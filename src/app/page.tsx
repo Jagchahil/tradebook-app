@@ -63,7 +63,7 @@ function WaitlistForm() {
         className="rounded-xl px-5 py-4 text-sm font-medium"
         style={{ background: INDIGO_TINT, color: INDIGO }}
       >
-        ✓ You&apos;re on the waitlist. We&apos;ll text you when we launch — 60 days free.
+        ✓ You&apos;re on the waitlist. We&apos;ll text you when we launch. 60 days free.
       </div>
     )
   }
@@ -139,7 +139,7 @@ function ChatMockup() {
             className="max-w-[215px] rounded-lg rounded-tl-none px-3 py-2 text-xs leading-relaxed shadow-sm"
             style={{ background: '#FFFFFF', color: INK }}
           >
-            ✓ £83.50 — Screwfix, materials, today. June total: £2,104.
+            ✓ £83.50. Screwfix, materials, today. June total: £2,104.
           </div>
         </div>
 
@@ -247,7 +247,7 @@ export default function LandingPage() {
                 style={{ background: INDIGO_TINT, color: INDIGO }}
               >
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: INDIGO }} />
-                MTD-ready · Launching 2026
+                MTD ready · Launching 2026
               </div>
 
               <h1
@@ -266,7 +266,7 @@ export default function LandingPage() {
               >
                 WhatsApp bookkeeping for UK tradespeople. Snap a receipt.
                 Voice note an expense. Ask what you owe.
-                Your TradeBook sorts it — MTD included.
+                Your TradeBook sorts it. MTD included.
               </p>
 
               <div id="waitlist" className="mx-auto max-w-md lg:mx-0">
@@ -373,7 +373,7 @@ export default function LandingPage() {
               className="block w-full rounded-lg px-6 py-3 text-center text-sm font-medium text-white transition-colors hover:bg-[#4338CA]"
               style={{ background: INDIGO, letterSpacing: '-0.01em' }}
             >
-              Join the waitlist — 60 days free →
+              Join the waitlist. Get 60 days free →
             </a>
             <p className="mt-3 text-xs" style={{ color: SUBTLE }}>
               No card required to join the waitlist.

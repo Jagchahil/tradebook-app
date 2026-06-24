@@ -116,10 +116,16 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
 
   await insertTransaction({
     user_id: userId,
-    merchant_name: parsed.merchant_name,
-    amount: parsed.amount,
+    vendor: parsed.merchant_name,
+    // Receipts are an expense, so we store the amount as a negative number.
+    // The app reads income vs expense from this sign.
+    amount: -Math.abs(parsed.amount),
     category: parsed.category,
-    transaction_type: parsed.transaction_type,
+    transaction_date: new Date().toISOString().slice(0, 10),
+    source_type: 'whatsapp_image',
+    // Captured but not yet confirmed by the user. They approve before it counts
+    // toward anything sent to HMRC.
+    confirmed: false,
     raw_whatsapp_message_id: messageId,
   });
 

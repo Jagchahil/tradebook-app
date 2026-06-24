@@ -30,11 +30,15 @@ function headers(extra: Record<string, string> = {}): Record<string, string> {
 
 export interface NewTransaction {
   user_id: string;
-  merchant_name: string;
-  amount: number;
+  vendor: string;
+  amount: number; // negative for an expense, positive for income
   category: string;
-  transaction_type: 'income' | 'expense';
-  receipt_url?: string | null;
+  transaction_date: string; // YYYY-MM-DD
+  source_type: string; // for example whatsapp_image
+  description?: string | null;
+  raw_input_url?: string | null;
+  confidence_score?: number | null;
+  confirmed?: boolean;
   raw_whatsapp_message_id?: string | null;
 }
 

@@ -1,19 +1,16 @@
 -- TradeBook database schema and security.
 --
--- This file is the source of truth for the database. It is safe to run more than
--- once and safe to run against the existing tradebook-prod database. It only
--- creates things that are missing and it replaces the security policies each time.
+-- This reflects the REAL tradebook-prod schema as observed on 2026-06-24. The
+-- tables already exist, so the create statements are documentation and no-ops.
+-- The parts that actually change anything are: one added column for webhook
+-- idempotency, its unique index, and the row level security block.
 --
--- How to run:
---   Supabase dashboard, project tradebook-prod, SQL Editor, paste this whole file, Run.
+-- Safe to run more than once. Safe to run on the live database.
 --
--- The big change from the old setup: row level security is ON. The webhook writes
--- transactions using the service role key, which bypasses these policies. The app
--- uses the public anon key, so the policies below make sure each person can only
--- read and change their own rows.
+-- Run it in the Supabase SQL Editor for tradebook-prod.
 
 -- ---------------------------------------------------------------------------
--- Tables
+-- Tables (as they really are. Create statements are no-ops on existing tables.)
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.users (
@@ -21,74 +18,77 @@ create table if not exists public.users (
   phone_number text,
   name         text,
   trade_type   text,
-  created_at   timestamptz not null default now()
+  is_active    boolean,
+  created_at   timestamptz default now(),
+  updated_at   timestamptz default now()
 );
 
 create table if not exists public.transactions (
-  id                      uuid primary key default gen_random_uuid(),
-  user_id                 uuid not null references public.users (id) on delete cascade,
-  merchant_name           text,
-  amount                  numeric,
-  category                text,
-  transaction_type        text,
-  receipt_url             text,
-  raw_whatsapp_message_id text,
-  created_at              timestamptz not null default now()
+  id               uuid primary key default gen_random_uuid(),
+  user_id          uuid not null references public.users (id) on delete cascade,
+  amount           numeric,
+  vendor           text,
+  category         text,
+  transaction_date date,
+  description      text,
+  source_type      text,
+  raw_input_url    text,
+  confidence_score numeric,
+  confirmed        boolean default false,
+  created_at       timestamptz default now()
 );
 
 create table if not exists public.monthly_summaries (
-  id             uuid primary key default gen_random_uuid(),
-  user_id        uuid not null references public.users (id) on delete cascade,
-  year           int,
-  month          int,
-  total_income   numeric,
-  total_expenses numeric,
-  created_at     timestamptz not null default now()
+  id                uuid primary key default gen_random_uuid(),
+  user_id           uuid not null references public.users (id) on delete cascade,
+  year              int,
+  month             int,
+  total_income      numeric,
+  total_expenses    numeric,
+  transaction_count int,
+  updated_at        timestamptz default now()
 );
 
 create table if not exists public.waitlist (
   id         uuid primary key default gen_random_uuid(),
   phone      text,
   email      text,
-  created_at timestamptz not null default now()
+  created_at timestamptz default now()
 );
 
--- Keep transaction_type honest. Only income or expense, or left empty.
--- Wrapped so re-running does not error if the constraint already exists.
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'transactions_type_check'
-  ) then
-    alter table public.transactions
-      add constraint transactions_type_check
-      check (transaction_type is null or transaction_type in ('income', 'expense'));
-  end if;
-end $$;
+create table if not exists public.audit_log (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid,
+  event_type text,
+  event_data jsonb,
+  ip_address text,
+  created_at timestamptz default now()
+);
 
--- Helpful indexes for the reads the app does.
-create index if not exists transactions_user_created_idx
-  on public.transactions (user_id, created_at desc);
-create index if not exists monthly_summaries_user_idx
-  on public.monthly_summaries (user_id);
+-- ---------------------------------------------------------------------------
+-- Webhook idempotency
+-- ---------------------------------------------------------------------------
+-- The transactions table had no field for the WhatsApp message id. We add one
+-- so a retried webhook delivery can never create a duplicate receipt. Additive
+-- and safe. Existing rows get null.
 
--- One transaction per WhatsApp message. This backs the idempotency check in the
--- webhook, so a retried delivery can never create a duplicate receipt.
+alter table public.transactions add column if not exists raw_whatsapp_message_id text;
+
 create unique index if not exists transactions_whatsapp_msg_uidx
   on public.transactions (raw_whatsapp_message_id)
   where raw_whatsapp_message_id is not null;
 
 -- ---------------------------------------------------------------------------
--- Row level security
+-- Row level security (already applied 2026-06-24, kept here so it is repeatable)
 -- ---------------------------------------------------------------------------
 
 alter table public.users enable row level security;
 alter table public.transactions enable row level security;
 alter table public.monthly_summaries enable row level security;
 alter table public.waitlist enable row level security;
+alter table public.audit_log enable row level security;
 
 -- users: a person can see and change only their own row.
--- The row id equals their auth user id, including anonymous sign ins.
 drop policy if exists users_select_own on public.users;
 create policy users_select_own on public.users
   for select using (auth.uid() = id);
@@ -101,27 +101,28 @@ drop policy if exists users_update_own on public.users;
 create policy users_update_own on public.users
   for update using (auth.uid() = id) with check (auth.uid() = id);
 
--- transactions: a person can read only their own. Writes come from the webhook
--- using the service role key, which bypasses these policies, so there is no
--- insert policy for the app on purpose.
+-- transactions: read your own only. Writes come from the webhook with the
+-- service role key, which bypasses RLS, so there is no app insert policy.
 drop policy if exists transactions_select_own on public.transactions;
 create policy transactions_select_own on public.transactions
   for select using (auth.uid() = user_id);
 
--- monthly_summaries: same rule. Read your own, writes are service role only.
+-- monthly_summaries: read your own only.
 drop policy if exists monthly_summaries_select_own on public.monthly_summaries;
 create policy monthly_summaries_select_own on public.monthly_summaries
   for select using (auth.uid() = user_id);
 
--- waitlist: no policies at all. RLS is on, so the anon key cannot read or write
--- it. The website saves signups through the API using the service role key,
--- which bypasses RLS. This stops anyone from scraping or spamming the list with
--- the public key.
+-- waitlist and audit_log: no policies. RLS is on, so the anon key cannot read
+-- or write them. The server uses the service role key, which bypasses RLS.
+-- audit_log holds IP addresses, so this keeps it private.
 
 -- ---------------------------------------------------------------------------
--- Notes
+-- Conventions (decided 2026-06-24 while the transactions table was still empty)
 -- ---------------------------------------------------------------------------
--- 1. If the app ever needs to let a user delete their own transactions from the
---    phone, add a delete policy: using (auth.uid() = user_id).
--- 2. Do not disable RLS to make an insert work. Use the service role key on the
---    server for that insert instead.
+-- 1. Income vs expense is the sign of `amount`. Expenses are negative. There is
+--    no transaction_type column.
+-- 2. The webhook stores a receipt with vendor, a negative amount, category,
+--    transaction_date, source_type 'whatsapp_image', and confirmed = false.
+-- 3. `confirmed` is the user approval flag. Nothing should be treated as final
+--    for tax until the user approves it.
+-- 4. Do not disable RLS to make an insert work. Use the service role key.

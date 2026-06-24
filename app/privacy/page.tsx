@@ -1,4 +1,10 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy. TradeBook.',
+  description: 'How TradeBook collects, uses, and protects your data under UK GDPR.',
+};
 
 const INK = '#111111';
 const INDIGO = '#4F46E5';

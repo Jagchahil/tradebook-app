@@ -1,4 +1,10 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Terms of Service. TradeBook.',
+  description: 'The terms for using TradeBook, including your free trial and billing.',
+};
 
 const INK = '#111111';
 const INDIGO = '#4F46E5';

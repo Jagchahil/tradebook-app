@@ -1,4 +1,17 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'TradeBook. Your back office on WhatsApp.',
+  description:
+    'Snap a receipt or leave a voice note. TradeBook logs it, sorts it, and keeps your books ready for tax. Built for UK sole traders. 30 days free.',
+  openGraph: {
+    title: 'TradeBook. Your back office on WhatsApp.',
+    description:
+      'Snap a receipt or leave a voice note. TradeBook logs it, sorts it, and keeps your books ready for tax. Built for UK sole traders.',
+    type: 'website',
+  },
+};
 
 const INK = '#111111';
 const INDIGO = '#4F46E5';
@@ -214,7 +227,7 @@ export default function HomePage() {
             See how it works
           </a>
         </div>
-        <p style={{ fontSize: 13, color: '#9CA3AF', marginTop: 18 }}>
+        <p style={{ fontSize: 13, color: '#6B7280', marginTop: 18 }}>
           30 days free. No card needed to start.
         </p>
       </section>
@@ -222,7 +235,7 @@ export default function HomePage() {
       {/* Trust strip */}
       <section style={{ borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}`, backgroundColor: '#FFFFFF' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '28px 24px', textAlign: 'center' }}>
-          <p style={{ fontSize: 13, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 16px' }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 16px' }}>
             Built for the trades
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 12px', justifyContent: 'center' }}>
@@ -389,7 +402,7 @@ export default function HomePage() {
             </div>
 
             <div style={{ flex: 1, padding: 36 }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 18px' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 18px' }}>
                 What you get
               </p>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -484,7 +497,7 @@ export default function HomePage() {
           </div>
         </div>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 24px 36px' }}>
-          <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>
+          <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>
             © {new Date().getFullYear()} TradeBook. Built for UK sole traders. TradeBook prepares your
             records. You stay responsible for your tax with HMRC.
           </p>

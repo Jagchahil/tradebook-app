@@ -102,3 +102,65 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
     return null;
   }
 }
+
+const SPOKEN_PROMPT = (transcript: string): string =>
+  [
+    'A UK self employed tradesperson left a voice note about a business expense.',
+    'Here is what they said:',
+    `"${transcript}"`,
+    'Pull out these fields and reply with JSON only, no other text:',
+    '{',
+    '  "merchant_name": string, who they paid or the shop name, or "Unknown",',
+    '  "amount": number, the amount in pounds, no currency symbol,',
+    `  "category": one of ${ALLOWED_CATEGORIES.join(', ')},`,
+    '  "transaction_type": "expense"',
+    '}',
+    'For example "forty quid of diesel at the BP" means amount 40, category fuel,',
+    'merchant_name BP. If no amount is clear, set amount to 0.',
+  ].join('\n');
+
+// Turn a spoken sentence into a structured expense. Text in, JSON out.
+export async function parseSpokenExpense(transcript: string): Promise<ParsedReceipt | null> {
+  if (!KEY) return null;
+
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': KEY,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 300,
+      messages: [{ role: 'user', content: SPOKEN_PROMPT(transcript) }],
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('[claude] Spoken parse failed:', res.status, text);
+    return null;
+  }
+
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const textBlock = data.content?.find((c) => c.type === 'text')?.text;
+  if (!textBlock) return null;
+
+  try {
+    const parsed = JSON.parse(clean(textBlock)) as Partial<ParsedReceipt>;
+    const amount = Number(parsed.amount);
+    const category =
+      parsed.category && ALLOWED_CATEGORIES.includes(parsed.category) ? parsed.category : 'other';
+
+    return {
+      merchant_name: (parsed.merchant_name || 'Unknown').toString().slice(0, 120),
+      amount: Number.isFinite(amount) ? Math.abs(amount) : 0,
+      category,
+      transaction_type: 'expense',
+    };
+  } catch {
+    console.error('[claude] Could not parse JSON from spoken reply.');
+    return null;
+  }
+}

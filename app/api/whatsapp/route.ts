@@ -6,7 +6,8 @@ import {
   downloadMedia,
   sendText,
 } from '../../../lib/whatsapp';
-import { parseReceipt, hasClaudeConfig } from '../../../lib/claude';
+import { parseReceipt, parseSpokenExpense, hasClaudeConfig } from '../../../lib/claude';
+import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
 import {
   findUserIdByPhone,
   transactionExists,
@@ -70,10 +71,12 @@ export async function POST(req: NextRequest) {
 
     if (message.type === 'image' && message.image?.id) {
       await handleReceiptImage(from, messageId, message.image.id);
+    } else if (message.type === 'audio' && message.audio?.id) {
+      await handleVoiceNote(from, messageId, message.audio.id);
     } else {
       await sendText(
         from,
-        'Send a photo of a receipt and I will log it for you. Voice notes are coming soon.',
+        'Send a photo of a receipt, or a voice note saying what you spent, and I will log it for you.',
       );
     }
   } catch (err) {
@@ -136,12 +139,69 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
   );
 }
 
+async function handleVoiceNote(from: string, messageId: string, mediaId: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(
+      from,
+      'We could not find your TradeBook account for this number. Open the app, add your number, then send the voice note again.',
+    );
+    return;
+  }
+
+  if (!hasTranscribeConfig() || !hasClaudeConfig()) {
+    await sendText(from, 'Voice notes are not switched on yet. Send a photo of the receipt for now.');
+    return;
+  }
+
+  const media = await downloadMedia(mediaId);
+  if (!media) {
+    await sendText(from, 'I could not open that voice note. Try sending it again.');
+    return;
+  }
+
+  const transcript = await transcribeAudio(media.base64, media.mediaType);
+  if (!transcript) {
+    await sendText(from, 'I could not make out that voice note. Try saying it again, nice and clear.');
+    return;
+  }
+
+  const parsed = await parseSpokenExpense(transcript);
+  if (!parsed || parsed.amount <= 0) {
+    await sendText(
+      from,
+      'I heard you, but I could not catch the amount. Try again, for example "forty quid of diesel at the BP".',
+    );
+    return;
+  }
+
+  await insertTransaction({
+    user_id: userId,
+    vendor: parsed.merchant_name,
+    amount: -Math.abs(parsed.amount),
+    category: parsed.category,
+    transaction_date: new Date().toISOString().slice(0, 10),
+    source_type: 'whatsapp_voice',
+    // Keep what they said so they can check it on review.
+    description: transcript.slice(0, 280),
+    confirmed: false,
+    raw_whatsapp_message_id: messageId,
+  });
+
+  const amountText = `£${parsed.amount.toFixed(2)}`;
+  await sendText(
+    from,
+    `Got it. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. Check it in the app and confirm.`,
+  );
+}
+
 // --- Shapes of the bits of the webhook payload we read. -------------------
 interface IncomingMessage {
   from: string;
   id: string;
   type: string;
   image?: { id: string };
+  audio?: { id: string };
 }
 
 interface WebhookBody {

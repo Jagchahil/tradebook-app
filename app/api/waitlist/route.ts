@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,7 +10,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Server misconfiguration.' }, { status: 500 });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
     const body = await req.json();
     const { phone } = body;
 
@@ -19,11 +17,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid phone number.' }, { status: 400 });
     }
 
-    const { error } = await supabase.from('waitlist').insert({ phone: phone.trim() });
+    const response = await fetch(`${supabaseUrl}/rest/v1/waitlist`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ phone: phone.trim() }),
+    });
 
-    if (error) {
-      console.error('[waitlist] Supabase error:', error.message, error.code);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('[waitlist] REST error:', response.status, text);
+      return NextResponse.json({ error: text }, { status: 500 });
     }
 
     console.log('[waitlist] Saved:', phone);

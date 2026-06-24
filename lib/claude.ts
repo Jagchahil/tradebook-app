@@ -181,3 +181,71 @@ export async function parseSpokenTransaction(text: string): Promise<ParsedEntry 
     return null;
   }
 }
+
+export interface DraftedInvoice {
+  customer_name: string | null;
+  line_items: Array<{ description: string; amount: number }>;
+}
+
+const INVOICE_PROMPT = (description: string): string =>
+  [
+    'A UK self employed tradesperson described a job they want to invoice for.',
+    'Here is what they said:',
+    `"${description}"`,
+    'Turn it into clean invoice lines. Reply with JSON only, no other text:',
+    '{',
+    '  "customer_name": the customer name if mentioned, else null,',
+    '  "line_items": [ { "description": short line of work or materials, "amount": number in pounds } ]',
+    '}',
+    'Split labour and materials into separate lines where it makes sense. Keep',
+    'descriptions short and clear, the kind a customer expects on an invoice.',
+    'Amounts are numbers only, no currency symbol.',
+  ].join('\n');
+
+// Turn a plain job description into draft invoice line items.
+export async function draftInvoice(description: string): Promise<DraftedInvoice | null> {
+  if (!KEY) return null;
+
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': KEY,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 500,
+      messages: [{ role: 'user', content: INVOICE_PROMPT(description) }],
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[claude] Invoice draft failed:', res.status, errText);
+    return null;
+  }
+
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const textBlock = data.content?.find((c) => c.type === 'text')?.text;
+  if (!textBlock) return null;
+
+  try {
+    const parsed = JSON.parse(clean(textBlock)) as Partial<DraftedInvoice>;
+    const items = Array.isArray(parsed.line_items) ? parsed.line_items : [];
+    const line_items = items
+      .map((li) => ({
+        description: String(li.description ?? '').slice(0, 200),
+        amount: Number.isFinite(Number(li.amount)) ? Math.abs(Number(li.amount)) : 0,
+      }))
+      .filter((li) => li.description && li.amount > 0);
+
+    return {
+      customer_name: parsed.customer_name ? String(parsed.customer_name).slice(0, 120) : null,
+      line_items,
+    };
+  } catch {
+    console.error('[claude] Could not parse invoice draft JSON.');
+    return null;
+  }
+}

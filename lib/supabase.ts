@@ -110,3 +110,72 @@ export async function insertTransaction(record: NewTransaction): Promise<void> {
     throw new Error(`Insert failed: ${res.status} ${text}`);
   }
 }
+
+// --- Invoices (read for the public invoice page, server side only) ---------
+
+export interface InvoiceLine {
+  description: string;
+  amount: number;
+}
+
+export interface PublicInvoice {
+  number: string;
+  customer_name: string;
+  customer_contact: string | null;
+  line_items: InvoiceLine[];
+  total: number;
+  status: string;
+  notes: string | null;
+  issued_date: string | null;
+  due_date: string | null;
+  business_name: string | null;
+  business_contact: string | null;
+}
+
+// Fetch one invoice plus the trader's business details. Uses the service role,
+// so the page renders for anyone with the link without exposing the whole table.
+export async function getPublicInvoice(id: string): Promise<PublicInvoice | null> {
+  const { url } = config();
+
+  const invRes = await fetch(
+    `${url}/rest/v1/invoices?id=eq.${encodeURIComponent(id)}&select=number,customer_name,customer_contact,line_items,total,status,notes,issued_date,due_date,user_id&limit=1`,
+    { headers: headers() },
+  );
+  if (!invRes.ok) return null;
+  const rows = (await invRes.json()) as Array<Record<string, unknown>>;
+  if (rows.length === 0) return null;
+  const inv = rows[0];
+
+  let businessName: string | null = null;
+  let businessContact: string | null = null;
+  const userId = inv.user_id as string | undefined;
+  if (userId) {
+    const userRes = await fetch(
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=name,business_name,phone_number&limit=1`,
+      { headers: headers() },
+    );
+    if (userRes.ok) {
+      const urows = (await userRes.json()) as Array<{ name?: string; business_name?: string; phone_number?: string }>;
+      if (urows.length > 0) {
+        businessName = urows[0].business_name || urows[0].name || null;
+        businessContact = urows[0].phone_number || null;
+      }
+    }
+  }
+
+  const lineItems = Array.isArray(inv.line_items) ? (inv.line_items as InvoiceLine[]) : [];
+
+  return {
+    number: (inv.number as string) ?? '',
+    customer_name: (inv.customer_name as string) ?? '',
+    customer_contact: (inv.customer_contact as string) ?? null,
+    line_items: lineItems,
+    total: Number(inv.total) || 0,
+    status: (inv.status as string) ?? 'draft',
+    notes: (inv.notes as string) ?? null,
+    issued_date: (inv.issued_date as string) ?? null,
+    due_date: (inv.due_date as string) ?? null,
+    business_name: businessName,
+    business_contact: businessContact,
+  };
+}

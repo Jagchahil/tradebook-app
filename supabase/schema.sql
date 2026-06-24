@@ -101,11 +101,20 @@ drop policy if exists users_update_own on public.users;
 create policy users_update_own on public.users
   for update using (auth.uid() = id) with check (auth.uid() = id);
 
--- transactions: read your own only. Writes come from the webhook with the
--- service role key, which bypasses RLS, so there is no app insert policy.
+-- transactions: read your own. The webhook inserts with the service role key,
+-- which bypasses RLS, so there is no app insert policy. The app can update and
+-- delete its own rows so a user can confirm, edit, or remove a receipt.
 drop policy if exists transactions_select_own on public.transactions;
 create policy transactions_select_own on public.transactions
   for select using (auth.uid() = user_id);
+
+drop policy if exists transactions_update_own on public.transactions;
+create policy transactions_update_own on public.transactions
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists transactions_delete_own on public.transactions;
+create policy transactions_delete_own on public.transactions
+  for delete using (auth.uid() = user_id);
 
 -- monthly_summaries: read your own only.
 drop policy if exists monthly_summaries_select_own on public.monthly_summaries;

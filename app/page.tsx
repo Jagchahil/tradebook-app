@@ -97,6 +97,56 @@ const included = [
   'Your records exported any time you want',
 ];
 
+const differences = [
+  {
+    title: 'One flat price',
+    body: 'Twenty nine pounds a month. No tiers, no features held back, no surprise rises. The price you see is the price you pay.',
+  },
+  {
+    title: 'Unlimited receipts',
+    body: 'Snap as many as you like. We never charge per receipt or make you buy credits to scan one.',
+  },
+  {
+    title: 'A real person in your chat',
+    body: 'Stuck on something. Message us on the same WhatsApp and a human replies. No hold music, no ticket numbers.',
+  },
+  {
+    title: 'Set up in seconds',
+    body: 'Send your number and start texting receipts. No long forms. No weekend lost to entering old data.',
+  },
+  {
+    title: 'Leave any time',
+    body: 'Cancel in one tap and take your records with you. Export everything whenever you want. No lock in.',
+  },
+  {
+    title: 'You check before it counts',
+    body: 'You see every receipt we read and fix anything that looks off. Nothing goes toward your tax until you confirm it.',
+  },
+];
+
+const faqs = [
+  {
+    q: 'What is Making Tax Digital?',
+    a: 'From April 2026, HMRC wants self employed people over a certain income to keep digital records and send a short update every quarter instead of one big return at year end. TradeBook keeps those records as you work.',
+  },
+  {
+    q: 'Do I have to do it?',
+    a: 'It starts with sole traders whose gross income is over £50,000 from April 2026, then over £30,000 from April 2027, then over £20,000 from April 2028. Gross income means your turnover before expenses, not your profit.',
+  },
+  {
+    q: 'Does this mean paying tax four times a year?',
+    a: 'No. That is a common myth. You send four short updates a year, but you still pay your tax on the normal dates. The updates are about records, not extra payments.',
+  },
+  {
+    q: 'Does TradeBook file my tax for me?',
+    a: 'We prepare your figures and get them ready. You always review and approve before anything is sent, through an HMRC recognised route. You stay responsible for your tax. We never imply HMRC endorses us, and we never file without you.',
+  },
+  {
+    q: 'What if a receipt is read wrong?',
+    a: 'You see every entry and can fix the amount, the shop, or the category in a tap. Nothing counts toward your books until you confirm it is right.',
+  },
+];
+
 export default function HomePage() {
   return (
     <main style={{ backgroundColor: OFF_WHITE, color: INK, fontFamily: FONT }}>
@@ -337,6 +387,55 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Why different */}
+      <section style={{ maxWidth: 1080, margin: '0 auto', padding: '80px 24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <h2 className="tb-section-h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>
+            The things other tools get wrong.
+          </h2>
+          <p style={{ fontSize: 17, color: MUTED, maxWidth: 540, margin: '0 auto' }}>
+            We read a lot of reviews of the old accounting apps. These are the complaints that come up
+            again and again. We built TradeBook so you never have them.
+          </p>
+        </div>
+
+        <div className="tb-grid" style={{ display: 'grid', gap: 20 }}>
+          {differences.map((d) => (
+            <div
+              key={d.title}
+              style={{
+                backgroundColor: '#FFFFFF',
+                border: `1px solid ${BORDER}`,
+                borderRadius: 16,
+                padding: 26,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <span
+                  style={{
+                    flexShrink: 0,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    backgroundColor: INDIGO_TINT,
+                    color: INDIGO,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  ✓
+                </span>
+                <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, letterSpacing: '-0.2px' }}>{d.title}</h3>
+              </div>
+              <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: 0 }}>{d.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Pricing */}
       <section id="pricing" style={{ maxWidth: 1080, margin: '0 auto', padding: '80px 24px' }}>
         <div style={{ textAlign: 'center', marginBottom: 44 }}>
@@ -431,6 +530,37 @@ export default function HomePage() {
                 ))}
               </ul>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section style={{ backgroundColor: '#FFFFFF', borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}` }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', padding: '80px 24px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <h2 className="tb-section-h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>
+              Making Tax Digital, explained straight.
+            </h2>
+            <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>
+              The rules are changing and a lot of the advice out there is confusing. Here is the plain version.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {faqs.map((f) => (
+              <div
+                key={f.q}
+                style={{
+                  backgroundColor: OFF_WHITE,
+                  border: `1px solid ${BORDER}`,
+                  borderRadius: 14,
+                  padding: 22,
+                }}
+              >
+                <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 8px', letterSpacing: '-0.2px' }}>{f.q}</h3>
+                <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: 0 }}>{f.a}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

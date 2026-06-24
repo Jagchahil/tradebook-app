@@ -5,6 +5,24 @@
 
 ---
 
+## Standing Rules (learned the hard way)
+
+1. **Disable RLS on every new table immediately after creation.**
+   Run this right after `create table`:
+   ```sql
+   alter table <table_name> disable row level security;
+   ```
+   Supabase enables RLS by default. Without this, all inserts from the API will fail with a 42501 policy violation.
+
+2. **Never use supabase-js in Next.js API routes for inserts/updates.**
+   The supabase-js client caches the schema and goes stale after any schema change, causing PGRST204 errors.
+   Always use raw `fetch` against the Supabase REST API directly. See `tradebook-web/app/api/waitlist/route.ts` for the pattern.
+
+3. **Always wait for Vercel deployment to reach "Ready" before testing.**
+   Deployments take 30 to 60 seconds. Testing before Ready means testing the old code.
+
+---
+
 ## How We Build
 
 All day-to-day code is written by Claude Code (the CLI tool running in terminal). Cowork (this chat) is used for planning, reviewing screenshots, and directing what to build next. Claude Code writes and commits the code. Cowork reviews the result and gives the next instruction.
@@ -15,6 +33,14 @@ The copy/push pattern: Claude Code writes files to the workspace folder at `~/Do
 cp ~/Documents/Claude/Projects/Tradesman/tradebook-app/app/\(tabs\)/*.tsx ~/Projects/tradesman/tradebook-app/app/\(tabs\)/
 cp ~/Documents/Claude/Projects/Tradesman/tradebook-app/lib/supabase.ts ~/Projects/tradesman/tradebook-app/lib/supabase.ts
 cd ~/Projects/tradesman/tradebook-app && git add -A && git commit -m "..." && git push
+```
+
+The same pattern applies for the landing page. Files are written to `~/Documents/Claude/Projects/Tradesman/tradebook-web/` and must be copied to `~/Projects/tradesman/tradebook/`:
+
+```bash
+cp -r ~/Documents/Claude/Projects/Tradesman/tradebook-web/app/early-access ~/Projects/tradesman/tradebook/app/
+cp -r ~/Documents/Claude/Projects/Tradesman/tradebook-web/app/api/waitlist ~/Projects/tradesman/tradebook/app/api/
+cd ~/Projects/tradesman/tradebook && git add -A && git commit -m "..." && git push
 ```
 
 Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
@@ -31,6 +57,16 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 - All dashes removed from copy per brand rules
 - Stack: Next.js App Router, Tailwind, deployed via Vercel GitHub integration
 
+#### Early access page (built, not yet copied to repo)
+- Route: `/early-access`
+- Phone number input (UK, +44 prefix) and optional email
+- Posts to `/api/waitlist` which inserts into Supabase `waitlist` table
+- Success state shown after submission
+- Files in workspace at `~/Documents/Claude/Projects/Tradesman/tradebook-web/`:
+  - `app/early-access/page.tsx`
+  - `app/api/waitlist/route.ts`
+- Copy commands above. Push to Vercel via GitHub.
+
 ### Mobile App (development build)
 - Repo: `~/Projects/tradesman/tradebook-app/` and on GitHub at `github.com/Jagchahil/tradebook-mobile`
 - Stack: React Native + Expo SDK 56, expo-router, TypeScript, Supabase
@@ -38,6 +74,24 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 - EAS Build profile set up for Android APK (development build installed on Samsung)
 
 #### Screens built
+
+**Welcome (`app/(auth)/index.tsx`)**
+- TradeBook wordmark + FREE badge
+- "Your back office. In your pocket." headline
+- Tagline explaining WhatsApp receipt capture
+- "Works through WhatsApp" pill
+- "Get started" button navigates to phone screen
+- "Free. No card needed." subtext
+
+**Phone (`app/(auth)/phone.tsx`)**
+- "What's your number?" heading
+- UK flag + +44 prefix input field
+- Continue button triggers anonymous sign-in (Supabase) then navigates to tabs
+- Error state for short/invalid numbers
+- Keyboard-aware layout
+
+**Auth layout (`app/(auth)/_layout.tsx`)**
+- Stack navigator with slide-from-right animation
 
 **Dashboard (`app/(tabs)/index.tsx`)**
 - TradeBook wordmark header with FREE badge and month/year
@@ -66,20 +120,26 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 - About section: version, privacy policy, terms
 - Sign out button
 
-**Auth (`app/(auth)/index.tsx`)**
-- Anonymous sign-in via `supabase.auth.signInAnonymously()`
-- Temporary bypass while proper phone OTP auth is pending budget for Twilio
-- Supabase: anonymous sign-ins enabled in dashboard
-
 **Tab bar (`app/(tabs)/_layout.tsx`)**
 - Four tabs: Dashboard, Transactions, Tax, Settings
 - Indigo active tint, grey inactive
 - Emoji icons
 
 #### Key files
-- `lib/supabase.ts`: Supabase client, `getTransactions()`, `signInAnonymously()`. All Supabase errors treated as empty array (transactions table does not exist yet).
+- `lib/supabase.ts`: Supabase client, `getTransactions()`, `signInAnonymously()`. All Supabase errors treated as empty array.
 - `hooks/useCurrentUser.ts`: auth state listener returning `{ user, session, loading }`
 - `app/_layout.tsx`: root Stack, redirects unauthenticated to `/(auth)`
+
+---
+
+## Supabase Tables (all created in tradebook-prod)
+
+| Table | Status | Notes |
+|---|---|---|
+| `users` | Created | phone_number, name, trade_type |
+| `transactions` | Created | Full schema per docs/03_BUILD_PLAN.md |
+| `monthly_summaries` | Created | Per-user year/month aggregates |
+| `waitlist` | Created | phone, email, created_at |
 
 ---
 
@@ -96,14 +156,12 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 
 ### Auth (blocked on budget)
 - Phone OTP requires Twilio (~$15/month). Not set up yet.
-- Email magic link deep links rejected by Supabase free tier (custom URL schemes not allowed in Redirect URLs).
 - Current workaround: anonymous sign-in. Users are not identified.
-- When Twilio budget is available: wire up phone OTP in `app/(auth)/index.tsx`, remove anonymous sign-in.
+- When Twilio budget is available: wire up phone OTP in `app/(auth)/phone.tsx`. The screen already collects the number.
 
-### Transactions table in Supabase
-- The `transactions` table from `docs/03_BUILD_PLAN.md` schema has not been created yet.
-- `getTransactions()` silently returns empty array on any error.
-- Table must be created before any real data flows through.
+### Transactions data
+- The `transactions` table is created but no data flows into it yet.
+- Blocked on WhatsApp webhook being wired up end-to-end.
 
 ### WhatsApp webhook (Phase 0 core loop)
 - `app/api/whatsapp/route.ts` exists in the Next.js app but is not wired to Meta Cloud API yet.
@@ -111,35 +169,36 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 - Meta WhatsApp Business account needs a phone number registered.
 - Once Anthropic credits are added: wire the webhook, test end-to-end receipt → parse → Supabase → WhatsApp reply → dashboard.
 
-### App onboarding screens
-- Welcome screen not built (currently drops straight into anonymous auth screen).
-- Proper sign-up flow: welcome → phone number input → OTP verify → into app.
-- Build these screens once auth budget is available.
+### Landing page early access CTA
+- Files built in workspace at `~/Documents/Claude/Projects/Tradesman/tradebook-web/`.
+- Not yet copied to the landing page repo or deployed.
+- Copy commands in the "How We Build" section above.
 
-### Landing page "Download" CTA
-- The website has no download link yet (no App Store / Play Store listing).
-- Interim plan: add a "Join waitlist" or "Request early access" page that collects email/phone.
-- App Store listing requires paid Apple Developer account ($99/year). Not yet purchased.
-- Play Store listing requires one-time $25 fee. Not yet purchased.
+### App onboarding in repo
+- Onboarding screens built in workspace, not yet copied to `~/Projects/tradesman/tradebook-app/`.
+- Files: `app/(auth)/index.tsx`, `app/(auth)/phone.tsx`, `app/(auth)/_layout.tsx`
+
+### App Store / Play Store
+- No listings yet. Apple Developer $99/year, Play Store $25 one-time.
+- Interim: early access page on website collects sign-ups.
 
 ### Stripe payments
 - Not started. Phase 1 item.
 - Plan: £29/month subscription, 30-day free trial.
-- Needs Stripe account and product created.
 
 ---
 
 ## Current User Flow (as built)
 
 ```
-Website (Vercel) → user lands → joins waitlist
-Mobile app → opens → anonymous sign-in → Dashboard (empty state)
+Website (Vercel) → user lands → joins waitlist (original form)
+Mobile app → opens → welcome screen → phone input → anonymous sign-in → Dashboard (empty state)
 ```
 
 ## Target User Flow (next milestone)
 
 ```
-Website → "Download the app" → App Store / Play Store
+Website → "Get early access" → /early-access page → submits phone/email → on waitlist
 App → Welcome screen → Enter phone → OTP verify → Dashboard
 WhatsApp → photo of receipt → parsed → stored → appears in app
 ```
@@ -159,7 +218,7 @@ WhatsApp → photo of receipt → parsed → stored → appears in app
 
 | Service | Status | Notes |
 |---|---|---|
-| Supabase | Active | Project: tradebook-prod. Anonymous sign-ins enabled. Transactions table not yet created. |
+| Supabase | Active | Project: tradebook-prod. All 4 tables created. |
 | Vercel | Active | Landing page deployed |
 | Anthropic API | Needs credits | Add $5 to unblock WhatsApp receipt parsing |
 | Meta WhatsApp | Not started | Need Business account and phone number |
@@ -172,10 +231,19 @@ WhatsApp → photo of receipt → parsed → stored → appears in app
 
 ## Next Actions (in order)
 
-1. **Add $5 Anthropic API credits** → unblocks WhatsApp receipt parsing and the Phase 0 core loop
-2. **Create transactions table in Supabase** → run schema from `docs/03_BUILD_PLAN.md`
-3. **Wire WhatsApp webhook** → test end-to-end receipt flow
-4. **Build onboarding screens** → welcome, phone input (anonymous for now, OTP when Twilio available)
-5. **Add waitlist/download page to website** → something for the "Download app" CTA to point to
-6. **Twilio for phone OTP** → replace anonymous auth with real identity
-7. **App Store + Play Store accounts** → needed to publish
+1. **Copy mobile onboarding screens to repo and push**
+   ```bash
+   cp ~/Documents/Claude/Projects/Tradesman/tradebook-app/app/\(auth\)/*.tsx ~/Projects/tradesman/tradebook-app/app/\(auth\)/
+   cd ~/Projects/tradesman/tradebook-app && git add -A && git commit -m "feat: onboarding welcome and phone screens" && git push
+   ```
+2. **Copy early access page to landing page repo and push**
+   ```bash
+   cp -r ~/Documents/Claude/Projects/Tradesman/tradebook-web/app/early-access ~/Projects/tradesman/tradebook/app/
+   mkdir -p ~/Projects/tradesman/tradebook/app/api/waitlist
+   cp ~/Documents/Claude/Projects/Tradesman/tradebook-web/app/api/waitlist/route.ts ~/Projects/tradesman/tradebook/app/api/waitlist/
+   cd ~/Projects/tradesman/tradebook && git add -A && git commit -m "feat: early access waitlist page" && git push
+   ```
+3. **Add $5 Anthropic API credits** → unblocks WhatsApp receipt parsing and the Phase 0 core loop
+4. **Wire WhatsApp webhook** → test end-to-end receipt flow
+5. **Twilio for phone OTP** → replace anonymous auth with real identity
+6. **App Store + Play Store accounts** → needed to publish

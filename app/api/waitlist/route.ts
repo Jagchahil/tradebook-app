@@ -7,26 +7,22 @@ export async function POST(req: NextRequest) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
-      console.error('[waitlist] Missing env vars', { supabaseUrl: !!supabaseUrl, supabaseKey: !!supabaseKey });
+      console.error('[waitlist] Missing env vars');
       return NextResponse.json({ error: 'Server misconfiguration.' }, { status: 500 });
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-
     const body = await req.json();
-    const { phone, email } = body;
+    const { phone } = body;
 
     if (!phone || typeof phone !== 'string' || phone.length < 10) {
       return NextResponse.json({ error: 'Invalid phone number.' }, { status: 400 });
     }
 
-    const { data, error } = await supabase.from('waitlist').insert({
-      phone: phone.trim(),
-      email: email?.trim() || null,
-    });
+    const { error } = await supabase.from('waitlist').insert({ phone: phone.trim() });
 
     if (error) {
-      console.error('[waitlist] Supabase error:', error.message, error.code, error.details, error.hint);
+      console.error('[waitlist] Supabase error:', error.message, error.code);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -34,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : JSON.stringify(err);
-    console.error('[waitlist] Caught exception:', message);
+    console.error('[waitlist] Exception:', message);
     return NextResponse.json({ error: 'Failed to save.' }, { status: 500 });
   }
 }

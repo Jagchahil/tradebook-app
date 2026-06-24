@@ -6,7 +6,7 @@ import {
   downloadMedia,
   sendText,
 } from '../../../lib/whatsapp';
-import { parseReceipt, parseSpokenExpense, hasClaudeConfig } from '../../../lib/claude';
+import { parseReceipt, parseSpokenTransaction, hasClaudeConfig } from '../../../lib/claude';
 import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
 import {
   findUserIdByPhone,
@@ -73,10 +73,12 @@ export async function POST(req: NextRequest) {
       await handleReceiptImage(from, messageId, message.image.id);
     } else if (message.type === 'audio' && message.audio?.id) {
       await handleVoiceNote(from, messageId, message.audio.id);
+    } else if (message.type === 'text' && message.text?.body) {
+      await handleTextEntry(from, messageId, message.text.body);
     } else {
       await sendText(
         from,
-        'Send a photo of a receipt, or a voice note saying what you spent, and I will log it for you.',
+        'Send a photo of a receipt, a voice note, or just type what you spent or got paid, and I will log it.',
       );
     }
   } catch (err) {
@@ -166,7 +168,7 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
     return;
   }
 
-  const parsed = await parseSpokenExpense(transcript);
+  const parsed = await parseSpokenTransaction(transcript);
   if (!parsed || parsed.amount <= 0) {
     await sendText(
       from,
@@ -175,24 +177,72 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
     return;
   }
 
+  await saveEntry(userId, messageId, parsed, 'whatsapp_voice', transcript);
+  await sendText(from, confirmationLine(parsed));
+}
+
+async function handleTextEntry(from: string, messageId: string, body: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(
+      from,
+      'We could not find your TradeBook account for this number. Open the app, add your number, then send it again.',
+    );
+    return;
+  }
+
+  if (!hasClaudeConfig()) {
+    await sendText(from, 'I am not switched on yet. Hang tight, it is coming very soon.');
+    return;
+  }
+
+  const parsed = await parseSpokenTransaction(body);
+  if (!parsed || parsed.amount <= 0) {
+    await sendText(
+      from,
+      'Tell me what you spent or got paid and how much, for example "spent £40 on diesel" or "got paid £500 by Dave".',
+    );
+    return;
+  }
+
+  await saveEntry(userId, messageId, parsed, 'whatsapp_text', body);
+  await sendText(from, confirmationLine(parsed));
+}
+
+// Shared insert for voice and text entries. Income is stored positive, an
+// expense is stored negative, so the app reads the direction from the sign.
+async function saveEntry(
+  userId: string,
+  messageId: string,
+  parsed: { merchant_name: string; amount: number; category: string; direction: 'income' | 'expense' },
+  sourceType: string,
+  rawText: string,
+): Promise<void> {
+  const magnitude = Math.abs(parsed.amount);
   await insertTransaction({
     user_id: userId,
     vendor: parsed.merchant_name,
-    amount: -Math.abs(parsed.amount),
+    amount: parsed.direction === 'income' ? magnitude : -magnitude,
     category: parsed.category,
     transaction_date: new Date().toISOString().slice(0, 10),
-    source_type: 'whatsapp_voice',
-    // Keep what they said so they can check it on review.
-    description: transcript.slice(0, 280),
+    source_type: sourceType,
+    description: rawText.slice(0, 280),
     confirmed: false,
     raw_whatsapp_message_id: messageId,
   });
+}
 
-  const amountText = `£${parsed.amount.toFixed(2)}`;
-  await sendText(
-    from,
-    `Got it. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. Check it in the app and confirm.`,
-  );
+function confirmationLine(parsed: {
+  merchant_name: string;
+  amount: number;
+  category: string;
+  direction: 'income' | 'expense';
+}): string {
+  const amountText = `£${Math.abs(parsed.amount).toFixed(2)}`;
+  if (parsed.direction === 'income') {
+    return `Got it. Income of ${amountText} from ${parsed.merchant_name}. Check it in the app and confirm.`;
+  }
+  return `Got it. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. Check it in the app and confirm.`;
 }
 
 // --- Shapes of the bits of the webhook payload we read. -------------------
@@ -202,6 +252,7 @@ interface IncomingMessage {
   type: string;
   image?: { id: string };
   audio?: { id: string };
+  text?: { body: string };
 }
 
 interface WebhookBody {

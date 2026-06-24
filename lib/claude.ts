@@ -103,24 +103,35 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
   }
 }
 
-const SPOKEN_PROMPT = (transcript: string): string =>
+export interface ParsedEntry {
+  merchant_name: string;
+  amount: number;
+  category: string;
+  direction: 'income' | 'expense';
+}
+
+const ENTRY_PROMPT = (text: string): string =>
   [
-    'A UK self employed tradesperson left a voice note about a business expense.',
+    'A UK self employed tradesperson sent a note about their money, by voice or text.',
     'Here is what they said:',
-    `"${transcript}"`,
-    'Pull out these fields and reply with JSON only, no other text:',
+    `"${text}"`,
+    'Work out if this is money they SPENT (an expense) or money they RECEIVED (income).',
+    'Phrases like "got paid", "customer paid", "invoice", "received", "earned" mean income.',
+    'Phrases like "bought", "spent", "paid for", "fuel", "materials" mean an expense.',
+    'Reply with JSON only, no other text:',
     '{',
-    '  "merchant_name": string, who they paid or the shop name, or "Unknown",',
+    '  "direction": "income" or "expense",',
+    '  "merchant_name": string, the customer or the shop or supplier, or "Unknown",',
     '  "amount": number, the amount in pounds, no currency symbol,',
-    `  "category": one of ${ALLOWED_CATEGORIES.join(', ')},`,
-    '  "transaction_type": "expense"',
+    `  "category": for an expense one of ${ALLOWED_CATEGORIES.join(', ')}; for income use "income"`,
     '}',
-    'For example "forty quid of diesel at the BP" means amount 40, category fuel,',
-    'merchant_name BP. If no amount is clear, set amount to 0.',
+    'Examples. "forty quid of diesel at the BP" is expense, amount 40, category fuel, BP.',
+    '"got paid 500 by Dave for the bathroom" is income, amount 500, category income, Dave.',
+    'If no amount is clear, set amount to 0.',
   ].join('\n');
 
-// Turn a spoken sentence into a structured expense. Text in, JSON out.
-export async function parseSpokenExpense(transcript: string): Promise<ParsedReceipt | null> {
+// Turn a spoken or typed sentence into a structured entry, income or expense.
+export async function parseSpokenTransaction(text: string): Promise<ParsedEntry | null> {
   if (!KEY) return null;
 
   const res = await fetch(API_URL, {
@@ -133,13 +144,13 @@ export async function parseSpokenExpense(transcript: string): Promise<ParsedRece
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 300,
-      messages: [{ role: 'user', content: SPOKEN_PROMPT(transcript) }],
+      messages: [{ role: 'user', content: ENTRY_PROMPT(text) }],
     }),
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    console.error('[claude] Spoken parse failed:', res.status, text);
+    const errText = await res.text();
+    console.error('[claude] Entry parse failed:', res.status, errText);
     return null;
   }
 
@@ -148,19 +159,25 @@ export async function parseSpokenExpense(transcript: string): Promise<ParsedRece
   if (!textBlock) return null;
 
   try {
-    const parsed = JSON.parse(clean(textBlock)) as Partial<ParsedReceipt>;
+    const parsed = JSON.parse(clean(textBlock)) as Partial<ParsedEntry>;
     const amount = Number(parsed.amount);
-    const category =
-      parsed.category && ALLOWED_CATEGORIES.includes(parsed.category) ? parsed.category : 'other';
+    const direction: 'income' | 'expense' = parsed.direction === 'income' ? 'income' : 'expense';
+    let category: string;
+    if (direction === 'income') {
+      category = 'income';
+    } else {
+      category =
+        parsed.category && ALLOWED_CATEGORIES.includes(parsed.category) ? parsed.category : 'other';
+    }
 
     return {
       merchant_name: (parsed.merchant_name || 'Unknown').toString().slice(0, 120),
       amount: Number.isFinite(amount) ? Math.abs(amount) : 0,
       category,
-      transaction_type: 'expense',
+      direction,
     };
   } catch {
-    console.error('[claude] Could not parse JSON from spoken reply.');
+    console.error('[claude] Could not parse JSON from entry reply.');
     return null;
   }
 }

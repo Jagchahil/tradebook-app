@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { validateWebhookSignature, sendTextMessage, downloadMedia } from '@/lib/whatsapp'
 import { parseReceipt, parseTextExpense, ParsedReceipt } from '@/lib/claude'
 import { supabaseAdmin } from '@/lib/supabase'
@@ -31,8 +32,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse('Bad Request', { status: 400 })
   }
 
-  // Fire-and-forget — Meta requires 200 within 5 seconds
-  processWebhook(body).catch((err) => console.error('Webhook processing error:', err))
+  waitUntil(processWebhook(body).catch((err) => console.error('Webhook processing error:', err)))
 
   return new NextResponse('OK', { status: 200 })
 }
@@ -43,7 +43,7 @@ async function processWebhook(body: WhatsAppWebhookBody): Promise<void> {
   const value = change?.value
   const message = value?.messages?.[0]
 
-  if (!message) return // status update, not a message
+  if (!message) return
 
   const from = message.from
   const messageType = message.type
@@ -63,7 +63,6 @@ async function processWebhook(body: WhatsAppWebhookBody): Promise<void> {
       parsed = await parseReceipt(mediaUrl)
     } else if (messageType === 'audio' && message.audio?.id) {
       sourceType = 'voice'
-      // Transcribe via Claude with audio, treat as text expense for now
       const audioBuffer = await downloadMedia(message.audio.id)
       const transcription = await transcribeAudio(audioBuffer)
       parsed = await parseTextExpense(transcription)
@@ -86,7 +85,6 @@ async function processWebhook(body: WhatsAppWebhookBody): Promise<void> {
   }
 
   const monthTotal = await storeTransaction(user.id, parsed, sourceType, rawInputUrl)
-
   const reply = buildReply(parsed, monthTotal)
   await sendTextMessage(from, reply)
 }
@@ -123,8 +121,6 @@ async function getMediaUrl(mediaId: string): Promise<string> {
 }
 
 async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
-  // Placeholder — in production use Whisper or Claude's audio capability
-  // For Phase 0 we return a fallback so the flow doesn't break
   console.error('Audio transcription not yet implemented, buffer size:', audioBuffer.length)
   return ''
 }
@@ -198,7 +194,6 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
-// WhatsApp webhook payload types
 type WhatsAppWebhookBody = {
   entry?: Array<{
     changes?: Array<{

@@ -35,15 +35,11 @@ export default function EarlyAccessPage() {
 
   if (done) {
     return (
-      <main className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
-        <div className="max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-[#EEF2FF] rounded-full flex items-center justify-center mx-auto mb-6">
-            <span className="text-3xl">✓</span>
-          </div>
-          <h1 className="text-3xl font-extrabold text-[#111111] tracking-tight mb-3">
-            You're on the list.
-          </h1>
-          <p className="text-[#6B7280] text-base leading-relaxed">
+      <main style={styles.page}>
+        <div style={{ ...styles.card, textAlign: 'center' }}>
+          <div style={styles.tick}>✓</div>
+          <h1 style={styles.heading}>You're on the list.</h1>
+          <p style={styles.sub}>
             We'll text you when TradeBook is ready for you. Keep your phone nearby.
           </p>
         </div>
@@ -52,31 +48,25 @@ export default function EarlyAccessPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-6">
-      <div className="max-w-md w-full">
-        <div className="mb-10">
-          <span className="text-2xl font-bold text-[#111111]">TradeBook</span>
-        </div>
+    <main style={styles.page}>
+      <div style={styles.card}>
+        <div style={styles.wordmark}>TradeBook</div>
 
-        <h1 className="text-4xl font-extrabold text-[#111111] tracking-tight leading-tight mb-4">
-          Get early access.
-        </h1>
-        <p className="text-[#6B7280] text-base leading-relaxed mb-8">
+        <h1 style={styles.heading}>Get early access.</h1>
+        <p style={styles.sub}>
           TradeBook is coming to WhatsApp first. Drop your number and we'll text
           you the moment it's live. No app download. No forms. Just text it.
         </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex rounded-xl border border-[#E5E7EB] bg-white overflow-hidden focus-within:border-[#4F46E5] transition-colors">
-            <span className="px-4 py-4 bg-[#EEF2FF] text-[#4F46E5] font-semibold text-sm border-r border-[#E5E7EB] whitespace-nowrap">
-              🇬🇧 +44
-            </span>
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <div style={styles.phoneRow}>
+            <span style={styles.prefix}>🇬🇧 +44</span>
             <input
               type="tel"
               placeholder="7700 900 000"
               value={phone}
               onChange={e => setPhone(e.target.value)}
-              className="flex-1 px-4 py-4 text-[#111111] text-base bg-transparent outline-none placeholder-[#9CA3AF]"
+              style={styles.phoneInput}
               required
             />
           </div>
@@ -86,22 +76,20 @@ export default function EarlyAccessPage() {
             placeholder="Email (optional)"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            className="w-full px-4 py-4 rounded-xl border border-[#E5E7EB] bg-white text-[#111111] text-base outline-none focus:border-[#4F46E5] transition-colors placeholder-[#9CA3AF]"
+            style={styles.emailInput}
           />
 
-          {error && (
-            <p className="text-[#EF4444] text-sm">{error}</p>
-          )}
+          {error && <p style={styles.error}>{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-[#4F46E5] text-white font-bold text-base rounded-xl hover:bg-[#4338CA] transition-colors disabled:opacity-60"
+            style={{ ...styles.button, opacity: loading ? 0.6 : 1 }}
           >
             {loading ? 'Saving...' : 'Get early access'}
           </button>
 
-          <p className="text-[#9CA3AF] text-xs text-center leading-relaxed">
+          <p style={styles.small}>
             UK numbers only. No spam. You can remove yourself any time.
           </p>
         </form>
@@ -109,3 +97,119 @@ export default function EarlyAccessPage() {
     </main>
   );
 }
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: '100vh',
+    backgroundColor: '#FAFAFA',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '24px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  card: {
+    width: '100%',
+    maxWidth: '420px',
+  },
+  wordmark: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#111111',
+    marginBottom: '36px',
+    letterSpacing: '-0.3px',
+  },
+  heading: {
+    fontSize: '38px',
+    fontWeight: '800',
+    color: '#111111',
+    letterSpacing: '-1px',
+    lineHeight: '1.15',
+    margin: '0 0 14px 0',
+  },
+  sub: {
+    fontSize: '16px',
+    color: '#6B7280',
+    lineHeight: '1.6',
+    margin: '0 0 32px 0',
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  phoneRow: {
+    display: 'flex',
+    borderRadius: '12px',
+    border: '1.5px solid #E5E7EB',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  prefix: {
+    padding: '16px',
+    backgroundColor: '#EEF2FF',
+    color: '#4F46E5',
+    fontWeight: '600',
+    fontSize: '14px',
+    borderRight: '1.5px solid #E5E7EB',
+    whiteSpace: 'nowrap',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  phoneInput: {
+    flex: 1,
+    padding: '16px',
+    fontSize: '16px',
+    color: '#111111',
+    border: 'none',
+    outline: 'none',
+    backgroundColor: 'transparent',
+  },
+  emailInput: {
+    width: '100%',
+    padding: '16px',
+    fontSize: '16px',
+    color: '#111111',
+    border: '1.5px solid #E5E7EB',
+    borderRadius: '12px',
+    outline: 'none',
+    backgroundColor: '#FFFFFF',
+    boxSizing: 'border-box',
+  },
+  error: {
+    color: '#EF4444',
+    fontSize: '13px',
+    margin: '0',
+  },
+  button: {
+    width: '100%',
+    padding: '17px',
+    backgroundColor: '#4F46E5',
+    color: '#FFFFFF',
+    fontSize: '16px',
+    fontWeight: '700',
+    border: 'none',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    transition: 'opacity 0.15s',
+  },
+  small: {
+    fontSize: '12px',
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: '1.5',
+    margin: '0',
+  },
+  tick: {
+    width: '56px',
+    height: '56px',
+    backgroundColor: '#EEF2FF',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '24px',
+    margin: '0 auto 20px',
+    color: '#4F46E5',
+  },
+};

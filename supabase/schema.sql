@@ -54,6 +54,17 @@ create index if not exists idx_transactions_user_id on transactions(user_id);
 create index if not exists idx_transactions_date on transactions(transaction_date desc);
 create index if not exists idx_users_phone on users(phone_number);
 
+-- Waitlist
+create table if not exists waitlist (
+  id uuid primary key default gen_random_uuid(),
+  phone_number text unique,
+  email text,
+  trade_type text,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_waitlist_phone on waitlist(phone_number);
+
 -- Function: upsert monthly summary with incrementing totals
 create or replace function increment_monthly_summary(
   p_user_id uuid,

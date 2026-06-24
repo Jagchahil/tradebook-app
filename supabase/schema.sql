@@ -72,6 +72,12 @@ create index if not exists transactions_user_created_idx
 create index if not exists monthly_summaries_user_idx
   on public.monthly_summaries (user_id);
 
+-- One transaction per WhatsApp message. This backs the idempotency check in the
+-- webhook, so a retried delivery can never create a duplicate receipt.
+create unique index if not exists transactions_whatsapp_msg_uidx
+  on public.transactions (raw_whatsapp_message_id)
+  where raw_whatsapp_message_id is not null;
+
 -- ---------------------------------------------------------------------------
 -- Row level security
 -- ---------------------------------------------------------------------------

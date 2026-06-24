@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { insertWaitlistSignup } from '../../../lib/supabase';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -21,14 +22,6 @@ function cleanEmail(value: unknown): string | null {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('[waitlist] Missing env vars');
-      return NextResponse.json({ error: 'Server misconfiguration.' }, { status: 500 });
-    }
-
     let body: unknown;
     try {
       body = await req.json();
@@ -52,23 +45,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'That email does not look right.' }, { status: 400 });
     }
 
-    const record: Record<string, string> = { phone };
-    if (email) record.email = email;
-
-    const response = await fetch(`${supabaseUrl}/rest/v1/waitlist`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify(record),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('[waitlist] REST error:', response.status, text);
+    try {
+      await insertWaitlistSignup({ phone, email });
+    } catch (dbErr) {
+      const detail = dbErr instanceof Error ? dbErr.message : 'unknown';
+      console.error('[waitlist] Save error:', detail);
       return NextResponse.json({ error: 'Could not save. Please try again.' }, { status: 500 });
     }
 

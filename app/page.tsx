@@ -405,14 +405,15 @@ export default function HomePage() {
           .mtd-panel{display:none}
           #mtd-old:checked ~ .mtd-panels .mtd-old-panel{display:block;animation:riseIn .5s ease}
           #mtd-new:checked ~ .mtd-panels .mtd-new-panel{display:block;animation:riseIn .5s ease}
-          .timeline{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:10px}
+          .timeline{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:10px}
           .tl-line{position:absolute;top:18px;left:10%;right:10%;height:3px;background:linear-gradient(90deg,${RIVER},${SAFFRON});border-radius:2px;transform:scaleX(0);transform-origin:left;animation:grow 1.4s ease forwards .3s}
           .tl-step{text-align:center;position:relative}
           .tl-dot{width:38px;height:38px;border-radius:19px;background:#fff;border:3px solid ${RIVER};color:${RIVER};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;position:relative;z-index:1;opacity:0;animation:popIn .5s ease forwards}
-          .tl-step:nth-child(2) .tl-dot{animation-delay:.5s}
-          .tl-step:nth-child(3) .tl-dot{animation-delay:.8s}
-          .tl-step:nth-child(4) .tl-dot{animation-delay:1.1s}
-          .tl-step:nth-child(5) .tl-dot{animation-delay:1.4s;border-color:${SAFFRON};color:${SAFFRON_DEEP}}
+          .tl-step:nth-child(2) .tl-dot{animation-delay:.35s}
+          .tl-step:nth-child(3) .tl-dot{animation-delay:.6s}
+          .tl-step:nth-child(4) .tl-dot{animation-delay:.85s}
+          .tl-step:nth-child(5) .tl-dot{animation-delay:1.1s}
+          .tl-step:nth-child(6) .tl-dot{animation-delay:1.35s;border-color:${SAFFRON};color:${SAFFRON_DEEP}}
           /* Reviews marquee */
           .marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
           .marquee-track{display:flex;gap:20px;width:max-content;animation:marquee 48s linear infinite}
@@ -484,7 +485,7 @@ export default function HomePage() {
             .hero-left{text-align:center}
             .hero-cta{justify-content:center}
             .stepper{grid-template-columns:1fr;gap:34px}.stepper-line{display:none}
-            .timeline{grid-template-columns:repeat(2,1fr);gap:24px}.tl-line{display:none}
+            .timeline{grid-template-columns:1fr;gap:22px}.tl-line{display:none}
             .stats-grid{grid-template-columns:repeat(2,1fr)!important}
             .appdemo-grid{grid-template-columns:1fr;gap:30px}
             .duo{grid-template-columns:1fr}

@@ -249,3 +249,36 @@ export async function draftInvoice(description: string): Promise<DraftedInvoice 
     return null;
   }
 }
+
+// Answer a plain money question from the user's own figures. We pass a compact
+// summary of their transactions and let Claude reply in one or two short lines.
+export async function answerMoneyQuestion(question: string, summary: string): Promise<string | null> {
+  if (!KEY) return null;
+
+  const prompt = [
+    'You are Lekhio, a calm, plain-talking money assistant for a UK self employed person.',
+    'Answer their question using ONLY the figures below. Money is in pounds.',
+    'Reply in one or two short sentences, friendly and direct. No jargon. Use the £ sign.',
+    'If the figures do not cover it, say so plainly and suggest what to send.',
+    '',
+    'Their question:',
+    `"${question}"`,
+    '',
+    'Their figures (confirmed and to-review entries, newest first):',
+    summary || '(no entries yet)',
+  ].join('\n');
+
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: MODEL, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[claude] Money question failed:', res.status, errText);
+    return null;
+  }
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const textBlock = data.content?.find((c) => c.type === 'text')?.text;
+  return textBlock ? textBlock.trim() : null;
+}

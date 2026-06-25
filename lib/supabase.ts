@@ -216,6 +216,33 @@ export async function insertTransaction(record: NewTransaction): Promise<void> {
   }
 }
 
+// A compact, plain-text summary of a user's recent entries, for answering money
+// questions over WhatsApp. Newest first, capped so the prompt stays small.
+export async function transactionSummaryForUser(userId: string, limit = 150): Promise<string> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&select=amount,category,vendor,transaction_date,confirmed&order=transaction_date.desc&limit=${limit}`,
+    { headers: headers() },
+  );
+  if (!res.ok) return '';
+  const rows = (await res.json()) as Array<{
+    amount: number;
+    category: string | null;
+    vendor: string | null;
+    transaction_date: string | null;
+    confirmed: boolean | null;
+  }>;
+  return rows
+    .map((r) => {
+      const amt = Number(r.amount) || 0;
+      const dir = amt >= 0 ? 'income' : 'expense';
+      const date = (r.transaction_date ?? '').slice(0, 10);
+      const tag = r.confirmed ? '' : ' (to review)';
+      return `${date} ${dir} £${Math.abs(amt).toFixed(2)} ${r.category ?? ''} ${r.vendor ?? ''}${tag}`.trim();
+    })
+    .join('\n');
+}
+
 // Mark an invoice paid from the server (Stripe webhook) and book the income,
 // once only. Safe to call more than once for the same invoice.
 export async function markInvoicePaidServer(invoiceId: string): Promise<void> {

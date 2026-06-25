@@ -6,12 +6,20 @@ import {
   downloadMedia,
   sendText,
 } from '../../../lib/whatsapp';
-import { parseReceipt, parseSpokenTransaction, draftInvoice, hasClaudeConfig } from '../../../lib/claude';
+import {
+  parseReceipt,
+  parseSpokenTransaction,
+  draftInvoice,
+  answerMoneyQuestion,
+  hasClaudeConfig,
+} from '../../../lib/claude';
 import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
+import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/email';
 import {
   findUserIdByPhone,
   transactionExists,
   insertTransaction,
+  transactionSummaryForUser,
   getSession,
   setSession,
   clearSession,
@@ -80,10 +88,17 @@ export async function POST(req: NextRequest) {
     } else if (message.type === 'audio' && message.audio?.id) {
       await handleVoiceNote(from, messageId, message.audio.id);
     } else if (message.type === 'text' && message.text?.body) {
+      const text = message.text.body;
       // Invoice flow takes priority. If it consumes the message, do not also log it.
-      const handled = await handleInvoiceFlow(from, message.text.body);
+      const handled = await handleInvoiceFlow(from, text);
       if (!handled) {
-        await handleTextEntry(from, messageId, message.text.body);
+        if (isHelp(text)) {
+          await handleHelp(from);
+        } else if (isQuestion(text)) {
+          await handleMoneyQuestion(from, text);
+        } else {
+          await handleTextEntry(from, messageId, text);
+        }
       }
     } else {
       await sendText(
@@ -255,6 +270,54 @@ function confirmationLine(parsed: {
   return `Got it. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. Check it in the app and confirm.`;
 }
 
+// --- Help and money questions ---------------------------------------------
+const HELP_RE = /^\s*(hi|hey|hello|help|menu|start|what can you do|commands)\b/i;
+const QUESTION_RE = /(^|\s)(how much|how many|what(?:'s| is| are)?|whats|when|show|list|total|do i|did i|am i|have i|spent|owe|owed|made|earn)\b/i;
+
+function isHelp(body: string): boolean {
+  return HELP_RE.test(body);
+}
+
+// A money question, but only if it actually reads like a question, not a log
+// entry. We treat a trailing question mark or a money question phrase as the cue.
+function isQuestion(body: string): boolean {
+  const b = body.trim();
+  if (b.endsWith('?')) return true;
+  return QUESTION_RE.test(b) && !/£|\bpaid\b|\bbought\b|\bspent £|\bgot paid\b/i.test(b);
+}
+
+async function handleHelp(from: string): Promise<void> {
+  await sendText(
+    from,
+    [
+      "Hi, I'm Lekhio. Your books, handled. Here is what I can do:",
+      '',
+      '📸 Send a photo of a receipt and I log it.',
+      '🎙️ Or leave a voice note, like "forty quid diesel at the BP".',
+      '✍️ Or just type it, like "spent £30 on screws" or "got paid £400 by Dave".',
+      '🧾 Type "create invoice" and I will build and send one with you.',
+      '💬 Ask me anything, like "how much did I spend on fuel this month?".',
+      '',
+      'Everything shows in your app to review and approve. Nothing goes to HMRC without you.',
+    ].join('\n'),
+  );
+}
+
+async function handleMoneyQuestion(from: string, body: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(from, 'Open the app and add your number first, then ask me anything about your money.');
+    return;
+  }
+  if (!hasClaudeConfig()) {
+    await sendText(from, 'I cannot answer questions just yet. Hang tight, it is coming very soon.');
+    return;
+  }
+  const summary = await transactionSummaryForUser(userId);
+  const answer = await answerMoneyQuestion(body, summary);
+  await sendText(from, answer ?? 'I could not work that out. Try asking another way.');
+}
+
 // --- Guided invoice flow over WhatsApp ------------------------------------
 // "create invoice" starts it. Then we ask for the customer, their contact, and
 // the work, and build a real invoice with a shareable link. Returns true if the
@@ -332,9 +395,24 @@ async function handleInvoiceFlow(from: string, body: string): Promise<boolean> {
       return true;
     }
     const link = `${APP_URL}/invoice/${inv.id}`;
+    let emailedTo: string | null = null;
+    if (looksLikeEmail(data.customer_contact) && hasEmailConfig()) {
+      const sent = await sendInvoiceEmail({
+        to: data.customer_contact as string,
+        number: inv.number,
+        total: inv.total,
+        link,
+        customerName: data.customer_name,
+      });
+      if (sent) emailedTo = data.customer_contact as string;
+    }
+    const head = `Done. Invoice ${inv.number} for ${data.customer_name || 'your customer'}, total £${inv.total.toFixed(2)}.`;
+    const deliver = emailedTo
+      ? `I have emailed it straight to ${emailedTo}. Track it here: ${link}`
+      : `Send it to them: ${link}`;
     await sendText(
       from,
-      `Done. Invoice ${inv.number} for ${data.customer_name || 'your customer'}, total £${inv.total.toFixed(2)}.\n\nSend it to them: ${link}\n\nIt is saved in your app as a draft. Mark it paid there when the money lands and it goes straight into your income.`,
+      `${head}\n\n${deliver}\n\nIt is saved in your app as a draft. Mark it paid when the money lands and it goes into your income.`,
     );
     return true;
   }

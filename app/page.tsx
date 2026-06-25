@@ -184,6 +184,132 @@ function RiverDivider() {
   );
 }
 
+const RED_INK = '#C0392B';
+const RED_BG = '#FDECEC';
+
+function MiniRiver() {
+  return (
+    <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+      <div style={{ width: 24, height: 3, borderRadius: 2, background: RIVER }} />
+      <div style={{ width: 11, height: 3, borderRadius: 2, background: SAFFRON }} />
+    </div>
+  );
+}
+
+function AppDash() {
+  const cards: [string, string, string, string][] = [
+    ['INCOME', '£2,450', GREEN, GREEN_TINT],
+    ['EXPENSES', '£1,180', RED_INK, RED_BG],
+    ['PROFIT', '£1,270', RIVER, RIVER_TINT],
+  ];
+  const rows: [string, string, string, string, string][] = [
+    ['🏗️', 'Wickes', 'Materials', '-£84.20', RED_INK],
+    ['⛽', 'BP', 'Fuel', '-£62.00', RED_INK],
+    ['💷', 'Dave Wilson', 'Invoice', '+£400.00', GREEN],
+  ];
+  return (
+    <div className="appscreen">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.5px', color: INK }}>Lekhio</div>
+          <MiniRiver />
+        </div>
+        <span style={{ fontSize: 9, fontWeight: 700, color: RIVER, background: RIVER_TINT, padding: '3px 8px', borderRadius: 10, letterSpacing: '0.4px' }}>FREE</span>
+      </div>
+      <div style={{ fontSize: 11, color: MUTED, marginTop: 9 }}>Good morning · June 2026</div>
+      <div style={{ display: 'flex', gap: 7, marginTop: 12 }}>
+        {cards.map(([l, v, fg, bg]) => (
+          <div key={l} style={{ flex: 1, background: bg, borderRadius: 11, padding: '10px 9px' }}>
+            <div style={{ fontSize: 7.5, fontWeight: 700, color: MUTED, letterSpacing: '0.5px' }}>{l}</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: fg, marginTop: 5, letterSpacing: '-0.3px' }}>{v}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 14, fontSize: 11, fontWeight: 700, color: INK }}>Recent</div>
+      <div className="appcard" style={{ marginTop: 8, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
+        {rows.map(([e, n, c, a, col], i) => (
+          <div key={n} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 11px', borderTop: i ? `1px solid ${SURFACE}` : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 14, background: SURFACE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{e}</div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: INK }}>{n}</div>
+                <div style={{ fontSize: 10, color: MUTED }}>{c}</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: col }}>{a}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AppTax() {
+  return (
+    <div className="appscreen">
+      <div style={{ fontSize: 18, fontWeight: 800, color: INK }}>Tax</div>
+      <MiniRiver />
+      <div style={{ marginTop: 12, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: RIVER }}>Q2 2026/27 · Jul to Sep</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
+          {['1', '2', '3', '4'].map((q, i) => (
+            <div key={q} style={{ textAlign: 'center' }}>
+              <div style={{ width: 26, height: 26, borderRadius: 13, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: i === 1 ? '#fff' : i < 1 ? RIVER_TINT : SURFACE, border: i === 1 ? `2px solid ${RIVER}` : '2px solid transparent', color: i <= 1 ? RIVER : MUTED }}>{q}</div>
+              <div style={{ fontSize: 9, color: i === 1 ? INK : MUTED, marginTop: 4, fontWeight: 600 }}>Q{q}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ marginTop: 12, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 12, color: MUTED }}>💰 Income</span>
+        <span style={{ fontSize: 14, fontWeight: 800, color: GREEN }}>£2,450.00</span>
+      </div>
+      <div style={{ marginTop: 9, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 12, color: MUTED }}>🧾 Expenses</span>
+        <span style={{ fontSize: 14, fontWeight: 800, color: RED_INK }}>£1,180.00</span>
+      </div>
+      <div style={{ marginTop: 9, paddingTop: 12, borderTop: `1px solid ${SURFACE}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: INK }}>Estimated profit</span>
+        <span style={{ fontSize: 14, fontWeight: 800, color: RIVER }}>£1,270.00</span>
+      </div>
+      <div style={{ marginTop: 14, background: RIVER, color: '#fff', borderRadius: 12, padding: '12px 0', textAlign: 'center', fontSize: 13, fontWeight: 700 }}>Prepare my summary</div>
+    </div>
+  );
+}
+
+function AppInv() {
+  const rows: [string, string, string, string, string, string][] = [
+    ['Dave Wilson', 'INV-0007', '£400.00', 'Paid', GREEN, '#DCFCE7'],
+    ['Sarah Khan', 'INV-0008', '£150.00', 'Sent', RIVER, RIVER_TINT],
+  ];
+  return (
+    <div className="appscreen">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 18, fontWeight: 800, color: INK }}>Invoices</div>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: RIVER, padding: '7px 13px', borderRadius: 10 }}>+ New</span>
+      </div>
+      <div style={{ marginTop: 14, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '15px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>Outstanding</span>
+        <span style={{ fontSize: 18, fontWeight: 800, color: INK }}>£550.00</span>
+      </div>
+      <div style={{ marginTop: 12, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
+        {rows.map(([n, num, amt, st, fg, bg], i) => (
+          <div key={num} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderTop: i ? `1px solid ${SURFACE}` : 'none' }}>
+            <div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: INK }}>{n}</div>
+              <div style={{ fontSize: 10.5, color: MUTED, marginTop: 2 }}>{num}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>{amt}</span>
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: fg, background: bg, padding: '3px 7px', borderRadius: 7 }}>{st}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
@@ -261,6 +387,16 @@ export default function HomePage() {
           .marquee-track{display:flex;gap:20px;width:max-content;animation:marquee 48s linear infinite}
           .marquee:hover .marquee-track{animation-play-state:paused}
           .rev-card{width:340px;flex:0 0 auto}
+          /* App demo phone */
+          .appdemo-grid{display:grid;grid-template-columns:.95fr 1.05fr;gap:48px;align-items:center}
+          .appphone{width:300px;max-width:100%;margin:0 auto;background:#fff;border-radius:38px;border:1px solid ${LINE};box-shadow:0 30px 70px rgba(17,17,17,.18);overflow:hidden}
+          .appstatus{height:30px;display:flex;align-items:center;justify-content:center;background:#fff}
+          .appstatus i{width:92px;height:6px;border-radius:3px;background:${LINE};display:block}
+          .appview{position:relative;height:540px;overflow:hidden;background:${PAPER}}
+          .apptrack{display:flex;width:400%;height:100%;animation:appslide 18s cubic-bezier(.7,0,.3,1) infinite}
+          .appscreen{width:25%;flex:0 0 25%;height:100%;padding:18px 16px;overflow:hidden}
+          @keyframes appslide{0%,20%{transform:translateX(0)}25%,45%{transform:translateX(-25%)}50%,70%{transform:translateX(-50%)}75%,100%{transform:translateX(-75%)}}
+          .appdot{display:inline-block;width:7px;height:7px;border-radius:4px;background:${LINE};margin:0 3px}
           /* Why different checklist */
           .why-item{display:flex;gap:16px;padding:22px 4px;border-bottom:1px solid rgba(255,255,255,.10)}
           .why-bar{flex-shrink:0;width:4px;border-radius:2px;background:linear-gradient(${RIVER},${SAFFRON})}
@@ -291,6 +427,7 @@ export default function HomePage() {
             .stepper{grid-template-columns:1fr;gap:34px}.stepper-line{display:none}
             .timeline{grid-template-columns:repeat(2,1fr);gap:24px}.tl-line{display:none}
             .stats-grid{grid-template-columns:repeat(2,1fr)!important}
+            .appdemo-grid{grid-template-columns:1fr;gap:30px}
           }
         `,
         }}
@@ -310,6 +447,7 @@ export default function HomePage() {
         </svg>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <a href="#how" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>How it works</a>
+          <a href="#app" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>The app</a>
           <a href="#mtd" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Tax changes</a>
           <a href="#compare" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Compare</a>
           <a href="#reviews" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Reviews</a>
@@ -447,6 +585,48 @@ export default function HomePage() {
               <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: 0 }}>{f.body}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* App demo */}
+      <section id="app" style={{ backgroundColor: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '84px 24px' }}>
+          <div className="appdemo-grid">
+            <div className="reveal">
+              <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>THE APP</span>
+              <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 16px' }}>Your whole back office, in your pocket.</h2>
+              <p style={{ fontSize: 17, color: MUTED, lineHeight: 1.6, margin: '0 0 24px', maxWidth: 440 }}>
+                Everything Lekhio logs from WhatsApp shows up here, sorted and ready. Open the app to see your month, your tax, and your invoices, all kept up to date for you.
+              </p>
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 30px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {['Income, expenses, and profit, updating as you go', 'Your quarterly tax figures, always ready to approve', 'Create, send, and track invoices from anywhere'].map((line) => (
+                  <li key={line} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <span style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: RIVER_TINT, color: RIVER, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>✓</span>
+                    <span style={{ fontSize: 15.5, color: INK, lineHeight: 1.5 }}>{line}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/early-access" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Get early access</Link>
+            </div>
+
+            <div className="reveal">
+              <div className="appphone phone">
+                <div className="appstatus"><i /></div>
+                <div className="appview">
+                  <div className="apptrack">
+                    <AppDash />
+                    <AppTax />
+                    <AppInv />
+                    <AppDash />
+                  </div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', marginTop: 18 }}>
+                <span className="appdot" /><span className="appdot" /><span className="appdot" />
+                <p style={{ fontSize: 13, color: MUTED, marginTop: 10 }}>A live look at Dashboard, Tax, and Invoices.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

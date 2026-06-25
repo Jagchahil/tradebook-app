@@ -389,13 +389,13 @@ export default function HomePage() {
           .rev-card{width:340px;flex:0 0 auto}
           /* App demo phone */
           .appdemo-grid{display:grid;grid-template-columns:.95fr 1.05fr;gap:48px;align-items:center}
-          .appphone{width:300px;max-width:100%;margin:0 auto;background:#fff;border-radius:38px;border:1px solid ${LINE};box-shadow:0 30px 70px rgba(17,17,17,.18);overflow:hidden}
+          .appphone{width:340px;max-width:100%;margin:0 auto;background:#fff;border-radius:40px;border:1px solid ${LINE};box-shadow:0 30px 70px rgba(17,17,17,.18);overflow:hidden}
           .appstatus{height:30px;display:flex;align-items:center;justify-content:center;background:#fff}
-          .appstatus i{width:92px;height:6px;border-radius:3px;background:${LINE};display:block}
-          .appview{position:relative;height:540px;overflow:hidden;background:${PAPER}}
-          .apptrack{display:flex;width:400%;height:100%;animation:appslide 18s cubic-bezier(.7,0,.3,1) infinite}
-          .appscreen{width:25%;flex:0 0 25%;height:100%;padding:18px 16px;overflow:hidden}
-          @keyframes appslide{0%,20%{transform:translateX(0)}25%,45%{transform:translateX(-25%)}50%,70%{transform:translateX(-50%)}75%,100%{transform:translateX(-75%)}}
+          .appstatus i{width:96px;height:6px;border-radius:3px;background:${LINE};display:block}
+          .appview{position:relative;height:438px;overflow:hidden;background:${PAPER}}
+          .apptrack{display:flex;width:400%;height:100%;animation:appslide 10.5s cubic-bezier(.65,0,.35,1) infinite}
+          .appscreen{width:25%;flex:0 0 25%;height:100%;padding:18px 18px;overflow:hidden}
+          @keyframes appslide{0%,22%{transform:translateX(0)}28%,47%{transform:translateX(-25%)}53%,72%{transform:translateX(-50%)}78%,100%{transform:translateX(-75%)}}
           .appdot{display:inline-block;width:7px;height:7px;border-radius:4px;background:${LINE};margin:0 3px}
           /* Why different checklist */
           .why-item{display:flex;gap:16px;padding:22px 4px;border-bottom:1px solid rgba(255,255,255,.10)}

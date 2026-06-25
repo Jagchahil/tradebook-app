@@ -602,7 +602,7 @@ export default function HomePage() {
         <input type="checkbox" id="navtoggle" className="nav-toggle" aria-label="Toggle menu" />
 
         <div className="nav-right">
-          <Link href="/start" className="btn-primary nav-cta-desktop" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Get early access</Link>
+          <Link href="/start" className="btn-primary nav-cta-desktop" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
           <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu"><span /><span /><span /></label>
         </div>
 
@@ -614,7 +614,7 @@ export default function HomePage() {
           <a href="#reviews">Reviews</a>
           <a href="#trust">Trust</a>
           <a href="#pricing">Pricing</a>
-          <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Get early access</Link>
+          <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
         </div>
       </nav>
 
@@ -633,7 +633,7 @@ export default function HomePage() {
               Lekhio is the back office for anyone self employed in the UK. Snap a receipt, leave a voice note, or type it. Lekhio logs it, sorts it, invoices for you, and keeps you ready for tax. All on WhatsApp.
             </p>
             <div className="hero-cta" style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-              <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Get early access</Link>
+              <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Sign up now</Link>
               <a href="#how" className="btn-ghost" style={{ backgroundColor: 'transparent', color: INK, border: `1px solid ${INK}`, fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>See how it works</a>
             </div>
             <div className="hero-cta" style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 22, flexWrap: 'wrap' }}>
@@ -807,7 +807,7 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/start" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Get early access</Link>
+              <Link href="/start" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Sign up now</Link>
             </div>
 
             <div className="reveal">
@@ -1109,7 +1109,7 @@ export default function HomePage() {
           <p style={{ fontSize: 17, color: '#B6BDC8', lineHeight: 1.6, maxWidth: 540, margin: '0 auto 32px' }}>
             HMRC keeps you responsible for your tax. Lekhio keeps you ready for it. We prepare your figures. You always approve before anything is sent.
           </p>
-          <Link href="/start" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Get early access</Link>
+          <Link href="/start" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Sign up now</Link>
         </div>
       </section>
 
@@ -1121,7 +1121,7 @@ export default function HomePage() {
             <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>Your books, handled. Just text it.</p>
           </div>
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-            <Link href="/start" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Early access</Link>
+            <Link href="/start" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Sign up</Link>
             <Link href="/privacy" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Privacy</Link>
             <Link href="/terms" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Terms</Link>
             <a href="mailto:support@lekhio.com" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Support</a>

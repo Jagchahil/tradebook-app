@@ -44,8 +44,15 @@ const steps = [
   {
     n: '3',
     title: 'Tax time is already done',
-    body: 'Your income and expenses add up as you go. We prepare your quarterly Making Tax Digital summary. You approve it. Nothing is sent without you.',
+    body: 'Your income and expenses add up as you go. We prepare your quarterly summary. You approve it. Nothing is sent without you.',
   },
+];
+
+const stats = [
+  { to: 30, prefix: '', suffix: 's', label: 'to log a receipt' },
+  { to: 29, prefix: '£', suffix: '', label: 'a month, one flat price' },
+  { to: 4, prefix: '', suffix: '', label: 'short updates a year, not one big return' },
+  { to: 0, prefix: '', suffix: '', label: 'spreadsheets for you to keep' },
 ];
 
 const audience = [
@@ -59,8 +66,22 @@ const features = [
   { icon: '🎙️', title: 'Voice notes', body: 'Hands full on the job. Say the expense out loud and carry on.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { icon: '🧾', title: 'Invoices from a text', body: 'Type "create invoice" on WhatsApp. Lekhio asks what it needs and sends a clean invoice for you.', tint: GREEN_TINT, fg: GREEN },
   { icon: '✅', title: 'You approve everything', body: 'See every entry. Fix anything that looks off. Nothing counts toward your tax until you confirm it.', tint: RIVER_TINT, fg: RIVER },
-  { icon: '📊', title: 'Tax prepared for you', body: 'Quarterly Making Tax Digital figures, ready. You check them, you send them. We never imply HMRC backs us.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
+  { icon: '📊', title: 'Tax prepared for you', body: 'Quarterly figures, ready. You check them, you send them. We never imply HMRC backs us.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { icon: '💬', title: 'A real person in the chat', body: 'Stuck on something. Message us on the same WhatsApp and a human replies. No hold music.', tint: GREEN_TINT, fg: GREEN },
+];
+
+// MTD quarterly updates, plain language. Kept seasonal, not exact dates, to stay simple.
+const mtdQuarters = [
+  { q: 'Update 1', when: 'Summer', note: 'A short summary of the last 3 months.' },
+  { q: 'Update 2', when: 'Autumn', note: 'Another quick summary. A few taps.' },
+  { q: 'Update 3', when: 'Winter', note: 'Same again. Already prepared for you.' },
+  { q: 'Update 4', when: 'Spring', note: 'The last quarter of the year.' },
+];
+
+const mtdMeans = [
+  { icon: '🗂️', title: 'Keep digital records', body: 'HMRC wants your income and costs kept digitally. Lekhio logs every receipt and payment as you go, so this is already done.', tint: RIVER_TINT, fg: RIVER },
+  { icon: '📨', title: 'Send four short updates', body: 'Instead of one big return in January, you send four quick summaries across the year. Lekhio prepares each one for you.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
+  { icon: '🤝', title: 'You stay in control', body: 'Nothing goes to HMRC until you say yes. HMRC keeps you responsible for your tax. Lekhio just keeps you ready for it.', tint: GREEN_TINT, fg: GREEN },
 ];
 
 // Comparison. We do not name competitors. Columns speak for themselves.
@@ -70,54 +91,18 @@ const compareRows = [
   { label: 'Log an expense by voice note', lekhio: true, apps: false, diy: false },
   { label: 'Create and send an invoice from a text', lekhio: true, apps: 'extra', diy: false },
   { label: 'One flat price, everything included', lekhio: true, apps: false, diy: true },
-  { label: 'Quarterly Making Tax Digital prepared', lekhio: true, apps: 'higher', diy: false },
+  { label: 'Quarterly tax updates prepared for you', lekhio: true, apps: 'higher', diy: false },
   { label: 'A real human replies, fast', lekhio: true, apps: false, diy: 'maybe' },
   { label: 'Set up in minutes, not a weekend', lekhio: true, apps: false, diy: false },
 ];
 
 const reviews = [
-  {
-    quote: 'I tried one of the big accounting apps and lost a whole Sunday just setting it up. With Lekhio I sent one photo and it was already working.',
-    name: 'Jas',
-    trade: 'Electrician, Birmingham',
-    tint: RIVER_TINT,
-    fg: RIVER,
-  },
-  {
-    quote: 'My old app started charging me once I went over a receipt limit. Lekhio is one price and I snap as many as I like.',
-    name: 'Sophie',
-    trade: 'Mobile hairdresser, Leeds',
-    tint: SAFFRON_TINT,
-    fg: SAFFRON_DEEP,
-  },
-  {
-    quote: 'The old software talked to me like I was an accountant. I am not. This one just speaks plain English.',
-    name: 'Marcus',
-    trade: 'Plasterer, Bristol',
-    tint: GREEN_TINT,
-    fg: GREEN,
-  },
-  {
-    quote: 'Every time I had a question the other one put me through a robot. On Lekhio a real person answered on the same chat.',
-    name: 'Priya',
-    trade: 'Freelance designer, London',
-    tint: RIVER_TINT,
-    fg: RIVER,
-  },
-  {
-    quote: 'I used to dread the quarter. Now the figures are sat there ready and I just check them over a brew.',
-    name: 'Tom',
-    trade: 'Plumber, Manchester',
-    tint: SAFFRON_TINT,
-    fg: SAFFRON_DEEP,
-  },
-  {
-    quote: 'Voice notes are the best bit. Hands full on the roof, I just say what I spent and carry on.',
-    name: 'Danny',
-    trade: 'Roofer, Glasgow',
-    tint: GREEN_TINT,
-    fg: GREEN,
-  },
+  { quote: 'I tried one of the big accounting apps and lost a whole Sunday just setting it up. With Lekhio I sent one photo and it was already working.', name: 'Jas', trade: 'Electrician, Birmingham', tint: RIVER_TINT, fg: RIVER },
+  { quote: 'My old app started charging me once I went over a receipt limit. Lekhio is one price and I snap as many as I like.', name: 'Sophie', trade: 'Mobile hairdresser, Leeds', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
+  { quote: 'The old software talked to me like I was an accountant. I am not. This one just speaks plain English.', name: 'Marcus', trade: 'Plasterer, Bristol', tint: GREEN_TINT, fg: GREEN },
+  { quote: 'Every time I had a question the other one put me through a robot. On Lekhio a real person answered on the same chat.', name: 'Priya', trade: 'Freelance designer, London', tint: RIVER_TINT, fg: RIVER },
+  { quote: 'I used to dread the quarter. Now the figures are sat there ready and I just check them over a brew.', name: 'Tom', trade: 'Plumber, Manchester', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
+  { quote: 'Voice notes are the best bit. Hands full on the roof, I just say what I spent and carry on.', name: 'Danny', trade: 'Roofer, Glasgow', tint: GREEN_TINT, fg: GREEN },
 ];
 
 const differences = [
@@ -133,7 +118,7 @@ const included = [
   'Unlimited receipt, voice, and text capture',
   'Automatic bookkeeping and categories',
   'Invoices created and sent from WhatsApp',
-  'Quarterly MTD summaries prepared for you',
+  'Quarterly tax summaries prepared for you',
   'A real human on the other end',
   'Your records exported any time',
 ];
@@ -168,6 +153,22 @@ function Mark({ value }: { value: boolean | string }) {
   return <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{labels[value] ?? String(value)}</span>;
 }
 
+function ReviewCard({ r }: { r: (typeof reviews)[number] }) {
+  return (
+    <div className="rev-card" style={{ backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, display: 'flex', flexDirection: 'column' }}>
+      <Stars />
+      <p style={{ fontSize: 15.5, color: INK, lineHeight: 1.6, margin: '0 0 20px', flex: 1 }}>“{r.quote}”</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: r.tint, color: r.fg, fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{r.name.charAt(0)}</span>
+        <div>
+          <div style={{ fontSize: 14.5, fontWeight: 700, color: INK }}>{r.name}</div>
+          <div style={{ fontSize: 13, color: MUTED }}>{r.trade}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RiverDivider() {
   return (
     <svg viewBox="0 0 1200 60" preserveAspectRatio="none" style={{ display: 'block', width: '100%', height: 48 }} aria-hidden="true">
@@ -198,6 +199,9 @@ export default function HomePage() {
           @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
           @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
           @keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+          @keyframes grow{to{transform:scaleX(1)}}
+          @keyframes popIn{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:scale(1)}}
+          @keyframes marquee{to{transform:translateX(-50%)}}
           .reveal{opacity:0;transform:translateY(20px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
           .reveal.in{opacity:1;transform:none}
           .hero-h1,.hero-sub,.hero-cta,.hero-pill{opacity:0;animation:riseIn .8s cubic-bezier(.2,.7,.2,1) forwards}
@@ -207,6 +211,8 @@ export default function HomePage() {
           .btn-primary:active{transform:translateY(0)}
           .btn-ghost{transition:background-color .18s ease, border-color .18s ease, transform .18s ease}
           .btn-ghost:hover{background-color:${SURFACE}!important;transform:translateY(-2px)}
+          .btn-white{transition:transform .18s ease, box-shadow .18s ease}
+          .btn-white:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.18)}
           .card{transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease}
           .card:hover{transform:translateY(-5px);box-shadow:0 18px 44px rgba(17,17,17,.10);border-color:${RIVER_TINT}}
           .icontile{transition:transform .2s ease}
@@ -226,6 +232,39 @@ export default function HomePage() {
           .bub1{animation-delay:.5s}.bub2{animation-delay:1.1s}.bub3{animation-delay:1.9s}.bub4{animation-delay:2.7s}
           .typing span{display:inline-block;width:6px;height:6px;border-radius:3px;background:#9aa3af;margin:0 2px;animation:blink 1.2s infinite}
           .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+          /* Stepper */
+          .stepper{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+          .stepper-line{position:absolute;top:30px;left:16%;right:16%;height:3px;background:linear-gradient(90deg,${RIVER},#2E7BBF,${SAFFRON});border-radius:2px;transform:scaleX(0);transform-origin:left;animation:grow 1.3s ease forwards .4s}
+          .step{text-align:center;position:relative}
+          .step-num{width:60px;height:60px;border-radius:30px;background:linear-gradient(135deg,${RIVER},#2E7BBF);color:#fff;font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 10px 24px rgba(27,89,166,.3);position:relative;z-index:1;border:5px solid ${PAPER}}
+          /* Stats band */
+          .stat-num{font-size:48px;font-weight:800;letter-spacing:-1.5px;line-height:1}
+          /* MTD */
+          .mtd-radio{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
+          .mtd-tabs{display:inline-flex;background:${SURFACE};border:1px solid ${LINE};border-radius:14px;padding:5px;gap:4px}
+          .mtd-tab{padding:11px 22px;border-radius:10px;font-size:14px;font-weight:600;color:${MUTED};cursor:pointer;transition:all .2s;user-select:none}
+          .mtd-tab:hover{color:${INK}}
+          #mtd-old:checked ~ .mtd-tabs label[for="mtd-old"],#mtd-new:checked ~ .mtd-tabs label[for="mtd-new"]{background:#fff;color:${INK};box-shadow:0 2px 8px rgba(0,0,0,.10)}
+          .mtd-panel{display:none}
+          #mtd-old:checked ~ .mtd-panels .mtd-old-panel{display:block;animation:riseIn .5s ease}
+          #mtd-new:checked ~ .mtd-panels .mtd-new-panel{display:block;animation:riseIn .5s ease}
+          .timeline{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:10px}
+          .tl-line{position:absolute;top:18px;left:10%;right:10%;height:3px;background:linear-gradient(90deg,${RIVER},${SAFFRON});border-radius:2px;transform:scaleX(0);transform-origin:left;animation:grow 1.4s ease forwards .3s}
+          .tl-step{text-align:center;position:relative}
+          .tl-dot{width:38px;height:38px;border-radius:19px;background:#fff;border:3px solid ${RIVER};color:${RIVER};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;position:relative;z-index:1;opacity:0;animation:popIn .5s ease forwards}
+          .tl-step:nth-child(2) .tl-dot{animation-delay:.5s}
+          .tl-step:nth-child(3) .tl-dot{animation-delay:.8s}
+          .tl-step:nth-child(4) .tl-dot{animation-delay:1.1s}
+          .tl-step:nth-child(5) .tl-dot{animation-delay:1.4s;border-color:${SAFFRON};color:${SAFFRON_DEEP}}
+          /* Reviews marquee */
+          .marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+          .marquee-track{display:flex;gap:20px;width:max-content;animation:marquee 48s linear infinite}
+          .marquee:hover .marquee-track{animation-play-state:paused}
+          .rev-card{width:340px;flex:0 0 auto}
+          /* Why different checklist */
+          .why-item{display:flex;gap:16px;padding:22px 4px;border-bottom:1px solid rgba(255,255,255,.10)}
+          .why-bar{flex-shrink:0;width:4px;border-radius:2px;background:linear-gradient(${RIVER},${SAFFRON})}
+          /* FAQ */
           details.faq{transition:border-color .2s ease, box-shadow .2s ease}
           details.faq[open]{border-color:${RIVER_TINT};box-shadow:0 10px 30px rgba(17,17,17,.06)}
           details.faq summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px}
@@ -233,7 +272,8 @@ export default function HomePage() {
           .faq-plus{flex-shrink:0;width:28px;height:28px;border-radius:14px;background:${RIVER_TINT};color:${RIVER};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;transition:transform .25s ease}
           details.faq[open] .faq-plus{transform:rotate(45deg)}
           .faq-body{overflow:hidden;max-height:0;opacity:0;transition:max-height .3s ease,opacity .3s ease,margin .3s ease}
-          details.faq[open] .faq-body{max-height:300px;opacity:1;margin-top:12px}
+          details.faq[open] .faq-body{max-height:320px;opacity:1;margin-top:12px}
+          /* Comparison */
           .cmp{width:100%;border-collapse:separate;border-spacing:0;min-width:640px}
           .cmp th,.cmp td{padding:16px 18px;text-align:left}
           .cmp thead th{font-size:13px;font-weight:700;letter-spacing:.3px}
@@ -248,6 +288,9 @@ export default function HomePage() {
             .hero-grid{grid-template-columns:1fr;gap:30px}
             .hero-left{text-align:center}
             .hero-cta{justify-content:center}
+            .stepper{grid-template-columns:1fr;gap:34px}.stepper-line{display:none}
+            .timeline{grid-template-columns:repeat(2,1fr);gap:24px}.tl-line{display:none}
+            .stats-grid{grid-template-columns:repeat(2,1fr)!important}
           }
         `,
         }}
@@ -267,6 +310,7 @@ export default function HomePage() {
         </svg>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <a href="#how" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>How it works</a>
+          <a href="#mtd" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Tax changes</a>
           <a href="#compare" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Compare</a>
           <a href="#reviews" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Reviews</a>
           <a href="#pricing" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Pricing</a>
@@ -337,20 +381,37 @@ export default function HomePage() {
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 24px 30px' }}><RiverDivider /></div>
 
-      {/* How it works */}
-      <section id="how" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px 80px' }}>
-        <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
+      {/* How it works (stepper) */}
+      <section id="how" style={{ maxWidth: 1040, margin: '0 auto', padding: '40px 24px 70px' }}>
+        <div className="reveal" style={{ textAlign: 'center', marginBottom: 54 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Three steps. That is the whole thing.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 540, margin: '0 auto' }}>No spreadsheets. No shoebox of receipts. No evenings lost to paperwork.</p>
         </div>
-        <div className="grid3" style={{ display: 'grid', gap: 20 }}>
+        <div className="stepper">
+          <div className="stepper-line" aria-hidden="true" />
           {steps.map((s, i) => (
-            <div key={s.n} className="reveal card" style={{ transitionDelay: `${i * 90}ms`, backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 28, position: 'relative' }}>
-              <div className="icontile" style={{ width: 46, height: 46, borderRadius: 23, background: `linear-gradient(135deg, ${RIVER}, #2E7BBF)`, color: '#fff', fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, boxShadow: '0 8px 20px rgba(27,89,166,.25)' }}>{s.n}</div>
+            <div key={s.n} className="step reveal" style={{ transitionDelay: `${i * 120}ms` }}>
+              <div className="step-num">{s.n}</div>
               <h3 style={{ fontSize: 19, fontWeight: 700, margin: '0 0 10px', letterSpacing: '-0.3px' }}>{s.title}</h3>
               <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: 0 }}>{s.body}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Stats band */}
+      <section style={{ background: `linear-gradient(120deg, ${RIVER_DEEP}, ${RIVER})`, color: '#fff' }}>
+        <div className="reveal" style={{ maxWidth: 1040, margin: '0 auto', padding: '54px 24px' }}>
+          <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 24 }}>
+            {stats.map((s) => (
+              <div key={s.label} style={{ textAlign: 'center' }}>
+                <div className="stat-num">
+                  {s.prefix}<span className="countup" data-to={s.to}>0</span>{s.suffix}
+                </div>
+                <p style={{ fontSize: 14, color: '#CFE0F2', margin: '10px auto 0', maxWidth: 180, lineHeight: 1.45 }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -389,6 +450,85 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* MTD explainer (interactive) */}
+      <section id="mtd" style={{ background: `linear-gradient(180deg, #fff, ${RIVER_TINT})`, borderTop: `1px solid ${LINE}` }}>
+        <div style={{ maxWidth: 980, margin: '0 auto', padding: '84px 24px' }}>
+          <div className="reveal" style={{ textAlign: 'center', marginBottom: 36 }}>
+            <span style={{ display: 'inline-block', backgroundColor: '#fff', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>NEW HMRC RULES</span>
+            <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>What HMRC is changing, in plain English.</h2>
+            <p style={{ fontSize: 17, color: MUTED, maxWidth: 600, margin: '0 auto' }}>
+              HMRC is moving the self employed onto something called Making Tax Digital. It sounds scary. It is not. Here is the whole thing on one screen. Tap to compare.
+            </p>
+          </div>
+
+          <div className="reveal" style={{ textAlign: 'center' }}>
+            <input className="mtd-radio" type="radio" name="mtd" id="mtd-old" />
+            <input className="mtd-radio" type="radio" name="mtd" id="mtd-new" defaultChecked />
+            <div className="mtd-tabs" role="tablist">
+              <label className="mtd-tab" htmlFor="mtd-old">The old way</label>
+              <label className="mtd-tab" htmlFor="mtd-new">The new way, from April 2026</label>
+            </div>
+
+            <div className="mtd-panels" style={{ marginTop: 28 }}>
+              {/* Old way */}
+              <div className="mtd-panel mtd-old-panel">
+                <div style={{ maxWidth: 560, margin: '0 auto', backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 20, padding: 34, textAlign: 'center', boxShadow: '0 14px 40px rgba(17,17,17,.06)' }}>
+                  <div style={{ fontSize: 40, marginBottom: 14 }}>📦</div>
+                  <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 10px' }}>One big return, once a year</h3>
+                  <p style={{ fontSize: 15.5, color: MUTED, lineHeight: 1.6, margin: '0 auto', maxWidth: 420 }}>
+                    A whole year of receipts saved up in a drawer. A scramble every January. Easy to miss things, easy to overpay, and a stressful evening you never look forward to.
+                  </p>
+                  <div style={{ marginTop: 20, display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: '#FDECEC', color: '#B4402F', fontSize: 13, fontWeight: 600, padding: '8px 14px', borderRadius: 20 }}>
+                    <span>📅</span> January: panic
+                  </div>
+                </div>
+              </div>
+
+              {/* New way */}
+              <div className="mtd-panel mtd-new-panel">
+                <div style={{ backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 20, padding: '34px 28px 30px', boxShadow: '0 14px 40px rgba(17,17,17,.06)' }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: RIVER_DEEP, textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 22px' }}>Your tax year, broken into four easy check ins</p>
+                  <div className="timeline">
+                    <div className="tl-line" aria-hidden="true" />
+                    {mtdQuarters.map((q, i) => (
+                      <div key={q.q} className="tl-step">
+                        <div className="tl-dot">{i + 1}</div>
+                        <h4 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 2px' }}>{q.q}</h4>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: RIVER, marginBottom: 6 }}>{q.when}</div>
+                        <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.5, margin: 0 }}>{q.note}</p>
+                      </div>
+                    ))}
+                    <div className="tl-step">
+                      <div className="tl-dot">★</div>
+                      <h4 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 2px' }}>Year end</h4>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: SAFFRON_DEEP, marginBottom: 6 }}>Final figure</div>
+                      <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.5, margin: 0 }}>You confirm the year. Done.</p>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 26, display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 13.5, fontWeight: 600, padding: '10px 16px', borderRadius: 20 }}>
+                    <span>👍</span> You still pay your tax on the same dates as now. Nothing changes there.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* What it means for you */}
+          <div className="reveal" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 22, marginTop: 44 }}>
+            {mtdMeans.map((m) => (
+              <div key={m.title} className="card" style={{ backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 24 }}>
+                <div className="icontile" style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: m.tint, color: m.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, marginBottom: 14 }}>{m.icon}</div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 8px' }}>{m.title}</h3>
+                <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.6, margin: 0 }}>{m.body}</p>
+              </div>
+            ))}
+          </div>
+          <p className="reveal" style={{ fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 26 }}>
+            Lekhio is built for these rules from day one. You keep working, Lekhio keeps the records, and the quarterly update is ready when it is due.
+          </p>
+        </div>
+      </section>
+
       {/* Comparison */}
       <section id="compare" style={{ backgroundColor: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
         <div style={{ maxWidth: 1000, margin: '0 auto', padding: '84px 24px' }}>
@@ -402,7 +542,7 @@ export default function HomePage() {
                 <thead>
                   <tr>
                     <th style={{ color: MUTED }}></th>
-                    <th className="center lekcol" style={{ color: RIVER_DEEP, borderTopLeftRadius: 0 }}>Lekhio</th>
+                    <th className="center lekcol" style={{ color: RIVER_DEEP }}>Lekhio</th>
                     <th className="center" style={{ color: MUTED }}>Typical accounting apps</th>
                     <th className="center" style={{ color: MUTED }}>Spreadsheets and shoeboxes</th>
                   </tr>
@@ -426,47 +566,36 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Reviews */}
-      <section id="reviews" style={{ maxWidth: 1100, margin: '0 auto', padding: '84px 24px' }}>
-        <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
+      {/* Reviews (marquee) */}
+      <section id="reviews" style={{ padding: '84px 0' }}>
+        <div className="reveal" style={{ textAlign: 'center', marginBottom: 48, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto', padding: '0 24px' }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Why people leave the old tools.</h2>
-          <p style={{ fontSize: 17, color: MUTED, maxWidth: 560, margin: '0 auto' }}>We read the one star reviews of the big accounting apps so you do not have to. These are the exact things people told us, and what Lekhio does instead.</p>
+          <p style={{ fontSize: 17, color: MUTED, margin: 0 }}>We read the one star reviews of the big accounting apps so you do not have to. These are the exact things people told us, and what Lekhio does instead.</p>
         </div>
-        <div className="grid3" style={{ display: 'grid', gap: 20 }}>
-          {reviews.map((r, i) => (
-            <div key={r.name} className="reveal card" style={{ transitionDelay: `${(i % 3) * 90}ms`, backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, display: 'flex', flexDirection: 'column' }}>
-              <Stars />
-              <p style={{ fontSize: 15.5, color: INK, lineHeight: 1.6, margin: '0 0 20px', flex: 1 }}>“{r.quote}”</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span className="icontile" style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: r.tint, color: r.fg, fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{r.name.charAt(0)}</span>
-                <div>
-                  <div style={{ fontSize: 14.5, fontWeight: 700, color: INK }}>{r.name}</div>
-                  <div style={{ fontSize: 13, color: MUTED }}>{r.trade}</div>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="marquee">
+          <div className="marquee-track">
+            {[...reviews, ...reviews].map((r, i) => (
+              <ReviewCard key={i} r={r} />
+            ))}
+          </div>
         </div>
-        <p className="reveal" style={{ fontSize: 12, color: MUTED, textAlign: 'center', marginTop: 28, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto' }}>
-          Illustrative, based on common complaints about other tools. We will replace these with real Lekhio customers as we launch.
-        </p>
       </section>
 
-      {/* Why different */}
+      {/* Why different (checklist) */}
       <section style={{ backgroundColor: INK, color: '#fff' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '84px 24px' }}>
-          <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '84px 24px' }}>
+          <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>The things other tools get wrong.</h2>
             <p style={{ fontSize: 17, color: '#B6BDC8', maxWidth: 560, margin: '0 auto' }}>We built Lekhio so you never have these complaints.</p>
           </div>
-          <div className="grid3" style={{ display: 'grid', gap: 20 }}>
-            {differences.map((d, i) => (
-              <div key={d.title} className="reveal card" style={{ transitionDelay: `${(i % 3) * 90}ms`, backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 18, padding: 26 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(224,163,62,0.18)', color: SAFFRON, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
-                  <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, letterSpacing: '-0.2px', color: '#fff' }}>{d.title}</h3>
+          <div className="reveal" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 48px' }}>
+            {differences.map((d) => (
+              <div key={d.title} className="why-item">
+                <span className="why-bar" aria-hidden="true" />
+                <div>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 6px', color: '#fff', letterSpacing: '-0.2px' }}>{d.title}</h3>
+                  <p style={{ fontSize: 14.5, color: '#B6BDC8', lineHeight: 1.6, margin: 0 }}>{d.body}</p>
                 </div>
-                <p style={{ fontSize: 15, color: '#B6BDC8', lineHeight: 1.6, margin: 0 }}>{d.body}</p>
               </div>
             ))}
           </div>
@@ -509,8 +638,8 @@ export default function HomePage() {
       <section style={{ backgroundColor: '#fff', borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '84px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
-            <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Making Tax Digital, explained straight.</h2>
-            <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>The rules are changing and a lot of the advice out there is confusing. Tap a question for the plain version.</p>
+            <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Questions, answered straight.</h2>
+            <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>Tap a question for the plain version.</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {faqs.map((f, i) => (
@@ -563,7 +692,19 @@ export default function HomePage() {
 
       <script
         dangerouslySetInnerHTML={{
-          __html: `(function(){try{var els=document.querySelectorAll('.reveal');if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')});return;}var io=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target);}})},{threshold:0.12});els.forEach(function(e){io.observe(e)});}catch(e){document.querySelectorAll('.reveal').forEach(function(x){x.classList.add('in')});}})();`,
+          __html: `(function(){
+            try{
+              var els=document.querySelectorAll('.reveal');
+              if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')});}
+              else{var io=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target);}})},{threshold:0.12});els.forEach(function(e){io.observe(e)});}
+            }catch(e){document.querySelectorAll('.reveal').forEach(function(x){x.classList.add('in')});}
+            try{
+              var nums=document.querySelectorAll('.countup');
+              function run(el){var to=parseFloat(el.getAttribute('data-to'))||0;var dur=1100,start=null;function step(ts){if(!start)start=ts;var p=Math.min((ts-start)/dur,1);el.textContent=Math.floor(p*to);if(p<1){requestAnimationFrame(step);}else{el.textContent=to;}}requestAnimationFrame(step);}
+              if(!('IntersectionObserver' in window)){nums.forEach(function(n){n.textContent=n.getAttribute('data-to');});}
+              else{var io2=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){run(x.target);io2.unobserve(x.target);}})},{threshold:0.5});nums.forEach(function(n){io2.observe(n);});}
+            }catch(e){document.querySelectorAll('.countup').forEach(function(n){n.textContent=n.getAttribute('data-to');});}
+          })();`,
         }}
       />
     </main>

@@ -130,6 +130,16 @@ const trustPillars = [
   { icon: '🇬🇧', title: 'A real UK company', body: 'Built by Satluj Ventures in the UK, registered for data protection and working under UK GDPR. A real person answers when you need help.', tint: RIVER_TINT, fg: RIVER },
 ];
 
+const trustBadges = [
+  { icon: '🔒', label: 'Encrypted' },
+  { icon: '👁️', label: 'Only you can see it' },
+  { icon: '🚫', label: 'Never sold' },
+  { icon: '✅', label: 'You approve everything' },
+  { icon: '🤝', label: 'Real human support' },
+  { icon: '🇬🇧', label: 'Built in the UK' },
+  { icon: '🛡️', label: 'UK GDPR' },
+];
+
 const willList = [
   'Only ever reply to messages you send us first',
   'Show you every entry and wait for you to approve it',
@@ -424,6 +434,12 @@ export default function HomePage() {
           .why-bar{flex-shrink:0;width:4px;border-radius:2px;background:linear-gradient(${RIVER},${SAFFRON})}
           .nav-links{display:flex;align-items:center;gap:24px}
           .duo{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+          .tbadges{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;max-width:780px;margin:0 auto 52px}
+          .tbadge{display:inline-flex;align-items:center;gap:9px;background:#fff;border:1px solid ${LINE};border-radius:999px;padding:11px 18px;font-size:14px;font-weight:600;color:${INK};box-shadow:0 10px 26px rgba(17,17,17,.07);animation:floaty 5s ease-in-out infinite;transition:transform .2s ease,box-shadow .2s ease}
+          .tbadge:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 16px 32px rgba(17,17,17,.12)}
+          .trust-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+          .trust-card{position:relative;overflow:hidden}
+          .trust-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,${RIVER},${SAFFRON})}
           /* Mobile menu */
           .nav-toggle{display:none}
           .nav-burger{display:none;flex-direction:column;justify-content:center;align-items:center;gap:5px;width:44px;height:44px;border-radius:11px;cursor:pointer;border:1px solid ${LINE};background:#fff}
@@ -468,6 +484,7 @@ export default function HomePage() {
             .stats-grid{grid-template-columns:repeat(2,1fr)!important}
             .appdemo-grid{grid-template-columns:1fr;gap:30px}
             .duo{grid-template-columns:1fr}
+            .trust-grid{grid-template-columns:1fr}
           }
         `,
         }}
@@ -852,12 +869,23 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid3 reveal" style={{ display: 'grid', gap: 20, marginBottom: 28 }}>
+          {/* Floating trust badges */}
+          <div className="tbadges reveal">
+            {trustBadges.map((b, i) => (
+              <span key={b.label} className="tbadge" style={{ animationDelay: `${(i * 0.45).toFixed(2)}s`, animationDuration: `${(4.6 + (i % 3) * 0.7).toFixed(1)}s` }}>
+                <span style={{ fontSize: 15 }}>{b.icon}</span>{b.label}
+              </span>
+            ))}
+          </div>
+
+          <div className="trust-grid reveal" style={{ marginBottom: 28 }}>
             {trustPillars.map((p) => (
-              <div key={p.title} className="card" style={{ backgroundColor: PAPER, border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
-                <div className="icontile" style={{ width: 50, height: 50, borderRadius: 13, backgroundColor: p.tint, color: p.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 16 }}>{p.icon}</div>
-                <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 8px', letterSpacing: '-0.2px' }}>{p.title}</h3>
-                <p style={{ fontSize: 14.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>{p.body}</p>
+              <div key={p.title} className="card trust-card" style={{ backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 20, padding: '30px 28px', display: 'flex', gap: 18, alignItems: 'flex-start' }}>
+                <div className="icontile" style={{ flexShrink: 0, width: 54, height: 54, borderRadius: 15, backgroundColor: p.tint, color: p.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>{p.icon}</div>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', letterSpacing: '-0.2px' }}>{p.title}</h3>
+                  <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: 0 }}>{p.body}</p>
+                </div>
               </div>
             ))}
           </div>

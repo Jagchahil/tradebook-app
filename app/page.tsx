@@ -123,6 +123,27 @@ const included = [
   'Your records exported any time',
 ];
 
+const trustPillars = [
+  { icon: '🔒', title: 'Your data is yours', body: 'Never sold. Never shared beyond the suppliers that run Lekhio. Encrypted, and only you can ever see your records. Export or delete everything whenever you want.', tint: RIVER_TINT, fg: RIVER },
+  { icon: '✅', title: 'You approve everything', body: 'We prepare your figures. Nothing reaches HMRC until you check it and say yes. HMRC keeps you responsible for your tax, and we never pretend otherwise.', tint: GREEN_TINT, fg: GREEN },
+  { icon: '💬', title: 'We never chase you', body: 'Lekhio only ever replies to a message you send first. We never text you out of the blue, and we never ask for your bank details, passwords, or login codes.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
+  { icon: '🇬🇧', title: 'A real UK company', body: 'Built by Satluj Ventures in the UK, registered for data protection and working under UK GDPR. A real person answers when you need help.', tint: RIVER_TINT, fg: RIVER },
+];
+
+const willList = [
+  'Only ever reply to messages you send us first',
+  'Show you every entry and wait for you to approve it',
+  'Let you check your tax figures before anything is sent',
+  'Let you export or delete your data whenever you want',
+];
+
+const neverList = [
+  'Text or call you out of the blue saying you owe tax',
+  'Ask for your bank details, card number, or passwords',
+  'Send anything to HMRC without your say so',
+  'Sell your data or pretend to be HMRC',
+];
+
 const faqs = [
   { q: 'Do I have to be a tradesperson?', a: 'No. Lekhio is for anyone self employed in the UK. A barber, a driver, a tutor, a freelancer, a plumber. If you keep receipts or send invoices, it is for you.' },
   { q: 'What is Making Tax Digital?', a: 'From April 2026, HMRC wants self employed people over a certain income to keep digital records and send a short update each quarter instead of one big return. Lekhio keeps those records as you work.' },
@@ -402,6 +423,7 @@ export default function HomePage() {
           .why-item{display:flex;gap:16px;padding:22px 4px;border-bottom:1px solid rgba(255,255,255,.10)}
           .why-bar{flex-shrink:0;width:4px;border-radius:2px;background:linear-gradient(${RIVER},${SAFFRON})}
           .nav-links{display:flex;align-items:center;gap:24px}
+          .duo{display:grid;grid-template-columns:1fr 1fr;gap:20px}
           /* FAQ */
           details.faq{transition:border-color .2s ease, box-shadow .2s ease}
           details.faq[open]{border-color:${RIVER_TINT};box-shadow:0 10px 30px rgba(17,17,17,.06)}
@@ -433,6 +455,7 @@ export default function HomePage() {
             .timeline{grid-template-columns:repeat(2,1fr);gap:24px}.tl-line{display:none}
             .stats-grid{grid-template-columns:repeat(2,1fr)!important}
             .appdemo-grid{grid-template-columns:1fr;gap:30px}
+            .duo{grid-template-columns:1fr}
           }
         `,
         }}
@@ -786,6 +809,58 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Trust */}
+      <section id="trust" style={{ backgroundColor: '#fff', borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '84px 24px' }}>
+          <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
+            <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>BUILT TO BE TRUSTED</span>
+            <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Your money. Your data. Your call.</h2>
+            <p style={{ fontSize: 17, color: MUTED, maxWidth: 600, margin: '0 auto' }}>
+              You hear about fake HMRC texts and dodgy apps all the time. Lekhio is the opposite of that. Here is exactly how it works, and what we will never do.
+            </p>
+          </div>
+
+          <div className="grid3 reveal" style={{ display: 'grid', gap: 20, marginBottom: 28 }}>
+            {trustPillars.map((p) => (
+              <div key={p.title} className="card" style={{ backgroundColor: PAPER, border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
+                <div className="icontile" style={{ width: 50, height: 50, borderRadius: 13, backgroundColor: p.tint, color: p.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 16 }}>{p.icon}</div>
+                <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 8px', letterSpacing: '-0.2px' }}>{p.title}</h3>
+                <p style={{ fontSize: 14.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>{p.body}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="duo reveal">
+            <div style={{ backgroundColor: GREEN_TINT, border: `1px solid #CFE9D8`, borderRadius: 18, padding: 28 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 16px', color: GREEN }}>Lekhio will</h3>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 13 }}>
+                {willList.map((line) => (
+                  <li key={line} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', color: GREEN, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>✓</span>
+                    <span style={{ fontSize: 15, color: INK, lineHeight: 1.5 }}>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div style={{ backgroundColor: '#FDECEC', border: `1px solid #F3D2CE`, borderRadius: 18, padding: 28 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 16px', color: '#B23A2B' }}>Lekhio will never</h3>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 13 }}>
+                {neverList.map((line) => (
+                  <li key={line} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', color: '#B23A2B', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>✕</span>
+                    <span style={{ fontSize: 15, color: INK, lineHeight: 1.5 }}>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <p className="reveal" style={{ fontSize: 13.5, color: MUTED, textAlign: 'center', marginTop: 30, maxWidth: 640, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>
+            Lekhio is not HMRC and is not endorsed by HMRC. We are an independent UK company that prepares your records and keeps you ready. You always approve before anything is sent.
+          </p>
         </div>
       </section>
 

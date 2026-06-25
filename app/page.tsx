@@ -424,6 +424,16 @@ export default function HomePage() {
           .why-bar{flex-shrink:0;width:4px;border-radius:2px;background:linear-gradient(${RIVER},${SAFFRON})}
           .nav-links{display:flex;align-items:center;gap:24px}
           .duo{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+          /* Mobile menu */
+          .nav-toggle{display:none}
+          .nav-burger{display:none;flex-direction:column;justify-content:center;align-items:center;gap:5px;width:44px;height:44px;border-radius:11px;cursor:pointer;border:1px solid ${LINE};background:#fff}
+          .nav-burger span{display:block;width:20px;height:2.5px;border-radius:2px;background:${INK};transition:transform .25s ease,opacity .2s ease}
+          #navtoggle:checked ~ .nav-burger span:nth-child(1){transform:translateY(7.5px) rotate(45deg)}
+          #navtoggle:checked ~ .nav-burger span:nth-child(2){opacity:0}
+          #navtoggle:checked ~ .nav-burger span:nth-child(3){transform:translateY(-7.5px) rotate(-45deg)}
+          .nav-panel{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border-top:1px solid ${LINE};border-bottom:1px solid ${LINE};box-shadow:0 18px 34px rgba(17,17,17,.10);padding:8px 24px 22px;flex-direction:column;z-index:50}
+          .nav-panel a{padding:14px 2px;font-size:16px;font-weight:500;color:${INK};border-bottom:1px solid ${SURFACE}}
+          .nav-panel a:last-of-type{border-bottom:none}
           /* FAQ */
           details.faq{transition:border-color .2s ease, box-shadow .2s ease}
           details.faq[open]{border-color:${RIVER_TINT};box-shadow:0 10px 30px rgba(17,17,17,.06)}
@@ -444,7 +454,9 @@ export default function HomePage() {
           @media (max-width:880px){
             .hero-h1-size{font-size:40px}.h2{font-size:27px}
             .grid3{grid-template-columns:1fr}
-            .nav-links{display:none}.price-split{flex-direction:column}
+            .nav-links{display:none}.nav-cta-desktop{display:none}.nav-burger{display:flex}
+            #navtoggle:checked ~ .nav-panel{display:flex}
+            .price-split{flex-direction:column}
             .why-grid{grid-template-columns:1fr;gap:0}
             .mtd-tab{padding:9px 13px;font-size:12.5px}
             .mtd-tabs{max-width:100%}
@@ -463,7 +475,7 @@ export default function HomePage() {
       <noscript><style dangerouslySetInnerHTML={{ __html: `.reveal{opacity:1;transform:none}.bub{opacity:1;animation:none}` }} /></noscript>
 
       {/* Nav */}
-      <nav style={{ maxWidth: 1100, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav style={{ position: 'relative', maxWidth: 1100, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <svg width="118" height="40" viewBox="0 0 300 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Lekhio">
           <defs>
             <linearGradient id="navriver" x1="20" y1="0" x2="280" y2="0" gradientUnits="userSpaceOnUse">
@@ -473,6 +485,9 @@ export default function HomePage() {
           <text x="150" y="58" textAnchor="middle" fontFamily={FONT} fontSize="54" fontWeight="700" letterSpacing="-1.8" fill={INK}>Lekhio</text>
           <path d="M34 78 C 90 64, 120 92, 150 78 S 230 64, 266 78" stroke="url(#navriver)" strokeWidth="5" strokeLinecap="round" fill="none" />
         </svg>
+
+        <input type="checkbox" id="navtoggle" className="nav-toggle" aria-label="Toggle menu" />
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <span className="nav-links">
             <a href="#how" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>How it works</a>
@@ -480,9 +495,23 @@ export default function HomePage() {
             <a href="#mtd" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Tax changes</a>
             <a href="#compare" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Compare</a>
             <a href="#reviews" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Reviews</a>
+            <a href="#trust" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Trust</a>
             <a href="#pricing" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Pricing</a>
           </span>
-          <Link href="/early-access" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Get early access</Link>
+          <Link href="/early-access" className="btn-primary nav-cta-desktop" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Get early access</Link>
+        </div>
+
+        <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu"><span /><span /><span /></label>
+
+        <div className="nav-panel">
+          <a href="#how">How it works</a>
+          <a href="#app">The app</a>
+          <a href="#mtd">Tax changes</a>
+          <a href="#compare">Compare</a>
+          <a href="#reviews">Reviews</a>
+          <a href="#trust">Trust</a>
+          <a href="#pricing">Pricing</a>
+          <Link href="/early-access" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Get early access</Link>
         </div>
       </nav>
 
@@ -966,6 +995,10 @@ export default function HomePage() {
               if(!('IntersectionObserver' in window)){nums.forEach(function(n){n.textContent=n.getAttribute('data-to');});}
               else{var io2=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){run(x.target);io2.unobserve(x.target);}})},{threshold:0.5});nums.forEach(function(n){io2.observe(n);});}
             }catch(e){document.querySelectorAll('.countup').forEach(function(n){n.textContent=n.getAttribute('data-to');});}
+            try{
+              var navt=document.getElementById('navtoggle');
+              document.querySelectorAll('.nav-panel a').forEach(function(a){a.addEventListener('click',function(){if(navt)navt.checked=false;});});
+            }catch(e){}
           })();`,
         }}
       />

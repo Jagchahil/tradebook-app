@@ -442,14 +442,18 @@ export default function HomePage() {
           .trust-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,${RIVER},${SAFFRON})}
           /* Mobile menu */
           .nav-toggle{display:none}
-          .nav-burger{display:none;flex-direction:column;justify-content:center;align-items:center;gap:5px;width:44px;height:44px;border-radius:11px;cursor:pointer;border:1px solid ${LINE};background:#fff}
+          .nav-right{display:flex;align-items:center;gap:14px}
+          .nav-burger{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;width:46px;height:46px;border-radius:12px;cursor:pointer;border:1px solid ${LINE};background:#fff;transition:background-color .15s ease}
+          .nav-burger:hover{background:${SURFACE}}
           .nav-burger span{display:block;width:20px;height:2.5px;border-radius:2px;background:${INK};transition:transform .25s ease,opacity .2s ease}
-          #navtoggle:checked ~ .nav-burger span:nth-child(1){transform:translateY(7.5px) rotate(45deg)}
-          #navtoggle:checked ~ .nav-burger span:nth-child(2){opacity:0}
-          #navtoggle:checked ~ .nav-burger span:nth-child(3){transform:translateY(-7.5px) rotate(-45deg)}
-          .nav-panel{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border-top:1px solid ${LINE};border-bottom:1px solid ${LINE};box-shadow:0 18px 34px rgba(17,17,17,.10);padding:8px 24px 22px;flex-direction:column;z-index:50}
-          .nav-panel a{padding:14px 2px;font-size:16px;font-weight:500;color:${INK};border-bottom:1px solid ${SURFACE}}
+          #navtoggle:checked ~ .nav-right .nav-burger span:nth-child(1){transform:translateY(7.5px) rotate(45deg)}
+          #navtoggle:checked ~ .nav-right .nav-burger span:nth-child(2){opacity:0}
+          #navtoggle:checked ~ .nav-right .nav-burger span:nth-child(3){transform:translateY(-7.5px) rotate(-45deg)}
+          .nav-panel{display:none;position:absolute;top:calc(100% - 6px);right:24px;left:auto;width:min(290px,calc(100vw - 48px));background:#fff;border:1px solid ${LINE};border-radius:16px;box-shadow:0 20px 42px rgba(17,17,17,.16);padding:10px 18px 18px;flex-direction:column;z-index:50}
+          #navtoggle:checked ~ .nav-panel{display:flex;animation:riseIn .25s ease}
+          .nav-panel a{padding:13px 2px;font-size:15.5px;font-weight:500;color:${INK};border-bottom:1px solid ${SURFACE}}
           .nav-panel a:last-of-type{border-bottom:none}
+          .float-chip{position:absolute;bottom:26px;left:-14px;display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid ${LINE};border-radius:999px;padding:9px 14px;font-size:13px;font-weight:600;color:${INK};box-shadow:0 14px 30px rgba(17,17,17,.16);animation:floaty 5.5s ease-in-out infinite;z-index:3}
           /* FAQ */
           details.faq{transition:border-color .2s ease, box-shadow .2s ease}
           details.faq[open]{border-color:${RIVER_TINT};box-shadow:0 10px 30px rgba(17,17,17,.06)}
@@ -470,8 +474,8 @@ export default function HomePage() {
           @media (max-width:880px){
             .hero-h1-size{font-size:40px}.h2{font-size:27px}
             .grid3{grid-template-columns:1fr}
-            .nav-links{display:none}.nav-cta-desktop{display:none}.nav-burger{display:flex}
-            #navtoggle:checked ~ .nav-panel{display:flex}
+            .nav-cta-desktop{display:none}
+            .float-chip{left:6px;bottom:14px}
             .price-split{flex-direction:column}
             .why-grid{grid-template-columns:1fr;gap:0}
             .mtd-tab{padding:9px 13px;font-size:12.5px}
@@ -505,20 +509,10 @@ export default function HomePage() {
 
         <input type="checkbox" id="navtoggle" className="nav-toggle" aria-label="Toggle menu" />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <span className="nav-links">
-            <a href="#how" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>How it works</a>
-            <a href="#app" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>The app</a>
-            <a href="#mtd" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Tax changes</a>
-            <a href="#compare" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Compare</a>
-            <a href="#reviews" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Reviews</a>
-            <a href="#trust" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Trust</a>
-            <a href="#pricing" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Pricing</a>
-          </span>
+        <div className="nav-right">
           <Link href="/early-access" className="btn-primary nav-cta-desktop" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Get early access</Link>
+          <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu"><span /><span /><span /></label>
         </div>
-
-        <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu"><span /><span /><span /></label>
 
         <div className="nav-panel">
           <a href="#how">How it works</a>
@@ -562,6 +556,11 @@ export default function HomePage() {
 
           {/* Animated WhatsApp demo */}
           <div className="hero-cta" style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={{ position: 'relative' }}>
+            <div className="float-chip">
+              <span style={{ color: SAFFRON, fontSize: 12, letterSpacing: '1px' }}>★★★★★</span>
+              Loved by UK sole traders
+            </div>
             <div className="phone" style={{ width: 320, maxWidth: '100%', backgroundColor: '#fff', borderRadius: 28, border: `1px solid ${LINE}`, boxShadow: '0 30px 70px rgba(17,17,17,.16)', overflow: 'hidden' }}>
               <div style={{ backgroundColor: '#075E54', color: '#fff', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: WHATSAPP, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>💬</span>
@@ -588,6 +587,7 @@ export default function HomePage() {
                   <span /><span /><span />
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </div>

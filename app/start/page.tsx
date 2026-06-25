@@ -59,9 +59,36 @@ export default function StartPage() {
     return false;
   }, [step, phoneReady, emailValid, tradeType, name, trade, customTrade, vat]);
 
+  function submitSignup() {
+    // Fire and forget. The success screen shows regardless, so the experience
+    // never breaks if the backend is not switched on yet.
+    try {
+      fetch('/api/onboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone,
+          email: email.trim(),
+          tradeType,
+          name: name.trim(),
+          trade: trade === 'Something else' ? customTrade.trim() : trade,
+          postcode: postcode.trim(),
+          address: address.trim(),
+          vat,
+        }),
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
+  }
+
   function next() {
-    if (step < TOTAL) setStep(step + 1);
-    else setDone(true);
+    if (step < TOTAL) {
+      setStep(step + 1);
+    } else {
+      submitSignup();
+      setDone(true);
+    }
   }
   function back() {
     if (step > 1) setStep(step - 1);

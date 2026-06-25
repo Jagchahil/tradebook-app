@@ -203,6 +203,39 @@ export async function insertWaitlistSignup(signup: WaitlistSignup): Promise<void
   }
 }
 
+export interface OnboardSignup {
+  phone: string;
+  email: string;
+  trade_type?: string | null;
+  name?: string | null;
+  trade?: string | null;
+  postcode?: string | null;
+  address?: string | null;
+  vat_registered?: boolean | null;
+}
+
+// Save a completed web onboarding. Written with the service role key, server side only.
+export async function createSignup(signup: OnboardSignup): Promise<void> {
+  const { url } = config();
+  const record: Record<string, unknown> = { phone: signup.phone, email: signup.email };
+  if (signup.trade_type) record.trade_type = signup.trade_type;
+  if (signup.name) record.name = signup.name;
+  if (signup.trade) record.trade = signup.trade;
+  if (signup.postcode) record.postcode = signup.postcode;
+  if (signup.address) record.address = signup.address;
+  if (signup.vat_registered !== undefined && signup.vat_registered !== null) record.vat_registered = signup.vat_registered;
+
+  const res = await fetch(`${url}/rest/v1/signups`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify(record),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Signup insert failed: ${res.status} ${text}`);
+  }
+}
+
 export async function insertTransaction(record: NewTransaction): Promise<void> {
   const { url } = config();
   const res = await fetch(`${url}/rest/v1/transactions`, {

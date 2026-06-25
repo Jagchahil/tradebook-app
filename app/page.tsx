@@ -453,7 +453,8 @@ export default function HomePage() {
           #navtoggle:checked ~ .nav-panel{display:flex;animation:riseIn .25s ease}
           .nav-panel a{padding:13px 2px;font-size:15.5px;font-weight:500;color:${INK};border-bottom:1px solid ${SURFACE}}
           .nav-panel a:last-of-type{border-bottom:none}
-          .float-chip{position:absolute;bottom:26px;left:-14px;display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid ${LINE};border-radius:999px;padding:9px 14px;font-size:13px;font-weight:600;color:${INK};box-shadow:0 14px 30px rgba(17,17,17,.16);animation:floaty 5.5s ease-in-out infinite;z-index:3}
+          .trustbar{background:linear-gradient(90deg,${RIVER_DEEP},${RIVER})}
+          .trustbar-dot{opacity:.45;padding:0 2px}
           /* FAQ */
           details.faq{transition:border-color .2s ease, box-shadow .2s ease}
           details.faq[open]{border-color:${RIVER_TINT};box-shadow:0 10px 30px rgba(17,17,17,.06)}
@@ -475,7 +476,6 @@ export default function HomePage() {
             .hero-h1-size{font-size:40px}.h2{font-size:27px}
             .grid3{grid-template-columns:1fr}
             .nav-cta-desktop{display:none}
-            .float-chip{left:6px;bottom:14px}
             .price-split{flex-direction:column}
             .why-grid{grid-template-columns:1fr;gap:0}
             .mtd-tab{padding:9px 13px;font-size:12.5px}
@@ -494,6 +494,17 @@ export default function HomePage() {
         }}
       />
       <noscript><style dangerouslySetInnerHTML={{ __html: `.reveal{opacity:1;transform:none}.bub{opacity:1;animation:none}` }} /></noscript>
+
+      {/* Trust bar */}
+      <div className="trustbar">
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '9px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: '#fff' }}>
+          <span>🔒 Encrypted and never sold</span>
+          <span className="trustbar-dot">·</span>
+          <span>✅ You approve everything</span>
+          <span className="trustbar-dot">·</span>
+          <span>🇬🇧 A real UK company, not HMRC</span>
+        </div>
+      </div>
 
       {/* Nav */}
       <nav style={{ position: 'relative', maxWidth: 1100, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -557,10 +568,6 @@ export default function HomePage() {
           {/* Animated WhatsApp demo */}
           <div className="hero-cta" style={{ display: 'flex', justifyContent: 'center' }}>
             <div style={{ position: 'relative' }}>
-            <div className="float-chip">
-              <span style={{ color: SAFFRON, fontSize: 12, letterSpacing: '1px' }}>★★★★★</span>
-              Loved by UK sole traders
-            </div>
             <div className="phone" style={{ width: 320, maxWidth: '100%', backgroundColor: '#fff', borderRadius: 28, border: `1px solid ${LINE}`, boxShadow: '0 30px 70px rgba(17,17,17,.16)', overflow: 'hidden' }}>
               <div style={{ backgroundColor: '#075E54', color: '#fff', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: WHATSAPP, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>💬</span>

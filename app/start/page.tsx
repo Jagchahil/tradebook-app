@@ -41,6 +41,7 @@ export default function StartPage() {
   const [tradeType, setTradeType] = useState<TradeType>(null);
   const [name, setName] = useState('');
   const [trade, setTrade] = useState('');
+  const [customTrade, setCustomTrade] = useState('');
   const [postcode, setPostcode] = useState('');
   const [address, setAddress] = useState('');
   const [vat, setVat] = useState<boolean | null>(false);
@@ -52,11 +53,11 @@ export default function StartPage() {
   const canContinue = useMemo(() => {
     if (step === 1) return phoneReady && emailValid;
     if (step === 2) return tradeType !== null && name.trim().length > 1;
-    if (step === 3) return trade !== '';
+    if (step === 3) return trade !== '' && (trade !== 'Something else' || customTrade.trim().length > 1);
     if (step === 4) return true; // address optional
     if (step === 5) return vat !== null;
     return false;
-  }, [step, phoneReady, emailValid, tradeType, name, trade, vat]);
+  }, [step, phoneReady, emailValid, tradeType, name, trade, customTrade, vat]);
 
   function next() {
     if (step < TOTAL) setStep(step + 1);
@@ -184,6 +185,12 @@ export default function StartPage() {
                       );
                     })}
                   </div>
+                  {trade === 'Something else' && (
+                    <div style={{ marginTop: 18 }}>
+                      <label style={fieldLabel}>Tell us what you do</label>
+                      <input className="field" value={customTrade} onChange={(e) => setCustomTrade(e.target.value)} placeholder="e.g. Mobile dog groomer" style={fieldStyle} autoFocus />
+                    </div>
+                  )}
                 </Step>
               )}
 

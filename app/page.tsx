@@ -105,15 +105,6 @@ const reviews = [
   { quote: 'Voice notes are the best bit. Hands full on the roof, I just say what I spent and carry on.', name: 'Danny', trade: 'Roofer, Glasgow', tint: GREEN_TINT, fg: GREEN },
 ];
 
-const differences = [
-  { title: 'One flat price', body: 'Twenty nine pounds a month. No tiers, no features held back, no surprise rises.' },
-  { title: 'Unlimited everything', body: 'Snap as many receipts as you like. We never charge per receipt or make you buy credits.' },
-  { title: 'Set up in seconds', body: 'Send your number and start. No long forms. No weekend lost to entering old data.' },
-  { title: 'Leave any time', body: 'Cancel in one tap and take your records with you. No lock in, no dark patterns.' },
-  { title: 'Built for you, not accountants', body: 'Plain English. Made for a busy self employed person, not someone who loves spreadsheets.' },
-  { title: 'You stay in control', body: 'We prepare, you approve. Your data is yours and you can export it whenever you want.' },
-];
-
 const included = [
   'Unlimited receipt, voice, and text capture',
   'Automatic bookkeeping and categories',
@@ -702,7 +693,7 @@ export default function HomePage() {
       </section>
 
       {/* Onboarding demo */}
-      <section id="setup" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px 84px' }}>
+      <section id="setup" style={{ maxWidth: 1100, margin: '0 auto', padding: '30px 24px 62px' }}>
         <div className="appdemo-grid">
           <div className="reveal">
             <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>SET UP IN UNDER A MINUTE</span>
@@ -756,7 +747,7 @@ export default function HomePage() {
 
       {/* Who it is for */}
       <section id="who" style={{ backgroundColor: INK, color: '#fff' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '84px 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '62px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>If you work for yourself, it is for you.</h2>
             <p style={{ fontSize: 17, color: '#B6BDC8', maxWidth: 600, margin: '0 auto' }}>
@@ -773,7 +764,7 @@ export default function HomePage() {
       </section>
 
       {/* Features */}
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '84px 24px' }}>
+      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '62px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Everything your accountant nags you for.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>Done as you work, not at the end of the year.</p>
@@ -791,7 +782,7 @@ export default function HomePage() {
 
       {/* App demo */}
       <section id="app" style={{ backgroundColor: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '84px 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '62px 24px' }}>
           <div className="appdemo-grid">
             <div className="reveal">
               <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>THE APP</span>
@@ -833,7 +824,7 @@ export default function HomePage() {
 
       {/* MTD explainer (interactive) */}
       <section id="mtd" style={{ background: `linear-gradient(180deg, #fff, ${RIVER_TINT})`, borderTop: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 980, margin: '0 auto', padding: '84px 24px' }}>
+        <div style={{ maxWidth: 980, margin: '0 auto', padding: '62px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 36 }}>
             <span style={{ display: 'inline-block', backgroundColor: '#fff', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>NEW HMRC RULES</span>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>What HMRC is changing, in plain English.</h2>
@@ -912,7 +903,7 @@ export default function HomePage() {
 
       {/* Comparison */}
       <section id="compare" style={{ backgroundColor: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '84px 24px' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '62px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>How Lekhio compares.</h2>
             <p style={{ fontSize: 17, color: MUTED, maxWidth: 560, margin: '0 auto' }}>The old way is an app that wants a weekend of setup, or a spreadsheet and a shoebox. Here is the honest side by side.</p>
@@ -947,45 +938,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Reviews (marquee) */}
-      <section id="reviews" style={{ padding: '84px 0' }}>
-        <div className="reveal" style={{ textAlign: 'center', marginBottom: 48, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto', padding: '0 24px' }}>
-          <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Why people leave the old tools.</h2>
-          <p style={{ fontSize: 17, color: MUTED, margin: 0 }}>We read the one star reviews of the big accounting apps so you do not have to. These are the exact things people told us, and what Lekhio does instead.</p>
-        </div>
-        <div className="marquee">
-          <div className="marquee-track">
-            {[...reviews, ...reviews].map((r, i) => (
-              <ReviewCard key={i} r={r} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Why different (checklist) */}
-      <section style={{ backgroundColor: INK, color: '#fff' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '84px 24px' }}>
-          <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
-            <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>The things other tools get wrong.</h2>
-            <p style={{ fontSize: 17, color: '#B6BDC8', maxWidth: 560, margin: '0 auto' }}>We built Lekhio so you never have these complaints.</p>
-          </div>
-          <div className="reveal why-grid">
-            {differences.map((d) => (
-              <div key={d.title} className="why-item">
-                <span className="why-bar" aria-hidden="true" />
-                <div>
-                  <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 6px', color: '#fff', letterSpacing: '-0.2px' }}>{d.title}</h3>
-                  <p style={{ fontSize: 14.5, color: '#B6BDC8', lineHeight: 1.6, margin: 0 }}>{d.body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Trust */}
       <section id="trust" style={{ backgroundColor: '#fff', borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '84px 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '62px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
             <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>BUILT TO BE TRUSTED</span>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Your money. Your data. Your call.</h2>
@@ -1047,7 +1002,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" style={{ maxWidth: 1100, margin: '0 auto', padding: '84px 24px' }}>
+      <section id="pricing" style={{ maxWidth: 1100, margin: '0 auto', padding: '62px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>One price. No surprises.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>Try it free for 30 days. Keep it for less than a tank of fuel a month.</p>
@@ -1078,9 +1033,24 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Reviews (marquee) */}
+      <section id="reviews" style={{ padding: '62px 0' }}>
+        <div className="reveal" style={{ textAlign: 'center', marginBottom: 48, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto', padding: '0 24px' }}>
+          <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Why people leave the old tools.</h2>
+          <p style={{ fontSize: 17, color: MUTED, margin: 0 }}>We read the one star reviews of the big accounting apps so you do not have to. These are the exact things people told us, and what Lekhio does instead.</p>
+        </div>
+        <div className="marquee">
+          <div className="marquee-track">
+            {[...reviews, ...reviews].map((r, i) => (
+              <ReviewCard key={i} r={r} />
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* FAQ */}
       <section style={{ backgroundColor: '#fff', borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', padding: '84px 24px' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', padding: '62px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Questions, answered straight.</h2>
             <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>Tap a question for the plain version.</p>

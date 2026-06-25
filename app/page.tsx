@@ -362,13 +362,14 @@ function OnbHead({ n, title }: { n: number; title: string }) {
 function OnbNum() {
   return (
     <div className="appscreen">
-      <OnbHead n={1} title="What is your mobile number?" />
+      <OnbHead n={1} title="Set up your account" />
       <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
-        <span style={{ padding: '13px 11px', background: RIVER_TINT, color: RIVER, fontWeight: 700, fontSize: 13, borderRight: `1.5px solid ${LINE}` }}>🇬🇧 +44</span>
-        <span style={{ padding: '13px 11px', fontSize: 14, color: INK }}>7700 900 000</span>
+        <span style={{ padding: '12px 11px', background: RIVER_TINT, color: RIVER, fontWeight: 700, fontSize: 13, borderRight: `1.5px solid ${LINE}` }}>🇬🇧 +44</span>
+        <span style={{ padding: '12px 11px', fontSize: 13.5, color: INK }}>7700 900 000</span>
       </div>
-      <div style={{ fontSize: 11.5, color: MUTED, marginTop: 12 }}>We never share it. We only reply to you.</div>
-      <div style={{ background: RIVER, color: '#fff', textAlign: 'center', borderRadius: 12, padding: '13px 0', fontSize: 14, fontWeight: 700, marginTop: 20 }}>Continue</div>
+      <div style={{ background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '12px 12px', fontSize: 13.5, color: MUTED, marginTop: 10 }}>you@example.com</div>
+      <div style={{ fontSize: 11.5, color: MUTED, marginTop: 10 }}>We never share your details.</div>
+      <div style={{ background: RIVER, color: '#fff', textAlign: 'center', borderRadius: 12, padding: '12px 0', fontSize: 14, fontWeight: 700, marginTop: 16 }}>Continue</div>
     </div>
   );
 }

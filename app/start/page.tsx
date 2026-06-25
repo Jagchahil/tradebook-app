@@ -37,6 +37,7 @@ export default function StartPage() {
   const [done, setDone] = useState(false);
 
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [tradeType, setTradeType] = useState<TradeType>(null);
   const [name, setName] = useState('');
   const [trade, setTrade] = useState('');
@@ -45,16 +46,17 @@ export default function StartPage() {
   const [vat, setVat] = useState<boolean | null>(false);
 
   const phoneReady = digitsOnly(phone).length >= 10;
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const nameLabel = tradeType === 'ltd' ? 'Company name' : tradeType === 'business' ? 'Trading name' : 'Your full name';
 
   const canContinue = useMemo(() => {
-    if (step === 1) return phoneReady;
+    if (step === 1) return phoneReady && emailValid;
     if (step === 2) return tradeType !== null && name.trim().length > 1;
     if (step === 3) return trade !== '';
     if (step === 4) return true; // address optional
     if (step === 5) return vat !== null;
     return false;
-  }, [step, phoneReady, tradeType, name, trade, vat]);
+  }, [step, phoneReady, emailValid, tradeType, name, trade, vat]);
 
   function next() {
     if (step < TOTAL) setStep(step + 1);
@@ -129,12 +131,15 @@ export default function StartPage() {
           ) : (
             <div key={step} className="step-anim">
               {step === 1 && (
-                <Step title="What is your mobile number?" sub="This links your WhatsApp to your books. It is the only thing we need to get you going.">
+                <Step title="Let's set up your account" sub="Your mobile links your WhatsApp, that is where the work happens. Your email is just for your receipt and trial reminders.">
+                  <label style={fieldLabel}>Mobile number</label>
                   <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '15px 14px', backgroundColor: RIVER_TINT, color: RIVER, fontWeight: 700, fontSize: 16, borderRight: `1.5px solid ${LINE}` }}>🇬🇧 +44</span>
                     <input className="field" inputMode="tel" placeholder="7700 900 000" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={14} style={{ flex: 1, border: 'none', padding: '15px 14px', fontSize: 17, color: INK, letterSpacing: '0.5px', background: 'transparent' }} />
                   </div>
-                  <p style={{ fontSize: 12.5, color: MUTED, marginTop: 12 }}>We never share it. We only ever message you in reply to you.</p>
+                  <label style={{ ...fieldLabel, marginTop: 18 }}>Email</label>
+                  <input className="field" inputMode="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={fieldStyle} />
+                  <p style={{ fontSize: 12.5, color: MUTED, marginTop: 12 }}>We never share your details. We only ever message you in reply to you.</p>
                 </Step>
               )}
 

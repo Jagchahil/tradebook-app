@@ -398,8 +398,10 @@ export default function HomePage() {
           @keyframes appslide{0%,22%{transform:translateX(0)}28%,47%{transform:translateX(-25%)}53%,72%{transform:translateX(-50%)}78%,100%{transform:translateX(-75%)}}
           .appdot{display:inline-block;width:7px;height:7px;border-radius:4px;background:${LINE};margin:0 3px}
           /* Why different checklist */
+          .why-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 48px}
           .why-item{display:flex;gap:16px;padding:22px 4px;border-bottom:1px solid rgba(255,255,255,.10)}
           .why-bar{flex-shrink:0;width:4px;border-radius:2px;background:linear-gradient(${RIVER},${SAFFRON})}
+          .nav-links{display:flex;align-items:center;gap:24px}
           /* FAQ */
           details.faq{transition:border-color .2s ease, box-shadow .2s ease}
           details.faq[open]{border-color:${RIVER_TINT};box-shadow:0 10px 30px rgba(17,17,17,.06)}
@@ -420,7 +422,10 @@ export default function HomePage() {
           @media (max-width:880px){
             .hero-h1-size{font-size:40px}.h2{font-size:27px}
             .grid3{grid-template-columns:1fr}
-            .nav-cta{display:none}.price-split{flex-direction:column}
+            .nav-links{display:none}.price-split{flex-direction:column}
+            .why-grid{grid-template-columns:1fr;gap:0}
+            .mtd-tab{padding:9px 13px;font-size:12.5px}
+            .mtd-tabs{max-width:100%}
             .hero-grid{grid-template-columns:1fr;gap:30px}
             .hero-left{text-align:center}
             .hero-cta{justify-content:center}
@@ -446,13 +451,15 @@ export default function HomePage() {
           <path d="M34 78 C 90 64, 120 92, 150 78 S 230 64, 266 78" stroke="url(#navriver)" strokeWidth="5" strokeLinecap="round" fill="none" />
         </svg>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <a href="#how" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>How it works</a>
-          <a href="#app" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>The app</a>
-          <a href="#mtd" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Tax changes</a>
-          <a href="#compare" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Compare</a>
-          <a href="#reviews" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Reviews</a>
-          <a href="#pricing" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Pricing</a>
-          <Link href="/early-access" className="btn-primary nav-cta" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}>Get early access</Link>
+          <span className="nav-links">
+            <a href="#how" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>How it works</a>
+            <a href="#app" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>The app</a>
+            <a href="#mtd" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Tax changes</a>
+            <a href="#compare" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Compare</a>
+            <a href="#reviews" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Reviews</a>
+            <a href="#pricing" className="navlink" style={{ color: MUTED, fontSize: 15, fontWeight: 500 }}>Pricing</a>
+          </span>
+          <Link href="/early-access" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Get early access</Link>
         </div>
       </nav>
 
@@ -694,7 +701,7 @@ export default function HomePage() {
           </div>
 
           {/* What it means for you */}
-          <div className="reveal" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 22, marginTop: 44 }}>
+          <div className="grid3 reveal" style={{ display: 'grid', gap: 22, marginTop: 44 }}>
             {mtdMeans.map((m) => (
               <div key={m.title} className="card" style={{ backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 24 }}>
                 <div className="icontile" style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: m.tint, color: m.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, marginBottom: 14 }}>{m.icon}</div>
@@ -768,7 +775,7 @@ export default function HomePage() {
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>The things other tools get wrong.</h2>
             <p style={{ fontSize: 17, color: '#B6BDC8', maxWidth: 560, margin: '0 auto' }}>We built Lekhio so you never have these complaints.</p>
           </div>
-          <div className="reveal" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 48px' }}>
+          <div className="reveal why-grid">
             {differences.map((d) => (
               <div key={d.title} className="why-item">
                 <span className="why-bar" aria-hidden="true" />

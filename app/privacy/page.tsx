@@ -2,15 +2,15 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy. TradeBook.',
-  description: 'How TradeBook collects, uses, and protects your data under UK GDPR.',
+  title: 'Privacy Policy. Lekhio.',
+  description: 'How Lekhio collects, uses, and protects your data under UK GDPR.',
 };
 
 const INK = '#111111';
-const INDIGO = '#4F46E5';
+const INDIGO = '#1B59A6';
 const MUTED = '#6B7280';
 const BORDER = '#ECECEC';
-const OFF_WHITE = '#FAFAFA';
+const OFF_WHITE = '#FBFAF7';
 
 const FONT =
   "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
 
       <nav style={{ maxWidth: 760, margin: '0 auto', padding: '22px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href="/" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px', color: INK }}>
-          TradeBook
+          Lekhio
         </Link>
         <Link href="/" style={{ fontSize: 14, fontWeight: 500, color: INDIGO }}>
           Back to home
@@ -55,16 +55,16 @@ export default function PrivacyPage() {
         <h1 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 8px' }}>Privacy Policy</h1>
         <p style={{ fontSize: 14, color: MUTED, margin: '0 0 8px' }}>Last updated 24 June 2026</p>
         <p style={para}>
-          This policy explains what TradeBook collects, why we collect it, and what we do with it. We
+          This policy explains what Lekhio collects, why we collect it, and what we do with it. We
           handle your data under the UK General Data Protection Regulation and the Data Protection Act
           2018. We keep this short and plain on purpose.
         </p>
 
         <h2 style={heading}>Who we are</h2>
         <p style={para}>
-          TradeBook provides bookkeeping and tax preparation tools for UK self employed tradespeople.
-          For data protection law, TradeBook is the data controller for the information described here.
-          You can reach us any time at privacy@tradebook.app.
+          Lekhio provides bookkeeping and tax preparation tools for UK self employed tradespeople.
+          For data protection law, Lekhio is the data controller for the information described here.
+          You can reach us any time at privacy@lekhio.com.
         </p>
 
         <h2 style={heading}>What we collect</h2>
@@ -91,8 +91,8 @@ export default function PrivacyPage() {
 
         <h2 style={heading}>Tax and HMRC</h2>
         <p style={para}>
-          TradeBook prepares your figures. You always review and approve them. We never submit anything
-          to HMRC without your explicit approval, and we never imply that HMRC endorses TradeBook. You
+          Lekhio prepares your figures. You always review and approve them. We never submit anything
+          to HMRC without your explicit approval, and we never imply that HMRC endorses Lekhio. You
           remain legally responsible for your own tax at all times.
         </p>
 
@@ -106,7 +106,7 @@ export default function PrivacyPage() {
         <h2 style={heading}>Who we share it with</h2>
         <p style={para}>
           We do not sell your data. We share it only with the service providers that help us run
-          TradeBook, such as our hosting, database, payment, and messaging providers. They act on our
+          Lekhio, such as our hosting, database, payment, and messaging providers. They act on our
           instructions and are bound to protect your data. If a recognised tax submission path is used,
           it only happens after you approve.
         </p>
@@ -128,7 +128,7 @@ export default function PrivacyPage() {
           <li style={li}>Object to or restrict certain processing.</li>
         </ul>
         <p style={para}>
-          To use any of these rights, email privacy@tradebook.app. You can also complain to the
+          To use any of these rights, email privacy@lekhio.com. You can also complain to the
           Information Commissioner's Office at ico.org.uk if you are unhappy with how we handle your
           data.
         </p>
@@ -140,7 +140,7 @@ export default function PrivacyPage() {
         </p>
 
         <h2 style={heading}>Contact</h2>
-        <p style={para}>Questions about your privacy. Email privacy@tradebook.app and we will help.</p>
+        <p style={para}>Questions about your privacy. Email privacy@lekhio.com and we will help.</p>
 
         <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 40, paddingTop: 20 }}>
           <Link href="/terms" style={{ fontSize: 14, fontWeight: 500, color: INDIGO }}>

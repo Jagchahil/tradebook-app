@@ -28,6 +28,111 @@ function headers(extra: Record<string, string> = {}): Record<string, string> {
   };
 }
 
+// --- WhatsApp conversation state ------------------------------------------
+
+export interface WaSession {
+  phone: string;
+  flow: string;
+  step: string;
+  data: Record<string, unknown>;
+  updated_at: string;
+}
+
+const SESSION_TTL_MS = 60 * 60 * 1000; // an abandoned flow expires after an hour
+
+export async function getSession(phone: string): Promise<WaSession | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/wa_sessions?phone=eq.${encodeURIComponent(phone)}&select=*&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as WaSession[];
+  if (rows.length === 0) return null;
+  const s = rows[0];
+  if (Date.now() - new Date(s.updated_at).getTime() > SESSION_TTL_MS) {
+    await clearSession(phone);
+    return null;
+  }
+  return s;
+}
+
+export async function setSession(
+  phone: string,
+  flow: string,
+  step: string,
+  data: Record<string, unknown>,
+): Promise<void> {
+  const { url } = config();
+  await fetch(`${url}/rest/v1/wa_sessions`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify({ phone, flow, step, data, updated_at: new Date().toISOString() }),
+  });
+}
+
+export async function clearSession(phone: string): Promise<void> {
+  const { url } = config();
+  await fetch(`${url}/rest/v1/wa_sessions?phone=eq.${encodeURIComponent(phone)}`, {
+    method: 'DELETE',
+    headers: headers({ Prefer: 'return=minimal' }),
+  });
+}
+
+// Create an invoice from the server (the WhatsApp flow). Returns the new id,
+// human number, and total, or null on failure.
+export interface ServerInvoiceInput {
+  customer_name: string;
+  customer_contact?: string | null;
+  line_items: Array<{ description: string; amount: number }>;
+}
+
+export async function createInvoice(
+  userId: string,
+  input: ServerInvoiceInput,
+): Promise<{ id: string; number: string; total: number } | null> {
+  const { url } = config();
+  const subtotal = input.line_items.reduce((s, li) => s + (Number(li.amount) || 0), 0);
+
+  // Number it from how many the user already has.
+  const countRes = await fetch(
+    `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}&select=id`,
+    { headers: headers() },
+  );
+  const existing = countRes.ok ? ((await countRes.json()) as unknown[]) : [];
+  const number = `INV-${String(existing.length + 1).padStart(4, '0')}`;
+
+  const today = new Date();
+  const due = new Date(today);
+  due.setDate(due.getDate() + 14);
+
+  const res = await fetch(`${url}/rest/v1/invoices`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'return=representation' }),
+    body: JSON.stringify({
+      user_id: userId,
+      number,
+      customer_name: input.customer_name,
+      customer_contact: input.customer_contact ?? null,
+      line_items: input.line_items,
+      subtotal,
+      tax: 0,
+      total: subtotal,
+      status: 'draft',
+      issued_date: today.toISOString().slice(0, 10),
+      due_date: due.toISOString().slice(0, 10),
+    }),
+  });
+  if (!res.ok) {
+    console.error('[createInvoice] failed:', res.status);
+    return null;
+  }
+  const created = (await res.json()) as Array<{ id: string }>;
+  const row = Array.isArray(created) ? created[0] : (created as { id: string });
+  if (!row?.id) return null;
+  return { id: row.id, number, total: subtotal };
+}
+
 export interface NewTransaction {
   user_id: string;
   vendor: string;
@@ -42,7 +147,7 @@ export interface NewTransaction {
   raw_whatsapp_message_id?: string | null;
 }
 
-// Find the TradeBook user whose stored phone matches this WhatsApp sender.
+// Find the Lekhio user whose stored phone matches this WhatsApp sender.
 // WhatsApp sends the number without a plus, for example 447700900000. The app
 // stores it as +447700900000. We check a few shapes to be safe.
 export async function findUserIdByPhone(senderDigits: string): Promise<string | null> {
@@ -109,6 +214,49 @@ export async function insertTransaction(record: NewTransaction): Promise<void> {
     const text = await res.text();
     throw new Error(`Insert failed: ${res.status} ${text}`);
   }
+}
+
+// Mark an invoice paid from the server (Stripe webhook) and book the income,
+// once only. Safe to call more than once for the same invoice.
+export async function markInvoicePaidServer(invoiceId: string): Promise<void> {
+  const { url } = config();
+
+  const invRes = await fetch(
+    `${url}/rest/v1/invoices?id=eq.${encodeURIComponent(invoiceId)}&select=user_id,number,customer_name,total,status&limit=1`,
+    { headers: headers() },
+  );
+  if (!invRes.ok) return;
+  const rows = (await invRes.json()) as Array<{
+    user_id: string;
+    number: string;
+    customer_name: string;
+    total: number;
+    status: string;
+  }>;
+  if (rows.length === 0) return;
+  const inv = rows[0];
+  if (inv.status === 'paid') return; // already done, do not double book
+
+  const upRes = await fetch(`${url}/rest/v1/invoices?id=eq.${encodeURIComponent(invoiceId)}`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ status: 'paid', paid_at: new Date().toISOString() }),
+  });
+  if (!upRes.ok) {
+    console.error('[markInvoicePaidServer] Update failed:', upRes.status);
+    return;
+  }
+
+  await insertTransaction({
+    user_id: inv.user_id,
+    vendor: inv.customer_name,
+    amount: Math.abs(Number(inv.total) || 0),
+    category: 'income',
+    transaction_date: new Date().toISOString().slice(0, 10),
+    source_type: 'invoice',
+    description: `Invoice ${inv.number}`,
+    confirmed: true,
+  }).catch((e) => console.error('[markInvoicePaidServer] Income insert failed:', e));
 }
 
 // --- Invoices (read for the public invoice page, server side only) ---------

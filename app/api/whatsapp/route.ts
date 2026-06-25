@@ -6,13 +6,19 @@ import {
   downloadMedia,
   sendText,
 } from '../../../lib/whatsapp';
-import { parseReceipt, parseSpokenTransaction, hasClaudeConfig } from '../../../lib/claude';
+import { parseReceipt, parseSpokenTransaction, draftInvoice, hasClaudeConfig } from '../../../lib/claude';
 import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
 import {
   findUserIdByPhone,
   transactionExists,
   insertTransaction,
+  getSession,
+  setSession,
+  clearSession,
+  createInvoice,
 } from '../../../lib/supabase';
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
 
 // We never log message text or media. Only ids and status, per the data rules.
 
@@ -74,7 +80,11 @@ export async function POST(req: NextRequest) {
     } else if (message.type === 'audio' && message.audio?.id) {
       await handleVoiceNote(from, messageId, message.audio.id);
     } else if (message.type === 'text' && message.text?.body) {
-      await handleTextEntry(from, messageId, message.text.body);
+      // Invoice flow takes priority. If it consumes the message, do not also log it.
+      const handled = await handleInvoiceFlow(from, message.text.body);
+      if (!handled) {
+        await handleTextEntry(from, messageId, message.text.body);
+      }
     } else {
       await sendText(
         from,
@@ -91,13 +101,13 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleReceiptImage(from: string, messageId: string, mediaId: string): Promise<void> {
-  // Find the TradeBook account for this number first. No point parsing if there
+  // Find the Lekhio account for this number first. No point parsing if there
   // is nobody to attach it to.
   const userId = await findUserIdByPhone(from);
   if (!userId) {
     await sendText(
       from,
-      'We could not find your TradeBook account for this number. Open the app, add your number, then send the receipt again.',
+      'We could not find your Lekhio account for this number. Open the app, add your number, then send the receipt again.',
     );
     return;
   }
@@ -137,7 +147,7 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
   const amountText = `£${parsed.amount.toFixed(2)}`;
   await sendText(
     from,
-    `Logged. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. It is in your TradeBook.`,
+    `Logged. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. It is in your Lekhio.`,
   );
 }
 
@@ -146,7 +156,7 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
   if (!userId) {
     await sendText(
       from,
-      'We could not find your TradeBook account for this number. Open the app, add your number, then send the voice note again.',
+      'We could not find your Lekhio account for this number. Open the app, add your number, then send the voice note again.',
     );
     return;
   }
@@ -186,7 +196,7 @@ async function handleTextEntry(from: string, messageId: string, body: string): P
   if (!userId) {
     await sendText(
       from,
-      'We could not find your TradeBook account for this number. Open the app, add your number, then send it again.',
+      'We could not find your Lekhio account for this number. Open the app, add your number, then send it again.',
     );
     return;
   }
@@ -243,6 +253,95 @@ function confirmationLine(parsed: {
     return `Got it. Income of ${amountText} from ${parsed.merchant_name}. Check it in the app and confirm.`;
   }
   return `Got it. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. Check it in the app and confirm.`;
+}
+
+// --- Guided invoice flow over WhatsApp ------------------------------------
+// "create invoice" starts it. Then we ask for the customer, their contact, and
+// the work, and build a real invoice with a shareable link. Returns true if the
+// message was part of an invoice conversation (so it is not also logged as an
+// expense), false otherwise.
+const INVOICE_TRIGGER = /^\s*(create|new|make|raise|start)?\s*invoice\b/i;
+const CANCEL = /^\s*(cancel|stop|quit|nevermind|never mind)\s*$/i;
+
+async function handleInvoiceFlow(from: string, body: string): Promise<boolean> {
+  const session = await getSession(from);
+  const isTrigger = INVOICE_TRIGGER.test(body);
+
+  // Not in a flow and not starting one. Let normal handling take it.
+  if (!session && !isTrigger) return false;
+
+  if (CANCEL.test(body)) {
+    await clearSession(from);
+    await sendText(from, 'No problem, I have cancelled that invoice.');
+    return true;
+  }
+
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await clearSession(from);
+    await sendText(
+      from,
+      'We could not find your Lekhio account for this number. Open the app, add your number, then try again.',
+    );
+    return true;
+  }
+
+  // Start (or restart) the flow.
+  if (!session || (isTrigger && session.flow !== 'invoice')) {
+    await setSession(from, 'invoice', 'customer', {});
+    await sendText(from, "Let's make an invoice. Who is it for? Just their name.");
+    return true;
+  }
+
+  const data = (session.data ?? {}) as { customer_name?: string; customer_contact?: string | null };
+
+  if (session.step === 'customer') {
+    data.customer_name = body.trim().slice(0, 120);
+    await setSession(from, 'invoice', 'contact', data);
+    await sendText(from, "Their email or mobile to send it to? Type skip if you will send it yourself.");
+    return true;
+  }
+
+  if (session.step === 'contact') {
+    const c = body.trim();
+    data.customer_contact = /^skip$/i.test(c) ? null : c.slice(0, 160);
+    await setSession(from, 'invoice', 'items', data);
+    await sendText(from, "What is the work and the amount? For example: bathroom rewire 450, materials 80.");
+    return true;
+  }
+
+  if (session.step === 'items') {
+    if (!hasClaudeConfig()) {
+      await clearSession(from);
+      await sendText(from, 'Invoice building is not switched on yet. Hang tight.');
+      return true;
+    }
+    const drafted = await draftInvoice(body);
+    if (!drafted || drafted.line_items.length === 0) {
+      await sendText(from, "I could not pick out the amounts. Try like: 'bathroom rewire 450, materials 80'.");
+      return true; // stay on this step
+    }
+    const inv = await createInvoice(userId, {
+      customer_name: data.customer_name || 'Customer',
+      customer_contact: data.customer_contact ?? null,
+      line_items: drafted.line_items,
+    });
+    await clearSession(from);
+    if (!inv) {
+      await sendText(from, 'Something went wrong saving that. Please try again.');
+      return true;
+    }
+    const link = `${APP_URL}/invoice/${inv.id}`;
+    await sendText(
+      from,
+      `Done. Invoice ${inv.number} for ${data.customer_name || 'your customer'}, total £${inv.total.toFixed(2)}.\n\nSend it to them: ${link}\n\nIt is saved in your app as a draft. Mark it paid there when the money lands and it goes straight into your income.`,
+    );
+    return true;
+  }
+
+  // Unknown state, reset cleanly.
+  await clearSession(from);
+  return false;
 }
 
 // --- Shapes of the bits of the webhook payload we read. -------------------

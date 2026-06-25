@@ -1,6 +1,6 @@
 // Speech to text for WhatsApp voice notes.
 //
-// Claude does not transcribe audio, so this is the one place TradeBook uses a
+// Claude does not transcribe audio, so this is the one place Lekhio uses a
 // non Anthropic service. It is isolated here on purpose. To swap providers,
 // change only this file. Everything else calls transcribeAudio and does not care
 // who does the work.

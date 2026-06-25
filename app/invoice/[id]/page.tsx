@@ -1,10 +1,11 @@
 import { getPublicInvoice } from '../../../lib/supabase';
+import { hasStripeConfig } from '../../../lib/stripe';
 
 const INK = '#111111';
-const INDIGO = '#4F46E5';
+const INDIGO = '#1B59A6';
 const MUTED = '#6B7280';
 const BORDER = '#ECECEC';
-const OFF_WHITE = '#FAFAFA';
+const OFF_WHITE = '#FBFAF7';
 const GREEN = '#15803D';
 
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
@@ -28,7 +29,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     return (
       <main style={{ backgroundColor: OFF_WHITE, color: INK, fontFamily: FONT, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>TradeBook</div>
+          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Lekhio</div>
           <p style={{ color: MUTED }}>This invoice could not be found.</p>
         </div>
       </main>
@@ -68,7 +69,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         <div style={{ padding: '24px 32px', display: 'flex', gap: 32, flexWrap: 'wrap', borderBottom: `1px solid ${BORDER}` }}>
           <div style={{ minWidth: 180 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>From</div>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>{invoice.business_name || 'TradeBook user'}</div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>{invoice.business_name || 'Lekhio user'}</div>
             {invoice.business_contact ? <div style={{ fontSize: 14, color: MUTED, marginTop: 2 }}>{invoice.business_contact}</div> : null}
           </div>
           <div style={{ minWidth: 180 }}>
@@ -104,13 +105,35 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </div>
         ) : null}
 
+        {!isPaid && hasStripeConfig() ? (
+          <div style={{ padding: '0 32px 28px' }}>
+            <a
+              href={`/api/pay/${id}`}
+              style={{
+                display: 'block',
+                textAlign: 'center',
+                backgroundColor: INDIGO,
+                color: '#FFFFFF',
+                fontSize: 16,
+                fontWeight: 700,
+                padding: '16px',
+                borderRadius: 12,
+                textDecoration: 'none',
+              }}
+            >
+              Pay {gbp(invoice.total)} now
+            </a>
+            <p style={{ textAlign: 'center', fontSize: 12, color: MUTED, marginTop: 10 }}>Secure card payment by Stripe.</p>
+          </div>
+        ) : null}
+
         {/* Footer */}
         <div style={{ padding: '18px 32px', borderTop: `1px solid ${BORDER}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <span style={{ fontSize: 13, color: MUTED }}>
             {isPaid ? 'This invoice has been paid. Thank you.' : 'Please pay by the due date.'}
           </span>
           <span style={{ fontSize: 13, color: MUTED }}>
-            Made with <span style={{ fontWeight: 700, color: INK }}>TradeBook</span>
+            Made with <span style={{ fontWeight: 700, color: INK }}>Lekhio</span>
           </span>
         </div>
       </div>

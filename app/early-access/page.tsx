@@ -40,7 +40,7 @@ export default function EarlyAccessPage() {
           <div style={styles.tick}>✓</div>
           <h1 style={styles.heading}>You're on the list.</h1>
           <p style={styles.sub}>
-            We'll text you when TradeBook is ready for you. Keep your phone nearby.
+            We'll text you when Lekhio is ready for you. Keep your phone nearby.
           </p>
         </div>
       </main>
@@ -50,11 +50,11 @@ export default function EarlyAccessPage() {
   return (
     <main style={styles.page}>
       <div style={styles.card}>
-        <div style={styles.wordmark}>TradeBook</div>
+        <div style={styles.wordmark}>Lekhio</div>
 
         <h1 style={styles.heading}>Get early access.</h1>
         <p style={styles.sub}>
-          TradeBook is coming to WhatsApp first. Drop your number and we'll text
+          Lekhio is coming to WhatsApp first. Drop your number and we'll text
           you the moment it's live. No app download. No forms. Just text it.
         </p>
 
@@ -101,7 +101,7 @@ export default function EarlyAccessPage() {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#FBFAF7',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -147,8 +147,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   prefix: {
     padding: '16px',
-    backgroundColor: '#EEF2FF',
-    color: '#4F46E5',
+    backgroundColor: '#E9F1FA',
+    color: '#1B59A6',
     fontWeight: '600',
     fontSize: '14px',
     borderRight: '1.5px solid #E5E7EB',
@@ -184,7 +184,7 @@ const styles: Record<string, React.CSSProperties> = {
   button: {
     width: '100%',
     padding: '17px',
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#1B59A6',
     color: '#FFFFFF',
     fontSize: '16px',
     fontWeight: '700',
@@ -203,13 +203,13 @@ const styles: Record<string, React.CSSProperties> = {
   tick: {
     width: '56px',
     height: '56px',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#E9F1FA',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '24px',
     margin: '0 auto 20px',
-    color: '#4F46E5',
+    color: '#1B59A6',
   },
 };

@@ -341,6 +341,85 @@ function AppInv() {
   );
 }
 
+function OnbBar({ pct }: { pct: number }) {
+  return (
+    <div style={{ height: 6, borderRadius: 3, background: SURFACE, overflow: 'hidden', margin: '4px 0 16px' }}>
+      <div style={{ height: 6, borderRadius: 3, width: `${pct}%`, background: `linear-gradient(90deg, ${RIVER}, ${SAFFRON})` }} />
+    </div>
+  );
+}
+
+function OnbHead({ n, title }: { n: number; title: string }) {
+  return (
+    <>
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: RIVER, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Step {n} of 5</div>
+      <OnbBar pct={[12, 40, 68, 100][n - 1]} />
+      <div style={{ fontSize: 17, fontWeight: 800, color: INK, letterSpacing: '-0.4px', marginBottom: 14 }}>{title}</div>
+    </>
+  );
+}
+
+function OnbNum() {
+  return (
+    <div className="appscreen">
+      <OnbHead n={1} title="What is your mobile number?" />
+      <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
+        <span style={{ padding: '13px 11px', background: RIVER_TINT, color: RIVER, fontWeight: 700, fontSize: 13, borderRight: `1.5px solid ${LINE}` }}>🇬🇧 +44</span>
+        <span style={{ padding: '13px 11px', fontSize: 14, color: INK }}>7700 900 000</span>
+      </div>
+      <div style={{ fontSize: 11.5, color: MUTED, marginTop: 12 }}>We never share it. We only reply to you.</div>
+      <div style={{ background: RIVER, color: '#fff', textAlign: 'center', borderRadius: 12, padding: '13px 0', fontSize: 14, fontWeight: 700, marginTop: 20 }}>Continue</div>
+    </div>
+  );
+}
+
+function OnbTrade() {
+  const rows: [string, string, boolean][] = [['👤', 'Just me', true], ['🏪', 'A business name', false], ['🏢', 'A limited company', false]];
+  return (
+    <div className="appscreen">
+      <OnbHead n={2} title="How do you trade?" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+        {rows.map(([icon, label, active]) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 11, background: active ? RIVER_TINT : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 12, padding: '12px 12px' }}>
+            <span style={{ fontSize: 18 }}>{icon}</span>
+            <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: INK }}>{label}</span>
+            <span style={{ width: 18, height: 18, borderRadius: 9, border: `2px solid ${active ? RIVER : LINE}`, background: active ? RIVER : 'transparent', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{active ? '✓' : ''}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OnbDo() {
+  const chips: [string, boolean][] = [['Electrician', true], ['Plumber', false], ['Builder', false], ['Cleaner', false], ['Driver', false], ['Hairdresser', false], ['Freelancer', false]];
+  return (
+    <div className="appscreen">
+      <OnbHead n={3} title="What do you do?" />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {chips.map(([t, active]) => (
+          <span key={t} style={{ fontSize: 13, fontWeight: 600, color: active ? '#fff' : INK, background: active ? RIVER : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 20, padding: '9px 14px' }}>{t}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OnbDone() {
+  return (
+    <div className="appscreen" style={{ textAlign: 'center' }}>
+      <OnbBar pct={100} />
+      <div style={{ width: 64, height: 64, borderRadius: 32, background: GREEN_TINT, color: GREEN, fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '14px auto 16px' }}>✓</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: INK, marginBottom: 8 }}>You are all set</div>
+      <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.5, marginBottom: 18, padding: '0 8px' }}>30 day free trial started. No card needed. Download the app and say hello on WhatsApp.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <span style={{ background: INK, color: '#fff', borderRadius: 10, padding: '10px 0', fontSize: 12.5, fontWeight: 600 }}>  App Store</span>
+        <span style={{ background: INK, color: '#fff', borderRadius: 10, padding: '10px 0', fontSize: 12.5, fontWeight: 600 }}>▶  Google Play</span>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
@@ -522,7 +601,7 @@ export default function HomePage() {
         <input type="checkbox" id="navtoggle" className="nav-toggle" aria-label="Toggle menu" />
 
         <div className="nav-right">
-          <Link href="/early-access" className="btn-primary nav-cta-desktop" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Get early access</Link>
+          <Link href="/start" className="btn-primary nav-cta-desktop" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Get early access</Link>
           <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu"><span /><span /><span /></label>
         </div>
 
@@ -534,7 +613,7 @@ export default function HomePage() {
           <a href="#reviews">Reviews</a>
           <a href="#trust">Trust</a>
           <a href="#pricing">Pricing</a>
-          <Link href="/early-access" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Get early access</Link>
+          <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Get early access</Link>
         </div>
       </nav>
 
@@ -553,7 +632,7 @@ export default function HomePage() {
               Lekhio is the back office for anyone self employed in the UK. Snap a receipt, leave a voice note, or type it. Lekhio logs it, sorts it, invoices for you, and keeps you ready for tax. All on WhatsApp.
             </p>
             <div className="hero-cta" style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-              <Link href="/early-access" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Get early access</Link>
+              <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Get early access</Link>
               <a href="#how" className="btn-ghost" style={{ backgroundColor: 'transparent', color: INK, border: `1px solid ${INK}`, fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>See how it works</a>
             </div>
             <div className="hero-cta" style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 22, flexWrap: 'wrap' }}>
@@ -618,6 +697,43 @@ export default function HomePage() {
               <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: 0 }}>{s.body}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Onboarding demo */}
+      <section id="setup" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px 84px' }}>
+        <div className="appdemo-grid">
+          <div className="reveal">
+            <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>SET UP IN UNDER A MINUTE</span>
+            <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 16px' }}>A professional setup, in a few taps.</h2>
+            <p style={{ fontSize: 17, color: MUTED, lineHeight: 1.6, margin: '0 0 24px', maxWidth: 440 }}>
+              Sign up on the web, answer a couple of quick questions, and you are ready to go. No long forms, no spreadsheets to import, and no card needed to start.
+            </p>
+            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 30px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {['Tell us your number and your trade', 'We set up your invoices and tax records for you', 'Download the app and you are in'].map((line, i) => (
+                <li key={line} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <span style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: RIVER, color: '#fff', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>{i + 1}</span>
+                  <span style={{ fontSize: 15.5, color: INK, lineHeight: 1.5 }}>{line}</span>
+                </li>
+              ))}
+            </ul>
+            <Link href="/start" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Start free trial</Link>
+          </div>
+
+          <div className="reveal" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="appphone phone">
+              <div className="appstatus"><i /></div>
+              <div className="appview">
+                <div className="apptrack">
+                  <OnbNum />
+                  <OnbTrade />
+                  <OnbDo />
+                  <OnbDone />
+                </div>
+              </div>
+            </div>
+            <p style={{ fontSize: 13, color: MUTED, marginTop: 18 }}>A real look at signing up. Quick and clean.</p>
+          </div>
         </div>
       </section>
 
@@ -690,7 +806,7 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/early-access" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Get early access</Link>
+              <Link href="/start" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Get early access</Link>
             </div>
 
             <div className="reveal">
@@ -825,7 +941,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="reveal" style={{ textAlign: 'center', marginTop: 36 }}>
-            <Link href="/early-access" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Switch to the easy way</Link>
+            <Link href="/start" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Switch to the easy way</Link>
           </div>
         </div>
       </section>
@@ -944,7 +1060,7 @@ export default function HomePage() {
                 <span style={{ fontSize: 17, color: MUTED }}>/ month</span>
               </div>
               <p style={{ fontSize: 14, color: MUTED, margin: '0 0 26px' }}>After your free trial. Cancel any time.</p>
-              <Link href="/early-access" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: 15, borderRadius: 12 }}>Start free trial</Link>
+              <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: 15, borderRadius: 12 }}>Start free trial</Link>
             </div>
             <div style={{ flex: 1, padding: 36 }}>
               <p style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 18px' }}>What you get</p>
@@ -992,7 +1108,7 @@ export default function HomePage() {
           <p style={{ fontSize: 17, color: '#B6BDC8', lineHeight: 1.6, maxWidth: 540, margin: '0 auto 32px' }}>
             HMRC keeps you responsible for your tax. Lekhio keeps you ready for it. We prepare your figures. You always approve before anything is sent.
           </p>
-          <Link href="/early-access" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Get early access</Link>
+          <Link href="/start" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Get early access</Link>
         </div>
       </section>
 
@@ -1004,7 +1120,7 @@ export default function HomePage() {
             <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>Your books, handled. Just text it.</p>
           </div>
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-            <Link href="/early-access" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Early access</Link>
+            <Link href="/start" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Early access</Link>
             <Link href="/privacy" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Privacy</Link>
             <Link href="/terms" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Terms</Link>
             <a href="mailto:support@lekhio.com" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Support</a>

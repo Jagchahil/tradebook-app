@@ -409,17 +409,22 @@ export async function markInvoicePaidServer(invoiceId: string): Promise<void> {
   }>;
   if (rows.length === 0) return;
   const inv = rows[0];
-  if (inv.status === 'paid') return; // already done, do not double book
+  if (inv.status === 'paid') return; // already done, fast path
 
-  const upRes = await fetch(`${url}/rest/v1/invoices?id=eq.${encodeURIComponent(invoiceId)}`, {
+  // Atomic gate against duplicate or concurrent Stripe deliveries: only flip rows
+  // that are not already paid, and ask for the result back. If no row comes back,
+  // another delivery already paid it, so we must not book the income twice.
+  const upRes = await fetch(`${url}/rest/v1/invoices?id=eq.${encodeURIComponent(invoiceId)}&status=neq.paid`, {
     method: 'PATCH',
-    headers: headers({ Prefer: 'return=minimal' }),
+    headers: headers({ Prefer: 'return=representation' }),
     body: JSON.stringify({ status: 'paid', paid_at: new Date().toISOString() }),
   });
   if (!upRes.ok) {
     console.error('[markInvoicePaidServer] Update failed:', upRes.status);
     return;
   }
+  const updated = (await upRes.json().catch(() => [])) as unknown[];
+  if (!Array.isArray(updated) || updated.length === 0) return; // already paid by another delivery
 
   await insertTransaction({
     user_id: inv.user_id,

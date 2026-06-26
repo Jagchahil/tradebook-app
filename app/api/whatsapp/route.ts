@@ -11,6 +11,7 @@ import {
   parseSpokenTransaction,
   draftInvoice,
   answerMoneyQuestion,
+  parseSchedule,
   hasClaudeConfig,
 } from '../../../lib/claude';
 import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
@@ -24,6 +25,7 @@ import {
   setSession,
   clearSession,
   createInvoice,
+  createEvent,
 } from '../../../lib/supabase';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
@@ -92,7 +94,9 @@ export async function POST(req: NextRequest) {
       // Invoice flow takes priority. If it consumes the message, do not also log it.
       const handled = await handleInvoiceFlow(from, text);
       if (!handled) {
-        if (isHelp(text)) {
+        if (isSchedule(text)) {
+          await handleSchedule(from, text);
+        } else if (isHelp(text)) {
           await handleHelp(from);
         } else if (isQuestion(text)) {
           await handleMoneyQuestion(from, text);
@@ -276,6 +280,40 @@ const QUESTION_RE = /(^|\s)(how much|how many|what(?:'s| is| are)?|whats|when|sh
 
 function isHelp(body: string): boolean {
   return HELP_RE.test(body);
+}
+
+const SCHEDULE_RE = /\b(remind me|reminder|price up|quote|book(?:ing)?|appointment|diary|schedule|pencil in|tomorrow|next (?:mon|tue|wed|thu|fri|sat|sun)|at \d{1,2}(?::\d{2})?\s?(?:am|pm)|o'?clock)\b/i;
+
+function isSchedule(body: string): boolean {
+  // Do not hijack a money entry. If it clearly mentions a spend or a payment, let the entry handler take it.
+  if (/£|\bspent\b|\bbought\b|\bgot paid\b|\bpaid me\b/i.test(body)) return false;
+  return SCHEDULE_RE.test(body);
+}
+
+function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'when it is due';
+  return `on ${d.toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })}`;
+}
+
+async function handleSchedule(from: string, body: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(from, 'Open the app and add your number first, then I can keep your diary.');
+    return;
+  }
+  if (!hasClaudeConfig()) {
+    await sendText(from, 'Reminders are not switched on yet. Hang tight, they are coming very soon.');
+    return;
+  }
+  const parsed = await parseSchedule(body, new Date().toISOString());
+  if (!parsed) {
+    await sendText(from, 'I could not work out a time for that. Try, for example, "remind me to price up Dave\'s job tomorrow at 8am".');
+    return;
+  }
+  await createEvent(userId, { title: parsed.title, kind: parsed.kind, starts_at: parsed.starts_at, remind_at: parsed.remind_at });
+  const when = parsed.remind_at ? formatWhen(parsed.remind_at) : 'when it is due';
+  await sendText(from, `Got it. "${parsed.title}". I will remind you ${when}. 👍`);
 }
 
 // A money question, but only if it actually reads like a question, not a log

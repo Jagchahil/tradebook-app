@@ -282,3 +282,69 @@ export async function answerMoneyQuestion(question: string, summary: string): Pr
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   return textBlock ? textBlock.trim() : null;
 }
+
+// --- Scheduling: turn "price up a job for Dave tomorrow at 8am" into a diary event ---
+
+export interface ParsedSchedule {
+  title: string;
+  kind: 'job' | 'quote' | 'reminder' | 'note';
+  starts_at: string | null; // ISO 8601
+  remind_at: string | null; // ISO 8601, when to send the reminder
+}
+
+const SCHEDULE_PROMPT = (text: string, nowIso: string): string =>
+  [
+    'A UK self employed tradesperson sent a message that might be a diary entry, a job, a quote, or a reminder.',
+    `The current date and time is ${nowIso}, in the Europe/London timezone.`,
+    'Here is the message:',
+    `"${text}"`,
+    'If it describes something to do at a time or date, reply with JSON only:',
+    '{',
+    '  "is_event": true,',
+    '  "title": a short title, for example "Price up a job for Dave",',
+    '  "kind": one of job, quote, reminder, note,',
+    '  "starts_at": ISO 8601 date-time for when it happens, or null if no clear time,',
+    '  "remind_at": ISO 8601 date-time for when to remind them. Use the start time, or 30 minutes before for a job or a quote.',
+    '}',
+    'Resolve relative times like "tomorrow at 8am", "next Tuesday", or "in 2 hours" against the current time.',
+    'If the message is NOT about scheduling anything, reply with {"is_event": false}.',
+    'Reply with JSON only, no other text.',
+  ].join('\n');
+
+export async function parseSchedule(text: string, nowIso: string): Promise<ParsedSchedule | null> {
+  if (!KEY) return null;
+
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: MODEL, max_tokens: 300, messages: [{ role: 'user', content: SCHEDULE_PROMPT(text, nowIso) }] }),
+  });
+  if (!res.ok) {
+    console.error('[claude] Schedule parse failed:', res.status);
+    return null;
+  }
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const textBlock = data.content?.find((c) => c.type === 'text')?.text;
+  if (!textBlock) return null;
+
+  try {
+    const p = JSON.parse(clean(textBlock)) as {
+      is_event?: boolean;
+      title?: string;
+      kind?: string;
+      starts_at?: string | null;
+      remind_at?: string | null;
+    };
+    if (!p.is_event) return null;
+    const kind = ['job', 'quote', 'reminder', 'note'].includes(p.kind ?? '') ? (p.kind as ParsedSchedule['kind']) : 'reminder';
+    return {
+      title: (p.title || 'Reminder').toString().slice(0, 140),
+      kind,
+      starts_at: p.starts_at ?? null,
+      remind_at: p.remind_at ?? p.starts_at ?? null,
+    };
+  } catch {
+    console.error('[claude] Could not parse schedule JSON.');
+    return null;
+  }
+}

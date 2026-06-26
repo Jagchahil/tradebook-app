@@ -236,6 +236,103 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
   }
 }
 
+// --- Events / diary / reminders -------------------------------------------
+
+export interface NewEvent {
+  title: string;
+  kind?: string;
+  starts_at?: string | null;
+  remind_at?: string | null;
+  notes?: string | null;
+}
+
+export async function createEvent(userId: string, e: NewEvent): Promise<void> {
+  const { url } = config();
+  const rec: Record<string, unknown> = { user_id: userId, title: e.title, kind: e.kind ?? 'reminder' };
+  if (e.starts_at) rec.starts_at = e.starts_at;
+  if (e.remind_at) rec.remind_at = e.remind_at;
+  if (e.notes) rec.notes = e.notes;
+  const res = await fetch(`${url}/rest/v1/events`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify(rec),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Event insert failed: ${res.status} ${text}`);
+  }
+}
+
+export interface DueReminder {
+  id: string;
+  user_id: string;
+  title: string;
+  kind: string;
+  remind_at: string;
+}
+
+export async function getDueReminders(nowIso: string, limit = 100): Promise<DueReminder[]> {
+  const { url } = config();
+  const q = `${url}/rest/v1/events?select=id,user_id,title,kind,remind_at&reminded=eq.false&remind_at=not.is.null&remind_at=lte.${encodeURIComponent(nowIso)}&order=remind_at.asc&limit=${limit}`;
+  const res = await fetch(q, { headers: headers() });
+  if (!res.ok) return [];
+  return (await res.json()) as DueReminder[];
+}
+
+export async function markReminded(id: string): Promise<void> {
+  const { url } = config();
+  await fetch(`${url}/rest/v1/events?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ reminded: true }),
+  });
+}
+
+export async function getPhoneForUser(userId: string): Promise<string | null> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/users?id=eq.${userId}&select=phone_number&limit=1`, { headers: headers() });
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ phone_number?: string | null }>;
+  return rows[0]?.phone_number ?? null;
+}
+
+export interface NudgeTarget {
+  user_id: string;
+  phone: string;
+  daily_nudges: boolean;
+  weekly_summary: boolean;
+}
+
+export async function listNudgeTargets(): Promise<NudgeTarget[]> {
+  const { url } = config();
+  const ures = await fetch(`${url}/rest/v1/users?select=id,phone_number&phone_number=not.is.null`, { headers: headers() });
+  if (!ures.ok) return [];
+  const users = (await ures.json()) as Array<{ id: string; phone_number: string }>;
+  const pres = await fetch(`${url}/rest/v1/reminder_prefs?select=user_id,daily_nudges,weekly_summary`, { headers: headers() });
+  const prefs = pres.ok ? ((await pres.json()) as Array<{ user_id: string; daily_nudges: boolean; weekly_summary: boolean }>) : [];
+  const pmap = new Map(prefs.map((p) => [p.user_id, p]));
+  return users.map((u) => {
+    const p = pmap.get(u.id);
+    return { user_id: u.id, phone: u.phone_number, daily_nudges: p ? p.daily_nudges : true, weekly_summary: p ? p.weekly_summary : true };
+  });
+}
+
+export async function weeklyTotals(userId: string): Promise<{ income: number; expenses: number }> {
+  const { url } = config();
+  const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const res = await fetch(`${url}/rest/v1/transactions?user_id=eq.${userId}&confirmed=eq.true&created_at=gte.${encodeURIComponent(since)}&select=amount`, { headers: headers() });
+  if (!res.ok) return { income: 0, expenses: 0 };
+  const rows = (await res.json()) as Array<{ amount: number }>;
+  let income = 0;
+  let expenses = 0;
+  for (const r of rows) {
+    const a = Number(r.amount) || 0;
+    if (a >= 0) income += a;
+    else expenses += Math.abs(a);
+  }
+  return { income, expenses };
+}
+
 export async function insertTransaction(record: NewTransaction): Promise<void> {
   const { url } = config();
   const res = await fetch(`${url}/rest/v1/transactions`, {

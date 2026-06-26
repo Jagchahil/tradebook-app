@@ -22,8 +22,29 @@ function authorised(req: NextRequest): boolean {
   return q === secret || header === `Bearer ${secret}`;
 }
 
+// Let the function run long enough to fan out at scale. Pro allows up to 300s.
+export const maxDuration = 60;
+
 function gbp(n: number): string {
   return `£${Math.abs(n).toFixed(2)}`;
+}
+
+// Run an async task over a list with a fixed number of workers, so we never
+// loop thousands of sequential awaits (which would time the function out).
+// Concurrency 20 keeps us under Meta's default ~80 messages a second too.
+async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let i = 0;
+  const worker = async () => {
+    while (i < items.length) {
+      const item = items[i++];
+      try {
+        await fn(item);
+      } catch {
+        // One failed send must not stop the rest.
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
 export async function GET(req: NextRequest) {
@@ -36,33 +57,31 @@ export async function GET(req: NextRequest) {
   try {
     if (job === 'due') {
       const due = await getDueReminders(new Date().toISOString());
-      for (const r of due) {
+      await mapLimit(due, 20, async (r) => {
         const phone = await getPhoneForUser(r.user_id);
         if (!phone) {
           await markReminded(r.id);
-          continue;
+          return;
         }
         const emoji = r.kind === 'job' ? '🔧' : r.kind === 'quote' ? '📋' : '⏰';
         await sendText(phone, `${emoji} Reminder: ${r.title}`);
         await markReminded(r.id);
         sent++;
-      }
+      });
     } else if (job === 'nudge') {
-      const targets = await listNudgeTargets();
-      for (const t of targets) {
-        if (!t.daily_nudges) continue;
+      const targets = (await listNudgeTargets()).filter((t) => t.daily_nudges);
+      await mapLimit(targets, 20, async (t) => {
         await sendText(t.phone, "Quick one. Don't forget today's expenses. Snap a receipt, leave a voice note, or just tell me what you spent.");
         sent++;
-      }
+      });
     } else if (job === 'weekly') {
-      const targets = await listNudgeTargets();
-      for (const t of targets) {
-        if (!t.weekly_summary) continue;
+      const targets = (await listNudgeTargets()).filter((t) => t.weekly_summary);
+      await mapLimit(targets, 20, async (t) => {
         const { income, expenses } = await weeklyTotals(t.user_id);
         const profit = income - expenses;
         await sendText(t.phone, `Your week with Lekhio. In ${gbp(income)}, out ${gbp(expenses)}, kept ${gbp(profit)}. Open the app for the detail.`);
         sent++;
-      }
+      });
     } else {
       return NextResponse.json({ error: 'Unknown job.' }, { status: 400 });
     }

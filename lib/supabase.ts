@@ -182,6 +182,23 @@ export async function transactionExists(messageId: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+// Atomically claim an inbound message id so it is handled once. Returns true if
+// we just claimed it (process it), false if it was already claimed (a Meta retry,
+// skip it). On any unexpected error we fail open and process, so a real message
+// is never silently dropped.
+export async function claimMessage(id: string): Promise<boolean> {
+  if (!id) return true;
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/processed_messages`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ id }),
+  });
+  if (res.status === 201) return true; // newly inserted, we own it
+  if (res.status === 409) return false; // duplicate, already handled
+  return true;
+}
+
 export interface WaitlistSignup {
   phone: string;
   email?: string | null;

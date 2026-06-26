@@ -18,7 +18,7 @@ import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
 import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/email';
 import {
   findUserIdByPhone,
-  transactionExists,
+  claimMessage,
   insertTransaction,
   transactionSummaryForUser,
   getSession,
@@ -80,8 +80,10 @@ export async function POST(req: NextRequest) {
     const from = message.from;
     const messageId = message.id;
 
-    // Idempotency guard. If we already handled this message, do nothing.
-    if (messageId && (await transactionExists(messageId))) {
+    // Idempotency. Claim the message id atomically. If we cannot claim it, this
+    // is a Meta retry of something we already handled, so acknowledge and stop.
+    // This covers every flow, not just receipts: reminders, questions, invoices.
+    if (messageId && !(await claimMessage(messageId))) {
       return NextResponse.json({ ok: true });
     }
 

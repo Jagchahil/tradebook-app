@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignup } from '../../../lib/supabase';
+import { rateLimited, clientIp } from '../../../lib/ratelimit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -32,6 +33,9 @@ function str(value: unknown, max = 120): string | null {
 
 export async function POST(req: NextRequest) {
   try {
+    if (rateLimited(`onboard:${clientIp(req)}`, 12, 10 * 60 * 1000)) {
+      return NextResponse.json({ error: 'Too many requests. Give it a moment.' }, { status: 429 });
+    }
     let body: unknown;
     try {
       body = await req.json();

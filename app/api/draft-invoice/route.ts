@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { draftInvoice, hasClaudeConfig } from '../../../lib/claude';
+import { rateLimited, clientIp } from '../../../lib/ratelimit';
 
 // The mobile app calls this from a different origin, so allow cross origin use.
 // It only drafts invoice text from a description. There is nothing sensitive here.
@@ -15,6 +16,10 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
+    // Protect the AI spend from a flood from one source.
+    if (rateLimited(`draft:${clientIp(req)}`, 20, 5 * 60 * 1000)) {
+      return NextResponse.json({ error: 'Too many requests. Give it a moment.' }, { status: 429, headers: CORS });
+    }
     if (!hasClaudeConfig()) {
       return NextResponse.json({ error: 'Drafting is not switched on yet.' }, { status: 503, headers: CORS });
     }

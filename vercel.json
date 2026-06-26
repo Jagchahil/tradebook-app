@@ -1,7 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/reminders?job=due", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/reminders?job=nudge", "schedule": "0 8,18 * * *" },
+    { "path": "/api/cron/reminders?job=nudge", "schedule": "0 8 * * *" },
     { "path": "/api/cron/reminders?job=weekly", "schedule": "0 17 * * 0" }
   ]
 }

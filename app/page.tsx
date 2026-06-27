@@ -412,6 +412,29 @@ function OnbDone() {
   );
 }
 
+// The looping hero conversation. Tells the whole story: a receipt logged with
+// its cost, profit answered, an invoice sent, then paid into income. The chat
+// builds message by message, holds, then clears and repeats. Pure CSS, no JS.
+const chatMessages: { side: 'out' | 'in'; text: string; image?: string }[] = [
+  { side: 'out', image: '🧾', text: 'Screwfix receipt' },
+  { side: 'in', text: 'Logged. £42.60, materials ✅' },
+  { side: 'out', text: 'how much profit this month?' },
+  { side: 'in', text: "You're £2,240 up this month 📈" },
+  { side: 'out', text: 'invoice Dave £450 for the rewire' },
+  { side: 'in', text: 'Sent ✅  Dave paid. +£450 income 💷' },
+];
+const HERO_CHAT_LOOP = 15;
+const chatAppear = [4, 16, 30, 44, 58, 72];
+const chatCss =
+  `.cmsg{opacity:0}` +
+  `@media (prefers-reduced-motion: reduce){.cmsg{opacity:1 !important;animation:none !important;transform:none !important}}` +
+  chatMessages
+    .map((_, i) => {
+      const a = chatAppear[i];
+      return `@keyframes cmsg${i}{0%,${a}%{opacity:0;transform:translateY(8px)}${a + 3}%,93%{opacity:1;transform:none}98%,100%{opacity:0}}.cmsg${i}{animation:cmsg${i} ${HERO_CHAT_LOOP}s infinite}`;
+    })
+    .join('');
+
 export default function HomePage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
@@ -649,23 +672,29 @@ export default function HomePage() {
                   <div style={{ fontSize: 11, opacity: 0.85 }}>online</div>
                 </div>
               </div>
-              <div style={{ backgroundColor: '#ECE5DD', padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 360 }}>
-                <div className="bub bub1" style={{ alignSelf: 'flex-end', backgroundColor: '#DCF8C6', borderRadius: '14px 14px 4px 14px', padding: '10px 12px', maxWidth: '78%', fontSize: 13.5, color: INK }}>
-                  <div style={{ backgroundColor: '#cde7b4', borderRadius: 8, padding: '18px 12px', textAlign: 'center', marginBottom: 6, fontSize: 22 }}>🧾</div>
-                  Photo of receipt
-                </div>
-                <div className="bub bub2" style={{ alignSelf: 'flex-start', backgroundColor: '#fff', borderRadius: '14px 14px 14px 4px', padding: '10px 12px', maxWidth: '82%', fontSize: 13.5, color: INK, boxShadow: '0 1px 2px rgba(0,0,0,.08)' }}>
-                  Logged. Wickes, £84.20. Filed under materials. ✅
-                </div>
-                <div className="bub bub3" style={{ alignSelf: 'flex-end', backgroundColor: '#DCF8C6', borderRadius: '14px 14px 4px 14px', padding: '10px 12px', maxWidth: '78%', fontSize: 13.5, color: INK }}>
-                  create invoice for Dave, £400 for the rewire
-                </div>
-                <div className="bub bub4" style={{ alignSelf: 'flex-start', backgroundColor: '#fff', borderRadius: '14px 14px 14px 4px', padding: '10px 12px', maxWidth: '82%', fontSize: 13.5, color: INK, boxShadow: '0 1px 2px rgba(0,0,0,.08)' }}>
-                  Invoice INV-0007 for £400 is ready. Sent to Dave and saved to your books. 👍
-                </div>
-                <div className="bub bub4 typing" style={{ alignSelf: 'flex-start', backgroundColor: '#fff', borderRadius: 14, padding: '12px 14px', boxShadow: '0 1px 2px rgba(0,0,0,.08)' }}>
-                  <span /><span /><span />
-                </div>
+              <style dangerouslySetInnerHTML={{ __html: chatCss }} />
+              <div style={{ backgroundColor: '#ECE5DD', padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 380 }}>
+                {chatMessages.map((m, i) => (
+                  <div
+                    key={i}
+                    className={`cmsg cmsg${i}`}
+                    style={{
+                      alignSelf: m.side === 'out' ? 'flex-end' : 'flex-start',
+                      backgroundColor: m.side === 'out' ? '#DCF8C6' : '#fff',
+                      borderRadius: m.side === 'out' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                      padding: '10px 12px',
+                      maxWidth: m.side === 'out' ? '80%' : '84%',
+                      fontSize: 13.5,
+                      color: INK,
+                      boxShadow: m.side === 'in' ? '0 1px 2px rgba(0,0,0,.08)' : 'none',
+                    }}
+                  >
+                    {m.image ? (
+                      <div style={{ backgroundColor: '#cde7b4', borderRadius: 8, padding: '16px 12px', textAlign: 'center', marginBottom: 6, fontSize: 22 }}>{m.image}</div>
+                    ) : null}
+                    {m.text}
+                  </div>
+                ))}
               </div>
             </div>
             </div>
@@ -823,6 +852,35 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Bank connector showcase */}
+      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '58px 24px' }}>
+        <div className="reveal" style={{ textAlign: 'center', marginBottom: 30 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 20, marginBottom: 14 }}>Optional, coming soon</div>
+          <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Connect your bank, books on autopilot.</h2>
+          <p style={{ fontSize: 17, color: MUTED, maxWidth: 560, margin: '0 auto', lineHeight: 1.6 }}>Link your account, read only, and every payment in and out logs itself, sorted and ready for tax. We can never move your money.</p>
+        </div>
+        <div className="reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ animation: 'floaty 3.2s ease-in-out infinite', backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '20px 22px', textAlign: 'center', minWidth: 150 }}>
+            <div style={{ fontSize: 30 }}>🏦</div>
+            <div style={{ fontWeight: 700, marginTop: 6 }}>Your bank</div>
+            <div style={{ fontSize: 12.5, color: MUTED }}>read only</div>
+          </div>
+          <div style={{ color: SAFFRON_DEEP, fontWeight: 700, fontSize: 13 }}>money in and out →</div>
+          <div style={{ animation: 'floaty 3.2s ease-in-out infinite', animationDelay: '0.4s', backgroundColor: RIVER, color: '#fff', borderRadius: 16, padding: '20px 22px', textAlign: 'center', minWidth: 150 }}>
+            <div style={{ fontSize: 30 }}>💬</div>
+            <div style={{ fontWeight: 700, marginTop: 6 }}>Lekhio sorts it</div>
+            <div style={{ fontSize: 12.5, color: '#CFE0F2' }}>every payment</div>
+          </div>
+          <div style={{ color: GREEN, fontWeight: 700, fontSize: 13 }}>→ ready</div>
+          <div style={{ animation: 'floaty 3.2s ease-in-out infinite', animationDelay: '0.8s', backgroundColor: GREEN_TINT, borderRadius: 16, padding: '20px 22px', textAlign: 'center', minWidth: 150 }}>
+            <div style={{ fontSize: 30 }}>📊</div>
+            <div style={{ fontWeight: 700, marginTop: 6, color: GREEN }}>Tax, done</div>
+            <div style={{ fontSize: 12.5, color: MUTED }}>nothing to chase</div>
+          </div>
+        </div>
+        <p className="reveal" style={{ fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 24 }}>Read only through your bank&apos;s own login. Optional, and you can switch it off any time.</p>
+      </section>
+
       {/* MTD explainer (interactive) */}
       <section id="mtd" style={{ background: `linear-gradient(180deg, #fff, ${RIVER_TINT})`, borderTop: `1px solid ${LINE}` }}>
         <div style={{ maxWidth: 980, margin: '0 auto', padding: '62px 24px' }}>
@@ -899,6 +957,16 @@ export default function HomePage() {
           <p className="reveal" style={{ fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 26 }}>
             Lekhio is built for these rules from day one. You keep working, Lekhio keeps the records, and the quarterly update is ready when it is due.
           </p>
+          <Link href="/file-your-tax-return" className="reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', maxWidth: 760, margin: '28px auto 0', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '18px 22px', textDecoration: 'none', color: INK }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span style={{ fontSize: 26 }}>📋</span>
+              <div>
+                <div style={{ fontSize: 15.5, fontWeight: 700 }}>Rather file it yourself? Here is the free guide.</div>
+                <div style={{ fontSize: 13.5, color: MUTED }}>Step by step, by trade. Stop paying for a 15 minute job.</div>
+              </div>
+            </div>
+            <span style={{ backgroundColor: RIVER, color: '#fff', fontSize: 14.5, fontWeight: 600, padding: '11px 18px', borderRadius: 10, whiteSpace: 'nowrap' }}>Read the guide →</span>
+          </Link>
         </div>
       </section>
 

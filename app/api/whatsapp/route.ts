@@ -102,6 +102,10 @@ export async function POST(req: NextRequest) {
         if (!taxHandled) {
           if (isMileage(text)) {
             await handleMileage(from, messageId, text);
+          } else if (isHomeOffice(text)) {
+            await handleHomeOffice(from, messageId, text);
+          } else if (isPhoneShare(text)) {
+            await handlePhoneShare(from, messageId, text);
           } else if (isSchedule(text)) {
             await handleSchedule(from, text);
           } else if (isHelp(text)) {
@@ -332,6 +336,82 @@ async function handleMileage(from: string, messageId: string, body: string): Pro
   );
 }
 
+// --- Working from home, simplified flat rate ------------------------------
+// "worked 90 hours from home" logs the HMRC flat rate for the month.
+// 25 to 50 hours = £10, 51 to 100 = £18, 101+ = £26.
+const HOMEOFFICE_RE = /\b(home office|worked from home|working from home|work from home|use of home|wfh)\b/i;
+function isHomeOffice(body: string): boolean {
+  if (/£/.test(body)) return false;
+  return HOMEOFFICE_RE.test(body);
+}
+async function handleHomeOffice(from: string, messageId: string, body: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(from, 'Open the app and add your number first, then I can log your home working.');
+    return;
+  }
+  const hm = body.match(/(\d{1,4})\s*(?:hours?|hrs?)\b/i);
+  const hours = hm ? parseInt(hm[1], 10) : null;
+  if (hours === null) {
+    await sendText(from, 'How many hours did you work from home this month? For example "worked 90 hours from home".');
+    return;
+  }
+  let rate = 0;
+  if (hours >= 101) rate = 26;
+  else if (hours >= 51) rate = 18;
+  else if (hours >= 25) rate = 10;
+  else {
+    await sendText(from, 'The flat rate starts at 25 hours a month. Below that, claim a fair share of your actual home costs instead.');
+    return;
+  }
+  await insertTransaction({
+    user_id: userId,
+    vendor: 'Use of home',
+    amount: -rate,
+    category: 'use of home',
+    transaction_date: new Date().toISOString().slice(0, 10),
+    source_type: 'whatsapp_homeoffice',
+    description: body.slice(0, 280),
+    confirmed: false,
+    raw_whatsapp_message_id: messageId,
+  });
+  await sendText(from, `Logged. ${hours} hours from home, that is the £${rate} HMRC flat rate for the month. One claim a month. Check it in the app and confirm.`);
+}
+
+// --- Phone and broadband, business share ----------------------------------
+// "phone bill £45, 80% business" logs only the business proportion.
+function isPhoneShare(body: string): boolean {
+  return /£/.test(body) && /\b(phone|mobile|broadband|internet)\b/i.test(body) && /\d{1,3}\s*%/.test(body);
+}
+async function handlePhoneShare(from: string, messageId: string, body: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(from, 'Open the app and add your number first, then I can log this.');
+    return;
+  }
+  const am = body.match(/£\s*(\d+(?:\.\d{1,2})?)/);
+  const pm = body.match(/(\d{1,3})\s*%/);
+  if (!am || !pm) {
+    await sendText(from, 'Tell me the bill and your business share, for example "phone bill £45, 80% business".');
+    return;
+  }
+  const total = parseFloat(am[1]);
+  const pct = Math.min(parseInt(pm[1], 10), 100);
+  const amount = Math.round(total * pct) / 100;
+  await insertTransaction({
+    user_id: userId,
+    vendor: 'Phone and broadband',
+    amount: -amount,
+    category: 'phone',
+    transaction_date: new Date().toISOString().slice(0, 10),
+    source_type: 'whatsapp_phoneshare',
+    description: body.slice(0, 280),
+    confirmed: false,
+    raw_whatsapp_message_id: messageId,
+  });
+  await sendText(from, `Logged. ${pct}% of £${total.toFixed(2)} is £${amount.toFixed(2)} of phone and broadband. Check it in the app and confirm.`);
+}
+
 // --- Help and money questions ---------------------------------------------
 const HELP_RE = /^\s*(hi|hey|hello|help|menu|start|what can you do|commands)\b/i;
 const QUESTION_RE = /(^|\s)(how much|how many|what(?:'s| is| are)?|whats|when|show|list|total|do i|did i|am i|have i|spent|owe|owed|made|earn)\b/i;
@@ -392,6 +472,7 @@ async function handleHelp(from: string): Promise<void> {
       '🎙️ Or leave a voice note, like "forty quid diesel at the BP".',
       '✍️ Or just type it, like "spent £30 on screws" or "got paid £400 by Dave".',
       '🚗 Log mileage, like "drove 24 miles to the job".',
+      '🏠 Log home working, like "worked 90 hours from home".',
       '🧾 Type "create invoice" and I will build and send one with you.',
       '💬 Ask me anything, like "how much did I spend on fuel this month?".',
       '',

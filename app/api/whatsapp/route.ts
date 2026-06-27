@@ -100,7 +100,9 @@ export async function POST(req: NextRequest) {
       if (!handled) {
         const taxHandled = await handleTaxGuideFlow(from, text);
         if (!taxHandled) {
-          if (isMileage(text)) {
+          if (isCIS(text)) {
+            await handleCIS(from, messageId, text);
+          } else if (isMileage(text)) {
             await handleMileage(from, messageId, text);
           } else if (isHomeOffice(text)) {
             await handleHomeOffice(from, messageId, text);
@@ -338,6 +340,59 @@ async function handleMileage(from: string, messageId: string, body: string): Pro
   );
 }
 
+// --- CIS, construction subcontractor deductions ---------------------------
+// "Dave paid me £400, £80 CIS deducted" records the GROSS income and the tax
+// already deducted. The deduction offsets your bill at tax time, often a refund.
+// It is stored separately so it never reduces your profit.
+function isCIS(body: string): boolean {
+  if (body.trim().endsWith('?')) return false;
+  if (/\bspent\b|\bbought\b/i.test(body)) return false;
+  return /\bcis\b/i.test(body) && /£\s*\d/.test(body);
+}
+async function handleCIS(from: string, messageId: string, body: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(from, 'Open the app and add your number first, then I can log your CIS.');
+    return;
+  }
+  const amounts = [...body.matchAll(/£\s*(\d+(?:\.\d{1,2})?)/g)].map((m) => parseFloat(m[1]));
+  if (amounts.length === 0) {
+    await sendText(from, 'Tell me the amounts, for example "Dave paid £400, £80 CIS deducted".');
+    return;
+  }
+  const gross = amounts[0];
+  const pctM = body.match(/(\d{1,3})\s*%/);
+  let deduction: number;
+  let assumed = false;
+  if (amounts.length >= 2) deduction = amounts[1];
+  else if (pctM) deduction = Math.round(gross * Math.min(parseInt(pctM[1], 10), 100)) / 100;
+  else { deduction = Math.round(gross * 0.2 * 100) / 100; assumed = true; }
+  if (deduction >= gross) {
+    await sendText(from, 'That CIS deduction looks bigger than the payment. Try "£400 paid, £80 CIS".');
+    return;
+  }
+  const net = Math.round((gross - deduction) * 100) / 100;
+  const nameM = body.match(/from\s+([A-Za-z][A-Za-z' ]{1,30})/i);
+  const vendor = nameM ? nameM[1].trim() : 'CIS payment';
+  await insertTransaction({
+    user_id: userId,
+    vendor,
+    amount: gross,
+    category: 'cis income',
+    transaction_date: new Date().toISOString().slice(0, 10),
+    source_type: 'whatsapp_cis',
+    description: body.slice(0, 280),
+    confirmed: false,
+    raw_whatsapp_message_id: messageId,
+    cis_deduction: deduction,
+  });
+  const tail = assumed ? ' I assumed 20% on the full amount. If materials were included, edit it in the app.' : '';
+  await sendText(
+    from,
+    `Logged. £${gross.toFixed(2)} gross, £${deduction.toFixed(2)} CIS taken, £${net.toFixed(2)} in your pocket. The £${deduction.toFixed(2)} is tax already paid that comes off your bill.${tail} Check it in the app and confirm.`,
+  );
+}
+
 // --- Working from home, simplified flat rate ------------------------------
 // "worked 90 hours from home" logs the HMRC flat rate for the month.
 // 25 to 50 hours = £10, 51 to 100 = £18, 101+ = £26.
@@ -476,6 +531,7 @@ async function handleHelp(from: string): Promise<void> {
       '✍️ Or just type it, like "spent £30 on screws" or "got paid £400 by Dave".',
       '🚗 Log mileage, like "drove 24 miles to the job".',
       '🏠 Log home working, like "worked 90 hours from home".',
+      '🏗️ Log CIS, like "Dave paid £400, £80 CIS deducted".',
       '🧾 Type "create invoice" and I will build and send one with you.',
       '💬 Ask me anything, like "how much did I spend on fuel this month?".',
       '',

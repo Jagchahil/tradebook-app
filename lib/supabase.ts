@@ -145,6 +145,7 @@ export interface NewTransaction {
   confidence_score?: number | null;
   confirmed?: boolean;
   raw_whatsapp_message_id?: string | null;
+  cis_deduction?: number | null;
 }
 
 // Find the Lekhio user whose stored phone matches this WhatsApp sender.

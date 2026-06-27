@@ -107,6 +107,16 @@ const reviews = [
   { quote: 'Voice notes are the best bit. Hands full on the roof, I just say what I spent and carry on.', name: 'Danny', trade: 'Roofer, Glasgow', tint: GREEN_TINT, fg: GREEN },
 ];
 
+// Common complaint themes from public reviews of other apps, paraphrased, never
+// named. Each is paired with how Lekhio is built differently.
+const fixes = [
+  { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'A real person replies on the same WhatsApp. No bots, no hold music.' },
+  { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £29 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
+  { stars: 2, who: 'A freelancer, reviewing another app', gripe: 'It talks to me like I am an accountant. I am not. Half of it I do not understand.', fix: 'Plain English, and it lives in WhatsApp. If you can send a text, you can use Lekhio.' },
+  { stars: 1, who: 'A self employed driver, reviewing another app', gripe: 'Took a whole weekend to set up and I still could not work it out.', fix: 'Set up in minutes. Snap one receipt and it is already working.' },
+  { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'Cancelling was a nightmare. I felt completely locked in.', fix: 'Cancel any time, in one tap. Your records export whenever you want.' },
+];
+
 const included = [
   'Unlimited receipt, voice, text, and mileage capture',
   'Automatic bookkeeping and categories',
@@ -569,6 +579,9 @@ export default function HomePage() {
           .cmp .lekcol{background:${RIVER_TINT}}
           .cmp .center{text-align:center}
           .rowlabel{font-weight:500;color:${INK}}
+          .fixrow{display:grid;grid-template-columns:1fr 44px 1fr;align-items:center;gap:0;margin-bottom:18px}
+          .fixarrow{display:flex;align-items:center;justify-content:center;color:${RIVER};font-size:22px;font-weight:700}
+          @media (max-width:760px){.fixrow{grid-template-columns:1fr;gap:12px;margin-bottom:22px}.fixarrow{transform:rotate(90deg);margin:0 auto}}
           @media (max-width:880px){
             .hero-h1-size{font-size:40px}.h2{font-size:27px}
             .grid3{grid-template-columns:1fr}
@@ -1007,6 +1020,37 @@ export default function HomePage() {
             <Link href="/start" className="btn-primary" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Switch to the easy way</Link>
           </div>
         </div>
+      </section>
+
+      {/* Complaints to fixes, review panel style */}
+      <section style={{ maxWidth: 1000, margin: '0 auto', padding: '62px 24px' }}>
+        <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
+          <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>The reviews that built Lekhio.</h2>
+          <p style={{ fontSize: 17, color: MUTED, maxWidth: 600, margin: '0 auto', lineHeight: 1.6 }}>These are the kinds of complaints people leave about other bookkeeping apps. Here is what we did about each one.</p>
+        </div>
+        {fixes.map((f, i) => (
+          <div key={i} className="fixrow reveal">
+            <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 20, boxShadow: '0 10px 26px rgba(17,17,17,.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 10 }}>
+                <span style={{ width: 38, height: 38, borderRadius: 19, background: SURFACE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>😕</span>
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{f.who}</div>
+                  <div style={{ fontSize: 13, letterSpacing: 1 }}><span style={{ color: '#E04646' }}>{'★'.repeat(f.stars)}</span><span style={{ color: '#D9D2C4' }}>{'★'.repeat(5 - f.stars)}</span></div>
+                </div>
+              </div>
+              <p style={{ margin: 0, fontSize: 14.5, color: INK, lineHeight: 1.55, fontStyle: 'italic' }}>&ldquo;{f.gripe}&rdquo;</p>
+            </div>
+            <div className="fixarrow">&rarr;</div>
+            <div style={{ background: RIVER_TINT, border: `1px solid ${RIVER_TINT}`, borderRadius: 16, padding: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+                <span style={{ width: 26, height: 26, borderRadius: 13, background: GREEN, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800 }}>&#10003;</span>
+                <div style={{ fontSize: 13, fontWeight: 700, color: RIVER_DEEP, textTransform: 'uppercase', letterSpacing: '.5px' }}>The Lekhio fix</div>
+              </div>
+              <p style={{ margin: 0, fontSize: 14.5, color: INK, lineHeight: 1.55 }}>{f.fix}</p>
+            </div>
+          </div>
+        ))}
+        <p style={{ fontSize: 12.5, color: MUTED, textAlign: 'center', marginTop: 12 }}>Complaints are common themes from public reviews of other apps, paraphrased. We never name names.</p>
       </section>
 
       {/* Trust */}

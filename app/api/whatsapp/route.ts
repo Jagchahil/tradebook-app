@@ -27,6 +27,8 @@ import {
   createInvoice,
   createEvent,
 } from '../../../lib/supabase';
+import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
+import type { TradeInfo } from '../../../lib/taxguide';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
 
@@ -96,14 +98,17 @@ export async function POST(req: NextRequest) {
       // Invoice flow takes priority. If it consumes the message, do not also log it.
       const handled = await handleInvoiceFlow(from, text);
       if (!handled) {
-        if (isSchedule(text)) {
-          await handleSchedule(from, text);
-        } else if (isHelp(text)) {
-          await handleHelp(from);
-        } else if (isQuestion(text)) {
-          await handleMoneyQuestion(from, text);
-        } else {
-          await handleTextEntry(from, messageId, text);
+        const taxHandled = await handleTaxGuideFlow(from, text);
+        if (!taxHandled) {
+          if (isSchedule(text)) {
+            await handleSchedule(from, text);
+          } else if (isHelp(text)) {
+            await handleHelp(from);
+          } else if (isQuestion(text)) {
+            await handleMoneyQuestion(from, text);
+          } else {
+            await handleTextEntry(from, messageId, text);
+          }
         }
       }
     } else {
@@ -370,8 +375,10 @@ async function handleInvoiceFlow(from: string, body: string): Promise<boolean> {
   const session = await getSession(from);
   const isTrigger = INVOICE_TRIGGER.test(body);
 
-  // Not in a flow and not starting one. Let normal handling take it.
-  if (!session && !isTrigger) return false;
+  // Only act on our own flow. If there is no session, or the session belongs to
+  // another flow (the tax walkthrough), and this is not an invoice trigger, let
+  // the other handlers take it. This stops us clearing another flow's session.
+  if ((!session || session.flow !== 'invoice') && !isTrigger) return false;
 
   if (CANCEL.test(body)) {
     await clearSession(from);
@@ -454,6 +461,84 @@ async function handleInvoiceFlow(from: string, body: string): Promise<boolean> {
       from,
       `${head}\n\n${deliver}\n\nIt is saved in your app as a draft. Mark it paid when the money lands and it goes into your income.`,
     );
+    return true;
+  }
+
+  // Unknown state, reset cleanly.
+  await clearSession(from);
+  return false;
+}
+
+// --- Guided "file your own tax return" walkthrough ------------------------
+// Triggered by "tax return", "self assessment", and similar. We send the steps
+// one message at a time, waiting for NEXT, personalised by the user's trade.
+// Static content only, so it works even before the AI is switched on. It never
+// submits anything, it points the user to the official HMRC service.
+const TAXGUIDE_NEXT = /^\s*(next|continue|go|carry on|yes|yep|ok(?:ay)?|y)\s*$/i;
+const TAXGUIDE_STOP = /^\s*(stop|quit|done|exit|cancel|end|finish)\s*$/i;
+const TAXGUIDE_SKIP = /^\s*skip\s*$/i;
+
+async function handleTaxGuideFlow(from: string, body: string): Promise<boolean> {
+  const session = await getSession(from);
+  const inFlow = session?.flow === 'taxguide';
+  // Do not fire on a money entry that happens to mention tax.
+  const isTrigger = TAXGUIDE_TRIGGER.test(body) && !/£/.test(body);
+
+  if (!inFlow && !isTrigger) return false;
+
+  // Finish on request.
+  if (inFlow && TAXGUIDE_STOP.test(body)) {
+    await clearSession(from);
+    await sendText(from, 'No problem. Text "tax return" whenever you want to run through it again. 👍');
+    return true;
+  }
+
+  // Start or restart.
+  if (!inFlow) {
+    await setSession(from, 'taxguide', 'await_trade', {});
+    await sendText(
+      from,
+      [
+        'Happy to walk you through your tax return, one step at a time. It is more straightforward than it looks.',
+        '',
+        'First, what is your trade? Reply with it, for example "electrician" or "plumber", and I will show what you can claim. Or reply SKIP.',
+      ].join('\n'),
+    );
+    return true;
+  }
+
+  const data = (session?.data ?? {}) as { idx?: number; trade?: TradeInfo | null };
+
+  // Waiting for their trade.
+  if (session?.step === 'await_trade') {
+    const trade = TAXGUIDE_SKIP.test(body) ? null : matchTrade(body);
+    await setSession(from, 'taxguide', 'walk', { idx: 0, trade });
+    await sendText(from, trade ? `Great, ${trade.name}. Here we go.` : 'No problem, here we go.');
+    await sendText(from, cardText(0, trade));
+    return true;
+  }
+
+  // Walking through the cards.
+  if (session?.step === 'walk') {
+    if (!TAXGUIDE_NEXT.test(body)) {
+      await sendText(from, 'Reply NEXT for the next step, or STOP to finish.');
+      return true;
+    }
+    const nextIdx = (data.idx ?? 0) + 1;
+    const last = totalCards() - 1;
+    if (nextIdx >= totalCards()) {
+      await clearSession(from);
+      await sendText(from, 'That is the lot. Text "tax return" any time to run through it again. 👍');
+      return true;
+    }
+    // The closing card ends the flow.
+    if (nextIdx === last) {
+      await clearSession(from);
+      await sendText(from, cardText(nextIdx, data.trade ?? null));
+      return true;
+    }
+    await setSession(from, 'taxguide', 'walk', { idx: nextIdx, trade: data.trade ?? null });
+    await sendText(from, cardText(nextIdx, data.trade ?? null));
     return true;
   }
 

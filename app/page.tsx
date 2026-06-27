@@ -109,6 +109,14 @@ const reviews = [
 
 // Common complaint themes from public reviews of other apps, paraphrased, never
 // named. Each is paired with how Lekhio is built differently.
+// The claim-by-text moat. Text the thing, it is claimed at the HMRC rate.
+const claimExamples = [
+  { text: 'drove 24 miles', result: '£13.20 of travel, logged' },
+  { text: 'worked 90 hours from home', result: '£18 home office claimed' },
+  { text: 'phone bill £45, 80% business', result: '£36 logged' },
+  { text: '£400 paid, £80 CIS deducted', result: 'gross logged, refund tracked' },
+];
+
 const fixes = [
   { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'A real person replies on the same WhatsApp. No bots, no hold music.' },
   { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £29 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
@@ -865,6 +873,24 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* Claim it by text */}
+      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '46px 24px' }}>
+        <div className="reveal" style={{ textAlign: 'center', marginBottom: 30 }}>
+          <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Say it. It is claimed.</h2>
+          <p style={{ fontSize: 17, color: MUTED, maxWidth: 580, margin: '0 auto', lineHeight: 1.6 }}>Text the thing. Lekhio works out the relief and logs it at the HMRC rate. No forms, no logbooks, no missed claims. No other app does this.</p>
+        </div>
+        <div className="reveal" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 16 }}>
+          {claimExamples.map((c) => (
+            <div key={c.text} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 18, textAlign: 'center', boxShadow: '0 10px 26px rgba(17,17,17,.05)' }}>
+              <div style={{ display: 'inline-block', background: '#DCF8C6', color: INK, borderRadius: '14px 14px 4px 14px', padding: '10px 14px', fontSize: 14, fontWeight: 600 }}>&ldquo;{c.text}&rdquo;</div>
+              <div style={{ fontSize: 20, color: RIVER, margin: '8px 0' }}>&darr;</div>
+              <div style={{ fontSize: 14.5, color: RIVER_DEEP, fontWeight: 700 }}>{c.result}</div>
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 12.5, color: MUTED, textAlign: 'center', marginTop: 16 }}>Mileage, working from home, phone and broadband, and CIS, all from a text. The simplified rates apply, and the method that claims you more is the one that counts.</p>
       </section>
 
       {/* Bank connector showcase */}

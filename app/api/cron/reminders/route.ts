@@ -6,7 +6,7 @@ import {
   listNudgeTargets,
   weeklyTotals,
 } from '../../../../lib/supabase';
-import { sendText, hasSendConfig } from '../../../../lib/whatsapp';
+import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
 
 // The reminder engine. Hit on a schedule (Vercel Cron, Supabase pg_cron, or any
 // external cron such as cron-job.org). Guarded by CRON_SECRET.
@@ -63,15 +63,14 @@ export async function GET(req: NextRequest) {
           await markReminded(r.id);
           return;
         }
-        const emoji = r.kind === 'job' ? '🔧' : r.kind === 'quote' ? '📋' : '⏰';
-        await sendText(phone, `${emoji} Reminder: ${r.title}`);
+        await sendTemplate(phone, 'lekhio_reminder', 'en_GB', [r.title]);
         await markReminded(r.id);
         sent++;
       });
     } else if (job === 'nudge') {
       const targets = (await listNudgeTargets()).filter((t) => t.daily_nudges);
       await mapLimit(targets, 20, async (t) => {
-        await sendText(t.phone, "Quick one. Don't forget today's expenses. Snap a receipt, leave a voice note, or just tell me what you spent.");
+        await sendTemplate(t.phone, 'lekhio_nudge', 'en_GB', []);
         sent++;
       });
     } else if (job === 'weekly') {
@@ -79,7 +78,7 @@ export async function GET(req: NextRequest) {
       await mapLimit(targets, 20, async (t) => {
         const { income, expenses } = await weeklyTotals(t.user_id);
         const profit = income - expenses;
-        await sendText(t.phone, `Your week with Lekhio. In ${gbp(income)}, out ${gbp(expenses)}, kept ${gbp(profit)}. Open the app for the detail.`);
+        await sendTemplate(t.phone, 'lekhio_weekly', 'en_GB', [gbp(income), gbp(expenses), gbp(profit)]);
         sent++;
       });
     } else {

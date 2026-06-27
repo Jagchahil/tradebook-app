@@ -108,3 +108,42 @@ export async function sendText(toPhone: string, body: string): Promise<void> {
     console.error('[whatsapp] Send failed:', res.status, text);
   }
 }
+
+// Send an approved WhatsApp message template. Required for any proactive message
+// sent outside the 24 hour customer service window, such as reminders. The
+// template must be registered and approved in the Meta dashboard first. See
+// docs/39 for the exact template definitions and variable order.
+export async function sendTemplate(
+  toPhone: string,
+  templateName: string,
+  languageCode: string,
+  bodyParams: string[] = [],
+): Promise<void> {
+  if (!TOKEN || !PHONE_NUMBER_ID) {
+    console.warn('[whatsapp] Template send skipped. Token or phone number id missing.');
+    return;
+  }
+
+  const components = bodyParams.length
+    ? [{ type: 'body', parameters: bodyParams.map((t) => ({ type: 'text', text: t })) }]
+    : [];
+
+  const res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: toPhone,
+      type: 'template',
+      template: { name: templateName, language: { code: languageCode }, components },
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('[whatsapp] Template send failed:', res.status, text);
+  }
+}

@@ -134,15 +134,26 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
+// The first time an unknown number messages us is the make-or-break moment.
+// Warm, and point them to sign up on the web, where onboarding and payment live.
+// We never say "open the app" for signup, because signup happens on the site.
+async function replyNotLinked(from: string): Promise<void> {
+  await sendText(
+    from,
+    [
+      'Hi, I am Lekhio. I do your books and tax, right here on WhatsApp. Snap a receipt, log your mileage, ask about your money, all by text.',
+      '',
+      `I do not have an account for this number yet. Get set up in two minutes at ${APP_URL.replace('https://', '')}, first month free, then text me again.`,
+    ].join('\n'),
+  );
+}
+
 async function handleReceiptImage(from: string, messageId: string, mediaId: string): Promise<void> {
   // Find the Lekhio account for this number first. No point parsing if there
   // is nobody to attach it to.
   const userId = await findUserIdByPhone(from);
   if (!userId) {
-    await sendText(
-      from,
-      'We could not find your Lekhio account for this number. Open the app, add your number, then send the receipt again.',
-    );
+    await replyNotLinked(from);
     return;
   }
 
@@ -188,10 +199,7 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
 async function handleVoiceNote(from: string, messageId: string, mediaId: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
-    await sendText(
-      from,
-      'We could not find your Lekhio account for this number. Open the app, add your number, then send the voice note again.',
-    );
+    await replyNotLinked(from);
     return;
   }
 
@@ -228,10 +236,7 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
 async function handleTextEntry(from: string, messageId: string, body: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
-    await sendText(
-      from,
-      'We could not find your Lekhio account for this number. Open the app, add your number, then send it again.',
-    );
+    await replyNotLinked(from);
     return;
   }
 

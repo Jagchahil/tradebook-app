@@ -178,6 +178,14 @@ const trades = [
   { id: 'scaffolders', name: 'Scaffolders', cis: true, items: ['Tube, fittings and boards', 'Harnesses and PPE', 'Transport of materials', 'CISRS card and training', 'Vehicle and trailer costs'] },
   { id: 'groundworkers', name: 'Groundworkers', cis: true, items: ['Aggregates, concrete and drainage materials', 'Plant and digger hire', 'Fuel for plant', 'Setting out kit', 'Site welfare and PPE'] },
   { id: 'landscapers', name: 'Landscapers', cis: false, items: ['Plants, turf and aggregates', 'Paving and materials', 'Mowers and machinery', 'Green waste and tip fees', 'Fuel and machine servicing'] },
+  { id: 'hairdressers', name: 'Hairdressers & barbers', cis: false, items: ['Products, colour and supplies', 'Scissors, clippers and tools', 'Chair or booth rent', 'Gowns, towels and PPE', 'Insurance and training'] },
+  { id: 'cleaners', name: 'Cleaners', cis: false, items: ['Cleaning products and supplies', 'Vacuums and equipment', 'Mileage between jobs', 'Gloves and PPE', 'Insurance and DBS checks'] },
+  { id: 'drivers', name: 'Drivers & couriers', cis: false, items: ['Fuel or the mileage rate', 'Vehicle running and servicing', 'Licensing and badges', 'Phone and delivery apps', 'Insurance'] },
+  { id: 'beauticians', name: 'Beauticians & nail techs', cis: false, items: ['Products and consumables', 'Kit, lamps and tools', 'Couch or room hire', 'PPE and sanitiser', 'Insurance and training'] },
+  { id: 'photographers', name: 'Photographers', cis: false, items: ['Cameras, lenses and gear', 'Editing software and storage', 'Studio or location hire', 'Travel to shoots', 'Website and insurance'] },
+  { id: 'trainers', name: 'Personal trainers', cis: false, items: ['Equipment and weights', 'Gym or studio hire', 'App and music subscriptions', 'Insurance and qualifications', 'Branded kit'] },
+  { id: 'tutors', name: 'Tutors', cis: false, items: ['Books and learning resources', 'Printing and materials', 'Room or online platform hire', 'Travel to students', 'DBS and memberships'] },
+  { id: 'creatives', name: 'Designers & freelancers', cis: false, items: ['Software subscriptions', 'Laptop and equipment', 'Website and hosting', 'Home office or co-working', 'Training and stock assets'] },
 ];
 
 const deadlines = [

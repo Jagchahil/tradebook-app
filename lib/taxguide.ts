@@ -28,6 +28,14 @@ const TRADES: { keywords: RegExp; info: TradeInfo }[] = [
   { keywords: /scaffold/i, info: { name: 'scaffolder', cis: true, items: ['tube, fittings and boards', 'harnesses and PPE', 'transport of materials', 'CISRS card and training', 'vehicle and trailer costs'] } },
   { keywords: /groundwork|grounds/i, info: { name: 'groundworker', cis: true, items: ['aggregates, concrete and drainage', 'plant and digger hire', 'fuel for plant', 'setting out kit', 'site welfare and PPE'] } },
   { keywords: /landscap|garden/i, info: { name: 'landscaper', cis: false, items: ['plants, turf and aggregates', 'paving and materials', 'mowers and machinery', 'green waste and tip fees', 'fuel and servicing'] } },
+  { keywords: /hairdress|barber|salon/i, info: { name: 'hairdresser', cis: false, items: ['products and colour', 'scissors and clippers', 'chair or booth rent', 'gowns and towels', 'insurance and training'] } },
+  { keywords: /cleaner|cleaning/i, info: { name: 'cleaner', cis: false, items: ['cleaning products', 'vacuums and equipment', 'mileage between jobs', 'gloves and PPE', 'insurance and DBS'] } },
+  { keywords: /driver|courier|taxi|delivery|uber|deliveroo/i, info: { name: 'driver', cis: false, items: ['fuel or mileage', 'vehicle servicing', 'licensing and badges', 'phone and apps', 'insurance'] } },
+  { keywords: /beautician|nail|lash|aesthetic/i, info: { name: 'beautician', cis: false, items: ['products and consumables', 'kit, lamps and tools', 'couch or room hire', 'PPE and sanitiser', 'insurance and training'] } },
+  { keywords: /photograph/i, info: { name: 'photographer', cis: false, items: ['cameras and lenses', 'editing software', 'studio or location hire', 'travel to shoots', 'website and insurance'] } },
+  { keywords: /personal train|fitness|gym instructor/i, info: { name: 'personal trainer', cis: false, items: ['equipment and weights', 'gym or studio hire', 'app subscriptions', 'insurance and quals', 'branded kit'] } },
+  { keywords: /tutor|teacher|teaching/i, info: { name: 'tutor', cis: false, items: ['books and resources', 'printing and materials', 'room or platform hire', 'travel to students', 'DBS and memberships'] } },
+  { keywords: /design|freelanc|developer|copywriter|writer|creative/i, info: { name: 'freelancer', cis: false, items: ['software subscriptions', 'laptop and equipment', 'website and hosting', 'home or co-working', 'training and assets'] } },
 ];
 
 export function matchTrade(text: string): TradeInfo | null {

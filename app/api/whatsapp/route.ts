@@ -301,6 +301,8 @@ const MILEAGE_RE = /\b(\d{1,4})\s*miles?\b/i;
 
 function isMileage(body: string): boolean {
   if (/£|\bspent\b|\bgot paid\b|\bpaid me\b/i.test(body)) return false;
+  // Do not hijack a reminder ("remind me ... 24 miles ...") or a question.
+  if (/\bremind\b|\breminder\b/i.test(body) || body.trim().endsWith('?')) return false;
   return MILEAGE_RE.test(body);
 }
 
@@ -341,7 +343,7 @@ async function handleMileage(from: string, messageId: string, body: string): Pro
 // 25 to 50 hours = £10, 51 to 100 = £18, 101+ = £26.
 const HOMEOFFICE_RE = /\b(home office|worked from home|working from home|work from home|use of home|wfh)\b/i;
 function isHomeOffice(body: string): boolean {
-  if (/£/.test(body)) return false;
+  if (/£/.test(body) || body.trim().endsWith('?')) return false;
   return HOMEOFFICE_RE.test(body);
 }
 async function handleHomeOffice(from: string, messageId: string, body: string): Promise<void> {
@@ -381,6 +383,7 @@ async function handleHomeOffice(from: string, messageId: string, body: string): 
 // --- Phone and broadband, business share ----------------------------------
 // "phone bill £45, 80% business" logs only the business proportion.
 function isPhoneShare(body: string): boolean {
+  if (body.trim().endsWith('?')) return false;
   return /£/.test(body) && /\b(phone|mobile|broadband|internet)\b/i.test(body) && /\d{1,3}\s*%/.test(body);
 }
 async function handlePhoneShare(from: string, messageId: string, body: string): Promise<void> {

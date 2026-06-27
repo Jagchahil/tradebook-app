@@ -649,7 +649,7 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '56px 24px 24px' }}>
+      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px 16px' }}>
         <div className="hero-grid">
           <div className="hero-left">
             <div className="hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 20, marginBottom: 24 }}>
@@ -720,7 +720,7 @@ export default function HomePage() {
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 24px 30px' }}><RiverDivider /></div>
 
       {/* How it works (stepper) */}
-      <section id="how" style={{ maxWidth: 1040, margin: '0 auto', padding: '40px 24px 70px' }}>
+      <section id="how" style={{ maxWidth: 1040, margin: '0 auto', padding: '34px 24px 46px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 54 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Three steps. That is the whole thing.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 540, margin: '0 auto' }}>No spreadsheets. No shoebox of receipts. No evenings lost to paperwork.</p>
@@ -776,7 +776,7 @@ export default function HomePage() {
 
       {/* Stats band */}
       <section style={{ background: `linear-gradient(120deg, ${RIVER_DEEP}, ${RIVER})`, color: '#fff' }}>
-        <div className="reveal" style={{ maxWidth: 1040, margin: '0 auto', padding: '54px 24px' }}>
+        <div className="reveal" style={{ maxWidth: 1040, margin: '0 auto', padding: '42px 24px' }}>
           <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 24 }}>
             {stats.map((s) => (
               <div key={s.label} style={{ textAlign: 'center' }}>
@@ -792,7 +792,7 @@ export default function HomePage() {
 
       {/* Who it is for */}
       <section id="who" style={{ backgroundColor: INK, color: '#fff' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '62px 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>If you work for yourself, it is for you.</h2>
             <p style={{ fontSize: 17, color: '#B6BDC8', maxWidth: 600, margin: '0 auto' }}>
@@ -809,7 +809,7 @@ export default function HomePage() {
       </section>
 
       {/* Features */}
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '62px 24px' }}>
+      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Everything your accountant nags you for.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>Done as you work, not at the end of the year.</p>
@@ -827,7 +827,7 @@ export default function HomePage() {
 
       {/* App demo */}
       <section id="app" style={{ backgroundColor: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '62px 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
           <div className="appdemo-grid">
             <div className="reveal">
               <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>THE APP</span>
@@ -868,7 +868,7 @@ export default function HomePage() {
       </section>
 
       {/* Bank connector showcase */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '58px 24px' }}>
+      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '44px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 30 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 20, marginBottom: 14 }}>Optional, coming soon</div>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Connect your bank, books on autopilot.</h2>
@@ -898,7 +898,7 @@ export default function HomePage() {
 
       {/* MTD explainer (interactive) */}
       <section id="mtd" style={{ background: `linear-gradient(180deg, #fff, ${RIVER_TINT})`, borderTop: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 980, margin: '0 auto', padding: '62px 24px' }}>
+        <div style={{ maxWidth: 980, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 36 }}>
             <span style={{ display: 'inline-block', backgroundColor: '#fff', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>NEW HMRC RULES</span>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>What HMRC is changing, in plain English.</h2>
@@ -987,7 +987,7 @@ export default function HomePage() {
 
       {/* Comparison */}
       <section id="compare" style={{ backgroundColor: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '62px 24px' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>How Lekhio compares.</h2>
             <p style={{ fontSize: 17, color: MUTED, maxWidth: 560, margin: '0 auto' }}>The old way is an app that wants a weekend of setup, or a spreadsheet and a shoebox. Here is the honest side by side.</p>
@@ -1023,7 +1023,7 @@ export default function HomePage() {
       </section>
 
       {/* Complaints to fixes, review panel style */}
-      <section style={{ maxWidth: 1000, margin: '0 auto', padding: '62px 24px' }}>
+      <section style={{ maxWidth: 1000, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>The reviews that built Lekhio.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 600, margin: '0 auto', lineHeight: 1.6 }}>These are the kinds of complaints people leave about other bookkeeping apps. Here is what we did about each one.</p>
@@ -1055,7 +1055,7 @@ export default function HomePage() {
 
       {/* Trust */}
       <section id="trust" style={{ backgroundColor: '#fff', borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '62px 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
             <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>BUILT TO BE TRUSTED</span>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Your money. Your data. Your call.</h2>
@@ -1117,7 +1117,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" style={{ maxWidth: 1100, margin: '0 auto', padding: '62px 24px' }}>
+      <section id="pricing" style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>One price. No surprises.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>Try it free for 30 days. Keep it for less than a tank of fuel a month.</p>
@@ -1149,7 +1149,7 @@ export default function HomePage() {
       </section>
 
       {/* Reviews (marquee) */}
-      <section id="reviews" style={{ padding: '62px 0' }}>
+      <section id="reviews" style={{ padding: '46px 0' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 48, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto', padding: '0 24px' }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Why people leave the old tools.</h2>
           <p style={{ fontSize: 17, color: MUTED, margin: 0 }}>We read the one star reviews of the big accounting apps so you do not have to. These are the exact things people told us, and what Lekhio does instead.</p>
@@ -1165,7 +1165,7 @@ export default function HomePage() {
 
       {/* FAQ */}
       <section style={{ backgroundColor: '#fff', borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', padding: '62px 24px' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Questions, answered straight.</h2>
             <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>Tap a question for the plain version.</p>

@@ -286,7 +286,13 @@ function confirmationLine(parsed: {
 // --- Mileage ---------------------------------------------------------------
 // Text "log 24 miles" or "drove 24 miles to the job" and we log the claim at
 // the current HMRC rate. Closes the one feature gap against the competition.
-const MILEAGE_PENCE = 55; // 2026/27 rate, first 10,000 business miles.
+// Simplified expenses mileage rates, 2026/27. Car or van 55p (first 10,000),
+// motorcycle 24p, bicycle 20p. We read the vehicle from the message.
+function mileageRate(body: string): { pence: number; vehicle: string } {
+  if (/\b(motorbike|motorcycle|moped|scooter)\b/i.test(body)) return { pence: 24, vehicle: 'motorcycle' };
+  if (/\b(bicycle|pushbike|push bike|cycling|on (?:the|my) bike|by bike|on (?:the|my) cycle)\b/i.test(body)) return { pence: 20, vehicle: 'bicycle' };
+  return { pence: 55, vehicle: 'car or van' };
+}
 const MILEAGE_RE = /\b(\d{1,4})\s*miles?\b/i;
 
 function isMileage(body: string): boolean {
@@ -306,7 +312,8 @@ async function handleMileage(from: string, messageId: string, body: string): Pro
     await sendText(from, 'Tell me the miles, for example "log 24 miles" or "drove 24 miles to the job".');
     return;
   }
-  const amount = Math.round(miles * MILEAGE_PENCE) / 100;
+  const { pence, vehicle } = mileageRate(body);
+  const amount = Math.round(miles * pence) / 100;
   await insertTransaction({
     user_id: userId,
     vendor: 'Mileage',
@@ -318,9 +325,10 @@ async function handleMileage(from: string, messageId: string, body: string): Pro
     confirmed: false,
     raw_whatsapp_message_id: messageId,
   });
+  const onVehicle = vehicle === 'car or van' ? '' : `on the ${vehicle} `;
   await sendText(
     from,
-    `Logged. ${miles} miles at ${MILEAGE_PENCE}p, that is £${amount.toFixed(2)} of travel. Check it in the app and confirm.`,
+    `Logged. ${miles} miles ${onVehicle}at ${pence}p, that is £${amount.toFixed(2)} of travel. Check it in the app and confirm.`,
   );
 }
 

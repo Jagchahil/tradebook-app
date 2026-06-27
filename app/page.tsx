@@ -64,6 +64,7 @@ const audience = [
 const features = [
   { icon: '📸', title: 'Receipt capture', body: 'Photograph a receipt and it is logged in seconds. No typing, no app to open.', tint: RIVER_TINT, fg: RIVER },
   { icon: '🎙️', title: 'Voice notes', body: 'Hands full on the job. Say the expense out loud and carry on.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
+  { icon: '🚗', title: 'Mileage in a text', body: 'Text "drove 24 miles to the job" and Lekhio logs the claim at the HMRC rate. No fiddly logbook.', tint: RIVER_TINT, fg: RIVER },
   { icon: '🧾', title: 'Invoices from a text', body: 'Type "create invoice" on WhatsApp. Lekhio asks what it needs and sends a clean invoice for you.', tint: GREEN_TINT, fg: GREEN },
   { icon: '✅', title: 'You approve everything', body: 'See every entry. Fix anything that looks off. Nothing counts toward your tax until you confirm it.', tint: RIVER_TINT, fg: RIVER },
   { icon: '📊', title: 'Tax prepared for you', body: 'Quarterly figures, ready. You check them, you send them. We never imply HMRC backs us.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
@@ -89,6 +90,7 @@ const compareRows = [
   { label: 'Lives in WhatsApp, no new app to learn', lekhio: true, apps: false, diy: false },
   { label: 'Snap a receipt and it is logged for you', lekhio: true, apps: 'limit', diy: false },
   { label: 'Log an expense by voice note', lekhio: true, apps: false, diy: false },
+  { label: 'Log mileage with a quick text', lekhio: true, apps: 'limit', diy: false },
   { label: 'Create and send an invoice from a text', lekhio: true, apps: 'extra', diy: false },
   { label: 'One flat price, everything included', lekhio: true, apps: false, diy: true },
   { label: 'Quarterly tax updates prepared for you', lekhio: true, apps: 'higher', diy: false },
@@ -106,12 +108,12 @@ const reviews = [
 ];
 
 const included = [
-  'Unlimited receipt, voice, and text capture',
+  'Unlimited receipt, voice, text, and mileage capture',
   'Automatic bookkeeping and categories',
   'Invoices created and sent from WhatsApp',
-  'Quarterly tax summaries prepared for you',
-  'A real human on the other end',
-  'Your records exported any time',
+  'MTD ready quarterly summaries, you approve before anything is filed',
+  'A real human on the other end, fast',
+  'Records exported any time, and cancel in one tap',
 ];
 
 const trustPillars = [

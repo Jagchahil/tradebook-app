@@ -100,7 +100,9 @@ export async function POST(req: NextRequest) {
       if (!handled) {
         const taxHandled = await handleTaxGuideFlow(from, text);
         if (!taxHandled) {
-          if (isSchedule(text)) {
+          if (isMileage(text)) {
+            await handleMileage(from, messageId, text);
+          } else if (isSchedule(text)) {
             await handleSchedule(from, text);
           } else if (isHelp(text)) {
             await handleHelp(from);
@@ -281,6 +283,47 @@ function confirmationLine(parsed: {
   return `Got it. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. Check it in the app and confirm.`;
 }
 
+// --- Mileage ---------------------------------------------------------------
+// Text "log 24 miles" or "drove 24 miles to the job" and we log the claim at
+// the current HMRC rate. Closes the one feature gap against the competition.
+const MILEAGE_PENCE = 55; // 2026/27 rate, first 10,000 business miles.
+const MILEAGE_RE = /\b(\d{1,4})\s*miles?\b/i;
+
+function isMileage(body: string): boolean {
+  if (/£|\bspent\b|\bgot paid\b|\bpaid me\b/i.test(body)) return false;
+  return MILEAGE_RE.test(body);
+}
+
+async function handleMileage(from: string, messageId: string, body: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(from, 'Open the app and add your number first, then I can log your mileage.');
+    return;
+  }
+  const m = body.match(MILEAGE_RE);
+  const miles = m ? parseInt(m[1], 10) : 0;
+  if (!miles || miles <= 0 || miles > 2000) {
+    await sendText(from, 'Tell me the miles, for example "log 24 miles" or "drove 24 miles to the job".');
+    return;
+  }
+  const amount = Math.round(miles * MILEAGE_PENCE) / 100;
+  await insertTransaction({
+    user_id: userId,
+    vendor: 'Mileage',
+    amount: -amount,
+    category: 'travel',
+    transaction_date: new Date().toISOString().slice(0, 10),
+    source_type: 'whatsapp_mileage',
+    description: body.slice(0, 280),
+    confirmed: false,
+    raw_whatsapp_message_id: messageId,
+  });
+  await sendText(
+    from,
+    `Logged. ${miles} miles at ${MILEAGE_PENCE}p, that is £${amount.toFixed(2)} of travel. Check it in the app and confirm.`,
+  );
+}
+
 // --- Help and money questions ---------------------------------------------
 const HELP_RE = /^\s*(hi|hey|hello|help|menu|start|what can you do|commands)\b/i;
 const QUESTION_RE = /(^|\s)(how much|how many|what(?:'s| is| are)?|whats|when|show|list|total|do i|did i|am i|have i|spent|owe|owed|made|earn)\b/i;
@@ -340,6 +383,7 @@ async function handleHelp(from: string): Promise<void> {
       '📸 Send a photo of a receipt and I log it.',
       '🎙️ Or leave a voice note, like "forty quid diesel at the BP".',
       '✍️ Or just type it, like "spent £30 on screws" or "got paid £400 by Dave".',
+      '🚗 Log mileage, like "drove 24 miles to the job".',
       '🧾 Type "create invoice" and I will build and send one with you.',
       '💬 Ask me anything, like "how much did I spend on fuel this month?".',
       '',

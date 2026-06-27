@@ -605,6 +605,7 @@ export default function HomePage() {
           <a href="#reviews">Reviews</a>
           <a href="#trust">Trust</a>
           <a href="#pricing">Pricing</a>
+          <Link href="/file-your-tax-return">Free tax return guide</Link>
           <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
         </div>
       </nav>
@@ -1092,6 +1093,7 @@ export default function HomePage() {
           </div>
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
             <Link href="/start" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Sign up</Link>
+            <Link href="/file-your-tax-return" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Free tax guide</Link>
             <Link href="/privacy" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Privacy</Link>
             <Link href="/terms" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Terms</Link>
             <a href="mailto:support@lekhio.com" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Support</a>

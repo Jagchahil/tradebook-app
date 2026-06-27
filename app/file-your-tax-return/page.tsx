@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: 'How to file your own tax return. A free step by step guide for the self employed | Lekhio',
   description:
     'File your own Self Assessment tax return without paying an accountant. A plain English, step by step guide for UK sole traders and tradespeople, with the expenses you can claim by trade, the deadlines, and what Making Tax Digital means for you. Free.',
+  metadataBase: new URL('https://tradebook-app-five.vercel.app'),
   alternates: { canonical: '/file-your-tax-return' },
   openGraph: {
     title: 'File your own tax return. Stop paying for a 15 minute job.',
@@ -140,13 +141,25 @@ const tradeCss = trades
   .map(
     (t) =>
       `#trade-${t.id}:checked ~ .trade-panels .tp-${t.id}{display:block}` +
-      `#trade-${t.id}:checked ~ .trade-chips label[for="trade-${t.id}"]{background:${RIVER};color:#fff;border-color:${RIVER}}`,
+      `#trade-${t.id}:checked ~ .trade-chips label[for="trade-${t.id}"]{background:${RIVER};color:#fff;border-color:${RIVER}}` +
+      `#trade-${t.id}:focus-visible ~ .trade-chips label[for="trade-${t.id}"]{outline:2px solid ${RIVER};outline-offset:2px}`,
   )
   .join('\n');
+
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+};
 
 export default function FileYourTaxReturnPage() {
   return (
     <main style={{ fontFamily: FONT, color: INK, background: PAPER, overflowX: 'hidden' }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -160,6 +173,8 @@ export default function FileYourTaxReturnPage() {
           #route-over:checked ~ .branch-panel.panel-over{display:block}
           #route-under:checked ~ .branch-tabs label[for="route-under"],
           #route-over:checked ~ .branch-tabs label[for="route-over"]{background:${RIVER};color:#fff;border-color:${RIVER}}
+          #route-under:focus-visible ~ .branch-tabs label[for="route-under"],
+          #route-over:focus-visible ~ .branch-tabs label[for="route-over"]{outline:2px solid ${RIVER};outline-offset:2px}
           .trade-panel{display:none;animation:riseIn .25s ease}
           ${tradeCss}
           details{border:1px solid ${LINE};border-radius:14px;background:#fff;margin-bottom:12px;overflow:hidden}
@@ -392,7 +407,7 @@ export default function FileYourTaxReturnPage() {
           <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
             <Link href="/" style={{ color: RIVER, fontWeight: 600, textDecoration: 'none' }}>Back to Lekhio</Link>
             <Link href="/start" style={{ color: RIVER, fontWeight: 600, textDecoration: 'none' }}>Start free trial</Link>
-            <a href="https://www.gov.uk/log-in-file-self-assessment-tax-return" style={{ color: RIVER, fontWeight: 600, textDecoration: 'none' }}>The official HMRC service</a>
+            <a href="https://www.gov.uk/log-in-file-self-assessment-tax-return" target="_blank" rel="noopener noreferrer" style={{ color: RIVER, fontWeight: 600, textDecoration: 'none' }}>The official HMRC service</a>
           </div>
         </div>
       </footer>

@@ -423,8 +423,8 @@ const chatMessages: { side: 'out' | 'in'; text: string; image?: string }[] = [
   { side: 'out', text: 'invoice Dave £450 for the rewire' },
   { side: 'in', text: 'Sent ✅  Dave paid. +£450 income 💷' },
 ];
-const HERO_CHAT_LOOP = 15;
-const chatAppear = [4, 16, 30, 44, 58, 72];
+const HERO_CHAT_LOOP = 8;
+const chatAppear = [3, 15, 29, 43, 57, 71];
 const chatCss =
   `.cmsg{opacity:0}` +
   `@media (prefers-reduced-motion: reduce){.cmsg{opacity:1 !important;animation:none !important;transform:none !important}}` +
@@ -453,10 +453,10 @@ export default function HomePage() {
           @keyframes grow{to{transform:scaleX(1)}}
           @keyframes popIn{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:scale(1)}}
           @keyframes marquee{to{transform:translateX(-50%)}}
-          .reveal{opacity:0;transform:translateY(20px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+          .reveal{opacity:0;transform:translateY(16px);transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.2,1)}
           .reveal.in{opacity:1;transform:none}
-          .hero-h1,.hero-sub,.hero-cta,.hero-pill{opacity:0;animation:riseIn .8s cubic-bezier(.2,.7,.2,1) forwards}
-          .hero-pill{animation-delay:.05s}.hero-h1{animation-delay:.15s}.hero-sub{animation-delay:.30s}.hero-cta{animation-delay:.45s}
+          .hero-h1,.hero-sub,.hero-cta,.hero-pill{opacity:0;animation:riseIn .5s cubic-bezier(.2,.7,.2,1) forwards}
+          .hero-pill{animation-delay:.04s}.hero-h1{animation-delay:.1s}.hero-sub{animation-delay:.2s}.hero-cta{animation-delay:.3s}
           .btn-primary{transition:background-color .18s ease, transform .18s ease, box-shadow .18s ease}
           .btn-primary:hover{background-color:${RIVER_DEEP}!important;transform:translateY(-2px);box-shadow:0 12px 30px rgba(27,89,166,.30)}
           .btn-primary:active{transform:translateY(0)}
@@ -471,8 +471,8 @@ export default function HomePage() {
           .chip{transition:transform .15s ease, background-color .15s ease, color .15s ease}
           .chip:hover{transform:translateY(-2px);background-color:${RIVER};color:#fff;border-color:${RIVER}}
           .navlink{transition:color .15s ease}.navlink:hover{color:${INK}!important}
-          .riverflow{stroke-dasharray:1600;stroke-dashoffset:1600;animation:flow 2.6s ease forwards .3s}
-          .gradtext{background:linear-gradient(90deg,${RIVER},#2E7BBF,${SAFFRON},${RIVER});background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:sheen 8s linear infinite}
+          .riverflow{stroke-dasharray:1600;stroke-dashoffset:1600;animation:flow 1.4s ease forwards .15s}
+          .gradtext{background:linear-gradient(90deg,${RIVER},#2E7BBF,${SAFFRON},${RIVER});background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:sheen 5s linear infinite}
           .hero-h1-size{font-size:72px;line-height:1.04}
           .h2{font-size:38px;line-height:1.12}
           .grid3{grid-template-columns:repeat(3,1fr)}
@@ -485,7 +485,7 @@ export default function HomePage() {
           .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
           /* Stepper */
           .stepper{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
-          .stepper-line{position:absolute;top:30px;left:16%;right:16%;height:3px;background:linear-gradient(90deg,${RIVER},#2E7BBF,${SAFFRON});border-radius:2px;transform:scaleX(0);transform-origin:left;animation:grow 1.3s ease forwards .4s}
+          .stepper-line{position:absolute;top:30px;left:16%;right:16%;height:3px;background:linear-gradient(90deg,${RIVER},#2E7BBF,${SAFFRON});border-radius:2px;transform:scaleX(0);transform-origin:left;animation:grow .8s ease forwards .2s}
           .step{text-align:center;position:relative}
           .step-num{width:60px;height:60px;border-radius:30px;background:linear-gradient(135deg,${RIVER},#2E7BBF);color:#fff;font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 10px 24px rgba(27,89,166,.3);position:relative;z-index:1;border:5px solid ${PAPER}}
           /* Stats band */
@@ -500,14 +500,14 @@ export default function HomePage() {
           #mtd-old:checked ~ .mtd-panels .mtd-old-panel{display:block;animation:riseIn .5s ease}
           #mtd-new:checked ~ .mtd-panels .mtd-new-panel{display:block;animation:riseIn .5s ease}
           .timeline{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:10px}
-          .tl-line{position:absolute;top:18px;left:10%;right:10%;height:3px;background:linear-gradient(90deg,${RIVER},${SAFFRON});border-radius:2px;transform:scaleX(0);transform-origin:left;animation:grow 1.4s ease forwards .3s}
+          .tl-line{position:absolute;top:18px;left:10%;right:10%;height:3px;background:linear-gradient(90deg,${RIVER},${SAFFRON});border-radius:2px;transform:scaleX(0);transform-origin:left;animation:grow .8s ease forwards .15s}
           .tl-step{text-align:center;position:relative}
           .tl-dot{width:38px;height:38px;border-radius:19px;background:#fff;border:3px solid ${RIVER};color:${RIVER};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;position:relative;z-index:1;opacity:0;animation:popIn .5s ease forwards}
-          .tl-step:nth-child(2) .tl-dot{animation-delay:.35s}
-          .tl-step:nth-child(3) .tl-dot{animation-delay:.6s}
-          .tl-step:nth-child(4) .tl-dot{animation-delay:.85s}
-          .tl-step:nth-child(5) .tl-dot{animation-delay:1.1s}
-          .tl-step:nth-child(6) .tl-dot{animation-delay:1.35s;border-color:${SAFFRON};color:${SAFFRON_DEEP}}
+          .tl-step:nth-child(2) .tl-dot{animation-delay:.2s}
+          .tl-step:nth-child(3) .tl-dot{animation-delay:.32s}
+          .tl-step:nth-child(4) .tl-dot{animation-delay:.44s}
+          .tl-step:nth-child(5) .tl-dot{animation-delay:.56s}
+          .tl-step:nth-child(6) .tl-dot{animation-delay:.68s;border-color:${SAFFRON};color:${SAFFRON_DEEP}}
           /* Reviews marquee */
           .marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
           .marquee-track{display:flex;gap:20px;width:max-content;animation:marquee 48s linear infinite}
@@ -519,7 +519,7 @@ export default function HomePage() {
           .appstatus{height:30px;display:flex;align-items:center;justify-content:center;background:#fff}
           .appstatus i{width:96px;height:6px;border-radius:3px;background:${LINE};display:block}
           .appview{position:relative;height:438px;overflow:hidden;background:${PAPER}}
-          .apptrack{display:flex;width:400%;height:100%;animation:appslide 10.5s cubic-bezier(.65,0,.35,1) infinite}
+          .apptrack{display:flex;width:400%;height:100%;animation:appslide 7s cubic-bezier(.65,0,.35,1) infinite}
           .appscreen{width:25%;flex:0 0 25%;height:100%;padding:18px 18px;overflow:hidden}
           @keyframes appslide{0%,22%{transform:translateX(0)}28%,47%{transform:translateX(-25%)}53%,72%{transform:translateX(-50%)}78%,100%{transform:translateX(-75%)}}
           .appdot{display:inline-block;width:7px;height:7px;border-radius:4px;background:${LINE};margin:0 3px}

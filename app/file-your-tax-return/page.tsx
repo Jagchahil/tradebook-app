@@ -33,55 +33,122 @@ const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sa
 
 const steps = [
   {
-    n: '1',
+    n: '1', key: 'utr', tint: RIVER_TINT, fg: RIVER,
     title: 'Register and get your UTR',
-    body:
-      'First time only. Tell HMRC you are self employed by registering for Self Assessment. They post you a Unique Taxpayer Reference, your UTR, which can take 2 to 3 weeks, so do this early. You also set up a Government Gateway user ID and password. Keep them safe, you need them every year.',
-    tint: RIVER_TINT, fg: RIVER,
+    lead: 'First time only. You tell HMRC you have started working for yourself.',
+    does: [
+      "On GOV.UK, search 'register for Self Assessment' and choose self employed.",
+      'Enter your details and the date you started trading.',
+      'HMRC posts your 10 digit UTR within 2 to 3 weeks.',
+      'Set up your Government Gateway user ID and password. You need these every year.',
+    ],
+    tip: 'Registered before? Skip this. Just have your UTR and Gateway login ready.',
   },
   {
-    n: '2',
+    n: '2', key: 'gather', tint: SAFFRON_TINT, fg: SAFFRON_DEEP,
     title: 'Gather your numbers',
-    body:
-      'You need your UTR and Gateway login, your National Insurance number, your total business income for the tax year (6 April to 5 April), your total allowable expenses, and any other income such as a job, interest or dividends. If you keep your records with Lekhio, these totals are already added up and waiting.',
-    tint: SAFFRON_TINT, fg: SAFFRON_DEEP,
+    lead: 'Five things, in front of you before you start.',
+    does: [
+      'Your UTR and Government Gateway login.',
+      'Your National Insurance number.',
+      'Your total income for 6 April 2025 to 5 April 2026.',
+      'Your total allowable expenses, ideally split by category.',
+      'Any other income: a job (P60), interest, or dividends.',
+    ],
+    tip: 'With Lekhio, your income and expense totals are already added up and split by category.',
   },
   {
-    n: '3',
-    title: 'Log in and start the return',
-    body:
-      'Sign in to the HMRC Self Assessment service with your Government Gateway. Pick the tax year you are filing. The return is the SA100 main form plus the self employment pages, called the SA103. The online system asks you simple questions and picks the right version for you.',
-    tint: GREEN_TINT, fg: GREEN,
+    n: '3', key: 'login', tint: GREEN_TINT, fg: GREEN,
+    title: 'Log in and open the return',
+    lead: 'Everything happens on the official HMRC website.',
+    does: [
+      'Sign in to the HMRC Self Assessment service with your Gateway login.',
+      'Start the return for the 2025/26 tax year.',
+      'Add the self employment section. This is the SA103.',
+      'The system picks the short or full version from your turnover.',
+    ],
+    tip: 'Turnover under £90,000 uses the short pages, SA103S. It is quicker.',
   },
   {
-    n: '4',
+    n: '4', key: 'form', tint: RIVER_TINT, fg: RIVER,
     title: 'Fill in your self employment pages',
-    body:
-      'Enter what your business does, your turnover (the total you were paid before expenses), and your allowable expenses. Putting expenses into categories is easier if HMRC ever asks a question. If your self employed income is under £1,000 you may not need to report it, and you can claim the flat £1,000 trading allowance instead of real expenses.',
-    tint: RIVER_TINT, fg: RIVER,
+    lead: 'The heart of it. Two figures, plus the detail.',
+    does: [
+      'Enter your turnover: everything you invoiced or were paid, before expenses.',
+      'Enter your allowable expenses, by category: materials, travel, phone, insurance.',
+      'Income under £1,000? Use the £1,000 trading allowance instead of real expenses.',
+      'Buying big tools or equipment? Claim them as capital allowances.',
+    ],
+    tip: 'Split expenses into categories, do not lump them into one box. It is cleaner if HMRC asks.',
   },
   {
-    n: '5',
-    title: 'Add other income, then let HMRC do the maths',
-    body:
-      'Add anything else, a PAYE job from your P60, savings interest, dividends. The online return then works out your tax and National Insurance for you. You do not calculate it by hand. It applies your personal allowance and shows the final figure.',
-    tint: SAFFRON_TINT, fg: SAFFRON_DEEP,
+    n: '5', key: 'maths', tint: SAFFRON_TINT, fg: SAFFRON_DEEP,
+    title: 'Let HMRC do the maths',
+    lead: 'You do not work out the tax. The return does.',
+    does: [
+      'Add any other income, like a PAYE job from your P60.',
+      'The return applies your £12,570 personal allowance automatically.',
+      'It works out your Income Tax and your Class 4 National Insurance.',
+      'It shows your final bill, and any payments on account.',
+    ],
+    tip: 'Class 2 NI changed recently. Most people no longer pay it separately but still build their state pension.',
   },
   {
-    n: '6',
+    n: '6', key: 'submit', tint: GREEN_TINT, fg: GREEN,
     title: 'Check, submit, save the proof',
-    body:
-      'Review the calculation against your records. When it looks right, submit. HMRC confirms it on screen straight away. Save or screenshot that confirmation for your records.',
-    tint: GREEN_TINT, fg: GREEN,
+    lead: 'Slow down here for one minute.',
+    does: [
+      'Read the calculation. Check it matches your own records.',
+      'Press submit. HMRC confirms on screen straight away.',
+      'Save or screenshot the confirmation and your submission reference.',
+      'That is your return filed. Done.',
+    ],
+    tip: 'Filed early? You still do not pay until 31 January. It just means no last minute panic.',
   },
   {
-    n: '7',
+    n: '7', key: 'pay', tint: RIVER_TINT, fg: RIVER,
     title: 'Pay what you owe by 31 January',
-    body:
-      'Pay your bill by 31 January. If your bill is over £1,000 you usually also make payments on account, advance payments towards next year, half by 31 January and half by 31 July. The return tells you the amounts. Set the money aside through the year so it never stings.',
-    tint: RIVER_TINT, fg: RIVER,
+    lead: 'The deadline that matters.',
+    does: [
+      'Pay your bill by 31 January, online, by bank transfer, or through your tax code.',
+      'If your bill is over £1,000, you also make payments on account towards next year.',
+      'That is half by 31 January and half by 31 July.',
+      'Set aside roughly 30% of your profit as you go.',
+    ],
+    tip: 'Lekhio gives you a running set aside figure, so the money is always there when the bill lands.',
   },
 ];
+
+// CSS that powers the interactive walkthrough. The radios drive which panel
+// shows; each panel's mock animations restart when it becomes visible.
+const stepperCss =
+  `.wt-panel{display:none}` +
+  steps
+    .map(
+      (s) =>
+        `#wt${s.n}:checked~.wt-stage .wtp-${s.n}{display:block}` +
+        `#wt${s.n}:checked~.wt-tabs label[for="wt${s.n}"]{background:${RIVER};color:#fff;border-color:${RIVER}}` +
+        `#wt${s.n}:focus-visible~.wt-tabs label[for="wt${s.n}"]{outline:2px solid ${RIVER};outline-offset:2px}`,
+    )
+    .join('') +
+  `@keyframes wtRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}` +
+  `@keyframes wtPop{0%{opacity:0;transform:scale(.4)}60%{transform:scale(1.12)}100%{opacity:1;transform:scale(1)}}` +
+  `@keyframes wtFill{from{width:6%}to{width:100%}}` +
+  `@keyframes wtPress{0%,55%{transform:scale(1)}68%{transform:scale(.93)}100%{transform:scale(1)}}` +
+  `@keyframes wtBlink{0%,100%{opacity:1}50%{opacity:0}}` +
+  `.wtA{opacity:0;animation:wtRise .45s ease forwards}` +
+  `.wtP{opacity:0;animation:wtPop .5s ease forwards}` +
+  `.wtF{animation:wtFill .7s ease forwards}` +
+  `.wtPress{animation:wtPress 1.5s ease .25s forwards}` +
+  `.wt-caret{display:inline-block;width:2px;height:14px;background:${RIVER};vertical-align:middle;animation:wtBlink .8s step-end infinite}` +
+  `.wt-screen{background:#fff;border:1px solid ${LINE};border-radius:16px;overflow:hidden;box-shadow:0 14px 36px rgba(17,17,17,.08)}` +
+  `.wt-screenbar{background:${INK};color:#fff;font-size:11.5px;font-weight:600;letter-spacing:.3px;padding:9px 14px}` +
+  `.wt-tabs{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:24px}` +
+  `.wt-tab{cursor:pointer;width:40px;height:40px;border-radius:999px;border:1.5px solid ${LINE};background:#fff;color:${INK};font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s}` +
+  `.wt-tab:hover{border-color:${RIVER}}` +
+  `.wt-stage{min-height:312px}` +
+  `.wt-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:center}` +
+  `@media (max-width:720px){.wt-grid{grid-template-columns:1fr;gap:18px}.wt-stage{min-height:0}}`;
 
 const universalExpenses = [
   'Materials and stock used on jobs',
@@ -156,6 +223,130 @@ const faqSchema = {
   })),
 };
 
+// The animated mock screen for each walkthrough step. Pure CSS animations that
+// restart when the panel becomes visible, so each step demonstrates the action.
+function StepMock({ k }: { k: string }) {
+  if (k === 'utr') {
+    return (
+      <div className="wt-screen">
+        <div className="wt-screenbar">GOV.UK</div>
+        <div style={{ padding: '18px 16px', minHeight: 168 }}>
+          <div className="wtA" style={{ animationDelay: '.05s', fontSize: 12, color: MUTED }}>Self Assessment</div>
+          <div className="wtA" style={{ animationDelay: '.15s', fontSize: 13.5, fontWeight: 700, marginTop: 6 }}>Your Unique Taxpayer Reference</div>
+          <div className="wtP" style={{ animationDelay: '.5s', marginTop: 14, background: RIVER_TINT, color: RIVER_DEEP, borderRadius: 10, padding: '14px 12px', textAlign: 'center', fontSize: 22, fontWeight: 800, letterSpacing: '2px' }}>1234 567 890</div>
+          <div className="wtA" style={{ animationDelay: '.8s', marginTop: 12, fontSize: 12, color: MUTED }}>Posted to you in 2 to 3 weeks.</div>
+        </div>
+      </div>
+    );
+  }
+  if (k === 'gather') {
+    const items = ['UTR and Gateway login', 'National Insurance number', 'Total income', 'Total expenses', 'Other income (P60)'];
+    return (
+      <div className="wt-screen">
+        <div className="wt-screenbar">Before you start</div>
+        <div style={{ padding: '12px 16px', minHeight: 168 }}>
+          {items.map((t, i) => (
+            <div key={t} className="wtA" style={{ animationDelay: `${0.1 + i * 0.12}s`, display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}>
+              <span className="wtP" style={{ animationDelay: `${0.2 + i * 0.12}s`, width: 22, height: 22, borderRadius: 11, background: GREEN, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>✓</span>
+              <span style={{ fontSize: 13.5 }}>{t}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (k === 'login') {
+    return (
+      <div className="wt-screen">
+        <div className="wt-screenbar">HMRC sign in</div>
+        <div style={{ padding: '18px 16px', minHeight: 168 }}>
+          <div style={{ fontSize: 12, color: MUTED, marginBottom: 4 }}>Government Gateway user ID</div>
+          <div style={{ height: 34, borderRadius: 8, border: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13 }}>
+            <span>1357924680</span><span className="wt-caret" style={{ marginLeft: 2 }} />
+          </div>
+          <div style={{ fontSize: 12, color: MUTED, margin: '12px 0 4px' }}>Password</div>
+          <div style={{ height: 34, borderRadius: 8, border: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13, letterSpacing: 2 }}>••••••••</div>
+          <div className="wtPress" style={{ marginTop: 14, background: RIVER, color: '#fff', borderRadius: 8, padding: '10px', textAlign: 'center', fontSize: 13.5, fontWeight: 700 }}>Sign in</div>
+          <div className="wtP" style={{ animationDelay: '1.55s', marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, color: GREEN, fontSize: 12.5, fontWeight: 600 }}><span>✓</span> Tax year 2025 to 2026</div>
+        </div>
+      </div>
+    );
+  }
+  if (k === 'form') {
+    return (
+      <div className="wt-screen">
+        <div className="wt-screenbar">SA103 Self employment</div>
+        <div style={{ padding: '16px 16px', minHeight: 168 }}>
+          <div style={{ fontSize: 12, color: MUTED }}>Turnover</div>
+          <div style={{ height: 30, borderRadius: 8, background: SURFACE, overflow: 'hidden', marginTop: 5, position: 'relative' }}>
+            <div className="wtF" style={{ height: '100%', background: RIVER_TINT, width: '6%' }} />
+            <span className="wtP" style={{ animationDelay: '.7s', position: 'absolute', right: 10, top: 5, fontSize: 13.5, fontWeight: 800, color: RIVER_DEEP }}>£38,400</span>
+          </div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 12 }}>Allowable expenses</div>
+          <div style={{ height: 30, borderRadius: 8, background: SURFACE, overflow: 'hidden', marginTop: 5, position: 'relative' }}>
+            <div className="wtF" style={{ height: '100%', background: GREEN_TINT, width: '6%', animationDelay: '.5s' }} />
+            <span className="wtP" style={{ animationDelay: '1.1s', position: 'absolute', right: 10, top: 5, fontSize: 13.5, fontWeight: 800, color: GREEN }}>£9,250</span>
+          </div>
+          <div className="wtA" style={{ animationDelay: '1.35s', marginTop: 14, fontSize: 12.5, color: MUTED }}>Net profit, worked out for you: <b style={{ color: INK }}>£29,150</b></div>
+        </div>
+      </div>
+    );
+  }
+  if (k === 'maths') {
+    const rows: [string, string][] = [['Profit', '£29,150'], ['Less personal allowance', '− £12,570'], ['Income tax, 20%', '£3,316'], ['Class 4 NI, 6%', '£995']];
+    return (
+      <div className="wt-screen">
+        <div className="wt-screenbar">Your tax, worked out</div>
+        <div style={{ padding: '14px 16px', minHeight: 168 }}>
+          {rows.map((r, i) => (
+            <div key={r[0]} className="wtA" style={{ animationDelay: `${0.1 + i * 0.18}s`, display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: `1px solid ${SURFACE}` }}>
+              <span style={{ color: MUTED }}>{r[0]}</span><span style={{ fontWeight: 600 }}>{r[1]}</span>
+            </div>
+          ))}
+          <div className="wtP" style={{ animationDelay: '1s', marginTop: 12, background: RIVER, color: '#fff', borderRadius: 10, padding: '11px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13 }}>Your bill</span><span style={{ fontSize: 18, fontWeight: 800 }}>£4,311</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (k === 'submit') {
+    return (
+      <div className="wt-screen">
+        <div className="wt-screenbar">Submit your return</div>
+        <div style={{ padding: '20px 16px', textAlign: 'center', minHeight: 168 }}>
+          <div className="wtPress" style={{ background: RIVER, color: '#fff', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700 }}>Submit return</div>
+          <div className="wtP" style={{ animationDelay: '1.55s', marginTop: 16 }}>
+            <div style={{ width: 54, height: 54, borderRadius: 27, background: GREEN, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 900, margin: '0 auto' }}>✓</div>
+            <div style={{ marginTop: 10, fontSize: 14, fontWeight: 700 }}>Submission received</div>
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>Reference IRMARK 9F2A7C</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // pay
+  return (
+    <div className="wt-screen">
+      <div className="wt-screenbar">Pay by 31 January</div>
+      <div style={{ padding: '16px 16px', display: 'flex', gap: 14, alignItems: 'center', minHeight: 168 }}>
+        <div className="wtP" style={{ animationDelay: '.2s', width: 84, flexShrink: 0, border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', textAlign: 'center' }}>
+          <div style={{ background: RIVER, color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px' }}>JAN</div>
+          <div style={{ fontSize: 30, fontWeight: 800, padding: '8px 0', color: RIVER_DEEP }}>31</div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>Set aside as you go</div>
+          <div style={{ height: 26, borderRadius: 13, background: SURFACE, overflow: 'hidden', position: 'relative' }}>
+            <div className="wtF" style={{ height: '100%', background: `linear-gradient(90deg,${GREEN},#3FB871)`, width: '6%' }} />
+            <span className="wtP" style={{ animationDelay: '.8s', position: 'absolute', right: 10, top: 4, fontSize: 12.5, fontWeight: 800, color: '#fff' }}>£4,311 ready</span>
+          </div>
+          <div className="wtA" style={{ animationDelay: '1s', fontSize: 12, color: MUTED, marginTop: 8 }}>Roughly 30% of profit, saved already.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FileYourTaxReturnPage() {
   return (
     <main style={{ fontFamily: FONT, color: INK, background: PAPER, overflowX: 'hidden' }}>
@@ -177,6 +368,7 @@ export default function FileYourTaxReturnPage() {
           #route-over:focus-visible ~ .branch-tabs label[for="route-over"]{outline:2px solid ${RIVER};outline-offset:2px}
           .trade-panel{display:none;animation:riseIn .25s ease}
           ${tradeCss}
+          ${stepperCss}
           details{border:1px solid ${LINE};border-radius:14px;background:#fff;margin-bottom:12px;overflow:hidden}
           details[open]{box-shadow:0 10px 30px rgba(17,17,17,.06)}
           summary{list-style:none;cursor:pointer;padding:18px 20px;font-weight:600;font-size:16.5px;display:flex;align-items:center;justify-content:space-between;gap:14px}
@@ -269,22 +461,46 @@ export default function FileYourTaxReturnPage() {
         </div>
       </section>
 
-      {/* The steps */}
-      <section id="steps" style={{ maxWidth: 820, margin: '0 auto', padding: '24px 24px 20px' }}>
-        <h2 style={{ fontSize: 26, fontWeight: 700, textAlign: 'center', margin: '0 0 8px' }}>The seven steps, start to finish</h2>
+      {/* The walkthrough, interactive and animated */}
+      <section id="steps" style={{ maxWidth: 920, margin: '0 auto', padding: '24px 24px 20px' }}>
+        <h2 style={{ fontSize: 26, fontWeight: 700, textAlign: 'center', margin: '0 0 8px' }}>The walkthrough, click through it</h2>
         <p style={{ fontSize: 16, color: MUTED, textAlign: 'center', maxWidth: 560, margin: '0 auto 26px' }}>
-          This is the whole job. Do it once and the next year feels easy.
+          Exactly what to do at each step, with a look at the screen you will see.
         </p>
-        {steps.map((s) => (
-          <div className="step-card" key={s.n}>
-            <div style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 12, background: s.tint, color: s.fg, fontWeight: 700, fontSize: 19, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{s.n}</div>
-            <div>
-              <h3 style={{ margin: '2px 0 6px', fontSize: 18 }}>{s.title}</h3>
-              <p style={{ margin: 0, color: MUTED, fontSize: 15.5, lineHeight: 1.6 }}>{s.body}</p>
-            </div>
+        <div className="wt" style={{ position: 'relative' }}>
+          {steps.map((s, i) => (
+            <input key={s.n} type="radio" name="wt" id={`wt${s.n}`} className="vh" defaultChecked={i === 0} />
+          ))}
+          <div className="wt-tabs">
+            {steps.map((s) => (
+              <label key={s.n} htmlFor={`wt${s.n}`} className="wt-tab" aria-label={`Step ${s.n}`}>{s.n}</label>
+            ))}
           </div>
-        ))}
-        <p style={{ fontSize: 14, color: MUTED, textAlign: 'center', marginTop: 18 }}>
+          <div className="wt-stage">
+            {steps.map((s) => (
+              <div key={s.n} className={`wt-panel wtp-${s.n}`}>
+                <div className="wt-grid">
+                  <div className="wt-mock"><StepMock k={s.key} /></div>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: s.fg, textTransform: 'uppercase', letterSpacing: '.5px' }}>Step {s.n} of 7</div>
+                    <h3 style={{ fontSize: 21, fontWeight: 700, margin: '6px 0 8px' }}>{s.title}</h3>
+                    <p style={{ fontSize: 15.5, color: MUTED, lineHeight: 1.55, margin: '0 0 14px' }}>{s.lead}</p>
+                    <div style={{ display: 'grid', gap: 9 }}>
+                      {s.does.map((d, j) => (
+                        <div key={j} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 14.5, lineHeight: 1.5 }}>
+                          <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 6, background: s.tint, color: s.fg, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{j + 1}</span>
+                          <span>{d}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {s.tip ? <div style={{ marginTop: 14, background: SAFFRON_TINT, color: SAFFRON_DEEP, borderRadius: 10, padding: '11px 13px', fontSize: 13.5, lineHeight: 1.5 }}>💡 {s.tip}</div> : null}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p style={{ fontSize: 14, color: MUTED, textAlign: 'center', marginTop: 24 }}>
           You make the actual submission on the official HMRC website. We are not HMRC and we never submit on your behalf.
         </p>
       </section>

@@ -152,6 +152,15 @@ const included = [
   'Records exported any time, and cancel in one tap',
 ];
 
+// The all-in-one value. One price replaces a stack of separate subscriptions.
+const replaces = [
+  { icon: '📒', label: 'Bookkeeping app', cost: '£10 to £20' },
+  { icon: '🧾', label: 'Invoicing tool', cost: '£10 to £25' },
+  { icon: '🗓️', label: 'Diary and reminders', cost: '£5 to £15' },
+  { icon: '🧮', label: 'Tax software', cost: '£10 to £20' },
+  { icon: '🚗', label: 'Mileage tracker', cost: '£5 to £10' },
+];
+
 const trustPillars = [
   { icon: '🔒', title: 'Your data is yours', body: 'Never sold. Never shared beyond the suppliers that run Lekhio. Encrypted, and only you can ever see your records. Export or delete everything whenever you want.', tint: RIVER_TINT, fg: RIVER },
   { icon: '✅', title: 'You approve everything', body: 'We prepare your figures. Nothing reaches HMRC until you check it and say yes. HMRC keeps you responsible for your tax, and we never pretend otherwise.', tint: GREEN_TINT, fg: GREEN },
@@ -675,6 +684,7 @@ export default function HomePage() {
           <a href="#trust">Trust</a>
           <a href="#pricing">Pricing</a>
           <Link href="/can-i-claim">Can I claim it?</Link>
+          <Link href="/tax-calculator">Free tax calculator</Link>
           <Link href="/file-your-tax-return">Free tax return guide</Link>
           <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
         </div>
@@ -1205,6 +1215,21 @@ export default function HomePage() {
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>One price. No surprises.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 620, margin: '0 auto' }}>Try it free for 30 days. Keep it for less than a tank of fuel a month. Other apps look cheaper, then charge extra for receipts, CIS, filing and support. Lekhio is one price with all of it in.</p>
         </div>
+        <div className="reveal" style={{ maxWidth: 760, margin: '0 auto 22px', background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 18, padding: '22px 24px' }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: RIVER_DEEP, textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 14px', textAlign: 'center' }}>One Lekhio replaces all of these</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10 }}>
+            {replaces.map((r) => (
+              <div key={r.label} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 10px', textAlign: 'center' }}>
+                <div style={{ fontSize: 22 }}>{r.icon}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: INK, marginTop: 5 }}>{r.label}</div>
+                <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{r.cost} / mo</div>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: 13.5, color: MUTED, textAlign: 'center', margin: '16px auto 0', maxWidth: 560, lineHeight: 1.6 }}>
+            Pay for those one by one and it is well over £29 a month, across five different logins. Lekhio is the lot, in one chat. Billed monthly, cancel any time, no locked in annual contract.
+          </p>
+        </div>
         <div className="reveal" style={{ maxWidth: 760, margin: '0 auto', backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 22, overflow: 'hidden', boxShadow: '0 18px 50px rgba(17,17,17,.07)' }}>
           <div className="price-split" style={{ display: 'flex' }}>
             <div style={{ flex: 1, padding: 36, borderRight: `1px solid ${LINE}` }}>
@@ -1292,6 +1317,7 @@ export default function HomePage() {
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
             <Link href="/start" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Sign up</Link>
             <Link href="/can-i-claim" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Can I claim it?</Link>
+            <Link href="/tax-calculator" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Tax calculator</Link>
             <Link href="/file-your-tax-return" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Free tax guide</Link>
             <Link href="/privacy" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Privacy</Link>
             <Link href="/terms" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Terms</Link>

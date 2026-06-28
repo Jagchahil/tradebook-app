@@ -117,6 +117,15 @@ const claimExamples = [
   { text: '£400 paid, £80 CIS deducted', result: 'gross logged, refund tracked' },
 ];
 
+// The platform roadmap, shown as coming soon. Signals ambition without
+// overpromising. Locked until the HMRC recognition and bank provider land.
+const comingSoon = [
+  { icon: '📤', title: 'File straight to HMRC', body: 'Submit your quarterly updates and your return from Lekhio, when you approve, through a recognised route.' },
+  { icon: '📊', title: 'Your HMRC balance, live', body: 'See exactly what you owe, what is due, and any refund building, right in the app.' },
+  { icon: '🏦', title: 'Connect your bank', body: 'Money in and out logs itself, read only, so your books stay up to date with no effort.' },
+  { icon: '🧑‍💼', title: 'A real accountant, on tap', body: 'For the tricky bits, a qualified accountant inside Lekhio. No leaving for help, ever.' },
+];
+
 const fixes = [
   { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'A real person replies on the same WhatsApp. No bots, no hold music.' },
   { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £29 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
@@ -922,6 +931,25 @@ export default function HomePage() {
         <p className="reveal" style={{ fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 24 }}>Read only through your bank&apos;s own login. Optional, and you can switch it off any time.</p>
       </section>
 
+      {/* Coming soon, the complete platform */}
+      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '40px 24px' }}>
+        <div className="reveal" style={{ textAlign: 'center', marginBottom: 28 }}>
+          <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>COMING SOON</span>
+          <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Soon, Lekhio does the lot.</h2>
+          <p style={{ fontSize: 17, color: MUTED, maxWidth: 580, margin: '0 auto', lineHeight: 1.6 }}>We are building the complete platform, so your whole tax life lives in one text. Here is what is on the way.</p>
+        </div>
+        <div className="reveal" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: 16 }}>
+          {comingSoon.map((c) => (
+            <div key={c.title} style={{ position: 'relative', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 22, boxShadow: '0 10px 26px rgba(17,17,17,.05)' }}>
+              <div style={{ fontSize: 28, marginBottom: 10 }}>{c.icon}</div>
+              <h3 style={{ fontSize: 16.5, fontWeight: 700, margin: '0 0 8px' }}>{c.title}</h3>
+              <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.55, margin: '0 0 14px' }}>{c.body}</p>
+              <span style={{ display: 'inline-block', fontSize: 11.5, fontWeight: 700, letterSpacing: '0.5px', color: SAFFRON_DEEP, background: SAFFRON_TINT, padding: '4px 10px', borderRadius: 14 }}>COMING SOON</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* MTD explainer (interactive) */}
       <section id="mtd" style={{ background: `linear-gradient(180deg, #fff, ${RIVER_TINT})`, borderTop: `1px solid ${LINE}` }}>
         <div style={{ maxWidth: 980, margin: '0 auto', padding: '46px 24px' }}>
@@ -1158,6 +1186,7 @@ export default function HomePage() {
               </div>
               <p style={{ fontSize: 14, color: MUTED, margin: '0 0 26px' }}>After your free trial. Cancel any time.</p>
               <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: 15, borderRadius: 12 }}>Start free trial</Link>
+              <p style={{ fontSize: 13, color: MUTED, textAlign: 'center', margin: '12px 0 0' }}>No card needed to start. Snap your first receipt in minutes.</p>
             </div>
             <div style={{ flex: 1, padding: 36 }}>
               <p style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 18px' }}>What you get</p>

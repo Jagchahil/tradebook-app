@@ -73,10 +73,40 @@ create table if not exists public.audit_log (
 -- and safe. Existing rows get null.
 
 alter table public.transactions add column if not exists raw_whatsapp_message_id text;
+-- CIS tax deducted at source by a contractor. Stored on the gross income row.
+-- It is tax already paid, never an expense, so it never touches profit.
+alter table public.transactions add column if not exists cis_deduction numeric default 0;
 
 create unique index if not exists transactions_whatsapp_msg_uidx
   on public.transactions (raw_whatsapp_message_id)
   where raw_whatsapp_message_id is not null;
+
+-- ---------------------------------------------------------------------------
+-- Bank connection scaffolding (Open Banking, doc 22). Laid dormant. The client
+-- lib and the connect flow are wired when the aggregator account and the
+-- BANK_TOKEN_KEY exist. Adding these now is safe and idempotent.
+-- ---------------------------------------------------------------------------
+
+-- Imported bank lines land in transactions with source_type 'bank' and a
+-- provider external_id, deduped so a re-sync never double counts.
+alter table public.transactions add column if not exists external_id text;
+create unique index if not exists transactions_external_uidx
+  on public.transactions (user_id, external_id)
+  where external_id is not null;
+
+create table if not exists public.bank_connections (
+  id                 uuid primary key default gen_random_uuid(),
+  user_id            uuid not null references public.users (id) on delete cascade,
+  provider           text,
+  access_token_enc   text,
+  refresh_token_enc  text,
+  consent_expires_at timestamptz,
+  status             text default 'active',
+  created_at         timestamptz default now()
+);
+-- Service role only. No user policies: these tokens are the crown jewels and the
+-- app never reads them. The sync job uses the service role key.
+alter table public.bank_connections enable row level security;
 
 -- ---------------------------------------------------------------------------
 -- Row level security (already applied 2026-06-24, kept here so it is repeatable)
@@ -206,6 +236,101 @@ create table if not exists public.wa_sessions (
 
 alter table public.wa_sessions enable row level security;
 -- No policies. Service role only. The anon key can never touch it.
+
+-- ---------------------------------------------------------------------------
+-- Signups (from the web onboarding flow at /start)
+-- ---------------------------------------------------------------------------
+-- Captures a completed web onboarding. This is the start of an account, written
+-- before the live auth and billing are switched on. Server only, the /api/onboard
+-- route writes it with the service role key.
+
+create table if not exists public.signups (
+  id             uuid primary key default gen_random_uuid(),
+  phone          text not null,
+  email          text,
+  trade_type     text,
+  name           text,
+  trade          text,
+  postcode       text,
+  address        text,
+  vat_registered boolean,
+  created_at     timestamptz not null default now()
+);
+
+alter table public.signups enable row level security;
+-- No policies. Service role only. The anon key can never touch it.
+
+-- ---------------------------------------------------------------------------
+-- Events (the diary and reminders)
+-- ---------------------------------------------------------------------------
+-- A job, quote, reminder, or note in the user's diary. Created from WhatsApp
+-- ("price up a job for Dave tomorrow at 8am") or in the app. The cron sender
+-- texts the user when remind_at is due. A user reads only their own rows.
+
+create table if not exists public.events (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null,
+  title      text not null,
+  kind       text not null default 'reminder',
+  starts_at  timestamptz,
+  remind_at  timestamptz,
+  reminded   boolean not null default false,
+  notes      text,
+  status     text not null default 'open',
+  created_at timestamptz not null default now()
+);
+
+alter table public.events enable row level security;
+create policy "events read own"   on public.events for select using (auth.uid() = user_id);
+create policy "events insert own" on public.events for insert with check (auth.uid() = user_id);
+create policy "events update own" on public.events for update using (auth.uid() = user_id);
+create policy "events delete own" on public.events for delete using (auth.uid() = user_id);
+create index if not exists events_user_idx   on public.events(user_id);
+create index if not exists events_remind_idx on public.events(remind_at) where reminded = false;
+
+-- ---------------------------------------------------------------------------
+-- Reminder preferences
+-- ---------------------------------------------------------------------------
+-- Per user: whether the twice a day expense nudge and the weekly summary are on,
+-- and at what times the nudge fires. Defaults are on.
+
+create table if not exists public.reminder_prefs (
+  user_id        uuid primary key,
+  daily_nudges   boolean not null default true,
+  morning_time   text not null default '08:00',
+  evening_time   text not null default '18:00',
+  weekly_summary boolean not null default true,
+  updated_at     timestamptz not null default now()
+);
+
+alter table public.reminder_prefs enable row level security;
+create policy "prefs read own"   on public.reminder_prefs for select using (auth.uid() = user_id);
+create policy "prefs insert own" on public.reminder_prefs for insert with check (auth.uid() = user_id);
+create policy "prefs update own" on public.reminder_prefs for update using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Indexes for scale (no-ops if they already exist)
+-- ---------------------------------------------------------------------------
+-- Keep the common per-user reads fast as the tables grow over a year of use.
+
+create index if not exists transactions_user_idx         on public.transactions(user_id);
+create index if not exists transactions_user_created_idx on public.transactions(user_id, created_at desc);
+create index if not exists invoices_user_idx             on public.invoices(user_id);
+
+-- ---------------------------------------------------------------------------
+-- Processed messages (webhook idempotency)
+-- ---------------------------------------------------------------------------
+-- Every inbound WhatsApp message id is claimed here before it is handled, so a
+-- Meta retry (which happens if we are slow to answer) never processes the same
+-- message twice. Service only.
+
+create table if not exists public.processed_messages (
+  id         text primary key,
+  created_at timestamptz not null default now()
+);
+
+alter table public.processed_messages enable row level security;
+-- No policies. Service role only.
 
 -- ---------------------------------------------------------------------------
 -- Conventions (decided 2026-06-24 while the transactions table was still empty)

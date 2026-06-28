@@ -69,6 +69,7 @@ const features = [
   { icon: '👷', title: 'CIS done right', body: 'Subcontractor? Lekhio splits labour and materials, applies your CIS deduction, and tracks the refund building up. Other apps charge extra or get it wrong.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { icon: '✅', title: 'You approve everything', body: 'See every entry. Fix anything that looks off. Nothing counts toward your tax until you confirm it.', tint: RIVER_TINT, fg: RIVER },
   { icon: '📊', title: 'Tax prepared for you', body: 'Quarterly figures, ready. You check them, you send them. We never imply HMRC backs us.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
+  { icon: '💡', title: 'Can I claim it?', body: 'Not sure if something counts? Text "can I claim my work boots?" and Lekhio answers straight, the grey areas included.', tint: RIVER_TINT, fg: RIVER },
   { icon: '💬', title: 'A real person in the chat', body: 'Stuck on something. Message us on the same WhatsApp and a human replies. No hold music.', tint: GREEN_TINT, fg: GREEN },
 ];
 
@@ -673,6 +674,7 @@ export default function HomePage() {
           <a href="#reviews">Reviews</a>
           <a href="#trust">Trust</a>
           <a href="#pricing">Pricing</a>
+          <Link href="/can-i-claim">Can I claim it?</Link>
           <Link href="/file-your-tax-return">Free tax return guide</Link>
           <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
         </div>
@@ -913,6 +915,20 @@ export default function HomePage() {
           ))}
         </div>
         <p style={{ fontSize: 12.5, color: MUTED, textAlign: 'center', marginTop: 16 }}>Mileage, working from home, phone and broadband, and CIS, all from a text. The simplified rates apply, and the method that claims you more is the one that counts.</p>
+      </section>
+
+      {/* Can I claim it CTA */}
+      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '6px 24px 30px' }}>
+        <Link href="/can-i-claim" className="reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '18px 22px', textDecoration: 'none', color: INK }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 26 }}>💡</span>
+            <div>
+              <div style={{ fontSize: 15.5, fontWeight: 700 }}>Not sure what you can claim? Ask away.</div>
+              <div style={{ fontSize: 13.5, color: MUTED }}>Boots, the van, training, meals. The real rules, the grey areas included, all legal.</div>
+            </div>
+          </div>
+          <span style={{ backgroundColor: RIVER, color: '#fff', fontSize: 14.5, fontWeight: 600, padding: '11px 18px', borderRadius: 10, whiteSpace: 'nowrap' }}>Can I claim it? &rarr;</span>
+        </Link>
       </section>
 
       {/* Bank connector showcase */}
@@ -1275,6 +1291,7 @@ export default function HomePage() {
           </div>
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
             <Link href="/start" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Sign up</Link>
+            <Link href="/can-i-claim" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Can I claim it?</Link>
             <Link href="/file-your-tax-return" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Free tax guide</Link>
             <Link href="/privacy" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Privacy</Link>
             <Link href="/terms" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Terms</Link>

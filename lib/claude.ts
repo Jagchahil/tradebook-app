@@ -283,6 +283,40 @@ export async function answerMoneyQuestion(question: string, summary: string): Pr
   return textBlock ? textBlock.trim() : null;
 }
 
+// Answer a "can I claim X?" expense question for a UK sole trader. Strictly
+// within the law. We never suggest claiming what is not allowable, we are honest
+// about the grey areas, and we always close with a short caveat. Used only as a
+// fallback when the deterministic knowledge base has no confident match.
+export async function answerExpenseQuestion(question: string): Promise<string | null> {
+  if (!KEY) return null;
+
+  const prompt = [
+    'You are Lekhio, a plain talking assistant helping a UK self employed sole trader work out if something is a tax allowable business expense.',
+    'The legal test is HMRC\'s "wholly and exclusively for the purposes of the trade". Cash basis, 2026/27.',
+    'Be accurate and strictly within the law. Never suggest claiming something that is not allowable. Be honest about grey areas.',
+    'Key rules to apply: everyday clothing is NOT allowable even if only worn for work; only branded uniform and genuine protective clothing are. Client entertaining is NOT allowable. Fines and penalties are never allowable. Ordinary commuting is not allowable but travel to varying job sites is. Training that updates existing skills is allowable, training for a brand new trade is not. For mixed use items like a phone or a car, only the business proportion is allowable.',
+    'Reply in two or three short sentences, friendly and direct, with the £ sign where useful. Start with a clear yes, no, part of it, or it depends.',
+    'End with this exact short line on a new line: "General info, not advice for your exact situation."',
+    '',
+    'Their question:',
+    `"${question}"`,
+  ].join('\n');
+
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: MODEL, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[claude] Expense question failed:', res.status, errText);
+    return null;
+  }
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const textBlock = data.content?.find((c) => c.type === 'text')?.text;
+  return textBlock ? textBlock.trim() : null;
+}
+
 // --- Scheduling: turn "price up a job for Dave tomorrow at 8am" into a diary event ---
 
 export interface ParsedSchedule {

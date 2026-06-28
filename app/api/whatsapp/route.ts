@@ -11,9 +11,11 @@ import {
   parseSpokenTransaction,
   draftInvoice,
   answerMoneyQuestion,
+  answerExpenseQuestion,
   parseSchedule,
   hasClaudeConfig,
 } from '../../../lib/claude';
+import { checkExpense, VERDICT_ICON, TAX_TIPS } from '../../../lib/taxrules';
 import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
 import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/email';
 import {
@@ -112,6 +114,10 @@ export async function POST(req: NextRequest) {
             await handleSchedule(from, text);
           } else if (isHelp(text)) {
             await handleHelp(from);
+          } else if (isTaxTips(text)) {
+            await handleTaxTips(from);
+          } else if (isExpenseCheck(text)) {
+            await handleExpenseCheck(from, text);
           } else if (isQuestion(text)) {
             await handleMoneyQuestion(from, text);
           } else {
@@ -539,6 +545,8 @@ async function handleHelp(from: string): Promise<void> {
       '🏗️ Log CIS, like "Dave paid £400, £80 CIS deducted".',
       '🧾 Type "create invoice" and I will build and send one with you.',
       '💬 Ask me anything, like "how much did I spend on fuel this month?".',
+      '💡 Ask "can I claim my work boots?" and I will tell you straight.',
+      '📈 Text "pay less tax" for the legal ways to keep more of what you earn.',
       '',
       'Everything shows in your app to review and approve. Nothing goes to HMRC without you.',
     ].join('\n'),
@@ -558,6 +566,87 @@ async function handleMoneyQuestion(from: string, body: string): Promise<void> {
   const summary = await transactionSummaryForUser(userId);
   const answer = await answerMoneyQuestion(body, summary);
   await sendText(from, answer ?? 'I could not work that out. Try asking another way.');
+}
+
+// --- "Can I claim this?" expense checker ----------------------------------
+// "can I expense my work boots?", "is a van tax deductible?", "can I claim fuel".
+// Answered from the deterministic knowledge base first, so it works even before
+// the AI is switched on, with Claude as a fallback for anything unusual.
+// General information only, never a filing or an action.
+const CLAIM_WORDS = /\b(claim|expense|deduct|deductible|allowable|write[- ]?off|writeoff|tax[- ]?deductible)\b/i;
+function isExpenseCheck(body: string): boolean {
+  if (!CLAIM_WORDS.test(body)) return false;
+  // It must read like a query, not a logged entry. No money amount being booked.
+  if (/£\s*\d/.test(body)) return false;
+  return /\bcan i\b|\bcould i\b|\bable to\b|\bdo i\b|\bis (?:it|this|that|a|an|my|the)\b|\bare (?:my|these|those)\b|\bwhat about\b|\?/i.test(body);
+}
+
+function isTaxTips(body: string): boolean {
+  if (/£\s*\d/.test(body)) return false;
+  return /\b(pay less tax|pay no tax|save (?:on )?tax|reduce my tax|lower my tax|less tax|tax efficient|tax efficiency|keep more|how (?:do|can) i pay)\b/i.test(body);
+}
+
+// A soft signup line, only for numbers we do not have an account for. The
+// expense checker and tax tips give value to anyone, then point them to sign up.
+async function signupTail(from: string): Promise<string> {
+  const linked = await findUserIdByPhone(from);
+  if (linked) return '';
+  return `\n\nWant me to track all this for you? Get set up in two minutes at ${APP_URL.replace('https://', '')}, first month free.`;
+}
+
+async function handleExpenseCheck(from: string, body: string): Promise<void> {
+  // A generic "what can I claim?" with no specific thing named: send the overview.
+  const hit = checkExpense(body);
+  if (!hit) {
+    if (/\bwhat\b/i.test(body) && /\bclaim\b/i.test(body)) {
+      await handleTaxTips(from);
+      return;
+    }
+    // Try the AI for anything unusual we do not have a rule for.
+    if (hasClaudeConfig()) {
+      const ai = await answerExpenseQuestion(body);
+      if (ai) {
+        await sendText(from, ai + (await signupTail(from)));
+        return;
+      }
+    }
+    await sendText(
+      from,
+      [
+        'The test HMRC uses is simple: was it spent wholly and only for the business? If yes, it is very likely claimable. If it is part personal, you claim the business share.',
+        '',
+        'Ask me about a specific thing, like "can I claim my work boots?" or "is a van deductible?". Or text "pay less tax" for the legal ways to keep more.',
+        '',
+        'General info, not advice for your exact situation.',
+      ].join('\n') + (await signupTail(from)),
+    );
+    return;
+  }
+  const icon = VERDICT_ICON[hit.verdict];
+  await sendText(
+    from,
+    [
+      `${icon} ${hit.title}. ${hit.rule}`,
+      '',
+      'Want it logged? Send the receipt or the amount and I will file it.',
+      '',
+      'General info, not advice for your exact situation.',
+    ].join('\n') + (await signupTail(from)),
+  );
+}
+
+async function handleTaxTips(from: string): Promise<void> {
+  const lines = TAX_TIPS.slice(0, 8).map((t) => `• ${t.title}. ${t.body}`);
+  await sendText(
+    from,
+    [
+      'Here are the legal ways to keep more of what you earn. All within the rules, nothing dodgy.',
+      '',
+      ...lines,
+      '',
+      'I track most of these for you as you go, so you do not leave money on the table. General info, not advice for your exact situation.',
+    ].join('\n') + (await signupTail(from)),
+  );
 }
 
 // --- Guided invoice flow over WhatsApp ------------------------------------

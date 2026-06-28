@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { TRADES } from '../../lib/trades';
 
 export const metadata: Metadata = {
   title: 'Free Tools & Guides for the UK Self Employed | Lekhio',
@@ -77,6 +78,16 @@ export default function ResourcesPage() {
               <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: 0, flex: 1 }}>{t.body}</p>
               <span style={{ fontSize: 14.5, fontWeight: 700, color: RIVER }}>Open {t.title.toLowerCase()} &rarr;</span>
             </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* By trade */}
+      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '6px 24px 26px' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Guides by trade</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {TRADES.map((t) => (
+            <Link key={t.slug} href={`/for/${t.slug}`} style={{ fontSize: 14, fontWeight: 600, color: INK, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 20, padding: '9px 16px' }}>{t.emoji} {t.name}</Link>
           ))}
         </div>
       </section>

@@ -4,7 +4,7 @@ import Link from 'next/link';
 export const metadata: Metadata = {
   title: 'Lekhio. Your books, handled. Just text it.',
   description:
-    'Lekhio is the WhatsApp back office for anyone self employed in the UK. Snap a receipt, leave a voice note, or just type it. Lekhio logs it, sorts it, invoices for you, and keeps you ready for tax. 30 days free.',
+    'Lekhio is the only complete tax assistant that lives in WhatsApp, for anyone self employed in the UK. Snap a receipt, leave a voice note, or just type it. Lekhio logs it, sorts it, invoices for you, claims your reliefs, and keeps you ready for tax. 30 days free.',
   openGraph: {
     title: 'Lekhio. Your books, handled. Just text it.',
     description:
@@ -66,6 +66,7 @@ const features = [
   { icon: '🎙️', title: 'Voice notes', body: 'Hands full on the job. Say the expense out loud and carry on.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { icon: '🚗', title: 'Mileage in a text', body: 'Text "drove 24 miles to the job" and Lekhio logs the claim at the HMRC rate. No fiddly logbook.', tint: RIVER_TINT, fg: RIVER },
   { icon: '🧾', title: 'Invoices from a text', body: 'Type "create invoice" on WhatsApp. Lekhio asks what it needs and sends a clean invoice for you.', tint: GREEN_TINT, fg: GREEN },
+  { icon: '👷', title: 'CIS done right', body: 'Subcontractor? Lekhio splits labour and materials, applies your CIS deduction, and tracks the refund building up. Other apps charge extra or get it wrong.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { icon: '✅', title: 'You approve everything', body: 'See every entry. Fix anything that looks off. Nothing counts toward your tax until you confirm it.', tint: RIVER_TINT, fg: RIVER },
   { icon: '📊', title: 'Tax prepared for you', body: 'Quarterly figures, ready. You check them, you send them. We never imply HMRC backs us.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { icon: '💬', title: 'A real person in the chat', body: 'Stuck on something. Message us on the same WhatsApp and a human replies. No hold music.', tint: GREEN_TINT, fg: GREEN },
@@ -88,14 +89,18 @@ const mtdMeans = [
 // Comparison. We do not name competitors. Columns speak for themselves.
 const compareRows = [
   { label: 'Lives in WhatsApp, no new app to learn', lekhio: true, apps: false, diy: false },
-  { label: 'Snap a receipt and it is logged for you', lekhio: true, apps: 'limit', diy: false },
+  { label: 'Snap a receipt and it is fully logged, not just matched', lekhio: true, apps: 'limit', diy: false },
   { label: 'Log an expense by voice note', lekhio: true, apps: false, diy: false },
-  { label: 'Log mileage with a quick text', lekhio: true, apps: 'limit', diy: false },
+  { label: 'Claim mileage, home, phone and CIS from a text', lekhio: true, apps: false, diy: false },
   { label: 'Create and send an invoice from a text', lekhio: true, apps: 'extra', diy: false },
-  { label: 'One flat price, everything included', lekhio: true, apps: false, diy: true },
-  { label: 'Quarterly tax updates prepared for you', lekhio: true, apps: 'higher', diy: false },
-  { label: 'A real human replies, fast', lekhio: true, apps: false, diy: 'maybe' },
-  { label: 'Set up in minutes, not a weekend', lekhio: true, apps: false, diy: false },
+  { label: 'CIS split and deduction done for you', lekhio: true, apps: 'higher', diy: false },
+  { label: 'Quarterly MTD updates prepared for you', lekhio: true, apps: 'higher', diy: false },
+  { label: 'A real human replies fast, in the same chat', lekhio: true, apps: false, diy: 'maybe' },
+  { label: 'Plain English, built for the non accountant', lekhio: true, apps: false, diy: true },
+  { label: 'One flat price, no receipt limits, no paywalls', lekhio: true, apps: false, diy: true },
+  { label: 'Set up in minutes, cancel in one tap', lekhio: true, apps: false, diy: false },
+  { label: 'File straight to HMRC', lekhio: 'soon', apps: true, diy: false },
+  { label: 'Connect your bank, read only', lekhio: 'soon', apps: true, diy: false },
 ];
 
 const reviews = [
@@ -129,8 +134,11 @@ const comingSoon = [
 const fixes = [
   { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'A real person replies on the same WhatsApp. No bots, no hold music.' },
   { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £29 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
+  { stars: 1, who: 'A self employed driver, reviewing another app', gripe: 'The bank feed kept dropping. Half my month went missing and I had to relink it again and again.', fix: 'Lekhio never leans on a fragile feed. Snap it or text it and it is logged for good. Connecting your bank, when it lands, is a bonus, never a crutch.' },
+  { stars: 2, who: 'A trades subcontractor, reviewing another app', gripe: 'I photographed a receipt and it would not even log it. It just tried to match it to something and gave up.', fix: 'Send a photo and Lekhio reads it and logs the lot, the amount, the VAT, the category, in seconds. No matching, no retyping.' },
+  { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'They held my own money for weeks with a copy and paste excuse. Never again.', fix: 'Lekhio never holds your money or touches your account. We keep the records, that is all. Your cash is only ever yours.' },
   { stars: 2, who: 'A freelancer, reviewing another app', gripe: 'It talks to me like I am an accountant. I am not. Half of it I do not understand.', fix: 'Plain English, and it lives in WhatsApp. If you can send a text, you can use Lekhio.' },
-  { stars: 1, who: 'A self employed driver, reviewing another app', gripe: 'Took a whole weekend to set up and I still could not work it out.', fix: 'Set up in minutes. Snap one receipt and it is already working.' },
+  { stars: 2, who: 'A self employed cleaner, reviewing another app', gripe: 'Once it auto sorted something wrong, fixing it was a proper faff. I gave up correcting it.', fix: 'Wrong category? Just say "that was fuel, not food" and it is fixed in one line. You are always in charge of every entry.' },
   { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'Cancelling was a nightmare. I felt completely locked in.', fix: 'Cancel any time, in one tap. Your records export whenever you want.' },
 ];
 
@@ -200,6 +208,9 @@ function Mark({ value }: { value: boolean | string }) {
   if (value === false) {
     return <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 13, backgroundColor: '#F3F1EC', color: '#B8B2A6', fontSize: 14, fontWeight: 700 }}>✕</span>;
   }
+  if (value === 'soon') {
+    return <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.3px', color: SAFFRON_DEEP, background: SAFFRON_TINT, padding: '4px 9px', borderRadius: 12 }}>Soon</span>;
+  }
   const labels: Record<string, string> = { limit: 'Up to a limit', extra: 'Costs extra', higher: 'Higher tiers', maybe: 'If you pay' };
   return <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{labels[value] ?? String(value)}</span>;
 }
@@ -265,7 +276,7 @@ function AppDash() {
           <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.5px', color: INK }}>Lekhio</div>
           <MiniRiver />
         </div>
-        <span style={{ fontSize: 9, fontWeight: 700, color: RIVER, background: RIVER_TINT, padding: '3px 8px', borderRadius: 10, letterSpacing: '0.4px' }}>FREE</span>
+        <span style={{ fontSize: 9, fontWeight: 700, color: RIVER, background: RIVER_TINT, padding: '3px 8px', borderRadius: 10, letterSpacing: '0.4px' }}>TRIAL</span>
       </div>
       <div style={{ fontSize: 11, color: MUTED, marginTop: 9 }}>Good morning · June 2026</div>
       <div style={{ display: 'flex', gap: 7, marginTop: 12 }}>
@@ -447,13 +458,15 @@ function OnbDone() {
 const chatMessages: { side: 'out' | 'in'; text: string; image?: string }[] = [
   { side: 'out', image: '🧾', text: 'Screwfix receipt' },
   { side: 'in', text: 'Logged. £42.60, materials ✅' },
+  { side: 'out', text: 'drove 32 miles to the job' },
+  { side: 'in', text: '£17.60 mileage claimed at the HMRC rate ✅' },
   { side: 'out', text: 'how much profit this month?' },
   { side: 'in', text: "You're £2,240 up this month 📈" },
   { side: 'out', text: 'invoice Dave £450 for the rewire' },
   { side: 'in', text: 'Sent ✅  Dave paid. +£450 income 💷' },
 ];
-const HERO_CHAT_LOOP = 8;
-const chatAppear = [3, 15, 29, 43, 57, 71];
+const HERO_CHAT_LOOP = 9.5;
+const chatAppear = [2, 12, 23, 34, 45, 56, 67, 79];
 const chatCss =
   `.cmsg{opacity:0}` +
   `@media (prefers-reduced-motion: reduce){.cmsg{opacity:1 !important;animation:none !important;transform:none !important}}` +
@@ -671,7 +684,7 @@ export default function HomePage() {
           <div className="hero-left">
             <div className="hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 20, marginBottom: 24 }}>
               <span style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E', display: 'inline-block', animation: 'pulseDot 2s infinite' }} />
-              Works through WhatsApp. No new app to learn.
+              The only complete tax assistant that lives in WhatsApp.
             </div>
             <h1 className="hero-h1 hero-h1-size" style={{ fontWeight: 700, letterSpacing: '-2.4px', margin: '0 0 20px' }}>
               Your books, handled.<br /><span className="gradtext">Just text it.</span>
@@ -1174,7 +1187,7 @@ export default function HomePage() {
       <section id="pricing" style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>One price. No surprises.</h2>
-          <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>Try it free for 30 days. Keep it for less than a tank of fuel a month.</p>
+          <p style={{ fontSize: 17, color: MUTED, maxWidth: 620, margin: '0 auto' }}>Try it free for 30 days. Keep it for less than a tank of fuel a month. Other apps look cheaper, then charge extra for receipts, CIS, filing and support. Lekhio is one price with all of it in.</p>
         </div>
         <div className="reveal" style={{ maxWidth: 760, margin: '0 auto', backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 22, overflow: 'hidden', boxShadow: '0 18px 50px rgba(17,17,17,.07)' }}>
           <div className="price-split" style={{ display: 'flex' }}>

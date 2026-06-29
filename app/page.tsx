@@ -1022,6 +1022,20 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Register offer banner */}
+      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '8px 24px 34px' }}>
+        <Link href="/register-your-business" className="reveal card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', background: INK, borderRadius: 20, padding: '26px 28px', color: '#fff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span style={{ fontSize: 30 }}>🏁</span>
+            <div>
+              <div style={{ fontSize: 19, fontWeight: 800 }}>Just starting out? Register your business free.</div>
+              <div style={{ fontSize: 14.5, color: '#B6BDC8', marginTop: 4, maxWidth: 640, lineHeight: 1.5 }}>Sole trader or limited, the exact steps, forms and codes. Set up with us and lock in first month free, then 20% off for life.</div>
+            </div>
+          </div>
+          <span style={{ background: SAFFRON, color: INK, fontSize: 14.5, fontWeight: 800, padding: '12px 20px', borderRadius: 10, whiteSpace: 'nowrap' }}>Register free &rarr;</span>
+        </Link>
+      </section>
+
       {/* Claim it by text */}
       <section style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 30 }}>

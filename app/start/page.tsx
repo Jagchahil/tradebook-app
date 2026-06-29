@@ -47,6 +47,7 @@ export default function StartPage() {
   const [vat, setVat] = useState<boolean | null>(false);
   const [hp, setHp] = useState(''); // honeypot, must stay empty for a real person
   const [t0] = useState(() => Date.now());
+  const [offer] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('offer') ?? '' : ''));
 
   const phoneReady = digitsOnly(phone).length >= 10;
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -79,6 +80,7 @@ export default function StartPage() {
           vat,
           website: hp,
           ts: Date.now() - t0,
+          offer,
         }),
       }).catch(() => {});
     } catch {
@@ -157,6 +159,12 @@ export default function StartPage() {
             onChange={(e) => setHp(e.target.value)}
             style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
           />
+          {offer ? (
+            <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, backgroundColor: GREEN_TINT, border: '1px solid #CFE9D8', borderRadius: 12, padding: '12px 14px' }}>
+              <span style={{ fontSize: 18 }}>🎉</span>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: GREEN, lineHeight: 1.4 }}>Your founder offer is locked in: first month free, then 20% off for life. Finish to keep it.</span>
+            </div>
+          ) : null}
           {done ? (
             <div className="step-anim" style={{ textAlign: 'center', paddingTop: 24 }}>
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>

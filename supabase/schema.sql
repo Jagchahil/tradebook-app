@@ -371,6 +371,14 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Signup offer (the register-your-business funnel)
+-- ---------------------------------------------------------------------------
+-- The free register tool offers first month free plus 20% off for life if the
+-- user signs up straight after. We record the offer code on their signup so it
+-- can be honoured when billing goes live. Additive and safe.
+alter table public.signups add column if not exists offer text;
+
+-- ---------------------------------------------------------------------------
 -- Conventions (decided 2026-06-24 while the transactions table was still empty)
 -- ---------------------------------------------------------------------------
 -- 1. Income vs expense is the sign of `amount`. Expenses are negative. There is

@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
         postcode: str(b.postcode, 12),
         address: str(b.address, 300),
         vat_registered: typeof b.vat === 'boolean' ? b.vat : null,
+        offer: str(b.offer, 40),
       });
     } catch (dbErr) {
       const detail = dbErr instanceof Error ? dbErr.message : 'unknown';

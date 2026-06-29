@@ -31,6 +31,7 @@ import {
 } from '../../../lib/supabase';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
 import type { TradeInfo } from '../../../lib/taxguide';
+import { rateLimited } from '../../../lib/ratelimit';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
 
@@ -88,6 +89,15 @@ export async function POST(req: NextRequest) {
     // is a Meta retry of something we already handled, so acknowledge and stop.
     // This covers every flow, not just receipts: reminders, questions, invoices.
     if (messageId && !(await claimMessage(messageId))) {
+      return NextResponse.json({ ok: true });
+    }
+
+    // Per sender burst limit. Protects the AI and transcription spend from a
+    // runaway or malicious sender. A genuine user never sends this many in a
+    // short window. We silently drop over the limit: no AI, no reply, so we
+    // never trigger a reply storm or rack up cost. (In-memory, per instance.
+    // Move to a shared store for hard guarantees at scale, see docs/19.)
+    if (rateLimited(`wa:${from}`, 30, 10 * 60 * 1000)) {
       return NextResponse.json({ ok: true });
     }
 
@@ -595,18 +605,26 @@ async function signupTail(from: string): Promise<string> {
 }
 
 async function handleExpenseCheck(from: string, body: string): Promise<void> {
-  // A generic "what can I claim?" with no specific thing named: send the overview.
+  // One lookup, reused below. Whether we have an account for this number decides
+  // both the signup nudge and whether the paid AI fallback is allowed.
+  const linked = await findUserIdByPhone(from);
+  const tail = linked
+    ? ''
+    : `\n\nWant me to track all this for you? Get set up in two minutes at ${APP_URL.replace('https://', '')}, first month free.`;
+
   const hit = checkExpense(body);
   if (!hit) {
     if (/\bwhat\b/i.test(body) && /\bclaim\b/i.test(body)) {
       await handleTaxTips(from);
       return;
     }
-    // Try the AI for anything unusual we do not have a rule for.
-    if (hasClaudeConfig()) {
+    // The Claude fallback runs ONLY for linked accounts, so an unknown number
+    // cannot spend our AI budget by spamming questions. Unlinked callers still
+    // get the safe general answer and a nudge to sign up.
+    if (hasClaudeConfig() && linked) {
       const ai = await answerExpenseQuestion(body);
       if (ai) {
-        await sendText(from, ai + (await signupTail(from)));
+        await sendText(from, ai + tail);
         return;
       }
     }
@@ -618,7 +636,7 @@ async function handleExpenseCheck(from: string, body: string): Promise<void> {
         'Ask me about a specific thing, like "can I claim my work boots?" or "is a van deductible?". Or text "pay less tax" for the legal ways to keep more.',
         '',
         'General info, not advice for your exact situation.',
-      ].join('\n') + (await signupTail(from)),
+      ].join('\n') + tail,
     );
     return;
   }
@@ -631,7 +649,7 @@ async function handleExpenseCheck(from: string, body: string): Promise<void> {
       'Want it logged? Send the receipt or the amount and I will file it.',
       '',
       'General info, not advice for your exact situation.',
-    ].join('\n') + (await signupTail(from)),
+    ].join('\n') + tail,
   );
 }
 

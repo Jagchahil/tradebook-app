@@ -108,6 +108,30 @@ const EXTRAS: { icon: string; title: string; body: string; href: string }[] = [
   { icon: '👥', title: 'PAYE', body: 'Taking on your first employee or apprentice? Register as an employer before their first payday.', href: 'https://www.gov.uk/paye-for-employers' },
 ];
 
+interface Essential {
+  icon: string;
+  title: string;
+  body: string;
+  cost?: string;
+  expense?: boolean;
+  expenseLabel?: string;
+  linkLabel: string;
+  linkHref?: string;
+  internalHref?: string;
+}
+
+// The full "set up the rest of your business" checklist. What a traditional
+// accountant would point you to, free, with Lekhio woven through. Every
+// allowable cost gets a nudge that Lekhio tracks it for tax.
+const ESSENTIALS: Essential[] = [
+  { icon: '🏦', title: 'Open a business bank account', body: 'Keep business money separate from day one. Popular free or low cost picks for sole traders are Starling, Tide, Mettle and Monzo Business.', cost: 'Free to a few pounds a month', expense: true, linkLabel: 'Compare business accounts', linkHref: 'https://www.moneysavingexpert.com/banking/business-bank-accounts/' },
+  { icon: '📧', title: 'Get a proper email and domain', body: 'name@yourbusiness.co.uk looks the part on every invoice. Google Workspace gives you email, and a .co.uk domain is about £10 a year.', cost: 'From about £5 a month plus the domain', expense: true, linkLabel: 'Set up Google Workspace', linkHref: 'https://workspace.google.com/' },
+  { icon: '🛡️', title: 'Sort your insurance', body: 'Public liability is a must for most trades. Add tools cover and professional indemnity if you need them. Compare quotes on a broker.', cost: 'From a few pounds a month', expense: true, linkLabel: 'Compare cover', linkHref: 'https://www.simplybusiness.co.uk/' },
+  { icon: '🧾', title: 'Look professional getting paid', body: 'Send clean, branded invoices and quotes. Use our free maker now, or let Lekhio build and send them from a text.', linkLabel: 'Free invoice maker', internalHref: '/invoice-generator' },
+  { icon: '📜', title: 'Trade registration, if you need it', body: 'Gas engineers need Gas Safe, electricians often need NICEIC or NAPIT. Check what your trade requires before you take on work.', cost: 'Varies by trade', expense: true, expenseLabel: 'Claim the fee on Lekhio', linkLabel: 'Gas Safe register', linkHref: 'https://www.gassaferegister.co.uk/' },
+  { icon: '💷', title: 'Start a pension', body: 'A self employed pension cuts your tax bill and builds your future. Nest is the simple, government backed option.', cost: 'You choose', expense: true, expenseLabel: 'Cuts your tax, Lekhio tracks it', linkLabel: 'See Nest', linkHref: 'https://www.nestpensions.org.uk/' },
+];
+
 const linkProps = { target: '_blank', rel: 'noopener noreferrer' as const };
 
 export default function Wizard() {
@@ -229,13 +253,32 @@ export default function Wizard() {
         <div className="wz-anim" style={{ textAlign: 'center' }}>
           <div style={{ width: 80, height: 80, borderRadius: 40, background: GREEN_TINT, color: GREEN, fontSize: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', animation: 'wzPop .5s ease' }}>✓</div>
           <h2 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>
-            {path === 'done' ? 'Great, you are already set up.' : 'You know exactly how to register.'}
+            {path === 'done' ? 'Great, you are already registered.' : 'Registration sorted. Now the rest.'}
           </h2>
           <p style={{ fontSize: 17, color: MUTED, lineHeight: 1.6, maxWidth: 520, margin: '0 auto 28px' }}>
             {path === 'done'
               ? 'Skip the paperwork and get straight to the part that saves you money and time.'
               : 'Follow the steps above on GOV.UK, it is quicker than it looks. Then let Lekhio handle the books, the claims and the tax, all by text.'}
           </p>
+
+          {/* Set up the rest of your business */}
+          <div style={{ maxWidth: 760, margin: '0 auto 30px', textAlign: 'left' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 14, textAlign: 'center' }}>Now set up the rest, the way an accountant would, but free</div>
+            <div className="wz-grid">
+              {ESSENTIALS.map((e) => (
+                <div key={e.title} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 20 }}>
+                  <div style={{ fontSize: 24 }}>{e.icon}</div>
+                  <div style={{ fontSize: 16.5, fontWeight: 800, marginTop: 8 }}>{e.title}</div>
+                  <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.55, margin: '6px 0 10px' }}>{e.body}</p>
+                  {e.cost ? <div style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>{e.cost}</div> : null}
+                  {e.expense ? <div style={{ display: 'inline-block', marginTop: 10, background: GREEN_TINT, color: GREEN, fontSize: 11.5, fontWeight: 700, padding: '4px 10px', borderRadius: 12 }}>💚 {e.expenseLabel ?? 'Claim it on Lekhio'}</div> : null}
+                  {e.linkHref ? <div style={{ marginTop: 10 }}><a href={e.linkHref} {...linkProps} style={{ fontSize: 13.5, fontWeight: 700, color: RIVER }}>{e.linkLabel} ↗</a></div> : null}
+                  {e.internalHref ? <div style={{ marginTop: 10 }}><Link href={e.internalHref} style={{ fontSize: 13.5, fontWeight: 700, color: RIVER }}>{e.linkLabel} →</Link></div> : null}
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 12, color: MUTED, marginTop: 12, textAlign: 'center' }}>Popular options, not recommendations or financial advice. Compare and pick what suits you.</p>
+          </div>
 
           {/* The offer */}
           <div style={{ maxWidth: 560, margin: '0 auto', background: INK, borderRadius: 20, padding: '30px 26px' }}>

@@ -34,9 +34,9 @@ export default function RegisterPage() {
 
       <section style={{ maxWidth: 760, margin: '0 auto', padding: '28px 24px 4px' }}>
         <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE TOOL · FIRST MONTH FREE + 20% OFF FOR LIFE</span>
-        <h1 className="h1b" style={{ fontWeight: 700, margin: '0 0 16px' }}>Register your business. We will show you exactly how.</h1>
+        <h1 className="h1b" style={{ fontWeight: 700, margin: '0 0 16px' }}>Set up your business, start to finish.</h1>
         <p style={{ fontSize: 18.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>
-          Tell us what you are setting up and we give you the exact steps, the forms, the codes and the GOV.UK links, in plain English. Do it with us and lock in your first month free, then 20% off for life.
+          Tell us what you are setting up. We give you the exact steps, the forms and the codes to register, then everything else you need, a bank, an email, insurance and your books, in plain English. Do it with us and lock in first month free, then 20% off for life.
         </p>
       </section>
 

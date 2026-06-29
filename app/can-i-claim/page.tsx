@@ -107,13 +107,13 @@ export default function CanIClaimPage() {
       <noscript><style dangerouslySetInnerHTML={{ __html: `.reveal{opacity:1;transform:none}` }} /></noscript>
 
       {/* Nav */}
-      <nav style={{ maxWidth: 1040, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
         <Link href="/start" className="btn" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
       </nav>
 
       {/* Hero */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '30px 24px 8px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '30px 24px 8px' }}>
         <div style={{ maxWidth: 720 }}>
           <span style={{ display: 'inline-block', backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 20 }}>ASK LEKHIO</span>
           <h1 className="h1" style={{ fontWeight: 700, margin: '0 0 18px' }}>Can I claim it? Just ask.</h1>
@@ -128,7 +128,7 @@ export default function CanIClaimPage() {
       </section>
 
       {/* The one rule + WhatsApp demo */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '34px 24px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px' }}>
         <div className="reveal" style={{ display: 'grid', gridTemplateColumns: '1.1fr .9fr', gap: 36, alignItems: 'center' }} >
           <div style={{ minWidth: 0 }}>
             <h2 className="h2" style={{ fontWeight: 700, margin: '0 0 14px' }}>One simple test runs the lot.</h2>
@@ -157,7 +157,7 @@ export default function CanIClaimPage() {
 
       {/* The list */}
       <section id="list" style={{ background: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1040, margin: '0 auto', padding: '46px 24px' }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
             <h2 className="h2" style={{ fontWeight: 700, margin: '0 0 12px' }}>What you can and cannot claim.</h2>
             <p style={{ fontSize: 16.5, color: MUTED, maxWidth: 560, margin: '0 auto' }}>The common ones for UK sole traders. Ask Lekhio about anything not here and it will tell you straight.</p>
@@ -169,7 +169,7 @@ export default function CanIClaimPage() {
       </section>
 
       {/* Grey areas done properly */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '50px 24px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '50px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 36 }}>
           <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>THE GREY AREAS</span>
           <h2 className="h2" style={{ fontWeight: 700, margin: '0 0 12px' }}>The ones everyone gets wrong.</h2>
@@ -193,7 +193,7 @@ export default function CanIClaimPage() {
 
       {/* Claim everything you are owed */}
       <section style={{ background: `linear-gradient(180deg, #fff, ${RIVER_TINT})`, borderTop: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1040, margin: '0 auto', padding: '50px 24px' }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '50px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 36 }}>
             <span style={{ display: 'inline-block', backgroundColor: '#fff', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>KEEP MORE, LEGALLY</span>
             <h2 className="h2" style={{ fontWeight: 700, margin: '0 0 12px' }}>The legal ways to pay less tax.</h2>

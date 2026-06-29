@@ -29,12 +29,12 @@ export default function TaxCalculatorPage() {
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1c{font-size:48px;line-height:1.06;letter-spacing:-1.8px}@media(max-width:880px){.h1c{font-size:34px}}` }} />
 
-      <nav style={{ maxWidth: 1040, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
         <Link href="/start" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
       </nav>
 
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '26px 24px 6px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '26px 24px 6px' }}>
         <div style={{ maxWidth: 720 }}>
           <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE TOOL, NO SIGNUP</span>
           <h1 className="h1c" style={{ fontWeight: 700, margin: '0 0 16px' }}>The self employed tax calculator.</h1>
@@ -44,12 +44,12 @@ export default function TaxCalculatorPage() {
         </div>
       </section>
 
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '22px 24px 10px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px 10px' }}>
         <Calc />
       </section>
 
       {/* Tie-in to the product */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '34px 24px 16px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px 16px' }}>
         <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: '28px 26px', display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           <div style={{ maxWidth: 560 }}>
             <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 10px', letterSpacing: '-0.4px' }}>The number that matters is the expenses one.</h2>
@@ -64,7 +64,7 @@ export default function TaxCalculatorPage() {
         </div>
       </section>
 
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '10px 24px 50px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '10px 24px 50px' }}>
         <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.6, maxWidth: 720 }}>
           This calculator is a free estimate to help you plan, not tax advice for your exact situation. Lekhio is an independent UK company, not HMRC. You stay responsible for your tax, and nothing is ever sent to HMRC without your approval.
         </p>

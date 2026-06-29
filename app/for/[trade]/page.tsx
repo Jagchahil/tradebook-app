@@ -50,12 +50,12 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1t{font-size:50px;line-height:1.05;letter-spacing:-2px}.claimgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.toolrow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}@media(max-width:820px){.h1t{font-size:34px}.claimgrid{grid-template-columns:1fr}.toolrow{grid-template-columns:1fr 1fr}}` }} />
 
-      <nav style={{ maxWidth: 1040, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
         <Link href="/start" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
       </nav>
 
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '26px 24px 8px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '26px 24px 8px' }}>
         <div style={{ maxWidth: 720 }}>
           <span style={{ display: 'inline-block', backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>{t.emoji} FOR {t.plural.toUpperCase()}</span>
           <h1 className="h1t" style={{ fontWeight: 700, margin: '0 0 16px' }}>The back office for UK {t.plural}.</h1>
@@ -68,7 +68,7 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
       </section>
 
       {/* What you can claim */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '34px 24px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px' }}>
         <h2 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.6px', margin: '0 0 8px' }}>What {t.plural} can claim.</h2>
         <p style={{ fontSize: 16, color: MUTED, margin: '0 0 22px', maxWidth: 620 }}>The everyday costs of the job, all allowable, all logged from a text. Claim them and you pay tax only on what is left.</p>
         <div className="claimgrid">
@@ -84,7 +84,7 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
 
       {/* CIS note for construction trades */}
       {t.cis ? (
-        <section style={{ maxWidth: 1040, margin: '0 auto', padding: '0 24px 8px' }}>
+        <section style={{ maxWidth: 1180, margin: '0 auto', padding: '0 24px 8px' }}>
           <div style={{ background: SAFFRON_TINT, borderRadius: 18, padding: '24px 26px', display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
             <div style={{ maxWidth: 600 }}>
               <h3 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 8px', color: SAFFRON_DEEP }}>CIS, sorted for {t.plural}.</h3>
@@ -95,7 +95,7 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
       ) : null}
 
       {/* Free tools */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '34px 24px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px' }}>
         <h2 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.5px', margin: '0 0 18px' }}>Free tools for {t.plural}.</h2>
         <div className="toolrow">
           {tools.map((tool) => (
@@ -117,7 +117,7 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
       </section>
 
       {/* Other trades, internal links */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '34px 24px 50px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px 50px' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Lekhio for every trade</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {TRADES.filter((o) => o.slug !== t.slug).map((o) => (

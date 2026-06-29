@@ -143,6 +143,13 @@ const fixes = [
   { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'Cancelling was a nightmare. I felt completely locked in.', fix: 'Cancel any time, in one tap. Your records export whenever you want.' },
 ];
 
+const freeTools = [
+  { href: '/tax-calculator', icon: '🧮', title: 'Tax calculator', body: 'Your tax, National Insurance, take home and what to set aside, in seconds.' },
+  { href: '/invoice-generator', icon: '🧾', title: 'Invoice and quote maker', body: 'A clean, professional invoice or quote in two minutes. Save as PDF, no signup.' },
+  { href: '/can-i-claim', icon: '💡', title: 'Can I claim it?', body: 'The real rules on what you can and cannot claim, the grey areas included.' },
+  { href: '/file-your-tax-return', icon: '📋', title: 'File your own return', body: 'A step by step walkthrough by trade, so you can do it yourself.' },
+];
+
 const included = [
   'Unlimited receipt, voice, text, and mileage capture',
   'Automatic bookkeeping and categories',
@@ -528,7 +535,8 @@ export default function HomePage() {
           .hero-h1-size{font-size:72px;line-height:1.04}
           .h2{font-size:38px;line-height:1.12}
           .grid3{grid-template-columns:repeat(3,1fr)}
-          .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
+          .grid4{grid-template-columns:repeat(4,1fr)}
+          .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
           .hero-left{text-align:left}
           .phone{animation:floaty 6s ease-in-out infinite}
           .bub{opacity:0;animation:bubbleIn .5s ease forwards}
@@ -625,6 +633,7 @@ export default function HomePage() {
           @media (max-width:880px){
             .hero-h1-size{font-size:40px}.h2{font-size:27px}
             .grid3{grid-template-columns:1fr}
+            .grid4{grid-template-columns:1fr 1fr}
             .nav-cta-desktop{display:none}
             .price-split{flex-direction:column}
             .why-grid{grid-template-columns:1fr;gap:0}
@@ -647,7 +656,7 @@ export default function HomePage() {
 
       {/* Trust bar */}
       <div className="trustbar">
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '9px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: '#fff' }}>
+        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '9px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: '#fff' }}>
           <span>🔒 Encrypted and never sold</span>
           <span className="trustbar-dot">·</span>
           <span>✅ You approve everything</span>
@@ -657,7 +666,7 @@ export default function HomePage() {
       </div>
 
       {/* Nav */}
-      <nav style={{ position: 'relative', maxWidth: 1100, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav style={{ position: 'relative', maxWidth: 1240, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <svg width="118" height="40" viewBox="0 0 300 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Lekhio">
           <defs>
             <linearGradient id="navriver" x1="20" y1="0" x2="280" y2="0" gradientUnits="userSpaceOnUse">
@@ -687,13 +696,14 @@ export default function HomePage() {
           <Link href="/can-i-claim">Can I claim it?</Link>
           <Link href="/tax-calculator">Free tax calculator</Link>
           <Link href="/invoice-generator">Invoice generator</Link>
+          <Link href="/register-your-business">Register your business</Link>
           <Link href="/file-your-tax-return">Free tax return guide</Link>
           <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
         </div>
       </nav>
 
       {/* Hero */}
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px 16px' }}>
+      <section style={{ maxWidth: 1240, margin: '0 auto', padding: '40px 24px 16px' }}>
         <div className="hero-grid">
           <div className="hero-left">
             <div className="hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 20, marginBottom: 24 }}>
@@ -761,10 +771,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 24px 30px' }}><RiverDivider /></div>
+      <div style={{ maxWidth: 1240, margin: '0 auto', padding: '20px 24px 30px' }}><RiverDivider /></div>
 
       {/* How it works (stepper) */}
-      <section id="how" style={{ maxWidth: 1040, margin: '0 auto', padding: '34px 24px 46px' }}>
+      <section id="how" style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px 46px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 54 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Three steps. That is the whole thing.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 540, margin: '0 auto' }}>No spreadsheets. No shoebox of receipts. No evenings lost to paperwork.</p>
@@ -782,7 +792,7 @@ export default function HomePage() {
       </section>
 
       {/* Onboarding demo */}
-      <section id="setup" style={{ maxWidth: 1100, margin: '0 auto', padding: '30px 24px 62px' }}>
+      <section id="setup" style={{ maxWidth: 1240, margin: '0 auto', padding: '30px 24px 62px' }}>
         <div className="appdemo-grid">
           <div className="reveal">
             <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>SET UP IN UNDER A MINUTE</span>
@@ -820,7 +830,7 @@ export default function HomePage() {
 
       {/* Stats band */}
       <section style={{ background: `linear-gradient(120deg, ${RIVER_DEEP}, ${RIVER})`, color: '#fff' }}>
-        <div className="reveal" style={{ maxWidth: 1040, margin: '0 auto', padding: '42px 24px' }}>
+        <div className="reveal" style={{ maxWidth: 1180, margin: '0 auto', padding: '42px 24px' }}>
           <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 24 }}>
             {stats.map((s) => (
               <div key={s.label} style={{ textAlign: 'center' }}>
@@ -836,7 +846,7 @@ export default function HomePage() {
 
       {/* Who it is for */}
       <section id="who" style={{ backgroundColor: INK, color: '#fff' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
+        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>If you work for yourself, it is for you.</h2>
             <p style={{ fontSize: 17, color: '#B6BDC8', maxWidth: 600, margin: '0 auto' }}>
@@ -853,7 +863,7 @@ export default function HomePage() {
       </section>
 
       {/* Features */}
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
+      <section style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Everything your accountant nags you for.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>Done as you work, not at the end of the year.</p>
@@ -871,7 +881,7 @@ export default function HomePage() {
 
       {/* App demo */}
       <section id="app" style={{ backgroundColor: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
+        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
           <div className="appdemo-grid">
             <div className="reveal">
               <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>THE APP</span>
@@ -911,8 +921,30 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Free tools showcase */}
+      <section style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
+        <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
+          <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>FREE, NO SIGNUP</span>
+          <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Free tools you can use right now.</h2>
+          <p style={{ fontSize: 17, color: MUTED, maxWidth: 560, margin: '0 auto' }}>No account, no card. Try the tools that do the maths for you, then let Lekhio do the rest by text.</p>
+        </div>
+        <div className="grid4" style={{ display: 'grid', gap: 18 }}>
+          {freeTools.map((t, i) => (
+            <Link key={t.href} href={t.href} className="card" style={{ transitionDelay: `${(i % 4) * 80}ms`, backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 24, color: INK, display: 'flex', flexDirection: 'column' }}>
+              <div className="icontile" style={{ width: 50, height: 50, borderRadius: 13, backgroundColor: RIVER_TINT, color: RIVER, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 25, marginBottom: 14 }}>{t.icon}</div>
+              <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 8px' }}>{t.title}</h3>
+              <p style={{ fontSize: 14.5, color: MUTED, lineHeight: 1.55, margin: '0 0 14px', flex: 1 }}>{t.body}</p>
+              <span style={{ fontSize: 14, fontWeight: 700, color: RIVER }}>Open it &rarr;</span>
+            </Link>
+          ))}
+        </div>
+        <div className="reveal" style={{ textAlign: 'center', marginTop: 30 }}>
+          <Link href="/resources" className="btn-ghost" style={{ display: 'inline-block', backgroundColor: 'transparent', color: INK, border: `1px solid ${INK}`, fontSize: 15.5, fontWeight: 600, padding: '13px 26px', borderRadius: 12 }}>See all free tools and guides</Link>
+        </div>
+      </section>
+
       {/* Claim it by text */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '46px 24px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 30 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Say it. It is claimed.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 580, margin: '0 auto', lineHeight: 1.6 }}>Text the thing. Lekhio works out the relief and logs it at the HMRC rate. No forms, no logbooks, no missed claims. No other app does this.</p>
@@ -930,7 +962,7 @@ export default function HomePage() {
       </section>
 
       {/* Can I claim it CTA */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '6px 24px 30px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '6px 24px 30px' }}>
         <Link href="/can-i-claim" className="reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '18px 22px', textDecoration: 'none', color: INK }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <span style={{ fontSize: 26 }}>💡</span>
@@ -944,7 +976,7 @@ export default function HomePage() {
       </section>
 
       {/* Bank connector showcase */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '44px 24px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '44px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 30 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 20, marginBottom: 14 }}>Optional, coming soon</div>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Connect your bank, books on autopilot.</h2>
@@ -973,7 +1005,7 @@ export default function HomePage() {
       </section>
 
       {/* Coming soon, the complete platform */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '40px 24px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '40px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 28 }}>
           <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>COMING SOON</span>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Soon, Lekhio does the lot.</h2>
@@ -993,7 +1025,7 @@ export default function HomePage() {
 
       {/* MTD explainer (interactive) */}
       <section id="mtd" style={{ background: `linear-gradient(180deg, #fff, ${RIVER_TINT})`, borderTop: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 980, margin: '0 auto', padding: '46px 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 36 }}>
             <span style={{ display: 'inline-block', backgroundColor: '#fff', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>NEW HMRC RULES</span>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>What HMRC is changing, in plain English.</h2>
@@ -1082,7 +1114,7 @@ export default function HomePage() {
 
       {/* Comparison */}
       <section id="compare" style={{ backgroundColor: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '46px 24px' }}>
+        <div style={{ maxWidth: 1140, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>How Lekhio compares.</h2>
             <p style={{ fontSize: 17, color: MUTED, maxWidth: 560, margin: '0 auto' }}>The old way is an app that wants a weekend of setup, or a spreadsheet and a shoebox. Here is the honest side by side.</p>
@@ -1118,7 +1150,7 @@ export default function HomePage() {
       </section>
 
       {/* Complaints to fixes, review panel style */}
-      <section style={{ maxWidth: 1000, margin: '0 auto', padding: '46px 24px' }}>
+      <section style={{ maxWidth: 1140, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>The reviews that built Lekhio.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 600, margin: '0 auto', lineHeight: 1.6 }}>These are the kinds of complaints people leave about other bookkeeping apps. Here is what we did about each one.</p>
@@ -1150,7 +1182,7 @@ export default function HomePage() {
 
       {/* Trust */}
       <section id="trust" style={{ backgroundColor: '#fff', borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
+        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
             <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>BUILT TO BE TRUSTED</span>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Your money. Your data. Your call.</h2>
@@ -1212,7 +1244,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" style={{ maxWidth: 1100, margin: '0 auto', padding: '46px 24px' }}>
+      <section id="pricing" style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>One price. No surprises.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 620, margin: '0 auto' }}>Try it free for 30 days. Keep it for less than a tank of fuel a month. Other apps look cheaper, then charge extra for receipts, CIS, filing and support. Lekhio is one price with all of it in.</p>
@@ -1299,7 +1331,7 @@ export default function HomePage() {
 
       {/* Promise band */}
       <section style={{ backgroundColor: INK }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px' }}><RiverDivider /></div>
+        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 24px' }}><RiverDivider /></div>
         <div className="reveal" style={{ maxWidth: 760, margin: '0 auto', padding: '40px 24px 76px', textAlign: 'center' }}>
           <h2 className="h2" style={{ color: '#fff', fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 16px' }}>You are good at your trade. Let Lekhio do the paperwork.</h2>
           <p style={{ fontSize: 17, color: '#B6BDC8', lineHeight: 1.6, maxWidth: 540, margin: '0 auto 32px' }}>
@@ -1311,7 +1343,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer style={{ backgroundColor: PAPER }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 24px', display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '40px 24px', display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.5px', marginBottom: 4 }}>Lekhio</div>
             <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>Your books, handled. Just text it.</p>
@@ -1322,13 +1354,14 @@ export default function HomePage() {
             <Link href="/can-i-claim" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Can I claim it?</Link>
             <Link href="/tax-calculator" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Tax calculator</Link>
             <Link href="/invoice-generator" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Invoice generator</Link>
+            <Link href="/register-your-business" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Register a business</Link>
             <Link href="/file-your-tax-return" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Free tax guide</Link>
             <Link href="/privacy" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Privacy</Link>
             <Link href="/terms" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Terms</Link>
             <a href="mailto:support@lekhio.com" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Support</a>
           </div>
         </div>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 36px' }}>
+        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 24px 36px' }}>
           <p style={{ fontSize: 12, color: MUTED, margin: 0 }}>
             © {new Date().getFullYear()} Lekhio, a Satluj Ventures company. Built for the UK self employed. Lekhio prepares your records. You stay responsible for your tax with HMRC.
           </p>

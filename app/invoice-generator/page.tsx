@@ -28,12 +28,12 @@ export default function InvoiceGeneratorPage() {
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1g{font-size:46px;line-height:1.07;letter-spacing:-1.7px}@media(max-width:880px){.h1g{font-size:32px}}@media print{.site-nav,.site-hero,.site-foot{display:none !important;}}` }} />
 
-      <nav className="site-nav" style={{ maxWidth: 1100, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav className="site-nav" style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
         <Link href="/start" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
       </nav>
 
-      <section className="site-hero" style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 24px 6px' }}>
+      <section className="site-hero" style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 24px 6px' }}>
         <div style={{ maxWidth: 760 }}>
           <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 16 }}>FREE TOOL, NO SIGNUP</span>
           <h1 className="h1g" style={{ fontWeight: 700, margin: '0 0 14px' }}>Free invoice and quote generator.</h1>
@@ -43,11 +43,11 @@ export default function InvoiceGeneratorPage() {
         </div>
       </section>
 
-      <section style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 24px 30px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '20px 24px 30px' }}>
         <Generator />
       </section>
 
-      <section className="site-foot" style={{ maxWidth: 1100, margin: '0 auto', padding: '10px 24px 50px' }}>
+      <section className="site-foot" style={{ maxWidth: 1180, margin: '0 auto', padding: '10px 24px 50px' }}>
         <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '24px 24px', display: 'flex', gap: 18, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <div style={{ maxWidth: 560 }}>
             <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 8px' }}>Want it to chase the payment too?</h2>

@@ -32,6 +32,7 @@ const tools = [
   { href: '/invoice-generator', icon: '🧾', title: 'Invoice & quote generator', body: 'A clean, professional invoice or quote in two minutes. Ready made templates by trade. Save as PDF.', tint: RIVER_TINT, fg: RIVER, tag: 'Generator' },
   { href: '/can-i-claim', icon: '💡', title: 'Can I claim it?', body: 'The real rules on what you can and cannot claim, the grey areas included. All within the law.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Checker' },
   { href: '/file-your-tax-return', icon: '📋', title: 'File your own return', body: 'A step by step walkthrough by trade, so you can do your Self Assessment yourself and stop paying for a short job.', tint: RIVER_TINT, fg: RIVER, tag: 'Guide' },
+  { href: '/register-your-business', icon: '🏁', title: 'Register your business', body: 'Sole trader, limited, VAT, PAYE and CIS, explained simply with the real 2026 costs and deadlines.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Guide' },
 ];
 
 const dates = [
@@ -51,12 +52,12 @@ export default function ResourcesPage() {
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1r{font-size:50px;line-height:1.06;letter-spacing:-1.9px}.toolgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}.card:hover{transform:translateY(-4px);box-shadow:0 18px 42px rgba(17,17,17,.09);border-color:${RIVER_TINT}}@media(max-width:820px){.h1r{font-size:34px}.toolgrid{grid-template-columns:1fr}}` }} />
 
-      <nav style={{ maxWidth: 1040, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
         <Link href="/start" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
       </nav>
 
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '28px 24px 10px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 10px' }}>
         <div style={{ maxWidth: 700 }}>
           <span style={{ display: 'inline-block', backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE, NO SIGNUP</span>
           <h1 className="h1r" style={{ fontWeight: 700, margin: '0 0 16px' }}>Free tools for the self employed.</h1>
@@ -66,7 +67,7 @@ export default function ResourcesPage() {
         </div>
       </section>
 
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '30px 24px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '30px 24px' }}>
         <div className="toolgrid">
           {tools.map((t) => (
             <Link key={t.href} href={t.href} className="card" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, display: 'flex', flexDirection: 'column', gap: 12, color: INK }}>
@@ -83,7 +84,7 @@ export default function ResourcesPage() {
       </section>
 
       {/* By trade */}
-      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '6px 24px 26px' }}>
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '6px 24px 26px' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Guides by trade</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {TRADES.map((t) => (

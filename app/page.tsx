@@ -150,6 +150,29 @@ const freeTools = [
   { href: '/file-your-tax-return', icon: '📋', title: 'File your own return', body: 'A step by step walkthrough by trade, so you can do it yourself.' },
 ];
 
+const oldAccountant = [
+  'A bill of £150 to £900 a year, just to file.',
+  'You see them once, at year end, when it is too late to plan.',
+  'A shoebox of receipts to dig out every January.',
+  'Jargon and forms you do not follow.',
+  'Days, sometimes weeks, for a simple answer.',
+];
+
+const lekhioWay = [
+  'One flat £29 a month, with everything in.',
+  'With you every day, not once a year.',
+  'Snap each receipt as you go. Nothing to dig out.',
+  'Plain English, always. Ask it anything.',
+  'A real person replies fast, on the same chat.',
+];
+
+const moneyFlow = [
+  { label: 'Money in', pct: '100%', color: GREEN, val: '£1,000' },
+  { label: 'Costs you claim', pct: '22%', color: SAFFRON, val: '£220' },
+  { label: 'Tax to set aside', pct: '18%', color: '#C0392B', val: '£180' },
+  { label: 'In your pocket', pct: '60%', color: RIVER, val: '£600' },
+];
+
 const included = [
   'Unlimited receipt, voice, text, and mileage capture',
   'Automatic bookkeeping and categories',
@@ -595,19 +618,27 @@ export default function HomePage() {
           .trust-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
           .trust-card{position:relative;overflow:hidden}
           .trust-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,${RIVER},${SAFFRON})}
-          /* Mobile menu */
+          /* Nav */
           .nav-toggle{display:none}
-          .nav-right{display:flex;align-items:center;gap:14px}
-          .nav-burger{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;width:46px;height:46px;border-radius:12px;cursor:pointer;border:1px solid ${LINE};background:#fff;transition:background-color .15s ease}
+          .nav-right{display:flex;align-items:center;gap:22px}
+          .nav-inline{display:flex;align-items:center;gap:26px}
+          .nav-inline a.navtop{font-size:15px;font-weight:600;color:${MUTED};transition:color .15s ease}
+          .nav-inline a.navtop:hover{color:${INK}}
+          .nav-burger{display:none;align-items:center;gap:9px;height:42px;padding:0 15px;border-radius:12px;cursor:pointer;border:1px solid ${LINE};background:#fff;font-size:14px;font-weight:700;color:${INK};transition:background-color .15s ease}
           .nav-burger:hover{background:${SURFACE}}
-          .nav-burger span{display:block;width:20px;height:2.5px;border-radius:2px;background:${INK};transition:transform .25s ease,opacity .2s ease}
-          #navtoggle:checked ~ .nav-right .nav-burger span:nth-child(1){transform:translateY(7.5px) rotate(45deg)}
-          #navtoggle:checked ~ .nav-right .nav-burger span:nth-child(2){opacity:0}
-          #navtoggle:checked ~ .nav-right .nav-burger span:nth-child(3){transform:translateY(-7.5px) rotate(-45deg)}
-          .nav-panel{display:none;position:absolute;top:calc(100% - 6px);right:24px;left:auto;width:min(290px,calc(100vw - 48px));background:#fff;border:1px solid ${LINE};border-radius:16px;box-shadow:0 20px 42px rgba(17,17,17,.16);padding:10px 18px 18px;flex-direction:column;z-index:50}
+          .nav-burger-lines{display:flex;flex-direction:column;gap:3.5px}
+          .nav-burger-lines i{display:block;width:18px;height:2px;border-radius:2px;background:${INK}}
+          .nav-panel{display:none;position:absolute;top:calc(100% - 6px);right:24px;left:auto;width:min(300px,calc(100vw - 48px));background:#fff;border:1px solid ${LINE};border-radius:16px;box-shadow:0 20px 42px rgba(17,17,17,.16);padding:10px 18px 18px;flex-direction:column;z-index:50}
           #navtoggle:checked ~ .nav-panel{display:flex;animation:riseIn .25s ease}
           .nav-panel a{padding:13px 2px;font-size:15.5px;font-weight:500;color:${INK};border-bottom:1px solid ${SURFACE}}
           .nav-panel a:last-of-type{border-bottom:none}
+          /* Money flow bars */
+          .moneyrow{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+          .moneylabel{width:140px;font-size:14.5px;font-weight:600;color:${INK};flex-shrink:0}
+          .moneytrack{flex:1;height:26px;background:#fff;border:1px solid ${LINE};border-radius:9px;overflow:hidden}
+          .moneyfill{height:100%;border-radius:8px;transform:scaleX(0);transform-origin:left;animation:grow 1.1s cubic-bezier(.2,.7,.2,1) forwards}
+          .moneyval{width:82px;text-align:right;font-size:15.5px;font-weight:800;color:${INK};flex-shrink:0}
+          @media(max-width:560px){.moneylabel{width:104px;font-size:13px}.moneyval{width:66px;font-size:13.5px}}
           .trustbar{background:linear-gradient(90deg,${RIVER_DEEP},${RIVER})}
           .trustbar-dot{opacity:.45;padding:0 2px}
           /* FAQ */
@@ -634,7 +665,8 @@ export default function HomePage() {
             .hero-h1-size{font-size:40px}.h2{font-size:27px}
             .grid3{grid-template-columns:1fr}
             .grid4{grid-template-columns:1fr 1fr}
-            .nav-cta-desktop{display:none}
+            .nav-inline{display:none}
+            .nav-burger{display:inline-flex}
             .price-split{flex-direction:column}
             .why-grid{grid-template-columns:1fr;gap:0}
             .mtd-tab{padding:9px 13px;font-size:12.5px}
@@ -656,7 +688,7 @@ export default function HomePage() {
 
       {/* Trust bar */}
       <div className="trustbar">
-        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '9px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: '#fff' }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto', padding: '9px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: '#fff' }}>
           <span>🔒 Encrypted and never sold</span>
           <span className="trustbar-dot">·</span>
           <span>✅ You approve everything</span>
@@ -666,7 +698,7 @@ export default function HomePage() {
       </div>
 
       {/* Nav */}
-      <nav style={{ position: 'relative', maxWidth: 1240, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav style={{ position: 'relative', maxWidth: 1320, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <svg width="118" height="40" viewBox="0 0 300 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Lekhio">
           <defs>
             <linearGradient id="navriver" x1="20" y1="0" x2="280" y2="0" gradientUnits="userSpaceOnUse">
@@ -680,8 +712,15 @@ export default function HomePage() {
         <input type="checkbox" id="navtoggle" className="nav-toggle" aria-label="Toggle menu" />
 
         <div className="nav-right">
-          <Link href="/start" className="btn-primary nav-cta-desktop" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
-          <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu"><span /><span /><span /></label>
+          <div className="nav-inline">
+            <a href="#how" className="navtop">How it works</a>
+            <a href="#app" className="navtop">The app</a>
+            <Link href="/resources" className="navtop">Free tools</Link>
+            <a href="#beat" className="navtop">Vs an accountant</a>
+            <a href="#pricing" className="navtop">Pricing</a>
+            <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
+          </div>
+          <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu">Menu <span className="nav-burger-lines"><i /><i /><i /></span></label>
         </div>
 
         <div className="nav-panel">
@@ -703,7 +742,7 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <section style={{ maxWidth: 1240, margin: '0 auto', padding: '40px 24px 16px' }}>
+      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '40px 24px 16px' }}>
         <div className="hero-grid">
           <div className="hero-left">
             <div className="hero-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 20, marginBottom: 24 }}>
@@ -771,10 +810,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div style={{ maxWidth: 1240, margin: '0 auto', padding: '20px 24px 30px' }}><RiverDivider /></div>
+      <div style={{ maxWidth: 1320, margin: '0 auto', padding: '20px 24px 30px' }}><RiverDivider /></div>
 
       {/* How it works (stepper) */}
-      <section id="how" style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px 46px' }}>
+      <section id="how" style={{ maxWidth: 1240, margin: '0 auto', padding: '34px 24px 46px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 54 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Three steps. That is the whole thing.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 540, margin: '0 auto' }}>No spreadsheets. No shoebox of receipts. No evenings lost to paperwork.</p>
@@ -792,7 +831,7 @@ export default function HomePage() {
       </section>
 
       {/* Onboarding demo */}
-      <section id="setup" style={{ maxWidth: 1240, margin: '0 auto', padding: '30px 24px 62px' }}>
+      <section id="setup" style={{ maxWidth: 1320, margin: '0 auto', padding: '30px 24px 62px' }}>
         <div className="appdemo-grid">
           <div className="reveal">
             <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>SET UP IN UNDER A MINUTE</span>
@@ -830,7 +869,7 @@ export default function HomePage() {
 
       {/* Stats band */}
       <section style={{ background: `linear-gradient(120deg, ${RIVER_DEEP}, ${RIVER})`, color: '#fff' }}>
-        <div className="reveal" style={{ maxWidth: 1180, margin: '0 auto', padding: '42px 24px' }}>
+        <div className="reveal" style={{ maxWidth: 1240, margin: '0 auto', padding: '42px 24px' }}>
           <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 24 }}>
             {stats.map((s) => (
               <div key={s.label} style={{ textAlign: 'center' }}>
@@ -846,7 +885,7 @@ export default function HomePage() {
 
       {/* Who it is for */}
       <section id="who" style={{ backgroundColor: INK, color: '#fff' }}>
-        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>If you work for yourself, it is for you.</h2>
             <p style={{ fontSize: 17, color: '#B6BDC8', maxWidth: 600, margin: '0 auto' }}>
@@ -863,7 +902,7 @@ export default function HomePage() {
       </section>
 
       {/* Features */}
-      <section style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
+      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Everything your accountant nags you for.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 520, margin: '0 auto' }}>Done as you work, not at the end of the year.</p>
@@ -879,9 +918,49 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Beat the accountant */}
+      <section id="beat" style={{ background: INK }}>
+        <div className="reveal" style={{ maxWidth: 1320, margin: '0 auto', padding: '64px 24px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <span style={{ display: 'inline-block', background: 'rgba(224,163,62,0.16)', color: SAFFRON, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 14px', borderRadius: 20, marginBottom: 16 }}>THE EXPERT IN YOUR POCKET</span>
+            <h2 className="h2" style={{ color: '#fff', fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>The brains of an accountant. None of the bill.</h2>
+            <p style={{ fontSize: 18, color: '#B6BDC8', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
+              An accountant trains for years in tax and bookkeeping, the ACCA exams, then charges you hundreds to see you once a year with a shoebox of receipts. Lekhio puts that knowledge in your chat, working every single day.
+            </p>
+          </div>
+          <div className="duo">
+            <div style={{ background: '#1B1B1B', border: '1px solid #2C2C2C', borderRadius: 20, padding: '28px 26px' }}>
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fff', margin: '0 0 16px' }}>The old way. A traditional accountant.</h3>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 13 }}>
+                {oldAccountant.map((line) => (
+                  <li key={line} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+                    <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 11, background: '#3A2A2A', color: '#E0796B', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>✕</span>
+                    <span style={{ fontSize: 15, color: '#C7CDD6', lineHeight: 1.5 }}>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div style={{ background: RIVER, borderRadius: 20, padding: '28px 26px' }}>
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fff', margin: '0 0 16px' }}>The Lekhio way.</h3>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 13 }}>
+                {lekhioWay.map((line) => (
+                  <li key={line} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+                    <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 11, background: 'rgba(255,255,255,0.22)', color: '#fff', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>✓</span>
+                    <span style={{ fontSize: 15, color: '#EAF1FA', lineHeight: 1.5 }}>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: '#8A93A0', textAlign: 'center', marginTop: 26, maxWidth: 660, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>
+            Lekhio is software that prepares your figures, plain and simple, with a real human when you need one. For the rare complex case, a qualified accountant on tap is coming. We never imply HMRC backs us.
+          </p>
+        </div>
+      </section>
+
       {/* App demo */}
       <section id="app" style={{ backgroundColor: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto', padding: '46px 24px' }}>
           <div className="appdemo-grid">
             <div className="reveal">
               <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>THE APP</span>
@@ -922,7 +1001,7 @@ export default function HomePage() {
       </section>
 
       {/* Free tools showcase */}
-      <section style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
+      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
           <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>FREE, NO SIGNUP</span>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Free tools you can use right now.</h2>
@@ -944,7 +1023,7 @@ export default function HomePage() {
       </section>
 
       {/* Claim it by text */}
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '46px 24px' }}>
+      <section style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 30 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Say it. It is claimed.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 580, margin: '0 auto', lineHeight: 1.6 }}>Text the thing. Lekhio works out the relief and logs it at the HMRC rate. No forms, no logbooks, no missed claims. No other app does this.</p>
@@ -961,8 +1040,29 @@ export default function HomePage() {
         <p style={{ fontSize: 12.5, color: MUTED, textAlign: 'center', marginTop: 16 }}>Mileage, working from home, phone and broadband, and CIS, all from a text. The simplified rates apply, and the method that claims you more is the one that counts.</p>
       </section>
 
+      {/* Where every pound goes */}
+      <section style={{ background: `linear-gradient(180deg, #fff, ${RIVER_TINT})`, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '54px 24px' }}>
+          <div className="reveal" style={{ textAlign: 'center', marginBottom: 34 }}>
+            <span style={{ display: 'inline-block', background: '#fff', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>SEE IT CLEARLY</span>
+            <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Where every pound goes.</h2>
+            <p style={{ fontSize: 17, color: MUTED, maxWidth: 560, margin: '0 auto' }}>Claim your costs, set aside for tax, keep the rest. Lekhio works the lot out as you go, so there are no nasty surprises.</p>
+          </div>
+          <div className="reveal" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: '28px 26px', boxShadow: '0 14px 40px rgba(17,17,17,.06)' }}>
+            {moneyFlow.map((m, i) => (
+              <div key={m.label} className="moneyrow">
+                <span className="moneylabel">{m.label}</span>
+                <div className="moneytrack"><div className="moneyfill" style={{ width: m.pct, background: m.color, animationDelay: `${0.15 + i * 0.18}s` }} /></div>
+                <span className="moneyval">{m.val}</span>
+              </div>
+            ))}
+            <p style={{ fontSize: 12.5, color: MUTED, textAlign: 'center', marginTop: 10 }}>An illustration, for every £1,000 you bring in. Your real figures live in the app.</p>
+          </div>
+        </div>
+      </section>
+
       {/* Can I claim it CTA */}
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '6px 24px 30px' }}>
+      <section style={{ maxWidth: 1240, margin: '0 auto', padding: '6px 24px 30px' }}>
         <Link href="/can-i-claim" className="reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '18px 22px', textDecoration: 'none', color: INK }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <span style={{ fontSize: 26 }}>💡</span>
@@ -976,7 +1076,7 @@ export default function HomePage() {
       </section>
 
       {/* Bank connector showcase */}
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '44px 24px' }}>
+      <section style={{ maxWidth: 1240, margin: '0 auto', padding: '44px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 30 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 20, marginBottom: 14 }}>Optional, coming soon</div>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Connect your bank, books on autopilot.</h2>
@@ -1005,7 +1105,7 @@ export default function HomePage() {
       </section>
 
       {/* Coming soon, the complete platform */}
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '40px 24px' }}>
+      <section style={{ maxWidth: 1240, margin: '0 auto', padding: '40px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 28 }}>
           <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>COMING SOON</span>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 12px' }}>Soon, Lekhio does the lot.</h2>
@@ -1114,7 +1214,7 @@ export default function HomePage() {
 
       {/* Comparison */}
       <section id="compare" style={{ backgroundColor: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1140, margin: '0 auto', padding: '46px 24px' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>How Lekhio compares.</h2>
             <p style={{ fontSize: 17, color: MUTED, maxWidth: 560, margin: '0 auto' }}>The old way is an app that wants a weekend of setup, or a spreadsheet and a shoebox. Here is the honest side by side.</p>
@@ -1150,7 +1250,7 @@ export default function HomePage() {
       </section>
 
       {/* Complaints to fixes, review panel style */}
-      <section style={{ maxWidth: 1140, margin: '0 auto', padding: '46px 24px' }}>
+      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>The reviews that built Lekhio.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 600, margin: '0 auto', lineHeight: 1.6 }}>These are the kinds of complaints people leave about other bookkeeping apps. Here is what we did about each one.</p>
@@ -1182,7 +1282,7 @@ export default function HomePage() {
 
       {/* Trust */}
       <section id="trust" style={{ backgroundColor: '#fff', borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto', padding: '46px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
             <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>BUILT TO BE TRUSTED</span>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Your money. Your data. Your call.</h2>
@@ -1244,7 +1344,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" style={{ maxWidth: 1240, margin: '0 auto', padding: '46px 24px' }}>
+      <section id="pricing" style={{ maxWidth: 1320, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>One price. No surprises.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 620, margin: '0 auto' }}>Try it free for 30 days. Keep it for less than a tank of fuel a month. Other apps look cheaper, then charge extra for receipts, CIS, filing and support. Lekhio is one price with all of it in.</p>
@@ -1331,7 +1431,7 @@ export default function HomePage() {
 
       {/* Promise band */}
       <section style={{ backgroundColor: INK }}>
-        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 24px' }}><RiverDivider /></div>
+        <div style={{ maxWidth: 1320, margin: '0 auto', padding: '0 24px' }}><RiverDivider /></div>
         <div className="reveal" style={{ maxWidth: 760, margin: '0 auto', padding: '40px 24px 76px', textAlign: 'center' }}>
           <h2 className="h2" style={{ color: '#fff', fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 16px' }}>You are good at your trade. Let Lekhio do the paperwork.</h2>
           <p style={{ fontSize: 17, color: '#B6BDC8', lineHeight: 1.6, maxWidth: 540, margin: '0 auto 32px' }}>
@@ -1343,7 +1443,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer style={{ backgroundColor: PAPER }}>
-        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '40px 24px', display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto', padding: '40px 24px', display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.5px', marginBottom: 4 }}>Lekhio</div>
             <p style={{ fontSize: 13, color: MUTED, margin: 0 }}>Your books, handled. Just text it.</p>
@@ -1361,7 +1461,7 @@ export default function HomePage() {
             <a href="mailto:support@lekhio.com" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Support</a>
           </div>
         </div>
-        <div style={{ maxWidth: 1240, margin: '0 auto', padding: '0 24px 36px' }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto', padding: '0 24px 36px' }}>
           <p style={{ fontSize: 12, color: MUTED, margin: 0 }}>
             © {new Date().getFullYear()} Lekhio, a Satluj Ventures company. Built for the UK self employed. Lekhio prepares your records. You stay responsible for your tax with HMRC.
           </p>

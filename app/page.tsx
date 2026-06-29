@@ -189,6 +189,7 @@ const replaces = [
   { icon: '🗓️', label: 'Diary and reminders', cost: '£5 to £15' },
   { icon: '🧮', label: 'Tax software', cost: '£10 to £20' },
   { icon: '🚗', label: 'Mileage tracker', cost: '£5 to £10' },
+  { icon: '🧑‍💼', label: 'Accountant fees', cost: '£20 to £60' },
 ];
 
 const trustPillars = [
@@ -1365,7 +1366,7 @@ export default function HomePage() {
         </div>
         <div className="reveal" style={{ maxWidth: 760, margin: '0 auto 22px', background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 18, padding: '22px 24px' }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: RIVER_DEEP, textTransform: 'uppercase', letterSpacing: '0.6px', margin: '0 0 14px', textAlign: 'center' }}>One Lekhio replaces all of these</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10 }}>
             {replaces.map((r) => (
               <div key={r.label} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 10px', textAlign: 'center' }}>
                 <div style={{ fontSize: 22 }}>{r.icon}</div>
@@ -1375,7 +1376,7 @@ export default function HomePage() {
             ))}
           </div>
           <p style={{ fontSize: 13.5, color: MUTED, textAlign: 'center', margin: '16px auto 0', maxWidth: 560, lineHeight: 1.6 }}>
-            Pay for those one by one and it is well over £40 a month, across five different logins. Lekhio is the lot, in one chat, for £19.99. Cheaper than a single one of the apps it replaces.
+            Pay for those one by one and it is well over £50 a month, across six different logins and bills. Lekhio is the lot, in one chat, for £19.99. Cheaper than a single one of the apps it replaces.
           </p>
         </div>
         <div className="reveal" style={{ maxWidth: 760, margin: '0 auto', backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 22, overflow: 'hidden', boxShadow: '0 18px 50px rgba(17,17,17,.07)' }}>

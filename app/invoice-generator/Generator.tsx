@@ -202,7 +202,7 @@ export default function Generator() {
   }
 
   const { subtotal, vatAmount, total } = useMemo(() => {
-    const sub = items.reduce((s, it) => s + (parseFloat(it.qty || '0') || 0) * (parseFloat(it.price || '0') || 0), 0);
+    const sub = items.reduce((s, it) => s + Math.round((parseFloat(it.qty || '0') || 0) * (parseFloat(it.price || '0') || 0) * 100) / 100, 0);
     const v = vat ? sub * ((parseFloat(vatRate || '0') || 0) / 100) : 0;
     return { subtotal: sub, vatAmount: v, total: sub + v };
   }, [items, vat, vatRate]);
@@ -266,8 +266,8 @@ export default function Generator() {
             {items.map((it, i) => (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 52px 76px 28px', gap: 6, marginBottom: 8, alignItems: 'center' }}>
                 <input value={it.desc} onChange={(e) => updateItem(i, 'desc', e.target.value)} placeholder="Description" style={{ ...inputStyle, padding: '9px 10px' }} />
-                <input value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value.replace(/[^0-9.]/g, ''))} placeholder="Qty" style={{ ...inputStyle, padding: '9px 6px', textAlign: 'center' }} />
-                <input value={it.price} onChange={(e) => updateItem(i, 'price', e.target.value.replace(/[^0-9.]/g, ''))} placeholder="£ each" style={{ ...inputStyle, padding: '9px 8px', textAlign: 'right' }} />
+                <input value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} placeholder="Qty" style={{ ...inputStyle, padding: '9px 6px', textAlign: 'center' }} />
+                <input value={it.price} onChange={(e) => updateItem(i, 'price', e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} placeholder="£ each" style={{ ...inputStyle, padding: '9px 8px', textAlign: 'right' }} />
                 <button onClick={() => removeItem(i)} aria-label="Remove line" style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 8, cursor: 'pointer', color: MUTED, fontSize: 16, height: 38 }}>×</button>
               </div>
             ))}
@@ -279,7 +279,7 @@ export default function Generator() {
               </label>
               {vat ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input value={vatRate} onChange={(e) => setVatRate(e.target.value.replace(/[^0-9.]/g, ''))} style={{ ...inputStyle, width: 64, padding: '8px 8px', textAlign: 'center' }} />
+                  <input value={vatRate} onChange={(e) => setVatRate(e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} style={{ ...inputStyle, width: 64, padding: '8px 8px', textAlign: 'center' }} />
                   <span style={{ fontSize: 14, color: MUTED }}>%</span>
                 </div>
               ) : null}

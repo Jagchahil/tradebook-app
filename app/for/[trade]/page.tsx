@@ -129,6 +129,19 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
           <Link href="/resources" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>All free tools</Link>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer style={{ borderTop: `1px solid ${LINE}`, background: PAPER }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px', display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, color: MUTED }}>© {new Date().getFullYear()} Lekhio, a Satluj Ventures company. Not HMRC.</span>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            <Link href="/start" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Sign up</Link>
+            <Link href="/privacy" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Privacy</Link>
+            <Link href="/terms" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Terms</Link>
+            <a href="mailto:support@lekhio.com" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Support</a>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }

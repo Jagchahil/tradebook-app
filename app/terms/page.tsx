@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 const INK = '#111111';
 const INDIGO = '#1B59A6';
-const MUTED = '#6B7280';
+const MUTED = '#5B6470';
 const BORDER = '#ECECEC';
 const OFF_WHITE = '#FBFAF7';
 

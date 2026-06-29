@@ -30,7 +30,7 @@ function incomeTax(profit: number): number {
   let tax = 0;
   const basic = Math.min(taxable, 37700);
   tax += basic * 0.2;
-  const higher = Math.min(Math.max(taxable - 37700, 0), 125140 - 50270);
+  const higher = Math.min(Math.max(taxable - 37700, 0), 125140 - pa - 37700);
   tax += higher * 0.4;
   const additional = Math.max(taxable - (125140 - pa), 0);
   tax += additional * 0.45;
@@ -122,8 +122,8 @@ export default function Calc() {
         <Line label="Take home after tax" value={gbp(takeHome)} strong accent={GREEN} />
 
         <div style={{ background: SAFFRON_TINT, borderRadius: 12, padding: '14px 16px', marginTop: 18 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: SAFFRON_DEEP, marginBottom: 4 }}>Set aside about {setAsidePct}p in every £1</div>
-          <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.5 }}>Put roughly {setAsidePct}% of what lands in your account aside and the tax bill never stings. Lekhio tracks this for you in real time.</div>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: SAFFRON_DEEP, marginBottom: 4 }}>Set aside about {setAsidePct}p of every £1 of profit</div>
+          <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.5 }}>Put roughly {setAsidePct}% of your profit aside and the tax bill never stings. Lekhio tracks this for you in real time.</div>
         </div>
 
         {saved > 0 ? (

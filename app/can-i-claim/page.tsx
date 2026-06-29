@@ -96,11 +96,12 @@ export default function CanIClaimPage() {
           .h1{font-size:54px;line-height:1.05;letter-spacing:-2px}
           .h2{font-size:32px;line-height:1.14;letter-spacing:-0.7px}
           .rulegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+          .oneRule{display:grid;grid-template-columns:1.1fr .9fr;gap:36px;align-items:center}
           .rulecard{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
           .rulecard:hover{transform:translateY(-4px);box-shadow:0 16px 36px rgba(17,17,17,.08);border-color:${RIVER_TINT}}
           .btn{transition:transform .18s ease,box-shadow .18s ease,background-color .18s ease}
           .btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(27,89,166,.28)}
-          @media (max-width:880px){.h1{font-size:36px}.h2{font-size:25px}.rulegrid{grid-template-columns:1fr}.grey-grid{grid-template-columns:1fr!important}.tips-grid{grid-template-columns:1fr!important}}
+          @media (max-width:880px){.h1{font-size:36px}.h2{font-size:25px}.rulegrid{grid-template-columns:1fr}.oneRule{grid-template-columns:1fr;gap:24px}.grey-grid{grid-template-columns:1fr!important}.tips-grid{grid-template-columns:1fr!important}}
           `,
         }}
       />
@@ -129,7 +130,7 @@ export default function CanIClaimPage() {
 
       {/* The one rule + WhatsApp demo */}
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px' }}>
-        <div className="reveal" style={{ display: 'grid', gridTemplateColumns: '1.1fr .9fr', gap: 36, alignItems: 'center' }} >
+        <div className="reveal oneRule">
           <div style={{ minWidth: 0 }}>
             <h2 className="h2" style={{ fontWeight: 700, margin: '0 0 14px' }}>One simple test runs the lot.</h2>
             <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.65, margin: '0 0 16px' }}>

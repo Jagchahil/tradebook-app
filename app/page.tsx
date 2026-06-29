@@ -50,7 +50,7 @@ const steps = [
 
 const stats = [
   { to: 30, prefix: '', suffix: 's', label: 'to log a receipt' },
-  { to: 29, prefix: '£', suffix: '', label: 'a month, one flat price' },
+  { to: 19.99, prefix: '£', suffix: '', label: 'a month, everything in' },
   { to: 4, prefix: '', suffix: '', label: 'short updates a year, not one big return' },
   { to: 0, prefix: '', suffix: '', label: 'spreadsheets for you to keep' },
 ];
@@ -134,7 +134,7 @@ const comingSoon = [
 
 const fixes = [
   { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'A real person replies on the same WhatsApp. No bots, no hold music.' },
-  { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £29 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
+  { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £19.99 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
   { stars: 1, who: 'A self employed driver, reviewing another app', gripe: 'The bank feed kept dropping. Half my month went missing and I had to relink it again and again.', fix: 'Lekhio never leans on a fragile feed. Snap it or text it and it is logged for good. Connecting your bank, when it lands, is a bonus, never a crutch.' },
   { stars: 2, who: 'A trades subcontractor, reviewing another app', gripe: 'I photographed a receipt and it would not even log it. It just tried to match it to something and gave up.', fix: 'Send a photo and Lekhio reads it and logs the lot, the amount, the VAT, the category, in seconds. No matching, no retyping.' },
   { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'They held my own money for weeks with a copy and paste excuse. Never again.', fix: 'Lekhio never holds your money or touches your account. We keep the records, that is all. Your cash is only ever yours.' },
@@ -159,7 +159,7 @@ const oldAccountant = [
 ];
 
 const lekhioWay = [
-  'One flat £29 a month, with everything in.',
+  'One flat £19.99 a month, with everything in.',
   'With you every day, not once a year.',
   'Snap each receipt as you go. Nothing to dig out.',
   'Plain English, always. Ask it anything.',
@@ -1375,7 +1375,7 @@ export default function HomePage() {
             ))}
           </div>
           <p style={{ fontSize: 13.5, color: MUTED, textAlign: 'center', margin: '16px auto 0', maxWidth: 560, lineHeight: 1.6 }}>
-            Pay for those one by one and it is well over £29 a month, across five different logins. Lekhio is the lot, in one chat. Billed monthly, cancel any time, no locked in annual contract.
+            Pay for those one by one and it is well over £40 a month, across five different logins. Lekhio is the lot, in one chat, for £19.99. Cheaper than a single one of the apps it replaces.
           </p>
         </div>
         <div className="reveal" style={{ maxWidth: 760, margin: '0 auto', backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 22, overflow: 'hidden', boxShadow: '0 18px 50px rgba(17,17,17,.07)' }}>
@@ -1383,10 +1383,12 @@ export default function HomePage() {
             <div style={{ flex: 1, padding: 36, borderRight: `1px solid ${LINE}` }}>
               <div style={{ display: 'inline-block', backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 8, marginBottom: 22 }}>30 DAYS FREE</div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
-                <span style={{ fontSize: 54, fontWeight: 800, letterSpacing: '-2px' }}>£29</span>
+                <span style={{ fontSize: 54, fontWeight: 800, letterSpacing: '-2px' }}>£19.99</span>
                 <span style={{ fontSize: 17, color: MUTED }}>/ month</span>
               </div>
-              <p style={{ fontSize: 14, color: MUTED, margin: '0 0 26px' }}>After your free trial. Cancel any time.</p>
+              <p style={{ fontSize: 14, color: MUTED, margin: '0 0 6px' }}>After your free trial. Cancel any time.</p>
+              <p style={{ fontSize: 14, color: INK, fontWeight: 600, margin: '0 0 6px' }}>Or £199 a year, two months free.</p>
+              <Link href="/register-your-business" style={{ display: 'block', fontSize: 13.5, color: GREEN, fontWeight: 700, margin: '0 0 22px' }}>Set up with us first and lock in 20% off for life →</Link>
               <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: 15, borderRadius: 12 }}>Start free trial</Link>
               <p style={{ fontSize: 13, color: MUTED, textAlign: 'center', margin: '12px 0 0' }}>No card needed to start. Snap your first receipt in minutes.</p>
             </div>

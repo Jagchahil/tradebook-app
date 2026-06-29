@@ -9,22 +9,37 @@
 
 import { execSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const libPath = path.resolve(here, '../../lib/taxengine.ts');
-const out = path.join(process.env.TMPDIR || '/tmp', 'taxengine.exam.mjs');
 
-// Find an esbuild binary: local node_modules first, then the sandbox copy.
-const candidates = [
-  path.resolve(here, '../../node_modules/.bin/esbuild'),
-  '/tmp/node_modules/.bin/esbuild',
-];
-const esbuild = candidates.find((p) => existsSync(p)) || 'esbuild';
-execSync(`"${esbuild}" "${libPath}" --format=esm --outfile="${out}"`, { stdio: 'inherit' });
+// Load the engine. Node 22.6+ reads TypeScript directly (type stripping), so we
+// import the .ts straight away. If that is not available, fall back to a one-off
+// esbuild transpile. Either way, no permanent dependency is needed to run this.
+async function loadEngine() {
+  try {
+    return await import(`${pathToFileURL(libPath).href}?t=${Date.now()}`);
+  } catch (err) {
+    const out = path.join(process.env.TMPDIR || '/tmp', 'taxengine.exam.mjs');
+    const candidates = [
+      path.resolve(here, '../../node_modules/.bin/esbuild'),
+      '/tmp/node_modules/.bin/esbuild',
+    ];
+    const esbuild = candidates.find((p) => existsSync(p));
+    if (!esbuild) {
+      console.error('\nCould not load the tax engine.');
+      console.error('This runs directly on Node 22.6 or newer. On older Node, install esbuild once: npm i -D esbuild');
+      console.error(`Original error: ${err.message}\n`);
+      process.exit(2);
+    }
+    execSync(`"${esbuild}" "${libPath}" --format=esm --outfile="${out}"`, { stdio: 'inherit' });
+    return import(`file://${out}?t=${Date.now()}`);
+  }
+}
 
-const E = await import(`file://${out}?t=${Date.now()}`);
+const E = await loadEngine();
 const bank = JSON.parse(readFileSync(path.resolve(here, 'exam-bank.json'), 'utf8'));
 
 function answer(q) {

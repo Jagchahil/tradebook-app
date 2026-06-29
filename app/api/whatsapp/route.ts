@@ -28,6 +28,7 @@ import {
   clearSession,
   createInvoice,
   createEvent,
+  bumpAiUsage,
 } from '../../../lib/supabase';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
 import type { TradeInfo } from '../../../lib/taxguide';
@@ -36,6 +37,23 @@ import { rateLimited } from '../../../lib/ratelimit';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
 
 // We never log message text or media. Only ids and status, per the data rules.
+
+// Hard daily AI budget, durable in the database, so it holds across every
+// serverless instance, unlike the in-memory burst limit. The per-phone cap
+// protects margin on a single account. The global cap is a kill switch against a
+// mass attack. If either is over for today, we refuse to spend on AI.
+const PHONE_DAILY_AI = 120;
+const GLOBAL_DAILY_AI = 4000;
+const AI_BUSY =
+  'I am a bit busy right now. Give me a few minutes and try again. Nothing is lost.';
+
+async function aiBudgetBlocked(from: string): Promise<boolean> {
+  const perPhone = await bumpAiUsage('phone', from);
+  if (perPhone !== null && perPhone > PHONE_DAILY_AI) return true;
+  const globalCount = await bumpAiUsage('global', 'all');
+  if (globalCount !== null && globalCount > GLOBAL_DAILY_AI) return true;
+  return false;
+}
 
 // --- GET. The webhook verification handshake. -----------------------------
 export async function GET(req: NextRequest) {
@@ -184,6 +202,10 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
     return;
   }
 
+  if (await aiBudgetBlocked(from)) {
+    await sendText(from, AI_BUSY);
+    return;
+  }
   const parsed = await parseReceipt(media.base64, media.mediaType);
   if (!parsed) {
     await sendText(from, 'I could not read that receipt. Try a clearer photo with the total showing.');
@@ -230,6 +252,10 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
     return;
   }
 
+  if (await aiBudgetBlocked(from)) {
+    await sendText(from, AI_BUSY);
+    return;
+  }
   const transcript = await transcribeAudio(media.base64, media.mediaType);
   if (!transcript) {
     await sendText(from, 'I could not make out that voice note. Try saying it again, nice and clear.');
@@ -261,6 +287,10 @@ async function handleTextEntry(from: string, messageId: string, body: string): P
     return;
   }
 
+  if (await aiBudgetBlocked(from)) {
+    await sendText(from, AI_BUSY);
+    return;
+  }
   const parsed = await parseSpokenTransaction(body);
   if (!parsed || parsed.amount <= 0) {
     await sendText(
@@ -523,6 +553,10 @@ async function handleSchedule(from: string, body: string): Promise<void> {
     await sendText(from, 'Reminders are not switched on yet. Hang tight, they are coming very soon.');
     return;
   }
+  if (await aiBudgetBlocked(from)) {
+    await sendText(from, AI_BUSY);
+    return;
+  }
   const parsed = await parseSchedule(body, new Date().toISOString());
   if (!parsed) {
     await sendText(from, 'I could not work out a time for that. Try, for example, "remind me to price up Dave\'s job tomorrow at 8am".');
@@ -571,6 +605,10 @@ async function handleMoneyQuestion(from: string, body: string): Promise<void> {
   }
   if (!hasClaudeConfig()) {
     await sendText(from, 'I cannot answer questions just yet. Hang tight, it is coming very soon.');
+    return;
+  }
+  if (await aiBudgetBlocked(from)) {
+    await sendText(from, AI_BUSY);
     return;
   }
   const summary = await transactionSummaryForUser(userId);
@@ -622,6 +660,10 @@ async function handleExpenseCheck(from: string, body: string): Promise<void> {
     // cannot spend our AI budget by spamming questions. Unlinked callers still
     // get the safe general answer and a nudge to sign up.
     if (hasClaudeConfig() && linked) {
+      if (await aiBudgetBlocked(from)) {
+        await sendText(from, AI_BUSY);
+        return;
+      }
       const ai = await answerExpenseQuestion(body);
       if (ai) {
         await sendText(from, ai + tail);
@@ -728,6 +770,10 @@ async function handleInvoiceFlow(from: string, body: string): Promise<boolean> {
     if (!hasClaudeConfig()) {
       await clearSession(from);
       await sendText(from, 'Invoice building is not switched on yet. Hang tight.');
+      return true;
+    }
+    if (await aiBudgetBlocked(from)) {
+      await sendText(from, AI_BUSY);
       return true;
     }
     const drafted = await draftInvoice(body);

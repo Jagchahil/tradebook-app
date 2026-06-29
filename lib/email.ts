@@ -68,3 +68,44 @@ export async function sendInvoiceEmail(opts: InvoiceEmail): Promise<boolean> {
     return false;
   }
 }
+
+// Sent once when someone signs up on the web. Best effort, dormant until Resend
+// is configured. Warm, gets them to the first WhatsApp action fast.
+export async function sendWelcomeEmail(to: string, name?: string | null): Promise<boolean> {
+  if (!KEY) return false;
+  if (!looksLikeEmail(to)) return false;
+
+  const fromAddr = FROM.replace(/.*</, '').replace(/>.*/, '');
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.com';
+  const hi = name ? `Welcome to Lekhio, ${name}.` : 'Welcome to Lekhio.';
+
+  const html = `
+  <div style="font-family:Inter,-apple-system,'Segoe UI',sans-serif;color:${INK};max-width:520px;margin:0 auto;padding:24px">
+    <p style="font-size:18px;font-weight:700;margin:0 0 12px">${hi}</p>
+    <p style="font-size:15px;line-height:1.6;color:${MUTED}">Your books and tax now live in WhatsApp. Here is how to start, it takes about a minute.</p>
+    <ol style="font-size:15px;line-height:1.8;color:${INK};padding-left:18px">
+      <li>We will text you to confirm your number. Save it as Lekhio.</li>
+      <li>Snap a photo of any receipt and send it. Logged in seconds.</li>
+      <li>Try a few: "drove 24 miles", "worked 90 hours from home", or "got paid £400 by Dave".</li>
+    </ol>
+    <p style="font-size:15px;line-height:1.6">Your first month is free. Open the app any time to watch it all add up, ready for tax.</p>
+    <p style="margin:24px 0"><a href="${appUrl}" style="background:${RIVER};color:#fff;text-decoration:none;font-weight:600;padding:13px 24px;border-radius:10px;display:inline-block">Open Lekhio</a></p>
+    <p style="font-size:12px;color:${MUTED};margin-top:28px">A real person is on the other end. Just reply if you need anything. Lekhio is not HMRC, and nothing is ever sent to HMRC without your approval.</p>
+  </div>`;
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: `Lekhio <${fromAddr}>`, to: [to], subject: 'Welcome to Lekhio. Here is how to start.', html }),
+    });
+    if (!res.ok) {
+      console.error('[email] welcome failed:', res.status, await res.text());
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('[email] welcome exception:', e instanceof Error ? e.message : 'unknown');
+    return false;
+  }
+}

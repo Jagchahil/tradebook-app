@@ -333,6 +333,44 @@ alter table public.processed_messages enable row level security;
 -- No policies. Service role only.
 
 -- ---------------------------------------------------------------------------
+-- AI usage budget (hard cost cap)
+-- ---------------------------------------------------------------------------
+-- A durable per-day counter so a runaway or malicious sender can never run up an
+-- insane AI bill. The webhook increments a per-phone key and a global key before
+-- every paid AI call and refuses to spend once either is over its daily cap.
+-- This is the hard backstop behind the in-memory burst limit. Service only.
+
+create table if not exists public.ai_usage (
+  day        date    not null default current_date,
+  scope      text    not null,            -- 'phone' or 'global'
+  key        text    not null,            -- the phone number, or 'all'
+  count      integer not null default 0,
+  primary key (day, scope, key)
+);
+
+alter table public.ai_usage enable row level security;
+-- No policies. Service role only.
+
+-- Atomic increment. Returns the new count for today so the caller can compare it
+-- to the cap. One row per (day, scope, key); the unique key makes it race safe.
+create or replace function public.increment_ai_usage(p_scope text, p_key text)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v integer;
+begin
+  insert into public.ai_usage (day, scope, key, count)
+  values (current_date, p_scope, p_key, 1)
+  on conflict (day, scope, key)
+  do update set count = public.ai_usage.count + 1
+  returning count into v;
+  return v;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Conventions (decided 2026-06-24 while the transactions table was still empty)
 -- ---------------------------------------------------------------------------
 -- 1. Income vs expense is the sign of `amount`. Expenses are negative. There is

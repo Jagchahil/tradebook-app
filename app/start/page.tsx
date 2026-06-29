@@ -45,6 +45,8 @@ export default function StartPage() {
   const [postcode, setPostcode] = useState('');
   const [address, setAddress] = useState('');
   const [vat, setVat] = useState<boolean | null>(false);
+  const [hp, setHp] = useState(''); // honeypot, must stay empty for a real person
+  const [t0] = useState(() => Date.now());
 
   const phoneReady = digitsOnly(phone).length >= 10;
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -75,6 +77,8 @@ export default function StartPage() {
           postcode: postcode.trim(),
           address: address.trim(),
           vat,
+          website: hp,
+          ts: Date.now() - t0,
         }),
       }).catch(() => {});
     } catch {
@@ -142,6 +146,17 @@ export default function StartPage() {
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '28px 22px 40px' }}>
         <div style={{ maxWidth: 560, width: '100%' }}>
+          {/* Honeypot. Hidden from people, but bots that fill every field trip it. */}
+          <input
+            type="text"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            value={hp}
+            onChange={(e) => setHp(e.target.value)}
+            style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
+          />
           {done ? (
             <div className="step-anim" style={{ textAlign: 'center', paddingTop: 24 }}>
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>

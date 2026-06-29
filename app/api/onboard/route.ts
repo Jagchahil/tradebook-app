@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignup } from '../../../lib/supabase';
+import { sendWelcomeEmail } from '../../../lib/email';
 import { rateLimited, clientIp } from '../../../lib/ratelimit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,6 +32,23 @@ function str(value: unknown, max = 120): string | null {
   return t.slice(0, max);
 }
 
+// Optional Cloudflare Turnstile check. Inert until TURNSTILE_SECRET is set. When
+// you enable it, also render the widget on /start so a token is sent here.
+async function verifyTurnstile(secret: string, token: string, ip: string): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ secret, response: token, remoteip: ip }).toString(),
+    });
+    const data = (await res.json()) as { success?: boolean };
+    return Boolean(data.success);
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (rateLimited(`onboard:${clientIp(req)}`, 12, 10 * 60 * 1000)) {
@@ -44,6 +62,24 @@ export async function POST(req: NextRequest) {
     }
 
     const b = (body ?? {}) as Record<string, unknown>;
+
+    // Bot traps. A hidden honeypot field humans never see, and a minimum fill
+    // time. Either being tripped means an automated submission. We return ok so a
+    // bot gets no signal, and we save nothing.
+    if (typeof b.website === 'string' && b.website.trim() !== '') {
+      return NextResponse.json({ ok: true });
+    }
+    if (typeof b.ts === 'number' && b.ts < 1500) {
+      return NextResponse.json({ ok: true });
+    }
+    // Optional Turnstile. Only enforced once the secret is configured.
+    if (process.env.TURNSTILE_SECRET) {
+      const token = typeof b.turnstileToken === 'string' ? b.turnstileToken : '';
+      const ok = await verifyTurnstile(process.env.TURNSTILE_SECRET, token, clientIp(req));
+      if (!ok) {
+        return NextResponse.json({ error: 'Verification failed. Please try again.' }, { status: 400 });
+      }
+    }
 
     const phone = cleanPhone(b.phone);
     const email = cleanEmail(b.email);
@@ -67,6 +103,9 @@ export async function POST(req: NextRequest) {
       console.error('[onboard] Save error:', detail);
       return NextResponse.json({ error: 'Could not save. Please try again.' }, { status: 500 });
     }
+
+    // Fire a welcome email, best effort. No-op until Resend is configured.
+    void sendWelcomeEmail(email, str(b.name)).catch(() => {});
 
     // Never log the personal details. Just confirm one signup saved.
     console.log('[onboard] Saved one signup');

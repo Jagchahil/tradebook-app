@@ -28,6 +28,28 @@ function headers(extra: Record<string, string> = {}): Record<string, string> {
   };
 }
 
+// --- AI usage budget (hard cost cap) --------------------------------------
+// Atomically increments today's counter for a scope and key and returns the new
+// count, so the webhook can refuse to spend on AI once a daily cap is hit. On any
+// error we return null and the caller fails open (the in-memory burst limit is
+// still the backstop), so a database hiccup never breaks the product.
+export async function bumpAiUsage(scope: string, key: string): Promise<number | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/rpc/increment_ai_usage`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_scope: scope, p_key: key }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const n = typeof data === 'number' ? data : Array.isArray(data) ? Number(data[0]) : Number(data);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
 // --- WhatsApp conversation state ------------------------------------------
 
 export interface WaSession {

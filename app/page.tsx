@@ -1358,6 +1358,33 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Expertise, proven */}
+      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '46px 24px' }}>
+        <div className="reveal" style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 22, padding: '40px 28px', textAlign: 'center' }}>
+          <span style={{ display: 'inline-block', fontSize: 12.5, fontWeight: 700, color: RIVER_DEEP, textTransform: 'uppercase', letterSpacing: '0.6px', backgroundColor: RIVER_TINT, padding: '6px 13px', borderRadius: 20, marginBottom: 16 }}>Tested expertise</span>
+          <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Built on what the experts are examined on.</h2>
+          <p style={{ fontSize: 17, color: MUTED, maxWidth: 680, margin: '0 auto 28px', lineHeight: 1.6 }}>
+            Our tax engine is built from the same rules taught in the leading tax and accountancy qualifications, and checked against an exam style test suite every release. The same topics a qualified adviser is examined on for a self employed client.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, maxWidth: 760, margin: '0 auto 22px' }}>
+            {[
+              { big: '71/71', small: 'exam checks passed' },
+              { big: '20', small: 'expert topic areas' },
+              { big: '7', small: 'qualifications mapped' },
+              { big: '2026/27', small: 'rates, kept current' },
+            ].map((s) => (
+              <div key={s.small} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '18px 12px' }}>
+                <div style={{ fontSize: 26, fontWeight: 800, color: INK, letterSpacing: '-1px' }}>{s.big}</div>
+                <div style={{ fontSize: 12.5, color: MUTED, marginTop: 4 }}>{s.small}</div>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: 13, color: MUTED, maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
+            Mapped from the syllabuses of ACCA, ICAEW, CIOT and AAT, with US CPA and Enrolled Agent for a global view. We are not your accountant and hold no qualification ourselves. We prepare your figures, you approve them, and HMRC keeps you responsible.
+          </p>
+        </div>
+      </section>
+
       {/* Pricing */}
       <section id="pricing" style={{ maxWidth: 1320, margin: '0 auto', padding: '46px 24px' }}>
         <div className="reveal" style={{ textAlign: 'center', marginBottom: 44 }}>

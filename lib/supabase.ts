@@ -278,6 +278,65 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
   }
 }
 
+// --- Subscriptions (Stripe billing) ---------------------------------------
+
+export interface SubscriptionRecord {
+  email?: string | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id: string;
+  plan?: string | null;
+  offer?: string | null;
+  status?: string | null;
+  amount_pence?: number | null;
+  current_period_end?: string | null; // ISO timestamp
+  cancel_at_period_end?: boolean | null;
+}
+
+// Insert or update a subscription, keyed on the Stripe subscription id, so the
+// webhook can be delivered any number of times in any order and the row always
+// reflects the latest state. Service role only.
+export async function upsertSubscription(rec: SubscriptionRecord): Promise<void> {
+  const { url } = config();
+  if (!rec.stripe_subscription_id) return;
+
+  const body: Record<string, unknown> = {
+    stripe_subscription_id: rec.stripe_subscription_id,
+    updated_at: new Date().toISOString(),
+  };
+  if (rec.email != null) body.email = rec.email;
+  if (rec.stripe_customer_id != null) body.stripe_customer_id = rec.stripe_customer_id;
+  if (rec.plan != null) body.plan = rec.plan;
+  if (rec.offer != null) body.offer = rec.offer;
+  if (rec.status != null) body.status = rec.status;
+  if (rec.amount_pence != null) body.amount_pence = rec.amount_pence;
+  if (rec.current_period_end != null) body.current_period_end = rec.current_period_end;
+  if (rec.cancel_at_period_end != null) body.cancel_at_period_end = rec.cancel_at_period_end;
+
+  const res = await fetch(`${url}/rest/v1/subscriptions?on_conflict=stripe_subscription_id`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('[upsertSubscription] failed:', res.status, text);
+  }
+}
+
+// Find the most recent subscription for an email, so the billing portal can be
+// opened for the right Stripe customer. Returns the customer id or null.
+export async function getStripeCustomerByEmail(email: string): Promise<string | null> {
+  const { url } = config();
+  if (!email) return null;
+  const res = await fetch(
+    `${url}/rest/v1/subscriptions?email=eq.${encodeURIComponent(email)}&select=stripe_customer_id&order=updated_at.desc&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ stripe_customer_id?: string | null }>;
+  return rows[0]?.stripe_customer_id ?? null;
+}
+
 // --- Events / diary / reminders -------------------------------------------
 
 export interface NewEvent {

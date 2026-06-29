@@ -48,6 +48,38 @@ export default function StartPage() {
   const [hp, setHp] = useState(''); // honeypot, must stay empty for a real person
   const [t0] = useState(() => Date.now());
   const [offer] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('offer') ?? '' : ''));
+  const [billingResult] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('billing') ?? '' : ''));
+
+  // Billing: the chosen period and the founder flag drive the price shown and charged.
+  const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly');
+  const [billingBusy, setBillingBusy] = useState(false);
+  const founder = offer.trim().toLowerCase() === 'setup20';
+  const priceNow =
+    plan === 'annual'
+      ? founder ? '£159 a year' : '£199 a year'
+      : founder ? '£15.99 a month' : '£19.99 a month';
+  const priceWas = plan === 'annual' ? '£199 a year' : '£19.99 a month';
+
+  async function startCheckout() {
+    setBillingBusy(true);
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, offer, email: email.trim() }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { url?: string };
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+    } catch {
+      // fall through
+    }
+    // Billing not switched on yet, or a hiccup. The free trial is already running,
+    // so we simply let the user carry on rather than block them.
+    setBillingBusy(false);
+  }
 
   const phoneReady = digitsOnly(phone).length >= 10;
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -133,7 +165,7 @@ export default function StartPage() {
       </div>
 
       {/* Progress */}
-      {!done && (
+      {!done && !billingResult && (
         <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: '20px 22px 0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: RIVER, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step {step} of {TOTAL}</span>
@@ -165,18 +197,78 @@ export default function StartPage() {
               <span style={{ fontSize: 13.5, fontWeight: 600, color: GREEN, lineHeight: 1.4 }}>Your founder offer is locked in: first month free, then 20% off for life. Finish to keep it.</span>
             </div>
           ) : null}
-          {done ? (
+          {billingResult === 'success' ? (
             <div className="step-anim" style={{ textAlign: 'center', paddingTop: 24 }}>
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
-              <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>You are all set{name ? `, ${name.split(' ')[0]}` : ''}.</h1>
-              <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 420, margin: '0 auto 28px' }}>
-                Your 30 day free trial has started. No card needed. Download the app to see your books, and say hello on WhatsApp to log your first receipt.
+              <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>Your plan is locked in.</h1>
+              <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 28px' }}>
+                Your card is saved and your 30 day free trial is running. You will not be charged until it ends, and you can cancel any time before then and pay nothing. Download the app and say hello on WhatsApp to log your first receipt.
               </p>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
                 <span style={badgeStore}>  Download on the App Store</span>
                 <span style={badgeStore}>▶  Get it on Google Play</span>
               </div>
-              <p style={{ fontSize: 13, color: MUTED, marginBottom: 28 }}>We will message you on WhatsApp with your download link as your spot opens.</p>
+              <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
+            </div>
+          ) : billingResult === 'cancelled' ? (
+            <div className="step-anim" style={{ textAlign: 'center', paddingTop: 24 }}>
+              <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: RIVER_TINT, color: RIVER, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
+              <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>Your trial is still running.</h1>
+              <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 28px' }}>
+                No card added, and that is fine. Your 30 day free trial is active. You can add a card to keep Lekhio any time, from the app or the website.
+              </p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
+                <span style={badgeStore}>  Download on the App Store</span>
+                <span style={badgeStore}>▶  Get it on Google Play</span>
+              </div>
+              <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
+            </div>
+          ) : done ? (
+            <div className="step-anim" style={{ textAlign: 'center', paddingTop: 24 }}>
+              <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
+              <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>You are all set{name ? `, ${name.split(' ')[0]}` : ''}.</h1>
+              <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 420, margin: '0 auto 22px' }}>
+                Your 30 day free trial has started. No card needed. Download the app to see your books, and say hello on WhatsApp to log your first receipt.
+              </p>
+
+              {/* Lock in your price. Optional, but this is where founders keep 20% off for life. */}
+              <div style={{ textAlign: 'left', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 20, maxWidth: 460, margin: '0 auto 24px' }}>
+                <p style={{ fontSize: 15, fontWeight: 800, color: INK, margin: '0 0 4px' }}>{founder ? 'Keep your founder price' : 'Add a card to keep Lekhio'}</p>
+                <p style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: '0 0 14px' }}>
+                  {founder
+                    ? 'Add your card now to lock in 20% off for as long as you stay. Still 30 days free, cancel any time before then.'
+                    : 'Save a card so Lekhio carries on after your trial. Still 30 days free, cancel any time before then and pay nothing.'}
+                </p>
+
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  {(['monthly', 'annual'] as const).map((p) => {
+                    const active = plan === p;
+                    return (
+                      <button key={p} onClick={() => setPlan(p)} style={{ flex: 1, cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: active ? RIVER : INK, backgroundColor: active ? RIVER_TINT : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 12, padding: '11px 0' }}>
+                        {p === 'monthly' ? 'Monthly' : 'Annual'}
+                        {p === 'annual' ? <span style={{ display: 'block', fontSize: 11, fontWeight: 600, color: GREEN, marginTop: 2 }}>2 months free</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
+                  <span style={{ fontSize: 26, fontWeight: 800, color: INK }}>{priceNow}</span>
+                  {founder ? <span style={{ fontSize: 14, color: MUTED, textDecoration: 'line-through' }}>{priceWas}</span> : null}
+                  <span style={{ fontSize: 12.5, color: MUTED }}>after your free trial</span>
+                </div>
+
+                <button className="btn" onClick={startCheckout} disabled={billingBusy} style={{ width: '100%', cursor: billingBusy ? 'wait' : 'pointer', backgroundColor: RIVER, color: '#fff', border: 'none', fontSize: 15.5, fontWeight: 700, padding: '14px 0', borderRadius: 12 }}>
+                  {billingBusy ? 'Opening secure checkout…' : 'Save my card, stay 30 days free →'}
+                </button>
+                <p style={{ fontSize: 11.5, color: MUTED, textAlign: 'center', margin: '10px 0 0' }}>Secure payment by Stripe. We never see your card number.</p>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
+                <span style={badgeStore}>  Download on the App Store</span>
+                <span style={badgeStore}>▶  Get it on Google Play</span>
+              </div>
+              <p style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>Prefer to decide later? Just download the app, your trial is already running.</p>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
           ) : (
@@ -275,7 +367,7 @@ export default function StartPage() {
       </div>
 
       {/* Footer nav */}
-      {!done && (
+      {!done && !billingResult && (
         <div style={{ borderTop: `1px solid ${LINE}`, backgroundColor: '#fff' }}>
           <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
             {step > 1 ? (

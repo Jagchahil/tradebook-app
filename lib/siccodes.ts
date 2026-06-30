@@ -32,6 +32,20 @@ export const TRADE_SIC: TradeSic[] = [
   { trade: 'Driver, courier or haulage', code: '49410', label: 'Freight transport by road', keywords: ['driver', 'courier', 'delivery', 'haulage', 'transport', 'van driver', 'removals'] },
   { trade: 'Mechanic or vehicle repair', code: '45200', label: 'Maintenance and repair of motor vehicles', keywords: ['mechanic', 'car repair', 'garage', 'mot', 'vehicle', 'bodywork'] },
   { trade: 'Window cleaner', code: '81220', label: 'Other building and industrial cleaning', keywords: ['window clean', 'window cleaner', 'gutter clean', 'pressure wash'] },
+  // Beyond the trades. Lekhio is for everyone self employed, so the recommender is too.
+  { trade: 'Tutor or teacher', code: '85590', label: 'Other education', keywords: ['tutor', 'tutoring', 'teacher', 'teaching', 'lessons', 'music teacher', 'driving instructor'] },
+  { trade: 'Photographer or videographer', code: '74201', label: 'Portrait photographic activities', keywords: ['photographer', 'photography', 'photo', 'videographer', 'video', 'wedding photo'] },
+  { trade: 'Personal trainer or fitness', code: '85510', label: 'Sports and recreation education', keywords: ['personal trainer', 'fitness', 'gym instructor', 'yoga', 'pilates', 'sports coach'] },
+  { trade: 'Consultant or coach', code: '70229', label: 'Management consultancy', keywords: ['consultant', 'consulting', 'coach', 'advisor', 'adviser', 'business coach'] },
+  { trade: 'Online seller or ecommerce', code: '47910', label: 'Retail sale via mail order or internet', keywords: ['online seller', 'ecommerce', 'etsy', 'ebay', 'amazon seller', 'shopify', 'reseller', 'dropship'] },
+  { trade: 'Childminder or carer', code: '88910', label: 'Child day-care activities', keywords: ['childminder', 'childcare', 'child care', 'nanny', 'carer', 'care worker'] },
+  { trade: 'Pet care or dog walker', code: '96090', label: 'Other service activities', keywords: ['dog walker', 'dog walking', 'pet', 'pet sitting', 'dog groomer', 'grooming'] },
+  { trade: 'Virtual assistant or admin', code: '82990', label: 'Other business support services', keywords: ['virtual assistant', 'admin', 'typing', 'data entry', 'pa'] },
+  { trade: 'Marketing or social media', code: '73110', label: 'Advertising agencies', keywords: ['marketing', 'social media', 'content creator', 'influencer', 'seo', 'ads'] },
+  { trade: 'Web or software developer', code: '62012', label: 'Business and domestic software development', keywords: ['developer', 'web developer', 'software', 'programmer', 'coder', 'it support', 'web design'] },
+  { trade: 'Taxi or private hire driver', code: '49320', label: 'Taxi operation', keywords: ['taxi', 'private hire', 'uber', 'cab', 'chauffeur'] },
+  { trade: 'Mobile catering or food', code: '56103', label: 'Take-away and mobile food stands', keywords: ['catering', 'food van', 'street food', 'burger van', 'coffee van', 'baker', 'cakes'] },
+  { trade: 'Bookkeeper or accountant', code: '69202', label: 'Bookkeeping activities', keywords: ['bookkeeper', 'bookkeeping', 'accountant', 'accounts', 'payroll'] },
   { trade: 'Other specialised trade', code: '43999', label: 'Other specialised construction', keywords: ['other', 'not sure', 'general'] },
 ];
 

@@ -119,7 +119,7 @@ const ESSENTIALS: Essential[] = [
 
 const linkProps = { target: '_blank', rel: 'noopener noreferrer' as const };
 
-const CHIP_TRADES = ['Electrician', 'Plumber, heating or gas', 'Builder or bricklayer', 'Joiner or carpenter', 'Plasterer', 'Painter and decorator', 'Roofer', 'Landscaper or gardener', 'Tiler or flooring', 'Cleaner'];
+const CHIP_TRADES = ['Electrician', 'Plumber, heating or gas', 'Builder or bricklayer', 'Joiner or carpenter', 'Painter and decorator', 'Cleaner', 'Driver, courier or haulage', 'Hairdresser, barber or beauty', 'Tutor or teacher', 'Photographer or videographer', 'Online seller or ecommerce', 'Consultant or coach'];
 
 export default function Wizard() {
   const [path, setPath] = useState<PathKey | null>(null);

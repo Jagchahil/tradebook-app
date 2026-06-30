@@ -359,16 +359,23 @@ function parseMoneyEntryRegex(body: string): ParsedEntry | null {
   // Looks like a question, not an entry.
   if (/^(how|what|whats|when|where|why|who|show|list|total|do i|did i|am i|have i|can i|could i|is it|are )/i.test(b)) return null;
 
-  const incomeVerb = MONEY_INCOME_RE.test(b) || /\bpaid\b[^?]*\b(by|from)\b/i.test(b);
-  const expenseVerb = MONEY_EXPENSE_RE.test(b) || (/\bpaid\b/i.test(b) && !incomeVerb);
+  // "<name> paid [me] £X" = someone paid the user = income. Exclude first person
+  // ("I paid", "we paid") which is an expense. Captures the payer's name too.
+  const subjectPaid = b.match(/\b([a-z][a-z'&.\- ]{1,30}?)\s+paid\b(?!\s+for)/i);
+  const subjectIsPayer = !!subjectPaid && !/^(i|we|you|ive|weve|i ve|we ve)$/i.test(subjectPaid[1].trim());
+
+  const incomeVerb =
+    MONEY_INCOME_RE.test(b) || /\bpaid\b[^?]*\b(by|from)\b/i.test(b) || subjectIsPayer;
+  const expenseVerb = !incomeVerb && (MONEY_EXPENSE_RE.test(b) || /\bpaid\b/i.test(b));
   if (!incomeVerb && !expenseVerb) return null;
 
   const amount = extractMoneyAmount(b);
   if (amount == null) return null;
 
   if (incomeVerb) {
-    const m = b.match(/\b(?:by|from)\s+([a-z0-9'&\- ]{2,40})/i);
-    const who = (m ? tidyName(m[1]) : '') || 'a customer';
+    const byFrom = b.match(/\b(?:by|from)\s+([a-z0-9'&\- ]{2,40})/i);
+    const who =
+      (byFrom ? tidyName(byFrom[1]) : subjectIsPayer ? tidyName(subjectPaid![1]) : '') || 'a customer';
     return { merchant_name: who, amount, category: 'income', direction: 'income' };
   }
   const m = b.match(/\b(?:on|at|in|for|from)\s+([a-z0-9'&\- ]{2,40})/i);

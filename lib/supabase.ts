@@ -175,19 +175,20 @@ export interface NewTransaction {
 // stores it as +447700900000. We check a few shapes to be safe.
 export async function findUserIdByPhone(senderDigits: string): Promise<string | null> {
   const { url } = config();
-  const digits = senderDigits.replace(/\D/g, '');
-  const candidates = Array.from(
-    new Set([`+${digits}`, digits, `+44${digits.replace(/^44/, '')}`]),
-  );
+  // Reduce the sender to the national significant number, then match on the last
+  // digits. This is format-proof: it matches whether the row is stored as
+  // +447..., 447..., or 07..., so onboarding format quirks never break the link.
+  let digits = senderDigits.replace(/\D/g, '');
+  if (digits.startsWith('44')) digits = digits.slice(2);
+  else if (digits.startsWith('0')) digits = digits.slice(1);
+  if (digits.length < 9) return null;
+  const last = digits.slice(-10);
 
-  for (const phone of candidates) {
-    const query = `${url}/rest/v1/users?phone_number=eq.${encodeURIComponent(phone)}&select=id&limit=1`;
-    const res = await fetch(query, { headers: headers() });
-    if (!res.ok) continue;
-    const rows = (await res.json()) as Array<{ id: string }>;
-    if (rows.length > 0) return rows[0].id;
-  }
-  return null;
+  const query = `${url}/rest/v1/users?phone_number=ilike.*${last}&select=id&limit=1`;
+  const res = await fetch(query, { headers: headers() });
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ id: string }>;
+  return rows.length > 0 ? rows[0].id : null;
 }
 
 // True if we have already saved a transaction for this WhatsApp message id.

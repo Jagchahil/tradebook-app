@@ -463,8 +463,13 @@ export async function exportUserData(userId: string, email: string | null): Prom
 export async function deleteUserData(userId: string, email: string | null): Promise<boolean> {
   const { url, key } = config();
   const phone = await getPhoneForUser(userId);
+  // Track whether every delete actually succeeded, so a GDPR erasure never
+  // reports success while leaving financial data behind on a failed sub-delete.
+  let allOk = true;
   const del = async (path: string): Promise<void> => {
-    await fetch(`${url}/rest/v1/${path}`, { method: 'DELETE', headers: headers({ Prefer: 'return=minimal' }) });
+    const res = await fetch(`${url}/rest/v1/${path}`, { method: 'DELETE', headers: headers({ Prefer: 'return=minimal' }) });
+    // PostgREST returns 200/204 on a successful delete (even if 0 rows matched).
+    if (!res.ok) allOk = false;
   };
   // User-owned rows (FKs cascade from users, but delete explicitly to be sure).
   await del(`transactions?user_id=eq.${encodeURIComponent(userId)}`);
@@ -487,7 +492,7 @@ export async function deleteUserData(userId: string, email: string | null): Prom
     method: 'DELETE',
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
-  return authRes.ok;
+  return allOk && authRes.ok;
 }
 
 // --- HMRC MTD connection (OAuth tokens) -----------------------------------
@@ -611,7 +616,7 @@ export async function claimDueReminder(id: string): Promise<boolean> {
 
 export async function getPhoneForUser(userId: string): Promise<string | null> {
   const { url } = config();
-  const res = await fetch(`${url}/rest/v1/users?id=eq.${userId}&select=phone_number&limit=1`, { headers: headers() });
+  const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=phone_number&limit=1`, { headers: headers() });
   if (!res.ok) return null;
   const rows = (await res.json()) as Array<{ phone_number?: string | null }>;
   return rows[0]?.phone_number ?? null;
@@ -654,7 +659,7 @@ export async function listNudgeTargets(): Promise<NudgeTarget[]> {
 export async function weeklyTotals(userId: string): Promise<{ income: number; expenses: number }> {
   const { url } = config();
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const res = await fetch(`${url}/rest/v1/transactions?user_id=eq.${userId}&confirmed=eq.true&created_at=gte.${encodeURIComponent(since)}&select=amount`, { headers: headers() });
+  const res = await fetch(`${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.true&created_at=gte.${encodeURIComponent(since)}&select=amount`, { headers: headers() });
   if (!res.ok) return { income: 0, expenses: 0 };
   const rows = (await res.json()) as Array<{ amount: number }>;
   let income = 0;

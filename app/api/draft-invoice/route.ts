@@ -5,12 +5,16 @@ import { bumpAiUsage } from '../../../lib/supabase';
 
 // A durable daily ceiling on total drafting spend, so even if the per-IP limit is
 // dodged with spoofed X-Forwarded-For, the wallet is still safe.
-const DRAFT_GLOBAL_DAILY = Number(process.env.DRAFT_GLOBAL_DAILY || 2000);
+const DRAFT_GLOBAL_DAILY = Number(process.env.DRAFT_GLOBAL_DAILY || 500);
+// A durable per-IP daily cap, the real backstop the in-memory burst limit cannot
+// give across serverless instances. Keyed in the same ai_usage table.
+const DRAFT_IP_DAILY = Number(process.env.DRAFT_IP_DAILY || 40);
 
-// The mobile app calls this from a different origin, so allow cross origin use.
-// It only drafts invoice text from a description. There is nothing sensitive here.
+// Native apps ignore CORS, so we only need to allow our own web origin (the
+// invoice-generator page), not the whole internet. Lock it down accordingly.
+const ALLOW_ORIGIN = process.env.NEXT_PUBLIC_APP_URL || 'https://tradebook-app-five.vercel.app';
 const CORS = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ALLOW_ORIGIN,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
@@ -39,6 +43,13 @@ export async function POST(req: NextRequest) {
     const description = (body as { description?: unknown }).description;
     if (typeof description !== 'string' || description.trim().length < 3 || description.length > 2000) {
       return NextResponse.json({ error: 'Tell me a bit about the job.' }, { status: 400, headers: CORS });
+    }
+
+    // Durable per-IP daily cap (holds across serverless instances, unlike the
+    // in-memory burst limit). Fail closed if the counter is unavailable.
+    const ipCount = await bumpAiUsage('draft:ip', clientIp(req));
+    if (ipCount === null || ipCount > DRAFT_IP_DAILY) {
+      return NextResponse.json({ error: 'Daily limit reached. Try again tomorrow.' }, { status: 429, headers: CORS });
     }
 
     // Durable global ceiling. Fail closed if the counter is unavailable.

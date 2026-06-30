@@ -35,10 +35,15 @@ const REDIRECT_URI = process.env.HMRC_REDIRECT_URI;
 // the `state` parameter has to round-trip the user id back to the callback. We
 // sign it (HMAC) with a server-only secret and expire it, so it cannot be forged
 // or replayed. Never put the raw user id on the wire without the signature.
-const STATE_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.HMRC_CLIENT_SECRET || 'lekhio-hmrc-state';
+// No hardcoded fallback. The signing secret must come from the environment, or
+// the flow fails closed (cannot sign or verify). A literal default would be in
+// the public repo and let anyone forge a state for any user. Prefer a dedicated
+// HMRC_STATE_SECRET; fall back only to the server-only service-role key.
+const STATE_SECRET = process.env.HMRC_STATE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const STATE_TTL_MS = 15 * 60 * 1000;
 
 export function signState(userId: string): string {
+  if (!STATE_SECRET) return '';
   const ts = Date.now().toString(36);
   const payload = `${userId}.${ts}`;
   const sig = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex').slice(0, 32);
@@ -46,6 +51,7 @@ export function signState(userId: string): string {
 }
 
 export function verifyState(state: string): string | null {
+  if (!STATE_SECRET) return null;
   try {
     const decoded = Buffer.from(state, 'base64url').toString('utf8');
     const parts = decoded.split('.');
@@ -194,6 +200,8 @@ const EXPENSE_MAP: Record<string, string> = {
   travel: 'carVanTravelExpenses',
   home: 'premisesRunningCosts',
   home_office: 'premisesRunningCosts',
+  'use of home': 'premisesRunningCosts',
+  use_of_home: 'premisesRunningCosts',
   premises: 'premisesRunningCosts',
   rent: 'premisesRunningCosts',
   insurance: 'premisesRunningCosts',

@@ -60,7 +60,7 @@ export const FACTS = {
   mtdThreshold2027: 30000,
   mtdThreshold2028: 20000,
   // Capital allowances, writing down allowance pools
-  wdaMainRate: 0.18, // main pool
+  wdaMainRate: 0.14, // main pool, reduced from 18% to 14% from 6 April 2026 (1 April 2026 for CT)
   wdaSpecialRate: 0.06, // special rate pool (e.g. most cars, integral features)
   // Payments on account
   poaThreshold: 1000, // POAs apply once the Self Assessment bill exceeds this

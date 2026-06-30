@@ -52,7 +52,7 @@
     { "id": "Q45", "qualification": "ACCA TX", "topic": "Rates and allowances", "fn": "FACT", "key": "tradingAllowance", "expected": 1000, "prompt": "Trading allowance?" },
     { "id": "Q46", "qualification": "HMRC simplified expenses", "topic": "Mileage rate", "fn": "FACT", "key": "mileageCarFirst10k", "expected": 0.55, "prompt": "Car mileage rate, first 10,000 miles, 2026/27?" },
     { "id": "Q47", "qualification": "CIOT CTA", "topic": "Rates and allowances", "fn": "FACT", "key": "additionalRateThreshold", "expected": 125140, "prompt": "Additional rate threshold (taxable income)?" },
-    { "id": "Q48", "qualification": "AAT Business Tax", "topic": "Class 2 NIC", "fn": "FACT", "key": "class2WeeklyRate", "expected": 3.5, "prompt": "Class 2 NIC weekly rate?" },
+    { "id": "Q48", "qualification": "AAT Business Tax", "topic": "Class 2 NIC", "fn": "FACT", "key": "class2WeeklyRate", "expected": 3.65, "prompt": "Class 2 NIC weekly rate?" },
     { "id": "Q49", "qualification": "CIS (trades)", "topic": "CIS rate", "fn": "FACT", "key": "cisRegisteredRate", "expected": 0.2, "prompt": "CIS deduction rate, registered subcontractor?" },
     { "id": "Q50", "qualification": "ACCA TX", "topic": "VAT deregistration", "fn": "FACT", "key": "vatDeregistrationThreshold", "expected": 88000, "prompt": "VAT deregistration threshold?" },
     { "id": "Q51", "qualification": "ACCA TX", "topic": "Allowable vs disallowable", "fn": "classifyExpense", "args": ["protective_clothing"], "expected": "yes", "prompt": "Protective clothing for the job. Allowable?" },
@@ -76,7 +76,7 @@
     { "id": "Q69", "qualification": "ACCA TX", "topic": "Trading allowance", "fn": "concept", "args": ["trading_allowance_creates_loss"], "expected": "no", "prompt": "Can the trading allowance create or increase a loss?" },
     { "id": "Q70", "qualification": "US CPA (REG)", "topic": "Ethics", "fn": "concept", "args": ["client_entertaining_allowable"], "expected": "no", "prompt": "Is client entertaining an allowable deduction?" },
     { "id": "Q71", "qualification": "CIMA BA3 / AAT L2", "topic": "Double-entry bookkeeping", "fn": "concept", "args": ["double_entry"], "expected": "equal", "prompt": "In double-entry bookkeeping, total debits must be how, relative to total credits?" },
-    { "id": "Q72", "qualification": "ACCA TX", "topic": "Capital allowances (WDA)", "fn": "writingDownAllowance", "args": [10000, "main"], "expected": 1800, "tol": 0.01, "prompt": "£10,000 in the main pool. Writing down allowance this year?" },
+    { "id": "Q72", "qualification": "ACCA TX", "topic": "Capital allowances (WDA)", "fn": "writingDownAllowance", "args": [10000, "main"], "expected": 1400, "tol": 0.01, "prompt": "£10,000 in the main pool. Writing down allowance this year (14% from 6 April 2026)?" },
     { "id": "Q73", "qualification": "ACCA TX", "topic": "Capital allowances (WDA)", "fn": "writingDownAllowance", "args": [10000, "special"], "expected": 600, "tol": 0.01, "prompt": "£10,000 in the special rate pool. Writing down allowance?" },
     { "id": "Q74", "qualification": "ICAEW Tax Compliance", "topic": "Payments on account", "fn": "paymentsOnAccount", "args": [4000], "field": "eachPayment", "expected": 2000, "tol": 0.01, "prompt": "Self Assessment bill £4,000. Each payment on account?" },
     { "id": "Q75", "qualification": "ACCA TX", "topic": "Payments on account", "fn": "paymentsOnAccount", "args": [800], "field": "required", "expected": false, "prompt": "Bill £800. Are payments on account required?" },
@@ -90,7 +90,7 @@
     { "id": "Q83", "qualification": "ACCA TX", "topic": "VAT flat rate scheme", "fn": "vatFlatRateDue", "args": [60000, 9.5], "expected": 5700, "tol": 0.01, "prompt": "£60,000 VAT-inclusive turnover, 9.5% flat rate. VAT due?" },
     { "id": "Q84", "qualification": "ICAEW Tax Compliance", "topic": "VAT flat rate scheme", "fn": "vatFlatRateDue", "args": [50000, 16.5], "expected": 8250, "tol": 0.01, "prompt": "£50,000 turnover, limited cost trader 16.5%. Flat rate VAT due?" },
     { "id": "Q85", "qualification": "CIOT CTA", "topic": "Rates and allowances", "fn": "FACT", "key": "cgtAnnualExempt", "expected": 3000, "prompt": "CGT annual exempt amount 2026/27?" },
-    { "id": "Q86", "qualification": "ACCA TX", "topic": "Capital allowances (WDA)", "fn": "FACT", "key": "wdaMainRate", "expected": 0.18, "prompt": "Main pool writing down allowance rate?" },
+    { "id": "Q86", "qualification": "ACCA TX", "topic": "Capital allowances (WDA)", "fn": "FACT", "key": "wdaMainRate", "expected": 0.14, "prompt": "Main pool writing down allowance rate (14% from 6 April 2026)?" },
     { "id": "Q87", "qualification": "CIOT CTA", "topic": "Business Asset Disposal Relief", "fn": "FACT", "key": "badrRate", "expected": 0.18, "prompt": "BADR rate from 6 April 2026?" }
   ]
 }

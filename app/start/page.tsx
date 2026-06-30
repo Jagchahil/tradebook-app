@@ -82,7 +82,8 @@ export default function StartPage() {
   }
 
   const phoneReady = digitsOnly(phone).length >= 10;
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  // Email is optional now. Empty is fine; if they do type one, it must be valid.
+  const emailValid = email.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const nameLabel = tradeType === 'ltd' ? 'Company name' : tradeType === 'business' ? 'Trading name' : 'Your full name';
 
   const canContinue = useMemo(() => {
@@ -283,14 +284,15 @@ export default function StartPage() {
           ) : (
             <div key={step} className="step-anim">
               {step === 1 && (
-                <Step title="Let's set up your account" sub="Your mobile links your WhatsApp, that is where the work happens. Your email is just for your receipt and trial reminders.">
+                <Step title="Let's set up your account" sub="Your mobile is your account. It links your WhatsApp, where the work happens. Email is optional.">
                   <label style={fieldLabel}>Mobile number</label>
                   <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '15px 14px', backgroundColor: RIVER_TINT, color: RIVER, fontWeight: 700, fontSize: 16, borderRight: `1.5px solid ${LINE}` }}>🇬🇧 +44</span>
                     <input className="field" inputMode="tel" placeholder="7700 900 000" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={14} style={{ flex: 1, border: 'none', padding: '15px 14px', fontSize: 17, color: INK, letterSpacing: '0.5px', background: 'transparent' }} />
                   </div>
-                  <label style={{ ...fieldLabel, marginTop: 18 }}>Email</label>
+                  <label style={{ ...fieldLabel, marginTop: 18 }}>Email (optional)</label>
                   <input className="field" inputMode="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={fieldStyle} />
+                  <p style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>Only if you want emailed receipts. Everything else happens on WhatsApp.</p>
                   <p style={{ fontSize: 12.5, color: MUTED, marginTop: 12 }}>We never share your details. We only ever message you in reply to you.</p>
                 </Step>
               )}

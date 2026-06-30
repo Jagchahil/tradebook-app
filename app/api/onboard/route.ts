@@ -82,15 +82,15 @@ export async function POST(req: NextRequest) {
     }
 
     const phone = cleanPhone(b.phone);
-    const email = cleanEmail(b.email);
-    if (!phone || !email) {
-      return NextResponse.json({ error: 'A valid mobile number and email are required.' }, { status: 400 });
+    const email = cleanEmail(b.email); // optional now: phone is the account
+    if (!phone) {
+      return NextResponse.json({ error: 'A valid mobile number is required.' }, { status: 400 });
     }
 
     try {
       await createSignup({
         phone,
-        email,
+        email: email || null,
         trade_type: str(b.tradeType, 20),
         name: str(b.name),
         trade: str(b.trade),

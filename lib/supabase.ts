@@ -258,7 +258,7 @@ export async function insertWaitlistSignup(signup: WaitlistSignup): Promise<void
 
 export interface OnboardSignup {
   phone: string;
-  email: string;
+  email?: string | null;
   trade_type?: string | null;
   name?: string | null;
   trade?: string | null;
@@ -271,7 +271,8 @@ export interface OnboardSignup {
 // Save a completed web onboarding. Written with the service role key, server side only.
 export async function createSignup(signup: OnboardSignup): Promise<void> {
   const { url } = config();
-  const record: Record<string, unknown> = { phone: normalizeUkPhone(signup.phone), email: signup.email };
+  const record: Record<string, unknown> = { phone: normalizeUkPhone(signup.phone) };
+  if (signup.email) record.email = signup.email;
   if (signup.trade_type) record.trade_type = signup.trade_type;
   if (signup.name) record.name = signup.name;
   if (signup.trade) record.trade = signup.trade;

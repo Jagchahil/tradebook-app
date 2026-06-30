@@ -32,8 +32,8 @@ export const FACTS = {
   class4UpperLimit: 50270,
   class4MainRate: 0.06,
   class4UpperRate: 0.02,
-  class2WeeklyRate: 3.5, // voluntary since April 2024; pay to protect benefits
-  class2SmallProfitsThreshold: 6725,
+  class2WeeklyRate: 3.65, // 2026/27; voluntary since April 2024, pay to protect benefits
+  class2SmallProfitsThreshold: 7105,
   // Allowances and reliefs
   tradingAllowance: 1000,
   annualInvestmentAllowance: 1000000, // 100% relief on qualifying plant and machinery

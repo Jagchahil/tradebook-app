@@ -130,7 +130,9 @@ export async function POST(req: NextRequest) {
       if (!handled) {
         const taxHandled = await handleTaxGuideFlow(from, text);
         if (!taxHandled) {
-          if (isCIS(text)) {
+          if (isGetStarted(text)) {
+            await handleWelcome(from);
+          } else if (isCIS(text)) {
             await handleCIS(from, messageId, text);
           } else if (isMileage(text)) {
             await handleMileage(from, messageId, text);
@@ -171,6 +173,38 @@ export async function POST(req: NextRequest) {
 // The first time an unknown number messages us is the make-or-break moment.
 // Warm, and point them to sign up on the web, where onboarding and payment live.
 // We never say "open the app" for signup, because signup happens on the site.
+// "Get started" or a bare greeting. The first contact after they download the
+// app and tap "Message Lekhio on WhatsApp". A linked user gets a warm welcome;
+// an unknown number gets pointed to sign up. No AI, so this works before keys.
+function isGetStarted(body: string): boolean {
+  const t = body.trim().toLowerCase().replace(/[!.\s]+$/, '');
+  return /^(get started|getstarted|start|hi|hiya|hello|hey|hey there|hello there|begin)$/.test(t);
+}
+
+async function handleWelcome(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  await sendText(
+    from,
+    [
+      'Welcome to Lekhio. I am your back office, right here in WhatsApp.',
+      '',
+      'Here is what I can do for you:',
+      'Snap a photo of any receipt and I log it for tax.',
+      "Text your miles, like 'drove 24 miles', and I claim them.",
+      'Tell me what you got paid and I keep your income tidy.',
+      'Ask me anything about your tax or expenses.',
+      '',
+      'Everything lands in your Lekhio app, ready for tax, and nothing ever goes to HMRC without your say so.',
+      '',
+      'Go on, send me your first receipt.',
+    ].join('\n'),
+  );
+}
+
 async function replyNotLinked(from: string): Promise<void> {
   await sendText(
     from,

@@ -59,6 +59,19 @@ export const FACTS = {
   mtdThreshold2026: 50000,
   mtdThreshold2027: 30000,
   mtdThreshold2028: 20000,
+  // Capital allowances, writing down allowance pools
+  wdaMainRate: 0.18, // main pool
+  wdaSpecialRate: 0.06, // special rate pool (e.g. most cars, integral features)
+  // Payments on account
+  poaThreshold: 1000, // POAs apply once the Self Assessment bill exceeds this
+  // Capital gains tax, 2026/27
+  cgtAnnualExempt: 3000,
+  cgtBasicRate: 0.18,
+  cgtHigherRate: 0.24,
+  badrRate: 0.18, // Business Asset Disposal Relief, from 6 April 2026
+  badrLifetimeLimit: 1000000,
+  // VAT flat rate scheme
+  vatFlatRateLimitedCost: 0.165, // the limited cost trader rate
 } as const;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -196,6 +209,73 @@ export function vatRegistrationRequired(rolling12mTurnover: number): boolean {
 export function mtdForIncomeTaxRequired(qualifyingIncome: number, startYear: 2026 | 2027 | 2028 = 2026): boolean {
   const threshold = startYear >= 2028 ? FACTS.mtdThreshold2028 : startYear === 2027 ? FACTS.mtdThreshold2027 : FACTS.mtdThreshold2026;
   return qualifyingIncome > threshold;
+}
+
+// --- Capital allowances: writing down allowance -----------------------------
+
+// The writing down allowance on a pool balance. Main pool 18%, special rate pool
+// 6%. Used for spend over the AIA limit, or assets that do not qualify for AIA.
+export function writingDownAllowance(poolBalance: number, pool: 'main' | 'special' = 'main'): number {
+  const rate = pool === 'special' ? FACTS.wdaSpecialRate : FACTS.wdaMainRate;
+  return round2(Math.max(0, poolBalance) * rate);
+}
+
+// --- Payments on account ----------------------------------------------------
+
+// How Self Assessment is actually paid. Once your bill is over £1,000, HMRC asks
+// for two payments on account towards next year, each half this year's bill, due
+// 31 January and 31 July, on top of the balancing payment. This is the thing that
+// surprises people, so we make it explicit.
+export interface PaymentsOnAccount {
+  required: boolean;
+  eachPayment: number;
+  firstDue: string;
+  secondDue: string;
+}
+
+export function paymentsOnAccount(saBill: number, taxYearEnd = 2026): PaymentsOnAccount {
+  const required = saBill > FACTS.poaThreshold;
+  const each = required ? round2(saBill / 2) : 0;
+  return {
+    required,
+    eachPayment: each,
+    firstDue: `31 January ${taxYearEnd + 1}`,
+    secondDue: `31 July ${taxYearEnd + 1}`,
+  };
+}
+
+// --- Trading losses ---------------------------------------------------------
+
+// The simplest, most common relief: a loss carried forward against future profits
+// of the same trade. Returns the taxable profit after relief and any loss still
+// carried forward. (Sideways relief against total income under s64 is also an
+// option in the loss year; the assistant explains that case.)
+export function lossCarriedForward(currentProfit: number, broughtForwardLoss: number): { taxableProfit: number; lossRemaining: number } {
+  const used = Math.min(Math.max(0, broughtForwardLoss), Math.max(0, currentProfit));
+  return {
+    taxableProfit: round2(Math.max(0, currentProfit) - used),
+    lossRemaining: round2(Math.max(0, broughtForwardLoss) - used),
+  };
+}
+
+// --- Capital gains tax ------------------------------------------------------
+
+// CGT on a gain, 2026/27. £3,000 tax free, then 18% or 24% on other assets, or
+// 18% with Business Asset Disposal Relief on a qualifying business sale.
+export function capitalGainsTax(gain: number, opts: { higherRate?: boolean; badr?: boolean } = {}): number {
+  const taxable = Math.max(0, gain - FACTS.cgtAnnualExempt);
+  if (taxable <= 0) return 0;
+  const rate = opts.badr ? FACTS.badrRate : opts.higherRate ? FACTS.cgtHigherRate : FACTS.cgtBasicRate;
+  return round2(taxable * rate);
+}
+
+// --- VAT flat rate scheme ---------------------------------------------------
+
+// VAT due under the flat rate scheme: a single percentage of VAT-inclusive
+// turnover. The percentage depends on the trade, with a 16.5% rate for limited
+// cost traders. The caller supplies the trade's rate.
+export function vatFlatRateDue(grossTurnover: number, ratePercent: number): number {
+  return round2(Math.max(0, grossTurnover) * (ratePercent / 100));
 }
 
 // --- Allowable expense classification ---------------------------------------

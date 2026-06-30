@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import {
   verifyWebhook,
   isValidSignature,
@@ -35,6 +35,12 @@ import type { TradeInfo } from '../../../lib/taxguide';
 import { rateLimited } from '../../../lib/ratelimit';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
+
+// Node runtime (we use crypto for signature checks). Allow the function to live
+// long enough to finish the after() work (AI/transcription) once it is switched
+// on; the HTTP 200 to Meta is still returned immediately, well within its 5s.
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 // We never log message text or media. Only ids and status, per the data rules.
 
@@ -93,33 +99,47 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  const message = firstMessage(body);
+
+  // No message in this event. It may be a delivery status. Acknowledge and stop.
+  if (!message) {
+    return NextResponse.json({ ok: true });
+  }
+
+  const from = message.from;
+  const messageId = message.id;
+
+  // Idempotency. Claim the message id atomically BEFORE we acknowledge, so a Meta
+  // retry of something we already handled is deduped at the source. This covers
+  // every flow, not just receipts: reminders, questions, invoices.
+  if (messageId && !(await claimMessage(messageId))) {
+    return NextResponse.json({ ok: true });
+  }
+
+  // Per sender burst limit. Protects the AI and transcription spend from a
+  // runaway or malicious sender. A genuine user never sends this many in a
+  // short window. We silently drop over the limit: no AI, no reply, so we
+  // never trigger a reply storm or rack up cost. (In-memory, per instance.
+  // Move to a shared store for hard guarantees at scale, see docs/19.)
+  if (rateLimited(`wa:${from}`, 30, 10 * 60 * 1000)) {
+    return NextResponse.json({ ok: true });
+  }
+
+  // Acknowledge Meta immediately, then do the heavy work (media download, AI,
+  // transcription, DB writes, the reply) AFTER the response is sent. A slow AI
+  // call can therefore never breach Meta's ~5s window and trigger a retry storm.
+  // The signature check, idempotency claim and burst limit above already ran, so
+  // the deferred work is safe and deduped.
+  after(() => processMessage(message));
+  return NextResponse.json({ ok: true });
+}
+
+// The full message dispatch, run after the 200 is sent. Any error is caught and
+// logged so it can never surface to Meta (we have already acknowledged).
+async function processMessage(message: IncomingMessage): Promise<void> {
+  const from = message.from;
+  const messageId = message.id;
   try {
-    const message = firstMessage(body);
-
-    // No message in this event. It may be a delivery status. Acknowledge and stop.
-    if (!message) {
-      return NextResponse.json({ ok: true });
-    }
-
-    const from = message.from;
-    const messageId = message.id;
-
-    // Idempotency. Claim the message id atomically. If we cannot claim it, this
-    // is a Meta retry of something we already handled, so acknowledge and stop.
-    // This covers every flow, not just receipts: reminders, questions, invoices.
-    if (messageId && !(await claimMessage(messageId))) {
-      return NextResponse.json({ ok: true });
-    }
-
-    // Per sender burst limit. Protects the AI and transcription spend from a
-    // runaway or malicious sender. A genuine user never sends this many in a
-    // short window. We silently drop over the limit: no AI, no reply, so we
-    // never trigger a reply storm or rack up cost. (In-memory, per instance.
-    // Move to a shared store for hard guarantees at scale, see docs/19.)
-    if (rateLimited(`wa:${from}`, 30, 10 * 60 * 1000)) {
-      return NextResponse.json({ ok: true });
-    }
-
     if (message.type === 'image' && message.image?.id) {
       await handleReceiptImage(from, messageId, message.image.id);
     } else if (message.type === 'audio' && message.audio?.id) {
@@ -163,12 +183,10 @@ export async function POST(req: NextRequest) {
       );
     }
   } catch (err) {
-    // Never throw back to Meta. Log and acknowledge so we are not retried.
+    // Already acknowledged to Meta. Log and stop; never rethrow.
     const messageText = err instanceof Error ? err.message : 'unknown error';
     console.error('[whatsapp] Handler error:', messageText);
   }
-
-  return NextResponse.json({ ok: true });
 }
 
 // The first time an unknown number messages us is the make-or-break moment.

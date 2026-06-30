@@ -310,6 +310,74 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
   await sendText(from, confirmationLine(parsed));
 }
 
+// Deterministic money-entry parser. Catches the common phrasings with no AI at
+// all, so "spent £40 on diesel" and "got paid £500 by Dave" log instantly even
+// before the AI keys have credit, exactly like mileage and CIS already do. It
+// returns null when the message is not a clear money entry, so the richer AI
+// path can still handle the unusual ones once credit is on.
+type ParsedEntry = { merchant_name: string; amount: number; category: string; direction: 'income' | 'expense' };
+
+const MONEY_INCOME_RE = /\b(got\s+paid|getting\s+paid|paid\s+me|earned|earnt|invoiced?|takings?|took|made|charged?)\b/i;
+const MONEY_EXPENSE_RE = /\b(spent|spend|bought|buy|buying|paid\s+for|paying\s+for)\b/i;
+
+function extractMoneyAmount(b: string): number | null {
+  const m = b.match(/£\s*(\d[\d,]*(?:\.\d{1,2})?)/) || b.match(/\b(\d[\d,]*(?:\.\d{1,2})?)\b/);
+  if (!m) return null;
+  const n = parseFloat((m[1] || '').replace(/,/g, ''));
+  if (!isFinite(n) || n <= 0 || n > 1_000_000) return null;
+  return n;
+}
+
+function tidyName(s: string): string {
+  return s
+    .replace(/\b(today|yesterday|this morning|this afternoon|just now|earlier|please|thanks|ta|mate)\b.*$/i, '')
+    .replace(/[.,!]+$/, '')
+    .trim()
+    .replace(/\s{2,}/g, ' ')
+    .slice(0, 40);
+}
+
+const EXPENSE_CATEGORY: Array<[RegExp, string]> = [
+  [/\b(diesel|petrol|fuel|unleaded)\b/i, 'fuel'],
+  [/\b(screwfix|toolstation|wickes|b ?& ?q|jewson|travis perkins|selco|materials?|cement|timber|cable|paint|tiles?|pipe|fittings|adhesive|plaster|sand|aggregate|screws?)\b/i, 'materials'],
+  [/\b(drill|tool|tools|saw|grinder|impact|battery|blade|disc)\b/i, 'tools'],
+  [/\b(insurance|liability)\b/i, 'insurance'],
+  [/\b(phone|mobile|airtime|sim)\b/i, 'phone'],
+  [/\b(parking|congestion|toll|train|bus)\b/i, 'travel'],
+  [/\b(van|vehicle|mot|tyres?)\b/i, 'van'],
+  [/\b(food|lunch|dinner|meal|coffee)\b/i, 'meals'],
+];
+
+function expenseCategory(b: string): string {
+  for (const [re, cat] of EXPENSE_CATEGORY) if (re.test(b)) return cat;
+  return 'other';
+}
+
+function parseMoneyEntryRegex(body: string): ParsedEntry | null {
+  const b = body.trim();
+  if (!b || b.endsWith('?')) return null;
+  // Looks like a question, not an entry.
+  if (/^(how|what|whats|when|where|why|who|show|list|total|do i|did i|am i|have i|can i|could i|is it|are )/i.test(b)) return null;
+
+  const incomeVerb = MONEY_INCOME_RE.test(b) || /\bpaid\b[^?]*\b(by|from)\b/i.test(b);
+  const expenseVerb = MONEY_EXPENSE_RE.test(b) || (/\bpaid\b/i.test(b) && !incomeVerb);
+  if (!incomeVerb && !expenseVerb) return null;
+
+  const amount = extractMoneyAmount(b);
+  if (amount == null) return null;
+
+  if (incomeVerb) {
+    const m = b.match(/\b(?:by|from)\s+([a-z0-9'&\- ]{2,40})/i);
+    const who = (m ? tidyName(m[1]) : '') || 'a customer';
+    return { merchant_name: who, amount, category: 'income', direction: 'income' };
+  }
+  const m = b.match(/\b(?:on|at|in|for|from)\s+([a-z0-9'&\- ]{2,40})/i);
+  const what = m ? tidyName(m[1]) : '';
+  const category = expenseCategory(b);
+  const name = what || (category !== 'other' ? category : 'an expense');
+  return { merchant_name: name, amount, category, direction: 'expense' };
+}
+
 async function handleTextEntry(from: string, messageId: string, body: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
@@ -317,13 +385,21 @@ async function handleTextEntry(from: string, messageId: string, body: string): P
     return;
   }
 
-  if (!hasClaudeConfig()) {
-    await sendText(from, 'I am not switched on yet. Hang tight, it is coming very soon.');
+  // Deterministic first. This needs no AI, so the core "spent / got paid" loop
+  // works the moment a number is linked, with or without AI credit.
+  const quick = parseMoneyEntryRegex(body);
+  if (quick) {
+    await saveEntry(userId, messageId, quick, 'whatsapp_text', body);
+    await sendText(from, confirmationLine(quick));
     return;
   }
 
-  if (await aiBudgetBlocked(from)) {
-    await sendText(from, AI_BUSY);
+  // Anything we could not parse deterministically falls to AI, if it is on.
+  if (!hasClaudeConfig() || (await aiBudgetBlocked(from))) {
+    await sendText(
+      from,
+      'Tell me what you spent or got paid and how much, for example "spent £40 on diesel" or "got paid £500 by Dave". You can also send a photo of a receipt.',
+    );
     return;
   }
   const parsed = await parseSpokenTransaction(body);

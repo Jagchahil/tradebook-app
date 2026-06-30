@@ -1056,11 +1056,11 @@ export default function HomePage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <span style={{ fontSize: 30 }}>🏁</span>
             <div>
-              <div style={{ fontSize: 19, fontWeight: 800 }}>Just starting out? Register your business free.</div>
-              <div style={{ fontSize: 14.5, color: '#B6BDC8', marginTop: 4, maxWidth: 640, lineHeight: 1.5 }}>Sole trader or limited, the exact steps, forms and codes. Set up with us and lock in first month free, then 20% off for life.</div>
+              <div style={{ fontSize: 19, fontWeight: 800 }}>Just starting out? Free guide to registering your business.</div>
+              <div style={{ fontSize: 14.5, color: '#B6BDC8', marginTop: 4, maxWidth: 640, lineHeight: 1.5 }}>Sole trader or limited, the exact steps, forms and codes, and the GOV.UK links to register yourself. The guide is free. Start with Lekhio and your first month is free, then 20% off for life.</div>
             </div>
           </div>
-          <span style={{ background: SAFFRON, color: INK, fontSize: 14.5, fontWeight: 800, padding: '12px 20px', borderRadius: 10, whiteSpace: 'nowrap' }}>Register free &rarr;</span>
+          <span style={{ background: SAFFRON, color: INK, fontSize: 14.5, fontWeight: 800, padding: '12px 20px', borderRadius: 10, whiteSpace: 'nowrap' }}>Free guide &rarr;</span>
         </Link>
       </section>
 

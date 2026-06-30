@@ -3,12 +3,12 @@ import Link from 'next/link';
 import Wizard from './Wizard';
 
 export const metadata: Metadata = {
-  title: 'Register Your Business Free, Step by Step | Lekhio',
+  title: 'Register Your Business: Free Step by Step Guide | Lekhio',
   description:
-    'Setting up as a sole trader or a limited company? Our free, step by step tool gives you the exact process, the forms like the CWF1, the SIC codes and the GOV.UK links. Set up with us and lock in first month free plus 20% off for life.',
+    'Setting up as a sole trader or a limited company? Our free, step by step guide gives you the exact process, the forms like the CWF1, the SIC codes and the GOV.UK links to register yourself. The guide is free. Start with Lekhio for first month free plus 20% off for life.',
   openGraph: {
-    title: 'Register Your Business, Free and Step by Step',
-    description: 'Sole trader or limited company, the exact steps, forms and codes. Set up with us and get first month free plus 20% off for life.',
+    title: 'Register Your Business: A Free Step by Step Guide',
+    description: 'Sole trader or limited company, the exact steps, forms and codes to register yourself on GOV.UK. The guide is free. Start with Lekhio for first month free plus 20% off.',
     type: 'website',
   },
 };
@@ -33,10 +33,10 @@ export default function RegisterPage() {
       </nav>
 
       <section style={{ maxWidth: 760, margin: '0 auto', padding: '28px 24px 4px' }}>
-        <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE TOOL · FIRST MONTH FREE + 20% OFF FOR LIFE</span>
+        <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE GUIDE · FIRST MONTH FREE + 20% OFF FOR LIFE</span>
         <h1 className="h1b" style={{ fontWeight: 700, margin: '0 0 16px' }}>Set up your business, start to finish.</h1>
         <p style={{ fontSize: 18.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>
-          Tell us what you are setting up. We give you the exact steps, the forms and the codes to register, then everything else you need, a bank, an email, insurance and your books, in plain English. Do it with us and lock in first month free, then 20% off for life.
+          Tell us what you are setting up. We give you the exact steps, the forms and the codes to register yourself on GOV.UK, plus where to sort a bank, an email and insurance, in plain English. The guide is free. Start with Lekhio and your first month is free, then 20% off for life.
         </p>
       </section>
 

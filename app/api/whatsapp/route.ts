@@ -396,7 +396,7 @@ function isMileage(body: string): boolean {
 async function handleMileage(from: string, messageId: string, body: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
-    await sendText(from, 'Open the app and add your number first, then I can log your mileage.');
+    await sendText(from, `Open the app and add your number first, then I can log your mileage. [debug: I see your number as ${from}]`);
     return;
   }
   const m = body.match(MILEAGE_RE);

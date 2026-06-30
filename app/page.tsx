@@ -1527,6 +1527,7 @@ export default function HomePage() {
             <Link href="/invoice-generator" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Invoice generator</Link>
             <Link href="/register-your-business" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Register a business</Link>
             <Link href="/file-your-tax-return" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Free tax guide</Link>
+            <Link href="/security" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Security</Link>
             <Link href="/privacy" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Privacy</Link>
             <Link href="/terms" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Terms</Link>
             <a href="mailto:support@lekhio.com" className="navlink" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Support</a>

@@ -238,8 +238,8 @@ export async function insertWaitlistSignup(signup: WaitlistSignup): Promise<void
     body: JSON.stringify(record),
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Waitlist insert failed: ${res.status} ${text}`);
+    // No response body in the error: it can contain the submitted phone/email.
+    throw new Error(`Waitlist insert failed: ${res.status}`);
   }
 }
 
@@ -273,8 +273,9 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
     body: JSON.stringify(record),
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Signup insert failed: ${res.status} ${text}`);
+    // Do not include the response body: a PostgREST error can echo the submitted
+    // phone/email back, and that personal data must never reach the logs.
+    throw new Error(`Signup insert failed: ${res.status}`);
   }
 }
 

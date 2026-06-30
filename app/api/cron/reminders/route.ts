@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import {
   getDueReminders,
   markReminded,
@@ -14,12 +15,20 @@ import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
 //   ?job=nudge   the twice a day "don't forget your expenses" text (run at 8am and 6pm)
 //   ?job=weekly  a short weekly money summary (run weekly)
 
+// Header-only and timing-safe. We do not accept the secret in the query string,
+// because URLs end up in proxy and access logs and Referer headers. Send it as
+// `Authorization: Bearer <CRON_SECRET>` from the scheduler.
 function authorised(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false; // not configured means closed
-  const q = new URL(req.url).searchParams.get('secret');
-  const header = req.headers.get('authorization');
-  return q === secret || header === `Bearer ${secret}`;
+  const header = req.headers.get('authorization') || '';
+  const expected = `Bearer ${secret}`;
+  if (header.length !== expected.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(header), Buffer.from(expected));
+  } catch {
+    return false;
+  }
 }
 
 // Let the function run long enough to fan out at scale. Pro allows up to 300s.

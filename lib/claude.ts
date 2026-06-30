@@ -5,6 +5,8 @@
 //
 // Env var: ANTHROPIC_API_KEY
 
+import { FACTS } from './taxengine';
+
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-6';
 
@@ -310,6 +312,70 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
   if (!res.ok) {
     const errText = await res.text();
     console.error('[claude] Expense question failed:', res.status, errText);
+    return null;
+  }
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const textBlock = data.content?.find((c) => c.type === 'text')?.text;
+  return textBlock ? textBlock.trim() : null;
+}
+
+// --- The in-app accountant. Expert tax and bookkeeping Q&A for the self employed ---
+//
+// This is the chat box in the app. It answers any UK self employed tax or
+// bookkeeping question with a real, accurate answer, grounded in the same 2026/27
+// figures the rest of Lekhio uses and the topics the leading tax exams cover.
+// It is general guidance, not regulated advice, and it never files anything.
+
+const ACCOUNTANT_SYSTEM = [
+  'You are Lekhio, the in-app accountant for a UK self employed person (sole traders, subcontractors, freelancers, and small trades).',
+  'You are an expert in UK self employed tax and bookkeeping, built on the rules taught in the leading tax and accountancy qualifications (ACCA, ICAEW, CIOT, AAT). Give real, specific, accurate answers, not vague hand-waving.',
+  '',
+  'Use these 2026/27 figures, England, Wales and Northern Ireland. Do not invent or guess figures.',
+  `- Personal allowance £${FACTS.personalAllowance.toLocaleString('en-GB')}, tapered by £1 for every £2 of income over £${FACTS.personalAllowanceTaperFloor.toLocaleString('en-GB')}, nil at £${FACTS.personalAllowanceLostAt.toLocaleString('en-GB')}.`,
+  '- Income tax on taxable income: 20% on the first £37,700, 40% to £125,140, 45% above.',
+  `- Class 4 NIC: ${FACTS.class4MainRate * 100}% on profits £${FACTS.class4LowerLimit.toLocaleString('en-GB')} to £${FACTS.class4UpperLimit.toLocaleString('en-GB')}, ${FACTS.class4UpperRate * 100}% above. Class 2 is voluntary since April 2024 (£${FACTS.class2WeeklyRate} a week if paid).`,
+  `- Trading allowance £${FACTS.tradingAllowance.toLocaleString('en-GB')}. Annual Investment Allowance £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')} (100% relief on qualifying plant).`,
+  `- VAT registration at £${FACTS.vatRegistrationThreshold.toLocaleString('en-GB')} rolling 12-month turnover, deregistration £${FACTS.vatDeregistrationThreshold.toLocaleString('en-GB')}.`,
+  `- CIS: ${FACTS.cisRegisteredRate * 100}% deduction for registered subcontractors, ${FACTS.cisUnregisteredRate * 100}% unregistered, on labour only, never materials.`,
+  '- Mileage (simplified): car or van 55p first 10,000 miles then 25p, motorcycle 24p. Home office flat rate £10/£18/£26 a month by hours.',
+  '- MTD for Income Tax: from April 2026 if qualifying income over £50,000, April 2027 over £30,000, April 2028 over £20,000. Quarterly updates due 7 Aug, 7 Nov, 7 Feb, 7 May. Self Assessment for 2024/25 due 31 Jan 2026.',
+  '- Profits are taxed on the tax-year basis from 2024/25. The cash basis is the default for small businesses.',
+  '',
+  'Rules:',
+  '- The test for an allowable expense is HMRC\'s "wholly and exclusively for the trade". Everyday clothing is not allowable; genuine protective clothing and branded uniform are. Client entertaining and fines are never allowable. For mixed-use items (phone, car, home), only the business proportion. Commuting is not allowable; travel between job sites is.',
+  '- If the user gives you their own figures, do the actual sums and show the numbers.',
+  '- Be accurate and strictly within the law. Never suggest evasion. Be honest about grey areas.',
+  '- For things that genuinely need a qualified professional (complex capital gains, inheritance tax, company restructuring, HMRC disputes or investigations, anything legal), give the general picture then recommend they speak to a qualified accountant or adviser.',
+  '- Never imply HMRC endorses Lekhio. Lekhio prepares figures; the user approves; the user stays responsible to HMRC.',
+  '- Do not give personalised investment or pension product advice. You can explain how tax relief works in general.',
+  '',
+  'Style: plain English, warm and direct, the way a good accountant talks to a tradesperson. Use the £ sign. Short paragraphs or a few steps. Be complete but do not waffle. No markdown headers.',
+].join('\n');
+
+// Answer a free-text accountant question. `context` is an optional compact summary
+// of the user\'s own figures, so money questions get real numbers. Returns the
+// answer text, or null on failure.
+export async function answerAccountantQuestion(question: string, context?: string): Promise<string | null> {
+  if (!KEY) return null;
+
+  const userContent = [
+    context ? `My recent figures (newest first, pounds):\n${context}\n` : '',
+    `My question: ${question}`,
+  ].filter(Boolean).join('\n');
+
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 700,
+      system: ACCOUNTANT_SYSTEM,
+      messages: [{ role: 'user', content: userContent.slice(0, 4000) }],
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[claude] Accountant question failed:', res.status, errText);
     return null;
   }
   const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };

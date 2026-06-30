@@ -278,6 +278,26 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
   }
 }
 
+// Verify a Supabase access token and return the user id, or null. Used by the
+// in-app accountant endpoint so it only answers for a genuinely signed-in user
+// and can meter usage against their real id, not something they can spoof.
+export async function verifyAccessToken(token: string): Promise<string | null> {
+  if (!token) return null;
+  const { url } = config();
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!anon) return null;
+  try {
+    const res = await fetch(`${url}/auth/v1/user`, {
+      headers: { apikey: anon, Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const u = (await res.json()) as { id?: string };
+    return u?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // --- Subscriptions (Stripe billing) ---------------------------------------
 
 export interface SubscriptionRecord {

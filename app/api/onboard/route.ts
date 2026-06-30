@@ -105,8 +105,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not save. Please try again.' }, { status: 500 });
     }
 
-    // Fire a welcome email, best effort. No-op until Resend is configured.
-    void sendWelcomeEmail(email, str(b.name)).catch(() => {});
+    // Fire a welcome email, best effort, only if they gave one. No-op until Resend is configured.
+    if (email) void sendWelcomeEmail(email, str(b.name)).catch(() => {});
 
     // Never log the personal details. Just confirm one signup saved.
     console.log('[onboard] Saved one signup');

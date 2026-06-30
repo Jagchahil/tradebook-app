@@ -204,9 +204,12 @@ export default function StartPage() {
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 28px' }}>
                 Your card is saved and your 30 day free trial is running. You will not be charged until it ends, and you can cancel any time before then and pay nothing. Download the app and say hello on WhatsApp to log your first receipt.
               </p>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
-                <span style={badgeStore}>  Download on the App Store</span>
-                <span style={badgeStore}>▶  Get it on Google Play</span>
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', opacity: 0.5 }}>
+                  <span style={badgeStore}>  App Store · soon</span>
+                  <span style={badgeStore}>▶  Google Play · soon</span>
+                </div>
+                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>The app lands in the stores soon. You do not need to wait, everything works on WhatsApp right now.</p>
               </div>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
@@ -217,9 +220,12 @@ export default function StartPage() {
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 28px' }}>
                 No card added, and that is fine. Your 30 day free trial is active. You can add a card to keep Lekhio any time, from the app or the website.
               </p>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
-                <span style={badgeStore}>  Download on the App Store</span>
-                <span style={badgeStore}>▶  Get it on Google Play</span>
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', opacity: 0.5 }}>
+                  <span style={badgeStore}>  App Store · soon</span>
+                  <span style={badgeStore}>▶  Google Play · soon</span>
+                </div>
+                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>The app lands in the stores soon. You do not need to wait, everything works on WhatsApp right now.</p>
               </div>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
@@ -264,9 +270,12 @@ export default function StartPage() {
                 <p style={{ fontSize: 11.5, color: MUTED, textAlign: 'center', margin: '10px 0 0' }}>Secure payment by Stripe. We never see your card number.</p>
               </div>
 
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
-                <span style={badgeStore}>  Download on the App Store</span>
-                <span style={badgeStore}>▶  Get it on Google Play</span>
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', opacity: 0.5 }}>
+                  <span style={badgeStore}>  App Store · soon</span>
+                  <span style={badgeStore}>▶  Google Play · soon</span>
+                </div>
+                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>The app lands in the stores soon. You do not need to wait, everything works on WhatsApp right now.</p>
               </div>
               <p style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>Prefer to decide later? Just download the app, your trial is already running.</p>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
@@ -291,7 +300,7 @@ export default function StartPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {([
                       ['sole', '👤', 'Just me', 'Self employed under my own name'],
-                      ['business', '🏪', 'A business name', 'I trade as a name, like Chahil Electrical'],
+                      ['business', '🏪', 'A business name', 'I trade as a name, like Smith Electrical'],
                       ['ltd', '🏢', 'A limited company', 'I have a registered company'],
                     ] as const).map(([val, icon, t, d]) => {
                       const active = tradeType === val;
@@ -310,7 +319,7 @@ export default function StartPage() {
                   {tradeType && (
                     <div style={{ marginTop: 16 }}>
                       <label style={fieldLabel}>{nameLabel}</label>
-                      <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={tradeType === 'ltd' ? 'Chahil Electrical Ltd' : tradeType === 'business' ? 'Chahil Electrical' : 'Jag Chahil'} style={fieldStyle} />
+                      <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={tradeType === 'ltd' ? 'Smith Electrical Ltd' : tradeType === 'business' ? 'Smith Electrical' : 'Sam Smith'} style={fieldStyle} />
                       {tradeType === 'ltd' && <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>We will verify your company details for you. No need to dig out paperwork.</p>}
                     </div>
                   )}

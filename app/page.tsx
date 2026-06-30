@@ -486,8 +486,8 @@ function OnbDone() {
       <div style={{ fontSize: 18, fontWeight: 800, color: INK, marginBottom: 8 }}>You are all set</div>
       <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.5, marginBottom: 18, padding: '0 8px' }}>30 day free trial started. No card needed. Download the app and say hello on WhatsApp.</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span style={{ background: INK, color: '#fff', borderRadius: 10, padding: '10px 0', fontSize: 12.5, fontWeight: 600 }}>  App Store</span>
-        <span style={{ background: INK, color: '#fff', borderRadius: 10, padding: '10px 0', fontSize: 12.5, fontWeight: 600 }}>▶  Google Play</span>
+        <span style={{ background: INK, color: '#fff', borderRadius: 10, padding: '10px 0', fontSize: 12.5, fontWeight: 600, opacity: 0.55 }}>  App Store · soon</span>
+        <span style={{ background: INK, color: '#fff', borderRadius: 10, padding: '10px 0', fontSize: 12.5, fontWeight: 600, opacity: 0.55 }}>▶  Google Play · soon</span>
       </div>
     </div>
   );

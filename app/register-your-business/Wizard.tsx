@@ -30,7 +30,7 @@ interface Choice {
 
 const CHOICES: Choice[] = [
   { key: 'sole', icon: '👤', title: 'Become a sole trader', sub: 'The simplest way to work for yourself. Most trades start here.' },
-  { key: 'name', icon: '🏪', title: 'Trade under a business name', sub: 'Still a sole trader, with a name like Chahil Electrical.' },
+  { key: 'name', icon: '🏪', title: 'Trade under a business name', sub: 'Still a sole trader, with a name like Smith Electrical.' },
   { key: 'ltd', icon: '🏢', title: 'Set up a limited company', sub: 'A registered company. More admin, more protection.' },
   { key: 'done', icon: '✅', title: 'I am already set up', sub: 'Skip the setup and go straight to your books.' },
 ];
@@ -70,7 +70,7 @@ function stepsFor(path: PathKey): Step[] {
   }
   if (path === 'name') {
     return [
-      { title: 'Pick your trading name', body: 'You can trade under a name like Chahil Electrical without registering it anywhere. The rules: it cannot include Limited, Ltd, plc or LLP, cannot be offensive, and cannot copy an existing trade mark. Put your own name and the business name on your invoices.', tip: 'Check the name is free as a trade mark on the IPO website, and grab the matching domain while you are at it.' },
+      { title: 'Pick your trading name', body: 'You can trade under a name like Smith Electrical without registering it anywhere. The rules: it cannot include Limited, Ltd, plc or LLP, cannot be offensive, and cannot copy an existing trade mark. Put your own name and the business name on your invoices.', tip: 'Check the name is free as a trade mark on the IPO website, and grab the matching domain while you are at it.' },
       { title: 'Check you need to register for tax', body: 'A business name does not change your tax. You are still a sole trader, so you register for Self Assessment once you earn over £1,000 a year, by 5 October after the tax year you started.' },
       ...SOLE_TAIL,
     ];

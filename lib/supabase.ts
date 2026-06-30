@@ -222,6 +222,19 @@ export async function claimMessage(id: string): Promise<boolean> {
   return true;
 }
 
+// Normalise any UK number to E.164 (+44...) so everything we store matches the
+// same shape: the app, the web signup, and the WhatsApp lookup. Examples:
+// "07375 694427" -> "+447375694427", "7375694427" -> "+447375694427",
+// "447375694427" -> "+447375694427", "+44 7375 694427" -> "+447375694427".
+export function normalizeUkPhone(input: string): string {
+  let digits = (input || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('00')) digits = digits.slice(2); // 0044... international prefix
+  if (digits.startsWith('44')) return '+' + digits;
+  if (digits.startsWith('0')) return '+44' + digits.slice(1); // 07... national
+  return '+44' + digits; // bare national, e.g. 7375694427
+}
+
 export interface WaitlistSignup {
   phone: string;
   email?: string | null;
@@ -229,7 +242,7 @@ export interface WaitlistSignup {
 
 export async function insertWaitlistSignup(signup: WaitlistSignup): Promise<void> {
   const { url } = config();
-  const record: Record<string, string> = { phone: signup.phone };
+  const record: Record<string, string> = { phone: normalizeUkPhone(signup.phone) };
   if (signup.email) record.email = signup.email;
 
   const res = await fetch(`${url}/rest/v1/waitlist`, {
@@ -258,7 +271,7 @@ export interface OnboardSignup {
 // Save a completed web onboarding. Written with the service role key, server side only.
 export async function createSignup(signup: OnboardSignup): Promise<void> {
   const { url } = config();
-  const record: Record<string, unknown> = { phone: signup.phone, email: signup.email };
+  const record: Record<string, unknown> = { phone: normalizeUkPhone(signup.phone), email: signup.email };
   if (signup.trade_type) record.trade_type = signup.trade_type;
   if (signup.name) record.name = signup.name;
   if (signup.trade) record.trade = signup.trade;

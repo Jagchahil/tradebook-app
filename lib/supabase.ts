@@ -191,27 +191,6 @@ export async function findUserIdByPhone(senderDigits: string): Promise<string | 
   return rows.length > 0 ? rows[0].id : null;
 }
 
-// TEMP DIAGNOSTIC: reports exactly what the webhook gets when it looks a sender
-// up, so we can see project ref, HTTP status, and row count. Remove after fixing.
-export async function debugUserLookup(senderDigits: string): Promise<string> {
-  try {
-    const { url } = config();
-    let digits = senderDigits.replace(/\D/g, '');
-    if (digits.startsWith('44')) digits = digits.slice(2);
-    else if (digits.startsWith('0')) digits = digits.slice(1);
-    const last = digits.slice(-10);
-    const q = `${url}/rest/v1/users?phone_number=ilike.*${last}&select=id`;
-    const res = await fetch(q, { headers: headers() });
-    const body = await res.text();
-    let count = -1;
-    try { const arr = JSON.parse(body); count = Array.isArray(arr) ? arr.length : -2; } catch { count = -3; }
-    const proj = url.replace('https://', '').split('.')[0];
-    return `proj=${proj} digits=${last} status=${res.status} rows=${count}`;
-  } catch (e) {
-    return `err=${e instanceof Error ? e.message : 'unknown'}`;
-  }
-}
-
 // True if we have already saved a transaction for this WhatsApp message id.
 // This keeps us idempotent. Meta retries a webhook if we are slow, and we do not
 // want a duplicate receipt each time.

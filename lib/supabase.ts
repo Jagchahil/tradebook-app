@@ -278,10 +278,17 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
   }
 }
 
-// Verify a Supabase access token and return the user id, or null. Used by the
-// in-app accountant endpoint so it only answers for a genuinely signed-in user
-// and can meter usage against their real id, not something they can spoof.
-export async function verifyAccessToken(token: string): Promise<string | null> {
+// Verify a Supabase access token and return the verified user (id and email), or
+// null. The values come from Supabase validating the JWT, never from anything the
+// client asserts, so a user cannot claim another user's identity. Used by the
+// authenticated endpoints (the accountant, the billing portal) to meter usage and
+// resolve the right account.
+export interface VerifiedUser {
+  id: string;
+  email: string | null;
+}
+
+export async function verifyAccessToken(token: string): Promise<VerifiedUser | null> {
   if (!token) return null;
   const { url } = config();
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -291,8 +298,9 @@ export async function verifyAccessToken(token: string): Promise<string | null> {
       headers: { apikey: anon, Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;
-    const u = (await res.json()) as { id?: string };
-    return u?.id ?? null;
+    const u = (await res.json()) as { id?: string; email?: string | null };
+    if (!u?.id) return null;
+    return { id: u.id, email: u.email ?? null };
   } catch {
     return null;
   }
@@ -496,7 +504,10 @@ export async function transactionSummaryForUser(userId: string, limit = 150): Pr
 
 // Mark an invoice paid from the server (Stripe webhook) and book the income,
 // once only. Safe to call more than once for the same invoice.
-export async function markInvoicePaidServer(invoiceId: string): Promise<void> {
+export async function markInvoicePaidServer(
+  invoiceId: string,
+  opts?: { paidPence?: number; currency?: string },
+): Promise<void> {
   const { url } = config();
 
   const invRes = await fetch(
@@ -514,6 +525,17 @@ export async function markInvoicePaidServer(invoiceId: string): Promise<void> {
   if (rows.length === 0) return;
   const inv = rows[0];
   if (inv.status === 'paid') return; // already done, fast path
+
+  // Verify the amount actually collected matches this invoice before booking it.
+  // Stops income being mis-booked if a checkout ever collects a different amount.
+  if (opts?.paidPence != null) {
+    const expected = Math.round((Number(inv.total) || 0) * 100);
+    const currencyOk = !opts.currency || opts.currency.toLowerCase() === 'gbp';
+    if (!currencyOk || Math.abs(opts.paidPence - expected) > 1) {
+      console.error('[markInvoicePaidServer] amount or currency mismatch, not booking income for', invoiceId);
+      return;
+    }
+  }
 
   // Atomic gate against duplicate or concurrent Stripe deliveries: only flip rows
   // that are not already paid, and ask for the result back. If no row comes back,
@@ -589,7 +611,8 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
       const urows = (await userRes.json()) as Array<{ name?: string; business_name?: string; phone_number?: string }>;
       if (urows.length > 0) {
         businessName = urows[0].business_name || urows[0].name || null;
-        businessContact = urows[0].phone_number || null;
+        // Do not expose the trader's personal mobile on a shareable public link.
+        businessContact = null;
       }
     }
   }
@@ -599,7 +622,8 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
   return {
     number: (inv.number as string) ?? '',
     customer_name: (inv.customer_name as string) ?? '',
-    customer_contact: (inv.customer_contact as string) ?? null,
+    // Keep the customer's own contact details off the public, shareable link.
+    customer_contact: null,
     line_items: lineItems,
     total: Number(inv.total) || 0,
     status: (inv.status as string) ?? 'draft',

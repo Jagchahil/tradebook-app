@@ -88,10 +88,15 @@ export async function POST(req: NextRequest) {
           }
         }
       } else {
-        // A customer paid one of our users' invoices.
+        // A customer paid one of our users' invoices. Only book it if Stripe
+        // actually collected the money, and verify the amount inside.
         const invoiceId = metadata.invoice_id || (obj.client_reference_id as string | undefined);
-        if (invoiceId) {
-          await markInvoicePaidServer(invoiceId);
+        const paid = obj.payment_status === 'paid' || obj.payment_status === 'no_payment_required';
+        if (invoiceId && paid) {
+          await markInvoicePaidServer(invoiceId, {
+            paidPence: typeof obj.amount_total === 'number' ? (obj.amount_total as number) : undefined,
+            currency: typeof obj.currency === 'string' ? (obj.currency as string) : undefined,
+          });
         }
       }
     } else if (

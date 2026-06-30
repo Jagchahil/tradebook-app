@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { draftInvoice, hasClaudeConfig } from '../../../lib/claude';
 import { rateLimited, clientIp } from '../../../lib/ratelimit';
+import { bumpAiUsage } from '../../../lib/supabase';
+
+// A durable daily ceiling on total drafting spend, so even if the per-IP limit is
+// dodged with spoofed X-Forwarded-For, the wallet is still safe.
+const DRAFT_GLOBAL_DAILY = Number(process.env.DRAFT_GLOBAL_DAILY || 2000);
 
 // The mobile app calls this from a different origin, so allow cross origin use.
 // It only drafts invoice text from a description. There is nothing sensitive here.
@@ -34,6 +39,12 @@ export async function POST(req: NextRequest) {
     const description = (body as { description?: unknown }).description;
     if (typeof description !== 'string' || description.trim().length < 3 || description.length > 2000) {
       return NextResponse.json({ error: 'Tell me a bit about the job.' }, { status: 400, headers: CORS });
+    }
+
+    // Durable global ceiling. Fail closed if the counter is unavailable.
+    const globalCount = await bumpAiUsage('draft:global', 'all');
+    if (globalCount === null || globalCount > DRAFT_GLOBAL_DAILY) {
+      return NextResponse.json({ error: 'Drafting is busy right now. Try again shortly.' }, { status: 503, headers: CORS });
     }
 
     const drafted = await draftInvoice(description.trim());

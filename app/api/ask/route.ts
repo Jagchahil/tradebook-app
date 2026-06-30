@@ -28,10 +28,11 @@ export async function POST(req: NextRequest) {
   }
 
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  const userId = await verifyAccessToken(token);
-  if (!userId) {
+  const verified = await verifyAccessToken(token);
+  if (!verified) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
+  const userId = verified.id;
 
   // Burst guard: at most a handful of questions in a short window.
   if (rateLimited(`ask:${userId}`, 4, 60 * 1000)) {
@@ -49,15 +50,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'empty' }, { status: 400 });
   }
 
-  // Per-user daily cap.
+  // Per-user daily cap. Fail CLOSED: if the durable counter is unavailable we do
+  // not spend on the paid AI, so a database hiccup can never become a cost blowup.
   const userCount = await bumpAiUsage('ask', userId);
-  if (userCount !== null && userCount > DAILY_LIMIT) {
+  if (userCount === null) {
+    return NextResponse.json({ error: 'busy', answer: 'The accountant is briefly unavailable. Please try again in a moment.' }, { status: 503 });
+  }
+  if (userCount > DAILY_LIMIT) {
     return NextResponse.json(
       { error: 'daily_limit', limit: DAILY_LIMIT, remaining: 0, answer: `That is your ${DAILY_LIMIT} accountant questions for today. They reset tomorrow. For anything urgent, your figures are always in the app.` },
       { status: 429 },
     );
   }
-  const remaining = userCount === null ? DAILY_LIMIT : Math.max(0, DAILY_LIMIT - userCount);
+  const remaining = Math.max(0, DAILY_LIMIT - userCount);
 
   // Global daily ceiling.
   const globalCount = await bumpAiUsage('ask:global', 'all');

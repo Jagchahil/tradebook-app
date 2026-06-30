@@ -1,31 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createBillingPortal, hasStripeConfig } from '../../../../lib/stripe';
-import { getStripeCustomerByEmail } from '../../../../lib/supabase';
+import { getStripeCustomerByEmail, verifyAccessToken } from '../../../../lib/supabase';
 
-// Open the Stripe billing portal for a subscriber, so they can update their card,
-// switch plan, or cancel. We look up their Stripe customer from their email, then
-// hand back the portal URL. Cancellation and refunds stay entirely in Stripe's
-// own UI, which is the safe place for them to live.
-
-function str(v: unknown, max = 200): string {
-  return typeof v === 'string' ? v.slice(0, max) : '';
-}
+// Open the Stripe billing portal for the SIGNED-IN subscriber only. The email is
+// taken from the verified Supabase token, never from the request body, so nobody
+// can open another person's billing portal by guessing their email. Cancellation
+// and refunds live in Stripe's own UI, which is the safe place for them.
 
 export async function POST(req: NextRequest) {
   if (!hasStripeConfig()) {
     return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 });
   }
 
-  let body: Record<string, unknown> = {};
-  try {
-    body = await req.json();
-  } catch {
-    // ignore
+  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  const verified = await verifyAccessToken(token);
+  if (!verified) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  const email = str(body.email, 200).trim().toLowerCase();
+  const email = (verified.email || '').trim().toLowerCase();
   if (!email) {
-    return NextResponse.json({ error: 'email_required' }, { status: 400 });
+    return NextResponse.json({ error: 'no_email_on_account' }, { status: 400 });
   }
 
   const customerId = await getStripeCustomerByEmail(email);

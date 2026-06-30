@@ -1,0 +1,52 @@
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import Calc from './Calc';
+
+export const metadata: Metadata = {
+  title: 'CIS Tax Refund Calculator 2026/27 | Are You Owed Money? | Lekhio',
+  description:
+    'Free CIS tax refund estimator for UK construction subcontractors. See if HMRC owes you a refund on the CIS deducted from your pay, using 2026/27 rates. No signup.',
+  openGraph: {
+    title: 'CIS Tax Refund Calculator 2026/27',
+    description: 'Subcontractor? See your likely CIS refund in seconds. Free, no signup.',
+    type: 'website',
+  },
+};
+
+const INK = '#111111';
+const RIVER = '#1B59A6';
+const RIVER_DEEP = '#134277';
+const RIVER_TINT = '#E9F1FA';
+const PAPER = '#FBFAF7';
+const MUTED = '#5B6470';
+const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
+export default function CisCalculatorPage() {
+  return (
+    <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden', minHeight: '100vh' }}>
+      <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1c{font-size:46px;line-height:1.07;letter-spacing:-1.7px}@media(max-width:820px){.h1c{font-size:32px}}` }} />
+
+      <nav style={{ maxWidth: 1080, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
+        <Link href="/resources" style={{ fontSize: 14, fontWeight: 600, color: RIVER }}>← All free tools</Link>
+      </nav>
+
+      <section style={{ maxWidth: 1080, margin: '0 auto', padding: '20px 24px 8px' }}>
+        <div style={{ maxWidth: 720 }}>
+          <span style={{ display: 'inline-block', backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 16 }}>FREE, NO SIGNUP · 2026/27</span>
+          <h1 className="h1c" style={{ fontWeight: 700, margin: '0 0 14px' }}>Are you owed a CIS refund?</h1>
+          <p style={{ fontSize: 18, color: MUTED, lineHeight: 1.6, margin: 0 }}>
+            On CIS, your contractor takes tax off your pay before you ever see it. Most subcontractors are owed some of it back. Put your numbers in and see your likely refund.
+          </p>
+        </div>
+      </section>
+
+      <section style={{ maxWidth: 1080, margin: '0 auto', padding: '24px 24px 60px' }}>
+        <Calc />
+        <p style={{ fontSize: 12.5, color: MUTED, textAlign: 'center', maxWidth: 680, margin: '28px auto 0', lineHeight: 1.55 }}>
+          This is a general estimate using 2026/27 rates and assumes your subcontracting is your only income with standard 20% CIS. It is not tax advice or a filed figure. Your real refund depends on your full circumstances, which HMRC settles when you file. Lekhio prepares your figures and you always approve them.
+        </p>
+      </section>
+    </main>
+  );
+}

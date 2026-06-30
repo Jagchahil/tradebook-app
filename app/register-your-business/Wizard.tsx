@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { findSic } from '../../lib/siccodes';
 
 const INK = '#111111';
 const RIVER = '#1B59A6';
@@ -43,26 +44,10 @@ interface Step {
   linkHref?: string;
   tip?: string;
   sic?: boolean;
+  preview?: { site: 'GOV.UK' | 'Companies House'; heading: string; cta: string };
 }
 
-const SIC_CODES: [string, string][] = [
-  ['43210', 'Electrical installation'],
-  ['43220', 'Plumbing, heat and air conditioning'],
-  ['43320', 'Joinery installation'],
-  ['43341', 'Painting'],
-  ['43342', 'Plastering'],
-  ['43390', 'Other building completion and finishing'],
-  ['43910', 'Roofing activities'],
-  ['43120', 'Site preparation, groundworks'],
-  ['41202', 'Construction of domestic buildings'],
-  ['81210', 'General cleaning of buildings'],
-  ['81300', 'Landscaping and gardening'],
-  ['96020', 'Hairdressing and beauty'],
-  ['49410', 'Freight transport by road'],
-  ['43999', 'Other specialised construction'],
-];
-
-const GATEWAY = 'https://www.gov.uk/log-in-register-hmrc-online-services';
+const GATEWAY ='https://www.gov.uk/log-in-register-hmrc-online-services';
 const REGISTER_SA = 'https://www.gov.uk/register-for-self-assessment/self-employed';
 const CH_SEARCH = 'https://find-and-update.company-information.service.gov.uk/';
 const CH_FORM = 'https://www.gov.uk/limited-company-formation';
@@ -70,8 +55,8 @@ const CH_IDV = 'https://www.gov.uk/guidance/verifying-your-identity-for-companie
 const CORP_TAX = 'https://www.gov.uk/corporation-tax';
 
 const SOLE_TAIL: Step[] = [
-  { title: 'Set up your Government Gateway', body: 'This is your login for everything HMRC. Create one with your email and you get a user ID and password. You will use it to register and, later, to file.', linkLabel: 'Create a Government Gateway account', linkHref: GATEWAY },
-  { title: 'Register for Self Assessment as self employed', body: 'Tell HMRC you are working for yourself. The form is the CWF1, done online. It also signs you up for Class 2 and Class 4 National Insurance at the same time, so this is one job, not three.', codeLabel: 'The form', codeValue: 'CWF1', linkLabel: 'Register for Self Assessment', linkHref: REGISTER_SA },
+  { title: 'Set up your Government Gateway', body: 'This is your login for everything HMRC. Create one with your email and you get a user ID and password. You will use it to register and, later, to file.', linkLabel: 'Create a Government Gateway account', linkHref: GATEWAY, preview: { site: 'GOV.UK', heading: 'Sign in to your HMRC online account', cta: 'Create sign in details' } },
+  { title: 'Register for Self Assessment as self employed', body: 'Tell HMRC you are working for yourself. The form is the CWF1, done online. It also signs you up for Class 2 and Class 4 National Insurance at the same time, so this is one job, not three.', codeLabel: 'The form', codeValue: 'CWF1', linkLabel: 'Register for Self Assessment', linkHref: REGISTER_SA, preview: { site: 'GOV.UK', heading: 'Register for Self Assessment', cta: 'Start now' } },
   { title: 'Get your UTR', body: 'HMRC posts you a Unique Taxpayer Reference, a 10 digit number, within about 10 working days, plus an activation code for your online account. Keep the UTR safe, you need it every time you file.', codeLabel: 'You receive', codeValue: 'A 10 digit UTR' },
   { title: 'Start keeping digital records', body: 'From day one, log your income and costs. Lekhio does this from a text, so you are ready for Making Tax Digital with no spreadsheets and no January scramble.' },
 ];
@@ -92,11 +77,11 @@ function stepsFor(path: PathKey): Step[] {
   }
   if (path === 'ltd') {
     return [
-      { title: 'Choose your company name', body: 'Check it is free on the Companies House register. It must end in Limited or Ltd, must not be the same as an existing company, and cannot use sensitive words without permission.', linkLabel: 'Search the Companies House register', linkHref: CH_SEARCH },
-      { title: 'Gather what you need', body: 'A registered office address, which is public, at least one director, your shareholders and how the shares split, anyone with significant control, usually anyone owning more than 25%, and a SIC code that describes what you do.', codeLabel: 'You need a', codeValue: 'SIC code', sic: true },
-      { title: 'Verify your identity', body: 'Since late 2025, every director and person with significant control must verify their identity with Companies House. You do it online with photo ID and get a personal code. Sort this before or as you register.', codeLabel: 'You get a', codeValue: 'Personal code', linkLabel: 'Verify your identity', linkHref: CH_IDV },
-      { title: 'Register at Companies House', body: 'Register online. It costs £100 and you are usually set up within 24 hours. You get a Certificate of Incorporation and your company number.', codeLabel: 'Cost', codeValue: '£100 online', linkLabel: 'Set up a limited company', linkHref: CH_FORM },
-      { title: 'Tell HMRC, set up Corporation Tax', body: 'Within 3 months of starting to trade, register the company for Corporation Tax. As a director you may also need to register for your own Self Assessment.', linkLabel: 'Register for Corporation Tax', linkHref: CORP_TAX },
+      { title: 'Choose your company name', body: 'Check it is free on the Companies House register. It must end in Limited or Ltd, must not be the same as an existing company, and cannot use sensitive words without permission.', linkLabel: 'Search the Companies House register', linkHref: CH_SEARCH, preview: { site: 'Companies House', heading: 'Search the register', cta: 'Search' } },
+      { title: 'Gather what you need, including your SIC code', body: 'A registered office address, which is public, at least one director, your shareholders and how the shares split, anyone with significant control, usually anyone owning more than 25%, and a SIC code that describes what you do. Tell us your trade below and we will give you the exact code.', codeLabel: 'You need a', codeValue: 'SIC code', sic: true },
+      { title: 'Verify your identity', body: 'Since late 2025, every director and person with significant control must verify their identity with Companies House. You do it online with photo ID and get a personal code. Sort this before or as you register.', codeLabel: 'You get a', codeValue: 'Personal code', linkLabel: 'Verify your identity', linkHref: CH_IDV, preview: { site: 'GOV.UK', heading: 'Verify your identity for Companies House', cta: 'Start now' } },
+      { title: 'Register at Companies House', body: 'Register online. It costs £100 and you are usually set up within 24 hours. You get a Certificate of Incorporation and your company number.', codeLabel: 'Cost', codeValue: '£100 online', linkLabel: 'Set up a limited company', linkHref: CH_FORM, preview: { site: 'GOV.UK', heading: 'Set up a limited company', cta: 'Register now' } },
+      { title: 'Tell HMRC, set up Corporation Tax', body: 'Within 3 months of starting to trade, register the company for Corporation Tax. As a director you may also need to register for your own Self Assessment.', linkLabel: 'Register for Corporation Tax', linkHref: CORP_TAX, preview: { site: 'GOV.UK', heading: 'Register for Corporation Tax', cta: 'Sign in and register' } },
     ];
   }
   return [];
@@ -134,9 +119,13 @@ const ESSENTIALS: Essential[] = [
 
 const linkProps = { target: '_blank', rel: 'noopener noreferrer' as const };
 
+const CHIP_TRADES = ['Electrician', 'Plumber, heating or gas', 'Builder or bricklayer', 'Joiner or carpenter', 'Plasterer', 'Painter and decorator', 'Roofer', 'Landscaper or gardener', 'Tiler or flooring', 'Cleaner'];
+
 export default function Wizard() {
   const [path, setPath] = useState<PathKey | null>(null);
   const [step, setStep] = useState(0);
+  const [sicQuery, setSicQuery] = useState('');
+  const sicMatches = useMemo(() => (sicQuery.trim() ? findSic(sicQuery, 3) : []), [sicQuery]);
 
   const steps = path && path !== 'done' ? stepsFor(path) : [];
   const total = steps.length;
@@ -162,6 +151,9 @@ export default function Wizard() {
         .wz-btn{transition:transform .15s ease,box-shadow .18s ease,background-color .18s ease}
         .wz-btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(27,89,166,.26)}
         .wz-bar{transition:width .4s cubic-bezier(.2,.7,.2,1)}
+        .wz-chip{transition:transform .12s ease,border-color .12s ease}
+        .wz-chip:hover{transform:translateY(-1px);border-color:${RIVER}!important}
+        .wz-field:focus{border-color:${RIVER}!important;box-shadow:0 0 0 3px ${RIVER_TINT}}
         .wz-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
         .wz-sic{display:grid;grid-template-columns:1fr 1fr;gap:8px}
         @media(max-width:760px){.wz-grid{grid-template-columns:1fr}.wz-sic{grid-template-columns:1fr}}
@@ -210,15 +202,72 @@ export default function Wizard() {
             ) : null}
 
             {steps[step].sic ? (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: MUTED, marginBottom: 8 }}>Common SIC codes for trades</div>
-                <div className="wz-sic">
-                  {SIC_CODES.map(([code, label]) => (
-                    <div key={code} style={{ display: 'flex', gap: 10, alignItems: 'baseline', background: SURFACE, borderRadius: 10, padding: '9px 12px' }}>
-                      <span style={{ fontSize: 13.5, fontWeight: 800, color: RIVER_DEEP, fontVariantNumeric: 'tabular-nums' }}>{code}</span>
-                      <span style={{ fontSize: 13, color: INK }}>{label}</span>
+              <div style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: INK, marginBottom: 10 }}>What do you do? We will find your SIC code.</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                  {CHIP_TRADES.map((t) => {
+                    const active = sicQuery === t;
+                    return (
+                      <button key={t} onClick={() => setSicQuery(t)} className="wz-chip" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: active ? '#fff' : INK, background: active ? RIVER : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 20, padding: '7px 13px' }}>{t}</button>
+                    );
+                  })}
+                </div>
+                <input
+                  value={sicQuery}
+                  onChange={(e) => setSicQuery(e.target.value)}
+                  placeholder="Or type it, e.g. kitchen fitter, drainage, mobile mechanic"
+                  className="wz-field"
+                  style={{ width: '100%', background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', fontSize: 15, color: INK, outline: 'none' }}
+                />
+
+                {sicMatches.length > 0 ? (
+                  <div className="wz-anim" style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Your recommended SIC code</div>
+                    <div style={{ background: GREEN_TINT, border: '1px solid #CFE9D8', borderRadius: 14, padding: '16px 18px' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 26, fontWeight: 800, color: INK, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.5px' }}>{sicMatches[0].code}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: INK }}>{sicMatches[0].label}</span>
+                      </div>
+                      <p style={{ fontSize: 13, color: MUTED, margin: '8px 0 0', lineHeight: 1.5 }}>Enter this when Companies House asks for your SIC code. You can add more than one if you do a few things.</p>
+                      {sicMatches[0].alt ? (
+                        <p style={{ fontSize: 12.5, color: MUTED, margin: '8px 0 0' }}>Often paired with <strong style={{ color: INK }}>{sicMatches[0].alt!.code}</strong> {sicMatches[0].alt!.label}.</p>
+                      ) : null}
                     </div>
-                  ))}
+                    {sicMatches.length > 1 ? (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>Or, if that is not quite it:</div>
+                        <div className="wz-sic">
+                          {sicMatches.slice(1).map((m) => (
+                            <div key={m.code} style={{ display: 'flex', gap: 10, alignItems: 'baseline', background: SURFACE, borderRadius: 10, padding: '9px 12px' }}>
+                              <span style={{ fontSize: 13.5, fontWeight: 800, color: RIVER_DEEP, fontVariantNumeric: 'tabular-nums' }}>{m.code}</span>
+                              <span style={{ fontSize: 13, color: INK }}>{m.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10 }}>Pick your trade or type what you do, and your exact code appears here.</p>
+                )}
+              </div>
+            ) : null}
+
+            {steps[step].preview ? (
+              <div className="wz-anim" style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>What you will see</div>
+                <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, boxShadow: '0 8px 24px rgba(17,17,17,.06)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#E8E8E8', padding: '8px 12px' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 5, background: '#F25F58' }} />
+                    <span style={{ width: 10, height: 10, borderRadius: 5, background: '#FBBE3C' }} />
+                    <span style={{ width: 10, height: 10, borderRadius: 5, background: '#58CB42' }} />
+                    <span style={{ marginLeft: 8, fontSize: 11, color: '#6B7280', background: '#fff', borderRadius: 6, padding: '3px 10px', fontVariantNumeric: 'tabular-nums' }}>{steps[step].preview!.site === 'Companies House' ? 'find-and-update.company-information.service.gov.uk' : 'gov.uk'}</span>
+                  </div>
+                  <div style={{ background: '#0b0c0c', color: '#fff', padding: '10px 16px', fontSize: 14, fontWeight: 700 }}>{steps[step].preview!.site}</div>
+                  <div style={{ background: '#fff', padding: '18px 16px' }}>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: '#0b0c0c', marginBottom: 12 }}>{steps[step].preview!.heading}</div>
+                    <span style={{ display: 'inline-block', background: '#00703c', color: '#fff', fontSize: 13.5, fontWeight: 700, padding: '9px 16px', borderRadius: 3 }}>{steps[step].preview!.cta} ›</span>
+                  </div>
                 </div>
               </div>
             ) : null}

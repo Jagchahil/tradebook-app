@@ -51,7 +51,8 @@ async function aiBudgetBlocked(from: string): Promise<boolean> {
   const perPhone = await bumpAiUsage('phone', from);
   if (perPhone !== null && perPhone > PHONE_DAILY_AI) return true;
   const globalCount = await bumpAiUsage('global', 'all');
-  if (globalCount !== null && globalCount > GLOBAL_DAILY_AI) return true;
+  if (globalCount === null) return true; // fail closed: never spend on AI if the durable cap cannot be checked
+  if (globalCount > GLOBAL_DAILY_AI) return true;
   return false;
 }
 
@@ -446,6 +447,10 @@ async function handleCIS(from: string, messageId: string, body: string): Promise
     return;
   }
   const gross = amounts[0];
+  if (gross > 1000000) {
+    await sendText(from, 'That amount looks too big to be right. Send it again, for example "Dave paid £400, £80 CIS deducted".');
+    return;
+  }
   const pctM = body.match(/(\d{1,3})\s*%/);
   let deduction: number;
   let assumed = false;
@@ -556,11 +561,13 @@ async function handlePhoneShare(from: string, messageId: string, body: string): 
 }
 
 // --- Help and money questions ---------------------------------------------
-const HELP_RE = /^\s*(hi|hey|hello|help|menu|start|what can you do|commands)\b/i;
+const HELP_RE = /^(help|menu|commands|options|what can you do|what can u do)$/i;
 const QUESTION_RE = /(^|\s)(how much|how many|what(?:'s| is| are)?|whats|when|show|list|total|do i|did i|am i|have i|spent|owe|owed|made|earn)\b/i;
 
 function isHelp(body: string): boolean {
-  return HELP_RE.test(body);
+  // Whole-message only, so a greeting in front of a real action ("hello, spent 40")
+  // is not swallowed by the help menu.
+  return HELP_RE.test(body.trim().replace(/[!.?\s]+$/, ''));
 }
 
 const SCHEDULE_RE = /\b(remind me|reminder|price up|quote|book(?:ing)?|appointment|diary|schedule|pencil in|tomorrow|next (?:mon|tue|wed|thu|fri|sat|sun)|at \d{1,2}(?::\d{2})?\s?(?:am|pm)|o'?clock)\b/i;
@@ -606,6 +613,9 @@ async function handleSchedule(from: string, body: string): Promise<void> {
 function isQuestion(body: string): boolean {
   const b = body.trim();
   if (b.endsWith('?')) return true;
+  // An entry, not a question: a spend/earn verb sitting with an amount. Never
+  // hijack a money entry into the Q&A path, or the expense is silently lost.
+  if (/\b(spent|spend|paid|bought|made|earnt|earned|got|took|takings?|invoiced?|charged?)\b[^?]*\d/i.test(b)) return false;
   return QUESTION_RE.test(b) && !/£|\bpaid\b|\bbought\b|\bspent £|\bgot paid\b/i.test(b);
 }
 

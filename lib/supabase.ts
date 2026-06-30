@@ -175,20 +175,32 @@ export interface NewTransaction {
 // stores it as +447700900000. We check a few shapes to be safe.
 export async function findUserIdByPhone(senderDigits: string): Promise<string | null> {
   const { url } = config();
-  // Reduce the sender to the national significant number, then match on the last
-  // digits. This is format-proof: it matches whether the row is stored as
-  // +447..., 447..., or 07..., so onboarding format quirks never break the link.
+  // 1) Exact canonical match. Storage is +44 E.164 (app OTP + normalised signup),
+  //    so this is the normal hit and can never match the wrong account.
+  const e164 = normalizeUkPhone(senderDigits);
+  if (e164) {
+    const exact = `${url}/rest/v1/users?phone_number=eq.${encodeURIComponent(e164)}&select=id&limit=2`;
+    const res = await fetch(exact, { headers: headers() });
+    if (res.ok) {
+      const rows = (await res.json()) as Array<{ id: string }>;
+      if (rows.length === 1) return rows[0].id;
+      if (rows.length > 1) return null; // ambiguous: never guess on money data
+    }
+  }
+
+  // 2) Fallback for any legacy row stored in a non-canonical shape: suffix-match
+  //    on the national significant digits, but only accept a SINGLE unambiguous hit.
   let digits = senderDigits.replace(/\D/g, '');
   if (digits.startsWith('44')) digits = digits.slice(2);
   else if (digits.startsWith('0')) digits = digits.slice(1);
   if (digits.length < 9) return null;
   const last = digits.slice(-10);
 
-  const query = `${url}/rest/v1/users?phone_number=ilike.*${last}&select=id&limit=1`;
-  const res = await fetch(query, { headers: headers() });
-  if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ id: string }>;
-  return rows.length > 0 ? rows[0].id : null;
+  const query = `${url}/rest/v1/users?phone_number=ilike.*${last}&select=id&limit=2`;
+  const res2 = await fetch(query, { headers: headers() });
+  if (!res2.ok) return null;
+  const rows2 = (await res2.json()) as Array<{ id: string }>;
+  return rows2.length === 1 ? rows2[0].id : null;
 }
 
 // True if we have already saved a transaction for this WhatsApp message id.

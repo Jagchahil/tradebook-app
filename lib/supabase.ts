@@ -222,16 +222,23 @@ export async function claimMessage(id: string): Promise<boolean> {
 }
 
 // Normalise any UK number to E.164 (+44...) so everything we store matches the
-// same shape: the app, the web signup, and the WhatsApp lookup. Examples:
+// same shape: the app, the web signup, and the WhatsApp lookup. This MUST stay
+// byte-identical to `toUkE164` in tradebook-app/app/(auth)/phone.tsx — the app
+// stores with that function and the webhook matches with this one, so if the two
+// ever diverge a user's WhatsApp messages land on a different account. The steps
+// are: drop a 00 international prefix, drop a 44 country code, drop any leading
+// zeros, then prefix +44. Order matters; it collapses every UK variant, incl. the
+// common "+44 07375..." double-prefix typo, to one canonical string.
 // "07375 694427" -> "+447375694427", "7375694427" -> "+447375694427",
-// "447375694427" -> "+447375694427", "+44 7375 694427" -> "+447375694427".
+// "447375694427" -> "+447375694427", "+44 07375 694427" -> "+447375694427".
 export function normalizeUkPhone(input: string): string {
-  let digits = (input || '').replace(/\D/g, '');
-  if (!digits) return '';
-  if (digits.startsWith('00')) digits = digits.slice(2); // 0044... international prefix
-  if (digits.startsWith('44')) return '+' + digits;
-  if (digits.startsWith('0')) return '+44' + digits.slice(1); // 07... national
-  return '+44' + digits; // bare national, e.g. 7375694427
+  let d = (input || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('00')) d = d.slice(2); // 0044... international prefix
+  if (d.startsWith('44')) d = d.slice(2); // 44... country code
+  d = d.replace(/^0+/, ''); // 07... national, or a stray leading zero
+  if (!d) return '';
+  return '+44' + d;
 }
 
 export interface WaitlistSignup {

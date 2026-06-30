@@ -20,6 +20,7 @@ import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
 import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/email';
 import {
   findUserIdByPhone,
+  debugUserLookup,
   claimMessage,
   insertTransaction,
   transactionSummaryForUser,
@@ -396,7 +397,8 @@ function isMileage(body: string): boolean {
 async function handleMileage(from: string, messageId: string, body: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
-    await sendText(from, 'Open the app and add your number first, then I can log your mileage.');
+    const diag = await debugUserLookup(from);
+    await sendText(from, `Open the app and add your number first. [debug: ${diag}]`);
     return;
   }
   const m = body.match(MILEAGE_RE);

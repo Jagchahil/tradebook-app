@@ -811,6 +811,19 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* MTD urgency strip */}
+      <section style={{ maxWidth: 1320, margin: '0 auto', padding: '14px 24px 0' }}>
+        <a href="#mtd" className="reveal card" style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'space-between', background: SAFFRON_TINT, border: `1px solid #EAD6A8`, borderRadius: 16, padding: '16px 22px', color: INK }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 260, flex: 1 }}>
+            <span style={{ fontSize: 24 }}>⏳</span>
+            <p style={{ fontSize: 15, color: INK, lineHeight: 1.5, margin: 0 }}>
+              <strong>Making Tax Digital is live.</strong> Earn over £50,000 self employed? You now have to keep digital records and send HMRC four updates a year. Lekhio keeps you ready from a text, no spreadsheets.
+            </p>
+          </div>
+          <span style={{ fontSize: 14, fontWeight: 800, color: SAFFRON_DEEP, whiteSpace: 'nowrap' }}>What this means for me →</span>
+        </a>
+      </section>
+
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: '20px 24px 30px' }}><RiverDivider /></div>
 
       {/* How it works (stepper) */}
@@ -1008,6 +1021,20 @@ export default function HomePage() {
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 14px' }}>Free tools you can use right now.</h2>
           <p style={{ fontSize: 17, color: MUTED, maxWidth: 560, margin: '0 auto' }}>No account, no card. Try the tools that do the maths for you, then let Lekhio do the rest by text.</p>
         </div>
+
+        {/* Featured: CIS refund estimator */}
+        <Link href="/cis-calculator" className="reveal card" style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap', justifyContent: 'space-between', background: INK, borderRadius: 20, padding: '28px 30px', color: '#fff', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, minWidth: 280, flex: 1 }}>
+            <div style={{ width: 56, height: 56, borderRadius: 15, background: 'rgba(224,163,62,0.18)', color: SAFFRON, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>🧱</div>
+            <div>
+              <div style={{ display: 'inline-block', background: 'rgba(34,197,94,0.18)', color: '#7BE0A0', fontSize: 11, fontWeight: 800, letterSpacing: '0.5px', padding: '3px 9px', borderRadius: 12, marginBottom: 8 }}>NEW · FOR SUBCONTRACTORS</div>
+              <h3 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px', margin: '0 0 5px' }}>Are you owed a CIS tax refund?</h3>
+              <p style={{ fontSize: 15, color: '#B6BDC8', lineHeight: 1.55, margin: 0, maxWidth: 520 }}>CIS comes off your pay before you see it, as if it were all profit. After your allowance and expenses, most subbies are owed money back. See your estimate in seconds.</p>
+            </div>
+          </div>
+          <span className="btn-primary" style={{ display: 'inline-block', background: SAFFRON, color: INK, fontSize: 15.5, fontWeight: 800, padding: '14px 26px', borderRadius: 12, whiteSpace: 'nowrap' }}>Check my refund →</span>
+        </Link>
+
         <div className="grid4" style={{ display: 'grid', gap: 18 }}>
           {freeTools.map((t, i) => (
             <Link key={t.href} href={t.href} className="card" style={{ transitionDelay: `${(i % 4) * 80}ms`, backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 24, color: INK, display: 'flex', flexDirection: 'column' }}>

@@ -464,6 +464,7 @@ export async function deleteUserData(userId: string, email: string | null): Prom
   await del(`invoices?user_id=eq.${encodeURIComponent(userId)}`);
   await del(`events?user_id=eq.${encodeURIComponent(userId)}`);
   await del(`reminder_prefs?user_id=eq.${encodeURIComponent(userId)}`);
+  await del(`hmrc_connections?user_id=eq.${encodeURIComponent(userId)}`);
   await del(`users?id=eq.${encodeURIComponent(userId)}`);
   // Server-only rows keyed by phone/email (these do NOT cascade from users).
   if (phone) {
@@ -480,6 +481,58 @@ export async function deleteUserData(userId: string, email: string | null): Prom
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
   return authRes.ok;
+}
+
+// --- HMRC MTD connection (OAuth tokens) -----------------------------------
+// Service role only. The app never reads these; it only ever asks the server to
+// start the connect flow or to act. Tokens are written by the OAuth callback.
+
+export interface HmrcConnection {
+  user_id: string;
+  access_token: string | null;
+  refresh_token: string | null;
+  expires_at: string | null;
+  nino: string | null;
+  business_id: string | null;
+}
+
+// Store (or refresh) the tokens for a user after a successful OAuth exchange.
+export async function saveHmrcConnection(
+  userId: string,
+  tokens: { access_token: string; refresh_token: string; expires_at: string },
+): Promise<boolean> {
+  const { url } = config();
+  const row = {
+    user_id: userId,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    expires_at: tokens.expires_at,
+    updated_at: new Date().toISOString(),
+  };
+  const res = await fetch(`${url}/rest/v1/hmrc_connections?on_conflict=user_id`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify(row),
+  });
+  return res.ok;
+}
+
+// Read a user's stored connection (server-side only).
+export async function getHmrcConnection(userId: string): Promise<HmrcConnection | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/hmrc_connections?user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as HmrcConnection[];
+  return rows[0] ?? null;
+}
+
+// Whether a user has linked their HMRC account (no tokens are returned).
+export async function hasHmrcConnection(userId: string): Promise<boolean> {
+  const c = await getHmrcConnection(userId);
+  return Boolean(c && c.access_token);
 }
 
 // --- Events / diary / reminders -------------------------------------------

@@ -22,11 +22,45 @@
 //
 // No SDK. Raw fetch, same as the rest of the codebase.
 
+import crypto from 'crypto';
+
 const SANDBOX = 'https://test-api.service.hmrc.gov.uk';
 const BASE = process.env.HMRC_BASE_URL || SANDBOX;
 const CLIENT_ID = process.env.HMRC_CLIENT_ID;
 const CLIENT_SECRET = process.env.HMRC_CLIENT_SECRET;
 const REDIRECT_URI = process.env.HMRC_REDIRECT_URI;
+
+// --- OAuth state (CSRF + carries which user is connecting) ------------------
+// The connect flow happens in a browser, away from the app's auth session, so
+// the `state` parameter has to round-trip the user id back to the callback. We
+// sign it (HMAC) with a server-only secret and expire it, so it cannot be forged
+// or replayed. Never put the raw user id on the wire without the signature.
+const STATE_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.HMRC_CLIENT_SECRET || 'lekhio-hmrc-state';
+const STATE_TTL_MS = 15 * 60 * 1000;
+
+export function signState(userId: string): string {
+  const ts = Date.now().toString(36);
+  const payload = `${userId}.${ts}`;
+  const sig = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex').slice(0, 32);
+  return Buffer.from(`${payload}.${sig}`).toString('base64url');
+}
+
+export function verifyState(state: string): string | null {
+  try {
+    const decoded = Buffer.from(state, 'base64url').toString('utf8');
+    const parts = decoded.split('.');
+    if (parts.length !== 3) return null;
+    const [userId, ts, sig] = parts;
+    const expected = crypto.createHmac('sha256', STATE_SECRET).update(`${userId}.${ts}`).digest('hex').slice(0, 32);
+    const a = Buffer.from(sig);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+    if (Date.now() - parseInt(ts, 36) > STATE_TTL_MS) return null;
+    return userId;
+  } catch {
+    return null;
+  }
+}
 
 export function isHmrcConfigured(): boolean {
   return Boolean(CLIENT_ID && CLIENT_SECRET && REDIRECT_URI);
@@ -40,6 +74,16 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // --- OAuth 2.0 (user-restricted endpoints) ---------------------------------
 
+// HMRC's OAuth authorize endpoint lives on a DIFFERENT host from the API/token
+// endpoint: the token host is (test-api|api).service.hmrc.gov.uk, but the user
+// is sent to (test-www|www).tax.service.hmrc.gov.uk to sign in and grant access.
+// Get this wrong and the connect link 404s, so derive it explicitly.
+function authorizeBase(): string {
+  return isLiveHmrc()
+    ? 'https://www.tax.service.hmrc.gov.uk'
+    : 'https://test-www.tax.service.hmrc.gov.uk';
+}
+
 // The URL we send the user to so they can grant Lekhio permission to file for
 // them. Scope covers reading and writing their Self Assessment data.
 export function authorizeUrl(state: string): string | null {
@@ -51,7 +95,7 @@ export function authorizeUrl(state: string): string | null {
     state,
     redirect_uri: REDIRECT_URI,
   });
-  return `${BASE.replace('test-api', 'test-www').replace('//api.', '//www.')}/oauth/authorize?${params.toString()}`;
+  return `${authorizeBase()}/oauth/authorize?${params.toString()}`;
 }
 
 interface TokenSet {

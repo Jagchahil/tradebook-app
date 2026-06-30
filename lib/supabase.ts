@@ -401,6 +401,87 @@ export async function getSubscriptionByPhone(phone: string): Promise<Subscriptio
   return rows[0] ?? null;
 }
 
+// --- GDPR: data export and erasure (the user acting on their own account) ----
+
+export interface AccountExport {
+  exported_at: string;
+  user: unknown;
+  transactions: unknown[];
+  invoices: unknown[];
+  events: unknown[];
+  reminder_prefs: unknown[];
+  subscriptions: unknown[];
+  signups: unknown[];
+}
+
+// Gather everything held about one user, scoped to them. Service role only.
+export async function exportUserData(userId: string, email: string | null): Promise<AccountExport> {
+  const { url } = config();
+  const get = async (path: string): Promise<unknown[]> => {
+    const res = await fetch(`${url}/rest/v1/${path}`, { headers: headers() });
+    return res.ok ? ((await res.json()) as unknown[]) : [];
+  };
+  const phone = await getPhoneForUser(userId);
+  const [user, transactions, invoices, events, reminder_prefs] = await Promise.all([
+    get(`users?id=eq.${encodeURIComponent(userId)}&select=*`),
+    get(`transactions?user_id=eq.${encodeURIComponent(userId)}&select=*`),
+    get(`invoices?user_id=eq.${encodeURIComponent(userId)}&select=*`),
+    get(`events?user_id=eq.${encodeURIComponent(userId)}&select=*`),
+    get(`reminder_prefs?user_id=eq.${encodeURIComponent(userId)}&select=*`),
+  ]);
+  const subsByPhone = phone ? await get(`subscriptions?phone=eq.${encodeURIComponent(phone)}&select=*`) : [];
+  const subsByEmail = email ? await get(`subscriptions?email=eq.${encodeURIComponent(email)}&select=*`) : [];
+  const seen = new Set<string>();
+  const subscriptions = [...subsByPhone, ...subsByEmail].filter((s) => {
+    const id = (s as { stripe_subscription_id?: string }).stripe_subscription_id || JSON.stringify(s);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  const signups = email ? await get(`signups?email=eq.${encodeURIComponent(email)}&select=*`) : [];
+  return {
+    exported_at: new Date().toISOString(),
+    user: user[0] ?? null,
+    transactions,
+    invoices,
+    events,
+    reminder_prefs,
+    subscriptions,
+    signups,
+  };
+}
+
+// Right to erasure: delete every row for this user across all tables, including
+// the server-only ones that do not cascade from `users`, then the auth user.
+export async function deleteUserData(userId: string, email: string | null): Promise<boolean> {
+  const { url, key } = config();
+  const phone = await getPhoneForUser(userId);
+  const del = async (path: string): Promise<void> => {
+    await fetch(`${url}/rest/v1/${path}`, { method: 'DELETE', headers: headers({ Prefer: 'return=minimal' }) });
+  };
+  // User-owned rows (FKs cascade from users, but delete explicitly to be sure).
+  await del(`transactions?user_id=eq.${encodeURIComponent(userId)}`);
+  await del(`invoices?user_id=eq.${encodeURIComponent(userId)}`);
+  await del(`events?user_id=eq.${encodeURIComponent(userId)}`);
+  await del(`reminder_prefs?user_id=eq.${encodeURIComponent(userId)}`);
+  await del(`users?id=eq.${encodeURIComponent(userId)}`);
+  // Server-only rows keyed by phone/email (these do NOT cascade from users).
+  if (phone) {
+    await del(`subscriptions?phone=eq.${encodeURIComponent(phone)}`);
+    await del(`waitlist?phone=eq.${encodeURIComponent(phone)}`);
+  }
+  if (email) {
+    await del(`subscriptions?email=eq.${encodeURIComponent(email)}`);
+    await del(`signups?email=eq.${encodeURIComponent(email)}`);
+  }
+  // Finally remove the auth identity itself (admin API, service role).
+  const authRes = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  return authRes.ok;
+}
+
 // --- Events / diary / reminders -------------------------------------------
 
 export interface NewEvent {

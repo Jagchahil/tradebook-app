@@ -66,7 +66,7 @@ export default function StartPage() {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, offer, email: email.trim() }),
+        body: JSON.stringify({ plan, offer, email: email.trim(), phone }),
       });
       const data = (await res.json().catch(() => ({}))) as { url?: string };
       if (data?.url) {

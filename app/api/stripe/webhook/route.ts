@@ -35,6 +35,7 @@ function subscriptionRowFrom(sub: Record<string, unknown>): SubscriptionRecord |
     cancel_at_period_end: typeof sub.cancel_at_period_end === 'boolean' ? (sub.cancel_at_period_end as boolean) : null,
   };
   if (typeof sub.customer === 'string') row.stripe_customer_id = sub.customer;
+  if (metadata.phone) row.phone = metadata.phone; // the account key, carried from checkout
   return row;
 }
 
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
         const customer = (typeof obj.customer === 'string' ? obj.customer : undefined) ?? undefined;
         const details = (obj.customer_details ?? {}) as Record<string, unknown>;
         const email = (details.email as string | undefined) || (obj.customer_email as string | undefined) || null;
+        const phone = metadata.phone || null; // the account key, from the session metadata
 
         if (subId) {
           const sub = await getStripeSubscription(subId);
@@ -73,12 +75,14 @@ export async function POST(req: NextRequest) {
           if (row) {
             if (email) row.email = email;
             if (customer) row.stripe_customer_id = customer;
+            if (phone && !row.phone) row.phone = phone;
             await upsertSubscription(row);
           } else {
             // Fall back to what the session already gave us, so we never lose a sale.
             await upsertSubscription({
               stripe_subscription_id: subId,
               email,
+              phone,
               stripe_customer_id: customer ?? null,
               plan: metadata.plan || null,
               offer: metadata.offer || null,

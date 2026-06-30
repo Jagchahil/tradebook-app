@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import {
   getDueReminders,
-  markReminded,
+  claimDueReminder,
   getPhoneForUser,
   listNudgeTargets,
   weeklyTotals,
@@ -67,13 +67,11 @@ export async function GET(req: NextRequest) {
     if (job === 'due') {
       const due = await getDueReminders(new Date().toISOString());
       await mapLimit(due, 20, async (r) => {
+        // Claim atomically before sending; if another run already took it, skip.
+        if (!(await claimDueReminder(r.id))) return;
         const phone = await getPhoneForUser(r.user_id);
-        if (!phone) {
-          await markReminded(r.id);
-          return;
-        }
+        if (!phone) return;
         await sendTemplate(phone, 'lekhio_reminder', 'en_GB', [r.title]);
-        await markReminded(r.id);
         sent++;
       });
     } else if (job === 'nudge') {

@@ -324,6 +324,7 @@ export async function verifyAccessToken(token: string): Promise<VerifiedUser | n
 
 export interface SubscriptionRecord {
   email?: string | null;
+  phone?: string | null;
   stripe_customer_id?: string | null;
   stripe_subscription_id: string;
   plan?: string | null;
@@ -346,6 +347,7 @@ export async function upsertSubscription(rec: SubscriptionRecord): Promise<void>
     updated_at: new Date().toISOString(),
   };
   if (rec.email != null) body.email = rec.email;
+  if (rec.phone != null) body.phone = rec.phone;
   if (rec.stripe_customer_id != null) body.stripe_customer_id = rec.stripe_customer_id;
   if (rec.plan != null) body.plan = rec.plan;
   if (rec.offer != null) body.offer = rec.offer;
@@ -377,6 +379,26 @@ export async function getStripeCustomerByEmail(email: string): Promise<string | 
   if (!res.ok) return null;
   const rows = (await res.json()) as Array<{ stripe_customer_id?: string | null }>;
   return rows[0]?.stripe_customer_id ?? null;
+}
+
+// Resolve a phone (E.164 +44) to its latest subscription state, so entitlement can
+// be checked for a phone-only account that has no email. Service role only.
+export interface SubscriptionStatus {
+  status: string | null;
+  plan: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean | null;
+}
+export async function getSubscriptionByPhone(phone: string): Promise<SubscriptionStatus | null> {
+  const { url } = config();
+  if (!phone) return null;
+  const res = await fetch(
+    `${url}/rest/v1/subscriptions?phone=eq.${encodeURIComponent(phone)}&select=status,plan,current_period_end,cancel_at_period_end&order=updated_at.desc&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as SubscriptionStatus[];
+  return rows[0] ?? null;
 }
 
 // --- Events / diary / reminders -------------------------------------------
@@ -424,11 +446,26 @@ export async function getDueReminders(nowIso: string, limit = 100): Promise<DueR
 
 export async function markReminded(id: string): Promise<void> {
   const { url } = config();
-  await fetch(`${url}/rest/v1/events?id=eq.${id}`, {
+  await fetch(`${url}/rest/v1/events?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: headers({ Prefer: 'return=minimal' }),
     body: JSON.stringify({ reminded: true }),
   });
+}
+
+// Atomically claim a due reminder: flip reminded false->true and only return true
+// if THIS call did the flip. The cron claims before sending, so two overlapping or
+// retried runs can never send the same reminder twice.
+export async function claimDueReminder(id: string): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/events?id=eq.${encodeURIComponent(id)}&reminded=eq.false`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=representation' }),
+    body: JSON.stringify({ reminded: true }),
+  });
+  if (!res.ok) return false;
+  const rows = (await res.json().catch(() => [])) as unknown[];
+  return Array.isArray(rows) && rows.length > 0;
 }
 
 export async function getPhoneForUser(userId: string): Promise<string | null> {
@@ -448,9 +485,22 @@ export interface NudgeTarget {
 
 export async function listNudgeTargets(): Promise<NudgeTarget[]> {
   const { url } = config();
-  const ures = await fetch(`${url}/rest/v1/users?select=id,phone_number&phone_number=not.is.null`, { headers: headers() });
-  if (!ures.ok) return [];
-  const users = (await ures.json()) as Array<{ id: string; phone_number: string }>;
+  const users: Array<{ id: string; phone_number: string }> = [];
+  let after = '';
+  // Keyset pagination so we never pull the whole users table in one giant response.
+  for (let page = 0; page < 200; page++) {
+    const cursor = after ? `&id=gt.${encodeURIComponent(after)}` : '';
+    const ures = await fetch(
+      `${url}/rest/v1/users?select=id,phone_number&phone_number=not.is.null&order=id.asc&limit=1000${cursor}`,
+      { headers: headers() },
+    );
+    if (!ures.ok) break;
+    const batch = (await ures.json()) as Array<{ id: string; phone_number: string }>;
+    if (batch.length === 0) break;
+    users.push(...batch);
+    if (batch.length < 1000) break;
+    after = batch[batch.length - 1].id;
+  }
   const pres = await fetch(`${url}/rest/v1/reminder_prefs?select=user_id,daily_nudges,weekly_summary`, { headers: headers() });
   const prefs = pres.ok ? ((await pres.json()) as Array<{ user_id: string; daily_nudges: boolean; weekly_summary: boolean }>) : [];
   const pmap = new Map(prefs.map((p) => [p.user_id, p]));

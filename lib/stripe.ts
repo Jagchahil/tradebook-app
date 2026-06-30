@@ -101,6 +101,7 @@ export interface SubscriptionCheckoutInput {
   plan: BillingPlan;
   offer?: string | null;
   email?: string | null;
+  phone?: string | null;
   successUrl: string;
   cancelUrl: string;
 }
@@ -131,6 +132,12 @@ export async function createSubscriptionCheckout(input: SubscriptionCheckoutInpu
   form.set('subscription_data[metadata][plan]', input.plan);
   form.set('subscription_data[metadata][offer]', offer);
   form.set('subscription_data[metadata][amount_pence]', String(amount));
+  // The phone is the account key. Carry it on the subscription AND the session so the
+  // webhook can tie this payment back to a phone-only account.
+  if (input.phone) {
+    form.set('subscription_data[metadata][phone]', input.phone);
+    form.set('metadata[phone]', input.phone);
+  }
   // And on the session, so checkout.session.completed can tell this from an invoice.
   form.set('metadata[kind]', 'subscription');
   form.set('metadata[plan]', input.plan);

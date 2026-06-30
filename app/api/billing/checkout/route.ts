@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSubscriptionCheckout, hasStripeConfig, type BillingPlan } from '../../../../lib/stripe';
+import { normalizeUkPhone } from '../../../../lib/supabase';
 
 // Start a real Lekhio subscription. The page posts the chosen plan and any founder
 // offer, we create a Stripe Checkout session with a 30 day free trial, and return
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
   const plan: BillingPlan = str(body.plan, 16).toLowerCase() === 'annual' ? 'annual' : 'monthly';
   const offer = str(body.offer, 40);
   const email = str(body.email, 200).trim() || null;
+  const phone = normalizeUkPhone(str(body.phone, 20)) || null; // E.164 +44, the account key
 
   const base = (process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin).replace(/\/$/, '');
 
@@ -31,6 +33,7 @@ export async function POST(req: NextRequest) {
     plan,
     offer,
     email,
+    phone,
     successUrl: `${base}/start?billing=success`,
     cancelUrl: `${base}/start?billing=cancelled`,
   });

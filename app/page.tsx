@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { TRADES } from '../lib/trades';
 
 export const metadata: Metadata = {
   title: 'Lekhio. Your books, handled. Just text it.',
@@ -518,9 +519,55 @@ const chatCss =
     })
     .join('');
 
+const SITE = 'https://tradebook-app-five.vercel.app';
+
 export default function HomePage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
+      {/* Structured data for search engines. Organization + the app + the FAQ.
+          No review/rating markup: the testimonials are illustrative composites,
+          and faking aggregateRating risks a Google penalty. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@graph': [
+              {
+                '@type': 'Organization',
+                '@id': `${SITE}/#org`,
+                name: 'Lekhio',
+                url: SITE,
+                logo: `${SITE}/lekhio-logo.svg`,
+                description:
+                  'WhatsApp-first bookkeeping and Making Tax Digital prep for UK self-employed tradespeople.',
+              },
+              {
+                '@type': 'SoftwareApplication',
+                name: 'Lekhio',
+                applicationCategory: 'FinanceApplication',
+                operatingSystem: 'iOS, Android, Web',
+                url: SITE,
+                description:
+                  'Text a receipt, voice note or invoice to WhatsApp. Lekhio logs it, categorises it, and keeps you ready for Making Tax Digital. You approve before anything reaches HMRC.',
+                offers: [
+                  { '@type': 'Offer', price: '19.99', priceCurrency: 'GBP', category: 'Monthly subscription' },
+                  { '@type': 'Offer', price: '199', priceCurrency: 'GBP', category: 'Annual subscription' },
+                ],
+                publisher: { '@id': `${SITE}/#org` },
+              },
+              {
+                '@type': 'FAQPage',
+                mainEntity: faqs.map((f) => ({
+                  '@type': 'Question',
+                  name: f.q,
+                  acceptedAnswer: { '@type': 'Answer', text: f.a },
+                })),
+              },
+            ],
+          }),
+        }}
+      />
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -911,6 +958,20 @@ export default function HomePage() {
               <span key={a} className="chip" style={{ fontSize: 14, fontWeight: 500, color: '#fff', backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', padding: '9px 16px', borderRadius: 22 }}>{a}</span>
             ))}
             <span style={{ fontSize: 14, fontWeight: 600, color: SAFFRON, padding: '9px 16px' }}>and everyone else.</span>
+          </div>
+
+          {/* Per trade landing pages. Internal links so each is one click from the
+              homepage and indexable for "bookkeeping for <trade>" searches. */}
+          <div className="reveal" style={{ display: 'flex', flexWrap: 'wrap', gap: 9, justifyContent: 'center', maxWidth: 940, margin: '26px auto 0' }}>
+            {TRADES.map((t) => (
+              <Link
+                key={t.slug}
+                href={`/for/${t.slug}`}
+                style={{ fontSize: 13.5, fontWeight: 600, color: '#fff', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', padding: '8px 14px', borderRadius: 20 }}
+              >
+                {t.emoji} For {t.plural}
+              </Link>
+            ))}
           </div>
         </div>
       </section>

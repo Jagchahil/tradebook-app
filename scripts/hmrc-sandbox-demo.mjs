@@ -116,6 +116,15 @@ function demoFraudContext(userId) {
     windowSize: 'width=1440&height=900',
     timezone: 'UTC+00:00',
     vendorVersion: process.env.npm_package_version || '1.0.0',
+    // DEMO PLACEHOLDERS for the two conditional headers, so the validator shows a
+    // fully clean pass. In production these are a real decision:
+    //   multiFactor  -> report your actual MFA event. Lekhio signs users in with
+    //                   phone OTP, which is a factor you can and should report.
+    //   licenseIds   -> Lekhio has no per-device license keys (it is SaaS), so you
+    //                   either send a hashed account id or declare to HMRC that this
+    //                   header does not apply. Do not ship this fake value live.
+    multiFactor: 'type=OTHER&timestamp=2026-07-01T13%3A20Z&unique-reference=0283da60063abfb3a87f1aed845d17fe2d9ba8c780b478dc4ae048f5ee97a6d5',
+    licenseIds: 'lekhio-web=8D7963490527D33716835EE7C195516D5E562E03B224E9B359836466EE40CDE1',
   };
 }
 

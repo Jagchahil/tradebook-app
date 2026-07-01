@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { soleTraderTax, FACTS } from '../../lib/taxengine';
+import LeadCapture from '../../components/LeadCapture';
 
 const INK = '#111111';
 const RIVER = '#1B59A6';
@@ -102,6 +103,15 @@ export default function Calc() {
         </p>
         <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: '#fff', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Let Lekhio track every expense for you →</Link>
       </div>
+
+      {/* Consent engine: only shown once they have a result, so the email is
+          never a condition of using the free tool. */}
+      {hasInput ? (
+        <LeadCapture
+          source="cis-calculator"
+          resultNote={`CIS ${refund ? 'refund' : 'to pay'} est ${gbp(Math.abs(r.balance))}`}
+        />
+      ) : null}
     </div>
   );
 }

@@ -262,6 +262,42 @@ export async function insertWaitlistSignup(signup: WaitlistSignup): Promise<void
   }
 }
 
+// --- Marketing leads (the consent engine) ---------------------------------
+// A lead captured from a free tool, WITH proof of consent. Stored server side
+// only. Re submitting the same email merges (updates consent), it does not error.
+export interface MarketingLead {
+  email: string;
+  source?: string | null;
+  result_note?: string | null;
+  consent: boolean;
+  consent_text?: string | null;
+  ip?: string | null;
+  user_agent?: string | null;
+}
+
+export async function insertMarketingLead(lead: MarketingLead): Promise<void> {
+  const { url } = config();
+  const record: Record<string, unknown> = {
+    email: lead.email,
+    source: lead.source ?? null,
+    result_note: lead.result_note ?? null,
+    consent: lead.consent,
+    consent_text: lead.consent_text ?? null,
+    consent_at: lead.consent ? new Date().toISOString() : null,
+    ip: lead.ip ?? null,
+    user_agent: lead.user_agent ?? null,
+  };
+  const res = await fetch(`${url}/rest/v1/marketing_leads?on_conflict=email`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify(record),
+  });
+  if (!res.ok) {
+    // No response body in the error: it can contain the submitted email.
+    throw new Error(`Marketing lead insert failed: ${res.status}`);
+  }
+}
+
 export interface OnboardSignup {
   phone: string;
   email?: string | null;

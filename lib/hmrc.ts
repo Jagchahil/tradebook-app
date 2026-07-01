@@ -82,12 +82,14 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // HMRC's OAuth authorize endpoint lives on a DIFFERENT host from the API/token
 // endpoint: the token host is (test-api|api).service.hmrc.gov.uk, but the user
-// is sent to (test-www|www).tax.service.hmrc.gov.uk to sign in and grant access.
-// Get this wrong and the connect link 404s, so derive it explicitly.
+// is sent to the GOV.UK tax service to sign in and grant access. Note the sign-in
+// host is (test-www|www).tax.service.gov.uk, with NO "hmrc" in it, unlike the API
+// host. Getting this wrong makes the connect link fail to resolve (NXDOMAIN), so
+// derive it explicitly. Verified against HMRC's user-restricted-endpoints docs.
 function authorizeBase(): string {
   return isLiveHmrc()
-    ? 'https://www.tax.service.hmrc.gov.uk'
-    : 'https://test-www.tax.service.hmrc.gov.uk';
+    ? 'https://www.tax.service.gov.uk'
+    : 'https://test-www.tax.service.gov.uk';
 }
 
 // The URL we send the user to so they can grant Lekhio permission to file for

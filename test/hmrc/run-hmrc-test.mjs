@@ -94,5 +94,18 @@ ok('forwarded header chains vendor then client IP', H.fraudPreventionHeaders(ful
 ok('user id header uses lekhio=<id>', H.fraudPreventionHeaders(fullCtx)['Gov-Client-User-IDs'] === 'lekhio=user-123');
 ok('public IP timestamp defaults when IP present but no ts', typeof H.fraudPreventionHeaders({ clientPublicIp: '198.51.100.0' })['Gov-Client-Public-IP-Timestamp'] === 'string');
 
+// --- OAuth authorize host regression --------------------------------------
+// The sign-in host must be the GOV.UK tax service (test-www.tax.service.gov.uk),
+// NOT test-www.tax.service.hmrc.gov.uk, which does not resolve. Load a fresh
+// module instance with credentials set so authorizeUrl returns a URL.
+process.env.HMRC_CLIENT_ID = 'test-client';
+process.env.HMRC_REDIRECT_URI = 'http://localhost:8610/callback';
+const H2 = await import(`${pathToFileURL(path.resolve(here, '../../lib/hmrc.ts')).href}?v=authhost`);
+const authUrl = H2.authorizeUrl('state123') || '';
+ok('authorize host is test-www.tax.service.gov.uk (sandbox, no hmrc)', authUrl.startsWith('https://test-www.tax.service.gov.uk/oauth/authorize'));
+ok('authorize URL carries the client id and redirect', authUrl.includes('client_id=test-client') && authUrl.includes('callback'));
+delete process.env.HMRC_CLIENT_ID;
+delete process.env.HMRC_REDIRECT_URI;
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# HMRC sandbox demo local state (tokens, test-user creds) - never commit
+.hmrc-sandbox.json

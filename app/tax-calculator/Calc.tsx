@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import LeadCapture from '../../components/LeadCapture';
 
 // 2026/27, England, Wales and Northern Ireland. Personal allowance £12,570
 // (tapered above £100,000), basic 20% then higher 40% then additional 45%.
@@ -100,6 +101,7 @@ export default function Calc() {
   const saved = Math.round(e * marginalRate(t > 12570 ? t : profit));
 
   return (
+    <>
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28, alignItems: 'start' }} className="calc-grid">
       {/* Inputs */}
       <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
@@ -140,5 +142,7 @@ export default function Calc() {
 
       <style>{`@media (max-width:820px){.calc-grid{grid-template-columns:1fr!important}}`}</style>
     </div>
+    <LeadCapture source="tax-calculator" resultNote={`Tax est ${gbp(totalTax)} on ${gbp(profit)} profit`} />
+    </>
   );
 }

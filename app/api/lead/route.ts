@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { insertMarketingLead } from '../../../lib/supabase';
 import { rateLimited, clientIp } from '../../../lib/ratelimit';
+import { hasEmailConfig, sendLeadConfirmEmail } from '../../../lib/email';
+import { confirmUrl, unsubscribeUrl } from '../../../lib/leadtoken';
 
 // Consent engine endpoint. Stores a marketing lead ONLY with an explicit, true
 // consent flag, together with the exact wording the user agreed to, a timestamp,
@@ -52,6 +54,19 @@ export async function POST(req: NextRequest) {
       ip: clientIp(req),
       user_agent: (req.headers.get('user-agent') || '').slice(0, 300),
     });
+
+    // Double opt in. If email is configured, send a confirmation link after the
+    // response so it never slows the request. If email is off, the consent record
+    // already stands on its own (single opt in is lawful), so nothing breaks.
+    if (hasEmailConfig()) {
+      after(async () => {
+        try {
+          await sendLeadConfirmEmail(email, confirmUrl(email), unsubscribeUrl(email));
+        } catch {
+          /* best effort */
+        }
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {

@@ -298,6 +298,41 @@ export async function insertMarketingLead(lead: MarketingLead): Promise<void> {
   }
 }
 
+// Mark a lead as double opt in confirmed (they clicked the confirm link).
+export async function setLeadConfirmed(email: string): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/marketing_leads?email=eq.${encodeURIComponent(email.toLowerCase())}`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ confirmed_at: new Date().toISOString() }),
+  });
+  return res.ok;
+}
+
+// Mark a lead as unsubscribed. From this point they are excluded from all sends.
+export async function setLeadUnsubscribed(email: string): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/marketing_leads?email=eq.${encodeURIComponent(email.toLowerCase())}`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ unsubscribed_at: new Date().toISOString() }),
+  });
+  return res.ok;
+}
+
+// The list we may lawfully email: consented and not unsubscribed. Confirmed only
+// is stricter and better for deliverability; pass confirmedOnly true once double
+// opt in is live.
+export async function listMarketableLeads(confirmedOnly = false): Promise<string[]> {
+  const { url } = config();
+  let q = `${url}/rest/v1/marketing_leads?select=email&consent=is.true&unsubscribed_at=is.null`;
+  if (confirmedOnly) q += '&confirmed_at=not.is.null';
+  const res = await fetch(q, { headers: headers() });
+  if (!res.ok) return [];
+  const rows = (await res.json()) as Array<{ email: string }>;
+  return rows.map((r) => r.email).filter(Boolean);
+}
+
 export interface OnboardSignup {
   phone: string;
   email?: string | null;

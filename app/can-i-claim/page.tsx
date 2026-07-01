@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { EXPENSE_RULES, TAX_TIPS, VERDICT_LABEL, type Verdict } from '../../lib/taxrules';
+import LeadCapture from '../../components/LeadCapture';
 
 export const metadata: Metadata = {
   title: 'Can I claim it? UK self employed expenses, answered straight | Lekhio',
@@ -212,6 +213,15 @@ export default function CanIClaimPage() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* Consent engine */}
+      <section style={{ maxWidth: 720, margin: '0 auto', padding: '8px 24px 0' }}>
+        <LeadCapture
+          source="can-i-claim"
+          heading="Get the claim answers, plus your tax reminders"
+          sub="Pop your email in and we will send you a handy claim guide, then the odd genuinely useful nudge about deadlines and money you could claim back. No spam, unsubscribe any time."
+        />
       </section>
 
       {/* CTA */}

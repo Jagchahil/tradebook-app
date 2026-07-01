@@ -109,3 +109,66 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
     return false;
   }
 }
+
+// --- Consent engine emails ------------------------------------------------
+
+// Double opt in confirmation. We only start sending marketing to someone once
+// they click this, which protects deliverability and gives a second proof of
+// consent. Dormant until Resend is configured.
+export async function sendLeadConfirmEmail(to: string, confirmLink: string, unsubscribeLink: string): Promise<boolean> {
+  if (!KEY || !looksLikeEmail(to)) return false;
+  const fromAddr = FROM.replace(/.*</, '').replace(/>.*/, '');
+  const html = `
+  <div style="font-family:Inter,-apple-system,'Segoe UI',sans-serif;color:${INK};max-width:520px;margin:0 auto;padding:24px">
+    <p style="font-size:18px;font-weight:700;margin:0 0 12px">One quick tap to confirm.</p>
+    <p style="font-size:15px;line-height:1.6;color:${MUTED}">You asked us to send your result and keep you right on your tax deadlines. Tap below to confirm and you are all set.</p>
+    <p style="margin:24px 0"><a href="${confirmLink}" style="background:${RIVER};color:#fff;text-decoration:none;font-weight:600;padding:13px 24px;border-radius:10px;display:inline-block">Confirm my email</a></p>
+    <p style="font-size:13px;color:${MUTED}">If you did not request this, ignore this email and nothing will happen. You can <a href="${unsubscribeLink}" style="color:${MUTED}">unsubscribe</a> any time. Lekhio is not HMRC.</p>
+  </div>`;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: `Lekhio <${fromAddr}>`,
+        to: [to],
+        subject: 'Confirm your email to get your result and reminders',
+        html,
+        headers: { 'List-Unsubscribe': `<${unsubscribeLink}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// A marketing email to a consented contact. Always carries a working unsubscribe
+// link and the List-Unsubscribe headers that inboxes expect. Dormant until Resend
+// is configured.
+export async function sendMarketingEmail(to: string, subject: string, bodyHtml: string, unsubscribeLink: string): Promise<boolean> {
+  if (!KEY || !looksLikeEmail(to)) return false;
+  const fromAddr = FROM.replace(/.*</, '').replace(/>.*/, '');
+  const html = `
+  <div style="font-family:Inter,-apple-system,'Segoe UI',sans-serif;color:${INK};max-width:560px;margin:0 auto;padding:24px">
+    ${bodyHtml}
+    <hr style="border:none;border-top:1px solid #ECECEC;margin:28px 0 14px" />
+    <p style="font-size:12px;color:${MUTED};line-height:1.6">You are getting this because you asked Lekhio for tax reminders and tips. <a href="${unsubscribeLink}" style="color:${MUTED}">Unsubscribe</a> any time. Lekhio is an independent UK company, not HMRC.</p>
+  </div>`;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: `Lekhio <${fromAddr}>`,
+        to: [to],
+        subject,
+        html,
+        headers: { 'List-Unsubscribe': `<${unsubscribeLink}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

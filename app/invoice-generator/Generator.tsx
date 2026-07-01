@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import LeadCapture from '../../components/LeadCapture';
 
 // Fully client side. No AI, no server, no cost. The browser does the maths and
 // the "Save as PDF" is the browser's own print to PDF, so it never calls us.
@@ -355,6 +356,14 @@ export default function Generator() {
 
           <div style={{ marginTop: 26, textAlign: 'center', fontSize: 11.5, color: '#A8AFB8' }}>Made free with Lekhio · lekhio.com</div>
         </div>
+      </div>
+      <div className="no-print" style={{ maxWidth: 900, margin: '22px auto 0' }}>
+        <LeadCapture
+          source="invoice-generator"
+          heading="Never miss a tax deadline"
+          sub="Invoice sorted. Now let us keep you right on the tax side. Pop your email in for MTD deadline reminders and money saving tips. No spam, unsubscribe any time."
+          resultNote="used invoice generator"
+        />
       </div>
     </div>
   );

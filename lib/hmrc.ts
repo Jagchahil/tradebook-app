@@ -150,35 +150,112 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenSet
 }
 
 // --- Fraud prevention headers (mandatory on every MTD call) -----------------
-// HMRC require Gov-Client-* and Gov-Vendor-* headers so they can see the origin
-// of a submission. This is the documented minimum for a server-hosted vendor.
-// The values come from the request context, never invented. Missing context is
-// sent as the literal HMRC expects rather than a guess.
+// HMRC require a full set of Gov-Client-* and Gov-Vendor-* headers on the
+// WEB_APP_VIA_SERVER connection method so they can see the origin of a
+// submission. This is NOT a "minimum" of three; HMRC's "Test Fraud Prevention
+// Headers" validator (and recognition) expects the complete set below. Some
+// values can only be collected in the user's browser (JS user agent, screen and
+// window geometry, timezone, public TCP port, MFA state) and must be captured
+// client-side and passed through to the server. The rest the server derives from
+// the request (public IPs, timestamp, forwarded chain) or from config (device id,
+// product name, version, user id). We SEND what we have and never invent a value;
+// where the browser could not supply one, omitting it is HMRC's documented
+// "unable to collect" behaviour, better than a fabricated value.
+//
+// Reference: developer.service.hmrc.gov.uk/guides/fraud-prevention/connection-method/web-app-via-server
+//
+// Formats that matter (enforced below):
+//   - percent-encode keys and values, but NOT the separators (= & , )
+//   - Gov-Vendor-Version and Gov-Vendor-License-IDs use software=value pairs
+//   - Gov-Client-Public-IP-Timestamp is yyyy-MM-ddThh:mm:ss.sssZ (UTC)
+//   - Gov-Vendor-Forwarded lists by=<vendorIP>&for=<clientIP> per internet hop
+
+const pe = (s: string) => encodeURIComponent(s);
 
 export interface FraudContext {
-  deviceId?: string; // a stable per-user id we generate, not personal data
-  userIpAddress?: string; // the end user's public IP, from the request
-  userAgent?: string;
-  vendorVersion?: string;
+  // Server-derivable (from the incoming request / config):
+  deviceId?: string; // stable per-device UUID we generate and persist, not PII
+  userId?: string; // our internal user id, for Gov-Client-User-IDs (lekhio=<id>)
+  clientPublicIp?: string; // the end user's public IP, from the request
+  clientPublicIpTimestamp?: string; // ISO ms UTC; defaults to now if IP present
+  vendorPublicIp?: string; // the public IP HMRC received our request on
+  vendorVersion?: string; // our software version, e.g. '1.0.0'
+  vendorProductName?: string; // defaults to 'Lekhio'
+  // Client-collected (must be gathered in the browser and forwarded):
+  clientPublicPort?: string; // the client's public TCP source port
+  browserJsUserAgent?: string; // navigator.userAgent from the browser
+  screens?: string; // pre-formatted, e.g. 'width=1920&height=1080&scaling-factor=1&colour-depth=24'
+  windowSize?: string; // pre-formatted, e.g. 'width=1256&height=803'
+  timezone?: string; // e.g. 'UTC+00:00'
+  multiFactor?: string; // pre-formatted MFA list, omit if none
+  licenseIds?: string; // pre-formatted vendor license pairs, omit if none
 }
 
 export function fraudPreventionHeaders(ctx: FraudContext): Record<string, string> {
   const h: Record<string, string> = {
     'Gov-Client-Connection-Method': 'WEB_APP_VIA_SERVER',
-    'Gov-Vendor-Product-Name': 'Lekhio',
-    'Gov-Vendor-Version': `lekhio=${ctx.vendorVersion || '1.0.0'}`,
+    'Gov-Vendor-Product-Name': pe(ctx.vendorProductName || 'Lekhio'),
+    'Gov-Vendor-Version': `lekhio-web=${pe(ctx.vendorVersion || '1.0.0')}`,
   };
+
   if (ctx.deviceId) h['Gov-Client-Device-ID'] = ctx.deviceId;
-  if (ctx.userIpAddress) h['Gov-Client-Public-IP'] = ctx.userIpAddress;
-  if (ctx.userAgent) h['Gov-Client-User-Agent'] = ctx.userAgent;
+  if (ctx.userId) h['Gov-Client-User-IDs'] = `lekhio=${pe(ctx.userId)}`;
+
+  if (ctx.clientPublicIp) {
+    h['Gov-Client-Public-IP'] = ctx.clientPublicIp;
+    h['Gov-Client-Public-IP-Timestamp'] = ctx.clientPublicIpTimestamp || new Date().toISOString();
+    // First internet hop: our server (by) received the client's request (for).
+    if (ctx.vendorPublicIp) {
+      h['Gov-Vendor-Forwarded'] = `by=${pe(ctx.vendorPublicIp)}&for=${pe(ctx.clientPublicIp)}`;
+    }
+  }
+  if (ctx.vendorPublicIp) h['Gov-Vendor-Public-IP'] = ctx.vendorPublicIp;
+
+  if (ctx.clientPublicPort) h['Gov-Client-Public-Port'] = ctx.clientPublicPort;
+  if (ctx.browserJsUserAgent) h['Gov-Client-Browser-JS-User-Agent'] = ctx.browserJsUserAgent;
+  if (ctx.screens) h['Gov-Client-Screens'] = ctx.screens;
+  if (ctx.windowSize) h['Gov-Client-Window-Size'] = ctx.windowSize;
+  if (ctx.timezone) h['Gov-Client-Timezone'] = ctx.timezone;
+  if (ctx.multiFactor) h['Gov-Client-Multi-Factor'] = ctx.multiFactor;
+  if (ctx.licenseIds) h['Gov-Vendor-License-IDs'] = ctx.licenseIds;
+
   return h;
 }
 
-// --- Quarterly periodic update: build the payload from our transactions -----
+// Which required WEB_APP_VIA_SERVER headers are still missing from a context.
+// Use this in the sandbox against the Test Fraud Prevention Headers API to see
+// exactly what the client still needs to collect before recognition.
+export function missingFraudHeaders(ctx: FraudContext): string[] {
+  const have = fraudPreventionHeaders(ctx);
+  const required = [
+    'Gov-Client-Connection-Method',
+    'Gov-Client-Browser-JS-User-Agent',
+    'Gov-Client-Device-ID',
+    'Gov-Client-Public-IP',
+    'Gov-Client-Public-IP-Timestamp',
+    'Gov-Client-Public-Port',
+    'Gov-Client-Screens',
+    'Gov-Client-Timezone',
+    'Gov-Client-User-IDs',
+    'Gov-Client-Window-Size',
+    'Gov-Vendor-Forwarded',
+    'Gov-Vendor-Product-Name',
+    'Gov-Vendor-Public-IP',
+    'Gov-Vendor-Version',
+  ];
+  return required.filter((k) => !(k in have));
+}
+
+// --- Cumulative period update: build the payload from our transactions ------
 // Software's job (per HMRC) is to turn transactions into summary totals. We map
 // each Lekhio category to the MTD self-employment field, then emit the documented
 // shape. Traders under the £90,000 turnover line may send a single consolidated
 // expenses figure; everyone else sends the category breakdown.
+//
+// CUMULATIVE model (2025-26 onward): feed this the transactions for the WHOLE
+// year to date (accounting-period start up to the end of the latest quarter),
+// not just the current quarter, and set periodEndDate to the latest quarter end.
+// The output is the running year-to-date summary the cumulative endpoint expects.
 
 export interface SimpleTxn {
   amount: number; // positive income, negative expense
@@ -285,13 +362,21 @@ export async function submitQuarterlyUpdate(args: SubmitArgs): Promise<{ ok: boo
   if (args.approved !== true) throw new ApprovalRequiredError();
   if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
 
-  // Self Employment Business (MTD) API, create/amend the period summary.
-  const url = `${BASE}/individuals/business/self-employment/${encodeURIComponent(args.nino)}/${encodeURIComponent(args.businessId)}/period/${encodeURIComponent(args.taxYear)}`;
+  // Self Employment Business (MTD) API v5.0, "Create and Amend a Self-Employment
+  // Cumulative Period Summary". From tax year 2025-26 HMRC replaced the old
+  // discrete quarterly "period" endpoint with a single CUMULATIVE summary per
+  // year: each update carries the running year-to-date totals from the start of
+  // the accounting period to the end of the latest quarter, and HMRC recalculates
+  // from the most recent submission. So `args.payload` must hold year-to-date
+  // figures, not just this quarter. The path and version below are the current
+  // ones (verified against the live OAS); the old /period/ + vnd.hmrc.3.0 path is
+  // retired for 2025-26 onward.
+  const url = `${BASE}/individuals/business/self-employment/${encodeURIComponent(args.nino)}/${encodeURIComponent(args.businessId)}/cumulative/${encodeURIComponent(args.taxYear)}`;
   const res = await fetch(url, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${args.accessToken}`,
-      Accept: 'application/vnd.hmrc.3.0+json',
+      Accept: 'application/vnd.hmrc.5.0+json',
       'Content-Type': 'application/json',
       ...fraudPreventionHeaders(args.fraud),
     },
@@ -308,7 +393,7 @@ export async function retrieveObligations(nino: string, accessToken: string, fra
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/vnd.hmrc.2.0+json',
+      Accept: 'application/vnd.hmrc.3.0+json',
       ...fraudPreventionHeaders(fraud),
     },
   });

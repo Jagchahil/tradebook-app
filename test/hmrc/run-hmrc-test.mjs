@@ -68,5 +68,31 @@ try {
 }
 ok('approved + no credentials = dormant, no send', dormant && dormant.body === 'hmrc_not_configured');
 
+// --- Fraud prevention headers (WEB_APP_VIA_SERVER) ------------------------
+// The always-on headers must be present even with an empty context.
+const baseHdr = H.fraudPreventionHeaders({});
+ok('connection method is WEB_APP_VIA_SERVER', baseHdr['Gov-Client-Connection-Method'] === 'WEB_APP_VIA_SERVER');
+ok('vendor product name always sent', baseHdr['Gov-Vendor-Product-Name'] === 'Lekhio');
+ok('vendor version uses software=value form', baseHdr['Gov-Vendor-Version'] === 'lekhio-web=1.0.0');
+
+// A full context should satisfy every required header (nothing missing).
+const fullCtx = {
+  deviceId: 'beec798b-b366-47fa-b1f8-92cede14a1ce',
+  userId: 'user-123',
+  clientPublicIp: '198.51.100.0',
+  clientPublicIpTimestamp: '2026-07-01T14:30:05.123Z',
+  vendorPublicIp: '203.0.113.6',
+  clientPublicPort: '12345',
+  browserJsUserAgent: 'Mozilla/5.0',
+  screens: 'width=1920&height=1080&scaling-factor=1&colour-depth=24',
+  windowSize: 'width=1256&height=803',
+  timezone: 'UTC+00:00',
+};
+ok('full context leaves no required header missing', H.missingFraudHeaders(fullCtx).length === 0);
+ok('empty context reports the client-collected headers missing', H.missingFraudHeaders({}).length > 0);
+ok('forwarded header chains vendor then client IP', H.fraudPreventionHeaders(fullCtx)['Gov-Vendor-Forwarded'] === 'by=203.0.113.6&for=198.51.100.0');
+ok('user id header uses lekhio=<id>', H.fraudPreventionHeaders(fullCtx)['Gov-Client-User-IDs'] === 'lekhio=user-123');
+ok('public IP timestamp defaults when IP present but no ts', typeof H.fraudPreventionHeaders({ clientPublicIp: '198.51.100.0' })['Gov-Client-Public-IP-Timestamp'] === 'string');
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

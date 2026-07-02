@@ -450,12 +450,40 @@ create table if not exists public.subscriptions (
 -- resolved by phone, not just email.
 alter table public.subscriptions add column if not exists phone text;
 
+-- Defensive: upsertSubscription writes updated_at on EVERY Stripe webhook, and
+-- reads order by updated_at.desc. If this table predates the column in any
+-- environment, the bare `create table if not exists` above is a no-op and every
+-- webhook PATCH would be rejected (billing silently frozen) -- the exact failure
+-- we hit on bank_connections. Never rely on the create block to introduce a
+-- written column; guarantee it with an explicit alter.
+alter table public.subscriptions add column if not exists updated_at timestamptz not null default now();
+create index if not exists subscriptions_phone_updated_idx on public.subscriptions(phone, updated_at desc);
+
 create index if not exists subscriptions_email_idx on public.subscriptions(email);
 create index if not exists subscriptions_customer_idx on public.subscriptions(stripe_customer_id);
 create index if not exists subscriptions_phone_idx on public.subscriptions(phone);
 
 alter table public.subscriptions enable row level security;
 -- No policies. Service role only, the same as the other server-written tables.
+
+-- ---------------------------------------------------------------------------
+-- Stripe webhook idempotency + replay protection
+-- ---------------------------------------------------------------------------
+-- Every Stripe event id is claimed here once, before any state mutation, so a
+-- Stripe retry (Stripe re-delivers when we are slow to answer 200) can never
+-- reprocess the same event and, for example, book a payment twice or double a
+-- subscription change. The webhook inserts the id right after the signature
+-- check: a 201 means first delivery (proceed), a 409 means duplicate (answer
+-- 200 and do nothing). Service role only, so anon and authenticated clients can
+-- never read or write it. Additive and safe to run on a live database.
+create table if not exists public.stripe_events (
+  id         text primary key,
+  type       text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.stripe_events enable row level security;
+-- No policies. Service role only.
 
 -- ---------------------------------------------------------------------------
 -- HMRC MTD connection: the OAuth tokens that let Lekhio file for a user. These
@@ -475,6 +503,34 @@ create table if not exists public.hmrc_connections (
 
 alter table public.hmrc_connections enable row level security;
 -- No policies. Service role only.
+
+-- ---------------------------------------------------------------------------
+-- HMRC approval audit trail
+-- ---------------------------------------------------------------------------
+-- The non-negotiable rule is that we PREPARE and the user APPROVES. Every write
+-- to HMRC (a quarterly update, a final declaration, a BSAS adjustment, a loss
+-- record or claim) passes an explicit approved === true gate in lib/hmrc.ts.
+-- This table is the durable record of each approval: who approved, what kind of
+-- submission, the figures they signed off, and when. It is written best effort
+-- with the service role key just before the HMRC network call, so we can always
+-- prove a human approved the exact numbers that were filed. A user may read
+-- their own approvals; only the server writes them. Additive and safe.
+create table if not exists public.hmrc_approvals (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null,
+  submission_type text not null,
+  calculation_id  text,
+  period_key      text,
+  figures         jsonb,
+  approved_at     timestamptz not null default now()
+);
+
+alter table public.hmrc_approvals enable row level security;
+-- A user can read their own approval history; the server writes with the
+-- service role key, which bypasses RLS, so there is no insert policy.
+create policy hmrc_approvals_own on public.hmrc_approvals
+  for select using (auth.uid() = user_id);
+create index if not exists hmrc_approvals_user_idx on public.hmrc_approvals (user_id, approved_at desc);
 
 -- ---------------------------------------------------------------------------
 -- Conventions (decided 2026-06-24 while the transactions table was still empty)
@@ -606,11 +662,21 @@ create table if not exists public.bank_connections (
   updated_at       timestamptz not null default now()
 );
 
--- Upgrade path if the earlier GoCardless shaped table exists: add the token
--- columns and relax the requisition column it no longer uses.
+-- Upgrade path if the earlier GoCardless shaped table exists: add every column
+-- the TrueLayer flow needs and relax the requisition column it no longer uses.
+-- The bare `create table if not exists` above is a no-op when the old table is
+-- already present, so these alters are the ONLY thing that brings such a table
+-- up to shape. updated_at MUST be here: lib/supabase.ts writes updated_at on
+-- every bank_connections PATCH, so if the column is absent every status/token
+-- update is rejected and connections stay stuck at 'created' (the bank card
+-- never flips to connected). See migration APPLY_2026-07-02_bankconn_updated_at.sql.
 alter table public.bank_connections add column if not exists access_token     text;
 alter table public.bank_connections add column if not exists refresh_token    text;
 alter table public.bank_connections add column if not exists token_expires_at timestamptz;
+alter table public.bank_connections add column if not exists reference        text;
+alter table public.bank_connections add column if not exists account_ids      jsonb not null default '[]';
+alter table public.bank_connections add column if not exists last_synced_date date;
+alter table public.bank_connections add column if not exists updated_at       timestamptz not null default now();
 do $$ begin
   if exists (select 1 from information_schema.columns
              where table_schema = 'public' and table_name = 'bank_connections'

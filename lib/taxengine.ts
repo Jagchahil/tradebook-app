@@ -16,6 +16,22 @@
 
 export const TAX_YEAR = '2026/27';
 
+// --- Tax-year staleness guard -----------------------------------------------
+// The figures in FACTS below are the published 2026/27 rates. They stop being
+// correct the moment the 2026/27 tax year ends, on 5 April 2027, because the
+// next Budget resets rates, thresholds and allowances.
+//
+// IMPORTANT: when the next Budget lands, you MUST bump the rates in FACTS AND
+// this date TOGETHER. Changing one without the other is the bug this guard
+// exists to catch. isTaxYearStale lets callers (the calculator, the WhatsApp
+// answers) warn the user, or refuse a stale estimate, once the year is over and
+// the numbers have not been refreshed.
+export const TAX_YEAR_VALID_UNTIL = '2027-04-05';
+
+export function isTaxYearStale(now: Date = new Date()): boolean {
+  return now > new Date(TAX_YEAR_VALID_UNTIL + 'T23:59:59Z');
+}
+
 // --- Published figures, 2026/27 (England, Wales, Northern Ireland) ----------
 export const FACTS = {
   taxYear: '2026/27',

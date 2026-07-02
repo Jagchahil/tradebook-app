@@ -12,7 +12,7 @@ import {
 } from '../../../../lib/supabase';
 import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
 import { hasBankFeedConfig } from '../../../../lib/bankfeed';
-import { syncAllLinked } from '../../../../lib/banksync';
+import { syncPageResumable } from '../../../../lib/banksync';
 
 // The reminder engine. Hit on a schedule (Vercel Cron, Supabase pg_cron, or any
 // external cron such as cron-job.org). Guarded by CRON_SECRET.
@@ -77,13 +77,16 @@ async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<v
 }
 
 // Trigger the next hop. The continuation acks immediately (same handler), so
-// this await resolves in milliseconds and never chains durations.
-async function triggerContinuation(job: string, afterId: string, hop: number): Promise<void> {
+// this await resolves in milliseconds and never chains durations. `afterId` is
+// nullable so this doubles as the kick off for a chain that starts with no
+// cursor (the daily run starting the bank feed walk from the first connection).
+async function triggerContinuation(job: string, afterId: string | null, hop: number): Promise<void> {
   const secret = process.env.CRON_SECRET;
   if (!secret) return;
+  const cursor = afterId ? `&after=${encodeURIComponent(afterId)}` : '';
   try {
     await fetch(
-      `${APP_URL}/api/cron/reminders?job=${encodeURIComponent(job)}&after=${encodeURIComponent(afterId)}&hop=${hop}`,
+      `${APP_URL}/api/cron/reminders?job=${encodeURIComponent(job)}${cursor}&hop=${hop}`,
       { headers: { Authorization: `Bearer ${secret}` } },
     );
   } catch (err) {
@@ -137,15 +140,73 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
   console.log(`[cron] job=${job} hop=${hop} sent=${sent} complete`);
 }
 
-// Pull new bank transactions for every linked connection. Dormant without the
-// bank feed keys. Each line is idempotent on the bank's own transaction id and
-// deduped against the user's recent WhatsApp captures, and every insert lands
-// unconfirmed so the approval gate holds. A time budget keeps the ride along
-// job from starving the reminders; at real scale this moves to its own
-// continuation chain like the nudges.
-async function syncBankFeeds(budgetMs = 25_000): Promise<{ connections: number; inserted: number }> {
-  if (!hasBankFeedConfig()) return { connections: 0, inserted: 0 };
-  return syncAllLinked(budgetMs);
+// The bank feed sync as a RESUMABLE hop chain, mirroring fanOut() above. This is
+// what actually reaches all 20,000+ connections: one invocation reads and syncs
+// one keyset page within a budget, then triggers a continuation of itself with
+// the cursor of the last connection id it saw. Each continuation acks
+// immediately (same handler, work in after()), so no invocation ever waits on
+// another and durations never chain.
+//
+// HOW THE CHAIN TERMINATES. Two independent guards, either of which stops it:
+//   1. Completion. syncPageResumable reports done=true as soon as a page comes
+//      back smaller than its page limit. Because connections are read strictly
+//      ordered by id ascending and every hop asks for id greater than the last
+//      cursor, the cursor is strictly increasing over a finite id set, so the
+//      walk must reach a final short (or empty) page and stop. No further hop is
+//      triggered once done is true.
+//   2. Hop cap. Even if something went wrong (e.g. a cursor that failed to
+//      advance), the hop counter is capped at MAX_HOPS. Once hop+1 would exceed
+//      the cap we log and stop without triggering another hop. So a loop is
+//      impossible: it ends on the last page, or on the cap, whichever comes
+//      first.
+async function bankFeedFanOut(startAfter: string | null, hop: number): Promise<void> {
+  if (!hasBankFeedConfig()) return; // dormant without the bank feed keys
+  const started = Date.now();
+  let cursor = startAfter;
+  let processed = 0;
+  let inserted = 0;
+
+  for (;;) {
+    const remaining = SEND_BUDGET_MS - (Date.now() - started);
+    if (remaining <= 0) {
+      // Budget spent mid page set. Hand the cursor to a continuation so the walk
+      // resumes exactly where it left off, unless we would exceed the hop cap.
+      if (hop + 1 > MAX_HOPS) {
+        console.error(`[cron] job=bankfeed hop cap reached at hop=${hop}, stopping with cursor set`);
+        break;
+      }
+      if (!cursor) break; // no progress made yet, nothing to resume from
+      console.log(`[cron] job=bankfeed hop=${hop} processed=${processed} inserted=${inserted} continuing after=${cursor}`);
+      await triggerContinuation('bankfeed', cursor, hop + 1);
+      return;
+    }
+
+    // Concurrency 5: each connection makes several TrueLayer calls (refresh then
+    // per account transactions), so a smaller pool than the WhatsApp sends keeps
+    // us well within TrueLayer's rate limits (429s are retried in bankfeed.ts).
+    const page = await syncPageResumable(cursor, remaining, 5);
+    processed += page.processed;
+    inserted += page.inserted;
+
+    if (page.done) break; // final short/empty page: the walk is complete
+
+    // Guard against a stuck cursor (should never happen given id.asc ordering):
+    // if the cursor did not advance, stop rather than loop forever.
+    if (!page.lastId || page.lastId === cursor) break;
+    cursor = page.lastId;
+
+    // If the budget is now spent, the top of the loop handles the handover.
+    if (Date.now() - started > SEND_BUDGET_MS) {
+      if (hop + 1 > MAX_HOPS) {
+        console.error(`[cron] job=bankfeed hop cap reached at hop=${hop}, stopping with cursor set`);
+        break;
+      }
+      console.log(`[cron] job=bankfeed hop=${hop} processed=${processed} inserted=${inserted} continuing after=${cursor}`);
+      await triggerContinuation('bankfeed', cursor, hop + 1);
+      return;
+    }
+  }
+  console.log(`[cron] job=bankfeed hop=${hop} processed=${processed} inserted=${inserted} complete`);
 }
 
 async function runJob(job: string, afterId: string | null, hop: number): Promise<void> {
@@ -161,23 +222,31 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
         await sendTemplate(phone, 'lekhio_reminder', 'en_GB', [r.title]);
         sent++;
       });
-      // Housekeeping and the bank feed sync ride along with the daily run, so
-      // no extra cron entry is needed (a bad cron config once silently blocked
-      // every deploy, and the Hobby plan caps how many cron jobs a project may
-      // declare). Both are no-ops until their features are switched on.
+      // Housekeeping rides along with the daily run, so no extra cron entry is
+      // needed (a bad cron config once silently blocked every deploy, and the
+      // Hobby plan caps how many cron jobs a project may declare). No-op until
+      // the feature is switched on.
       const { pruned } = await pruneOldRows();
-      const bank = await syncBankFeeds();
-      console.log(`[cron] job=due sent=${sent} pruned=${pruned} bankConnections=${bank.connections} bankInserted=${bank.inserted}`);
+      // Kick off the bank feed walk as its OWN resumable hop chain rather than
+      // syncing inline. Inline could only ever reach a handful of the 20k+
+      // connections inside this one invocation's budget; the chain fans out
+      // across successive invocations and covers them all. Fire and forget: the
+      // first hop acks immediately, so the due job does not wait on it. It is a
+      // no-op without the bank feed keys.
+      if (hasBankFeedConfig()) {
+        await triggerContinuation('bankfeed', null, 1);
+      }
+      console.log(`[cron] job=due sent=${sent} pruned=${pruned} bankfeed=${hasBankFeedConfig() ? 'kicked' : 'dormant'}`);
     } else if (job === 'nudge' || job === 'weekly') {
       await fanOut(job, afterId, hop);
     } else if (job === 'cleanup') {
       const { pruned } = await pruneOldRows();
       console.log(`[cron] job=cleanup pruned=${pruned}`);
     } else if (job === 'bankfeed') {
-      // Manual trigger for testing and catch up runs; the daily due job also
-      // runs this automatically.
-      const bank = await syncBankFeeds(50_000);
-      console.log(`[cron] job=bankfeed connections=${bank.connections} inserted=${bank.inserted}`);
+      // The resumable bank feed walk. The daily due job kicks off the first hop
+      // (?job=bankfeed with no cursor); each hop self-continues with ?after=
+      // until the whole linked set is covered. Also usable as a manual trigger.
+      await bankFeedFanOut(afterId, hop);
     }
   } catch (err) {
     console.error('[cron] error', err instanceof Error ? err.message : err);

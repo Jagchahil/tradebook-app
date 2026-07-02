@@ -72,6 +72,53 @@ export function isHmrcConfigured(): boolean {
   return Boolean(CLIENT_ID && CLIENT_SECRET && REDIRECT_URI);
 }
 
+// --- Approval audit trail ---------------------------------------------------
+// We PREPARE, the user APPROVES. Every write below passes an explicit
+// approved === true gate. Just before the HMRC network call we record the
+// approval durably: who approved, what kind of submission, and the key figures
+// they signed off. This is our proof that a human agreed to the exact numbers
+// filed. It is BEST EFFORT: written with the service role key, and if the write
+// fails we log and carry on. Recording the approval must never block a
+// submission the user has already agreed to. Never throws.
+async function recordApproval(row: {
+  userId?: string;
+  submissionType: string;
+  calculationId?: string;
+  periodKey?: string;
+  figures?: Record<string, unknown>;
+}): Promise<void> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // user_id is not null in the schema. Without a user id we cannot write a valid
+  // row, so skip rather than fail the submission the user already approved.
+  if (!url || !key || !row.userId) {
+    if (!row.userId) console.error('[hmrc] approval not recorded: no user id in scope');
+    return;
+  }
+  try {
+    const res = await fetch(`${url}/rest/v1/hmrc_approvals`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        user_id: row.userId,
+        submission_type: row.submissionType,
+        calculation_id: row.calculationId ?? null,
+        period_key: row.periodKey ?? null,
+        figures: row.figures ?? null,
+      }),
+    });
+    if (!res.ok) console.error('[hmrc] approval audit write failed:', res.status);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[hmrc] approval audit write errored:', message);
+  }
+}
+
 export function isLiveHmrc(): boolean {
   return BASE.includes('://api.service.hmrc.gov.uk');
 }
@@ -351,6 +398,7 @@ export interface SubmitArgs {
   payload: PeriodicUpdate;
   approved: boolean; // must be explicitly true
   fraud: FraudContext;
+  userId?: string; // our internal user id, recorded in the approval audit trail
 }
 
 export class ApprovalRequiredError extends Error {
@@ -363,6 +411,21 @@ export class ApprovalRequiredError extends Error {
 export async function submitQuarterlyUpdate(args: SubmitArgs): Promise<{ ok: boolean; status: number; body?: unknown }> {
   if (args.approved !== true) throw new ApprovalRequiredError();
   if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
+
+  // Record the approval before the network call. The period key is the latest
+  // quarter end date. Figures are the year-to-date totals being submitted.
+  await recordApproval({
+    userId: args.userId,
+    submissionType: 'quarterly-update',
+    periodKey: args.payload.periodDates.periodEndDate,
+    figures: {
+      taxYear: args.taxYear,
+      businessId: args.businessId,
+      periodDates: args.payload.periodDates,
+      periodIncome: args.payload.periodIncome,
+      periodExpenses: args.payload.periodExpenses,
+    },
+  });
 
   // Self Employment Business (MTD) API v5.0, "Create and Amend a Self-Employment
   // Cumulative Period Summary". From tax year 2025-26 HMRC replaced the old
@@ -469,9 +532,22 @@ export async function submitFinalDeclaration(args: {
   approved: boolean;
   fraud: FraudContext;
   govTestScenario?: string;
+  userId?: string; // our internal user id, recorded in the approval audit trail
 }): Promise<{ ok: boolean; status: number; body?: unknown }> {
   if (args.approved !== true) throw new ApprovalRequiredError();
   if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
+
+  // Record the approval before crystallising. This is the irreversible step, so
+  // the audit row (which calculation the user finalised, for which year) matters
+  // most here.
+  await recordApproval({
+    userId: args.userId,
+    submissionType: 'final-declaration',
+    calculationId: args.calculationId,
+    periodKey: args.taxYear,
+    figures: { taxYear: args.taxYear, calculationId: args.calculationId },
+  });
+
   const url = `${BASE}/individuals/calculations/${encodeURIComponent(args.nino)}/self-assessment/${encodeURIComponent(args.taxYear)}/${encodeURIComponent(args.calculationId)}/final-declaration`;
   const headers: Record<string, string> = {
     Authorization: `Bearer ${args.accessToken}`,
@@ -528,9 +604,21 @@ export async function submitBsasAdjustments(args: {
   approved: boolean;
   accessToken: string;
   fraud: FraudContext;
+  userId?: string; // our internal user id, recorded in the approval audit trail
 }): Promise<{ ok: boolean; status: number; body?: unknown }> {
   if (args.approved !== true) throw new ApprovalRequiredError();
   if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
+
+  // Record the approval before the network call. The adjustments themselves are
+  // the key figures the user signed off.
+  await recordApproval({
+    userId: args.userId,
+    submissionType: 'bsas-adjustment',
+    calculationId: args.calculationId,
+    periodKey: args.taxYear,
+    figures: { taxYear: args.taxYear, calculationId: args.calculationId, adjustments: args.adjustments },
+  });
+
   const url = `${BASE}/individuals/self-assessment/adjustable-summary/${encodeURIComponent(args.nino)}/self-employment/${encodeURIComponent(args.calculationId)}/adjust/${encodeURIComponent(args.taxYear)}`;
   const res = await fetch(url, {
     method: 'PUT',
@@ -553,9 +641,19 @@ const LOSS_VERSION = 'application/vnd.hmrc.6.0+json';
 // Creating a loss record changes what the user owes, so like every other write
 // to HMRC it sits behind the approval gate: the caller must pass approved: true
 // from an explicit user action. The gate is built before the automation.
-export async function createBroughtForwardLoss(nino: string, taxYearBroughtForwardFrom: string, lossBody: Record<string, unknown>, accessToken: string, fraud: FraudContext, approved: boolean): Promise<{ ok: boolean; status: number; lossId?: string; body?: unknown }> {
+export async function createBroughtForwardLoss(nino: string, taxYearBroughtForwardFrom: string, lossBody: Record<string, unknown>, accessToken: string, fraud: FraudContext, approved: boolean, userId?: string): Promise<{ ok: boolean; status: number; lossId?: string; body?: unknown }> {
   if (approved !== true) throw new ApprovalRequiredError();
   if (!isHmrcConfigured()) return { ok: false, status: 0 };
+
+  // Record the approval before the network call. The loss body carries the
+  // figures the user signed off (typeOfLoss, businessId, lossAmount, etc.).
+  await recordApproval({
+    userId,
+    submissionType: 'brought-forward-loss',
+    periodKey: taxYearBroughtForwardFrom,
+    figures: { taxYearBroughtForwardFrom, lossBody },
+  });
+
   const url = `${BASE}/individuals/losses/${encodeURIComponent(nino)}/brought-forward-losses/tax-year/brought-forward-from/${encodeURIComponent(taxYearBroughtForwardFrom)}`;
   const res = await fetch(url, {
     method: 'POST',
@@ -575,9 +673,18 @@ export async function listBroughtForwardLosses(nino: string, taxYear: string, ac
 }
 
 // Approval gated for the same reason as createBroughtForwardLoss above.
-export async function createLossClaim(nino: string, claimBody: Record<string, unknown>, accessToken: string, fraud: FraudContext, approved: boolean): Promise<{ ok: boolean; status: number; claimId?: string; body?: unknown }> {
+export async function createLossClaim(nino: string, claimBody: Record<string, unknown>, accessToken: string, fraud: FraudContext, approved: boolean, userId?: string): Promise<{ ok: boolean; status: number; claimId?: string; body?: unknown }> {
   if (approved !== true) throw new ApprovalRequiredError();
   if (!isHmrcConfigured()) return { ok: false, status: 0 };
+
+  // Record the approval before the network call. The claim body carries the
+  // figures the user signed off (typeOfLoss, typeOfClaim, taxYearClaimedFor).
+  await recordApproval({
+    userId,
+    submissionType: 'loss-claim',
+    figures: { claimBody },
+  });
+
   const url = `${BASE}/individuals/losses/${encodeURIComponent(nino)}/loss-claims`;
   const res = await fetch(url, {
     method: 'POST',

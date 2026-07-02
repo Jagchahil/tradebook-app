@@ -8,6 +8,8 @@
 // Never import this from client code. The service role key must never reach the
 // browser.
 
+import { encryptSecret, decryptSecret } from './crypto';
+
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -394,8 +396,27 @@ export async function verifyAccessToken(token: string): Promise<VerifiedUser | n
       headers: { apikey: anon, Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;
-    const u = (await res.json()) as { id?: string; email?: string | null };
+    const u = (await res.json()) as {
+      id?: string;
+      email?: string | null;
+      is_anonymous?: boolean;
+      app_metadata?: { is_anonymous?: boolean } | null;
+    };
     if (!u?.id) return null;
+    // Defense in depth: reject anonymous sessions server side. The Supabase
+    // project may still allow anonymous sign in, and an anonymous JWT is a valid,
+    // Supabase-signed token, so token validation alone would let one through.
+    // GoTrue marks these with is_anonymous: true (top level on the /auth/v1/user
+    // response, and sometimes mirrored in app_metadata).
+    //
+    // This is GATED so it can ship now without breaking the current app, which
+    // still logs in anonymously until phone OTP is switched on. Flip it on at
+    // launch, together with turning OFF anonymous sign in at the Supabase
+    // project and enforcing OTP, by setting REJECT_ANON_USERS=true. Until then
+    // the behaviour is unchanged.
+    const rejectAnon = process.env.REJECT_ANON_USERS === 'true';
+    const isAnon = u.is_anonymous === true || u.app_metadata?.is_anonymous === true;
+    if (rejectAnon && isAnon) return null;
     return { id: u.id, email: u.email ?? null };
   } catch {
     return null;
@@ -552,15 +573,26 @@ export async function deleteUserData(userId: string, email: string | null): Prom
   await del(`events?user_id=eq.${encodeURIComponent(userId)}`);
   await del(`reminder_prefs?user_id=eq.${encodeURIComponent(userId)}`);
   await del(`hmrc_connections?user_id=eq.${encodeURIComponent(userId)}`);
+  // Bank tokens + connection rows. These cascade when the users row goes, but
+  // delete first and explicitly so erasure never leaves a live banking token
+  // behind if the users delete were to fail.
+  await del(`bank_connections?user_id=eq.${encodeURIComponent(userId)}`);
+  // Audit trail holds user_id + ip_address (personal data under UK GDPR).
+  await del(`audit_log?user_id=eq.${encodeURIComponent(userId)}`);
   await del(`users?id=eq.${encodeURIComponent(userId)}`);
   // Server-only rows keyed by phone/email (these do NOT cascade from users).
   if (phone) {
     await del(`subscriptions?phone=eq.${encodeURIComponent(phone)}`);
     await del(`waitlist?phone=eq.${encodeURIComponent(phone)}`);
+    // In-flight WhatsApp session state (may hold draft invoice/customer data).
+    await del(`wa_sessions?phone=eq.${encodeURIComponent(phone)}`);
   }
   if (email) {
     await del(`subscriptions?email=eq.${encodeURIComponent(email)}`);
     await del(`signups?email=eq.${encodeURIComponent(email)}`);
+    await del(`waitlist?email=eq.${encodeURIComponent(email)}`);
+    // Marketing capture holds email + ip + user agent (personal data).
+    await del(`marketing_leads?email=eq.${encodeURIComponent(email)}`);
   }
   // Finally remove the auth identity itself (admin API, service role).
   const authRes = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
@@ -589,10 +621,11 @@ export async function saveHmrcConnection(
   tokens: { access_token: string; refresh_token: string; expires_at: string },
 ): Promise<boolean> {
   const { url } = config();
+  // Encrypt the OAuth tokens at rest. No-op until BANK_TOKEN_KEY is set.
   const row = {
     user_id: userId,
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
+    access_token: encryptSecret(tokens.access_token),
+    refresh_token: encryptSecret(tokens.refresh_token),
     expires_at: tokens.expires_at,
     updated_at: new Date().toISOString(),
   };
@@ -613,7 +646,13 @@ export async function getHmrcConnection(userId: string): Promise<HmrcConnection 
   );
   if (!res.ok) return null;
   const rows = (await res.json()) as HmrcConnection[];
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  if (!row) return null;
+  // Decrypt the OAuth tokens so callers see plaintext. Legacy plaintext rows
+  // (written before encryption was enabled) pass through unchanged.
+  row.access_token = decryptSecret(row.access_token);
+  row.refresh_token = decryptSecret(row.refresh_token);
+  return row;
 }
 
 // Whether a user has linked their HMRC account (no tokens are returned).
@@ -954,7 +993,12 @@ export async function totalsForUser(
   category: string | null,
 ): Promise<UserTotals | null> {
   const { url } = config();
-  let q = `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&select=amount,cis_deduction,transaction_date,created_at&limit=5000`;
+  // Confirmed-only: a WhatsApp "how much have I made / spent / owe" answer must
+  // never present un-reviewed data (e.g. freshly imported bank lines that are
+  // still "to review") as a settled figure. This matches the app's tax tab and
+  // the approved-only rule. Filtering here also shrinks the row set well under
+  // the 5000 cap for all but the heaviest users.
+  let q = `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.true&select=amount,cis_deduction,transaction_date,created_at&limit=5000`;
   if (category) q += `&category=eq.${encodeURIComponent(category)}`;
   const res = await fetch(q, { headers: headers() });
   if (!res.ok) return null;
@@ -1079,7 +1123,16 @@ export async function getBankConnectionByReference(reference: string): Promise<B
   );
   if (!res.ok) return null;
   const rows = (await res.json()) as BankConnection[];
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  return row ? decryptBankTokens(row) : null;
+}
+
+// Decrypt the token fields on a bank connection row in place, so callers see
+// plaintext. Legacy plaintext rows pass through unchanged (see decryptSecret).
+function decryptBankTokens(row: BankConnection): BankConnection {
+  row.access_token = decryptSecret(row.access_token);
+  row.refresh_token = decryptSecret(row.refresh_token);
+  return row;
 }
 
 export async function updateBankConnection(
@@ -1095,11 +1148,29 @@ export async function updateBankConnection(
   },
 ): Promise<boolean> {
   const { url } = config();
+  // Encrypt the OAuth tokens at rest before they reach the database. No-op until
+  // BANK_TOKEN_KEY is set. Only encrypt fields that are actually present in the
+  // patch, so we never turn an absent field into an encrypted empty string.
+  const body: Record<string, unknown> = { ...patch, updated_at: new Date().toISOString() };
+  if (patch.access_token !== undefined) {
+    body.access_token = encryptSecret(patch.access_token);
+  }
+  if (patch.refresh_token !== undefined && patch.refresh_token !== null) {
+    body.refresh_token = encryptSecret(patch.refresh_token);
+  }
   const res = await fetch(`${url}/rest/v1/bank_connections?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: headers({ Prefer: 'return=minimal' }),
-    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+    body: JSON.stringify(body),
   });
+  if (!res.ok) {
+    // A silent failure here is what left every connection stuck at 'created':
+    // a missing column (e.g. updated_at) makes PostgREST reject the whole PATCH,
+    // so the bank never links. The error body names the failing column and holds
+    // no personal data. Never let this fail quietly again.
+    const text = await res.text().catch(() => '');
+    console.error('[updateBankConnection] failed:', res.status, text.slice(0, 300));
+  }
   return res.ok;
 }
 
@@ -1150,7 +1221,9 @@ export async function listLinkedBankConnections(limit = 500): Promise<BankConnec
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return (await res.json()) as BankConnection[];
+  const rows = (await res.json()) as BankConnection[];
+  // Decrypt each row's tokens so the sync path sees plaintext.
+  return rows.map(decryptBankTokens);
 }
 
 // A user's recent unconfirmed WhatsApp captures, for deduping a bank line

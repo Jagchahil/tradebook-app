@@ -200,8 +200,14 @@ export function webhookConfigured(): boolean {
   return Boolean(WEBHOOK_SECRET);
 }
 
+// How far the signature timestamp may drift from now before we reject it. Five
+// minutes matches Stripe's own default tolerance and blocks replay of an old,
+// validly signed request. Clock skew inside this window is tolerated.
+const SIGNATURE_TOLERANCE_SECONDS = 300;
+
 // Verify the Stripe-Signature header. Stripe signs `${timestamp}.${payload}`
-// with the webhook secret. We recompute and compare in constant time.
+// with the webhook secret. We check the timestamp is recent (replay protection),
+// then recompute the HMAC and compare in constant time.
 export function verifyStripeSignature(payload: string, sigHeader: string | null): boolean {
   if (!WEBHOOK_SECRET || !sigHeader) return false;
 
@@ -214,6 +220,14 @@ export function verifyStripeSignature(payload: string, sigHeader: string | null)
   const timestamp = parts['t'];
   const signature = parts['v1'];
   if (!timestamp || !signature) return false;
+
+  // Replay protection. Reject if the signed timestamp is too far from now, in
+  // either direction, before spending any time on the HMAC. A `t` that is not a
+  // valid unix time also fails closed.
+  const t = Number(timestamp);
+  if (!Number.isFinite(t)) return false;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSeconds - t) > SIGNATURE_TOLERANCE_SECONDS) return false;
 
   const signed = `${timestamp}.${payload}`;
   const expected = crypto.createHmac('sha256', WEBHOOK_SECRET).update(signed, 'utf8').digest('hex');

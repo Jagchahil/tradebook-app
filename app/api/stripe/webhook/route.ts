@@ -5,8 +5,51 @@ import { markInvoicePaidServer, upsertSubscription, SubscriptionRecord } from '.
 // Stripe calls this for two kinds of money:
 //   1. A customer paying one of our users' invoices (mode: payment).
 //   2. A user subscribing to Lekhio itself (mode: subscription).
-// We verify the signature, then route on the event. Always answer 200 for genuine
-// Stripe traffic so it is not retried into duplicate work.
+// We verify the signature, claim the event id once for idempotency, then route
+// on the event. Always answer 200 for genuine Stripe traffic so it is not
+// retried into duplicate work.
+
+// Idempotency claim. Stripe re-delivers an event if we are slow to answer 200,
+// so before any state mutation we try to insert the event id into stripe_events
+// with the service role key. The primary key makes this atomic:
+//   201  first time we have seen this event  -> proceed
+//   409  we already processed it             -> caller returns 200, does nothing
+//   anything else (network, config)          -> fail open (process), but log it,
+//                                               so a real event is never dropped.
+// Never store event contents here, only the id and type.
+type ClaimResult = 'new' | 'duplicate';
+
+async function claimStripeEvent(id: string, type: string | undefined): Promise<ClaimResult> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    // Fail open. If Supabase is not configured for some reason, we would rather
+    // process a genuine, signature-verified event than silently drop it.
+    console.error('[stripe webhook] Idempotency store not configured, processing without claim.');
+    return 'new';
+  }
+  try {
+    const res = await fetch(`${url}/rest/v1/stripe_events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ id, type: type ?? null }),
+    });
+    if (res.status === 201) return 'new';
+    if (res.status === 409) return 'duplicate'; // primary key conflict, already seen
+    // Any other status is unexpected. Fail open so a real event is never lost.
+    console.error('[stripe webhook] Unexpected idempotency claim status:', res.status);
+    return 'new';
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[stripe webhook] Idempotency claim failed, processing anyway:', message);
+    return 'new';
+  }
+}
 
 // Turn a Stripe subscription object into the row we store. Pulls the live price
 // and renewal date so the record is always current, however the event arrived.
@@ -46,11 +89,21 @@ export async function POST(req: NextRequest) {
     return new NextResponse('Invalid signature', { status: 401 });
   }
 
-  let event: { type?: string; data?: { object?: Record<string, unknown> } };
+  let event: { id?: string; type?: string; data?: { object?: Record<string, unknown> } };
   try {
     event = JSON.parse(raw);
   } catch {
     return NextResponse.json({ ok: true });
+  }
+
+  // Idempotency: claim this event id before touching any state. A duplicate
+  // delivery is acknowledged with 200 and does no work. Events without an id
+  // (should not happen for real Stripe traffic) simply skip the claim.
+  if (event.id) {
+    const claim = await claimStripeEvent(event.id, event.type);
+    if (claim === 'duplicate') {
+      return NextResponse.json({ ok: true, duplicate: true });
+    }
   }
 
   try {

@@ -34,6 +34,77 @@ export function hasBankFeedConfig(): boolean {
   return Boolean(CLIENT_ID && CLIENT_SECRET);
 }
 
+// --- TrueLayer transport resilience ------------------------------------------
+//
+// Every call to TrueLayer goes through this helper so a rate limit (429), a
+// server blip (5xx), a slow socket, or a dropped connection never surfaces as a
+// permanent failure to the sync. At 20,000 connections a day the odds of hitting
+// at least one transient TrueLayer error per run are effectively 100%, so retry
+// with backoff is not optional, it is load bearing.
+//
+// Behaviour:
+//   . Each attempt is bounded by AbortSignal.timeout(timeoutMs), so a hung
+//     socket can never stall a whole sync run past its budget.
+//   . On HTTP 429 or any 5xx, or on a thrown network/timeout error, we back off
+//     and retry, up to `retries` attempts total. Backoff is exponential with
+//     jitter, and honours a numeric Retry-After header when TrueLayer sends one.
+//   . 4xx other than 429 (e.g. 400, 401) is returned to the caller as is, since
+//     those are real, non transient answers that retrying would not fix.
+//   . After the final attempt we return the last Response (so the caller can
+//     read its status) or, if every attempt threw, we return null.
+//
+// The caller decides what a null or an error status means for connection state;
+// this helper only owns the transport.
+interface TrueLayerFetchOptions {
+  retries?: number;
+  timeoutMs?: number;
+}
+
+function backoffDelayMs(attempt: number, retryAfterHeader: string | null): number {
+  // Honour a server supplied Retry-After (seconds) when present and sane.
+  if (retryAfterHeader) {
+    const secs = Number(retryAfterHeader);
+    if (Number.isFinite(secs) && secs >= 0 && secs <= 60) return secs * 1000;
+  }
+  // Otherwise exponential backoff (base 500ms) with full jitter, capped at 8s.
+  const base = Math.min(500 * 2 ** attempt, 8000);
+  return Math.floor(Math.random() * base);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function truelayerFetch(
+  url: string,
+  init: RequestInit = {},
+  { retries = 3, timeoutMs = 10_000 }: TrueLayerFetchOptions = {},
+): Promise<Response | null> {
+  let lastResponse: Response | null = null;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+      // Retry only on 429 and 5xx. Everything else (2xx success, or a real 4xx
+      // like 400/401) is a final answer we hand straight back to the caller.
+      if (res.status !== 429 && res.status < 500) return res;
+      lastResponse = res;
+      // No point sleeping after the final attempt; fall out and return it.
+      if (attempt < retries - 1) {
+        await sleep(backoffDelayMs(attempt, res.headers.get('retry-after')));
+      }
+    } catch {
+      // Network error, DNS failure, or AbortSignal.timeout firing. All transient.
+      lastResponse = null;
+      if (attempt < retries - 1) {
+        await sleep(backoffDelayMs(attempt, null));
+      }
+    }
+  }
+  // Exhausted all attempts. Return the last transient Response (429/5xx) so the
+  // caller can distinguish it, or null when every attempt threw.
+  return lastResponse;
+}
+
 // The sandbox Mock Bank ships STATIC transactions dated years in the past, so
 // date-bounded syncs there return nothing. The sync uses this to drop the date
 // bound in sandbox while keeping it for real banks.
@@ -84,7 +155,7 @@ export async function exchangeCode(code: string): Promise<TokenSet | null> {
   if (!CLIENT_ID || !CLIENT_SECRET) return null;
   const redirect = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app'}/api/bank/callback`;
   try {
-    const res = await fetch(`${AUTH_BASE}/connect/token`, {
+    const res = await truelayerFetch(`${AUTH_BASE}/connect/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -95,8 +166,10 @@ export async function exchangeCode(code: string): Promise<TokenSet | null> {
         code,
       }).toString(),
     });
-    if (!res.ok) {
-      console.error('[bankfeed] code exchange failed:', res.status);
+    // truelayerFetch returns null when every attempt threw (transient network),
+    // or a Response we still check for a non ok status (a genuine bad code).
+    if (!res || !res.ok) {
+      if (res) console.error('[bankfeed] code exchange failed:', res.status);
       return null;
     }
     return toTokenSet((await res.json()) as { access_token?: string; refresh_token?: string; expires_in?: number });
@@ -106,10 +179,24 @@ export async function exchangeCode(code: string): Promise<TokenSet | null> {
 }
 
 // Refresh an expired access token ahead of a sync run.
-export async function refreshAccess(refreshToken: string): Promise<TokenSet | null> {
-  if (!CLIENT_ID || !CLIENT_SECRET) return null;
+//
+// Return contract matters for how the caller treats the connection:
+//   TokenSet  -> success
+//   null      -> GENUINE auth failure (consent lapsed / invalid_grant): safe to
+//                mark the connection expired and prompt a reconnect.
+//   'retry'   -> TRANSIENT failure (429 rate limit, 5xx, network, or a missing
+//                client config): the consent is probably fine, so the caller
+//                must NOT expire the connection -- just try again next run.
+// Conflating the two is what would wrongly nag a user to reconnect a healthy
+// bank the moment TrueLayer rate-limits or blips.
+export type RefreshOutcome = TokenSet | 'retry' | null;
+
+export async function refreshAccess(refreshToken: string): Promise<RefreshOutcome> {
+  // Missing client credentials is an ops problem, not the user's lapsed consent.
+  // Treat as transient so a misconfig never mass-expires every connection.
+  if (!CLIENT_ID || !CLIENT_SECRET) return 'retry';
   try {
-    const res = await fetch(`${AUTH_BASE}/connect/token`, {
+    const res = await truelayerFetch(`${AUTH_BASE}/connect/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -119,13 +206,20 @@ export async function refreshAccess(refreshToken: string): Promise<TokenSet | nu
         refresh_token: refreshToken,
       }).toString(),
     });
+    // Every attempt threw (network/DNS/timeout, or 429/5xx that never recovered
+    // within the retry budget). Transient by definition, so never expire.
+    if (!res) return 'retry';
     if (!res.ok) {
       console.error('[bankfeed] token refresh failed:', res.status);
-      return null;
+      // Only 400/401 (invalid_grant, revoked/expired consent) is a real auth
+      // failure. Everything else that survived the retries (a 429/5xx that was
+      // still failing on the final attempt) is transient -> retry.
+      return res.status === 400 || res.status === 401 ? null : 'retry';
     }
     return toTokenSet((await res.json()) as { access_token?: string; refresh_token?: string; expires_in?: number }, refreshToken);
   } catch {
-    return null;
+    // Reading the body threw. Treat as transient, never expire on this.
+    return 'retry';
   }
 }
 
@@ -138,11 +232,14 @@ export interface BankAccounts {
 
 export async function listAccounts(accessToken: string): Promise<BankAccounts | null> {
   try {
-    const res = await fetch(`${API_BASE}/data/v1/accounts`, {
+    const res = await truelayerFetch(`${API_BASE}/data/v1/accounts`, {
       headers: { accept: 'application/json', Authorization: `Bearer ${accessToken}` },
     });
-    if (!res.ok) {
-      console.error('[bankfeed] accounts fetch failed:', res.status);
+    // null (all attempts threw) or a non ok status both mean skip cleanly; the
+    // caller treats a null account list as "nothing to sync", never corrupting
+    // stored state on a transient blip.
+    if (!res || !res.ok) {
+      if (res) console.error('[bankfeed] accounts fetch failed:', res.status);
       return null;
     }
     const data = (await res.json()) as {
@@ -179,11 +276,13 @@ export async function getBookedTransactions(
 ): Promise<BankTransaction[] | null> {
   try {
     const qs = fromDate ? `?from=${encodeURIComponent(fromDate)}` : '';
-    const res = await fetch(`${API_BASE}/data/v1/accounts/${encodeURIComponent(accountId)}/transactions${qs}`, {
+    const res = await truelayerFetch(`${API_BASE}/data/v1/accounts/${encodeURIComponent(accountId)}/transactions${qs}`, {
       headers: { accept: 'application/json', Authorization: `Bearer ${accessToken}` },
     });
-    if (!res.ok) {
-      console.error('[bankfeed] transactions fetch failed:', res.status);
+    // null (all attempts threw) or a non ok status: return null so the caller
+    // skips this account for the run without marking the connection unhealthy.
+    if (!res || !res.ok) {
+      if (res) console.error('[bankfeed] transactions fetch failed:', res.status);
       return null;
     }
     const data = (await res.json()) as { results?: BankTransaction[] };

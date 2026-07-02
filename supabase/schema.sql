@@ -633,4 +633,8 @@ create index if not exists bank_connections_status_idx on public.bank_connection
 drop index if exists public.transactions_external_id_key;
 create unique index if not exists transactions_external_id_key
   on public.transactions(external_id);
+
+-- The connected bank's display name (TrueLayer provider display_name), shown on
+-- the app's bank card so the user can see which bank is linked.
+alter table public.bank_connections add column if not exists bank_name text;
 notify pgrst, 'reload schema';

@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     connected: linked.length > 0,
     expired: linked.length === 0 && expired,
+    bank_name: linked[0]?.bank_name ?? null,
     last_synced_date: linked[0]?.last_synced_date ?? null,
   });
 }

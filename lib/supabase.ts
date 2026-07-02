@@ -1048,6 +1048,7 @@ export interface BankConnection {
   reference: string;
   status: string;
   account_ids: string[];
+  bank_name?: string | null;
   access_token: string | null;
   refresh_token: string | null;
   token_expires_at: string | null;
@@ -1086,6 +1087,7 @@ export async function updateBankConnection(
   patch: {
     status?: string;
     account_ids?: string[];
+    bank_name?: string | null;
     last_synced_date?: string;
     access_token?: string;
     refresh_token?: string | null;
@@ -1104,14 +1106,14 @@ export async function updateBankConnection(
 // A user's own connections, for the status endpoint. Never returns tokens.
 export async function listBankConnectionsForUser(
   userId: string,
-): Promise<Array<{ id: string; status: string; created_at?: string; last_synced_date: string | null }>> {
+): Promise<Array<{ id: string; status: string; created_at?: string; bank_name?: string | null; last_synced_date: string | null }>> {
   const { url } = config();
   const res = await fetch(
-    `${url}/rest/v1/bank_connections?user_id=eq.${encodeURIComponent(userId)}&select=id,status,created_at,last_synced_date&order=created_at.desc&limit=20`,
+    `${url}/rest/v1/bank_connections?user_id=eq.${encodeURIComponent(userId)}&select=id,status,created_at,bank_name,last_synced_date&order=created_at.desc&limit=20`,
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return (await res.json()) as Array<{ id: string; status: string; created_at?: string; last_synced_date: string | null }>;
+  return (await res.json()) as Array<{ id: string; status: string; created_at?: string; bank_name?: string | null; last_synced_date: string | null }>;
 }
 
 // Disconnect: revoke every linked connection for the user and destroy our copy

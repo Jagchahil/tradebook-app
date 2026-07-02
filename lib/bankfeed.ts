@@ -129,8 +129,14 @@ export async function refreshAccess(refreshToken: string): Promise<TokenSet | nu
   }
 }
 
-// The user's connected accounts.
-export async function listAccounts(accessToken: string): Promise<string[] | null> {
+// The user's connected accounts, plus the bank's display name so the app can
+// show which bank is connected on the settings card.
+export interface BankAccounts {
+  ids: string[];
+  bankName: string | null;
+}
+
+export async function listAccounts(accessToken: string): Promise<BankAccounts | null> {
   try {
     const res = await fetch(`${API_BASE}/data/v1/accounts`, {
       headers: { accept: 'application/json', Authorization: `Bearer ${accessToken}` },
@@ -139,9 +145,14 @@ export async function listAccounts(accessToken: string): Promise<string[] | null
       console.error('[bankfeed] accounts fetch failed:', res.status);
       return null;
     }
-    const data = (await res.json()) as { results?: Array<{ account_id?: string }> };
+    const data = (await res.json()) as {
+      results?: Array<{ account_id?: string; provider?: { display_name?: string } }>;
+    };
     if (!Array.isArray(data.results)) return null;
-    return data.results.map((a) => a.account_id).filter((id): id is string => Boolean(id));
+    return {
+      ids: data.results.map((a) => a.account_id).filter((id): id is string => Boolean(id)),
+      bankName: data.results[0]?.provider?.display_name?.trim() || null,
+    };
   } catch {
     return null;
   }

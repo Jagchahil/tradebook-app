@@ -64,14 +64,15 @@ export async function GET(req: NextRequest) {
   }
 
   const accounts = await listAccounts(tokens.access_token);
-  if (!accounts || accounts.length === 0) {
+  if (!accounts || accounts.ids.length === 0) {
     await updateBankConnection(connection.id, { status: 'failed' });
     return page('No accounts found', 'The bank did not share any accounts. Try again and make sure at least one account is selected.');
   }
 
   await updateBankConnection(connection.id, {
     status: 'linked',
-    account_ids: accounts,
+    account_ids: accounts.ids,
+    bank_name: accounts.bankName,
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
     token_expires_at: tokens.expires_at,
@@ -84,7 +85,7 @@ export async function GET(req: NextRequest) {
   after(async () => {
     try {
       const r = await syncWithAccessToken(
-        { id: connection.id, user_id: connection.user_id, account_ids: accounts, last_synced_date: null },
+        { id: connection.id, user_id: connection.user_id, account_ids: accounts.ids, last_synced_date: null },
         tokens.access_token,
       );
       console.log(`[bank] first sync inserted=${r.inserted}`);

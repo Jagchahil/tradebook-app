@@ -87,7 +87,15 @@ export async function downloadMedia(mediaId: string): Promise<MediaPayload | nul
   });
   if (!fileRes.ok) return null;
 
+  // Cap the size before pulling the bytes into memory and base64. A receipt
+  // photo or a voice note is a few MB at most; anything bigger is a mistake or
+  // an attack on the AI spend.
+  const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
+  const declared = Number(fileRes.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_MEDIA_BYTES) return null;
+
   const buffer = Buffer.from(await fileRes.arrayBuffer());
+  if (buffer.byteLength > MAX_MEDIA_BYTES) return null;
   return {
     base64: buffer.toString('base64'),
     mediaType: meta.mime_type || 'image/jpeg',

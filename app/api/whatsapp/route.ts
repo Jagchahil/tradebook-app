@@ -29,7 +29,30 @@ import {
   createInvoice,
   createEvent,
   bumpAiUsage,
+  totalsForUser,
+  latestUnconfirmed,
+  deleteTransactionById,
+  updateTransactionAmount,
+  setNudgePrefs,
 } from '../../../lib/supabase';
+import {
+  parseMoneyEntryRegex,
+  poundAmounts,
+  entryDate,
+  clampReceiptDate,
+  isThanks,
+  matchAck,
+  matchStopStart,
+  isDeleteLast,
+  matchEditLast,
+  isPricing,
+  isIdentity,
+  isDeadlineQuestion,
+  deadlineAnswer,
+  matchTotalsQuestion,
+  formatGbp,
+} from '../../../lib/waintents';
+import { soleTraderTax } from '../../../lib/taxengine';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
 import type { TradeInfo } from '../../../lib/taxguide';
 import { rateLimited } from '../../../lib/ratelimit';
@@ -50,16 +73,31 @@ export const maxDuration = 60;
 // mass attack. If either is over for today, we refuse to spend on AI.
 const PHONE_DAILY_AI = 120;
 const GLOBAL_DAILY_AI = 4000;
+// Durable per-phone daily message cap. Unlike the in-memory burst limit this
+// holds across every serverless instance, using the same ai_usage counter table
+// as the AI budget. A real user never sends 300 messages in a day; a runaway
+// script can, and we silently stop replying rather than fuel a storm.
+const PHONE_DAILY_MESSAGES = 300;
 const AI_BUSY =
   'I am a bit busy right now. Give me a few minutes and try again. Nothing is lost.';
 
 async function aiBudgetBlocked(from: string): Promise<boolean> {
+  // Fail closed on both caps: if the durable counter cannot be read we do not
+  // spend on AI. The deterministic paths still work, so the user is never stuck.
   const perPhone = await bumpAiUsage('phone', from);
-  if (perPhone !== null && perPhone > PHONE_DAILY_AI) return true;
+  if (perPhone === null || perPhone > PHONE_DAILY_AI) return true;
   const globalCount = await bumpAiUsage('global', 'all');
-  if (globalCount === null) return true; // fail closed: never spend on AI if the durable cap cannot be checked
+  if (globalCount === null) return true;
   if (globalCount > GLOBAL_DAILY_AI) return true;
   return false;
+}
+
+// True when this phone is over its durable daily message allowance. Fails open:
+// a database hiccup must never mute real users, and the AI budget above is the
+// wallet protection.
+async function messageCapExceeded(from: string): Promise<boolean> {
+  const n = await bumpAiUsage('wamsg', from);
+  return n !== null && n > PHONE_DAILY_MESSAGES;
 }
 
 // --- GET. The webhook verification handshake. -----------------------------
@@ -140,6 +178,10 @@ async function processMessage(message: IncomingMessage): Promise<void> {
   const from = message.from;
   const messageId = message.id;
   try {
+    // Durable daily cap first. Over the cap we stop replying entirely, so a
+    // runaway sender cannot generate a reply storm across instances.
+    if (await messageCapExceeded(from)) return;
+
     if (message.type === 'image' && message.image?.id) {
       await handleReceiptImage(from, messageId, message.image.id);
     } else if (message.type === 'audio' && message.audio?.id) {
@@ -153,6 +195,16 @@ async function processMessage(message: IncomingMessage): Promise<void> {
         if (!taxHandled) {
           if (isGetStarted(text)) {
             await handleWelcome(from);
+          } else if (isThanks(text)) {
+            await handleThanks(from);
+          } else if (matchStopStart(text)) {
+            await handleStopStart(from, matchStopStart(text) as 'stop' | 'start');
+          } else if (matchAck(text)) {
+            await handleAck(from, matchAck(text) as 'yes' | 'no');
+          } else if (isDeleteLast(text)) {
+            await handleDeleteLast(from);
+          } else if (matchEditLast(text)) {
+            await handleEditLast(from, matchEditLast(text)!.amount);
           } else if (isCIS(text)) {
             await handleCIS(from, messageId, text);
           } else if (isMileage(text)) {
@@ -167,8 +219,16 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handleHelp(from);
           } else if (isTaxTips(text)) {
             await handleTaxTips(from);
+          } else if (isIdentity(text)) {
+            await handleIdentity(from);
+          } else if (isPricing(text)) {
+            await handlePricing(from);
+          } else if (isDeadlineQuestion(text)) {
+            await sendText(from, deadlineAnswer());
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);
+          } else if (matchTotalsQuestion(text)) {
+            await handleTotals(from, text);
           } else if (isQuestion(text)) {
             await handleMoneyQuestion(from, text);
           } else {
@@ -272,7 +332,9 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
     // The app reads income vs expense from this sign.
     amount: -Math.abs(parsed.amount),
     category: parsed.category,
-    transaction_date: new Date().toISOString().slice(0, 10),
+    // The date printed on the receipt, clamped to a sane range, so a back-dated
+    // receipt lands in the right tax quarter. Falls back to today.
+    transaction_date: clampReceiptDate(parsed.transaction_date),
     source_type: 'whatsapp_image',
     // Captured but not yet confirmed by the user. They approve before it counts
     // toward anything sent to HMRC.
@@ -328,80 +390,10 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
   await sendText(from, confirmationLine(parsed));
 }
 
-// Deterministic money-entry parser. Catches the common phrasings with no AI at
-// all, so "spent £40 on diesel" and "got paid £500 by Dave" log instantly even
-// before the AI keys have credit, exactly like mileage and CIS already do. It
-// returns null when the message is not a clear money entry, so the richer AI
-// path can still handle the unusual ones once credit is on.
-type ParsedEntry = { merchant_name: string; amount: number; category: string; direction: 'income' | 'expense' };
-
-const MONEY_INCOME_RE = /\b(got\s+paid|getting\s+paid|paid\s+me|earned|earnt|invoiced?|takings?|took|made|charged?)\b/i;
-const MONEY_EXPENSE_RE = /\b(spent|spend|bought|buy|buying|paid\s+for|paying\s+for)\b/i;
-
-function extractMoneyAmount(b: string): number | null {
-  const m = b.match(/£\s*(\d[\d,]*(?:\.\d{1,2})?)/) || b.match(/\b(\d[\d,]*(?:\.\d{1,2})?)\b/);
-  if (!m) return null;
-  const n = parseFloat((m[1] || '').replace(/,/g, ''));
-  if (!isFinite(n) || n <= 0 || n > 1_000_000) return null;
-  return n;
-}
-
-function tidyName(s: string): string {
-  return s
-    .replace(/\b(today|yesterday|this morning|this afternoon|just now|earlier|please|thanks|ta|mate)\b.*$/i, '')
-    .replace(/[.,!]+$/, '')
-    .trim()
-    .replace(/\s{2,}/g, ' ')
-    .slice(0, 40);
-}
-
-const EXPENSE_CATEGORY: Array<[RegExp, string]> = [
-  [/\b(diesel|petrol|fuel|unleaded)\b/i, 'fuel'],
-  [/\b(screwfix|toolstation|wickes|b ?& ?q|jewson|travis perkins|selco|materials?|cement|timber|cable|paint|tiles?|pipe|fittings|adhesive|plaster|sand|aggregate|screws?)\b/i, 'materials'],
-  [/\b(drill|tool|tools|saw|grinder|impact|battery|blade|disc)\b/i, 'tools'],
-  [/\b(insurance|liability)\b/i, 'insurance'],
-  [/\b(phone|mobile|airtime|sim)\b/i, 'phone'],
-  [/\b(parking|congestion|toll|train|bus)\b/i, 'travel'],
-  [/\b(van|vehicle|mot|tyres?)\b/i, 'van'],
-  [/\b(food|lunch|dinner|meal|coffee)\b/i, 'meals'],
-];
-
-function expenseCategory(b: string): string {
-  for (const [re, cat] of EXPENSE_CATEGORY) if (re.test(b)) return cat;
-  return 'other';
-}
-
-function parseMoneyEntryRegex(body: string): ParsedEntry | null {
-  const b = body.trim();
-  if (!b || b.endsWith('?')) return null;
-  // Looks like a question, not an entry.
-  if (/^(how|what|whats|when|where|why|who|show|list|total|do i|did i|am i|have i|can i|could i|is it|are )/i.test(b)) return null;
-
-  // "<name> paid [me] £X" = someone paid the user = income. Exclude first person
-  // ("I paid", "we paid") which is an expense. Captures the payer's name too.
-  const subjectPaid = b.match(/\b([a-z][a-z'&.\- ]{1,30}?)\s+paid\b(?!\s+for)/i);
-  const subjectIsPayer = !!subjectPaid && !/^(i|we|you|ive|weve|i ve|we ve)$/i.test(subjectPaid[1].trim());
-
-  const incomeVerb =
-    MONEY_INCOME_RE.test(b) || /\bpaid\b[^?]*\b(by|from)\b/i.test(b) || subjectIsPayer;
-  const expenseVerb = !incomeVerb && (MONEY_EXPENSE_RE.test(b) || /\bpaid\b/i.test(b));
-  if (!incomeVerb && !expenseVerb) return null;
-
-  const amount = extractMoneyAmount(b);
-  if (amount == null) return null;
-
-  if (incomeVerb) {
-    const byFrom = b.match(/\b(?:by|from)\s+([a-z0-9'&\- ]{2,40})/i);
-    const who =
-      (byFrom ? tidyName(byFrom[1]) : subjectIsPayer ? tidyName(subjectPaid![1]) : '') || 'a customer';
-    return { merchant_name: who, amount, category: 'income', direction: 'income' };
-  }
-  const m = b.match(/\b(?:on|at|in|for|from)\s+([a-z0-9'&\- ]{2,40})/i);
-  const what = m ? tidyName(m[1]) : '';
-  const category = expenseCategory(b);
-  const name = what || (category !== 'other' ? category : 'an expense');
-  return { merchant_name: name, amount, category, direction: 'expense' };
-}
+// The deterministic money-entry parser now lives in lib/waintents.ts with unit
+// tests. It catches the common phrasings with no AI at all, so "spent £40 on
+// diesel" and "got paid £500 by Dave" log instantly even before the AI keys have
+// credit, exactly like mileage and CIS already do.
 
 async function handleTextEntry(from: string, messageId: string, body: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
@@ -442,6 +434,8 @@ async function handleTextEntry(from: string, messageId: string, body: string): P
 
 // Shared insert for voice and text entries. Income is stored positive, an
 // expense is stored negative, so the app reads the direction from the sign.
+// "yesterday" in the message dates the entry to yesterday; everything else is
+// today. Tax periods key off transaction_date, so this matters at quarter edges.
 async function saveEntry(
   userId: string,
   messageId: string,
@@ -455,12 +449,154 @@ async function saveEntry(
     vendor: parsed.merchant_name,
     amount: parsed.direction === 'income' ? magnitude : -magnitude,
     category: parsed.category,
-    transaction_date: new Date().toISOString().slice(0, 10),
+    transaction_date: entryDate(rawText),
     source_type: sourceType,
     description: rawText.slice(0, 280),
     confirmed: false,
     raw_whatsapp_message_id: messageId,
   });
+}
+
+// --- Small talk, acks, and fixing the last entry (all deterministic) ---------
+
+async function handleThanks(from: string): Promise<void> {
+  await sendText(from, 'Any time. Send the next one whenever it happens. 👍');
+}
+
+async function handleAck(from: string, kind: 'yes' | 'no'): Promise<void> {
+  if (kind === 'yes') {
+    await sendText(
+      from,
+      'Nothing waiting on me here. Entries are confirmed in your Lekhio app, under Activity. Or just send me the next receipt.',
+    );
+    return;
+  }
+  await sendText(from, 'No problem. If an entry is wrong, text "delete that" or "change it to 40" and I will sort the last one.');
+}
+
+async function handleStopStart(from: string, kind: 'stop' | 'start'): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const on = kind === 'start';
+  const ok = await setNudgePrefs(userId, { daily_nudges: on, weekly_summary: on });
+  if (!ok) {
+    await sendText(from, 'I could not update that just now. Try again in a minute, or change it in the app under Settings.');
+    return;
+  }
+  await sendText(
+    from,
+    on
+      ? 'Reminders are back on. I will keep them useful and rare.'
+      : 'Done. No more reminder texts from me. I will still reply whenever you message me, and you can text START any time to switch them back on.',
+  );
+}
+
+async function handleDeleteLast(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const last = await latestUnconfirmed(userId);
+  if (!last) {
+    await sendText(from, 'There is nothing waiting to be confirmed. Confirmed entries are edited in the app, under Activity, so you can see exactly what changes.');
+    return;
+  }
+  const ok = await deleteTransactionById(last.id, userId);
+  if (!ok) {
+    await sendText(from, 'I could not delete that just now. You can remove it in the app, under Activity.');
+    return;
+  }
+  await sendText(from, `Deleted. ${last.vendor ?? 'That entry'} for ${formatGbp(Number(last.amount) || 0)} is gone.`);
+}
+
+async function handleEditLast(from: string, amount: number): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const last = await latestUnconfirmed(userId);
+  if (!last) {
+    await sendText(from, 'There is nothing waiting to be confirmed. Confirmed entries are edited in the app, under Activity.');
+    return;
+  }
+  const direction = Number(last.amount) >= 0 ? 'income' : 'expense';
+  const ok = await updateTransactionAmount(last.id, userId, amount, direction);
+  if (!ok) {
+    await sendText(from, 'I could not change that just now. You can edit it in the app, under Activity.');
+    return;
+  }
+  await sendText(from, `Changed. ${last.vendor ?? 'The last entry'} is now ${formatGbp(amount)}. Check it in the app and confirm.`);
+}
+
+async function handleIdentity(from: string): Promise<void> {
+  await sendText(
+    from,
+    [
+      'I am Lekhio, a bookkeeping assistant for the UK self employed, right here in WhatsApp. Yes, I am software, with real people behind me.',
+      '',
+      'Snap a receipt, say what you spent or got paid, and I log it for tax. You approve everything before anything goes near HMRC. Text "help" to see the lot.',
+    ].join('\n'),
+  );
+}
+
+async function handlePricing(from: string): Promise<void> {
+  await sendText(
+    from,
+    [
+      'Lekhio is £19.99 a month or £199 a year, everything in, and your first 30 days are free.',
+      '',
+      `That covers receipt capture, bookkeeping, invoicing, CIS, mileage, and your quarterly tax prep. Get started at ${APP_URL.replace('https://', '')}.`,
+    ].join('\n'),
+  );
+}
+
+// "How much have I spent this month" and friends, answered from the user's own
+// rows with no AI at all. The tax estimate uses the same engine as the app.
+async function handleTotals(from: string, body: string): Promise<void> {
+  const q = matchTotalsQuestion(body);
+  if (!q) return;
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const totals = await totalsForUser(userId, q.sinceISO, q.category);
+  if (!totals) {
+    await sendText(from, 'I could not fetch your figures just now. Try again in a minute.');
+    return;
+  }
+  if (totals.count === 0) {
+    await sendText(from, `Nothing logged ${q.periodLabel === 'all time' ? 'yet' : q.periodLabel}. Send me a receipt or what you spent and I will start the tally.`);
+    return;
+  }
+  const profit = totals.income - totals.expenses;
+  if (q.kind === 'spent') {
+    const what = q.category ? `on ${q.category} ` : '';
+    await sendText(from, `You have spent ${formatGbp(totals.expenses)} ${what}${q.periodLabel}. It is all in your Lekhio, ready for tax.`);
+    return;
+  }
+  if (q.kind === 'made') {
+    await sendText(from, `You have brought in ${formatGbp(totals.income)} ${q.periodLabel}. Nice going. Profit after expenses is ${formatGbp(profit)}.`);
+    return;
+  }
+  if (q.kind === 'profit') {
+    await sendText(from, `${q.periodLabel === 'all time' ? 'All time' : `For ${q.periodLabel}`}: ${formatGbp(totals.income)} in, ${formatGbp(totals.expenses)} out, so ${formatGbp(profit)} profit.`);
+    return;
+  }
+  // Tax estimate for the year to date. Includes to-review entries, says so, and
+  // credits CIS already deducted. A guide, not a bill.
+  const est = soleTraderTax(Math.max(0, profit));
+  const afterCis = Math.max(0, est.total - totals.cis);
+  const cisLine = totals.cis > 0 ? ` You have already had ${formatGbp(totals.cis)} taken in CIS, so the bill after that is about ${formatGbp(afterCis)}.` : '';
+  await sendText(
+    from,
+    `On ${formatGbp(profit)} profit so far this tax year, the rough bill is ${formatGbp(est.total)} (income tax plus National Insurance).${cisLine} A rough guide from your logged entries, including ones you have not confirmed yet, not a final figure.`,
+  );
 }
 
 function confirmationLine(parsed: {
@@ -542,7 +678,8 @@ async function handleCIS(from: string, messageId: string, body: string): Promise
     await sendText(from, 'Open the app and add your number first, then I can log your CIS.');
     return;
   }
-  const amounts = [...body.matchAll(/£\s*(\d+(?:\.\d{1,2})?)/g)].map((m) => parseFloat(m[1]));
+  // poundAmounts handles thousands separators, so "£1,200" is £1200, not £1.
+  const amounts = poundAmounts(body);
   if (amounts.length === 0) {
     await sendText(from, 'Tell me the amounts, for example "Dave paid £400, £80 CIS deducted".');
     return;
@@ -638,13 +775,13 @@ async function handlePhoneShare(from: string, messageId: string, body: string): 
     await sendText(from, 'Open the app and add your number first, then I can log this.');
     return;
   }
-  const am = body.match(/£\s*(\d+(?:\.\d{1,2})?)/);
+  const amounts = poundAmounts(body);
   const pm = body.match(/(\d{1,3})\s*%/);
-  if (!am || !pm) {
+  if (amounts.length === 0 || !pm) {
     await sendText(from, 'Tell me the bill and your business share, for example "phone bill £45, 80% business".');
     return;
   }
-  const total = parseFloat(am[1]);
+  const total = amounts[0];
   const pct = Math.min(parseInt(pm[1], 10), 100);
   const amount = Math.round(total * pct) / 100;
   await insertTransaction({

@@ -30,9 +30,11 @@ function headers(extra: Record<string, string> = {}): Record<string, string> {
 
 // --- AI usage budget (hard cost cap) --------------------------------------
 // Atomically increments today's counter for a scope and key and returns the new
-// count, so the webhook can refuse to spend on AI once a daily cap is hit. On any
-// error we return null and the caller fails open (the in-memory burst limit is
-// still the backstop), so a database hiccup never breaks the product.
+// count, so the webhook can refuse to spend on AI once a daily cap is hit. On
+// any error we return null. For AI SPEND the callers treat null as blocked
+// (fail closed); for plain message counting they treat null as allowed (fail
+// open), so a database hiccup can never mute real users but can never leak AI
+// spend either.
 export async function bumpAiUsage(scope: string, key: string): Promise<number | null> {
   try {
     const { url } = config();
@@ -116,13 +118,15 @@ export async function createInvoice(
   const { url } = config();
   const subtotal = input.line_items.reduce((s, li) => s + (Number(li.amount) || 0), 0);
 
-  // Number it from how many the user already has.
+  // Number it from how many the user already has. A HEAD count means we never
+  // pull every invoice row just to count them.
   const countRes = await fetch(
-    `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}&select=id`,
-    { headers: headers() },
+    `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}&select=id&limit=1`,
+    { method: 'HEAD', headers: headers({ Prefer: 'count=exact' }) },
   );
-  const existing = countRes.ok ? ((await countRes.json()) as unknown[]) : [];
-  const number = `INV-${String(existing.length + 1).padStart(4, '0')}`;
+  const range = countRes.headers.get('content-range') || '';
+  const count = Number(range.split('/')[1]) || 0;
+  const number = `INV-${String(count + 1).padStart(4, '0')}`;
 
   const today = new Date();
   const due = new Date(today);
@@ -223,7 +227,7 @@ export async function claimMessage(id: string): Promise<boolean> {
 
 // Normalise any UK number to E.164 (+44...) so everything we store matches the
 // same shape: the app, the web signup, and the WhatsApp lookup. This MUST stay
-// byte-identical to `toUkE164` in tradebook-app/app/(auth)/phone.tsx — the app
+// byte-identical to `toUkE164` in tradebook-app/app/(auth)/phone.tsx. The app
 // stores with that function and the webhook matches with this one, so if the two
 // ever diverge a user's WhatsApp messages land on a different account. The steps
 // are: drop a 00 international prefix, drop a 44 country code, drop any leading
@@ -727,6 +731,32 @@ export async function listNudgeTargets(): Promise<NudgeTarget[]> {
   });
 }
 
+// One grouped aggregate for every user's last-seven-day totals, replacing the
+// old one-query-per-user fan out in the weekly cron. Uses the weekly_totals_all
+// RPC (see supabase/schema.sql). Returns null when the RPC is not yet applied,
+// so the cron can fall back to the per-user path until the SQL is run.
+export interface WeeklyTotalsRow {
+  user_id: string;
+  income: number;
+  expenses: number;
+}
+export async function weeklyTotalsAll(): Promise<WeeklyTotalsRow[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/rpc/weekly_totals_all`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ user_id: string; income: number | string; expenses: number | string }>;
+    if (!Array.isArray(rows)) return null;
+    return rows.map((r) => ({ user_id: r.user_id, income: Number(r.income) || 0, expenses: Number(r.expenses) || 0 }));
+  } catch {
+    return null;
+  }
+}
+
 export async function weeklyTotals(userId: string): Promise<{ income: number; expenses: number }> {
   const { url } = config();
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
@@ -756,9 +786,11 @@ export async function insertTransaction(record: NewTransaction): Promise<void> {
   }
 }
 
-// A compact, plain-text summary of a user's recent entries, for answering money
-// questions over WhatsApp. Newest first, capped so the prompt stays small.
-export async function transactionSummaryForUser(userId: string, limit = 150): Promise<string> {
+// A compact, plain-text summary of a user's recent entries, for the open ended
+// accountant questions only. Simple totals questions are answered without AI by
+// totalsForUser below, so 60 recent rows is plenty of context and keeps the
+// prompt small and cheap.
+export async function transactionSummaryForUser(userId: string, limit = 60): Promise<string> {
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&select=amount,category,vendor,transaction_date,confirmed&order=transaction_date.desc&limit=${limit}`,
@@ -843,6 +875,106 @@ export async function markInvoicePaidServer(
     description: `Invoice ${inv.number}`,
     confirmed: true,
   }).catch((e) => console.error('[markInvoicePaidServer] Income insert failed:', e));
+}
+
+// --- Deterministic totals for WhatsApp money questions ----------------------
+// Sums a user's entries in code from a bounded page of rows, filtered by date
+// and optionally category, so "how much have I spent this month" never needs AI.
+// A sole trader's yearly row count is small; 5000 covers years of daily use.
+export interface UserTotals {
+  income: number;
+  expenses: number;
+  cis: number;
+  count: number;
+}
+export async function totalsForUser(
+  userId: string,
+  sinceISO: string | null,
+  category: string | null,
+): Promise<UserTotals | null> {
+  const { url } = config();
+  let q = `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&select=amount,cis_deduction,transaction_date,created_at&limit=5000`;
+  if (category) q += `&category=eq.${encodeURIComponent(category)}`;
+  const res = await fetch(q, { headers: headers() });
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{
+    amount: number;
+    cis_deduction: number | null;
+    transaction_date: string | null;
+    created_at: string | null;
+  }>;
+  const totals: UserTotals = { income: 0, expenses: 0, cis: 0, count: 0 };
+  for (const r of rows) {
+    // Key the period off transaction_date, matching the app, with created_at as
+    // the fallback for old rows.
+    const d = (r.transaction_date || r.created_at || '').slice(0, 10);
+    if (sinceISO && d && d < sinceISO) continue;
+    const a = Number(r.amount) || 0;
+    if (a >= 0) totals.income += a;
+    else totals.expenses += Math.abs(a);
+    totals.cis += Number(r.cis_deduction) || 0;
+    totals.count += 1;
+  }
+  return totals;
+}
+
+// The user's most recent unconfirmed entry, so "delete that" and "change it to
+// 40" can act on the thing they just logged. Confirmed entries are never touched
+// from WhatsApp; those are edited in the app where the user can see them.
+export interface LastEntry {
+  id: string;
+  vendor: string | null;
+  amount: number;
+  category: string | null;
+}
+export async function latestUnconfirmed(userId: string): Promise<LastEntry | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.false&select=id,vendor,amount,category&order=created_at.desc&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as LastEntry[];
+  return rows[0] ?? null;
+}
+
+export async function deleteTransactionById(id: string, userId: string): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.false`,
+    { method: 'DELETE', headers: headers({ Prefer: 'return=representation' }) },
+  );
+  if (!res.ok) return false;
+  const rows = (await res.json().catch(() => [])) as unknown[];
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+// Change the amount of an unconfirmed entry, keeping its direction (sign).
+export async function updateTransactionAmount(id: string, userId: string, magnitude: number, direction: 'income' | 'expense'): Promise<boolean> {
+  const { url } = config();
+  const signed = direction === 'income' ? Math.abs(magnitude) : -Math.abs(magnitude);
+  const res = await fetch(
+    `${url}/rest/v1/transactions?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.false`,
+    { method: 'PATCH', headers: headers({ Prefer: 'return=representation' }), body: JSON.stringify({ amount: signed }) },
+  );
+  if (!res.ok) return false;
+  const rows = (await res.json().catch(() => [])) as unknown[];
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+// STOP and START over WhatsApp. Writes the same reminder_prefs the app settings
+// screen uses, so opting out by text and by app stay in step.
+export async function setNudgePrefs(
+  userId: string,
+  prefs: { daily_nudges: boolean; weekly_summary: boolean },
+): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/reminder_prefs?on_conflict=user_id`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify({ user_id: userId, ...prefs, updated_at: new Date().toISOString() }),
+  });
+  return res.ok;
 }
 
 // --- Invoices (read for the public invoice page, server side only) ---------

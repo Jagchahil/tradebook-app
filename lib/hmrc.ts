@@ -550,7 +550,7 @@ export async function submitBsasAdjustments(args: {
 
 const LOSS_VERSION = 'application/vnd.hmrc.6.0+json';
 
-export async function createBroughtForwardLoss(nino: string, taxYearBroughtForwardFrom: string, lossBody: Record<string, unknown>, accessToken: string, fraud: FraudContext): Promise<{ ok: boolean; status: number; lossId?: string }> {
+export async function createBroughtForwardLoss(nino: string, taxYearBroughtForwardFrom: string, lossBody: Record<string, unknown>, accessToken: string, fraud: FraudContext): Promise<{ ok: boolean; status: number; lossId?: string; body?: unknown }> {
   if (!isHmrcConfigured()) return { ok: false, status: 0 };
   const url = `${BASE}/individuals/losses/${encodeURIComponent(nino)}/brought-forward-losses/tax-year/brought-forward-from/${encodeURIComponent(taxYearBroughtForwardFrom)}`;
   const res = await fetch(url, {
@@ -559,7 +559,7 @@ export async function createBroughtForwardLoss(nino: string, taxYearBroughtForwa
     body: JSON.stringify(lossBody),
   });
   const body = (await res.json().catch(() => undefined)) as { lossId?: string } | undefined;
-  return { ok: res.ok, status: res.status, lossId: body?.lossId };
+  return { ok: res.ok, status: res.status, lossId: body?.lossId, body };
 }
 
 export async function listBroughtForwardLosses(nino: string, taxYear: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
@@ -570,7 +570,7 @@ export async function listBroughtForwardLosses(nino: string, taxYear: string, ac
   return res.json().catch(() => null);
 }
 
-export async function createLossClaim(nino: string, claimBody: Record<string, unknown>, accessToken: string, fraud: FraudContext): Promise<{ ok: boolean; status: number; claimId?: string }> {
+export async function createLossClaim(nino: string, claimBody: Record<string, unknown>, accessToken: string, fraud: FraudContext): Promise<{ ok: boolean; status: number; claimId?: string; body?: unknown }> {
   if (!isHmrcConfigured()) return { ok: false, status: 0 };
   const url = `${BASE}/individuals/losses/${encodeURIComponent(nino)}/loss-claims`;
   const res = await fetch(url, {
@@ -579,7 +579,7 @@ export async function createLossClaim(nino: string, claimBody: Record<string, un
     body: JSON.stringify(claimBody),
   });
   const body = (await res.json().catch(() => undefined)) as { claimId?: string } | undefined;
-  return { ok: res.ok, status: res.status, claimId: body?.claimId };
+  return { ok: res.ok, status: res.status, claimId: body?.claimId, body };
 }
 
 export async function listLossClaims(nino: string, taxYearClaimedFor: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {

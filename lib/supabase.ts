@@ -704,6 +704,67 @@ export interface NudgeTarget {
   weekly_summary: boolean;
 }
 
+// One page of nudge targets, keyset ordered by user id, for the resumable cron
+// fan out. At 20,000 users one function invocation cannot send everything inside
+// its duration limit, so the cron processes pages and hands the cursor to a
+// continuation invocation. Prefs are fetched once per invocation by the caller.
+export async function listNudgeTargetsPage(
+  afterId: string | null,
+  limit = 500,
+): Promise<{ targets: Array<{ user_id: string; phone: string }>; last: string | null }> {
+  const { url } = config();
+  const cursor = afterId ? `&id=gt.${encodeURIComponent(afterId)}` : '';
+  const res = await fetch(
+    `${url}/rest/v1/users?select=id,phone_number&phone_number=not.is.null&order=id.asc&limit=${limit}${cursor}`,
+    { headers: headers() },
+  );
+  if (!res.ok) return { targets: [], last: null };
+  const batch = (await res.json()) as Array<{ id: string; phone_number: string }>;
+  return {
+    targets: batch.map((u) => ({ user_id: u.id, phone: u.phone_number })),
+    last: batch.length === limit ? batch[batch.length - 1].id : null,
+  };
+}
+
+// Everyone's reminder preferences in one read. One row exists only for users who
+// changed the defaults, so this stays small even at 20,000 users.
+export async function listAllNudgePrefs(): Promise<Map<string, { daily_nudges: boolean; weekly_summary: boolean }>> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/reminder_prefs?select=user_id,daily_nudges,weekly_summary&limit=100000`, { headers: headers() });
+  if (!res.ok) return new Map();
+  const prefs = (await res.json()) as Array<{ user_id: string; daily_nudges: boolean; weekly_summary: boolean }>;
+  return new Map(prefs.map((p) => [p.user_id, { daily_nudges: p.daily_nudges, weekly_summary: p.weekly_summary }]));
+}
+
+// Housekeeping so the always-growing tables never become a scale problem.
+// Batched deletes (PostgREST order+limit) so no single call locks a huge range:
+//   processed_messages  idempotency horizon, 7 days is far beyond Meta retries
+//   wa_sessions         abandoned flows, the code already treats >1h as expired
+//   ai_usage            per day counters, 60 days of history is plenty
+export async function pruneOldRows(): Promise<{ pruned: number }> {
+  const { url } = config();
+  let pruned = 0;
+  const batchDelete = async (path: string, maxBatches: number): Promise<void> => {
+    for (let i = 0; i < maxBatches; i++) {
+      const res = await fetch(`${url}/rest/v1/${path}`, {
+        method: 'DELETE',
+        headers: headers({ Prefer: 'return=representation', 'Range-Unit': 'items' }),
+      });
+      if (!res.ok) return;
+      const rows = (await res.json().catch(() => [])) as unknown[];
+      pruned += Array.isArray(rows) ? rows.length : 0;
+      if (!Array.isArray(rows) || rows.length === 0) return;
+    }
+  };
+  const week = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const day = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const sixtyDays = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  await batchDelete(`processed_messages?created_at=lt.${encodeURIComponent(week)}&order=created_at.asc&limit=10000`, 30);
+  await batchDelete(`wa_sessions?updated_at=lt.${encodeURIComponent(day)}&order=updated_at.asc&limit=1000`, 5);
+  await batchDelete(`ai_usage?day=lt.${encodeURIComponent(sixtyDays)}&order=day.asc&limit=10000`, 10);
+  return { pruned };
+}
+
 export async function listNudgeTargets(): Promise<NudgeTarget[]> {
   const { url } = config();
   const users: Array<{ id: string; phone_number: string }> = [];

@@ -57,6 +57,17 @@ function clean(raw: string): string {
     .trim();
 }
 
+// Cost observability. One log line per AI call with the feature name and the
+// token counts the API reports, so spend per feature is visible in the logs
+// with no schema and no personal data. Never log message content here.
+function logUsage(feature: string, data: { model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } }): void {
+  const u = data.usage;
+  if (!u) return;
+  console.log(
+    `[ai] feature=${feature} model=${data.model ?? 'unknown'} in=${u.input_tokens ?? 0} out=${u.output_tokens ?? 0} cached=${u.cache_read_input_tokens ?? 0}`,
+  );
+}
+
 export async function parseReceipt(base64: string, mediaType: string): Promise<ParsedReceipt | null> {
   if (!KEY) return null;
 
@@ -91,7 +102,8 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
     return null;
   }
 
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  logUsage('receipt_vision', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
 
@@ -168,7 +180,8 @@ export async function parseSpokenTransaction(text: string): Promise<ParsedEntry 
     return null;
   }
 
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  logUsage('entry_parse', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
 
@@ -240,7 +253,8 @@ export async function draftInvoice(description: string): Promise<DraftedInvoice 
     return null;
   }
 
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  logUsage('invoice_draft', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
 
@@ -292,7 +306,8 @@ export async function answerMoneyQuestion(question: string, summary: string): Pr
     console.error('[claude] Money question failed:', res.status, errText);
     return null;
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  logUsage('money_question', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   return textBlock ? textBlock.trim() : null;
 }
@@ -326,7 +341,8 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
     console.error('[claude] Expense question failed:', res.status, errText);
     return null;
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  logUsage('expense_check', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   return textBlock ? textBlock.trim() : null;
 }
@@ -398,7 +414,8 @@ export async function answerAccountantQuestion(question: string, context?: strin
     console.error('[claude] Accountant question failed:', res.status, errText);
     return null;
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  logUsage('accountant', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   return textBlock ? textBlock.trim() : null;
 }
@@ -443,7 +460,8 @@ export async function parseSchedule(text: string, nowIso: string): Promise<Parse
     console.error('[claude] Schedule parse failed:', res.status);
     return null;
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  logUsage('schedule_parse', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
 

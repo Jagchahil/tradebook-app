@@ -572,3 +572,11 @@ drop trigger if exists users_phone_binding on public.users;
 create trigger users_phone_binding
   before insert or update of phone_number on public.users
   for each row execute function public.enforce_phone_binding();
+
+-- Scale indexes for 20,000+ users (added 2 July 2026, apply with the block above).
+-- The cleanup job deletes processed_messages by age; without this index that
+-- delete scans millions of rows.
+create index if not exists processed_messages_created_idx on public.processed_messages(created_at);
+-- The webhook's "latest unconfirmed entry" lookup (delete that / change it to X).
+create index if not exists transactions_user_unconfirmed_idx
+  on public.transactions(user_id, created_at desc) where confirmed = false;

@@ -661,6 +661,40 @@ export async function hasHmrcConnection(userId: string): Promise<boolean> {
   return Boolean(c && c.access_token);
 }
 
+// Store the latest device collected fraud prevention values for a user. These
+// are device characteristics (already sanitized upstream), not secrets, so they
+// are stored as plain jsonb on the connection row. Upserts so it works whether
+// or not the user has linked HMRC yet. Service role only, like the rest of this
+// table.
+export async function saveHmrcFraud(userId: string, client: Record<string, unknown>): Promise<boolean> {
+  const { url } = config();
+  const row = {
+    user_id: userId,
+    fraud_client: client,
+    fraud_collected_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  const res = await fetch(`${url}/rest/v1/hmrc_connections?on_conflict=user_id`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify(row),
+  });
+  return res.ok;
+}
+
+// Read a user's stored fraud snapshot (server side only). Used at submit time to
+// build the fraud prevention headers alongside the request derived values.
+export async function getHmrcFraud(userId: string): Promise<Record<string, unknown> | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/hmrc_connections?user_id=eq.${encodeURIComponent(userId)}&select=fraud_client&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as { fraud_client?: Record<string, unknown> | null }[];
+  return rows[0]?.fraud_client ?? null;
+}
+
 // --- Events / diary / reminders -------------------------------------------
 
 export interface NewEvent {

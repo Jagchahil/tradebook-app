@@ -1,7 +1,10 @@
-// Global security headers for every response.
+// Global security headers for every response, plus tighter rules for the
+// capability URLs (invoice and pay links).
 //
-// Set here rather than per route so the whole site, including the public
-// invoice and pay pages and the OAuth callback pages, is covered.
+// This is the single Next.js config for the site. If a next.config.ts also
+// exists in the deploy repo, DELETE it: Next.js loads only one config file and
+// two is a silent footgun. Everything the old next.config.ts did is folded in
+// here, with a fuller Content Security Policy on top.
 //
 // Content Security Policy notes:
 // - The marketing pages use inline <style> (dangerouslySetInnerHTML) and inline
@@ -13,8 +16,8 @@
 //   default, and the only inline blocks are our own static styles and schema),
 //   this is the right trade off.
 // - challenges.cloudflare.com is allow listed for script and frame so the
-//   Cloudflare Turnstile bot check can load. It is server side only today, but
-//   pre allow listing it means switching on the client widget will not break.
+//   Cloudflare Turnstile bot check can load. Server side only today, but pre
+//   allow listing it means switching on the client widget will not break.
 // - The lock down directives (frame-ancestors none, object-src none, base-uri
 //   self, form-action self) close clickjacking, plugin, base tag and form
 //   hijack vectors.
@@ -39,29 +42,40 @@ const csp = [
   'upgrade-insecure-requests',
 ].join('; ');
 
-const securityHeaders = [
+// Applied to every path.
+const baseSecurityHeaders = [
   {
     key: 'Strict-Transport-Security',
     value: 'max-age=63072000; includeSubDomains; preload',
   },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'X-DNS-Prefetch-Control', value: 'off' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), payment=()',
+    value: 'camera=(), microphone=(), geolocation=(), payment=(), browsing-topics=()',
   },
   { key: 'Content-Security-Policy', value: csp },
+];
+
+// Invoice and pay links carry a secret, unguessable UUID in the path. They are
+// capability URLs: anyone with the link can view the invoice, by design. So we
+// send no referrer at all on these paths (the link never leaks through Referer)
+// and tell crawlers not to index them. These come AFTER the base rules for the
+// same paths, so the no-referrer value overrides the base referrer policy.
+const capabilityUrlHeaders = [
+  { key: 'Referrer-Policy', value: 'no-referrer' },
+  { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
 ];
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async headers() {
     return [
-      {
-        source: '/:path*',
-        headers: securityHeaders,
-      },
+      { source: '/:path*', headers: baseSecurityHeaders },
+      { source: '/invoice/:path*', headers: capabilityUrlHeaders },
+      { source: '/api/pay/:path*', headers: capabilityUrlHeaders },
     ];
   },
 };

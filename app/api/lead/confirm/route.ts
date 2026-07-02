@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyLeadToken } from '../../../../lib/leadtoken';
 import { setLeadConfirmed } from '../../../../lib/supabase';
+import { rateLimited, clientIp } from '../../../../lib/ratelimit';
 
 // The double opt in confirmation link. The signed token proves the request is
 // genuine for this exact email, so a link cannot be forged or reused for another
 // address. On success we mark the lead confirmed and show a friendly page.
 export async function GET(req: NextRequest) {
+  if (rateLimited(`confirm:${clientIp(req)}`, 30, 10 * 60 * 1000)) {
+    return new NextResponse('Too many requests.', { status: 429 });
+  }
   const e = req.nextUrl.searchParams.get('e') || '';
   const t = req.nextUrl.searchParams.get('t') || '';
   const email = e.trim().toLowerCase();

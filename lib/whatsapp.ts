@@ -70,6 +70,18 @@ export async function downloadMedia(mediaId: string): Promise<MediaPayload | nul
   const meta = (await metaRes.json()) as { url?: string; mime_type?: string };
   if (!meta.url) return null;
 
+  // Only ever follow the media URL if it is a Meta host, and only then send our
+  // bearer token. If Graph ever returned an unexpected URL, this stops the token
+  // leaking to a third party and stops a server side request forgery.
+  let host = '';
+  try {
+    host = new URL(meta.url).hostname;
+  } catch {
+    return null;
+  }
+  const metaHost = /(^|\.)(fbcdn\.net|fbsbx\.com|facebook\.com|cdninstagram\.com)$/i.test(host);
+  if (!metaHost) return null;
+
   const fileRes = await fetch(meta.url, {
     headers: { Authorization: `Bearer ${TOKEN}` },
   });

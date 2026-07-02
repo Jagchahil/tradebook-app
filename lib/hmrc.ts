@@ -403,27 +403,74 @@ export async function retrieveObligations(nino: string, accessToken: string, fra
   return res.json().catch(() => null);
 }
 
-// Final declaration (crystallisation) also runs behind the approval gate. Built
-// here as the explicit guarded entry point; the calculation id comes from the
-// Individual Calculations API once that step is wired for live use.
+// --- Individual Calculations (MTD) v8.0, year-end estimate and finalisation --
+// The year-end journey HMRC's minimum functionality standard requires: trigger a
+// calculation, retrieve it to show the user their income tax estimate, then, only
+// on explicit approval, crystallise with a final declaration. For tax year
+// 2025-26 onward the calculationType values are: in-year, intent-to-finalise,
+// intent-to-amend, final-declaration (verified against the live v8.0 OAS). The
+// exact success shapes are to be confirmed in sandbox testing.
+
+const CALC_VERSION = 'application/vnd.hmrc.8.0+json';
+
+export type CalculationType = 'in-year' | 'intent-to-finalise' | 'intent-to-amend' | 'final-declaration';
+
+// Trigger a calculation and return the calculationId HMRC assigns. Use this with
+// an estimate type (in-year or intent-to-finalise). Final declaration is guarded
+// separately below because it is the irreversible crystallisation step.
+export async function triggerCalculation(
+  nino: string,
+  taxYear: string,
+  calculationType: Exclude<CalculationType, 'final-declaration'>,
+  accessToken: string,
+  fraud: FraudContext,
+): Promise<{ ok: boolean; status: number; calculationId?: string }> {
+  if (!isHmrcConfigured()) return { ok: false, status: 0 };
+  const url = `${BASE}/individuals/calculations/${encodeURIComponent(nino)}/self-assessment/${encodeURIComponent(taxYear)}/trigger/${encodeURIComponent(calculationType)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: CALC_VERSION, ...fraudPreventionHeaders(fraud) },
+  });
+  const body = (await res.json().catch(() => undefined)) as { calculationId?: string } | undefined;
+  return { ok: res.ok, status: res.status, calculationId: body?.calculationId };
+}
+
+// Retrieve a calculation by id, which carries the income tax estimate we show the
+// user (with an accuracy disclaimer) before they decide to finalise.
+export async function retrieveCalculation(
+  nino: string,
+  taxYear: string,
+  calculationId: string,
+  accessToken: string,
+  fraud: FraudContext,
+): Promise<unknown | null> {
+  if (!isHmrcConfigured()) return null;
+  const url = `${BASE}/individuals/calculations/${encodeURIComponent(nino)}/self-assessment/${encodeURIComponent(taxYear)}/${encodeURIComponent(calculationId)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: CALC_VERSION, ...fraudPreventionHeaders(fraud) },
+  });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+// Final declaration (crystallisation), behind the approval gate. From tax year
+// 2025-26 this is submitted by triggering a calculation of type final-declaration
+// on the Individual Calculations v8.0 API. THE GATE: nothing is sent unless the
+// user has explicitly approved this exact submission.
 export async function submitFinalDeclaration(args: {
   nino: string;
   taxYear: string;
-  calculationId: string;
   accessToken: string;
   approved: boolean;
   fraud: FraudContext;
-}): Promise<{ ok: boolean; status: number }> {
+}): Promise<{ ok: boolean; status: number; body?: unknown }> {
   if (args.approved !== true) throw new ApprovalRequiredError();
-  if (!isHmrcConfigured()) return { ok: false, status: 0 };
-  const url = `${BASE}/individuals/calculations/${encodeURIComponent(args.nino)}/self-assessment/${encodeURIComponent(args.taxYear)}/${encodeURIComponent(args.calculationId)}/final-declaration`;
+  if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
+  const url = `${BASE}/individuals/calculations/${encodeURIComponent(args.nino)}/self-assessment/${encodeURIComponent(args.taxYear)}/trigger/final-declaration`;
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${args.accessToken}`,
-      Accept: 'application/vnd.hmrc.5.0+json',
-      ...fraudPreventionHeaders(args.fraud),
-    },
+    headers: { Authorization: `Bearer ${args.accessToken}`, Accept: CALC_VERSION, ...fraudPreventionHeaders(args.fraud) },
   });
-  return { ok: res.ok, status: res.status };
+  const body = await res.json().catch(() => undefined);
+  return { ok: res.ok, status: res.status, body };
 }

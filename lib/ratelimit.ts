@@ -8,9 +8,19 @@
 const buckets = new Map<string, number[]>();
 
 export function clientIp(req: Request): string {
+  // Prefer the platform-trusted client IP that Vercel sets and the client cannot
+  // spoof. Only fall back to X-Forwarded-For, and then use the LAST hop (added by
+  // the trusted proxy) rather than the first (which a client can forge).
+  const vercel = req.headers.get('x-vercel-forwarded-for');
+  if (vercel) return vercel.split(',')[0].trim();
+  const real = req.headers.get('x-real-ip');
+  if (real) return real.trim();
   const xff = req.headers.get('x-forwarded-for');
-  if (xff) return xff.split(',')[0].trim();
-  return req.headers.get('x-real-ip') ?? 'unknown';
+  if (xff) {
+    const hops = xff.split(',').map((h) => h.trim()).filter(Boolean);
+    return hops[hops.length - 1] || 'unknown';
+  }
+  return 'unknown';
 }
 
 // Returns true if this key has gone over the limit in the window.

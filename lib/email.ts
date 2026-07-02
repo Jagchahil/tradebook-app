@@ -24,6 +24,17 @@ function looksLikeEmail(value: string | null | undefined): boolean {
 
 export { looksLikeEmail };
 
+// Escape any user supplied text before it goes into email HTML, so a customer or
+// business name containing markup cannot inject into the recipient's inbox.
+function esc(s: string | null | undefined): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export interface InvoiceEmail {
   to: string;
   number: string;
@@ -43,8 +54,8 @@ export async function sendInvoiceEmail(opts: InvoiceEmail): Promise<boolean> {
 
   const html = `
   <div style="font-family:Inter,-apple-system,'Segoe UI',sans-serif;color:${INK};max-width:520px;margin:0 auto;padding:24px">
-    <p style="font-size:15px;color:${MUTED}">Hi ${opts.customerName || 'there'},</p>
-    <p style="font-size:15px;line-height:1.6">Here is your invoice <strong>${opts.number}</strong>${opts.businessName ? ` from <strong>${opts.businessName}</strong>` : ''}, for <strong>${total}</strong>.</p>
+    <p style="font-size:15px;color:${MUTED}">Hi ${esc(opts.customerName) || 'there'},</p>
+    <p style="font-size:15px;line-height:1.6">Here is your invoice <strong>${esc(opts.number)}</strong>${opts.businessName ? ` from <strong>${esc(opts.businessName)}</strong>` : ''}, for <strong>${total}</strong>.</p>
     <p style="margin:28px 0">
       <a href="${opts.link}" style="background:${RIVER};color:#fff;text-decoration:none;font-weight:600;padding:14px 26px;border-radius:10px;display:inline-block">View and pay the invoice</a>
     </p>
@@ -77,7 +88,7 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
 
   const fromAddr = FROM.replace(/.*</, '').replace(/>.*/, '');
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.com';
-  const hi = name ? `Welcome to Lekhio, ${name}.` : 'Welcome to Lekhio.';
+  const hi = name ? `Welcome to Lekhio, ${esc(name)}.` : 'Welcome to Lekhio.';
 
   const html = `
   <div style="font-family:Inter,-apple-system,'Segoe UI',sans-serif;color:${INK};max-width:520px;margin:0 auto;padding:24px">

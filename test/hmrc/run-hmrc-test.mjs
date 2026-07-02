@@ -107,5 +107,25 @@ ok('authorize URL carries the client id and redirect', authUrl.includes('client_
 delete process.env.HMRC_CLIENT_ID;
 delete process.env.HMRC_REDIRECT_URI;
 
+// --- Year-end: final declaration gate + calculation dormancy --------------
+let fdThrew = false;
+try {
+  await H.submitFinalDeclaration({ nino: 'AA000000A', taxYear: '2026-27', accessToken: 't', approved: false, fraud: {} });
+} catch (e) {
+  fdThrew = e instanceof H.ApprovalRequiredError;
+}
+ok('final declaration refuses without explicit approval', fdThrew);
+
+let fdDormant = null;
+try {
+  fdDormant = await H.submitFinalDeclaration({ nino: 'AA000000A', taxYear: '2026-27', accessToken: 't', approved: true, fraud: {} });
+} catch {
+  fdDormant = { body: 'threw' };
+}
+ok('final declaration approved + no credentials = dormant', fdDormant && fdDormant.body === 'hmrc_not_configured');
+
+const trig = await H.triggerCalculation('AA000000A', '2026-27', 'intent-to-finalise', 't', {});
+ok('trigger calculation is dormant with no credentials', trig && trig.ok === false && trig.status === 0);
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

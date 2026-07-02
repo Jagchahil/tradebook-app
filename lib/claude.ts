@@ -8,7 +8,12 @@
 import { FACTS } from './taxengine';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-6';
+// Two tiers. The structured extraction tasks (receipt fields, entry parsing,
+// invoice lines, schedule times) are simple and high volume, so they run on the
+// cheapest capable model. The open ended accountant answers stay on the stronger
+// model, because a wrong tax answer costs more than the tokens ever will.
+const MODEL_FAST = 'claude-haiku-4-5';
+const MODEL_SMART = 'claude-sonnet-4-6';
 
 const KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -21,6 +26,10 @@ export interface ParsedReceipt {
   amount: number;
   category: string;
   transaction_type: 'expense';
+  // The date printed on the receipt, YYYY-MM-DD, or null when unreadable. The
+  // webhook clamps it and stores it in transaction_date, so back-dated receipts
+  // land in the right tax quarter.
+  transaction_date: string | null;
 }
 
 const ALLOWED_CATEGORIES = ['tools', 'fuel', 'meals', 'materials', 'other'];
@@ -32,7 +41,8 @@ const PROMPT = [
   '  "merchant_name": string, the shop or supplier name,',
   '  "amount": number, the total paid in pounds, no currency symbol,',
   `  "category": one of ${ALLOWED_CATEGORIES.join(', ')},`,
-  '  "transaction_type": "expense"',
+  '  "transaction_type": "expense",',
+  '  "transaction_date": the date printed on the receipt as YYYY-MM-DD, or null if you cannot read one',
   '}',
   'Pick the closest category. Use "materials" for building supplies, "tools" for',
   'tools and hardware, "fuel" for petrol or diesel, "meals" for food and drink,',
@@ -58,7 +68,7 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: MODEL_FAST,
       max_tokens: 300,
       messages: [
         {
@@ -93,11 +103,13 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
         ? parsed.category
         : 'other';
 
+    const rawDate = typeof parsed.transaction_date === 'string' ? parsed.transaction_date : null;
     return {
       merchant_name: (parsed.merchant_name || 'Unknown').toString().slice(0, 120),
       amount: Number.isFinite(amount) ? Math.abs(amount) : 0,
       category,
       transaction_type: 'expense',
+      transaction_date: rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null,
     };
   } catch {
     console.error('[claude] Could not parse JSON from model reply.');
@@ -144,7 +156,7 @@ export async function parseSpokenTransaction(text: string): Promise<ParsedEntry 
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: MODEL_FAST,
       max_tokens: 300,
       messages: [{ role: 'user', content: ENTRY_PROMPT(text) }],
     }),
@@ -216,7 +228,7 @@ export async function draftInvoice(description: string): Promise<DraftedInvoice 
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: MODEL_FAST,
       max_tokens: 500,
       messages: [{ role: 'user', content: INVOICE_PROMPT(description) }],
     }),
@@ -273,7 +285,7 @@ export async function answerMoneyQuestion(question: string, summary: string): Pr
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
   });
   if (!res.ok) {
     const errText = await res.text();
@@ -307,7 +319,7 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
   });
   if (!res.ok) {
     const errText = await res.text();
@@ -331,6 +343,7 @@ const ACCOUNTANT_SYSTEM = [
   'You are an expert in UK self employed tax and bookkeeping, built on the rules taught in the leading tax and accountancy qualifications (ACCA, ICAEW, CIOT, AAT). Give real, specific, accurate answers, not vague hand-waving.',
   '',
   'Use these 2026/27 figures, England, Wales and Northern Ireland. Do not invent or guess figures.',
+  'Scottish income tax bands are different and are not modelled here. If the user says they are in Scotland, say your income tax figures use the England, Wales and Northern Ireland bands, point them to the Scottish bands on gov.scot, and note that National Insurance and VAT are the same UK wide.',
   `- Personal allowance £${FACTS.personalAllowance.toLocaleString('en-GB')}, tapered by £1 for every £2 of income over £${FACTS.personalAllowanceTaperFloor.toLocaleString('en-GB')}, nil at £${FACTS.personalAllowanceLostAt.toLocaleString('en-GB')}.`,
   '- Income tax on taxable income: 20% on the first £37,700, 40% to £125,140, 45% above.',
   `- Class 4 NIC: ${FACTS.class4MainRate * 100}% on profits £${FACTS.class4LowerLimit.toLocaleString('en-GB')} to £${FACTS.class4UpperLimit.toLocaleString('en-GB')}, ${FACTS.class4UpperRate * 100}% above. Class 2 is voluntary since April 2024 (£${FACTS.class2WeeklyRate} a week if paid).`,
@@ -341,7 +354,7 @@ const ACCOUNTANT_SYSTEM = [
   '- MTD for Income Tax: from April 2026 if qualifying income over £50,000, April 2027 over £30,000, April 2028 over £20,000. Quarterly updates due 7 Aug, 7 Nov, 7 Feb, 7 May. Self Assessment for 2024/25 due 31 Jan 2026.',
   '- Profits are taxed on the tax-year basis from 2024/25. The cash basis (money in and out when it moves) is the default for small businesses; accruals counts income and costs when invoiced or incurred. Opening and closing years can create overlap, so the first and last year need care.',
   '- Payments on account: once a Self Assessment bill is over £1,000, you also make two payments on account towards next year, each half this year\'s bill, due 31 January and 31 July, on top of the balancing payment. This is the bill that surprises people.',
-  '- Capital allowances: the Annual Investment Allowance gives 100% relief on most plant and machinery up to £1,000,000. Above that, or for cars, you claim a writing down allowance each year, 18% on the main pool, 6% on the special rate pool (most cars, integral features).',
+  `- Capital allowances: the Annual Investment Allowance gives 100% relief on most plant and machinery up to £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')}. Above that, or for cars, you claim a writing down allowance each year, ${Math.round(FACTS.wdaMainRate * 100)}% on the main pool (reduced from 18% from April 2026), ${Math.round(FACTS.wdaSpecialRate * 100)}% on the special rate pool (most cars, integral features).`,
   '- Trading losses: a loss can be carried forward against future profits of the same trade, or set against your total income of this year or last year (s64), whichever saves the most. It is a choice worth thinking about.',
   '- Capital gains tax, 2026/27: the first £3,000 of gains is tax free, then 18% or 24% on most assets, or 18% with Business Asset Disposal Relief when you sell a qualifying business, up to a £1,000,000 lifetime limit.',
   '- VAT flat rate scheme: instead of tracking input VAT, you pay a single percentage of your VAT-inclusive turnover. The percentage depends on your trade, with 16.5% for limited cost traders, and a 1% discount in your first year.',
@@ -372,9 +385,11 @@ export async function answerAccountantQuestion(question: string, context?: strin
     method: 'POST',
     headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: MODEL,
+      model: MODEL_SMART,
       max_tokens: 700,
-      system: ACCOUNTANT_SYSTEM,
+      // The system prompt is long and stable, so cache it. Repeat questions then
+      // pay a tenth of the input price for it.
+      system: [{ type: 'text', text: ACCOUNTANT_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: userContent.slice(0, 4000) }],
     }),
   });
@@ -422,7 +437,7 @@ export async function parseSchedule(text: string, nowIso: string): Promise<Parse
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 300, messages: [{ role: 'user', content: SCHEDULE_PROMPT(text, nowIso) }] }),
+    body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: SCHEDULE_PROMPT(text, nowIso) }] }),
   });
   if (!res.ok) {
     console.error('[claude] Schedule parse failed:', res.status);

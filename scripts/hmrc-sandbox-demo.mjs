@@ -339,7 +339,7 @@ async function losses() {
   if (!st.accessToken || !st.nino || !st.businessId) { console.error('Run create-user, authorize and businesses first.'); process.exit(1); }
   const taxYear = process.env.HMRC_DEMO_TAX_YEAR || '2026-27';
   const fraud = demoFraudContext('demo-user');
-  const bfl = await HMRC.createBroughtForwardLoss(st.nino, taxYear, { businessId: st.businessId, typeOfLoss: 'self-employment', lossAmount: 1000 }, st.accessToken, fraud);
+  const bfl = await HMRC.createBroughtForwardLoss(st.nino, taxYear, { businessId: st.businessId, typeOfLoss: 'self-employment', lossAmount: 1000, taxYearBroughtForwardFrom: taxYear }, st.accessToken, fraud);
   console.log('Create brought-forward loss:', JSON.stringify(bfl, null, 2));
   console.log('Brought-forward losses:', JSON.stringify(await HMRC.listBroughtForwardLosses(st.nino, taxYear, st.accessToken, fraud), null, 2));
   const claim = await HMRC.createLossClaim(st.nino, { businessId: st.businessId, typeOfLoss: 'self-employment', typeOfClaim: 'carry-forward', taxYearClaimedFor: taxYear }, st.accessToken, fraud);

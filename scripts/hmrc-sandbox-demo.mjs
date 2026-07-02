@@ -309,9 +309,11 @@ async function finalise(approve) {
     return;
   }
   // Real approval gate: submitFinalDeclaration throws unless approved === true.
-  // In the sandbox we send the FINAL_DECLARATION_RECEIVED test scenario so HMRC
-  // simulates a clean submission. In production no test scenario is ever set.
-  const scenario = process.env.HMRC_DEMO_SCENARIO || 'FINAL_DECLARATION_RECEIVED';
+  // No Gov-Test-Scenario means the sandbox simulates a clean, successful final
+  // declaration. The named scenarios (FINAL_DECLARATION_RECEIVED, etc.) simulate
+  // specific ERROR states, so we only set one if asked via HMRC_DEMO_SCENARIO. In
+  // production a test scenario is never set.
+  const scenario = process.env.HMRC_DEMO_SCENARIO || '';
   const res = await HMRC.submitFinalDeclaration({ nino: st.nino, taxYear, calculationId: st.calculationId, accessToken: st.accessToken, approved: true, fraud: demoFraudContext('demo-user'), govTestScenario: scenario });
   console.log('OK final declaration result:', JSON.stringify(res, null, 2));
 }

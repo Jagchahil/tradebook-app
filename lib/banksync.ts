@@ -38,12 +38,12 @@ export async function syncWithAccessToken(
 ): Promise<SyncResult> {
   // Overlap the window by 3 days so late-booked lines are never missed; the
   // external_id conflict rule makes the overlap harmless. A first sync (no
-  // last_synced_date) is bounded to recent history in production. In the
-  // SANDBOX there is no date bound at all, because Mock Bank's static test
-  // transactions are dated years back and a bounded window returns nothing;
-  // the per account row cap is the safety valve there.
+  // last_synced_date) is bounded to recent history in production. The SANDBOX
+  // asks from 2015 explicitly, because Mock Bank's static test transactions are
+  // dated years back AND TrueLayer applies its own recent default window when
+  // `from` is omitted, so omitting the bound is not enough to reach them.
   const from = isSandbox()
-    ? undefined
+    ? '2015-01-01'
     : conn.last_synced_date
       ? new Date(new Date(conn.last_synced_date).getTime() - 3 * 24 * 3600 * 1000).toISOString().slice(0, 10)
       : new Date(Date.now() - FIRST_SYNC_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
@@ -60,6 +60,15 @@ export async function syncWithAccessToken(
       if (taken >= MAX_ROWS_PER_ACCOUNT) break;
       const entry = mapBankTransaction(raw);
       if (!entry) continue;
+      // SANDBOX ONLY: Mock Bank dates are years in the past, so the app's
+      // current period views would never show them. Respread them across the
+      // last four weeks so the sandbox exercises the real user experience.
+      // Real banks never enter this branch; real dates are never touched.
+      if (isSandbox()) {
+        entry.transaction_date = new Date(Date.now() - (taken % 28) * 24 * 3600 * 1000)
+          .toISOString()
+          .slice(0, 10);
+      }
       // Skip anything the user already captured on WhatsApp themselves.
       if (captures.some((c) => matchesCapture(entry, c))) continue;
       toInsert.push(entry);

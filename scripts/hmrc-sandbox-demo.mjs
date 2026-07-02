@@ -287,6 +287,31 @@ async function submit(approve) {
   console.log('OK submit result:', JSON.stringify(result, null, 2));
 }
 
+async function calc() {
+  const st = loadState();
+  if (!st.accessToken || !st.nino) { console.error('Run create-user and authorize first.'); process.exit(1); }
+  const taxYear = process.env.HMRC_DEMO_TAX_YEAR || '2026-27';
+  const trig = await HMRC.triggerCalculation(st.nino, taxYear, 'intent-to-finalise', st.accessToken, demoFraudContext('demo-user'));
+  console.log('Trigger calculation:', JSON.stringify(trig, null, 2));
+  if (!trig.calculationId) { console.error('No calculationId returned (sandbox may need a Gov-Test-Scenario for this test user).'); return; }
+  const calculation = await HMRC.retrieveCalculation(st.nino, taxYear, trig.calculationId, st.accessToken, demoFraudContext('demo-user'));
+  saveState({ calculationId: trig.calculationId });
+  console.log('OK calculation (the income tax estimate to show the user, with a disclaimer):\n', JSON.stringify(calculation, null, 2));
+}
+
+async function finalise(approve) {
+  const st = loadState();
+  if (!st.accessToken || !st.nino) { console.error('Run create-user and authorize first.'); process.exit(1); }
+  const taxYear = process.env.HMRC_DEMO_TAX_YEAR || '2026-27';
+  if (!approve) {
+    console.log('Final declaration crystallises the tax year and is irreversible. DRY RUN, nothing sent. Re-run with --approve to submit (sandbox).');
+    return;
+  }
+  // Real approval gate: submitFinalDeclaration throws unless approved === true.
+  const res = await HMRC.submitFinalDeclaration({ nino: st.nino, taxYear, accessToken: st.accessToken, approved: true, fraud: demoFraudContext('demo-user') });
+  console.log('OK final declaration result:', JSON.stringify(res, null, 2));
+}
+
 async function fph() {
   const st = loadState();
   if (!st.serverToken) { console.error('Run server-token first.'); process.exit(1); }
@@ -327,13 +352,15 @@ const commands = {
   businesses,
   obligations,
   submit: () => submit(approve),
+  calc,
+  finalise: () => finalise(approve),
   fph,
   status: async () => status(),
 };
 
 if (!cmd || !commands[cmd]) {
   console.log('HMRC MTD sandbox demo. Commands, run in order:');
-  console.log('  server-token | create-user | authorize | businesses | obligations | submit [--approve] | fph | status');
+  console.log('  server-token | create-user | authorize | businesses | obligations | submit [--approve] | calc | finalise [--approve] | fph | status');
   console.log('\nSee the header of this file and docs/66 for the full walkthrough.');
   process.exit(cmd ? 1 : 0);
 }

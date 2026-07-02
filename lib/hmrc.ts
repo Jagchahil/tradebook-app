@@ -453,24 +453,33 @@ export async function retrieveCalculation(
   return res.json().catch(() => null);
 }
 
-// Final declaration (crystallisation), behind the approval gate. From tax year
-// 2025-26 this is submitted by triggering a calculation of type final-declaration
-// on the Individual Calculations v8.0 API. THE GATE: nothing is sent unless the
-// user has explicitly approved this exact submission.
+// Final declaration (crystallisation), behind the approval gate. The user first
+// triggers an intent-to-finalise calculation (triggerCalculation) to get a
+// calculationId, reviews the figures, and only then agrees. This POSTs the final
+// declaration for that calculation on the Individual Calculations v8.0 API,
+// endpoint /{calculationId}/final-declaration. THE GATE: nothing is sent unless
+// the user has explicitly approved. govTestScenario is sandbox only (for example
+// FINAL_DECLARATION_RECEIVED to simulate a successful submission); it is never set
+// in production.
 export async function submitFinalDeclaration(args: {
   nino: string;
   taxYear: string;
+  calculationId: string;
   accessToken: string;
   approved: boolean;
   fraud: FraudContext;
+  govTestScenario?: string;
 }): Promise<{ ok: boolean; status: number; body?: unknown }> {
   if (args.approved !== true) throw new ApprovalRequiredError();
   if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
-  const url = `${BASE}/individuals/calculations/${encodeURIComponent(args.nino)}/self-assessment/${encodeURIComponent(args.taxYear)}/trigger/final-declaration`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${args.accessToken}`, Accept: CALC_VERSION, ...fraudPreventionHeaders(args.fraud) },
-  });
+  const url = `${BASE}/individuals/calculations/${encodeURIComponent(args.nino)}/self-assessment/${encodeURIComponent(args.taxYear)}/${encodeURIComponent(args.calculationId)}/final-declaration`;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${args.accessToken}`,
+    Accept: CALC_VERSION,
+    ...fraudPreventionHeaders(args.fraud),
+  };
+  if (args.govTestScenario) headers['Gov-Test-Scenario'] = args.govTestScenario;
+  const res = await fetch(url, { method: 'POST', headers });
   const body = await res.json().catch(() => undefined);
   return { ok: res.ok, status: res.status, body };
 }

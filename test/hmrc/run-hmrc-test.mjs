@@ -110,7 +110,7 @@ delete process.env.HMRC_REDIRECT_URI;
 // --- Year-end: final declaration gate + calculation dormancy --------------
 let fdThrew = false;
 try {
-  await H.submitFinalDeclaration({ nino: 'AA000000A', taxYear: '2026-27', accessToken: 't', approved: false, fraud: {} });
+  await H.submitFinalDeclaration({ nino: 'AA000000A', taxYear: '2026-27', calculationId: 'c', accessToken: 't', approved: false, fraud: {} });
 } catch (e) {
   fdThrew = e instanceof H.ApprovalRequiredError;
 }
@@ -118,7 +118,7 @@ ok('final declaration refuses without explicit approval', fdThrew);
 
 let fdDormant = null;
 try {
-  fdDormant = await H.submitFinalDeclaration({ nino: 'AA000000A', taxYear: '2026-27', accessToken: 't', approved: true, fraud: {} });
+  fdDormant = await H.submitFinalDeclaration({ nino: 'AA000000A', taxYear: '2026-27', calculationId: 'c', accessToken: 't', approved: true, fraud: {} });
 } catch {
   fdDormant = { body: 'threw' };
 }

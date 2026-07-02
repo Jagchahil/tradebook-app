@@ -302,13 +302,17 @@ async function calc() {
 async function finalise(approve) {
   const st = loadState();
   if (!st.accessToken || !st.nino) { console.error('Run create-user and authorize first.'); process.exit(1); }
+  if (!st.calculationId) { console.error('Run `calc` first, it saves the calculationId that final declaration needs.'); process.exit(1); }
   const taxYear = process.env.HMRC_DEMO_TAX_YEAR || '2026-27';
   if (!approve) {
     console.log('Final declaration crystallises the tax year and is irreversible. DRY RUN, nothing sent. Re-run with --approve to submit (sandbox).');
     return;
   }
   // Real approval gate: submitFinalDeclaration throws unless approved === true.
-  const res = await HMRC.submitFinalDeclaration({ nino: st.nino, taxYear, accessToken: st.accessToken, approved: true, fraud: demoFraudContext('demo-user') });
+  // In the sandbox we send the FINAL_DECLARATION_RECEIVED test scenario so HMRC
+  // simulates a clean submission. In production no test scenario is ever set.
+  const scenario = process.env.HMRC_DEMO_SCENARIO || 'FINAL_DECLARATION_RECEIVED';
+  const res = await HMRC.submitFinalDeclaration({ nino: st.nino, taxYear, calculationId: st.calculationId, accessToken: st.accessToken, approved: true, fraud: demoFraudContext('demo-user'), govTestScenario: scenario });
   console.log('OK final declaration result:', JSON.stringify(res, null, 2));
 }
 

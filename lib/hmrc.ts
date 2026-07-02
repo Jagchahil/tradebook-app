@@ -474,3 +474,109 @@ export async function submitFinalDeclaration(args: {
   const body = await res.json().catch(() => undefined);
   return { ok: res.ok, status: res.status, body };
 }
+
+// --- Business Source Adjustable Summary (BSAS) v7.0 --------------------------
+// The year-end accounting adjustments HMRC's minimum standard requires: trigger a
+// summary of the business's figures, retrieve it, then submit any adjustments
+// (disallowables, additions) that bring the accounting profit to the taxable one.
+// Adjustments change the tax position, so the submit is behind the approval gate.
+// Verified against the live BSAS v7.0 OAS. Exact body shapes confirmed in sandbox.
+
+const BSAS_VERSION = 'application/vnd.hmrc.7.0+json';
+
+export async function triggerBsas(args: {
+  nino: string;
+  taxYear: string;
+  businessId: string;
+  accountingPeriod: { startDate: string; endDate: string };
+  accessToken: string;
+  fraud: FraudContext;
+}): Promise<{ ok: boolean; status: number; calculationId?: string }> {
+  if (!isHmrcConfigured()) return { ok: false, status: 0 };
+  const url = `${BASE}/individuals/self-assessment/adjustable-summary/${encodeURIComponent(args.nino)}/trigger`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${args.accessToken}`, Accept: BSAS_VERSION, 'Content-Type': 'application/json', ...fraudPreventionHeaders(args.fraud) },
+    body: JSON.stringify({ accountingPeriod: args.accountingPeriod, typeOfBusiness: 'self-employment', businessId: args.businessId, taxYear: args.taxYear }),
+  });
+  const body = (await res.json().catch(() => undefined)) as { calculationId?: string } | undefined;
+  return { ok: res.ok, status: res.status, calculationId: body?.calculationId };
+}
+
+export async function retrieveSelfEmploymentBsas(nino: string, calculationId: string, taxYear: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
+  if (!isHmrcConfigured()) return null;
+  const url = `${BASE}/individuals/self-assessment/adjustable-summary/${encodeURIComponent(nino)}/self-employment/${encodeURIComponent(calculationId)}/${encodeURIComponent(taxYear)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: BSAS_VERSION, ...fraudPreventionHeaders(fraud) } });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+export async function submitBsasAdjustments(args: {
+  nino: string;
+  calculationId: string;
+  taxYear: string;
+  adjustments: Record<string, unknown>;
+  approved: boolean;
+  accessToken: string;
+  fraud: FraudContext;
+}): Promise<{ ok: boolean; status: number; body?: unknown }> {
+  if (args.approved !== true) throw new ApprovalRequiredError();
+  if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
+  const url = `${BASE}/individuals/self-assessment/adjustable-summary/${encodeURIComponent(args.nino)}/self-employment/${encodeURIComponent(args.calculationId)}/adjust/${encodeURIComponent(args.taxYear)}`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${args.accessToken}`, Accept: BSAS_VERSION, 'Content-Type': 'application/json', ...fraudPreventionHeaders(args.fraud) },
+    body: JSON.stringify(args.adjustments),
+  });
+  const body = await res.json().catch(() => undefined);
+  return { ok: res.ok, status: res.status, body };
+}
+
+// --- Individual Losses (MTD) v6.0 -------------------------------------------
+// Brought forward losses and loss claims (carry forward, or set sideways against
+// other income when permitted). These let a trader apply a bad year against a good
+// one. Body shapes are passed through so the caller supplies the exact documented
+// fields (typeOfLoss, businessId, lossAmount, typeOfClaim, taxYearClaimedFor).
+// Verified against the live Individual Losses v6.0 OAS.
+
+const LOSS_VERSION = 'application/vnd.hmrc.6.0+json';
+
+export async function createBroughtForwardLoss(nino: string, taxYearBroughtForwardFrom: string, lossBody: Record<string, unknown>, accessToken: string, fraud: FraudContext): Promise<{ ok: boolean; status: number; lossId?: string }> {
+  if (!isHmrcConfigured()) return { ok: false, status: 0 };
+  const url = `${BASE}/individuals/losses/${encodeURIComponent(nino)}/brought-forward-losses/tax-year/brought-forward-from/${encodeURIComponent(taxYearBroughtForwardFrom)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: LOSS_VERSION, 'Content-Type': 'application/json', ...fraudPreventionHeaders(fraud) },
+    body: JSON.stringify(lossBody),
+  });
+  const body = (await res.json().catch(() => undefined)) as { lossId?: string } | undefined;
+  return { ok: res.ok, status: res.status, lossId: body?.lossId };
+}
+
+export async function listBroughtForwardLosses(nino: string, taxYear: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
+  if (!isHmrcConfigured()) return null;
+  const url = `${BASE}/individuals/losses/${encodeURIComponent(nino)}/brought-forward-losses/tax-year/${encodeURIComponent(taxYear)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: LOSS_VERSION, ...fraudPreventionHeaders(fraud) } });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+export async function createLossClaim(nino: string, claimBody: Record<string, unknown>, accessToken: string, fraud: FraudContext): Promise<{ ok: boolean; status: number; claimId?: string }> {
+  if (!isHmrcConfigured()) return { ok: false, status: 0 };
+  const url = `${BASE}/individuals/losses/${encodeURIComponent(nino)}/loss-claims`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: LOSS_VERSION, 'Content-Type': 'application/json', ...fraudPreventionHeaders(fraud) },
+    body: JSON.stringify(claimBody),
+  });
+  const body = (await res.json().catch(() => undefined)) as { claimId?: string } | undefined;
+  return { ok: res.ok, status: res.status, claimId: body?.claimId };
+}
+
+export async function listLossClaims(nino: string, taxYearClaimedFor: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
+  if (!isHmrcConfigured()) return null;
+  const url = `${BASE}/individuals/losses/${encodeURIComponent(nino)}/loss-claims/tax-year/${encodeURIComponent(taxYearClaimedFor)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: LOSS_VERSION, ...fraudPreventionHeaders(fraud) } });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}

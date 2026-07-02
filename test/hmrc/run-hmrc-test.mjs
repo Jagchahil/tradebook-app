@@ -127,5 +127,20 @@ ok('final declaration approved + no credentials = dormant', fdDormant && fdDorma
 const trig = await H.triggerCalculation('AA000000A', '2026-27', 'intent-to-finalise', 't', {});
 ok('trigger calculation is dormant with no credentials', trig && trig.ok === false && trig.status === 0);
 
+// --- Annual: BSAS adjustments gate + losses dormancy ----------------------
+let bsasThrew = false;
+try {
+  await H.submitBsasAdjustments({ nino: 'AA000000A', calculationId: 'c', taxYear: '2026-27', adjustments: {}, approved: false, accessToken: 't', fraud: {} });
+} catch (e) {
+  bsasThrew = e instanceof H.ApprovalRequiredError;
+}
+ok('BSAS adjustments refuse without explicit approval', bsasThrew);
+
+const lossDormant = await H.listBroughtForwardLosses('AA000000A', '2026-27', 't', {});
+ok('losses read is dormant with no credentials', lossDormant === null);
+
+const claim = await H.createLossClaim('AA000000A', {}, 't', {});
+ok('create loss claim is dormant with no credentials', claim && claim.ok === false && claim.status === 0);
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

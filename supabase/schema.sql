@@ -56,6 +56,28 @@ create table if not exists public.waitlist (
   created_at timestamptz default now()
 );
 
+-- Marketing leads captured from the free tools (the consent engine). Each row is
+-- a person who opted in, WITH the proof of consent (exact wording, timestamp, ip,
+-- user agent) that UK PECR requires before we may email them marketing. Service
+-- role only: RLS is on with no policy, so anon and authenticated clients cannot
+-- read or write it.
+create table if not exists public.marketing_leads (
+  id              uuid primary key default gen_random_uuid(),
+  email           text not null,
+  source          text,
+  result_note     text,
+  consent         boolean not null default false,
+  consent_text    text,
+  consent_at      timestamptz,
+  confirmed_at    timestamptz,
+  ip              text,
+  user_agent      text,
+  unsubscribed_at timestamptz,
+  created_at      timestamptz not null default now()
+);
+create unique index if not exists marketing_leads_email_uniq on public.marketing_leads (email);
+alter table public.marketing_leads enable row level security;
+
 create table if not exists public.audit_log (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid,
@@ -317,6 +339,15 @@ create index if not exists transactions_user_idx         on public.transactions(
 create index if not exists transactions_user_created_idx on public.transactions(user_id, created_at desc);
 create index if not exists invoices_user_idx             on public.invoices(user_id);
 
+-- One phone, one account. This is the hard backstop for the app<->WhatsApp link:
+-- the webhook matches a sender to exactly one user by phone, so two accounts must
+-- never hold the same number. The app already routes a phone to a single auth
+-- user via OTP, but this makes it impossible at the database level regardless of
+-- any code path. Partial, so the many historic phone-less rows are unaffected.
+create unique index if not exists users_phone_unique_idx
+  on public.users (phone_number) where phone_number is not null;
+create index if not exists users_phone_idx on public.users (phone_number);
+
 -- ---------------------------------------------------------------------------
 -- Processed messages (webhook idempotency)
 -- ---------------------------------------------------------------------------
@@ -379,6 +410,73 @@ $$;
 alter table public.signups add column if not exists offer text;
 
 -- ---------------------------------------------------------------------------
+-- Security: one phone number, one account
+-- ---------------------------------------------------------------------------
+-- A phone number identifies an account, so it must be unique. This stops an
+-- attacker claiming a number that already belongs to someone else (the takeover
+-- vector when sign-in is not yet OTP verified). Partial index, so any number of
+-- accounts without a phone set yet are fine. On a live database, clear any
+-- duplicate phone_number rows before running this. Real production sign-in must
+-- still use phone OTP (EXPO_PUBLIC_OTP_ENABLED) so the number is proven, not just
+-- typed.
+create unique index if not exists users_phone_unique
+  on public.users(phone_number) where phone_number is not null;
+
+-- ---------------------------------------------------------------------------
+-- Subscriptions (Stripe billing for the Lekhio subscription itself)
+-- ---------------------------------------------------------------------------
+-- One row per Stripe subscription. The web checkout creates the subscription and
+-- the Stripe webhook keeps status, plan, price, and renewal date in sync. This is
+-- the record of who is paying, on what plan, and whether they are still inside
+-- their free trial. Service role only, written by the webhook. Additive and safe
+-- to run on a live database.
+create table if not exists public.subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  email text,
+  stripe_customer_id text,
+  stripe_subscription_id text unique,
+  plan text,                       -- 'monthly' or 'annual'
+  offer text,                      -- 'setup20' for the founder price, else null
+  status text,                     -- trialing, active, past_due, canceled, unpaid, incomplete
+  amount_pence integer,            -- the recurring amount actually being charged
+  current_period_end timestamptz,  -- when the next charge or renewal is due
+  cancel_at_period_end boolean default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- The account is keyed by phone (E.164 +44). Store it on the subscription so a
+-- phone-only payer (email optional at signup) is recognised and entitlement can be
+-- resolved by phone, not just email.
+alter table public.subscriptions add column if not exists phone text;
+
+create index if not exists subscriptions_email_idx on public.subscriptions(email);
+create index if not exists subscriptions_customer_idx on public.subscriptions(stripe_customer_id);
+create index if not exists subscriptions_phone_idx on public.subscriptions(phone);
+
+alter table public.subscriptions enable row level security;
+-- No policies. Service role only, the same as the other server-written tables.
+
+-- ---------------------------------------------------------------------------
+-- HMRC MTD connection: the OAuth tokens that let Lekhio file for a user. These
+-- are highly sensitive, so the table is service-role only (the app never reads
+-- the tokens; it only ever asks the server to act).
+-- ---------------------------------------------------------------------------
+create table if not exists public.hmrc_connections (
+  user_id       uuid primary key references public.users(id) on delete cascade,
+  access_token  text,
+  refresh_token text,
+  expires_at    timestamptz,
+  nino          text,
+  business_id   text,
+  created_at    timestamptz default now(),
+  updated_at    timestamptz default now()
+);
+
+alter table public.hmrc_connections enable row level security;
+-- No policies. Service role only.
+
+-- ---------------------------------------------------------------------------
 -- Conventions (decided 2026-06-24 while the transactions table was still empty)
 -- ---------------------------------------------------------------------------
 -- 1. Income vs expense is the sign of `amount`. Expenses are negative. There is
@@ -388,3 +486,89 @@ alter table public.signups add column if not exists offer text;
 -- 3. `confirmed` is the user approval flag. Nothing should be treated as final
 --    for tax until the user approves it.
 -- 4. Do not disable RLS to make an insert work. Use the service role key.
+
+-- ---------------------------------------------------------------------------
+-- ADDED 2 JULY 2026 (Fable audit, doc 74). APPLY THIS BLOCK IN THE SUPABASE SQL
+-- EDITOR. Two items: the grouped weekly totals RPC (replaces the N plus one
+-- weekly cron fan out) and the phone binding trigger (binds users.phone_number
+-- to the OTP verified phone on the JWT, closing the deferred H1 finding).
+-- Both are idempotent. The cron falls back to the old per user query until the
+-- RPC exists, so applying late is safe; applying is still required for scale.
+-- ---------------------------------------------------------------------------
+
+-- Weekly totals for every user in one grouped pass. Confirmed entries only,
+-- keyed off transaction_date (falling back to created_at) so the WhatsApp
+-- summary agrees with the app.
+create or replace function public.weekly_totals_all()
+returns table (user_id uuid, income numeric, expenses numeric)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    t.user_id,
+    coalesce(sum(case when t.amount >= 0 then t.amount end), 0) as income,
+    coalesce(sum(case when t.amount < 0 then -t.amount end), 0) as expenses
+  from public.transactions t
+  where t.confirmed = true
+    and coalesce(t.transaction_date, t.created_at::date) >= (current_date - 7)
+  group by t.user_id;
+$$;
+
+-- Lock the function down: only the service role should call it.
+revoke all on function public.weekly_totals_all() from public;
+revoke all on function public.weekly_totals_all() from anon;
+revoke all on function public.weekly_totals_all() from authenticated;
+grant execute on function public.weekly_totals_all() to service_role;
+
+-- Bind the stored phone to the verified phone on the JWT. OTP is the only login
+-- path in production, so an authenticated session always carries the phone it
+-- verified. This makes it impossible for a signed in client to point its account
+-- at someone else's number, even with handcrafted REST calls. The service role
+-- (webhook, server) is exempt. Clearing the phone (null) stays allowed.
+-- NOTE: apply only while OTP login is ON (it is, and anonymous sign in is
+-- disabled). Comparison is on national significant digits so formatting cannot
+-- dodge the check.
+create or replace function public.enforce_phone_binding()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  claims  json;
+  role_c  text;
+  jwt_ph  text;
+  new_d   text;
+  jwt_d   text;
+begin
+  begin
+    claims := nullif(current_setting('request.jwt.claims', true), '')::json;
+  exception when others then
+    claims := null;
+  end;
+  role_c := coalesce(claims->>'role', '');
+  -- Server side writes (service role, or no JWT at all) are trusted.
+  if role_c <> 'authenticated' then
+    return new;
+  end if;
+  if new.phone_number is null then
+    return new;
+  end if;
+  jwt_ph := coalesce(claims->>'phone', '');
+  new_d := regexp_replace(new.phone_number, '\D', '', 'g');
+  jwt_d := regexp_replace(jwt_ph, '\D', '', 'g');
+  -- Accept +44 E.164, national 07 form, or bare digits of the same number.
+  if new_d = jwt_d
+     or ('44' || ltrim(new_d, '0')) = jwt_d
+     or new_d = ('44' || ltrim(jwt_d, '0')) then
+    return new;
+  end if;
+  raise exception 'phone_number must match the phone verified on this account';
+end;
+$$;
+
+drop trigger if exists users_phone_binding on public.users;
+create trigger users_phone_binding
+  before insert or update of phone_number on public.users
+  for each row execute function public.enforce_phone_binding();

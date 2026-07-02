@@ -131,7 +131,7 @@ export default function PrivacyPage() {
         </ul>
         <p style={para}>
           To use any of these rights, email privacy@lekhio.com. You can also complain to the
-          Information Commissioner's Office at ico.org.uk if you are unhappy with how we handle your
+          Information Commissioner&apos;s Office at ico.org.uk if you are unhappy with how we handle your
           data.
         </p>
 

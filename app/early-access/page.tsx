@@ -38,9 +38,9 @@ export default function EarlyAccessPage() {
       <main style={styles.page}>
         <div style={{ ...styles.card, textAlign: 'center' }}>
           <div style={styles.tick}>✓</div>
-          <h1 style={styles.heading}>You're on the list.</h1>
+          <h1 style={styles.heading}>You&apos;re on the list.</h1>
           <p style={styles.sub}>
-            We'll text you when Lekhio is ready for you. Keep your phone nearby.
+            We&apos;ll text you when Lekhio is ready for you. Keep your phone nearby.
           </p>
         </div>
       </main>
@@ -54,8 +54,8 @@ export default function EarlyAccessPage() {
 
         <h1 style={styles.heading}>Get early access.</h1>
         <p style={styles.sub}>
-          Lekhio is coming to WhatsApp first. Drop your number and we'll text
-          you the moment it's live. No app download. No forms. Just text it.
+          Lekhio is coming to WhatsApp first. Drop your number and we&apos;ll text
+          you the moment it&apos;s live. No app download. No forms. Just text it.
         </p>
 
         <form onSubmit={handleSubmit} style={styles.form}>

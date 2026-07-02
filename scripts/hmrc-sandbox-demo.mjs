@@ -318,6 +318,35 @@ async function finalise(approve) {
   console.log('OK final declaration result:', JSON.stringify(res, null, 2));
 }
 
+async function bsas() {
+  const st = loadState();
+  if (!st.accessToken || !st.nino || !st.businessId) { console.error('Run create-user, authorize and businesses first.'); process.exit(1); }
+  const taxYear = process.env.HMRC_DEMO_TAX_YEAR || '2026-27';
+  const y = Number(taxYear.slice(0, 4));
+  const trig = await HMRC.triggerBsas({
+    nino: st.nino, taxYear, businessId: st.businessId,
+    accountingPeriod: { startDate: `${y}-04-06`, endDate: `${y + 1}-04-05` },
+    accessToken: st.accessToken, fraud: demoFraudContext('demo-user'),
+  });
+  console.log('Trigger BSAS:', JSON.stringify(trig, null, 2));
+  if (!trig.calculationId) { console.error('No BSAS calculationId returned (sandbox may need submitted period data or a Gov-Test-Scenario).'); return; }
+  const summary = await HMRC.retrieveSelfEmploymentBsas(st.nino, trig.calculationId, taxYear, st.accessToken, demoFraudContext('demo-user'));
+  console.log('OK BSAS summary (the adjustable annual figures):\n', JSON.stringify(summary, null, 2));
+}
+
+async function losses() {
+  const st = loadState();
+  if (!st.accessToken || !st.nino || !st.businessId) { console.error('Run create-user, authorize and businesses first.'); process.exit(1); }
+  const taxYear = process.env.HMRC_DEMO_TAX_YEAR || '2026-27';
+  const fraud = demoFraudContext('demo-user');
+  const bfl = await HMRC.createBroughtForwardLoss(st.nino, taxYear, { businessId: st.businessId, typeOfLoss: 'self-employment', lossAmount: 1000 }, st.accessToken, fraud);
+  console.log('Create brought-forward loss:', JSON.stringify(bfl, null, 2));
+  console.log('Brought-forward losses:', JSON.stringify(await HMRC.listBroughtForwardLosses(st.nino, taxYear, st.accessToken, fraud), null, 2));
+  const claim = await HMRC.createLossClaim(st.nino, { businessId: st.businessId, typeOfLoss: 'self-employment', typeOfClaim: 'carry-forward', taxYearClaimedFor: taxYear }, st.accessToken, fraud);
+  console.log('Create loss claim:', JSON.stringify(claim, null, 2));
+  console.log('Loss claims:', JSON.stringify(await HMRC.listLossClaims(st.nino, taxYear, st.accessToken, fraud), null, 2));
+}
+
 async function fph() {
   const st = loadState();
   if (!st.serverToken) { console.error('Run server-token first.'); process.exit(1); }
@@ -360,13 +389,15 @@ const commands = {
   submit: () => submit(approve),
   calc,
   finalise: () => finalise(approve),
+  bsas,
+  losses,
   fph,
   status: async () => status(),
 };
 
 if (!cmd || !commands[cmd]) {
   console.log('HMRC MTD sandbox demo. Commands, run in order:');
-  console.log('  server-token | create-user | authorize | businesses | obligations | submit [--approve] | calc | finalise [--approve] | fph | status');
+  console.log('  server-token | create-user | authorize | businesses | obligations | submit [--approve] | calc | finalise [--approve] | bsas | losses | fph | status');
   console.log('\nSee the header of this file and docs/66 for the full walkthrough.');
   process.exit(cmd ? 1 : 0);
 }

@@ -1038,9 +1038,9 @@ export async function setNudgePrefs(
   return res.ok;
 }
 
-// --- Bank feed connections (Open Banking, service role only) ----------------
-// One row per consent journey. Tokens are never stored here; GoCardless holds
-// the bank consent and we hold only the requisition id needed to read data.
+// --- Bank feed connections (Open Banking via TrueLayer, service role only) --
+// One row per consent journey, including the per connection OAuth tokens
+// (service role only table, RLS with no policies, never returned to clients).
 
 export interface BankConnection {
   id: string;
@@ -1104,14 +1104,18 @@ export async function updateBankConnection(
 }
 
 // A user's own connections, for the status endpoint. Never returns tokens.
+// Falls back to a select without bank_name if that column is missing or the
+// PostgREST schema cache is stale, so the status probe can never report a
+// connected bank as disconnected over a cosmetic column.
 export async function listBankConnectionsForUser(
   userId: string,
 ): Promise<Array<{ id: string; status: string; created_at?: string; bank_name?: string | null; last_synced_date: string | null }>> {
   const { url } = config();
-  const res = await fetch(
-    `${url}/rest/v1/bank_connections?user_id=eq.${encodeURIComponent(userId)}&select=id,status,created_at,bank_name,last_synced_date&order=created_at.desc&limit=20`,
-    { headers: headers() },
-  );
+  const base = `${url}/rest/v1/bank_connections?user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=20`;
+  let res = await fetch(`${base}&select=id,status,created_at,bank_name,last_synced_date`, { headers: headers() });
+  if (!res.ok) {
+    res = await fetch(`${base}&select=id,status,created_at,last_synced_date`, { headers: headers() });
+  }
   if (!res.ok) return [];
   return (await res.json()) as Array<{ id: string; status: string; created_at?: string; bank_name?: string | null; last_synced_date: string | null }>;
 }

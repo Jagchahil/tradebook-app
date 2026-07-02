@@ -39,6 +39,16 @@ export async function GET(req: NextRequest) {
     return page('We could not find that connection', 'Start the bank connection again from the Lekhio app.');
   }
 
+  // Reload guard. Auth codes are single use, so if this connection is already
+  // linked (the user refreshed the success page, or a browser retried), do not
+  // exchange again; just show the success page.
+  if (connection.status === 'linked') {
+    return page(
+      'Bank connected',
+      'Your transactions arrive in Lekhio each day, marked "to review". Nothing counts toward your tax until you approve it. You can close this and go back to the app.',
+    );
+  }
+
   if (providerError || !code) {
     await updateBankConnection(connection.id, { status: 'failed' });
     return page(

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { A11Y_CSS } from '../../lib/tokens';
 
 export const metadata: Metadata = {
   title: 'Security and Your Data | Lekhio',
@@ -67,6 +68,7 @@ export default function SecurityPage() {
   return (
     <main style={{ backgroundColor: OFF_WHITE, color: INK, fontFamily: FONT, minHeight: '100vh' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:680px){.grid2{grid-template-columns:1fr}}` }} />
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       <nav style={{ maxWidth: 820, margin: '0 auto', padding: '22px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href="/" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px', color: INK }}>Lekhio</Link>

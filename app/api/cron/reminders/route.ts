@@ -6,6 +6,7 @@ import {
   getPhoneForUser,
   listNudgeTargets,
   weeklyTotals,
+  weeklyTotalsAll,
 } from '../../../../lib/supabase';
 import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
 
@@ -82,10 +83,15 @@ export async function GET(req: NextRequest) {
       });
     } else if (job === 'weekly') {
       const targets = (await listNudgeTargets()).filter((t) => t.weekly_summary);
+      // One grouped aggregate for every user's totals, instead of one query per
+      // user. Falls back to the old per-user query until the weekly_totals_all
+      // RPC (supabase/schema.sql) has been applied.
+      const all = await weeklyTotalsAll();
+      const totalsMap = all ? new Map(all.map((r) => [r.user_id, r])) : null;
       await mapLimit(targets, 20, async (t) => {
-        const { income, expenses } = await weeklyTotals(t.user_id);
-        const profit = income - expenses;
-        await sendTemplate(t.phone, 'lekhio_weekly', 'en_GB', [gbp(income), gbp(expenses), gbp(profit)]);
+        const row = totalsMap ? totalsMap.get(t.user_id) ?? { income: 0, expenses: 0 } : await weeklyTotals(t.user_id);
+        const profit = row.income - row.expenses;
+        await sendTemplate(t.phone, 'lekhio_weekly', 'en_GB', [gbp(row.income), gbp(row.expenses), gbp(profit)]);
         sent++;
       });
     } else {

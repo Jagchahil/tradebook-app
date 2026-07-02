@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { EXPENSE_RULES, TAX_TIPS, VERDICT_LABEL, type Verdict } from '../../lib/taxrules';
 import LeadCapture from '../../components/LeadCapture';
+import { A11Y_CSS } from '../../lib/tokens';
 
 export const metadata: Metadata = {
   title: 'Can I claim it? UK self employed expenses, answered straight | Lekhio',
@@ -107,6 +108,7 @@ export default function CanIClaimPage() {
         }}
       />
       <noscript><style dangerouslySetInnerHTML={{ __html: `.reveal{opacity:1;transform:none}` }} /></noscript>
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       {/* Nav */}
       <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

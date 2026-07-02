@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { TRADES, tradeBySlug } from '../../../lib/trades';
+import { A11Y_CSS } from '../../../lib/tokens';
 
 export const dynamicParams = false;
 
@@ -49,6 +50,7 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1t{font-size:50px;line-height:1.05;letter-spacing:-2px}.claimgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.toolrow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}@media(max-width:820px){.h1t{font-size:34px}.claimgrid{grid-template-columns:1fr}.toolrow{grid-template-columns:1fr 1fr}}` }} />
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>

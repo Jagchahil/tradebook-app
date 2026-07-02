@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { A11Y_CSS } from '../../lib/tokens';
 
 const INK = '#111111';
 const RIVER = '#1B59A6';
@@ -137,6 +138,7 @@ export default function StartPage() {
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: PAPER, color: INK, fontFamily: FONT, display: 'flex', flexDirection: 'column' }}>
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
       <style
         dangerouslySetInnerHTML={{
           __html: `

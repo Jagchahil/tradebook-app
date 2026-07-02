@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { TRADES } from '../lib/trades';
+import { A11Y_CSS } from '../lib/tokens';
 
 export const metadata: Metadata = {
   title: 'Lekhio. Your books, handled. Just text it.',
@@ -733,6 +734,7 @@ export default function HomePage() {
         }}
       />
       <noscript><style dangerouslySetInnerHTML={{ __html: `.reveal{opacity:1;transform:none}.bub{opacity:1;animation:none}` }} /></noscript>
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       {/* Trust bar */}
       <div className="trustbar">

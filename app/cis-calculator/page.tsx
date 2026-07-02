@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Calc from './Calc';
+import { A11Y_CSS } from '../../lib/tokens';
 
 export const metadata: Metadata = {
   title: 'CIS Tax Refund Calculator 2026/27 | Are You Owed Money? | Lekhio',
@@ -21,10 +22,45 @@ const PAPER = '#FBFAF7';
 const MUTED = '#5B6470';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
+// FAQPage structured data for search and AI assistants. Figures stay in step
+// with lib/taxengine.ts (CIS 20% registered, 30% unregistered, 0% gross).
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'How much CIS tax is deducted from subcontractors?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Contractors deduct 20% from registered subcontractors and 30% from unregistered ones, on the labour element only, never on materials. Subcontractors with gross payment status have nothing deducted.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can I get CIS tax back?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Often, yes. CIS deductions are tax you have already paid. When your Self Assessment is worked out, the deductions come off your bill, and many subcontractors are due a refund because 20% was taken off their labour before expenses and the personal allowance were counted.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Is CIS deducted on materials?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'No. CIS is deducted on the labour element only. If your invoice splits labour and materials, the contractor should deduct nothing on the materials part.',
+      },
+    },
+  ],
+};
+
 export default function CisCalculatorPage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden', minHeight: '100vh' }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1c{font-size:46px;line-height:1.07;letter-spacing:-1.7px}@media(max-width:820px){.h1c{font-size:32px}}` }} />
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       <nav style={{ maxWidth: 1080, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>

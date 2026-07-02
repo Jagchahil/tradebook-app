@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Calc from './Calc';
+import { A11Y_CSS } from '../../lib/tokens';
 
 export const metadata: Metadata = {
   title: 'Free Self Employed Tax Calculator 2026/27 | Lekhio',
@@ -24,10 +25,45 @@ const LINE = '#E7E3D9';
 const MUTED = '#5B6470';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
+// FAQPage structured data, so search and AI assistants can quote the answers.
+// Figures must stay in step with lib/taxengine.ts (2026/27).
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'How much tax does a UK sole trader pay in 2026/27?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'You pay income tax on profit above the £12,570 personal allowance: 20% on the first £37,700 of taxable income, 40% up to £125,140 and 45% above. You also pay Class 4 National Insurance: 6% on profits between £12,570 and £50,270 and 2% above. Class 2 is voluntary since April 2024.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How much should a self employed person set aside for tax?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'A common rule of thumb is 25 to 30 per cent of profit for basic rate earners, and this calculator gives you the exact figure for your numbers, including National Insurance and payments on account.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What are payments on account?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Once your Self Assessment bill is over £1,000, HMRC also asks for two advance payments towards next year, each half of this year’s bill, due 31 January and 31 July, on top of the balancing payment.',
+      },
+    },
+  ],
+};
+
 export default function TaxCalculatorPage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1c{font-size:48px;line-height:1.06;letter-spacing:-1.8px}@media(max-width:880px){.h1c{font-size:34px}}` }} />
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Wizard from './Wizard';
+import { A11Y_CSS } from '../../lib/tokens';
 
 export const metadata: Metadata = {
   title: 'Register Your Business: Free Step by Step Guide | Lekhio',
@@ -26,6 +27,7 @@ export default function RegisterPage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1b{font-size:48px;line-height:1.06;letter-spacing:-1.9px}@media(max-width:820px){.h1b{font-size:33px}}` }} />
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>

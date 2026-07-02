@@ -1,5 +1,6 @@
 import { getPublicInvoice } from '../../../lib/supabase';
 import { hasStripeConfig } from '../../../lib/stripe';
+import { A11Y_CSS } from '../../../lib/tokens';
 
 const INK = '#111111';
 const INDIGO = '#1B59A6';
@@ -41,6 +42,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   return (
     <main style={{ backgroundColor: OFF_WHITE, color: INK, fontFamily: FONT, minHeight: '100vh', padding: '32px 16px' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}` }} />
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
       <div
         style={{
           maxWidth: 640,

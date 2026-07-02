@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Generator from './Generator';
+import { A11Y_CSS } from '../../lib/tokens';
 
 export const metadata: Metadata = {
   title: 'Free Invoice & Quote Generator for Tradespeople | Lekhio',
@@ -27,6 +28,7 @@ export default function InvoiceGeneratorPage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1g{font-size:46px;line-height:1.07;letter-spacing:-1.7px}@media(max-width:880px){.h1g{font-size:32px}}@media print{.site-nav,.site-hero,.site-foot{display:none !important;}}` }} />
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       <nav className="site-nav" style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>

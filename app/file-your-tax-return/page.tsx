@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { A11Y_CSS } from '../../lib/tokens';
 
 export const metadata: Metadata = {
   title: 'How to file your own tax return. A free step by step guide for the self employed | Lekhio',
@@ -359,6 +360,7 @@ export default function FileYourTaxReturnPage() {
   return (
     <main style={{ fontFamily: FONT, color: INK, background: PAPER, overflowX: 'hidden' }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -382,7 +384,7 @@ export default function FileYourTaxReturnPage() {
           summary{list-style:none;cursor:pointer;padding:18px 20px;font-weight:600;font-size:16.5px;display:flex;align-items:center;justify-content:space-between;gap:14px}
           summary::-webkit-details-marker{display:none}
           summary::after{content:'+';font-size:22px;color:${RIVER};font-weight:400;line-height:1}
-          details[open] summary::after{content:'–'}
+          details[open] summary::after{content:'−'}
           .step-card{display:flex;gap:18px;padding:22px;background:#fff;border:1px solid ${LINE};border-radius:16px;margin-bottom:14px}
           .branch-tab{display:inline-block;cursor:pointer;border:1.5px solid ${LINE};background:#fff;color:${INK};font-weight:600;font-size:15px;padding:12px 20px;border-radius:999px}
           .chip{display:inline-block;cursor:pointer;border:1.5px solid ${LINE};background:#fff;color:${INK};font-weight:600;font-size:14px;padding:9px 15px;border-radius:999px;transition:all .15s}

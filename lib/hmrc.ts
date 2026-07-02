@@ -1,4 +1,4 @@
-// lib/hmrc.ts — Making Tax Digital for Income Tax (MTD ITSA) integration.
+// lib/hmrc.ts. Making Tax Digital for Income Tax (MTD ITSA) integration.
 //
 // SANDBOX-FIRST AND DORMANT. This is the path that turns "we prepared your
 // quarter" into "it is filed". It is built to HMRC's documented shape and points
@@ -550,7 +550,11 @@ export async function submitBsasAdjustments(args: {
 
 const LOSS_VERSION = 'application/vnd.hmrc.6.0+json';
 
-export async function createBroughtForwardLoss(nino: string, taxYearBroughtForwardFrom: string, lossBody: Record<string, unknown>, accessToken: string, fraud: FraudContext): Promise<{ ok: boolean; status: number; lossId?: string; body?: unknown }> {
+// Creating a loss record changes what the user owes, so like every other write
+// to HMRC it sits behind the approval gate: the caller must pass approved: true
+// from an explicit user action. The gate is built before the automation.
+export async function createBroughtForwardLoss(nino: string, taxYearBroughtForwardFrom: string, lossBody: Record<string, unknown>, accessToken: string, fraud: FraudContext, approved: boolean): Promise<{ ok: boolean; status: number; lossId?: string; body?: unknown }> {
+  if (approved !== true) throw new ApprovalRequiredError();
   if (!isHmrcConfigured()) return { ok: false, status: 0 };
   const url = `${BASE}/individuals/losses/${encodeURIComponent(nino)}/brought-forward-losses/tax-year/brought-forward-from/${encodeURIComponent(taxYearBroughtForwardFrom)}`;
   const res = await fetch(url, {
@@ -570,7 +574,9 @@ export async function listBroughtForwardLosses(nino: string, taxYear: string, ac
   return res.json().catch(() => null);
 }
 
-export async function createLossClaim(nino: string, claimBody: Record<string, unknown>, accessToken: string, fraud: FraudContext): Promise<{ ok: boolean; status: number; claimId?: string; body?: unknown }> {
+// Approval gated for the same reason as createBroughtForwardLoss above.
+export async function createLossClaim(nino: string, claimBody: Record<string, unknown>, accessToken: string, fraud: FraudContext, approved: boolean): Promise<{ ok: boolean; status: number; claimId?: string; body?: unknown }> {
+  if (approved !== true) throw new ApprovalRequiredError();
   if (!isHmrcConfigured()) return { ok: false, status: 0 };
   const url = `${BASE}/individuals/losses/${encodeURIComponent(nino)}/loss-claims`;
   const res = await fetch(url, {

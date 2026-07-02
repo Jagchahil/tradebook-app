@@ -139,8 +139,25 @@ ok('BSAS adjustments refuse without explicit approval', bsasThrew);
 const lossDormant = await H.listBroughtForwardLosses('AA000000A', '2026-27', 't', {});
 ok('losses read is dormant with no credentials', lossDormant === null);
 
-const claim = await H.createLossClaim('AA000000A', {}, 't', {});
-ok('create loss claim is dormant with no credentials', claim && claim.ok === false && claim.status === 0);
+// The loss WRITES are approval gated like every other HMRC write.
+let lossClaimThrew = false;
+try {
+  await H.createLossClaim('AA000000A', {}, 't', {}, false);
+} catch (e) {
+  lossClaimThrew = e instanceof H.ApprovalRequiredError;
+}
+ok('create loss claim refuses without explicit approval', lossClaimThrew);
+
+let bflThrew = false;
+try {
+  await H.createBroughtForwardLoss('AA000000A', '2026-27', {}, 't', {}, false);
+} catch (e) {
+  bflThrew = e instanceof H.ApprovalRequiredError;
+}
+ok('create brought-forward loss refuses without explicit approval', bflThrew);
+
+const claim = await H.createLossClaim('AA000000A', {}, 't', {}, true);
+ok('create loss claim approved + no credentials = dormant', claim && claim.ok === false && claim.status === 0);
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

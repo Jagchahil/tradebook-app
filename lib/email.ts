@@ -51,15 +51,19 @@ export async function sendInvoiceEmail(opts: InvoiceEmail): Promise<boolean> {
   const from = opts.businessName ? `${opts.businessName} via Lekhio` : 'Lekhio';
   const subject = `Invoice ${opts.number}${opts.businessName ? ` from ${opts.businessName}` : ''}`;
   const total = `£${(Number(opts.total) || 0).toFixed(2)}`;
+  // Only ever emit an https link with no characters that could break out of the
+  // href attribute. The link is server built today, but this keeps the email
+  // safe if the source ever changes to include user input.
+  const safeLink = /^https:\/\/[^\s"'<>]+$/i.test(opts.link) ? opts.link : '';
 
   const html = `
   <div style="font-family:Inter,-apple-system,'Segoe UI',sans-serif;color:${INK};max-width:520px;margin:0 auto;padding:24px">
     <p style="font-size:15px;color:${MUTED}">Hi ${esc(opts.customerName) || 'there'},</p>
     <p style="font-size:15px;line-height:1.6">Here is your invoice <strong>${esc(opts.number)}</strong>${opts.businessName ? ` from <strong>${esc(opts.businessName)}</strong>` : ''}, for <strong>${total}</strong>.</p>
     <p style="margin:28px 0">
-      <a href="${opts.link}" style="background:${RIVER};color:#fff;text-decoration:none;font-weight:600;padding:14px 26px;border-radius:10px;display:inline-block">View and pay the invoice</a>
+      <a href="${safeLink}" style="background:${RIVER};color:#fff;text-decoration:none;font-weight:600;padding:14px 26px;border-radius:10px;display:inline-block">View and pay the invoice</a>
     </p>
-    <p style="font-size:13px;color:${MUTED}">Or open this link: <a href="${opts.link}" style="color:${RIVER}">${opts.link}</a></p>
+    <p style="font-size:13px;color:${MUTED}">Or open this link: <a href="${safeLink}" style="color:${RIVER}">${esc(safeLink)}</a></p>
     <p style="font-size:12px;color:${MUTED};margin-top:32px">Sent with Lekhio.</p>
   </div>`;
 

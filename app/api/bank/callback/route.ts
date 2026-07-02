@@ -16,7 +16,16 @@ export const maxDuration = 60;
 
 function page(title: string, body: string): NextResponse {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${title} | Lekhio</title></head><body style="margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#FBFAF7;color:#111111;display:flex;min-height:100vh;align-items:center;justify-content:center"><div style="max-width:420px;padding:32px;text-align:center"><div style="font-size:22px;font-weight:700;letter-spacing:-1px;margin-bottom:18px">Lekhio</div><h1 style="font-size:24px;margin:0 0 10px">${title}</h1><p style="font-size:15.5px;color:#5B6470;line-height:1.6;margin:0">${body}</p></div></body></html>`;
-  return new NextResponse(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  return new NextResponse(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      // The callback URL carries the one time auth code and signed state in the
+      // query string. no-referrer stops that URL leaking through the Referer
+      // header if the page ever links out.
+      'Referrer-Policy': 'no-referrer',
+    },
+  });
 }
 
 export async function GET(req: NextRequest) {

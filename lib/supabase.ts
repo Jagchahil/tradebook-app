@@ -1038,6 +1038,122 @@ export async function setNudgePrefs(
   return res.ok;
 }
 
+// --- Bank feed connections (Open Banking, service role only) ----------------
+// One row per consent journey. Tokens are never stored here; GoCardless holds
+// the bank consent and we hold only the requisition id needed to read data.
+
+export interface BankConnection {
+  id: string;
+  user_id: string;
+  requisition_id: string;
+  reference: string;
+  institution_id: string | null;
+  status: string;
+  account_ids: string[];
+  last_synced_date: string | null;
+}
+
+export async function createBankConnection(
+  userId: string,
+  requisitionId: string,
+  reference: string,
+  institutionId: string,
+): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/bank_connections`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({
+      user_id: userId,
+      requisition_id: requisitionId,
+      reference,
+      institution_id: institutionId,
+      status: 'created',
+    }),
+  });
+  return res.ok;
+}
+
+export async function getBankConnectionByReference(reference: string): Promise<BankConnection | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/bank_connections?reference=eq.${encodeURIComponent(reference)}&select=*&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as BankConnection[];
+  return rows[0] ?? null;
+}
+
+export async function updateBankConnection(
+  id: string,
+  patch: { status?: string; account_ids?: string[]; last_synced_date?: string },
+): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/bank_connections?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+  });
+  return res.ok;
+}
+
+export async function listLinkedBankConnections(limit = 500): Promise<BankConnection[]> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/bank_connections?status=eq.linked&select=*&order=last_synced_date.asc.nullsfirst&limit=${limit}`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return (await res.json()) as BankConnection[];
+}
+
+// A user's recent unconfirmed WhatsApp captures, for deduping a bank line
+// against a receipt or typed entry covering the same purchase.
+export async function recentUnconfirmedCaptures(
+  userId: string,
+  sinceISO: string,
+): Promise<Array<{ amount: number; transaction_date: string | null }>> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.false&source_type=like.whatsapp*&transaction_date=gte.${encodeURIComponent(sinceISO)}&select=amount,transaction_date&limit=500`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return (await res.json()) as Array<{ amount: number; transaction_date: string | null }>;
+}
+
+// Insert a bank transaction idempotently: external_id carries the bank's own
+// transaction id, and the partial unique index on external_id (schema block,
+// 2 July 2026) makes re-syncing the same window safe. Duplicate inserts are
+// silently ignored.
+export async function insertBankTransaction(userId: string, entry: {
+  external_id: string;
+  vendor: string;
+  amount: number;
+  category: string;
+  transaction_date: string;
+  description: string;
+}): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/transactions?on_conflict=external_id`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'resolution=ignore-duplicates,return=minimal' }),
+    body: JSON.stringify({
+      user_id: userId,
+      vendor: entry.vendor,
+      amount: entry.amount,
+      category: entry.category,
+      transaction_date: entry.transaction_date,
+      source_type: 'bank_feed',
+      description: entry.description,
+      confirmed: false,
+      external_id: entry.external_id,
+    }),
+  });
+  return res.ok;
+}
+
 // --- Invoices (read for the public invoice page, server side only) ---------
 
 export interface InvoiceLine {

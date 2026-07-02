@@ -9,8 +9,19 @@ import {
   weeklyTotals,
   weeklyTotalsAll,
   pruneOldRows,
+  listLinkedBankConnections,
+  updateBankConnection,
+  recentUnconfirmedCaptures,
+  insertBankTransaction,
 } from '../../../../lib/supabase';
 import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
+import {
+  hasBankFeedConfig,
+  getAccessToken,
+  getBookedTransactions,
+  mapBankTransaction,
+  matchesCapture,
+} from '../../../../lib/bankfeed';
 
 // The reminder engine. Hit on a schedule (Vercel Cron, Supabase pg_cron, or any
 // external cron such as cron-job.org). Guarded by CRON_SECRET.
@@ -135,6 +146,49 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
   console.log(`[cron] job=${job} hop=${hop} sent=${sent} complete`);
 }
 
+// Pull new bank transactions for every linked connection. Dormant without the
+// bank feed keys. Each line is idempotent on the bank's own transaction id and
+// deduped against the user's recent WhatsApp captures, and every insert lands
+// unconfirmed so the approval gate holds. A time budget keeps the ride along
+// job from starving the reminders; at real scale this moves to its own
+// continuation chain like the nudges.
+async function syncBankFeeds(budgetMs = 25_000): Promise<{ connections: number; inserted: number }> {
+  const started = Date.now();
+  let connections = 0;
+  let inserted = 0;
+  if (!hasBankFeedConfig()) return { connections, inserted };
+  const access = await getAccessToken();
+  if (!access) return { connections, inserted };
+
+  const linked = await listLinkedBankConnections();
+  for (const conn of linked) {
+    if (Date.now() - started > budgetMs) break;
+    connections += 1;
+    // Overlap the window by 3 days so late-booked lines are never missed; the
+    // external_id conflict rule makes the overlap harmless.
+    const from = conn.last_synced_date
+      ? new Date(new Date(conn.last_synced_date).getTime() - 3 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+      : undefined;
+    const captures = await recentUnconfirmedCaptures(
+      conn.user_id,
+      new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+    );
+    for (const accountId of conn.account_ids) {
+      const booked = await getBookedTransactions(access, accountId, from);
+      if (!booked) continue;
+      for (const raw of booked) {
+        const entry = mapBankTransaction(raw);
+        if (!entry) continue;
+        // Skip anything the user already captured on WhatsApp themselves.
+        if (captures.some((c) => matchesCapture(entry, c))) continue;
+        if (await insertBankTransaction(conn.user_id, entry)) inserted += 1;
+      }
+    }
+    await updateBankConnection(conn.id, { last_synced_date: new Date().toISOString().slice(0, 10) });
+  }
+  return { connections, inserted };
+}
+
 async function runJob(job: string, afterId: string | null, hop: number): Promise<void> {
   try {
     if (job === 'due') {
@@ -148,16 +202,23 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
         await sendTemplate(phone, 'lekhio_reminder', 'en_GB', [r.title]);
         sent++;
       });
-      // Housekeeping rides along with the daily run, so no extra cron entry is
-      // needed (a bad cron config once silently blocked every deploy, and the
-      // Hobby plan caps how many cron jobs a project may declare).
+      // Housekeeping and the bank feed sync ride along with the daily run, so
+      // no extra cron entry is needed (a bad cron config once silently blocked
+      // every deploy, and the Hobby plan caps how many cron jobs a project may
+      // declare). Both are no-ops until their features are switched on.
       const { pruned } = await pruneOldRows();
-      console.log(`[cron] job=due sent=${sent} pruned=${pruned}`);
+      const bank = await syncBankFeeds();
+      console.log(`[cron] job=due sent=${sent} pruned=${pruned} bankConnections=${bank.connections} bankInserted=${bank.inserted}`);
     } else if (job === 'nudge' || job === 'weekly') {
       await fanOut(job, afterId, hop);
     } else if (job === 'cleanup') {
       const { pruned } = await pruneOldRows();
       console.log(`[cron] job=cleanup pruned=${pruned}`);
+    } else if (job === 'bankfeed') {
+      // Manual trigger for testing and catch up runs; the daily due job also
+      // runs this automatically.
+      const bank = await syncBankFeeds(50_000);
+      console.log(`[cron] job=bankfeed connections=${bank.connections} inserted=${bank.inserted}`);
     }
   } catch (err) {
     console.error('[cron] error', err instanceof Error ? err.message : err);
@@ -173,7 +234,7 @@ export async function GET(req: NextRequest) {
   const afterId = params.get('after');
   const hop = Math.max(1, parseInt(params.get('hop') ?? '1', 10) || 1);
 
-  if (!['due', 'nudge', 'weekly', 'cleanup'].includes(job)) {
+  if (!['due', 'nudge', 'weekly', 'cleanup', 'bankfeed'].includes(job)) {
     return NextResponse.json({ error: 'Unknown job.' }, { status: 400 });
   }
   if (hop > MAX_HOPS) {

@@ -25,6 +25,8 @@ jobs:
         run: node test/hmrc/run-hmrc-test.mjs
       - name: WhatsApp intent suite
         run: node test/waintents.test.mjs
+      - name: Bank feed suite
+        run: node test/bankfeed.test.mjs
       - name: Logic tests
         run: node test/logic.test.js
       - name: Build

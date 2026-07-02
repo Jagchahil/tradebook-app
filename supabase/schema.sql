@@ -580,3 +580,34 @@ create index if not exists processed_messages_created_idx on public.processed_me
 -- The webhook's "latest unconfirmed entry" lookup (delete that / change it to X).
 create index if not exists transactions_user_unconfirmed_idx
   on public.transactions(user_id, created_at desc) where confirmed = false;
+
+-- ---------------------------------------------------------------------------
+-- ADDED 2 JULY 2026, SECOND BLOCK (bank feeds foundation, doc 77). APPLY IN THE
+-- SUPABASE SQL EDITOR WHEN BANK FEEDS ARE SWITCHED ON (harmless to apply now).
+-- ---------------------------------------------------------------------------
+
+-- One row per Open Banking consent journey. No tokens live here; GoCardless
+-- holds the bank consent and we hold only the requisition id needed to read.
+create table if not exists public.bank_connections (
+  id               uuid primary key default gen_random_uuid(),
+  user_id          uuid not null references public.users(id) on delete cascade,
+  requisition_id   text not null,
+  reference        text not null unique,
+  institution_id   text,
+  status           text not null default 'created', -- created | linked | failed | revoked
+  account_ids      jsonb not null default '[]',
+  last_synced_date date,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+alter table public.bank_connections enable row level security;
+-- No policies. Service role only, same posture as hmrc_connections.
+
+create index if not exists bank_connections_user_idx   on public.bank_connections(user_id);
+create index if not exists bank_connections_status_idx on public.bank_connections(status);
+
+-- Idempotent bank imports: the bank's own transaction id lives in external_id,
+-- so re-syncing an overlapping window can never duplicate a row.
+create unique index if not exists transactions_external_id_key
+  on public.transactions(external_id) where external_id is not null;

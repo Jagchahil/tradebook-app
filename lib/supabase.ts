@@ -1045,31 +1045,21 @@ export async function setNudgePrefs(
 export interface BankConnection {
   id: string;
   user_id: string;
-  requisition_id: string;
   reference: string;
-  institution_id: string | null;
   status: string;
   account_ids: string[];
+  access_token: string | null;
+  refresh_token: string | null;
+  token_expires_at: string | null;
   last_synced_date: string | null;
 }
 
-export async function createBankConnection(
-  userId: string,
-  requisitionId: string,
-  reference: string,
-  institutionId: string,
-): Promise<boolean> {
+export async function createBankConnection(userId: string, reference: string): Promise<boolean> {
   const { url } = config();
   const res = await fetch(`${url}/rest/v1/bank_connections`, {
     method: 'POST',
     headers: headers({ Prefer: 'return=minimal' }),
-    body: JSON.stringify({
-      user_id: userId,
-      requisition_id: requisitionId,
-      reference,
-      institution_id: institutionId,
-      status: 'created',
-    }),
+    body: JSON.stringify({ user_id: userId, reference, status: 'created' }),
   });
   return res.ok;
 }
@@ -1087,7 +1077,14 @@ export async function getBankConnectionByReference(reference: string): Promise<B
 
 export async function updateBankConnection(
   id: string,
-  patch: { status?: string; account_ids?: string[]; last_synced_date?: string },
+  patch: {
+    status?: string;
+    account_ids?: string[];
+    last_synced_date?: string;
+    access_token?: string;
+    refresh_token?: string | null;
+    token_expires_at?: string;
+  },
 ): Promise<boolean> {
   const { url } = config();
   const res = await fetch(`${url}/rest/v1/bank_connections?id=eq.${encodeURIComponent(id)}`, {

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { hasBankFeedConfig, getAccessToken, listInstitutions } from '../../../../lib/bankfeed';
+import { hasBankFeedConfig } from '../../../../lib/bankfeed';
 import { verifyAccessToken } from '../../../../lib/supabase';
 
-// The UK bank list for the app's bank picker. Authenticated, because there is
-// no reason to serve it to anyone else, and dormant until the bank feed keys
-// exist. Returns id, name and logo only.
+// TrueLayer hosts the bank picker inside its own auth dialog, so the app does
+// not need a real institutions list. This endpoint exists for two jobs: the
+// Settings screen probes it to decide whether to show the "Connect your bank"
+// row (503 while dormant), and the picker screen renders the single entry it
+// returns, which starts the hosted journey. Authenticated, dormant without the
+// TrueLayer keys.
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
@@ -16,16 +19,14 @@ export async function GET(req: NextRequest) {
   if (!hasBankFeedConfig()) {
     return NextResponse.json({ error: 'not_enabled', message: 'Bank feeds are not switched on yet.' }, { status: 503 });
   }
-  const access = await getAccessToken();
-  if (!access) return NextResponse.json({ error: 'provider_unavailable' }, { status: 502 });
-  const institutions = await listInstitutions(access);
-  if (!institutions) return NextResponse.json({ error: 'provider_unavailable' }, { status: 502 });
 
-  // GoCardless's fake test bank does not appear in the real GB list. With
-  // BANK_SANDBOX=true it is pinned to the top so the end to end consent loop
-  // can be walked without touching a real bank. Remove the env var for launch.
-  if (process.env.BANK_SANDBOX === 'true') {
-    institutions.unshift({ id: 'SANDBOXFINANCE_SFIN0000', name: 'Sandbox Finance (test bank)', logo: null });
-  }
-  return NextResponse.json({ institutions });
+  return NextResponse.json({
+    institutions: [
+      {
+        id: 'truelayer',
+        name: process.env.BANK_SANDBOX === 'true' ? 'Choose your bank (test mode)' : 'Choose your bank',
+        logo: null,
+      },
+    ],
+  });
 }

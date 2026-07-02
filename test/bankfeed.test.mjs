@@ -1,4 +1,4 @@
-// Tests for the pure bank feed logic in lib/bankfeed.ts: mapping GoCardless
+// Tests for the pure bank feed logic in lib/bankfeed.ts: mapping TrueLayer
 // booked transactions to our rows, categorisation, and capture dedupe. No
 // network. Run with:
 //   node test/bankfeed.test.mjs
@@ -16,45 +16,57 @@ const ok = (name, cond) => {
   else { fail += 1; console.log(`  FAIL  ${name}`); }
 };
 
-console.log('\n=== bankfeed: mapping ===\n');
+console.log('\n=== bankfeed: mapping (TrueLayer Data API v1) ===\n');
 
 const spend = B.mapBankTransaction({
-  transactionId: 'tx-1',
-  transactionAmount: { amount: '-42.60', currency: 'GBP' },
-  bookingDate: '2026-07-01',
-  creditorName: 'SCREWFIX DIRECT LTD',
-  remittanceInformationUnstructured: 'CARD PAYMENT SCREWFIX 1042',
+  transaction_id: 'tx-1',
+  normalised_provider_transaction_id: 'norm-1',
+  transaction_type: 'DEBIT',
+  amount: 42.6,
+  currency: 'GBP',
+  timestamp: '2026-07-01T09:12:00Z',
+  merchant_name: 'Screwfix',
+  description: 'CARD PAYMENT SCREWFIX 1042',
 });
-ok('spend maps negative', spend && spend.amount === -42.6);
-ok('spend categorised materials', spend && spend.category === 'materials');
-ok('spend vendor from creditor', spend && /screwfix/i.test(spend.vendor));
-ok('spend external id prefixed', spend && spend.external_id === 'bank:tx-1');
-ok('spend date carried', spend && spend.transaction_date === '2026-07-01');
+ok('debit maps negative regardless of sign', spend && spend.amount === -42.6);
+ok('debit categorised materials', spend && spend.category === 'materials');
+ok('vendor from merchant_name', spend && /screwfix/i.test(spend.vendor));
+ok('stable normalised id preferred', spend && spend.external_id === 'bank:norm-1');
+ok('date from timestamp', spend && spend.transaction_date === '2026-07-01');
+
+const signedDebit = B.mapBankTransaction({
+  transaction_id: 'tx-1b',
+  transaction_type: 'DEBIT',
+  amount: -18.5,
+  currency: 'GBP',
+  timestamp: '2026-07-01T09:12:00Z',
+  description: 'SHELL WELLING',
+});
+ok('already negative debit stays negative once', signedDebit && signedDebit.amount === -18.5);
+ok('falls back to transaction_id when no normalised id', signedDebit && signedDebit.external_id === 'bank:tx-1b');
 
 const income = B.mapBankTransaction({
-  transactionId: 'tx-2',
-  transactionAmount: { amount: '500.00', currency: 'GBP' },
-  bookingDate: '2026-07-01',
-  debtorName: 'DAVE JONES',
+  transaction_id: 'tx-2',
+  transaction_type: 'CREDIT',
+  amount: 500,
+  currency: 'GBP',
+  timestamp: '2026-07-01T10:00:00Z',
+  description: 'FASTER PAYMENT DAVE JONES',
 });
-ok('income maps positive with income category', income && income.amount === 500 && income.category === 'income');
-ok('income vendor is the payer', income && /dave/i.test(income.vendor));
+ok('credit maps positive with income category', income && income.amount === 500 && income.category === 'income');
+ok('vendor falls back to description', income && /dave/i.test(income.vendor));
 
-const fuel = B.mapBankTransaction({
-  transactionId: 'tx-3',
-  transactionAmount: { amount: '-64.10', currency: 'GBP' },
-  bookingDate: '2026-06-30',
-  remittanceInformationUnstructured: 'SHELL WELLING 4021',
-});
-ok('fuel categorised from remittance', fuel && fuel.category === 'fuel');
-ok('vendor falls back to remittance', fuel && /shell/i.test(fuel.vendor));
+ok('no id rejected', B.mapBankTransaction({ transaction_type: 'DEBIT', amount: 5, currency: 'GBP', timestamp: '2026-07-01T00:00:00Z' }) === null);
+ok('zero amount rejected', B.mapBankTransaction({ transaction_id: 't', transaction_type: 'DEBIT', amount: 0, currency: 'GBP', timestamp: '2026-07-01T00:00:00Z' }) === null);
+ok('non GBP rejected', B.mapBankTransaction({ transaction_id: 't', transaction_type: 'DEBIT', amount: 5, currency: 'EUR', timestamp: '2026-07-01T00:00:00Z' }) === null);
+ok('unknown type rejected', B.mapBankTransaction({ transaction_id: 't', transaction_type: 'PENDING', amount: 5, currency: 'GBP', timestamp: '2026-07-01T00:00:00Z' }) === null);
+ok('bad timestamp rejected', B.mapBankTransaction({ transaction_id: 't', transaction_type: 'DEBIT', amount: 5, currency: 'GBP', timestamp: 'yesterday' }) === null);
+ok('missing currency defaults to GBP', B.mapBankTransaction({ transaction_id: 't', transaction_type: 'DEBIT', amount: 5, timestamp: '2026-07-01T00:00:00Z' }) !== null);
 
-ok('no id rejected', B.mapBankTransaction({ transactionAmount: { amount: '-5' }, bookingDate: '2026-07-01' }) === null);
-ok('internalTransactionId accepted as fallback id', B.mapBankTransaction({ internalTransactionId: 'i-9', transactionAmount: { amount: '-5.00', currency: 'GBP' }, bookingDate: '2026-07-01' }) !== null);
-ok('zero amount rejected', B.mapBankTransaction({ transactionId: 't', transactionAmount: { amount: '0.00' }, bookingDate: '2026-07-01' }) === null);
-ok('non GBP rejected', B.mapBankTransaction({ transactionId: 't', transactionAmount: { amount: '-5.00', currency: 'EUR' }, bookingDate: '2026-07-01' }) === null);
-ok('bad date rejected', B.mapBankTransaction({ transactionId: 't', transactionAmount: { amount: '-5.00', currency: 'GBP' }, bookingDate: '01/07/2026' }) === null);
-ok('missing currency defaults to GBP', B.mapBankTransaction({ transactionId: 't', transactionAmount: { amount: '-5.00' }, bookingDate: '2026-07-01' }) !== null);
+console.log('\n=== bankfeed: auth link ===\n');
+// buildAuthLink is null without config in this test environment (dormant).
+ok('auth link dormant without keys', B.buildAuthLink('state') === null);
+ok('config check dormant', B.hasBankFeedConfig() === false);
 
 console.log('\n=== bankfeed: categorisation stays aligned with WhatsApp ===\n');
 const W = await import(`${pathToFileURL(path.resolve(here, '../lib/waintents.ts')).href}`);

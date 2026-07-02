@@ -17,7 +17,7 @@ import {
 import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
 import {
   hasBankFeedConfig,
-  getAccessToken,
+  refreshAccess,
   getBookedTransactions,
   mapBankTransaction,
   matchesCapture,
@@ -157,12 +157,25 @@ async function syncBankFeeds(budgetMs = 25_000): Promise<{ connections: number; 
   let connections = 0;
   let inserted = 0;
   if (!hasBankFeedConfig()) return { connections, inserted };
-  const access = await getAccessToken();
-  if (!access) return { connections, inserted };
 
   const linked = await listLinkedBankConnections();
   for (const conn of linked) {
     if (Date.now() - started > budgetMs) break;
+    if (!conn.refresh_token) continue;
+    // Fresh access token per connection (TrueLayer access tokens last an hour).
+    // Persist the rotated refresh token so the chain never breaks.
+    const tokens = await refreshAccess(conn.refresh_token);
+    if (!tokens) {
+      // Refresh failing usually means the 90 day consent has lapsed. Mark it so
+      // the app can prompt a reconnect rather than silently going stale.
+      await updateBankConnection(conn.id, { status: 'expired' });
+      continue;
+    }
+    await updateBankConnection(conn.id, {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      token_expires_at: tokens.expires_at,
+    });
     connections += 1;
     // Overlap the window by 3 days so late-booked lines are never missed; the
     // external_id conflict rule makes the overlap harmless.
@@ -174,7 +187,7 @@ async function syncBankFeeds(budgetMs = 25_000): Promise<{ connections: number; 
       new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString().slice(0, 10),
     );
     for (const accountId of conn.account_ids) {
-      const booked = await getBookedTransactions(access, accountId, from);
+      const booked = await getBookedTransactions(tokens.access_token, accountId, from);
       if (!booked) continue;
       for (const raw of booked) {
         const entry = mapBankTransaction(raw);

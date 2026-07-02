@@ -582,32 +582,50 @@ create index if not exists transactions_user_unconfirmed_idx
   on public.transactions(user_id, created_at desc) where confirmed = false;
 
 -- ---------------------------------------------------------------------------
--- ADDED 2 JULY 2026, SECOND BLOCK (bank feeds foundation, doc 77). APPLY IN THE
--- SUPABASE SQL EDITOR WHEN BANK FEEDS ARE SWITCHED ON (harmless to apply now).
+-- ADDED 2 JULY 2026, SECOND BLOCK, REVISED SAME DAY (bank feeds via TrueLayer,
+-- doc 77; GoCardless Bank Account Data closed to new signups so the fallback
+-- provider is live). APPLY IN THE SUPABASE SQL EDITOR. Idempotent, and safe
+-- whether or not the earlier GoCardless shaped block was ever applied.
 -- ---------------------------------------------------------------------------
 
--- One row per Open Banking consent journey. No tokens live here; GoCardless
--- holds the bank consent and we hold only the requisition id needed to read.
+-- One row per Open Banking consent journey. TrueLayer issues per connection
+-- OAuth tokens (1 hour access, long lived refresh); they live here, in a
+-- service role only table with RLS and no policies, same posture as
+-- hmrc_connections. The app never reads this table.
 create table if not exists public.bank_connections (
   id               uuid primary key default gen_random_uuid(),
   user_id          uuid not null references public.users(id) on delete cascade,
-  requisition_id   text not null,
   reference        text not null unique,
-  institution_id   text,
-  status           text not null default 'created', -- created | linked | failed | revoked
+  status           text not null default 'created', -- created | linked | failed | expired | revoked
   account_ids      jsonb not null default '[]',
+  access_token     text,
+  refresh_token    text,
+  token_expires_at timestamptz,
   last_synced_date date,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
 
+-- Upgrade path if the earlier GoCardless shaped table exists: add the token
+-- columns and relax the requisition column it no longer uses.
+alter table public.bank_connections add column if not exists access_token     text;
+alter table public.bank_connections add column if not exists refresh_token    text;
+alter table public.bank_connections add column if not exists token_expires_at timestamptz;
+do $$ begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'bank_connections'
+               and column_name = 'requisition_id') then
+    alter table public.bank_connections alter column requisition_id drop not null;
+  end if;
+end $$;
+
 alter table public.bank_connections enable row level security;
--- No policies. Service role only, same posture as hmrc_connections.
+-- No policies. Service role only.
 
 create index if not exists bank_connections_user_idx   on public.bank_connections(user_id);
 create index if not exists bank_connections_status_idx on public.bank_connections(status);
 
--- Idempotent bank imports: the bank's own transaction id lives in external_id,
--- so re-syncing an overlapping window can never duplicate a row.
+-- Idempotent bank imports: the provider's stable transaction id lives in
+-- external_id, so re-syncing an overlapping window can never duplicate a row.
 create unique index if not exists transactions_external_id_key
   on public.transactions(external_id) where external_id is not null;

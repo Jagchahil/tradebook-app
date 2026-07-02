@@ -1,166 +1,175 @@
-// lib/bankfeed.ts. Open Banking bank feeds via GoCardless Bank Account Data
-// (the API formerly Nordigen). Read only account information: the user connects
-// their bank through GoCardless's hosted consent journey, and a daily sync pulls
-// new transactions into the normal `transactions` table as UNCONFIRMED entries.
-// The approval gate is untouched: nothing counts toward tax until the user
-// confirms it in the app, exactly like a WhatsApp capture.
+// lib/bankfeed.ts. Open Banking bank feeds via TrueLayer's Data API.
+// Read only account information: the user connects their bank through
+// TrueLayer's hosted auth dialog (which includes the bank picker), and a daily
+// sync pulls new transactions into the normal `transactions` table as
+// UNCONFIRMED entries. The approval gate is untouched: nothing counts toward
+// tax until the user confirms it in the app, exactly like a WhatsApp capture.
 //
-// DORMANT BY DEFAULT. Without BANK_SECRET_ID and BANK_SECRET_KEY in the
-// environment every entry point returns null or false and no user visible
-// surface changes. Same pattern as lib/hmrc.ts and Stripe. Verified against the
-// GoCardless Bank Account Data quickstart on 2 July 2026 (doc 77).
+// PROVIDER HISTORY (doc 77): the first build targeted GoCardless Bank Account
+// Data, but GoCardless closed that product to new signups (verified 2 July
+// 2026), so this is the planned TrueLayer fallback. TrueLayer is FCA regulated
+// for account information services; Lekhio integrates as its client.
+// Verified against the live TrueLayer docs on 2 July 2026: auth link
+// parameters, code exchange, and the Data API v1 transactions shape.
 //
-// GDPR gates before this goes live with real users (doc 77): ICO registration
-// and a privacy policy update naming GoCardless as the AIS provider. Sandbox
-// (institution SANDBOXFINANCE_SFIN0000) is fine before that.
+// DORMANT BY DEFAULT. Without BANK_CLIENT_ID and BANK_CLIENT_SECRET every
+// entry point returns null or false and no user visible surface changes.
+// BANK_SANDBOX=true points everything at the TrueLayer sandbox and enables
+// their Mock Bank in the dialog.
 //
-// No SDK. Raw fetch, same as the rest of the codebase. Tokens are minted per
-// run from the server side secrets and never stored or logged.
+// Tokens: unlike the GoCardless design, TrueLayer issues per connection OAuth
+// tokens (1 hour access, long lived refresh with the offline_access scope).
+// They are stored in bank_connections, a service role only table with RLS and
+// no policies, the same posture as hmrc_connections. Never logged.
+//
+// No SDK. Raw fetch, same as the rest of the codebase.
 
-const BASE = 'https://bankaccountdata.gocardless.com/api/v2';
-const SECRET_ID = process.env.BANK_SECRET_ID;
-const SECRET_KEY = process.env.BANK_SECRET_KEY;
+const SANDBOX = process.env.BANK_SANDBOX === 'true';
+const AUTH_BASE = SANDBOX ? 'https://auth.truelayer-sandbox.com' : 'https://auth.truelayer.com';
+const API_BASE = SANDBOX ? 'https://api.truelayer-sandbox.com' : 'https://api.truelayer.com';
+const CLIENT_ID = process.env.BANK_CLIENT_ID;
+const CLIENT_SECRET = process.env.BANK_CLIENT_SECRET;
 
 export function hasBankFeedConfig(): boolean {
-  return Boolean(SECRET_ID && SECRET_KEY);
+  return Boolean(CLIENT_ID && CLIENT_SECRET);
 }
 
-// Mint a fresh access token: secrets -> refresh token -> access token. Two
-// calls, stateless, nothing persisted. The sync runs once a day, so the extra
-// round trip is irrelevant and we never hold a long lived credential in the DB.
-export async function getAccessToken(): Promise<string | null> {
-  if (!SECRET_ID || !SECRET_KEY) return null;
+// The hosted auth dialog link. TrueLayer runs the bank picker itself, so the
+// app never needs an institutions list. `state` is our HMAC signed user state,
+// which the callback verifies; scope includes offline_access so we receive a
+// refresh token and the daily sync can run without the user present. In the
+// sandbox the Mock Bank is included so the whole loop can be walked without a
+// real bank account.
+export function buildAuthLink(state: string): string | null {
+  if (!CLIENT_ID) return null;
+  const redirect = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app'}/api/bank/callback`;
+  const providers = SANDBOX ? 'uk-cs-mock uk-ob-all uk-oauth-all' : 'uk-ob-all uk-oauth-all';
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: CLIENT_ID,
+    redirect_uri: redirect,
+    scope: 'info accounts balance transactions offline_access',
+    providers,
+    state,
+  });
+  return `${AUTH_BASE}/?${params.toString()}`;
+}
+
+export interface TokenSet {
+  access_token: string;
+  refresh_token: string | null;
+  expires_at: string; // ISO
+}
+
+function toTokenSet(data: { access_token?: string; refresh_token?: string; expires_in?: number }, previousRefresh?: string | null): TokenSet | null {
+  if (!data.access_token) return null;
+  const expiresIn = Number(data.expires_in) || 3600;
+  return {
+    access_token: data.access_token,
+    // TrueLayer may rotate the refresh token; keep the old one if none returned.
+    refresh_token: data.refresh_token ?? previousRefresh ?? null,
+    expires_at: new Date(Date.now() + (expiresIn - 60) * 1000).toISOString(),
+  };
+}
+
+// Exchange the one-time code from the callback for tokens.
+export async function exchangeCode(code: string): Promise<TokenSet | null> {
+  if (!CLIENT_ID || !CLIENT_SECRET) return null;
+  const redirect = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app'}/api/bank/callback`;
   try {
-    const newRes = await fetch(`${BASE}/token/new/`, {
+    const res = await fetch(`${AUTH_BASE}/connect/token`, {
       method: 'POST',
-      headers: { accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret_id: SECRET_ID, secret_key: SECRET_KEY }),
-    });
-    if (!newRes.ok) {
-      console.error('[bankfeed] token/new failed:', newRes.status);
-      return null;
-    }
-    const { refresh } = (await newRes.json()) as { refresh?: string };
-    if (!refresh) return null;
-    const refRes = await fetch(`${BASE}/token/refresh/`, {
-      method: 'POST',
-      headers: { accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh }),
-    });
-    if (!refRes.ok) {
-      console.error('[bankfeed] token/refresh failed:', refRes.status);
-      return null;
-    }
-    const { access } = (await refRes.json()) as { access?: string };
-    return access ?? null;
-  } catch (err) {
-    console.error('[bankfeed] token error:', err instanceof Error ? err.message : 'unknown');
-    return null;
-  }
-}
-
-export interface BankInstitution {
-  id: string;
-  name: string;
-  logo: string | null;
-}
-
-// UK institutions for the bank picker. The app renders name and logo only.
-export async function listInstitutions(accessToken: string): Promise<BankInstitution[] | null> {
-  try {
-    const res = await fetch(`${BASE}/institutions/?country=gb`, {
-      headers: { accept: 'application/json', Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) return null;
-    const rows = (await res.json()) as Array<{ id: string; name: string; logo?: string }>;
-    if (!Array.isArray(rows)) return null;
-    return rows.map((r) => ({ id: r.id, name: r.name, logo: r.logo ?? null }));
-  } catch {
-    return null;
-  }
-}
-
-export interface CreatedRequisition {
-  id: string;
-  link: string;
-}
-
-// Create the consent journey. `redirect` is where GoCardless sends the user
-// after their bank authentication; we pass our callback with a signed state so
-// the callback can bind the requisition to the right user without trusting any
-// client supplied id. Default agreement terms apply (90 days history and
-// access, full scope), which is exactly what we want.
-export async function createRequisition(
-  accessToken: string,
-  institutionId: string,
-  redirect: string,
-  reference: string,
-): Promise<CreatedRequisition | null> {
-  try {
-    const res = await fetch(`${BASE}/requisitions/`, {
-      method: 'POST',
-      headers: { accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ redirect, institution_id: institutionId, reference, user_language: 'EN' }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        redirect_uri: redirect,
+        code,
+      }).toString(),
     });
     if (!res.ok) {
-      console.error('[bankfeed] create requisition failed:', res.status);
+      console.error('[bankfeed] code exchange failed:', res.status);
       return null;
     }
-    const data = (await res.json()) as { id?: string; link?: string };
-    if (!data.id || !data.link) return null;
-    return { id: data.id, link: data.link };
+    return toTokenSet((await res.json()) as { access_token?: string; refresh_token?: string; expires_in?: number });
   } catch {
     return null;
   }
 }
 
-export interface RequisitionState {
-  status: string; // 'LN' means linked
-  accounts: string[];
+// Refresh an expired access token ahead of a sync run.
+export async function refreshAccess(refreshToken: string): Promise<TokenSet | null> {
+  if (!CLIENT_ID || !CLIENT_SECRET) return null;
+  try {
+    const res = await fetch(`${AUTH_BASE}/connect/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        refresh_token: refreshToken,
+      }).toString(),
+    });
+    if (!res.ok) {
+      console.error('[bankfeed] token refresh failed:', res.status);
+      return null;
+    }
+    return toTokenSet((await res.json()) as { access_token?: string; refresh_token?: string; expires_in?: number }, refreshToken);
+  } catch {
+    return null;
+  }
 }
 
-export async function getRequisition(accessToken: string, requisitionId: string): Promise<RequisitionState | null> {
+// The user's connected accounts.
+export async function listAccounts(accessToken: string): Promise<string[] | null> {
   try {
-    const res = await fetch(`${BASE}/requisitions/${encodeURIComponent(requisitionId)}/`, {
+    const res = await fetch(`${API_BASE}/data/v1/accounts`, {
       headers: { accept: 'application/json', Authorization: `Bearer ${accessToken}` },
     });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { status?: string; accounts?: string[] };
-    return { status: data.status ?? '', accounts: Array.isArray(data.accounts) ? data.accounts : [] };
+    if (!res.ok) {
+      console.error('[bankfeed] accounts fetch failed:', res.status);
+      return null;
+    }
+    const data = (await res.json()) as { results?: Array<{ account_id?: string }> };
+    if (!Array.isArray(data.results)) return null;
+    return data.results.map((a) => a.account_id).filter((id): id is string => Boolean(id));
   } catch {
     return null;
   }
 }
 
-// The raw booked transaction shape GoCardless returns (bank data is bank data:
-// fields vary by institution, so everything is optional and defensively read).
+// One booked (settled) transaction from Data API v1. Bank data varies by
+// institution, so everything is optional and defensively read.
 export interface BankTransaction {
-  transactionId?: string;
-  internalTransactionId?: string;
-  transactionAmount?: { amount?: string; currency?: string };
-  bookingDate?: string;
-  valueDate?: string;
-  remittanceInformationUnstructured?: string;
-  creditorName?: string;
-  debtorName?: string;
+  transaction_id?: string;
+  normalised_provider_transaction_id?: string;
+  provider_transaction_id?: string;
+  timestamp?: string;
+  description?: string;
+  amount?: number;
+  currency?: string;
+  transaction_type?: string; // DEBIT | CREDIT
+  merchant_name?: string;
 }
 
 export async function getBookedTransactions(
   accessToken: string,
   accountId: string,
-  dateFrom?: string,
+  fromDate?: string,
 ): Promise<BankTransaction[] | null> {
   try {
-    const qs = dateFrom ? `?date_from=${encodeURIComponent(dateFrom)}` : '';
-    const res = await fetch(`${BASE}/accounts/${encodeURIComponent(accountId)}/transactions/${qs}`, {
+    const qs = fromDate ? `?from=${encodeURIComponent(fromDate)}` : '';
+    const res = await fetch(`${API_BASE}/data/v1/accounts/${encodeURIComponent(accountId)}/transactions${qs}`, {
       headers: { accept: 'application/json', Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) {
       console.error('[bankfeed] transactions fetch failed:', res.status);
       return null;
     }
-    const data = (await res.json()) as { transactions?: { booked?: BankTransaction[] } };
-    return Array.isArray(data.transactions?.booked) ? data.transactions!.booked! : null;
+    const data = (await res.json()) as { results?: BankTransaction[] };
+    return Array.isArray(data.results) ? data.results : null;
   } catch {
     return null;
   }
@@ -197,31 +206,37 @@ export function categoriseBankLine(text: string): string {
   return 'other';
 }
 
-// Map one booked bank transaction to our transactions row. Returns null when
-// the line is unusable (no id, no amount, not GBP, or an unreadable date).
+// Map one settled TrueLayer transaction to our transactions row. Direction
+// comes from transaction_type (DEBIT is money out), never from the sign of
+// amount, because providers differ on signing. The stable
+// normalised_provider_transaction_id is preferred for idempotency; TrueLayer
+// documents that transaction_id itself may change between requests.
+// Returns null when the line is unusable.
 export function mapBankTransaction(t: BankTransaction): MappedBankEntry | null {
-  const id = t.transactionId || t.internalTransactionId;
+  const id = t.normalised_provider_transaction_id || t.provider_transaction_id || t.transaction_id;
   if (!id) return null;
-  const amt = parseFloat(t.transactionAmount?.amount ?? '');
-  if (!Number.isFinite(amt) || amt === 0) return null;
-  const currency = (t.transactionAmount?.currency ?? 'GBP').toUpperCase();
+  const raw = Number(t.amount);
+  if (!Number.isFinite(raw) || raw === 0) return null;
+  const currency = (t.currency ?? 'GBP').toUpperCase();
   if (currency !== 'GBP') return null;
-  const date = t.bookingDate || t.valueDate || '';
+  const type = (t.transaction_type ?? '').toUpperCase();
+  if (type !== 'DEBIT' && type !== 'CREDIT') return null;
+  const date = (t.timestamp ?? '').slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
 
-  const remittance = (t.remittanceInformationUnstructured ?? '').trim();
-  // Money out names the payee (creditor); money in names the payer (debtor).
-  const counterparty = (amt < 0 ? t.creditorName : t.debtorName)?.trim() || '';
-  const vendor = (counterparty || remittance || 'Bank transaction').slice(0, 120);
-  const category = amt >= 0 ? 'income' : categoriseBankLine(`${vendor} ${remittance}`);
+  const description = (t.description ?? '').trim();
+  const vendor = (t.merchant_name?.trim() || description || 'Bank transaction').slice(0, 120);
+  const magnitude = Math.round(Math.abs(raw) * 100) / 100;
+  const amount = type === 'DEBIT' ? -magnitude : magnitude;
+  const category = type === 'CREDIT' ? 'income' : categoriseBankLine(`${vendor} ${description}`);
 
   return {
     external_id: `bank:${id}`.slice(0, 180),
     vendor,
-    amount: Math.round(amt * 100) / 100,
+    amount,
     category,
     transaction_date: date,
-    description: remittance.slice(0, 280),
+    description: description.slice(0, 280),
   };
 }
 

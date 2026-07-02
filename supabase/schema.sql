@@ -627,5 +627,10 @@ create index if not exists bank_connections_status_idx on public.bank_connection
 
 -- Idempotent bank imports: the provider's stable transaction id lives in
 -- external_id, so re-syncing an overlapping window can never duplicate a row.
+-- MUST be a full (non partial) unique index: PostgREST's on_conflict cannot
+-- infer a partial one and every bulk insert fails with 42P10. Postgres treats
+-- NULLs as distinct, so the app's own entries (external_id null) are unaffected.
+drop index if exists public.transactions_external_id_key;
 create unique index if not exists transactions_external_id_key
-  on public.transactions(external_id) where external_id is not null;
+  on public.transactions(external_id);
+notify pgrst, 'reload schema';

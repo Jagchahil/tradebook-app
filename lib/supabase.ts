@@ -1061,6 +1061,12 @@ export async function createBankConnection(userId: string, reference: string): P
     headers: headers({ Prefer: 'return=minimal' }),
     body: JSON.stringify({ user_id: userId, reference, status: 'created' }),
   });
+  if (!res.ok) {
+    // The PostgREST error body names the failing constraint or column and holds
+    // no personal data for this insert. Vital for diagnosing schema drift.
+    const text = await res.text().catch(() => '');
+    console.error('[createBankConnection] failed:', res.status, text.slice(0, 300));
+  }
   return res.ok;
 }
 

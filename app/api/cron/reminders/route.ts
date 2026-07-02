@@ -9,19 +9,10 @@ import {
   weeklyTotals,
   weeklyTotalsAll,
   pruneOldRows,
-  listLinkedBankConnections,
-  updateBankConnection,
-  recentUnconfirmedCaptures,
-  insertBankTransaction,
 } from '../../../../lib/supabase';
 import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
-import {
-  hasBankFeedConfig,
-  refreshAccess,
-  getBookedTransactions,
-  mapBankTransaction,
-  matchesCapture,
-} from '../../../../lib/bankfeed';
+import { hasBankFeedConfig } from '../../../../lib/bankfeed';
+import { syncAllLinked } from '../../../../lib/banksync';
 
 // The reminder engine. Hit on a schedule (Vercel Cron, Supabase pg_cron, or any
 // external cron such as cron-job.org). Guarded by CRON_SECRET.
@@ -153,53 +144,8 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
 // job from starving the reminders; at real scale this moves to its own
 // continuation chain like the nudges.
 async function syncBankFeeds(budgetMs = 25_000): Promise<{ connections: number; inserted: number }> {
-  const started = Date.now();
-  let connections = 0;
-  let inserted = 0;
-  if (!hasBankFeedConfig()) return { connections, inserted };
-
-  const linked = await listLinkedBankConnections();
-  for (const conn of linked) {
-    if (Date.now() - started > budgetMs) break;
-    if (!conn.refresh_token) continue;
-    // Fresh access token per connection (TrueLayer access tokens last an hour).
-    // Persist the rotated refresh token so the chain never breaks.
-    const tokens = await refreshAccess(conn.refresh_token);
-    if (!tokens) {
-      // Refresh failing usually means the 90 day consent has lapsed. Mark it so
-      // the app can prompt a reconnect rather than silently going stale.
-      await updateBankConnection(conn.id, { status: 'expired' });
-      continue;
-    }
-    await updateBankConnection(conn.id, {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      token_expires_at: tokens.expires_at,
-    });
-    connections += 1;
-    // Overlap the window by 3 days so late-booked lines are never missed; the
-    // external_id conflict rule makes the overlap harmless.
-    const from = conn.last_synced_date
-      ? new Date(new Date(conn.last_synced_date).getTime() - 3 * 24 * 3600 * 1000).toISOString().slice(0, 10)
-      : undefined;
-    const captures = await recentUnconfirmedCaptures(
-      conn.user_id,
-      new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString().slice(0, 10),
-    );
-    for (const accountId of conn.account_ids) {
-      const booked = await getBookedTransactions(tokens.access_token, accountId, from);
-      if (!booked) continue;
-      for (const raw of booked) {
-        const entry = mapBankTransaction(raw);
-        if (!entry) continue;
-        // Skip anything the user already captured on WhatsApp themselves.
-        if (captures.some((c) => matchesCapture(entry, c))) continue;
-        if (await insertBankTransaction(conn.user_id, entry)) inserted += 1;
-      }
-    }
-    await updateBankConnection(conn.id, { last_synced_date: new Date().toISOString().slice(0, 10) });
-  }
-  return { connections, inserted };
+  if (!hasBankFeedConfig()) return { connections: 0, inserted: 0 };
+  return syncAllLinked(budgetMs);
 }
 
 async function runJob(job: string, afterId: string | null, hop: number): Promise<void> {

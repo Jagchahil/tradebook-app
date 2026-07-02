@@ -1101,6 +1101,42 @@ export async function updateBankConnection(
   return res.ok;
 }
 
+// A user's own connections, for the status endpoint. Never returns tokens.
+export async function listBankConnectionsForUser(
+  userId: string,
+): Promise<Array<{ id: string; status: string; created_at?: string; last_synced_date: string | null }>> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/bank_connections?user_id=eq.${encodeURIComponent(userId)}&select=id,status,created_at,last_synced_date&order=created_at.desc&limit=20`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return (await res.json()) as Array<{ id: string; status: string; created_at?: string; last_synced_date: string | null }>;
+}
+
+// Disconnect: revoke every linked connection for the user and destroy our copy
+// of the tokens, so no further reads are possible from our side. The consent
+// record at the bank expires on its own 90 day clock and can also be revoked by
+// the user at their bank.
+export async function revokeBankConnections(userId: string): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/bank_connections?user_id=eq.${encodeURIComponent(userId)}&status=in.(linked,expired,created,failed)`,
+    {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        status: 'revoked',
+        access_token: null,
+        refresh_token: null,
+        token_expires_at: null,
+        updated_at: new Date().toISOString(),
+      }),
+    },
+  );
+  return res.ok;
+}
+
 export async function listLinkedBankConnections(limit = 500): Promise<BankConnection[]> {
   const { url } = config();
   const res = await fetch(

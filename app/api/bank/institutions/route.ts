@@ -20,5 +20,12 @@ export async function GET(req: NextRequest) {
   if (!access) return NextResponse.json({ error: 'provider_unavailable' }, { status: 502 });
   const institutions = await listInstitutions(access);
   if (!institutions) return NextResponse.json({ error: 'provider_unavailable' }, { status: 502 });
+
+  // GoCardless's fake test bank does not appear in the real GB list. With
+  // BANK_SANDBOX=true it is pinned to the top so the end to end consent loop
+  // can be walked without touching a real bank. Remove the env var for launch.
+  if (process.env.BANK_SANDBOX === 'true') {
+    institutions.unshift({ id: 'SANDBOXFINANCE_SFIN0000', name: 'Sandbox Finance (test bank)', logo: null });
+  }
   return NextResponse.json({ institutions });
 }

@@ -337,6 +337,11 @@ create policy "prefs update own" on public.reminder_prefs for update using (auth
 
 create index if not exists transactions_user_idx         on public.transactions(user_id);
 create index if not exists transactions_user_created_idx on public.transactions(user_id, created_at desc);
+-- Serves the confirmed-only totals (WhatsApp money answers, accountant export):
+-- filter by user + confirmed=true, ordered by transaction_date. Partial so it
+-- stays small (only confirmed rows). Applied to prod 2026-07-02.
+create index if not exists transactions_user_confirmed_date_idx
+  on public.transactions(user_id, transaction_date desc) where confirmed = true;
 create index if not exists invoices_user_idx             on public.invoices(user_id);
 
 -- One phone, one account. This is the hard backstop for the app<->WhatsApp link:
@@ -576,6 +581,40 @@ revoke all on function public.weekly_totals_all() from public;
 revoke all on function public.weekly_totals_all() from anon;
 revoke all on function public.weekly_totals_all() from authenticated;
 grant execute on function public.weekly_totals_all() to service_role;
+
+-- Per user totals in one server side pass, for the WhatsApp money answers
+-- ("how much have I made / spent / owe this month"). Replaces fetching up to
+-- 5000 rows over PostgREST and summing them in code, which was slow and silently
+-- truncated the heaviest users at 5000 rows. Confirmed entries only, matching the
+-- app's tax tab and the approved-only rule. The period is keyed off
+-- transaction_date (falling back to created_at) when p_since is given, and the
+-- category is filtered when p_category is given; both are optional (pass null to
+-- skip). income sums the positive amounts, expenses the absolute value of the
+-- negative ones, cis the CIS deductions, and count is every matching row. Called
+-- with the service key, so it is locked to the service role only.
+create or replace function public.user_totals(p_user_id uuid, p_since date, p_category text)
+returns table (income numeric, expenses numeric, cis numeric, count bigint)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    coalesce(sum(case when t.amount >= 0 then t.amount end), 0) as income,
+    coalesce(sum(case when t.amount < 0 then -t.amount end), 0) as expenses,
+    coalesce(sum(coalesce(t.cis_deduction, 0)), 0) as cis,
+    count(*) as count
+  from public.transactions t
+  where t.user_id = p_user_id
+    and t.confirmed = true
+    and (p_since is null or coalesce(t.transaction_date, t.created_at::date) >= p_since)
+    and (p_category is null or t.category = p_category);
+$$;
+
+-- Lock the function down: only the service role should call it.
+revoke all on function public.user_totals(uuid, date, text) from public;
+revoke all on function public.user_totals(uuid, date, text) from anon;
+revoke all on function public.user_totals(uuid, date, text) from authenticated;
+grant execute on function public.user_totals(uuid, date, text) to service_role;
 
 -- Bind the stored phone to the verified phone on the JWT. OTP is the only login
 -- path in production, so an authenticated session always carries the phone it

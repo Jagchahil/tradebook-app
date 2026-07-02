@@ -12,6 +12,12 @@
 const OPENAI_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const MODEL = 'whisper-1';
 
+// Per-call timeout for Whisper. Transcribing a voice note is the slowest upstream
+// step, so the budget is the most generous of the three, but it is still bounded
+// so a hung request cannot pin a worker forever. On abort the fetch throws an
+// AbortError, which the existing try/catch turns into a safe null.
+const WHISPER_TIMEOUT_MS = 30000;
+
 const KEY = process.env.OPENAI_API_KEY;
 
 export function hasTranscribeConfig(): boolean {
@@ -42,6 +48,7 @@ export async function transcribeAudio(base64: string, mimeType: string): Promise
     const res = await fetch(OPENAI_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${KEY}` },
+      signal: AbortSignal.timeout(WHISPER_TIMEOUT_MS),
       body: form,
     });
 

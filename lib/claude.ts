@@ -15,6 +15,13 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL_FAST = 'claude-haiku-4-5';
 const MODEL_SMART = 'claude-sonnet-4-6';
 
+// Per-call timeout for Anthropic. The webhook must ack Meta within 5 seconds and
+// does its real work in after(). A slow or hung upstream call must never block a
+// worker indefinitely at volume, so every request aborts after this budget and
+// the caller degrades to a safe null. Vision and generation get a generous
+// budget because image reads and longer answers legitimately take a few seconds.
+const ANTHROPIC_TIMEOUT_MS = 20000;
+
 const KEY = process.env.ANTHROPIC_API_KEY;
 
 export function hasClaudeConfig(): boolean {
@@ -71,30 +78,40 @@ function logUsage(feature: string, data: { model?: string; usage?: { input_token
 export async function parseReceipt(base64: string, mediaType: string): Promise<ParsedReceipt | null> {
   if (!KEY) return null;
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'x-api-key': KEY,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL_FAST,
-      max_tokens: 300,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: base64 },
-            },
-            { type: 'text', text: PROMPT },
-          ],
-        },
-      ],
-    }),
-  });
+  // A timeout aborts the fetch with an AbortError, so the whole request is
+  // wrapped. A hang degrades to null rather than throwing out of the webhook.
+  let res: Response;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: MODEL_FAST,
+        max_tokens: 300,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mediaType, data: base64 },
+              },
+              { type: 'text', text: PROMPT },
+            ],
+          },
+        ],
+      }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[claude] Parse request failed or timed out:', message);
+    return null;
+  }
 
   if (!res.ok) {
     const text = await res.text();
@@ -160,19 +177,28 @@ const ENTRY_PROMPT = (text: string): string =>
 export async function parseSpokenTransaction(text: string): Promise<ParsedEntry | null> {
   if (!KEY) return null;
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'x-api-key': KEY,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL_FAST,
-      max_tokens: 300,
-      messages: [{ role: 'user', content: ENTRY_PROMPT(text) }],
-    }),
-  });
+  // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.
+  let res: Response;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: MODEL_FAST,
+        max_tokens: 300,
+        messages: [{ role: 'user', content: ENTRY_PROMPT(text) }],
+      }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[claude] Entry parse request failed or timed out:', message);
+    return null;
+  }
 
   if (!res.ok) {
     const errText = await res.text();
@@ -233,19 +259,28 @@ const INVOICE_PROMPT = (description: string): string =>
 export async function draftInvoice(description: string): Promise<DraftedInvoice | null> {
   if (!KEY) return null;
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'x-api-key': KEY,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL_FAST,
-      max_tokens: 500,
-      messages: [{ role: 'user', content: INVOICE_PROMPT(description) }],
-    }),
-  });
+  // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.
+  let res: Response;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: MODEL_FAST,
+        max_tokens: 500,
+        messages: [{ role: 'user', content: INVOICE_PROMPT(description) }],
+      }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[claude] Invoice draft request failed or timed out:', message);
+    return null;
+  }
 
   if (!res.ok) {
     const errText = await res.text();
@@ -296,11 +331,20 @@ export async function answerMoneyQuestion(question: string, summary: string): Pr
     summary || '(no entries yet)',
   ].join('\n');
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
-  });
+  // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.
+  let res: Response;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[claude] Money question request failed or timed out:', message);
+    return null;
+  }
   if (!res.ok) {
     const errText = await res.text();
     console.error('[claude] Money question failed:', res.status, errText);
@@ -331,11 +375,20 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
     `"${question}"`,
   ].join('\n');
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
-  });
+  // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.
+  let res: Response;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[claude] Expense question request failed or timed out:', message);
+    return null;
+  }
   if (!res.ok) {
     const errText = await res.text();
     console.error('[claude] Expense question failed:', res.status, errText);
@@ -397,18 +450,27 @@ export async function answerAccountantQuestion(question: string, context?: strin
     `My question: ${question}`,
   ].filter(Boolean).join('\n');
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: MODEL_SMART,
-      max_tokens: 700,
-      // The system prompt is long and stable, so cache it. Repeat questions then
-      // pay a tenth of the input price for it.
-      system: [{ type: 'text', text: ACCOUNTANT_SYSTEM, cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: userContent.slice(0, 4000) }],
-    }),
-  });
+  // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.
+  let res: Response;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: MODEL_SMART,
+        max_tokens: 700,
+        // The system prompt is long and stable, so cache it. Repeat questions then
+        // pay a tenth of the input price for it.
+        system: [{ type: 'text', text: ACCOUNTANT_SYSTEM, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: userContent.slice(0, 4000) }],
+      }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[claude] Accountant question request failed or timed out:', message);
+    return null;
+  }
   if (!res.ok) {
     const errText = await res.text();
     console.error('[claude] Accountant question failed:', res.status, errText);
@@ -451,11 +513,20 @@ const SCHEDULE_PROMPT = (text: string, nowIso: string): string =>
 export async function parseSchedule(text: string, nowIso: string): Promise<ParsedSchedule | null> {
   if (!KEY) return null;
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: SCHEDULE_PROMPT(text, nowIso) }] }),
-  });
+  // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.
+  let res: Response;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      body: JSON.stringify({ model: MODEL_FAST, max_tokens: 300, messages: [{ role: 'user', content: SCHEDULE_PROMPT(text, nowIso) }] }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[claude] Schedule parse request failed or timed out:', message);
+    return null;
+  }
   if (!res.ok) {
     console.error('[claude] Schedule parse failed:', res.status);
     return null;

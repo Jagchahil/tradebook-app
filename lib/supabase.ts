@@ -978,9 +978,12 @@ export async function markInvoicePaidServer(
 }
 
 // --- Deterministic totals for WhatsApp money questions ----------------------
-// Sums a user's entries in code from a bounded page of rows, filtered by date
-// and optionally category, so "how much have I spent this month" never needs AI.
-// A sole trader's yearly row count is small; 5000 covers years of daily use.
+// Aggregates a user's entries server side in Postgres (the user_totals RPC), so
+// "how much have I spent this month" never needs AI and never depends on the
+// caller paging rows. This replaced fetching up to 5000 rows over PostgREST and
+// summing them in code, which was slow and silently truncated the heaviest users
+// at 5000 rows. The exported signature and shape are unchanged, so callers are
+// unaffected.
 export interface UserTotals {
   income: number;
   expenses: number;
@@ -993,34 +996,36 @@ export async function totalsForUser(
   category: string | null,
 ): Promise<UserTotals | null> {
   const { url } = config();
-  // Confirmed-only: a WhatsApp "how much have I made / spent / owe" answer must
-  // never present un-reviewed data (e.g. freshly imported bank lines that are
-  // still "to review") as a settled figure. This matches the app's tax tab and
-  // the approved-only rule. Filtering here also shrinks the row set well under
-  // the 5000 cap for all but the heaviest users.
-  let q = `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.true&select=amount,cis_deduction,transaction_date,created_at&limit=5000`;
-  if (category) q += `&category=eq.${encodeURIComponent(category)}`;
-  const res = await fetch(q, { headers: headers() });
+  // The function does the confirmed-only filter, the period cut off transaction_date
+  // (falling back to created_at), and the optional category filter, all in the
+  // database. Confirmed-only matters: a "how much have I made / spent / owe" answer
+  // must never present un-reviewed data (e.g. freshly imported bank lines still
+  // "to review") as a settled figure. p_since / p_category are null when not given.
+  const res = await fetch(`${url}/rest/v1/rpc/user_totals`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      p_user_id: userId,
+      p_since: sinceISO,
+      p_category: category,
+    }),
+  });
   if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{
-    amount: number;
-    cis_deduction: number | null;
-    transaction_date: string | null;
-    created_at: string | null;
-  }>;
-  const totals: UserTotals = { income: 0, expenses: 0, cis: 0, count: 0 };
-  for (const r of rows) {
-    // Key the period off transaction_date, matching the app, with created_at as
-    // the fallback for old rows.
-    const d = (r.transaction_date || r.created_at || '').slice(0, 10);
-    if (sinceISO && d && d < sinceISO) continue;
-    const a = Number(r.amount) || 0;
-    if (a >= 0) totals.income += a;
-    else totals.expenses += Math.abs(a);
-    totals.cis += Number(r.cis_deduction) || 0;
-    totals.count += 1;
-  }
-  return totals;
+  // The function returns one row; PostgREST delivers it as a single element array.
+  const rows = (await res.json().catch(() => null)) as Array<{
+    income: number | string | null;
+    expenses: number | string | null;
+    cis: number | string | null;
+    count: number | string | null;
+  }> | null;
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const r = rows[0];
+  return {
+    income: Number(r.income) || 0,
+    expenses: Number(r.expenses) || 0,
+    cis: Number(r.cis) || 0,
+    count: Number(r.count) || 0,
+  };
 }
 
 // The user's most recent unconfirmed entry, so "delete that" and "change it to

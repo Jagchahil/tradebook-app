@@ -11,6 +11,13 @@ import crypto from 'crypto';
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
+// Per-call timeout for outbound Graph API calls. Sends and media fetches are the
+// last thing the webhook does in after(), so a hung Meta call must never pin a
+// worker at volume. Each request aborts after this budget. On abort fetch throws
+// an AbortError, so every call site here catches it and degrades to a safe result
+// (null for a media download, a logged failure for a send).
+const GRAPH_TIMEOUT_MS = 10000;
+
 const TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
@@ -63,9 +70,19 @@ export interface MediaPayload {
 export async function downloadMedia(mediaId: string): Promise<MediaPayload | null> {
   if (!TOKEN) return null;
 
-  const metaRes = await fetch(`${GRAPH}/${mediaId}`, {
-    headers: { Authorization: `Bearer ${TOKEN}` },
-  });
+  // A timeout aborts the fetch with an AbortError. Both Graph calls are wrapped so
+  // a slow media host degrades to null rather than throwing out of the webhook.
+  let metaRes: Response;
+  try {
+    metaRes = await fetch(`${GRAPH}/${mediaId}`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[whatsapp] Media lookup failed or timed out:', message);
+    return null;
+  }
   if (!metaRes.ok) return null;
   const meta = (await metaRes.json()) as { url?: string; mime_type?: string };
   if (!meta.url) return null;
@@ -82,9 +99,17 @@ export async function downloadMedia(mediaId: string): Promise<MediaPayload | nul
   const metaHost = /(^|\.)(fbcdn\.net|fbsbx\.com|facebook\.com|cdninstagram\.com)$/i.test(host);
   if (!metaHost) return null;
 
-  const fileRes = await fetch(meta.url, {
-    headers: { Authorization: `Bearer ${TOKEN}` },
-  });
+  let fileRes: Response;
+  try {
+    fileRes = await fetch(meta.url, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[whatsapp] Media download failed or timed out:', message);
+    return null;
+  }
   if (!fileRes.ok) return null;
 
   // Cap the size before pulling the bytes into memory and base64. A receipt
@@ -109,19 +134,29 @@ export async function sendText(toPhone: string, body: string): Promise<void> {
     return;
   }
 
-  const res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to: toPhone,
-      type: 'text',
-      text: { body },
-    }),
-  });
+  // A timeout aborts the fetch with an AbortError. The send is wrapped so a hung
+  // Graph call is logged and swallowed rather than rejecting out of the webhook.
+  let res: Response;
+  try {
+    res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: toPhone,
+        type: 'text',
+        text: { body },
+      }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[whatsapp] Send failed or timed out:', message);
+    return;
+  }
 
   if (!res.ok) {
     const text = await res.text();
@@ -148,19 +183,29 @@ export async function sendTemplate(
     ? [{ type: 'body', parameters: bodyParams.map((t) => ({ type: 'text', text: t })) }]
     : [];
 
-  const res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to: toPhone,
-      type: 'template',
-      template: { name: templateName, language: { code: languageCode }, components },
-    }),
-  });
+  // A timeout aborts the fetch with an AbortError. The send is wrapped so a hung
+  // Graph call is logged and swallowed rather than rejecting out of the caller.
+  let res: Response;
+  try {
+    res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: toPhone,
+        type: 'template',
+        template: { name: templateName, language: { code: languageCode }, components },
+      }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[whatsapp] Template send failed or timed out:', message);
+    return;
+  }
 
   if (!res.ok) {
     const text = await res.text();

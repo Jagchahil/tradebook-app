@@ -1,5 +1,18 @@
 // Lekhio canonical UK tax engine, 2026/27.
 //
+// PARITY WARNING. The sole-trader tax maths in this file (personalAllowance,
+// incomeTaxOnProfit, class4NIC, soleTraderTax and the bands, thresholds and
+// rates they use) is duplicated by hand in the app at tradebook-app/lib/tax.ts.
+// The two are separate builds, so there is no shared import. They MUST produce
+// identical soleTraderTax numbers, or the app's "your tax bill" will silently
+// disagree with the website and WhatsApp answers.
+//
+// Update ritual when a Budget changes a rate or threshold:
+//   1. Change the number in BOTH this file AND tradebook-app/lib/tax.ts.
+//   2. Run the parity guard: node tradebook-web/test/tax-parity.test.mjs
+//   3. Only ship once it reports PARITY OK.
+// The parity test fails loudly if the two files ever diverge.
+//
 // This is the single source of truth for the numbers Lekhio works out: income
 // tax, National Insurance, CIS, mileage, capital allowances, the trading
 // allowance, VAT registration and MTD thresholds. The website calculator, the

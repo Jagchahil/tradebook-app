@@ -34,6 +34,13 @@ export function hasBankFeedConfig(): boolean {
   return Boolean(CLIENT_ID && CLIENT_SECRET);
 }
 
+// The sandbox Mock Bank ships STATIC transactions dated years in the past, so
+// date-bounded syncs there return nothing. The sync uses this to drop the date
+// bound in sandbox while keeping it for real banks.
+export function isSandbox(): boolean {
+  return SANDBOX;
+}
+
 // The hosted auth dialog link. TrueLayer runs the bank picker itself, so the
 // app never needs an institutions list. `state` is our HMAC signed user state,
 // which the callback verifies; scope includes offline_access so we receive a

@@ -15,7 +15,7 @@ import {
   recentUnconfirmedCaptures,
   insertBankTransactions,
 } from './supabase';
-import { refreshAccess, getBookedTransactions, mapBankTransaction, matchesCapture } from './bankfeed';
+import { refreshAccess, getBookedTransactions, mapBankTransaction, matchesCapture, isSandbox } from './bankfeed';
 
 export interface SyncResult {
   inserted: number;
@@ -38,10 +38,15 @@ export async function syncWithAccessToken(
 ): Promise<SyncResult> {
   // Overlap the window by 3 days so late-booked lines are never missed; the
   // external_id conflict rule makes the overlap harmless. A first sync (no
-  // last_synced_date) is bounded to recent history.
-  const from = conn.last_synced_date
-    ? new Date(new Date(conn.last_synced_date).getTime() - 3 * 24 * 3600 * 1000).toISOString().slice(0, 10)
-    : new Date(Date.now() - FIRST_SYNC_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  // last_synced_date) is bounded to recent history in production. In the
+  // SANDBOX there is no date bound at all, because Mock Bank's static test
+  // transactions are dated years back and a bounded window returns nothing;
+  // the per account row cap is the safety valve there.
+  const from = isSandbox()
+    ? undefined
+    : conn.last_synced_date
+      ? new Date(new Date(conn.last_synced_date).getTime() - 3 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+      : new Date(Date.now() - FIRST_SYNC_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
   const captures = await recentUnconfirmedCaptures(
     conn.user_id,
     new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString().slice(0, 10),

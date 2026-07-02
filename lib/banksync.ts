@@ -9,10 +9,11 @@
 
 import {
   BankConnection,
+  BankEntryInsert,
   listLinkedBankConnections,
   updateBankConnection,
   recentUnconfirmedCaptures,
-  insertBankTransaction,
+  insertBankTransactions,
 } from './supabase';
 import { refreshAccess, getBookedTransactions, mapBankTransaction, matchesCapture } from './bankfeed';
 
@@ -21,33 +22,46 @@ export interface SyncResult {
   ok: boolean;
 }
 
+// A first sync pulls this many days of history. Enough to fill the current tax
+// quarter view with something real, without dragging in years of statements.
+const FIRST_SYNC_DAYS = 30;
+// Safety valve per account per run; the daily sync catches anything beyond it.
+const MAX_ROWS_PER_ACCOUNT = 1000;
+
 // Sync one connection using a valid access token the caller already holds
-// (fresh from the code exchange, or from a refresh).
+// (fresh from the code exchange, or from a refresh). Rows are collected first
+// and written in BULK, so even a large first import is a handful of database
+// requests rather than one per transaction.
 export async function syncWithAccessToken(
   conn: Pick<BankConnection, 'id' | 'user_id' | 'account_ids' | 'last_synced_date'>,
   accessToken: string,
 ): Promise<SyncResult> {
-  let inserted = 0;
   // Overlap the window by 3 days so late-booked lines are never missed; the
-  // external_id conflict rule makes the overlap harmless.
+  // external_id conflict rule makes the overlap harmless. A first sync (no
+  // last_synced_date) is bounded to recent history.
   const from = conn.last_synced_date
     ? new Date(new Date(conn.last_synced_date).getTime() - 3 * 24 * 3600 * 1000).toISOString().slice(0, 10)
-    : undefined;
+    : new Date(Date.now() - FIRST_SYNC_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
   const captures = await recentUnconfirmedCaptures(
     conn.user_id,
     new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString().slice(0, 10),
   );
+  const toInsert: BankEntryInsert[] = [];
   for (const accountId of conn.account_ids) {
     const booked = await getBookedTransactions(accessToken, accountId, from);
     if (!booked) continue;
+    let taken = 0;
     for (const raw of booked) {
+      if (taken >= MAX_ROWS_PER_ACCOUNT) break;
       const entry = mapBankTransaction(raw);
       if (!entry) continue;
       // Skip anything the user already captured on WhatsApp themselves.
       if (captures.some((c) => matchesCapture(entry, c))) continue;
-      if (await insertBankTransaction(conn.user_id, entry)) inserted += 1;
+      toInsert.push(entry);
+      taken += 1;
     }
   }
+  const inserted = await insertBankTransactions(conn.user_id, toInsert);
   await updateBankConnection(conn.id, { last_synced_date: new Date().toISOString().slice(0, 10) });
   return { inserted, ok: true };
 }

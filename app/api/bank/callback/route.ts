@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { hasBankFeedConfig, exchangeCode, listAccounts } from '../../../../lib/bankfeed';
 import { getBankConnectionByReference, updateBankConnection } from '../../../../lib/supabase';
 import { syncWithAccessToken } from '../../../../lib/banksync';
@@ -67,23 +67,24 @@ export async function GET(req: NextRequest) {
     token_expires_at: tokens.expires_at,
   });
 
-  // First sync, right now, so the win is visible immediately. Errors are
-  // swallowed: the daily sync will catch anything this pass misses.
-  let firstSync = 0;
-  try {
-    const r = await syncWithAccessToken(
-      { id: connection.id, user_id: connection.user_id, account_ids: accounts, last_synced_date: null },
-      tokens.access_token,
-    );
-    firstSync = r.inserted;
-  } catch {
-    // The daily sync is the safety net.
-  }
+  // First sync runs in the BACKGROUND, after this page has been sent. Mock and
+  // real banks alike can return hundreds of lines, and making the redirect wait
+  // on the import is what makes a page feel stuck. The page renders instantly;
+  // the transactions land seconds later; the daily sync is the safety net.
+  after(async () => {
+    try {
+      const r = await syncWithAccessToken(
+        { id: connection.id, user_id: connection.user_id, account_ids: accounts, last_synced_date: null },
+        tokens.access_token,
+      );
+      console.log(`[bank] first sync inserted=${r.inserted}`);
+    } catch (err) {
+      console.error('[bank] first sync failed:', err instanceof Error ? err.message : 'unknown');
+    }
+  });
 
   return page(
     'Bank connected',
-    firstSync > 0
-      ? `${firstSync} transactions are already in your Lekhio, marked "to review". New ones will arrive each day. Nothing counts toward your tax until you approve it. Go and have a look in the app.`
-      : 'Your transactions will appear in Lekhio each day, ready for you to check and confirm. Nothing counts toward your tax until you approve it. You can close this and go back to the app.',
+    'Your recent transactions are arriving in Lekhio right now, marked "to review", with new ones each day. Nothing counts toward your tax until you approve it. Give it a few seconds, then have a look in the app.',
   );
 }

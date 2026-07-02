@@ -1162,23 +1162,27 @@ export async function recentUnconfirmedCaptures(
   return (await res.json()) as Array<{ amount: number; transaction_date: string | null }>;
 }
 
-// Insert a bank transaction idempotently: external_id carries the bank's own
-// transaction id, and the partial unique index on external_id (schema block,
-// 2 July 2026) makes re-syncing the same window safe. Duplicate inserts are
-// silently ignored.
-export async function insertBankTransaction(userId: string, entry: {
+export interface BankEntryInsert {
   external_id: string;
   vendor: string;
   amount: number;
   category: string;
   transaction_date: string;
   description: string;
-}): Promise<boolean> {
+}
+
+// Insert bank transactions idempotently and in BULK: one PostgREST request per
+// chunk instead of one per row, which is what keeps a first sync of hundreds
+// of lines fast. external_id carries the bank's own transaction id, and the
+// partial unique index on it makes re-syncing the same window safe; duplicates
+// are silently ignored, and the response counts only the genuinely new rows.
+export async function insertBankTransactions(userId: string, entries: BankEntryInsert[]): Promise<number> {
+  if (entries.length === 0) return 0;
   const { url } = config();
-  const res = await fetch(`${url}/rest/v1/transactions?on_conflict=external_id`, {
-    method: 'POST',
-    headers: headers({ Prefer: 'resolution=ignore-duplicates,return=minimal' }),
-    body: JSON.stringify({
+  let inserted = 0;
+  const CHUNK = 200;
+  for (let i = 0; i < entries.length; i += CHUNK) {
+    const rows = entries.slice(i, i + CHUNK).map((entry) => ({
       user_id: userId,
       vendor: entry.vendor,
       amount: entry.amount,
@@ -1188,9 +1192,21 @@ export async function insertBankTransaction(userId: string, entry: {
       description: entry.description,
       confirmed: false,
       external_id: entry.external_id,
-    }),
-  });
-  return res.ok;
+    }));
+    const res = await fetch(`${url}/rest/v1/transactions?on_conflict=external_id&select=id`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'resolution=ignore-duplicates,return=representation' }),
+      body: JSON.stringify(rows),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.error('[insertBankTransactions] failed:', res.status, text.slice(0, 300));
+      continue;
+    }
+    const created = (await res.json().catch(() => [])) as unknown[];
+    inserted += Array.isArray(created) ? created.length : 0;
+  }
+  return inserted;
 }
 
 // --- Invoices (read for the public invoice page, server side only) ---------

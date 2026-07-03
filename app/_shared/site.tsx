@@ -199,6 +199,10 @@ export const MARKETING_CSS = `
 .apptrack{display:flex;width:300%;height:100%;animation:apptour 8s cubic-bezier(.65,0,.35,1) infinite}
 .appscreen{width:33.333%;flex:0 0 33.333%;height:100%;padding:18px;overflow:hidden}
 @keyframes apptour{0%,28%{transform:translateX(0)}36%,62%{transform:translateX(-33.333%)}70%,100%{transform:translateX(-66.666%)}}
+/* Fail-safe: on marketing pages, content is always visible. Motion is layered
+   on with self-triggering CSS animations, never gated behind the reveal script,
+   so a page can never render blank. */
+.mkt .reveal{opacity:1;transform:none}
 `;
 
 // ---------- content data ----------

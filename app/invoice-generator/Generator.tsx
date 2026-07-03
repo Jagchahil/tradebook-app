@@ -220,6 +220,8 @@ export default function Generator() {
         }
         .gen-grid{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:28px;align-items:start;}
         @media(max-width:900px){.gen-grid{grid-template-columns:1fr;}}
+        /* The invoice is a document: keep it a white printable page in any theme. */
+        .paper{--panel:#FFFFFF;--bg:#FBFAF7;--surface:#F2F0EA;--bd:#E7E3D9;--tx:#111111;--tx-mut:#5B6470;--river:#1B59A6;--river-deep:#134277;--green:#15803D;--red:#C0392B;background:#FFFFFF;color:#111111;}
       `}</style>
 
       <div className="gen-grid">
@@ -228,7 +230,7 @@ export default function Generator() {
           <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: 22 }}>
             <div style={{ display: 'inline-flex', background: SURFACE, borderRadius: 12, padding: 4, marginBottom: 18 }}>
               {(['invoice', 'quote'] as DocType[]).map((d) => (
-                <button key={d} onClick={() => setDocType(d)} style={{ border: 'none', cursor: 'pointer', padding: '9px 18px', borderRadius: 9, fontSize: 14, fontWeight: 700, fontFamily: 'inherit', background: docType === d ? '#fff' : 'transparent', color: docType === d ? INK : MUTED, boxShadow: docType === d ? '0 2px 8px rgba(0,0,0,.10)' : 'none' }}>{d === 'invoice' ? 'Invoice' : 'Quote'}</button>
+                <button key={d} onClick={() => setDocType(d)} style={{ border: 'none', cursor: 'pointer', padding: '9px 18px', borderRadius: 9, fontSize: 14, fontWeight: 700, fontFamily: 'inherit', background: docType === d ? 'var(--surface)' : 'transparent', color: docType === d ? INK : MUTED, boxShadow: docType === d ? '0 2px 8px rgba(0,0,0,.10)' : 'none' }}>{d === 'invoice' ? 'Invoice' : 'Quote'}</button>
               ))}
             </div>
 

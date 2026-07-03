@@ -51,7 +51,7 @@ export const MARKETING_CSS = `
 .mkt .pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:7px 14px;border-radius:999px;background:var(--river-tint);color:var(--river-deep)}
 .mkt .dot{width:8px;height:8px;border-radius:999px;background:#22C55E;animation:hpulse 2s infinite}
 @keyframes hpulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
-.mkt .btn{display:inline-block;font-weight:700;font-size:16px;padding:15px 30px;border-radius:13px;cursor:pointer;border:0;font-family:inherit;transition:transform .18s,box-shadow .25s}
+.mkt .btn{display:inline-block;text-align:center;font-weight:700;font-size:16px;padding:15px 30px;border-radius:13px;cursor:pointer;border:0;font-family:inherit;transition:transform .18s,box-shadow .25s}
 .mkt .btn.primary{background:var(--river);color:#fff;box-shadow:0 10px 26px rgba(27,89,166,.32)}
 .mkt .btn.primary:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(27,89,166,.4)}
 .mkt .btn.ghost{background:transparent;color:var(--tx);border:1px solid var(--tx)}
@@ -68,6 +68,7 @@ export const MARKETING_CSS = `
 .truststrip .row span{display:inline-flex;align-items:center;gap:8px}
 .truststrip b{color:var(--tx);font-weight:800}
 .mkt .hero{padding:56px 0 26px}
+.mkt .hero.center,.mkt section.center{text-align:center}
 .hero .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
 .hero h1{font-size:clamp(40px,6.4vw,72px);letter-spacing:-.045em;line-height:1.05;font-weight:800;margin:22px 0 0}
 .hero .gt{background:linear-gradient(100deg,var(--river),var(--saffron));-webkit-background-clip:text;background-clip:text;color:transparent;position:relative;display:inline-block}

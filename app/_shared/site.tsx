@@ -601,7 +601,7 @@ a{text-decoration:none}
 .logo-chip{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--river),var(--saffron));display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:19px;box-shadow:0 6px 16px rgba(27,89,166,.35)}
 .logo-word{font-size:23px;font-weight:900;letter-spacing:-1px;color:var(--tx)}
 /* dark/light toggle in the nav */
-.theme-toggle{width:40px;height:40px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font-size:17px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s ease,background-color .18s ease}
+.theme-toggle{display:none !important}
 .theme-toggle:hover{transform:translateY(-2px)}
 @keyframes riseIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 @keyframes flow{to{stroke-dashoffset:0}}
@@ -729,7 +729,7 @@ const REVEAL_JS = `
   try{
     var saved = localStorage.getItem('lekhio-theme');
     var sys = (window.matchMedia && window.matchMedia('(prefers-color-scheme:dark)').matches) ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', saved || 'light');
+    document.documentElement.setAttribute('data-theme', 'light');
   }catch(e){}
   var setIcon = function(){ var b=document.getElementById('lekhio-theme'); if(b) b.textContent = document.documentElement.getAttribute('data-theme')==='dark' ? '☀️' : '🌙'; };
   var wireToggle = function(){

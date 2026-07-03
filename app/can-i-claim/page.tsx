@@ -17,20 +17,20 @@ export const metadata: Metadata = {
   },
 };
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const SAFFRON_DEEP = '#C9842A';
-const SAFFRON_TINT = '#FBEFD8';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
-const RED_INK = '#B23A2B';
-const RED_TINT = '#FDECEC';
-const PAPER = '#FBFAF7';
-const SURFACE = '#F2F0EA';
-const LINE = '#E7E3D9';
-const MUTED = '#5B6470';
+const INK = 'var(--tx)';
+const RIVER = 'var(--river)';
+const RIVER_DEEP = 'var(--river-deep)';
+const RIVER_TINT = 'var(--river-tint)';
+const SAFFRON_DEEP = 'var(--saffron-deep)';
+const SAFFRON_TINT = 'var(--saffron-tint)';
+const GREEN = 'var(--green)';
+const GREEN_TINT = 'var(--green-tint)';
+const RED_INK = 'var(--red)';
+const RED_TINT = 'var(--red-tint)';
+const PAPER = 'var(--bg)';
+const SURFACE = 'var(--surface)';
+const LINE = 'var(--bd)';
+const MUTED = 'var(--tx-mut)';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 function verdictColours(v: Verdict): { fg: string; bg: string } {
@@ -59,7 +59,7 @@ const demo: { side: 'out' | 'in'; text: string }[] = [
 function RuleCard({ r }: { r: (typeof EXPENSE_RULES)[number] }) {
   const c = verdictColours(r.verdict);
   return (
-    <div className="rulecard" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="rulecard" style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <h3 style={{ fontSize: 15.5, fontWeight: 700, margin: 0, letterSpacing: '-0.2px' }}>{r.title}</h3>
         <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.3px', color: c.fg, background: c.bg, padding: '5px 10px', borderRadius: 12 }}>{VERDICT_LABEL[r.verdict]}</span>
@@ -143,7 +143,7 @@ export default function CanIClaimPage() {
             </p>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div style={{ width: 300, maxWidth: '100%', background: '#fff', borderRadius: 26, border: `1px solid ${LINE}`, boxShadow: '0 24px 60px rgba(17,17,17,.14)', overflow: 'hidden' }}>
+            <div style={{ width: 300, maxWidth: '100%', background: 'var(--panel)', borderRadius: 26, border: `1px solid ${LINE}`, boxShadow: '0 24px 60px rgba(17,17,17,.14)', overflow: 'hidden' }}>
               <div style={{ background: '#075E54', color: '#fff', padding: '12px 15px', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ width: 32, height: 32, borderRadius: 16, background: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>💬</span>
                 <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>Lekhio</div><div style={{ fontSize: 10.5, opacity: 0.85 }}>online</div></div>
@@ -182,7 +182,7 @@ export default function CanIClaimPage() {
           {greyAreas.map((r) => {
             const c = verdictColours(r.verdict);
             return (
-              <div key={r.key} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 24 }}>
+              <div key={r.key} style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 18, padding: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                   <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>{r.title}</h3>
                   <span style={{ fontSize: 11, fontWeight: 700, color: c.fg, background: c.bg, padding: '4px 10px', borderRadius: 12 }}>{VERDICT_LABEL[r.verdict]}</span>
@@ -198,13 +198,13 @@ export default function CanIClaimPage() {
       <section style={{ background: `linear-gradient(180deg, #fff, ${RIVER_TINT})`, borderTop: `1px solid ${LINE}` }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '50px 24px' }}>
           <div className="reveal" style={{ textAlign: 'center', marginBottom: 36 }}>
-            <span style={{ display: 'inline-block', backgroundColor: '#fff', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>KEEP MORE, LEGALLY</span>
+            <span style={{ display: 'inline-block', backgroundColor: 'var(--panel)', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>KEEP MORE, LEGALLY</span>
             <h2 className="h2" style={{ fontWeight: 700, margin: '0 0 12px' }}>The legal ways to pay less tax.</h2>
             <p style={{ fontSize: 16.5, color: MUTED, maxWidth: 600, margin: '0 auto' }}>Nothing dodgy, nothing risky. Just the reliefs and allowances people miss. Lekhio tracks most of these for you as you work.</p>
           </div>
           <div className="reveal tips-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             {TAX_TIPS.map((t, i) => (
-              <div key={t.title} style={{ display: 'flex', gap: 14, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '18px 20px' }}>
+              <div key={t.title} style={{ display: 'flex', gap: 14, background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 14, padding: '18px 20px' }}>
                 <span style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 14, background: RIVER, color: '#fff', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
                 <div>
                   <h3 style={{ fontSize: 15.5, fontWeight: 700, margin: '0 0 4px' }}>{t.title}</h3>
@@ -226,7 +226,7 @@ export default function CanIClaimPage() {
       </section>
 
       {/* CTA */}
-      <section style={{ background: INK }}>
+      <section style={{ background: 'var(--band)' }}>
         <div className="reveal" style={{ maxWidth: 720, margin: '0 auto', padding: '54px 24px', textAlign: 'center' }}>
           <h2 className="h2" style={{ color: '#fff', fontWeight: 700, margin: '0 0 14px' }}>Stop overpaying. Just ask.</h2>
           <p style={{ fontSize: 16.5, color: '#B6BDC8', lineHeight: 1.6, maxWidth: 540, margin: '0 auto 28px' }}>

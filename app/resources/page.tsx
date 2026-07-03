@@ -15,18 +15,18 @@ export const metadata: Metadata = {
   },
 };
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const SAFFRON_DEEP = '#C9842A';
-const SAFFRON_TINT = '#FBEFD8';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
-const PAPER = '#FBFAF7';
-const SURFACE = '#F2F0EA';
-const LINE = '#E7E3D9';
-const MUTED = '#5B6470';
+const INK = 'var(--tx)';
+const RIVER = 'var(--river)';
+const RIVER_DEEP = 'var(--river-deep)';
+const RIVER_TINT = 'var(--river-tint)';
+const SAFFRON_DEEP = 'var(--saffron-deep)';
+const SAFFRON_TINT = 'var(--saffron-tint)';
+const GREEN = 'var(--green)';
+const GREEN_TINT = 'var(--green-tint)';
+const PAPER = 'var(--bg)';
+const SURFACE = 'var(--surface)';
+const LINE = 'var(--bd)';
+const MUTED = 'var(--tx-mut)';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 const tools = [
@@ -72,7 +72,7 @@ export default function ResourcesPage() {
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '30px 24px' }}>
         <div className="toolgrid">
           {tools.map((t) => (
-            <Link key={t.href} href={t.href} className="card" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, display: 'flex', flexDirection: 'column', gap: 12, color: INK }}>
+            <Link key={t.href} href={t.href} className="card" style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, display: 'flex', flexDirection: 'column', gap: 12, color: INK }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ width: 50, height: 50, borderRadius: 13, background: t.tint, color: t.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>{t.icon}</div>
                 <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.4px', color: MUTED, background: SURFACE, padding: '4px 10px', borderRadius: 12 }}>{t.tag}</span>
@@ -90,7 +90,7 @@ export default function ResourcesPage() {
         <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Guides by trade</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {TRADES.map((t) => (
-            <Link key={t.slug} href={`/for/${t.slug}`} style={{ fontSize: 14, fontWeight: 600, color: INK, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 20, padding: '9px 16px' }}>{t.emoji} {t.name}</Link>
+            <Link key={t.slug} href={`/for/${t.slug}`} style={{ fontSize: 14, fontWeight: 600, color: INK, background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 20, padding: '9px 16px' }}>{t.emoji} {t.name}</Link>
           ))}
         </div>
       </section>
@@ -99,7 +99,7 @@ export default function ResourcesPage() {
       <section style={{ background: SURFACE, borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
         <div style={{ maxWidth: 820, margin: '0 auto', padding: '46px 24px' }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <span style={{ display: 'inline-block', backgroundColor: '#fff', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>KEY DATES</span>
+            <span style={{ display: 'inline-block', backgroundColor: 'var(--panel)', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>KEY DATES</span>
             <h2 style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.6px', margin: '0 0 10px' }}>The tax dates that matter, 2026 to 2027.</h2>
             <p style={{ fontSize: 16, color: MUTED, maxWidth: 540, margin: '0 auto' }}>Miss one and HMRC charges a penalty. Lekhio reminds you well before each, so you never do.</p>
           </div>
@@ -116,7 +116,7 @@ export default function ResourcesPage() {
       </section>
 
       {/* CTA */}
-      <section style={{ background: INK }}>
+      <section style={{ background: 'var(--band)' }}>
         <div style={{ maxWidth: 700, margin: '0 auto', padding: '50px 24px', textAlign: 'center' }}>
           <h2 style={{ fontSize: 30, color: '#fff', fontWeight: 700, letterSpacing: '-0.6px', margin: '0 0 14px' }}>Free tools are the start. Lekhio does the rest.</h2>
           <p style={{ fontSize: 16.5, color: '#B6BDC8', lineHeight: 1.6, maxWidth: 540, margin: '0 auto 28px' }}>

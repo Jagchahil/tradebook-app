@@ -725,11 +725,12 @@ details.faq[open] .faq-body{max-height:360px;opacity:1;margin-top:12px}
 // Idempotent reveal + countup. Safe to run even if a global layout script also runs.
 const REVEAL_JS = `
 (function(){
-  // Theme: apply saved choice or the system preference immediately, before paint.
+  // Theme: follow the device's light/dark setting automatically, and keep in
+  // step if the user changes it while the page is open. No manual toggle.
   try{
-    var saved = localStorage.getItem('lekhio-theme');
-    var sys = (window.matchMedia && window.matchMedia('(prefers-color-scheme:dark)').matches) ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', 'light');
+    var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme:dark)') : null;
+    document.documentElement.setAttribute('data-theme', (mq && mq.matches) ? 'dark' : 'light');
+    if(mq && mq.addEventListener){ mq.addEventListener('change', function(e){ document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light'); }); }
   }catch(e){}
   var setIcon = function(){ var b=document.getElementById('lekhio-theme'); if(b) b.textContent = document.documentElement.getAttribute('data-theme')==='dark' ? '☀️' : '🌙'; };
   var wireToggle = function(){

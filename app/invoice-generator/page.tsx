@@ -15,14 +15,14 @@ export const metadata: Metadata = {
   },
 };
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
-const PAPER = '#FBFAF7';
-const LINE = '#E7E3D9';
-const MUTED = '#5B6470';
+const INK = 'var(--tx)';
+const RIVER = 'var(--river)';
+const RIVER_DEEP = 'var(--river-deep)';
+const GREEN = 'var(--green)';
+const GREEN_TINT = 'var(--green-tint)';
+const PAPER = 'var(--bg)';
+const LINE = 'var(--bd)';
+const MUTED = 'var(--tx-mut)';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 export default function InvoiceGeneratorPage() {
@@ -49,7 +49,7 @@ export default function InvoiceGeneratorPage() {
       </section>
 
       <section className="site-foot" style={{ maxWidth: 1180, margin: '0 auto', padding: '10px 24px 50px' }}>
-        <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '24px 24px', display: 'flex', gap: 18, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: '24px 24px', display: 'flex', gap: 18, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <div style={{ maxWidth: 560 }}>
             <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 8px' }}>Want it to chase the payment too?</h2>
             <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: 0 }}>This generator is free forever. Lekhio goes further: it builds the invoice from a text, sends it, logs the income when it is paid, and keeps you ready for tax.</p>

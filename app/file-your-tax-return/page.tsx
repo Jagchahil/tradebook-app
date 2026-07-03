@@ -17,18 +17,18 @@ export const metadata: Metadata = {
   },
 };
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const SAFFRON_DEEP = '#C9842A';
-const SAFFRON_TINT = '#FBEFD8';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
-const PAPER = '#FBFAF7';
-const SURFACE = '#F2F0EA';
-const LINE = '#E7E3D9';
-const MUTED = '#5B6470';
+const INK = 'var(--tx)';
+const RIVER = 'var(--river)';
+const RIVER_DEEP = 'var(--river-deep)';
+const RIVER_TINT = 'var(--river-tint)';
+const SAFFRON_DEEP = 'var(--saffron-deep)';
+const SAFFRON_TINT = 'var(--saffron-tint)';
+const GREEN = 'var(--green)';
+const GREEN_TINT = 'var(--green-tint)';
+const PAPER = 'var(--bg)';
+const SURFACE = 'var(--surface)';
+const LINE = 'var(--bd)';
+const MUTED = 'var(--tx-mut)';
 
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
@@ -424,7 +424,7 @@ export default function FileYourTaxReturnPage() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <a href="#steps" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12, textDecoration: 'none' }}>Start the walkthrough</a>
-          <Link href="/start" style={{ background: '#fff', color: RIVER, border: `1.5px solid ${RIVER}`, fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12, textDecoration: 'none' }}>Get WhatsApp reminders</Link>
+          <Link href="/start" style={{ background: 'var(--panel)', color: RIVER, border: `1.5px solid ${RIVER}`, fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12, textDecoration: 'none' }}>Get WhatsApp reminders</Link>
         </div>
       </section>
 
@@ -441,13 +441,13 @@ export default function FileYourTaxReturnPage() {
             <label htmlFor="route-under" className="branch-tab">Under £50k turnover</label>
             <label htmlFor="route-over" className="branch-tab">£50k or more</label>
           </div>
-          <div className="branch-panel panel-under" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 24 }}>
+          <div className="branch-panel panel-under" style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: 24 }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 18, color: RIVER_DEEP }}>You file the normal Self Assessment return, once a year</h3>
             <p style={{ margin: 0, color: MUTED, fontSize: 15.5, lineHeight: 1.6 }}>
               This is most sole traders today. One return, due online by 31 January, covering the tax year that ran 6 April to 5 April. Follow the seven steps below and you are done. Keep your records tidy through the year and it is quick.
             </p>
           </div>
-          <div className="branch-panel panel-over" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 24 }}>
+          <div className="branch-panel panel-over" style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: 24 }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 18, color: RIVER_DEEP }}>From April 2026 you use Making Tax Digital</h3>
             <p style={{ margin: '0 0 10px', color: MUTED, fontSize: 15.5, lineHeight: 1.6 }}>
               If your turnover is £50,000 or more, you must keep digital records and send four short quarterly updates plus a final declaration, instead of one return. The first quarter, 6 April to 5 July 2026, is due by 7 August 2026.
@@ -512,7 +512,7 @@ export default function FileYourTaxReturnPage() {
           </p>
 
           {/* Universal list */}
-          <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 22, marginBottom: 22 }}>
+          <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: 22, marginBottom: 22 }}>
             <h3 style={{ margin: '0 0 12px', fontSize: 16, color: RIVER_DEEP }}>Every trade can claim</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '8px 18px' }}>
               {universalExpenses.map((e) => (
@@ -534,7 +534,7 @@ export default function FileYourTaxReturnPage() {
             </div>
             <div className="trade-panels">
               {trades.map((t) => (
-                <div key={t.id} className={`trade-panel tp-${t.id}`} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 24, maxWidth: 640, margin: '0 auto' }}>
+                <div key={t.id} className={`trade-panel tp-${t.id}`} style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: 24, maxWidth: 640, margin: '0 auto' }}>
                   <h3 style={{ margin: '0 0 12px', fontSize: 17 }}>{t.name}, on top of the basics</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '8px 18px' }}>
                     {t.items.map((it) => (
@@ -563,7 +563,7 @@ export default function FileYourTaxReturnPage() {
         </p>
         <div style={{ display: 'grid', gap: 12 }}>
           {deadlines.map((d) => (
-            <div key={d.date} style={{ display: 'flex', gap: 16, alignItems: 'center', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '16px 20px' }}>
+            <div key={d.date} style={{ display: 'flex', gap: 16, alignItems: 'center', background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 14, padding: '16px 20px' }}>
               <div style={{ flexShrink: 0, minWidth: 110, fontWeight: 700, color: RIVER_DEEP, fontSize: 15.5 }}>{d.date}</div>
               <div style={{ fontSize: 15.5, color: INK }}>{d.label}</div>
             </div>
@@ -600,7 +600,7 @@ export default function FileYourTaxReturnPage() {
 
       {/* Soft CTA */}
       <section style={{ maxWidth: 760, margin: '0 auto', padding: '20px 24px 64px' }}>
-        <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 22, padding: 36, textAlign: 'center', boxShadow: '0 14px 40px rgba(17,17,17,.06)' }}>
+        <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 22, padding: 36, textAlign: 'center', boxShadow: '0 14px 40px rgba(17,17,17,.06)' }}>
           <h2 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 12px' }}>Make the 15 minutes actually 15 minutes</h2>
           <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.65, maxWidth: 520, margin: '0 auto 22px' }}>
             Keep your records with Lekhio through the year. Snap a receipt, leave a voice note, or just text it. When the deadline comes, your numbers are already added up and ready, and we send the reminder to your WhatsApp. Your first 30 days are free.

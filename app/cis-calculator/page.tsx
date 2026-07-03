@@ -14,11 +14,11 @@ export const metadata: Metadata = {
   },
 };
 
-const INK = '#111111';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const PAPER = '#FBFAF7';
-const MUTED = '#5B6470';
+const INK = 'var(--tx)';
+const RIVER_DEEP = 'var(--river-deep)';
+const RIVER_TINT = 'var(--river-tint)';
+const PAPER = 'var(--bg)';
+const MUTED = 'var(--tx-mut)';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 // FAQPage structured data for search and AI assistants. Figures stay in step

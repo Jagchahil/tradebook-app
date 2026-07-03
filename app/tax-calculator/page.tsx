@@ -15,15 +15,15 @@ export const metadata: Metadata = {
   },
 };
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
-const PAPER = '#FBFAF7';
-const LINE = '#E7E3D9';
-const MUTED = '#5B6470';
+const INK = 'var(--tx)';
+const RIVER = 'var(--river)';
+const RIVER_DEEP = 'var(--river-deep)';
+const RIVER_TINT = 'var(--river-tint)';
+const GREEN = 'var(--green)';
+const GREEN_TINT = 'var(--green-tint)';
+const PAPER = 'var(--bg)';
+const LINE = 'var(--bd)';
+const MUTED = 'var(--tx-mut)';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 // FAQPage structured data, so search and AI assistants can quote the answers.
@@ -85,7 +85,7 @@ export default function TaxCalculatorPage() {
 
       {/* Tie-in to the product */}
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px 16px' }}>
-        <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: '28px 26px', display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+        <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 18, padding: '28px 26px', display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           <div style={{ maxWidth: 560 }}>
             <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 10px', letterSpacing: '-0.4px' }}>The number that matters is the expenses one.</h2>
             <p style={{ fontSize: 15.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>

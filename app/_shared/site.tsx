@@ -865,7 +865,7 @@ export function SiteFooter() {
           <div style={{ fontSize: 13, color: '#8A93A0', maxWidth: 640, lineHeight: 1.6 }}>
             Lekhio prepares your figures and keeps you ready for Making Tax Digital. You approve everything before it reaches HMRC. HMRC keeps you responsible for your tax. We never imply HMRC backs us. Built in the UK.
           </div>
-          <div style={{ fontSize: 13, color: '#8A93A0' }}>© {new Date().getFullYear()} Lekhio</div>
+          <div style={{ fontSize: 13, color: '#8A93A0' }}>© 2026 Lekhio</div>
         </div>
       </div>
     </footer>

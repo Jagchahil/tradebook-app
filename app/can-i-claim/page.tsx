@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { EXPENSE_RULES, TAX_TIPS, VERDICT_LABEL, type Verdict } from '../../lib/taxrules';
 import LeadCapture from '../../components/LeadCapture';
 import { A11Y_CSS } from '../../lib/tokens';
+import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
   title: 'Can I claim it? UK self employed expenses, answered straight | Lekhio',
@@ -88,12 +89,13 @@ function Group({ title, blurb, rules, accent }: { title: string; blurb: string; 
 export default function CanIClaimPage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
+      <SharedHead />
       <style
         dangerouslySetInnerHTML={{
           __html: `
           *{box-sizing:border-box} body{margin:0} a{text-decoration:none}
           @keyframes riseIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-          .reveal{opacity:0;transform:translateY(16px);transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.2,1)}
+          .reveal{opacity:1;transform:none}
           .reveal.in{opacity:1;transform:none}
           .h1{font-size:54px;line-height:1.05;letter-spacing:-2px}
           .h2{font-size:32px;line-height:1.14;letter-spacing:-0.7px}
@@ -111,10 +113,7 @@ export default function CanIClaimPage() {
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       {/* Nav */}
-      <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
-        <Link href="/start" className="btn" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
-      </nav>
+      <SiteNav />
 
       {/* Hero */}
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '30px 24px 8px' }}>
@@ -248,6 +247,7 @@ export default function CanIClaimPage() {
           __html: `(function(){try{var els=document.querySelectorAll('.reveal');if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')});}else{var io=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target);}})},{threshold:0.1});els.forEach(function(e){io.observe(e)});}}catch(e){document.querySelectorAll('.reveal').forEach(function(x){x.classList.add('in')});}})();`,
         }}
       />
+      <SiteFooter />
     </main>
   );
 }

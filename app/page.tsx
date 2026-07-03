@@ -51,6 +51,7 @@ const HOME_CSS = `
 .truststrip .row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px 28px;padding:16px 24px;font-size:13px;font-weight:600;color:var(--tx-mut)}
 .truststrip .row span{display:inline-flex;align-items:center;gap:8px}
 .truststrip b{color:var(--tx);font-weight:800}
+@media(max-width:640px){.truststrip .row{flex-direction:column;gap:11px;font-size:13px;padding:16px 20px;text-align:center}}
 
 .home .hero{padding:56px 0 26px}
 .hero .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}

@@ -128,14 +128,12 @@ const COMPARE_JS = `
       var t=+el.getAttribute('data-to');var v=0;var st=function(){v+=Math.ceil((t-v)/6);if(v>=t)v=t;el.textContent=v;if(v<t)setTimeout(st,60);};st();
     });
   }
-  function wire(){
-    document.querySelectorAll('#seg button').forEach(function(b){b.addEventListener('click',function(){
-      document.querySelectorAll('#seg button').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
-      applyFilter(b.getAttribute('data-f'));
-    });});
-    counts();
-  }
-  if(document.readyState!=='loading')wire();else document.addEventListener('DOMContentLoaded',wire);
+  document.addEventListener('click',function(e){
+    var b=(e.target&&e.target.closest)?e.target.closest('#seg button'):null;if(!b)return;
+    document.querySelectorAll('#seg button').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+    applyFilter(b.getAttribute('data-f'));
+  });
+  if(document.readyState!=='loading')counts();else document.addEventListener('DOMContentLoaded',counts);
 })();
 `;
 

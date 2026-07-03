@@ -88,6 +88,8 @@ const PRODUCT_CSS = `
 .rbadge{font-size:10px;font-weight:900;letter-spacing:.05em;padding:4px 9px;border-radius:999px;display:inline-block}
 .rbadge.soon{color:var(--saffron-deep);background:var(--saffron-tint)}
 .rbadge.prog{color:var(--river);background:var(--river-tint)}
+/* Content is visible by default; motion is an enhancement, never a gate. */
+.mkt .reveal{opacity:1;transform:none}
 `;
 
 const PRODUCT_JS = `
@@ -190,8 +192,12 @@ export default function ProductPage() {
             <div className="ftab" data-f="5">💡 Ask</div>
           </div>
           <div className="fstage reveal">
-            <div className="ftext" id="ftext" />
-            <div className="fdemo" id="fdemo" />
+            <div className="ftext" id="ftext"><h3>Snap a receipt</h3><p>Photograph it on WhatsApp. Lekhio pulls the total, the VAT and the category, and logs it in seconds.</p></div>
+            <div className="fdemo" id="fdemo">
+              <div className="db out d1"><div style={{ background: '#cde7b4', borderRadius: 8, padding: 12, textAlign: 'center', fontSize: 20, marginBottom: 4 }}>🧾</div>Screwfix receipt</div>
+              <div className="db in d2">Logged. £42.60, materials ✅</div>
+              <div className="db in d3" style={{ background: 'transparent', fontSize: 12, color: 'var(--tx-mut)' }}>VAT £7.10 · Materials · 3 Jul</div>
+            </div>
           </div>
         </div>
       </section>

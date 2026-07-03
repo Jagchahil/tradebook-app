@@ -422,7 +422,7 @@ export default function HomePage() {
               <li><span className="t">✓</span> Invoices created and sent from WhatsApp</li>
               <li><span className="t">✓</span> MTD ready quarterly summaries, you approve</li>
               <li><span className="t">✓</span> CIS split, deduction and refund tracking</li>
-              <li><span className="t">✓</span> A real human on the other end, fast</li>
+              <li><span className="t">✓</span> Instant replies, in the same chat</li>
               <li><span className="t">✓</span> Cancel in one tap, export any time</li>
             </ul>
           </div>

@@ -261,7 +261,7 @@ export default function ProductPage() {
               <li><span className="m">✓</span> One flat price, everything in.</li>
               <li><span className="m">✓</span> With you every day, not once a year.</li>
               <li><span className="m">✓</span> Snap as you go. Nothing to dig out.</li>
-              <li><span className="m">✓</span> A real person replies fast, same chat.</li>
+              <li><span className="m">✓</span> Instant replies, right in the same chat.</li>
             </ul></div>
           </div>
         </div>

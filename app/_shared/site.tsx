@@ -235,7 +235,7 @@ export const features = [
   { icon: '✅', title: 'You approve everything', body: 'See every entry. Fix anything that looks off. Nothing counts toward your tax until you confirm it.', tint: RIVER_TINT, fg: RIVER },
   { icon: '📊', title: 'Tax prepared for you', body: 'Quarterly figures, ready. You check them, you send them. We never imply HMRC backs us.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { icon: '💡', title: 'Can I claim it?', body: 'Not sure if something counts? Text "can I claim my work boots?" and Lekhio answers straight, the grey areas included.', tint: RIVER_TINT, fg: RIVER },
-  { icon: '💬', title: 'A real person in the chat', body: 'Stuck on something. Message us on the same WhatsApp and a human replies. No hold music.', tint: GREEN_TINT, fg: GREEN },
+  { icon: '💬', title: 'Instant replies in the chat', body: 'Stuck on something? Message the same WhatsApp and get an instant reply. No hold music, no queue.', tint: GREEN_TINT, fg: GREEN },
 ];
 
 export const mtdMeans = [
@@ -252,7 +252,7 @@ export const compareRows = [
   { label: 'Create and send an invoice from a text', lekhio: true, apps: 'extra', diy: false },
   { label: 'CIS split and deduction done for you', lekhio: true, apps: 'higher', diy: false },
   { label: 'Quarterly MTD updates prepared for you', lekhio: true, apps: 'higher', diy: false },
-  { label: 'A real human replies fast, in the same chat', lekhio: true, apps: false, diy: 'maybe' },
+  { label: 'Instant replies in the same chat', lekhio: true, apps: false, diy: 'maybe' },
   { label: 'Plain English, built for the non accountant', lekhio: true, apps: false, diy: true },
   { label: 'One flat price, no receipt limits, no paywalls', lekhio: true, apps: false, diy: true },
   { label: 'Set up in minutes, cancel in one tap', lekhio: true, apps: false, diy: false },
@@ -264,7 +264,7 @@ export const reviews = [
   { quote: 'I tried one of the big accounting apps and lost a whole Sunday just setting it up. With Lekhio I sent one photo and it was already working.', name: 'Jas', trade: 'Electrician, Birmingham', tint: RIVER_TINT, fg: RIVER },
   { quote: 'My old app started charging me once I went over a receipt limit. Lekhio is one price and I snap as many as I like.', name: 'Sophie', trade: 'Mobile hairdresser, Leeds', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { quote: 'The old software talked to me like I was an accountant. I am not. This one just speaks plain English.', name: 'Marcus', trade: 'Plasterer, Bristol', tint: GREEN_TINT, fg: GREEN },
-  { quote: 'Every time I had a question the other one put me through a robot. On Lekhio a real person answered on the same chat.', name: 'Priya', trade: 'Freelance designer, London', tint: RIVER_TINT, fg: RIVER },
+  { quote: 'Every time I had a question the other one put me through a robot. On Lekhio I got a straight answer on the same chat, in seconds.', name: 'Priya', trade: 'Freelance designer, London', tint: RIVER_TINT, fg: RIVER },
   { quote: 'I used to dread the quarter. Now the figures are sat there ready and I just check them over a brew.', name: 'Tom', trade: 'Plumber, Manchester', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { quote: 'Voice notes are the best bit. Hands full on the roof, I just say what I spent and carry on.', name: 'Danny', trade: 'Roofer, Glasgow', tint: GREEN_TINT, fg: GREEN },
 ];
@@ -284,7 +284,7 @@ export const comingSoon = [
 ];
 
 export const fixes = [
-  { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'A real person replies on the same WhatsApp. No bots, no hold music.' },
+  { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'Message the same WhatsApp and get a straight answer fast. No going in circles, no hold music.' },
   { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £19.99 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
   { stars: 1, who: 'A self employed driver, reviewing another app', gripe: 'The bank feed kept dropping. Half my month went missing and I had to relink it again and again.', fix: 'Lekhio never leans on a fragile feed. Snap it or text it and it is logged for good. Connecting your bank, when it lands, is a bonus, never a crutch.' },
   { stars: 2, who: 'A trades subcontractor, reviewing another app', gripe: 'I photographed a receipt and it would not even log it. It just tried to match it to something and gave up.', fix: 'Send a photo and Lekhio reads it and logs the lot, the amount, the VAT, the category, in seconds. No matching, no retyping.' },
@@ -314,7 +314,7 @@ export const lekhioWay = [
   'With you every day, not once a year.',
   'Snap each receipt as you go. Nothing to dig out.',
   'Plain English, always. Ask it anything.',
-  'A real person replies fast, on the same chat.',
+  'Instant replies, right in the same chat.',
 ];
 
 export const moneyFlow = [
@@ -329,7 +329,7 @@ export const included = [
   'Automatic bookkeeping and categories',
   'Invoices created and sent from WhatsApp',
   'MTD ready quarterly summaries, you approve before anything is filed',
-  'A real human on the other end, fast',
+  'Instant replies in the same chat',
   'Records exported any time, and cancel in one tap',
 ];
 

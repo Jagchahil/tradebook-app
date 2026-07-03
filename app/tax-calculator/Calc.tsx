@@ -8,17 +8,17 @@ import LeadCapture from '../../components/LeadCapture';
 // Class 4 NI 6% between £12,570 and £50,270, 2% above. Class 2 is not a flat
 // charge for most from 2024/25, so it is left out. Simplified, an estimate only.
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
-const SAFFRON_DEEP = '#C9842A';
-const SAFFRON_TINT = '#FBEFD8';
-const LINE = '#E7E3D9';
-const MUTED = '#5B6470';
-const SURFACE = '#F2F0EA';
+const INK = 'var(--tx)';
+const RIVER = 'var(--river)';
+const RIVER_DEEP = 'var(--river-deep)';
+const RIVER_TINT = 'var(--river-tint)';
+const GREEN = 'var(--green)';
+const GREEN_TINT = 'var(--green-tint)';
+const SAFFRON_DEEP = 'var(--saffron-deep)';
+const SAFFRON_TINT = 'var(--saffron-tint)';
+const LINE = 'var(--bd)';
+const MUTED = 'var(--tx-mut)';
+const SURFACE = 'var(--surface)';
 
 function personalAllowance(profit: number): number {
   if (profit <= 100000) return 12570;
@@ -60,7 +60,7 @@ function Field({ label, value, onChange, hint }: { label: string; value: string;
   return (
     <div style={{ marginBottom: 18 }}>
       <label style={{ display: 'block', fontSize: 14, fontWeight: 700, color: INK, marginBottom: 7 }}>{label}</label>
-      <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', background: 'var(--panel)', border: `1.5px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
         <span style={{ padding: '13px 12px', background: RIVER_TINT, color: RIVER, fontWeight: 800, fontSize: 15, borderRight: `1.5px solid ${LINE}` }}>£</span>
         <input
           inputMode="numeric"
@@ -104,7 +104,7 @@ export default function Calc() {
     <>
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28, alignItems: 'start' }} className="calc-grid">
       {/* Inputs */}
-      <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
+      <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
         <h2 style={{ fontSize: 19, fontWeight: 800, margin: '0 0 4px', color: INK }}>Your year</h2>
         <p style={{ fontSize: 13.5, color: MUTED, margin: '0 0 20px' }}>Rough figures are fine. Change them and watch it update.</p>
         <Field label="Money in (your turnover)" value={turnover} onChange={setTurnover} hint="Everything you got paid before costs, across the year." />
@@ -116,7 +116,7 @@ export default function Calc() {
       </div>
 
       {/* Results */}
-      <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, boxShadow: '0 16px 40px rgba(17,17,17,.06)' }}>
+      <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, boxShadow: '0 16px 40px rgba(17,17,17,.06)' }}>
         <h2 style={{ fontSize: 19, fontWeight: 800, margin: '0 0 14px', color: INK }}>What it means</h2>
         <Line label="Income tax" value={gbp(tax)} />
         <Line label="National Insurance (Class 4)" value={gbp(ni)} />

@@ -6,14 +6,14 @@ import LeadCapture from '../../components/LeadCapture';
 // Fully client side. No AI, no server, no cost. The browser does the maths and
 // the "Save as PDF" is the browser's own print to PDF, so it never calls us.
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const GREEN = '#15803D';
-const MUTED = '#5B6470';
-const LINE = '#E7E3D9';
-const SURFACE = '#F2F0EA';
+const INK = 'var(--tx)';
+const RIVER = 'var(--river)';
+const RIVER_DEEP = 'var(--river-deep)';
+const RIVER_TINT = 'var(--river-tint)';
+const GREEN = 'var(--green)';
+const MUTED = 'var(--tx-mut)';
+const LINE = 'var(--bd)';
+const SURFACE = 'var(--surface)';
 
 type DocType = 'invoice' | 'quote';
 interface Item { desc: string; qty: string; price: string }
@@ -165,7 +165,7 @@ function prettyDate(iso: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-const inputStyle: React.CSSProperties = { width: '100%', border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '11px 12px', fontSize: 14.5, color: INK, background: '#fff', outline: 'none', fontFamily: 'inherit' };
+const inputStyle: React.CSSProperties = { width: '100%', border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '11px 12px', fontSize: 14.5, color: INK, background: 'var(--panel)', outline: 'none', fontFamily: 'inherit' };
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 6 };
 
 export default function Generator() {
@@ -225,7 +225,7 @@ export default function Generator() {
       <div className="gen-grid">
         {/* Controls */}
         <div className="no-print">
-          <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 22 }}>
+          <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: 22 }}>
             <div style={{ display: 'inline-flex', background: SURFACE, borderRadius: 12, padding: 4, marginBottom: 18 }}>
               {(['invoice', 'quote'] as DocType[]).map((d) => (
                 <button key={d} onClick={() => setDocType(d)} style={{ border: 'none', cursor: 'pointer', padding: '9px 18px', borderRadius: 9, fontSize: 14, fontWeight: 700, fontFamily: 'inherit', background: docType === d ? '#fff' : 'transparent', color: docType === d ? INK : MUTED, boxShadow: docType === d ? '0 2px 8px rgba(0,0,0,.10)' : 'none' }}>{d === 'invoice' ? 'Invoice' : 'Quote'}</button>
@@ -269,7 +269,7 @@ export default function Generator() {
                 <input value={it.desc} onChange={(e) => updateItem(i, 'desc', e.target.value)} placeholder="Description" style={{ ...inputStyle, padding: '9px 10px' }} />
                 <input value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} placeholder="Qty" style={{ ...inputStyle, padding: '9px 6px', textAlign: 'center' }} />
                 <input value={it.price} onChange={(e) => updateItem(i, 'price', e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} placeholder="£ each" style={{ ...inputStyle, padding: '9px 8px', textAlign: 'right' }} />
-                <button onClick={() => removeItem(i)} aria-label="Remove line" style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 8, cursor: 'pointer', color: MUTED, fontSize: 16, height: 38 }}>×</button>
+                <button onClick={() => removeItem(i)} aria-label="Remove line" style={{ border: `1px solid ${LINE}`, background: 'var(--panel)', borderRadius: 8, cursor: 'pointer', color: MUTED, fontSize: 16, height: 38 }}>×</button>
               </div>
             ))}
             <button onClick={addItem} style={{ border: `1px dashed ${RIVER}`, background: RIVER_TINT, color: RIVER_DEEP, borderRadius: 10, padding: '10px 0', width: '100%', cursor: 'pointer', fontWeight: 700, fontSize: 14, fontFamily: 'inherit', marginBottom: 18 }}>+ Add a line</button>
@@ -295,7 +295,7 @@ export default function Generator() {
         </div>
 
         {/* Live preview, the printable paper */}
-        <div className="paper" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '40px 38px', boxShadow: '0 18px 50px rgba(17,17,17,.08)', minWidth: 0 }}>
+        <div className="paper" style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 14, padding: '40px 38px', boxShadow: '0 18px 50px rgba(17,17,17,.08)', minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 22, fontWeight: 800, color: INK, letterSpacing: '-0.4px' }}>{fromName || 'Your business name'}</div>

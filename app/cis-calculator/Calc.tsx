@@ -5,17 +5,17 @@ import Link from 'next/link';
 import { soleTraderTax, FACTS } from '../../lib/taxengine';
 import LeadCapture from '../../components/LeadCapture';
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
+const INK = 'var(--tx)';
+const RIVER = 'var(--river)';
+const RIVER_DEEP = 'var(--river-deep)';
+const RIVER_TINT = 'var(--river-tint)';
+const GREEN = 'var(--green)';
+const GREEN_TINT = 'var(--green-tint)';
 const RED = '#B42318';
 const RED_TINT = '#FBEAE8';
-const SURFACE = '#F2F0EA';
-const LINE = '#E7E3D9';
-const MUTED = '#5B6470';
+const SURFACE = 'var(--surface)';
+const LINE = 'var(--bd)';
+const MUTED = 'var(--tx-mut)';
 
 function parseNum(v: string): number {
   const n = Number(v.replace(/[^0-9.]/g, ''));
@@ -53,7 +53,7 @@ export default function Calc() {
 
       <div className="cis-grid">
         {/* Inputs */}
-        <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 24 }}>
+        <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 18, padding: 24 }}>
           <Field label="Total paid to you this year, before CIS" hint="Everything your contractors invoiced you, before they took CIS off." value={income} onChange={setIncome} placeholder="38,000" autoFocus />
           <Field label="CIS already deducted" hint="Add up the CIS amounts from your monthly statements. Usually 20% of your labour." value={cis} onChange={setCis} placeholder="6,400" />
           <Field label="Your business expenses" hint="Tools, materials, fuel, insurance, phone, the lot. This is where most refunds grow." value={expenses} onChange={setExpenses} placeholder="9,000" />
@@ -83,7 +83,7 @@ export default function Calc() {
             </div>
           )}
 
-          <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 22, marginTop: 16 }}>
+          <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 18, padding: 22, marginTop: 16 }}>
             <Row label="Taxable profit" value={gbp(r.taxableProfit)} sub="Income less your expenses" />
             <Row label="Income tax" value={gbp(r.incomeTax)} />
             <Row label="Class 4 National Insurance" value={gbp(r.class4)} />
@@ -120,7 +120,7 @@ function Field({ label, hint, value, onChange, placeholder, autoFocus }: { label
   return (
     <div style={{ marginBottom: 18 }}>
       <label style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 4 }}>{label}</label>
-      <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', background: 'var(--panel)', border: `1.5px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
         <span style={{ padding: '13px 12px', background: SURFACE, color: MUTED, fontWeight: 700, fontSize: 16, borderRight: `1.5px solid ${LINE}` }}>£</span>
         <input
           className="cis-field"

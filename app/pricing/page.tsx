@@ -4,6 +4,7 @@ import {
   INK, RIVER, RIVER_TINT, SAFFRON_DEEP, SAFFRON_TINT, GREEN, GREEN_TINT, PAPER, LINE, MUTED, SURFACE,
   included, replaces, faqs,
   SharedHead, TrustBar, SiteNav, StickyCta, SiteFooter,
+  PANEL,
 } from '../_shared/site';
 
 export const metadata: Metadata = {
@@ -43,7 +44,7 @@ export default function Page() {
 
       {/* Price card */}
       <section style={{ maxWidth: 1320, margin: '0 auto', padding: '24px 24px 46px' }}>
-        <div className="reveal" style={{ maxWidth: 560, margin: '0 auto', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 24, padding: '40px 32px', textAlign: 'center', boxShadow: '0 18px 44px rgba(17,17,17,.06)' }}>
+        <div className="reveal" style={{ maxWidth: 560, margin: '0 auto', background: PANEL, border: `1px solid ${LINE}`, borderRadius: 24, padding: '40px 32px', textAlign: 'center', boxShadow: '0 18px 44px rgba(17,17,17,.06)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 4 }}>
             <span style={{ fontSize: 34, fontWeight: 800, color: INK, marginTop: 10 }}>£</span>
             <span style={{ fontSize: 68, fontWeight: 800, letterSpacing: '-2px', lineHeight: 1, color: INK }}>19.99</span>
@@ -66,7 +67,7 @@ export default function Page() {
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 24px', textAlign: 'center' }}>Everything is in the price</h2>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
             {included.map((item) => (
-              <li key={item} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '16px 18px' }}>
+              <li key={item} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', background: PANEL, border: `1px solid ${LINE}`, borderRadius: 14, padding: '16px 18px' }}>
                 <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 13, background: RIVER_TINT, color: RIVER, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800 }}>✓</span>
                 <span style={{ fontSize: 16, lineHeight: 1.55, color: INK }}>{item}</span>
               </li>
@@ -83,7 +84,7 @@ export default function Page() {
         </div>
         <div className="grid3 reveal" style={{ display: 'grid', gap: 18, maxWidth: 900, margin: '0 auto' }}>
           {replaces.map((r) => (
-            <div key={r.label} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '20px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div key={r.label} style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 16, padding: '20px 22px', display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ width: 46, height: 46, borderRadius: 12, background: SURFACE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{r.icon}</div>
               <div>
                 <div style={{ fontSize: 15.5, fontWeight: 700, color: INK }}>{r.label}</div>
@@ -112,7 +113,7 @@ export default function Page() {
         </div>
         <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {faqs.map((f) => (
-            <details key={f.q} className="faq reveal" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '20px 22px' }}>
+            <details key={f.q} className="faq reveal" style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 16, padding: '20px 22px' }}>
               <summary>
                 <span style={{ fontSize: 16.5, fontWeight: 700, color: INK }}>{f.q}</span>
                 <span className="faq-plus">+</span>
@@ -130,7 +131,7 @@ export default function Page() {
         <div className="reveal" style={{ borderRadius: 24, padding: '52px 32px', textAlign: 'center', background: `linear-gradient(135deg, ${RIVER}, #2E7BBF)`, color: '#fff' }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', color: '#fff', margin: '0 0 14px' }}>One flat price. Everything in.</h2>
           <p style={{ fontSize: 18, lineHeight: 1.6, color: '#DCEAF8', maxWidth: 560, margin: '0 auto 28px' }}>Try it free for 30 days. No card needed. Cancel in one tap.</p>
-          <Link href="/start" className="btn-white" style={{ background: '#fff', color: RIVER, fontSize: 16, fontWeight: 700, padding: '15px 28px', borderRadius: 12, display: 'inline-block' }}>Start free trial</Link>
+          <Link href="/start" className="btn-white" style={{ background: PANEL, color: RIVER, fontSize: 16, fontWeight: 700, padding: '15px 28px', borderRadius: 12, display: 'inline-block' }}>Start free trial</Link>
         </div>
       </section>
 

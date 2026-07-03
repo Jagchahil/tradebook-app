@@ -7,22 +7,29 @@ import Link from 'next/link';
 import { TRADES } from '../../lib/trades';
 import { A11Y_CSS } from '../../lib/tokens';
 
-export const INK = '#111111';
-export const RIVER = '#1B59A6';
-export const RIVER_DEEP = '#134277';
-export const RIVER_TINT = '#E9F1FA';
-export const SAFFRON = '#E0A33E';
-export const SAFFRON_DEEP = '#C9842A';
-export const SAFFRON_TINT = '#FBEFD8';
-export const GREEN = '#15803D';
-export const GREEN_TINT = '#E7F5EC';
-export const RED_INK = '#C0392B';
-export const RED_BG = '#FDECEC';
-export const PAPER = '#FBFAF7';
-export const SURFACE = '#F2F0EA';
-export const LINE = '#E7E3D9';
-export const MUTED = '#5B6470';
+// Colours are CSS variables so the whole site themes light and dark from one
+// place. The raw palette lives in THEME_VARS below. Components keep using these
+// same constant names, so nothing downstream has to change.
+export const INK = 'var(--tx)';
+export const RIVER = 'var(--river)';
+export const RIVER_DEEP = 'var(--river-deep)';
+export const RIVER_TINT = 'var(--river-tint)';
+export const SAFFRON = 'var(--saffron)';
+export const SAFFRON_DEEP = 'var(--saffron-deep)';
+export const SAFFRON_TINT = 'var(--saffron-tint)';
+export const GREEN = 'var(--green)';
+export const GREEN_TINT = 'var(--green-tint)';
+export const RED_INK = 'var(--red)';
+export const RED_BG = 'var(--red-tint)';
+export const PAPER = 'var(--bg)';
+export const SURFACE = 'var(--surface)';
+export const LINE = 'var(--bd)';
+export const MUTED = 'var(--tx-mut)';
 export const WHATSAPP = '#25D366';
+// A white card surface that becomes a dark panel in dark mode.
+export const PANEL = 'var(--panel)';
+// A deep contrast band (footer, feature-dark sections) in both themes.
+export const INK_BG = 'var(--band)';
 export const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 export const SITE = 'https://tradebook-app-five.vercel.app';
 
@@ -221,7 +228,7 @@ export function Mark({ value }: { value: boolean | string }) {
 
 export function ReviewCard({ r }: { r: (typeof reviews)[number] }) {
   return (
-    <div className="rev-card" style={{ backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, display: 'flex', flexDirection: 'column' }}>
+    <div className="rev-card" style={{ backgroundColor: PANEL, border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, display: 'flex', flexDirection: 'column' }}>
       <Stars />
       <p style={{ fontSize: 15.5, color: INK, lineHeight: 1.6, margin: '0 0 20px', flex: 1 }}>“{r.quote}”</p>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -289,7 +296,7 @@ export function AppDash() {
         ))}
       </div>
       <div style={{ marginTop: 14, fontSize: 11, fontWeight: 700, color: INK }}>Recent</div>
-      <div className="appcard" style={{ marginTop: 8, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
+      <div className="appcard" style={{ marginTop: 8, background: PANEL, border: `1px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
         {rows.map(([e, n, c, a, col], i) => (
           <div key={n} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 11px', borderTop: i ? `1px solid ${SURFACE}` : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
@@ -312,7 +319,7 @@ export function AppTax() {
     <div className="appscreen">
       <div style={{ fontSize: 18, fontWeight: 800, color: INK }}>Tax</div>
       <MiniRiver />
-      <div style={{ marginTop: 12, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: 14 }}>
+      <div style={{ marginTop: 12, background: PANEL, border: `1px solid ${LINE}`, borderRadius: 14, padding: 14 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: RIVER }}>Q2 2026/27 · Jul to Sep</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
           {['1', '2', '3', '4'].map((q, i) => (
@@ -323,11 +330,11 @@ export function AppTax() {
           ))}
         </div>
       </div>
-      <div style={{ marginTop: 12, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginTop: 12, background: PANEL, border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 12, color: MUTED }}>💰 Income</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: GREEN }}>£2,450.00</span>
       </div>
-      <div style={{ marginTop: 9, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginTop: 9, background: PANEL, border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 12, color: MUTED }}>🧾 Expenses</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: RED_INK }}>£1,180.00</span>
       </div>
@@ -351,11 +358,11 @@ export function AppInv() {
         <div style={{ fontSize: 18, fontWeight: 800, color: INK }}>Invoices</div>
         <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: RIVER, padding: '7px 13px', borderRadius: 10 }}>+ New</span>
       </div>
-      <div style={{ marginTop: 14, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '15px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginTop: 14, background: PANEL, border: `1px solid ${LINE}`, borderRadius: 14, padding: '15px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>Outstanding</span>
         <span style={{ fontSize: 18, fontWeight: 800, color: INK }}>£550.00</span>
       </div>
-      <div style={{ marginTop: 12, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ marginTop: 12, background: PANEL, border: `1px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
         {rows.map(([n, num, amt, st, fg, bg], i) => (
           <div key={num} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderTop: i ? `1px solid ${SURFACE}` : 'none' }}>
             <div>
@@ -375,7 +382,7 @@ export function AppInv() {
 
 export function HeroPhone() {
   return (
-    <div className="phone" style={{ width: 320, maxWidth: '100%', backgroundColor: '#fff', borderRadius: 28, border: `1px solid ${LINE}`, boxShadow: '0 30px 70px rgba(17,17,17,.16)', overflow: 'hidden' }}>
+    <div className="phone" style={{ width: 320, maxWidth: '100%', backgroundColor: PANEL, borderRadius: 28, border: `1px solid ${LINE}`, boxShadow: '0 30px 70px rgba(17,17,17,.16)', overflow: 'hidden' }}>
       <div style={{ backgroundColor: '#075E54', color: '#fff', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: WHATSAPP, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>💬</span>
         <div>
@@ -398,8 +405,31 @@ export function HeroPhone() {
 
 // ---------- shared chrome ----------
 const SHARED_CSS = `
+:root{
+  --river:#1B59A6;--river-deep:#134277;--river-tint:#E9F1FA;
+  --saffron:#E0A33E;--saffron-deep:#C9842A;--saffron-tint:#FBEFD8;
+  --green:#15803D;--green-tint:#E7F5EC;--red:#C0392B;--red-tint:#FDECEC;
+  --bg:#FBFAF7;--panel:#FFFFFF;--surface:#F2F0EA;--bd:#E7E3D9;--band:#141821;
+  --tx:#111111;--tx-mut:#5B6470;
+}
+[data-theme="dark"]{
+  --river:#4C8FDB;--river-deep:#6AA6E6;--river-tint:#16263C;
+  --saffron:#E9B45A;--saffron-deep:#F0C173;--saffron-tint:#2A2113;
+  --green:#43BE72;--green-tint:#12281B;--red:#E67667;--red-tint:#2A1614;
+  --bg:#0E1116;--panel:#161A21;--surface:#1E242E;--bd:#2A313C;--band:#080A0E;
+  --tx:#F3F5F8;--tx-mut:#9AA6B5;
+}
+html,body{background:var(--bg)}
+body{transition:background-color .35s ease,color .35s ease}
 *{box-sizing:border-box} body{margin:0}
 a{text-decoration:none}
+/* brand mark: gradient L chip + wordmark, matching the design direction */
+.brandrow{display:inline-flex;align-items:center;gap:10px}
+.logo-chip{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--river),var(--saffron));display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:19px;box-shadow:0 6px 16px rgba(27,89,166,.35)}
+.logo-word{font-size:23px;font-weight:900;letter-spacing:-1px;color:var(--tx)}
+/* dark/light toggle in the nav */
+.theme-toggle{width:40px;height:40px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font-size:17px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s ease,background-color .18s ease}
+.theme-toggle:hover{transform:translateY(-2px)}
 @keyframes riseIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 @keyframes flow{to{stroke-dashoffset:0}}
 @keyframes sheen{0%{background-position:0% 50%}100%{background-position:200% 50%}}
@@ -420,8 +450,10 @@ a{text-decoration:none}
 .btn-ghost:hover{background-color:${SURFACE}!important;transform:translateY(-2px)}
 .btn-white{transition:transform .18s ease, box-shadow .18s ease}
 .btn-white:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.18)}
-.card{transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease}
-.card:hover{transform:translateY(-5px);box-shadow:0 18px 44px rgba(17,17,17,.10);border-color:${RIVER_TINT}}
+.card{transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;box-shadow:0 1px 2px rgba(17,17,17,.04),0 10px 30px rgba(17,17,17,.05)}
+.card:hover{transform:translateY(-5px);box-shadow:0 18px 44px rgba(17,17,17,.12);border-color:${RIVER}}
+[data-theme="dark"] .card{box-shadow:0 1px 2px rgba(0,0,0,.4),0 12px 34px rgba(0,0,0,.45)}
+[data-theme="dark"] .card:hover{box-shadow:0 18px 44px rgba(0,0,0,.6)}
 .icontile{transition:transform .2s ease}
 .card:hover .icontile{transform:scale(1.08) rotate(-3deg)}
 .chip{transition:transform .15s ease, background-color .15s ease, color .15s ease}
@@ -520,6 +552,26 @@ details.faq[open] .faq-body{max-height:360px;opacity:1;margin-top:12px}
 // Idempotent reveal + countup. Safe to run even if a global layout script also runs.
 const REVEAL_JS = `
 (function(){
+  // Theme: apply saved choice or the system preference immediately, before paint.
+  try{
+    var saved = localStorage.getItem('lekhio-theme');
+    var sys = (window.matchMedia && window.matchMedia('(prefers-color-scheme:dark)').matches) ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', saved || sys);
+  }catch(e){}
+  var setIcon = function(){ var b=document.getElementById('lekhio-theme'); if(b) b.textContent = document.documentElement.getAttribute('data-theme')==='dark' ? '☀️' : '🌙'; };
+  var wireToggle = function(){
+    var b=document.getElementById('lekhio-theme');
+    if(b && !b.__wired){ b.__wired=true; b.addEventListener('click', function(){
+      var d = document.documentElement.getAttribute('data-theme')==='dark';
+      var n = d ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', n);
+      try{ localStorage.setItem('lekhio-theme', n); }catch(e){}
+      setIcon();
+    }); }
+    setIcon();
+  };
+  if (document.readyState !== 'loading') wireToggle(); else document.addEventListener('DOMContentLoaded', wireToggle);
+
   if (window.__lekhioReveal) return; window.__lekhioReveal = true;
   var run = function(){
     var els = document.querySelectorAll('.reveal');
@@ -573,16 +625,9 @@ const NAV_LINKS: [string, string][] = [
 export function SiteNav() {
   return (
     <nav style={{ position: 'relative', maxWidth: 1320, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Link href="/" aria-label="Lekhio home" style={{ display: 'inline-flex' }}>
-        <svg width="118" height="40" viewBox="0 0 300 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Lekhio">
-          <defs>
-            <linearGradient id="navriver" x1="20" y1="0" x2="280" y2="0" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stopColor={RIVER} /><stop offset="0.6" stopColor="#2E7BBF" /><stop offset="1" stopColor={SAFFRON} />
-            </linearGradient>
-          </defs>
-          <text x="150" y="58" textAnchor="middle" fontFamily={FONT} fontSize="54" fontWeight="700" letterSpacing="-1.8" fill={INK}>Lekhio</text>
-          <path d="M34 78 C 90 64, 120 92, 150 78 S 230 64, 266 78" stroke="url(#navriver)" strokeWidth="5" strokeLinecap="round" fill="none" />
-        </svg>
+      <Link href="/" aria-label="Lekhio home" className="brandrow">
+        <span className="logo-chip">L</span>
+        <span className="logo-word">Lekhio</span>
       </Link>
 
       <input type="checkbox" id="navtoggle" className="nav-toggle" aria-label="Toggle menu" />
@@ -594,6 +639,7 @@ export function SiteNav() {
           ))}
           <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
         </div>
+        <button id="lekhio-theme" className="theme-toggle" type="button" aria-label="Toggle dark mode">🌙</button>
         <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu">Menu <span className="nav-burger-lines"><i /><i /><i /></span></label>
       </div>
 
@@ -633,7 +679,7 @@ export function SiteFooter() {
     </div>
   );
   return (
-    <footer style={{ background: INK, color: '#fff' }}>
+    <footer style={{ background: INK_BG, color: '#fff' }}>
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: '52px 24px 40px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 32, marginBottom: 40 }}>
           {col('Product', [['/product', 'How it works'], ['/how-mtd-works', 'How MTD works'], ['/compare', 'Compare'], ['/pricing', 'Pricing'], ['/start', 'Sign up']])}

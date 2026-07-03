@@ -5,6 +5,7 @@ import {
   RED_INK, RED_BG,
   features, oldAccountant, lekhioWay, claimExamples, fixes, comingSoon,
   SharedHead, TrustBar, SiteNav, StickyCta, SiteFooter, AppDash, AppTax, AppInv,
+  PANEL, INK_BG,
 } from '../_shared/site';
 
 export const metadata: Metadata = {
@@ -36,7 +37,7 @@ export default function Page() {
       <section style={{ maxWidth: 1320, margin: '0 auto', padding: '30px 24px 46px' }}>
         <div className="grid3" style={{ display: 'grid', gap: 20 }}>
           {features.map((f) => (
-            <div key={f.title} className="reveal card" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
+            <div key={f.title} className="reveal card" style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
               <div className="icontile" style={{ width: 52, height: 52, borderRadius: 14, background: f.tint, color: f.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 16 }}>{f.icon}</div>
               <h3 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.3px', margin: '0 0 8px' }}>{f.title}</h3>
               <p style={{ fontSize: 15, lineHeight: 1.6, color: MUTED, margin: 0 }}>{f.body}</p>
@@ -46,7 +47,7 @@ export default function Page() {
       </section>
 
       {/* Beat the accountant (dark) */}
-      <section style={{ background: INK }}>
+      <section style={{ background: INK_BG }}>
         <div style={{ maxWidth: 1320, margin: '0 auto', padding: '56px 24px' }}>
           <div className="reveal" style={{ maxWidth: 720, marginBottom: 34 }}>
             <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', color: '#fff', margin: '0 0 14px' }}>Beat the accountant</h2>
@@ -124,7 +125,7 @@ export default function Page() {
         </div>
         <div className="grid4" style={{ display: 'grid', gap: 18 }}>
           {claimExamples.map((c) => (
-            <div key={c.text} className="reveal card" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 22, textAlign: 'center' }}>
+            <div key={c.text} className="reveal card" style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 18, padding: 22, textAlign: 'center' }}>
               <div style={{ background: '#DCF8C6', borderRadius: '14px 14px 14px 4px', padding: '12px 14px', fontSize: 14.5, color: INK, fontWeight: 500, display: 'inline-block' }}>“{c.text}”</div>
               <div style={{ fontSize: 22, color: RIVER, margin: '10px 0 8px' }}>↓</div>
               <div style={{ fontSize: 15.5, fontWeight: 800, color: RIVER_DEEP }}>{c.result}</div>
@@ -142,7 +143,7 @@ export default function Page() {
         <div>
           {fixes.map((f) => (
             <div key={f.gripe} className="fixrow reveal">
-              <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 20 }}>
+              <div style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 16, padding: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
                   <span style={{ fontSize: 12, color: MUTED }}>{f.who}</span>
                   <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.3px', color: RED_INK, background: RED_BG, padding: '4px 9px', borderRadius: 10 }}>{f.stars} star{f.stars === 1 ? '' : 's'}</span>
@@ -167,7 +168,7 @@ export default function Page() {
         </div>
         <div className="grid4" style={{ display: 'grid', gap: 18 }}>
           {comingSoon.map((c) => (
-            <div key={c.title} className="reveal card" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 24 }}>
+            <div key={c.title} className="reveal card" style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 18, padding: 24 }}>
               <div className="icontile" style={{ width: 48, height: 48, borderRadius: 13, background: SAFFRON_TINT, color: RIVER, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, marginBottom: 14 }}>{c.icon}</div>
               <h3 style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.3px', margin: '0 0 8px' }}>{c.title}</h3>
               <p style={{ fontSize: 14.5, lineHeight: 1.55, color: MUTED, margin: 0 }}>{c.body}</p>
@@ -182,7 +183,7 @@ export default function Page() {
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', color: '#fff', margin: '0 0 14px' }}>Your whole back office, sorted from a text.</h2>
           <p style={{ fontSize: 18, lineHeight: 1.6, color: '#DCEAF8', maxWidth: 560, margin: '0 auto 28px' }}>30 days free. No card needed. Cancel in one tap.</p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/start" className="btn-white" style={{ background: '#fff', color: RIVER, fontSize: 16, fontWeight: 700, padding: '15px 28px', borderRadius: 12 }}>Start free trial</Link>
+            <Link href="/start" className="btn-white" style={{ background: PANEL, color: RIVER, fontSize: 16, fontWeight: 700, padding: '15px 28px', borderRadius: 12 }}>Start free trial</Link>
             <Link href="/pricing" className="btn-ghost" style={{ background: 'rgba(255,255,255,.12)', color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 28px', borderRadius: 12, border: '1px solid rgba(255,255,255,.35)' }}>See pricing</Link>
           </div>
         </div>

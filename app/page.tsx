@@ -5,6 +5,7 @@ import {
   PAPER, SURFACE, LINE, MUTED, FONT, SITE,
   steps, stats, features, reviews, faqs,
   SharedHead, TrustBar, SiteNav, SiteFooter, StickyCta, HeroPhone, ReviewCard, RiverDivider,
+  PANEL,
 } from './_shared/site';
 
 export const metadata: Metadata = {
@@ -126,7 +127,7 @@ export default function HomePage() {
         </div>
         <div className="grid3" style={{ display: 'grid', gap: 20 }}>
           {features.slice(0, 6).map((f, i) => (
-            <div key={f.title} className="reveal card" style={{ transitionDelay: `${(i % 3) * 90}ms`, backgroundColor: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
+            <div key={f.title} className="reveal card" style={{ transitionDelay: `${(i % 3) * 90}ms`, backgroundColor: PANEL, border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
               <div className="icontile" style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: f.tint, color: f.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, marginBottom: 16 }}>{f.icon}</div>
               <h3 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 8px', letterSpacing: '-0.2px' }}>{f.title}</h3>
               <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: 0 }}>{f.body}</p>
@@ -160,7 +161,7 @@ export default function HomePage() {
           </p>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.16)', color: '#fff', fontSize: 13.5, fontWeight: 700, padding: '6px 14px', borderRadius: 20, margin: '6px 0 24px' }}>🎉 Founder pricing for the first cohort: £15.99 a month or £159 a year</div>
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <Link href="/start" className="btn-white" style={{ background: '#fff', color: RIVER, fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12 }}>Start free trial</Link>
+            <Link href="/start" className="btn-white" style={{ background: PANEL, color: RIVER, fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12 }}>Start free trial</Link>
             <Link href="/pricing" className="btn-ghost" style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.5)', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>See what is included</Link>
           </div>
         </div>

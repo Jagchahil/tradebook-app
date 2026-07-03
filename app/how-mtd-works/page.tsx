@@ -4,6 +4,7 @@ import {
   INK, RIVER, RIVER_TINT, GREEN_TINT, PAPER, LINE, MUTED,
   mtdMeans,
   SharedHead, TrustBar, SiteNav, StickyCta, SiteFooter,
+  PANEL,
 } from '../_shared/site';
 
 export const metadata: Metadata = {
@@ -46,7 +47,7 @@ export default function Page() {
         </div>
         <div className="grid3" style={{ display: 'grid', gap: 20 }}>
           {mtdMeans.map((m) => (
-            <div key={m.title} className="reveal card" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
+            <div key={m.title} className="reveal card" style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 18, padding: 26 }}>
               <div className="icontile" style={{ width: 52, height: 52, borderRadius: 14, background: m.tint, color: m.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 16 }}>{m.icon}</div>
               <h3 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.3px', margin: '0 0 8px' }}>{m.title}</h3>
               <p style={{ fontSize: 15, lineHeight: 1.6, color: MUTED, margin: 0 }}>{m.body}</p>
@@ -62,7 +63,7 @@ export default function Page() {
           <p style={{ fontSize: 18, lineHeight: 1.6, color: MUTED, margin: 0 }}>The January scramble is going. In its place, four short check ins across the year.</p>
         </div>
         <div className="duo reveal">
-          <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 28 }}>
+          <div style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 18, padding: 28 }}>
             <div style={{ fontSize: 34, marginBottom: 10 }}>📦</div>
             <h3 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.3px', margin: '0 0 10px' }}>One big return, once a year</h3>
             <p style={{ fontSize: 15.5, lineHeight: 1.6, color: MUTED, margin: 0 }}>
@@ -75,7 +76,7 @@ export default function Page() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
               {quarters.map(([label, season], i) => (
                 <div key={label} style={{ textAlign: 'center' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 20, background: '#fff', border: `2px solid ${RIVER}`, color: RIVER, fontWeight: 800, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>{i + 1}</div>
+                  <div style={{ width: 40, height: 40, borderRadius: 20, background: PANEL, border: `2px solid ${RIVER}`, color: RIVER, fontWeight: 800, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>{i + 1}</div>
                   <div style={{ fontSize: 11.5, fontWeight: 700, color: INK }}>{label}</div>
                   <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{season}</div>
                 </div>
@@ -102,7 +103,7 @@ export default function Page() {
         <div className="reveal" style={{ borderRadius: 24, padding: '52px 32px', textAlign: 'center', background: `linear-gradient(135deg, ${RIVER}, #2E7BBF)`, color: '#fff' }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', color: '#fff', margin: '0 0 14px' }}>Get ready for MTD without lifting a finger.</h2>
           <p style={{ fontSize: 18, lineHeight: 1.6, color: '#DCEAF8', maxWidth: 560, margin: '0 auto 28px' }}>Start now and your records build themselves. 30 days free, no card needed.</p>
-          <Link href="/start" className="btn-white" style={{ background: '#fff', color: RIVER, fontSize: 16, fontWeight: 700, padding: '15px 28px', borderRadius: 12, display: 'inline-block' }}>Start free trial</Link>
+          <Link href="/start" className="btn-white" style={{ background: PANEL, color: RIVER, fontSize: 16, fontWeight: 700, padding: '15px 28px', borderRadius: 12, display: 'inline-block' }}>Start free trial</Link>
         </div>
       </section>
 

@@ -4,6 +4,7 @@ import {
   INK, RIVER, RIVER_TINT, PAPER, LINE, MUTED,
   compareRows, Mark,
   SharedHead, TrustBar, SiteNav, StickyCta, SiteFooter,
+  PANEL,
 } from '../_shared/site';
 
 export const metadata: Metadata = {
@@ -33,7 +34,7 @@ export default function Page() {
 
       {/* Comparison table */}
       <section style={{ maxWidth: 1320, margin: '0 auto', padding: '30px 24px 46px' }}>
-        <div className="reveal" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, overflow: 'hidden' }}>
+        <div className="reveal" style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 18, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table className="cmp">
               <thead>
@@ -67,7 +68,7 @@ export default function Page() {
         <div className="reveal" style={{ borderRadius: 24, padding: '52px 32px', textAlign: 'center', background: `linear-gradient(135deg, ${RIVER}, #2E7BBF)`, color: '#fff' }}>
           <h2 className="h2" style={{ fontWeight: 700, letterSpacing: '-0.8px', color: '#fff', margin: '0 0 14px' }}>See the difference for yourself.</h2>
           <p style={{ fontSize: 18, lineHeight: 1.6, color: '#DCEAF8', maxWidth: 560, margin: '0 auto 28px' }}>30 days free. No card needed. Cancel in one tap.</p>
-          <Link href="/start" className="btn-white" style={{ background: '#fff', color: RIVER, fontSize: 16, fontWeight: 700, padding: '15px 28px', borderRadius: 12, display: 'inline-block' }}>Start free trial</Link>
+          <Link href="/start" className="btn-white" style={{ background: PANEL, color: RIVER, fontSize: 16, fontWeight: 700, padding: '15px 28px', borderRadius: 12, display: 'inline-block' }}>Start free trial</Link>
         </div>
       </section>
 

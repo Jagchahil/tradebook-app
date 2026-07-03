@@ -331,13 +331,13 @@ export default function Wizard() {
 
           {/* The offer */}
           <div style={{ maxWidth: 560, margin: '0 auto', background: INK, borderRadius: 20, padding: '30px 26px' }}>
-            <div style={{ display: 'inline-block', background: 'rgba(224,163,62,0.18)', color: SAFFRON, fontSize: 12, fontWeight: 800, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>FOUNDER OFFER, TODAY ONLY FOR YOU</div>
-            <h3 style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: '-0.5px', margin: '0 0 10px' }}>First month free, then 20% off for life.</h3>
+            <div style={{ display: 'inline-block', background: 'rgba(224,163,62,0.18)', color: SAFFRON, fontSize: 12, fontWeight: 800, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>YOUR BOOKS, SORTED FROM DAY ONE</div>
+            <h3 style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: '-0.5px', margin: '0 0 10px' }}>Try Lekhio free for 30 days.</h3>
             <p style={{ fontSize: 15.5, color: '#B6BDC8', lineHeight: 1.6, margin: '0 0 22px' }}>
-              Because you set up with us, lock in 20% off every month, for as long as you stay. That is £15.99 a month instead of £19.99, forever. The catch: you have to sign up now, straight from here.
+              Get set up in minutes and let Lekhio keep your books from your first receipt. One simple price after your trial, £19.99 a month or £199 a year. No card needed to start, cancel any time.
             </p>
-            <Link href={OFFER_HREF} className="wz-btn" style={{ display: 'inline-block', background: RIVER, color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 34px', borderRadius: 12 }}>Claim my offer and sign up</Link>
-            <p style={{ fontSize: 12.5, color: '#8A93A0', marginTop: 14 }}>30 days free, no card needed. Cancel any time. The 20% sticks for life.</p>
+            <Link href={OFFER_HREF} className="wz-btn" style={{ display: 'inline-block', background: RIVER, color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 34px', borderRadius: 12 }}>Start my 30 days free</Link>
+            <p style={{ fontSize: 12.5, color: '#8A93A0', marginTop: 14 }}>30 days free, no card needed. Cancel any time before it ends and pay nothing.</p>
           </div>
 
           {/* Extras */}

@@ -192,7 +192,7 @@ export default function HomePage() {
       <style dangerouslySetInnerHTML={{ __html: HOME_CSS }} />
 
       {/* One clean top bar: the MTD announcement CTA */}
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for the self employed. <span className="go">See if it affects you →</span></Link></div>
+      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for the self employed earning over £50k. <span className="go">See if it affects you →</span></Link></div>
 
       <SiteNav />
 
@@ -386,7 +386,7 @@ export default function HomePage() {
           <div className="rev-track">
             {[...reviews, ...reviews].map((r, i) => (
               <div className="quote" key={i} aria-hidden={i >= reviews.length ? true : undefined}>
-                <div className="stars">★★★★★</div>
+                <div className="stars" aria-hidden="true">★★★★★</div>
                 <p>&quot;{r.quote}&quot;</p>
                 <div className="who"><span className="a" style={{ background: r.tint, color: r.fg }}>{r.name.charAt(0)}</span><div><b>{r.name}</b><small>{r.trade}</small></div></div>
               </div>

@@ -51,15 +51,10 @@ export default function StartPage() {
   const [offer] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('offer') ?? '' : ''));
   const [billingResult] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('billing') ?? '' : ''));
 
-  // Billing: the chosen period and the founder flag drive the price shown and charged.
+  // Billing: the chosen period drives the price shown and charged. One simple price for everyone.
   const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly');
   const [billingBusy, setBillingBusy] = useState(false);
-  const founder = offer.trim().toLowerCase() === 'setup20';
-  const priceNow =
-    plan === 'annual'
-      ? founder ? '£159 a year' : '£199 a year'
-      : founder ? '£15.99 a month' : '£19.99 a month';
-  const priceWas = plan === 'annual' ? '£199 a year' : '£19.99 a month';
+  const priceNow = plan === 'annual' ? '£199 a year' : '£19.99 a month';
 
   async function startCheckout() {
     setBillingBusy(true);
@@ -197,7 +192,7 @@ export default function StartPage() {
           {offer ? (
             <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, backgroundColor: GREEN_TINT, border: '1px solid #CFE9D8', borderRadius: 12, padding: '12px 14px' }}>
               <span style={{ fontSize: 18 }}>🎉</span>
-              <span style={{ fontSize: 13.5, fontWeight: 600, color: GREEN, lineHeight: 1.4 }}>Your founder offer is locked in: first month free, then 20% off for life. Finish to keep it.</span>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: GREEN, lineHeight: 1.4 }}>Your 30 days free is ready. No card needed. Finish to get started.</span>
             </div>
           ) : null}
           {billingResult === 'success' ? (
@@ -240,13 +235,11 @@ export default function StartPage() {
                 Your 30 day free trial has started. No card needed. Download the app to see your books, and say hello on WhatsApp to log your first receipt.
               </p>
 
-              {/* Lock in your price. Optional, but this is where founders keep 20% off for life. */}
+              {/* Optional: add a card so Lekhio carries on after the free trial. */}
               <div style={{ textAlign: 'left', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 20, maxWidth: 460, margin: '0 auto 24px' }}>
-                <p style={{ fontSize: 15, fontWeight: 800, color: INK, margin: '0 0 4px' }}>{founder ? 'Keep your founder price' : 'Add a card to keep Lekhio'}</p>
+                <p style={{ fontSize: 15, fontWeight: 800, color: INK, margin: '0 0 4px' }}>Add a card to keep Lekhio</p>
                 <p style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: '0 0 14px' }}>
-                  {founder
-                    ? 'Add your card now to lock in 20% off for as long as you stay. Still 30 days free, cancel any time before then.'
-                    : 'Save a card so Lekhio carries on after your trial. Still 30 days free, cancel any time before then and pay nothing.'}
+                  {'Save a card so Lekhio carries on after your trial. Still 30 days free, cancel any time before then and pay nothing.'}
                 </p>
 
                 <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -263,7 +256,6 @@ export default function StartPage() {
 
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
                   <span style={{ fontSize: 26, fontWeight: 800, color: INK }}>{priceNow}</span>
-                  {founder ? <span style={{ fontSize: 14, color: MUTED, textDecoration: 'line-through' }}>{priceWas}</span> : null}
                   <span style={{ fontSize: 12.5, color: MUTED }}>after your free trial</span>
                 </div>
 

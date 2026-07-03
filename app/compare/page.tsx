@@ -165,7 +165,7 @@ export default function ComparePage() {
       <style dangerouslySetInnerHTML={{ __html: MARKETING_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: COMPARE_CSS }} />
 
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for the self employed. <span className="go">See if it affects you →</span></Link></div>
+      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for the self employed earning over £50k. <span className="go">See if it affects you →</span></Link></div>
       <SiteNav />
 
       {/* Hero */}

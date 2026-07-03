@@ -1,23 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { A11Y_CSS } from '../../lib/tokens';
+import {
+  INK, PAPER, FONT, MARKETING_CSS,
+  SharedHead, SiteNav, SiteFooter, StickyCta,
+} from '../_shared/site';
 
 export const metadata: Metadata = {
   title: 'Security and Your Data | Lekhio',
   description:
     'How Lekhio keeps your money and tax data safe, and exactly how the AI is and is not used. Plain English. Your data is yours, encrypted, never sold, and you approve everything before it reaches HMRC.',
 };
-
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
-const MUTED = '#5B6470';
-const BORDER = '#ECECEC';
-const OFF_WHITE = '#FBFAF7';
-const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 const promises: { icon: string; title: string; body: string }[] = [
   {
@@ -57,76 +49,105 @@ const aiPoints: { q: string; a: string }[] = [
   },
   {
     q: 'Is the AI accurate?',
-    a: 'Our tax engine is built on the rules taught in the leading tax qualifications and checked against an exam-style test suite every release. It is expert and tested. For complex matters it will tell you to speak to a qualified accountant.',
+    a: 'Our tax engine is built on the rules taught in the leading tax qualifications and checked against an exam-style test suite of over one hundred cases every release. For anything complex it will tell you to speak to a qualified accountant.',
   },
 ];
 
-const heading: React.CSSProperties = { fontSize: 22, fontWeight: 800, letterSpacing: '-0.4px', margin: '40px 0 16px', color: INK };
-const para: React.CSSProperties = { fontSize: 16, lineHeight: 1.7, color: '#374151', margin: '0 0 14px' };
+const SECURITY_CSS = `
+.mkt .hero{padding:52px 0 6px}
+.sec-wrap{max-width:840px;margin:0 auto;padding:8px 24px 90px}
+.sec-badge{display:inline-block;background:var(--teal-tint);color:var(--teal);font-size:12px;font-weight:800;letter-spacing:.06em;padding:6px 12px;border-radius:20px;margin-bottom:16px}
+.sec-h{font-size:clamp(23px,3.4vw,30px);letter-spacing:-.03em;font-weight:800;margin:44px 0 16px;color:var(--tx)}
+.sec-p{font-size:16px;line-height:1.7;color:var(--tx-mut);margin:0 0 14px}
+.sec-p a{color:var(--river);font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:680px){.grid2{grid-template-columns:1fr}}
+.sec-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+.sec-card .i{font-size:26px}
+.sec-card .t{font-size:16.5px;font-weight:800;margin:8px 0 6px;color:var(--tx)}
+.sec-card p{font-size:14.5px;color:var(--tx-mut);line-height:1.6;margin:0}
+.ai-list{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.ai-item{padding:18px 20px;border-top:1px solid var(--line)}
+.ai-item:first-child{border-top:0}
+.ai-item .q{font-size:16px;font-weight:800;color:var(--tx);margin-bottom:6px}
+.ai-item p{font-size:15px;color:var(--tx-mut);line-height:1.65;margin:0}
+.sec-line{margin-top:34px;background:var(--river-tint);border:1px solid var(--line);border-radius:16px;padding:22px 24px}
+.sec-line .t{font-size:17px;font-weight:800;color:var(--river);margin-bottom:6px}
+.sec-line p{font-size:15.5px;color:var(--tx);line-height:1.6;margin:0}
+.sec-foot{border-top:1px solid var(--line);margin-top:42px;padding-top:20px;display:flex;gap:18px;flex-wrap:wrap}
+.sec-foot a{font-size:14px;font-weight:600;color:var(--river)}
+`;
 
 export default function SecurityPage() {
   return (
-    <main style={{ backgroundColor: OFF_WHITE, color: INK, fontFamily: FONT, minHeight: '100vh' }}>
-      <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:680px){.grid2{grid-template-columns:1fr}}` }} />
-      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
+    <main className="mkt" style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
+      <SharedHead />
+      <style dangerouslySetInnerHTML={{ __html: MARKETING_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: SECURITY_CSS }} />
 
-      <nav style={{ maxWidth: 820, margin: '0 auto', padding: '22px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Link href="/" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px', color: INK }}>Lekhio</Link>
-        <Link href="/" style={{ fontSize: 14, fontWeight: 500, color: RIVER }}>Back to home</Link>
-      </nav>
+      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for the self employed earning over £50k. <span className="go">See if it affects you →</span></Link></div>
+      <SiteNav />
 
-      <article style={{ maxWidth: 820, margin: '0 auto', padding: '20px 24px 80px' }}>
-        <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 16 }}>SECURITY AND TRUST</span>
-        <h1 style={{ fontSize: 38, fontWeight: 800, letterSpacing: '-1.2px', margin: '0 0 14px', lineHeight: 1.1 }}>Your money data, kept safe. Said plainly.</h1>
-        <p style={{ fontSize: 18, color: MUTED, lineHeight: 1.6, margin: '0 0 8px', maxWidth: 640 }}>
-          This is your livelihood and your tax, so you deserve to know exactly how it is protected and how the AI is used. No jargon, no hand-waving. Here is the truth.
-        </p>
+      {/* Hero */}
+      <section className="hero center">
+        <div className="wrap">
+          <span className="sec-badge">SECURITY AND TRUST</span>
+          <h1 style={{ maxWidth: 720, margin: '0 auto' }}>Your money data, kept safe.<br /><span className="gt">Said plainly.</span></h1>
+          <p className="sub" style={{ maxWidth: 620, margin: '20px auto 0' }}>
+            This is your livelihood and your tax, so you deserve to know exactly how it is protected and how the AI is used. No jargon, no hand-waving. Here is the truth.
+          </p>
+        </div>
+      </section>
 
-        <h2 style={heading}>The four promises</h2>
+      <article className="sec-wrap reveal">
+        <h2 className="sec-h">The four promises</h2>
         <div className="grid2">
           {promises.map((p) => (
-            <div key={p.title} style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 16, padding: 20 }}>
-              <div style={{ fontSize: 26 }}>{p.icon}</div>
-              <div style={{ fontSize: 16.5, fontWeight: 800, margin: '8px 0 6px' }}>{p.title}</div>
-              <p style={{ fontSize: 14.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>{p.body}</p>
+            <div key={p.title} className="sec-card">
+              <div className="i" aria-hidden="true">{p.icon}</div>
+              <div className="t">{p.title}</div>
+              <p>{p.body}</p>
             </div>
           ))}
         </div>
 
-        <h2 style={heading}>Straight answers about the AI</h2>
-        <p style={para}>
+        <h2 className="sec-h">Straight answers about the AI</h2>
+        <p className="sec-p">
           Plenty of people are wary of AI, and that is fair. It is early, the way the internet was once new. So we will be straight with you about what ours does and does not do.
         </p>
-        <div style={{ background: '#fff', border: `1px solid ${BORDER}`, borderRadius: 16, overflow: 'hidden' }}>
-          {aiPoints.map((it, i) => (
-            <div key={it.q} style={{ padding: '18px 20px', borderTop: i ? `1px solid ${BORDER}` : 'none' }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: INK, marginBottom: 6 }}>{it.q}</div>
-              <p style={{ fontSize: 15, color: '#374151', lineHeight: 1.65, margin: 0 }}>{it.a}</p>
+        <div className="ai-list">
+          {aiPoints.map((it) => (
+            <div key={it.q} className="ai-item">
+              <div className="q">{it.q}</div>
+              <p>{it.a}</p>
             </div>
           ))}
         </div>
 
-        <h2 style={heading}>How we run it</h2>
-        <p style={para}>
+        <h2 className="sec-h">How we run it</h2>
+        <p className="sec-p">
           Payments are handled by Stripe, so we never see or store your full card number. Messages that come in are checked with a cryptographic signature before we act on them, so nobody can fake a request. Access inside the company follows least privilege, meaning systems only get the keys they actually need. We do not log the content of your WhatsApp messages to any outside service.
         </p>
-        <p style={para}>
-          We follow UK GDPR, and we are completing our registration with the Information Commissioner&apos;s Office. If you ever have a question about your data, email <a href="mailto:privacy@lekhio.com" style={{ color: RIVER, fontWeight: 600 }}>privacy@lekhio.com</a>.
+        <p className="sec-p">
+          We follow UK GDPR, and we are completing our registration with the Information Commissioner&apos;s Office. If you ever have a question about your data, email <a href="mailto:privacy@lekhio.com">privacy@lekhio.com</a>.
         </p>
 
-        <div style={{ marginTop: 32, background: RIVER_TINT, border: `1px solid #D4E4F4`, borderRadius: 16, padding: '22px 24px' }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: RIVER_DEEP, marginBottom: 6 }}>The line that never moves</div>
-          <p style={{ fontSize: 15.5, color: INK, lineHeight: 1.6, margin: 0 }}>
+        <div className="sec-line">
+          <div className="t">The line that never moves</div>
+          <p>
             Lekhio prepares. You approve. You stay in control of your money and your tax, always. Anything that moves money, files with HMRC, or sends a message on your behalf waits for your yes.
           </p>
         </div>
 
-        <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 40, paddingTop: 20, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-          <Link href="/privacy" style={{ fontSize: 14, fontWeight: 600, color: RIVER }}>Privacy Policy</Link>
-          <Link href="/terms" style={{ fontSize: 14, fontWeight: 600, color: RIVER }}>Terms of Service</Link>
-          <Link href="/" style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>Back to home</Link>
+        <div className="sec-foot">
+          <Link href="/privacy">Privacy Policy</Link>
+          <Link href="/terms">Terms of Service</Link>
+          <Link href="/">Back to home</Link>
         </div>
       </article>
+
+      <SiteFooter />
+      <StickyCta />
     </main>
   );
 }

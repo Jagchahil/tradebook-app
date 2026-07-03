@@ -6,10 +6,10 @@ import { A11Y_CSS } from '../../lib/tokens';
 export const metadata: Metadata = {
   title: 'Register Your Business: Free Step by Step Guide | Lekhio',
   description:
-    'Setting up as a sole trader or a limited company? Our free, step by step guide gives you the exact process, the forms like the CWF1, the SIC codes and the GOV.UK links to register yourself. The guide is free. Start with Lekhio for first month free plus 20% off for life.',
+    'Setting up as a sole trader or a limited company? Our free, step by step guide gives you the exact process, the forms like the CWF1, the SIC codes and the GOV.UK links to register yourself. The guide is free. Start with Lekhio and get 30 days free.',
   openGraph: {
     title: 'Register Your Business: A Free Step by Step Guide',
-    description: 'Sole trader or limited company, the exact steps, forms and codes to register yourself on GOV.UK. The guide is free. Start with Lekhio for first month free plus 20% off.',
+    description: 'Sole trader or limited company, the exact steps, forms and codes to register yourself on GOV.UK. The guide is free. Start with Lekhio and get 30 days free.',
     type: 'website',
   },
 };
@@ -35,10 +35,10 @@ export default function RegisterPage() {
       </nav>
 
       <section style={{ maxWidth: 760, margin: '0 auto', padding: '28px 24px 4px' }}>
-        <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE GUIDE · FIRST MONTH FREE + 20% OFF FOR LIFE</span>
+        <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE GUIDE · 30 DAYS FREE ON LEKHIO</span>
         <h1 className="h1b" style={{ fontWeight: 700, margin: '0 0 16px' }}>Set up your business, start to finish.</h1>
         <p style={{ fontSize: 18.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>
-          Tell us what you are setting up. We give you the exact steps, the forms and the codes to register yourself on GOV.UK, plus where to sort a bank, an email and insurance, in plain English. The guide is free. Start with Lekhio and your first month is free, then 20% off for life.
+          Tell us what you are setting up. We give you the exact steps, the forms and the codes to register yourself on GOV.UK, plus where to sort a bank, an email and insurance, in plain English. The guide is free. Start with Lekhio and your first 30 days are free, then £19.99 a month or £199 a year.
         </p>
       </section>
 

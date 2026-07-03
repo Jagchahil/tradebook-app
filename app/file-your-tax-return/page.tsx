@@ -615,7 +615,7 @@ export default function FileYourTaxReturnPage() {
         <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 22, padding: 36, textAlign: 'center', boxShadow: '0 14px 40px rgba(17,17,17,.06)' }}>
           <h2 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 12px' }}>Make the 15 minutes actually 15 minutes</h2>
           <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.65, maxWidth: 520, margin: '0 auto 22px' }}>
-            Keep your records with Lekhio through the year. Snap a receipt, leave a voice note, or just text it. When the deadline comes, your numbers are already added up and ready, and we send the reminder to your WhatsApp. First month free.
+            Keep your records with Lekhio through the year. Snap a receipt, leave a voice note, or just text it. When the deadline comes, your numbers are already added up and ready, and we send the reminder to your WhatsApp. Your first 30 days are free.
           </p>
           <Link href="/start" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12, textDecoration: 'none' }}>Start free for 30 days</Link>
         </div>

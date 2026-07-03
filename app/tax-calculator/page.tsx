@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import Calc from './Calc';
 import { A11Y_CSS } from '../../lib/tokens';
+import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
   title: 'Free Self Employed Tax Calculator 2026/27 | Lekhio',
@@ -65,10 +66,8 @@ export default function TaxCalculatorPage() {
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1c{font-size:48px;line-height:1.06;letter-spacing:-1.8px}@media(max-width:880px){.h1c{font-size:34px}}` }} />
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
-      <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
-        <Link href="/start" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
-      </nav>
+      <SharedHead />
+      <SiteNav />
 
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '26px 24px 6px' }}>
         <div style={{ maxWidth: 720 }}>
@@ -110,6 +109,7 @@ export default function TaxCalculatorPage() {
           <Link href="/file-your-tax-return" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>File your own return</Link>
         </div>
       </section>
+      <SiteFooter />
     </main>
   );
 }

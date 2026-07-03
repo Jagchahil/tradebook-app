@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { TRADES } from '../../lib/trades';
 import { A11Y_CSS } from '../../lib/tokens';
+import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
   title: 'Free Tools & Guides for the UK Self Employed | Lekhio',
@@ -55,10 +56,8 @@ export default function ResourcesPage() {
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1r{font-size:50px;line-height:1.06;letter-spacing:-1.9px}.toolgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}.card:hover{transform:translateY(-4px);box-shadow:0 18px 42px rgba(17,17,17,.09);border-color:${RIVER_TINT}}@media(max-width:820px){.h1r{font-size:34px}.toolgrid{grid-template-columns:1fr}}` }} />
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
-      <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
-        <Link href="/start" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
-      </nav>
+      <SharedHead />
+      <SiteNav />
 
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 10px' }}>
         <div style={{ maxWidth: 700 }}>
@@ -129,6 +128,7 @@ export default function ResourcesPage() {
           </div>
         </div>
       </section>
+      <SiteFooter />
     </main>
   );
 }

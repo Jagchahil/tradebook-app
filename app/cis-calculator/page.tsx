@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import Calc from './Calc';
 import { A11Y_CSS } from '../../lib/tokens';
+import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
   title: 'CIS Tax Refund Calculator 2026/27 | Are You Owed Money? | Lekhio',
@@ -15,7 +15,6 @@ export const metadata: Metadata = {
 };
 
 const INK = '#111111';
-const RIVER = '#1B59A6';
 const RIVER_DEEP = '#134277';
 const RIVER_TINT = '#E9F1FA';
 const PAPER = '#FBFAF7';
@@ -62,10 +61,8 @@ export default function CisCalculatorPage() {
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1c{font-size:46px;line-height:1.07;letter-spacing:-1.7px}@media(max-width:820px){.h1c{font-size:32px}}` }} />
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
-      <nav style={{ maxWidth: 1080, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
-        <Link href="/resources" style={{ fontSize: 14, fontWeight: 600, color: RIVER }}>← All free tools</Link>
-      </nav>
+      <SharedHead />
+      <SiteNav />
 
       <section style={{ maxWidth: 1080, margin: '0 auto', padding: '20px 24px 8px' }}>
         <div style={{ maxWidth: 720 }}>
@@ -83,6 +80,7 @@ export default function CisCalculatorPage() {
           This is a general estimate using 2026/27 rates and assumes your subcontracting is your only income with standard 20% CIS. It is not tax advice or a filed figure. Your real refund depends on your full circumstances, which HMRC settles when you file. Lekhio prepares your figures and you always approve them.
         </p>
       </section>
+      <SiteFooter />
     </main>
   );
 }

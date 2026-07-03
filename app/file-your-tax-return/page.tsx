@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
+import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
   title: 'How to file your own tax return. A free step by step guide for the self employed | Lekhio',
@@ -20,7 +21,6 @@ const INK = '#111111';
 const RIVER = '#1B59A6';
 const RIVER_DEEP = '#134277';
 const RIVER_TINT = '#E9F1FA';
-const SAFFRON = '#E0A33E';
 const SAFFRON_DEEP = '#C9842A';
 const SAFFRON_TINT = '#FBEFD8';
 const GREEN = '#15803D';
@@ -405,20 +405,8 @@ export default function FileYourTaxReturnPage() {
       </div>
 
       {/* Nav */}
-      <nav style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link href="/" aria-label="Lekhio home">
-          <svg width="112" height="38" viewBox="0 0 300 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Lekhio">
-            <defs>
-              <linearGradient id="navriver" x1="20" y1="0" x2="280" y2="0" gradientUnits="userSpaceOnUse">
-                <stop offset="0" stopColor={RIVER} /><stop offset="0.6" stopColor="#2E7BBF" /><stop offset="1" stopColor={SAFFRON} />
-              </linearGradient>
-            </defs>
-            <text x="150" y="58" textAnchor="middle" fontFamily={FONT} fontSize="54" fontWeight="700" letterSpacing="-1.8" fill={INK}>Lekhio</text>
-            <path d="M34 78 C 90 64, 120 92, 150 78 S 230 64, 266 78" stroke="url(#navriver)" strokeWidth="5" strokeLinecap="round" fill="none" />
-          </svg>
-        </Link>
-        <Link href="/start" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10, textDecoration: 'none' }}>Sign up now</Link>
-      </nav>
+      <SharedHead />
+      <SiteNav />
 
       {/* Hero */}
       <section style={{ maxWidth: 820, margin: '0 auto', padding: '40px 24px 20px', textAlign: 'center' }}>
@@ -637,6 +625,7 @@ export default function FileYourTaxReturnPage() {
           </div>
         </div>
       </footer>
+      <SiteFooter />
     </main>
   );
 }

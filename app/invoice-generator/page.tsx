@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import Generator from './Generator';
 import { A11Y_CSS } from '../../lib/tokens';
+import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
   title: 'Free Invoice & Quote Generator for Tradespeople | Lekhio',
@@ -30,10 +31,8 @@ export default function InvoiceGeneratorPage() {
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1g{font-size:46px;line-height:1.07;letter-spacing:-1.7px}@media(max-width:880px){.h1g{font-size:32px}}@media print{.site-nav,.site-hero,.site-foot{display:none !important;}}` }} />
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
-      <nav className="site-nav" style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
-        <Link href="/start" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
-      </nav>
+      <SharedHead />
+      <div className="site-nav"><SiteNav /></div>
 
       <section className="site-hero" style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 24px 6px' }}>
         <div style={{ maxWidth: 760 }}>
@@ -63,6 +62,7 @@ export default function InvoiceGeneratorPage() {
           <Link href="/can-i-claim" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Can I claim it?</Link>
         </div>
       </section>
+      <div className="site-foot"><SiteFooter /></div>
     </main>
   );
 }

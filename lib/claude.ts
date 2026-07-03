@@ -12,8 +12,8 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 // invoice lines, schedule times) are simple and high volume, so they run on the
 // cheapest capable model. The open ended accountant answers stay on the stronger
 // model, because a wrong tax answer costs more than the tokens ever will.
-const MODEL_FAST = 'claude-haiku-4-5';
-const MODEL_SMART = 'claude-sonnet-4-6';
+const MODEL_FAST = 'claude-haiku-4-5-20251001';
+const MODEL_SMART = 'claude-sonnet-5';
 
 // Per-call timeout for Anthropic. The webhook must ack Meta within 5 seconds and
 // does its real work in after(). A slow or hung upstream call must never block a

@@ -728,7 +728,9 @@ const REVEAL_JS = `
   // Theme: follow the device's light/dark setting automatically, and keep in
   // step if the user changes it while the page is open. No manual toggle.
   try{
-    document.documentElement.setAttribute('data-theme', 'light');
+    var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme:dark)') : null;
+    document.documentElement.setAttribute('data-theme', (mq && mq.matches) ? 'dark' : 'light');
+    if(mq && mq.addEventListener){ mq.addEventListener('change', function(e){ document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light'); }); }
   }catch(e){}
   var setIcon = function(){ var b=document.getElementById('lekhio-theme'); if(b) b.textContent = document.documentElement.getAttribute('data-theme')==='dark' ? '☀️' : '🌙'; };
   var wireToggle = function(){

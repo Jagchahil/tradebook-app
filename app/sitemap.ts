@@ -7,6 +7,10 @@ const BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://tradebook-app-five.verc
 // from the single TRADES source so this never drifts out of sync with the pages.
 const ROUTES = [
   '',
+  'product',
+  'how-mtd-works',
+  'compare',
+  'pricing',
   'tax-calculator',
   'cis-calculator',
   'invoice-generator',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import LeadCapture from '../../components/LeadCapture';
 
 // Fully client side. No AI, no server, no cost. The browser does the maths and
@@ -179,7 +179,7 @@ export default function Generator() {
   const [due, setDue] = useState('');
   // Seed dates on the client after mount so the server-rendered HTML and the client
   // agree (new Date() on the server vs browser can differ across the day boundary).
-  React.useEffect(() => { setDate(todayISO()); setDue(plusDays(14)); }, []);
+  useEffect(() => { setDate(todayISO()); setDue(plusDays(14)); }, []);
   const [vat, setVat] = useState(PRESETS[0].vat);
   const [vatRate, setVatRate] = useState('20');
   const [notes, setNotes] = useState(PRESETS[0].notes);

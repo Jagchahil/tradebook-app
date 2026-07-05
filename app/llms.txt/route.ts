@@ -34,6 +34,8 @@ Making Tax Digital for Income Tax began on 6 April 2026. Sole traders and landlo
 - Income tax calculator for the self employed: /tax-calculator
 - Invoice and quote generator: /invoice-generator
 - Can I claim it, an allowable expenses guide: /can-i-claim
+- National Insurance checker, Class 1, 2 and 4 with State Pension year status: /ni-checker
+- Student loan repayment checker, all plans including the Self Assessment lump: /student-loan-checker
 - Register your business, a free guide: /register-your-business
 - File your own tax return, a free guide: /file-your-tax-return
 

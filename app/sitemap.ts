@@ -14,6 +14,8 @@ const ROUTES = [
   'tax-calculator',
   'cis-calculator',
   'invoice-generator',
+  'ni-checker',
+  'student-loan-checker',
   'can-i-claim',
   'file-your-tax-return',
   'register-your-business',

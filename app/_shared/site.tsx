@@ -299,6 +299,8 @@ export const freeTools = [
   { href: '/invoice-generator', icon: '🧾', title: 'Invoice and quote maker', body: 'A clean, professional invoice or quote in two minutes. Save as PDF, no signup.' },
   { href: '/can-i-claim', icon: '💡', title: 'Can I claim it?', body: 'The real rules on what you can and cannot claim, the grey areas included.' },
   { href: '/file-your-tax-return', icon: '📋', title: 'File your own return', body: 'A step by step walkthrough by trade, so you can do it yourself.' },
+  { href: '/ni-checker', icon: '🛡️', title: 'NI checker', body: 'Your Class 1, 2 and 4 for the year, and whether your State Pension year is safe.' },
+  { href: '/student-loan-checker', icon: '🎓', title: 'Student loan checker', body: 'Every plan, the 2026/27 thresholds, and the January lump if you work for yourself.' },
 ];
 
 export const oldAccountant = [
@@ -825,6 +827,8 @@ export function SiteNav() {
         <Link href="/tax-calculator">Free tax calculator</Link>
         <Link href="/cis-calculator">CIS refund calculator</Link>
         <Link href="/invoice-generator">Invoice generator</Link>
+        <Link href="/ni-checker">NI checker</Link>
+        <Link href="/student-loan-checker">Student loan checker</Link>
         <Link href="/security">Security and trust</Link>
         <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
       </div>
@@ -857,7 +861,7 @@ export function SiteFooter() {
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: '52px 24px 40px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 32, marginBottom: 40 }}>
           {col('Product', [['/product', 'How it works'], ['/how-mtd-works', 'How MTD works'], ['/compare', 'Compare'], ['/pricing', 'Pricing'], ['/start', 'Sign up']])}
-          {col('Free tools', [['/tax-calculator', 'Tax calculator'], ['/cis-calculator', 'CIS refund calculator'], ['/invoice-generator', 'Invoice maker'], ['/can-i-claim', 'Can I claim it?'], ['/file-your-tax-return', 'File your return'], ['/resources', 'All tools']])}
+          {col('Free tools', [['/tax-calculator', 'Tax calculator'], ['/cis-calculator', 'CIS refund calculator'], ['/invoice-generator', 'Invoice maker'], ['/ni-checker', 'NI checker'], ['/student-loan-checker', 'Student loan checker'], ['/can-i-claim', 'Can I claim it?'], ['/file-your-tax-return', 'File your return'], ['/resources', 'All tools']])}
           {col('For your trade', TRADES.slice(0, 6).map((t) => [`/for/${t.slug}`, `For ${t.plural}`] as [string, string]))}
           {col('Company', [['/security', 'Security and trust'], ['/register-your-business', 'Register your business'], ['/privacy', 'Privacy'], ['/terms', 'Terms']])}
         </div>

@@ -34,6 +34,8 @@ const tools = [
   { href: '/cis-calculator', icon: '🧱', title: 'CIS tax refund estimator', body: 'Subcontractor? CIS is taken off your pay before you see it, and most subbies are owed money back. See your likely refund in seconds.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Calculator' },
   { href: '/invoice-generator', icon: '🧾', title: 'Invoice & quote generator', body: 'A clean, professional invoice or quote in two minutes. Ready made templates by trade. Save as PDF.', tint: RIVER_TINT, fg: RIVER, tag: 'Generator' },
   { href: '/can-i-claim', icon: '💡', title: 'Can I claim it?', body: 'The real rules on what you can and cannot claim, the grey areas included. All within the law.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Checker' },
+  { href: '/ni-checker', icon: '🛡️', title: 'National Insurance checker', body: 'Class 1, 2 and 4 explained with your numbers, and whether your State Pension year is safe. The £190 decision nobody tells you about.', tint: GREEN_TINT, fg: GREEN, tag: 'Checker' },
+  { href: '/student-loan-checker', icon: '🎓', title: 'Student loan checker', body: 'Every plan, the real thresholds, and the January lump the self employed never see coming. Know it before it lands.', tint: RIVER_TINT, fg: RIVER, tag: 'Checker' },
   { href: '/file-your-tax-return', icon: '📋', title: 'File your own return', body: 'A step by step walkthrough by trade, so you can do your Self Assessment yourself and stop paying for a short job.', tint: RIVER_TINT, fg: RIVER, tag: 'Guide' },
   { href: '/register-your-business', icon: '🏁', title: 'Register your business', body: 'Sole trader, limited, VAT, PAYE and CIS, explained simply with the real 2026 costs and deadlines.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Guide' },
 ];

@@ -160,3 +160,19 @@ export function validPlanSelection(plans: StudentPlan[]): boolean {
   const undergrad = plans.filter((p) => p !== 'postgrad');
   return undergrad.length <= 1;
 }
+
+// The student loan share that belongs in the Self Assessment set aside figure.
+// Payroll already collects the loan on any PAYE salary as they go, so what
+// lands on the January bill is the repayment on total income LESS what payroll
+// already took: repay(profit + salary) - repay(salary). With no salary this is
+// simply the repayment on profit. Never negative.
+export function studentLoanForSA(
+  annualProfit: number,
+  annualSalary: number,
+  plans: StudentPlan[],
+): number {
+  if (plans.length === 0) return 0;
+  const total = studentLoanRepayment(Math.max(0, annualProfit) + Math.max(0, annualSalary), plans).annualTotal;
+  const viaPayroll = studentLoanRepayment(Math.max(0, annualSalary), plans).annualTotal;
+  return Math.max(0, Math.round((total - viaPayroll) * 100) / 100);
+}

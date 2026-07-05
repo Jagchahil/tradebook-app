@@ -21,7 +21,7 @@ writeFileSync(
   )
 );
 const mod = await import(pathToFileURL(path.join(stage, 'nistudentloan.ts')).href);
-const { NI_FACTS, class1NIC, niPosition, STUDENT_PLANS, studentLoanRepayment, validPlanSelection } = mod;
+const { NI_FACTS, class1NIC, niPosition, STUDENT_PLANS, studentLoanRepayment, validPlanSelection, studentLoanForSA } = mod;
 
 let pass = 0;
 let fail = 0;
@@ -109,6 +109,20 @@ eq('postgrad alone valid', validPlanSelection(['postgrad']), true);
 // Zero and negative income guard
 eq('zero income zero repayment', studentLoanRepayment(0, ['plan2']).annualTotal, 0);
 eq('negative income zero repayment', studentLoanRepayment(-5, ['plan2']).annualTotal, 0);
+
+
+// --- studentLoanForSA: the Self Assessment share -----------------------------
+// No salary: simply the repayment on profit.
+eq('SA share no salary', studentLoanForSA(35000, 0, ['plan2']), (35000 - 29385) * 0.09);
+// Salary above threshold: payroll already collects on the salary, SA gets the rest.
+// repay(30000+34000) - repay(34000) = (64000-29385)*.09 - (34000-29385)*.09 = 30000*.09
+eq('SA share with salary above threshold', studentLoanForSA(30000, 34000, ['plan2']), 30000 * 0.09);
+// Salary below threshold: the profit pushes them over, SA collects it all.
+eq('SA share salary below threshold', studentLoanForSA(20000, 15000, ['plan2']), (35000 - 29385) * 0.09);
+// No plan, nothing.
+eq('SA share no plans', studentLoanForSA(50000, 0, []), 0);
+// Never negative.
+eq('SA share never negative', studentLoanForSA(0, 60000, ['plan2']), 0);
 
 console.log(`nistudentloan: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

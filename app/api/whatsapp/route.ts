@@ -60,7 +60,7 @@ import {
   studentLoanAnswer,
 } from '../../../lib/waintents';
 import { soleTraderTax } from '../../../lib/taxengine';
-import { niPosition, studentLoanRepayment, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
+import { niPosition, studentLoanRepayment, studentLoanForSA, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
 import type { TradeInfo } from '../../../lib/taxguide';
 import { rateLimited } from '../../../lib/ratelimit';
@@ -603,13 +603,22 @@ async function handleTotals(from: string, body: string): Promise<void> {
     return;
   }
   // Tax estimate for the year to date. Includes to-review entries, says so, and
-  // credits CIS already deducted. A guide, not a bill.
+  // credits CIS already deducted. A guide, not a bill. Once a student loan plan
+  // is stored, the loan folds in automatically so the number is the whole
+  // January picture, not a surprise minus one line.
   const est = soleTraderTax(Math.max(0, profit));
-  const afterCis = Math.max(0, est.total - totals.cis);
+  const slSettings = await getStudentLoanSettings(userId).catch(() => null);
+  const slPlans: StudentPlan[] = [];
+  if (slSettings?.plan) slPlans.push(slSettings.plan);
+  if (slSettings?.postgrad) slPlans.push('postgrad');
+  const slDue = slPlans.length > 0 ? studentLoanForSA(Math.max(0, profit), slSettings?.employmentIncome ?? 0, slPlans) : 0;
+  const totalDue = est.total + slDue;
+  const afterCis = Math.max(0, totalDue - totals.cis);
+  const slLine = slDue > 0 ? ` including ${formatGbp(slDue)} of student loan` : '';
   const cisLine = totals.cis > 0 ? ` You have already had ${formatGbp(totals.cis)} taken in CIS, so the bill after that is about ${formatGbp(afterCis)}.` : '';
   await sendText(
     from,
-    `On ${formatGbp(profit)} profit so far this tax year, the rough bill is ${formatGbp(est.total)} (income tax plus National Insurance).${cisLine} A rough guide from your logged entries, including ones you have not confirmed yet, not a final figure.`,
+    `On ${formatGbp(profit)} profit so far this tax year, the rough bill is ${formatGbp(totalDue)} (income tax plus National Insurance${slLine}).${cisLine} A rough guide from your logged entries, including ones you have not confirmed yet, not a final figure.`,
   );
 }
 

@@ -86,5 +86,17 @@ for (const y of [25000, 35000, 50000, 90000]) {
   );
 }
 
+
+// The Self Assessment share function agrees across salary and profit mixes.
+for (const s of [0, 15000, 34000, 60000]) {
+  for (const p of [0, 10000, 30000, 80000]) {
+    agree(
+      `SA share ${s}/${p}`,
+      web.studentLoanForSA(p, s, ['plan2', 'postgrad']),
+      app.studentLoanForSA(p, s, ['plan2', 'postgrad']),
+    );
+  }
+}
+
 console.log(`nisl-parity: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

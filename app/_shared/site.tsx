@@ -612,7 +612,7 @@ a{text-decoration:none}
 @keyframes grow{to{transform:scaleX(1)}}
 @keyframes popIn{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:scale(1)}}
 @keyframes marquee{to{transform:translateX(-50%)}}
-.reveal{opacity:0;transform:translateY(16px);transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.2,1)}
+.reveal{opacity:1;transform:none;transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.2,1)}
 .reveal.in{opacity:1;transform:none}
 .hero-h1,.hero-sub,.hero-cta,.hero-pill{opacity:0;animation:riseIn .5s cubic-bezier(.2,.7,.2,1) forwards}
 .hero-pill{animation-delay:.04s}.hero-h1{animation-delay:.1s}.hero-sub{animation-delay:.2s}.hero-cta{animation-delay:.3s}

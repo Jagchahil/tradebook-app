@@ -175,8 +175,11 @@ export default function Generator() {
   const [toName, setToName] = useState(PRESETS[0].toName);
   const [toDetails, setToDetails] = useState(PRESETS[0].toDetails);
   const [number, setNumber] = useState('0001');
-  const [date, setDate] = useState(todayISO());
-  const [due, setDue] = useState(plusDays(14));
+  const [date, setDate] = useState('');
+  const [due, setDue] = useState('');
+  // Seed dates on the client after mount so the server-rendered HTML and the client
+  // agree (new Date() on the server vs browser can differ across the day boundary).
+  React.useEffect(() => { setDate(todayISO()); setDue(plusDays(14)); }, []);
   const [vat, setVat] = useState(PRESETS[0].vat);
   const [vatRate, setVatRate] = useState('20');
   const [notes, setNotes] = useState(PRESETS[0].notes);

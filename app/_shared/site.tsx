@@ -31,7 +31,7 @@ export const PANEL = 'var(--panel)';
 // A deep contrast band (footer, feature-dark sections) in both themes.
 export const INK_BG = 'var(--band)';
 export const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-export const SITE = 'https://tradebook-app-five.vercel.app';
+export const SITE = process.env.NEXT_PUBLIC_APP_URL || 'https://tradebook-app-five.vercel.app';
 
 // Shared marketing-page styling. Every marketing page wraps its <main> in
 // className="mkt" and injects this once via <style>. One source so home,

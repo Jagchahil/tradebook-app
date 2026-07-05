@@ -190,7 +190,7 @@ export default function ComparePage() {
       {/* Only Lekhio */}
       <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 40 }}><h2 className="h2">Three things only Lekhio does.</h2><p className="lead">No other app on the market gives you these.</p></div>
+          <div className="center reveal" style={{ marginBottom: 40 }}><h2 className="h2">Three things only Lekhio does.</h2><p className="lead">No app we have found does all three.</p></div>
           <div className="only reveal">
             <div className="ocard"><span className="otag">ONLY LEKHIO</span><h3>Lives in WhatsApp</h3><p className="mut" style={{ fontSize: 14, margin: 0 }}>No new app to learn. Text it like you text a mate.</p><div className="demo"><div className="bub out">spent 42 on diesel</div><div className="bub in two">Logged, £42 fuel ✅</div></div></div>
             <div className="ocard"><span className="otag">ONLY LEKHIO</span><h3>Log by voice note</h3><p className="mut" style={{ fontSize: 14, margin: 0 }}>Hands full on the job? Just say it.</p><div className="demo"><div className="bub out" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 16 }}>🎙️</span><span className="wave"><i /><i /><i /><i /><i /></span></div><div className="bub in two">£40 fuel, logged ✅</div></div></div>
@@ -217,10 +217,10 @@ export default function ComparePage() {
       <section>
         <div className="wrap"><div className="cred reveal">
           <h2>Built by the book. Better than the rest.</h2>
-          <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>The only complete tax assistant that lives in WhatsApp, and it does the sums properly.</p>
+          <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>The complete tax assistant that lives in WhatsApp, and it does the sums properly.</p>
           <div className="credrow">
             <div className="credchip">📐 <span>Checked against HMRC&apos;s <b>2026/27 rules</b>, 104 tests</span></div>
-            <div className="credchip">💬 <span>The only one in WhatsApp</span></div>
+            <div className="credchip">💬 <span>Built for WhatsApp</span></div>
             <div className="credchip">🏛️ <span>HMRC recognition <b>in progress</b></span></div>
             <div className="credchip">🇬🇧 <span>A real UK company</span></div>
           </div>

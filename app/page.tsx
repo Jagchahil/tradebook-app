@@ -381,7 +381,7 @@ export default function HomePage() {
       {/* Proof slider */}
       <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">Built with people who work for themselves.</h2></div>
+          <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">Built with people who work for themselves.</h2><p className="mut" style={{ fontSize: 13, marginTop: 8 }}>Illustrative examples, based on real trades.</p></div>
         </div>
         <div className="rev-marquee reveal">
           <div className="rev-track">

@@ -166,8 +166,8 @@ export default function ProductPage() {
               <div className="jphone">
                 <div className="appbar"><b>Feed</b><span style={{ fontSize: 16 }}>🔔</span></div>
                 <div className="appbody">
-                  <div className="feedcard jC" style={{ borderColor: 'var(--saffron)' }}><div className="fi" style={{ background: 'var(--saffron-tint)' }}>🧾</div><div className="fm"><b>Screwfix</b><small>Materials · just now</small></div><div className="fa">-£42.60</div></div>
-                  <div className="feedcard"><div className="fi">⛽</div><div className="fm"><b>BP</b><small>Fuel · today</small></div><div className="fa">-£62.00</div></div>
+                  <div className="feedcard jC" style={{ borderColor: 'var(--saffron)' }}><div className="fi" style={{ background: 'var(--saffron-tint)' }}>🧾</div><div className="fm"><b>Screwfix</b><small>Materials · just now</small></div><div className="fa">−£42.60</div></div>
+                  <div className="feedcard"><div className="fi">⛽</div><div className="fm"><b>BP</b><small>Fuel · today</small></div><div className="fa">−£62.00</div></div>
                   <div className="feedcard"><div className="fi" style={{ background: 'var(--green-tint)' }}>💷</div><div className="fm"><b>Dave Wilson</b><small>Invoice · today</small></div><div className="fa" style={{ color: 'var(--green)' }}>+£400</div></div>
                 </div>
               </div>
@@ -217,8 +217,8 @@ export default function ProductPage() {
                 <div className="tslides" id="tslides">
                   <div className="tslide">
                     <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Feed</b><span>🔔</span></div>
-                    <div className="feedcard"><div className="fi" style={{ background: 'var(--saffron-tint)' }}>🧾</div><div className="fm"><b>Screwfix</b><small>Materials · 2m</small></div><div className="fa">-£42.60</div></div>
-                    <div className="feedcard"><div className="fi">⛽</div><div className="fm"><b>BP</b><small>Fuel · 1h</small></div><div className="fa">-£62.00</div></div>
+                    <div className="feedcard"><div className="fi" style={{ background: 'var(--saffron-tint)' }}>🧾</div><div className="fm"><b>Screwfix</b><small>Materials · 2m</small></div><div className="fa">−£42.60</div></div>
+                    <div className="feedcard"><div className="fi">⛽</div><div className="fm"><b>BP</b><small>Fuel · 1h</small></div><div className="fa">−£62.00</div></div>
                     <div className="feedcard" style={{ borderColor: 'var(--green)' }}><div className="fi" style={{ background: 'var(--green-tint)' }}>💷</div><div className="fm"><b>Dave paid you</b><small>CIS £80 held · 3h</small></div><div className="fa" style={{ color: 'var(--green)' }}>+£500</div></div>
                     <div className="feedcard" style={{ background: 'var(--saffron-tint)', borderColor: 'var(--saffron)' }}><div className="fi" style={{ background: '#fff' }}>🔥</div><div className="fm"><b>7-day streak!</b><small>Keep it going</small></div></div>
                   </div>

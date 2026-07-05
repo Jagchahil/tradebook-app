@@ -34,6 +34,8 @@ import {
   deleteTransactionById,
   updateTransactionAmount,
   setNudgePrefs,
+  getStudentLoanSettings,
+  setStudentLoanPlan,
 } from '../../../lib/supabase';
 import {
   parseMoneyEntryRegex,
@@ -51,8 +53,14 @@ import {
   deadlineAnswer,
   matchTotalsQuestion,
   formatGbp,
+  isNiQuestion,
+  isStudentLoanQuestion,
+  matchStudentLoanPlanSet,
+  niAnswer,
+  studentLoanAnswer,
 } from '../../../lib/waintents';
 import { soleTraderTax } from '../../../lib/taxengine';
+import { niPosition, studentLoanRepayment, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
 import type { TradeInfo } from '../../../lib/taxguide';
 import { rateLimited } from '../../../lib/ratelimit';
@@ -227,6 +235,12 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await sendText(from, deadlineAnswer());
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);
+          } else if (matchStudentLoanPlanSet(text)) {
+            await handleStudentLoanPlanSet(from, text);
+          } else if (isStudentLoanQuestion(text)) {
+            await handleStudentLoanQuestion(from);
+          } else if (isNiQuestion(text)) {
+            await handleNiQuestion(from);
           } else if (matchTotalsQuestion(text)) {
             await handleTotals(from, text);
           } else if (isQuestion(text)) {
@@ -596,6 +610,100 @@ async function handleTotals(from: string, body: string): Promise<void> {
   await sendText(
     from,
     `On ${formatGbp(profit)} profit so far this tax year, the rough bill is ${formatGbp(est.total)} (income tax plus National Insurance).${cisLine} A rough guide from your logged entries, including ones you have not confirmed yet, not a final figure.`,
+  );
+}
+
+// The UK tax year starts 6 April. Same rule as matchTotalsQuestion.
+function taxYearSinceISO(now: Date = new Date()): string {
+  const d = new Date(now);
+  const y = d.getUTCMonth() > 3 || (d.getUTCMonth() === 3 && d.getUTCDate() >= 6) ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
+  return `${y}-04-06`;
+}
+
+// "How much national insurance do I pay": Class 4 on the year to date profit,
+// Class 1 if they have saved a salary, and the pension year status. No AI.
+async function handleNiQuestion(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const totals = await totalsForUser(userId, taxYearSinceISO(), null);
+  if (!totals) {
+    await sendText(from, 'I could not fetch your figures just now. Try again in a minute.');
+    return;
+  }
+  const settings = await getStudentLoanSettings(userId);
+  const salary = settings?.employmentIncome ?? 0;
+  const profit = Math.max(0, totals.income - totals.expenses);
+  const pos = niPosition(salary, profit);
+  await sendText(
+    from,
+    niAnswer({
+      profit,
+      salary,
+      class1: pos.class1,
+      class4: pos.class4,
+      class2Annual: pos.class2Voluntary.annual,
+      qualifies: pos.qualifiesViaEmployment || pos.qualifiesViaProfits,
+      voluntarySuggested: pos.voluntaryClass2Suggested,
+    }),
+  );
+}
+
+// "How much student loan will I owe": the stored plan against year to date
+// income (profit plus any saved salary). No AI.
+async function handleStudentLoanQuestion(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const settings = await getStudentLoanSettings(userId);
+  const plans: StudentPlan[] = [];
+  if (settings?.plan) plans.push(settings.plan);
+  if (settings?.postgrad) plans.push('postgrad');
+  if (plans.length === 0) {
+    await sendText(from, studentLoanAnswer({ hasPlan: false, planLabel: null, annual: 0, threshold: 0, income: 0 }));
+    return;
+  }
+  const totals = await totalsForUser(userId, taxYearSinceISO(), null);
+  if (!totals) {
+    await sendText(from, 'I could not fetch your figures just now. Try again in a minute.');
+    return;
+  }
+  const profit = Math.max(0, totals.income - totals.expenses);
+  const income = profit + (settings?.employmentIncome ?? 0);
+  const r = studentLoanRepayment(income, plans);
+  await sendText(
+    from,
+    studentLoanAnswer({
+      hasPlan: true,
+      planLabel: plans.map((p) => STUDENT_PLANS[p].label).join(' plus '),
+      annual: r.annualTotal,
+      threshold: Math.min(...plans.map((p) => STUDENT_PLANS[p].threshold)),
+      income,
+    }),
+  );
+}
+
+// "Plan 2" or "my student loan is plan 2": store it, no form needed.
+async function handleStudentLoanPlanSet(from: string, text: string): Promise<void> {
+  const plan = matchStudentLoanPlanSet(text);
+  if (!plan) return;
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const ok = await setStudentLoanPlan(userId, plan);
+  if (!ok) {
+    await sendText(from, 'I could not save that just now. Try again in a minute, or set it in the app under Money, Student loan.');
+    return;
+  }
+  await sendText(
+    from,
+    `Got it, ${STUDENT_PLANS[plan].label} saved. Ask me "how much student loan will I owe" any time and I will answer from your real numbers. You can also see it building in the app under Money, Student loan.`,
   );
 }
 

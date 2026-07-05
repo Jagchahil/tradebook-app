@@ -107,5 +107,41 @@ ok('entry with question mark is not totals', W.matchTotalsQuestion('spent 40 on 
 ok('claim question is not totals', W.matchTotalsQuestion('how much can I claim for tools?', now) === null);
 eq('gbp formatting', W.formatGbp(1250.5), '£1,250.50');
 
+
+console.log('\n=== waintents: NI and student loan ===\n');
+ok('ni question full phrase', W.isNiQuestion('how much national insurance do I pay'));
+ok('ni question class 4', W.isNiQuestion('what is my class 4'));
+ok('ni question class 2', W.isNiQuestion('do i need to pay class 2'));
+ok('ni question state pension', W.isNiQuestion('am i paying enough for my state pension'));
+ok('bare ni with question shape', W.isNiQuestion('how much ni do i pay'));
+ok('bare ni without question shape is not', !W.isNiQuestion('ni'));
+ok('money entry is not an ni question', !W.isNiQuestion('spent £40 on national insurance'));
+ok('generic tax question is not ni', !W.isNiQuestion('how much tax do I owe'));
+
+ok('student loan question', W.isStudentLoanQuestion('how much student loan will I owe'));
+ok('uni loan question', W.isStudentLoanQuestion('whats my uni loan looking like'));
+ok('postgrad loan question', W.isStudentLoanQuestion('do i owe on my postgraduate loan'));
+ok('plain tax question is not student loan', !W.isStudentLoanQuestion('how much tax do I owe'));
+
+eq('plan set bare', W.matchStudentLoanPlanSet('plan 2'), 'plan2');
+eq('plan set with context', W.matchStudentLoanPlanSet('my student loan is plan 5'), 'plan5');
+eq('plan set student loan plan 4', W.matchStudentLoanPlanSet('student loan plan 4'), 'plan4');
+eq('plan 3 does not exist', W.matchStudentLoanPlanSet('student loan plan 3'), null);
+eq('plan without loan context rejected', W.matchStudentLoanPlanSet('plan 2 rewires next week'), null);
+eq('totals question is not a plan set', W.matchStudentLoanPlanSet('how much tax do I owe'), null);
+
+const nia = W.niAnswer({ profit: 30000, salary: 0, class1: 0, class4: 1045.8, class2Annual: 189.8, qualifies: true, voluntarySuggested: false });
+ok('ni answer names class 4', /Class 4/.test(nia) && /1,045\.80/.test(nia));
+ok('ni answer says pension covered', /pension year looks covered/i.test(nia));
+const nib = W.niAnswer({ profit: 5000, salary: 0, class1: 0, class4: 0, class2Annual: 189.8, qualifies: false, voluntarySuggested: true });
+ok('low profit ni answer suggests voluntary class 2', /Voluntary Class 2/i.test(nib) && /189\.80/.test(nib));
+
+const sla = W.studentLoanAnswer({ hasPlan: true, planLabel: 'Plan 2', annual: 505.35, threshold: 29385, income: 35000 });
+ok('student loan answer has figure and january', /505\.35/.test(sla) && /January/.test(sla));
+const slb = W.studentLoanAnswer({ hasPlan: false, planLabel: null, annual: 0, threshold: 0, income: 0 });
+ok('no plan answer asks for the plan', /plan 2/i.test(slb));
+const slc = W.studentLoanAnswer({ hasPlan: true, planLabel: 'Plan 5', annual: 0, threshold: 25000, income: 20000 });
+ok('under threshold answer says nothing due', /Nothing due/.test(slc) && /25,000/.test(slc));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

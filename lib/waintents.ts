@@ -289,3 +289,85 @@ export function matchTotalsQuestion(body: string, now: Date = new Date()): Total
 export function formatGbp(n: number): string {
   return `£${Math.abs(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+// --- National Insurance and student loan questions ---------------------------
+// Answered deterministically from the user's own rows plus the plan stored on
+// their account, no AI. These run BEFORE matchTotalsQuestion in the webhook,
+// because "how much student loan do i owe" would otherwise be caught by the
+// generic tax totals matcher. The maths comes from lib/nistudentloan.ts, the
+// same engine as the app hub and the free website tools.
+
+export function isNiQuestion(body: string): boolean {
+  const b = body.trim().toLowerCase();
+  if (/£\s*\d/.test(b)) return false; // an amount means it is probably an entry
+  if (/\b(national insurance|class ?2|class ?4|state pension)\b/.test(b)) {
+    return /\b(how much|what|do i|am i|my|pay|paying|owe)\b/.test(b);
+  }
+  // Bare "ni" only with a clear question shape, to avoid false hits.
+  return /\bni\b/.test(b) && /\b(how much|what|do i pay|am i paying)\b/.test(b);
+}
+
+export function isStudentLoanQuestion(body: string): boolean {
+  const b = body.trim().toLowerCase();
+  if (/£\s*\d/.test(b)) return false;
+  return /\b(student loan|uni loan|postgrad(uate)? loan|slc)\b/.test(b);
+}
+
+// "I'm on plan 2", "student loan plan 2", "my student loan is plan 5".
+// Stores the plan from chat so the user never has to open a form. Plan 3 does
+// not exist (postgrad is set in the app), and bare "plan 2" without student
+// loan context is accepted only because HMRC plan numbers are unambiguous.
+export function matchStudentLoanPlanSet(body: string): 'plan1' | 'plan2' | 'plan4' | 'plan5' | null {
+  const b = body.trim().toLowerCase();
+  const m = b.match(/\b(?:i'?m on |my student loan is |student loan(?: is)? )?plan ?([1245])\b/);
+  if (!m) return null;
+  // Require student loan context somewhere in the message unless it is the
+  // whole message ("plan 2").
+  if (!/\b(student|uni|loan)\b/.test(b) && !/^plan ?[1245]$/.test(b)) return null;
+  return (`plan${m[1]}`) as 'plan1' | 'plan2' | 'plan4' | 'plan5';
+}
+
+// Reply for an NI question, from the year to date profit and optional salary.
+export function niAnswer(input: {
+  profit: number;
+  salary: number;
+  class1: number;
+  class4: number;
+  class2Annual: number;
+  qualifies: boolean;
+  voluntarySuggested: boolean;
+}): string {
+  const lines: string[] = [];
+  if (input.class4 > 0 || input.class1 > 0) {
+    const parts: string[] = [];
+    if (input.class4 > 0) parts.push(`${formatGbp(input.class4)} Class 4 on your profit so far`);
+    if (input.class1 > 0) parts.push(`about ${formatGbp(input.class1)} Class 1 through your payslip`);
+    lines.push(`National Insurance this tax year: ${parts.join(', plus ')}.`);
+  } else {
+    lines.push('No National Insurance is due on your figures so far this tax year.');
+  }
+  if (input.voluntarySuggested) {
+    lines.push(`One thing worth knowing: profits under the small profits threshold with no job covering you means this year may not count for your State Pension. Voluntary Class 2 protects it for about ${formatGbp(input.class2Annual)} for the whole year. Worth a look near year end.`);
+  } else if (input.qualifies) {
+    lines.push('Your State Pension year looks covered.');
+  }
+  lines.push('Full breakdown is in your app under Money, National Insurance.');
+  return lines.join(' ');
+}
+
+// Reply for a student loan question, from the stored plan and year to date income.
+export function studentLoanAnswer(input: {
+  hasPlan: boolean;
+  planLabel: string | null;
+  annual: number;
+  threshold: number;
+  income: number;
+}): string {
+  if (!input.hasPlan) {
+    return 'I do not know your student loan plan yet. Tell me here, like "plan 2", or set it in the app under Money, Student loan, and I will track the repayment on your real numbers.';
+  }
+  if (input.annual <= 0) {
+    return `Nothing due so far: your income this tax year (${formatGbp(input.income)}) is under the ${input.planLabel} threshold of ${formatGbp(input.threshold)}. If income grows past it, I will have the figure ready.`;
+  }
+  return `On your income so far this tax year, about ${formatGbp(input.annual)} of student loan (${input.planLabel}) is building up. It lands in one lump on your January Self Assessment bill, so put about ${formatGbp(input.annual / 12)} a month aside and it will never bite. Full picture in the app under Money, Student loan.`;
+}

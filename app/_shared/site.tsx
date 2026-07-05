@@ -815,7 +815,10 @@ export function SiteNav() {
           ))}
           <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
         </div>
-        <button id="lekhio-theme" className="theme-toggle" type="button" aria-label="Toggle dark mode">🌙</button>
+        {/* suppressHydrationWarning: the head script sets this button's icon from the
+            OS theme before React hydrates, so dark mode visitors would otherwise get a
+            React 418 text mismatch on every page. The icon is cosmetic, let it differ. */}
+        <button id="lekhio-theme" className="theme-toggle" type="button" aria-label="Toggle dark mode" suppressHydrationWarning>🌙</button>
         <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu">Menu <span className="nav-burger-lines"><i /><i /><i /></span></label>
       </div>
 

@@ -1397,3 +1397,49 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
     business_contact: businessContact,
   };
 }
+
+// --- Student loan and mixed income settings ----------------------------------
+// The plan is asked once (app hub, or "plan 2" on WhatsApp) and stored on the
+// users row, so the app, the WhatsApp answers and later the agent read one
+// source. employment_income is the optional PAYE salary from the NI hub.
+export interface StudentLoanSettings {
+  plan: 'plan1' | 'plan2' | 'plan4' | 'plan5' | null;
+  postgrad: boolean;
+  employmentIncome: number;
+}
+
+export async function getStudentLoanSettings(userId: string): Promise<StudentLoanSettings | null> {
+  const { url } = config();
+  const query = `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=student_loan_plan,student_loan_postgrad,employment_income&limit=1`;
+  const res = await fetch(query, { headers: headers() });
+  if (!res.ok) return null;
+  const rows = (await res.json().catch(() => null)) as Array<{
+    student_loan_plan: string | null;
+    student_loan_postgrad: boolean | null;
+    employment_income: number | string | null;
+  }> | null;
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const r = rows[0];
+  const plan =
+    r.student_loan_plan === 'plan1' || r.student_loan_plan === 'plan2' || r.student_loan_plan === 'plan4' || r.student_loan_plan === 'plan5'
+      ? r.student_loan_plan
+      : null;
+  return {
+    plan,
+    postgrad: Boolean(r.student_loan_postgrad),
+    employmentIncome: Number(r.employment_income) || 0,
+  };
+}
+
+export async function setStudentLoanPlan(
+  userId: string,
+  plan: 'plan1' | 'plan2' | 'plan4' | 'plan5',
+): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ student_loan_plan: plan }),
+  });
+  return res.ok;
+}

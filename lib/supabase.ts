@@ -1443,3 +1443,153 @@ export async function setStudentLoanPlan(
   });
   return res.ok;
 }
+
+// --- The Agentic Accountant v1 (doc 84) --------------------------------------
+
+export interface AgentUserRow {
+  id: string;
+  phone_number: string | null;
+  student_loan_plan: 'plan1' | 'plan2' | 'plan4' | 'plan5' | null;
+  student_loan_postgrad: boolean;
+  employment_income: number;
+}
+
+// One keyset page of users for the nightly agent walk, ordered by id ascending.
+export async function listAgentUsersPage(
+  afterId: string | null,
+  limit: number,
+): Promise<{ users: AgentUserRow[]; last: string | null }> {
+  const { url } = config();
+  const after = afterId ? `&id=gt.${encodeURIComponent(afterId)}` : '';
+  const query = `${url}/rest/v1/users?select=id,phone_number,student_loan_plan,student_loan_postgrad,employment_income&order=id.asc&limit=${limit}${after}`;
+  const res = await fetch(query, { headers: headers() });
+  if (!res.ok) return { users: [], last: null };
+  const rows = (await res.json().catch(() => [])) as Array<{
+    id: string;
+    phone_number: string | null;
+    student_loan_plan: string | null;
+    student_loan_postgrad: boolean | null;
+    employment_income: number | string | null;
+  }>;
+  const users: AgentUserRow[] = rows.map((r) => ({
+    id: r.id,
+    phone_number: r.phone_number,
+    student_loan_plan:
+      r.student_loan_plan === 'plan1' || r.student_loan_plan === 'plan2' || r.student_loan_plan === 'plan4' || r.student_loan_plan === 'plan5'
+        ? r.student_loan_plan
+        : null,
+    student_loan_postgrad: Boolean(r.student_loan_postgrad),
+    employment_income: Number(r.employment_income) || 0,
+  }));
+  // A full page means there may be more; a short page is the end of the walk.
+  return { users, last: users.length === limit ? users[users.length - 1].id : null };
+}
+
+export interface AgentAggregates {
+  months: { month: string; income: number; expenses: number; cis: number }[];
+  unconfirmed: number;
+  equipment: number;
+}
+
+// The one round trip aggregate for the signal engine (agent_user_aggregates RPC).
+export async function agentAggregates(userId: string): Promise<AgentAggregates | null> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/rpc/agent_user_aggregates`, {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_user_id: userId }),
+  });
+  if (!res.ok) return null;
+  const j = (await res.json().catch(() => null)) as {
+    months?: Array<{ month: string; income: number | string; expenses: number | string; cis: number | string }>;
+    unconfirmed?: number | string;
+    equipment?: number | string;
+  } | null;
+  if (!j) return null;
+  return {
+    months: (j.months ?? []).map((m) => ({
+      month: m.month,
+      income: Number(m.income) || 0,
+      expenses: Number(m.expenses) || 0,
+      cis: Number(m.cis) || 0,
+    })),
+    unconfirmed: Number(j.unconfirmed) || 0,
+    equipment: Number(j.equipment) || 0,
+  };
+}
+
+export interface NewAgentSignal {
+  user_id: string;
+  signal_key: string;
+  period_key: string;
+  payload: Record<string, unknown>;
+  priority: 'ping' | 'card';
+}
+
+// Insert signals, structurally deduped: on_conflict on the unique index with
+// ignore-duplicates, returning ONLY the rows that actually inserted, so the
+// caller knows which are genuinely new and eligible for a WhatsApp ping.
+export async function insertAgentSignals(
+  rows: NewAgentSignal[],
+): Promise<Array<{ id: string; signal_key: string; priority: string }>> {
+  if (rows.length === 0) return [];
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/agent_signals?on_conflict=user_id,signal_key,period_key&select=id,signal_key,priority`,
+    {
+      method: 'POST',
+      headers: {
+        ...headers(),
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=ignore-duplicates,return=representation',
+      },
+      body: JSON.stringify(rows),
+    },
+  );
+  if (!res.ok) return [];
+  return ((await res.json().catch(() => [])) as Array<{ id: string; signal_key: string; priority: string }>) ?? [];
+}
+
+// How many WhatsApp pings this user received in the trailing 7 days, for the
+// noise caps.
+export async function agentPingsLast7Days(userId: string): Promise<number> {
+  const { url } = config();
+  const since = new Date(Date.now() - 7 * 86400000).toISOString();
+  const query = `${url}/rest/v1/agent_signals?user_id=eq.${encodeURIComponent(userId)}&delivered_wa_at=gte.${encodeURIComponent(since)}&select=id`;
+  const res = await fetch(query, { headers: { ...headers(), Prefer: 'count=exact', Range: '0-0' } });
+  if (!res.ok) return 0;
+  const range = res.headers.get('content-range');
+  const total = range?.split('/')[1];
+  return total && total !== '*' ? parseInt(total, 10) || 0 : 0;
+}
+
+// The user's agent ping preference; defaults on when no prefs row exists.
+export async function agentPingPref(userId: string): Promise<boolean> {
+  const { url } = config();
+  const query = `${url}/rest/v1/reminder_prefs?user_id=eq.${encodeURIComponent(userId)}&select=agent_pings&limit=1`;
+  const res = await fetch(query, { headers: headers() });
+  if (!res.ok) return true;
+  const rows = (await res.json().catch(() => [])) as Array<{ agent_pings: boolean | null }>;
+  if (rows.length === 0) return true;
+  return rows[0].agent_pings !== false;
+}
+
+export async function markAgentSignalDelivered(id: string): Promise<void> {
+  const { url } = config();
+  await fetch(`${url}/rest/v1/agent_signals?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ delivered_wa_at: new Date().toISOString() }),
+  }).catch(() => undefined);
+}
+
+// Outbound agent sends are audited like every other side effect. No message
+// content beyond the signal key, keeping PII out of the log.
+export async function logAgentDelivery(userId: string, signalKey: string): Promise<void> {
+  const { url } = config();
+  await fetch(`${url}/rest/v1/audit_log`, {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ user_id: userId, event_type: 'agent_ping_sent', event_data: { signal_key: signalKey } }),
+  }).catch(() => undefined);
+}

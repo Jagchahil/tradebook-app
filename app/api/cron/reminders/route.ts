@@ -236,7 +236,19 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
       if (hasBankFeedConfig()) {
         await triggerContinuation('bankfeed', null, 1);
       }
-      console.log(`[cron] job=due sent=${sent} pruned=${pruned} bankfeed=${hasBankFeedConfig() ? 'kicked' : 'dormant'}`);
+      // Kick the agent's nightly walk (doc 84) as its own resumable chain. No
+      // new vercel.json cron entry on purpose: the Hobby plan's cron cap once
+      // silently blocked every deploy. Fire and forget, the agent route acks
+      // immediately and works in after().
+      const cronSecret = process.env.CRON_SECRET;
+      if (cronSecret) {
+        try {
+          await fetch(`${APP_URL}/api/cron/agent`, { headers: { Authorization: `Bearer ${cronSecret}` } });
+        } catch (err) {
+          console.error('[cron] agent kick failed:', err instanceof Error ? err.message : err);
+        }
+      }
+      console.log(`[cron] job=due sent=${sent} pruned=${pruned} bankfeed=${hasBankFeedConfig() ? 'kicked' : 'dormant'} agent=kicked`);
     } else if (job === 'nudge' || job === 'weekly') {
       await fanOut(job, afterId, hop);
     } else if (job === 'cleanup') {

@@ -565,10 +565,22 @@ export function HeroPhone() {
           <div style={{ fontSize: 11, opacity: 0.85 }}>online</div>
         </div>
       </div>
-      <style dangerouslySetInnerHTML={{ __html: chatCss }} />
-      <div style={{ backgroundColor: '#ECE5DD', padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 380 }}>
+      {/* Bubble colours live in classes so dark mode flips background and text
+          TOGETHER, the same treatment as the product page's .wb bubbles. The old
+          inline version kept light bubbles but let the text follow var(--tx),
+          which went white on white for dark mode visitors. */}
+      <style dangerouslySetInnerHTML={{ __html: chatCss + `
+.hp-chat{background:#ECE5DD}
+[data-theme="dark"] .hp-chat{background:#0b141a}
+.hp-b{color:#111;font-size:13.5px;padding:10px 12px}
+.hp-b.out{background:#DCF8C6}
+.hp-b.in{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+[data-theme="dark"] .hp-b.out{background:#005c4b;color:#e8f0ee}
+[data-theme="dark"] .hp-b.in{background:#202c33;color:#e8f0ee;box-shadow:none}
+` }} />
+      <div className="hp-chat" style={{ padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 380 }}>
         {chatMessages.map((m, i) => (
-          <div key={i} className={`cmsg cmsg${i}`} style={{ alignSelf: m.side === 'out' ? 'flex-end' : 'flex-start', backgroundColor: m.side === 'out' ? '#DCF8C6' : '#fff', borderRadius: m.side === 'out' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '10px 12px', maxWidth: m.side === 'out' ? '80%' : '84%', fontSize: 13.5, color: INK, boxShadow: m.side === 'in' ? '0 1px 2px rgba(0,0,0,.08)' : 'none' }}>
+          <div key={i} className={`cmsg cmsg${i} hp-b ${m.side}`} style={{ alignSelf: m.side === 'out' ? 'flex-end' : 'flex-start', borderRadius: m.side === 'out' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', maxWidth: m.side === 'out' ? '80%' : '84%' }}>
             {m.image ? <div style={{ backgroundColor: '#cde7b4', borderRadius: 8, padding: '16px 12px', textAlign: 'center', marginBottom: 6, fontSize: 22 }}>{m.image}</div> : null}
             {m.text}
           </div>

@@ -149,8 +149,10 @@ export default function CanIClaimPage() {
                 <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>Lekhio</div><div style={{ fontSize: 10.5, opacity: 0.85 }}>online</div></div>
               </div>
               <div style={{ background: '#ECE5DD', padding: '16px 13px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {/* Hardcoded light WhatsApp bubbles need hardcoded dark text: var(--tx)
+                    goes near white in dark mode and vanished on these surfaces. */}
                 {demo.map((m, i) => (
-                  <div key={i} style={{ alignSelf: m.side === 'out' ? 'flex-end' : 'flex-start', background: m.side === 'out' ? '#DCF8C6' : '#fff', borderRadius: m.side === 'out' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '9px 12px', maxWidth: '86%', fontSize: 13, color: INK, boxShadow: m.side === 'in' ? '0 1px 2px rgba(0,0,0,.08)' : 'none', lineHeight: 1.5 }}>{m.text}</div>
+                  <div key={i} style={{ alignSelf: m.side === 'out' ? 'flex-end' : 'flex-start', background: m.side === 'out' ? '#DCF8C6' : '#fff', borderRadius: m.side === 'out' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '9px 12px', maxWidth: '86%', fontSize: 13, color: '#111111', boxShadow: m.side === 'in' ? '0 1px 2px rgba(0,0,0,.08)' : 'none', lineHeight: 1.5 }}>{m.text}</div>
                 ))}
               </div>
             </div>

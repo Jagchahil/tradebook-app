@@ -571,8 +571,10 @@ export default function FileYourTaxReturnPage() {
         </div>
       </section>
 
-      {/* MTD heads up */}
-      <section style={{ background: RIVER_DEEP, color: '#fff' }}>
+      {/* MTD heads up. The band stays the deep brand blue in BOTH themes, so it is
+          hardcoded: var(--river-deep) flips to a light blue in dark mode and the
+          white text on it became unreadable. */}
+      <section style={{ background: '#134277', color: '#fff' }}>
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '54px 24px', textAlign: 'center' }}>
           <h2 style={{ fontSize: 25, fontWeight: 700, margin: '0 0 14px' }}>The once a year return is changing</h2>
           <p style={{ fontSize: 16.5, color: '#CFE0F2', lineHeight: 1.65, margin: '0 0 14px' }}>

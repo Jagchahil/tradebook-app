@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import OnboardingShow from './OnboardingShow';
 import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
@@ -279,6 +280,21 @@ export default function ProductPage() {
               <p>Rakha watches your numbers all year: the VAT threshold creeping closer, a State Pension year about to slip, the January bill quietly building. When something needs you, Rakha tells you first, in the app and on WhatsApp. It suggests, never acts. You decide everything.</p>
               <p className="hname">Rakha is Punjabi for guardian. Lekhio keeps your books. Rakha watches them.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* The journey: signup to a system that runs itself, animated */}
+      <section>
+        <div className="wrap">
+          <div className="center reveal" style={{ marginBottom: 34 }}>
+            <h2 className="h2">From first click to running itself.</h2>
+            <p style={{ fontSize: 17, color: 'var(--tx-mut)', maxWidth: 620, margin: '12px auto 0', lineHeight: 1.6 }}>
+              Onboarding is one journey across three places. Watch it play out: the website asks who you are, the app shows you around in sixty seconds, and WhatsApp finishes the setup. Then it just runs.
+            </p>
+          </div>
+          <div className="reveal">
+            <OnboardingShow />
           </div>
         </div>
       </section>

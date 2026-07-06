@@ -267,9 +267,10 @@ export default function ProductPage() {
           <div className="helpers reveal">
             <div className="helpercard ai">
               <div className="hic">📊</div>
-              <h3>Lekhio AI</h3>
+              <h3>Puchio</h3>
               <div className="htag">Answers when you ask</div>
-              <p>Your quick tax helper, in the chat. Ask anything about your tax, expenses, CIS, VAT or your own numbers, and get a straight answer in plain English, in seconds. No jargon, no waiting days for a reply.</p>
+              <p>Your AI tax helper, in the chat. Ask anything about your tax, expenses, CIS, VAT or your own numbers, and get a straight answer in plain English, in seconds. No jargon, no waiting days for a reply.</p>
+              <p className="hname">Puchio comes from puchh: ask. Go on, puchho.</p>
             </div>
             <div className="helpercard rakha">
               <div className="hic">🛡️</div>

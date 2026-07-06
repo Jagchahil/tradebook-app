@@ -29,6 +29,7 @@ import {
   markAgentSignalDelivered,
   logAgentDelivery,
   getActiveGoals,
+  listOverdueInvoices,
 } from '../../../../lib/supabase';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
 import { computeSignals, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
@@ -65,6 +66,7 @@ const TEMPLATE_FOR: Record<string, string> = {
   class2_pension_year: 'agent_deadline_alert',
   poa_cliff: 'agent_deadline_alert',
   quarter_unconfirmed: 'agent_deadline_alert',
+  invoice_chase: 'agent_deadline_alert',
   aia_timing: 'agent_opportunity',
 };
 
@@ -109,12 +111,14 @@ async function processUser(user: {
   // A user with no data produces no signals; skip the engine's edge cases early.
   if (agg.months.length === 0 && agg.unconfirmed === 0) return { inserted: 0, pinged: 0 };
 
-  const goals = await getActiveGoals(user.id);
+  const [goals, overdue] = await Promise.all([getActiveGoals(user.id), listOverdueInvoices(user.id)]);
   const input: AgentInput = {
     today: new Date(),
     months: agg.months,
     week: agg.week,
     property: agg.property,
+    invoices: overdue.map((i) => ({ ...i, link: `${APP_URL}/invoice/${i.id}` })),
+    categories: agg.categories,
     unconfirmedCount: agg.unconfirmed,
     equipmentSpendYtd: agg.equipment,
     studentLoanPlan: user.student_loan_plan,

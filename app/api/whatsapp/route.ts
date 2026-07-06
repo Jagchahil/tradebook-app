@@ -26,6 +26,7 @@ import {
   insertTransaction,
   listUserProperties,
   propertyYtdTotals,
+  listOverdueInvoices,
   transactionSummaryForUser,
   getSession,
   setSession,
@@ -69,6 +70,8 @@ import {
   matchRentIn,
   isPropertyQuestion,
   propertyAnswer,
+  matchChaseRequest,
+  chaseMessage,
   isGoalQuestion,
   isGoalDone,
   goalAnswer,
@@ -252,6 +255,8 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await sendText(from, deadlineAnswer());
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);
+          } else if (matchChaseRequest(text)) {
+            await handleChaseRequest(from, text);
           } else if (matchRentIn(text)) {
             await handleRentIn(from, text);
           } else if (isPropertyQuestion(text)) {
@@ -773,6 +778,37 @@ async function handleStudentLoanQuestion(from: string): Promise<void> {
 // "Rent 950 in from flat 2": rent is income in the property stream, tagged to
 // the property whose nickname appears in the message. Unmatched rent lands
 // untagged (the app shows it as General property) and still counts.
+// "Chase invoice 12" or "who owes me": Rakha drafts the message in the user's
+// voice, the user forwards it. Never sent by us, ever.
+async function handleChaseRequest(from: string, text: string): Promise<void> {
+  const req = matchChaseRequest(text);
+  if (!req) return;
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const overdue = await listOverdueInvoices(userId);
+  if (overdue.length === 0) {
+    await sendText(from, 'Nothing unpaid past its date. Tidy books, happy January.');
+    return;
+  }
+  const wanted = req.number
+    ? overdue.find((i) => i.number.toLowerCase().replace(/^0+(?=\d)/, '').includes(req.number as string))
+    : null;
+  const target = wanted ?? overdue[0];
+  const draft = chaseMessage(target.customer, target.number, target.total, target.daysOver, `${APP_URL}/invoice/${target.id}`);
+  const others = overdue.length - 1;
+  await sendText(
+    from,
+    `Invoice ${target.number} (${formatGbp(target.total)}, ${target.customer || 'customer'}) is ${target.daysOver} days over. Here is a chase in your voice, forward it as it is or tweak it first:`,
+  );
+  await sendText(from, draft);
+  if (others > 0 && !req.number) {
+    await sendText(from, `${others} more unpaid. Say "chase invoice" with the number for each.`);
+  }
+}
+
 async function handleRentIn(from: string, text: string): Promise<void> {
   const rent = matchRentIn(text);
   if (!rent) return;

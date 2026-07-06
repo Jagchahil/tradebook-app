@@ -14,6 +14,7 @@
 import { FACTS, soleTraderTax } from './taxengine';
 import { studentLoanForSA, STUDENT_PLANS, type StudentPlan } from './nistudentloan';
 import { aprilDelta, PROPERTY_FACTS } from './propertyengine';
+import { chaseMessage } from './waintents';
 
 // --- Input ---------------------------------------------------------------------
 
@@ -43,6 +44,12 @@ export interface AgentInput {
   // The property stream this tax year (doc 82 s4/s5d). Null when the RPC
   // predates the split; landlord signals then skip and VAT uses gross income.
   property: { rents: number; expenses: number; finance: number; rents12: number } | null;
+  // Overdue invoices for the chaser (doc 82 s5e item 3), oldest first, capped
+  // by the caller. Null skips; the link is the public invoice page.
+  invoices: Array<{ id: string; number: string; customer: string; total: number; daysOver: number; link: string }> | null;
+  // Distinct trade expense categories this tax year, lowercased. Null skips
+  // the completeness check (old RPC).
+  categories: string[] | null;
   unconfirmedCount: number;
   // Equipment and tools spend this tax year (confirmed, category tools or equipment).
   equipmentSpendYtd: number;
@@ -71,6 +78,7 @@ export interface AgentSignal {
 export const PING_PRIORITY_ORDER: string[] = [
   'mtd_combined_trap',
   'mtd_mandation',
+  'invoice_chase',
   'pa_taper',
   'goal_threshold_combo',
   'poa_cliff',
@@ -568,6 +576,54 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         body: `From 6 April 2027 property income gets its own rates (22%, 42%, 47%) and the mortgage interest credit moves to 22%. On your year so far, that is about ${gbp(delta.extraPerYear)} more per year. Nobody else will tell you this early. Nothing to do today, but pricing rent reviews and planning with the real number beats finding out in 2028.`,
         waText: `the April 2027 property rates would add about ${gbp(delta.extraPerYear)} a year on your current numbers`,
         numbers: { extraPerYear: delta.extraPerYear, billNow: delta.now.incomeTax, billThen: delta.then.incomeTax },
+      });
+    }
+  }
+
+  // 17. Expense completeness: the claims most tradespeople have that this user
+  // has not logged all year. Money left on the table, purely from category
+  // presence, no patterns needed. Fires once a year, after four months of data.
+  if (input.categories && d.monthsElapsed >= 4 && d.ytdExpenses > 500 && salary === 0) {
+    const seen = input.categories.map((c) => c.toLowerCase());
+    const has = (...words: string[]) => seen.some((c) => words.some((w) => c.includes(w)));
+    const missing: string[] = [];
+    if (!has('phone', 'mobile')) missing.push('phone and internet (the business share)');
+    if (!has('insurance')) missing.push('public liability or tool insurance');
+    if (!has('travel', 'fuel', 'mileage', 'diesel', 'petrol')) missing.push('mileage or fuel');
+    if (!has('tools', 'equipment')) missing.push('tools and equipment');
+    if (missing.length >= 2) {
+      out.push({
+        signalKey: 'expense_completeness',
+        periodKey: `${year}#chk`,
+        priority: 'card',
+        title: 'Claims most trades have that you have not logged',
+        body: `Nothing logged this year for: ${missing.join('; ')}. If you genuinely have none, ignore this. But most tradespeople do, and every missed claim is tax paid for nothing. Text them to Lekhio as they happen, even the small ones: it all comes off the bill.`,
+        waText: `you have logged nothing this year for ${missing.length} common claims (${missing[0]} among them), worth a look`,
+        numbers: { missingCount: missing.length, monthsIn: d.monthsElapsed },
+      });
+    }
+  }
+
+  // 16. The invoice chaser (doc 82 s5e item 3): Rakha DRAFTS, the user sends.
+  // A nudge tier at 14 days and a firmer tier at 30, each firing once per
+  // invoice per tier, at most two invoices per walk so nobody gets flooded.
+  if (input.invoices) {
+    for (const inv of input.invoices.slice(0, 2)) {
+      const tier = inv.daysOver >= 30 ? 30 : inv.daysOver >= 14 ? 14 : 0;
+      if (tier === 0) continue;
+      const draft = chaseMessage(inv.customer, inv.number, inv.total, inv.daysOver, inv.link);
+      out.push({
+        signalKey: 'invoice_chase',
+        periodKey: `inv-${inv.id.slice(0, 8)}#${tier}`,
+        priority: tier === 30 ? 'ping' : 'card',
+        title: `Invoice ${inv.number} is ${inv.daysOver} days unpaid`,
+        body: `${gbp(inv.total)} from ${inv.customer || 'your customer'} is still outstanding. Here is a chase written in your voice, ready to forward:
+
+"${draft}"
+
+Send it as it is or tweak it first. You send, never me. Most invoices get paid within days of a polite nudge.`,
+        waText: `invoice ${inv.number} (${gbp(inv.total)}, ${inv.customer || 'customer'}) is ${inv.daysOver} days unpaid, and I have a polite chase drafted for you, just say "chase invoice ${inv.number}"`,
+        numbers: { total: inv.total, daysOver: inv.daysOver, tier },
       });
     }
   }

@@ -488,3 +488,38 @@ export function propertyAnswer(
     : '';
   return `Property this tax year${where}: ${gbpShort(rents)} of rent in, adding about ${gbpShort(taxAdded)} to your tax bill (rent carries no National Insurance).${april}`;
 }
+
+// --- The invoice chaser (doc 82 s5e item 3) -------------------------------------
+// Rakha DRAFTS the chase in the user's own voice; the user forwards it. The
+// approval gate is the product: we never message a customer ourselves.
+
+export function chaseMessage(
+  customer: string,
+  number: string,
+  total: number,
+  daysOver: number,
+  link: string,
+): string {
+  const name = customer.trim() || 'there';
+  if (daysOver >= 30) {
+    return `Hi ${name}, invoice ${number} for ${gbpShort(total)} is now ${daysOver} days outstanding. I would appreciate payment this week so I can keep things straight on my side. Here it is again: ${link}. Thanks for sorting it.`;
+  }
+  return `Hi ${name}, hope all is well. Just a friendly nudge on invoice ${number} for ${gbpShort(total)}, sent ${daysOver} days ago. Here it is again in case it is handy: ${link}. Cheers.`;
+}
+
+// "chase invoice 12", "chase INV-0012", "chase up dave's invoice", "who owes me".
+export interface ChaseRequest {
+  number: string | null;
+}
+
+export function matchChaseRequest(body: string): ChaseRequest | null {
+  const low = body.trim().toLowerCase();
+  const owes = /\bwho owes me\b|\bunpaid invoices?\b|\boverdue invoices?\b/.test(low);
+  const chase = /\bchase\b/.test(low) && /\binvoice|\binv\b|\bowes|\bpayment\b/.test(low);
+  if (!owes && !chase) return null;
+  // The token must carry a digit: otherwise "inv" backtracks inside the word
+  // "invoice" and captures "oice" as a number.
+  const m = low.match(/\b(?:invoice|inv)[\s#-]*([a-z0-9-]*\d[a-z0-9-]*)\b/);
+  const raw = m ? m[1].replace(/^0+(?=\d)/, '') : null;
+  return { number: raw };
+}

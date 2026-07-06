@@ -853,6 +853,10 @@ as $$
       'expenses', coalesce((select sum(-amount) from tx where amount < 0 and d >= current_date - 7), 0),
       'activeDays', (select count(distinct d) from tx where d >= current_date - 7)
     ),
+    'categories', coalesce((
+      select jsonb_agg(distinct category) from tx, ty
+      where amount < 0 and income_type = 'trade' and d >= ty.start and category <> ''
+    ), '[]'::jsonb),
     'property', jsonb_build_object(
       'rents', coalesce((select sum(amount) from tx, ty where income_type = 'property' and amount >= 0 and d >= ty.start), 0),
       'expenses', coalesce((select sum(-amount) from tx, ty

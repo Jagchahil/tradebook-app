@@ -193,5 +193,23 @@ ok('no goals answer invites one', /my goal is/.test(gb));
   ok('answers carry no forbidden dashes', !/[\u2013\u2014\u2212]/.test(empty + full));
 }
 
+// --- The invoice chaser -----------------------------------------------------------
+{
+  ok('chase invoice with number', W.matchChaseRequest('chase invoice 12').number === '12');
+  ok('chase INV form', W.matchChaseRequest('chase INV-0012 payment').number === '0012'.replace(/^0+(?=\d)/, ''));
+  ok('who owes me matches', !!W.matchChaseRequest('who owes me'));
+  ok('unpaid invoices matches', !!W.matchChaseRequest('any unpaid invoices'));
+  ok('chase up without number', W.matchChaseRequest('chase up that invoice').number === null);
+  ok('plain chat never matches', !W.matchChaseRequest('going to chase some leads today'));
+  ok('rent logging never matches', !W.matchChaseRequest('rent 950 in from flat 2'));
+
+  const nudge = W.chaseMessage('Dave Wilson', '0012', 850, 18, 'https://x/i/1');
+  ok('14 day draft is friendly', nudge.includes('friendly nudge') && nudge.includes('£850') && nudge.includes('https://x/i/1'));
+  const firm = W.chaseMessage('Dave Wilson', '0012', 850, 34, 'https://x/i/1');
+  ok('30 day draft is firmer', firm.includes('outstanding') && firm.includes('this week'));
+  ok('empty customer falls back politely', W.chaseMessage('', '7', 100, 20, 'https://x').startsWith('Hi there'));
+  ok('drafts carry no forbidden dashes', !/[\u2013\u2014\u2212]/.test(nudge + firm));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

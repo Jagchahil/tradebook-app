@@ -13,10 +13,12 @@ const fix = (s) =>
   s
     .replace("from './taxengine'", "from './taxengine.ts'")
     .replace("from './nistudentloan'", "from './nistudentloan.ts'")
-    .replace("from './propertyengine'", "from './propertyengine.ts'");
+    .replace("from './propertyengine'", "from './propertyengine.ts'")
+    .replace("from './waintents'", "from './waintents.ts'");
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'nistudentloan.ts'), fix(readFileSync(path.join(lib, 'nistudentloan.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'propertyengine.ts'), fix(readFileSync(path.join(lib, 'propertyengine.ts'), 'utf8')));
+writeFileSync(path.join(stage, 'waintents.ts'), fix(readFileSync(path.join(lib, 'waintents.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'agent.ts'), fix(readFileSync(path.join(lib, 'agent.ts'), 'utf8')));
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);
 
@@ -60,6 +62,8 @@ function input(today, months, extra = {}) {
     months,
     week: null,
     property: null,
+    invoices: null,
+    categories: null,
     unconfirmedCount: 0,
     equipmentSpendYtd: 0,
     studentLoanPlan: null,
@@ -447,6 +451,59 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
     const found = [trap, s24, preview].find((x) => x && x.signalKey === key);
     ok(`${key}: no forbidden dashes`, found && !/[\u2013\u2014\u2212]/.test(found.title + found.body + found.waText));
   }
+}
+
+// --- signal 16: the invoice chaser (doc 82 s5e item 3) --------------------------------
+{
+  const today = new Date('2026-12-15T00:00:00Z');
+  const months = monthsFor(today, 6, { incomePerMonth: 3000, expensesPerMonth: 800 });
+  const inv = (daysOver, id = 'aaaabbbb-0000-0000-0000-000000000000') => ({
+    id, number: '0012', customer: 'Dave Wilson', total: 850, daysOver, link: 'https://example.com/invoice/x',
+  });
+
+  const s14 = find(A.computeSignals(input(today, months, { invoices: [inv(18)] })), 'invoice_chase');
+  ok('14 day tier fires as card', s14 && s14.priority === 'card');
+  ok('card carries the forwardable draft', s14.body.includes('Hi Dave Wilson') && s14.body.includes('£850'));
+  ok('draft includes the invoice link', s14.body.includes('https://example.com/invoice/x'));
+  ok('approval gate in the copy', s14.body.includes('You send, never me'));
+  eq('fire once per invoice per tier', s14.periodKey, 'inv-aaaabbbb#14');
+
+  const s30 = find(A.computeSignals(input(today, months, { invoices: [inv(34)] })), 'invoice_chase');
+  ok('30 day tier escalates to ping', s30 && s30.priority === 'ping');
+  ok('firmer tone at 30 days', s30.body.includes('outstanding'));
+  eq('the 30 tier has its own period key', s30.periodKey, 'inv-aaaabbbb#30');
+
+  const many = A.computeSignals(input(today, months, {
+    invoices: [inv(40, '11111111-0'), inv(35, '22222222-0'), inv(33, '33333333-0')],
+  })).filter((x) => x.signalKey === 'invoice_chase');
+  eq('never more than two chases per walk', many.length, 2);
+
+  ok('under 14 days stays quiet', !find(A.computeSignals(input(today, months, { invoices: [inv(9)] })), 'invoice_chase'));
+  ok('null invoices skip cleanly', !find(A.computeSignals(input(today, months)), 'invoice_chase'));
+  ok('chase copy has no forbidden dashes', !/[\u2013\u2014\u2212]/.test(s14.title + s14.body + s14.waText + s30.body));
+}
+
+// --- signal 17: expense completeness ---------------------------------------------------
+{
+  const today = new Date('2026-12-15T00:00:00Z');
+  const months = monthsFor(today, 8, { incomePerMonth: 3000, expensesPerMonth: 600 });
+  const sparse = find(A.computeSignals(input(today, months, { categories: ['materials', 'other'] })), 'expense_completeness');
+  ok('sparse categories fire the check', sparse && sparse.priority === 'card');
+  ok('missing claims are named', sparse.body.includes('insurance') && sparse.body.includes('fuel'));
+  ok('the escape hatch is honest', sparse.body.includes('If you genuinely have none, ignore this'));
+  const full = A.computeSignals(input(today, months, {
+    categories: ['materials', 'phone', 'insurance', 'travel', 'tools'],
+  }));
+  ok('complete categories stay quiet', !find(full, 'expense_completeness'));
+  const employee = A.computeSignals(input(today, months, { categories: ['materials'], employmentIncome: 30000 }));
+  ok('employees are not nagged about trade claims', !find(employee, 'expense_completeness'));
+  ok('null categories skip (old RPC)', !find(A.computeSignals(input(today, months)), 'expense_completeness'));
+  const early = new Date('2026-06-10T00:00:00Z');
+  ok('too early in the year stays quiet', !find(
+    A.computeSignals(input(early, monthsFor(early, 3, { incomePerMonth: 3000, expensesPerMonth: 600 }), { categories: ['materials'] })),
+    'expense_completeness',
+  ));
+  ok('completeness copy has no forbidden dashes', !/[\u2013\u2014\u2212]/.test(sparse.title + sparse.body + sparse.waText));
 }
 
 console.log(`agent: ${pass} passed, ${fail} failed`);

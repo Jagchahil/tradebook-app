@@ -1500,6 +1500,8 @@ export interface AgentAggregates {
   week: { income: number; expenses: number; activeDays: number } | null;
   // The property stream split (doc 82 s5d). Null until the RPC v3 runs on prod.
   property: { rents: number; expenses: number; finance: number; rents12: number } | null;
+  // Distinct trade expense categories this tax year. Null until RPC v5.
+  categories: string[] | null;
   unconfirmed: number;
   equipment: number;
 }
@@ -1517,6 +1519,7 @@ export async function agentAggregates(userId: string): Promise<AgentAggregates |
     months?: Array<{ month: string; income: number | string; expenses: number | string; cis: number | string }>;
     week?: { income?: number | string; expenses?: number | string; activeDays?: number | string } | null;
     property?: { rents?: number | string; expenses?: number | string; finance?: number | string; rents12?: number | string } | null;
+    categories?: string[] | null;
     unconfirmed?: number | string;
     equipment?: number | string;
   } | null;
@@ -1543,6 +1546,7 @@ export async function agentAggregates(userId: string): Promise<AgentAggregates |
           rents12: Number(j.property.rents12) || 0,
         }
       : null,
+    categories: Array.isArray(j.categories) ? j.categories.map((c) => String(c)) : null,
     unconfirmed: Number(j.unconfirmed) || 0,
     equipment: Number(j.equipment) || 0,
   };
@@ -1743,4 +1747,54 @@ export async function propertyYtdTotals(
     }
   }
   return { rents, expenses, finance };
+}
+
+// --- Overdue invoices for the chaser (doc 82 s5e item 3) ----------------------
+// Sent, unpaid, and past the reference date: the due date when one was set,
+// otherwise 14 days from issue. Capped at five, oldest first, so the agent
+// never floods anyone.
+
+export interface OverdueInvoice {
+  id: string;
+  number: string;
+  customer: string;
+  total: number;
+  daysOver: number;
+}
+
+export async function listOverdueInvoices(userId: string): Promise<OverdueInvoice[]> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}&status=eq.sent&select=id,number,customer_name,total,issued_date,due_date&order=issued_date.asc&limit=25`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  const rows = (await res.json().catch(() => [])) as Array<{
+    id: string;
+    number: string | null;
+    customer_name: string | null;
+    total: number | string;
+    issued_date: string | null;
+    due_date: string | null;
+  }>;
+  const now = Date.now();
+  const out: OverdueInvoice[] = [];
+  for (const r of rows) {
+    const ref = r.due_date ?? r.issued_date;
+    if (!ref) continue;
+    const days = Math.floor((now - new Date(`${ref}T00:00:00Z`).getTime()) / 86400000);
+    // With a due date, overdue starts the day after it. Without one, 14 days
+    // from issue is the polite nudge point.
+    const daysOver = r.due_date ? days : days - 14 >= 0 ? days : -1;
+    if (daysOver < 0 || (r.due_date && days <= 0)) continue;
+    out.push({
+      id: r.id,
+      number: r.number ?? '',
+      customer: r.customer_name ?? '',
+      total: Number(r.total) || 0,
+      daysOver: r.due_date ? days : days,
+    });
+    if (out.length >= 5) break;
+  }
+  return out;
 }

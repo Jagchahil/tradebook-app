@@ -1452,6 +1452,9 @@ export interface AgentUserRow {
   student_loan_plan: 'plan1' | 'plan2' | 'plan4' | 'plan5' | null;
   student_loan_postgrad: boolean;
   employment_income: number;
+  // Set by the app after the EAS rebuild that carries expo-notifications.
+  // Null means no lock screen delivery for this user yet.
+  expo_push_token: string | null;
 }
 
 // One keyset page of users for the nightly agent walk, ordered by id ascending.
@@ -1461,7 +1464,7 @@ export async function listAgentUsersPage(
 ): Promise<{ users: AgentUserRow[]; last: string | null }> {
   const { url } = config();
   const after = afterId ? `&id=gt.${encodeURIComponent(afterId)}` : '';
-  const query = `${url}/rest/v1/users?select=id,phone_number,student_loan_plan,student_loan_postgrad,employment_income&order=id.asc&limit=${limit}${after}`;
+  const query = `${url}/rest/v1/users?select=id,phone_number,student_loan_plan,student_loan_postgrad,employment_income,expo_push_token&order=id.asc&limit=${limit}${after}`;
   const res = await fetch(query, { headers: headers() });
   if (!res.ok) return { users: [], last: null };
   const rows = (await res.json().catch(() => [])) as Array<{
@@ -1470,6 +1473,7 @@ export async function listAgentUsersPage(
     student_loan_plan: string | null;
     student_loan_postgrad: boolean | null;
     employment_income: number | string | null;
+    expo_push_token: string | null;
   }>;
   const users: AgentUserRow[] = rows.map((r) => ({
     id: r.id,
@@ -1480,6 +1484,7 @@ export async function listAgentUsersPage(
         : null,
     student_loan_postgrad: Boolean(r.student_loan_postgrad),
     employment_income: Number(r.employment_income) || 0,
+    expo_push_token: r.expo_push_token ?? null,
   }));
   // A full page means there may be more; a short page is the end of the walk.
   return { users, last: users.length === limit ? users[users.length - 1].id : null };
@@ -1583,6 +1588,18 @@ export async function agentPingPref(userId: string): Promise<boolean> {
   const rows = (await res.json().catch(() => [])) as Array<{ agent_pings: boolean | null }>;
   if (rows.length === 0) return true;
   return rows[0].agent_pings !== false;
+}
+
+// "Rakha on your lock screen" (doc 82 s5c). Defaults on, like the WhatsApp
+// pings; a user with no prefs row has not opted out of anything.
+export async function agentPushPref(userId: string): Promise<boolean> {
+  const { url } = config();
+  const query = `${url}/rest/v1/reminder_prefs?user_id=eq.${encodeURIComponent(userId)}&select=agent_push&limit=1`;
+  const res = await fetch(query, { headers: headers() });
+  if (!res.ok) return true;
+  const rows = (await res.json().catch(() => [])) as Array<{ agent_push: boolean | null }>;
+  if (rows.length === 0) return true;
+  return rows[0].agent_push !== false;
 }
 
 export async function markAgentSignalDelivered(id: string): Promise<void> {

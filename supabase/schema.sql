@@ -879,3 +879,13 @@ drop policy if exists user_goals_own on public.user_goals;
 create policy user_goals_own on public.user_goals
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- Rakha on the lock screen (doc 82 section 5c). The token lands when the app
+-- gains expo-notifications in the next EAS rebuild; until then the column sits
+-- null and the cron's push path skips everyone. agent_push is the per user
+-- "Rakha on your lock screen" switch, on by default like agent_pings.
+-- ---------------------------------------------------------------------------
+alter table public.users add column if not exists expo_push_token text;
+alter table public.reminder_prefs add column if not exists agent_push boolean not null default true;
+notify pgrst, 'reload schema';

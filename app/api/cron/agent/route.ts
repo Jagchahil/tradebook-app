@@ -25,10 +25,12 @@ import {
   insertAgentSignals,
   agentPingsLast7Days,
   agentPingPref,
+  agentPushPref,
   markAgentSignalDelivered,
   logAgentDelivery,
   getActiveGoals,
 } from '../../../../lib/supabase';
+import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
 import { computeSignals, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
 
 export const runtime = 'nodejs';
@@ -99,6 +101,7 @@ async function processUser(user: {
   student_loan_plan: 'plan1' | 'plan2' | 'plan4' | 'plan5' | null;
   student_loan_postgrad: boolean;
   employment_income: number;
+  expo_push_token: string | null;
 }): Promise<{ inserted: number; pinged: number }> {
   const agg = await agentAggregates(user.id);
   if (!agg) return { inserted: 0, pinged: 0 };
@@ -150,6 +153,19 @@ async function processUser(user: {
         await markAgentSignalDelivered(row.id);
         await logAgentDelivery(user.id, row.signal_key);
         pinged++;
+      }
+    }
+  }
+
+  // Lock screen delivery (doc 82 s5c): ping priority only, the same caps
+  // already applied above, no template gate (push has no Meta approval step).
+  // Dormant until the EAS rebuild registers tokens: no token, no send.
+  if (newPings.length > 0 && isExpoPushToken(user.expo_push_token)) {
+    if (await agentPushPref(user.id)) {
+      for (const row of newPings) {
+        const s = bySignal.get(row.signal_key);
+        if (!s) continue;
+        await sendExpoPush(user.expo_push_token, s.title, s.waText);
       }
     }
   }

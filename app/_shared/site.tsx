@@ -303,6 +303,7 @@ export const freeTools = [
   { href: '/student-loan-checker', icon: '🎓', title: 'Student loan checker', body: 'Every plan, the 2026/27 thresholds, and the January lump if you work for yourself.' },
   { href: '/landlord-tax-calculator', icon: '🏠', title: 'Landlord tax calculator', body: 'Your rental tax now, and what the new April 2027 property rates will add. A year early.' },
   { href: '/rent-a-room-checker', icon: '🛏️', title: 'Rent a Room checker', body: 'Lodger income and the £7,500 rule: tax free or not, and the election most people miss.' },
+  { href: '/sole-trader-vs-limited', icon: '⚖️', title: 'Sole trader vs limited', body: 'Which keeps you more on 2026/27 rates, honestly, including the costs the folklore forgets.' },
 ];
 
 export const oldAccountant = [
@@ -848,6 +849,7 @@ export function SiteNav() {
         <Link href="/student-loan-checker">Student loan checker</Link>
         <Link href="/landlord-tax-calculator">Landlord tax calculator</Link>
         <Link href="/rent-a-room-checker">Rent a Room checker</Link>
+        <Link href="/sole-trader-vs-limited">Sole trader vs limited</Link>
         <Link href="/security">Security and trust</Link>
         <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
       </div>
@@ -880,8 +882,8 @@ export function SiteFooter() {
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: '52px 24px 40px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 32, marginBottom: 40 }}>
           {col('Product', [['/product', 'How it works'], ['/how-mtd-works', 'How MTD works'], ['/compare', 'Compare'], ['/pricing', 'Pricing'], ['/start', 'Sign up']])}
-          {col('Free tools', [['/tax-calculator', 'Tax calculator'], ['/cis-calculator', 'CIS refund calculator'], ['/landlord-tax-calculator', 'Landlord tax calculator'], ['/rent-a-room-checker', 'Rent a Room checker'], ['/invoice-generator', 'Invoice maker'], ['/ni-checker', 'NI checker'], ['/student-loan-checker', 'Student loan checker'], ['/can-i-claim', 'Can I claim it?'], ['/file-your-tax-return', 'File your return'], ['/resources', 'All tools']])}
-          {col('For your trade', TRADES.slice(0, 6).map((t) => [`/for/${t.slug}`, `For ${t.plural}`] as [string, string]))}
+          {col('Free tools', [['/tax-calculator', 'Tax calculator'], ['/cis-calculator', 'CIS refund calculator'], ['/landlord-tax-calculator', 'Landlord tax calculator'], ['/rent-a-room-checker', 'Rent a Room checker'], ['/sole-trader-vs-limited', 'Sole trader vs limited'], ['/invoice-generator', 'Invoice maker'], ['/ni-checker', 'NI checker'], ['/student-loan-checker', 'Student loan checker'], ['/can-i-claim', 'Can I claim it?'], ['/file-your-tax-return', 'File your return'], ['/resources', 'All tools']])}
+          {col('For your trade', [...TRADES.slice(0, 5).map((t) => [`/for/${t.slug}`, `For ${t.plural}`] as [string, string]), ['/for-landlords', 'For landlords'] as [string, string]])}
           {col('Company', [['/security', 'Security and trust'], ['/register-your-business', 'Register your business'], ['/privacy', 'Privacy'], ['/terms', 'Terms']])}
         </div>
         <div style={{ borderTop: '1px solid #2C2C2C', paddingTop: 24, display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>

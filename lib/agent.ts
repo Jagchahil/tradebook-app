@@ -290,24 +290,29 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
     }
   }
 
-  // G4. Monthly progress against a dated goal, only while it is still short.
+  // G4. Monthly progress while a goal is still short. A dated goal gets the
+  // weekly pacing; an undated goal still gets its gentle monthly pulse.
   if (canProject) {
     const monthKeyNow = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, '0')}`;
     for (const g of input.goals) {
-      if (!g.targetDate || potNow >= g.amount) continue;
-      const target = new Date(`${g.targetDate}T00:00:00Z`);
-      const weeksLeft = Math.max(1, Math.round((target.getTime() - today.getTime()) / (7 * DAY_MS)));
-      if (target <= today) continue;
+      if (potNow >= g.amount) continue;
+      const target = g.targetDate ? new Date(`${g.targetDate}T00:00:00Z`) : null;
+      if (target && target <= today) continue;
       const gap = g.amount - potNow;
-      const perWeek = Math.ceil(gap / weeksLeft);
+      const weeksLeft = target ? Math.max(1, Math.round((target.getTime() - today.getTime()) / (7 * DAY_MS))) : 0;
+      const perWeek = target ? Math.ceil(gap / weeksLeft) : 0;
       out.push({
         signalKey: 'goal_progress',
         periodKey: `${monthKeyNow}#g${g.id.slice(0, 8)}`,
         priority: 'card',
         title: `"${g.title}": ${gbp(potNow)} of ${gbp(g.amount)} covered`,
-        body: `Towards "${g.title}" by ${target.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}: your after tax earnings this year cover ${gbp(potNow)} of the ${gbp(g.amount)}. Clearing about ${gbp(perWeek)} a week from here gets you there on time.`,
-        waText: `"${g.title}": ${gbp(potNow)} of ${gbp(g.amount)} covered, about ${gbp(perWeek)} a week keeps you on track`,
-        numbers: { pot: potNow, goalAmount: g.amount, perWeek, weeksLeft },
+        body: target
+          ? `Towards "${g.title}" by ${target.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}: your after tax earnings this year cover ${gbp(potNow)} of the ${gbp(g.amount)}. Clearing about ${gbp(perWeek)} a week from here gets you there on time.`
+          : `Towards "${g.title}": your after tax earnings this year cover ${gbp(potNow)} of the ${gbp(g.amount)}. ${gbp(gap)} to go. Give it a date in Money, Goals and I will pace it for you week by week.`,
+        waText: target
+          ? `"${g.title}": ${gbp(potNow)} of ${gbp(g.amount)} covered, about ${gbp(perWeek)} a week keeps you on track`
+          : `"${g.title}": ${gbp(potNow)} of ${gbp(g.amount)} covered, ${gbp(gap)} to go`,
+        numbers: target ? { pot: potNow, goalAmount: g.amount, perWeek, weeksLeft } : { pot: potNow, goalAmount: g.amount, gap },
       });
     }
   }

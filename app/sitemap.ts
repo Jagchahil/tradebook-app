@@ -18,6 +18,8 @@ const ROUTES = [
   'student-loan-checker',
   'landlord-tax-calculator',
   'rent-a-room-checker',
+  'sole-trader-vs-limited',
+  'for-landlords',
   'can-i-claim',
   'file-your-tax-return',
   'register-your-business',

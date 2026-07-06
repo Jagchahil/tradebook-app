@@ -506,5 +506,20 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   ok('completeness copy has no forbidden dashes', !/[\u2013\u2014\u2212]/.test(sparse.title + sparse.body + sparse.waText));
 }
 
+// --- undated goals still get the monthly pulse ------------------------------------------
+{
+  const today = new Date('2026-12-15T00:00:00Z');
+  const months = monthsFor(today, 8, { incomePerMonth: 4000, expensesPerMonth: 1000 });
+  const g = find(
+    A.computeSignals(input(today, months, {
+      goals: [{ id: 'ffffeeee-0000-0000-0000-000000000000', kind: 'purchase', title: 'van', amount: 40000, targetDate: null }],
+    })),
+    'goal_progress',
+  );
+  ok('undated goal pulses monthly', !!g);
+  ok('undated pulse invites a date', g.body.includes('Give it a date'));
+  ok('no weekly pacing without a date', !g.body.includes('a week from here'));
+}
+
 console.log(`agent: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

@@ -44,6 +44,7 @@ import {
   getActiveGoals,
   insertUserGoal,
   completeLatestGoal,
+  setEmploymentIncome,
 } from '../../../lib/supabase';
 import {
   parseMoneyEntryRegex,
@@ -72,6 +73,8 @@ import {
   propertyAnswer,
   matchChaseRequest,
   chaseMessage,
+  isSetupRequest,
+  matchSalarySet,
   isGoalQuestion,
   isGoalDone,
   goalAnswer,
@@ -255,6 +258,10 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await sendText(from, deadlineAnswer());
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);
+          } else if (isSetupRequest(text)) {
+            await handleSetupStart(from);
+          } else if (matchSalarySet(text) !== null) {
+            await handleSalarySet(from, text);
           } else if (matchChaseRequest(text)) {
             await handleChaseRequest(from, text);
           } else if (matchRentIn(text)) {
@@ -370,6 +377,53 @@ async function handleButtonReply(from: string, buttonId: string): Promise<void> 
   }
   if (buttonId === 'wk_help') {
     await handleHelp(from);
+    return;
+  }
+  // The guided setup chain (stateless: every button carries the next step).
+  if (buttonId === 'su_sl_yes') {
+    await sendButtons(from, 'Which plan? Started uni 2012 to 2023 in England or Wales is usually Plan 2. From 2023 is Plan 5.', [
+      { id: 'su_plan_1', title: 'Plan 1' },
+      { id: 'su_plan_2', title: 'Plan 2' },
+      { id: 'su_plan_other', title: 'Other / not sure' },
+    ]);
+    return;
+  }
+  if (buttonId === 'su_plan_other') {
+    await sendText(from, 'No bother. Text it when you know, like "plan 4", "plan 5" or "postgrad", and it saves itself. Next question:');
+    await askSetupJob(from);
+    return;
+  }
+  if (buttonId === 'su_plan_1' || buttonId === 'su_plan_2') {
+    const userId = await findUserIdByPhone(from);
+    if (userId) await setStudentLoanPlan(userId, buttonId === 'su_plan_1' ? 'plan1' : 'plan2');
+    await sendText(from, 'Saved ✓ Your set aside number now includes the loan automatically.');
+    await askSetupJob(from);
+    return;
+  }
+  if (buttonId === 'su_sl_no') {
+    await askSetupJob(from);
+    return;
+  }
+  if (buttonId === 'su_job_yes') {
+    await sendText(from, 'Text your yearly salary before tax, like "salary 32000". It sharpens every number: the loan, the bands, the set aside.');
+    return;
+  }
+  if (buttonId === 'su_job_no') {
+    await askSetupProperty(from);
+    return;
+  }
+  if (buttonId === 'su_prop_yes') {
+    await sendText(
+      from,
+      'Then two habits and you are covered: text rent as it lands, like "rent 950 in from flat 2", and add the property once in the app under Money, Your properties, so everything tags itself. Setup done 🎉 Send a receipt photo any time.',
+    );
+    return;
+  }
+  if (buttonId === 'su_prop_no') {
+    await sendText(
+      from,
+      'Setup done 🎉 From here it is just: photo any receipt, text any expense, and ask me anything. Your quarterly figures build themselves and nothing ever goes to HMRC without your yes.',
+    );
     return;
   }
   // An unknown button id (future flows): fall back to the help list.
@@ -778,6 +832,56 @@ async function handleStudentLoanQuestion(from: string): Promise<void> {
 // "Rent 950 in from flat 2": rent is income in the property stream, tagged to
 // the property whose nickname appears in the message. Unmatched rent lands
 // untagged (the app shows it as General property) and still counts.
+// The guided setup (stateless button chain). Two minutes, thumb only.
+async function handleSetupStart(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  await sendButtons(
+    from,
+    'Two minutes, all by tap, and every number gets sharper. First: do you have a student loan?',
+    [
+      { id: 'su_sl_yes', title: 'Yes' },
+      { id: 'su_sl_no', title: 'No' },
+    ],
+    'Lekhio setup · 1 of 3',
+  );
+}
+
+async function askSetupJob(from: string): Promise<void> {
+  await sendButtons(from, 'Do you also have a PAYE job alongside the business?', [
+    { id: 'su_job_yes', title: 'Yes' },
+    { id: 'su_job_no', title: 'No' },
+  ], 'Lekhio setup · 2 of 3');
+}
+
+async function askSetupProperty(from: string): Promise<void> {
+  await sendButtons(from, 'Last one: do you rent out a property?', [
+    { id: 'su_prop_yes', title: 'Yes' },
+    { id: 'su_prop_no', title: 'No' },
+  ], 'Lekhio setup · 3 of 3');
+}
+
+// "salary 32000": saves the PAYE salary and continues the setup chain.
+async function handleSalarySet(from: string, text: string): Promise<void> {
+  const amount = matchSalarySet(text);
+  if (amount === null) return;
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const ok = await setEmploymentIncome(userId, amount);
+  if (!ok) {
+    await sendText(from, 'I could not save that just now. Try again in a minute.');
+    return;
+  }
+  await sendText(from, `Salary saved: ${formatGbp(amount)} ✓ Your loan, your bands and your set aside all use it now.`);
+  await askSetupProperty(from);
+}
+
 // "Chase invoice 12" or "who owes me": Rakha drafts the message in the user's
 // voice, the user forwards it. Never sent by us, ever.
 async function handleChaseRequest(from: string, text: string): Promise<void> {

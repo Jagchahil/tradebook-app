@@ -211,5 +211,20 @@ ok('no goals answer invites one', /my goal is/.test(gb));
   ok('drafts carry no forbidden dashes', !/[\u2013\u2014\u2212]/.test(nudge + firm));
 }
 
+// --- The guided setup --------------------------------------------------------------
+{
+  ok('setup matches', W.isSetupRequest('setup'));
+  ok('set me up matches', W.isSetupRequest('set me up'));
+  ok('a question never starts setup', !W.isSetupRequest('how do i set up a limited company?'));
+  ok('chat about setup does not trigger', !W.isSetupRequest('the site setup took ages'));
+
+  ok('salary 32000 saves', W.matchSalarySet('salary 32000') === 32000);
+  ok('my salary is 28,500', W.matchSalarySet('my salary is 28,500') === 28500);
+  ok('i earn 45k', W.matchSalarySet('i earn 45k') === 45000);
+  ok('rent never reads as salary', W.matchSalarySet('rent 950 in from flat 2') === null);
+  ok('a salary question stays a question', W.matchSalarySet('what salary should i pay myself?') === null);
+  ok('tiny numbers rejected', W.matchSalarySet('salary 5') === null);
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

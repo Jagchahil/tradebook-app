@@ -523,3 +523,27 @@ export function matchChaseRequest(body: string): ChaseRequest | null {
   const raw = m ? m[1].replace(/^0+(?=\d)/, '') : null;
   return { number: raw };
 }
+
+
+// --- The guided setup (the complete system run, 6 July) --------------------------
+// Stateless on purpose: each button leads to the next question, and the free
+// text setters (plan 2, salary 32000) already exist as intents, so there is no
+// conversation state to store or lose.
+
+export function isSetupRequest(body: string): boolean {
+  const b = body.trim().toLowerCase();
+  if (b.includes('?')) return false;
+  return /^(set ?up|setup|set me up|get set up|onboard me?)$/.test(b) || /\b(set me up|run setup|start setup)\b/.test(b);
+}
+
+// "salary 32000", "my salary is 32k", "i earn 28,500". Strict: the word and an
+// amount, and never anything that smells like rent or an expense.
+export function matchSalarySet(body: string): number | null {
+  const low = body.trim().toLowerCase();
+  if (!/\b(salary|i earn|my wage)\b/.test(low)) return null;
+  if (/\b(rent|spent|paid for|invoice)\b/.test(low)) return null;
+  if (low.includes('?')) return null;
+  const amount = extractMoneyAmount(low);
+  if (!amount || amount < 1000 || amount > 1000000) return null;
+  return amount;
+}

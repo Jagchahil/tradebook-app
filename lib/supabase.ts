@@ -1447,6 +1447,17 @@ export async function setStudentLoanPlan(
   return res.ok;
 }
 
+// The PAYE salary from the WhatsApp setup flow ("salary 32000").
+export async function setEmploymentIncome(userId: string, amount: number): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ employment_income: Math.max(0, Math.round(amount)) }),
+  });
+  return res.ok;
+}
+
 // --- The Agentic Accountant v1 (doc 84) --------------------------------------
 
 export interface AgentUserRow {

@@ -16,6 +16,8 @@ const ROUTES = [
   'invoice-generator',
   'ni-checker',
   'student-loan-checker',
+  'landlord-tax-calculator',
+  'rent-a-room-checker',
   'can-i-claim',
   'file-your-tax-return',
   'register-your-business',

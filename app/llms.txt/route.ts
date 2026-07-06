@@ -36,6 +36,8 @@ Making Tax Digital for Income Tax began on 6 April 2026. Sole traders and landlo
 - Can I claim it, an allowable expenses guide: /can-i-claim
 - National Insurance checker, Class 1, 2 and 4 with State Pension year status: /ni-checker
 - Student loan repayment checker, all plans including the Self Assessment lump: /student-loan-checker
+- Landlord tax calculator, the bill now and under the April 2027 property rates (22/42/47, Section 24 at 22 percent): /landlord-tax-calculator
+- Rent a Room checker, the £7,500 lodger allowance and the opt in election: /rent-a-room-checker
 - Register your business, a free guide: /register-your-business
 - File your own tax return, a free guide: /file-your-tax-return
 

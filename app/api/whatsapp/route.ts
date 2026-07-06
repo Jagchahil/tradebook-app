@@ -24,6 +24,8 @@ import {
   findUserIdByPhone,
   claimMessage,
   insertTransaction,
+  listUserProperties,
+  propertyYtdTotals,
   transactionSummaryForUser,
   getSession,
   setSession,
@@ -64,11 +66,15 @@ import {
   niAnswer,
   studentLoanAnswer,
   matchGoalSet,
+  matchRentIn,
+  isPropertyQuestion,
+  propertyAnswer,
   isGoalQuestion,
   isGoalDone,
   goalAnswer,
 } from '../../../lib/waintents';
 import { soleTraderTax } from '../../../lib/taxengine';
+import { aprilDelta } from '../../../lib/propertyengine';
 import { niPosition, studentLoanRepayment, studentLoanForSA, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
 import type { TradeInfo } from '../../../lib/taxguide';
@@ -246,6 +252,10 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await sendText(from, deadlineAnswer());
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);
+          } else if (matchRentIn(text)) {
+            await handleRentIn(from, text);
+          } else if (isPropertyQuestion(text)) {
+            await handlePropertyQuestion(from);
           } else if (matchGoalSet(text)) {
             await handleGoalSet(from, text);
           } else if (isGoalDone(text)) {
@@ -760,6 +770,71 @@ async function handleStudentLoanQuestion(from: string): Promise<void> {
 }
 
 // "My goal is a van for 24k": create the goal in the user's own words.
+// "Rent 950 in from flat 2": rent is income in the property stream, tagged to
+// the property whose nickname appears in the message. Unmatched rent lands
+// untagged (the app shows it as General property) and still counts.
+async function handleRentIn(from: string, text: string): Promise<void> {
+  const rent = matchRentIn(text);
+  if (!rent) return;
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const properties = await listUserProperties(userId);
+  const needle = (rent.property ?? '').toLowerCase();
+  const match = properties.find((p) => {
+    const nick = p.nickname.toLowerCase();
+    return needle.length > 0 && (nick.includes(needle) || needle.includes(nick));
+  });
+  await insertTransaction({
+    user_id: userId,
+    vendor: match?.nickname ?? (rent.property ? rent.property : 'Rent'),
+    amount: Math.abs(rent.amount),
+    category: 'rent',
+    transaction_date: new Date().toISOString().slice(0, 10),
+    source_type: 'whatsapp_text',
+    confirmed: false,
+    income_type: 'property',
+    property_id: match?.id ?? null,
+  });
+  const whereLine = match
+    ? ` from ${match.nickname}`
+    : rent.property
+      ? ` from ${rent.property} (add it as a property in the app and future rent tags itself)`
+      : '';
+  await sendText(
+    from,
+    `Rent in: ${formatGbp(rent.amount)}${whereLine} 🏠 Logged to your property stream, its own tax rules, ready for your yes in the app.`,
+  );
+}
+
+// "How are my properties doing": this year's stream plus the April 2027 line,
+// the same engine as the app and the website calculator.
+async function handlePropertyQuestion(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const [totals, tradeTotals, properties, profile] = await Promise.all([
+    propertyYtdTotals(userId, taxYearSinceISO()),
+    totalsForUser(userId, taxYearSinceISO(), null),
+    listUserProperties(userId),
+    getStudentLoanSettings(userId),
+  ]);
+  const tradeProfit = Math.max(0, (tradeTotals?.income ?? 0) - (tradeTotals?.expenses ?? 0) - totals.rents + totals.expenses + totals.finance);
+  const d = aprilDelta({
+    employmentIncome: profile?.employmentIncome ?? 0,
+    tradeProfit,
+    rents: totals.rents,
+    propertyExpenses: totals.expenses,
+    financeCosts: totals.finance,
+    jointShare: 1,
+  });
+  await sendText(from, propertyAnswer(totals.rents, d.now.taxCausedByProperty, d.extraPerYear, properties.length));
+}
+
 async function handleGoalSet(from: string, text: string): Promise<void> {
   const goal = matchGoalSet(text);
   if (!goal) return;

@@ -165,5 +165,33 @@ ok('goal answer shows coverage', /12,000\.00/.test(ga) && /50%/.test(ga));
 const gb = W.goalAnswer([], 0);
 ok('no goals answer invites one', /my goal is/.test(gb));
 
+// --- Property: rent in and the property question ---------------------------------
+{
+  const a = W.matchRentIn('rent 950 in from flat 2');
+  ok('rent in from a property matches', a && a.amount === 950 && a.property === 'flat 2');
+  const b = W.matchRentIn('received rent 800');
+  ok('received rent matches without a property', b && b.amount === 800 && b.property === null);
+  const c = W.matchRentIn('rent in 1200 from the leeds house');
+  ok('the strips from the nickname', c && c.property === 'leeds house');
+  ok('paying rent out never matches', !W.matchRentIn('paid 950 rent for the yard'));
+  ok('a rent question never matches', !W.matchRentIn('how much rent did I get?'));
+  ok('rent with no amount never matches', !W.matchRentIn('rent came in from flat 2'));
+  ok('rent with no direction never matches', !W.matchRentIn('rent 950'));
+  ok('tenant paid me counts as incoming', !!W.matchRentIn('tenant paid me 950 rent in'));
+
+  ok('property question matches', W.isPropertyQuestion('how are my properties doing'));
+  ok('rental tax question matches', W.isPropertyQuestion('what tax do I owe on my rental'));
+  ok('logging never reads as a question', !W.isPropertyQuestion('rent 950 in from flat 2'));
+  ok('plain trade totals stay out', !W.isPropertyQuestion('how much have I made'));
+
+  const empty = W.propertyAnswer(0, 0, 0, 0);
+  ok('no rent answer teaches the intent', /rent 950 in from flat 2/.test(empty));
+  const full = W.propertyAnswer(12000, 800, 80, 2);
+  ok('answer carries the figures', /£12,000/.test(full) && /£800/.test(full) && /2 properties/.test(full));
+  ok('answer warns about April 2027', /April 2027/.test(full) && /£80/.test(full));
+  ok('no NI line present', /no National Insurance/.test(full));
+  ok('answers carry no forbidden dashes', !/[\u2013\u2014\u2212]/.test(empty + full));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

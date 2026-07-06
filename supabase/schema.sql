@@ -889,3 +889,30 @@ notify pgrst, 'reload schema';
 alter table public.users add column if not exists expo_push_token text;
 alter table public.reminder_prefs add column if not exists agent_push boolean not null default true;
 notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- The property stream (doc 82 section 4, Phase E). No landlord mode: a
+-- transaction simply belongs to a stream, trade by default so nothing
+-- existing changes. Properties give rents a home per address; joint_share is
+-- this user's ownership share (0 to 1) and scales their figures.
+-- ---------------------------------------------------------------------------
+create table if not exists public.properties (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  nickname text not null,
+  joint_share numeric not null default 1 check (joint_share > 0 and joint_share <= 1),
+  created_at timestamptz not null default now()
+);
+alter table public.properties enable row level security;
+drop policy if exists properties_own on public.properties;
+create policy properties_own on public.properties
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table public.transactions add column if not exists income_type text not null default 'trade';
+alter table public.transactions drop constraint if exists transactions_income_type_check;
+alter table public.transactions add constraint transactions_income_type_check
+  check (income_type in ('trade', 'property'));
+alter table public.transactions add column if not exists property_id uuid references public.properties(id) on delete set null;
+create index if not exists transactions_user_stream
+  on public.transactions(user_id, income_type);
+notify pgrst, 'reload schema';

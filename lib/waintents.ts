@@ -428,3 +428,63 @@ export function goalAnswer(goals: { title: string; amount: number }[], pot: numb
   });
   return `${lines.join('. ')}. That is measured against what your business has cleared after tax this year. Rakha keeps these in mind and will tell you when timing or tax works in your favour.`;
 }
+
+// --- Property (doc 82 s4, Phase E) --------------------------------------------
+// Rent arriving is a logging action, so the matcher is deliberately strict:
+// the word rent plus an amount plus a clearly incoming direction. "Paid 950
+// rent for the yard" is the user PAYING rent (a trade expense) and must not
+// match; a question must not match either.
+
+const gbpShort = (n: number) => `£${Math.round(Math.abs(n)).toLocaleString('en-GB')}`;
+
+export interface RentIn {
+  amount: number;
+  property: string | null; // nickname text after "from", if any
+}
+
+export function matchRentIn(body: string): RentIn | null {
+  const low = body.trim().toLowerCase();
+  if (!/\brent(al)?\b/.test(low)) return null;
+  if (low.includes('?')) return null;
+  // Paying rent out, unless it was paid TO the user.
+  if (/\b(paid|paying|pay)\b/.test(low) && !/\b(paid me|paid in)\b/.test(low)) return null;
+  // The amount must sit before any "from": otherwise "flat 2" reads as 2.
+  const amount = extractMoneyAmount(low.split(/\bfrom\b/)[0]);
+  if (!amount) return null;
+  const incoming = /\b(in|came|received|got|landed)\b/.test(low) || /\bfrom\b/.test(low);
+  if (!incoming) return null;
+  const m = low.match(/\bfrom\s+(.+)$/);
+  let property: string | null = null;
+  if (m) {
+    property = m[1]
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\b(the|my)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() || null;
+  }
+  return { amount, property };
+}
+
+export function isPropertyQuestion(body: string): boolean {
+  const b = body.trim().toLowerCase();
+  if (extractMoneyAmount(b)) return false;
+  return /\b(propert(y|ies)|rentals?|landlord)\b/.test(b) && /\b(how|what|doing|going|position|tax|owe)\b/.test(b);
+}
+
+// The property position in one message: this year's stream plus the April
+// 2027 line, the same engine as the app and the website tool.
+export function propertyAnswer(
+  rents: number,
+  taxAdded: number,
+  extra2027: number,
+  propertyCount: number,
+): string {
+  if (rents <= 0) {
+    return 'No rental money logged this tax year yet. Text it as it lands, like "rent 950 in from flat 2", and I will keep your property stream separate from your work money, ready for tax.';
+  }
+  const where = propertyCount > 0 ? ` across ${propertyCount} ${propertyCount === 1 ? 'property' : 'properties'}` : '';
+  const april = extra2027 > 0
+    ? ` Heads up: the new property rates from April 2027 would add about ${gbpShort(extra2027)} a year on these numbers. You will hear it from me first, not from a January surprise.`
+    : '';
+  return `Property this tax year${where}: ${gbpShort(rents)} of rent in, adding about ${gbpShort(taxAdded)} to your tax bill (rent carries no National Insurance).${april}`;
+}

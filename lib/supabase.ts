@@ -174,6 +174,9 @@ export interface NewTransaction {
   confirmed?: boolean;
   raw_whatsapp_message_id?: string | null;
   cis_deduction?: number | null;
+  // The stream (doc 82 s4): trade by default, property for rental money.
+  income_type?: 'trade' | 'property';
+  property_id?: string | null;
 }
 
 // Find the Lekhio user whose stored phone matches this WhatsApp sender.
@@ -1683,4 +1686,50 @@ export async function completeLatestGoal(userId: string): Promise<string | null>
     body: JSON.stringify({ status: 'done', updated_at: new Date().toISOString() }),
   });
   return res.ok ? goals[0].title : null;
+}
+
+// --- Properties, service role side (doc 82 s4) --------------------------------
+export interface UserProperty {
+  id: string;
+  nickname: string;
+  joint_share: number;
+}
+
+export async function listUserProperties(userId: string): Promise<UserProperty[]> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/properties?user_id=eq.${encodeURIComponent(userId)}&select=id,nickname,joint_share&order=created_at.asc`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  const rows = (await res.json().catch(() => [])) as Array<{ id: string; nickname: string; joint_share: number | string }>;
+  return rows.map((r) => ({ id: r.id, nickname: r.nickname, joint_share: Number(r.joint_share) || 1 }));
+}
+
+// Confirmed property stream totals for the tax year, split so the engine can
+// treat mortgage interest as the Section 24 credit rather than an expense.
+export async function propertyYtdTotals(
+  userId: string,
+  sinceISO: string,
+): Promise<{ rents: number; expenses: number; finance: number }> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&income_type=eq.property&confirmed=eq.true&transaction_date=gte.${sinceISO}&select=amount,category,vendor`,
+    { headers: headers() },
+  );
+  if (!res.ok) return { rents: 0, expenses: 0, finance: 0 };
+  const rows = (await res.json().catch(() => [])) as Array<{ amount: number | string; category: string | null; vendor: string | null }>;
+  let rents = 0;
+  let expenses = 0;
+  let finance = 0;
+  for (const r of rows) {
+    const a = Number(r.amount) || 0;
+    if (a > 0) rents += a;
+    else {
+      const hay = `${r.category ?? ''} ${r.vendor ?? ''}`.toLowerCase();
+      if (hay.includes('mortgage') || hay.includes('interest')) finance += Math.abs(a);
+      else expenses += Math.abs(a);
+    }
+  }
+  return { rents, expenses, finance };
 }

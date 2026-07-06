@@ -952,6 +952,61 @@ export async function transactionSummaryForUser(userId: string, limit = 60): Pro
     .join('\n');
 }
 
+// The quarter end pack (lib/quarterpack.ts) needs the user's CONFIRMED entries
+// for a date range, in the engine sign convention, plus the property stream and
+// any CIS suffered. Only confirmed rows count, exactly like every total in the
+// product, so nothing unapproved reaches the accountant's summary.
+export interface PackRow {
+  amount: number;
+  category: string | null;
+  vendor: string | null;
+  transaction_date: string;
+  cis_deduction: number | null;
+  income_type: string | null;
+}
+
+export async function getConfirmedTransactionsForRange(
+  userId: string,
+  startISO: string,
+  endISO: string,
+): Promise<PackRow[]> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+      `&confirmed=eq.true` +
+      `&transaction_date=gte.${encodeURIComponent(startISO)}` +
+      `&transaction_date=lte.${encodeURIComponent(endISO)}` +
+      `&select=amount,category,vendor,transaction_date,cis_deduction,income_type` +
+      `&order=transaction_date.asc&limit=5000`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  const rows = (await res.json()) as Array<Record<string, unknown>>;
+  return rows
+    .filter((r) => typeof r.transaction_date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(r.transaction_date as string))
+    .map((r) => ({
+      amount: Number(r.amount) || 0,
+      category: (r.category as string | null) ?? null,
+      vendor: (r.vendor as string | null) ?? null,
+      transaction_date: (r.transaction_date as string).slice(0, 10),
+      cis_deduction: r.cis_deduction == null ? null : Number(r.cis_deduction),
+      income_type: (r.income_type as string | null) ?? null,
+    }));
+}
+
+// The trader's own business name for the pack header, business_name preferred
+// then their name, else null (the pack falls back to a neutral label).
+export async function getBusinessName(userId: string): Promise<string | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=name,business_name&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ name?: string | null; business_name?: string | null }>;
+  return rows[0]?.business_name || rows[0]?.name || null;
+}
+
 // Mark an invoice paid from the server (Stripe webhook) and book the income,
 // once only. Safe to call more than once for the same invoice.
 export async function markInvoicePaidServer(

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyStripeSignature, getStripeSubscription } from '../../../../lib/stripe';
-import { markInvoicePaidServer, upsertSubscription, SubscriptionRecord } from '../../../../lib/supabase';
+import { markInvoicePaidServer, upsertSubscription } from '../../../../lib/supabase';
+import { claimResultFromStatus, subscriptionRowFrom, ClaimResult } from '../../../../lib/stripewebhook';
 
 // Stripe calls this for two kinds of money:
 //   1. A customer paying one of our users' invoices (mode: payment).
@@ -16,9 +17,9 @@ import { markInvoicePaidServer, upsertSubscription, SubscriptionRecord } from '.
 //   409  we already processed it             -> caller returns 200, does nothing
 //   anything else (network, config)          -> fail open (process), but log it,
 //                                               so a real event is never dropped.
-// Never store event contents here, only the id and type.
-type ClaimResult = 'new' | 'duplicate';
-
+// Never store event contents here, only the id and type. The pure status->result
+// mapping (and its fail-open policy) lives in lib/stripewebhook.ts and is unit
+// tested; this wrapper only owns the network insert.
 async function claimStripeEvent(id: string, type: string | undefined): Promise<ClaimResult> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -39,47 +40,16 @@ async function claimStripeEvent(id: string, type: string | undefined): Promise<C
       },
       body: JSON.stringify({ id, type: type ?? null }),
     });
-    if (res.status === 201) return 'new';
-    if (res.status === 409) return 'duplicate'; // primary key conflict, already seen
-    // Any other status is unexpected. Fail open so a real event is never lost.
-    console.error('[stripe webhook] Unexpected idempotency claim status:', res.status);
-    return 'new';
+    if (res.status !== 201 && res.status !== 409) {
+      // Unexpected status is logged, then treated as 'new' (fail open) below.
+      console.error('[stripe webhook] Unexpected idempotency claim status:', res.status);
+    }
+    return claimResultFromStatus(res.status);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
     console.error('[stripe webhook] Idempotency claim failed, processing anyway:', message);
     return 'new';
   }
-}
-
-// Turn a Stripe subscription object into the row we store. Pulls the live price
-// and renewal date so the record is always current, however the event arrived.
-function subscriptionRowFrom(sub: Record<string, unknown>): SubscriptionRecord | null {
-  const id = sub.id as string | undefined;
-  if (!id) return null;
-
-  const metadata = (sub.metadata ?? {}) as Record<string, string>;
-  const items = ((sub.items as Record<string, unknown> | undefined)?.data as Array<Record<string, unknown>> | undefined) ?? [];
-  const price = (items[0]?.price ?? {}) as Record<string, unknown>;
-  const recurring = (price.recurring ?? {}) as Record<string, unknown>;
-  const interval = recurring.interval as string | undefined;
-
-  const amountFromPrice = typeof price.unit_amount === 'number' ? (price.unit_amount as number) : undefined;
-  const amountFromMeta = metadata.amount_pence ? Number(metadata.amount_pence) : undefined;
-
-  const periodEnd = typeof sub.current_period_end === 'number' ? (sub.current_period_end as number) : undefined;
-
-  const row: SubscriptionRecord = {
-    stripe_subscription_id: id,
-    status: (sub.status as string | undefined) ?? null,
-    plan: metadata.plan || (interval === 'year' ? 'annual' : interval === 'month' ? 'monthly' : null),
-    offer: metadata.offer || null,
-    amount_pence: amountFromPrice ?? amountFromMeta ?? null,
-    current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
-    cancel_at_period_end: typeof sub.cancel_at_period_end === 'boolean' ? (sub.cancel_at_period_end as boolean) : null,
-  };
-  if (typeof sub.customer === 'string') row.stripe_customer_id = sub.customer;
-  if (metadata.phone) row.phone = metadata.phone; // the account key, carried from checkout
-  return row;
 }
 
 export async function POST(req: NextRequest) {

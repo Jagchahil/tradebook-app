@@ -27,7 +27,7 @@ const trades = [
   'Photographer', 'Tutor', 'Carer', 'Cafe', 'Market trader', 'Freelancer', 'Something else',
 ];
 
-const TOTAL = 5;
+const TOTAL = 6;
 
 function digitsOnly(v: string) {
   return v.replace(/\D/g, '');
@@ -46,6 +46,9 @@ export default function StartPage() {
   const [postcode, setPostcode] = useState('');
   const [address, setAddress] = useState('');
   const [vat, setVat] = useState<boolean | null>(false);
+  // The streams question: what sits alongside the trade. It shapes the tax
+  // picture and primes the WhatsApp setup, so it earns a step of its own.
+  const [streams, setStreams] = useState<string[]>([]);
   const [hp, setHp] = useState(''); // honeypot, must stay empty for a real person
   const [t0] = useState(() => Date.now());
   const [offer] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('offer') ?? '' : ''));
@@ -86,8 +89,9 @@ export default function StartPage() {
     if (step === 1) return phoneReady && emailValid;
     if (step === 2) return tradeType !== null && name.trim().length > 1;
     if (step === 3) return trade !== '' && (trade !== 'Something else' || customTrade.trim().length > 1);
-    if (step === 4) return true; // address optional
-    if (step === 5) return vat !== null;
+    if (step === 4) return true; // streams optional, none is a fine answer
+    if (step === 5) return true; // address optional
+    if (step === 6) return vat !== null;
     return false;
   }, [step, phoneReady, emailValid, tradeType, name, trade, customTrade, vat]);
 
@@ -107,6 +111,7 @@ export default function StartPage() {
           postcode: postcode.trim(),
           address: address.trim(),
           vat,
+          streams,
           website: hp,
           ts: Date.now() - t0,
           offer,
@@ -231,9 +236,26 @@ export default function StartPage() {
             <div className="step-anim" style={{ textAlign: 'center', paddingTop: 24 }}>
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
               <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>You are all set{name ? `, ${name.split(' ')[0]}` : ''}.</h1>
-              <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 420, margin: '0 auto 22px' }}>
-                Your 30 day free trial has started. No card needed. Download the app to see your books, and say hello on WhatsApp to log your first receipt.
+              <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 420, margin: '0 auto 18px' }}>
+                Your 30 day free trial has started. No card needed. Three steps and your back office runs itself:
               </p>
+
+              <div style={{ textAlign: 'left', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 18, maxWidth: 460, margin: '0 auto 18px' }}>
+                {[
+                  ['1', 'Download the app', 'Your books, your figures, your yes on every entry.'],
+                  ['2', 'Take the 60 second tour', 'It opens on first launch: how capture works, who Puchio and Rakha are, and why January stops hurting.'],
+                  ['3', 'Finish setup on WhatsApp', 'Six quick questions: your work, CIS, student loan, salary, property, a goal. Each answer sharpens your numbers.'],
+                ].map(([n, t, d]) => (
+                  <div key={n} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '8px 0' }}>
+                    <span style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: RIVER_TINT, color: RIVER, fontSize: 12.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{n}</span>
+                    <span style={{ flex: 1 }}>
+                      <span style={{ display: 'block', fontSize: 14.5, fontWeight: 800, color: INK }}>{t}</span>
+                      <span style={{ display: 'block', fontSize: 13, color: MUTED, lineHeight: 1.5, marginTop: 2 }}>{d}</span>
+                    </span>
+                  </div>
+                ))}
+                <a href={`https://wa.me/447593214044?text=${encodeURIComponent('setup')}`} style={{ display: 'block', textAlign: 'center', backgroundColor: '#25D366', color: '#fff', fontSize: 15, fontWeight: 700, padding: '13px 0', borderRadius: 12, marginTop: 10 }}>💬 Start the WhatsApp setup now</a>
+              </div>
 
               {/* Optional: add a card so Lekhio carries on after the free trial. */}
               <div style={{ textAlign: 'left', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 20, maxWidth: 460, margin: '0 auto 24px' }}>
@@ -342,6 +364,31 @@ export default function StartPage() {
               )}
 
               {step === 4 && (
+                <Step title="Anything alongside the work?" sub="The question most tax tools never ask, and it changes everything: each stream is taxed its own way, and Lekhio keeps them separate the way HMRC does.">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {([
+                      ['job', '💼', 'A PAYE job', 'A salary uses your allowance and bands first, so it sets the rate your business profit is taxed at.'],
+                      ['property', '🏠', 'Rental property', 'Rent has its own rules: no National Insurance, Section 24 on the mortgage interest, and new rates arriving April 2027.'],
+                      ['loan', '🎓', 'A student loan', 'On self employed income the repayment lands in one lump with the January bill. Lekhio includes it in your set aside figure.'],
+                    ] as const).map(([val, icon, t, d]) => {
+                      const active = streams.includes(val);
+                      return (
+                        <button key={val} className="opt" onClick={() => setStreams(active ? streams.filter((x) => x !== val) : [...streams, val])} style={{ textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: active ? RIVER_TINT : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 14, padding: '15px 16px' }}>
+                          <span style={{ fontSize: 24 }}>{icon}</span>
+                          <span style={{ flex: 1 }}>
+                            <span style={{ display: 'block', fontSize: 16, fontWeight: 700, color: INK }}>{t}</span>
+                            <span style={{ display: 'block', fontSize: 13, color: MUTED, marginTop: 2, lineHeight: 1.45 }}>{d}</span>
+                          </span>
+                          <span style={{ width: 22, height: 22, borderRadius: 11, border: `2px solid ${active ? RIVER : LINE}`, backgroundColor: active ? RIVER : 'transparent', color: '#fff', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{active ? '✓' : ''}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p style={{ fontSize: 12.5, color: MUTED, marginTop: 14 }}>Tick any that apply, or none. The two minute WhatsApp setup picks these up properly with the exact figures.</p>
+                </Step>
+              )}
+
+              {step === 5 && (
                 <Step title="Your business address" sub="This shows at the top of your invoices. You can skip it and add it later.">
                   <label style={fieldLabel}>Postcode</label>
                   <input className="field" value={postcode} onChange={(e) => setPostcode(e.target.value.toUpperCase())} placeholder="LS1 4AB" style={fieldStyle} />
@@ -351,7 +398,7 @@ export default function StartPage() {
                 </Step>
               )}
 
-              {step === 5 && (
+              {step === 6 && (
                 <Step title="Are you VAT registered?" sub="Most sole traders are not. If you are not sure, choose No, you can change it any time.">
                   <div style={{ display: 'flex', gap: 12 }}>
                     {([['no', 'No', false], ['yes', 'Yes', true]] as const).map(([k, label, val]) => {

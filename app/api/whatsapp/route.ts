@@ -343,7 +343,7 @@ async function handleWelcome(from: string): Promise<void> {
     ].join('\n'),
     [
       { id: 'wk_receipt', title: '📸 Log a receipt' },
-      { id: 'wk_expense', title: '💬 Text an expense' },
+      { id: 'wk_setup', title: '⚙️ Set me up right' },
       { id: 'wk_help', title: '❓ Everything I do' },
     ],
     'Lekhio · text it, sorted',
@@ -379,24 +379,72 @@ async function handleButtonReply(from: string, buttonId: string): Promise<void> 
     await handleHelp(from);
     return;
   }
-  // The guided setup chain (stateless: every button carries the next step).
+  // The deep setup chain (stateless: every button carries the next step, and
+  // the free text setters, "plan 4", "salary 32000", "my goal is...", already
+  // exist as intents, so nothing needs conversation state).
+  if (buttonId === 'wk_setup') {
+    await handleSetupStart(from);
+    return;
+  }
+  if (buttonId === 'su_work_trade' || buttonId === 'su_work_both') {
+    await sendText(
+      from,
+      buttonId === 'su_work_both'
+        ? 'Good to know. Your job and your business are taxed together: the salary uses your allowance and bands first, and the business profit stacks on top. Lekhio works all of it as one picture.'
+        : 'Noted. Everything you log builds one picture: income tax plus Class 4 National Insurance on your profit, and one honest figure for what to set aside.',
+    );
+    await sendButtons(from, 'Do you work in construction with tax taken off before you are paid? That is CIS, the Construction Industry Scheme.', [
+      { id: 'su_cis_yes', title: 'Yes, CIS' },
+      { id: 'su_cis_no', title: 'No' },
+    ], 'Lekhio setup · 2 of 6');
+    return;
+  }
+  if (buttonId === 'su_work_prop') {
+    await sendText(
+      from,
+      'Then you are in the right place. Rental income is its own stream with its own rules: no National Insurance on rent, mortgage interest works as a tax credit rather than an expense, and new property rates arrive in April 2027. Lekhio handles all three and prices the 2027 change on your numbers a year early.',
+    );
+    await askSetupLoan(from);
+    return;
+  }
+  if (buttonId === 'su_cis_yes') {
+    await sendText(
+      from,
+      'Then one habit pays for itself: log income with the deduction in the message, like "Dave paid 500, they held 100 CIS". Lekhio tracks every pound held at source, counts it as tax you have already paid, and watches your likely refund. Most subcontractors are owed money back and never claim it.',
+    );
+    await askSetupLoan(from);
+    return;
+  }
+  if (buttonId === 'su_cis_no') {
+    await askSetupLoan(from);
+    return;
+  }
   if (buttonId === 'su_sl_yes') {
-    await sendButtons(from, 'Which plan? Started uni 2012 to 2023 in England or Wales is usually Plan 2. From 2023 is Plan 5.', [
-      { id: 'su_plan_1', title: 'Plan 1' },
-      { id: 'su_plan_2', title: 'Plan 2' },
-      { id: 'su_plan_other', title: 'Other / not sure' },
-    ]);
+    await sendButtons(
+      from,
+      'Which plan? Started university between 2012 and 2023 in England or Wales is usually Plan 2. Started from autumn 2023 is Plan 5. Scotland is Plan 4, pre 2012 is Plan 1.',
+      [
+        { id: 'su_plan_2', title: 'Plan 2' },
+        { id: 'su_plan_5', title: 'Plan 5' },
+        { id: 'su_plan_other', title: 'Another plan' },
+      ],
+      'Lekhio setup · 3 of 6',
+    );
     return;
   }
   if (buttonId === 'su_plan_other') {
-    await sendText(from, 'No bother. Text it when you know, like "plan 4", "plan 5" or "postgrad", and it saves itself. Next question:');
+    await sendText(from, 'Easy: text it whenever, like "plan 1", "plan 4" or "postgrad", and it saves itself. On to the next one.');
     await askSetupJob(from);
     return;
   }
-  if (buttonId === 'su_plan_1' || buttonId === 'su_plan_2') {
+  if (buttonId === 'su_plan_2' || buttonId === 'su_plan_5') {
     const userId = await findUserIdByPhone(from);
-    if (userId) await setStudentLoanPlan(userId, buttonId === 'su_plan_1' ? 'plan1' : 'plan2');
-    await sendText(from, 'Saved ✓ Your set aside number now includes the loan automatically.');
+    const plan = buttonId === 'su_plan_2' ? 'plan2' : 'plan5';
+    if (userId) await setStudentLoanPlan(userId, plan);
+    await sendText(
+      from,
+      `${plan === 'plan2' ? 'Plan 2' : 'Plan 5'} saved ✓ Here is why it matters: self employed loan repayments are not taken as you go, they land in one lump with the January bill. From now on your set aside figure includes it, worked out the way HMRC will.`,
+    );
     await askSetupJob(from);
     return;
   }
@@ -405,7 +453,10 @@ async function handleButtonReply(from: string, buttonId: string): Promise<void> 
     return;
   }
   if (buttonId === 'su_job_yes') {
-    await sendText(from, 'Text your yearly salary before tax, like "salary 32000". It sharpens every number: the loan, the bands, the set aside.');
+    await sendText(
+      from,
+      'Text it with the word salary, like "salary 32000", before tax. Why I ask: your salary uses up your tax free allowance and your bands first, so it sets the rate every pound of profit is taxed at, and it changes what payroll already collects on any student loan.',
+    );
     return;
   }
   if (buttonId === 'su_job_no') {
@@ -415,15 +466,21 @@ async function handleButtonReply(from: string, buttonId: string): Promise<void> 
   if (buttonId === 'su_prop_yes') {
     await sendText(
       from,
-      'Then two habits and you are covered: text rent as it lands, like "rent 950 in from flat 2", and add the property once in the app under Money, Your properties, so everything tags itself. Setup done 🎉 Send a receipt photo any time.',
+      'Rental money gets its own stream, kept apart from your work money because HMRC taxes it differently: no National Insurance, mortgage interest as a credit under Section 24, and new property rates from April 2027 that Lekhio prices on your numbers a year early. Two habits cover you: text rent as it lands, like "rent 950 in from flat 2", and add each property once in the app under Money, Your properties, so everything tags itself.',
     );
+    await askSetupGoal(from);
     return;
   }
   if (buttonId === 'su_prop_no') {
-    await sendText(
-      from,
-      'Setup done 🎉 From here it is just: photo any receipt, text any expense, and ask me anything. Your quarterly figures build themselves and nothing ever goes to HMRC without your yes.',
-    );
+    await askSetupGoal(from);
+    return;
+  }
+  if (buttonId === 'su_goal_text') {
+    await sendText(from, 'Go on then, in your own words: the thing and the number. "My goal is a van for 24k", "my goal is to earn 60k this year", whatever it really is.');
+    return;
+  }
+  if (buttonId === 'su_goal_skip') {
+    await sendSetupDone(from);
     return;
   }
   // An unknown button id (future flows): fall back to the help list.
@@ -832,7 +889,9 @@ async function handleStudentLoanQuestion(from: string): Promise<void> {
 // "Rent 950 in from flat 2": rent is income in the property stream, tagged to
 // the property whose nickname appears in the message. Unmatched rent lands
 // untagged (the app shows it as General property) and still counts.
-// The guided setup (stateless button chain). Two minutes, thumb only.
+// The deep setup (doc 82, rebuilt 6 July after Jag's onboarding review).
+// Stateless button chain, six steps, every question explains why it makes the
+// numbers sharper. Entry: the "setup" text intent or the welcome button.
 async function handleSetupStart(from: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
@@ -841,27 +900,82 @@ async function handleSetupStart(from: string): Promise<void> {
   }
   await sendButtons(
     from,
-    'Two minutes, all by tap, and every number gets sharper. First: do you have a student loan?',
+    [
+      'Right, let us set your numbers up properly. Six short questions, most are one tap, and each one makes your tax figures sharper: the bands, the set aside, the January bill.',
+      '',
+      'First: how does your money come in?',
+    ].join('\n'),
+    [
+      { id: 'su_work_trade', title: '🔧 Self employed' },
+      { id: 'su_work_both', title: '💼 Job + my own work' },
+      { id: 'su_work_prop', title: '🏠 Mostly property' },
+    ],
+    'Lekhio setup · 1 of 6',
+  );
+}
+
+async function askSetupLoan(from: string): Promise<void> {
+  await sendButtons(
+    from,
+    'Do you have a student loan? People forget this one and it bites: on self employed income the repayment is not taken as you go, it arrives in one lump with the January tax bill.',
     [
       { id: 'su_sl_yes', title: 'Yes' },
       { id: 'su_sl_no', title: 'No' },
     ],
-    'Lekhio setup · 1 of 3',
+    'Lekhio setup · 3 of 6',
   );
 }
 
 async function askSetupJob(from: string): Promise<void> {
-  await sendButtons(from, 'Do you also have a PAYE job alongside the business?', [
-    { id: 'su_job_yes', title: 'Yes' },
-    { id: 'su_job_no', title: 'No' },
-  ], 'Lekhio setup · 2 of 3');
+  await sendButtons(
+    from,
+    'Do you earn a PAYE salary as well, with tax taken through payroll? It changes which rate your business profit is taxed at, so it is worth me knowing.',
+    [
+      { id: 'su_job_yes', title: 'Yes' },
+      { id: 'su_job_no', title: 'No' },
+    ],
+    'Lekhio setup · 4 of 6',
+  );
 }
 
 async function askSetupProperty(from: string): Promise<void> {
-  await sendButtons(from, 'Last one: do you rent out a property?', [
-    { id: 'su_prop_yes', title: 'Yes' },
-    { id: 'su_prop_no', title: 'No' },
-  ], 'Lekhio setup · 3 of 3');
+  await sendButtons(
+    from,
+    'Do you rent out any property? Even one flat changes the picture: rental income has its own rules and its own new tax rates arriving in April 2027.',
+    [
+      { id: 'su_prop_yes', title: 'Yes' },
+      { id: 'su_prop_no', title: 'No' },
+    ],
+    'Lekhio setup · 5 of 6',
+  );
+}
+
+async function askSetupGoal(from: string): Promise<void> {
+  await sendButtons(
+    from,
+    'Last one, and it is the good one. Are you working towards something? A van, a turnover number, a safety buffer. Tell Rakha, the agent that watches your numbers, and it plans your tax around the goal: progress, timing, and the moments a purchase saves you real money.',
+    [
+      { id: 'su_goal_text', title: '🎯 Set a goal now' },
+      { id: 'su_goal_skip', title: 'Maybe later' },
+    ],
+    'Lekhio setup · 6 of 6',
+  );
+}
+
+async function sendSetupDone(from: string): Promise<void> {
+  await sendText(
+    from,
+    [
+      'Setup done ✓ Day to day, Lekhio is now this simple:',
+      '',
+      '📸 Photo any receipt and it reads and files itself',
+      '🎙️ Voice notes work too, say it like you would to a mate',
+      '💷 "Dave paid 500" logs income, "spent 40 on diesel" logs a cost',
+      '❓ Ask anything: "how much should I set aside", "can I claim my van"',
+      '',
+      'Everything lands in your app for your yes. Nothing counts until you approve it, and nothing ever goes to HMRC without you. That is the deal, always.',
+    ].join('\n'),
+  );
 }
 
 // "salary 32000": saves the PAYE salary and continues the setup chain.
@@ -878,7 +992,7 @@ async function handleSalarySet(from: string, text: string): Promise<void> {
     await sendText(from, 'I could not save that just now. Try again in a minute.');
     return;
   }
-  await sendText(from, `Salary saved: ${formatGbp(amount)} ✓ Your loan, your bands and your set aside all use it now.`);
+  await sendText(from, `Salary saved: ${formatGbp(amount)} ✓ Your bands, your loan and your set aside figure all start from the right place now.`);
   await askSetupProperty(from);
 }
 

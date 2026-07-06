@@ -1498,6 +1498,8 @@ export interface AgentAggregates {
   // Trailing 7 day totals for the Monday brief. Null until the RPC extension
   // is applied on prod; the engine skips week based signals when null.
   week: { income: number; expenses: number; activeDays: number } | null;
+  // The property stream split (doc 82 s5d). Null until the RPC v3 runs on prod.
+  property: { rents: number; expenses: number; finance: number; rents12: number } | null;
   unconfirmed: number;
   equipment: number;
 }
@@ -1514,6 +1516,7 @@ export async function agentAggregates(userId: string): Promise<AgentAggregates |
   const j = (await res.json().catch(() => null)) as {
     months?: Array<{ month: string; income: number | string; expenses: number | string; cis: number | string }>;
     week?: { income?: number | string; expenses?: number | string; activeDays?: number | string } | null;
+    property?: { rents?: number | string; expenses?: number | string; finance?: number | string; rents12?: number | string } | null;
     unconfirmed?: number | string;
     equipment?: number | string;
   } | null;
@@ -1530,6 +1533,14 @@ export async function agentAggregates(userId: string): Promise<AgentAggregates |
           income: Number(j.week.income) || 0,
           expenses: Number(j.week.expenses) || 0,
           activeDays: Number(j.week.activeDays) || 0,
+        }
+      : null,
+    property: j.property
+      ? {
+          rents: Number(j.property.rents) || 0,
+          expenses: Number(j.property.expenses) || 0,
+          finance: Number(j.property.finance) || 0,
+          rents12: Number(j.property.rents12) || 0,
         }
       : null,
     unconfirmed: Number(j.unconfirmed) || 0,

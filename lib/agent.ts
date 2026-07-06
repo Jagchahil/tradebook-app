@@ -13,6 +13,7 @@
 
 import { FACTS, soleTraderTax } from './taxengine';
 import { studentLoanForSA, STUDENT_PLANS, type StudentPlan } from './nistudentloan';
+import { aprilDelta, PROPERTY_FACTS } from './propertyengine';
 
 // --- Input ---------------------------------------------------------------------
 
@@ -39,6 +40,9 @@ export interface AgentInput {
   // Confirmed totals for the trailing 7 days, for the Monday brief. Null when
   // the aggregates RPC predates the week extension; week based signals skip.
   week: { income: number; expenses: number; activeDays: number } | null;
+  // The property stream this tax year (doc 82 s4/s5d). Null when the RPC
+  // predates the split; landlord signals then skip and VAT uses gross income.
+  property: { rents: number; expenses: number; finance: number; rents12: number } | null;
   unconfirmedCount: number;
   // Equipment and tools spend this tax year (confirmed, category tools or equipment).
   equipmentSpendYtd: number;
@@ -65,6 +69,7 @@ export interface AgentSignal {
 // goal signals added per doc 82 section 5b. The threshold combo outranks nearly
 // everything: one suggestion that solves two problems is the flagship moment.
 export const PING_PRIORITY_ORDER: string[] = [
+  'mtd_combined_trap',
   'mtd_mandation',
   'pa_taper',
   'goal_threshold_combo',
@@ -300,8 +305,11 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
   }
 
   // 1. VAT registration threshold, rolling 12 months, three tiers.
+  // Residential rent is exempt from VAT, so the property stream is excluded
+  // from the taxable turnover test once the RPC provides the split.
   const vat = FACTS.vatRegistrationThreshold;
-  const vatPct = d.rolling12Income / vat;
+  const vatTurnover = Math.max(0, d.rolling12Income - (input.property?.rents12 ?? 0));
+  const vatPct = vatTurnover / vat;
   const vatTier = vatPct >= 1 ? 3 : vatPct >= 0.9 ? 2 : vatPct >= 0.8 ? 1 : 0;
   if (vatTier > 0) {
     out.push({
@@ -314,19 +322,35 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
           : `You are at ${Math.floor(vatPct * 100)}% of the VAT threshold`,
       body:
         vatTier === 3
-          ? `Your rolling 12 month turnover is ${gbp(d.rolling12Income)}, over the ${gbp(vat)} VAT registration threshold. You normally have 30 days from the end of the month you crossed in to register. Worth acting on now.`
-          : `Your rolling 12 month turnover is ${gbp(d.rolling12Income)}. VAT registration becomes required at ${gbp(vat)}. Knowing early gives you choices: timing of invoices, the flat rate scheme, or planning for the price change.`,
+          ? `Your rolling 12 month turnover is ${gbp(vatTurnover)}, over the ${gbp(vat)} VAT registration threshold. You normally have 30 days from the end of the month you crossed in to register. Worth acting on now.`
+          : `Your rolling 12 month turnover is ${gbp(vatTurnover)}. VAT registration becomes required at ${gbp(vat)}. Knowing early gives you choices: timing of invoices, the flat rate scheme, or planning for the price change.`,
       waText:
         vatTier === 3
-          ? `your rolling 12 month turnover (${gbp(d.rolling12Income)}) has crossed the ${gbp(vat)} VAT threshold`
-          : `your rolling 12 month turnover (${gbp(d.rolling12Income)}) is ${Math.floor(vatPct * 100)}% of the ${gbp(vat)} VAT threshold`,
-      numbers: { rolling12: d.rolling12Income, threshold: vat, pct: Math.floor(vatPct * 100) },
+          ? `your rolling 12 month turnover (${gbp(vatTurnover)}) has crossed the ${gbp(vat)} VAT threshold`
+          : `your rolling 12 month turnover (${gbp(vatTurnover)}) is ${Math.floor(vatPct * 100)}% of the ${gbp(vat)} VAT threshold`,
+      numbers: { rolling12: vatTurnover, threshold: vat, pct: Math.floor(vatPct * 100) },
     });
   }
 
-  // 2. MTD mandation, on gross trade income against the current threshold.
+  // 2. MTD mandation, on gross qualifying income (trade PLUS property, the
+  // combined test) against the current threshold. When the combination alone
+  // is what crosses the line, the sharper combined trap signal replaces this.
   const mtdThreshold = FACTS.mtdThreshold2026; // widen by year at the next Budget update
-  const mtdHit = d.ytdIncome >= mtdThreshold || (canProject && projIncome >= mtdThreshold);
+  const rentsYtd = input.property?.rents ?? 0;
+  const tradeGrossYtd = Math.max(0, d.ytdIncome - rentsYtd);
+  const combinedTrap = rentsYtd > 0 && tradeGrossYtd < mtdThreshold && d.ytdIncome >= mtdThreshold;
+  if (combinedTrap) {
+    out.push({
+      signalKey: 'mtd_combined_trap',
+      periodKey: year,
+      priority: 'ping',
+      title: 'Your trade plus your rent crosses the MTD line together',
+      body: `Making Tax Digital counts trade and property income TOGETHER. Your trade alone (${gbp(tradeGrossYtd)}) sits under the ${gbp(mtdThreshold)} level, but with ${gbp(rentsYtd)} of rent the combined ${gbp(d.ytdIncome)} crosses it. Most landlords with a day trade miss this. No panic: your Lekhio records already fit the quarterly rhythm, both streams.`,
+      waText: `trade (${gbp(tradeGrossYtd)}) plus rent (${gbp(rentsYtd)}) crosses the ${gbp(mtdThreshold)} Making Tax Digital level combined, which most people miss`,
+      numbers: { tradeGross: tradeGrossYtd, rents: rentsYtd, combined: d.ytdIncome, threshold: mtdThreshold },
+    });
+  }
+  const mtdHit = !combinedTrap && (d.ytdIncome >= mtdThreshold || (canProject && projIncome >= mtdThreshold));
   if (mtdHit) {
     const crossedNow = d.ytdIncome >= mtdThreshold;
     out.push({
@@ -504,6 +528,48 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       waText: `${input.unconfirmedCount} entries need a quick check before the quarter closes in ${daysToQuarterEnd} ${daysToQuarterEnd === 1 ? 'day' : 'days'}`,
       numbers: { unconfirmed: input.unconfirmedCount, daysToQuarterEnd },
     });
+  }
+
+  // 14. Section 24 exposure (doc 82 s5d): a higher rate landlord's mortgage
+  // interest only earns relief at the credit rate while the rent is taxed at
+  // the top slice. Making that arithmetic visible is the whole value.
+  if (input.property && input.property.finance >= 1000 && canProject && projTotalIncome > hrBoundary) {
+    const pf = PROPERTY_FACTS['2026-27'];
+    const creditPct = Math.round(pf.s24CreditRate * 100);
+    const topPct = projTotalIncome >= FACTS.additionalRateThreshold ? 45 : 40;
+    out.push({
+      signalKey: 's24_exposure',
+      periodKey: year,
+      priority: 'card',
+      title: 'Your mortgage interest relief is capped',
+      body: `Your rent is taxed at ${topPct}% on the top slice, but mortgage interest on a residential let only earns a ${creditPct}% credit (Section 24). On the ${gbp(input.property.finance)} of interest so far, that is relief of about ${gbp(Math.round(input.property.finance * pf.s24CreditRate))}, not ${gbp(Math.round((input.property.finance * topPct) / 100))}. Companies still deduct interest in full, which is why some landlords compare incorporating. Information, not advice: the comparison lives in the app under Pay yourself.`,
+      waText: `your ${gbp(input.property.finance)} of mortgage interest earns ${creditPct}% relief while the rent is taxed at ${topPct}%, the Section 24 gap`,
+      numbers: { finance: input.property.finance, creditPct, topPct },
+    });
+  }
+
+  // 15. April 2027 preview (doc 82 s5d): what the new property rates do to
+  // THIS user's numbers, a full year early. Year to date facts only.
+  if (input.property && input.property.rents > 0) {
+    const delta = aprilDelta({
+      employmentIncome: salary,
+      tradeProfit: Math.max(0, tradeGrossYtd - Math.max(0, d.ytdExpenses - input.property.expenses - input.property.finance)),
+      rents: input.property.rents,
+      propertyExpenses: input.property.expenses,
+      financeCosts: input.property.finance,
+      jointShare: 1,
+    });
+    if (delta.extraPerYear >= 25) {
+      out.push({
+        signalKey: 'property_rates_2027',
+        periodKey: year,
+        priority: 'card',
+        title: 'April 2027, priced on your numbers',
+        body: `From 6 April 2027 property income gets its own rates (22%, 42%, 47%) and the mortgage interest credit moves to 22%. On your year so far, that is about ${gbp(delta.extraPerYear)} more per year. Nobody else will tell you this early. Nothing to do today, but pricing rent reviews and planning with the real number beats finding out in 2028.`,
+        waText: `the April 2027 property rates would add about ${gbp(delta.extraPerYear)} a year on your current numbers`,
+        numbers: { extraPerYear: delta.extraPerYear, billNow: delta.now.incomeTax, billThen: delta.then.incomeTax },
+      });
+    }
   }
 
   // 12. The Monday brief (doc 82 section 5e item 1): the weekly heartbeat.

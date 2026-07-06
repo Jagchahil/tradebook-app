@@ -9,9 +9,14 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'agent-'));
-const fix = (s) => s.replace("from './taxengine'", "from './taxengine.ts'").replace("from './nistudentloan'", "from './nistudentloan.ts'");
+const fix = (s) =>
+  s
+    .replace("from './taxengine'", "from './taxengine.ts'")
+    .replace("from './nistudentloan'", "from './nistudentloan.ts'")
+    .replace("from './propertyengine'", "from './propertyengine.ts'");
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'nistudentloan.ts'), fix(readFileSync(path.join(lib, 'nistudentloan.ts'), 'utf8')));
+writeFileSync(path.join(stage, 'propertyengine.ts'), fix(readFileSync(path.join(lib, 'propertyengine.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'agent.ts'), fix(readFileSync(path.join(lib, 'agent.ts'), 'utf8')));
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);
 
@@ -54,6 +59,7 @@ function input(today, months, extra = {}) {
     today,
     months,
     week: null,
+    property: null,
     unconfirmedCount: 0,
     equipmentSpendYtd: 0,
     studentLoanPlan: null,
@@ -387,6 +393,60 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   ok('loan raises the bill', withSl.numbers.bill > richPlain.numbers.bill);
   const underThreshold = find(A.computeSignals(input(qStart, months, { studentLoanPlan: 'plan2' })), 'january_rehearsal');
   ok('loan under threshold stays out of the bill', underThreshold && !underThreshold.body.includes('student loan'));
+}
+
+// --- signals 14 and 15 plus the combined trap: the landlord set (doc 82 s5d) ----------
+{
+  const today = new Date('2026-12-15T00:00:00Z');
+  // A sparky with a flat: trade 30,600 gross YTD, rents 24,300 YTD combined in
+  // months. Trade alone under 50k, combined over: the trap fires and the
+  // generic mandation stays quiet.
+  const months = monthsFor(today, 9, { incomePerMonth: 6100, expensesPerMonth: 1200 }); // ytd income 54,900
+  const property = { rents: 24300, expenses: 3000, finance: 6000, rents12: 24300 };
+  const sig = A.computeSignals(input(today, months, { property }));
+  const trap = find(sig, 'mtd_combined_trap');
+  ok('combined trap fires as ping', trap && trap.priority === 'ping');
+  ok('trap replaces generic mandation', !find(sig, 'mtd_mandation'));
+  ok('trap names both streams', trap.body.includes('£30,600') && trap.body.includes('£24,300'));
+
+  // Trade alone over the line: generic fires, trap stays quiet.
+  const bigTrade = A.computeSignals(input(today, monthsFor(today, 9, { incomePerMonth: 6500 }), {
+    property: { rents: 1000, expenses: 0, finance: 0, rents12: 1000 },
+  }));
+  ok('trade alone over keeps generic', Boolean(find(bigTrade, 'mtd_mandation')));
+  ok('no trap when trade alone crosses', !find(bigTrade, 'mtd_combined_trap'));
+
+  // VAT excludes rent: 95,400 rolling gross of which 24,300 rent leaves 71,100
+  // of taxable turnover, 79%: no VAT signal. Without the split it would fire.
+  const vatMonths = monthsFor(today, 12, { incomePerMonth: 7950 }); // rolling 95,400
+  ok('rent-blind VAT would fire', Boolean(find(A.computeSignals(input(today, vatMonths)), 'vat_approach')));
+  ok('VAT ignores exempt rent', !find(A.computeSignals(input(today, vatMonths, { property })), 'vat_approach'));
+
+  // Section 24 exposure: higher rate territory with real finance costs.
+  const hrMonths = monthsFor(today, 9, { incomePerMonth: 7000, expensesPerMonth: 1000 });
+  const s24 = find(A.computeSignals(input(today, hrMonths, { property })), 's24_exposure');
+  ok('s24 exposure fires for the higher rate landlord', s24 && s24.priority === 'card');
+  ok('s24 shows both percentages', s24.body.includes('40%') && s24.body.includes('20%'));
+  ok('s24 holds the FCA line', !/apply for|this lender|this mortgage deal/i.test(s24.body));
+  ok('no s24 card without finance costs', !find(
+    A.computeSignals(input(today, hrMonths, { property: { ...property, finance: 0 } })),
+    's24_exposure',
+  ));
+
+  // April 2027 preview prices the change on real numbers.
+  const preview = find(A.computeSignals(input(today, hrMonths, { property })), 'property_rates_2027');
+  ok('April 2027 preview fires', preview && preview.priority === 'card');
+  ok('preview carries a per year figure', preview.numbers.extraPerYear >= 25);
+  ok('preview names the new rates', preview.body.includes('22%') && preview.body.includes('42%'));
+
+  // No property stream: none of the landlord set fires, nothing breaks.
+  const none = A.computeSignals(input(today, hrMonths));
+  ok('no landlord signals without the stream', !find(none, 's24_exposure') && !find(none, 'property_rates_2027') && !find(none, 'mtd_combined_trap'));
+
+  for (const key of ['mtd_combined_trap', 's24_exposure', 'property_rates_2027']) {
+    const found = [trap, s24, preview].find((x) => x && x.signalKey === key);
+    ok(`${key}: no forbidden dashes`, found && !/[\u2013\u2014\u2212]/.test(found.title + found.body + found.waText));
+  }
 }
 
 console.log(`agent: ${pass} passed, ${fail} failed`);

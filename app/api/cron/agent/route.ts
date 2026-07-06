@@ -60,6 +60,7 @@ function authorised(req: NextRequest): boolean {
 const TEMPLATE_FOR: Record<string, string> = {
   vat_approach: 'agent_threshold_alert',
   mtd_mandation: 'agent_threshold_alert',
+  mtd_combined_trap: 'agent_threshold_alert',
   pa_taper: 'agent_threshold_alert',
   class2_pension_year: 'agent_deadline_alert',
   poa_cliff: 'agent_deadline_alert',
@@ -113,6 +114,7 @@ async function processUser(user: {
     today: new Date(),
     months: agg.months,
     week: agg.week,
+    property: agg.property,
     unconfirmedCount: agg.unconfirmed,
     equipmentSpendYtd: agg.equipment,
     studentLoanPlan: user.student_loan_plan,

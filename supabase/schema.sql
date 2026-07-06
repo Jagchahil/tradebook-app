@@ -820,7 +820,9 @@ as $$
     select coalesce(transaction_date, created_at::date) as d,
            amount,
            coalesce(cis_deduction, 0) as cis,
-           lower(coalesce(category, '')) as category
+           lower(coalesce(category, '')) as category,
+           lower(coalesce(vendor, '')) as vendor,
+           coalesce(income_type, 'trade') as income_type
     from public.transactions
     where user_id = p_user_id
       and confirmed = true
@@ -850,6 +852,18 @@ as $$
       'income', coalesce((select sum(amount) from tx where amount >= 0 and d >= current_date - 7), 0),
       'expenses', coalesce((select sum(-amount) from tx where amount < 0 and d >= current_date - 7), 0),
       'activeDays', (select count(distinct d) from tx where d >= current_date - 7)
+    ),
+    'property', jsonb_build_object(
+      'rents', coalesce((select sum(amount) from tx, ty where income_type = 'property' and amount >= 0 and d >= ty.start), 0),
+      'expenses', coalesce((select sum(-amount) from tx, ty
+        where income_type = 'property' and amount < 0 and d >= ty.start
+          and category not like '%mortgage%' and category not like '%interest%'
+          and vendor not like '%mortgage%' and vendor not like '%interest%'), 0),
+      'finance', coalesce((select sum(-amount) from tx, ty
+        where income_type = 'property' and amount < 0 and d >= ty.start
+          and (category like '%mortgage%' or category like '%interest%'
+            or vendor like '%mortgage%' or vendor like '%interest%')), 0),
+      'rents12', coalesce((select sum(amount) from tx where income_type = 'property' and amount >= 0), 0)
     )
   );
 $$;

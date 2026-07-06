@@ -36,6 +36,9 @@ export interface AgentInput {
   // Confirmed monthly totals for the trailing 12 calendar months including the
   // current partial month, oldest first. Missing months may be omitted.
   months: MonthTotals[];
+  // Confirmed totals for the trailing 7 days, for the Monday brief. Null when
+  // the aggregates RPC predates the week extension; week based signals skip.
+  week: { income: number; expenses: number; activeDays: number } | null;
   unconfirmedCount: number;
   // Equipment and tools spend this tax year (confirmed, category tools or equipment).
   equipmentSpendYtd: number;
@@ -501,6 +504,66 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       waText: `${input.unconfirmedCount} entries need a quick check before the quarter closes in ${daysToQuarterEnd} ${daysToQuarterEnd === 1 ? 'day' : 'days'}`,
       numbers: { unconfirmed: input.unconfirmedCount, daysToQuarterEnd },
     });
+  }
+
+  // 12. The Monday brief (doc 82 section 5e item 1): the weekly heartbeat.
+  // Plain facts, no projections, so every user with any data hears from Rakha
+  // from their very first week. Card only, never a ping.
+  if (today.getUTCDay() === 1 && input.week && (input.week.income > 0 || input.week.expenses > 0 || d.ytdIncome > 0)) {
+    const w = input.week;
+    const kept = Math.max(0, w.income - w.expenses);
+    const quiet = w.income === 0 && w.expenses === 0;
+    const watch =
+      input.unconfirmedCount >= 5
+        ? `This week's watchpoint: ${input.unconfirmedCount} entries are waiting for your yes. Two minutes in the app squares the books.`
+        : daysToQuarterEnd <= 21
+          ? `This week's watchpoint: the quarter closes in ${daysToQuarterEnd} ${daysToQuarterEnd === 1 ? 'day' : 'days'}. Your figures are ready when you are.`
+          : `The year so far is carrying about ${gbp(taxDueYtd)} of tax. Your set aside number has it covered.`;
+    out.push({
+      signalKey: 'monday_brief',
+      periodKey: `wk-${today.toISOString().slice(0, 10)}`,
+      priority: 'card',
+      title: 'Your Monday brief',
+      body: quiet
+        ? `Nothing logged last week. No judgement, some weeks are like that. ${watch}`
+        : `Last week: ${gbp(w.income)} in, ${gbp(w.expenses)} out, ${gbp(kept)} kept. ${watch}`,
+      waText: quiet
+        ? `Monday brief: nothing logged last week, fresh start today`
+        : `Monday brief: ${gbp(w.income)} in, ${gbp(w.expenses)} out last week, ${gbp(kept)} kept`,
+      numbers: { weekIncome: w.income, weekExpenses: w.expenses, kept, activeDays: w.activeDays },
+    });
+  }
+
+  // 13. The January rehearsal (doc 82 section 5e item 2): once a quarter,
+  // filing day run early. Year to date facts only, no projections, so it
+  // works from the very first quarter of data and kills the January fear.
+  {
+    const sYear = taxYearStart(today).getUTCFullYear();
+    const qStarts = [
+      new Date(Date.UTC(sYear, 3, 6)),
+      new Date(Date.UTC(sYear, 6, 6)),
+      new Date(Date.UTC(sYear, 9, 6)),
+      new Date(Date.UTC(sYear + 1, 0, 6)),
+    ];
+    const qStart = [...qStarts].reverse().find((s) => s <= today) ?? qStarts[0];
+    const daysSinceQuarterStart = Math.floor((today.getTime() - qStart.getTime()) / DAY_MS);
+    const slShareYtd = plans.length > 0 ? studentLoanForSA(d.ytdProfit, salary, plans) : 0;
+    const bill = Math.round(taxDueYtd + slShareYtd);
+    if (daysSinceQuarterStart <= 6 && bill >= 400) {
+      let jan31 = new Date(Date.UTC(today.getUTCFullYear(), 0, 31));
+      if (today >= jan31) jan31 = new Date(Date.UTC(today.getUTCFullYear() + 1, 0, 31));
+      const weeksTo31Jan = Math.max(1, Math.floor((jan31.getTime() - today.getTime()) / (7 * DAY_MS)));
+      const perWeek = Math.ceil(bill / weeksTo31Jan);
+      out.push({
+        signalKey: 'january_rehearsal',
+        periodKey: q.label,
+        priority: 'card',
+        title: 'January, rehearsed early',
+        body: `If the year stopped today, the Self Assessment bill on it would be about ${gbp(bill)}${slShareYtd > 0 ? ' including your student loan' : ''}. About ${gbp(perWeek)} a week set aside from here has that covered by 31 January. The real bill grows as you earn and your set aside number tracks it, so January never gets to surprise you.`,
+        waText: `if the year stopped today the bill is about ${gbp(bill)}, and ${gbp(perWeek)} a week from here covers it by 31 January`,
+        numbers: { bill, perWeek, weeksTo31Jan },
+      });
+    }
   }
 
   return out;

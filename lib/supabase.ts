@@ -1487,6 +1487,9 @@ export async function listAgentUsersPage(
 
 export interface AgentAggregates {
   months: { month: string; income: number; expenses: number; cis: number }[];
+  // Trailing 7 day totals for the Monday brief. Null until the RPC extension
+  // is applied on prod; the engine skips week based signals when null.
+  week: { income: number; expenses: number; activeDays: number } | null;
   unconfirmed: number;
   equipment: number;
 }
@@ -1502,6 +1505,7 @@ export async function agentAggregates(userId: string): Promise<AgentAggregates |
   if (!res.ok) return null;
   const j = (await res.json().catch(() => null)) as {
     months?: Array<{ month: string; income: number | string; expenses: number | string; cis: number | string }>;
+    week?: { income?: number | string; expenses?: number | string; activeDays?: number | string } | null;
     unconfirmed?: number | string;
     equipment?: number | string;
   } | null;
@@ -1513,6 +1517,13 @@ export async function agentAggregates(userId: string): Promise<AgentAggregates |
       expenses: Number(m.expenses) || 0,
       cis: Number(m.cis) || 0,
     })),
+    week: j.week
+      ? {
+          income: Number(j.week.income) || 0,
+          expenses: Number(j.week.expenses) || 0,
+          activeDays: Number(j.week.activeDays) || 0,
+        }
+      : null,
     unconfirmed: Number(j.unconfirmed) || 0,
     equipment: Number(j.equipment) || 0,
   };

@@ -53,6 +53,7 @@ function input(today, months, extra = {}) {
   return {
     today,
     months,
+    week: null,
     unconfirmedCount: 0,
     equipmentSpendYtd: 0,
     studentLoanPlan: null,
@@ -320,6 +321,72 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
     ok(`${s.signalKey}: no certainty claims`, !/\byou will save\b|\bguaranteed\b/i.test(s.body));
     ok(`${s.signalKey}: has numbers payload`, Object.keys(s.numbers).length > 0);
   }
+}
+
+// --- signal 12: the Monday brief ---------------------------------------------------
+{
+  const monday = new Date('2026-12-14T07:00:00Z'); // a Monday
+  const tuesday = new Date('2026-12-15T07:00:00Z');
+  const months = monthsFor(monday, 6, { incomePerMonth: 3000, expensesPerMonth: 800 });
+  const week = { income: 850, expenses: 210, activeDays: 4 };
+
+  const b = find(A.computeSignals(input(monday, months, { week })), 'monday_brief');
+  ok('fires on a Monday with week data', !!b);
+  ok('is a card, never a ping', b.priority === 'card');
+  eq('period key is the Monday', b.periodKey, 'wk-2026-12-14');
+  ok('three numbers in the body', b.body.includes('£850') && b.body.includes('£210') && b.body.includes('£640'));
+  ok('kept figure in numbers', b.numbers.kept === 640);
+
+  ok('does not fire on a Tuesday', !find(A.computeSignals(input(tuesday, months, { week })), 'monday_brief'));
+  ok('skips when week is null (old RPC)', !find(A.computeSignals(input(monday, months)), 'monday_brief'));
+  ok(
+    'no data at all stays silent',
+    !find(A.computeSignals(input(monday, [], { week: { income: 0, expenses: 0, activeDays: 0 } })), 'monday_brief'),
+  );
+
+  const quiet = find(
+    A.computeSignals(input(monday, months, { week: { income: 0, expenses: 0, activeDays: 0 } })),
+    'monday_brief',
+  );
+  ok('quiet week gets the gentle version', quiet && quiet.body.startsWith('Nothing logged last week'));
+
+  const withUnconfirmed = find(A.computeSignals(input(monday, months, { week, unconfirmedCount: 12 })), 'monday_brief');
+  ok('unconfirmed entries become the watchpoint', withUnconfirmed.body.includes('12 entries'));
+}
+
+// --- signal 13: the January rehearsal ------------------------------------------------
+{
+  // 6 July 2026 is day 0 of Q2: the rehearsal fires with YTD facts only.
+  const qStart = new Date('2026-07-06T07:00:00Z');
+  const months = monthsFor(qStart, 4, { incomePerMonth: 8000, expensesPerMonth: 2000 });
+  const r = find(A.computeSignals(input(qStart, months)), 'january_rehearsal');
+  ok('fires in the first week of a quarter', !!r);
+  ok('is a card', r.priority === 'card');
+  eq('period key is the quarter', r.periodKey, '2026-27Q2');
+  ok('bill and perWeek are coherent', r.numbers.bill > 0 && r.numbers.perWeek >= Math.floor(r.numbers.bill / r.numbers.weeksTo31Jan));
+  ok('no projection language', !/heading for|current pace/.test(r.body));
+
+  const midQuarter = new Date('2026-08-15T07:00:00Z');
+  ok(
+    'silent mid quarter',
+    !find(A.computeSignals(input(midQuarter, monthsFor(midQuarter, 5, { incomePerMonth: 8000, expensesPerMonth: 2000 }))), 'january_rehearsal'),
+  );
+
+  const tiny = find(A.computeSignals(input(qStart, monthsFor(qStart, 4, { incomePerMonth: 1100, expensesPerMonth: 400 }))), 'january_rehearsal');
+  ok('tiny bills stay quiet', !tiny);
+
+  // The loan only joins the bill once YTD profit clears the plan threshold,
+  // so the SL case earns more: 4 months at 10k profit = 40,000 > 29,385.
+  const richMonths = monthsFor(qStart, 4, { incomePerMonth: 12000, expensesPerMonth: 2000 });
+  const richPlain = find(A.computeSignals(input(qStart, richMonths)), 'january_rehearsal');
+  const withSl = find(
+    A.computeSignals(input(qStart, richMonths, { studentLoanPlan: 'plan2' })),
+    'january_rehearsal',
+  );
+  ok('student loan named when a plan is set', withSl && withSl.body.includes('including your student loan'));
+  ok('loan raises the bill', withSl.numbers.bill > richPlain.numbers.bill);
+  const underThreshold = find(A.computeSignals(input(qStart, months, { studentLoanPlan: 'plan2' })), 'january_rehearsal');
+  ok('loan under threshold stays out of the bill', underThreshold && !underThreshold.body.includes('student loan'));
 }
 
 console.log(`agent: ${pass} passed, ${fail} failed`);

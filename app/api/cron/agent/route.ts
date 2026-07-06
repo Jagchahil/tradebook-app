@@ -109,6 +109,7 @@ async function processUser(user: {
   const input: AgentInput = {
     today: new Date(),
     months: agg.months,
+    week: agg.week,
     unconfirmedCount: agg.unconfirmed,
     equipmentSpendYtd: agg.equipment,
     studentLoanPlan: user.student_loan_plan,

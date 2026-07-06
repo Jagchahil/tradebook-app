@@ -743,3 +743,139 @@ create unique index if not exists transactions_external_id_key
 -- the app's bank card so the user can see which bank is linked.
 alter table public.bank_connections add column if not exists bank_name text;
 notify pgrst, 'reload schema';
+
+-- HMRC fraud prevention: the latest device collected values (device id, browser
+-- JS user agent, screen and window geometry, timezone, optional public port and
+-- MFA), stored so the server can build the full Gov-Client / Gov-Vendor header
+-- set at submit time. Device characteristics, not secrets, so plain jsonb. Table
+-- stays service role only (RLS enabled, no policies, set at creation).
+alter table public.hmrc_connections add column if not exists fraud_client jsonb;
+alter table public.hmrc_connections add column if not exists fraud_collected_at timestamptz;
+notify pgrst, 'reload schema';
+
+-- Student loan and mixed income (Phase B, NI and student loan hubs). The plan
+-- is asked once in the app and stored here so the app hub, the WhatsApp
+-- answers and later the agent all read one source. employment_income is an
+-- optional annual salary for people with a PAYE job alongside the trade, used
+-- for the NI position and student loan threshold maths. All nullable, nothing
+-- existing changes.
+alter table public.users add column if not exists student_loan_plan text
+  check (student_loan_plan in ('plan1','plan2','plan4','plan5'));
+alter table public.users add column if not exists student_loan_postgrad boolean not null default false;
+alter table public.users add column if not exists employment_income numeric;
+notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- The Agentic Accountant v1 (doc 84). Signals fired by the nightly engine.
+-- ---------------------------------------------------------------------------
+create table if not exists public.agent_signals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  signal_key text not null,
+  period_key text not null,
+  payload jsonb not null,
+  priority text not null default 'card' check (priority in ('ping','card')),
+  created_at timestamptz not null default now(),
+  delivered_wa_at timestamptz,
+  read_at timestamptz,
+  dismissed_at timestamptz
+);
+-- Fire once per user per signal per period. The cron upserts with
+-- on_conflict=user_id,signal_key,period_key and ignore-duplicates, so a retry
+-- or a double hop can never double insert, structurally.
+create unique index if not exists agent_signals_once
+  on public.agent_signals(user_id, signal_key, period_key);
+create index if not exists agent_signals_user_active
+  on public.agent_signals(user_id, created_at desc) where dismissed_at is null;
+alter table public.agent_signals enable row level security;
+-- The app reads its own rows and can mark them read or dismissed. Inserts are
+-- service role only: no insert policy exists on purpose.
+drop policy if exists agent_signals_own_read on public.agent_signals;
+create policy agent_signals_own_read on public.agent_signals
+  for select using (auth.uid() = user_id);
+drop policy if exists agent_signals_own_update on public.agent_signals;
+create policy agent_signals_own_update on public.agent_signals
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Per user switch for the agent's WhatsApp pings (in app cards always show).
+alter table public.reminder_prefs add column if not exists agent_pings boolean not null default true;
+
+-- One round trip for everything the signal engine needs about a user: monthly
+-- confirmed buckets for the trailing 12 months, the unconfirmed count, and the
+-- tax year's equipment spend. Same N+1 discipline as user_totals.
+create or replace function public.agent_user_aggregates(p_user_id uuid)
+returns jsonb
+language sql
+stable
+as $$
+  with ty as (
+    select case
+      when extract(month from current_date) > 4
+        or (extract(month from current_date) = 4 and extract(day from current_date) >= 6)
+      then make_date(extract(year from current_date)::int, 4, 6)
+      else make_date(extract(year from current_date)::int - 1, 4, 6)
+    end as start
+  ),
+  tx as (
+    select coalesce(transaction_date, created_at::date) as d,
+           amount,
+           coalesce(cis_deduction, 0) as cis,
+           lower(coalesce(category, '')) as category
+    from public.transactions
+    where user_id = p_user_id
+      and confirmed = true
+      and coalesce(transaction_date, created_at::date) >= (current_date - interval '12 months')::date
+  )
+  select jsonb_build_object(
+    'months', coalesce((
+      select jsonb_agg(jsonb_build_object('month', m, 'income', inc, 'expenses', exp, 'cis', c) order by m)
+      from (
+        select to_char(d, 'YYYY-MM') as m,
+               sum(case when amount >= 0 then amount else 0 end) as inc,
+               sum(case when amount < 0 then -amount else 0 end) as exp,
+               sum(c1s.cis) as c
+        from tx c1s
+        group by 1
+      ) buckets
+    ), '[]'::jsonb),
+    'unconfirmed', (
+      select count(*) from public.transactions
+      where user_id = p_user_id and confirmed = false
+    ),
+    'equipment', coalesce((
+      select sum(-amount) from tx, ty
+      where amount < 0 and category in ('tools', 'equipment') and d >= ty.start
+    ), 0),
+    'week', jsonb_build_object(
+      'income', coalesce((select sum(amount) from tx where amount >= 0 and d >= current_date - 7), 0),
+      'expenses', coalesce((select sum(-amount) from tx where amount < 0 and d >= current_date - 7), 0),
+      'activeDays', (select count(distinct d) from tx where d >= current_date - 7)
+    )
+  );
+$$;
+notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- Goals: what Rakha plans around (doc 82 section 5b). The user's own words
+-- plus a number. vendor_note is the USER'S stated vendor, held and repeated
+-- back, never sourced by us (the FCA line).
+-- ---------------------------------------------------------------------------
+create table if not exists public.user_goals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  kind text not null check (kind in ('purchase', 'income', 'savings')),
+  title text not null,
+  amount numeric not null check (amount > 0),
+  target_date date,
+  vendor_note text,
+  status text not null default 'active' check (status in ('active', 'done', 'dropped')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists user_goals_user_active
+  on public.user_goals(user_id) where status = 'active';
+alter table public.user_goals enable row level security;
+drop policy if exists user_goals_own on public.user_goals;
+create policy user_goals_own on public.user_goals
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+notify pgrst, 'reload schema';

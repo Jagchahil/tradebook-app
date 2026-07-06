@@ -5,6 +5,8 @@ import {
   appSecretConfigured,
   downloadMedia,
   sendText,
+  sendButtons,
+  sendImageUrl,
 } from '../../../lib/whatsapp';
 import {
   parseReceipt,
@@ -201,6 +203,8 @@ async function processMessage(message: IncomingMessage): Promise<void> {
       await handleReceiptImage(from, messageId, message.image.id);
     } else if (message.type === 'audio' && message.audio?.id) {
       await handleVoiceNote(from, messageId, message.audio.id);
+    } else if (message.type === 'interactive' && message.interactive?.button_reply?.id) {
+      await handleButtonReply(from, message.interactive.button_reply.id);
     } else if (message.type === 'text' && message.text?.body) {
       const text = message.text.body;
       // Invoice flow takes priority. If it consumes the message, do not also log it.
@@ -287,28 +291,74 @@ function isGetStarted(body: string): boolean {
   return /^(get started|getstarted|start|hi|hiya|hello|hey|hey there|hello there|begin)$/.test(t);
 }
 
+// The first hello sets the tone for everything. A brand card, a short warm
+// message with real examples, then three tappable buttons so the very first
+// action is one thumb press, not a decision. All in-session, no templates.
 async function handleWelcome(from: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
     await replyNotLinked(from);
     return;
   }
-  await sendText(
+  await sendImageUrl(
+    from,
+    `${APP_URL}/opengraph-image.png`,
+    'Welcome to Lekhio 👋 Your back office, right here in WhatsApp.',
+  );
+  await sendButtons(
     from,
     [
-      'Welcome to Lekhio. I am your back office, right here in WhatsApp.',
+      'Everything works by text, photo or voice note:',
       '',
-      'Here is what I can do for you:',
-      'Snap a photo of any receipt and I log it for tax.',
-      "Text your miles, like 'drove 24 miles', and I claim them.",
-      'Tell me what you got paid and I keep your income tidy.',
-      'Ask me anything about your tax or expenses.',
+      '📸 Snap any receipt and it logs itself',
+      '⛽ "spent 40 on diesel" logs the expense',
+      '🚐 "drove 24 miles" claims your mileage',
+      '💷 "Dave paid 500" keeps income tidy',
+      '🎯 "my goal is a van for 24k" and Rakha plans around it',
+      '❓ Or just ask anything about your tax',
       '',
-      'Everything lands in your Lekhio app, ready for tax, and nothing ever goes to HMRC without your say so.',
-      '',
-      'Go on, send me your first receipt.',
+      'It all lands in your app ready for tax, and nothing ever goes to HMRC without your yes. Pick one to try:',
     ].join('\n'),
+    [
+      { id: 'wk_receipt', title: '📸 Log a receipt' },
+      { id: 'wk_expense', title: '💬 Text an expense' },
+      { id: 'wk_help', title: '❓ Everything I do' },
+    ],
+    'Lekhio · text it, sorted',
   );
+}
+
+// A tapped welcome button. Each reply teaches by inviting a real first action.
+async function handleButtonReply(from: string, buttonId: string): Promise<void> {
+  if (buttonId === 'wk_receipt') {
+    await sendText(
+      from,
+      'Easy one. Snap a photo of any receipt, crumpled is fine, and send it right here. I read the shop, the total and the VAT, and it lands in your app to approve. Go on, try one now.',
+    );
+    return;
+  }
+  if (buttonId === 'wk_expense') {
+    await sendText(
+      from,
+      [
+        'Type it like you would say it out loud:',
+        '',
+        '"spent 40 on diesel"',
+        '"log 24 miles"',
+        '"Dave paid 500 for the rewire"',
+        '"paid 80 for screws at Screwfix"',
+        '',
+        'Send one now and watch it come back logged.',
+      ].join('\n'),
+    );
+    return;
+  }
+  if (buttonId === 'wk_help') {
+    await handleHelp(from);
+    return;
+  }
+  // An unknown button id (future flows): fall back to the help list.
+  await handleHelp(from);
 }
 
 async function replyNotLinked(from: string): Promise<void> {
@@ -1366,6 +1416,7 @@ interface IncomingMessage {
   image?: { id: string };
   audio?: { id: string };
   text?: { body: string };
+  interactive?: { type?: string; button_reply?: { id: string; title: string } };
 }
 
 interface WebhookBody {

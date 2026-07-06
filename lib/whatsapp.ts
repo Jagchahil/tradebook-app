@@ -212,3 +212,69 @@ export async function sendTemplate(
     console.error('[whatsapp] Template send failed:', res.status, text);
   }
 }
+
+// Send an interactive message with up to three quick reply buttons. Only valid
+// inside the 24 hour customer service window (the user messaged first), which
+// is exactly when the welcome flow runs. Button titles max 20 characters.
+export async function sendButtons(
+  toPhone: string,
+  body: string,
+  buttons: Array<{ id: string; title: string }>,
+  footer?: string,
+): Promise<void> {
+  if (!TOKEN || !PHONE_NUMBER_ID) {
+    console.warn('[whatsapp] Send skipped. Token or phone number id missing.');
+    return;
+  }
+  try {
+    const res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: toPhone,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: body },
+          ...(footer ? { footer: { text: footer } } : {}),
+          action: {
+            buttons: buttons.slice(0, 3).map((b) => ({
+              type: 'reply',
+              reply: { id: b.id, title: b.title.slice(0, 20) },
+            })),
+          },
+        },
+      }),
+    });
+    if (!res.ok) console.error('[whatsapp] Buttons send failed:', res.status, await res.text());
+  } catch (err) {
+    console.error('[whatsapp] Buttons send failed or timed out:', err instanceof Error ? err.message : err);
+  }
+}
+
+// Send an image by public URL with an optional caption. Used for the welcome
+// brand card; in-session media needs no template.
+export async function sendImageUrl(toPhone: string, link: string, caption?: string): Promise<void> {
+  if (!TOKEN || !PHONE_NUMBER_ID) {
+    console.warn('[whatsapp] Send skipped. Token or phone number id missing.');
+    return;
+  }
+  try {
+    const res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: toPhone,
+        type: 'image',
+        image: { link, ...(caption ? { caption } : {}) },
+      }),
+    });
+    if (!res.ok) console.error('[whatsapp] Image send failed:', res.status, await res.text());
+  } catch (err) {
+    console.error('[whatsapp] Image send failed or timed out:', err instanceof Error ? err.message : err);
+  }
+}

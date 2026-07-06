@@ -143,5 +143,27 @@ ok('no plan answer asks for the plan', /plan 2/i.test(slb));
 const slc = W.studentLoanAnswer({ hasPlan: true, planLabel: 'Plan 5', annual: 0, threshold: 25000, income: 20000 });
 ok('under threshold answer says nothing due', /Nothing due/.test(slc) && /25,000/.test(slc));
 
+
+console.log('\n=== waintents: goals ===\n');
+const g1 = W.matchGoalSet('my goal is a van for 24k');
+ok('goal set parses', g1 && g1.amount === 24000 && g1.kind === 'purchase');
+ok('goal title is the thing', g1 && g1.title === 'van');
+const g2 = W.matchGoalSet('saving up for a rainy day fund 5000');
+ok('savings kind detected', g2 && g2.kind === 'savings' && g2.amount === 5000);
+const g3 = W.matchGoalSet('new goal earn 60k this year');
+ok('income kind detected', g3 && g3.kind === 'income' && g3.amount === 60000);
+ok('no trigger no goal', W.matchGoalSet('spent 40 on diesel') === null);
+ok('no amount no goal', W.matchGoalSet('my goal is a van') === null);
+ok('goal question matches', W.isGoalQuestion('how are my goals looking'));
+ok('goal question progress', W.isGoalQuestion('what is my goal progress'));
+ok('plain goal word alone is not a question', !W.isGoalQuestion('goal'));
+ok('goal done matches', W.isGoalDone('goal done'));
+ok('goal smashed matches', W.isGoalDone('goal smashed mate'));
+ok('unrelated done does not match', !W.isGoalDone('job done'));
+const ga = W.goalAnswer([{ title: 'van', amount: 24000 }], 12000);
+ok('goal answer shows coverage', /12,000\.00/.test(ga) && /50%/.test(ga));
+const gb = W.goalAnswer([], 0);
+ok('no goals answer invites one', /my goal is/.test(gb));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

@@ -371,3 +371,60 @@ export function studentLoanAnswer(input: {
   }
   return `On your income so far this tax year, about ${formatGbp(input.annual)} of student loan (${input.planLabel}) is building up. It lands in one lump on your January Self Assessment bill, so put about ${formatGbp(input.annual / 12)} a month aside and it will never bite. Full picture in the app under Money, Student loan.`;
 }
+
+// --- Goals from chat (doc 82 section 5b) --------------------------------------
+// "my goal is a van for 24k" creates a goal in the user's own words, no form.
+// These run BEFORE the student loan and totals matchers in the webhook.
+
+export interface GoalSet {
+  kind: 'purchase' | 'income' | 'savings';
+  title: string;
+  amount: number;
+}
+
+export function matchGoalSet(body: string): GoalSet | null {
+  const low = body.trim().toLowerCase();
+  if (!/\b(my goal is|new goal|goal:|i am saving (for|up)|i'm saving (for|up)|saving up for)\b/.test(low)) return null;
+  const amount = extractMoneyAmount(low);
+  if (!amount) return null;
+  const kind: GoalSet['kind'] = /\b(earn|make|turnover|income)\b/.test(low)
+    ? 'income'
+    : /\b(save|savings|buffer|rainy)\b/.test(low)
+      ? 'savings'
+      : 'purchase';
+  // The title is what remains once the trigger phrase, the amount and filler
+  // words are stripped: "my goal is a van for 24k" leaves "van".
+  const title = low
+    .replace(/\b(my goal is|new goal|goal:|i am saving (for|up)|i'm saving (for|up)|saving up for)\b/g, ' ')
+    .replace(/£?\s*\d+(?:[,.]\d+)?\s*k?\b/g, ' ')
+    .replace(/\b(for|of|a|an|to|buy|get|save|the|new)\b/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { kind, title: title || 'my goal', amount };
+}
+
+export function isGoalQuestion(body: string): boolean {
+  const b = body.trim().toLowerCase();
+  if (/£\s*\d/.test(b)) return false;
+  return /\bgoals?\b/.test(b) && /\b(how|what|where|am i|progress|looking|going|close)\b/.test(b);
+}
+
+export function isGoalDone(body: string): boolean {
+  const b = body.trim().toLowerCase();
+  return /\bgoal (done|complete|completed|finished|sorted|reached|smashed)\b/.test(b);
+}
+
+// Progress reply for one or more goals: the pot is what the business has
+// cleared after tax this year, the same figure the app and Rakha use.
+export function goalAnswer(goals: { title: string; amount: number }[], pot: number): string {
+  if (goals.length === 0) {
+    return 'No goals set yet. Tell me one here, like "my goal is a van for 24k", and I will keep it in mind: progress, tax timing, the lot.';
+  }
+  const lines = goals.slice(0, 3).map((g) => {
+    const covered = Math.min(pot, g.amount);
+    const pct = Math.min(100, Math.floor((covered / g.amount) * 100));
+    return `"${g.title}": ${formatGbp(covered)} of ${formatGbp(g.amount)} covered (${pct}%)`;
+  });
+  return `${lines.join('. ')}. That is measured against what your business has cleared after tax this year. Rakha keeps these in mind and will tell you when timing or tax works in your favour.`;
+}

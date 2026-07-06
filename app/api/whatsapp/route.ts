@@ -36,6 +36,9 @@ import {
   setNudgePrefs,
   getStudentLoanSettings,
   setStudentLoanPlan,
+  getActiveGoals,
+  insertUserGoal,
+  completeLatestGoal,
 } from '../../../lib/supabase';
 import {
   parseMoneyEntryRegex,
@@ -58,6 +61,10 @@ import {
   matchStudentLoanPlanSet,
   niAnswer,
   studentLoanAnswer,
+  matchGoalSet,
+  isGoalQuestion,
+  isGoalDone,
+  goalAnswer,
 } from '../../../lib/waintents';
 import { soleTraderTax } from '../../../lib/taxengine';
 import { niPosition, studentLoanRepayment, studentLoanForSA, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
@@ -235,6 +242,12 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await sendText(from, deadlineAnswer());
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);
+          } else if (matchGoalSet(text)) {
+            await handleGoalSet(from, text);
+          } else if (isGoalDone(text)) {
+            await handleGoalDone(from);
+          } else if (isGoalQuestion(text)) {
+            await handleGoalQuestion(from);
           } else if (matchStudentLoanPlanSet(text)) {
             await handleStudentLoanPlanSet(from, text);
           } else if (isStudentLoanQuestion(text)) {
@@ -694,6 +707,55 @@ async function handleStudentLoanQuestion(from: string): Promise<void> {
       income,
     }),
   );
+}
+
+// "My goal is a van for 24k": create the goal in the user's own words.
+async function handleGoalSet(from: string, text: string): Promise<void> {
+  const goal = matchGoalSet(text);
+  if (!goal) return;
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const ok = await insertUserGoal(userId, goal);
+  if (!ok) {
+    await sendText(from, 'I could not save that just now. Try again in a minute, or add it in the app under Money, Goals.');
+    return;
+  }
+  await sendText(
+    from,
+    `Goal saved: "${goal.title}", ${formatGbp(goal.amount)}. Rakha keeps it in mind from tonight: progress, tax timing, the lot. Ask "how are my goals" any time.`,
+  );
+}
+
+// "How are my goals looking": progress from the after tax pot, same figure as
+// the app.
+async function handleGoalQuestion(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const [goals, totals] = await Promise.all([getActiveGoals(userId), totalsForUser(userId, taxYearSinceISO(), null)]);
+  const profit = totals ? Math.max(0, totals.income - totals.expenses) : 0;
+  const pot = Math.max(0, profit - soleTraderTax(profit).total);
+  await sendText(from, goalAnswer(goals, pot));
+}
+
+// "Goal done": close the newest goal and celebrate properly.
+async function handleGoalDone(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const title = await completeLatestGoal(userId);
+  if (!title) {
+    await sendText(from, 'No open goals to close. Set one any time, like "my goal is a van for 24k".');
+    return;
+  }
+  await sendText(from, `"${title}" marked done. Get in. 🎉 Set the next one whenever you are ready.`);
 }
 
 // "Plan 2" or "my student loan is plan 2": store it, no form needed.

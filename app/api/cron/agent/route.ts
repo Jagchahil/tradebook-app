@@ -27,6 +27,7 @@ import {
   agentPingPref,
   markAgentSignalDelivered,
   logAgentDelivery,
+  getActiveGoals,
 } from '../../../../lib/supabase';
 import { computeSignals, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
 
@@ -104,6 +105,7 @@ async function processUser(user: {
   // A user with no data produces no signals; skip the engine's edge cases early.
   if (agg.months.length === 0 && agg.unconfirmed === 0) return { inserted: 0, pinged: 0 };
 
+  const goals = await getActiveGoals(user.id);
   const input: AgentInput = {
     today: new Date(),
     months: agg.months,
@@ -112,6 +114,7 @@ async function processUser(user: {
     studentLoanPlan: user.student_loan_plan,
     studentLoanPostgrad: user.student_loan_postgrad,
     employmentIncome: user.employment_income,
+    goals: goals.map((g) => ({ id: g.id, kind: g.kind, title: g.title, amount: g.amount, targetDate: g.target_date })),
   };
   let signals = computeSignals(input);
   if (signals.length === 0) return { inserted: 0, pinged: 0 };

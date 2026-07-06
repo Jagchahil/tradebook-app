@@ -58,6 +58,7 @@ function input(today, months, extra = {}) {
     studentLoanPlan: null,
     studentLoanPostgrad: false,
     employmentIncome: 0,
+    goals: [],
     ...extra,
   };
 }
@@ -244,6 +245,53 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   ok('four entries stays quiet', !find(A.computeSignals(input(nearQ3End, months, { unconfirmedCount: 4 })), 'quarter_unconfirmed'));
   const early = new Date('2026-11-20T00:00:00Z'); // 46 days out
   ok('far from quarter end stays quiet', !find(A.computeSignals(input(early, months, { unconfirmedCount: 7 })), 'quarter_unconfirmed'));
+}
+
+
+// --- goal signals (doc 82 section 5b) -------------------------------------------
+{
+  const van = { id: 'aaaabbbb-0000-0000-0000-000000000000', kind: 'purchase', title: 'the van', amount: 24000, targetDate: null };
+  // G1 combo: projected ~6k over the 40% line, van goal covers the overshoot.
+  const today = new Date('2026-12-15T00:00:00Z');
+  const hot = monthsFor(today, 12, { incomePerMonth: 5500, expensesPerMonth: 800 }); // proj profit ~59k
+  const combo = A.computeSignals(input(today, hot, { goals: [van] }));
+  const c = find(combo, 'goal_threshold_combo');
+  ok('combo fires as ping', c && c.priority === 'ping');
+  ok('combo names the goal', c.body.includes('the van'));
+  ok('combo period key carries the goal id', c.periodKey.includes('#gaaaabbbb'));
+  ok('combo suppresses the generic higher rate card', !find(combo, 'higher_rate_approach'));
+  ok('no goal means generic card returns', Boolean(find(A.computeSignals(input(today, hot)), 'higher_rate_approach')));
+  // A goal too small to fix the overshoot does not fire the combo.
+  const smallGoal = { ...van, id: 'ccccdddd-0000-0000-0000-000000000000', amount: 800 };
+  const noCombo = A.computeSignals(input(today, hot, { goals: [smallGoal] }));
+  ok('small goal no combo', !find(noCombo, 'goal_threshold_combo'));
+
+  // G2 timing near year end, with the after tax cost at the marginal rate.
+  const nearEnd = new Date('2027-02-20T00:00:00Z');
+  const strong = monthsFor(nearEnd, 12, { incomePerMonth: 8000, expensesPerMonth: 1200 }); // proj profit ~74k, 42% marginal
+  const t = find(A.computeSignals(input(nearEnd, strong, { goals: [van] })), 'goal_purchase_timing');
+  ok('timing fires near year end', t && t.priority === 'ping');
+  eq('after tax cost at 42%', t.numbers.realCost, Math.round(24000 * 0.58));
+  ok('timing suppresses generic aia', !find(A.computeSignals(input(nearEnd, strong, { goals: [van] })), 'aia_timing'));
+  ok('generic aia returns without a goal', Boolean(find(A.computeSignals(input(nearEnd, strong)), 'aia_timing')));
+  // Tiny profits: the deduction saves nothing, no timing nudge.
+  const weak = monthsFor(nearEnd, 12, { incomePerMonth: 2200, expensesPerMonth: 400 });
+  ok('weak year no timing', !find(A.computeSignals(input(nearEnd, weak, { goals: [van] })), 'goal_purchase_timing'));
+
+  // G3 within reach: after tax pot covers the goal.
+  const smallVan = { ...van, id: 'eeeeffff-0000-0000-0000-000000000000', amount: 9000 };
+  const mid = new Date('2026-12-15T00:00:00Z');
+  const earner = monthsFor(mid, 12, { incomePerMonth: 3000, expensesPerMonth: 800 }); // ytd profit ~19.8k, tax ~1.9k, pot ~17.9k
+  const w = find(A.computeSignals(input(mid, earner, { goals: [smallVan] })), 'goal_within_reach');
+  ok('within reach fires as card', w && w.priority === 'card');
+  ok('within reach quiet when short', !find(A.computeSignals(input(mid, earner, { goals: [van] })), 'goal_within_reach'));
+
+  // G4 progress: dated goal still short, monthly period, per week figure.
+  const dated = { ...van, id: 'abcdabcd-0000-0000-0000-000000000000', targetDate: '2027-03-15' };
+  const p2 = find(A.computeSignals(input(mid, earner, { goals: [dated] })), 'goal_progress');
+  ok('progress fires monthly card', p2 && p2.priority === 'card' && p2.periodKey.startsWith('2026-12#g'));
+  ok('progress has a per week figure', p2.numbers.perWeek > 0);
+  ok('reached goal has no progress card', !find(A.computeSignals(input(mid, earner, { goals: [{ ...dated, amount: 9000 }] })), 'goal_progress'));
 }
 
 // --- the noise caps ------------------------------------------------------------------------------

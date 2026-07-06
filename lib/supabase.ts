@@ -1593,3 +1593,66 @@ export async function logAgentDelivery(userId: string, signalKey: string): Promi
     body: JSON.stringify({ user_id: userId, event_type: 'agent_ping_sent', event_data: { signal_key: signalKey } }),
   }).catch(() => undefined);
 }
+
+// --- Goals (doc 82 section 5b) ------------------------------------------------
+
+export interface ActiveGoal {
+  id: string;
+  kind: 'purchase' | 'income' | 'savings';
+  title: string;
+  amount: number;
+  target_date: string | null;
+}
+
+export async function getActiveGoals(userId: string): Promise<ActiveGoal[]> {
+  const { url } = config();
+  const query = `${url}/rest/v1/user_goals?user_id=eq.${encodeURIComponent(userId)}&status=eq.active&select=id,kind,title,amount,target_date&order=created_at.desc&limit=10`;
+  const res = await fetch(query, { headers: headers() });
+  if (!res.ok) return [];
+  const rows = (await res.json().catch(() => [])) as Array<{
+    id: string;
+    kind: string;
+    title: string;
+    amount: number | string;
+    target_date: string | null;
+  }>;
+  return rows
+    .filter((r) => r.kind === 'purchase' || r.kind === 'income' || r.kind === 'savings')
+    .map((r) => ({
+      id: r.id,
+      kind: r.kind as ActiveGoal['kind'],
+      title: r.title,
+      amount: Number(r.amount) || 0,
+      target_date: r.target_date,
+    }));
+}
+
+// Create a goal from WhatsApp ("my goal is a van for 24k"). The title is the
+// user's own words.
+export async function insertUserGoal(
+  userId: string,
+  goal: { kind: 'purchase' | 'income' | 'savings'; title: string; amount: number },
+): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/user_goals`, {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ user_id: userId, ...goal }),
+  });
+  return res.ok;
+}
+
+// "goal done": marks the newest active goal done. From WhatsApp there is no
+// picker, so newest-first is the least surprising rule; the app can manage
+// individual goals precisely.
+export async function completeLatestGoal(userId: string): Promise<string | null> {
+  const goals = await getActiveGoals(userId);
+  if (goals.length === 0) return null;
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/user_goals?id=eq.${encodeURIComponent(goals[0].id)}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ status: 'done', updated_at: new Date().toISOString() }),
+  });
+  return res.ok ? goals[0].title : null;
+}

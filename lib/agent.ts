@@ -23,6 +23,14 @@ export interface MonthTotals {
   cis: number; // CIS deducted in the month
 }
 
+export interface UserGoal {
+  id: string;
+  kind: 'purchase' | 'income' | 'savings';
+  title: string; // the user's own words
+  amount: number;
+  targetDate: string | null; // YYYY-MM-DD
+}
+
 export interface AgentInput {
   today: Date;
   // Confirmed monthly totals for the trailing 12 calendar months including the
@@ -34,6 +42,8 @@ export interface AgentInput {
   studentLoanPlan: StudentPlan | null; // undergraduate plan or null
   studentLoanPostgrad: boolean;
   employmentIncome: number; // annual PAYE salary saved on the account, 0 if none
+  // Active goals (doc 82 section 5b). Empty array when none.
+  goals: UserGoal[];
 }
 
 export type SignalPriority = 'ping' | 'card';
@@ -48,13 +58,17 @@ export interface AgentSignal {
   numbers: Record<string, number>; // the figures behind it, for the payload
 }
 
-// When the daily or weekly ping caps bite, higher priority wins. Doc 84 section 2.
+// When the daily or weekly ping caps bite, higher priority wins. Doc 84 section 2,
+// goal signals added per doc 82 section 5b. The threshold combo outranks nearly
+// everything: one suggestion that solves two problems is the flagship moment.
 export const PING_PRIORITY_ORDER: string[] = [
   'mtd_mandation',
   'pa_taper',
+  'goal_threshold_combo',
   'poa_cliff',
   'vat_approach',
   'class2_pension_year',
+  'goal_purchase_timing',
   'aia_timing',
   'quarter_unconfirmed',
 ];
@@ -180,6 +194,108 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
 
   const out: AgentSignal[] = [];
 
+  // --- Goal derived figures, computed early because goal aware signals
+  // supersede their generic cousins: a suggestion tied to the user's own plan
+  // beats a generic one, and firing both would be noise.
+  const hrBoundary = FACTS.class4UpperLimit; // 50,270, where 40% starts
+  const taxDueYtd = soleTraderTax(d.ytdProfit).total;
+  // What the business has cleared after tax this year: the honest goal pot.
+  const potNow = Math.max(0, d.ytdProfit - taxDueYtd);
+  const purchaseGoals = input.goals.filter((g) => g.kind === 'purchase');
+  // The rate the NEXT pound of profit is taxed at (income tax plus Class 4),
+  // which is exactly what a deductible purchase saves per pound.
+  const projTotalIncome = canProject ? projProfit + salary : 0;
+  const marginalRate = !canProject
+    ? 0
+    : projTotalIncome >= FACTS.personalAllowanceTaperFloor
+      ? 0.62 // 40% + 2% Class 4 + the allowance taper's extra 20 points
+      : projTotalIncome >= hrBoundary
+        ? 0.42 // 40% + 2%
+        : projTotalIncome > FACTS.personalAllowance
+          ? 0.26 // 20% + 6%
+          : 0;
+  let goalComboFired = false;
+  let goalTimingFired = false;
+
+  // G1. The flagship: heading over a threshold AND an open purchase goal that
+  // would bring them back under. One suggestion, two problems solved.
+  if (canProject && projTotalIncome > hrBoundary) {
+    const overshoot = Math.round(projTotalIncome - hrBoundary);
+    const fix = purchaseGoals.find((g) => g.amount >= overshoot);
+    if (fix && overshoot >= 500) {
+      goalComboFired = true;
+      out.push({
+        signalKey: 'goal_threshold_combo',
+        periodKey: `${year}#g${fix.id.slice(0, 8)}`,
+        priority: 'ping',
+        title: 'Your goal could solve a tax problem',
+        body: `At your current pace your income lands about ${gbp(overshoot)} over ${gbp(hrBoundary)}, where 40% tax starts. Your goal "${fix.title}" (${gbp(fix.amount)}) is a deductible business purchase: made this tax year it brings you back under the line AND you get the thing you were saving for. Two birds, one van. A suggestion from your numbers, not advice. You decide.`,
+        waText: `your income is heading ${gbp(overshoot)} over the 40% line, and your goal "${fix.title}" would bring you back under if bought this tax year`,
+        numbers: { overshoot, boundary: hrBoundary, goalAmount: fix.amount },
+      });
+    }
+  }
+
+  // G2. Purchase timing near year end: the goal aware version of the AIA nudge,
+  // with the real after tax cost at the user's marginal rate.
+  {
+    const yearEndG = taxYearEnd(today);
+    const daysToEndG = Math.floor((yearEndG.getTime() - today.getTime()) / DAY_MS);
+    if (daysToEndG <= 56 && daysToEndG >= 0 && canProject && marginalRate > 0) {
+      const g = purchaseGoals.find((x) => input.equipmentSpendYtd < x.amount && projProfit - x.amount > FACTS.personalAllowance);
+      if (g) {
+        goalTimingFired = true;
+        const realCost = Math.round(g.amount * (1 - marginalRate));
+        out.push({
+          signalKey: 'goal_purchase_timing',
+          periodKey: `${year}#g${g.id.slice(0, 8)}`,
+          priority: 'ping',
+          title: `"${g.title}" costs less before 5 April`,
+          body: `Bought before 5 April, "${g.title}" comes off THIS year's profit under the Annual Investment Allowance. At your rate the ${gbp(g.amount)} really costs you about ${gbp(realCost)} after the tax saving. Buy it a week into April and the saving waits a year. Only for kit you genuinely need. A suggestion from your numbers, not advice. You decide.`,
+          waText: `your goal "${g.title}" saves more before 5 April: at your rate the ${gbp(g.amount)} really costs about ${gbp(realCost)} after tax`,
+          numbers: { amount: g.amount, realCost, marginalRatePct: Math.round(marginalRate * 100), daysToEnd: daysToEndG },
+        });
+      }
+    }
+  }
+
+  // G3. The pot passed the goal: once per goal per year.
+  for (const g of input.goals) {
+    if (potNow >= g.amount) {
+      out.push({
+        signalKey: 'goal_within_reach',
+        periodKey: `${year}#g${g.id.slice(0, 8)}`,
+        priority: 'card',
+        title: `"${g.title}" is within reach`,
+        body: `What your business has cleared after tax this year (${gbp(potNow)}) now covers your goal "${g.title}" (${gbp(g.amount)}). Whether now is the moment is yours to call, but the money side is there.`,
+        waText: `your after tax earnings this year (${gbp(potNow)}) now cover your goal "${g.title}"`,
+        numbers: { pot: potNow, goalAmount: g.amount },
+      });
+    }
+  }
+
+  // G4. Monthly progress against a dated goal, only while it is still short.
+  if (canProject) {
+    const monthKeyNow = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, '0')}`;
+    for (const g of input.goals) {
+      if (!g.targetDate || potNow >= g.amount) continue;
+      const target = new Date(`${g.targetDate}T00:00:00Z`);
+      const weeksLeft = Math.max(1, Math.round((target.getTime() - today.getTime()) / (7 * DAY_MS)));
+      if (target <= today) continue;
+      const gap = g.amount - potNow;
+      const perWeek = Math.ceil(gap / weeksLeft);
+      out.push({
+        signalKey: 'goal_progress',
+        periodKey: `${monthKeyNow}#g${g.id.slice(0, 8)}`,
+        priority: 'card',
+        title: `"${g.title}": ${gbp(potNow)} of ${gbp(g.amount)} covered`,
+        body: `Towards "${g.title}" by ${target.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}: your after tax earnings this year cover ${gbp(potNow)} of the ${gbp(g.amount)}. Clearing about ${gbp(perWeek)} a week from here gets you there on time.`,
+        waText: `"${g.title}": ${gbp(potNow)} of ${gbp(g.amount)} covered, about ${gbp(perWeek)} a week keeps you on track`,
+        numbers: { pot: potNow, goalAmount: g.amount, perWeek, weeksLeft },
+      });
+    }
+  }
+
   // 1. VAT registration threshold, rolling 12 months, three tiers.
   const vat = FACTS.vatRegistrationThreshold;
   const vatPct = d.rolling12Income / vat;
@@ -226,8 +342,8 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
   }
 
   // 3. Higher rate approach, projected total income crossing the 40% boundary.
-  const hrBoundary = FACTS.class4UpperLimit; // 50,270, where 40% income tax starts
-  if (canProject && projProfit + salary >= hrBoundary && d.ytdProfit + salary < hrBoundary * 1.5) {
+  // Superseded by the goal combo when it fires: same fact, better suggestion.
+  if (!goalComboFired && canProject && projProfit + salary >= hrBoundary && d.ytdProfit + salary < hrBoundary * 1.5) {
     out.push({
       signalKey: 'higher_rate_approach',
       periodKey: year,
@@ -306,7 +422,6 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
   }
 
   // 8. CIS refund milestones.
-  const taxDueYtd = soleTraderTax(d.ytdProfit).total;
   const refund = Math.max(0, d.ytdCis - taxDueYtd);
   // The highest milestone the refund has passed: 250, 500, 1000, then every 500.
   const milestone =
@@ -357,9 +472,11 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
   }
 
   // 10. AIA timing: strong year, near year end, no big kit purchase yet.
+  // Superseded by goal_purchase_timing when a purchase goal exists: the goal
+  // version carries the user's own plan and the exact after tax cost.
   const yearEnd = taxYearEnd(today);
   const daysToEnd = Math.floor((yearEnd.getTime() - today.getTime()) / DAY_MS);
-  if (daysToEnd <= 56 && daysToEnd >= 0 && canProject && projProfit + salary >= hrBoundary && input.equipmentSpendYtd < 1000) {
+  if (!goalTimingFired && daysToEnd <= 56 && daysToEnd >= 0 && canProject && projProfit + salary >= hrBoundary && input.equipmentSpendYtd < 1000) {
     out.push({
       signalKey: 'aia_timing',
       periodKey: year,

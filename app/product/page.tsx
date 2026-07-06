@@ -88,6 +88,19 @@ const PRODUCT_CSS = `
 .rbadge{font-size:10px;font-weight:900;letter-spacing:.05em;padding:4px 9px;border-radius:999px;display:inline-block}
 .rbadge.soon{color:var(--saffron-deep);background:var(--saffron-tint)}
 .rbadge.prog{color:var(--river);background:var(--river-tint)}
+.rbadge.live{color:var(--green);background:var(--green-tint)}
+.helpers{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:940px;margin:0 auto}
+@media(max-width:820px){.helpers{grid-template-columns:1fr}}
+.helpercard{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px;box-shadow:var(--shadow)}
+.helpercard.rakha{border-top:3px solid var(--saffron)}
+.helpercard.ai{border-top:3px solid var(--river)}
+.helpercard .hic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px;margin-bottom:14px}
+.helpercard.ai .hic{background:var(--river-tint)}
+.helpercard.rakha .hic{background:var(--saffron-tint)}
+.helpercard h3{font-size:20px;margin:0 0 4px;letter-spacing:-.02em}
+.helpercard .htag{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--tx-mut);margin-bottom:12px}
+.helpercard p{font-size:15px;color:var(--tx-mut);line-height:1.6;margin:0 0 10px}
+.helpercard .hname{font-size:12.5px;color:var(--tx-mut);font-style:italic}
 /* Content is visible by default; motion is an enhancement, never a gate. */
 .mkt .reveal{opacity:1;transform:none}
 `;
@@ -243,6 +256,32 @@ export default function ProductPage() {
         </div>
       </section>
 
+      {/* The two helpers: the reactive AI and Rakha, the proactive agent */}
+      <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
+        <div className="wrap">
+          <div className="center reveal" style={{ marginBottom: 38 }}>
+            <div className="eyebrow" style={{ color: 'var(--saffron-deep)' }}>Meet your back office</div>
+            <h2 className="h2">Two helpers. One answers, one watches.</h2>
+            <p className="lead">Every other app waits for you to ask. Lekhio comes with a second helper that speaks first.</p>
+          </div>
+          <div className="helpers reveal">
+            <div className="helpercard ai">
+              <div className="hic">📊</div>
+              <h3>Lekhio AI</h3>
+              <div className="htag">Answers when you ask</div>
+              <p>Your quick tax helper, in the chat. Ask anything about your tax, expenses, CIS, VAT or your own numbers, and get a straight answer in plain English, in seconds. No jargon, no waiting days for a reply.</p>
+            </div>
+            <div className="helpercard rakha">
+              <div className="hic">🛡️</div>
+              <h3>Rakha</h3>
+              <div className="htag">Speaks before you ask</div>
+              <p>Rakha watches your numbers all year: the VAT threshold creeping closer, a State Pension year about to slip, the January bill quietly building. When something needs you, Rakha tells you first, in the app and on WhatsApp. It suggests, never acts. You decide everything.</p>
+              <p className="hname">Rakha is Punjabi for guardian. Lekhio keeps your books. Rakha watches them.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Beat the accountant, short */}
       <section>
         <div className="wrap">
@@ -279,7 +318,7 @@ export default function ProductPage() {
             <div className="sooncard"><div className="se">📤</div><h3>File straight to HMRC</h3><p>Submit your quarterly updates and return from Lekhio, when you approve, through a recognised route.</p><span className="rbadge prog">HMRC RECOGNITION IN PROGRESS</span></div>
             <div className="sooncard"><div className="se">📊</div><h3>Your HMRC balance, live</h3><p>See exactly what you owe, what is due, and any refund building, right in the app.</p><span className="rbadge soon">COMING SOON</span></div>
             <div className="sooncard"><div className="se">🏦</div><h3>Connect your bank</h3><p>Money in and out logs itself, read only, so your books stay up to date with no effort.</p><span className="rbadge soon">BUILT · SWITCHING ON SOON</span></div>
-            <div className="sooncard"><div className="se">🤖</div><h3>Agentic accountant</h3><p>An AI accountant that works your books for you, checks the tricky bits, and answers your questions.</p><span className="rbadge soon">COMING SOON</span></div>
+            <div className="sooncard"><div className="se">🛡️</div><h3>Rakha gets sharper</h3><p>Rakha already watches your thresholds. Soon it reads HMRC updates and the Budget the moment they land, and tells you exactly what changes for you.</p><span className="rbadge soon">COMING SOON</span></div>
           </div>
         </div>
       </section>

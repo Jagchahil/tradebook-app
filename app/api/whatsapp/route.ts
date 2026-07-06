@@ -45,7 +45,9 @@ import {
   insertUserGoal,
   completeLatestGoal,
   setEmploymentIncome,
+  getOrCreateReferralCode,
 } from '../../../lib/supabase';
+import { isReferRequest, referralInvite } from '../../../lib/referral';
 import {
   parseMoneyEntryRegex,
   poundAmounts,
@@ -280,6 +282,8 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handleStudentLoanQuestion(from);
           } else if (isNiQuestion(text)) {
             await handleNiQuestion(from);
+          } else if (isReferRequest(text)) {
+            await handleReferRequest(from);
           } else if (matchTotalsQuestion(text)) {
             await handleTotals(from, text);
           } else if (isQuestion(text)) {
@@ -1120,6 +1124,22 @@ async function handleGoalQuestion(from: string): Promise<void> {
   const profit = totals ? Math.max(0, totals.income - totals.expenses) : 0;
   const pot = Math.max(0, profit - soleTraderTax(profit).total);
   await sendText(from, goalAnswer(goals, pot));
+}
+
+// Referral invite (doc 82). We hand back the user's own link and a ready to
+// forward message. The user forwards it: we never message a mate for them.
+async function handleReferRequest(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const code = await getOrCreateReferralCode(userId);
+  if (!code) {
+    await sendText(from, 'I could not fetch your invite link just now. Try again in a minute.');
+    return;
+  }
+  await sendText(from, referralInvite(code).reply);
 }
 
 // "Goal done": close the newest goal and celebrate properly.

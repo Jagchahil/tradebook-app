@@ -19,16 +19,12 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npx tsc --noEmit
-      - name: Tax exam suite
-        run: node test/exams/run-exams.mjs
-      - name: HMRC foundation suite
-        run: node test/hmrc/run-hmrc-test.mjs
-      - name: WhatsApp intent suite
-        run: node test/waintents.test.mjs
-      - name: Bank feed suite
-        run: node test/bankfeed.test.mjs
-      - name: Logic tests
-        run: node test/logic.test.js
+      - name: All test suites
+        # One runner covers every suite (engines, parity, agent, waintents,
+        # crypto, stripe, quarterpack, exams, hmrc, and logic.test.js, which runs
+        # here because the typescript module is installed). Exits non zero on any
+        # failure. New test/*.test.mjs files are picked up automatically.
+        run: node test/run-all.mjs
       - name: Build
         run: npx next build
         env:

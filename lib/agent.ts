@@ -693,6 +693,64 @@ Send it as it is or tweak it first. You send, never me. Most invoices get paid w
     }
   }
 
+  // 14. Year end countdown (doc 82 section 5e item 6): the last six weeks before
+  // 5 April, a weekly list of moves the user can still make this tax year, which
+  // shrinks as the door closes. Seasonal and dormant the rest of the year. A
+  // card, never a ping, so it informs without interrupting. Deterministic: it
+  // only lists moves that actually apply to this user, so a quiet account with
+  // nothing to act on gets nothing.
+  {
+    const yearEnd = taxYearEnd(today); // 5 April
+    const daysToYearEnd = Math.floor((yearEnd.getTime() - today.getTime()) / DAY_MS);
+    if (daysToYearEnd >= 0 && daysToYearEnd <= 42) {
+      const weeksLeft = Math.max(1, Math.ceil((daysToYearEnd + 1) / 7));
+      const moves: string[] = [];
+
+      // Confirm anything still waiting, so it lands in this tax year.
+      if (input.unconfirmedCount > 0) {
+        moves.push(
+          `Confirm the ${input.unconfirmedCount} ${input.unconfirmedCount === 1 ? 'entry' : 'entries'} waiting for your yes, so they count in ${year}.`,
+        );
+      }
+      // Every late receipt is a deduction while it is still dated this year.
+      moves.push('Send any receipts still sat on your phone. Every expense dated on or before 5 April lowers this year\'s bill.');
+
+      // A deductible purchase the user already wants, framed as AIA timing.
+      const firstPurchase = purchaseGoals[0];
+      if (firstPurchase && marginalRate > 0) {
+        const saving = Math.round(firstPurchase.amount * marginalRate);
+        moves.push(
+          `Buying ${firstPurchase.title} before 5 April puts the whole cost against this year under the Annual Investment Allowance. At your rate that is about ${gbp(saving)} off the tax on ${gbp(firstPurchase.amount)} spent. You decide.`,
+        );
+      }
+      // Higher rate profit: a pension contribution is the classic year end lever.
+      if (canProject && projTotalIncome > hrBoundary) {
+        moves.push('A pension contribution before 5 April lowers the profit taxed at 40 percent. Your provider sets the amount, we are not a financial adviser, you decide.');
+      }
+
+      // Only fire when there is something to actually do beyond the generic
+      // receipts line: real activity this year, or a purchase goal, or entries
+      // to confirm. A dormant account is left alone.
+      const worthSaying = d.ytdProfit > 0 || input.unconfirmedCount > 0 || purchaseGoals.length > 0;
+      if (worthSaying) {
+        const list = moves.map((m) => `. ${m}`).join('\n');
+        out.push({
+          signalKey: 'year_end_countdown',
+          // Weekly bucket by weeks remaining, so it re-fires once a week through
+          // the window and naturally shrinks (6 down to 1), never twice in a week.
+          periodKey: `${year}-yec-w${weeksLeft}`,
+          priority: 'card',
+          title: `${weeksLeft} ${weeksLeft === 1 ? 'week' : 'weeks'} to 5 April`,
+          body:
+            `The ${year} tax year closes on 5 April. Moves you can still make before then:\n${list}\n` +
+            'After 5 April these count against next year instead.',
+          waText: `${weeksLeft} ${weeksLeft === 1 ? 'week' : 'weeks'} to 5 April. ${moves.length} ${moves.length === 1 ? 'move' : 'moves'} you can still make this tax year`,
+          numbers: { weeksLeft, daysToYearEnd, ytdProfit: d.ytdProfit, taxDueYtd },
+        });
+      }
+    }
+  }
+
   return out;
 }
 

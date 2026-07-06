@@ -9,6 +9,7 @@
 // browser.
 
 import { encryptSecret, decryptSecret } from './crypto';
+import { referralCode, sanitizeRefCode } from './referral';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -352,6 +353,7 @@ export interface OnboardSignup {
   address?: string | null;
   vat_registered?: boolean | null;
   offer?: string | null;
+  referred_by_code?: string | null;
 }
 
 // Save a completed web onboarding. Written with the service role key, server side only.
@@ -366,6 +368,10 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
   if (signup.address) record.address = signup.address;
   if (signup.vat_registered !== undefined && signup.vat_registered !== null) record.vat_registered = signup.vat_registered;
   if (signup.offer) record.offer = signup.offer;
+  // Attribution only. Store the sanitised referral code they arrived through, if
+  // it is a valid code. Reward is a separate gated decision (doc 82).
+  const ref = sanitizeRefCode(signup.referred_by_code ?? null);
+  if (ref) record.referred_by_code = ref;
 
   const res = await fetch(`${url}/rest/v1/signups`, {
     method: 'POST',
@@ -1005,6 +1011,46 @@ export async function getBusinessName(userId: string): Promise<string | null> {
   if (!res.ok) return null;
   const rows = (await res.json()) as Array<{ name?: string | null; business_name?: string | null }>;
   return rows[0]?.business_name || rows[0]?.name || null;
+}
+
+// The user's stable referral code (doc 82 referral loop). Read it if stored,
+// otherwise derive it deterministically, persist it, and return it. Deriving is
+// stable per account, so a race that writes twice writes the same value.
+export async function getOrCreateReferralCode(userId: string): Promise<string | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=referral_code&limit=1`,
+    { headers: headers() },
+  );
+  if (res.ok) {
+    const rows = (await res.json()) as Array<{ referral_code?: string | null }>;
+    const existing = rows[0]?.referral_code;
+    if (existing) return existing;
+  }
+  const code = referralCode(userId);
+  // Persist it. The unique index means a collision would 409, harmless: the
+  // reader above already returns any stored value, so we just try once.
+  await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ referral_code: code }),
+  }).catch(() => {});
+  return code;
+}
+
+// Attribution only: record the code a new user arrived through, if valid and not
+// their own. Never moves money; reward is a separate gated decision (doc 82).
+export async function setReferredByCode(userId: string, rawCode: string): Promise<void> {
+  const code = sanitizeRefCode(rawCode);
+  if (!code) return;
+  const own = referralCode(userId);
+  if (code === own) return; // cannot refer yourself
+  const { url } = config();
+  await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&referred_by_code=is.null`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ referred_by_code: code }),
+  }).catch(() => {});
 }
 
 // Mark an invoice paid from the server (Stripe webhook) and book the income,

@@ -53,6 +53,9 @@ export default function StartPage() {
   const [t0] = useState(() => Date.now());
   const [offer] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('offer') ?? '' : ''));
   const [billingResult] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('billing') ?? '' : ''));
+  // A referral code carried in on ?ref= (doc 82). Attribution only; passed to the
+  // onboard save, sanitised server side. Never shown, never rewards automatically.
+  const [ref] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') ?? '' : ''));
 
   // Billing: the chosen period drives the price shown and charged. One simple price for everyone.
   const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly');
@@ -115,6 +118,7 @@ export default function StartPage() {
           website: hp,
           ts: Date.now() - t0,
           offer,
+          ref,
         }),
       }).catch(() => {});
     } catch {

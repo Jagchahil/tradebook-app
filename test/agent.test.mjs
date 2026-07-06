@@ -521,5 +521,49 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   ok('no weekly pacing without a date', !g.body.includes('a week from here'));
 }
 
+// --- year end countdown (seasonal) -----------------------------------------------------
+{
+  // Too early: 49 days before 5 April is outside the six week window.
+  const early = new Date('2027-02-15T00:00:00Z');
+  const earlyOut = A.computeSignals(input(early, monthsFor(early, 12, { incomePerMonth: 4000, expensesPerMonth: 1000 })));
+  ok('no countdown seven weeks out', !find(earlyOut, 'year_end_countdown'));
+
+  // In window: 21 days before 5 April, with real profit this year.
+  const mid = new Date('2027-03-15T00:00:00Z');
+  const months = monthsFor(mid, 12, { incomePerMonth: 4000, expensesPerMonth: 1000 });
+  const c = find(A.computeSignals(input(mid, months)), 'year_end_countdown');
+  ok('countdown fires inside the six weeks', !!c);
+  ok('countdown is a card, never a ping', c.priority === 'card');
+  ok('countdown weeks left is 1..6', c.numbers.weeksLeft >= 1 && c.numbers.weeksLeft <= 6);
+  ok('countdown title names the weeks', /week/.test(c.title) && c.title.includes('5 April'));
+  ok('countdown always lists the receipts move', c.body.toLowerCase().includes('receipts'));
+  ok('countdown copy has no forbidden dashes', !/[–—−]/.test(c.title + c.body + c.waText));
+
+  // Dormant account inside the window: nothing to act on, so no nag.
+  const dormant = find(A.computeSignals(input(mid, monthsFor(mid, 12, { incomePerMonth: 0, expensesPerMonth: 0 }))), 'year_end_countdown');
+  ok('no countdown for a dormant account', !dormant);
+
+  // Unconfirmed entries add the confirm move.
+  const withUnconf = find(A.computeSignals(input(mid, months, { unconfirmedCount: 4 })), 'year_end_countdown');
+  ok('countdown includes the confirm move', withUnconf.body.includes('4 entries'));
+
+  // Higher rate profit plus a purchase goal: pension and AIA levers appear.
+  const rich = monthsFor(mid, 12, { incomePerMonth: 6000, expensesPerMonth: 500 });
+  const hr = find(
+    A.computeSignals(input(mid, rich, {
+      goals: [{ id: 'aaaabbbb-0000-0000-0000-000000000000', kind: 'purchase', title: 'a van', amount: 24000, targetDate: null }],
+    })),
+    'year_end_countdown',
+  );
+  ok('higher rate countdown mentions a pension move', hr.body.toLowerCase().includes('pension'));
+  ok('countdown surfaces the AIA purchase timing', hr.body.includes('Annual Investment Allowance') && hr.body.includes('a van'));
+
+  // Shrinking: near the last week before 5 April, fewer weeks and a distinct key.
+  const late = new Date('2027-03-30T00:00:00Z');
+  const c2 = find(A.computeSignals(input(late, monthsFor(late, 12, { incomePerMonth: 4000, expensesPerMonth: 1000 }))), 'year_end_countdown');
+  ok('countdown shrinks as the door closes', c2.numbers.weeksLeft < c.numbers.weeksLeft);
+  ok('each week has its own period key', c2.periodKey !== c.periodKey);
+}
+
 console.log(`agent: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

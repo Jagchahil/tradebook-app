@@ -48,10 +48,25 @@ const HOME_CSS = `
 .mtdtop a:hover .go{text-decoration-color:#fff}
 
 .truststrip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--panel)}
-.truststrip .row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px 28px;padding:16px 24px;font-size:13px;font-weight:600;color:var(--tx-mut)}
-.truststrip .row span{display:inline-flex;align-items:center;gap:8px}
+.truststrip .row{display:grid;grid-template-columns:repeat(4,1fr);max-width:1040px;margin:0 auto;padding:0 24px}
+.truststrip .ti{display:flex;align-items:center;gap:12px;padding:18px 20px;font-size:13.5px;font-weight:600;color:var(--tx-mut);border-left:1px solid var(--line)}
+.truststrip .ti:first-child{border-left:0}
+.truststrip .tc{flex:0 0 36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:17px}
 .truststrip b{color:var(--tx);font-weight:800}
-@media(max-width:640px){.truststrip .row{flex-direction:column;gap:11px;font-size:13px;padding:16px 20px;text-align:center}}
+@media(max-width:760px){.truststrip .row{grid-template-columns:1fr 1fr}.truststrip .ti{border-left:0}.truststrip .ti:nth-child(odd){border-right:1px solid var(--line)}.truststrip .ti:nth-child(n+3){border-top:1px solid var(--line)}}
+@media(max-width:420px){.truststrip .row{grid-template-columns:1fr}.truststrip .ti:nth-child(odd){border-right:0}.truststrip .ti:nth-child(n+2){border-top:1px solid var(--line)}}
+
+.helpers{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:760px){.helpers{grid-template-columns:1fr}}
+.hcard{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px;box-shadow:var(--shadow)}
+.hcard .hicon{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;font-size:26px;margin-bottom:16px}
+.hcard .role{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tx-mut);margin-bottom:8px}
+.hcard h3{font-size:21px;margin:0 0 10px;letter-spacing:-.02em}
+.hcard>p{font-size:15px;color:var(--tx-mut);margin:0 0 18px;line-height:1.55}
+.hchat{display:flex;flex-direction:column;gap:7px}
+.compliance{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px 24px;display:flex;flex-wrap:wrap;gap:14px 34px;align-items:center;justify-content:center;box-shadow:var(--shadow)}
+.compliance .ci{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:var(--tx-mut)}
+.compliance b{color:var(--tx);font-weight:800}
 
 .home .hero{padding:56px 0 26px}
 .hero .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
@@ -220,10 +235,10 @@ export default function HomePage() {
       {/* Trust strip */}
       <div className="truststrip">
         <div className="row">
-          <span>🔒 Encrypted, never sold</span>
-          <span>✅ You approve everything</span>
-          <span>📐 <b>Checked against HMRC&apos;s 2026/27 rules</b> across 104 tests</span>
-          <span>🇬🇧 A real UK company</span>
+          <div className="ti"><span className="tc" style={{ background: 'var(--green-tint)' }}>🔒</span><span>Encrypted, <b>never sold</b></span></div>
+          <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}>✅</span><span><b>You approve</b> everything</span></div>
+          <div className="ti"><span className="tc" style={{ background: 'var(--saffron-tint)' }}>📐</span><span><b>HMRC 2026/27 rules</b>, 104 tests</span></div>
+          <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}>🇬🇧</span><span>A <b>real UK company</b></span></div>
         </div>
       </div>
 
@@ -361,6 +376,21 @@ export default function HomePage() {
 
           <div className="drow flip reveal">
             <div className="dtext">
+              <div className="eyebrow" style={{ color: 'var(--river)' }}>📈 Ways to save</div>
+              <h3>It finds you legal ways to pay less.</h3>
+              <p>Lekhio reads your own numbers and surfaces the real reliefs you are entitled to: use of home, mileage, kit timing, a pension to step out of the 40% band. The legitimate ones only, and always your call.</p>
+            </div>
+            <div className="dvis">
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>WAYS TO SAVE · ON YOUR NUMBERS</div>
+              <div className="splitrow"><span>Claim use of home</span><span style={{ color: 'var(--green)' }}>save ~£190</span></div>
+              <div className="splitrow"><span>Mileage instead of fuel</span><span style={{ color: 'var(--tx-mut)' }}>worth a look</span></div>
+              <div className="splitrow"><span>Pension, step out of 40%</span><span style={{ color: 'var(--green)' }}>save ~£1,200</span></div>
+              <div className="splitrow"><span>On the table this year</span><span style={{ color: 'var(--green)' }}>£1,390</span></div>
+            </div>
+          </div>
+
+          <div className="drow reveal">
+            <div className="dtext">
               <div className="eyebrow" style={{ color: 'var(--green)' }}>✅ You approve</div>
               <h3>Prepared for you. Sent by you.</h3>
               <p>Your quarterly figures sit there ready. You check them and send them. Nothing reaches HMRC without your yes. That is the line we never cross.</p>
@@ -375,6 +405,44 @@ export default function HomePage() {
           </div>
 
           <div className="center reveal" style={{ marginTop: 44 }}><Link href="/product" className="btn primary">See everything Lekhio does →</Link></div>
+        </div>
+      </section>
+
+      {/* Two helpers + compliance */}
+      <section style={{ background: 'var(--river-tint)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
+        <div className="wrap">
+          <div className="center reveal" style={{ marginBottom: 40 }}>
+            <div className="eyebrow">The expert in your pocket</div>
+            <h2 className="h2">Two helpers. Day and night.</h2>
+            <p className="lead">The brains of an accountant, in the chat you already use. One answers the second you ask. One speaks up before you have to.</p>
+          </div>
+          <div className="helpers reveal">
+            <div className="hcard">
+              <div className="hicon" style={{ background: 'var(--river-tint)' }}>💬</div>
+              <div className="role">Puchio · answers when you ask</div>
+              <h3>Any tax question, straight answer.</h3>
+              <p>Ask anything in plain English and get a clear answer in seconds, worked on your real numbers. No jargon, no waiting days for a callback.</p>
+              <div className="hchat">
+                <div className="dbub out">can I claim my work boots?</div>
+                <div className="dbub in">Yes, protective boots for work are an allowable expense. Snap the receipt and I will log it.</div>
+              </div>
+            </div>
+            <div className="hcard">
+              <div className="hicon" style={{ background: 'var(--saffron-tint)' }}>🛡️</div>
+              <div className="role">Rakha · speaks before you ask</div>
+              <h3>It watches your numbers for you.</h3>
+              <p>A threshold creeping up, a deadline, an unpaid invoice, a moment a purchase saves real tax. Rakha spots it and tells you first. Suggestions, never actions.</p>
+              <div className="hchat">
+                <div className="dbub in" style={{ background: 'var(--saffron-tint)', border: '1px solid var(--saffron)' }}>🛡️ Heads up: you are about £900 from the VAT threshold. Worth planning before you cross it.</div>
+                <div className="dbub in" style={{ background: 'var(--saffron-tint)', border: '1px solid var(--saffron)' }}>🛡️ Invoice 0012 is 18 days late. Want me to draft a chase in your voice?</div>
+              </div>
+            </div>
+          </div>
+          <div className="compliance reveal">
+            <div className="ci">📐 Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
+            <div className="ci">🧪 <b>104 tests</b> on the tax engine</div>
+            <div className="ci">✅ <b>Nothing filed</b> without your yes</div>
+          </div>
         </div>
       </section>
 
@@ -434,7 +502,7 @@ export default function HomePage() {
       <section style={{ paddingTop: 20 }}>
         <div className="wrap">
           <div className="final reveal">
-            <h2>Text it. It is in your Lekhio.</h2>
+            <h2>Text it. It&apos;s in your Lekhio.</h2>
             <p>Your whole back office, sorted from a text. 14 days free, no card needed.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
           </div>

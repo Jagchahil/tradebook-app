@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { answerAccountantQuestion, hasClaudeConfig } from '../../../lib/claude';
-import { verifyAccessToken, bumpAiUsage, transactionSummaryForUser } from '../../../lib/supabase';
+import { verifyAccessToken, bumpAiUsage, transactionSummaryForUser, getRelevantKnowledge } from '../../../lib/supabase';
 import { rateLimited } from '../../../lib/ratelimit';
 
 // The in-app accountant endpoint. The app posts a question with the user's
@@ -78,7 +78,24 @@ export async function POST(req: NextRequest) {
     context = '';
   }
 
-  const answer = await answerAccountantQuestion(question, context);
+  // Fold in any verified GOV.UK / HMRC updates Khoji has distilled and a human
+  // has reviewed. Reviewed and source-linked only, so an empty or un-reviewed
+  // knowledge base simply yields nothing and Puchio answers from its static,
+  // exam-verified rules exactly as before. This is how the brain grows into the
+  // answers without ever letting an unchecked summary become advice.
+  let knowledge = '';
+  try {
+    const items = await getRelevantKnowledge(question, 6);
+    if (items.length) {
+      knowledge = items
+        .map((k) => `- ${k.title}${k.effective_date ? ` (effective ${k.effective_date})` : ''}: ${k.summary} [source: ${k.source_url}]`)
+        .join('\n');
+    }
+  } catch {
+    knowledge = '';
+  }
+
+  const answer = await answerAccountantQuestion(question, context, knowledge);
   if (!answer) {
     return NextResponse.json({ error: 'failed', answer: 'I could not work that out just now. Try rewording it, or ask me something else.' }, { status: 502 });
   }

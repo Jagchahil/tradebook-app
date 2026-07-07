@@ -58,6 +58,66 @@ export async function bumpAiUsage(scope: string, key: string): Promise<number | 
   }
 }
 
+// --- Khoji knowledge retrieval (the growing brain) ------------------------
+// Khoji (the Mac mini watcher) distils GOV.UK and HMRC updates into the
+// knowledge_items table. This reads back only the rows a human has REVIEWED and
+// that carry a primary source link. That gate is the safety boundary: an
+// un-reviewed or source-less summary can never reach a user's tax answer. Puchio
+// (and later the agent) call this to fold the latest verified changes into their
+// reasoning. Returns [] on any error or when nothing relevant is found, so the
+// caller simply falls back to its static, exam-verified rules. Never relax the
+// status=reviewed and source_url filters.
+export interface KnowledgeItem {
+  title: string;
+  summary: string;
+  source_url: string;
+  effective_date: string | null;
+}
+
+const KNOWLEDGE_STOPWORDS = new Set([
+  'what', 'when', 'where', 'which', 'that', 'this', 'with', 'from', 'have', 'about',
+  'does', 'will', 'would', 'should', 'could', 'much', 'many', 'need', 'want', 'know',
+  'tell', 'your', 'yours', 'them', 'they', 'been', 'into', 'over', 'more', 'most',
+  'than', 'then', 'some', 'just', 'like', 'make', 'made', 'also', 'still', 'only',
+  'income', 'money',
+]);
+
+export async function getRelevantKnowledge(question: string, limit = 6): Promise<KnowledgeItem[]> {
+  try {
+    const { url } = config();
+    // Significant words for a light keyword match. Restricted to plain
+    // alphanumerics of 4+ chars, so there is nothing to escape and no injection
+    // path. Short and common words are dropped so the filter stays meaningful.
+    const words = Array.from(
+      new Set(
+        (question.toLowerCase().match(/[a-z0-9]{4,}/g) || [])
+          .filter((w) => !KNOWLEDGE_STOPWORDS.has(w))
+          .slice(0, 8),
+      ),
+    );
+    // The safety gate, never relaxed: reviewed, source-linked, distilled.
+    let path =
+      'knowledge_items?status=eq.reviewed&source_url=not.is.null&summary=not.is.null' +
+      `&select=title,summary,source_url,effective_date&order=effective_date.desc.nullslast&limit=${limit}`;
+    // Surface items that relate to the question. With no usable words we fall back
+    // to the most recent verified items.
+    if (words.length) {
+      const ors = words
+        .flatMap((w) => [`title.ilike.*${w}*`, `summary.ilike.*${w}*`, `affects.ilike.*${w}*`])
+        .join(',');
+      path += `&or=(${ors})`;
+    }
+    const res = await fetch(`${url}/rest/v1/${path}`, { headers: headers() });
+    if (!res.ok) return [];
+    const rows = (await res.json()) as KnowledgeItem[];
+    return Array.isArray(rows)
+      ? rows.filter((r) => r && r.summary && r.source_url).slice(0, limit)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 // --- WhatsApp conversation state ------------------------------------------
 
 export interface WaSession {

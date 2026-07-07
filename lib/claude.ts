@@ -443,6 +443,7 @@ const ACCOUNTANT_SYSTEM = [
   '- The test for an allowable expense is HMRC\'s "wholly and exclusively for the trade". Everyday clothing is not allowable; genuine protective clothing and branded uniform are. Client entertaining and fines are never allowable. For mixed-use items (phone, car, home), only the business proportion. Commuting is not allowable; travel between job sites is.',
   '- If the user gives you their own figures, do the actual sums and show the numbers.',
   '- Be accurate and strictly within the law. Never suggest evasion. Be honest about grey areas.',
+  '- The only external updates you may rely on are the ones in a Verified recent updates section, if the message has one. Never claim a tax change, rate or threshold that is not in your built-in figures or that verified section. If unsure whether something changed, give the figure you have and suggest they check the current position on GOV.UK.',
   '- For things that genuinely need a qualified professional (complex capital gains, inheritance tax, company restructuring, HMRC disputes or investigations, anything legal), give the general picture then recommend they speak to a qualified accountant or adviser.',
   '- Never imply HMRC endorses Lekhio. Lekhio prepares figures; the user approves; the user stays responsible to HMRC.',
   '- Do not give personalised investment or pension product advice. You can explain how tax relief works in general.',
@@ -455,10 +456,13 @@ const ACCOUNTANT_SYSTEM = [
 // Answer a free-text accountant question. `context` is an optional compact summary
 // of the user\'s own figures, so money questions get real numbers. Returns the
 // answer text, or null on failure.
-export async function answerAccountantQuestion(question: string, context?: string): Promise<string | null> {
+export async function answerAccountantQuestion(question: string, context?: string, knowledge?: string): Promise<string | null> {
   if (!ready() || !KEY) return null;
 
   const userContent = [
+    knowledge
+      ? `Verified recent updates from official sources (GOV.UK and HMRC), reviewed and carrying a primary source link. Treat these as the latest confirmed position, prefer them where they are relevant, name the change, and cite the source. Ignore this section if none are relevant:\n${knowledge}\n`
+      : '',
     context ? `My recent figures (newest first, pounds):\n${context}\n` : '',
     `My question: ${question}`,
   ].filter(Boolean).join('\n');

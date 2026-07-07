@@ -47,6 +47,16 @@ export function poundAmounts(b: string): number[] {
     .filter((n) => Number.isFinite(n) && n > 0);
 }
 
+// Money amounts with the pound sign OPTIONAL, because people rarely type it,
+// and our own examples omit it ("Dave paid 500, 100 CIS held"). It skips a
+// number that is a percentage (the "20" in "20%") and never matches mid number,
+// so "500, 100" gives [500, 100] and "20%" gives nothing.
+export function moneyAmounts(b: string): number[] {
+  return [...b.matchAll(/(?<![\d.])£?\s*(\d[\d,]*(?:\.\d{1,2})?)\b(?!\s*%)/g)]
+    .map((m) => parseFloat(m[1].replace(/,/g, '')))
+    .filter((n) => Number.isFinite(n) && n > 0);
+}
+
 // --- Typed money entries -----------------------------------------------------
 export type ParsedEntry = {
   merchant_name: string;

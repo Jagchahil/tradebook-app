@@ -52,6 +52,7 @@ import { isReferRequest, referralInvite } from '../../../lib/referral';
 import {
   parseMoneyEntryRegex,
   poundAmounts,
+  moneyAmounts,
   entryDate,
   clampReceiptDate,
   isThanks,
@@ -1273,7 +1274,11 @@ async function handleMileage(from: string, messageId: string, body: string): Pro
 function isCIS(body: string): boolean {
   if (body.trim().endsWith('?')) return false;
   if (/\bspent\b|\bbought\b/i.test(body)) return false;
-  return /\bcis\b/i.test(body) && /£\s*\d/.test(body);
+  if (!/\bcis\b/i.test(body)) return false;
+  // A CIS income log has an amount, with or without a pound sign, because our
+  // own onboarding examples omit it ("Dave paid 500, 100 CIS held"). We require
+  // a payment context word so a plain question about CIS never books anything.
+  return /\d/.test(body) && /\bpaid\b|\bheld\b|\bdeduct|\btook\b|\bkept\b|\bstopped\b|%/i.test(body);
 }
 async function handleCIS(from: string, messageId: string, body: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
@@ -1281,10 +1286,11 @@ async function handleCIS(from: string, messageId: string, body: string): Promise
     await sendText(from, 'Open the app and add your number first, then I can log your CIS.');
     return;
   }
-  // poundAmounts handles thousands separators, so "£1,200" is £1200, not £1.
-  const amounts = poundAmounts(body);
+  // moneyAmounts reads amounts with or without a pound sign and skips the "20"
+  // in "20%", so "Dave paid 500, 100 CIS held" gives [500, 100].
+  const amounts = moneyAmounts(body);
   if (amounts.length === 0) {
-    await sendText(from, 'Tell me the amounts, for example "Dave paid £400, £80 CIS deducted".');
+    await sendText(from, 'Tell me the amounts, for example "Dave paid 500, 100 CIS held".');
     return;
   }
   const gross = amounts[0];

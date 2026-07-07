@@ -240,5 +240,17 @@ ok('no goals answer invites one', /my goal is/.test(gb));
   ok('empty is safe', W.isInvoiceThis('') === false);
 }
 
+{
+  console.log('\n--- moneyAmounts: pound sign optional, skips percentages ---');
+  const a = W.moneyAmounts('Dave paid 500, 100 CIS held');
+  ok('bare numbers both captured', a.length === 2 && a[0] === 500 && a[1] === 100);
+  const b = W.moneyAmounts('£400, £80 CIS deducted');
+  ok('pound amounts still work', b.length === 2 && b[0] === 400 && b[1] === 80);
+  const c = W.moneyAmounts('20% CIS on 500');
+  ok('a percentage is not read as an amount', c.length === 1 && c[0] === 500);
+  ok('thousands separators handled', W.moneyAmounts('paid 1,200')[0] === 1200);
+  ok('no numbers gives empty', W.moneyAmounts('nothing here').length === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

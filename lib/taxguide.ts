@@ -103,7 +103,7 @@ export function cardText(idx: number, trade: TradeInfo | null): string {
     '',
     '• Register by 5 Oct 2026, if it is your first return.',
     '• File online and pay by 31 Jan 2027. Miss it and it is an automatic £100 penalty.',
-    '• Mileage is 45p a mile for the first 10,000 business miles this year.',
+    '• Mileage on your 2025/26 return is 45p a mile for the first 10,000 business miles. It rises to 55p from 2026/27, which is what I use when you log a trip today.',
     '',
     'Heads up, from April 2026 if you turn over more than £50,000 you move to Making Tax Digital, four short updates a year instead of one return. I keep you ready for it.',
     '',

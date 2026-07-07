@@ -17,7 +17,7 @@
 // so this is safe to wire straight into CI or a pre-push hook.
 
 import { spawnSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
@@ -50,6 +50,15 @@ try {
   tsInstalled = false;
 }
 
+// The *-parity suites compare this repo's engine against the mobile app's engine,
+// which lives in a sibling checkout at ../tradebook-app/lib/tax.ts (the exact path
+// those tests resolve). That sibling exists locally, where both repos sit side by
+// side, but not in single-repo CI. When it is absent we skip the parity suites
+// rather than fail, the same way `logic` is skipped without `typescript`. The
+// parity guard still runs locally and anywhere both repos are checked out.
+const parityAppEngine = path.resolve(repoRoot, '../tradebook-app/lib/tax.ts');
+const parityPossible = existsSync(parityAppEngine);
+
 const results = [];
 const started = Date.now();
 
@@ -57,6 +66,12 @@ for (const suite of suites) {
   if (suite.kind === 'logic' && !tsInstalled) {
     results.push({ name: suite.name, status: 'skip', note: 'needs `typescript` (runs in deploy CI)', passed: 0, failed: 0 });
     process.stdout.write(`  SKIP  ${suite.name.padEnd(16)} needs \`typescript\`, runs in deploy CI\n`);
+    continue;
+  }
+
+  if (suite.name.endsWith('-parity') && !parityPossible) {
+    results.push({ name: suite.name, status: 'skip', note: 'needs the sibling app engine (../tradebook-app/lib/tax.ts)', passed: 0, failed: 0 });
+    process.stdout.write(`  SKIP  ${suite.name.padEnd(16)} needs the sibling app engine, runs where both repos exist\n`);
     continue;
   }
 

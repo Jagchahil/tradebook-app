@@ -16,6 +16,16 @@ const PRODUCT_CSS = `
 .mkt .hero{padding:52px 0 20px}
 .mkt .hero .cta-row{justify-content:center}
 .mkt .hero .sub{font-size:20px;color:var(--tx-mut);max-width:560px;margin:20px auto 26px}
+.featgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:1000px;margin:0 auto}
+@media(max-width:900px){.featgrid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.featgrid{grid-template-columns:1fr}}
+.featcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;text-align:left;box-shadow:var(--shadow)}
+.featcard .fe{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:20px;margin-bottom:12px}
+.featcard h3{font-size:15.5px;margin:0 0 5px;letter-spacing:-.01em}
+.featcard p{font-size:13px;color:var(--tx-mut);margin:0;line-height:1.5}
+.compliance{margin:28px auto 0;max-width:880px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px 24px;display:flex;flex-wrap:wrap;gap:14px 34px;align-items:center;justify-content:center;box-shadow:var(--shadow)}
+.compliance .ci{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:var(--tx-mut)}
+.compliance b{color:var(--tx);font-weight:800}
 .wphone{width:290px;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:30px;overflow:hidden;box-shadow:0 30px 70px rgba(17,17,17,.2)}
 [data-theme="dark"] .wphone{box-shadow:0 30px 70px rgba(0,0,0,.6)}
 .wahead{background:#075E54;color:#fff;padding:12px 15px;display:flex;align-items:center;gap:9px}
@@ -152,6 +162,32 @@ export default function ProductPage() {
           <h1 style={{ marginTop: 20 }}>Snap it. Say it.<br /><span className="gt">Sorted.</span></h1>
           <p className="sub">Text Lekhio like you text a mate. It reads it, sorts it, and it lands in your app, tidy and ready. Watch how.</p>
           <div className="cta-row"><Link href="/start" className="btn primary">Start free</Link><Link href="/pricing" className="btn ghost">See pricing</Link></div>
+        </div>
+      </section>
+
+      {/* App main features at a glance */}
+      <section style={{ paddingTop: 8 }}>
+        <div className="wrap">
+          <div className="center reveal" style={{ marginBottom: 28 }}>
+            <div className="eyebrow">Everything it does</div>
+            <h2 className="h2">Your whole back office, in one place.</h2>
+            <p className="lead">Ten seconds a day on WhatsApp. Lekhio does the rest and keeps it tidy in your app.</p>
+          </div>
+          <div className="featgrid reveal">
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}>📸</div><h3>Snap a receipt</h3><p>Photo it, Lekhio reads the shop, total and VAT.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}>🎙️</div><h3>Say it or type it</h3><p>&quot;spent 40 on diesel&quot;, by voice note or text.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}>🚐</div><h3>Mileage</h3><p>&quot;drove 24 miles&quot; and it claims it at the HMRC rate.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}>🧾</div><h3>Invoices</h3><p>Built and sent from the chat, chased when late.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}>👷</div><h3>CIS refund</h3><p>Deductions tracked, your refund watched all year.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}>📊</div><h3>Tax set aside</h3><p>One honest number, updated as you earn.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}>📈</div><h3>Ways to save</h3><p>The legal reliefs you are owed, on your numbers.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}>✅</div><h3>You approve</h3><p>MTD quarterly prep, nothing filed without your yes.</p></div>
+          </div>
+          <div className="compliance reveal">
+            <div className="ci">📐 Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
+            <div className="ci">🧪 <b>104 tests</b> on the tax engine</div>
+            <div className="ci">✅ <b>Nothing filed</b> without your yes</div>
+          </div>
         </div>
       </section>
 

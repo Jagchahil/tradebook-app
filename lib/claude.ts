@@ -6,6 +6,7 @@
 // Env var: ANTHROPIC_API_KEY
 
 import { FACTS } from './taxengine';
+import { aiEnabled } from './aicost';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 // Two tiers. The structured extraction tasks (receipt fields, entry parsing,
@@ -28,8 +29,10 @@ const KEY = process.env.ANTHROPIC_API_KEY;
 // be off. AI_KILL_SWITCH=on disables every AI call instantly, no deploy needed,
 // so if spend ever runs hot you pull one lever and the whole AI layer goes quiet
 // while the deterministic features keep working untouched.
+// One definition of the kill switch, shared with the cost governance module, so
+// AI_KILL_SWITCH can never mean one thing here and another there.
 function ready(): boolean {
-  return Boolean(KEY) && (process.env.AI_KILL_SWITCH ?? '').toLowerCase() !== 'on';
+  return aiEnabled(process.env);
 }
 
 export function hasClaudeConfig(): boolean {

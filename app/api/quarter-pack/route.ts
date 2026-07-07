@@ -77,7 +77,10 @@ export async function GET(req: NextRequest) {
     getBusinessName(userId),
   ]);
 
-  const pack = buildQuarterPack({ transactions, startYear, quarter, businessName });
+  // If the fetch hit its 20000-row cap the summary may be short, so flag it and
+  // the document shows a warning rather than passing an accountant a partial pack.
+  const truncated = transactions.length >= 20000;
+  const pack = buildQuarterPack({ transactions, startYear, quarter, businessName, truncated });
 
   if (sp.get('format') === 'json') {
     return NextResponse.json(pack);

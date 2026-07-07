@@ -65,6 +65,7 @@ export interface QuarterPack {
   cisSuffered: number;
   txCount: number;
   hasProperty: boolean;
+  truncated: boolean; // the source data may be incomplete (row limit hit)
   // Year to date, up to and including this quarter, for the running tax picture.
   ytd: {
     trade: StreamSummary;
@@ -72,6 +73,7 @@ export interface QuarterPack {
     cisSuffered: number;
     grossQualifyingIncome: number; // trade gross + property gross, the MTD test base
     mtdApplies: boolean;
+    mtdThreshold: number; // the MTD gross threshold for this tax year (50k/30k/20k)
     estimatedTax: EstimatedTax;
   };
 }
@@ -199,6 +201,18 @@ export interface BuildInput {
   quarter: 1 | 2 | 3 | 4;
   businessName?: string | null;
   now?: Date; // for the generated timestamp, injectable for tests
+  // True when the transaction fetch hit its row limit and may be incomplete, so
+  // the document warns rather than silently handing an accountant a short summary.
+  truncated?: boolean;
+}
+
+// The MTD for Income Tax gross qualifying income threshold by tax year opening
+// year: 50k (April 2026), 30k (April 2027), 20k (April 2028+).
+function mtdThresholdFor(startYear: number): number {
+  return startYear >= 2028 ? 20000 : startYear >= 2027 ? 30000 : 50000;
+}
+function mtdYearFor(startYear: number): 2026 | 2027 | 2028 {
+  return startYear >= 2028 ? 2028 : startYear >= 2027 ? 2027 : 2026;
 }
 
 // Build the pack. Quarter figures cover the selected quarter only (the MTD
@@ -224,7 +238,8 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
   // property, before expenses. We test the year to date gross, which is
   // conservative: if it already clears the threshold, mandation certainly applies.
   const grossQualifying = round2(ytdTrade.income + ytdProperty.income);
-  const mtdApplies = mtdForIncomeTaxRequired(grossQualifying, 2026);
+  const mtdApplies = mtdForIncomeTaxRequired(grossQualifying, mtdYearFor(startYear));
+  const mtdThreshold = mtdThresholdFor(startYear);
 
   // The running tax estimate is on trade net profit only. Property profit is
   // taxed on its own schedule (and from April 2027 its own rates), so folding it
@@ -257,12 +272,14 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
     cisSuffered: cisTotal(quarterTx),
     txCount: quarterTx.length,
     hasProperty: ytdProperty.income > 0 || ytdProperty.expenses > 0,
+    truncated: Boolean(input.truncated),
     ytd: {
       trade: ytdTrade,
       property: ytdProperty,
       cisSuffered: cisTotal(ytdTx),
       grossQualifyingIncome: grossQualifying,
       mtdApplies,
+      mtdThreshold,
       estimatedTax,
     },
   };
@@ -327,8 +344,14 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
     : '';
 
   const mtdLine = pack.ytd.mtdApplies
-    ? `Your gross income so far this year (${gbp(pack.ytd.grossQualifyingIncome)}) is over the £50,000 Making Tax Digital for Income Tax threshold, so quarterly updates apply.`
+    ? `Your gross income so far this year (${gbp(pack.ytd.grossQualifyingIncome)}) is over the ${gbp(pack.ytd.mtdThreshold)} Making Tax Digital for Income Tax threshold for ${esc(pack.taxYear)}, so quarterly updates apply.`
     : `Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}. Making Tax Digital for Income Tax applies from £50,000 gross (from April 2026), £30,000 (April 2027), then £20,000 (April 2028).`;
+
+  // A safety banner if the underlying data may have been capped, so a truncated
+  // summary is never presented to an accountant as complete.
+  const truncatedBanner = pack.truncated
+    ? `<div style="background:#FDECEC;border:1px solid #F5B5B5;border-radius:10px;padding:12px 14px;margin:0 0 18px;font-size:13px;color:#8A1F1F">This summary may be incomplete: you have an unusually large number of entries and not all could be included. Please contact us before relying on these figures.</div>`
+    : '';
 
   return `<!doctype html>
 <html lang="en-GB">
@@ -375,6 +398,8 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
           <div>Tax year ${esc(pack.taxYear)}</div>
         </div>
       </div>
+
+      ${truncatedBanner}
 
       <div class="kpis">
         <div class="kpi"><div class="n">${gbp(t.income)}</div><div class="l">Trade income this quarter</div></div>

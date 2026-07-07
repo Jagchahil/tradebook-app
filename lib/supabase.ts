@@ -984,7 +984,7 @@ export async function getConfirmedTransactionsForRange(
       `&transaction_date=gte.${encodeURIComponent(startISO)}` +
       `&transaction_date=lte.${encodeURIComponent(endISO)}` +
       `&select=amount,category,vendor,transaction_date,cis_deduction,income_type` +
-      `&order=transaction_date.asc&limit=5000`,
+      `&order=transaction_date.asc&limit=20000`,
     { headers: headers() },
   );
   if (!res.ok) return [];

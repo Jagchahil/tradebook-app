@@ -326,24 +326,38 @@ async function handleWelcome(from: string): Promise<void> {
     await replyNotLinked(from);
     return;
   }
+  // 1. The brand card, so the name has a face.
   await sendImageUrl(
     from,
     `${APP_URL}/opengraph-image.png`,
-    'Welcome to Lekhio 👋 Your back office, right here in WhatsApp.',
+    'Welcome to Lekhio 👋 Your whole back office, right here in this chat.',
   );
+  // 2. The warm, quirky hello. The one job of this message is to make you feel
+  //    that this is going to be easy.
+  await sendText(
+    from,
+    [
+      'Here is the good part: there is nothing to set up before you start. No forms, no spreadsheet, no shoebox of curled up receipts.',
+      '',
+      'You just tell me things as they happen, by photo, voice note or a quick text, and I turn them into tidy books that are ready for tax. You approve everything, and I never go near HMRC without your yes.',
+    ].join('\n'),
+  );
+  // 3. The feature menu, in the language you already use, plus three tappable
+  //    first actions so the very next move is one thumb press.
   await sendButtons(
     from,
     [
-      'Everything works by text, photo or voice note:',
+      'Everything works the way you already talk:',
       '',
-      '📸 Snap any receipt and it logs itself',
-      '⛽ "spent 40 on diesel" logs the expense',
+      '📸 Snap any receipt and it files itself',
+      '🎙️ "spent 40 on diesel", by text or voice note',
       '🚐 "drove 24 miles" claims your mileage',
-      '💷 "Dave paid 500" keeps income tidy',
-      '🎯 "my goal is a van for 24k" and Rakha plans around it',
-      '❓ Or just ask anything about your tax',
+      '🏗️ "Dave paid 500, 100 CIS held" tracks your refund',
+      '💷 "create invoice" builds and sends one',
+      '🎯 "my goal is a van for 24k" and I plan around it',
+      '❓ Or ask me anything, like "can I claim my boots?"',
       '',
-      'It all lands in your app ready for tax, and nothing ever goes to HMRC without your yes. Pick one to try:',
+      'It all lands in your app ready for tax. Pick one to try right now:',
     ].join('\n'),
     [
       { id: 'wk_receipt', title: '📸 Log a receipt' },

@@ -470,7 +470,12 @@ export async function answerAccountantQuestion(question: string, context?: strin
       signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
       body: JSON.stringify({
         model: MODEL_SMART,
-        max_tokens: 700,
+        // claude-sonnet-5 reasons before answering, so the budget must cover the
+        // reasoning AND the final text. At 700 the model could exhaust the budget
+        // mid-thought and emit no text block, which surfaced to users as
+        // "I could not work that out". A roomier ceiling lets a full answer land;
+        // real accountant replies are short, so the extra headroom is rarely used.
+        max_tokens: 2000,
         // The system prompt is long and stable, so cache it. Repeat questions then
         // pay a tenth of the input price for it.
         system: [{ type: 'text', text: ACCOUNTANT_SYSTEM, cache_control: { type: 'ephemeral' } }],
@@ -489,8 +494,15 @@ export async function answerAccountantQuestion(question: string, context?: strin
   }
   const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
   logUsage('accountant', data);
-  const textBlock = data.content?.find((c) => c.type === 'text')?.text;
-  return textBlock ? textBlock.trim() : null;
+  // Join every text block, not just the first. A reasoning model can return a
+  // thinking block before the text, so find-first could miss the answer. Ignore
+  // non text blocks and stitch any text together.
+  const textBlock = (data.content || [])
+    .filter((c) => c.type === 'text' && typeof c.text === 'string')
+    .map((c) => c.text as string)
+    .join('')
+    .trim();
+  return textBlock ? textBlock : null;
 }
 
 // --- Scheduling: turn "price up a job for Dave tomorrow at 8am" into a diary event ---

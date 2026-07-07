@@ -24,8 +24,16 @@ const ANTHROPIC_TIMEOUT_MS = 20000;
 
 const KEY = process.env.ANTHROPIC_API_KEY;
 
+// The gate every call passes: a key must be configured AND the kill switch must
+// be off. AI_KILL_SWITCH=on disables every AI call instantly, no deploy needed,
+// so if spend ever runs hot you pull one lever and the whole AI layer goes quiet
+// while the deterministic features keep working untouched.
+function ready(): boolean {
+  return Boolean(KEY) && (process.env.AI_KILL_SWITCH ?? '').toLowerCase() !== 'on';
+}
+
 export function hasClaudeConfig(): boolean {
-  return Boolean(KEY);
+  return ready();
 }
 
 export interface ParsedReceipt {
@@ -76,7 +84,7 @@ function logUsage(feature: string, data: { model?: string; usage?: { input_token
 }
 
 export async function parseReceipt(base64: string, mediaType: string): Promise<ParsedReceipt | null> {
-  if (!KEY) return null;
+  if (!ready()) return null;
 
   // A timeout aborts the fetch with an AbortError, so the whole request is
   // wrapped. A hang degrades to null rather than throwing out of the webhook.
@@ -175,7 +183,7 @@ const ENTRY_PROMPT = (text: string): string =>
 
 // Turn a spoken or typed sentence into a structured entry, income or expense.
 export async function parseSpokenTransaction(text: string): Promise<ParsedEntry | null> {
-  if (!KEY) return null;
+  if (!ready()) return null;
 
   // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.
   let res: Response;
@@ -257,7 +265,7 @@ const INVOICE_PROMPT = (description: string): string =>
 
 // Turn a plain job description into draft invoice line items.
 export async function draftInvoice(description: string): Promise<DraftedInvoice | null> {
-  if (!KEY) return null;
+  if (!ready()) return null;
 
   // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.
   let res: Response;
@@ -316,7 +324,7 @@ export async function draftInvoice(description: string): Promise<DraftedInvoice 
 // Answer a plain money question from the user's own figures. We pass a compact
 // summary of their transactions and let Claude reply in one or two short lines.
 export async function answerMoneyQuestion(question: string, summary: string): Promise<string | null> {
-  if (!KEY) return null;
+  if (!ready()) return null;
 
   const prompt = [
     'You are Lekhio, a calm, plain-talking money assistant for a UK self employed person.',
@@ -361,7 +369,7 @@ export async function answerMoneyQuestion(question: string, summary: string): Pr
 // about the grey areas, and we always close with a short caveat. Used only as a
 // fallback when the deterministic knowledge base has no confident match.
 export async function answerExpenseQuestion(question: string): Promise<string | null> {
-  if (!KEY) return null;
+  if (!ready()) return null;
 
   const prompt = [
     'You are Lekhio, a plain talking assistant helping a UK self employed sole trader work out if something is a tax allowable business expense.',
@@ -443,7 +451,7 @@ const ACCOUNTANT_SYSTEM = [
 // of the user\'s own figures, so money questions get real numbers. Returns the
 // answer text, or null on failure.
 export async function answerAccountantQuestion(question: string, context?: string): Promise<string | null> {
-  if (!KEY) return null;
+  if (!ready()) return null;
 
   const userContent = [
     context ? `My recent figures (newest first, pounds):\n${context}\n` : '',
@@ -511,7 +519,7 @@ const SCHEDULE_PROMPT = (text: string, nowIso: string): string =>
   ].join('\n');
 
 export async function parseSchedule(text: string, nowIso: string): Promise<ParsedSchedule | null> {
-  if (!KEY) return null;
+  if (!ready()) return null;
 
   // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.
   let res: Response;

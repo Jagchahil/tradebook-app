@@ -63,7 +63,7 @@ export default function StartPage() {
   // Billing: the chosen period drives the price shown and charged. One simple price for everyone.
   const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly');
   const [billingBusy, setBillingBusy] = useState(false);
-  const priceNow = plan === 'annual' ? '£199 a year' : '£19.99 a month';
+  const priceNow = plan === 'annual' ? '£129 a year' : '£12.99 a month';
 
   async function startCheckout() {
     setBillingBusy(true);

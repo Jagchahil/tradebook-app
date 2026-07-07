@@ -198,7 +198,7 @@ export default function HomePage() {
             '@context': 'https://schema.org',
             '@graph': [
               { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: 'WhatsApp-first bookkeeping and Making Tax Digital prep for the UK self-employed: trades, freelancers, drivers, carers, consultants and landlords.' },
-              { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'iOS, Android, Web', url: SITE, description: 'Text a receipt, voice note or invoice to WhatsApp. Lekhio logs it, categorises it, and keeps you ready for Making Tax Digital. You approve before anything reaches HMRC.', offers: [ { '@type': 'Offer', price: '19.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '199', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
+              { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'iOS, Android, Web', url: SITE, description: 'Text a receipt, voice note or invoice to WhatsApp. Lekhio logs it, categorises it, and keeps you ready for Making Tax Digital. You approve before anything reaches HMRC.', offers: [ { '@type': 'Offer', price: '12.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '129', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
               { '@type': 'FAQPage', mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
             ],
           }),
@@ -471,16 +471,16 @@ export default function HomePage() {
           <div className="prices reveal">
             <div className="pcard">
               <div className="pname">Monthly</div>
-              <div className="pamt">£19.99<span>/mo</span></div>
+              <div className="pamt">£12.99<span>/mo</span></div>
               <div className="pnote">Billed monthly. Cancel any time.</div>
               <div className="pcta"><Link href="/start" className="btn primary">Start 14 days free</Link><div className="pmicro">No card needed</div></div>
             </div>
             <div className="pcard best">
               <span className="pbadge">🎉 2 months free</span>
               <div className="pname" style={{ color: 'var(--river)' }}>Yearly · best value</div>
-              <div className="pamt">£199<span>/yr</span></div>
-              <div className="pnote">Just £16.58 a month, billed once a year.</div>
-              <span className="psave">You save £40 a year</span>
+              <div className="pamt">£129<span>/yr</span></div>
+              <div className="pnote">Just £10.75 a month, billed once a year.</div>
+              <span className="psave">You save £27 a year</span>
               <div className="pcta"><Link href="/start" className="btn primary">Start 14 days free</Link><div className="pmicro">No card needed</div></div>
             </div>
           </div>

@@ -215,7 +215,7 @@ export const steps = [
 
 export const stats = [
   { to: 30, prefix: '', suffix: 's', label: 'to log a receipt' },
-  { to: 19.99, prefix: '£', suffix: '', label: 'a month, everything in' },
+  { to: 12.99, prefix: '£', suffix: '', label: 'a month, everything in' },
   { to: 4, prefix: '', suffix: '', label: 'short updates a year, not one big return' },
   { to: 0, prefix: '', suffix: '', label: 'spreadsheets for you to keep' },
 ];
@@ -285,7 +285,7 @@ export const comingSoon = [
 
 export const fixes = [
   { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'Message the same WhatsApp and get a straight answer fast. No going in circles, no hold music.' },
-  { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £19.99 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
+  { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £12.99 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
   { stars: 1, who: 'A self employed driver, reviewing another app', gripe: 'The bank feed kept dropping. Half my month went missing and I had to relink it again and again.', fix: 'Lekhio never leans on a fragile feed. Snap it or text it and it is logged for good. Connecting your bank, when it lands, is a bonus, never a crutch.' },
   { stars: 2, who: 'A trades subcontractor, reviewing another app', gripe: 'I photographed a receipt and it would not even log it. It just tried to match it to something and gave up.', fix: 'Send a photo and Lekhio reads it and logs the lot, the amount, the VAT, the category, in seconds. No matching, no retyping.' },
   { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'They held my own money for weeks with a copy and paste excuse. Never again.', fix: 'Lekhio never holds your money or touches your account. We keep the records, that is all. Your cash is only ever yours.' },
@@ -315,7 +315,7 @@ export const oldAccountant = [
 ];
 
 export const lekhioWay = [
-  'One flat £19.99 a month, with everything in.',
+  'One flat £12.99 a month, with everything in.',
   'With you every day, not once a year.',
   'Snap each receipt as you go. Nothing to dig out.',
   'Plain English, always. Ask it anything.',

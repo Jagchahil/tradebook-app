@@ -72,19 +72,21 @@ export async function createInvoiceCheckout(input: CheckoutInput): Promise<strin
 // Price objects in the dashboard. Checkout accepts an inline recurring price, so
 // the amounts live here in code, in pence, and that is the single source of truth.
 //
-//   Standard   £19.99 a month   or   £199 a year
-//   Founder    £15.99 a month   or   £159 a year   (20% off for life, offer=setup20)
+//   Launch     £12.99 a month   or   £129 a year   (about two months free on annual)
 //
-// The founder discount is the price itself, not a coupon, so it simply never goes
-// away. A 14 day free trial is attached by default, so no card is charged for the
-// first two weeks. A field sales rep can hand a customer a longer 30 day trial by
-// giving them a rep code (see REP_TRIAL_CODES and resolveTrialDays below).
+// This is the launch price. It undercuts the direct WhatsApp rival while live HMRC
+// filing is still being switched on; the plan is to raise it to £19.99 a month once
+// filing is live, at which point every existing subscriber keeps this price for life
+// automatically, because Stripe locks the amount at signup (inline price_data). A
+// 14 day free trial is attached by default, so no card is charged for the first two
+// weeks. A field sales rep can hand a customer a longer 30 day trial by giving them a
+// rep code (see REP_TRIAL_CODES and resolveTrialDays below).
 
 export type BillingPlan = 'monthly' | 'annual';
 
 const PRICE_PENCE: Record<BillingPlan, { standard: number; founder: number; interval: 'month' | 'year'; label: string }> = {
-  monthly: { standard: 1999, founder: 1599, interval: 'month', label: 'Lekhio, monthly' },
-  annual: { standard: 19900, founder: 15900, interval: 'year', label: 'Lekhio, annual' },
+  monthly: { standard: 1299, founder: 1299, interval: 'month', label: 'Lekhio, monthly' },
+  annual: { standard: 12900, founder: 12900, interval: 'year', label: 'Lekhio, annual' },
 };
 
 // The default self serve trial. Fourteen days: long enough to reach the aha

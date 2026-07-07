@@ -8,7 +8,7 @@ import {
 export const metadata: Metadata = {
   title: 'Pricing. One flat price, everything in.',
   description:
-    'Lekhio is £19.99 a month, or £199 a year with two months free. No receipt limits, no tiers, no surprises. It replaces a whole shelf of subscriptions. 14 days free, no card needed.',
+    'Lekhio is £12.99 a month, or £129 a year with about two months free. No receipt limits, no tiers, no surprises. It replaces a whole shelf of subscriptions. 14 days free, no card needed.',
 };
 
 const STACK = [
@@ -70,8 +70,8 @@ const PRICING_JS = `
     document.querySelectorAll('#bill button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-b')===b);});
     var amt=document.getElementById('pamt'),note=document.getElementById('pnote'),save=document.getElementById('psave');
     if(!amt)return;
-    if(b==='year'){amt.innerHTML='£199<span>/yr</span>';note.textContent='Just £16.58 a month, billed once a year.';save.style.opacity='1';}
-    else{amt.innerHTML='£19.99<span>/mo</span>';note.textContent='Billed monthly. Cancel any time.';save.style.opacity='0';}
+    if(b==='year'){amt.innerHTML='£129<span>/yr</span>';note.textContent='Just £10.75 a month, billed once a year.';save.style.opacity='1';}
+    else{amt.innerHTML='£12.99<span>/mo</span>';note.textContent='Billed monthly. Cancel any time.';save.style.opacity='0';}
     if(amt.animate)amt.animate([{transform:'scale(.92)',opacity:.4},{transform:'scale(1)',opacity:1}],{duration:280,easing:'cubic-bezier(.2,1.6,.4,1)'});
   }
   function wire(){document.querySelectorAll('#bill button').forEach(function(b){b.addEventListener('click',function(){setBill(b.getAttribute('data-b'));});});}
@@ -109,9 +109,9 @@ export default function PricingPage() {
         <div className="wrap center">
           <div className="billtoggle reveal" id="bill"><button className="on" data-b="month">Monthly</button><button data-b="year">Yearly <span className="savepill">SAVE 2 MONTHS</span></button></div>
           <div className="pricebig reveal">
-            <div className="pamt" id="pamt">£19.99<span>/mo</span></div>
+            <div className="pamt" id="pamt">£12.99<span>/mo</span></div>
             <div className="pnote" id="pnote">Billed monthly. Cancel any time.</div>
-            <div className="psave" id="psave" style={{ opacity: 0 }}>🎉 2 months free · save £40 a year</div>
+            <div className="psave" id="psave" style={{ opacity: 0 }}>🎉 2 months free · save £27 a year</div>
             <div className="pcta"><Link href="/start" className="btn primary">Start 14 days free</Link></div>
             <div className="pmicro">14 day free trial · no card needed</div>
           </div>
@@ -138,7 +138,7 @@ export default function PricingPage() {
               <div className="srow" key={s.label}><div className="se">{s.e}</div><div className="sl">{s.label}</div><div className="sc">{s.cost}</div></div>
             ))}
             <div className="stotal"><div className="stl">You would pay</div><div className="stc">£60 to £150 a month</div></div>
-            <div className="replace"><div className="rt">All of it, in Lekhio, for</div><div className="rp">£19.99 a month</div></div>
+            <div className="replace"><div className="rt">All of it, in Lekhio, for</div><div className="rp">£12.99 a month</div></div>
           </div>
         </div>
       </section>

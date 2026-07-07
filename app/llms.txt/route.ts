@@ -26,7 +26,7 @@ Making Tax Digital for Income Tax began on 6 April 2026. Sole traders and landlo
 ## Key facts
 - Interaction is WhatsApp first. Photo and voice capture are the primary inputs.
 - The user approves before anything reaches HMRC. HMRC keeps the taxpayer responsible at all times.
-- Pricing: 19.99 pounds per month or 199 pounds per year. A 14 day free trial. Founder pricing 15.99 pounds per month or 159 pounds per year.
+- Pricing: 12.99 pounds per month or 129 pounds per year (a launch price). A 14 day free trial, no card needed.
 - Data is handled under UK GDPR, encrypted in transit and at rest.
 
 ## Free tools (no signup)

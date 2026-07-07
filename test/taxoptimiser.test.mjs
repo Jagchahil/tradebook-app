@@ -11,9 +11,13 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'opt-'));
-const fix = (s) => s.replace("from './taxengine'", "from './taxengine.ts'").replace("from './autonomy'", "from './autonomy.ts'");
+const fix = (s) => s
+  .replace("from './taxengine'", "from './taxengine.ts'")
+  .replace("from './autonomy'", "from './autonomy.ts'")
+  .replace("from './ltdengine'", "from './ltdengine.ts'");
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'autonomy.ts'), readFileSync(path.join(lib, 'autonomy.ts'), 'utf8'));
+writeFileSync(path.join(stage, 'ltdengine.ts'), fix(readFileSync(path.join(lib, 'ltdengine.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'taxoptimiser.ts'), fix(readFileSync(path.join(lib, 'taxoptimiser.ts'), 'utf8')));
 const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);
 
@@ -77,6 +81,29 @@ for (const level of ['suggest', 'draft', 'auto']) {
 const autoDialled = O.applyDial(rich, 'auto');
 ok('at auto, home office (admin) may auto-run', find(autoDialled, 'home_office').mode === 'auto' && find(autoDialled, 'home_office').requiresApproval === false);
 ok('at suggest, home office only suggests', find(O.applyDial(rich, 'suggest'), 'home_office').mode === 'suggest');
+
+console.log('\n=== optimiser: incorporation lever (honest answer, not a reflex nudge) ===\n');
+// At a live-question profit the lever fires, but it answers from our own maths.
+// On 2026/27 full-extraction rates a sole trader wins, so it must say "not yet"
+// rather than push a company, and it must never claim a saving.
+const bigEarner = O.findOptimisations({ ...base, ytdTradeIncome: 80000, ytdTradeExpenses: 0, categoriesLogged: ['fuel', 'phone', 'insurance', 'tools'] });
+const inc = find(bigEarner, 'incorporation');
+ok('incorporation question surfaces at a higher profit', !!inc);
+ok('incorporation is information, never summed into the headline (estSaving 0)', inc && inc.info === true && inc.estSaving === 0);
+ok('incorporation names a pound figure in the words', inc && /£[\d,]+/.test(inc.detail));
+ok('does not push a company when our maths says sole trader wins', inc && /sole trader is currently the better deal/i.test(inc.detail));
+ok('flags the condition that flips it and points to the free tool', inc && /leave money in the business/i.test(inc.detail) && /free/i.test(inc.detail));
+// A modest earner should not get the incorporation question at all.
+const smallEarner = O.findOptimisations({ ...base, ytdTradeIncome: 18000, ytdTradeExpenses: 3000, categoriesLogged: ['fuel', 'phone', 'insurance', 'tools'] });
+ok('no incorporation item for a modest earner', !find(smallEarner, 'incorporation'));
+
+console.log('\n=== optimiser: property costs lever ===\n');
+const landlord = O.findOptimisations({ ...base, ytdTradeIncome: 5000, ytdTradeExpenses: 1000, categoriesLogged: ['fuel', 'phone', 'insurance', 'tools'], ytdPropertyIncome: 12000, ytdPropertyExpenses: 200 });
+const prop = find(landlord, 'property_costs');
+ok('property costs prompt fires when rental income has almost no expenses', !!prop);
+ok('property costs is a reversible admin prompt', prop.action === 'log_entry' && O.applyDial([prop], 'auto')[0].requiresApproval === false);
+const goodLandlord = O.findOptimisations({ ...base, ytdPropertyIncome: 12000, ytdPropertyExpenses: 5000, categoriesLogged: ['fuel', 'phone', 'insurance', 'tools'] });
+ok('no property prompt when expenses are already logged', !find(goodLandlord, 'property_costs'));
 
 console.log('\n=== optimiser: no forbidden dashes in copy ===\n');
 const allText = rich.map((o) => o.title + o.detail).join(' ');

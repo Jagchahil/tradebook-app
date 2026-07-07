@@ -12,6 +12,7 @@
 // for the user's yes. Timing and tax-treatment guidance only. You decide.
 
 import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly } from './taxengine';
+import { compare } from './ltdengine';
 import { decideAction, type AutonomyLevel } from './autonomy';
 
 export interface OptimiserInput {
@@ -25,6 +26,9 @@ export interface OptimiserInput {
   homeOfficeClaimed: boolean;
   mileageClaimed: boolean;
   purchaseGoal?: { title: string; amount: number } | null;
+  // Property stream this year, for the property levers. Default 0.
+  ytdPropertyIncome?: number;
+  ytdPropertyExpenses?: number;
 }
 
 export interface Optimisation {
@@ -144,6 +148,54 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
       estSaving: 0,
       info: true,
       action: 'confirm_prompt',
+    });
+  }
+
+  // 7. Incorporation. The question every higher earner eventually asks. We answer
+  //    it honestly from our own maths rather than reflexively pushing a company.
+  //    On 2026/27 rates a sole trader who draws all their profit is usually better
+  //    off, so at a profit where the question is live we say so, name the figure,
+  //    and flag the one thing that flips it (leaving money in the business). If
+  //    the maths ever favours a company for this user, the message flips. Pure
+  //    information, never summed into the headline (estSaving 0); accountant note
+  //    on both sides because it is a structural decision with real admin.
+  if (projTradeNet >= 50000) {
+    const comp = compare(Math.round(projTradeNet));
+    const profitStr = round(projTradeNet).toLocaleString('en-GB');
+    if (comp.winner === 'ltd' && comp.delta >= 1000) {
+      out.push({
+        key: 'incorporation',
+        title: 'A limited company could save you tax',
+        detail: `At your projected profit of about £${profitStr}, running as a limited company could leave roughly £${round(comp.delta).toLocaleString('en-GB')} more in your pocket a year, mostly through the lower tax on dividends. It adds filing and admin duties, so it is a real decision. Speak to an accountant before you switch, we can show them your numbers.`,
+        estSaving: 0,
+        info: true,
+        action: 'confirm_prompt',
+      });
+    } else {
+      const gap = Math.max(0, round(-comp.delta));
+      out.push({
+        key: 'incorporation',
+        title: 'Should you go limited? Not yet',
+        detail: `People ask us this a lot at your level. On this year's rates, staying a sole trader is currently the better deal for you by about £${gap.toLocaleString('en-GB')} a year, because you draw all your profit out and dividend tax has risen. A limited company starts to pay off when you leave money in the business rather than taking it all. If that changes, we will tell you. Our free sole trader against limited tool shows the full picture, and any accountant can talk it through.`,
+        estSaving: 0,
+        info: true,
+        action: 'confirm_prompt',
+      });
+    }
+  }
+
+  // 8. Property costs. Rental income with almost no expenses logged means likely
+  //    unclaimed deductions (mortgage interest for the 20% credit, repairs, agent
+  //    fees, insurance). Reversible admin: a prompt to log them.
+  const propIncome = Math.max(0, input.ytdPropertyIncome ?? 0);
+  const propExpenses = Math.max(0, input.ytdPropertyExpenses ?? 0);
+  if (propIncome > 0 && propExpenses < propIncome * 0.1) {
+    out.push({
+      key: 'property_costs',
+      title: 'Property costs you may not be claiming',
+      detail: `You have rental income but very little logged against it. Mortgage interest (a 20% tax credit), repairs, agent fees, insurance and ground rent all reduce your property tax. Log them and Lekhio applies the £1,000 property allowance or your actual costs, whichever leaves you better off.`,
+      estSaving: 0,
+      action: 'log_entry',
     });
   }
 

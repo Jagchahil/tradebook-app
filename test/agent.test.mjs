@@ -506,6 +506,25 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   ok('completeness copy has no forbidden dashes', !/[\u2013\u2014\u2212]/.test(sparse.title + sparse.body + sparse.waText));
 }
 
+// --- signal 18: use of home saving ------------------------------------------------------
+{
+  const today = new Date('2026-12-15T00:00:00Z');
+  const months = monthsFor(today, 8, { incomePerMonth: 3000, expensesPerMonth: 600 });
+  const noHome = find(A.computeSignals(input(today, months, { categories: ['materials', 'fuel'] })), 'home_office_saving');
+  ok('use of home fires when no home cost is logged', noHome && noHome.priority === 'card');
+  ok('use of home names a monthly figure and a yearly saving', noHome && /£\d/.test(noHome.body) && noHome.numbers.saving > 0);
+  ok('use of home saving matches the flat rate x marginal rate', noHome && noHome.numbers.saving === Math.round(noHome.numbers.monthly * 12 * (noHome.numbers.marginalRatePct / 100)));
+  const claimed = A.computeSignals(input(today, months, { categories: ['materials', 'use of home'] }));
+  ok('already claiming use of home stays quiet', !find(claimed, 'home_office_saving'));
+  ok('null categories skip (old RPC)', !find(A.computeSignals(input(today, months)), 'home_office_saving'));
+  const early = new Date('2026-06-10T00:00:00Z');
+  ok('too early in the year stays quiet', !find(
+    A.computeSignals(input(early, monthsFor(early, 3, { incomePerMonth: 3000, expensesPerMonth: 600 }), { categories: ['materials'] })),
+    'home_office_saving',
+  ));
+  ok('use of home copy has no forbidden dashes', noHome && !/[–—−]/.test(noHome.title + noHome.body + noHome.waText));
+}
+
 // --- undated goals still get the monthly pulse ------------------------------------------
 {
   const today = new Date('2026-12-15T00:00:00Z');

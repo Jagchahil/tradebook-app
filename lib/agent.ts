@@ -11,7 +11,7 @@
 // finance products (the FCA line, doc 82 section 5). Visibly automated.
 // Writing rule: no em dashes, no en dashes anywhere, including every message.
 
-import { FACTS, soleTraderTax } from './taxengine';
+import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly } from './taxengine';
 import { studentLoanForSA, STUDENT_PLANS, type StudentPlan } from './nistudentloan';
 import { aprilDelta, PROPERTY_FACTS } from './propertyengine';
 import { chaseMessage } from './waintents';
@@ -605,6 +605,30 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         body: `Nothing logged this year for: ${missing.join('; ')}. If you genuinely have none, ignore this. But most tradespeople do, and every missed claim is tax paid for nothing. Text them to Lekhio as they happen, even the small ones: it all comes off the bill.`,
         waText: `you have logged nothing this year for ${missing.length} common claims (${missing[0]} among them), worth a look`,
         numbers: { missingCount: missing.length, monthsIn: d.monthsElapsed },
+      });
+    }
+  }
+
+  // 18. Use of home (doc 82 s5, the optimiser's biggest quantified lever that is
+  // not otherwise surfaced proactively). Pension shows up as higher_rate_approach
+  // and pa_taper, AIA as aia_timing, so the one quantified saving Rakha does not
+  // yet push is the flat rate use of home claim, missed by almost everyone. We
+  // read it the same way expense_completeness does, from category presence, so no
+  // new aggregate is needed, and quantify it exactly as lib/taxoptimiser does so
+  // the figure matches the Ways to save screen. Card, once a year, trade led.
+  if (input.categories && d.monthsElapsed >= 4 && d.ytdProfit > 0 && marginalRate > 0) {
+    const claimsHome = input.categories.some((c) => c.toLowerCase().includes('home'));
+    if (!claimsHome) {
+      const monthly = homeOfficeFlatRateMonthly(25); // the 25 to 50 hours a month band
+      const saving = Math.round(monthly * 12 * marginalRate);
+      out.push({
+        signalKey: 'home_office_saving',
+        periodKey: `${year}#hom`,
+        priority: 'card',
+        title: 'A claim most trades miss: use of home',
+        body: `Do your quotes, invoices or admin from home? You can claim a flat ${gbp(monthly)} a month for it, no receipts to keep. Over a year that is about ${gbp(saving)} off your tax at your rate. Say "claim use of home" and Lekhio adds it. A suggestion from your numbers, not advice. You decide.`,
+        waText: `you can claim a flat ${gbp(monthly)} a month for working from home, about ${gbp(saving)} off your tax a year, just say "claim use of home"`,
+        numbers: { monthly, saving, marginalRatePct: Math.round(marginalRate * 100) },
       });
     }
   }

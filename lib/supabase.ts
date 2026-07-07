@@ -1034,10 +1034,16 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   let ytdTradeIncome = 0;
   let ytdTradeExpenses = 0;
   let ytdCisSuffered = 0;
+  let ytdPropertyIncome = 0;
+  let ytdPropertyExpenses = 0;
   const cats = new Set<string>();
   for (const r of rows) {
-    if ((r.income_type ?? '').toLowerCase() === 'property') continue; // trade levers only
     const amt = Number(r.amount) || 0;
+    if ((r.income_type ?? '').toLowerCase() === 'property') {
+      if (amt > 0) ytdPropertyIncome += amt;
+      else if (amt < 0) ytdPropertyExpenses += -amt;
+      continue;
+    }
     if (amt > 0) ytdTradeIncome += amt;
     else if (amt < 0) {
       ytdTradeExpenses += -amt;
@@ -1062,6 +1068,8 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     homeOfficeClaimed: categoriesLogged.some((c) => c.includes('home')),
     mileageClaimed: categoriesLogged.some((c) => c.includes('mile')),
     purchaseGoal: purchase ? { title: purchase.title, amount: purchase.amount } : null,
+    ytdPropertyIncome: Math.round(ytdPropertyIncome * 100) / 100,
+    ytdPropertyExpenses: Math.round(ytdPropertyExpenses * 100) / 100,
   };
 }
 

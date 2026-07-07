@@ -40,7 +40,7 @@ function longDate(iso: string): string {
 // does, because a lender wants total self employed income, not one slice.
 export function buildIncomeProof(
   txns: IncomeProofTxn[],
-  businessName: string,
+  businessName: string | null,
   startYear: number,
   now: Date = new Date(),
 ): IncomeProof {

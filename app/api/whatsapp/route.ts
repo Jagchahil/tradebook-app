@@ -227,7 +227,7 @@ async function processMessage(message: IncomingMessage): Promise<void> {
       // "invoice this" turns the last logged sale into a draft invoice. Checked
       // before the multi step invoice flow, which also begins with the word invoice.
       if (isInvoiceThis(text)) {
-        await handleInvoiceThis(from);
+        await handleInvoiceThis(from, text);
       } else {
       // Invoice flow takes priority. If it consumes the message, do not also log it.
       const handled = await handleInvoiceFlow(from, text);
@@ -1605,7 +1605,15 @@ async function handleTaxTips(from: string): Promise<void> {
 // "invoice this" and Lekhio turns that payment into a DRAFT invoice with a
 // shareable link. The user sends it, never us: drafting is fine, sending to a
 // third party is the user's to do. No new session, it reads the last income row.
-async function handleInvoiceThis(from: string): Promise<void> {
+async function handleInvoiceThis(from: string, text: string): Promise<void> {
+  // If the user is midway through the guided "create invoice" flow, this is part
+  // of that conversation, not the shortcut. Hand it back to the flow so the
+  // session is never orphaned.
+  const session = await getSession(from);
+  if (session && session.flow === 'invoice') {
+    await handleInvoiceFlow(from, text);
+    return;
+  }
   const userId = await findUserIdByPhone(from);
   if (!userId) {
     await sendText(from, 'Open the app and add your number first, then I can turn a payment into an invoice.');

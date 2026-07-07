@@ -840,6 +840,24 @@ export async function listAllNudgePrefs(): Promise<Map<string, { daily_nudges: b
   return new Map(prefs.map((p) => [p.user_id, { daily_nudges: p.daily_nudges, weekly_summary: p.weekly_summary }]));
 }
 
+// The nudge/weekly preferences for just one page of users, so the fan out never
+// loads the whole prefs table on every hop. Only opted out users have a row, so
+// this is a small, bounded read even at 100k users. Missing = the default (on).
+export async function getNudgePrefsForUsers(
+  userIds: string[],
+): Promise<Map<string, { daily_nudges: boolean; weekly_summary: boolean }>> {
+  if (userIds.length === 0) return new Map();
+  const { url } = config();
+  const inList = userIds.join(',');
+  const res = await fetch(
+    `${url}/rest/v1/reminder_prefs?user_id=in.(${inList})&select=user_id,daily_nudges,weekly_summary`,
+    { headers: headers() },
+  );
+  if (!res.ok) return new Map();
+  const prefs = (await res.json()) as Array<{ user_id: string; daily_nudges: boolean; weekly_summary: boolean }>;
+  return new Map(prefs.map((p) => [p.user_id, { daily_nudges: p.daily_nudges, weekly_summary: p.weekly_summary }]));
+}
+
 // Housekeeping so the always-growing tables never become a scale problem.
 // Batched deletes (PostgREST order+limit) so no single call locks a huge range:
 //   processed_messages  idempotency horizon, 7 days is far beyond Meta retries

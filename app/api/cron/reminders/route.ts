@@ -5,7 +5,7 @@ import {
   claimDueReminder,
   getPhoneForUser,
   listNudgeTargetsPage,
-  listAllNudgePrefs,
+  getNudgePrefsForUsers,
   weeklyTotals,
   weeklyTotalsAll,
   pruneOldRows,
@@ -98,7 +98,6 @@ async function triggerContinuation(job: string, afterId: string | null, hop: num
 async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: number): Promise<void> {
   const started = Date.now();
   let sent = 0;
-  const prefs = await listAllNudgePrefs();
   // One grouped aggregate for the weekly totals; falls back per user until the
   // weekly_totals_all RPC (supabase/schema.sql) is applied.
   const all = job === 'weekly' ? await weeklyTotalsAll() : null;
@@ -108,6 +107,8 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
   for (;;) {
     const { targets, last } = await listNudgeTargetsPage(cursor, PAGE_SIZE);
     if (targets.length === 0) break;
+    // Prefs for just this page, not the whole table on every hop.
+    const prefs = await getNudgePrefsForUsers(targets.map((t) => t.user_id));
     const wanted = targets.filter((t) => {
       const p = prefs.get(t.user_id);
       return job === 'nudge' ? (p ? p.daily_nudges : true) : (p ? p.weekly_summary : true);
@@ -212,43 +213,57 @@ async function bankFeedFanOut(startAfter: string | null, hop: number): Promise<v
 async function runJob(job: string, afterId: string | null, hop: number): Promise<void> {
   try {
     if (job === 'due') {
-      const due = await getDueReminders(new Date().toISOString());
-      let sent = 0;
-      await mapLimit(due, 20, async (r) => {
-        // Claim atomically before sending; if another run already took it, skip.
-        if (!(await claimDueReminder(r.id))) return;
-        const phone = await getPhoneForUser(r.user_id);
-        if (!phone) return;
-        await sendTemplate(phone, 'lekhio_reminder', 'en_GB', [r.title]);
-        sent++;
-      });
-      // Housekeeping rides along with the daily run, so no extra cron entry is
-      // needed (a bad cron config once silently blocked every deploy, and the
-      // Hobby plan caps how many cron jobs a project may declare). No-op until
-      // the feature is switched on.
-      const { pruned } = await pruneOldRows();
-      // Kick off the bank feed walk as its OWN resumable hop chain rather than
-      // syncing inline. Inline could only ever reach a handful of the 20k+
-      // connections inside this one invocation's budget; the chain fans out
-      // across successive invocations and covers them all. Fire and forget: the
-      // first hop acks immediately, so the due job does not wait on it. It is a
-      // no-op without the bank feed keys.
-      if (hasBankFeedConfig()) {
-        await triggerContinuation('bankfeed', null, 1);
+      // One-time side jobs run ONLY on the first invocation (hop 1), before the
+      // resumable send loop, so they always happen exactly once even when the
+      // send loop hands over to a continuation. Housekeeping rides along with the
+      // daily run so no extra cron entry is needed (the Hobby plan caps cron
+      // jobs, and a bad cron config once silently blocked every deploy).
+      if (hop === 1) {
+        const { pruned } = await pruneOldRows();
+        // Kick the bank feed walk and the agent walk as their OWN resumable
+        // chains. Fire and forget: each acks immediately, so the due job never
+        // waits on them. No-ops until those features are switched on.
+        if (hasBankFeedConfig()) await triggerContinuation('bankfeed', null, 1);
+        const cronSecret = process.env.CRON_SECRET;
+        if (cronSecret) {
+          try {
+            await fetch(`${APP_URL}/api/cron/agent`, { headers: { Authorization: `Bearer ${cronSecret}` } });
+          } catch (err) {
+            console.error('[cron] agent kick failed:', err instanceof Error ? err.message : err);
+          }
+        }
+        console.log(`[cron] job=due hop=1 pruned=${pruned} bankfeed=${hasBankFeedConfig() ? 'kicked' : 'dormant'} agent=kicked`);
       }
-      // Kick the agent's nightly walk (doc 84) as its own resumable chain. No
-      // new vercel.json cron entry on purpose: the Hobby plan's cron cap once
-      // silently blocked every deploy. Fire and forget, the agent route acks
-      // immediately and works in after().
-      const cronSecret = process.env.CRON_SECRET;
-      if (cronSecret) {
-        try {
-          await fetch(`${APP_URL}/api/cron/agent`, { headers: { Authorization: `Bearer ${cronSecret}` } });
-        } catch (err) {
-          console.error('[cron] agent kick failed:', err instanceof Error ? err.message : err);
+
+      // Resumable send. Every returned reminder is atomically claimed
+      // (reminded=true) before sending, so the next getDueReminders page never
+      // returns it again. The claim IS the cursor: the reminded=false set shrinks
+      // every iteration, so the walk always makes progress and cannot loop. When
+      // the budget is spent mid set, hand over to a continuation of the due job.
+      const started = Date.now();
+      let sent = 0;
+      for (;;) {
+        const due = await getDueReminders(new Date().toISOString(), PAGE_SIZE);
+        if (due.length === 0) break;
+        await mapLimit(due, 20, async (r) => {
+          if (!(await claimDueReminder(r.id))) return; // another run took it
+          const phone = await getPhoneForUser(r.user_id);
+          if (!phone) return;
+          await sendTemplate(phone, 'lekhio_reminder', 'en_GB', [r.title]);
+          sent++;
+        });
+        if (due.length < PAGE_SIZE) break; // final page
+        if (Date.now() - started > SEND_BUDGET_MS) {
+          if (hop + 1 > MAX_HOPS) {
+            console.error(`[cron] job=due hop cap reached at hop=${hop}, stopping`);
+            break;
+          }
+          console.log(`[cron] job=due hop=${hop} sent=${sent} continuing`);
+          await triggerContinuation('due', null, hop + 1);
+          return;
         }
       }
-      console.log(`[cron] job=due sent=${sent} pruned=${pruned} bankfeed=${hasBankFeedConfig() ? 'kicked' : 'dormant'} agent=kicked`);
+      console.log(`[cron] job=due hop=${hop} sent=${sent} complete`);
     } else if (job === 'nudge' || job === 'weekly') {
       await fanOut(job, afterId, hop);
     } else if (job === 'cleanup') {

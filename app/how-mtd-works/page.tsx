@@ -210,7 +210,7 @@ export default function HowMtdWorksPage() {
         <div className="wrap">
           <div className="final reveal">
             <h2>Get ready for MTD without lifting a finger.</h2>
-            <p>Start now and your records build themselves. 30 days free, no card needed.</p>
+            <p>Start now and your records build themselves. 14 days free, no card needed.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
           </div>
         </div>

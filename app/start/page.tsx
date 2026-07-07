@@ -56,6 +56,9 @@ export default function StartPage() {
   // A referral code carried in on ?ref= (doc 82). Attribution only; passed to the
   // onboard save, sanitised server side. Never shown, never rewards automatically.
   const [ref] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') ?? '' : ''));
+  // A field sales rep's code on ?rep=. Only a valid one unlocks the longer 30 day
+  // trial at checkout; the server decides, this just carries it through.
+  const [rep] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('rep') ?? '' : ''));
 
   // Billing: the chosen period drives the price shown and charged. One simple price for everyone.
   const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly');
@@ -68,7 +71,7 @@ export default function StartPage() {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, offer, email: email.trim(), phone }),
+        body: JSON.stringify({ plan, offer, email: email.trim(), phone, rep }),
       });
       const data = (await res.json().catch(() => ({}))) as { url?: string };
       if (data?.url) {
@@ -201,7 +204,7 @@ export default function StartPage() {
           {offer ? (
             <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, backgroundColor: GREEN_TINT, border: '1px solid #CFE9D8', borderRadius: 12, padding: '12px 14px' }}>
               <span style={{ fontSize: 18 }}>🎉</span>
-              <span style={{ fontSize: 13.5, fontWeight: 600, color: GREEN, lineHeight: 1.4 }}>Your 30 days free is ready. No card needed. Finish to get started.</span>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: GREEN, lineHeight: 1.4 }}>Your 14 days free is ready. No card needed. Finish to get started.</span>
             </div>
           ) : null}
           {billingResult === 'success' ? (
@@ -209,7 +212,7 @@ export default function StartPage() {
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
               <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>Your plan is locked in.</h1>
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 28px' }}>
-                Your card is saved and your 30 day free trial is running. You will not be charged until it ends, and you can cancel any time before then and pay nothing. Download the app and say hello on WhatsApp to log your first receipt.
+                Your card is saved and your 14 day free trial is running. You will not be charged until it ends, and you can cancel any time before then and pay nothing. Download the app and say hello on WhatsApp to log your first receipt.
               </p>
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', opacity: 0.5 }}>
@@ -225,7 +228,7 @@ export default function StartPage() {
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: RIVER_TINT, color: RIVER, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
               <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>Your trial is still running.</h1>
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 28px' }}>
-                No card added, and that is fine. Your 30 day free trial is active. You can add a card to keep Lekhio any time, from the app or the website.
+                No card added, and that is fine. Your 14 day free trial is active. You can add a card to keep Lekhio any time, from the app or the website.
               </p>
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', opacity: 0.5 }}>
@@ -241,7 +244,7 @@ export default function StartPage() {
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
               <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>You are all set{name ? `, ${name.split(' ')[0]}` : ''}.</h1>
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 420, margin: '0 auto 18px' }}>
-                Your 30 day free trial has started. No card needed. Three steps and your back office runs itself:
+                Your 14 day free trial has started. No card needed. Three steps and your back office runs itself:
               </p>
 
               <div style={{ textAlign: 'left', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 18, maxWidth: 460, margin: '0 auto 18px' }}>
@@ -265,7 +268,7 @@ export default function StartPage() {
               <div style={{ textAlign: 'left', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 20, maxWidth: 460, margin: '0 auto 24px' }}>
                 <p style={{ fontSize: 15, fontWeight: 800, color: INK, margin: '0 0 4px' }}>Add a card to keep Lekhio</p>
                 <p style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: '0 0 14px' }}>
-                  {'Save a card so Lekhio carries on after your trial. Still 30 days free, cancel any time before then and pay nothing.'}
+                  {'Save a card so Lekhio carries on after your trial. Still 14 days free, cancel any time before then and pay nothing.'}
                 </p>
 
                 <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -286,7 +289,7 @@ export default function StartPage() {
                 </div>
 
                 <button className="btn" onClick={startCheckout} disabled={billingBusy} style={{ width: '100%', cursor: billingBusy ? 'wait' : 'pointer', backgroundColor: RIVER, color: '#fff', border: 'none', fontSize: 15.5, fontWeight: 700, padding: '14px 0', borderRadius: 12 }}>
-                  {billingBusy ? 'Opening secure checkout…' : 'Save my card, stay 30 days free →'}
+                  {billingBusy ? 'Opening secure checkout…' : 'Save my card, stay 14 days free →'}
                 </button>
                 <p style={{ fontSize: 11.5, color: MUTED, textAlign: 'center', margin: '10px 0 0' }}>Secure payment by Stripe. We never see your card number.</p>
               </div>
@@ -433,7 +436,7 @@ export default function StartPage() {
               {step === TOTAL ? 'Start free trial' : 'Continue'}
             </button>
           </div>
-          <p style={{ textAlign: 'center', fontSize: 12, color: MUTED, paddingBottom: 16, margin: 0 }}>30 days free · No card needed · Cancel any time</p>
+          <p style={{ textAlign: 'center', fontSize: 12, color: MUTED, paddingBottom: 16, margin: 0 }}>14 days free · No card needed · Cancel any time</p>
         </div>
       )}
     </main>

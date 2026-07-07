@@ -85,7 +85,7 @@ export default function TermsPage() {
 
         <h2 style={heading}>Free trial and payment</h2>
         <ul style={{ paddingLeft: 20, margin: '0 0 14px' }}>
-          <li style={li}>Your first 30 days are free. We will not charge you during the trial.</li>
+          <li style={li}>Your first 14 days are free. We will not charge you during the trial.</li>
           <li style={li}>After the trial, Lekhio costs £19.99 a month, or £199 a year, unless you cancel first.</li>
           <li style={li}>We will remind you before the trial ends.</li>
           <li style={li}>You can cancel any time. Your plan runs to the end of the period you have paid for.</li>

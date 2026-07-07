@@ -860,7 +860,7 @@ export function SiteNav() {
 export function StickyCta() {
   return (
     <div className="stickycta">
-      <span style={{ fontSize: 14, fontWeight: 700, color: INK }}>30 days free. No card.</span>
+      <span style={{ fontSize: 14, fontWeight: 700, color: INK }}>14 days free. No card.</span>
       <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 700, padding: '11px 20px', borderRadius: 10 }}>Start free</Link>
     </div>
   );

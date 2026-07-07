@@ -8,7 +8,7 @@ import {
 export const metadata: Metadata = {
   title: 'Lekhio. Never do your books again. Just text it.',
   description:
-    'Lekhio is the WhatsApp back office for the UK self employed. Snap a receipt, say an expense, or text what you got paid. Lekhio logs it, sorts it, writes your invoices, and keeps your tax ready. You just approve. 30 days free.',
+    'Lekhio is the WhatsApp back office for the UK self employed. Snap a receipt, say an expense, or text what you got paid. Lekhio logs it, sorts it, writes your invoices, and keeps your tax ready. You just approve. 14 days free.',
   openGraph: {
     title: 'Lekhio. Never do your books again. Just text it.',
     description: 'The WhatsApp back office for the UK self employed. Snap it, say it, or text it. Lekhio does the books.',
@@ -210,7 +210,7 @@ export default function HomePage() {
             </div>
             <div className="micro">
               <span className="avs"><span style={{ background: '#1B59A6' }} /><span style={{ background: '#E0A33E' }} /><span style={{ background: '#15803D' }} /><span style={{ background: '#134277' }} /></span>
-              <span><b style={{ color: 'var(--saffron)' }}>★★★★★</b> &nbsp;Built with UK sole traders. 30 days free, no card.</span>
+              <span><b style={{ color: 'var(--saffron)' }}>★★★★★</b> &nbsp;Built with UK sole traders. 14 days free, no card.</span>
             </div>
           </div>
           <div><HeroPhone /></div>
@@ -399,13 +399,13 @@ export default function HomePage() {
       {/* Pricing */}
       <section className="pricewrap">
         <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 42 }}><h2 className="h2">One price. Everything in.</h2><p className="lead">No receipt limits, no tiers, no surprises. Both plans start with 30 days free, no card needed.</p></div>
+          <div className="center reveal" style={{ marginBottom: 42 }}><h2 className="h2">One price. Everything in.</h2><p className="lead">No receipt limits, no tiers, no surprises. Both plans start with 14 days free, no card needed.</p></div>
           <div className="prices reveal">
             <div className="pcard">
               <div className="pname">Monthly</div>
               <div className="pamt">£19.99<span>/mo</span></div>
               <div className="pnote">Billed monthly. Cancel any time.</div>
-              <div className="pcta"><Link href="/start" className="btn primary">Start 30 days free</Link><div className="pmicro">No card needed</div></div>
+              <div className="pcta"><Link href="/start" className="btn primary">Start 14 days free</Link><div className="pmicro">No card needed</div></div>
             </div>
             <div className="pcard best">
               <span className="pbadge">🎉 2 months free</span>
@@ -413,7 +413,7 @@ export default function HomePage() {
               <div className="pamt">£199<span>/yr</span></div>
               <div className="pnote">Just £16.58 a month, billed once a year.</div>
               <span className="psave">You save £40 a year</span>
-              <div className="pcta"><Link href="/start" className="btn primary">Start 30 days free</Link><div className="pmicro">No card needed</div></div>
+              <div className="pcta"><Link href="/start" className="btn primary">Start 14 days free</Link><div className="pmicro">No card needed</div></div>
             </div>
           </div>
           <div className="incl-panel reveal">
@@ -435,7 +435,7 @@ export default function HomePage() {
         <div className="wrap">
           <div className="final reveal">
             <h2>Text it. It is in your Lekhio.</h2>
-            <p>Your whole back office, sorted from a text. 30 days free, no card needed.</p>
+            <p>Your whole back office, sorted from a text. 14 days free, no card needed.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
           </div>
         </div>

@@ -8,7 +8,7 @@ import {
 export const metadata: Metadata = {
   title: 'Pricing. One flat price, everything in.',
   description:
-    'Lekhio is £19.99 a month, or £199 a year with two months free. No receipt limits, no tiers, no surprises. It replaces a whole shelf of subscriptions. 30 days free, no card needed.',
+    'Lekhio is £19.99 a month, or £199 a year with two months free. No receipt limits, no tiers, no surprises. It replaces a whole shelf of subscriptions. 14 days free, no card needed.',
 };
 
 const STACK = [
@@ -100,7 +100,7 @@ export default function PricingPage() {
         <div className="wrap">
           <span className="pill"><span className="dot" /> One price, everything in</span>
           <h1 style={{ marginTop: 20 }}>Simple pricing.<br /><span className="gt">No surprises.</span></h1>
-          <p className="sub" style={{ maxWidth: 540, margin: '20px auto 0', fontSize: 20, color: 'var(--tx-mut)' }}>No receipt limits. No tiers. No hidden fees. Every plan starts with 30 days free, no card needed.</p>
+          <p className="sub" style={{ maxWidth: 540, margin: '20px auto 0', fontSize: 20, color: 'var(--tx-mut)' }}>No receipt limits. No tiers. No hidden fees. Every plan starts with 14 days free, no card needed.</p>
         </div>
       </section>
 
@@ -112,8 +112,8 @@ export default function PricingPage() {
             <div className="pamt" id="pamt">£19.99<span>/mo</span></div>
             <div className="pnote" id="pnote">Billed monthly. Cancel any time.</div>
             <div className="psave" id="psave" style={{ opacity: 0 }}>🎉 2 months free · save £40 a year</div>
-            <div className="pcta"><Link href="/start" className="btn primary">Start 30 days free</Link></div>
-            <div className="pmicro">30 day free trial · no card needed</div>
+            <div className="pcta"><Link href="/start" className="btn primary">Start 14 days free</Link></div>
+            <div className="pmicro">14 day free trial · no card needed</div>
           </div>
           <div className="incl-panel reveal">
             <h4>Everything, in every plan</h4>
@@ -164,7 +164,7 @@ export default function PricingPage() {
           <h2>One honest price. Everything you need.</h2>
           <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>No paywalls, no receipt caps, no surprise upgrades. Start free and only pay when you are sure.</p>
           <div className="credrow">
-            <div className="credchip">🎁 <span><b>30 days free</b>, no card needed</span></div>
+            <div className="credchip">🎁 <span><b>14 days free</b>, no card needed</span></div>
             <div className="credchip">🔓 <span>Cancel in one tap</span></div>
             <div className="credchip">📤 <span>Export your data any time</span></div>
             <div className="credchip">🇬🇧 <span>A real UK company</span></div>
@@ -176,7 +176,7 @@ export default function PricingPage() {
       <section style={{ paddingTop: 20 }}>
         <div className="wrap">
           <div className="final reveal">
-            <h2>Try it free for 30 days.</h2>
+            <h2>Try it free for 14 days.</h2>
             <p>No card needed. Snap your first receipt today and see it work.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
           </div>

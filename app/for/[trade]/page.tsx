@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ trade: st
   const t = tradeBySlug(trade);
   if (!t) return { title: 'Lekhio' };
   const title = `Bookkeeping and Tax for ${t.plural.charAt(0).toUpperCase() + t.plural.slice(1)} | Lekhio`;
-  const description = `Lekhio is the WhatsApp back office for UK ${t.plural}. Snap receipts, log mileage and jobs, claim every cost, and stay MTD ready. ${t.cis ? 'CIS handled. ' : ''}30 days free, no card.`;
+  const description = `Lekhio is the WhatsApp back office for UK ${t.plural}. Snap receipts, log mileage and jobs, claim every cost, and stay MTD ready. ${t.cis ? 'CIS handled. ' : ''}14 days free, no card.`;
   return { title, description, openGraph: { title, description, type: 'website' } };
 }
 

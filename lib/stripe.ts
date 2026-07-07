@@ -76,7 +76,9 @@ export async function createInvoiceCheckout(input: CheckoutInput): Promise<strin
 //   Founder    £15.99 a month   or   £159 a year   (20% off for life, offer=setup20)
 //
 // The founder discount is the price itself, not a coupon, so it simply never goes
-// away. A 30 day free trial is attached, so no card is charged for the first month.
+// away. A 14 day free trial is attached by default, so no card is charged for the
+// first two weeks. A field sales rep can hand a customer a longer 30 day trial by
+// giving them a rep code (see REP_TRIAL_CODES and resolveTrialDays below).
 
 export type BillingPlan = 'monthly' | 'annual';
 
@@ -85,7 +87,30 @@ const PRICE_PENCE: Record<BillingPlan, { standard: number; founder: number; inte
   annual: { standard: 19900, founder: 15900, interval: 'year', label: 'Lekhio, annual' },
 };
 
-export const TRIAL_DAYS = 30;
+// The default self serve trial. Fourteen days: long enough to reach the aha
+// moments (a first week of entries, a receipt, the CIS refund building), short
+// enough to keep momentum and filter tyre kickers.
+export const TRIAL_DAYS = 14;
+
+// The longer trial a field sales rep can grant in person. Reps hand out a code
+// from REP_TRIAL_CODES (a comma separated env list, case insensitive). Only a
+// matching code unlocks it, so it can never be self served off a public link.
+export const REP_TRIAL_DAYS = 30;
+
+export function isRepTrialCode(code?: string | null): boolean {
+  const c = (code ?? '').trim().toLowerCase();
+  if (!c) return false;
+  const allowed = (process.env.REP_TRIAL_CODES ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return allowed.includes(c);
+}
+
+// How many trial days this checkout gets: 30 for a valid rep code, else 14.
+export function resolveTrialDays(repCode?: string | null): number {
+  return isRepTrialCode(repCode) ? REP_TRIAL_DAYS : TRIAL_DAYS;
+}
 
 export function isFounderOffer(offer?: string | null): boolean {
   return (offer ?? '').trim().toLowerCase() === 'setup20';
@@ -102,13 +127,15 @@ export interface SubscriptionCheckoutInput {
   offer?: string | null;
   email?: string | null;
   phone?: string | null;
+  repCode?: string | null; // a field rep's code, unlocks the 30 day trial
   successUrl: string;
   cancelUrl: string;
 }
 
-// Create a hosted Stripe Checkout session in subscription mode, with a 30 day
-// free trial and the right recurring price. Returns the URL to send the user to,
-// or null if Stripe is not configured or the call fails.
+// Create a hosted Stripe Checkout session in subscription mode, with the trial
+// (14 days by default, 30 for a valid rep code) and the right recurring price.
+// Returns the URL to send the user to, or null if Stripe is not configured or
+// the call fails.
 export async function createSubscriptionCheckout(input: SubscriptionCheckoutInput): Promise<string | null> {
   if (!KEY) return null;
 
@@ -127,7 +154,7 @@ export async function createSubscriptionCheckout(input: SubscriptionCheckoutInpu
   form.set('line_items[0][price_data][unit_amount]', String(amount));
   form.set('line_items[0][price_data][recurring][interval]', meta.interval);
   form.set('line_items[0][price_data][product_data][name]', meta.label);
-  form.set('subscription_data[trial_period_days]', String(TRIAL_DAYS));
+  form.set('subscription_data[trial_period_days]', String(resolveTrialDays(input.repCode)));
   // Carry the plan and offer on the subscription so later webhook events keep them.
   form.set('subscription_data[metadata][plan]', input.plan);
   form.set('subscription_data[metadata][offer]', offer);

@@ -345,7 +345,7 @@ export default function ProductPage() {
         <div className="wrap">
           <div className="final reveal">
             <h2>Snap it. Say it. Sorted.</h2>
-            <p>Your whole back office, from a text. 30 days free, no card needed.</p>
+            <p>Your whole back office, from a text. 14 days free, no card needed.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { createSubscriptionCheckout, hasStripeConfig, type BillingPlan } from '.
 import { normalizeUkPhone } from '../../../../lib/supabase';
 
 // Start a real Lekhio subscription. The page posts the chosen plan and any founder
-// offer, we create a Stripe Checkout session with a 30 day free trial, and return
+// offer, we create a Stripe Checkout session with a 14 day free trial, and return
 // the hosted URL for the browser to redirect to. No card details ever touch us.
 
 function str(v: unknown, max = 200): string {
@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
   const offer = str(body.offer, 40);
   const email = str(body.email, 200).trim() || null;
   const phone = normalizeUkPhone(str(body.phone, 20)) || null; // E.164 +44, the account key
+  const repCode = str(body.rep, 40).trim() || null; // a field rep's code, unlocks the 30 day trial
 
   const base = (process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin).replace(/\/$/, '');
 
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
     offer,
     email,
     phone,
+    repCode,
     successUrl: `${base}/start?billing=success`,
     cancelUrl: `${base}/start?billing=cancelled`,
   });

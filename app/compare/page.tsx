@@ -232,7 +232,7 @@ export default function ComparePage() {
         <div className="wrap">
           <div className="final reveal">
             <h2>See the difference for yourself.</h2>
-            <p>30 days free. No card needed. Cancel in one tap.</p>
+            <p>14 days free. No card needed. Cancel in one tap.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
           </div>
         </div>

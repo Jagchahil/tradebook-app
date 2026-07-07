@@ -141,7 +141,7 @@ export default function TermsPage() {
         </p>
 
         <h2 style={heading}>Contact</h2>
-        <p style={para}>Questions about these terms. Email support@lekhio.com.</p>
+        <p style={para}>Questions about these terms. Email info@lekhio.app.</p>
 
         <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 40, paddingTop: 20 }}>
           <Link href="/privacy" style={{ fontSize: 14, fontWeight: 500, color: INDIGO }}>

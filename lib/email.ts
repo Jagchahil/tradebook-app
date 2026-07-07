@@ -4,11 +4,11 @@
 //
 // Env vars:
 //   RESEND_API_KEY   from resend.com
-//   EMAIL_FROM       e.g. "Lekhio <invoices@lekhio.com>" (the domain must be
+//   EMAIL_FROM       e.g. "Lekhio <invoices@lekhio.app>" (the domain must be
 //                    verified in Resend before sending)
 
 const KEY = process.env.RESEND_API_KEY;
-const FROM = process.env.EMAIL_FROM || 'Lekhio <invoices@lekhio.com>';
+const FROM = process.env.EMAIL_FROM || 'Lekhio <invoices@lekhio.app>';
 
 const INK = '#111111';
 const RIVER = '#1B59A6';

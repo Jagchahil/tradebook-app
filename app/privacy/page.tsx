@@ -66,7 +66,7 @@ export default function PrivacyPage() {
         <p style={para}>
           Lekhio provides bookkeeping and tax preparation tools for UK self employed tradespeople.
           For data protection law, Lekhio is the data controller for the information described here.
-          You can reach us any time at privacy@lekhio.com.
+          You can reach us any time at info@lekhio.app.
         </p>
 
         <h2 style={heading}>What we collect</h2>
@@ -130,7 +130,7 @@ export default function PrivacyPage() {
           <li style={li}>Object to or restrict certain processing.</li>
         </ul>
         <p style={para}>
-          To use any of these rights, email privacy@lekhio.com. You can also complain to the
+          To use any of these rights, email info@lekhio.app. You can also complain to the
           Information Commissioner&apos;s Office at ico.org.uk if you are unhappy with how we handle your
           data.
         </p>
@@ -142,7 +142,7 @@ export default function PrivacyPage() {
         </p>
 
         <h2 style={heading}>Contact</h2>
-        <p style={para}>Questions about your privacy. Email privacy@lekhio.com and we will help.</p>
+        <p style={para}>Questions about your privacy. Email info@lekhio.app and we will help.</p>
 
         <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 40, paddingTop: 20 }}>
           <Link href="/terms" style={{ fontSize: 14, fontWeight: 500, color: INDIGO }}>

@@ -140,7 +140,7 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
             <Link href="/start" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Sign up</Link>
             <Link href="/privacy" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Privacy</Link>
             <Link href="/terms" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Terms</Link>
-            <a href="mailto:support@lekhio.com" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Support</a>
+            <a href="mailto:info@lekhio.app" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Support</a>
           </div>
         </div>
       </footer>

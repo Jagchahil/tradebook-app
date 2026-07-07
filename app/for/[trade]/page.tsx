@@ -120,7 +120,7 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
 
       {/* Other trades, internal links */}
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px 50px' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Lekhio for every trade</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Lekhio for every line of work</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {TRADES.filter((o) => o.slug !== t.slug).map((o) => (
             <Link key={o.slug} href={`/for/${o.slug}`} style={{ fontSize: 14, fontWeight: 600, color: INK, background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 20, padding: '9px 16px' }}>{o.emoji} {o.name}</Link>

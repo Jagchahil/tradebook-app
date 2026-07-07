@@ -197,7 +197,7 @@ export default function HomePage() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@graph': [
-              { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: 'WhatsApp-first bookkeeping and Making Tax Digital prep for UK self-employed tradespeople.' },
+              { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: 'WhatsApp-first bookkeeping and Making Tax Digital prep for the UK self-employed: trades, freelancers, drivers, carers, consultants and landlords.' },
               { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'iOS, Android, Web', url: SITE, description: 'Text a receipt, voice note or invoice to WhatsApp. Lekhio logs it, categorises it, and keeps you ready for Making Tax Digital. You approve before anything reaches HMRC.', offers: [ { '@type': 'Offer', price: '19.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '199', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
               { '@type': 'FAQPage', mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
             ],
@@ -449,7 +449,7 @@ export default function HomePage() {
       {/* Proof slider */}
       <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">Built with people who work for themselves.</h2><p className="mut" style={{ fontSize: 13, marginTop: 8 }}>Illustrative examples, based on real trades.</p></div>
+          <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">Built with people who work for themselves.</h2><p className="mut" style={{ fontSize: 13, marginTop: 8 }}>Illustrative examples, based on real self employed people.</p></div>
         </div>
         <div className="rev-marquee reveal">
           <div className="rev-track">

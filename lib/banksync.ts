@@ -14,7 +14,7 @@ import {
   recentUnconfirmedCaptures,
   insertBankTransactions,
 } from './supabase';
-import { refreshAccess, getBookedTransactions, mapBankTransaction, matchesCapture, isSandbox } from './bankfeed';
+import { refreshAccess, getBookedTransactions, mapBankTransaction, matchesCapture, isSandbox, taxYearStartISO } from './bankfeed';
 import { decryptSecret } from './crypto';
 
 export interface SyncResult {
@@ -22,9 +22,6 @@ export interface SyncResult {
   ok: boolean;
 }
 
-// A first sync pulls this many days of history. Enough to fill the current tax
-// quarter view with something real, without dragging in years of statements.
-const FIRST_SYNC_DAYS = 30;
 // Safety valve per account per run; the daily sync catches anything beyond it.
 const MAX_ROWS_PER_ACCOUNT = 1000;
 
@@ -33,7 +30,7 @@ const MAX_ROWS_PER_ACCOUNT = 1000;
 // and written in BULK, so even a large first import is a handful of database
 // requests rather than one per transaction.
 export async function syncWithAccessToken(
-  conn: Pick<BankConnection, 'id' | 'user_id' | 'account_ids' | 'last_synced_date'>,
+  conn: Pick<BankConnection, 'id' | 'user_id' | 'account_ids' | 'last_synced_date' | 'history_from'>,
   accessToken: string,
 ): Promise<SyncResult> {
   // Overlap the window by 3 days so late-booked lines are never missed; the
@@ -42,11 +39,14 @@ export async function syncWithAccessToken(
   // asks from 2015 explicitly, because Mock Bank's static test transactions are
   // dated years back AND TrueLayer applies its own recent default window when
   // `from` is omitted, so omitting the bound is not enough to reach them.
+  // First sync is bounded to the range the user chose at connect time (default
+  // the current tax year), so we never pull more history than tax needs. Later
+  // syncs are incremental from the last synced date, with a 3 day overlap.
   const from = isSandbox()
     ? '2015-01-01'
     : conn.last_synced_date
       ? new Date(new Date(conn.last_synced_date).getTime() - 3 * 24 * 3600 * 1000).toISOString().slice(0, 10)
-      : new Date(Date.now() - FIRST_SYNC_DAYS * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      : conn.history_from ?? taxYearStartISO();
   const captures = await recentUnconfirmedCaptures(
     conn.user_id,
     new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString().slice(0, 10),

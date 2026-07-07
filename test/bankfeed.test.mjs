@@ -90,5 +90,17 @@ ok('different amount does not match', !B.matchesCapture(entry, { amount: -55, tr
 ok('opposite direction does not match', !B.matchesCapture(entry, { amount: 42.6, transaction_date: '2026-07-01' }));
 ok('null capture date does not match', !B.matchesCapture(entry, { amount: -42.6, transaction_date: null }));
 
+{
+  console.log('\n--- history range (data minimisation) ---');
+  const mid = new Date('2026-12-01T00:00:00Z'); // in the 2026-27 tax year
+  ok('tax year start is 6 April of the current year', B.taxYearStartISO(mid) === '2026-04-06');
+  const early = new Date('2026-03-01T00:00:00Z'); // before 6 April, so prior tax year
+  ok('before 6 April belongs to the previous tax year', B.taxYearStartISO(early) === '2025-04-06');
+  ok('this_year maps to the current tax year start', B.historyFromISO('this_year', mid) === '2026-04-06');
+  ok('two_years reaches back to the previous tax year start', B.historyFromISO('two_years', mid) === '2025-04-06');
+  ok('all uses a far past date', B.historyFromISO('all', mid) === '2015-01-01');
+  ok('default choice is never someones whole history', B.historyFromISO('this_year', mid) > '2015-01-01');
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

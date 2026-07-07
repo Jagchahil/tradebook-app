@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
   after(async () => {
     try {
       const r = await syncWithAccessToken(
-        { id: connection.id, user_id: connection.user_id, account_ids: accounts.ids, last_synced_date: null },
+        { id: connection.id, user_id: connection.user_id, account_ids: accounts.ids, last_synced_date: null, history_from: connection.history_from },
         tokens.access_token,
       );
       console.log(`[bank] first sync inserted=${r.inserted}`);

@@ -112,6 +112,28 @@ export function isSandbox(): boolean {
   return SANDBOX;
 }
 
+// --- How much history to import (data minimisation) ---------------------------
+// We only ever pull what tax needs. The user chooses at connect time, and the
+// default is the current tax year only, never a person's whole banking history.
+export type BankHistory = 'this_year' | 'two_years' | 'all';
+
+// The UK tax year containing `now` starts on 6 April.
+export function taxYearStartISO(now: Date = new Date()): string {
+  const y = now.getUTCMonth() > 3 || (now.getUTCMonth() === 3 && now.getUTCDate() >= 6) ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  return `${y}-04-06`;
+}
+
+// The from-date for a chosen depth. Always a concrete date, so a stored value is
+// never ambiguous: 'this_year' is the current tax year (the default and the
+// minimum), 'two_years' reaches back to the start of the previous tax year, and
+// 'all' uses a far past date to mean everything the bank will give.
+export function historyFromISO(choice: BankHistory, now: Date = new Date()): string {
+  if (choice === 'all') return '2015-01-01';
+  const start = taxYearStartISO(now);
+  if (choice === 'two_years') return `${Number(start.slice(0, 4)) - 1}-04-06`;
+  return start;
+}
+
 // The hosted auth dialog link. TrueLayer runs the bank picker itself, so the
 // app never needs an institutions list. `state` is our HMAC signed user state,
 // which the callback verifies; scope includes offline_access so we receive a

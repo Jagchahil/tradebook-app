@@ -1345,14 +1345,19 @@ export interface BankConnection {
   refresh_token: string | null;
   token_expires_at: string | null;
   last_synced_date: string | null;
+  history_from: string | null; // the earliest date the first sync may pull, chosen at connect
 }
 
-export async function createBankConnection(userId: string, reference: string): Promise<boolean> {
+export async function createBankConnection(
+  userId: string,
+  reference: string,
+  historyFrom?: string | null,
+): Promise<boolean> {
   const { url } = config();
   const res = await fetch(`${url}/rest/v1/bank_connections`, {
     method: 'POST',
     headers: headers({ Prefer: 'return=minimal' }),
-    body: JSON.stringify({ user_id: userId, reference, status: 'created' }),
+    body: JSON.stringify({ user_id: userId, reference, status: 'created', history_from: historyFrom ?? null }),
   });
   if (!res.ok) {
     // The PostgREST error body names the failing constraint or column and holds

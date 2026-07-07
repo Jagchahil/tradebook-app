@@ -11,6 +11,8 @@
 import { encryptSecret, decryptSecret } from './crypto';
 import { referralCode, sanitizeRefCode } from './referral';
 import { parseLevel, type AutonomyLevel } from './autonomy';
+import { quarterForDate, quarterBounds } from './quarterpack';
+import type { OptimiserInput } from './taxoptimiser';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1012,6 +1014,55 @@ export async function getBusinessName(userId: string): Promise<string | null> {
   if (!res.ok) return null;
   const rows = (await res.json()) as Array<{ name?: string | null; business_name?: string | null }>;
   return rows[0]?.business_name || rows[0]?.name || null;
+}
+
+// Assemble the tax optimiser's input from the user's confirmed data and profile
+// for the current tax year. Trade stream only (the optimiser's levers are trade
+// side); home-office and mileage are inferred from the categories they have used.
+export async function getOptimiserInput(userId: string): Promise<OptimiserInput> {
+  const now = new Date();
+  const { startYear } = quarterForDate(now);
+  const taxYearStart = quarterBounds(startYear, 1).start;
+  const todayISO = now.toISOString().slice(0, 10);
+
+  const [rows, sl, goals] = await Promise.all([
+    getConfirmedTransactionsForRange(userId, taxYearStart, todayISO),
+    getStudentLoanSettings(userId),
+    getActiveGoals(userId),
+  ]);
+
+  let ytdTradeIncome = 0;
+  let ytdTradeExpenses = 0;
+  let ytdCisSuffered = 0;
+  const cats = new Set<string>();
+  for (const r of rows) {
+    if ((r.income_type ?? '').toLowerCase() === 'property') continue; // trade levers only
+    const amt = Number(r.amount) || 0;
+    if (amt > 0) ytdTradeIncome += amt;
+    else if (amt < 0) {
+      ytdTradeExpenses += -amt;
+      if (r.category) cats.add(String(r.category).toLowerCase());
+    }
+    const c = Number(r.cis_deduction);
+    if (Number.isFinite(c) && c > 0) ytdCisSuffered += c;
+  }
+  const categoriesLogged = [...cats];
+  const start = new Date(`${taxYearStart}T00:00:00Z`);
+  const monthsElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (30.44 * 86400000)));
+  const purchase = goals.find((g) => g.kind === 'purchase');
+
+  return {
+    startYear,
+    monthsElapsed,
+    ytdTradeIncome: Math.round(ytdTradeIncome * 100) / 100,
+    ytdTradeExpenses: Math.round(ytdTradeExpenses * 100) / 100,
+    ytdCisSuffered: Math.round(ytdCisSuffered * 100) / 100,
+    employmentIncome: sl?.employmentIncome ?? 0,
+    categoriesLogged,
+    homeOfficeClaimed: categoriesLogged.some((c) => c.includes('home')),
+    mileageClaimed: categoriesLogged.some((c) => c.includes('mile')),
+    purchaseGoal: purchase ? { title: purchase.title, amount: purchase.amount } : null,
+  };
 }
 
 // The autonomy dial (lib/autonomy.ts). Read the user's level, defaulting to the

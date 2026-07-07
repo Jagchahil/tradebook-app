@@ -133,5 +133,27 @@ ok('rendered HTML has no em dash', !html.includes('—'));
 ok('rendered HTML has no en dash', !html.includes('–'));
 ok('rendered HTML has no U+2212 minus', !html.includes('−'));
 
+console.log('\n=== quarterpack: MTD threshold is year-correct (scale audit M1) ===\n');
+// A 2027/28 pack with gross of 35k: over the 30k April-2027 threshold but under
+// the old hard-coded 50k. The fix must mark MTD as applying.
+const p2027 = Q.buildQuarterPack({
+  transactions: [{ amount: 35000, category: 'income', transaction_date: '2027-05-01' }],
+  startYear: 2027, quarter: 1,
+});
+ok('2027 threshold is 30000, not 50000', p2027.ytd.mtdThreshold === 30000);
+ok('35k gross clears the 2027 MTD threshold', p2027.ytd.mtdApplies === true);
+const p2028 = Q.buildQuarterPack({ transactions: [{ amount: 25000, category: 'income', transaction_date: '2028-05-01' }], startYear: 2028, quarter: 1 });
+ok('2028 threshold is 20000', p2028.ytd.mtdThreshold === 20000);
+ok('25k gross clears the 2028 MTD threshold', p2028.ytd.mtdApplies === true);
+ok('2026 threshold stays 50000', pack.ytd.mtdThreshold === 50000);
+ok('2027 MTD line shows the correct threshold', Q.renderQuarterPackHtml(p2027).includes('£30,000'));
+
+console.log('\n=== quarterpack: truncation warning (scale audit M2) ===\n');
+ok('default pack is not truncated', pack.truncated === false);
+ok('default pack shows no truncation warning', !html.includes('may be incomplete'));
+const cut = Q.buildQuarterPack({ transactions: [{ amount: 100, category: 'income', transaction_date: '2026-05-01' }], startYear: 2026, quarter: 1, truncated: true });
+ok('truncated flag carries through', cut.truncated === true);
+ok('truncated pack renders a clear warning', Q.renderQuarterPackHtml(cut).includes('may be incomplete'));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

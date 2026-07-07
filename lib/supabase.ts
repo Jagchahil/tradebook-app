@@ -10,6 +10,7 @@
 
 import { encryptSecret, decryptSecret } from './crypto';
 import { referralCode, sanitizeRefCode } from './referral';
+import { parseLevel, type AutonomyLevel } from './autonomy';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1011,6 +1012,32 @@ export async function getBusinessName(userId: string): Promise<string | null> {
   if (!res.ok) return null;
   const rows = (await res.json()) as Array<{ name?: string | null; business_name?: string | null }>;
   return rows[0]?.business_name || rows[0]?.name || null;
+}
+
+// The autonomy dial (lib/autonomy.ts). Read the user's level, defaulting to the
+// most cautious 'suggest' when unset or unknown.
+export async function getAutonomyLevel(userId: string): Promise<AutonomyLevel> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=autonomy_level&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return 'suggest';
+  const rows = (await res.json()) as Array<{ autonomy_level?: string | null }>;
+  return parseLevel(rows[0]?.autonomy_level);
+}
+
+// Set the dial. The value is validated through parseLevel, so only a real level
+// is ever written. This governs reversible admin only; money and filing always
+// require explicit approval regardless (enforced in lib/autonomy.ts).
+export async function setAutonomyLevel(userId: string, level: string): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ autonomy_level: parseLevel(level) }),
+  });
+  return res.ok;
 }
 
 // The user's stable referral code (doc 82 referral loop). Read it if stored,

@@ -226,5 +226,19 @@ ok('no goals answer invites one', /my goal is/.test(gb));
   ok('tiny numbers rejected', W.matchSalarySet('salary 5') === null);
 }
 
+{
+  console.log('\n--- instant invoice: "invoice this" ---');
+  ok('invoice this fires', W.isInvoiceThis('invoice this') === true);
+  ok('invoice that fires', W.isInvoiceThis('Invoice that') === true);
+  ok('invoice it fires', W.isInvoiceThis('invoice it') === true);
+  ok('make that an invoice fires', W.isInvoiceThis('make that an invoice') === true);
+  ok('turn it into an invoice fires', W.isInvoiceThis('turn it into an invoice') === true);
+  ok('invoice the last job fires', W.isInvoiceThis('invoice the last job') === true);
+  ok('create invoice does NOT fire (that is the full flow)', W.isInvoiceThis('create invoice') === false);
+  ok('invoice Dave 500 does NOT fire here', W.isInvoiceThis('invoice Dave 500') === false);
+  ok('a bare invoice word does not fire', W.isInvoiceThis('invoice') === false);
+  ok('empty is safe', W.isInvoiceThis('') === false);
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

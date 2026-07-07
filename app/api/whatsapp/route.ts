@@ -32,6 +32,7 @@ import {
   setSession,
   clearSession,
   createInvoice,
+  getLastIncomeTransaction,
   createEvent,
   bumpAiUsage,
   totalsForUser,
@@ -80,6 +81,7 @@ import {
   isGoalQuestion,
   isGoalDone,
   goalAnswer,
+  isInvoiceThis,
 } from '../../../lib/waintents';
 import { soleTraderTax } from '../../../lib/taxengine';
 import { aprilDelta } from '../../../lib/propertyengine';
@@ -221,6 +223,11 @@ async function processMessage(message: IncomingMessage): Promise<void> {
       await handleButtonReply(from, message.interactive.button_reply.id);
     } else if (message.type === 'text' && message.text?.body) {
       const text = message.text.body;
+      // "invoice this" turns the last logged sale into a draft invoice. Checked
+      // before the multi step invoice flow, which also begins with the word invoice.
+      if (isInvoiceThis(text)) {
+        await handleInvoiceThis(from);
+      } else {
       // Invoice flow takes priority. If it consumes the message, do not also log it.
       const handled = await handleInvoiceFlow(from, text);
       if (!handled) {
@@ -292,6 +299,7 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handleTextEntry(from, messageId, text);
           }
         }
+      }
       }
     } else {
       await sendText(
@@ -1199,7 +1207,10 @@ function confirmationLine(parsed: {
 }): string {
   const amountText = `£${Math.abs(parsed.amount).toFixed(2)}`;
   if (parsed.direction === 'income') {
-    return `Got it. Income of ${amountText} from ${parsed.merchant_name}. Check it in the app and confirm.`;
+    const payer = (parsed.merchant_name ?? '').trim();
+    const namedPayer = payer.length > 1 && !/^(a\s+)?(customer|client|someone|cash|payment|them|they)$/i.test(payer);
+    const offer = namedPayer ? ` Want it as an invoice for ${payer}? Reply "invoice this".` : '';
+    return `Got it. Income of ${amountText} from ${parsed.merchant_name}. Check it in the app and confirm.${offer}`;
   }
   return `Got it. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. Check it in the app and confirm.`;
 }
@@ -1580,6 +1591,43 @@ async function handleTaxTips(from: string): Promise<void> {
       '',
       'I track most of these for you as you go, so you do not leave money on the table. General info, not advice for your exact situation.',
     ].join('\n') + (await signupTail(from)),
+  );
+}
+
+// --- Instant invoice from a logged sale (the Tyms mechanic) --------------------
+// After logging income like "Dave paid 500 for a rewire", the user can reply
+// "invoice this" and Lekhio turns that payment into a DRAFT invoice with a
+// shareable link. The user sends it, never us: drafting is fine, sending to a
+// third party is the user's to do. No new session, it reads the last income row.
+async function handleInvoiceThis(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(from, 'Open the app and add your number first, then I can turn a payment into an invoice.');
+    return;
+  }
+  const last = await getLastIncomeTransaction(userId);
+  if (!last || last.amount <= 0) {
+    await sendText(from, 'I could not find a recent payment to invoice. Log it first, like "Dave paid 500 for a rewire", then say "invoice this".');
+    return;
+  }
+  const customer = (last.vendor ?? '').trim();
+  if (!customer) {
+    await sendText(from, 'I have the amount but not who it was for. Say "create invoice" and I will take you through it.');
+    return;
+  }
+  const cat = (last.category ?? '').trim();
+  const description = cat && cat.toLowerCase() !== 'income' ? cat.charAt(0).toUpperCase() + cat.slice(1) : 'Work completed';
+  const inv = await createInvoice(userId, {
+    customer_name: customer,
+    line_items: [{ description, amount: Math.abs(last.amount) }],
+  });
+  if (!inv) {
+    await sendText(from, 'Something went wrong making that invoice. Try "create invoice" instead.');
+    return;
+  }
+  await sendText(
+    from,
+    `Done. Invoice ${inv.number} for ${formatGbp(inv.total)} to ${customer} is ready as a draft.\n\nSend it to them here:\n${APP_URL}/invoice/${inv.id}\n\nYou send it, never me. Tweak anything first in the app.`,
   );
 }
 

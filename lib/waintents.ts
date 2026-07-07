@@ -489,6 +489,16 @@ export function propertyAnswer(
   return `Property this tax year${where}: ${gbpShort(rents)} of rent in, adding about ${gbpShort(taxAdded)} to your tax bill (rent carries no National Insurance).${april}`;
 }
 
+// --- Instant invoice from a logged sale (the Tyms mechanic) ---------------------
+// "invoice this", "make that an invoice", "turn it into an invoice". Turns the
+// last logged income into a draft invoice the user then sends. Kept tight so it
+// never collides with the multi step "create invoice" flow (which starts with the
+// word invoice), which is why the route checks this FIRST.
+const INVOICE_THIS_RE = /^\s*(invoice\s+(this|that|it|the\s+last\s+(one|payment|job))|make\s+(this|that|it)\s+(an\s+)?invoice|turn\s+(this|that|it)\s+into\s+an\s+invoice)\s*$/i;
+export function isInvoiceThis(body: string): boolean {
+  return INVOICE_THIS_RE.test((body || '').trim());
+}
+
 // --- The invoice chaser (doc 82 s5e item 3) -------------------------------------
 // Rakha DRAFTS the chase in the user's own voice; the user forwards it. The
 // approval gate is the product: we never message a customer ourselves.

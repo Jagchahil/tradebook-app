@@ -165,6 +165,25 @@ export async function createInvoice(
   return { id: row.id, number, total: subtotal };
 }
 
+// The most recent income entry (positive amount), for turning a just logged sale
+// into an invoice, the Tyms style "invoice this". Trade income only, so a rent
+// receipt never becomes an invoice.
+export async function getLastIncomeTransaction(
+  userId: string,
+): Promise<{ vendor: string | null; amount: number; category: string | null } | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&amount=gt.0&income_type=neq.property` +
+      `&select=vendor,amount,category,created_at&order=created_at.desc&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ vendor: string | null; amount: number; category: string | null }>;
+  const r = Array.isArray(rows) ? rows[0] : null;
+  if (!r) return null;
+  return { vendor: r.vendor ?? null, amount: Number(r.amount) || 0, category: r.category ?? null };
+}
+
 export interface NewTransaction {
   user_id: string;
   vendor: string;

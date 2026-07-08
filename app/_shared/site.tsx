@@ -552,7 +552,7 @@ export function AppDash() {
         {rows.map(([e, n, c, a, col], i) => (
           <div key={n} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 11px', borderTop: i ? `1px solid ${SURFACE}` : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 14, background: SURFACE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{e}</div>
+              <div style={{ width: 28, height: 28, borderRadius: 14, background: SURFACE, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic e={e} color={col} size={15} /></div>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: INK }}>{n}</div>
                 <div style={{ fontSize: 10, color: MUTED }}>{c}</div>

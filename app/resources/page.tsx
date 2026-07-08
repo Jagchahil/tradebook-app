@@ -95,7 +95,7 @@ export default function ResourcesPage() {
         <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Guides by trade</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {TRADES.map((t) => (
-            <Link key={t.slug} href={`/for/${t.slug}`} style={{ fontSize: 14, fontWeight: 600, color: INK, background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 20, padding: '9px 16px' }}>{t.emoji} {t.name}</Link>
+            <Link key={t.slug} href={`/for/${t.slug}`} style={{ fontSize: 14, fontWeight: 600, color: INK, background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 20, padding: '9px 16px' }}><Ic e={t.emoji} color="var(--tx-mut)" size={15} style={{ verticalAlign: 'middle', marginRight: 5 }} />{t.name}</Link>
           ))}
         </div>
       </section>

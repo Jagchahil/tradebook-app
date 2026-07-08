@@ -583,11 +583,11 @@ export function AppTax() {
         </div>
       </div>
       <div style={{ marginTop: 12, background: PANEL, border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 12, color: MUTED }}>💰 Income</span>
+        <span style={{ fontSize: 12, color: MUTED }}>Income</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: GREEN }}>£2,450.00</span>
       </div>
       <div style={{ marginTop: 9, background: PANEL, border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 12, color: MUTED }}>🧾 Expenses</span>
+        <span style={{ fontSize: 12, color: MUTED }}>Expenses</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: RED_INK }}>£1,180.00</span>
       </div>
       <div style={{ marginTop: 9, paddingTop: 12, borderTop: `1px solid ${SURFACE}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -869,9 +869,9 @@ export function TrustBar() {
   return (
     <div className="trustbar">
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: '9px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: '#fff' }}>
-        <span>🔒 Encrypted and never sold</span>
+        <span>Encrypted and never sold</span>
         <span className="trustbar-dot">·</span>
-        <span>✅ You approve everything</span>
+        <span>You approve everything</span>
         <span className="trustbar-dot">·</span>
         <span>🇬🇧 A real UK company, not HMRC</span>
       </div>

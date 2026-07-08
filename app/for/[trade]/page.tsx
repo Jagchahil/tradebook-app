@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { TRADES, tradeBySlug } from '../../../lib/trades';
 import { A11Y_CSS } from '../../../lib/tokens';
+import { Ic } from '../../../_shared/site';
 
 export const dynamicParams = false;
 
@@ -59,7 +60,7 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
 
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '26px 24px 8px' }}>
         <div style={{ maxWidth: 720 }}>
-          <span style={{ display: 'inline-block', backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>{t.emoji} FOR {t.plural.toUpperCase()}</span>
+          <span style={{ display: 'inline-block', backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}><Ic e={t.emoji} color="var(--river-deep)" size={14} style={{ verticalAlign: 'middle', marginRight: 5 }} />FOR {t.plural.toUpperCase()}</span>
           <h1 className="h1t" style={{ fontWeight: 700, margin: '0 0 16px' }}>The back office for UK {t.plural}.</h1>
           <p style={{ fontSize: 18.5, color: MUTED, lineHeight: 1.6, margin: '0 0 26px' }}>{t.blurb}</p>
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
@@ -102,7 +103,7 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
         <div className="toolrow">
           {tools.map((tool) => (
             <Link key={tool.href} href={tool.href} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '18px 16px', textAlign: 'center', color: INK }}>
-              <div style={{ fontSize: 26 }}>{tool.icon}</div>
+              <div><Ic e={tool.icon} color="var(--river)" size={26} /></div>
               <div style={{ fontSize: 14, fontWeight: 700, marginTop: 8 }}>{tool.label}</div>
             </Link>
           ))}
@@ -123,7 +124,7 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
         <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 14 }}>Lekhio for every line of work</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {TRADES.filter((o) => o.slug !== t.slug).map((o) => (
-            <Link key={o.slug} href={`/for/${o.slug}`} style={{ fontSize: 14, fontWeight: 600, color: INK, background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 20, padding: '9px 16px' }}>{o.emoji} {o.name}</Link>
+            <Link key={o.slug} href={`/for/${o.slug}`} style={{ fontSize: 14, fontWeight: 600, color: INK, background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 20, padding: '9px 16px' }}><Ic e={o.emoji} color="var(--tx-mut)" size={15} style={{ verticalAlign: 'middle', marginRight: 5 }} />{o.name}</Link>
           ))}
         </div>
         <div style={{ marginTop: 22, display: 'flex', gap: 20, flexWrap: 'wrap' }}>

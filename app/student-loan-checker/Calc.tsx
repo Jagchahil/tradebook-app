@@ -111,7 +111,7 @@ export default function Calc() {
             </div>
           ) : (
             <div style={{ background: SURFACE, border: `1px dashed ${LINE}`, borderRadius: 18, padding: 24, textAlign: 'center' }}>
-              <div style={{ fontSize: 30, marginBottom: 8 }}>🎓</div>
+              
               <div style={{ fontSize: 15, color: MUTED, lineHeight: 1.5 }}>Pick your plan, add your income, and your repayment appears here.</div>
             </div>
           )}

@@ -167,7 +167,7 @@ export default function Wizard() {
           <div className="wz-grid">
             {CHOICES.map((c) => (
               <button key={c.key} onClick={() => choose(c.key)} className="wz-choice" style={{ textAlign: 'left', cursor: 'pointer', background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 22, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                <span style={{ fontSize: 28 }}>{c.icon}</span>
+                
                 <span>
                   <span style={{ display: 'block', fontSize: 17, fontWeight: 800, color: INK }}>{c.title}</span>
                   <span style={{ display: 'block', fontSize: 14, color: MUTED, marginTop: 4, lineHeight: 1.5 }}>{c.sub}</span>
@@ -274,7 +274,7 @@ export default function Wizard() {
 
             {steps[step].tip ? (
               <div style={{ marginTop: 16, display: 'flex', gap: 10, background: RIVER_TINT, borderRadius: 12, padding: '12px 14px' }}>
-                <span style={{ fontSize: 15 }}>💡</span>
+                
                 <span style={{ fontSize: 13.5, color: RIVER_DEEP, lineHeight: 1.55 }}>{steps[step].tip}</span>
               </div>
             ) : null}
@@ -316,7 +316,7 @@ export default function Wizard() {
             <div className="wz-grid">
               {ESSENTIALS.map((e) => (
                 <div key={e.title} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 20 }}>
-                  <div style={{ fontSize: 24 }}>{e.icon}</div>
+                  
                   <div style={{ fontSize: 16.5, fontWeight: 800, marginTop: 8 }}>{e.title}</div>
                   <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.55, margin: '6px 0 10px' }}>{e.body}</p>
                   {e.cost ? <div style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>{e.cost}</div> : null}
@@ -347,7 +347,7 @@ export default function Wizard() {
               <div className="wz-grid">
                 {EXTRAS.map((e) => (
                   <a key={e.title} href={e.href} {...linkProps} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: 18, color: INK }}>
-                    <div style={{ fontSize: 22 }}>{e.icon}</div>
+                    
                     <div style={{ fontSize: 15.5, fontWeight: 800, marginTop: 6 }}>{e.title}</div>
                     <div style={{ fontSize: 13.5, color: MUTED, marginTop: 4, lineHeight: 1.55 }}>{e.body}</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: RIVER, marginTop: 8 }}>How to ↗</div>

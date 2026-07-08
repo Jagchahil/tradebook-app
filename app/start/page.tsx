@@ -203,7 +203,7 @@ export default function StartPage() {
           />
           {offer ? (
             <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, backgroundColor: GREEN_TINT, border: '1px solid #CFE9D8', borderRadius: 12, padding: '12px 14px' }}>
-              <span style={{ fontSize: 18 }}>🎉</span>
+              
               <span style={{ fontSize: 13.5, fontWeight: 600, color: GREEN, lineHeight: 1.4 }}>Your 14 days free is ready. No card needed. Finish to get started.</span>
             </div>
           ) : null}
@@ -324,9 +324,9 @@ export default function StartPage() {
                 <Step title="How do you trade?" sub="So your invoices and tax records show the right name.">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {([
-                      ['sole', '👤', 'Just me', 'Self employed under my own name'],
-                      ['business', '🏪', 'A business name', 'I trade as a name, like Smith Electrical'],
-                      ['ltd', '🏢', 'A limited company', 'I have a registered company'],
+                      ['sole', '', 'Just me', 'Self employed under my own name'],
+                      ['business', '', 'A business name', 'I trade as a name, like Smith Electrical'],
+                      ['ltd', '', 'A limited company', 'I have a registered company'],
                     ] as const).map(([val, icon, t, d]) => {
                       const active = tradeType === val;
                       return (
@@ -374,9 +374,9 @@ export default function StartPage() {
                 <Step title="Anything alongside the work?" sub="The question most tax tools never ask, and it changes everything: each stream is taxed its own way, and Lekhio keeps them separate the way HMRC does.">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {([
-                      ['job', '💼', 'A PAYE job', 'A salary uses your allowance and bands first, so it sets the rate your business profit is taxed at.'],
-                      ['property', '🏠', 'Rental property', 'Rent has its own rules: no National Insurance, Section 24 on the mortgage interest, and new rates arriving April 2027.'],
-                      ['loan', '🎓', 'A student loan', 'On self employed income the repayment lands in one lump with the January bill. Lekhio includes it in your set aside figure.'],
+                      ['job', '', 'A PAYE job', 'A salary uses your allowance and bands first, so it sets the rate your business profit is taxed at.'],
+                      ['property', '', 'Rental property', 'Rent has its own rules: no National Insurance, Section 24 on the mortgage interest, and new rates arriving April 2027.'],
+                      ['loan', '', 'A student loan', 'On self employed income the repayment lands in one lump with the January bill. Lekhio includes it in your set aside figure.'],
                     ] as const).map(([val, icon, t, d]) => {
                       const active = streams.includes(val);
                       return (

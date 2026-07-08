@@ -28,8 +28,8 @@ const COUNTS = [6, 5, 6, 5];
 const durFor = (i: number) => COUNTS[i] * STAGGER + HOLD;
 
 const STAGES = [
-  { n: 'Step 1 · the website', t: 'Sign up asks who you are', head: '🌐 lekhio.com/start · step 4 of 6', live: false },
-  { n: 'Step 2 · the app', t: 'A 60 second tour', head: '📱 Lekhio app · first launch', live: false },
+  { n: 'Step 1 · the website', t: 'Sign up asks who you are', head: 'lekhio.com/start · step 4 of 6', live: false },
+  { n: 'Step 2 · the app', t: 'A 60 second tour', head: 'Lekhio app · first launch', live: false },
   { n: 'Step 3 · WhatsApp', t: 'The two minute setup', head: '💬 Lekhio · WhatsApp', live: true },
   { n: 'Step 4 · every day after', t: 'It runs itself', head: '💬 Lekhio · day to day', live: true },
 ];

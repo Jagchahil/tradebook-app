@@ -75,6 +75,7 @@ const ICONS: Record<string, string> = {
   '🚚': '<rect x="2.5" y="7" width="11" height="9" rx="1.2"/><path d="M13.5 10h4l3 3v3h-7Z"/><circle cx="6.5" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>',
   '🌿': '<path d="M11 20c0-6 3-11 9-13-1 7-4 11-9 11Z"/><path d="M11 20c0-4-1.5-7-5-8.5"/>',
   '🧱': '<rect x="3" y="6" width="18" height="12" rx="1"/><path d="M3 12h18M9 6v6M15 12v6M9 12H3M15 6h6"/>',
+  '🔔': '<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
 };
 
 // A line icon in the app's style. `e` is the emoji it stands in for.

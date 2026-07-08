@@ -184,9 +184,9 @@ export default function ProductPage() {
             <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="✅" color="var(--saffron-deep)" size={26} /></div><h3>You approve</h3><p>MTD quarterly prep, nothing filed without your yes.</p></div>
           </div>
           <div className="compliance reveal">
-            <div className="ci">📐 Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
-            <div className="ci">🧪 <b>104 tests</b> on the tax engine</div>
-            <div className="ci">✅ <b>Nothing filed</b> without your yes</div>
+            <div className="ci">Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
+            <div className="ci"><b>104 tests</b> on the tax engine</div>
+            <div className="ci"><b>Nothing filed</b> without your yes</div>
           </div>
         </div>
       </section>
@@ -214,7 +214,7 @@ export default function ProductPage() {
             <div>
               <div className="jlabel">2 · It appears in your app</div>
               <div className="jphone">
-                <div className="appbar"><b>Feed</b><span style={{ fontSize: 16 }}>🔔</span></div>
+                <div className="appbar"><b>Feed</b><Ic e="🔔" color="var(--tx-mut)" size={16} /></div>
                 <div className="appbody">
                   <div className="feedcard jC" style={{ borderColor: 'var(--saffron)' }}><div className="fi" style={{ background: 'var(--saffron-tint)' }}><Ic e="🧾" color="var(--saffron-deep)" size={22} /></div><div className="fm"><b>Screwfix</b><small>Materials · just now</small></div><div className="fa">-£42.60</div></div>
                   <div className="feedcard"><div className="fi"><Ic e="⛽" color="var(--river)" size={22} /></div><div className="fm"><b>BP</b><small>Fuel · today</small></div><div className="fa">-£62.00</div></div>
@@ -234,12 +234,12 @@ export default function ProductPage() {
             <h2 className="h2">One chat. Everything handled.</h2>
           </div>
           <div className="ftabs reveal" id="ftabs" style={{ marginTop: 26 }}>
-            <div className="ftab on" data-f="0">📸 Receipt</div>
-            <div className="ftab" data-f="1">🎙️ Voice</div>
-            <div className="ftab" data-f="2">🚗 Mileage</div>
-            <div className="ftab" data-f="3">🧾 Invoice</div>
-            <div className="ftab" data-f="4">👷 CIS</div>
-            <div className="ftab" data-f="5">💡 Ask</div>
+            <div className="ftab on" data-f="0">Receipt</div>
+            <div className="ftab" data-f="1">Voice</div>
+            <div className="ftab" data-f="2">Mileage</div>
+            <div className="ftab" data-f="3">Invoice</div>
+            <div className="ftab" data-f="4">CIS</div>
+            <div className="ftab" data-f="5">Ask</div>
           </div>
           <div className="fstage reveal">
             <div className="ftext" id="ftext"><h3>Snap a receipt</h3><p>Photograph it on WhatsApp. Lekhio pulls the total, the VAT and the category, and logs it in seconds.</p></div>
@@ -261,12 +261,12 @@ export default function ProductPage() {
             <p className="lead">Open the app whenever you want the full picture. Tap through it.</p>
           </div>
           <div className="tourwrap reveal">
-            <div className="ttabs" id="ttabs"><div className="ttab on" data-t="0">🏠 Feed</div><div className="ttab" data-t="1">📊 Money</div><div className="ttab" data-t="2">🧾 Invoices</div></div>
+            <div className="ttabs" id="ttabs"><div className="ttab on" data-t="0">Feed</div><div className="ttab" data-t="1">Money</div><div className="ttab" data-t="2">Invoices</div></div>
             <div className="tourphone">
               <div className="tourscreen">
                 <div className="tslides" id="tslides">
                   <div className="tslide">
-                    <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Feed</b><span>🔔</span></div>
+                    <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Feed</b><Ic e="🔔" color="var(--tx-mut)" size={16} /></div>
                     <div className="feedcard"><div className="fi" style={{ background: 'var(--saffron-tint)' }}><Ic e="🧾" color="var(--saffron-deep)" size={22} /></div><div className="fm"><b>Screwfix</b><small>Materials · 2m</small></div><div className="fa">-£42.60</div></div>
                     <div className="feedcard"><div className="fi"><Ic e="⛽" color="var(--river)" size={22} /></div><div className="fm"><b>BP</b><small>Fuel · 1h</small></div><div className="fa">-£62.00</div></div>
                     <div className="feedcard" style={{ borderColor: 'var(--green)' }}><div className="fi" style={{ background: 'var(--green-tint)' }}><Ic e="💷" color="var(--green)" size={22} /></div><div className="fm"><b>Dave paid you</b><small>CIS £80 held · 3h</small></div><div className="fa" style={{ color: 'var(--green)' }}>+£500</div></div>
@@ -276,7 +276,7 @@ export default function ProductPage() {
                     <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Money</b><span style={{ fontSize: 12 }}>2026/27 ▾</span></div>
                     <div className="bignum"><div className="l">Tax set aside · this year</div><div className="v">£3,240</div><div style={{ fontSize: 11, opacity: 0.85 }}>81% ready for the quarter</div></div>
                     <div className="mini2"><div><div className="l">Income</div><div className="v" style={{ color: 'var(--green)' }}>£28.4k</div></div><div><div className="l">Profit</div><div className="v" style={{ color: 'var(--river)' }}>£19.3k</div></div></div>
-                    <div className="trow"><span>🏗️ CIS refund building</span><span style={{ color: 'var(--saffron-deep)', fontWeight: 800 }}>£1,120</span></div>
+                    <div className="trow"><span>CIS refund building</span><span style={{ color: 'var(--saffron-deep)', fontWeight: 800 }}>£1,120</span></div>
                     <div className="trow"><span>Next deadline</span><span style={{ fontWeight: 800 }}>31 Jan</span></div>
                   </div>
                   <div className="tslide">

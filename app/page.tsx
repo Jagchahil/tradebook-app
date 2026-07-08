@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   INK, PAPER, FONT, SITE, faqs, reviews,
-  SharedHead, SiteNav, SiteFooter, StickyCta, HeroPhone,
+  SharedHead, SiteNav, SiteFooter, StickyCta, HeroPhone, Ic,
 } from './_shared/site';
 
 export const metadata: Metadata = {
@@ -235,8 +235,8 @@ export default function HomePage() {
       {/* Trust strip */}
       <div className="truststrip">
         <div className="row">
-          <div className="ti"><span className="tc" style={{ background: 'var(--green-tint)' }}>🔒</span><span>Encrypted, <b>never sold</b></span></div>
-          <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}>✅</span><span><b>You approve</b> everything</span></div>
+          <div className="ti"><span className="tc" style={{ background: 'var(--green-tint)' }}><Ic e="🔒" color="var(--green)" size={18} /></span><span>Encrypted, <b>never sold</b></span></div>
+          <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}><Ic e="✅" color="var(--river)" size={18} /></span><span><b>You approve</b> everything</span></div>
           <div className="ti"><span className="tc" style={{ background: 'var(--saffron-tint)' }}>📐</span><span><b>HMRC 2026/27 rules</b>, 104 tests</span></div>
           <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}>🇬🇧</span><span>A <b>real UK company</b></span></div>
         </div>
@@ -252,7 +252,7 @@ export default function HomePage() {
           </div>
           <div className="ba reveal">
             <div className="old">
-              <h3>The old way 😩</h3>
+              <h3>The old way</h3>
               <ul>
                 <li><span className="m">✕</span> A shoebox of receipts you dread opening.</li>
                 <li><span className="m">✕</span> A lost weekend every January.</li>
@@ -262,7 +262,7 @@ export default function HomePage() {
               </ul>
             </div>
             <div className="new">
-              <h3>The Lekhio way 😌</h3>
+              <h3>The Lekhio way</h3>
               <ul>
                 <li><span className="m">✓</span> Snap it, say it, or text it. Done in seconds.</li>
                 <li><span className="m">✓</span> Your books build themselves all year.</li>

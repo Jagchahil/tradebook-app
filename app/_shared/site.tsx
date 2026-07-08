@@ -4,6 +4,7 @@
 // Server components only, no client boundary needed. The reveal + countup
 // behaviour is injected as an idempotent inline script by <SharedHead />.
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { TRADES } from '../../lib/trades';
 import { A11Y_CSS } from '../../lib/tokens';
 
@@ -32,6 +33,70 @@ export const PANEL = 'var(--panel)';
 export const INK_BG = 'var(--band)';
 export const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 export const SITE = process.env.NEXT_PUBLIC_APP_URL || 'https://tradebook-app-five.vercel.app';
+
+// --- Icons (premium line set, to match the app) ----------------------------
+// Keyed by the emoji they replace, so a render site can swap {x.icon} for
+// <Ic e={x.icon} /> without touching the data. Any emoji with no drawing here
+// falls back to the emoji itself, so a missed swap is never a broken glyph.
+const ICONS: Record<string, string> = {
+  '📸': '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7 10 4.5h4L15.5 7"/><circle cx="12" cy="13.5" r="3.2"/>',
+  '🎙️': '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3"/><path d="M9 20h6"/>',
+  '🚗': '<path d="M4 13 5.6 8.8A2 2 0 0 1 7.5 7.5h9a2 2 0 0 1 1.9 1.3L20 13"/><rect x="3" y="13" width="18" height="5" rx="1.6"/><circle cx="7.5" cy="18.6" r="1.3"/><circle cx="16.5" cy="18.6" r="1.3"/>',
+  '🚐': '<path d="M4 13 5.6 8.8A2 2 0 0 1 7.5 7.5h9a2 2 0 0 1 1.9 1.3L20 13"/><rect x="3" y="13" width="18" height="5" rx="1.6"/><circle cx="7.5" cy="18.6" r="1.3"/><circle cx="16.5" cy="18.6" r="1.3"/>',
+  '🧾': '<path d="M6 3.5h12v17l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3z"/><path d="M9 8h6M9 11.5h4"/>',
+  '👷': '<path d="M4 18h16"/><path d="M6 18v-2a6 6 0 0 1 12 0v2"/><path d="M11 4.5h2V9"/>',
+  '🏗️': '<path d="M4 18h16"/><path d="M6 18v-2a6 6 0 0 1 12 0v2"/><path d="M11 4.5h2V9"/>',
+  '✅': '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.5L16 9.5"/>',
+  '📊': '<path d="M5 20v-6M12 20V6M19 20v-9"/><path d="M4 20h16"/>',
+  '📈': '<path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/>',
+  '💡': '<path d="M9.5 18h5"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5.9 1 1 1.7l.1.5h5l.1-.5c.1-.7.4-1.2 1-1.7A6 6 0 0 0 12 3Z"/>',
+  '💬': '<path d="M20 15a2 2 0 0 1-2 2H8l-4 3.5V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2Z"/>',
+  '🗂️': '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+  '📨': '<path d="M21 3 3 10.5l7 2.6L12.6 21 21 3Z"/><path d="M21 3 10 13.1"/>',
+  '🤝': '<path d="M12 3 5 6v5c0 4.4 3 7.9 7 9.8 4-1.9 7-5.4 7-9.8V6Z"/><path d="M9 11.5l2.2 2.2L15.5 9"/>',
+  '🛡️': '<path d="M12 3 5 6v5c0 4.4 3 7.9 7 9.8 4-1.9 7-5.4 7-9.8V6Z"/><path d="M9 11.5l2.2 2.2L15.5 9"/>',
+  '📤': '<path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+  '🏦': '<path d="M4 10 12 5l8 5"/><path d="M4 10h16"/><path d="M6 10v7M10 10v7M14 10v7M18 10v7"/><path d="M4 20h16"/>',
+  '🧑‍💼': '<circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/>',
+  '🧮': '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 15h.01M12 15h.01M15.5 15h.01"/>',
+  '📋': '<rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V5.5H9Z"/><path d="M9 11h6M9 14.5h4"/>',
+  '🎓': '<path d="M12 4 2 9l10 5 10-5Z"/><path d="M6 11v4.5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5V11"/>',
+  '🏠': '<path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/>',
+  '🛏️': '<path d="M3 8v11"/><path d="M21 19v-4a3 3 0 0 0-3-3H8V9"/><path d="M3 14.5h18"/><circle cx="6.5" cy="11" r="1.3"/>',
+  '⚖️': '<path d="M12 3v18"/><path d="M7.5 21h9"/><path d="M5 7h14"/><path d="M5 7 2.8 12a3 3 0 0 0 4.4 0Z"/><path d="M19 7l-2.2 5a3 3 0 0 0 4.4 0Z"/>',
+  '🔒': '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  '⛽': '<path d="M5 21V5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v16"/><path d="M4 21h11"/><path d="M6 9h6"/><path d="M14 7l3 3v7a1.6 1.6 0 0 0 1.6-1.6V10L15.5 6.5"/>',
+  '🔥': '<path d="M12 3c3 3 4.5 5.5 4.5 8.5A4.5 4.5 0 0 1 12 21a4.5 4.5 0 0 1-4.5-4.5c0-1.5.6-2.7 1.5-3.7.3 1 .9 1.7 1.7 2 0-2 .8-3.8 1.8-5.3Z"/>',
+  '🐷': '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><circle cx="16.5" cy="14.5" r="1.3"/>',
+  '⚡': '<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/>',
+  '🔧': '<path d="M14.7 6.3a4 4 0 0 0-5.2 5.2L4 16.9 7.1 20l5.4-5.5a4 4 0 0 0 5.2-5.2l-2.6 2.6-2-.5-.5-2Z"/>',
+  '🎨': '<path d="M12 3a9 9 0 1 0 0 18c1.4 0 1.9-1 1.4-2-.5-1.1.3-2 1.5-2H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16" cy="10.5" r="1"/>',
+  '✂️': '<circle cx="6" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><path d="M8 8.5 20 17M8 15.5 20 7"/>',
+  '🚚': '<rect x="2.5" y="7" width="11" height="9" rx="1.2"/><path d="M13.5 10h4l3 3v3h-7Z"/><circle cx="6.5" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/>',
+  '🌿': '<path d="M11 20c0-6 3-11 9-13-1 7-4 11-9 11Z"/><path d="M11 20c0-4-1.5-7-5-8.5"/>',
+  '🧱': '<rect x="3" y="6" width="18" height="12" rx="1"/><path d="M3 12h18M9 6v6M15 12v6M9 12H3M15 6h6"/>',
+};
+
+// A line icon in the app's style. `e` is the emoji it stands in for.
+export function Ic({ e, size = 24, color = 'currentColor', style }: { e: string; size?: number; color?: string; style?: CSSProperties }) {
+  const inner = ICONS[e];
+  if (!inner) return <span style={style}>{e}</span>;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={style}
+      dangerouslySetInnerHTML={{ __html: inner }}
+    />
+  );
+}
 
 // Shared marketing-page styling. Every marketing page wraps its <main> in
 // className="mkt" and injects this once via <style>. One source so home,

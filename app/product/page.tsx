@@ -3,7 +3,7 @@ import Link from 'next/link';
 import OnboardingShow from './OnboardingShow';
 import {
   INK, PAPER, FONT, MARKETING_CSS,
-  SharedHead, SiteNav, SiteFooter, StickyCta,
+  SharedHead, SiteNav, SiteFooter, StickyCta, Ic,
 } from '../_shared/site';
 
 export const metadata: Metadata = {
@@ -174,14 +174,14 @@ export default function ProductPage() {
             <p className="lead">Ten seconds a day on WhatsApp. Lekhio does the rest and keeps it tidy in your app.</p>
           </div>
           <div className="featgrid reveal">
-            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}>📸</div><h3>Snap a receipt</h3><p>Photo it, Lekhio reads the shop, total and VAT.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}>🎙️</div><h3>Say it or type it</h3><p>&quot;spent 40 on diesel&quot;, by voice note or text.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}>🚐</div><h3>Mileage</h3><p>&quot;drove 24 miles&quot; and it claims it at the HMRC rate.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}>🧾</div><h3>Invoices</h3><p>Built and sent from the chat, chased when late.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}>👷</div><h3>CIS refund</h3><p>Deductions tracked, your refund watched all year.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}>📊</div><h3>Tax set aside</h3><p>One honest number, updated as you earn.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}>📈</div><h3>Ways to save</h3><p>The legal reliefs you are owed, on your numbers.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}>✅</div><h3>You approve</h3><p>MTD quarterly prep, nothing filed without your yes.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📸" color="var(--river)" size={26} /></div><h3>Snap a receipt</h3><p>Photo it, Lekhio reads the shop, total and VAT.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="🎙️" color="var(--saffron-deep)" size={26} /></div><h3>Say it or type it</h3><p>&quot;spent 40 on diesel&quot;, by voice note or text.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}><Ic e="🚐" color="var(--green)" size={26} /></div><h3>Mileage</h3><p>&quot;drove 24 miles&quot; and it claims it at the HMRC rate.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><h3>Invoices</h3><p>Built and sent from the chat, chased when late.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="👷" color="var(--saffron-deep)" size={26} /></div><h3>CIS refund</h3><p>Deductions tracked, your refund watched all year.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📊" color="var(--river)" size={26} /></div><h3>Tax set aside</h3><p>One honest number, updated as you earn.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}><Ic e="📈" color="var(--green)" size={26} /></div><h3>Ways to save</h3><p>The legal reliefs you are owed, on your numbers.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="✅" color="var(--saffron-deep)" size={26} /></div><h3>You approve</h3><p>MTD quarterly prep, nothing filed without your yes.</p></div>
           </div>
           <div className="compliance reveal">
             <div className="ci">📐 Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
@@ -216,9 +216,9 @@ export default function ProductPage() {
               <div className="jphone">
                 <div className="appbar"><b>Feed</b><span style={{ fontSize: 16 }}>🔔</span></div>
                 <div className="appbody">
-                  <div className="feedcard jC" style={{ borderColor: 'var(--saffron)' }}><div className="fi" style={{ background: 'var(--saffron-tint)' }}>🧾</div><div className="fm"><b>Screwfix</b><small>Materials · just now</small></div><div className="fa">-£42.60</div></div>
-                  <div className="feedcard"><div className="fi">⛽</div><div className="fm"><b>BP</b><small>Fuel · today</small></div><div className="fa">-£62.00</div></div>
-                  <div className="feedcard"><div className="fi" style={{ background: 'var(--green-tint)' }}>💷</div><div className="fm"><b>Dave Wilson</b><small>Invoice · today</small></div><div className="fa" style={{ color: 'var(--green)' }}>+£400</div></div>
+                  <div className="feedcard jC" style={{ borderColor: 'var(--saffron)' }}><div className="fi" style={{ background: 'var(--saffron-tint)' }}><Ic e="🧾" color="var(--saffron-deep)" size={22} /></div><div className="fm"><b>Screwfix</b><small>Materials · just now</small></div><div className="fa">-£42.60</div></div>
+                  <div className="feedcard"><div className="fi"><Ic e="⛽" color="var(--river)" size={22} /></div><div className="fm"><b>BP</b><small>Fuel · today</small></div><div className="fa">-£62.00</div></div>
+                  <div className="feedcard"><div className="fi" style={{ background: 'var(--green-tint)' }}><Ic e="💷" color="var(--green)" size={22} /></div><div className="fm"><b>Dave Wilson</b><small>Invoice · today</small></div><div className="fa" style={{ color: 'var(--green)' }}>+£400</div></div>
                 </div>
               </div>
             </div>
@@ -267,10 +267,10 @@ export default function ProductPage() {
                 <div className="tslides" id="tslides">
                   <div className="tslide">
                     <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Feed</b><span>🔔</span></div>
-                    <div className="feedcard"><div className="fi" style={{ background: 'var(--saffron-tint)' }}>🧾</div><div className="fm"><b>Screwfix</b><small>Materials · 2m</small></div><div className="fa">-£42.60</div></div>
-                    <div className="feedcard"><div className="fi">⛽</div><div className="fm"><b>BP</b><small>Fuel · 1h</small></div><div className="fa">-£62.00</div></div>
-                    <div className="feedcard" style={{ borderColor: 'var(--green)' }}><div className="fi" style={{ background: 'var(--green-tint)' }}>💷</div><div className="fm"><b>Dave paid you</b><small>CIS £80 held · 3h</small></div><div className="fa" style={{ color: 'var(--green)' }}>+£500</div></div>
-                    <div className="feedcard" style={{ background: 'var(--saffron-tint)', borderColor: 'var(--saffron)' }}><div className="fi" style={{ background: '#fff' }}>🔥</div><div className="fm"><b>7-day streak!</b><small>Keep it going</small></div></div>
+                    <div className="feedcard"><div className="fi" style={{ background: 'var(--saffron-tint)' }}><Ic e="🧾" color="var(--saffron-deep)" size={22} /></div><div className="fm"><b>Screwfix</b><small>Materials · 2m</small></div><div className="fa">-£42.60</div></div>
+                    <div className="feedcard"><div className="fi"><Ic e="⛽" color="var(--river)" size={22} /></div><div className="fm"><b>BP</b><small>Fuel · 1h</small></div><div className="fa">-£62.00</div></div>
+                    <div className="feedcard" style={{ borderColor: 'var(--green)' }}><div className="fi" style={{ background: 'var(--green-tint)' }}><Ic e="💷" color="var(--green)" size={22} /></div><div className="fm"><b>Dave paid you</b><small>CIS £80 held · 3h</small></div><div className="fa" style={{ color: 'var(--green)' }}>+£500</div></div>
+                    <div className="feedcard" style={{ background: 'var(--saffron-tint)', borderColor: 'var(--saffron)' }}><div className="fi" style={{ background: '#fff' }}><Ic e="🔥" color="var(--saffron-deep)" size={22} /></div><div className="fm"><b>7-day streak!</b><small>Keep it going</small></div></div>
                   </div>
                   <div className="tslide">
                     <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Money</b><span style={{ fontSize: 12 }}>2026/27 ▾</span></div>
@@ -282,9 +282,9 @@ export default function ProductPage() {
                   <div className="tslide">
                     <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Invoices</b><span style={{ color: 'var(--river)', fontWeight: 800, fontSize: 13 }}>＋ New</span></div>
                     <div className="mini2"><div><div className="l">Outstanding</div><div className="v" style={{ color: 'var(--saffron-deep)' }}>£1,450</div></div><div><div className="l">Paid this month</div><div className="v" style={{ color: 'var(--green)' }}>£3,900</div></div></div>
-                    <div className="feedcard"><div className="fi" style={{ background: 'var(--river-tint)' }}>🧾</div><div className="fm"><b>Dave · rewire</b><small>#0042</small></div><div className="fa" style={{ color: 'var(--green)' }}>Paid</div></div>
-                    <div className="feedcard"><div className="fi" style={{ background: 'var(--river-tint)' }}>🧾</div><div className="fm"><b>Miller Bros</b><small>#0041</small></div><div className="fa" style={{ color: 'var(--saffron-deep)' }}>Due 12d</div></div>
-                    <div className="feedcard"><div className="fi" style={{ background: 'var(--river-tint)' }}>🧾</div><div className="fm"><b>J. Okafor</b><small>#0040</small></div><div className="fa" style={{ color: 'var(--red)' }}>Overdue</div></div>
+                    <div className="feedcard"><div className="fi" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><div className="fm"><b>Dave · rewire</b><small>#0042</small></div><div className="fa" style={{ color: 'var(--green)' }}>Paid</div></div>
+                    <div className="feedcard"><div className="fi" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><div className="fm"><b>Miller Bros</b><small>#0041</small></div><div className="fa" style={{ color: 'var(--saffron-deep)' }}>Due 12d</div></div>
+                    <div className="feedcard"><div className="fi" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><div className="fm"><b>J. Okafor</b><small>#0040</small></div><div className="fa" style={{ color: 'var(--red)' }}>Overdue</div></div>
                   </div>
                 </div>
               </div>
@@ -303,14 +303,14 @@ export default function ProductPage() {
           </div>
           <div className="helpers reveal">
             <div className="helpercard ai">
-              <div className="hic">📊</div>
+              <div className="hic"><Ic e="📊" color="var(--river)" size={26} /></div>
               <h3>Puchio</h3>
               <div className="htag">Answers when you ask</div>
               <p>Your AI tax helper, in the chat. Ask anything about your tax, expenses, CIS, VAT or your own numbers, and get a straight answer in plain English, in seconds. No jargon, no waiting days for a reply.</p>
               <p className="hname">Puchio comes from puchh: ask. Go on, puchho.</p>
             </div>
             <div className="helpercard rakha">
-              <div className="hic">🛡️</div>
+              <div className="hic"><Ic e="🛡️" color="var(--saffron-deep)" size={26} /></div>
               <h3>Rakha</h3>
               <div className="htag">Speaks before you ask</div>
               <p>Rakha watches your numbers all year: the VAT threshold creeping closer, a State Pension year about to slip, the January bill quietly building. When something needs you, Rakha tells you first, in the app and on WhatsApp. It suggests, never acts. You decide everything.</p>
@@ -343,13 +343,13 @@ export default function ProductPage() {
             <h2 className="h2">The brains of an accountant. None of the bill.</h2>
           </div>
           <div className="ba reveal" style={{ maxWidth: 900, margin: '0 auto' }}>
-            <div className="old"><h3>A traditional accountant 😩</h3><ul>
+            <div className="old"><h3>A traditional accountant</h3><ul>
               <li><span className="m">✕</span> £150 to £900 a year, just to file.</li>
               <li><span className="m">✕</span> You see them once, when it is too late to plan.</li>
               <li><span className="m">✕</span> A shoebox to dig out every January.</li>
               <li><span className="m">✕</span> Days for a simple answer.</li>
             </ul></div>
-            <div className="new"><h3>The Lekhio way 😌</h3><ul>
+            <div className="new"><h3>The Lekhio way</h3><ul>
               <li><span className="m">✓</span> One flat price, everything in.</li>
               <li><span className="m">✓</span> With you every day, not once a year.</li>
               <li><span className="m">✓</span> Snap as you go. Nothing to dig out.</li>
@@ -368,10 +368,10 @@ export default function ProductPage() {
             <p className="lead">Every one keeps you in control, and never sends a thing without your yes.</p>
           </div>
           <div className="soongrid reveal">
-            <div className="sooncard"><div className="se">📤</div><h3>File straight to HMRC</h3><p>Submit your quarterly updates and return from Lekhio, when you approve, through a recognised route.</p><span className="rbadge prog">HMRC RECOGNITION IN PROGRESS</span></div>
-            <div className="sooncard"><div className="se">📊</div><h3>Your HMRC balance, live</h3><p>See exactly what you owe, what is due, and any refund building, right in the app.</p><span className="rbadge soon">COMING SOON</span></div>
-            <div className="sooncard"><div className="se">🏦</div><h3>Connect your bank</h3><p>Money in and out logs itself, read only, so your books stay up to date with no effort.</p><span className="rbadge soon">BUILT · SWITCHING ON SOON</span></div>
-            <div className="sooncard"><div className="se">🛡️</div><h3>Rakha gets sharper</h3><p>Rakha already watches your thresholds. Soon it reads HMRC updates and the Budget the moment they land, and tells you exactly what changes for you.</p><span className="rbadge soon">COMING SOON</span></div>
+            <div className="sooncard"><div className="se"><Ic e="📤" color="var(--river)" size={24} /></div><h3>File straight to HMRC</h3><p>Submit your quarterly updates and return from Lekhio, when you approve, through a recognised route.</p><span className="rbadge prog">HMRC RECOGNITION IN PROGRESS</span></div>
+            <div className="sooncard"><div className="se"><Ic e="📊" color="var(--saffron-deep)" size={24} /></div><h3>Your HMRC balance, live</h3><p>See exactly what you owe, what is due, and any refund building, right in the app.</p><span className="rbadge soon">COMING SOON</span></div>
+            <div className="sooncard"><div className="se"><Ic e="🏦" color="var(--green)" size={24} /></div><h3>Connect your bank</h3><p>Money in and out logs itself, read only, so your books stay up to date with no effort.</p><span className="rbadge soon">BUILT · SWITCHING ON SOON</span></div>
+            <div className="sooncard"><div className="se"><Ic e="🛡️" color="var(--river)" size={24} /></div><h3>Rakha gets sharper</h3><p>Rakha already watches your thresholds. Soon it reads HMRC updates and the Budget the moment they land, and tells you exactly what changes for you.</p><span className="rbadge soon">COMING SOON</span></div>
           </div>
         </div>
       </section>

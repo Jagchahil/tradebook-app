@@ -62,6 +62,13 @@ export interface AgentInput {
 
 export type SignalPriority = 'ping' | 'card';
 
+// A prepared action a card can offer (doc 95 Phase 1.5). Rakha only ever
+// PREPARES: the user taps to carry it out, and anything irreversible (sending to
+// a customer) is a device action the user triggers by hand in their own
+// messenger. Nothing here bypasses the approval gate.
+export type AgentAction =
+  | { kind: 'invoice_chase'; invoiceId: string; invoiceNumber: string; customer: string; total: number; link: string; draft: string };
+
 export interface AgentSignal {
   signalKey: string;
   periodKey: string;
@@ -70,6 +77,7 @@ export interface AgentSignal {
   body: string; // the in app card body
   waText: string; // the WhatsApp line pair, used to fill the approved template
   numbers: Record<string, number>; // the figures behind it, for the payload
+  action?: AgentAction; // an optional one-tap prepared action for the card
 }
 
 // When the daily or weekly ping caps bite, higher priority wins. Doc 84 section 2,
@@ -653,6 +661,15 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
 Send it as it is or tweak it first. You send, never me. Most invoices get paid within days of a polite nudge.`,
         waText: `invoice ${inv.number} (${gbp(inv.total)}, ${inv.customer || 'customer'}) is ${inv.daysOver} days unpaid, and I have a polite chase drafted for you, just say "chase invoice ${inv.number}"`,
         numbers: { total: inv.total, daysOver: inv.daysOver, tier },
+        action: {
+          kind: 'invoice_chase',
+          invoiceId: inv.id,
+          invoiceNumber: inv.number,
+          customer: inv.customer || '',
+          total: inv.total,
+          link: inv.link || '',
+          draft,
+        },
       });
     }
   }

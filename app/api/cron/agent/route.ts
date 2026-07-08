@@ -141,7 +141,7 @@ async function processUser(user: {
       signal_key: s.signalKey,
       period_key: s.periodKey,
       // Rendered copy travels in the payload: one renderer, nothing to drift.
-      payload: { title: s.title, body: s.body, waText: s.waText, numbers: s.numbers },
+      payload: { title: s.title, body: s.body, waText: s.waText, numbers: s.numbers, action: s.action ?? null },
       priority: s.priority,
     })),
   );

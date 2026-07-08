@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { TRADES, tradeBySlug } from '../../../lib/trades';
 import { A11Y_CSS } from '../../../lib/tokens';
-import { Ic } from '../../../_shared/site';
+import { Ic } from '../../_shared/site';
 
 export const dynamicParams = false;
 

@@ -67,7 +67,9 @@ export type SignalPriority = 'ping' | 'card';
 // a customer) is a device action the user triggers by hand in their own
 // messenger. Nothing here bypasses the approval gate.
 export type AgentAction =
-  | { kind: 'invoice_chase'; invoiceId: string; invoiceNumber: string; customer: string; total: number; link: string; draft: string };
+  | { kind: 'invoice_chase'; invoiceId: string; invoiceNumber: string; customer: string; total: number; link: string; draft: string }
+  | { kind: 'set_aside'; amount: number; label: string }   // set a savings TARGET, never a transfer, Lekhio holds no money
+  | { kind: 'open_confirm'; count: number };                // one tap to the entries that need a yes
 
 export interface AgentSignal {
   signalKey: string;
@@ -465,6 +467,7 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
         body: `Your Self Assessment bill is heading for about ${gbp(estBill)}. Over ${gbp(FACTS.poaThreshold)}, HMRC also asks for half of next year in advance, so the first January bill is roughly one and a half times what you expect: the year's bill plus about ${gbp(poa)} on account. Brutal if it surprises you, boring if you set aside for it, and your set aside number can carry it from here.`,
         waText: `your Self Assessment bill is heading for about ${gbp(estBill)}, which switches on payments on account: January asks for roughly ${gbp(estBill + poa)} in total`,
         numbers: { estBill, poa, threshold: FACTS.poaThreshold },
+        action: { kind: 'set_aside', amount: estBill, label: 'Tax set aside' },
       });
     }
   }
@@ -548,6 +551,7 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       body: `The quarter ends in ${daysToQuarterEnd} ${daysToQuarterEnd === 1 ? 'day' : 'days'} and ${input.unconfirmedCount} entries are still waiting for your yes. Two minutes in the app keeps your quarterly figures complete and correct. Nothing is ever sent without you.`,
       waText: `${input.unconfirmedCount} entries need a quick check before the quarter closes in ${daysToQuarterEnd} ${daysToQuarterEnd === 1 ? 'day' : 'days'}`,
       numbers: { unconfirmed: input.unconfirmedCount, daysToQuarterEnd },
+      action: { kind: 'open_confirm', count: input.unconfirmedCount },
     });
   }
 

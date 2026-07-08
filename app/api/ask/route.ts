@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { answerAccountantQuestion, hasClaudeConfig } from '../../../lib/claude';
-import { verifyAccessToken, bumpAiUsage, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate } from '../../../lib/supabase';
+import { verifyAccessToken, bumpAiUsage, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised } from '../../../lib/supabase';
 import { rateLimited } from '../../../lib/ratelimit';
 
 // The in-app accountant endpoint. The app posts a question with the user's
@@ -51,6 +51,32 @@ export async function POST(req: NextRequest) {
   }
   // Optional: continue an existing thread. Absent means start a new one.
   const conversationIdIn = str(body.conversationId, 100).trim();
+
+  // Cache first (doc 95 Feature B). A GENERAL question that was answered before
+  // from recognised sources is served for FREE: it does not call the paid model
+  // and does not touch the daily cap, so it works even when a user has used up
+  // their paid questions. This is the credit saver, one paid answer per distinct
+  // question serves everyone who ever asks it.
+  const questionNorm = normaliseQuestion(question);
+  const general = isGeneralQuestion(question);
+  if (general) {
+    const cached = await lookupQaCache(questionNorm);
+    if (cached) {
+      let conversationId = '';
+      if (conversationIdIn && (await conversationOwnedBy(userId, conversationIdIn))) {
+        conversationId = conversationIdIn;
+      } else {
+        conversationId = (await createConversation(userId, question)) || '';
+      }
+      after(async () => {
+        if (conversationId) await saveConversationTurn(userId, conversationId, question, cached.answer, cached.sources);
+        await bumpQaCacheHit(questionNorm);
+      });
+      // remaining is null so the app keeps its last pill: a free answer never
+      // decrements the visible counter.
+      return NextResponse.json({ answer: cached.answer, remaining: null, limit: DAILY_LIMIT, conversationId, sources: cached.sources, cached: true });
+    }
+  }
 
   // Per-user daily cap. Fail CLOSED: if the durable counter is unavailable we do
   // not spend on the paid AI, so a database hiccup can never become a cost blowup.
@@ -123,6 +149,12 @@ export async function POST(req: NextRequest) {
       await saveConversationTurn(userId, conversationId, question, answer, sourceUrls);
     }
     await logQaCandidate(question, answer, sourceUrls, sourceUrls.length > 0);
+    // Populate the free cache only when BOTH gates pass: the question carried no
+    // personal context, and every source was recognised. So a served answer can
+    // never contain another user's figures and is always source backed.
+    if (general && allSourcesRecognised(sourceUrls)) {
+      await upsertQaCache(questionNorm, question, answer, sourceUrls);
+    }
   });
 
   return NextResponse.json({ answer, remaining, limit: DAILY_LIMIT, conversationId, sources: sourceUrls });

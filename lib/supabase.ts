@@ -146,6 +146,105 @@ export function allSourcesRecognised(urls: string[]): boolean {
   return urls.length > 0 && urls.every(isRecognisedSource);
 }
 
+// --- General answer cache (doc 95 Phase 1.5 Feature B) ----------------------
+// A repeat of a GENERAL question (no personal context) is served from here for
+// free, so paid credit is spent once per distinct question, not once per user.
+// Safety rests on two gates enforced at WRITE time: the question carried no first
+// person context, and every source was recognised. So a served answer can never
+// contain another user's figures and is always source backed. Khoji marks the
+// whole cache stale when a distilled item changes a tax figure, and a freshness
+// window bounds staleness even if that signal is ever missed.
+
+const QA_CACHE_TTL_DAYS = 21;
+
+// Deterministic shape for a question: lowercase, strip punctuation, collapse
+// whitespace. Two phrasings differing only in spacing or a final question mark
+// map to the same key, which is what lets a repeat hit.
+export function normaliseQuestion(q: string): string {
+  return (q || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500);
+}
+
+// Is this a GENERAL question, safe to cache and serve to anyone? Conservative by
+// design: any first person marker means the answer might lean on the asker's own
+// figures, so it is treated as personal and never cached. A cache miss is
+// cheap; serving a wrong personalised answer is not.
+const PERSONAL_MARKERS = /\b(i|im|ive|id|ill|me|my|mine|myself|we|our|ours|us)\b/;
+export function isGeneralQuestion(q: string): boolean {
+  const n = normaliseQuestion(q);
+  if (n.length < 6) return false;
+  return !PERSONAL_MARKERS.test(n);
+}
+
+// Serve a cached general answer. Active and within the freshness window only.
+// Returns null on any miss, so the caller falls through to the paid path.
+export async function lookupQaCache(questionNorm: string): Promise<{ answer: string; sources: string[] } | null> {
+  try {
+    const { url } = config();
+    const cutoff = new Date(Date.now() - QA_CACHE_TTL_DAYS * 86_400_000).toISOString();
+    const path =
+      `qa_cache?question_norm=eq.${encodeURIComponent(questionNorm)}` +
+      `&status=eq.active&updated_at=gte.${encodeURIComponent(cutoff)}` +
+      `&select=answer,sources&limit=1`;
+    const res = await fetch(`${url}/rest/v1/${path}`, { headers: headers() });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ answer: string; sources: unknown }>;
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row || !row.answer) return null;
+    const sources = Array.isArray(row.sources) ? (row.sources as string[]) : [];
+    return { answer: row.answer, sources };
+  } catch {
+    return null;
+  }
+}
+
+// Best effort +1 to the popularity counter, so we can measure credits saved.
+export async function bumpQaCacheHit(questionNorm: string): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/rpc/bump_qa_cache_hit`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_norm: questionNorm }),
+    });
+  } catch {
+    /* best effort */
+  }
+}
+
+// Store (or refresh) a general answer. Called only after a LIVE answer whose
+// sources were ALL recognised, for a question with no personal context. On
+// conflict we refresh the answer and reactivate, so a re answered question also
+// un-stales itself. The stored sample is PII redacted for good measure.
+export async function upsertQaCache(
+  questionNorm: string,
+  questionSample: string,
+  answer: string,
+  sources: string[],
+): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/qa_cache?on_conflict=question_norm`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({
+        question_norm: questionNorm,
+        question_sample: redactPii(questionSample).slice(0, 500),
+        answer: answer.slice(0, 8000),
+        sources: sources.length ? sources : [],
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  } catch {
+    /* best effort */
+  }
+}
+
 // --- Puchio chat memory + the learning loop (doc 95) -----------------------
 
 export interface ConversationRow {

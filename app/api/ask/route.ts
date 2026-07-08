@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { answerAccountantQuestion, hasClaudeConfig } from '../../../lib/claude';
-import { verifyAccessToken, bumpAiUsage, transactionSummaryForUser, getRelevantKnowledge, createConversation, saveMessage, logQaCandidate } from '../../../lib/supabase';
+import { verifyAccessToken, bumpAiUsage, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate } from '../../../lib/supabase';
 import { rateLimited } from '../../../lib/ratelimit';
 
 // The in-app accountant endpoint. The app posts a question with the user's
@@ -105,18 +105,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'failed', answer: 'I could not work that out just now. Try rewording it, or ask me something else.' }, { status: 502 });
   }
 
-  // Persist the turn so the chat appears in the Messages tab and can be reused.
-  // All best effort: storage must never block or fail the answer the user waits on.
-  let conversationId = conversationIdIn;
-  if (!conversationId) {
+  // Resolve the thread. A client supplied conversation id is trusted ONLY if it
+  // belongs to this user, otherwise we start a fresh one. This stops a crafted id
+  // from attaching a message to someone else's thread. The new thread is created
+  // inline because the client needs its id back to continue the chat.
+  let conversationId = '';
+  if (conversationIdIn && (await conversationOwnedBy(userId, conversationIdIn))) {
+    conversationId = conversationIdIn;
+  } else {
     conversationId = (await createConversation(userId, question)) || '';
   }
-  if (conversationId) {
-    await saveMessage(userId, conversationId, 'user', question);
-    await saveMessage(userId, conversationId, 'puchio', answer, sourceUrls);
-  }
-  // Log for the learning loop: the general question and answer, no personal figures.
-  await logQaCandidate(question, answer, sourceUrls, sourceUrls.length > 0);
+
+  // Store the turn and log the learning candidate AFTER the response is sent, so
+  // the user never waits on this best effort persistence.
+  after(async () => {
+    if (conversationId) {
+      await saveConversationTurn(userId, conversationId, question, answer, sourceUrls);
+    }
+    await logQaCandidate(question, answer, sourceUrls, sourceUrls.length > 0);
+  });
 
   return NextResponse.json({ answer, remaining, limit: DAILY_LIMIT, conversationId, sources: sourceUrls });
 }

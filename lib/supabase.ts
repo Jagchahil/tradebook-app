@@ -129,10 +129,16 @@ const RECOGNISED_HOSTS = [
 
 export function isRecognisedSource(url: string): boolean {
   // Extract the host with a regex, not the URL constructor: this module already
-  // has a `URL` constant (the Supabase base URL) that shadows the global.
-  const m = /^https?:\/\/([^/?#]+)/i.exec(url || '');
-  const host = (m ? m[1] : '').toLowerCase();
-  if (!host) return false;
+  // has a `URL` constant (the Supabase base URL) that shadows the global. Strip
+  // any userinfo and port, reject a junk authority, so the allowlist that gates
+  // auto approval of tax content cannot be widened by a crafted authority and a
+  // legitimate URL carrying a port or stray whitespace still matches.
+  const m = /^https?:\/\/([^/?#\s]+)/i.exec((url || '').trim());
+  if (!m) return false;
+  let host = m[1].toLowerCase();
+  host = host.split('@').pop() || '';   // drop any userinfo before the host
+  host = host.split(':')[0];            // drop any port
+  if (!/^[a-z0-9.-]+$/.test(host)) return false; // reject non hostname junk
   return RECOGNISED_HOSTS.some((h) => host === h || host.endsWith('.' + h));
 }
 
@@ -177,6 +183,22 @@ export async function createConversation(userId: string, title: string): Promise
     return Array.isArray(rows) && rows[0]?.id ? String(rows[0].id) : null;
   } catch {
     return null;
+  }
+}
+
+// True only if the conversation exists AND belongs to this user. Called before
+// writing into a client supplied thread id, so a crafted id can never attach a
+// message to someone else's conversation.
+export async function conversationOwnedBy(userId: string, conversationId: string): Promise<boolean> {
+  try {
+    const res = await rest(
+      `conversations?id=eq.${encodeURIComponent(conversationId)}&user_id=eq.${encodeURIComponent(userId)}&select=id&limit=1`,
+    );
+    if (!res.ok) return false;
+    const rows = await res.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
   }
 }
 
@@ -237,9 +259,49 @@ export async function saveMessage(
   }
 }
 
-// Log a Puchio answer as a learning candidate for the brain. Records whether the
-// sources are all recognised so a later governed step can auto approve the clean
-// ones. Never auto approves here. Best effort.
+// Store a full turn (the user question and Puchio's answer) in ONE batched
+// insert, then bump last_message_at once: two round trips instead of four. Best
+// effort, so it never blocks or fails the answer the user is waiting on.
+export async function saveConversationTurn(
+  userId: string,
+  conversationId: string,
+  question: string,
+  answer: string,
+  sources?: string[],
+): Promise<void> {
+  try {
+    await rest('messages', {
+      method: 'POST',
+      body: JSON.stringify([
+        { user_id: userId, conversation_id: conversationId, role: 'user', content: question.slice(0, 8000), sources: null },
+        { user_id: userId, conversation_id: conversationId, role: 'puchio', content: answer.slice(0, 8000), sources: sources && sources.length ? sources : null },
+      ]),
+    });
+    await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}&user_id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ last_message_at: new Date().toISOString() }),
+    });
+  } catch {
+    /* best effort */
+  }
+}
+
+// Strip the obvious personal bits from a question before it enters the shared
+// review pool: emails, UK postcodes, currency amounts, and long digit runs. The
+// general tax question survives, the identifying detail does not. This keeps the
+// learning corpus from becoming a store of users' personal figures and names.
+function redactPii(s: string): string {
+  return (s || '')
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]')
+    .replace(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/gi, '[postcode]')
+    .replace(/£\s?\d[\d,]*(\.\d+)?/g, '[amount]')
+    .replace(/\b\d{7,}\b/g, '[number]');
+}
+
+// Log a Puchio answer as a learning candidate for the brain. The question is PII
+// redacted first. Records whether the sources are all recognised so a later
+// governed step can auto approve the clean ones. Never auto approves here. Best
+// effort.
 export async function logQaCandidate(
   question: string,
   answer: string,
@@ -251,7 +313,7 @@ export async function logQaCandidate(
     await rest('qa_candidates', {
       method: 'POST',
       body: JSON.stringify({
-        question: question.slice(0, 1000),
+        question: redactPii(question).slice(0, 1000),
         answer: answer.slice(0, 8000),
         sources: sources.length ? sources : null,
         used_knowledge: usedKnowledge,
@@ -816,6 +878,11 @@ export async function deleteUserData(userId: string, email: string | null): Prom
   await del(`bank_connections?user_id=eq.${encodeURIComponent(userId)}`);
   // Audit trail holds user_id + ip_address (personal data under UK GDPR).
   await del(`audit_log?user_id=eq.${encodeURIComponent(userId)}`);
+  // Puchio chat threads and their messages (chat content is personal data).
+  // These cascade from auth.users on the final delete, but remove explicitly so
+  // erasure never leaves chat history behind if that last delete were to fail.
+  await del(`messages?user_id=eq.${encodeURIComponent(userId)}`);
+  await del(`conversations?user_id=eq.${encodeURIComponent(userId)}`);
   await del(`users?id=eq.${encodeURIComponent(userId)}`);
   // Server-only rows keyed by phone/email (these do NOT cascade from users).
   if (phone) {

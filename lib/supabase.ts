@@ -118,6 +118,152 @@ export async function getRelevantKnowledge(question: string, limit = 6): Promise
   }
 }
 
+// --- Recognised sources (doc 95 decision 2) --------------------------------
+// A distilled or self answered item may auto approve into the brain only when
+// EVERY source it leaned on is on this list, and it is not an engine_impact
+// change. Tight by default, easy to extend. Suffix match, so subdomains count.
+const RECOGNISED_HOSTS = [
+  'gov.uk', 'legislation.gov.uk', 'hmrc.gov.uk',
+  'icaew.com', 'accaglobal.com', 'tax.org.uk', 'att.org.uk', 'aat.org.uk', 'icas.com',
+];
+
+export function isRecognisedSource(url: string): boolean {
+  // Extract the host with a regex, not the URL constructor: this module already
+  // has a `URL` constant (the Supabase base URL) that shadows the global.
+  const m = /^https?:\/\/([^/?#]+)/i.exec(url || '');
+  const host = (m ? m[1] : '').toLowerCase();
+  if (!host) return false;
+  return RECOGNISED_HOSTS.some((h) => host === h || host.endsWith('.' + h));
+}
+
+export function allSourcesRecognised(urls: string[]): boolean {
+  return urls.length > 0 && urls.every(isRecognisedSource);
+}
+
+// --- Puchio chat memory + the learning loop (doc 95) -----------------------
+
+export interface ConversationRow {
+  id: string;
+  title: string;
+  last_message_at: string;
+  created_at: string;
+}
+
+export interface MessageRow {
+  id: string;
+  role: 'user' | 'puchio';
+  content: string;
+  sources: unknown;
+  created_at: string;
+}
+
+// Small REST helper for the new endpoints. Service role, so RLS is bypassed and
+// we scope every read and write by user_id ourselves, matching this file's rule.
+async function rest(path: string, init?: RequestInit): Promise<Response> {
+  const { url } = config();
+  return fetch(`${url}/rest/v1/${path}`, { ...init, headers: { ...headers(), ...(init?.headers || {}) } });
+}
+
+// Create a conversation, return its id. Title is a trimmed first question.
+export async function createConversation(userId: string, title: string): Promise<string | null> {
+  try {
+    const res = await rest('conversations', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ user_id: userId, title: (title || 'New chat').slice(0, 80) }),
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) && rows[0]?.id ? String(rows[0].id) : null;
+  } catch {
+    return null;
+  }
+}
+
+// List a user's conversations, newest activity first.
+export async function listConversations(userId: string, limit = 50): Promise<ConversationRow[]> {
+  try {
+    const res = await rest(
+      `conversations?user_id=eq.${encodeURIComponent(userId)}&select=id,title,last_message_at,created_at&order=last_message_at.desc&limit=${limit}`,
+    );
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+// The turns in one conversation, oldest first, scoped to the owner.
+export async function getConversationMessages(userId: string, conversationId: string, limit = 200): Promise<MessageRow[]> {
+  try {
+    const res = await rest(
+      `messages?user_id=eq.${encodeURIComponent(userId)}&conversation_id=eq.${encodeURIComponent(conversationId)}&select=id,role,content,sources,created_at&order=created_at.asc&limit=${limit}`,
+    );
+    if (!res.ok) return [];
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+// Store one turn and bump the conversation's last_message_at. Best effort, so a
+// storage hiccup never blocks the answer the user is waiting on.
+export async function saveMessage(
+  userId: string,
+  conversationId: string,
+  role: 'user' | 'puchio',
+  content: string,
+  sources?: string[],
+): Promise<void> {
+  try {
+    await rest('messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: userId,
+        conversation_id: conversationId,
+        role,
+        content: content.slice(0, 8000),
+        sources: sources && sources.length ? sources : null,
+      }),
+    });
+    await rest(`conversations?id=eq.${encodeURIComponent(conversationId)}&user_id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ last_message_at: new Date().toISOString() }),
+    });
+  } catch {
+    /* best effort */
+  }
+}
+
+// Log a Puchio answer as a learning candidate for the brain. Records whether the
+// sources are all recognised so a later governed step can auto approve the clean
+// ones. Never auto approves here. Best effort.
+export async function logQaCandidate(
+  question: string,
+  answer: string,
+  sources: string[],
+  usedKnowledge: boolean,
+  engineImpact = false,
+): Promise<void> {
+  try {
+    await rest('qa_candidates', {
+      method: 'POST',
+      body: JSON.stringify({
+        question: question.slice(0, 1000),
+        answer: answer.slice(0, 8000),
+        sources: sources.length ? sources : null,
+        used_knowledge: usedKnowledge,
+        all_sources_recognised: allSourcesRecognised(sources),
+        engine_impact: engineImpact,
+      }),
+    });
+  } catch {
+    /* best effort */
+  }
+}
+
 // --- WhatsApp conversation state ------------------------------------------
 
 export interface WaSession {

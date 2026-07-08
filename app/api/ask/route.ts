@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { answerAccountantQuestion, hasClaudeConfig } from '../../../lib/claude';
-import { verifyAccessToken, bumpAiUsage, transactionSummaryForUser, getRelevantKnowledge } from '../../../lib/supabase';
+import { verifyAccessToken, bumpAiUsage, transactionSummaryForUser, getRelevantKnowledge, createConversation, saveMessage, logQaCandidate } from '../../../lib/supabase';
 import { rateLimited } from '../../../lib/ratelimit';
 
 // The in-app accountant endpoint. The app posts a question with the user's
@@ -49,6 +49,8 @@ export async function POST(req: NextRequest) {
   if (question.length < 2) {
     return NextResponse.json({ error: 'empty' }, { status: 400 });
   }
+  // Optional: continue an existing thread. Absent means start a new one.
+  const conversationIdIn = str(body.conversationId, 100).trim();
 
   // Per-user daily cap. Fail CLOSED: if the durable counter is unavailable we do
   // not spend on the paid AI, so a database hiccup can never become a cost blowup.
@@ -84,15 +86,18 @@ export async function POST(req: NextRequest) {
   // exam-verified rules exactly as before. This is how the brain grows into the
   // answers without ever letting an unchecked summary become advice.
   let knowledge = '';
+  let sourceUrls: string[] = [];
   try {
     const items = await getRelevantKnowledge(question, 6);
     if (items.length) {
+      sourceUrls = items.map((k) => k.source_url).filter(Boolean);
       knowledge = items
         .map((k) => `- ${k.title}${k.effective_date ? ` (effective ${k.effective_date})` : ''}: ${k.summary} [source: ${k.source_url}]`)
         .join('\n');
     }
   } catch {
     knowledge = '';
+    sourceUrls = [];
   }
 
   const answer = await answerAccountantQuestion(question, context, knowledge);
@@ -100,5 +105,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'failed', answer: 'I could not work that out just now. Try rewording it, or ask me something else.' }, { status: 502 });
   }
 
-  return NextResponse.json({ answer, remaining, limit: DAILY_LIMIT });
+  // Persist the turn so the chat appears in the Messages tab and can be reused.
+  // All best effort: storage must never block or fail the answer the user waits on.
+  let conversationId = conversationIdIn;
+  if (!conversationId) {
+    conversationId = (await createConversation(userId, question)) || '';
+  }
+  if (conversationId) {
+    await saveMessage(userId, conversationId, 'user', question);
+    await saveMessage(userId, conversationId, 'puchio', answer, sourceUrls);
+  }
+  // Log for the learning loop: the general question and answer, no personal figures.
+  await logQaCandidate(question, answer, sourceUrls, sourceUrls.length > 0);
+
+  return NextResponse.json({ answer, remaining, limit: DAILY_LIMIT, conversationId, sources: sourceUrls });
 }

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
+  Ic,
 } from '../_shared/site';
 
 export const metadata: Metadata = {
@@ -142,9 +143,9 @@ export default function HowMtdWorksPage() {
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 40 }}><h2 className="h2">Three simple things.</h2><p className="lead">Lekhio does the first two. You stay in charge of the third.</p></div>
           <div className="g3 reveal">
-            <div className="mcard"><div className="ci" style={{ background: 'var(--river-tint)', color: 'var(--river)' }}>🗂️</div><h3>Keep digital records</h3><p>HMRC wants income and costs kept digitally. Lekhio logs every receipt and payment as you go.</p></div>
-            <div className="mcard"><div className="ci" style={{ background: 'var(--saffron-tint)', color: 'var(--saffron-deep)' }}>📨</div><h3>Send four short updates</h3><p>Four quick summaries across the year instead of one big return. Lekhio prepares each one.</p></div>
-            <div className="mcard"><div className="ci" style={{ background: 'var(--green-tint)', color: 'var(--green)' }}>🤝</div><h3>You stay in control</h3><p>Nothing goes to HMRC until you say yes. Lekhio keeps you ready. The final say is always yours.</p></div>
+            <div className="mcard"><div className="ci" style={{ background: 'var(--river-tint)', color: 'var(--river)' }}><Ic e="🗂️" color="var(--river)" size={24} /></div><h3>Keep digital records</h3><p>HMRC wants income and costs kept digitally. Lekhio logs every receipt and payment as you go.</p></div>
+            <div className="mcard"><div className="ci" style={{ background: 'var(--saffron-tint)', color: 'var(--saffron-deep)' }}><Ic e="📨" color="var(--saffron-deep)" size={24} /></div><h3>Send four short updates</h3><p>Four quick summaries across the year instead of one big return. Lekhio prepares each one.</p></div>
+            <div className="mcard"><div className="ci" style={{ background: 'var(--green-tint)', color: 'var(--green)' }}><Ic e="🤝" color="var(--green)" size={24} /></div><h3>You stay in control</h3><p>Nothing goes to HMRC until you say yes. Lekhio keeps you ready. The final say is always yours.</p></div>
           </div>
         </div>
       </section>
@@ -180,11 +181,11 @@ export default function HowMtdWorksPage() {
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 40 }}><div className="eyebrow">Effortless</div><h2 className="h2">You barely lift a finger.</h2></div>
           <div className="flow reveal">
-            <div className="fbox"><div className="fe">💬</div><b>You text as you go</b><small>Receipts, voice notes, payments</small></div>
+            <div className="fbox"><div className="fe"><Ic e="💬" color="var(--river)" size={26} /></div><b>You text as you go</b><small>Receipts, voice notes, payments</small></div>
             <div className="farrow">→</div>
-            <div className="fbox"><div className="fe">📊</div><b>Your summary builds itself</b><small>Sorted and ready, all year</small></div>
+            <div className="fbox"><div className="fe"><Ic e="📊" color="var(--saffron-deep)" size={26} /></div><b>Your summary builds itself</b><small>Sorted and ready, all year</small></div>
             <div className="farrow">→</div>
-            <div className="fbox"><div className="fe">✅</div><b>You approve and send</b><small>Nothing goes without your yes</small></div>
+            <div className="fbox"><div className="fe"><Ic e="✅" color="var(--green)" size={26} /></div><b>You approve and send</b><small>Nothing goes without your yes</small></div>
           </div>
         </div>
       </section>
@@ -196,9 +197,9 @@ export default function HowMtdWorksPage() {
             <h2>Built by the book. Better than the rest.</h2>
             <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>While others leave you to it, Lekhio keeps you ready and does the sums properly.</p>
             <div className="credrow">
-              <div className="credchip">📐 <span>Checked against HMRC&apos;s <b>2026/27 rules</b>, 104 test cases</span></div>
-              <div className="credchip">✅ <span>MTD-ready today</span></div>
-              <div className="credchip">🏛️ <span>HMRC recognition <b>in progress</b></span></div>
+              <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b>, 104 test cases</span></div>
+              <div className="credchip"><span>MTD-ready today</span></div>
+              <div className="credchip"><span>HMRC recognition <b>in progress</b></span></div>
               <div className="credchip">🇬🇧 <span>A real UK company</span></div>
             </div>
           </div>

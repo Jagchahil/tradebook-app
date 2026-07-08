@@ -76,6 +76,14 @@ const ICONS: Record<string, string> = {
   '🌿': '<path d="M11 20c0-6 3-11 9-13-1 7-4 11-9 11Z"/><path d="M11 20c0-4-1.5-7-5-8.5"/>',
   '🧱': '<rect x="3" y="6" width="18" height="12" rx="1"/><path d="M3 12h18M9 6v6M15 12v6M9 12H3M15 6h6"/>',
   '🔔': '<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  '📐': '<path d="M5 15 15 5l4 4L9 19z"/><path d="M8.5 8.5l1.5 1.5M11 6l1.5 1.5M13.5 8.5l1 1"/>',
+  '🏁': '<path d="M5 21V4"/><path d="M5 5h13l-2 3 2 3H5"/>',
+  '👁️': '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  '🧰': '<rect x="3" y="8" width="18" height="11" rx="2"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/><path d="M10 13v2h4v-2"/>',
+  '💼': '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
+  '📒': '<path d="M6 3h13v18H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M9 3v18"/>',
+  '🗓️': '<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 9h16M9 3v4M15 3v4"/>',
+  '📅': '<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 9h16M9 3v4M15 3v4"/>',
 };
 
 // A line icon in the app's style. `e` is the emoji it stands in for.

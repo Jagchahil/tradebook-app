@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
+  Ic,
 } from '../_shared/site';
 
 export const metadata: Metadata = {
@@ -206,7 +207,7 @@ export default function ComparePage() {
           <div className="filterbar reveal"><div className="seg" id="seg"><button className="on" data-f="all">Everything</button><button data-f="win">Where Lekhio wins</button></div></div>
           <div className="tablewrap reveal">
             <div className="tscroll"><table className="cmp" id="cmp">
-              <thead><tr><th>What you get</th><th className="c lekh">Lekhio<div className="crown">👑 BEST FOR YOU</div></th><th className="c">Other apps</th><th className="c">Doing it yourself</th></tr></thead>
+              <thead><tr><th>What you get</th><th className="c lekh">Lekhio<div className="crown">BEST FOR YOU</div></th><th className="c">Other apps</th><th className="c">Doing it yourself</th></tr></thead>
               <tbody>{rows}</tbody>
             </table></div>
           </div>
@@ -219,9 +220,9 @@ export default function ComparePage() {
           <h2>Built by the book. Better than the rest.</h2>
           <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>The complete tax assistant that lives in WhatsApp, and it does the sums properly.</p>
           <div className="credrow">
-            <div className="credchip">📐 <span>Checked against HMRC&apos;s <b>2026/27 rules</b>, 104 tests</span></div>
-            <div className="credchip">💬 <span>Built for WhatsApp</span></div>
-            <div className="credchip">🏛️ <span>HMRC recognition <b>in progress</b></span></div>
+            <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b>, 104 tests</span></div>
+            <div className="credchip"><span>Built for WhatsApp</span></div>
+            <div className="credchip"><span>HMRC recognition <b>in progress</b></span></div>
             <div className="credchip">🇬🇧 <span>A real UK company</span></div>
           </div>
         </div></div>

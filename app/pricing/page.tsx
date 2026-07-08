@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {
   INK, PAPER, FONT, faqs, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
+  Ic,
 } from '../_shared/site';
 
 export const metadata: Metadata = {
@@ -111,7 +112,7 @@ export default function PricingPage() {
           <div className="pricebig reveal">
             <div className="pamt" id="pamt">£12.99<span>/mo</span></div>
             <div className="pnote" id="pnote">Billed monthly. Cancel any time.</div>
-            <div className="psave" id="psave" style={{ opacity: 0 }}>🎉 2 months free · save £27 a year</div>
+            <div className="psave" id="psave" style={{ opacity: 0 }}>2 months free · save £27 a year</div>
             <div className="pcta"><Link href="/start" className="btn primary">Start 14 days free</Link></div>
             <div className="pmicro">14 day free trial · no card needed</div>
           </div>
@@ -135,7 +136,7 @@ export default function PricingPage() {
           <div className="center reveal" style={{ marginBottom: 38 }}><div className="eyebrow">The real value</div><h2 className="h2">It replaces a whole shelf of subscriptions.</h2><p className="lead">Most people juggle five or six tools and an accountant. Lekhio is all of it, in one text.</p></div>
           <div className="stack reveal">
             {STACK.map((s) => (
-              <div className="srow" key={s.label}><div className="se">{s.e}</div><div className="sl">{s.label}</div><div className="sc">{s.cost}</div></div>
+              <div className="srow" key={s.label}><div className="se"><Ic e={s.e} color="var(--tx-mut)" size={22} /></div><div className="sl">{s.label}</div><div className="sc">{s.cost}</div></div>
             ))}
             <div className="stotal"><div className="stl">You would pay</div><div className="stc">£60 to £150 a month</div></div>
             <div className="replace"><div className="rt">All of it, in Lekhio, for</div><div className="rp">£12.99 a month</div></div>
@@ -164,9 +165,9 @@ export default function PricingPage() {
           <h2>One honest price. Everything you need.</h2>
           <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>No paywalls, no receipt caps, no surprise upgrades. Start free and only pay when you are sure.</p>
           <div className="credrow">
-            <div className="credchip">🎁 <span><b>14 days free</b>, no card needed</span></div>
-            <div className="credchip">🔓 <span>Cancel in one tap</span></div>
-            <div className="credchip">📤 <span>Export your data any time</span></div>
+            <div className="credchip"><span><b>14 days free</b>, no card needed</span></div>
+            <div className="credchip"><span>Cancel in one tap</span></div>
+            <div className="credchip"><span>Export your data any time</span></div>
             <div className="credchip">🇬🇧 <span>A real UK company</span></div>
           </div>
         </div></div>

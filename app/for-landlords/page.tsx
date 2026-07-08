@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
-import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
+import { SharedHead, SiteNav, SiteFooter, Ic } from '../_shared/site';
 
 export const metadata: Metadata = {
   title: 'Lekhio for Landlords | Rent, Section 24 and April 2027, Sorted on WhatsApp',
@@ -85,7 +85,7 @@ export default function ForLandlordsPage() {
         <div className="pgrid">
           {personas.map((p) => (
             <div key={p.title} style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 18, padding: 22 }}>
-              <div style={{ fontSize: 30, marginBottom: 10 }}>{p.icon}</div>
+              <div style={{ fontSize: 30, marginBottom: 10 }}><Ic e={p.icon} color="var(--river)" size={28} /></div>
               <h3 style={{ fontSize: 17.5, fontWeight: 800, margin: '0 0 8px' }}>{p.title}</h3>
               <p style={{ fontSize: 14.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>{p.body}</p>
             </div>

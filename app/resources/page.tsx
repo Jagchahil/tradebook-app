@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { TRADES } from '../../lib/trades';
 import { A11Y_CSS } from '../../lib/tokens';
-import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
+import { SharedHead, SiteNav, SiteFooter, Ic } from '../_shared/site';
 
 export const metadata: Metadata = {
   title: 'Free Tools & Guides for the UK Self Employed | Lekhio',
@@ -79,7 +79,7 @@ export default function ResourcesPage() {
           {tools.map((t) => (
             <Link key={t.href} href={t.href} className="card" style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, display: 'flex', flexDirection: 'column', gap: 12, color: INK }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ width: 50, height: 50, borderRadius: 13, background: t.tint, color: t.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>{t.icon}</div>
+                <div style={{ width: 50, height: 50, borderRadius: 13, background: t.tint, color: t.fg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}><Ic e={t.icon} color={t.fg} size={26} /></div>
                 <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.4px', color: MUTED, background: SURFACE, padding: '4px 10px', borderRadius: 12 }}>{t.tag}</span>
               </div>
               <h2 style={{ fontSize: 19, fontWeight: 800, margin: '4px 0 0', letterSpacing: '-0.3px' }}>{t.title}</h2>

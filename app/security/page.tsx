@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
+  Ic,
 } from '../_shared/site';
 
 export const metadata: Metadata = {
@@ -104,7 +105,7 @@ export default function SecurityPage() {
         <div className="grid2">
           {promises.map((p) => (
             <div key={p.title} className="sec-card">
-              <div className="i" aria-hidden="true">{p.icon}</div>
+              <div className="i" aria-hidden="true"><Ic e={p.icon} color="var(--river)" size={22} /></div>
               <div className="t">{p.title}</div>
               <p>{p.body}</p>
             </div>

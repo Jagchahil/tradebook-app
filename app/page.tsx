@@ -237,7 +237,7 @@ export default function HomePage() {
         <div className="row">
           <div className="ti"><span className="tc" style={{ background: 'var(--green-tint)' }}><Ic e="🔒" color="var(--green)" size={18} /></span><span>Encrypted, <b>never sold</b></span></div>
           <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}><Ic e="✅" color="var(--river)" size={18} /></span><span><b>You approve</b> everything</span></div>
-          <div className="ti"><span className="tc" style={{ background: 'var(--saffron-tint)' }}>📐</span><span><b>HMRC 2026/27 rules</b>, 104 tests</span></div>
+          <div className="ti"><span className="tc" style={{ background: 'var(--saffron-tint)' }}><Ic e="📐" color="var(--saffron-deep)" size={18} /></span><span><b>HMRC 2026/27 rules</b>, 104 tests</span></div>
           <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}>🇬🇧</span><span>A <b>real UK company</b></span></div>
         </div>
       </div>
@@ -311,7 +311,7 @@ export default function HomePage() {
                   {CBARS.map((b, i) => (<div key={i} className="cbar" style={{ background: b.c, opacity: b.o, ['--h']: `${b.h}px` } as any} />))}
                 </div>
               </div>
-              <div className="cisbar"><div className="top"><span>🏗️ CIS refund building up</span><span>£1,120</span></div><div className="track"><div className="fill" /></div></div>
+              <div className="cisbar"><div className="top"><span>CIS refund building up</span><span>£1,120</span></div><div className="track"><div className="fill" /></div></div>
             </div>
           </div>
           <div className="reveal">
@@ -333,7 +333,7 @@ export default function HomePage() {
 
           <div className="drow reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--river)' }}>📸 Receipt capture</div>
+              <div className="eyebrow" style={{ color: 'var(--river)' }}>Receipt capture</div>
               <h3>Snap it. It reads itself.</h3>
               <p>Photograph any receipt on WhatsApp. Lekhio pulls the total, the VAT and the category, and logs it in seconds. No typing, no app to open.</p>
             </div>
@@ -346,13 +346,13 @@ export default function HomePage() {
 
           <div className="drow flip reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--saffron-deep)' }}>🎙️ Voice notes</div>
+              <div className="eyebrow" style={{ color: 'var(--saffron-deep)' }}>Voice notes</div>
               <h3>Hands full? Just say it.</h3>
               <p>On a roof or under a sink, talking is the only input that works. Say what you spent and carry on. It is logged before you have put the phone down.</p>
             </div>
             <div className="dvis">
               <div className="diconrow">
-                <div className="dicon">🎙️</div>
+                <div className="dicon"><Ic e="🎙️" color="var(--saffron-deep)" size={30} /></div>
                 <div className="wf">{[10, 22, 14, 28, 18, 24, 12, 20, 10].map((h, i) => (<i key={i} style={{ height: h }} />))}</div>
               </div>
               <div className="dbub out">&quot;spent forty on diesel&quot;</div>
@@ -362,7 +362,7 @@ export default function HomePage() {
 
           <div className="drow reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--teal)' }}>👷 CIS done right</div>
+              <div className="eyebrow" style={{ color: 'var(--teal)' }}>CIS done right</div>
               <h3>Your refund, tracked all year.</h3>
               <p>Lekhio splits labour and materials, applies your CIS deduction, and tracks the refund building up. Most subbies are owed money back. You get to watch it grow.</p>
             </div>
@@ -376,7 +376,7 @@ export default function HomePage() {
 
           <div className="drow flip reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--river)' }}>📈 Ways to save</div>
+              <div className="eyebrow" style={{ color: 'var(--river)' }}>Ways to save</div>
               <h3>It finds you legal ways to pay less.</h3>
               <p>Lekhio reads your own numbers and surfaces the real reliefs you are entitled to: use of home, mileage, kit timing, a pension to step out of the 40% band. The legitimate ones only, and always your call.</p>
             </div>
@@ -391,7 +391,7 @@ export default function HomePage() {
 
           <div className="drow reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--green)' }}>✅ You approve</div>
+              <div className="eyebrow" style={{ color: 'var(--green)' }}>You approve</div>
               <h3>Prepared for you. Sent by you.</h3>
               <p>Your quarterly figures sit there ready. You check them and send them. Nothing reaches HMRC without your yes. That is the line we never cross.</p>
             </div>
@@ -418,7 +418,7 @@ export default function HomePage() {
           </div>
           <div className="helpers reveal">
             <div className="hcard">
-              <div className="hicon" style={{ background: 'var(--river-tint)' }}>💬</div>
+              <div className="hicon" style={{ background: 'var(--river-tint)' }}><Ic e="💬" color="var(--river)" size={26} /></div>
               <div className="role">Puchio · answers when you ask</div>
               <h3>Any tax question, straight answer.</h3>
               <p>Ask anything in plain English and get a clear answer in seconds, worked on your real numbers. No jargon, no waiting days for a callback.</p>
@@ -428,20 +428,20 @@ export default function HomePage() {
               </div>
             </div>
             <div className="hcard">
-              <div className="hicon" style={{ background: 'var(--saffron-tint)' }}>🛡️</div>
+              <div className="hicon" style={{ background: 'var(--saffron-tint)' }}><Ic e="🛡️" color="var(--saffron-deep)" size={26} /></div>
               <div className="role">Rakha · speaks before you ask</div>
               <h3>It watches your numbers for you.</h3>
               <p>A threshold creeping up, a deadline, an unpaid invoice, a moment a purchase saves real tax. Rakha spots it and tells you first. Suggestions, never actions.</p>
               <div className="hchat">
-                <div className="dbub in" style={{ background: 'var(--saffron-tint)', border: '1px solid var(--saffron)' }}>🛡️ Heads up: you are about £900 from the VAT threshold. Worth planning before you cross it.</div>
-                <div className="dbub in" style={{ background: 'var(--saffron-tint)', border: '1px solid var(--saffron)' }}>🛡️ Invoice 0012 is 18 days late. Want me to draft a chase in your voice?</div>
+                <div className="dbub in" style={{ background: 'var(--saffron-tint)', border: '1px solid var(--saffron)' }}>Heads up: you are about £900 from the VAT threshold. Worth planning before you cross it.</div>
+                <div className="dbub in" style={{ background: 'var(--saffron-tint)', border: '1px solid var(--saffron)' }}>Invoice 0012 is 18 days late. Want me to draft a chase in your voice?</div>
               </div>
             </div>
           </div>
           <div className="compliance reveal">
-            <div className="ci">📐 Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
-            <div className="ci">🧪 <b>104 tests</b> on the tax engine</div>
-            <div className="ci">✅ <b>Nothing filed</b> without your yes</div>
+            <div className="ci">Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
+            <div className="ci"><b>104 tests</b> on the tax engine</div>
+            <div className="ci"><b>Nothing filed</b> without your yes</div>
           </div>
         </div>
       </section>
@@ -476,7 +476,7 @@ export default function HomePage() {
               <div className="pcta"><Link href="/start" className="btn primary">Start 14 days free</Link><div className="pmicro">No card needed</div></div>
             </div>
             <div className="pcard best">
-              <span className="pbadge">🎉 2 months free</span>
+              <span className="pbadge">2 months free</span>
               <div className="pname" style={{ color: 'var(--river)' }}>Yearly · best value</div>
               <div className="pamt">£129<span>/yr</span></div>
               <div className="pnote">Just £10.75 a month, billed once a year.</div>

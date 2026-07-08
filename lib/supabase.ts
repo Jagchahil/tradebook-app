@@ -13,6 +13,7 @@ import { referralCode, sanitizeRefCode } from './referral';
 import { parseLevel, type AutonomyLevel } from './autonomy';
 import { quarterForDate, quarterBounds } from './quarterpack';
 import type { OptimiserInput } from './taxoptimiser';
+import { qaDedupeKey, qaPrunePaths } from './qaretention';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -399,8 +400,14 @@ function redactPii(s: string): string {
 
 // Log a Puchio answer as a learning candidate for the brain. The question is PII
 // redacted first. Records whether the sources are all recognised so a later
-// governed step can auto approve the clean ones. Never auto approves here. Best
-// effort.
+// governed step can auto approve the clean ones. Never auto approves here.
+//
+// Deduped: the same question asked again bumps a seen_count on the one row
+// instead of adding a new one, so the pool stays bounded at scale (doc 96). The
+// log_qa_candidate RPC upserts on the normalised question and NEVER overwrites a
+// human's review or dismissal. If the question has no usable dedupe key (too
+// short to normalise) we fall back to a plain insert so nothing is dropped.
+// Best effort throughout.
 export async function logQaCandidate(
   question: string,
   answer: string,
@@ -409,15 +416,32 @@ export async function logQaCandidate(
   engineImpact = false,
 ): Promise<void> {
   try {
-    await rest('qa_candidates', {
+    const redacted = redactPii(question).slice(0, 1000);
+    const norm = qaDedupeKey(redacted);
+    if (!norm) {
+      await rest('qa_candidates', {
+        method: 'POST',
+        body: JSON.stringify({
+          question: redacted,
+          answer: answer.slice(0, 8000),
+          sources: sources.length ? sources : null,
+          used_knowledge: usedKnowledge,
+          all_sources_recognised: allSourcesRecognised(sources),
+          engine_impact: engineImpact,
+        }),
+      });
+      return;
+    }
+    await rest('rpc/log_qa_candidate', {
       method: 'POST',
       body: JSON.stringify({
-        question: redactPii(question).slice(0, 1000),
-        answer: answer.slice(0, 8000),
-        sources: sources.length ? sources : null,
-        used_knowledge: usedKnowledge,
-        all_sources_recognised: allSourcesRecognised(sources),
-        engine_impact: engineImpact,
+        p_question_norm: norm,
+        p_question: redacted,
+        p_answer: answer.slice(0, 8000),
+        p_sources: sources.length ? sources : null,
+        p_used_knowledge: usedKnowledge,
+        p_all_recognised: allSourcesRecognised(sources),
+        p_engine_impact: engineImpact,
       }),
     });
   } catch {
@@ -1235,6 +1259,8 @@ export async function getNudgePrefsForUsers(
 //   processed_messages  idempotency horizon, 7 days is far beyond Meta retries
 //   wa_sessions         abandoned flows, the code already treats >1h as expired
 //   ai_usage            per day counters, 60 days of history is plenty
+//   qa_candidates       learning pool, terminal rows >90d and stale rows >365d
+//   qa_cache            general answer cache, entries past the read TTL (see qaPrunePaths)
 export async function pruneOldRows(): Promise<{ pruned: number }> {
   const { url } = config();
   let pruned = 0;
@@ -1256,6 +1282,12 @@ export async function pruneOldRows(): Promise<{ pruned: number }> {
   await batchDelete(`processed_messages?created_at=lt.${encodeURIComponent(week)}&order=created_at.asc&limit=10000`, 30);
   await batchDelete(`wa_sessions?updated_at=lt.${encodeURIComponent(day)}&order=updated_at.asc&limit=1000`, 5);
   await batchDelete(`ai_usage?day=lt.${encodeURIComponent(sixtyDays)}&order=day.asc&limit=10000`, 10);
+  // The learning pool and general answer cache (doc 96). Write time dedupe
+  // bounds qa_candidates; this trims terminal and long stale rows, and drops
+  // qa_cache entries that are past the read TTL so can never be served again.
+  for (const p of qaPrunePaths()) {
+    await batchDelete(p.path, p.maxBatches);
+  }
   return { pruned };
 }
 

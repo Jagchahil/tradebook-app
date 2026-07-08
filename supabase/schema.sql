@@ -143,41 +143,41 @@ alter table public.audit_log enable row level security;
 -- users: a person can see and change only their own row.
 drop policy if exists users_select_own on public.users;
 create policy users_select_own on public.users
-  for select using (auth.uid() = id);
+  for select using ((select auth.uid()) = id);
 
 drop policy if exists users_insert_own on public.users;
 create policy users_insert_own on public.users
-  for insert with check (auth.uid() = id);
+  for insert with check ((select auth.uid()) = id);
 
 drop policy if exists users_update_own on public.users;
 create policy users_update_own on public.users
-  for update using (auth.uid() = id) with check (auth.uid() = id);
+  for update using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 
 -- transactions: read your own. The webhook inserts with the service role key,
 -- which bypasses RLS, so there is no app insert policy. The app can update and
 -- delete its own rows so a user can confirm, edit, or remove a receipt.
 drop policy if exists transactions_select_own on public.transactions;
 create policy transactions_select_own on public.transactions
-  for select using (auth.uid() = user_id);
+  for select using ((select auth.uid()) = user_id);
 
 -- The app can insert its own transactions too, for example booking income when
 -- an invoice is marked paid. The webhook still uses the service role key.
 drop policy if exists transactions_insert_own on public.transactions;
 create policy transactions_insert_own on public.transactions
-  for insert with check (auth.uid() = user_id);
+  for insert with check ((select auth.uid()) = user_id);
 
 drop policy if exists transactions_update_own on public.transactions;
 create policy transactions_update_own on public.transactions
-  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for update using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 drop policy if exists transactions_delete_own on public.transactions;
 create policy transactions_delete_own on public.transactions
-  for delete using (auth.uid() = user_id);
+  for delete using ((select auth.uid()) = user_id);
 
 -- monthly_summaries: read your own only.
 drop policy if exists monthly_summaries_select_own on public.monthly_summaries;
 create policy monthly_summaries_select_own on public.monthly_summaries
-  for select using (auth.uid() = user_id);
+  for select using ((select auth.uid()) = user_id);
 
 -- waitlist and audit_log: no policies. RLS is on, so the anon key cannot read
 -- or write them. The server uses the service role key, which bypasses RLS.
@@ -190,6 +190,19 @@ create policy monthly_summaries_select_own on public.monthly_summaries
 -- A couple of business details on the user, used to fill out an invoice.
 alter table public.users add column if not exists business_name text;
 alter table public.users add column if not exists address text;
+
+-- Referral loop (doc 82). referral_code is this user's own stable invite code,
+-- referred_by_code is the code they arrived through (attribution only). Reward is
+-- tracked, never an automatic movement of money; that stays a gated decision.
+alter table public.users add column if not exists referral_code text;
+alter table public.users add column if not exists referred_by_code text;
+
+-- The autonomy dial (lib/autonomy.ts): how much Lekhio may do on the user's
+-- behalf. Defaults to the most cautious 'suggest'. Never governs money or filing,
+-- which always require explicit approval regardless of this value.
+alter table public.users add column if not exists autonomy_level text default 'suggest';
+create unique index if not exists users_referral_code_key on public.users (referral_code) where referral_code is not null;
+notify pgrst, 'reload schema';
 
 create table if not exists public.invoices (
   id               uuid primary key default gen_random_uuid(),
@@ -227,19 +240,19 @@ alter table public.invoices enable row level security;
 -- reads with the service role key on the server, so no public read policy.
 drop policy if exists invoices_select_own on public.invoices;
 create policy invoices_select_own on public.invoices
-  for select using (auth.uid() = user_id);
+  for select using ((select auth.uid()) = user_id);
 
 drop policy if exists invoices_insert_own on public.invoices;
 create policy invoices_insert_own on public.invoices
-  for insert with check (auth.uid() = user_id);
+  for insert with check ((select auth.uid()) = user_id);
 
 drop policy if exists invoices_update_own on public.invoices;
 create policy invoices_update_own on public.invoices
-  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for update using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 drop policy if exists invoices_delete_own on public.invoices;
 create policy invoices_delete_own on public.invoices
-  for delete using (auth.uid() = user_id);
+  for delete using ((select auth.uid()) = user_id);
 
 -- ---------------------------------------------------------------------------
 -- WhatsApp conversation state (for the guided invoice flow)
@@ -303,10 +316,10 @@ create table if not exists public.events (
 );
 
 alter table public.events enable row level security;
-create policy "events read own"   on public.events for select using (auth.uid() = user_id);
-create policy "events insert own" on public.events for insert with check (auth.uid() = user_id);
-create policy "events update own" on public.events for update using (auth.uid() = user_id);
-create policy "events delete own" on public.events for delete using (auth.uid() = user_id);
+create policy "events read own"   on public.events for select using ((select auth.uid()) = user_id);
+create policy "events insert own" on public.events for insert with check ((select auth.uid()) = user_id);
+create policy "events update own" on public.events for update using ((select auth.uid()) = user_id);
+create policy "events delete own" on public.events for delete using ((select auth.uid()) = user_id);
 create index if not exists events_user_idx   on public.events(user_id);
 create index if not exists events_remind_idx on public.events(remind_at) where reminded = false;
 
@@ -326,9 +339,9 @@ create table if not exists public.reminder_prefs (
 );
 
 alter table public.reminder_prefs enable row level security;
-create policy "prefs read own"   on public.reminder_prefs for select using (auth.uid() = user_id);
-create policy "prefs insert own" on public.reminder_prefs for insert with check (auth.uid() = user_id);
-create policy "prefs update own" on public.reminder_prefs for update using (auth.uid() = user_id);
+create policy "prefs read own"   on public.reminder_prefs for select using ((select auth.uid()) = user_id);
+create policy "prefs insert own" on public.reminder_prefs for insert with check ((select auth.uid()) = user_id);
+create policy "prefs update own" on public.reminder_prefs for update using ((select auth.uid()) = user_id);
 
 -- ---------------------------------------------------------------------------
 -- Indexes for scale (no-ops if they already exist)
@@ -413,19 +426,21 @@ $$;
 -- user signs up straight after. We record the offer code on their signup so it
 -- can be honoured when billing goes live. Additive and safe.
 alter table public.signups add column if not exists offer text;
+alter table public.signups add column if not exists referred_by_code text;
 
 -- ---------------------------------------------------------------------------
 -- Security: one phone number, one account
 -- ---------------------------------------------------------------------------
 -- A phone number identifies an account, so it must be unique. This stops an
 -- attacker claiming a number that already belongs to someone else (the takeover
--- vector when sign-in is not yet OTP verified). Partial index, so any number of
--- accounts without a phone set yet are fine. On a live database, clear any
--- duplicate phone_number rows before running this. Real production sign-in must
--- still use phone OTP (EXPO_PUBLIC_OTP_ENABLED) so the number is proven, not just
--- typed.
-create unique index if not exists users_phone_unique
-  on public.users(phone_number) where phone_number is not null;
+-- vector when sign-in is not yet OTP verified). The partial unique index that
+-- enforces this is users_phone_unique_idx, declared once above. The older twin
+-- named users_phone_unique was removed on 7 July 2026 because Postgres built it
+-- as a second physical index on the same column and predicate, which the Supabase
+-- performance advisor flagged as a duplicate. See
+-- supabase/drop_redundant_users_index_2026-07-07.sql for the prod drop. Real
+-- production sign-in must still use phone OTP (EXPO_PUBLIC_OTP_ENABLED) so the
+-- number is proven, not just typed.
 
 -- ---------------------------------------------------------------------------
 -- Subscriptions (Stripe billing for the Lekhio subscription itself)
@@ -534,7 +549,7 @@ alter table public.hmrc_approvals enable row level security;
 -- A user can read their own approval history; the server writes with the
 -- service role key, which bypasses RLS, so there is no insert policy.
 create policy hmrc_approvals_own on public.hmrc_approvals
-  for select using (auth.uid() = user_id);
+  for select using ((select auth.uid()) = user_id);
 create index if not exists hmrc_approvals_user_idx on public.hmrc_approvals (user_id, approved_at desc);
 
 -- ---------------------------------------------------------------------------
@@ -730,6 +745,10 @@ alter table public.bank_connections enable row level security;
 create index if not exists bank_connections_user_idx   on public.bank_connections(user_id);
 create index if not exists bank_connections_status_idx on public.bank_connections(status);
 
+-- Data minimisation: the earliest date the first sync may pull, chosen by the
+-- user at connect time. Null means the sync defaults to the current tax year.
+alter table public.bank_connections add column if not exists history_from date;
+
 -- Idempotent bank imports: the provider's stable transaction id lives in
 -- external_id, so re-syncing an overlapping window can never duplicate a row.
 -- MUST be a full (non partial) unique index: PostgREST's on_conflict cannot
@@ -792,10 +811,10 @@ alter table public.agent_signals enable row level security;
 -- service role only: no insert policy exists on purpose.
 drop policy if exists agent_signals_own_read on public.agent_signals;
 create policy agent_signals_own_read on public.agent_signals
-  for select using (auth.uid() = user_id);
+  for select using ((select auth.uid()) = user_id);
 drop policy if exists agent_signals_own_update on public.agent_signals;
 create policy agent_signals_own_update on public.agent_signals
-  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for update using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 -- Per user switch for the agent's WhatsApp pings (in app cards always show).
 alter table public.reminder_prefs add column if not exists agent_pings boolean not null default true;
@@ -807,6 +826,7 @@ create or replace function public.agent_user_aggregates(p_user_id uuid)
 returns jsonb
 language sql
 stable
+set search_path = ''
 as $$
   with ty as (
     select case
@@ -895,7 +915,7 @@ create index if not exists user_goals_user_active
 alter table public.user_goals enable row level security;
 drop policy if exists user_goals_own on public.user_goals;
 create policy user_goals_own on public.user_goals
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 notify pgrst, 'reload schema';
 
 -- ---------------------------------------------------------------------------
@@ -924,7 +944,7 @@ create table if not exists public.properties (
 alter table public.properties enable row level security;
 drop policy if exists properties_own on public.properties;
 create policy properties_own on public.properties
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 alter table public.transactions add column if not exists income_type text not null default 'trade';
 alter table public.transactions drop constraint if exists transactions_income_type_check;
@@ -933,4 +953,177 @@ alter table public.transactions add constraint transactions_income_type_check
 alter table public.transactions add column if not exists property_id uuid references public.properties(id) on delete set null;
 create index if not exists transactions_user_stream
   on public.transactions(user_id, income_type);
+notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- Advisor hardening (7 July 2026). Keeps the Supabase security and performance
+-- advisors clean. RLS policies above already wrap auth.uid() in a scalar
+-- subquery so it is evaluated once per query, not once per row.
+-- ---------------------------------------------------------------------------
+-- Lock the two server-only SECURITY DEFINER functions to the service role.
+-- Both are only ever called server-side (increment_ai_usage via the service
+-- role, enforce_phone_binding as a trigger), so revoking public execute is safe.
+revoke execute on function public.increment_ai_usage(text, text) from anon, authenticated, public;
+revoke execute on function public.enforce_phone_binding() from anon, authenticated, public;
+
+-- Covering indexes for the unindexed foreign keys.
+create index if not exists audit_log_user_idx        on public.audit_log(user_id);
+create index if not exists properties_user_idx       on public.properties(user_id);
+create index if not exists transactions_property_idx on public.transactions(property_id);
+notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- Puchio chat memory (doc 95, Phase 1). Conversations are threads a user can
+-- return to, like DMs. Messages are the turns inside a thread. Both are RLS
+-- scoped to the owner, so a user only ever sees their own chats, and chat
+-- content lives only in Supabase, never logged elsewhere.
+-- ---------------------------------------------------------------------------
+create table if not exists public.conversations (
+  id uuid primary key default gen_random_uuid(),
+  -- References auth.users, not public.users, so chat memory works for any signed
+  -- in identity (a user reaching Puchio before a public.users profile row exists
+  -- would otherwise fail the insert). Cascades when the auth account is deleted.
+  user_id uuid not null references auth.users(id) on delete cascade,
+  title text not null default 'New chat',
+  created_at timestamptz not null default now(),
+  last_message_at timestamptz not null default now()
+);
+create index if not exists conversations_user_recent
+  on public.conversations(user_id, last_message_at desc);
+alter table public.conversations enable row level security;
+drop policy if exists conversations_own on public.conversations;
+create policy conversations_own on public.conversations
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,  -- see conversations note
+  role text not null check (role in ('user', 'puchio')),
+  content text not null,
+  sources jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists messages_conversation
+  on public.messages(conversation_id, created_at);
+alter table public.messages enable row level security;
+drop policy if exists messages_own on public.messages;
+create policy messages_own on public.messages
+  for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+
+-- ---------------------------------------------------------------------------
+-- The learning loop (doc 95, feature 2). Every Puchio answer is logged here as
+-- a candidate for the brain. Only the general tax question and answer are kept,
+-- personal figures are stripped before storing. Items whose sources are all on
+-- the recognised allowlist and that do not change a tax figure auto approve into
+-- knowledge; the rest wait for a human. engine_impact items always wait, because
+-- they feed the tax maths. Service role only, no user policy, so it is internal
+-- review data like knowledge_items.
+-- ---------------------------------------------------------------------------
+create table if not exists public.qa_candidates (
+  id uuid primary key default gen_random_uuid(),
+  question text not null,
+  answer text not null,
+  sources jsonb,                                 -- source URLs the answer leaned on
+  used_knowledge boolean not null default false, -- did reviewed knowledge back it
+  all_sources_recognised boolean not null default false,
+  engine_impact boolean not null default false,
+  status text not null default 'unreviewed'
+    check (status in ('unreviewed', 'auto_approved', 'reviewed', 'dismissed')),
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+create index if not exists qa_candidates_status on public.qa_candidates(status, created_at);
+alter table public.qa_candidates enable row level security;  -- service role only, no policy
+
+-- ---------------------------------------------------------------------------
+-- qa_cache: answered GENERAL questions, so a repeat costs nothing (doc 95 Phase
+-- 1.5 Feature B). A question is cached only when it carried NO personal context
+-- and every source was recognised, so a served answer can never contain another
+-- user's figures and is always source backed. /api/ask serves from here for free
+-- before ever spending on the paid model, and even when a user has used up their
+-- daily paid questions. Khoji marks the whole cache stale when a distilled item
+-- changes a tax figure (engine_impact), and a 21 day freshness window on the read
+-- side bounds staleness even if that signal is ever missed. Service role only, no
+-- user policy: the app never reads it directly.
+-- ---------------------------------------------------------------------------
+create table if not exists public.qa_cache (
+  id             uuid primary key default gen_random_uuid(),
+  question_norm  text unique not null,
+  question_sample text not null,
+  answer         text not null,
+  sources        jsonb not null default '[]'::jsonb,
+  status         text not null default 'active' check (status in ('active', 'stale')),
+  hits           integer not null default 0,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+create index if not exists qa_cache_lookup on public.qa_cache (question_norm) where status = 'active';
+alter table public.qa_cache enable row level security;  -- service role only, no policy
+
+-- A race free +1 to the popularity counter, so we can measure credits saved.
+create or replace function public.bump_qa_cache_hit(p_norm text)
+returns void
+language sql
+as $$
+  update public.qa_cache set hits = hits + 1 where question_norm = p_norm;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Bound the qa_candidates learning pool (doc 96 scale item, 8 Jul 2026). One row
+-- per answer forever is the one genuinely unbounded low value surface. A
+-- normalised question key lets the write path DEDUPE: the same question asked
+-- again bumps a seen_count on the one row instead of inserting a new one, so the
+-- table can never grow faster than the number of distinct questions. Retention
+-- (lib/qaretention.ts, run by the cleanup cron) trims terminal and very old
+-- rows. These statements are additive and idempotent, safe to run on the live
+-- table. See lib/qaretention.ts for the matching TypeScript.
+-- ---------------------------------------------------------------------------
+alter table public.qa_candidates
+  add column if not exists question_norm text,
+  add column if not exists seen_count    integer     not null default 1,
+  add column if not exists last_seen_at   timestamptz not null default now();
+
+-- Dedupe key. A plain unique index: Postgres treats NULLs as distinct, so the
+-- legacy rows (question_norm null until they age out) never collide, and new
+-- rows always carry a non null key. This index is the ON CONFLICT arbiter below.
+create unique index if not exists qa_candidates_norm_uniq
+  on public.qa_candidates(question_norm);
+
+-- Insert a candidate, or if the same normalised question already exists, bump
+-- its seen_count instead of adding a row. A human decision (reviewed, dismissed)
+-- or an auto approval is NEVER overwritten: the answer and flags refresh only
+-- while the row is still 'unreviewed'. Service role only, like the table.
+create or replace function public.log_qa_candidate(
+  p_question_norm  text,
+  p_question       text,
+  p_answer         text,
+  p_sources        jsonb,
+  p_used_knowledge boolean,
+  p_all_recognised boolean,
+  p_engine_impact  boolean
+) returns void
+language sql
+as $$
+  insert into public.qa_candidates
+    (question_norm, question, answer, sources, used_knowledge,
+     all_sources_recognised, engine_impact, seen_count, last_seen_at)
+  values
+    (p_question_norm, p_question, p_answer, p_sources, coalesce(p_used_knowledge, false),
+     coalesce(p_all_recognised, false), coalesce(p_engine_impact, false), 1, now())
+  on conflict (question_norm) do update set
+    seen_count             = public.qa_candidates.seen_count + 1,
+    last_seen_at           = now(),
+    answer                 = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.answer else public.qa_candidates.answer end,
+    sources                = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.sources else public.qa_candidates.sources end,
+    used_knowledge         = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.used_knowledge else public.qa_candidates.used_knowledge end,
+    all_sources_recognised = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.all_sources_recognised else public.qa_candidates.all_sources_recognised end,
+    engine_impact          = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.engine_impact else public.qa_candidates.engine_impact end;
+$$;
+
 notify pgrst, 'reload schema';

@@ -168,7 +168,7 @@ const HOME_CSS = `
 .pcta .btn{width:100%}
 .pmicro{font-size:12px;color:var(--tx-mut);text-align:center;margin-top:10px}
 .incl-panel{max-width:800px;margin:24px auto 0;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px 30px;box-shadow:var(--shadow)}
-.incl-panel h4{font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--tx-mut);text-align:center;margin:0 0 20px}
+.incl-panel h3{font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--tx-mut);text-align:center;margin:0 0 20px}
 .incl-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 30px;margin:0;padding:0}
 @media(max-width:640px){.incl-grid{grid-template-columns:1fr}}
 .incl-grid li{list-style:none;display:flex;gap:12px;align-items:center;font-size:14.5px;font-weight:600}
@@ -485,7 +485,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="incl-panel reveal">
-            <h4>Everything, in both plans</h4>
+            <h3>Everything, in both plans</h3>
             <ul className="incl-grid">
               <li><span className="t">✓</span> Unlimited receipts, voice notes and mileage</li>
               <li><span className="t">✓</span> Invoices created and sent from WhatsApp</li>

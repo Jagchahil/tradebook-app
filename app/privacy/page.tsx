@@ -55,7 +55,7 @@ export default function PrivacyPage() {
 
       <article style={{ maxWidth: 760, margin: '0 auto', padding: '24px 24px 80px' }}>
         <h1 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 8px' }}>Privacy Policy</h1>
-        <p style={{ fontSize: 14, color: MUTED, margin: '0 0 8px' }}>Last updated 24 June 2026</p>
+        <p style={{ fontSize: 14, color: MUTED, margin: '0 0 8px' }}>Last updated 9 July 2026</p>
         <p style={para}>
           This policy explains what Lekhio collects, why we collect it, and what we do with it. We
           handle your data under the UK General Data Protection Regulation and the Data Protection Act
@@ -103,6 +103,16 @@ export default function PrivacyPage() {
           Your data is encrypted in transit and at rest. We store it with trusted infrastructure
           providers and limit access to the people and systems that need it. We do not store the
           content of your WhatsApp messages with any third party beyond our secure database.
+        </p>
+
+        <h2 style={heading}>Where we process your data</h2>
+        <p style={para}>
+          Your records are stored in the United Kingdom, in a London data centre run by our database
+          provider. Some processing happens on servers in the United States run by our hosting
+          provider, so the app can run. These transfers to the United States are covered by the UK
+          extension to the EU to US Data Privacy Framework, under which the provider is certified, so
+          your data keeps an equivalent level of protection to the UK. We only use providers that are
+          bound to protect your data and that act on our instructions.
         </p>
 
         <h2 style={heading}>Who we share it with</h2>

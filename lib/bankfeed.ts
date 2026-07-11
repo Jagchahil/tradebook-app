@@ -323,6 +323,11 @@ export interface MappedBankEntry {
   category: string;
   transaction_date: string; // YYYY-MM-DD
   description: string;
+  // Set by the brain (lib/memory.ts) during sync, when the user has already told us
+  // this vendor is not business money. It arrives out of the tax figures rather
+  // than having to be corrected all over again. Still unconfirmed either way: the
+  // approval gate is untouched.
+  is_personal?: boolean;
 }
 
 // Merchant keyword map, mirroring the WhatsApp categoriser so a Screwfix card

@@ -4,8 +4,11 @@ import {
   getAllConfirmedForReview,
   setTransactionPersonal,
   setManyPersonal,
+  getTransactionVendor,
+  learnVendor,
 } from '../../../lib/supabase';
 import { findPersonal, impactOf } from '../../../lib/personal';
+import { learn } from '../../../lib/memory';
 import { rateLimited } from '../../../lib/ratelimit';
 
 // Money in the books that is not business money.
@@ -61,15 +64,45 @@ export async function POST(req: NextRequest) {
   if (Array.isArray(body.ids)) {
     const ids = body.ids.filter((i) => typeof i === 'string').slice(0, 200);
     const marked = await setManyPersonal(user.id, ids);
+    // Learn every one of them, so none of these vendors is ever counted as income
+    // again. Fire and forget: a lesson must never delay the user's answer.
+    void Promise.all(ids.map((id) => teach(user.id, id, true)));
     return NextResponse.json({ ok: true, marked });
   }
 
   // One row, either way. Reversible: a user who taps it by mistake taps it back.
   if (typeof body.id === 'string') {
-    const ok = await setTransactionPersonal(user.id, body.id, body.personal !== false);
+    const personal = body.personal !== false;
+    const ok = await setTransactionPersonal(user.id, body.id, personal);
     if (!ok) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+
+    // TEACH THE BRAIN. This is the whole idea: they should only ever have to tell
+    // us once. Next time this vendor arrives from the bank it lands already out of
+    // the tax figures, with no AI call and no second question.
+    void teach(user.id, body.id, personal);
+
     return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+}
+
+// Turn one answer into a lasting lesson.
+//
+// NEVER SHARED WITH THE CROWD. "Not business" is a fact about a PERSON, not about a
+// merchant: one man's transfer to MR J SMITH is his brother, another's is a customer
+// paying him for a rewire. Pooling that would put a stranger's private life into
+// everyone else's books. learn() enforces this (shareable is false for anything
+// personal), and we pass false explicitly here as well.
+//
+// Never throws. A failed lesson must not break the answer the user just gave.
+async function teach(userId: string, transactionId: string, personal: boolean): Promise<void> {
+  try {
+    const vendor = await getTransactionVendor(userId, transactionId);
+    const lesson = learn({ vendor, isPersonal: personal });
+    if (!lesson) return;
+    await learnVendor(userId, lesson.vendorKey, lesson.category, lesson.isPersonal, false);
+  } catch {
+    /* learning is a bonus, never a dependency */
+  }
 }

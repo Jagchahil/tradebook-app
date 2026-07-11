@@ -13,8 +13,11 @@ import {
   updateBankConnection,
   recentUnconfirmedCaptures,
   insertBankTransactions,
+  getUserRules,
+  getVendorPatterns,
 } from './supabase';
 import { refreshAccess, getBookedTransactions, mapBankTransaction, matchesCapture, isSandbox, taxYearStartISO } from './bankfeed';
+import { normaliseVendor, recall } from './memory';
 import { decryptSecret } from './crypto';
 
 export interface SyncResult {
@@ -75,6 +78,42 @@ export async function syncWithAccessToken(
       taken += 1;
     }
   }
+  // THE BRAIN. Apply what we already know before anything is written.
+  //
+  // Without this, a bank line the keyword map does not recognise lands as "other",
+  // and it stays "other" no matter how many times the user has already told us what
+  // that shop is. With it, everything they have ever corrected is applied for free,
+  // and everything the crowd agrees on is applied for free too. NO AI CALL. That is
+  // the whole point: the bank feed can be accurate AND cost us nothing, so it stays
+  // the channel we want people on (see lib/margin.ts).
+  //
+  // Never fatal: if the brain is unreachable, the entries land exactly as they did
+  // before, and the user simply has to correct them by hand as they always did.
+  try {
+    const keys = toInsert.map((e) => normaliseVendor(e.vendor));
+    const [rules, patterns] = await Promise.all([
+      getUserRules(conn.user_id),
+      getVendorPatterns(keys.filter(Boolean)),
+    ]);
+
+    if (rules.length > 0 || patterns.length > 0) {
+      for (const entry of toInsert) {
+        const known = recall(entry.vendor, rules, patterns);
+        if (known.source === 'none') continue;
+
+        // A category we know beats the keyword map's guess, and always beats "other".
+        if (known.category) entry.category = known.category;
+
+        // And if they have told us this vendor is not business money, we never ask
+        // twice. It arrives already out of the tax figures. Still unconfirmed, so
+        // the approval gate is untouched.
+        if (known.isPersonal === true) entry.is_personal = true;
+      }
+    }
+  } catch {
+    /* the brain is an improvement, never a dependency */
+  }
+
   const inserted = await insertBankTransactions(conn.user_id, toInsert);
   await updateBankConnection(conn.id, { last_synced_date: new Date().toISOString().slice(0, 10) });
   return { inserted, ok: true };

@@ -2668,3 +2668,72 @@ export async function getAllConfirmedForReview(userId: string): Promise<Record<s
   if (!res.ok) return [];
   return (await res.json()) as Record<string, unknown>[];
 }
+
+// --- the brain ---------------------------------------------------------------
+//
+// What this person taught us, and what everyone taught us. See lib/memory.ts.
+
+export async function getUserRules(userId: string): Promise<Array<{ vendor_key: string; category: string | null; is_personal: boolean | null; hits: number }>> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/user_rules?user_id=eq.${encodeURIComponent(userId)}` +
+      `&select=vendor_key,category,is_personal,hits&limit=2000`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+// The crowd's answers for a specific set of vendors. Scoped to the keys we are
+// actually about to categorise, so we never pull the whole table.
+export async function getVendorPatterns(keys: string[]): Promise<Array<{ vendor_key: string; category: string; votes: number }>> {
+  if (keys.length === 0) return [];
+  const { url } = config();
+  const list = [...new Set(keys)].slice(0, 200).map((k) => `"${k}"`).join(',');
+  const res = await fetch(
+    `${url}/rest/v1/vendor_patterns?vendor_key=in.(${encodeURIComponent(list)})` +
+      `&select=vendor_key,category,votes&limit=1000`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+// Write a lesson. Never throws: failing to learn must never break the thing the
+// user was actually doing.
+export async function learnVendor(
+  userId: string,
+  vendorKey: string,
+  category: string | null,
+  isPersonal: boolean | null,
+  share: boolean,
+): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/rpc/learn_vendor`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        p_user: userId,
+        p_key: vendorKey,
+        p_category: category,
+        p_personal: isPersonal,
+        p_share: share,
+      }),
+    });
+  } catch {
+    /* a lesson is never worth an error in the user's face */
+  }
+}
+
+// The vendor of a transaction, so a correction knows what it is teaching us about.
+export async function getTransactionVendor(userId: string, id: string): Promise<string | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}&select=vendor&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ vendor: string | null }>;
+  return rows[0]?.vendor ?? null;
+}

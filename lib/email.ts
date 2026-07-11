@@ -91,7 +91,7 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
   if (!looksLikeEmail(to)) return false;
 
   const fromAddr = FROM.replace(/.*</, '').replace(/>.*/, '');
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
   const hi = name ? `Welcome to Lekhio, ${esc(name)}.` : 'Welcome to Lekhio.';
 
   const html = `

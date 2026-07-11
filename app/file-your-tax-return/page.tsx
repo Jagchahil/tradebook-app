@@ -1,13 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
-import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
+import { SharedHead, SiteNav, SiteFooter, SITE } from '../_shared/site';
 
 export const metadata: Metadata = {
   title: 'How to file your own tax return. A free step by step guide for the self employed | Lekhio',
   description:
     'File your own Self Assessment tax return without paying an accountant. A plain English, step by step guide for UK sole traders and tradespeople, with the expenses you can claim by trade, the deadlines, and what Making Tax Digital means for you. Free.',
-  metadataBase: new URL('https://tradebook-app-five.vercel.app'),
+  // SITE, not a hardcoded Vercel URL. This was declaring the canonical for this
+  // page to be tradebook-app-five.vercel.app, which tells Google the preview
+  // deployment is the real page rather than lekhio.app.
+  metadataBase: new URL(SITE),
   alternates: { canonical: '/file-your-tax-return' },
   openGraph: {
     title: 'File your own tax return. Stop paying for a 15 minute job.',

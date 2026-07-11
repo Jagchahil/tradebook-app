@@ -1,46 +1,45 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies. NEVER commit these.
+#
+# This file used to contain ONLY the .env rules below. It got rsynced over the
+# deploy repo's real .gitignore, and the next `git add -A` swept node_modules into
+# the commit. node_modules holds binaries far over GitHub's 100 MB file limit (the
+# Next SWC binary alone is ~116 MB), so the push was rejected outright. Keep this
+# list complete: this file is synced, so a gap here silently breaks the repo.
+node_modules/
+.pnp
+.pnp.js
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
+# Build output
+.next/
+out/
+build/
+dist/
 *.tsbuildinfo
 next-env.d.ts
 
-# HMRC sandbox demo local state (tokens, test-user creds) - never commit
-.hmrc-sandbox.json
+# Secrets. Never commit.
+.env*
+!.env*.example
 
+# Vercel
+.vercel
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Testing
+coverage/
+
+# OS and editor noise
+.DS_Store
+*.pem
+.idea/
+.vscode/
+
+# Orphaned file handles from the Cowork FUSE mount, and 0 byte editor temp files.
+# They are not source. They got committed once; never again.
 .fuse_hidden*
+XX*

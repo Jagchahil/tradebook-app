@@ -13,10 +13,15 @@ import { NextRequest, NextResponse } from 'next/server';
 // works. Because the API authenticates with a Bearer token (never cookies),
 // reflecting the origin here does not expose a logged-in session to other sites.
 
+// lekhio.app. NOT lekhio.com, which we do not own: it belongs to an unrelated ERP
+// company (Lacspace Corporation). It was in this allowlist, which meant we were
+// telling browsers to trust a third party's origin against our API. No session
+// could actually be stolen, because these routes authenticate with a Bearer token
+// and never a cookie, but an origin we do not control has no business here.
 const PROD_ALLOWED = [
-  process.env.NEXT_PUBLIC_APP_URL || 'https://tradebook-app-five.vercel.app',
-  'https://lekhio.com',
-  'https://www.lekhio.com',
+  process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app',
+  'https://lekhio.app',
+  'https://www.lekhio.app',
 ];
 
 function corsHeaders(origin: string | null): Record<string, string> {

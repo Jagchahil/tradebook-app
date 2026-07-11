@@ -359,7 +359,7 @@ export default function Generator() {
             </div>
           ) : null}
 
-          <div style={{ marginTop: 26, textAlign: 'center', fontSize: 11.5, color: '#A8AFB8' }}>Made free with Lekhio · lekhio.com</div>
+          <div style={{ marginTop: 26, textAlign: 'center', fontSize: 11.5, color: '#A8AFB8' }}>Made free with Lekhio · lekhio.app</div>
         </div>
       </div>
       <div className="no-print" style={{ maxWidth: 900, margin: '22px auto 0' }}>

@@ -6,7 +6,7 @@ const BASE = APP_URL || 'https://tradebook-app-five.vercel.app';
 // Tell crawlers what to index and where the sitemap is. Keep the funnel/account
 // and API paths out of the index; everything marketing/tool is fair game.
 //
-// Until the real domain is set (NEXT_PUBLIC_APP_URL, i.e. lekhio.com), we are on
+// Until the real domain is set (NEXT_PUBLIC_APP_URL, i.e. lekhio.app), we are on
 // the temporary Vercel URL. Block ALL indexing so search engines never index the
 // temp host and split the SEO equity before the real domain goes live. The moment
 // NEXT_PUBLIC_APP_URL is set, normal indexing rules apply automatically.

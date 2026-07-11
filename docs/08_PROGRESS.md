@@ -5,14 +5,45 @@
 
 ---
 
+## Update 2026-06-25: Lekhio rebrand and feature build
+
+**The product is now Lekhio**, owned by **Lekhio Ltd** (the parent company, named after the river through the founders' villages). The old name TradeBook is fully retired. The product is positioned for ANY UK self employed person, not just trades. Trades is the first ad campaign, not the brand.
+
+Brand: river blue `#1B59A6` and saffron gold `#E0A33E` on warm paper `#FBFAF7`. Logo is the Lekhio wordmark with a river running beneath it. See `docs/07_BRAND.md`. Logo file at `tradebook-web/public/lekhio-logo.svg`.
+
+Built and pushed since the rebrand:
+- Website fully redesigned: premium, minimal, animated (flowing river, scroll reveals), with a universal "who it is for" section.
+- App recoloured to the river palette, animated welcome, universal copy, plus a "Your business details" screen (`app/profile.tsx`) that fills the invoice From line.
+- WhatsApp now does a lot more than capture:
+  - Photo, voice, and typed capture of income and expenses.
+  - "create invoice" runs a guided flow and produces a shareable invoice. If the customer contact is an email and Resend is configured, it emails the invoice directly.
+  - "help" or "hi" returns a friendly menu of what Lekhio can do.
+  - Money questions ("how much did I spend on fuel?") are answered from the user's own figures via Claude.
+- Stripe pay-now on invoices, idempotent webhook, auto-books income.
+
+New env vars (all optional, features degrade gracefully without them): `WHATSAPP_APP_SECRET`, `OPENAI_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_APP_URL`. Full list in `CLAUDE.md`.
+
+New tables since the audit: `invoices`, `wa_sessions` (WhatsApp conversation state), plus `business_name` and `address` columns on `users`, and a `raw_whatsapp_message_id` column on `transactions`. All in `supabase/schema.sql`, all run on prod.
+
+Repos and infra still carry the old "tradebook" names (folders `tradebook-app` / `tradebook-web`, GitHub `tradebook-mobile` / `tradebook-app`, Vercel `tradebook-app-five.vercel.app`). These are infrastructure names, not user facing, and can be renamed when convenient. Nothing breaks if left.
+
+Outstanding, founder only: register `lekhio.app` and `lekhio.co.uk`, point the domain at Vercel and set `NEXT_PUBLIC_APP_URL`, trademark check on Lekhio, `support@lekhio.app` mailbox, and the live accounts in `docs/13_GO_LIVE_RUNBOOK.md`.
+
+---
+
 ## Standing Rules (learned the hard way)
 
-1. **Disable RLS on every new table immediately after creation.**
-   Run this right after `create table`:
-   ```sql
-   alter table <table_name> disable row level security;
-   ```
-   Supabase enables RLS by default. Without this, all inserts from the API will fail with a 42501 policy violation.
+1. **Keep RLS on. Do not disable it. (Updated 2026-06-24 after the audit.)**
+   The old rule here said to disable RLS so inserts would work. That was a security
+   hole. Anyone with the public anon key could read or overwrite any user's data, and
+   reads of real transactions were broken too. The fix is in `supabase/schema.sql`:
+   RLS is on, each person can read only their own rows, and the server does its writes
+   with the service role key, which bypasses RLS. So:
+   - App reads (anon key): allowed only for the signed in owner, by policy.
+   - Server writes (webhook, waitlist): use the service role key, which ignores RLS.
+   - Never run `disable row level security` to make an insert work. Move the insert to
+     the server with the service role key instead.
+   See `docs/09_AUDIT.md` for the full reasoning.
 
 2. **Never use supabase-js in Next.js API routes for inserts/updates.**
    The supabase-js client caches the schema and goes stale after any schema change, causing PGRST204 errors.
@@ -66,6 +97,15 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 
 ## What Has Been Built
 
+> Update 2026-06-24. A full front-end build and a deep audit landed today. The
+> subsections below predate it in places. The current state is:
+> - Landing page: full marketing homepage, plus `/privacy` and `/terms`. Live.
+> - App: every screen polished, a subscribe screen added between phone and tabs,
+>   the phone screen rebuilt (it was broken), and a set of logic bugs fixed.
+> - Database: `supabase/schema.sql` defines all tables and the RLS policies.
+> - WhatsApp webhook and its `lib/` clients are built and pushed.
+> See `docs/09_AUDIT.md` for every fix and the items that still need your action.
+
 ### 1. Landing Page
 
 **Status:** Live on Vercel. Auto-deploys on push to main.
@@ -75,7 +115,7 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 **Pages:**
 
 `/` (homepage)
-- TradeBook wordmark, headline, waitlist form (original)
+- Lekhio wordmark, headline, waitlist form (original)
 - All copy cleaned per brand rules (no dashes)
 
 `/early-access`
@@ -112,7 +152,7 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 - `headerShown: false`
 
 `app/(auth)/index.tsx` (Welcome screen)
-- TradeBook wordmark, top-left
+- Lekhio wordmark, top-left
 - FREE badge
 - Headline: "Your back office. In your pocket."
 - Subtext explaining WhatsApp receipt capture
@@ -137,13 +177,13 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 
 **Tab bar (`app/(tabs)/_layout.tsx`):**
 - Four tabs: Dashboard, Transactions, Tax, Settings
-- Indigo active tint (`#4F46E5`), grey inactive
+- Indigo active tint (`#1B59A6`), grey inactive
 - Emoji icons (no icon library dependency)
 
 **Dashboard (`app/(tabs)/index.tsx`):**
-- TradeBook wordmark header + FREE badge + current month/year (right-aligned)
+- Lekhio wordmark header + FREE badge + current month/year (right-aligned)
 - Android status bar padding fix
-- Three summary cards: Income (green `#10B981`), Expenses (red `#EF4444`), Profit (indigo `#4F46E5`)
+- Three summary cards: Income (green `#10B981`), Expenses (red `#EF4444`), Profit (indigo `#1B59A6`)
 - Cards show £0.00 until real transaction data flows in
 - Indigo WhatsApp prompt strip: "Send a receipt on WhatsApp to get started"
 - Recent transactions section with empty state (receipt emoji + "No transactions yet")
@@ -159,7 +199,7 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 **Tax (`app/(tabs)/tax.tsx`):**
 - Current UK tax quarter calculated from today's date (e.g. "Q1 2026/27: Apr to Jun")
 - Income card, Expenses card, Estimated profit row for the quarter
-- Compliance note: "TradeBook prepares your summary. You approve before anything is sent to HMRC."
+- Compliance note: "Lekhio prepares your summary. You approve before anything is sent to HMRC."
 - "Prepare MTD Summary" button (shows Alert, no backend action yet)
 - Tax year runs Apr to Mar
 
@@ -201,8 +241,8 @@ Metro hot-reloads on save. For cache issues: `npx expo start --clear`.
 
 From `docs/07_BRAND.md`:
 
-- **Name:** TradeBook. Capital T, capital B, no space.
-- **Colours:** Ink `#111111`, Indigo `#4F46E5`, Indigo tint `#EEF2FF`, Off-white `#FAFAFA`, Surface `#F4F4F4`
+- **Name:** Lekhio. Capital T, capital B, no space.
+- **Colours:** Ink `#111111`, Indigo `#1B59A6`, Indigo tint `#E9F1FA`, Off-white `#FBFAF7`, Surface `#F2F0EA`
 - **No em dashes, no en dashes, no hyphens as dashes** in any copy. Use a full stop or rewrite.
 - **Voice:** Direct, short sentences. No jargon. Time-poor tradespeople on a job site.
 
@@ -212,11 +252,11 @@ From `docs/07_BRAND.md`:
 
 | Service | Status | Notes |
 |---|---|---|
-| Supabase | Active | tradebook-prod. All 4 tables live. |
+| Supabase | Active | tradebook-prod. All 4 tables live. Schema and RLS in `supabase/schema.sql`. Run it to enable RLS. |
 | Vercel | Active | Landing page auto-deploys from GitHub. |
-| Anthropic API | Needs credits | $5 top-up unblocks WhatsApp receipt parsing (Phase 0 core loop). |
-| Meta WhatsApp | Not started | Need Business account + registered phone number. Free to set up. |
-| Stripe | Not started | £29/month subscription, 30-day free trial. Need account + test keys. |
+| Anthropic API | Needs credits | $5 top-up switches on WhatsApp receipt parsing. Webhook is built and waiting. |
+| Meta WhatsApp | Not started | Webhook is built. Need a Business account, a number, and to set the webhook URL plus app secret. |
+| Stripe | Not started | £12.99/month subscription, 30-day free trial. Need account + test keys. |
 | Twilio | Not started | Phone OTP auth. ~$15/month. Budget required. |
 | Apple Developer | Not started | $99/year for App Store listing. |
 | Google Play | Not started | $25 one-time for Play Store listing. |
@@ -248,7 +288,7 @@ Mobile app
 ## What Is Not Built Yet
 
 ### Stripe subscription (next up)
-- Plan: £29/month, 30-day free trial
+- Plan: £12.99/month, 30-day free trial
 - Needs: Stripe account, test secret key, product + price created in Stripe dashboard
 - To build: checkout API route in `tradebook-web`, subscribe screen in app, success page
 - The subscribe screen will sit between phone entry and the main tabs
@@ -258,10 +298,23 @@ Mobile app
 - When ready: add Twilio to Supabase Auth settings, update `phone.tsx` to use `supabase.auth.signInWithOtp()` and add an OTP entry screen.
 - The phone screen already collects the number. The wiring is the only change.
 
-### WhatsApp webhook (Phase 0 core, blocked on Anthropic credits)
-- `app/api/whatsapp/route.ts` exists in the landing page repo but is not connected to Meta.
-- The full loop: WhatsApp message received → webhook fires → Claude Vision parses receipt → transaction saved to Supabase → WhatsApp confirmation sent → appears in app dashboard.
-- Blocked on: $5 Anthropic API credit top-up, Meta WhatsApp Business account setup.
+### WhatsApp webhook (built 2026-06-24, awaiting go-live)
+The full loop is written, pushed, and the security parts are tested. It is not yet
+connected to Meta and the receipt parsing is dormant until Anthropic credits are added.
+
+- `tradebook-web/app/api/whatsapp/route.ts`. GET verify handshake. POST validates the
+  `x-hub-signature-256` signature, then handles the message. Always answers 200 for
+  genuine Meta traffic. Idempotent on the WhatsApp message id.
+- `tradebook-web/lib/whatsapp.ts`. Signature check, media download, send text.
+- `tradebook-web/lib/claude.ts`. Receipt parsing with Claude Vision into merchant,
+  amount, and category.
+- `tradebook-web/lib/supabase.ts`. Server side REST access with the service role key.
+  Finds the user by phone, idempotency check, inserts the transaction.
+- Receipt photo flow: download image, parse with Claude, find user by phone, insert,
+  reply with a confirmation. Other message types get a helpful reply.
+- To go live: run `supabase/schema.sql`, set the WhatsApp and Anthropic env vars in
+  Vercel, point the Meta webhook at `/api/whatsapp`, top up Anthropic credits.
+- New env var added: `WHATSAPP_APP_SECRET` for the signature check.
 
 ### App Store / Play Store
 - No listings. Distribution is currently via EAS development build on Samsung only.
@@ -274,7 +327,7 @@ Mobile app
 1. **Set up Stripe account and get test keys**
    - Create account at stripe.com
    - Go to Developers → API keys → copy test secret key (`sk_test_...`)
-   - Create a product: "TradeBook" with price £29/month (recurring)
+   - Create a product: "Lekhio" with price £12.99/month (recurring)
    - Copy the price ID (`price_...`)
    - Add to Vercel env vars: `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`
    - Add to app `.env.local`: `EXPO_PUBLIC_API_URL=https://your-vercel-url.vercel.app`

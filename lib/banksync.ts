@@ -20,6 +20,8 @@ import {
 import { refreshAccess, getBookedTransactions, mapBankTransaction, isSandbox, taxYearStartISO } from './bankfeed';
 import { normaliseVendor, recall } from './memory';
 import { findDuplicate } from './dedupe';
+import { looksPersonal } from './personal';
+import { shouldAutoFile } from './digest';
 import { decryptSecret } from './crypto';
 
 export interface SyncResult {
@@ -128,10 +130,38 @@ export async function syncWithAccessToken(
         // A category we know beats the keyword map's guess, and always beats "other".
         if (known.category) entry.category = known.category;
 
-        // And if they have told us this vendor is not business money, we never ask
-        // twice. It arrives already out of the tax figures. Still unconfirmed, so
-        // the approval gate is untouched.
+        // If they have told us this vendor is not business money, we never ask
+        // twice. It arrives already out of the tax figures.
         if (known.isPersonal === true) entry.is_personal = true;
+
+        // AUTO FILE. Doc 104 section 3: Lekhio decides everything reversible, the
+        // user decides everything that is not.
+        //
+        // He has already told us what this shop is. Asking him again is asking a
+        // question he has answered, and that is not an approval gate, it is an admin
+        // task we invented and handed back to him.
+        //
+        // FOUR LIMITS, AND THEY ARE NOT NEGOTIABLE:
+        //
+        //   1. Only a rule HE taught us ('user'). The crowd's guess is a guess, not
+        //      his answer, so a crowd category still gets asked about.
+        //   2. Nothing that looks personal is ever auto filed. A benefit, a refund
+        //      or a bet is the one thing that must never slip into the books unseen.
+        //   3. The FILING to HMRC still asks. Every time. That is the irreversible
+        //      act and it is his alone.
+        //   4. He is told exactly what was filed, in the digest, and one word undoes
+        //      it.
+        // The rule itself lives in lib/digest.ts, in the open and under test, rather
+        // than inline here where nobody would ever check it. It fails towards ASKING.
+        if (
+          shouldAutoFile({
+            source: known.source,
+            knownPersonal: known.isPersonal,
+            looksPersonal: looksPersonal(entry.vendor, entry.description) !== null,
+          })
+        ) {
+          entry.confirmed = true;
+        }
       }
     }
   } catch {

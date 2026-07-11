@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import {
   usersDueDigest,
-  undigestedBankEntries,
+  bankEntriesForDigest,
   markDigestSent,
   addWaSend,
   countActiveSubscribers,
@@ -86,10 +86,11 @@ export async function GET(req: NextRequest) {
     lastId = u.id;
     if (!u.phone_number) continue;
 
-    const entries = await undigestedBankEntries(u.id);
+    const split = await bankEntriesForDigest(u.id);
+    const total = split.filed.length + split.asking.length;
 
     const decision = decideDigest({
-      entryCount: entries.length,
+      entryCount: total,
       lastInboundAt: u.last_inbound_at,
       lastDigestAt: u.last_digest_at,
       budgetLeft,
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    const text = buildDigest(entries);
+    const text = buildDigest(split);
     if (!text) {
       skipped += 1;
       continue;

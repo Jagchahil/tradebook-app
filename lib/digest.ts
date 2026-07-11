@@ -42,6 +42,67 @@ export interface DigestEntry {
   category: string | null;
 }
 
+// THE CUT THE DOCTRINE DEMANDS (doc 104, section 3).
+//
+// "Lekhio decides everything that is reversible. The user decides everything that
+// is not."
+//
+// If a man has already told us Screwfix is materials, and his bank sends us a
+// Screwfix payment, and nothing about it looks off, then asking him again is asking
+// a question he has already answered. That is not an approval gate. It is an admin
+// task we invented and then handed back to him.
+//
+// So we FILE what he has already taught us, and we ASK only about what is genuinely
+// new. One question, about the one thing that is actually a question.
+//
+// The limits, and they are not negotiable:
+//   . only a rule HE taught us counts. The crowd's guess is not his answer.
+//   . nothing that looks personal is ever auto filed (a benefit, a refund, a bet).
+//   . the FILING to HMRC still asks. Every time. That is the irreversible one.
+//   . he is told exactly what was filed, and can undo any of it.
+export interface DigestSplit {
+  // Filed on his behalf, because he had already told us about these vendors.
+  filed: DigestEntry[];
+  // Genuinely new. These are what he is asked about.
+  asking: DigestEntry[];
+}
+
+// SHOULD WE FILE THIS WITHOUT ASKING HIM?
+//
+// This is the most dangerous function in the file, so it lives here in the open,
+// with tests, instead of buried inline in the sync where nobody could check it.
+//
+// Getting it wrong in one direction is an inconvenience: we ask him about a shop he
+// has already told us about, and he is mildly annoyed. Getting it wrong in the OTHER
+// direction puts a child tax credit into a man's taxable income without him ever
+// seeing it. Those are not the same mistake, so this fails towards ASKING.
+//
+// Four conditions. ALL of them must hold.
+export function shouldAutoFile(input: {
+  // Where our knowledge of this vendor came from. Only 'user' counts: the crowd's
+  // opinion is a guess, not his answer.
+  source: 'user' | 'crowd' | 'none';
+  // Whether he told us this vendor is not business money.
+  knownPersonal: boolean | null;
+  // Whether the personal detector thinks this looks like a benefit, a refund, a bet
+  // or a personal transfer. Pass the result of looksPersonal() from lib/personal.ts.
+  looksPersonal: boolean;
+}): boolean {
+  // 1. HE taught us this, not the crowd. A stranger's vote is not his decision.
+  if (input.source !== 'user') return false;
+
+  // 2. If he already said it is not business money, it is not something to file into
+  //    his books at all.
+  if (input.knownPersonal === true) return false;
+
+  // 3. Anything that smells like a benefit, a refund, a bet or a transfer from a
+  //    person NEVER gets filed silently, however well we think we know the vendor.
+  //    This is the guard that stops the exact bug we found in the real books.
+  if (input.looksPersonal) return false;
+
+  return true;
+}
+
 export function isWindowOpen(lastInboundAt: string | null | undefined, now: Date = new Date()): boolean {
   if (!lastInboundAt) return false;
   const t = new Date(lastInboundAt).getTime();
@@ -53,37 +114,48 @@ function gbp(n: number): string {
   return `£${Math.abs(n).toFixed(2)}`;
 }
 
-// The message itself. Plain, scannable, and it never pretends to have done
-// something it has not: these entries are CAPTURED, not counted. Nothing reaches a
-// tax figure until he says yes.
-export function buildDigest(entries: DigestEntry[]): string | null {
-  if (entries.length === 0) return null;
+// "Screwfix, £84.30, materials"
+function line(e: DigestEntry): string {
+  const name = (e.vendor ?? '').trim() || 'Something';
+  const cat = (e.category ?? '').trim();
+  return `${name}, ${gbp(e.amount)}${cat && cat.toLowerCase() !== 'other' ? `, ${cat}` : ''}`;
+}
 
-  const shown = entries.slice(0, MAX_LINES);
-  const lines = shown.map((e) => {
-    const name = (e.vendor ?? '').trim() || 'Something';
-    const cat = (e.category ?? '').trim();
-    // "Screwfix, £84.30, materials"
-    return `${name}, ${gbp(e.amount)}${cat && cat.toLowerCase() !== 'other' ? `, ${cat}` : ''}`;
-  });
+// The message. It says what we DID, and then asks about the one thing that is
+// actually a question.
+//
+// It never dresses up a decision as a question, and it never hides one either. If we
+// filed something on his behalf, he is told, in the same breath, with the shop and
+// the money and the category, and one word undoes it.
+export function buildDigest(split: DigestSplit): string | null {
+  const { filed, asking } = split;
+  if (filed.length === 0 && asking.length === 0) return null;
 
-  const more = entries.length - shown.length;
-  const head =
-    entries.length === 1
-      ? 'One thing landed from your bank today.'
-      : `${entries.length} things landed from your bank today.`;
+  const parts: string[] = [];
 
-  const tail =
-    more > 0
-      ? `\n\nand ${more} more in the app.`
-      : '';
+  if (filed.length > 0) {
+    const shown = filed.slice(0, MAX_LINES);
+    const more = filed.length - shown.length;
+    parts.push(
+      filed.length === 1
+        ? 'I filed one thing for you today, because you have told me about it before.'
+        : `I filed ${filed.length} things for you today, because you have told me about them before.`,
+    );
+    parts.push(shown.map((e) => `• ${line(e)}`).join('\n') + (more > 0 ? `\n• and ${more} more` : ''));
+  }
 
-  return (
-    `${head}\n\n` +
-    lines.map((l) => `• ${l}`).join('\n') +
-    tail +
-    `\n\nReply YES and I will file the lot. Reply NO and I will leave them for you to check.`
-  );
+  if (asking.length > 0) {
+    const shown = asking.slice(0, MAX_LINES);
+    parts.push(asking.length === 1 ? 'One I do not recognise:' : `${asking.length} I do not recognise:`);
+    parts.push(shown.map((e) => `• ${line(e)}`).join('\n'));
+    parts.push('Reply YES to file those too, or tell me what they were and I will remember.');
+  } else if (filed.length > 0) {
+    // Nothing to ask, so we do not ask. We say what we did and get out of the way.
+    // That is the whole point.
+    parts.push('Nothing needs you. Reply NO if any of that looks wrong.');
+  }
+
+  return parts.join('\n\n');
 }
 
 // Should we send at all, and will it cost us anything?

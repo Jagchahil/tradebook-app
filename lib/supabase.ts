@@ -2007,9 +2007,12 @@ export interface BankEntryInsert {
   description: string;
   // Set during sync when the brain (lib/memory.ts) already knows this vendor is not
   // business money, so a benefit or a personal transfer arrives out of the tax
-  // figures instead of having to be corrected all over again. Still unconfirmed
-  // either way: the approval gate is untouched.
+  // figures instead of having to be corrected all over again.
   is_personal?: boolean;
+  // AUTO FILED. True when the USER has already told us what this vendor is, so
+  // asking him again would be asking a question he has answered. See doc 104
+  // section 3 and lib/digest.ts. He is told in the digest, and one word undoes it.
+  confirmed?: boolean;
 }
 
 // Insert bank transactions idempotently and in BULK: one PostgREST request per
@@ -2031,7 +2034,9 @@ export async function insertBankTransactions(userId: string, entries: BankEntryI
       transaction_date: entry.transaction_date,
       source_type: 'bank_feed',
       description: entry.description,
-      confirmed: false,
+      // Auto filed ONLY when he has already taught us this vendor. Everything else
+      // still waits for him. See banksync.
+      confirmed: entry.confirmed === true,
       external_id: entry.external_id,
       // Carry the brain's answer through to the row. Leaving this out would compile
       // fine and silently drop every lesson: the sync would decide a benefit was
@@ -2901,18 +2906,32 @@ export async function usersDueDigest(afterId: string | null, limit: number): Pro
 }
 
 // What landed from the bank and is still waiting for a yes.
-export async function undigestedBankEntries(userId: string): Promise<Array<{ id: string; vendor: string | null; amount: number; category: string | null }>> {
+// What the bank sent, split the way the digest needs it.
+//
+//   filed   we auto filed these, because he had already taught us the vendor
+//   asking  we do not know these, so they are the only thing he is asked about
+//
+// See doc 104 section 3 and lib/banksync.ts for why that split exists.
+export async function bankEntriesForDigest(
+  userId: string,
+): Promise<{ filed: Array<{ id: string; vendor: string | null; amount: number; category: string | null }>; asking: Array<{ id: string; vendor: string | null; amount: number; category: string | null }> }> {
   const { url } = config();
-  const since = new Date(Date.now() - 3 * 86400_000).toISOString();
-  const res = await fetch(
-    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
-      `&confirmed=eq.false&source_type=eq.bank_feed&is_personal=eq.false` +
-      `&created_at=gte.${encodeURIComponent(since)}` +
-      `&select=id,vendor,amount,category&order=created_at.desc&limit=20`,
-    { headers: headers() },
-  );
-  if (!res.ok) return [];
-  return await res.json();
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+
+  async function q(confirmed: boolean) {
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+        `&confirmed=eq.${confirmed}&source_type=eq.bank_feed&is_personal=eq.false` +
+        `&created_at=gte.${encodeURIComponent(since)}` +
+        `&select=id,vendor,amount,category&order=created_at.desc&limit=20`,
+      { headers: headers() },
+    );
+    if (!res.ok) return [];
+    return await res.json();
+  }
+
+  const [filed, asking] = await Promise.all([q(true), q(false)]);
+  return { filed, asking };
 }
 
 export async function markDigestSent(userId: string): Promise<void> {

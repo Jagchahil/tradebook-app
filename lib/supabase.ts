@@ -1396,7 +1396,7 @@ export async function weeklyTotalsAll(): Promise<WeeklyTotalsRow[] | null> {
 export async function weeklyTotals(userId: string): Promise<{ income: number; expenses: number }> {
   const { url } = config();
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const res = await fetch(`${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.true&created_at=gte.${encodeURIComponent(since)}&select=amount`, { headers: headers() });
+  const res = await fetch(`${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.true&is_personal=eq.false&created_at=gte.${encodeURIComponent(since)}&select=amount`, { headers: headers() });
   if (!res.ok) return { income: 0, expenses: 0 };
   const rows = (await res.json()) as Array<{ amount: number }>;
   let income = 0;
@@ -1429,7 +1429,7 @@ export async function insertTransaction(record: NewTransaction): Promise<void> {
 export async function transactionSummaryForUser(userId: string, limit = 60): Promise<string> {
   const { url } = config();
   const res = await fetch(
-    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&select=amount,category,vendor,transaction_date,confirmed&order=transaction_date.desc&limit=${limit}`,
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&is_personal=eq.false&select=amount,category,vendor,transaction_date,confirmed&order=transaction_date.desc&limit=${limit}`,
     { headers: headers() },
   );
   if (!res.ok) return '';
@@ -1472,7 +1472,7 @@ export async function getConfirmedTransactionsForRange(
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
-      `&confirmed=eq.true` +
+      `&confirmed=eq.true&is_personal=eq.false` +
       `&transaction_date=gte.${encodeURIComponent(startISO)}` +
       `&transaction_date=lte.${encodeURIComponent(endISO)}` +
       `&select=amount,category,vendor,transaction_date,cis_deduction,income_type` +
@@ -2422,7 +2422,7 @@ export async function propertyYtdTotals(
 ): Promise<{ rents: number; expenses: number; finance: number }> {
   const { url } = config();
   const res = await fetch(
-    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&income_type=eq.property&confirmed=eq.true&transaction_date=gte.${sinceISO}&select=amount,category,vendor`,
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&income_type=eq.property&confirmed=eq.true&is_personal=eq.false&transaction_date=gte.${sinceISO}&select=amount,category,vendor`,
     { headers: headers() },
   );
   if (!res.ok) return { rents: 0, expenses: 0, finance: 0 };
@@ -2602,9 +2602,67 @@ export async function getConfirmedTransactionsForUser(userId: string): Promise<R
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
-      `&confirmed=eq.true` +
+      `&confirmed=eq.true&is_personal=eq.false` +
       `&select=amount,vendor,category,transaction_date,description,confirmed` +
       `&order=transaction_date.desc&limit=5000`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return (await res.json()) as Record<string, unknown>[];
+}
+
+// --- "not business" -----------------------------------------------------------
+//
+// Personal money kept out of the books. See lib/personal.ts for why this matters:
+// a child tax credit counted as trading income means a tax bill on a benefit.
+//
+// The row is never deleted. It stays visible to the user, it just stops counting.
+
+export async function setTransactionPersonal(
+  userId: string,
+  transactionId: string,
+  isPersonal: boolean,
+): Promise<boolean> {
+  const { url } = config();
+  // Scoped by user_id as well as id, so a caller can never touch anyone else's row.
+  const res = await fetch(
+    `${url}/rest/v1/transactions?id=eq.${encodeURIComponent(transactionId)}` +
+      `&user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ is_personal: isPersonal }),
+    },
+  );
+  return res.ok;
+}
+
+// Mark several at once, for the "yes, all of those are personal" tap.
+export async function setManyPersonal(userId: string, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const { url } = config();
+  const list = ids.map((i) => `"${i}"`).join(',');
+  const res = await fetch(
+    `${url}/rest/v1/transactions?id=in.(${encodeURIComponent(list)})` +
+      `&user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ is_personal: true }),
+    },
+  );
+  return res.ok ? ids.length : 0;
+}
+
+// Everything confirmed, INCLUDING personal, so the detector can look at the whole
+// picture and the app can show a personal entry greyed out rather than hiding it.
+export async function getAllConfirmedForReview(userId: string): Promise<Record<string, unknown>[]> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+      `&confirmed=eq.true` +
+      `&select=id,amount,vendor,category,transaction_date,description,confirmed,is_personal` +
+      `&order=transaction_date.desc&limit=2000`,
     { headers: headers() },
   );
   if (!res.ok) return [];

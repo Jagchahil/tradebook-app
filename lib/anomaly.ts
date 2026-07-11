@@ -30,6 +30,14 @@ export interface Anomaly {
   when: string; // the entry date it concerns, YYYY-MM-DD
   amount: number; // the absolute pound figure it concerns
   ids: string[]; // the transaction ids involved, when known
+  // An optional one tap answer the card can offer. 'mark_personal' means "this is
+  // not business money, take it out of my books". Rakha only ever PREPARES: the
+  // user taps, and nothing is reclassified without them.
+  //
+  // The personal money check itself lives in lib/personal.ts and is merged in by
+  // the route, NOT imported here, so this module stays import free and directly
+  // testable by the node runner.
+  action?: 'mark_personal';
 }
 
 // Tunables. Conservative on purpose.

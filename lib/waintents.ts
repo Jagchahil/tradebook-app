@@ -159,10 +159,30 @@ export function isThanks(body: string): boolean {
   return /^(thanks|thank you|thanks a lot|thanks mate|cheers|nice one|ta|perfect|brilliant|great|lovely|sorted|good stuff|top man|legend)$/.test(t);
 }
 
-export function matchAck(body: string): 'yes' | 'no' | null {
+// A bare yes, a bare no, or a friendly noise.
+//
+// THE THREE ARE NOT THE SAME THING, AND TREATING THEM AS THE SAME WAS A REAL BUG.
+//
+// "yes" used to include ok, k, sure, fine, done, will do, sounds good and 👍. All of
+// those were then routed into confirming the user's books. So a man who replied 👍 to
+// "Logged. Screwfix, £84.30" was silently approving every unconfirmed entry in his
+// account, including months of bank lines he had never laid eyes on.
+//
+// Approving things you were never shown is not an approval gate. It is the opposite
+// of one.
+//
+// So a friendly noise is now its own thing. It gets a friendly answer and changes
+// NOTHING. Only an explicit, unambiguous yes files anything.
+export function matchAck(body: string): 'yes' | 'no' | 'ack' | null {
   const t = body.trim().toLowerCase().replace(/[!.\s]+$/, '');
-  if (/^(yes|yep|yeah|ok|okay|k|sure|fine|done|will do|👍|sounds good)$/.test(t)) return 'yes';
-  if (/^(no|nope|nah|not yet|dont|don't)$/.test(t)) return 'no';
+
+  // Explicit. He means it.
+  if (/^(yes|y|yep|yeah|yea|confirm|confirmed|correct|aye|thats right|all good)$/.test(t)) return 'yes';
+  if (/^(no|n|nope|nah|not yet|dont|don't|wrong)$/.test(t)) return 'no';
+
+  // A noise, not a decision. "ok", "cheers", "👍". Answer him. Change nothing.
+  if (/^(ok|okay|k|kk|sure|fine|done|will do|👍|👌|ta|cheers|nice|sound|sounds good|lovely|great)$/.test(t)) return 'ack';
+
   return null;
 }
 

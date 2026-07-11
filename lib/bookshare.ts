@@ -35,13 +35,18 @@
 
 import crypto from 'crypto';
 
-// Reuse the same secret chain as the other capability tokens, so there is one
-// thing to rotate. A dedicated ACCOUNTANT_TOKEN_SECRET is preferred in production.
+// This secret signs the links a man hands to his accountant. It is its own secret.
 const SECRET =
   process.env.SHARE_TOKEN_SECRET ||
-  process.env.ACCOUNTANT_TOKEN_SECRET ||
-  process.env.PACK_TOKEN_SECRET ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  // NO FALLBACK TO THE SERVICE ROLE KEY.
+  //
+  // It used to fall back to SUPABASE_SERVICE_ROLE_KEY, which "worked". But that key is
+  // the key to every row in the database, and we were using it to sign links people
+  // hand to their accountant. Signing is not encryption: every signature is a sample of
+  // output from a key that, if it ever leaked, reads the whole book. And rotating it,
+  // the thing you must be able to do in a hurry, would silently break every live share.
+  //
+  // A secret that guards one thing should guard one thing. No secret, no shares.
   '';
 
 // A tax year is the natural life of an accountant relationship, so default to a
@@ -76,6 +81,7 @@ function sign(shareId: string): string {
 // revocation. Expiry and revocation both live in the row, which is the only place
 // they can be changed after the fact.
 export function shareToken(grantId: string): string {
+  if (!SECRET) throw new Error('SHARE_TOKEN_SECRET is not set');
   return `${grantId}.${sign(grantId)}`;
 }
 

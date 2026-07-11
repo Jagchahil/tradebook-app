@@ -35,7 +35,8 @@ import {
   recentUnconfirmedForMatch,
   mergeIntoTransaction,
   touchLastInbound,
-  confirmAllPending,
+  confirmDigestEntries,
+  lastDigestAt,
   claimMessage,
   insertTransaction,
   listUserProperties,
@@ -343,7 +344,7 @@ async function processMessage(message: IncomingMessage): Promise<void> {
           } else if (matchStopStart(text)) {
             await handleStopStart(from, matchStopStart(text) as 'stop' | 'start');
           } else if (matchAck(text)) {
-            await handleAck(from, matchAck(text) as 'yes' | 'no');
+            await handleAck(from, matchAck(text) as 'yes' | 'no' | 'ack');
           } else if (isDeleteLast(text)) {
             await handleDeleteLast(from);
           } else if (matchEditLast(text)) {
@@ -873,7 +874,18 @@ async function handleThanks(from: string): Promise<void> {
 // This does NOT weaken the approval gate, it IS the approval gate. Confirming an
 // entry says "that is really mine". It sends nothing to HMRC and it moves no money.
 // Those two still ask, every single time, and always will.
-async function handleAck(from: string, kind: 'yes' | 'no'): Promise<void> {
+async function handleAck(from: string, kind: 'yes' | 'no' | 'ack'): Promise<void> {
+  // A friendly noise, not a decision. "ok", "cheers", a thumbs up.
+  //
+  // This used to be treated as YES, and YES used to confirm every unconfirmed entry
+  // in the account. So a man who sent a thumbs up after "Logged. Screwfix, £84.30"
+  // was silently approving months of bank lines he had never seen. Approving things
+  // you were never shown is not an approval gate. Now it changes nothing.
+  if (kind === 'ack') {
+    await sendText(from, 'No bother. Send me the next one whenever you like.');
+    return;
+  }
+
   if (kind === 'no') {
     await sendText(
       from,
@@ -888,7 +900,19 @@ async function handleAck(from: string, kind: 'yes' | 'no'): Promise<void> {
     return;
   }
 
-  const filed = await confirmAllPending(userId);
+  // YES files what the DIGEST ACTUALLY SHOWED HIM, and nothing else.
+  //
+  // Bounded to the digest window. Anything older, and anything he captured himself
+  // and has not reviewed, still waits for him. He can only approve what he was shown.
+  const since = await lastDigestAt(userId);
+  if (!since) {
+    await sendText(from, 'Nothing waiting on me. Send me the next receipt whenever you like.');
+    return;
+  }
+
+  // A day either side of the digest, so a late reply still lands on the right batch.
+  const from24h = new Date(new Date(since).getTime() - 24 * 3600_000).toISOString();
+  const filed = await confirmDigestEntries(userId, from24h);
 
   if (filed === 0) {
     await sendText(from, 'Nothing waiting on me. Send me the next receipt whenever you like.');

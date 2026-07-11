@@ -62,7 +62,21 @@ ok('thanks', W.isThanks('Thanks mate!'));
 ok('cheers', W.isThanks('cheers'));
 ok('not thanks with content', !W.isThanks('thanks, also spent £40 on diesel'));
 eq('bare yes', W.matchAck('Yes'), 'yes');
-eq('bare ok', W.matchAck('ok.'), 'yes');
+// A FRIENDLY NOISE IS NOT AN APPROVAL. This test used to assert the opposite, and
+// that assertion was protecting a real bug: "ok", "done", "sure" and 👍 all returned
+// 'yes', and 'yes' confirmed EVERY unconfirmed entry in the account. A man replying
+// 👍 to "Logged. Screwfix, £84.30" was silently approving months of bank lines he had
+// never seen. Approving what you were never shown is not an approval gate.
+eq('bare ok is an ACK, not an approval', W.matchAck('ok.'), 'ack');
+eq('a thumbs up is an ACK, not an approval', W.matchAck('👍'), 'ack');
+eq('"done" is an ACK, not an approval', W.matchAck('done'), 'ack');
+eq('"sure" is an ACK, not an approval', W.matchAck('sure'), 'ack');
+eq('"cheers" is an ACK', W.matchAck('cheers'), 'ack');
+// Only an explicit, unambiguous yes files anything.
+eq('an explicit yes IS an approval', W.matchAck('yes'), 'yes');
+eq('yeah is an approval', W.matchAck('yeah'), 'yes');
+eq('confirm is an approval', W.matchAck('confirm'), 'yes');
+eq('no is still no', W.matchAck('no'), 'no');
 eq('bare no', W.matchAck('nah'), 'no');
 ok('yes with content passes through', W.matchAck('yes I spent £40') === null);
 eq('stop', W.matchStopStart('STOP'), 'stop');

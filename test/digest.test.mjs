@@ -38,8 +38,13 @@ const NEW = [{ id: '9', vendor: 'Bob Windows', amount: -340, category: 'other' }
 
 const msg = D.buildDigest({ filed: KNOWN, asking: NEW });
 
-ok('says plainly what it FILED', msg.includes('I filed 3 things for you today'));
-ok('and WHY (he already told us)', msg.includes('you have told me about them before'));
+// THE DIGEST NEVER TAKES CREDIT FOR HIS WORK. It used to say "I filed 3 things FOR YOU
+// today, because you have told me about them before". `filed` is every confirmed bank
+// entry from the last day, which includes the ones HE opened the app and confirmed
+// himself. So we claimed his work, and invented a reason for a decision he made.
+ok('says what happened, and counts it', msg.includes('3 things landed from your bank today, and they count'));
+ok('never claims to have done his work for him', !msg.includes('I filed'));
+ok('and invents no reason for a decision it did not make', !msg.includes('you have told me about'));
 ok('names the shop, the money and the category', msg.includes('Screwfix, £84.30, materials'));
 ok('asks ONLY about the one it does not know', msg.includes('One I do not recognise'));
 ok('and names it', msg.includes('Bob Windows, £340.00'));
@@ -54,8 +59,8 @@ ok('and leaves a way to undo', noQuestion.includes('Reply NO'));
 
 // Only new things: no "I filed" claim we did not earn.
 const onlyNew = D.buildDigest({ filed: [], asking: NEW });
-ok('never claims to have filed something it did not', !onlyNew.includes('I filed'));
-ok('one reads as one, not "1 things"', D.buildDigest({ filed: [KNOWN[0]], asking: [] }).includes('I filed one thing'));
+ok('nothing landed means no claim that anything landed', !onlyNew.includes('landed from your bank'));
+ok('one reads as one, not "1 things"', D.buildDigest({ filed: [KNOWN[0]], asking: [] }).includes('One thing landed'));
 
 ok('nothing at all means no message at all', D.buildDigest({ filed: [], asking: [] }) === null);
 
@@ -101,18 +106,16 @@ const killed = D.decideDigest({ ...base, lastInboundAt: ago(1), sendsEnabled: fa
 ok('the kill switch beats everything, including free', killed.send === false && killed.reason === 'sends_disabled');
 
 // --- the one word ---------------------------------------------------------------
-for (const yes of ['YES', 'yes', 'y', 'Yep', 'ok', 'OK.', 'confirm', 'aye', 'sound', 'yeah']) {
-  ok(`"${yes}" means confirm`, D.readReply(yes) === 'confirm');
-}
-for (const no of ['NO', 'no', 'nope', 'nah', 'wrong']) {
-  ok(`"${no}" means leave them`, D.readReply(no) === 'reject');
-}
-
-// Anything else is a real message and must NOT be swallowed as an approval.
-for (const other of ['spent 40 at screwfix', 'how much tax do i owe', 'yes but not the shell one', '']) {
-  ok(`"${other}" is NOT taken as blanket approval`, D.readReply(other) === 'none');
-}
-
+//
+// It lives in matchAck (lib/waintents.ts) and it is tested in waintents.test.mjs.
+//
+// There was a second copy here, readReply(), with no callers and a real bug: it read
+// "ok", "sure" and a thumbs up as a blanket CONFIRM. Since a confirm files a day's
+// books, a man replying "ok" to a digest was approving entries he had not read. It was
+// never wired up, so it never bit anyone. It was simply sitting there, correct looking,
+// waiting for whoever searched the digest file for how to read a digest reply.
+//
+// Deleted, along with the tests that were carefully proving it did the wrong thing.
 
 // --- shouldAutoFile: THE MOST DANGEROUS FUNCTION IN THE PRODUCT ----------------
 //

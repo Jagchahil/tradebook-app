@@ -136,10 +136,23 @@ export function buildDigest(split: DigestSplit): string | null {
   if (filed.length > 0) {
     const shown = filed.slice(0, MAX_LINES);
     const more = filed.length - shown.length;
+
+    // NOTE THE WORDING, IT IS LOAD BEARING.
+    //
+    // This said "I filed 3 things FOR YOU today, because you have told me about them
+    // before." Both halves could be false. `filed` is every confirmed bank entry from
+    // the last day, and a man who opened the app and tapped confirm himself confirmed
+    // them himself. We would then have taken the credit for his work, and invented a
+    // reason ("you told me before") for a decision he made, not us.
+    //
+    // Nobody would ever have reported it. He would just have quietly learned that the
+    // thing narrating his money does not know what happened, and stopped reading it.
+    //
+    // So we say the only thing we know for certain is true: it landed, and it counts.
     parts.push(
       filed.length === 1
-        ? 'I filed one thing for you today, because you have told me about it before.'
-        : `I filed ${filed.length} things for you today, because you have told me about them before.`,
+        ? 'One thing landed from your bank today, and it counts:'
+        : `${filed.length} things landed from your bank today, and they count:`,
     );
     parts.push(shown.map((e) => `• ${line(e)}`).join('\n') + (more > 0 ? `\n• and ${more} more` : ''));
   }
@@ -150,7 +163,7 @@ export function buildDigest(split: DigestSplit): string | null {
     parts.push(shown.map((e) => `• ${line(e)}`).join('\n'));
     parts.push('Reply YES to file those too, or tell me what they were and I will remember.');
   } else if (filed.length > 0) {
-    // Nothing to ask, so we do not ask. We say what we did and get out of the way.
+    // Nothing to ask, so we do not ask. We say what happened and get out of the way.
     // That is the whole point.
     parts.push('Nothing needs you. Reply NO if any of that looks wrong.');
   }
@@ -206,24 +219,12 @@ export function decideDigest(input: {
   return { send: true, free: false };
 }
 
-// What a bare "yes" means when a digest is sitting unanswered.
+// WHAT A BARE "YES" MEANS: see matchAck in lib/waintents.ts. It lives there, once.
 //
-// This used to be answered with a pointer to the app, which is exactly the thing we
-// promise people they will not have to do. If he says yes, that IS his approval, and
-// it is his to give. Nothing irreversible happens here: confirming an entry only
-// says "this is really mine", it does not send anything to HMRC and it does not move
-// any money. Those still ask, every time.
-export type DigestReply = 'confirm' | 'reject' | 'none';
-
-export function readReply(body: string): DigestReply {
-  const t = (body ?? '').trim().toLowerCase().replace(/[^a-z ]/g, '');
-  if (!t) return 'none';
-
-  if (/^(yes|y|yep|yeah|yea|ok|okay|confirm|confirmed|correct|all good|thats right|sound|aye)$/.test(t)) {
-    return 'confirm';
-  }
-  if (/^(no|n|nope|nah|wrong|not right)$/.test(t)) {
-    return 'reject';
-  }
-  return 'none';
-}
+// There used to be a readReply() here that did the same job, and did it WRONG: it read
+// "ok", "sure" and 👍 as a blanket CONFIRM. It had no callers, so it was never the bug
+// that bit us. It was the bug waiting to be wired up by the next person who found it,
+// searched for "digest reply", and reasonably assumed the function named readReply in
+// the digest file was the one to call.
+//
+// Dead code that looks correct is worse than no code. Deleted on purpose.

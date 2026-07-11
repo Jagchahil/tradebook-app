@@ -39,7 +39,17 @@ const REDIRECT_URI = process.env.HMRC_REDIRECT_URI;
 // the flow fails closed (cannot sign or verify). A literal default would be in
 // the public repo and let anyone forge a state for any user. Prefer a dedicated
 // HMRC_STATE_SECRET; fall back only to the server-only service-role key.
-const STATE_SECRET = process.env.HMRC_STATE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const STATE_SECRET = process.env.HMRC_STATE_SECRET || '';
+
+// NO FALLBACK TO THE SERVICE ROLE KEY.
+//
+// This used to end in `|| process.env.SUPABASE_SERVICE_ROLE_KEY`, which "worked" and was
+// quietly the worst line in the file. That key reads every row in the database. Signing
+// is not encryption: every token we hand out is a sample of output from that key. And
+// rotating it, the one thing you must be able to do FAST if it ever leaks, would silently
+// break every live link at the same moment.
+//
+// A secret that guards one thing guards one thing. No secret, no tokens.
 const STATE_TTL_MS = 15 * 60 * 1000;
 
 export function signState(userId: string): string {

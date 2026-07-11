@@ -84,7 +84,16 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
   const { token } = await params;
 
   // 1. Did we issue this?
-  const shareId = verifyShareToken(decodeURIComponent(token));
+  // A malformed %-escape makes decodeURIComponent THROW, and an uncaught throw in a
+  // server component is a 500 page. A bad link should look like a bad link, not like
+  // our site falling over.
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(token);
+  } catch {
+    decoded = token;
+  }
+  const shareId = verifyShareToken(decoded);
   if (!shareId) {
     return (
       <Dead

@@ -5,7 +5,17 @@
 // literal default.
 import crypto from 'crypto';
 
-const SECRET = process.env.LEAD_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SECRET = process.env.LEAD_TOKEN_SECRET || '';
+
+// NO FALLBACK TO THE SERVICE ROLE KEY.
+//
+// This used to end in `|| process.env.SUPABASE_SERVICE_ROLE_KEY`, which "worked" and was
+// quietly the worst line in the file. That key reads every row in the database. Signing
+// is not encryption: every token we hand out is a sample of output from that key. And
+// rotating it, the one thing you must be able to do FAST if it ever leaks, would silently
+// break every live link at the same moment.
+//
+// A secret that guards one thing guards one thing. No secret, no tokens.
 
 export function leadToken(purpose: 'confirm' | 'unsub', email: string): string {
   if (!SECRET) return '';

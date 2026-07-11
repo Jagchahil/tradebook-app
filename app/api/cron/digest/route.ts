@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after as afterResponse } from 'next/server';
 import crypto from 'crypto';
 import {
   usersDueDigest,
-  bankEntriesForDigest,
-  markDigestSent,
+  bankEntriesForDigestMany,
+  markDigestSentMany,
   addWaSend,
   countActiveSubscribers,
 } from '../../../../lib/supabase';
@@ -72,59 +72,113 @@ export async function GET(req: NextRequest) {
   // Where we already are against today's global cap. addWaSend returns the running
   // count, so a paid send is only made when there is genuinely room for it.
   const sentToday = (await addWaSend(0)) ?? dailyCap;
+
+  const cursor = req.nextUrl.searchParams.get('after');
+  const page = await usersDueDigest(cursor, PAGE);
+
+  // Everything this page needs, in two queries. See bankEntriesForDigestMany.
+  const withPhones = page.users.filter((u) => u.phone_number);
+  const entries = await bankEntriesForDigestMany(withPhones.map((u) => u.id));
+
+  // DECIDE FIRST, SEND SECOND.
+  //
+  // The decision is pure and free, so it is made for the whole page in memory. That
+  // means the WhatsApp budget is spent in a single, honest pass rather than drifting as
+  // sends race each other.
+  const plan: Array<{ id: string; phone: string; text: string; free: boolean }> = [];
+  let skipped = 0;
   let budgetLeft = Math.max(0, dailyCap - sentToday);
 
-  const after = req.nextUrl.searchParams.get('after');
-  const users = await usersDueDigest(after, PAGE);
-
-  let sentFree = 0;
-  let sentPaid = 0;
-  let skipped = 0;
-  let lastId: string | null = after;
-
-  for (const u of users) {
-    lastId = u.id;
-    if (!u.phone_number) continue;
-
-    const split = await bankEntriesForDigest(u.id);
-    const total = split.filed.length + split.asking.length;
-
+  for (const u of withPhones) {
+    const split = entries.get(u.id) ?? { filed: [], asking: [] };
     const decision = decideDigest({
-      entryCount: total,
+      entryCount: split.filed.length + split.asking.length,
       lastInboundAt: u.last_inbound_at,
       lastDigestAt: u.last_digest_at,
       budgetLeft,
       sendsEnabled: true,
     });
-
     if (!decision.send) {
       skipped += 1;
       continue;
     }
-
     const text = buildDigest(split);
     if (!text) {
       skipped += 1;
       continue;
     }
-
-    await sendText(u.phone_number, text);
-    await markDigestSent(u.id);
-
-    if (decision.free) {
-      // Costs nothing. Not counted against the budget, because it is not spend.
-      sentFree += 1;
-    } else {
-      // A paid template. Count it, and stop when the money runs out.
-      await addWaSend(1);
-      budgetLeft -= 1;
-      sentPaid += 1;
-    }
+    if (!decision.free) budgetLeft -= 1;
+    plan.push({ id: u.id, phone: u.phone_number as string, text, free: decision.free });
   }
 
-  // More users to walk? Hand the cursor back so the next hop picks up where this
-  // one stopped, rather than starting again and re-sending.
-  const more = users.length === PAGE;
+  const paid = plan.filter((p) => !p.free).length;
+
+  // RESERVE THE SPEND BEFORE SPENDING IT.
+  //
+  // The counter used to go up after each send. If the function dies half way, the sends
+  // happened and the count did not, so the next hop thinks it has money it has already
+  // spent. Reserving up front means a crash makes us send LESS than we could, never
+  // more. When the failure mode is "a bill", fail towards not spending.
+  if (paid > 0) await addWaSend(paid);
+
+  // Bounded concurrency. Serial was ninety seconds a page; unbounded would open two
+  // hundred sockets to Meta at once and get us rate limited, which looks exactly like
+  // being broken.
+  const LANES = 8;
+  let sentFree = 0;
+  let sentPaid = 0;
+  let cursorIdx = 0;
+  const done: string[] = [];
+
+  async function lane(): Promise<void> {
+    for (;;) {
+      const i = cursorIdx++;
+      if (i >= plan.length) return;
+      const job = plan[i];
+      try {
+        await sendText(job.phone, job.text);
+        done.push(job.id);
+        if (job.free) sentFree += 1;
+        else sentPaid += 1;
+      } catch {
+        // One number failing is not the page failing. It is picked up tomorrow.
+        skipped += 1;
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(LANES, plan.length) }, lane));
+
+  // One write for everyone who actually got a message. Only the ones who got one, so a
+  // send that failed is retried tomorrow instead of being marked as delivered.
+  await markDigestSentMany(done);
+
+  // MORE USERS TO WALK? GO AND WALK THEM.
+  //
+  // This used to hand the cursor back in the JSON and stop, and NOTHING ON EARTH WAS
+  // READING THAT JSON. Vercel calls this once a day, we answer "ok, and by the way
+  // there are 99,800 more people", and the scheduler, which is not a person, does not
+  // ring us back. So the digest reached the first 200 users by id and no one else, and
+  // every id after those 200 got silence, forever, while the endpoint returned 200 OK.
+  //
+  // Same continuation the reminders cron already uses: hop to ourselves with the cursor,
+  // AFTER the response has gone back, so Vercel is not waiting on us and the whole walk
+  // is not trying to fit in one 60 second invocation.
+  if (page.more && page.lastId) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
+    const secret = process.env.CRON_SECRET;
+    if (secret) {
+      afterResponse(async () => {
+        try {
+          await fetch(`${appUrl}/api/cron/digest?after=${encodeURIComponent(page.lastId!)}`, {
+            headers: { Authorization: `Bearer ${secret}` },
+          });
+        } catch {
+          // The next daily run picks it up from the start. A missed digest is a
+          // nuisance. A cron that retries in a tight loop is a bill.
+        }
+      });
+    }
+  }
 
   return NextResponse.json({
     ok: true,
@@ -132,7 +186,7 @@ export async function GET(req: NextRequest) {
     sentPaid,
     skipped,
     budgetLeft,
-    more,
-    next: more ? lastId : null,
+    more: page.more,
+    next: page.more ? page.lastId : null,
   });
 }

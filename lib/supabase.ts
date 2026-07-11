@@ -2685,10 +2685,20 @@ export async function setTransactionPersonal(
 }
 
 // Mark several at once, for the "yes, all of those are personal" tap.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function setManyPersonal(userId: string, ids: string[]): Promise<number> {
-  if (ids.length === 0) return 0;
+  // These ids arrive from a request body and get built into a PostgREST filter by hand.
+  // encodeURIComponent is not a validator: PostgREST decodes the string straight back,
+  // so an id containing a quote and a comma reopens the list and appends rows of the
+  // attacker's choosing. user_id=eq. means he could only ever reach his own books, so
+  // this is a bug rather than a breach, but "the blast radius happens to be small" is
+  // not a design. An id is a uuid or it is not an id.
+  const clean = ids.filter((i) => UUID.test(i));
+  if (clean.length === 0) return 0;
+
   const { url } = config();
-  const list = ids.map((i) => `"${i}"`).join(',');
+  const list = clean.map((i) => `"${i}"`).join(',');
   const res = await fetch(
     `${url}/rest/v1/transactions?id=in.(${encodeURIComponent(list)})` +
       `&user_id=eq.${encodeURIComponent(userId)}`,
@@ -2698,7 +2708,7 @@ export async function setManyPersonal(userId: string, ids: string[]): Promise<nu
       body: JSON.stringify({ is_personal: true }),
     },
   );
-  return res.ok ? ids.length : 0;
+  return res.ok ? clean.length : 0;
 }
 
 // Everything confirmed, INCLUDING personal, so the detector can look at the whole
@@ -2893,7 +2903,19 @@ export interface DigestCandidate {
 
 // Users who have unconfirmed BANK entries we have not told them about yet.
 // Paged, so the cron can walk 100k users a chunk at a time.
-export async function usersDueDigest(afterId: string | null, limit: number): Promise<DigestCandidate[]> {
+// A page of the digest walk.
+//
+// `users` is who to TEXT. `lastId` and `more` describe the RAW SCAN, and they have to,
+// because the two are no longer the same thing once opt outs are removed.
+//
+// The cron used to infer "more users to walk" from `users.length === PAGE`. The moment
+// this function started dropping opted out people, that inference became a bug with a
+// nasty shape: a page of 200 where 150 have opted out returns 50, the cron reads 50 as
+// "the list is finished", stops, and every user after that point silently never gets a
+// digest again. It would have looked like nothing at all was wrong.
+export type DigestPage = { users: DigestCandidate[]; lastId: string | null; more: boolean };
+
+export async function usersDueDigest(afterId: string | null, limit: number): Promise<DigestPage> {
   const { url } = config();
   const after = afterId ? `&id=gt.${encodeURIComponent(afterId)}` : '';
   const res = await fetch(
@@ -2901,8 +2923,43 @@ export async function usersDueDigest(afterId: string | null, limit: number): Pro
       `&phone_number=not.is.null&order=id.asc&limit=${limit}`,
     { headers: headers() },
   );
-  if (!res.ok) return [];
-  return await res.json();
+  if (!res.ok) return { users: [], lastId: afterId, more: false };
+
+  const page = (await res.json()) as DigestCandidate[];
+  // The cursor and the "keep going" flag come from the RAW page, before any filtering.
+  const lastId = page.length > 0 ? page[page.length - 1].id : afterId;
+  const more = page.length === limit;
+  if (page.length === 0) return { users: [], lastId, more: false };
+
+  // STOP HAS TO ACTUALLY STOP.
+  //
+  // This page came straight out of `users` and went straight to WhatsApp. It never
+  // looked at reminder_prefs. So a man who texted STOP, and got told "no more
+  // reminders", carried on getting a message from us every single day.
+  //
+  // That is not a bug you get to fix later. Under PECR an opt out has to be honoured,
+  // and on WhatsApp it does not need a regulator: enough people press Block and Meta
+  // takes the number off us, and the whole product goes with it.
+  //
+  // We ask for the prefs of THIS PAGE only, and drop the opt outs. A missing row means
+  // he never touched it, which means yes, so we only remove people who explicitly said no.
+  const prefsRes = await fetch(
+    `${url}/rest/v1/reminder_prefs?select=user_id,daily_nudges&user_id=in.(${page.map((u) => u.id).join(',')})`,
+    { headers: headers() },
+  );
+
+  // FAIL CLOSED, but KEEP WALKING. If we cannot read the prefs we text nobody on this
+  // page, because texting a man who asked us twice to leave him alone costs us the
+  // number. But `more` still stands, so one bad lookup does not end the whole run.
+  if (!prefsRes.ok) return { users: [], lastId, more };
+
+  const optedOut = new Set(
+    ((await prefsRes.json()) as Array<{ user_id: string; daily_nudges: boolean }>)
+      .filter((p) => p.daily_nudges === false)
+      .map((p) => p.user_id),
+  );
+
+  return { users: page.filter((u) => !optedOut.has(u.id)), lastId, more };
 }
 
 // What landed from the bank and is still waiting for a yes.
@@ -2912,18 +2969,40 @@ export async function usersDueDigest(afterId: string | null, limit: number): Pro
 //   asking  we do not know these, so they are the only thing he is asked about
 //
 // See doc 104 section 3 and lib/banksync.ts for why that split exists.
-export async function bankEntriesForDigest(
-  userId: string,
-): Promise<{ filed: Array<{ id: string; vendor: string | null; amount: number; category: string | null }>; asking: Array<{ id: string; vendor: string | null; amount: number; category: string | null }> }> {
+export type DigestEntry = { id: string; vendor: string | null; amount: number; category: string | null };
+export type DigestSplitRow = { filed: DigestEntry[]; asking: DigestEntry[] };
+
+// ONE QUERY FOR THE WHOLE PAGE, NOT TWO PER PERSON.
+//
+// The digest cron called bankEntriesForDigest(u.id) inside its loop. Two REST queries
+// per user, then a send, then a write: roughly three round trips each, in a row, for
+// two hundred users. At a realistic 150ms that is ninety seconds of work inside a sixty
+// second function.
+//
+// And the way it failed was the nasty part. The page times out half way through, and
+// the continuation hop is registered in after(), which never runs if the invocation is
+// killed. So the walk does not slow down, it STOPS, silently, at whatever user id it
+// happened to reach, and every user after that gets nothing until someone notices.
+//
+// So we ask once for the whole page and group in memory. Two queries for two hundred
+// people instead of four hundred.
+export async function bankEntriesForDigestMany(userIds: string[]): Promise<Map<string, DigestSplitRow>> {
+  const out = new Map<string, DigestSplitRow>();
+  if (userIds.length === 0) return out;
+  for (const id of userIds) out.set(id, { filed: [], asking: [] });
+
   const { url } = config();
   const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const ids = userIds.filter((i) => UUID.test(i));
+  if (ids.length === 0) return out;
+  const inList = ids.map((i) => `"${i}"`).join(',');
 
-  async function q(confirmed: boolean) {
+  async function q(confirmed: boolean): Promise<Array<DigestEntry & { user_id: string }>> {
     const res = await fetch(
-      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+      `${url}/rest/v1/transactions?user_id=in.(${encodeURIComponent(inList)})` +
         `&confirmed=eq.${confirmed}&source_type=eq.bank_feed&is_personal=eq.false` +
         `&created_at=gte.${encodeURIComponent(since)}` +
-        `&select=id,vendor,amount,category&order=created_at.desc&limit=20`,
+        `&select=id,user_id,vendor,amount,category&order=created_at.desc`,
       { headers: headers() },
     );
     if (!res.ok) return [];
@@ -2931,7 +3010,32 @@ export async function bankEntriesForDigest(
   }
 
   const [filed, asking] = await Promise.all([q(true), q(false)]);
-  return { filed, asking };
+
+  // The old per-user query had `limit=20`. That limit has to survive the batching, or a
+  // man with a busy day gets a digest the length of a bank statement. It is applied per
+  // person here, not across the page.
+  for (const r of filed) {
+    const slot = out.get(r.user_id);
+    if (slot && slot.filed.length < 20) slot.filed.push({ id: r.id, vendor: r.vendor, amount: r.amount, category: r.category });
+  }
+  for (const r of asking) {
+    const slot = out.get(r.user_id);
+    if (slot && slot.asking.length < 20) slot.asking.push({ id: r.id, vendor: r.vendor, amount: r.amount, category: r.category });
+  }
+  return out;
+}
+
+// Same idea: one write for everyone we texted, not one per person.
+export async function markDigestSentMany(userIds: string[]): Promise<void> {
+  const ids = userIds.filter((i) => UUID.test(i));
+  if (ids.length === 0) return;
+  const { url } = config();
+  const inList = ids.map((i) => `"${i}"`).join(',');
+  await fetch(`${url}/rest/v1/users?id=in.(${encodeURIComponent(inList)})`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ last_digest_at: new Date().toISOString() }),
+  });
 }
 
 export async function markDigestSent(userId: string): Promise<void> {
@@ -2949,14 +3053,27 @@ export async function markDigestSent(userId: string): Promise<void> {
 
 // "YES." His approval, given in the only place he actually is.
 //
-// This confirms UNCONFIRMED entries only, and confirming is not an irreversible act:
-// it says "this is really mine". It sends nothing to HMRC and it moves no money.
-// Those still ask, every single time, and always will.
-export async function confirmAllPending(userId: string): Promise<number> {
+// BOUNDED, AND THE BOUND IS THE WHOLE POINT.
+//
+// This used to confirm EVERY unconfirmed row in the account, with no date limit. The
+// digest shows him at most eight lines. So "yes" was approving things he had never
+// been shown, which is not an approval gate, it is a rubber stamp with his name on
+// it.
+//
+// Now it confirms only what the digest actually put in front of him: bank entries,
+// unconfirmed, from the window the digest covered. Anything older, and anything he
+// captured himself and has not reviewed, still waits for him.
+//
+// Confirming is not irreversible: it says "that is really mine". It sends nothing to
+// HMRC and it moves no money. Those still ask, every single time.
+export async function confirmDigestEntries(userId: string, sinceISO: string): Promise<number> {
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
-      `&confirmed=eq.false&is_personal=eq.false&select=id`,
+      `&confirmed=eq.false&is_personal=eq.false` +
+      `&source_type=eq.bank_feed` +
+      `&created_at=gte.${encodeURIComponent(sinceISO)}` +
+      `&select=id`,
     {
       method: 'PATCH',
       headers: headers({ Prefer: 'return=representation' }),
@@ -2967,3 +3084,16 @@ export async function confirmAllPending(userId: string): Promise<number> {
   const rows = (await res.json()) as unknown[];
   return Array.isArray(rows) ? rows.length : 0;
 }
+
+// When we last sent this user a digest, so "yes" can be scoped to it.
+export async function lastDigestAt(userId: string): Promise<string | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=last_digest_at&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ last_digest_at: string | null }>;
+  return rows[0]?.last_digest_at ?? null;
+}
+

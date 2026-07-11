@@ -18,9 +18,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      // /accountant/ is somebody's actual books behind a signed link. It carries a
+      // /share/ is somebody's actual books behind a signed link. It carries a
       // noindex header too, but a crawler should never be following one at all.
-      disallow: ['/api/', '/start', '/early-access', '/invoice/', '/hmrc/', '/accountant/'],
+      disallow: ['/api/', '/start', '/early-access', '/invoice/', '/hmrc/', '/share/', '/accountant/'],
     },
     sitemap: `${BASE}/sitemap.xml`,
     host: BASE,

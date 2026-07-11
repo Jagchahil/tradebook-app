@@ -2492,65 +2492,72 @@ export async function listOverdueInvoices(userId: string): Promise<OverdueInvoic
   return out;
 }
 
-// --- accountant read only access ---------------------------------------------
+// --- share my books -----------------------------------------------------------
 //
-// The grant lives in a row so it can be REVOKED. See lib/accountant.ts for why a
-// pure signed token was not good enough. Every read here goes through the service
-// role, and every one of them is scoped by user_id at the query, never filtered
-// afterwards.
+// The share lives in a row so it can be REVOKED, and so its SCOPE (date range and
+// excluded categories) is a server side fact rather than something the page is
+// trusted to remember. See lib/bookshare.ts.
 
-export interface AccountantGrant {
+export interface BookShare {
   id: string;
   user_id: string;
-  accountant_name: string | null;
-  accountant_email: string | null;
+  recipient_name: string | null;
+  recipient_email: string | null;
   revoked_at: string | null;
   expires_at: string;
   last_viewed_at: string | null;
   view_count: number;
   created_at: string;
+  from_date: string | null;
+  exclude_categories: string[] | null;
 }
 
-export async function createAccountantGrant(
+const SHARE_COLS =
+  'id,user_id,recipient_name,recipient_email,revoked_at,expires_at,last_viewed_at,view_count,created_at,from_date,exclude_categories';
+
+export async function createBookShare(
   userId: string,
   name: string | null,
   email: string | null,
   expiresAtISO: string,
-): Promise<AccountantGrant | null> {
+  fromDate: string,
+  excludeCategories: string[],
+): Promise<BookShare | null> {
   const { url } = config();
-  const res = await fetch(`${url}/rest/v1/accountant_grants`, {
+  const res = await fetch(`${url}/rest/v1/book_shares`, {
     method: 'POST',
     headers: headers({ Prefer: 'return=representation' }),
     body: JSON.stringify({
       user_id: userId,
-      accountant_name: name,
-      accountant_email: email,
+      recipient_name: name,
+      recipient_email: email,
       expires_at: expiresAtISO,
+      from_date: fromDate,
+      exclude_categories: excludeCategories,
     }),
   });
   if (!res.ok) return null;
-  const rows = (await res.json()) as AccountantGrant[];
+  const rows = (await res.json()) as BookShare[];
   return rows[0] ?? null;
 }
 
-export async function listAccountantGrants(userId: string): Promise<AccountantGrant[]> {
+export async function listBookShares(userId: string): Promise<BookShare[]> {
   const { url } = config();
   const res = await fetch(
-    `${url}/rest/v1/accountant_grants?user_id=eq.${encodeURIComponent(userId)}` +
-      `&select=id,user_id,accountant_name,accountant_email,revoked_at,expires_at,last_viewed_at,view_count,created_at` +
-      `&order=created_at.desc&limit=50`,
+    `${url}/rest/v1/book_shares?user_id=eq.${encodeURIComponent(userId)}` +
+      `&select=${SHARE_COLS}&order=created_at.desc&limit=50`,
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return (await res.json()) as AccountantGrant[];
+  return (await res.json()) as BookShare[];
 }
 
 // Scoped by user_id as well as id, so a caller can only ever revoke their OWN
-// grant even if they somehow learned another id.
-export async function revokeAccountantGrant(userId: string, grantId: string): Promise<boolean> {
+// share even if they somehow learned another id.
+export async function revokeBookShare(userId: string, shareId: string): Promise<boolean> {
   const { url } = config();
   const res = await fetch(
-    `${url}/rest/v1/accountant_grants?id=eq.${encodeURIComponent(grantId)}` +
+    `${url}/rest/v1/book_shares?id=eq.${encodeURIComponent(shareId)}` +
       `&user_id=eq.${encodeURIComponent(userId)}`,
     {
       method: 'PATCH',
@@ -2561,37 +2568,36 @@ export async function revokeAccountantGrant(userId: string, grantId: string): Pr
   return res.ok;
 }
 
-// Used by the PUBLIC accountant view, after the signature has already checked out.
-// Returns the row so the caller can judge revoked_at and expires_at for itself.
-export async function getAccountantGrant(grantId: string): Promise<AccountantGrant | null> {
+// Used by the PUBLIC share view, after the signature has already checked out.
+// Returns the row so the caller can judge revoked_at, expires_at and the scope.
+export async function getBookShare(shareId: string): Promise<BookShare | null> {
   const { url } = config();
   const res = await fetch(
-    `${url}/rest/v1/accountant_grants?id=eq.${encodeURIComponent(grantId)}` +
-      `&select=id,user_id,accountant_name,accountant_email,revoked_at,expires_at,last_viewed_at,view_count,created_at&limit=1`,
+    `${url}/rest/v1/book_shares?id=eq.${encodeURIComponent(shareId)}&select=${SHARE_COLS}&limit=1`,
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as AccountantGrant[];
+  const rows = (await res.json()) as BookShare[];
   return rows[0] ?? null;
 }
 
-// Record that the link was opened, so the user can see it being used. Never
-// throws: an audit write must not be able to break the accountant's view.
-export async function touchAccountantGrant(grantId: string): Promise<void> {
+// Record that the link was opened, so the owner can see it being used, and see it
+// being used when they did not expect it. Never throws.
+export async function touchBookShare(shareId: string): Promise<void> {
   try {
     const { url } = config();
-    await fetch(`${url}/rest/v1/rpc/touch_accountant_grant`, {
+    await fetch(`${url}/rest/v1/rpc/touch_book_share`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ p_grant: grantId }),
+      body: JSON.stringify({ p_share: shareId }),
     });
   } catch {
     /* never block the view on the counter */
   }
 }
 
-// Every confirmed entry for a user. The accountant view needs the whole picture,
-// not a date window, so this is deliberately unbounded by date but hard capped.
+// Every confirmed entry for a user. The SCOPE (date range, excluded categories) is
+// applied afterwards by lib/bookshare.ts, in one tested place.
 export async function getConfirmedTransactionsForUser(userId: string): Promise<Record<string, unknown>[]> {
   const { url } = config();
   const res = await fetch(

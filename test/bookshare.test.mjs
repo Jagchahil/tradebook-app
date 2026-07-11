@@ -7,9 +7,9 @@
 //
 // The middle one is why the grant lives in a table at all. See lib/accountant.ts.
 
-process.env.ACCOUNTANT_TOKEN_SECRET = 'test-secret-for-accountant-tokens';
+process.env.SHARE_TOKEN_SECRET = 'test-secret-for-accountant-tokens';
 
-const A = await import('../lib/accountant.ts');
+const A = await import('../lib/bookshare.ts');
 
 let pass = 0;
 let fail = 0;
@@ -26,20 +26,20 @@ function ok(name, cond) {
 const ID = '3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b';
 const OTHER = '9e8d7c6b-5a4f-4e3d-2c1b-0a9f8e7d6c5b';
 
-console.log('\nAccountant read only access\n');
+console.log('\nShare my books\n');
 
 // --- the token --------------------------------------------------------------
-const tok = A.accountantToken(ID);
-ok('round trips a grant id', A.verifyAccountantToken(tok) === ID);
+const tok = A.shareToken(ID);
+ok('round trips a grant id', A.verifyShareToken(tok) === ID);
 ok('carries the id, not the books', tok.startsWith(ID));
 
-ok('rejects a tampered signature', A.verifyAccountantToken(`${ID}.deadbeef`) === null);
-ok('rejects a swapped grant id (signature is bound to the id)', A.verifyAccountantToken(`${OTHER}.${tok.split('.')[1]}`) === null);
-ok('rejects a bare uuid with no signature', A.verifyAccountantToken(ID) === null);
-ok('rejects junk', A.verifyAccountantToken('nonsense') === null);
-ok('rejects empty', A.verifyAccountantToken('') === null);
-ok('rejects null', A.verifyAccountantToken(null) === null);
-ok('rejects a non uuid id even when correctly signed for itself', A.verifyAccountantToken(A.accountantToken('../../etc/passwd')) === null);
+ok('rejects a tampered signature', A.verifyShareToken(`${ID}.deadbeef`) === null);
+ok('rejects a swapped grant id (signature is bound to the id)', A.verifyShareToken(`${OTHER}.${tok.split('.')[1]}`) === null);
+ok('rejects a bare uuid with no signature', A.verifyShareToken(ID) === null);
+ok('rejects junk', A.verifyShareToken('nonsense') === null);
+ok('rejects empty', A.verifyShareToken('') === null);
+ok('rejects null', A.verifyShareToken(null) === null);
+ok('rejects a non uuid id even when correctly signed for itself', A.verifyShareToken(A.shareToken('../../etc/passwd')) === null);
 
 // The whole point: the token does NOT encode expiry, so it can never outlive a
 // revocation that happened after it was signed.
@@ -94,13 +94,14 @@ const rows = [
   { amount: -999, confirmed: false, transaction_date: '2026-07-06', category: 'Tools' }, // a GUESS
   { amount: -10, confirmed: true, transaction_date: '2026-07-03', category: 'Fuel' },
 ];
-const shared = A.accountantTransactions(rows);
+const ALL = { fromDate: '2000-01-01', excludeCategories: [] };
+const shared = A.shareTransactions(rows, ALL);
 
 ok('an UNCONFIRMED entry is never shared (it is our guess, not their books)', shared.length === 3);
 ok('the unconfirmed amount is nowhere in the output', !JSON.stringify(shared).includes('999'));
 ok('newest first', shared[0].date === '2026-07-05');
 
-const totals = A.accountantTotals(shared);
+const totals = A.shareTotals(shared);
 ok('income totals only the positives', totals.income === 100);
 ok('expenses total the negatives as positives', totals.expenses === 50);
 ok('profit is income minus expenses', totals.profit === 50);
@@ -112,11 +113,74 @@ ok('sums a category', cats[0].total === 50);
 ok('income is not an expense category', !cats.some((c) => c.category === 'Income'));
 
 // --- rounding ---------------------------------------------------------------
-const pennies = A.accountantTotals([
+const pennies = A.shareTotals([
   { date: '2026-07-01', vendor: null, category: null, description: null, amount: 0.1, confirmed: true },
   { date: '2026-07-01', vendor: null, category: null, description: null, amount: 0.2, confirmed: true },
 ]);
 ok('no floating point dust in the totals', pennies.income === 0.3);
+
+
+// --- THE SCOPE. This is the bug the first real test link exposed. ------------
+//
+// Sharing your books must not mean sharing your life. The first version shared
+// every confirmed entry ever, and the first link Jag made contained CHILD TAX
+// CREDIT and BET365. These tests exist so that can never happen again.
+
+const REAL_BOOKS = [
+  { amount: 23000, vendor: 'Ravi', category: 'income', transaction_date: '2026-07-02', confirmed: true },
+  { amount: -13.2, vendor: 'Mileage', category: 'travel', transaction_date: '2026-06-30', confirmed: true },
+  { amount: 345.13, vendor: 'CHILD TAX CREDIT', category: 'income', transaction_date: '2026-06-09', confirmed: true },
+  { amount: -0.01, vendor: 'BET365', category: 'other', transaction_date: '2026-06-22', confirmed: true },
+  { amount: -10, vendor: 'L&G INSURANCE', category: 'insurance', transaction_date: '2026-06-16', confirmed: true },
+  { amount: -50, vendor: 'Old job', category: 'travel', transaction_date: '2024-01-01', confirmed: true },
+];
+
+// No date range means share NOTHING. Failing closed is the whole point: an old
+// link, or a bug, must never dump someone's entire financial history.
+const noScope = A.shareTransactions(REAL_BOOKS, { fromDate: null, excludeCategories: [] });
+ok('NO date range shares NOTHING, it does not share everything', noScope.length === 0);
+
+// A date range keeps last year's unrelated work out of it.
+const thisYear = A.shareTransactions(REAL_BOOKS, { fromDate: '2026-04-06', excludeCategories: [] });
+ok('the date range excludes entries before it', !JSON.stringify(thisYear).includes('Old job'));
+ok('the date range keeps entries after it', thisYear.length === 5);
+
+// Excluding a category actually removes it.
+const noPersonal = A.shareTransactions(REAL_BOOKS, {
+  fromDate: '2026-04-06',
+  excludeCategories: ['other'],
+});
+ok('an excluded category is GONE (no BET365)', !JSON.stringify(noPersonal).includes('BET365'));
+ok('everything else survives', noPersonal.length === 4);
+
+// Exclusion is case insensitive, because a category typed as "Other" and stored
+// as "other" must not silently defeat the filter.
+const caseInsensitive = A.shareTransactions(REAL_BOOKS, {
+  fromDate: '2026-04-06',
+  excludeCategories: ['OTHER'],
+});
+ok('exclusion is case insensitive (a capital letter cannot defeat it)', !JSON.stringify(caseInsensitive).includes('BET365'));
+
+// Excluding several.
+const clean = A.shareTransactions(REAL_BOOKS, {
+  fromDate: '2026-04-06',
+  excludeCategories: ['other', 'income'],
+});
+ok('multiple exclusions all apply', !JSON.stringify(clean).includes('BET365') && !JSON.stringify(clean).includes('CHILD TAX CREDIT'));
+
+// --- normaliseScope: an unreadable scope must not become "share everything" ---
+ok('a missing from_date normalises to null, which shares nothing', A.normaliseScope({}).fromDate === null);
+ok('a junk from_date is rejected, not passed through', A.normaliseScope({ from_date: 'whenever' }).fromDate === null);
+ok('a good from_date survives', A.normaliseScope({ from_date: '2026-04-06' }).fromDate === '2026-04-06');
+ok('a junk exclude list becomes empty, not undefined', Array.isArray(A.normaliseScope({ exclude_categories: 'nope' }).excludeCategories));
+ok('exclusions are lowercased on the way in', A.normaliseScope({ exclude_categories: ['Other'] }).excludeCategories[0] === 'other');
+ok('non strings are dropped from the exclude list', A.normaliseScope({ exclude_categories: ['ok', 5, null] }).excludeCategories.length === 1);
+
+// --- categoriesIn: show the user their OWN categories, not a guessed list -----
+const cats2 = A.categoriesIn(REAL_BOOKS);
+ok('lists the real categories in the books', cats2.includes('other') && cats2.includes('travel') && cats2.includes('income'));
+ok('does not invent categories', cats2.length === 4);
+ok('ignores unconfirmed entries', !A.categoriesIn([{ category: 'ghost', confirmed: false }]).includes('ghost'));
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

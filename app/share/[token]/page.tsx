@@ -1,19 +1,20 @@
 import type { Metadata } from 'next';
 import {
-  verifyAccountantToken,
+  verifyShareToken,
   grantState,
-  accountantTransactions,
-  accountantTotals,
+  shareTransactions,
+  shareTotals,
   byCategory,
-} from '../../../lib/accountant';
+  normaliseScope,
+} from '../../../lib/bookshare';
 import {
-  getAccountantGrant,
-  touchAccountantGrant,
+  getBookShare,
+  touchBookShare,
   getConfirmedTransactionsForUser,
 } from '../../../lib/supabase';
 import { A11Y_CSS } from '../../../lib/tokens';
 
-// The accountant's view. Public URL, no login, READ ONLY.
+// The shared books view. Public URL, no login, READ ONLY.
 //
 // THE SECURITY MODEL, IN ORDER. Both checks, every request, no exceptions:
 //
@@ -29,8 +30,10 @@ import { A11Y_CSS } from '../../../lib/tokens';
 //
 // The data is fetched with the service role, scoped to the granting user's id at
 // the query. The anon key is never used, so no policy mistake can widen this.
-// The accountant sees CONFIRMED entries only, redacted: no user id, no receipt
-// image, no WhatsApp message id, no phone number. See lib/accountant.ts.
+// The recipient sees CONFIRMED entries only, inside the date range the owner chose,
+// with the categories they excluded removed, redacted: no user id, no receipt image,
+// no WhatsApp message id, no phone number. The scope is applied in lib/bookshare.ts,
+// in one tested place, NOT in this template, so a redesign here cannot widen it.
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -81,25 +84,25 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
   const { token } = await params;
 
   // 1. Did we issue this?
-  const grantId = verifyAccountantToken(decodeURIComponent(token));
-  if (!grantId) {
+  const shareId = verifyShareToken(decodeURIComponent(token));
+  if (!shareId) {
     return (
       <Dead
         title="This link is not valid"
-        body="Check you have the whole link, exactly as it was sent to you. If in doubt, ask your client to send you a new one from the Lekhio app."
+        body="Check you have the whole link, exactly as it was sent to you. If in doubt, ask them to send you a new one from the Lekhio app."
       />
     );
   }
 
   // 2. Is it still good? The row is the truth, not the token.
-  const grant = await getAccountantGrant(grantId);
+  const grant = await getBookShare(shareId);
   const state = grantState(grant);
 
   if (state === 'revoked') {
     return (
       <Dead
         title="This link has been turned off"
-        body="Your client has revoked access to their books. If you still need them, ask them to share a new link."
+        body="The person who shared these books has turned the link off. If you still need them, ask them to share a new one."
       />
     );
   }
@@ -107,7 +110,7 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
     return (
       <Dead
         title="This link has expired"
-        body="Shared links do not last forever, on purpose. Ask your client to send a fresh one from the Lekhio app."
+        body="Shared links do not last forever, on purpose. Ask for a fresh one from the Lekhio app."
       />
     );
   }
@@ -115,18 +118,22 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
     return (
       <Dead
         title="This link is not valid"
-        body="We could not find these books. Ask your client to send you a new link from the Lekhio app."
+        body="We could not find these books. Ask for a new link from the Lekhio app."
       />
     );
   }
 
   // Count the view so the owner can see their link being used, and see it being
   // used when they did not expect it.
-  await touchAccountantGrant(grant.id);
+  await touchBookShare(grant.id);
 
   const raw = await getConfirmedTransactionsForUser(grant.user_id);
-  const rows = accountantTransactions(raw);
-  const totals = accountantTotals(rows);
+
+  // The scope is the owner's, read from the row, never from the URL. Fails closed:
+  // a share with no date range shows nothing at all.
+  const scope = normaliseScope(grant);
+  const rows = shareTransactions(raw, scope);
+  const totals = shareTotals(rows);
   const cats = byCategory(rows);
 
   return (
@@ -137,9 +144,9 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
         Shared books
       </h1>
       <p style={{ color: MUTED, fontSize: 15.5, lineHeight: 1.6, marginTop: 10, maxWidth: 640 }}>
-        {grant.accountant_name ? `Shared with ${grant.accountant_name}. ` : ''}
-        This is a read only view. Every figure below has been reviewed and confirmed by your client.
-        Nothing here can be changed from this page.
+        {grant.recipient_name ? `Shared with ${grant.recipient_name}. ` : ''}
+        This is a read only view. Every figure below was reviewed and confirmed by the person who shared
+        it, and they chose what to include. Nothing here can be changed from this page.
       </p>
 
       <section
@@ -193,8 +200,8 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
 
       {rows.length === 0 ? (
         <p style={{ color: MUTED, marginTop: 12 }}>
-          Your client has not confirmed any entries yet. Anything they have captured but not yet reviewed is
-          deliberately not shown here.
+          There is nothing to show for the period that was shared. Anything captured but not yet reviewed,
+          and anything outside the shared dates or categories, is deliberately not here.
         </p>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 14, fontSize: 14.5 }}>
@@ -234,7 +241,8 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
 
       <p style={{ color: MUTED, fontSize: 13, lineHeight: 1.6, marginTop: 40, maxWidth: 640 }}>
         Lekhio prepares figures. The taxpayer reviews and approves them, and remains responsible for their own
-        tax. This view is read only and your client can turn it off at any time.
+        tax. This view is read only, it shows only what its owner chose to share, and they can turn it off at
+        any time.
       </p>
     </Shell>
   );

@@ -316,6 +316,12 @@ create table if not exists public.events (
 );
 
 alter table public.events enable row level security;
+-- Drops first so the whole file stays re-runnable (a bare create policy on a
+-- second run aborts the batch, which previously blocked later migrations).
+drop policy if exists "events read own"   on public.events;
+drop policy if exists "events insert own" on public.events;
+drop policy if exists "events update own" on public.events;
+drop policy if exists "events delete own" on public.events;
 create policy "events read own"   on public.events for select using ((select auth.uid()) = user_id);
 create policy "events insert own" on public.events for insert with check ((select auth.uid()) = user_id);
 create policy "events update own" on public.events for update using ((select auth.uid()) = user_id);
@@ -339,6 +345,9 @@ create table if not exists public.reminder_prefs (
 );
 
 alter table public.reminder_prefs enable row level security;
+drop policy if exists "prefs read own"   on public.reminder_prefs;
+drop policy if exists "prefs insert own" on public.reminder_prefs;
+drop policy if exists "prefs update own" on public.reminder_prefs;
 create policy "prefs read own"   on public.reminder_prefs for select using ((select auth.uid()) = user_id);
 create policy "prefs insert own" on public.reminder_prefs for insert with check ((select auth.uid()) = user_id);
 create policy "prefs update own" on public.reminder_prefs for update using ((select auth.uid()) = user_id);
@@ -418,6 +427,29 @@ begin
   return v;
 end;
 $$;
+
+-- Batch increment for a whole page of sends (e.g. a page of WhatsApp template
+-- fan-out), so a 100k user run adds one counter write per page instead of one
+-- per message. Returns the new count for today so the caller can stop once a
+-- daily budget is hit. Same table and race-safe upsert as increment_ai_usage.
+create or replace function public.add_ai_usage(p_scope text, p_key text, p_n integer)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v integer;
+begin
+  insert into public.ai_usage (day, scope, key, count)
+  values (current_date, p_scope, p_key, greatest(p_n, 0))
+  on conflict (day, scope, key)
+  do update set count = public.ai_usage.count + greatest(p_n, 0)
+  returning count into v;
+  return v;
+end;
+$$;
+revoke execute on function public.add_ai_usage(text, text, integer) from anon, authenticated, public;
+grant execute on function public.add_ai_usage(text, text, integer) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Signup offer (the register-your-business funnel)
@@ -1062,12 +1094,17 @@ create index if not exists qa_cache_lookup on public.qa_cache (question_norm) wh
 alter table public.qa_cache enable row level security;  -- service role only, no policy
 
 -- A race free +1 to the popularity counter, so we can measure credits saved.
+-- Pinned search_path and service-role-only execute, to match every other
+-- function here and keep the Supabase security advisor board clean.
 create or replace function public.bump_qa_cache_hit(p_norm text)
 returns void
 language sql
+set search_path = public
 as $$
   update public.qa_cache set hits = hits + 1 where question_norm = p_norm;
 $$;
+revoke execute on function public.bump_qa_cache_hit(text) from anon, authenticated, public;
+grant execute on function public.bump_qa_cache_hit(text) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Bound the qa_candidates learning pool (doc 96 scale item, 8 Jul 2026). One row
@@ -1104,6 +1141,7 @@ create or replace function public.log_qa_candidate(
   p_engine_impact  boolean
 ) returns void
 language sql
+set search_path = public
 as $$
   insert into public.qa_candidates
     (question_norm, question, answer, sources, used_knowledge,
@@ -1125,5 +1163,7 @@ as $$
     engine_impact          = case when public.qa_candidates.status = 'unreviewed'
                                   then excluded.engine_impact else public.qa_candidates.engine_impact end;
 $$;
+revoke execute on function public.log_qa_candidate(text, text, text, jsonb, boolean, boolean, boolean) from anon, authenticated, public;
+grant execute on function public.log_qa_candidate(text, text, text, jsonb, boolean, boolean, boolean) to service_role;
 
 notify pgrst, 'reload schema';

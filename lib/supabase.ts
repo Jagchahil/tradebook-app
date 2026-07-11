@@ -59,6 +59,51 @@ export async function bumpAiUsage(scope: string, key: string): Promise<number | 
   }
 }
 
+// How many users are actually paying us right now (active or in trial). One HEAD
+// count, no rows pulled. Used to derive the day's proactive WhatsApp send budget
+// from the margin target: revenue scales with this number, so the send ceiling
+// must too (see lib/wabudget.ts). Returns null on any error, and the caller then
+// falls back to the safe floor rather than sending without a ceiling.
+export async function countActiveSubscribers(): Promise<number | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/subscriptions?select=stripe_subscription_id&status=in.(active,trialing)`,
+      { method: 'HEAD', headers: headers({ Prefer: 'count=exact', Range: '0-0' }) },
+    );
+    if (!res.ok) return null;
+    // PostgREST returns the total in Content-Range as "0-0/123".
+    const total = (res.headers.get('content-range') ?? '').split('/')[1];
+    const n = Number(total);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+// Add a whole page of proactive WhatsApp sends to today's global counter in one
+// write (scale audit). Returns the new running total for today so the cron can
+// stop once the daily budget is hit, or null on any error (the caller treats
+// null as "cannot confirm, keep going" so a DB hiccup never mutes reminders; the
+// kill switch is the hard stop). Uses the same ai_usage table under scope
+// 'wa_send', key 'global'.
+export async function addWaSend(n: number): Promise<number | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/rpc/add_ai_usage`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_scope: 'wa_send', p_key: 'global', p_n: n }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const c = typeof data === 'number' ? data : Array.isArray(data) ? Number(data[0]) : Number(data);
+    return Number.isFinite(c) ? c : null;
+  } catch {
+    return null;
+  }
+}
+
 // --- Khoji knowledge retrieval (the growing brain) ------------------------
 // Khoji (the Mac mini watcher) distils GOV.UK and HMRC updates into the
 // knowledge_items table. This reads back only the rows a human has REVIEWED and
@@ -995,6 +1040,10 @@ export async function deleteUserData(userId: string, email: string | null): Prom
   await del(`events?user_id=eq.${encodeURIComponent(userId)}`);
   await del(`reminder_prefs?user_id=eq.${encodeURIComponent(userId)}`);
   await del(`hmrc_connections?user_id=eq.${encodeURIComponent(userId)}`);
+  // The user's signed-off HMRC figures (their approval records). Keyed by user_id
+  // with no FK, so this does NOT cascade from users: erase it explicitly or the
+  // numbers a user approved would survive an account deletion (UK GDPR erasure).
+  await del(`hmrc_approvals?user_id=eq.${encodeURIComponent(userId)}`);
   // Bank tokens + connection rows. These cascade when the users row goes, but
   // delete first and explicitly so erasure never leaves a live banking token
   // behind if the users delete were to fail.

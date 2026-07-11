@@ -9,7 +9,10 @@ import {
   weeklyTotals,
   weeklyTotalsAll,
   pruneOldRows,
+  addWaSend,
+  countActiveSubscribers,
 } from '../../../../lib/supabase';
+import { waSendsEnabled, waBudgetExceeded, globalDailyCapFor } from '../../../../lib/wabudget';
 import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
 import { hasBankFeedConfig } from '../../../../lib/bankfeed';
 import { syncPageResumable } from '../../../../lib/banksync';
@@ -98,13 +101,34 @@ async function triggerContinuation(job: string, afterId: string | null, hop: num
 async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: number): Promise<void> {
   const started = Date.now();
   let sent = 0;
+  // Emergency brake: if proactive sends are switched off, do nothing. This is the
+  // cost kill switch (scale audit); inbound service replies are unaffected.
+  if (!waSendsEnabled()) {
+    console.log(`[cron] job=${job} proactive WhatsApp sends disabled (WHATSAPP_SENDS_ENABLED=false), skipping`);
+    return;
+  }
+  // The day's send ceiling, DERIVED from the live paying base and the margin
+  // target (lib/wabudget.ts), so WhatsApp spend can never outgrow revenue. A
+  // failed count falls back to the safe floor rather than sending uncapped.
+  const subs = await countActiveSubscribers();
+  const dailyCap = globalDailyCapFor(subs ?? 0);
+
   // One grouped aggregate for the weekly totals; falls back per user until the
   // weekly_totals_all RPC (supabase/schema.sql) is applied.
   const all = job === 'weekly' ? await weeklyTotalsAll() : null;
   const totalsMap = all ? new Map(all.map((r) => [r.user_id, r])) : null;
 
   let cursor = startAfter;
+  let runningTotal: number | null = null; // today's global proactive-send count
   for (;;) {
+    // Stop before sending another page once the day's send budget is reached.
+    // We can overshoot by at most one page (checked on the prior page's total).
+    if (runningTotal != null && waBudgetExceeded(runningTotal, dailyCap)) {
+      console.error(
+        `[cron] job=${job} WhatsApp daily budget reached (${runningTotal}/${dailyCap}, subs=${subs ?? 'unknown'}), stopping with cursor set`,
+      );
+      return;
+    }
     const { targets, last } = await listNudgeTargetsPage(cursor, PAGE_SIZE);
     if (targets.length === 0) break;
     // Prefs for just this page, not the whole table on every hop.
@@ -113,10 +137,12 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
       const p = prefs.get(t.user_id);
       return job === 'nudge' ? (p ? p.daily_nudges : true) : (p ? p.weekly_summary : true);
     });
+    let pageSent = 0;
     if (job === 'nudge') {
       await mapLimit(wanted, 20, async (t) => {
         await sendTemplate(t.phone, 'lekhio_nudge', 'en_GB', []);
         sent++;
+        pageSent++;
       });
     } else {
       await mapLimit(wanted, 20, async (t) => {
@@ -124,7 +150,14 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
         const profit = row.income - row.expenses;
         await sendTemplate(t.phone, 'lekhio_weekly', 'en_GB', [gbp(row.income), gbp(row.expenses), gbp(profit)]);
         sent++;
+        pageSent++;
       });
+    }
+    // One counter write per page (not per message) keeps the daily budget honest
+    // across hops and instances without a write per send.
+    if (pageSent > 0) {
+      const total = await addWaSend(pageSent);
+      if (total != null) runningTotal = total;
     }
     if (!last) break; // final page done
     cursor = last;
@@ -242,7 +275,10 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
       // the budget is spent mid set, hand over to a continuation of the due job.
       const started = Date.now();
       let sent = 0;
-      for (;;) {
+      // Respect the proactive-send kill switch. Due reminders are not claimed
+      // when sends are off, so they stay due and go out once sending resumes.
+      const dueSendsOn = waSendsEnabled();
+      for (; dueSendsOn; ) {
         const due = await getDueReminders(new Date().toISOString(), PAGE_SIZE);
         if (due.length === 0) break;
         await mapLimit(due, 20, async (r) => {

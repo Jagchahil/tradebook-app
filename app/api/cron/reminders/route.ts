@@ -7,7 +7,10 @@ import {
   listNudgeTargetsPage,
   getNudgePrefsForUsers,
   weeklyTotals,
-  weeklyTotalsAll,
+  weeklyTotalsFor,
+  cronStarted,
+  cronFinished,
+  sweepRateHits,
   pruneOldRows,
   addWaSend,
   countActiveSubscribers,
@@ -113,10 +116,24 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
   const subs = await countActiveSubscribers();
   const dailyCap = globalDailyCapFor(subs ?? 0);
 
-  // One grouped aggregate for the weekly totals; falls back per user until the
-  // weekly_totals_all RPC (supabase/schema.sql) is applied.
-  const all = job === 'weekly' ? await weeklyTotalsAll() : null;
-  const totalsMap = all ? new Map(all.map((r) => [r.user_id, r])) : null;
+  // The weekly totals used to be fetched HERE, for EVERY USER ALIVE, in one payload, and
+  // held in a Map before the paging loop below had even started. All the careful pagination
+  // underneath it was decorative: at a hundred thousand users the function dies on that one
+  // query and nobody gets a Monday brief at all.
+  //
+  // Now they are fetched per page, inside the loop, for the people we are about to text.
+
+  // THE WATCHDOG. A walk that dies does not fail, it just never finishes, and the endpoint
+  // keeps answering 200 while it does not finish. So we write down when a walk STARTS and
+  // when it FINISHES, and /api/health goes red when a job has been quiet too long.
+  //
+  // Note it marks the finish of the WALK, not of a hop. Finishing a page is not finishing
+  // the job, and conflating the two is precisely how the digest reached the first two
+  // hundred users and reported success every single day.
+  if (startAfter === null) {
+    await cronStarted(job);
+    await sweepRateHits(); // housekeeping, piggybacked. No separate schedule to forget.
+  }
 
   let cursor = startAfter;
   let runningTotal: number | null = null; // today's global proactive-send count
@@ -127,6 +144,9 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
       console.error(
         `[cron] job=${job} WhatsApp daily budget reached (${runningTotal}/${dailyCap}, subs=${subs ?? 'unknown'}), stopping with cursor set`,
       );
+      // Deliberate, not a death. The day's money is spent and we stop on purpose, so the
+      // walk counts as finished: the watchdog must not cry wolf about a guard working.
+      await cronFinished(job, true, hop, `budget reached (${runningTotal}/${dailyCap})`);
       return;
     }
     const { targets, last } = await listNudgeTargetsPage(cursor, PAGE_SIZE);
@@ -137,6 +157,13 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
       const p = prefs.get(t.user_id);
       return job === 'nudge' ? (p ? p.daily_nudges : true) : (p ? p.weekly_summary : true);
     });
+
+    // Totals for this page only, and only for the people who actually want the brief.
+    // Null means the RPC could not answer, and we fall back to asking per user, because an
+    // empty map would mean "everybody earned nothing" and we would text a man that his week
+    // was zero when it was not.
+    const totalsMap =
+      job === 'weekly' ? await weeklyTotalsFor(wanted.map((t) => t.user_id)) : null;
     let pageSent = 0;
     if (job === 'nudge') {
       await mapLimit(wanted, 20, async (t) => {
@@ -164,7 +191,11 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
     if (Date.now() - started > SEND_BUDGET_MS) {
       if (hop + 1 > MAX_HOPS) {
         console.error(`[cron] job=${job} hop cap reached at hop=${hop}, stopping with cursor set`);
-        break;
+        // NOT ok. The cap exists to stop a runaway, so hitting it means either we have
+        // outgrown MAX_HOPS or a cursor is not advancing. Either way somebody after this
+        // point got nothing, and somebody should hear about it.
+        await cronFinished(job, false, hop, `hop cap reached at hop ${hop}, users after the cursor were not reached`);
+        return;
       }
       console.log(`[cron] job=${job} hop=${hop} sent=${sent} continuing after=${cursor}`);
       await triggerContinuation(job, cursor, hop + 1);
@@ -172,6 +203,7 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
     }
   }
   console.log(`[cron] job=${job} hop=${hop} sent=${sent} complete`);
+  await cronFinished(job, true, hop);
 }
 
 // The bank feed sync as a RESUMABLE hop chain, mirroring fanOut() above. This is
@@ -246,6 +278,7 @@ async function bankFeedFanOut(startAfter: string | null, hop: number): Promise<v
 async function runJob(job: string, afterId: string | null, hop: number): Promise<void> {
   try {
     if (job === 'due') {
+      if (hop === 1) await cronStarted('due');
       // One-time side jobs run ONLY on the first invocation (hop 1), before the
       // resumable send loop, so they always happen exactly once even when the
       // send loop hands over to a continuation. Housekeeping rides along with the
@@ -292,7 +325,8 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
         if (Date.now() - started > SEND_BUDGET_MS) {
           if (hop + 1 > MAX_HOPS) {
             console.error(`[cron] job=due hop cap reached at hop=${hop}, stopping`);
-            break;
+            await cronFinished('due', false, hop, `hop cap reached at hop ${hop}, reminders after this point were not sent`);
+            return;
           }
           console.log(`[cron] job=due hop=${hop} sent=${sent} continuing`);
           await triggerContinuation('due', null, hop + 1);
@@ -300,6 +334,7 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
         }
       }
       console.log(`[cron] job=due hop=${hop} sent=${sent} complete`);
+      await cronFinished('due', true, hop);
     } else if (job === 'nudge' || job === 'weekly') {
       await fanOut(job, afterId, hop);
     } else if (job === 'cleanup') {

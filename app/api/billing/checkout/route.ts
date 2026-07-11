@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSubscriptionCheckout, hasStripeConfig, type BillingPlan } from '../../../../lib/stripe';
 import { normalizeUkPhone } from '../../../../lib/supabase';
-import { rateLimited, clientIp } from '../../../../lib/ratelimit';
+import { rateLimitedShared, clientIp } from '../../../../lib/ratelimit';
 
 // Start a real Lekhio subscription. The page posts the chosen plan and any founder
 // offer, we create a Stripe Checkout session with a 14 day free trial, and return
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   // This endpoint is unauthenticated by design (pre-signup funnel), so throttle
   // per IP to stop mass creation of Stripe Checkout sessions with arbitrary
   // emails. A genuine buyer is never near this limit.
-  if (rateLimited(`checkout:${clientIp(req)}`, 12, 10 * 60 * 1000)) {
+  if (await rateLimitedShared(`checkout:${clientIp(req)}`, 12, 10 * 60 * 1000)) {
     return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   }
 

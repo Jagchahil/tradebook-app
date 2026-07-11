@@ -9,7 +9,7 @@ import {
 } from '../../../lib/supabase';
 import { findPersonal, impactOf } from '../../../lib/personal';
 import { learn } from '../../../lib/memory';
-import { rateLimited } from '../../../lib/ratelimit';
+import { rateLimitedShared } from '../../../lib/ratelimit';
 
 // Money in the books that is not business money.
 //
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   const user = token ? await verifyAccessToken(token) : null;
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  if (rateLimited(`personal:${user.id}`, 120, 60 * 60 * 1000)) {
+  if (await rateLimitedShared(`personal:${user.id}`, 120, 60 * 60 * 1000)) {
     return NextResponse.json({ error: 'too_many_requests' }, { status: 429 });
   }
 

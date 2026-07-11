@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken, saveHmrcFraud } from '../../../../lib/supabase';
-import { rateLimited, clientIp } from '../../../../lib/ratelimit';
+import { rateLimitedShared, clientIp } from '../../../../lib/ratelimit';
 import { sanitizeClientFraud, fraudContextFromRequest } from '../../../../lib/fraud';
 import { missingFraudHeaders } from '../../../../lib/hmrc';
 
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   // Light hygiene throttle. The durable protection is that this is authed and
   // only touches the caller's own row.
-  if (rateLimited(`fph:${clientIp(req)}`, 30, 10 * 60 * 1000)) {
+  if (await rateLimitedShared(`fph:${clientIp(req)}`, 30, 10 * 60 * 1000)) {
     return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   }
 

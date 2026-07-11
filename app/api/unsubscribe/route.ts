@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyLeadToken } from '../../../lib/leadtoken';
 import { setLeadUnsubscribed } from '../../../lib/supabase';
-import { rateLimited, clientIp } from '../../../lib/ratelimit';
+import { rateLimitedShared, clientIp } from '../../../lib/ratelimit';
 
 // One click unsubscribe. Works two ways: a normal GET when the person clicks the
 // link in an email, and a POST that inboxes send automatically for their built in
@@ -14,7 +14,7 @@ async function handle(email: string, token: string): Promise<boolean> {
 }
 
 export async function GET(req: NextRequest) {
-  if (rateLimited(`unsub:${clientIp(req)}`, 30, 10 * 60 * 1000)) {
+  if (await rateLimitedShared(`unsub:${clientIp(req)}`, 30, 10 * 60 * 1000)) {
     return new NextResponse('Too many requests.', { status: 429 });
   }
   const ok = await handle(req.nextUrl.searchParams.get('e') || '', req.nextUrl.searchParams.get('t') || '');

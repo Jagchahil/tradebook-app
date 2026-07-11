@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { listCronRuns } from '../../../lib/supabase';
+import { cronAlarms } from '../../../lib/cronwatch';
 
 // A tiny health check for uptime monitoring. Reports whether the app is up and
 // whether the database answers, and nothing else: no counts, no data, no
@@ -41,7 +43,10 @@ export async function GET(req: NextRequest) {
   if (req.nextUrl.searchParams.get('config') && authorised(req)) {
     // Presence only. Never the value, not even a prefix.
     const missing = SIGNING_SECRETS.filter((k) => !process.env[k]);
-    return NextResponse.json({ ok: missing.length === 0, missing }, { status: missing.length === 0 ? 200 : 503 });
+    const runs = await listCronRuns();
+    const alarms = runs ? cronAlarms(runs) : [];
+    const ok = missing.length === 0 && alarms.length === 0;
+    return NextResponse.json({ ok, missing, crons: runs ?? 'unreadable', alarms }, { status: ok ? 200 : 503 });
   }
 
   let db = false;
@@ -58,5 +63,24 @@ export async function GET(req: NextRequest) {
   } catch {
     db = false;
   }
-  return NextResponse.json({ ok: true, db }, { status: db ? 200 : 503 });
+
+  // THE ALARM HAS TO BE WIRED TO SOMETHING THAT WAKES SOMEBODY UP.
+  //
+  // A watchdog that writes a row nobody reads is a diary, not a watchdog. UptimeRobot
+  // already polls THIS endpoint, so a stopped cron has to change THIS status code, or the
+  // whole thing is theatre.
+  //
+  // The PUBLIC body says only whether the crons are healthy, never which one is late or how
+  // late. "The digest has not run for two days" is a useful thing for a stranger to know and
+  // no use at all to you, who will get an email either way. The detail lives behind the
+  // bearer, above.
+  const runs = await listCronRuns();
+  const alarms = runs ? cronAlarms(runs) : [];
+  const cronsOk = alarms.length === 0;
+
+  const healthy = db && cronsOk;
+  return NextResponse.json(
+    { ok: healthy, db, crons: runs === null ? 'unknown' : cronsOk ? 'ok' : 'stale' },
+    { status: healthy ? 200 : 503 },
+  );
 }

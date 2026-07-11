@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { draftInvoice, hasClaudeConfig } from '../../../lib/claude';
-import { rateLimited, clientIp } from '../../../lib/ratelimit';
+import { rateLimitedShared, clientIp } from '../../../lib/ratelimit';
 import { bumpAiUsage } from '../../../lib/supabase';
 
 // A durable daily ceiling on total drafting spend, so even if the per-IP limit is
@@ -16,7 +16,7 @@ const DRAFT_IP_DAILY = Number(process.env.DRAFT_IP_DAILY || 40);
 export async function POST(req: NextRequest) {
   try {
     // Protect the AI spend from a flood from one source.
-    if (rateLimited(`draft:${clientIp(req)}`, 20, 5 * 60 * 1000)) {
+    if (await rateLimitedShared(`draft:${clientIp(req)}`, 20, 5 * 60 * 1000)) {
       return NextResponse.json({ error: 'Too many requests. Give it a moment.' }, { status: 429 });
     }
     if (!hasClaudeConfig()) {

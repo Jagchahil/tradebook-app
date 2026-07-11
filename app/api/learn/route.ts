@@ -7,7 +7,7 @@ import {
   forgetUserRule,
 } from '../../../lib/supabase';
 import { learn, normaliseVendor } from '../../../lib/memory';
-import { rateLimited } from '../../../lib/ratelimit';
+import { rateLimitedShared } from '../../../lib/ratelimit';
 
 // What Lekhio has learned.
 //
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   const user = token ? await verifyAccessToken(token) : null;
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  if (rateLimited(`learn:${user.id}`, 300, 60 * 60 * 1000)) {
+  if (await rateLimitedShared(`learn:${user.id}`, 300, 60 * 60 * 1000)) {
     return NextResponse.json({ error: 'too_many_requests' }, { status: 429 });
   }
 

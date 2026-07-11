@@ -7,7 +7,7 @@ import {
   getConfirmedTransactionsForUser,
 } from '../../../lib/supabase';
 import { shareToken, clampGrantDays, expiryFor, categoriesIn, normaliseScope } from '../../../lib/bookshare';
-import { rateLimited } from '../../../lib/ratelimit';
+import { rateLimitedShared } from '../../../lib/ratelimit';
 import { siteBase } from '../../../lib/packtoken';
 
 // Share my books, from the owner's side.
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   // Minting a link hands out a view of someone's books, so it is rate limited
   // hard, per account rather than per IP.
-  if (rateLimited(`share:${user.id}`, 10, 60 * 60 * 1000)) {
+  if (await rateLimitedShared(`share:${user.id}`, 10, 60 * 60 * 1000)) {
     return NextResponse.json({ error: 'too_many_requests' }, { status: 429 });
   }
 

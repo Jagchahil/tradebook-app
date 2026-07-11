@@ -6,6 +6,8 @@ import {
   markDigestSentMany,
   addWaSend,
   countActiveSubscribers,
+  cronStarted,
+  cronFinished,
 } from '../../../../lib/supabase';
 import { sendText } from '../../../../lib/whatsapp';
 import { buildDigest, decideDigest } from '../../../../lib/digest';
@@ -74,6 +76,8 @@ export async function GET(req: NextRequest) {
   const sentToday = (await addWaSend(0)) ?? dailyCap;
 
   const cursor = req.nextUrl.searchParams.get('after');
+  if (cursor === null) await cronStarted('digest');
+
   const page = await usersDueDigest(cursor, PAGE);
 
   // Everything this page needs, in two queries. See bankEntriesForDigestMany.
@@ -163,9 +167,21 @@ export async function GET(req: NextRequest) {
   // Same continuation the reminders cron already uses: hop to ourselves with the cursor,
   // AFTER the response has gone back, so Vercel is not waiting on us and the whole walk
   // is not trying to fit in one 60 second invocation.
+  // The walk is over only when there is nothing left to walk. Marking a HOP as finished
+  // would defeat the whole purpose: the digest bug we are guarding against was a walk that
+  // stopped after one page and reported success.
+  if (!page.more) {
+    await cronFinished('digest', true, 1);
+  }
+
   if (page.more && page.lastId) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
     const secret = process.env.CRON_SECRET;
+    if (!secret) {
+      // We cannot continue without it, and stopping here silently is exactly the failure we
+      // are trying to make impossible. Say so, loudly, in the place that is watched.
+      await cronFinished('digest', false, 1, 'CRON_SECRET missing: cannot continue past the first page');
+    }
     if (secret) {
       afterResponse(async () => {
         try {

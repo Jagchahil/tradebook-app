@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { insertMarketingLead } from '../../../lib/supabase';
-import { rateLimited, clientIp } from '../../../lib/ratelimit';
+import { rateLimitedShared, clientIp } from '../../../lib/ratelimit';
 import { hasEmailConfig, sendLeadConfirmEmail } from '../../../lib/email';
 import { confirmUrl, unsubscribeUrl } from '../../../lib/leadtoken';
 
@@ -12,7 +12,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: NextRequest) {
   try {
-    if (rateLimited(`lead:${clientIp(req)}`, 12, 10 * 60 * 1000)) {
+    if (await rateLimitedShared(`lead:${clientIp(req)}`, 12, 10 * 60 * 1000)) {
       return NextResponse.json({ error: 'Too many requests. Give it a moment.' }, { status: 429 });
     }
 

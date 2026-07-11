@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPublicInvoice } from '../../../../lib/supabase';
 import { createInvoiceCheckout, hasStripeConfig } from '../../../../lib/stripe';
-import { rateLimited, clientIp } from '../../../../lib/ratelimit';
+import { rateLimitedShared, clientIp } from '../../../../lib/ratelimit';
 
 // The customer hits this from the Pay now button on the invoice page. It creates
 // a Stripe Checkout session and redirects them to it. If Stripe is not set up,
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Throttle so this open endpoint cannot be used to mass create Stripe
   // Checkout sessions. On the limit, send the customer back to the invoice
   // rather than erroring, so a genuine payer is never blocked.
-  if (rateLimited(`pay:${clientIp(req)}`, 20, 10 * 60 * 1000)) {
+  if (await rateLimitedShared(`pay:${clientIp(req)}`, 20, 10 * 60 * 1000)) {
     return NextResponse.redirect(invoiceUrl, 303);
   }
 

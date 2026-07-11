@@ -1393,6 +1393,39 @@ export async function weeklyTotalsAll(): Promise<WeeklyTotalsRow[] | null> {
   }
 }
 
+// The weekly totals for THE PAGE WE ARE ABOUT TO SEND TO. Not for everybody.
+//
+// weeklyTotalsAll() (below, now unused by the cron) asked for every user in one payload and
+// held the lot in a Map before the paging loop had even started. The careful pagination
+// underneath it was decorative: at a hundred thousand users the function dies on that one
+// query, and nobody gets a Monday brief at all.
+//
+// Same shape as getNudgePrefsForUsers, which already got this right.
+export async function weeklyTotalsFor(userIds: string[]): Promise<Map<string, WeeklyTotalsRow> | null> {
+  if (userIds.length === 0) return new Map();
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/rpc/weekly_totals_for`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_user_ids: userIds.filter((i) => UUID.test(i)) }),
+    });
+    // null, not an empty map. An empty map means "nobody earned anything", and we would
+    // cheerfully text a man that he made zero this week. Null means "we do not know", and
+    // the caller falls back to asking per user.
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ user_id: string; income: number | string; expenses: number | string }>;
+    if (!Array.isArray(rows)) return null;
+    const out = new Map<string, WeeklyTotalsRow>();
+    for (const r of rows) {
+      out.set(r.user_id, { user_id: r.user_id, income: Number(r.income) || 0, expenses: Number(r.expenses) || 0 });
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 export async function weeklyTotals(userId: string): Promise<{ income: number; expenses: number }> {
   const { url } = config();
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
@@ -3097,3 +3130,108 @@ export async function lastDigestAt(userId: string): Promise<string | null> {
   return rows[0]?.last_digest_at ?? null;
 }
 
+
+
+// ---------------------------------------------------------------------------
+// The cron watchdog. See supabase/scale_hardening.sql.
+//
+// A cron that stops does not fail. It simply never happens again, and the endpoint keeps
+// answering 200 while it does not happen. That is how the digest reached the first two
+// hundred users and reported success every day. These three write down enough for
+// /api/health to notice the silence.
+// ---------------------------------------------------------------------------
+
+export async function cronStarted(job: string): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/rpc/cron_started`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ p_job: job }),
+    });
+  } catch {
+    // The watchdog must never be the thing that breaks the job it is watching.
+  }
+}
+
+export async function cronFinished(job: string, ok: boolean, pages: number, error?: string): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/rpc/cron_finished`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ p_job: job, p_ok: ok, p_pages: pages, p_error: error ?? null }),
+    });
+  } catch {
+    // As above.
+  }
+}
+
+export interface OverdueCron {
+  job: string;
+  last_finished: string | null;
+  hours_ago: number;
+}
+
+import type { CronRun } from './cronwatch';
+
+// Every job's last known state. Small table, one row per job, so no paging needed.
+export async function listCronRuns(): Promise<CronRun[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/cron_runs?select=job,last_started,last_finished,last_ok,last_error`, {
+      headers: headers(),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function cronOverdue(maxAgeHours: number): Promise<OverdueCron[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/rpc/cron_overdue`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_max_age_hours: maxAgeHours }),
+    });
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : null;
+  } catch {
+    return null;
+  }
+}
+
+// One shared counter, in the same database as the spend caps. See lib/ratelimit.ts.
+export async function rateHit(key: string, limit: number, windowSeconds: number): Promise<boolean | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/rpc/rate_hit`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_key: key, p_limit: limit, p_window_seconds: windowSeconds }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) === true;
+  } catch {
+    return null;
+  }
+}
+
+export async function sweepRateHits(): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/rpc/rate_hits_sweep`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({}),
+    });
+  } catch {
+    // Housekeeping. Never worth failing a cron over.
+  }
+}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignup } from '../../../lib/supabase';
 import { sendWelcomeEmail } from '../../../lib/email';
-import { rateLimited, clientIp } from '../../../lib/ratelimit';
+import { rateLimitedShared, clientIp } from '../../../lib/ratelimit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -51,7 +51,7 @@ async function verifyTurnstile(secret: string, token: string, ip: string): Promi
 
 export async function POST(req: NextRequest) {
   try {
-    if (rateLimited(`onboard:${clientIp(req)}`, 12, 10 * 60 * 1000)) {
+    if (await rateLimitedShared(`onboard:${clientIp(req)}`, 12, 10 * 60 * 1000)) {
       return NextResponse.json({ error: 'Too many requests. Give it a moment.' }, { status: 429 });
     }
     let body: unknown;

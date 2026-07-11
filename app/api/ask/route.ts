@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { answerAccountantQuestion, hasClaudeConfig } from '../../../lib/claude';
 import { verifyAccessToken, bumpAiUsage, countActiveSubscribers, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised } from '../../../lib/supabase';
-import { rateLimited } from '../../../lib/ratelimit';
+import { rateLimitedShared } from '../../../lib/ratelimit';
 import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
 
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const userId = verified.id;
 
   // Burst guard: at most a handful of questions in a short window.
-  if (rateLimited(`ask:${userId}`, 4, 60 * 1000)) {
+  if (await rateLimitedShared(`ask:${userId}`, 4, 60 * 1000)) {
     return NextResponse.json({ error: 'slow_down', answer: 'One sec, give me a moment to catch up and ask again.' }, { status: 429 });
   }
 

@@ -105,7 +105,7 @@ import { aprilDelta } from '../../../lib/propertyengine';
 import { niPosition, studentLoanRepayment, studentLoanForSA, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
 import type { TradeInfo } from '../../../lib/taxguide';
-import { rateLimited } from '../../../lib/ratelimit';
+import { rateLimitedShared } from '../../../lib/ratelimit';
 import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
 
@@ -296,7 +296,7 @@ export async function POST(req: NextRequest) {
   // short window. We silently drop over the limit: no AI, no reply, so we
   // never trigger a reply storm or rack up cost. (In-memory, per instance.
   // Move to a shared store for hard guarantees at scale, see docs/19.)
-  if (rateLimited(`wa:${from}`, 30, 10 * 60 * 1000)) {
+  if (await rateLimitedShared(`wa:${from}`, 30, 10 * 60 * 1000)) {
     return NextResponse.json({ ok: true });
   }
 

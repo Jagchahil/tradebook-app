@@ -54,8 +54,28 @@ function round(n: number): number {
   return Math.round(Number.isFinite(n) ? n : 0);
 }
 
+// The SAME normalisation the brain uses to learn a vendor (normaliseVendor in
+// lib/memory.ts), reimplemented here rather than imported so this module stays
+// import free and testable by the node runner. Kept deliberately simple; the two
+// only need to agree that "SCREWFIX 1234 LONDON" and "Screwfix" are one shop.
+//
+// WHY IT MATTERS HERE. This rule used to compare the RAW strings, so a bank line
+// ("SCREWFIX 1234 LONDON") and its receipt ("Screwfix") never matched, and the one
+// check meant to catch a double counted purchase was blind to the single most
+// common way it happens.
+const VENDOR_NOISE = /\b(card|payment|purchase|to|from|via|ref|ltd|limited|plc|uk|gb|co|com|the|contactless|debit|credit|direct|online|store|shop|services?|stn|branch|int|intl|group|trading)\b/g;
+
 function normVendor(v: string | null): string {
-  return (v ?? '').trim().toLowerCase();
+  const words = (v ?? '')
+    .toLowerCase()
+    .replace(/[*#].*$/, ' ')
+    .replace(/\b\d{2,}\b/g, ' ')
+    .replace(VENDOR_NOISE, ' ')
+    .replace(/[^a-z0-9&]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 1);
+  return words.slice(0, 2).join(' ');
 }
 
 function daysBetween(a: string, b: string): number {

@@ -387,6 +387,21 @@ export function mapBankTransaction(t: BankTransaction): MappedBankEntry | null {
 // True when a bank line looks like a capture the user already sent on WhatsApp:
 // same direction, amount within 5p, date within 3 days. Used to skip the bank
 // copy so a receipt photo and its card payment never double count.
+// SUPERSEDED. DO NOT WIRE THIS BACK IN. Use findDuplicate in lib/dedupe.ts.
+//
+// This matched on the AMOUNT and the DATE and nothing else. It never looked at the
+// vendor. So a £42.60 card payment at Screwfix and a £42.60 receipt from Shell,
+// three days apart, were treated as the same purchase, and one of them was silently
+// dropped. That is a real cost deleted from a man's books, and a tax bill raised,
+// with no message and no way for him to notice.
+//
+// It also only ever ran in one direction (a bank line arriving after a receipt), so
+// the common case, where the bank feed lands first and the photo comes that evening,
+// was never checked at all and simply double counted.
+//
+// lib/dedupe.ts requires the SAME SHOP, using the same vendor normalisation the
+// brain learns with, and refuses to merge anything it cannot vouch for. Kept here
+// only because its tests document the old tolerances.
 export function matchesCapture(
   entry: { amount: number; transaction_date: string },
   capture: { amount: number; transaction_date: string | null },

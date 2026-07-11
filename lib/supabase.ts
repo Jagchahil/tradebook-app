@@ -1955,14 +1955,47 @@ export async function listLinkedBankConnections(limit = 500): Promise<BankConnec
 export async function recentUnconfirmedCaptures(
   userId: string,
   sinceISO: string,
-): Promise<Array<{ amount: number; transaction_date: string | null }>> {
+): Promise<Array<{ id: string; vendor: string | null; amount: number; transaction_date: string | null }>> {
   const { url } = config();
   const res = await fetch(
-    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.false&source_type=like.whatsapp*&transaction_date=gte.${encodeURIComponent(sinceISO)}&select=amount,transaction_date&limit=500`,
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.false&source_type=like.whatsapp*&transaction_date=gte.${encodeURIComponent(sinceISO)}&select=id,vendor,amount,transaction_date&limit=500`,
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return (await res.json()) as Array<{ amount: number; transaction_date: string | null }>;
+  return await res.json();
+}
+
+// The receipt came first, and now the bank has sent us the card payment for it.
+//
+// The OLD behaviour was to silently drop the bank line. That left the books holding
+// an OCR reading of a photograph when the bank had just told us the exact figure and
+// the exact date the money left the account. The photo's total can be misread, and
+// the date printed on a receipt is not always the day the card was charged.
+//
+// So instead we write the BANK's truth onto the capture the user already sent, and
+// keep their photo, their category and their evidence. One entry. Right figures.
+//
+// Setting external_id also makes the merge idempotent: the next sync sees that id
+// already in the table and never re-imports the line.
+export async function applyBankTruthToCapture(
+  userId: string,
+  captureId: string,
+  bank: { amount: number; transaction_date: string; external_id: string },
+): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?id=eq.${encodeURIComponent(captureId)}&user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        amount: bank.amount,
+        transaction_date: bank.transaction_date,
+        external_id: bank.external_id,
+      }),
+    },
+  );
+  return res.ok;
 }
 
 export interface BankEntryInsert {
@@ -2770,6 +2803,61 @@ export async function forgetUserRule(userId: string, vendorKey: string): Promise
     `${url}/rest/v1/user_rules?user_id=eq.${encodeURIComponent(userId)}` +
       `&vendor_key=eq.${encodeURIComponent(vendorKey)}`,
     { method: 'DELETE', headers: headers({ Prefer: 'return=minimal' }) },
+  );
+  return res.ok;
+}
+
+// --- the same purchase, twice -------------------------------------------------
+//
+// A card payment from the bank and the photo of its receipt are ONE purchase. See
+// lib/dedupe.ts for why this was broken in both directions.
+
+// Recent UNCONFIRMED entries that a new capture might duplicate. Unconfirmed only:
+// once the user has approved something we do not go rearranging it behind them.
+export async function recentUnconfirmedForMatch(
+  userId: string,
+  sinceISO: string,
+): Promise<Array<{ id: string; vendor: string | null; amount: number; transaction_date: string | null; category: string | null; source_type: string | null }>> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+      `&confirmed=eq.false` +
+      `&transaction_date=gte.${encodeURIComponent(sinceISO)}` +
+      `&select=id,vendor,amount,transaction_date,category,source_type&limit=300`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+// Fold a receipt into the bank line it duplicates, so ONE entry is left holding the
+// bank's figures and the receipt's evidence.
+export async function mergeIntoTransaction(
+  userId: string,
+  id: string,
+  patch: {
+    vendor?: string;
+    category?: string | null;
+    raw_input_url?: string | null;
+    raw_whatsapp_message_id?: string | null;
+  },
+): Promise<boolean> {
+  const { url } = config();
+  const row: Record<string, unknown> = {};
+  if (patch.vendor !== undefined) row.vendor = patch.vendor;
+  if (patch.category !== undefined && patch.category !== null) row.category = patch.category;
+  if (patch.raw_input_url !== undefined) row.raw_input_url = patch.raw_input_url;
+  if (patch.raw_whatsapp_message_id !== undefined) row.raw_whatsapp_message_id = patch.raw_whatsapp_message_id;
+  // Deliberately NOT touching amount or transaction_date: the bank's figures are
+  // facts and must survive the merge. See lib/dedupe.ts.
+
+  const res = await fetch(
+    `${url}/rest/v1/transactions?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify(row),
+    },
   );
   return res.ok;
 }

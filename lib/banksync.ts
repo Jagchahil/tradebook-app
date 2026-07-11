@@ -15,9 +15,11 @@ import {
   insertBankTransactions,
   getUserRules,
   getVendorPatterns,
+  applyBankTruthToCapture,
 } from './supabase';
-import { refreshAccess, getBookedTransactions, mapBankTransaction, matchesCapture, isSandbox, taxYearStartISO } from './bankfeed';
+import { refreshAccess, getBookedTransactions, mapBankTransaction, isSandbox, taxYearStartISO } from './bankfeed';
 import { normaliseVendor, recall } from './memory';
+import { findDuplicate } from './dedupe';
 import { decryptSecret } from './crypto';
 
 export interface SyncResult {
@@ -72,8 +74,30 @@ export async function syncWithAccessToken(
           .toISOString()
           .slice(0, 10);
       }
-      // Skip anything the user already captured on WhatsApp themselves.
-      if (captures.some((c) => matchesCapture(entry, c))) continue;
+      // THE USER ALREADY SENT US THIS RECEIPT.
+      //
+      // We used to just drop the bank line here. That left the books holding an OCR
+      // reading of a photograph, when the bank had just told us the exact amount and
+      // the exact day the money left the account. A photo total can be misread, and
+      // the date printed on a receipt is not always the date the card was charged.
+      //
+      // So now the BANK's figures are written onto the capture the user already
+      // sent, and their photo, their category and their evidence are all kept. One
+      // entry, with the right numbers on it. The user is told nothing, because
+      // nothing has gone wrong and there is nothing for them to do.
+      const already = findDuplicate(entry, captures, normaliseVendor);
+      if (already && already.strength === 'same') {
+        await applyBankTruthToCapture(conn.user_id, String(already.match.id), {
+          amount: entry.amount,
+          transaction_date: entry.transaction_date,
+          external_id: entry.external_id,
+        });
+        continue;
+      }
+      // A 'maybe' is NOT merged: quietly deleting one of two genuine purchases
+      // would raise the user's tax bill without them ever knowing. Let it come in as
+      // its own row, and the duplicate rule in Things to check will raise it.
+
       toInsert.push(entry);
       taken += 1;
     }

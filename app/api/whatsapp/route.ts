@@ -21,6 +21,8 @@ import { checkExpense, VERDICT_ICON, TAX_TIPS } from '../../../lib/taxrules';
 import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
 import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/email';
 import { hasBankFeedConfig } from '../../../lib/bankfeed';
+import { findDuplicate } from '../../../lib/dedupe';
+import { normaliseVendor } from '../../../lib/memory';
 import {
   busyMessage,
   receiptMilestoneNudge,
@@ -30,6 +32,8 @@ import {
 import {
   findUserIdByPhone,
   listBankConnectionsForUser,
+  recentUnconfirmedForMatch,
+  mergeIntoTransaction,
   claimMessage,
   insertTransaction,
   listUserProperties,
@@ -638,6 +642,40 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
     return;
   }
 
+  const receiptDate = clampReceiptDate(parsed.transaction_date);
+
+  // IS THIS THE CARD PAYMENT WE ALREADY HAVE?
+  //
+  // The bank feed usually lands a purchase the SAME DAY. The photo of the receipt
+  // turns up that evening. That is one purchase, and before this it became two
+  // entries: costs inflated, profit understated, tax wrong.
+  //
+  // So before writing anything, look for the bank line this receipt belongs to. If
+  // we find it, fold the receipt INTO it rather than adding a second row. The bank
+  // keeps the amount and the date, because those are facts rather than a reading of
+  // a photograph. The receipt gives the shop name, the category and the image.
+  //
+  // Never fatal: if the lookup fails we simply insert as before, and the duplicate
+  // rule in Things to check remains as the safety net.
+  const dup = await findReceiptDuplicate(userId, {
+    vendor: parsed.merchant_name,
+    amount: -Math.abs(parsed.amount),
+    transaction_date: receiptDate,
+  });
+
+  if (dup) {
+    await mergeIntoTransaction(userId, dup.id, {
+      vendor: parsed.merchant_name,
+      category: parsed.category,
+      raw_whatsapp_message_id: messageId,
+    });
+    await sendText(
+      from,
+      `Got it. That is the same £${parsed.amount.toFixed(2)} ${parsed.merchant_name} payment your bank already sent me, so I have put the receipt with it rather than counting it twice. Filed under ${parsed.category}.`,
+    );
+    return;
+  }
+
   await insertTransaction({
     user_id: userId,
     vendor: parsed.merchant_name,
@@ -647,7 +685,7 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
     category: parsed.category,
     // The date printed on the receipt, clamped to a sane range, so a back-dated
     // receipt lands in the right tax quarter. Falls back to today.
-    transaction_date: clampReceiptDate(parsed.transaction_date),
+    transaction_date: receiptDate,
     source_type: 'whatsapp_image',
     // Captured but not yet confirmed by the user. They approve before it counts
     // toward anything sent to HMRC.
@@ -1975,4 +2013,30 @@ interface WebhookBody {
 
 function firstMessage(body: WebhookBody): IncomingMessage | null {
   return body.entry?.[0]?.changes?.[0]?.value?.messages?.[0] ?? null;
+}
+
+// The bank line this receipt is a duplicate of, if there is one.
+//
+// Only a CONFIDENT match merges automatically: same shop, same money, within a few
+// days. A 'maybe' (same money and time but an unreadable shop) is deliberately NOT
+// merged here, because merging two genuinely different purchases would quietly
+// delete one of the user's costs and RAISE his tax bill, and he would never know we
+// had done it. Those surface in Things to check instead, for him to judge.
+//
+// Never throws: a failed lookup must not cost someone their receipt.
+async function findReceiptDuplicate(
+  userId: string,
+  receipt: { vendor: string; amount: number; transaction_date: string },
+): Promise<{ id: string } | null> {
+  try {
+    const since = new Date(Date.now() - 10 * 86400_000).toISOString().slice(0, 10);
+    const recent = await recentUnconfirmedForMatch(userId, since);
+    // Only ever fold a receipt into a BANK line. Two photographs of the same receipt
+    // are a different problem, and the duplicate rule already catches those.
+    const bankRows = recent.filter((r) => r.source_type === 'bank_feed');
+    const hit = findDuplicate(receipt, bankRows, normaliseVendor);
+    return hit && hit.strength === 'same' ? { id: String(hit.match.id) } : null;
+  } catch {
+    return null;
+  }
 }

@@ -1972,6 +1972,11 @@ export interface BankEntryInsert {
   category: string;
   transaction_date: string;
   description: string;
+  // Set during sync when the brain (lib/memory.ts) already knows this vendor is not
+  // business money, so a benefit or a personal transfer arrives out of the tax
+  // figures instead of having to be corrected all over again. Still unconfirmed
+  // either way: the approval gate is untouched.
+  is_personal?: boolean;
 }
 
 // Insert bank transactions idempotently and in BULK: one PostgREST request per
@@ -1995,6 +2000,10 @@ export async function insertBankTransactions(userId: string, entries: BankEntryI
       description: entry.description,
       confirmed: false,
       external_id: entry.external_id,
+      // Carry the brain's answer through to the row. Leaving this out would compile
+      // fine and silently drop every lesson: the sync would decide a benefit was
+      // not business money, and then write it to the books as income anyway.
+      is_personal: entry.is_personal === true,
     }));
     const res = await fetch(`${url}/rest/v1/transactions?on_conflict=external_id&select=id`, {
       method: 'POST',

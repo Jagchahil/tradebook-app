@@ -62,7 +62,7 @@ export async function bumpAiUsage(scope: string, key: string): Promise<number | 
 // How many users are actually paying us right now (active or in trial). One HEAD
 // count, no rows pulled. Used to derive the day's proactive WhatsApp send budget
 // from the margin target: revenue scales with this number, so the send ceiling
-// must too (see lib/wabudget.ts). Returns null on any error, and the caller then
+// must too (see lib/margin.ts). Returns null on any error, and the caller then
 // falls back to the safe floor rather than sending without a ceiling.
 export async function countActiveSubscribers(): Promise<number | null> {
   try {

@@ -19,6 +19,11 @@
 // existing ai_usage table via bumpAiUsage; decideSpend just judges the numbers,
 // which is what makes it unit testable.
 
+// NOTE: the margin-derived caps now live in lib/margin.ts (aiCapsFor), which is
+// deliberately import free so the whole economics model stays unit testable. This
+// module keeps the pure SPEND DECISION (decideSpend) and the model tiering; it is
+// the judge, margin.ts sets the budget.
+
 export type AiModel = 'claude-haiku-4-5-20251001' | 'claude-sonnet-5';
 
 // Approximate list price in pence per 1,000,000 tokens, input and output. Rounded
@@ -51,6 +56,12 @@ function num(v: string | undefined, fallback: number): number {
 
 // Resolve the caps from the environment, with conservative defaults that are
 // generous for real use but lethal to a runaway loop. Tune per launch scale.
+//
+// NOTE: prefer aiCapsFor(activeSubscribers) from lib/margin.ts. These flat defaults do
+// NOT scale with the user base: a fixed global daily cap becomes a hard GROWTH
+// CEILING (at 100k users a 5,000/day global cap starves everyone after the first
+// few hundred), which is exactly the trap the scale audit found. This overload
+// remains for callers with no subscriber count to hand.
 export function resolveCaps(env: Record<string, string | undefined> = process.env): AiCaps {
   return {
     killed: (env.AI_KILL_SWITCH ?? '').toLowerCase() === 'on',
@@ -59,6 +70,10 @@ export function resolveCaps(env: Record<string, string | undefined> = process.en
     userDaily: num(env.AI_USER_DAILY, 40),
   };
 }
+
+// Margin-derived caps live in lib/margin.ts as aiCapsFor(activeSubscribers). Use
+// those at the AI entry points; they scale with the paying base so the ceiling
+// grows with the business instead of becoming a growth ceiling.
 
 export interface SpendCounts {
   globalDay: number; // calls already made today, all users

@@ -12,7 +12,7 @@ import {
   addWaSend,
   countActiveSubscribers,
 } from '../../../../lib/supabase';
-import { waSendsEnabled, waBudgetExceeded, globalDailyCapFor } from '../../../../lib/wabudget';
+import { waSendsEnabled, waBudgetExceeded, globalDailyCapFor } from '../../../../lib/margin';
 import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
 import { hasBankFeedConfig } from '../../../../lib/bankfeed';
 import { syncPageResumable } from '../../../../lib/banksync';
@@ -108,7 +108,7 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
     return;
   }
   // The day's send ceiling, DERIVED from the live paying base and the margin
-  // target (lib/wabudget.ts), so WhatsApp spend can never outgrow revenue. A
+  // target (lib/margin.ts), so WhatsApp spend can never outgrow revenue. A
   // failed count falls back to the safe floor rather than sending uncapped.
   const subs = await countActiveSubscribers();
   const dailyCap = globalDailyCapFor(subs ?? 0);

@@ -35,6 +35,7 @@ import {
   getLastIncomeTransaction,
   createEvent,
   bumpAiUsage,
+  countActiveSubscribers,
   totalsForUser,
   latestUnconfirmed,
   deleteTransactionById,
@@ -90,6 +91,8 @@ import { niPosition, studentLoanRepayment, studentLoanForSA, STUDENT_PLANS, type
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
 import type { TradeInfo } from '../../../lib/taxguide';
 import { rateLimited } from '../../../lib/ratelimit';
+import { decideSpend } from '../../../lib/aicost';
+import { aiCapsFor } from '../../../lib/margin';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
 
@@ -101,12 +104,6 @@ export const maxDuration = 60;
 
 // We never log message text or media. Only ids and status, per the data rules.
 
-// Hard daily AI budget, durable in the database, so it holds across every
-// serverless instance, unlike the in-memory burst limit. The per-phone cap
-// protects margin on a single account. The global cap is a kill switch against a
-// mass attack. If either is over for today, we refuse to spend on AI.
-const PHONE_DAILY_AI = 120;
-const GLOBAL_DAILY_AI = 4000;
 // Durable per-phone daily message cap. Unlike the in-memory burst limit this
 // holds across every serverless instance, using the same ai_usage counter table
 // as the AI budget. A real user never sends 300 messages in a day; a runaway
@@ -115,15 +112,42 @@ const PHONE_DAILY_MESSAGES = 300;
 const AI_BUSY =
   'I am a bit busy right now. Give me a few minutes and try again. Nothing is lost.';
 
+// The AI spend gate. Caps are DERIVED from the live paying base and the margin
+// floor (lib/margin.ts, lib/aicost.ts), not hardcoded: a flat global cap becomes
+// a hard GROWTH CEILING (the old 4,000/day would have starved every user after
+// roughly the first 800 users' worth of activity at 100k). Now the ceiling grows
+// with the business while margin stays bounded.
+//
+// Fails CLOSED on the durable counters: if we cannot read the budget we do not
+// spend on AI. The deterministic paths (typed money, mileage, CIS, totals) still
+// work, so the user is never stuck, just not AI-parsed.
 async function aiBudgetBlocked(from: string): Promise<boolean> {
-  // Fail closed on both caps: if the durable counter cannot be read we do not
-  // spend on AI. The deterministic paths still work, so the user is never stuck.
-  const perPhone = await bumpAiUsage('phone', from);
-  if (perPhone === null || perPhone > PHONE_DAILY_AI) return true;
-  const globalCount = await bumpAiUsage('global', 'all');
-  if (globalCount === null) return true;
-  if (globalCount > GLOBAL_DAILY_AI) return true;
+  const subs = await countActiveSubscribers();
+  const caps = aiCapsFor(subs ?? 0);
+  if (caps.killed) return true;
+
+  const userDay = await bumpAiUsage('phone', from);
+  if (userDay === null) return true;
+  const globalDay = await bumpAiUsage('global', 'all');
+  if (globalDay === null) return true;
+  const globalMonth = await bumpAiUsage('globalmonth', monthKey());
+  if (globalMonth === null) return true;
+
+  // decideSpend judges the counts BEFORE this call, so subtract our own bump.
+  const decision = decideSpend(
+    { globalDay: globalDay - 1, globalMonth: globalMonth - 1, userDay: userDay - 1 },
+    caps,
+  );
+  if (!decision.allowed) {
+    console.warn(`[wa] AI refused: ${decision.reason} (subs=${subs ?? 'unknown'})`);
+    return true;
+  }
   return false;
+}
+
+// Calendar month key for the monthly AI counter, e.g. "2026-07".
+function monthKey(): string {
+  return new Date().toISOString().slice(0, 7);
 }
 
 // True when this phone is over its durable daily message allowance. Fails open:

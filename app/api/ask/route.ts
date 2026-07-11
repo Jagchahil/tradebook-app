@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { answerAccountantQuestion, hasClaudeConfig } from '../../../lib/claude';
-import { verifyAccessToken, bumpAiUsage, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised } from '../../../lib/supabase';
+import { verifyAccessToken, bumpAiUsage, countActiveSubscribers, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised } from '../../../lib/supabase';
 import { rateLimited } from '../../../lib/ratelimit';
+import { decideSpend } from '../../../lib/aicost';
+import { aiCapsFor } from '../../../lib/margin';
 
 // The in-app accountant endpoint. The app posts a question with the user's
 // Supabase access token. We verify the user, meter usage so costs stay bounded
@@ -9,14 +11,15 @@ import { rateLimited } from '../../../lib/ratelimit';
 // then return the expert reply.
 //
 // Cost control, three layers:
-//   1. Per-user daily cap (ASK_DAILY_LIMIT, default 6). Keeps any one user's spend
-//      tiny and predictable, which is what holds the 85% margin.
-//   2. Global daily cap (ASK_GLOBAL_DAILY, default 3000). A hard ceiling on total
-//      spend across everyone, so a surge can never blow the budget.
+//   1. Per-user daily quota (ASK_DAILY_LIMIT, default 6). This is a PRODUCT
+//      promise shown to the user ("your 6 questions today"), not the wallet guard.
+//   2. Global daily and monthly AI ceilings, DERIVED from the live paying base and
+//      the margin floor (lib/margin.ts, lib/aicost.ts) and shared with the
+//      WhatsApp AI path, so total AI spend is bounded once and the ceiling grows
+//      with the business instead of throttling it.
 //   3. In-memory burst limit, so rapid-fire taps do not stack up calls.
 
 const DAILY_LIMIT = Number(process.env.ASK_DAILY_LIMIT || 6);
-const GLOBAL_DAILY = Number(process.env.ASK_GLOBAL_DAILY || 3000);
 
 function str(v: unknown, max = 1000): string {
   return typeof v === 'string' ? v.slice(0, max) : '';
@@ -92,10 +95,28 @@ export async function POST(req: NextRequest) {
   }
   const remaining = Math.max(0, DAILY_LIMIT - userCount);
 
-  // Global daily ceiling.
-  const globalCount = await bumpAiUsage('ask:global', 'all');
-  if (globalCount !== null && globalCount > GLOBAL_DAILY) {
-    return NextResponse.json({ error: 'busy', answer: 'The accountant is very busy right now. Please try again shortly.' }, { status: 503 });
+  // The global AI ceiling, DERIVED from the live paying base and the margin floor
+  // (lib/margin.ts). Two things were wrong before: the ceiling was a flat 3,000 a
+  // day, which becomes a hard GROWTH CEILING once there are real users, and it sat
+  // in its own counter separate from the WhatsApp AI path, so total AI spend was
+  // bounded twice over rather than once. Both paths now share one global counter,
+  // so the budget means what it says. Fails CLOSED on an unreadable counter.
+  const subs = await countActiveSubscribers();
+  const caps = aiCapsFor(subs ?? 0);
+  const busy = NextResponse.json(
+    { error: 'busy', answer: 'The accountant is very busy right now. Please try again shortly.' },
+    { status: 503 },
+  );
+  if (caps.killed) return busy;
+  const globalDay = await bumpAiUsage('global', 'all');
+  const globalMonth = await bumpAiUsage('globalmonth', new Date().toISOString().slice(0, 7));
+  if (globalDay === null || globalMonth === null) return busy;
+  // userDay is 0 here: the per-user quota is the DAILY_LIMIT check above, which is
+  // a product promise ("your 6 questions"), not the wallet guard.
+  const decision = decideSpend({ globalDay: globalDay - 1, globalMonth: globalMonth - 1, userDay: 0 }, caps);
+  if (!decision.allowed) {
+    console.warn(`[ask] AI refused: ${decision.reason} (subs=${subs ?? 'unknown'})`);
+    return busy;
   }
 
   // Pull a compact summary of their figures so money questions get real numbers.

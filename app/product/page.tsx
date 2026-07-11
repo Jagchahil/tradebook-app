@@ -62,7 +62,7 @@ const PRODUCT_CSS = `
 .jC{animation:jkC 6s infinite}
 @keyframes jkC{0%,32%{opacity:0;transform:translateY(-12px) scale(.96)}39%,90%{opacity:1;transform:none}97%,100%{opacity:0}}
 .ftabs{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:28px}
-.ftab{display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;cursor:pointer;transition:.2s;color:var(--tx)}
+.ftab{display:flex;align-items:center;gap:8px;font-family:inherit;padding:11px 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;cursor:pointer;transition:.2s;color:var(--tx)}
 .ftab:hover{border-color:var(--river);transform:translateY(-2px)}
 .ftab.on{background:var(--river);color:#fff;border-color:var(--river);box-shadow:0 8px 20px rgba(27,89,166,.3)}
 .fstage{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center;max-width:900px;margin:0 auto;min-height:280px}
@@ -87,7 +87,7 @@ const PRODUCT_CSS = `
 .tslides{display:flex;height:100%;transition:transform .5s cubic-bezier(.2,.7,.3,1)}
 .tslide{min-width:100%;height:100%;padding:20px 16px;overflow:hidden}
 .ttabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-.ttab{padding:9px 15px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:13px;cursor:pointer;transition:.2s;color:var(--tx)}
+.ttab{padding:9px 15px;font-family:inherit;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:13px;cursor:pointer;transition:.2s;color:var(--tx)}
 .ttab.on{background:var(--river);color:#fff;border-color:var(--river)}
 .bignum{background:linear-gradient(135deg,var(--river),var(--river-deep));border-radius:16px;padding:16px;color:#fff}
 .bignum .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;opacity:.85}
@@ -127,12 +127,20 @@ const PRODUCT_JS = `
    {t:'Ask it anything',p:'Not sure what counts? Ask in plain words. Lekhio answers straight, the grey areas included.',demo:'<div class="db out d1">can I claim my work boots?</div><div class="db in d2">Yes 👍 protective boots for the job are allowable.</div><div class="db in d3">Want me to note them for you?</div>'}
   ];
   function showFeat(i){
-    document.querySelectorAll('#ftabs .ftab').forEach(function(t){t.classList.toggle('on',+t.getAttribute('data-f')===i);});
+    document.querySelectorAll('#ftabs .ftab').forEach(function(t){
+      var on=+t.getAttribute('data-f')===i;
+      t.classList.toggle('on',on);
+      t.setAttribute('aria-selected',on?'true':'false');
+    });
     document.getElementById('ftext').innerHTML='<h3>'+FEAT[i].t+'</h3><p>'+FEAT[i].p+'</p>';
     document.getElementById('fdemo').innerHTML=FEAT[i].demo;
   }
   function showTour(i){
-    document.querySelectorAll('#ttabs .ttab').forEach(function(t){t.classList.toggle('on',+t.getAttribute('data-t')===i);});
+    document.querySelectorAll('#ttabs .ttab').forEach(function(t){
+      var on=+t.getAttribute('data-t')===i;
+      t.classList.toggle('on',on);
+      t.setAttribute('aria-selected',on?'true':'false');
+    });
     var s=document.getElementById('tslides');if(s)s.style.transform='translateX(-'+(i*100)+'%)';
   }
   function wire(){
@@ -232,13 +240,16 @@ export default function ProductPage() {
             <div className="eyebrow">Tap one, watch it happen</div>
             <h2 className="h2">One chat. Everything handled.</h2>
           </div>
-          <div className="ftabs reveal" id="ftabs" style={{ marginTop: 26 }}>
-            <div className="ftab on" data-f="0">Receipt</div>
-            <div className="ftab" data-f="1">Voice</div>
-            <div className="ftab" data-f="2">Mileage</div>
-            <div className="ftab" data-f="3">Invoice</div>
-            <div className="ftab" data-f="4">CIS</div>
-            <div className="ftab" data-f="5">Ask</div>
+          {/* Real buttons, not divs: a div is not focusable and cannot be reached
+              or activated with a keyboard, so these tabs were invisible to anyone
+              not using a mouse. Buttons also pick up the focus ring in A11Y_CSS. */}
+          <div className="ftabs reveal" id="ftabs" role="tablist" aria-label="What Lekhio does" style={{ marginTop: 26 }}>
+            <button type="button" className="ftab on" data-f="0" role="tab" aria-selected="true">Receipt</button>
+            <button type="button" className="ftab" data-f="1" role="tab" aria-selected="false">Voice</button>
+            <button type="button" className="ftab" data-f="2" role="tab" aria-selected="false">Mileage</button>
+            <button type="button" className="ftab" data-f="3" role="tab" aria-selected="false">Invoice</button>
+            <button type="button" className="ftab" data-f="4" role="tab" aria-selected="false">CIS</button>
+            <button type="button" className="ftab" data-f="5" role="tab" aria-selected="false">Ask</button>
           </div>
           <div className="fstage reveal">
             <div className="ftext" id="ftext"><h3>Snap a receipt</h3><p>Photograph it on WhatsApp. Lekhio pulls the total, the VAT and the category, and logs it in seconds.</p></div>
@@ -260,7 +271,7 @@ export default function ProductPage() {
             <p className="lead">Open the app whenever you want the full picture. Tap through it.</p>
           </div>
           <div className="tourwrap reveal">
-            <div className="ttabs" id="ttabs"><div className="ttab on" data-t="0">Feed</div><div className="ttab" data-t="1">Money</div><div className="ttab" data-t="2">Invoices</div></div>
+            <div className="ttabs" id="ttabs" role="tablist" aria-label="A tour of the app"><button type="button" className="ttab on" data-t="0" role="tab" aria-selected="true">Feed</button><button type="button" className="ttab" data-t="1" role="tab" aria-selected="false">Money</button><button type="button" className="ttab" data-t="2" role="tab" aria-selected="false">Invoices</button></div>
             <div className="tourphone">
               <div className="tourscreen">
                 <div className="tslides" id="tslides">

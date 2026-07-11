@@ -1,0 +1,32 @@
+# Lekhio web CI. Runs on every push so a red change never reaches production
+# unnoticed. Vercel still builds and deploys; this is the tripwire that fails
+# fast and visibly on types, tests, or the build.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: All test suites
+        # One runner covers every suite (engines, parity, agent, waintents,
+        # crypto, stripe, quarterpack, exams, hmrc, and logic.test.js, which runs
+        # here because the typescript module is installed). Exits non zero on any
+        # failure. New test/*.test.mjs files are picked up automatically.
+        run: node test/run-all.mjs
+      - name: Build
+        run: npx next build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder

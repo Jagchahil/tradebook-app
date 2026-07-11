@@ -1,0 +1,1253 @@
+{
+ "meta": {
+  "title": "Lekhio professional exam suite",
+  "taxYear": "2026/27",
+  "note": "Exam-style questions drawn from the topic areas of ACCA TX/ATX, ICAEW Principles of Taxation and Tax Compliance, CIOT CTA, AAT Business and Personal Tax, CIMA, US CPA REG and IRS EA. Each is answered by the canonical engine in lib/taxengine.ts and checked against the published 2026/27 treatment."
+ },
+ "questions": [
+  {
+   "id": "Q01",
+   "qualification": "ACCA TX",
+   "topic": "Income tax computation",
+   "fn": "soleTraderTax",
+   "args": [
+    30000
+   ],
+   "field": "total",
+   "expected": 4531.8,
+   "tol": 0.01,
+   "prompt": "Sole trader profit £30,000. Income tax plus Class 4 NIC?"
+  },
+  {
+   "id": "Q02",
+   "qualification": "ICAEW Tax Compliance",
+   "topic": "Income tax computation",
+   "fn": "soleTraderTax",
+   "args": [
+    60000
+   ],
+   "field": "total",
+   "expected": 13888.6,
+   "tol": 0.01,
+   "prompt": "Profit £60,000. Income tax plus Class 4 NIC?"
+  },
+  {
+   "id": "Q03",
+   "qualification": "CIOT CTA",
+   "topic": "Personal allowance taper",
+   "fn": "soleTraderTax",
+   "args": [
+    120000
+   ],
+   "field": "total",
+   "expected": 43088.6,
+   "tol": 0.01,
+   "prompt": "Profit £120,000 (PA tapered). Income tax plus Class 4 NIC?"
+  },
+  {
+   "id": "Q04",
+   "qualification": "CIOT CTA",
+   "topic": "Additional rate",
+   "fn": "soleTraderTax",
+   "args": [
+    130000
+   ],
+   "field": "total",
+   "expected": 48559.6,
+   "tol": 0.01,
+   "prompt": "Profit £130,000. Income tax plus Class 4 NIC?"
+  },
+  {
+   "id": "Q05",
+   "qualification": "AAT Personal Tax",
+   "topic": "Below thresholds",
+   "fn": "soleTraderTax",
+   "args": [
+    12000
+   ],
+   "field": "total",
+   "expected": 0,
+   "tol": 0.01,
+   "prompt": "Profit £12,000. Income tax plus Class 4 NIC?"
+  },
+  {
+   "id": "Q06",
+   "qualification": "ACCA TX",
+   "topic": "Income tax bands",
+   "fn": "incomeTaxOnProfit",
+   "args": [
+    50270
+   ],
+   "expected": 7540,
+   "tol": 0.01,
+   "prompt": "Profit £50,270. Income tax only?"
+  },
+  {
+   "id": "Q07",
+   "qualification": "ACCA TX",
+   "topic": "Higher rate",
+   "fn": "incomeTaxOnProfit",
+   "args": [
+    60000
+   ],
+   "expected": 11432,
+   "tol": 0.01,
+   "prompt": "Profit £60,000. Income tax only?"
+  },
+  {
+   "id": "Q08",
+   "qualification": "ICAEW Principles of Taxation",
+   "topic": "Additional rate",
+   "fn": "incomeTaxOnProfit",
+   "args": [
+    130000
+   ],
+   "expected": 44703,
+   "tol": 0.01,
+   "prompt": "Profit £130,000. Income tax only?"
+  },
+  {
+   "id": "Q09",
+   "qualification": "AAT Business Tax",
+   "topic": "Class 4 NIC",
+   "fn": "class4NIC",
+   "args": [
+    40000
+   ],
+   "expected": 1645.8,
+   "tol": 0.01,
+   "prompt": "Profit £40,000. Class 4 NIC?"
+  },
+  {
+   "id": "Q10",
+   "qualification": "ACCA TX",
+   "topic": "Class 4 NIC",
+   "fn": "class4NIC",
+   "args": [
+    60000
+   ],
+   "expected": 2456.6,
+   "tol": 0.01,
+   "prompt": "Profit £60,000. Class 4 NIC (both rates)?"
+  },
+  {
+   "id": "Q11",
+   "qualification": "AAT Business Tax",
+   "topic": "Class 4 NIC",
+   "fn": "class4NIC",
+   "args": [
+    50270
+   ],
+   "expected": 2262,
+   "tol": 0.01,
+   "prompt": "Profit £50,270. Class 4 NIC?"
+  },
+  {
+   "id": "Q12",
+   "qualification": "CIOT CTA",
+   "topic": "Personal allowance taper",
+   "fn": "personalAllowance",
+   "args": [
+    110000
+   ],
+   "expected": 7570,
+   "tol": 0.01,
+   "prompt": "Adjusted net income £110,000. Personal allowance?"
+  },
+  {
+   "id": "Q13",
+   "qualification": "CIOT CTA",
+   "topic": "Personal allowance taper",
+   "fn": "personalAllowance",
+   "args": [
+    125140
+   ],
+   "expected": 0,
+   "tol": 0.01,
+   "prompt": "Adjusted net income £125,140. Personal allowance?"
+  },
+  {
+   "id": "Q14",
+   "qualification": "ACCA TX",
+   "topic": "Personal allowance",
+   "fn": "personalAllowance",
+   "args": [
+    90000
+   ],
+   "expected": 12570,
+   "tol": 0.01,
+   "prompt": "Income £90,000. Personal allowance?"
+  },
+  {
+   "id": "Q15",
+   "qualification": "ICAEW Principles of Taxation",
+   "topic": "Personal allowance",
+   "fn": "personalAllowance",
+   "args": [
+    100000
+   ],
+   "expected": 12570,
+   "tol": 0.01,
+   "prompt": "Income £100,000. Personal allowance?"
+  },
+  {
+   "id": "Q16",
+   "qualification": "AAT Business Tax",
+   "topic": "CIS",
+   "fn": "cisDeduction",
+   "args": [
+    1000,
+    0,
+    "registered"
+   ],
+   "field": "deduction",
+   "expected": 200,
+   "tol": 0.01,
+   "prompt": "Registered subcontractor, £1,000 labour. CIS deduction?"
+  },
+  {
+   "id": "Q17",
+   "qualification": "CIS (trades)",
+   "topic": "CIS",
+   "fn": "cisDeduction",
+   "args": [
+    2000,
+    500,
+    "registered"
+   ],
+   "field": "net",
+   "expected": 2100,
+   "tol": 0.01,
+   "prompt": "£2,000 labour, £500 materials, registered. Net paid after CIS?"
+  },
+  {
+   "id": "Q18",
+   "qualification": "CIS (trades)",
+   "topic": "CIS",
+   "fn": "cisDeduction",
+   "args": [
+    1000,
+    0,
+    "unregistered"
+   ],
+   "field": "deduction",
+   "expected": 300,
+   "tol": 0.01,
+   "prompt": "Unregistered subcontractor, £1,000 labour. CIS deduction?"
+  },
+  {
+   "id": "Q19",
+   "qualification": "CIS (trades)",
+   "topic": "CIS",
+   "fn": "cisDeduction",
+   "args": [
+    1000,
+    0,
+    "gross"
+   ],
+   "field": "deduction",
+   "expected": 0,
+   "tol": 0.01,
+   "prompt": "Gross status, £1,000 labour. CIS deduction?"
+  },
+  {
+   "id": "Q20",
+   "qualification": "ACCA TX",
+   "topic": "Mileage (simplified)",
+   "fn": "mileageClaim",
+   "args": [
+    12000,
+    "car"
+   ],
+   "expected": 6000,
+   "tol": 0.01,
+   "prompt": "12,000 business miles by car. Simplified mileage claim?"
+  },
+  {
+   "id": "Q21",
+   "qualification": "AAT Business Tax",
+   "topic": "Mileage (simplified)",
+   "fn": "mileageClaim",
+   "args": [
+    5000,
+    "car"
+   ],
+   "expected": 2750,
+   "tol": 0.01,
+   "prompt": "5,000 business miles by car. Mileage claim?"
+  },
+  {
+   "id": "Q22",
+   "qualification": "ACCA TX",
+   "topic": "Mileage (simplified)",
+   "fn": "mileageClaim",
+   "args": [
+    8000,
+    "motorcycle"
+   ],
+   "expected": 1920,
+   "tol": 0.01,
+   "prompt": "8,000 miles by motorcycle. Mileage claim?"
+  },
+  {
+   "id": "Q23",
+   "qualification": "ICAEW Tax Compliance",
+   "topic": "Mileage (simplified)",
+   "fn": "mileageClaim",
+   "args": [
+    15000,
+    "car"
+   ],
+   "expected": 6750,
+   "tol": 0.01,
+   "prompt": "15,000 business miles by car. Mileage claim across both rates?"
+  },
+  {
+   "id": "Q24",
+   "qualification": "AAT Business Tax",
+   "topic": "Use of home (simplified)",
+   "fn": "homeOfficeFlatRateMonthly",
+   "args": [
+    60
+   ],
+   "expected": 18,
+   "tol": 0.01,
+   "prompt": "60 hours a month worked at home. Monthly flat rate?"
+  },
+  {
+   "id": "Q25",
+   "qualification": "ACCA TX",
+   "topic": "Use of home (simplified)",
+   "fn": "homeOfficeFlatRateMonthly",
+   "args": [
+    30
+   ],
+   "expected": 10,
+   "tol": 0.01,
+   "prompt": "30 hours a month at home. Monthly flat rate?"
+  },
+  {
+   "id": "Q26",
+   "qualification": "ICAEW Tax Compliance",
+   "topic": "Use of home (simplified)",
+   "fn": "homeOfficeFlatRateMonthly",
+   "args": [
+    120
+   ],
+   "expected": 26,
+   "tol": 0.01,
+   "prompt": "120 hours a month at home. Monthly flat rate?"
+  },
+  {
+   "id": "Q27",
+   "qualification": "ACCA TX",
+   "topic": "Use of home (simplified)",
+   "fn": "homeOfficeFlatRateMonthly",
+   "args": [
+    20
+   ],
+   "expected": 0,
+   "tol": 0.01,
+   "prompt": "20 hours a month at home. Monthly flat rate under the scheme?"
+  },
+  {
+   "id": "Q28",
+   "qualification": "ACCA TX",
+   "topic": "Trading allowance",
+   "fn": "taxableTradingProfit",
+   "args": [
+    800,
+    0
+   ],
+   "expected": 0,
+   "tol": 0.01,
+   "prompt": "Gross casual income £800. Taxable profit after trading allowance?"
+  },
+  {
+   "id": "Q29",
+   "qualification": "AAT Business Tax",
+   "topic": "Trading allowance",
+   "fn": "taxableTradingProfit",
+   "args": [
+    5000,
+    400
+   ],
+   "expected": 4000,
+   "tol": 0.01,
+   "prompt": "Gross £5,000, actual expenses £400. Best taxable profit?"
+  },
+  {
+   "id": "Q30",
+   "qualification": "ACCA TX",
+   "topic": "Trading allowance",
+   "fn": "taxableTradingProfit",
+   "args": [
+    5000,
+    2000
+   ],
+   "expected": 3000,
+   "tol": 0.01,
+   "prompt": "Gross £5,000, expenses £2,000. Taxable profit (use actual)?"
+  },
+  {
+   "id": "Q31",
+   "qualification": "ICAEW Principles of Taxation",
+   "topic": "Trading allowance",
+   "fn": "taxableTradingProfit",
+   "args": [
+    1500,
+    0
+   ],
+   "expected": 500,
+   "tol": 0.01,
+   "prompt": "Gross £1,500, no expenses. Taxable profit using the allowance?"
+  },
+  {
+   "id": "Q32",
+   "qualification": "ACCA TX",
+   "topic": "Capital allowances (AIA)",
+   "fn": "annualInvestmentAllowance",
+   "args": [
+    20000
+   ],
+   "expected": 20000,
+   "tol": 0.01,
+   "prompt": "£20,000 of qualifying plant. AIA relief?"
+  },
+  {
+   "id": "Q33",
+   "qualification": "ICAEW Tax Compliance",
+   "topic": "Capital allowances (AIA)",
+   "fn": "annualInvestmentAllowance",
+   "args": [
+    1200000
+   ],
+   "expected": 1000000,
+   "tol": 0.01,
+   "prompt": "£1.2m of qualifying plant. AIA relief (capped)?"
+  },
+  {
+   "id": "Q34",
+   "qualification": "ACCA TX",
+   "topic": "VAT registration",
+   "fn": "vatRegistrationRequired",
+   "args": [
+    95000
+   ],
+   "expected": true,
+   "prompt": "Rolling 12-month turnover £95,000. Must register for VAT?"
+  },
+  {
+   "id": "Q35",
+   "qualification": "AAT Indirect Tax",
+   "topic": "VAT registration",
+   "fn": "vatRegistrationRequired",
+   "args": [
+    85000
+   ],
+   "expected": false,
+   "prompt": "Turnover £85,000. Must register for VAT?"
+  },
+  {
+   "id": "Q36",
+   "qualification": "ICAEW Tax Compliance",
+   "topic": "VAT registration",
+   "fn": "vatRegistrationRequired",
+   "args": [
+    90000
+   ],
+   "expected": false,
+   "prompt": "Turnover exactly £90,000. Must register (must it be exceeded)?"
+  },
+  {
+   "id": "Q37",
+   "qualification": "MTD ITSA",
+   "topic": "MTD threshold",
+   "fn": "mtdForIncomeTaxRequired",
+   "args": [
+    60000,
+    2026
+   ],
+   "expected": true,
+   "prompt": "Qualifying income £60,000 from April 2026. MTD for IT required?"
+  },
+  {
+   "id": "Q38",
+   "qualification": "MTD ITSA",
+   "topic": "MTD threshold",
+   "fn": "mtdForIncomeTaxRequired",
+   "args": [
+    45000,
+    2026
+   ],
+   "expected": false,
+   "prompt": "Qualifying income £45,000 from April 2026. MTD required?"
+  },
+  {
+   "id": "Q39",
+   "qualification": "MTD ITSA",
+   "topic": "MTD threshold",
+   "fn": "mtdForIncomeTaxRequired",
+   "args": [
+    45000,
+    2027
+   ],
+   "expected": true,
+   "prompt": "Qualifying income £45,000 from April 2027. MTD required?"
+  },
+  {
+   "id": "Q40",
+   "qualification": "MTD ITSA",
+   "topic": "MTD threshold",
+   "fn": "mtdForIncomeTaxRequired",
+   "args": [
+    25000,
+    2028
+   ],
+   "expected": true,
+   "prompt": "Qualifying income £25,000 from April 2028. MTD required?"
+  },
+  {
+   "id": "Q41",
+   "qualification": "ACCA TX",
+   "topic": "Rates and allowances",
+   "fn": "FACT",
+   "key": "personalAllowance",
+   "expected": 12570,
+   "prompt": "Personal allowance 2026/27?"
+  },
+  {
+   "id": "Q42",
+   "qualification": "ACCA TX",
+   "topic": "Rates and allowances",
+   "fn": "FACT",
+   "key": "vatRegistrationThreshold",
+   "expected": 90000,
+   "prompt": "VAT registration threshold?"
+  },
+  {
+   "id": "Q43",
+   "qualification": "ICAEW Tax Compliance",
+   "topic": "Rates and allowances",
+   "fn": "FACT",
+   "key": "annualInvestmentAllowance",
+   "expected": 1000000,
+   "prompt": "Annual Investment Allowance limit?"
+  },
+  {
+   "id": "Q44",
+   "qualification": "AAT Business Tax",
+   "topic": "Rates and allowances",
+   "fn": "FACT",
+   "key": "class4MainRate",
+   "expected": 0.06,
+   "prompt": "Class 4 NIC main rate?"
+  },
+  {
+   "id": "Q45",
+   "qualification": "ACCA TX",
+   "topic": "Rates and allowances",
+   "fn": "FACT",
+   "key": "tradingAllowance",
+   "expected": 1000,
+   "prompt": "Trading allowance?"
+  },
+  {
+   "id": "Q46",
+   "qualification": "HMRC simplified expenses",
+   "topic": "Mileage rate",
+   "fn": "FACT",
+   "key": "mileageCarFirst10k",
+   "expected": 0.55,
+   "prompt": "Car mileage rate, first 10,000 miles, 2026/27?"
+  },
+  {
+   "id": "Q47",
+   "qualification": "CIOT CTA",
+   "topic": "Rates and allowances",
+   "fn": "FACT",
+   "key": "additionalRateThreshold",
+   "expected": 125140,
+   "prompt": "Additional rate threshold (taxable income)?"
+  },
+  {
+   "id": "Q48",
+   "qualification": "AAT Business Tax",
+   "topic": "Class 2 NIC",
+   "fn": "FACT",
+   "key": "class2WeeklyRate",
+   "expected": 3.65,
+   "prompt": "Class 2 NIC weekly rate?"
+  },
+  {
+   "id": "Q49",
+   "qualification": "CIS (trades)",
+   "topic": "CIS rate",
+   "fn": "FACT",
+   "key": "cisRegisteredRate",
+   "expected": 0.2,
+   "prompt": "CIS deduction rate, registered subcontractor?"
+  },
+  {
+   "id": "Q50",
+   "qualification": "ACCA TX",
+   "topic": "VAT deregistration",
+   "fn": "FACT",
+   "key": "vatDeregistrationThreshold",
+   "expected": 88000,
+   "prompt": "VAT deregistration threshold?"
+  },
+  {
+   "id": "Q51",
+   "qualification": "ACCA TX",
+   "topic": "Allowable vs disallowable",
+   "fn": "classifyExpense",
+   "args": [
+    "protective_clothing"
+   ],
+   "expected": "yes",
+   "prompt": "Protective clothing for the job. Allowable?"
+  },
+  {
+   "id": "Q52",
+   "qualification": "ACCA TX",
+   "topic": "Allowable vs disallowable",
+   "fn": "classifyExpense",
+   "args": [
+    "everyday_clothing"
+   ],
+   "expected": "no",
+   "prompt": "Everyday clothing worn for work. Allowable?"
+  },
+  {
+   "id": "Q53",
+   "qualification": "ICAEW Tax Compliance",
+   "topic": "Allowable vs disallowable",
+   "fn": "classifyExpense",
+   "args": [
+    "client_entertaining"
+   ],
+   "expected": "no",
+   "prompt": "Entertaining a client. Allowable?"
+  },
+  {
+   "id": "Q54",
+   "qualification": "AAT Business Tax",
+   "topic": "Allowable vs disallowable",
+   "fn": "classifyExpense",
+   "args": [
+    "accountancy_fees"
+   ],
+   "expected": "yes",
+   "prompt": "Accountancy fees for the business. Allowable?"
+  },
+  {
+   "id": "Q55",
+   "qualification": "CIOT CTA",
+   "topic": "Allowable vs disallowable",
+   "fn": "classifyExpense",
+   "args": [
+    "training_new_trade"
+   ],
+   "expected": "no",
+   "prompt": "Training to start a brand new trade. Allowable?"
+  },
+  {
+   "id": "Q56",
+   "qualification": "ACCA TX",
+   "topic": "Allowable vs disallowable",
+   "fn": "classifyExpense",
+   "args": [
+    "training_existing_skill"
+   ],
+   "expected": "yes",
+   "prompt": "Training to update an existing skill. Allowable?"
+  },
+  {
+   "id": "Q57",
+   "qualification": "ICAEW Principles of Taxation",
+   "topic": "Allowable vs disallowable",
+   "fn": "classifyExpense",
+   "args": [
+    "fines_and_penalties"
+   ],
+   "expected": "no",
+   "prompt": "Parking fines incurred at work. Allowable?"
+  },
+  {
+   "id": "Q58",
+   "qualification": "AAT Business Tax",
+   "topic": "Allowable vs disallowable",
+   "fn": "classifyExpense",
+   "args": [
+    "home_office_proportion"
+   ],
+   "expected": "partly",
+   "prompt": "Household costs with a business-use share. Allowable?"
+  },
+  {
+   "id": "Q59",
+   "qualification": "ACCA TX",
+   "topic": "Allowable vs disallowable",
+   "fn": "classifyExpense",
+   "args": [
+    "staff_wages"
+   ],
+   "expected": "yes",
+   "prompt": "Wages paid to staff. Allowable?"
+  },
+  {
+   "id": "Q60",
+   "qualification": "AAT Business Tax",
+   "topic": "Allowable vs disallowable",
+   "fn": "classifyExpense",
+   "args": [
+    "phone_business_share"
+   ],
+   "expected": "partly",
+   "prompt": "Phone bill with a business-use share. Allowable?"
+  },
+  {
+   "id": "Q61",
+   "qualification": "ACCA TX",
+   "topic": "Basis period reform",
+   "fn": "concept",
+   "args": [
+    "basis_of_assessment"
+   ],
+   "expected": "tax-year basis",
+   "prompt": "What basis are unincorporated profits taxed on from 2024/25?"
+  },
+  {
+   "id": "Q62",
+   "qualification": "ACCA TX",
+   "topic": "Cash basis",
+   "fn": "concept",
+   "args": [
+    "cash_basis_default_from"
+   ],
+   "expected": "2024/25",
+   "prompt": "From which year is the cash basis the default for small businesses?"
+  },
+  {
+   "id": "Q63",
+   "qualification": "Ethics (ICAEW/CIOT/CPA REG/EA)",
+   "topic": "Ethics",
+   "fn": "concept",
+   "args": [
+    "illegal_practice"
+   ],
+   "expected": "evasion",
+   "prompt": "Avoidance or evasion: which is illegal?"
+  },
+  {
+   "id": "Q64",
+   "qualification": "IRS EA (Representation)",
+   "topic": "Record keeping",
+   "fn": "concept",
+   "args": [
+    "record_keeping_years"
+   ],
+   "expected": 5,
+   "prompt": "How many years must a self-employed person keep records after the filing deadline?"
+  },
+  {
+   "id": "Q65",
+   "qualification": "MTD ITSA",
+   "topic": "MTD deadlines",
+   "fn": "concept",
+   "args": [
+    "mtd_first_quarter_deadline"
+   ],
+   "expected": "2026-08-07",
+   "prompt": "Deadline for the first MTD quarterly update (6 Apr to 5 Jul 2026)?"
+  },
+  {
+   "id": "Q66",
+   "qualification": "ACCA TX",
+   "topic": "Self-assessment admin",
+   "fn": "concept",
+   "args": [
+    "self_assessment_deadline"
+   ],
+   "expected": "2026-01-31",
+   "prompt": "Online self assessment and balancing payment deadline for 2024/25?"
+  },
+  {
+   "id": "Q67",
+   "qualification": "CIS (trades)",
+   "topic": "CIS basis",
+   "fn": "concept",
+   "args": [
+    "cis_deducted_from"
+   ],
+   "expected": "labour",
+   "prompt": "CIS deductions are taken from which element of a payment?"
+  },
+  {
+   "id": "Q68",
+   "qualification": "ICAEW Principles of Taxation",
+   "topic": "Badges of trade",
+   "fn": "concept",
+   "args": [
+    "badges_of_trade_decide"
+   ],
+   "expected": "trading",
+   "prompt": "The badges of trade decide whether an activity amounts to what?"
+  },
+  {
+   "id": "Q69",
+   "qualification": "ACCA TX",
+   "topic": "Trading allowance",
+   "fn": "concept",
+   "args": [
+    "trading_allowance_creates_loss"
+   ],
+   "expected": "no",
+   "prompt": "Can the trading allowance create or increase a loss?"
+  },
+  {
+   "id": "Q70",
+   "qualification": "US CPA (REG)",
+   "topic": "Ethics",
+   "fn": "concept",
+   "args": [
+    "client_entertaining_allowable"
+   ],
+   "expected": "no",
+   "prompt": "Is client entertaining an allowable deduction?"
+  },
+  {
+   "id": "Q71",
+   "qualification": "CIMA BA3 / AAT L2",
+   "topic": "Double-entry bookkeeping",
+   "fn": "concept",
+   "args": [
+    "double_entry"
+   ],
+   "expected": "equal",
+   "prompt": "In double-entry bookkeeping, total debits must be how, relative to total credits?"
+  },
+  {
+   "id": "Q72",
+   "qualification": "ACCA TX",
+   "topic": "Capital allowances (WDA)",
+   "fn": "writingDownAllowance",
+   "args": [
+    10000,
+    "main"
+   ],
+   "expected": 1400,
+   "tol": 0.01,
+   "prompt": "£10,000 in the main pool. Writing down allowance this year (14% from 6 April 2026)?"
+  },
+  {
+   "id": "Q73",
+   "qualification": "ACCA TX",
+   "topic": "Capital allowances (WDA)",
+   "fn": "writingDownAllowance",
+   "args": [
+    10000,
+    "special"
+   ],
+   "expected": 600,
+   "tol": 0.01,
+   "prompt": "£10,000 in the special rate pool. Writing down allowance?"
+  },
+  {
+   "id": "Q74",
+   "qualification": "ICAEW Tax Compliance",
+   "topic": "Payments on account",
+   "fn": "paymentsOnAccount",
+   "args": [
+    4000
+   ],
+   "field": "eachPayment",
+   "expected": 2000,
+   "tol": 0.01,
+   "prompt": "Self Assessment bill £4,000. Each payment on account?"
+  },
+  {
+   "id": "Q75",
+   "qualification": "ACCA TX",
+   "topic": "Payments on account",
+   "fn": "paymentsOnAccount",
+   "args": [
+    800
+   ],
+   "field": "required",
+   "expected": false,
+   "prompt": "Bill £800. Are payments on account required?"
+  },
+  {
+   "id": "Q76",
+   "qualification": "AAT Business Tax",
+   "topic": "Payments on account",
+   "fn": "paymentsOnAccount",
+   "args": [
+    3000
+   ],
+   "field": "eachPayment",
+   "expected": 1500,
+   "tol": 0.01,
+   "prompt": "Bill £3,000. Each payment on account?"
+  },
+  {
+   "id": "Q77",
+   "qualification": "ACCA TX",
+   "topic": "Trading losses",
+   "fn": "lossCarriedForward",
+   "args": [
+    20000,
+    5000
+   ],
+   "field": "taxableProfit",
+   "expected": 15000,
+   "tol": 0.01,
+   "prompt": "£20,000 profit, £5,000 loss brought forward. Taxable profit after relief?"
+  },
+  {
+   "id": "Q78",
+   "qualification": "ACCA ATX",
+   "topic": "Trading losses",
+   "fn": "lossCarriedForward",
+   "args": [
+    3000,
+    5000
+   ],
+   "field": "lossRemaining",
+   "expected": 2000,
+   "tol": 0.01,
+   "prompt": "£3,000 profit, £5,000 loss brought forward. Loss still carried forward?"
+  },
+  {
+   "id": "Q79",
+   "qualification": "ACCA TX",
+   "topic": "Capital gains tax",
+   "fn": "capitalGainsTax",
+   "args": [
+    10000
+   ],
+   "expected": 1260,
+   "tol": 0.01,
+   "prompt": "£10,000 gain, basic rate. CGT after the annual exemption?"
+  },
+  {
+   "id": "Q80",
+   "qualification": "CIOT CTA",
+   "topic": "Capital gains tax",
+   "fn": "capitalGainsTax",
+   "args": [
+    10000,
+    {
+     "higherRate": true
+    }
+   ],
+   "expected": 1680,
+   "tol": 0.01,
+   "prompt": "£10,000 gain, higher rate. CGT?"
+  },
+  {
+   "id": "Q81",
+   "qualification": "CIOT CTA",
+   "topic": "Business Asset Disposal Relief",
+   "fn": "capitalGainsTax",
+   "args": [
+    50000,
+    {
+     "badr": true
+    }
+   ],
+   "expected": 8460,
+   "tol": 0.01,
+   "prompt": "£50,000 qualifying business gain with BADR. CGT at 18%?"
+  },
+  {
+   "id": "Q82",
+   "qualification": "AAT Personal Tax",
+   "topic": "Capital gains tax",
+   "fn": "capitalGainsTax",
+   "args": [
+    2000
+   ],
+   "expected": 0,
+   "tol": 0.01,
+   "prompt": "£2,000 gain. CGT (within the £3,000 exemption)?"
+  },
+  {
+   "id": "Q83",
+   "qualification": "ACCA TX",
+   "topic": "VAT flat rate scheme",
+   "fn": "vatFlatRateDue",
+   "args": [
+    60000,
+    9.5
+   ],
+   "expected": 5700,
+   "tol": 0.01,
+   "prompt": "£60,000 VAT-inclusive turnover, 9.5% flat rate. VAT due?"
+  },
+  {
+   "id": "Q84",
+   "qualification": "ICAEW Tax Compliance",
+   "topic": "VAT flat rate scheme",
+   "fn": "vatFlatRateDue",
+   "args": [
+    50000,
+    16.5
+   ],
+   "expected": 8250,
+   "tol": 0.01,
+   "prompt": "£50,000 turnover, limited cost trader 16.5%. Flat rate VAT due?"
+  },
+  {
+   "id": "Q85",
+   "qualification": "CIOT CTA",
+   "topic": "Rates and allowances",
+   "fn": "FACT",
+   "key": "cgtAnnualExempt",
+   "expected": 3000,
+   "prompt": "CGT annual exempt amount 2026/27?"
+  },
+  {
+   "id": "Q86",
+   "qualification": "ACCA TX",
+   "topic": "Capital allowances (WDA)",
+   "fn": "FACT",
+   "key": "wdaMainRate",
+   "expected": 0.14,
+   "prompt": "Main pool writing down allowance rate (14% from 6 April 2026)?"
+  },
+  {
+   "id": "Q87",
+   "qualification": "CIOT CTA",
+   "topic": "Business Asset Disposal Relief",
+   "fn": "FACT",
+   "key": "badrRate",
+   "expected": 0.18,
+   "prompt": "BADR rate from 6 April 2026?"
+  },
+  {
+   "id": "Q88",
+   "qualification": "ATT Paper 1",
+   "topic": "Personal allowance taper",
+   "fn": "soleTraderTax",
+   "args": [
+    110000
+   ],
+   "field": "total",
+   "expected": 36888.6,
+   "tol": 0.01,
+   "prompt": "Profit £110,000. Tapered PA £7,570. Income tax plus Class 4 NIC?"
+  },
+  {
+   "id": "Q89",
+   "qualification": "CIOT ATT",
+   "topic": "Personal allowance taper",
+   "fn": "soleTraderTax",
+   "args": [
+    125140
+   ],
+   "field": "total",
+   "expected": 46275.4,
+   "tol": 0.01,
+   "prompt": "Profit £125,140, PA fully lost. Income tax plus Class 4?"
+  },
+  {
+   "id": "Q90",
+   "qualification": "AAT Business Tax",
+   "topic": "Income tax bands",
+   "fn": "incomeTaxOnProfit",
+   "args": [
+    50270
+   ],
+   "expected": 7540,
+   "tol": 0.01,
+   "prompt": "Profit £50,270, the higher rate threshold. Income tax?"
+  },
+  {
+   "id": "Q91",
+   "qualification": "ACCA TX",
+   "topic": "Additional rate",
+   "fn": "incomeTaxOnProfit",
+   "args": [
+    150000
+   ],
+   "expected": 53703,
+   "tol": 0.01,
+   "prompt": "Profit £150,000, no PA. Income tax across all three bands?"
+  },
+  {
+   "id": "Q92",
+   "qualification": "ACCA TX",
+   "topic": "Class 4 NIC",
+   "fn": "class4NIC",
+   "args": [
+    60000
+   ],
+   "expected": 2456.6,
+   "tol": 0.01,
+   "prompt": "Profit £60,000. Class 4 NIC at 6% then 2%?"
+  },
+  {
+   "id": "Q93",
+   "qualification": "AAT Business Tax",
+   "topic": "Capital allowances (WDA)",
+   "fn": "writingDownAllowance",
+   "args": [
+    20000,
+    "main"
+   ],
+   "expected": 2800,
+   "tol": 0.01,
+   "prompt": "Main pool £20,000. WDA at the 14% 2026/27 rate?"
+  },
+  {
+   "id": "Q94",
+   "qualification": "ACCA TX",
+   "topic": "Capital allowances (WDA)",
+   "fn": "writingDownAllowance",
+   "args": [
+    10000,
+    "special"
+   ],
+   "expected": 600,
+   "tol": 0.01,
+   "prompt": "Special rate pool £10,000. WDA at 6%?"
+  },
+  {
+   "id": "Q95",
+   "qualification": "ATT Paper 1",
+   "topic": "Trading losses",
+   "fn": "lossCarriedForward",
+   "args": [
+    10000,
+    15000
+   ],
+   "field": "lossRemaining",
+   "expected": 5000,
+   "tol": 0.01,
+   "prompt": "Profit £10,000, loss b/f £15,000. Loss still carried forward?"
+  },
+  {
+   "id": "Q96",
+   "qualification": "AAT Business Tax",
+   "topic": "Trading losses",
+   "fn": "lossCarriedForward",
+   "args": [
+    30000,
+    12000
+   ],
+   "field": "taxableProfit",
+   "expected": 18000,
+   "tol": 0.01,
+   "prompt": "Profit £30,000, loss b/f £12,000. Taxable profit after relief?"
+  },
+  {
+   "id": "Q97",
+   "qualification": "ACCA TX",
+   "topic": "Capital gains tax",
+   "fn": "capitalGainsTax",
+   "args": [
+    13000,
+    {
+     "higherRate": true
+    }
+   ],
+   "expected": 2400,
+   "tol": 0.01,
+   "prompt": "Gain £13,000, higher rate taxpayer. CGT after the £3,000 AEA?"
+  },
+  {
+   "id": "Q98",
+   "qualification": "CIOT ATT",
+   "topic": "Business Asset Disposal Relief",
+   "fn": "capitalGainsTax",
+   "args": [
+    203000,
+    {
+     "badr": true
+    }
+   ],
+   "expected": 36000,
+   "tol": 0.01,
+   "prompt": "Qualifying business sale, gain £203,000 with BADR. CGT at 18%?"
+  },
+  {
+   "id": "Q99",
+   "qualification": "AAT Business Tax",
+   "topic": "CIS",
+   "fn": "cisDeduction",
+   "args": [
+    1000,
+    200,
+    "unregistered"
+   ],
+   "field": "net",
+   "expected": 900,
+   "tol": 0.01,
+   "prompt": "Unregistered subbie: labour £1,000, materials £200. Net payment?"
+  },
+  {
+   "id": "Q100",
+   "qualification": "ACCA TX",
+   "topic": "Mileage (simplified)",
+   "fn": "mileageClaim",
+   "args": [
+    12000,
+    "car"
+   ],
+   "expected": 6000,
+   "tol": 0.01,
+   "prompt": "12,000 business miles by car. Simplified expenses claim (55p/25p)?"
+  },
+  {
+   "id": "Q101",
+   "qualification": "AAT Business Tax",
+   "topic": "Class 2 NIC",
+   "fn": "class2Voluntary",
+   "args": [],
+   "field": "annual",
+   "expected": 189.8,
+   "tol": 0.01,
+   "prompt": "Voluntary Class 2 for a full year at £3.65 a week?"
+  },
+  {
+   "id": "Q102",
+   "qualification": "ATT Paper 1",
+   "topic": "Trading allowance",
+   "fn": "taxableTradingProfit",
+   "args": [
+    5000,
+    200
+   ],
+   "expected": 4000,
+   "tol": 0.01,
+   "prompt": "Income £5,000, expenses £200. Taxable profit taking the better of expenses or the trading allowance?"
+  },
+  {
+   "id": "Q103",
+   "qualification": "ICAEW Tax Compliance",
+   "topic": "Payments on account",
+   "fn": "paymentsOnAccount",
+   "args": [
+    1000
+   ],
+   "field": "required",
+   "expected": false,
+   "prompt": "Bill exactly £1,000. Are payments on account required (threshold is over £1,000)?"
+  },
+  {
+   "id": "Q104",
+   "qualification": "ACCA TX",
+   "topic": "MTD threshold",
+   "fn": "mtdForIncomeTaxRequired",
+   "args": [
+    25000,
+    2028
+   ],
+   "expected": true,
+   "prompt": "Qualifying income £25,000. In MTD from April 2028 (£20,000 threshold)?"
+  }
+ ]
+}

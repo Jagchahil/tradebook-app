@@ -2737,3 +2737,30 @@ export async function getTransactionVendor(userId: string, id: string): Promise<
   const rows = (await res.json()) as Array<{ vendor: string | null }>;
   return rows[0]?.vendor ?? null;
 }
+
+// One transaction, for the purpose of learning from a correction to it.
+export async function getTransactionForLearning(
+  userId: string,
+  id: string,
+): Promise<{ vendor: string | null; category: string | null; is_personal: boolean | null } | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}` +
+      `&select=vendor,category,is_personal&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return rows[0] ?? null;
+}
+
+// Forget a vendor. The user is always allowed to take a lesson back.
+export async function forgetUserRule(userId: string, vendorKey: string): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/user_rules?user_id=eq.${encodeURIComponent(userId)}` +
+      `&vendor_key=eq.${encodeURIComponent(vendorKey)}`,
+    { method: 'DELETE', headers: headers({ Prefer: 'return=minimal' }) },
+  );
+  return res.ok;
+}

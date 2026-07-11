@@ -328,6 +328,14 @@ export interface MappedBankEntry {
   // than having to be corrected all over again. Still unconfirmed either way: the
   // approval gate is untouched.
   is_personal?: boolean;
+  // Set at import by the rules-based detector (lib/personal.ts) on EVERY line, known vendor or
+  // not. This does NOT take the money out of the books: that is his call, and getting it wrong
+  // in this direction (excluding a real supplier refund) makes him under-declare income, which
+  // is a worse thing to be wrong about than paying a bit too much tax.
+  //
+  // What it does is make the line UNSWEEPABLE. Nothing flagged here can ever be swept up by a
+  // bulk confirm, however fast he is going. He gets asked, once, plainly.
+  looks_personal?: boolean;
 }
 
 // Merchant keyword map, mirroring the WhatsApp categoriser so a Screwfix card

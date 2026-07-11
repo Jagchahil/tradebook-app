@@ -2046,6 +2046,10 @@ export interface BankEntryInsert {
   // asking him again would be asking a question he has answered. See doc 104
   // section 3 and lib/digest.ts. He is told in the digest, and one word undoes it.
   confirmed?: boolean;
+  // UNSWEEPABLE. This line smells like a benefit, a refund, a bet or a transfer. It is NOT
+  // excluded from the books (that is his call), but no bulk confirm may ever touch it. See
+  // lib/personal.ts and lib/banksync.ts.
+  looks_personal?: boolean;
 }
 
 // Insert bank transactions idempotently and in BULK: one PostgREST request per
@@ -2075,6 +2079,11 @@ export async function insertBankTransactions(userId: string, entries: BankEntryI
       // fine and silently drop every lesson: the sync would decide a benefit was
       // not business money, and then write it to the books as income anyway.
       is_personal: entry.is_personal === true,
+      // And the "this smells like a benefit" flag. Same trap: this builder constructs rows
+      // field by field, so a field you forget is a field that is silently thrown away, and the
+      // code still compiles and the tests still pass. That is exactly how is_personal was lost
+      // once already.
+      looks_personal: entry.looks_personal === true,
     }));
     const res = await fetch(`${url}/rest/v1/transactions?on_conflict=external_id&select=id`, {
       method: 'POST',
@@ -3233,5 +3242,58 @@ export async function sweepRateHits(): Promise<void> {
     });
   } catch {
     // Housekeeping. Never worth failing a cron over.
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// The pile. See lib/reviewpile.ts and app/api/pile/route.ts.
+// ---------------------------------------------------------------------------
+
+// Everything still waiting on him. Bank rows, unconfirmed, not already excluded.
+//
+// Capped at 1000. Ninety days of a busy tradesman is two to three hundred; a thousand is a
+// year of heavy use and well past the point where a review deck is the right tool anyway.
+export async function pileEntries(userId: string): Promise<Array<{
+  id: string;
+  vendor: string | null;
+  description: string | null;
+  amount: number;
+  category: string | null;
+  looks_personal: boolean | null;
+}>> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+      `&confirmed=eq.false&is_personal=eq.false&source_type=eq.bank_feed` +
+      `&select=id,vendor,description,amount,category,looks_personal` +
+      `&order=transaction_date.desc&limit=1000`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+// One decision, many rows, one statement.
+//
+// The GUARD IS IN THE SQL, not here. confirm_pile refuses income, refuses anything flagged
+// looks_personal, and refuses rows that are not his, whatever this function passes it. A guard
+// that lives only in the client is a suggestion, and this endpoint takes a list of ids from a
+// request body.
+export async function confirmPile(userId: string, ids: string[], category: string): Promise<number> {
+  const clean = ids.filter((i) => UUID.test(i));
+  if (clean.length === 0) return 0;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/rpc/confirm_pile`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_user: userId, p_ids: clean, p_category: category }),
+    });
+    if (!res.ok) return 0;
+    const n = await res.json();
+    return typeof n === 'number' ? n : 0;
+  } catch {
+    return 0;
   }
 }

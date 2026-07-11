@@ -122,6 +122,30 @@ export async function syncWithAccessToken(
       getVendorPatterns(keys.filter(Boolean)),
     ]);
 
+    // THE PERSONAL CHECK RUNS ON EVERY LINE, KNOWN OR NOT.
+    //
+    // It used to live inside the loop below, AFTER `if (known.source === 'none') continue`.
+    // So it only ever ran for a vendor we already knew about. On day one of a bank connect we
+    // know NOTHING, and mapBankTransaction categorises every CREDIT as 'income'.
+    //
+    // Which means a CHILD TAX CREDIT landed in a man's books labelled "income", with no flag
+    // on it, on the very day he connected his bank. It survived only because it arrived
+    // unconfirmed, and he would probably have spotted it while tapping through them one by one.
+    //
+    // The moment we build a way to confirm two hundred things quickly, that stops being true.
+    // A fast confirm over an unflagged pile is a machine for sweeping benefits into taxable
+    // income. So the check runs first, on everything, before anything else looks at the entry.
+    //
+    // It does NOT mark them personal. Deciding a man's benefit is not business money is his
+    // call, not ours, and the false positive direction here is the dangerous one: a supplier
+    // refund wrongly excluded means he under-declares income, which is a worse problem to have
+    // than paying a little too much tax. So we flag, and we ask, and we never bulk-confirm it.
+    for (const entry of toInsert) {
+      if (looksPersonal(entry.vendor, entry.description) !== null) {
+        entry.looks_personal = true;
+      }
+    }
+
     if (rules.length > 0 || patterns.length > 0) {
       for (const entry of toInsert) {
         const known = recall(entry.vendor, rules, patterns);

@@ -34,6 +34,8 @@ import {
   listBankConnectionsForUser,
   recentUnconfirmedForMatch,
   mergeIntoTransaction,
+  touchLastInbound,
+  confirmAllPending,
   claimMessage,
   insertTransaction,
   listUserProperties,
@@ -273,6 +275,20 @@ export async function POST(req: NextRequest) {
   if (messageId && !(await claimMessage(messageId))) {
     return NextResponse.json({ ok: true });
   }
+
+  // THE FREE WINDOW. Every message a user sends us reopens Meta's 24 hour customer
+  // service window, inside which our sends cost NOTHING. Recording when it happened
+  // is the difference between a daily digest that is free and one that eats the
+  // entire WhatsApp budget (57.8p per user per month, nineteen paid sends, see
+  // lib/margin.ts). Fire and forget: a timestamp is never worth delaying a reply.
+  void (async () => {
+    try {
+      const uid = await findUserIdByPhone(from);
+      if (uid) await touchLastInbound(uid);
+    } catch {
+      /* never break an inbound message over a timestamp */
+    }
+  })();
 
   // Per sender burst limit. Protects the AI and transcription spend from a
   // runaway or malicious sender. A genuine user never sends this many in a
@@ -846,15 +862,45 @@ async function handleThanks(from: string): Promise<void> {
   await sendText(from, 'Any time. Send the next one whenever it happens. 👍');
 }
 
+// "YES."
+//
+// This used to answer "entries are confirmed in your Lekhio app, under Activity",
+// which is precisely the thing we promise a man he will never have to do. He is
+// standing in a loft with one hand on a ladder. He is not opening an app.
+//
+// So yes means YES: everything waiting gets filed, right there in the text.
+//
+// This does NOT weaken the approval gate, it IS the approval gate. Confirming an
+// entry says "that is really mine". It sends nothing to HMRC and it moves no money.
+// Those two still ask, every single time, and always will.
 async function handleAck(from: string, kind: 'yes' | 'no'): Promise<void> {
-  if (kind === 'yes') {
+  if (kind === 'no') {
     await sendText(
       from,
-      'Nothing waiting on me here. Entries are confirmed in your Lekhio app, under Activity. Or just send me the next receipt.',
+      'No bother, I will leave them as they are. Nothing counts until you say so. If one is wrong, text "delete that" or "change it to 40" and I will sort the last one.',
     );
     return;
   }
-  await sendText(from, 'No problem. If an entry is wrong, text "delete that" or "change it to 40" and I will sort the last one.');
+
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+
+  const filed = await confirmAllPending(userId);
+
+  if (filed === 0) {
+    await sendText(from, 'Nothing waiting on me. Send me the next receipt whenever you like.');
+    return;
+  }
+
+  await sendText(
+    from,
+    filed === 1
+      ? 'Done. That one is filed and counted. Nothing else is waiting.'
+      : `Done. All ${filed} filed and counted. Nothing else is waiting.`,
+  );
 }
 
 async function handleStopStart(from: string, kind: 'stop' | 'start'): Promise<void> {

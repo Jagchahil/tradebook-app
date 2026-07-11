@@ -2861,3 +2861,90 @@ export async function mergeIntoTransaction(
   );
   return res.ok;
 }
+
+// --- the daily digest ---------------------------------------------------------
+
+// Every inbound message reopens Meta's free 24 hour window. Recording when it
+// happened is what lets us know a send is free. Never throws.
+export async function touchLastInbound(userId: string): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ last_inbound_at: new Date().toISOString() }),
+    });
+  } catch {
+    /* never break an inbound message over a timestamp */
+  }
+}
+
+export interface DigestCandidate {
+  id: string;
+  phone_number: string | null;
+  last_inbound_at: string | null;
+  last_digest_at: string | null;
+}
+
+// Users who have unconfirmed BANK entries we have not told them about yet.
+// Paged, so the cron can walk 100k users a chunk at a time.
+export async function usersDueDigest(afterId: string | null, limit: number): Promise<DigestCandidate[]> {
+  const { url } = config();
+  const after = afterId ? `&id=gt.${encodeURIComponent(afterId)}` : '';
+  const res = await fetch(
+    `${url}/rest/v1/users?select=id,phone_number,last_inbound_at,last_digest_at${after}` +
+      `&phone_number=not.is.null&order=id.asc&limit=${limit}`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+// What landed from the bank and is still waiting for a yes.
+export async function undigestedBankEntries(userId: string): Promise<Array<{ id: string; vendor: string | null; amount: number; category: string | null }>> {
+  const { url } = config();
+  const since = new Date(Date.now() - 3 * 86400_000).toISOString();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+      `&confirmed=eq.false&source_type=eq.bank_feed&is_personal=eq.false` +
+      `&created_at=gte.${encodeURIComponent(since)}` +
+      `&select=id,vendor,amount,category&order=created_at.desc&limit=20`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+export async function markDigestSent(userId: string): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ last_digest_at: new Date().toISOString() }),
+    });
+  } catch {
+    /* nothing */
+  }
+}
+
+// "YES." His approval, given in the only place he actually is.
+//
+// This confirms UNCONFIRMED entries only, and confirming is not an irreversible act:
+// it says "this is really mine". It sends nothing to HMRC and it moves no money.
+// Those still ask, every single time, and always will.
+export async function confirmAllPending(userId: string): Promise<number> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+      `&confirmed=eq.false&is_personal=eq.false&select=id`,
+    {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=representation' }),
+      body: JSON.stringify({ confirmed: true }),
+    },
+  );
+  if (!res.ok) return 0;
+  const rows = (await res.json()) as unknown[];
+  return Array.isArray(rows) ? rows.length : 0;
+}

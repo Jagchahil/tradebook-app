@@ -136,7 +136,11 @@ export default async function TradePage({ params }: { params: Promise<{ trade: s
       {/* Footer */}
       <footer style={{ borderTop: `1px solid ${LINE}`, background: PAPER }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px', display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, color: MUTED }}>© {new Date().getFullYear()} Lekhio, a Satluj Ventures company. Not HMRC.</span>
+          {/* "a Satluj Ventures company" was live here, on the footer of every trade
+              landing page, naming a company that does not exist and never will. Doc 92
+              is explicit: one shareholder, one share class, NO holding company. The
+              entity is LEKHIO LTD, 17329341. Lekhio is the only name. */}
+          <span style={{ fontSize: 13, color: MUTED }}>© {new Date().getFullYear()} Lekhio. Not HMRC.</span>
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
             <Link href="/start" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Sign up</Link>
             <Link href="/privacy" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Privacy</Link>

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import ClientScript from '../_shared/ClientScript';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import {
@@ -112,9 +113,7 @@ tr.hide{display:none}
 `;
 
 const COMPARE_JS = `
-(function(){
-  if(window.__lekCmp)return;window.__lekCmp=true;
-  function applyFilter(f){
+(function(){  function applyFilter(f){
     var groups={};
     document.querySelectorAll('#cmp .datarow').forEach(function(tr){
       var win=tr.getAttribute('data-win')==='1';var show=(f!=='win')||win;
@@ -241,7 +240,7 @@ export default function ComparePage() {
 
       <SiteFooter />
       <StickyCta />
-      <script dangerouslySetInnerHTML={{ __html: COMPARE_JS }} />
+      <ClientScript js={COMPARE_JS} />
     </main>
   );
 }

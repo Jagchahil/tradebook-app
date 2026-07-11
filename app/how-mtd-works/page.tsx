@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import ClientScript from '../_shared/ClientScript';
 import Link from 'next/link';
 import {
   INK, PAPER, FONT, MARKETING_CSS,
@@ -74,9 +75,7 @@ const MTD_CSS = `
 `;
 
 const MTD_JS = `
-(function(){
-  if(window.__lekMtd)return;window.__lekMtd=true;
-  function money(k){return '£'+(k*1000).toLocaleString('en-GB')+(k>=100?'+':'');}
+(function(){  function money(k){return '£'+(k*1000).toLocaleString('en-GB')+(k>=100?'+':'');}
   function checkMTD(){
     var slider=document.getElementById('slider');if(!slider)return;
     var k=+slider.value;var iv=document.getElementById('incomeVal');if(iv)iv.textContent=money(k);
@@ -219,7 +218,7 @@ export default function HowMtdWorksPage() {
 
       <SiteFooter />
       <StickyCta />
-      <script dangerouslySetInnerHTML={{ __html: MTD_JS }} />
+      <ClientScript js={MTD_JS} />
     </main>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import ClientScript from '../_shared/ClientScript';
 import Link from 'next/link';
 import {
   INK, PAPER, FONT, faqs, MARKETING_CSS,
@@ -65,9 +66,7 @@ details.faq .fa{font-size:14.5px;color:var(--tx-mut);margin-top:12px;line-height
 `;
 
 const PRICING_JS = `
-(function(){
-  if(window.__lekPr)return;window.__lekPr=true;
-  function setBill(b){
+(function(){  function setBill(b){
     document.querySelectorAll('#bill button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-b')===b);});
     var amt=document.getElementById('pamt'),note=document.getElementById('pnote'),save=document.getElementById('psave');
     if(!amt)return;
@@ -186,7 +185,7 @@ export default function PricingPage() {
 
       <SiteFooter />
       <StickyCta />
-      <script dangerouslySetInnerHTML={{ __html: PRICING_JS }} />
+      <ClientScript js={PRICING_JS} />
     </main>
   );
 }

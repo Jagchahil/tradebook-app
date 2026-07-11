@@ -4,6 +4,7 @@
 // Server components only, no client boundary needed. The reveal + countup
 // behaviour is injected as an idempotent inline script by <SharedHead />.
 import Link from 'next/link';
+import ClientScript from './ClientScript';
 import type { CSSProperties } from 'react';
 import { TRADES } from '../../lib/trades';
 import { A11Y_CSS } from '../../lib/tokens';
@@ -835,10 +836,7 @@ const REVEAL_JS = `
     }); }
     setIcon();
   };
-  if (document.readyState !== 'loading') wireToggle(); else document.addEventListener('DOMContentLoaded', wireToggle);
-
-  if (window.__lekhioReveal) return; window.__lekhioReveal = true;
-  var run = function(){
+  if (document.readyState !== 'loading') wireToggle(); else document.addEventListener('DOMContentLoaded', wireToggle);  var run = function(){
     var els = document.querySelectorAll('.reveal');
     if ('IntersectionObserver' in window){
       var io = new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.12,rootMargin:'0px 0px -40px 0px'});
@@ -860,7 +858,7 @@ export function SharedHead() {
       <style dangerouslySetInnerHTML={{ __html: SHARED_CSS }} />
       <noscript><style dangerouslySetInnerHTML={{ __html: `.reveal{opacity:1;transform:none}.cmsg{opacity:1 !important}` }} /></noscript>
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
-      <script dangerouslySetInnerHTML={{ __html: REVEAL_JS }} />
+      <ClientScript js={REVEAL_JS} />
     </>
   );
 }

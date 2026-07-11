@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import ClientScript from '../_shared/ClientScript';
 import Link from 'next/link';
 import OnboardingShow from './OnboardingShow';
 import {
@@ -117,9 +118,7 @@ const PRODUCT_CSS = `
 `;
 
 const PRODUCT_JS = `
-(function(){
-  if(window.__lekProd)return;window.__lekProd=true;
-  var FEAT=[
+(function(){  var FEAT=[
    {t:'Snap a receipt',p:'Photograph it on WhatsApp. Lekhio pulls the total, the VAT and the category, and logs it in seconds.',demo:'<div class="db out d1"><div style="background:#cde7b4;border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:4px">🧾</div>Screwfix receipt</div><div class="db in d2">Logged. £42.60, materials ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">VAT £7.10 · Materials · 3 Jul</div>'},
    {t:'Say it out loud',p:'Hands full on the job? Leave a voice note. Lekhio hears it and logs it before you have put the phone down.',demo:'<div class="db out d1" style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">🎙️</span><span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div><div class="db out d2">"spent forty on diesel"</div><div class="db in d3">£40 fuel, logged ✅</div>'},
    {t:'Mileage in a text',p:'Text the trip. Lekhio works out the claim at the HMRC rate and logs it. No fiddly logbook.',demo:'<div class="db out d1">drove 24 miles to the job</div><div class="db in d2">£13.20 mileage claimed at the HMRC rate ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">45p a mile · logged to travel</div>'},
@@ -389,7 +388,7 @@ export default function ProductPage() {
 
       <SiteFooter />
       <StickyCta />
-      <script dangerouslySetInnerHTML={{ __html: PRODUCT_JS }} />
+      <ClientScript js={PRODUCT_JS} />
     </main>
   );
 }

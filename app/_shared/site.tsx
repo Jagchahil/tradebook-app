@@ -426,7 +426,7 @@ export const faqs = [
   { q: 'Do I have to be a tradesperson?', a: 'No. Lekhio is for anyone self employed in the UK. A barber, a driver, a tutor, a freelancer, a plumber. If you keep receipts or send invoices, it is for you.' },
   { q: 'What is Making Tax Digital?', a: 'From April 2026, HMRC wants self employed people over a certain income to keep digital records and send a short update each quarter instead of one big return. Lekhio keeps those records as you work.' },
   { q: 'Does this mean paying tax four times a year?', a: 'No, that is a common myth. You send four short updates a year, but you still pay your tax on the normal dates.' },
-  { q: 'Does Lekhio file my tax for me?', a: 'We prepare your figures and get them ready. You always review and approve before anything is sent, through an HMRC recognised route. You stay responsible for your tax.' },
+  { q: 'Does Lekhio file my tax for me?', a: 'Lekhio prepares your figures and gets them ready. You always review and approve before anything is sent, and you stay responsible for your tax. Filing straight from Lekhio is coming: our HMRC recognition is in progress. Until it lands, Lekhio does all the preparation so filing takes minutes.' },
   { q: 'What if a receipt is read wrong?', a: 'You see every entry and can fix the amount, the shop, or the category in a tap. Nothing counts until you confirm it.' },
   { q: 'Is my financial data safe?', a: 'Yes. Your data is encrypted in transit and at rest, you can only ever see your own records, and you can export or delete everything whenever you want.' },
 ];

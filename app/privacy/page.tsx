@@ -146,6 +146,21 @@ export default function PrivacyPage() {
           it only happens after you approve.
         </p>
 
+        <h2 style={heading}>Sharing your books with your accountant (optional)</h2>
+        <p style={para}>
+          You can choose to give your accountant a read only view of your books. This is entirely your
+          decision, it is off unless you switch it on, and Lekhio works fully without it.
+        </p>
+        <p style={para}>
+          When you create a link, you choose who it is for and how long it lasts, and you can turn it off
+          at any time from the app. The link stops working immediately. Whoever holds it can see only the
+          entries you have confirmed: the date, the merchant, the category and the amount. They cannot see
+          your receipt photos, your voice notes, your WhatsApp messages, your phone number or your bank
+          connection, and they cannot change anything. We show you how many times the link has been opened
+          and when it was last used, so you can see it being used and spot it being used when you did not
+          expect it.
+        </p>
+
         <h2 style={heading}>How long we keep it</h2>
         <p style={para}>
           We keep your financial records for as long as your account is active, and afterwards for the

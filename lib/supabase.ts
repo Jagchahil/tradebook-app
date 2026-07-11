@@ -2491,3 +2491,116 @@ export async function listOverdueInvoices(userId: string): Promise<OverdueInvoic
   }
   return out;
 }
+
+// --- accountant read only access ---------------------------------------------
+//
+// The grant lives in a row so it can be REVOKED. See lib/accountant.ts for why a
+// pure signed token was not good enough. Every read here goes through the service
+// role, and every one of them is scoped by user_id at the query, never filtered
+// afterwards.
+
+export interface AccountantGrant {
+  id: string;
+  user_id: string;
+  accountant_name: string | null;
+  accountant_email: string | null;
+  revoked_at: string | null;
+  expires_at: string;
+  last_viewed_at: string | null;
+  view_count: number;
+  created_at: string;
+}
+
+export async function createAccountantGrant(
+  userId: string,
+  name: string | null,
+  email: string | null,
+  expiresAtISO: string,
+): Promise<AccountantGrant | null> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/accountant_grants`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'return=representation' }),
+    body: JSON.stringify({
+      user_id: userId,
+      accountant_name: name,
+      accountant_email: email,
+      expires_at: expiresAtISO,
+    }),
+  });
+  if (!res.ok) return null;
+  const rows = (await res.json()) as AccountantGrant[];
+  return rows[0] ?? null;
+}
+
+export async function listAccountantGrants(userId: string): Promise<AccountantGrant[]> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/accountant_grants?user_id=eq.${encodeURIComponent(userId)}` +
+      `&select=id,user_id,accountant_name,accountant_email,revoked_at,expires_at,last_viewed_at,view_count,created_at` +
+      `&order=created_at.desc&limit=50`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return (await res.json()) as AccountantGrant[];
+}
+
+// Scoped by user_id as well as id, so a caller can only ever revoke their OWN
+// grant even if they somehow learned another id.
+export async function revokeAccountantGrant(userId: string, grantId: string): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/accountant_grants?id=eq.${encodeURIComponent(grantId)}` +
+      `&user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ revoked_at: new Date().toISOString() }),
+    },
+  );
+  return res.ok;
+}
+
+// Used by the PUBLIC accountant view, after the signature has already checked out.
+// Returns the row so the caller can judge revoked_at and expires_at for itself.
+export async function getAccountantGrant(grantId: string): Promise<AccountantGrant | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/accountant_grants?id=eq.${encodeURIComponent(grantId)}` +
+      `&select=id,user_id,accountant_name,accountant_email,revoked_at,expires_at,last_viewed_at,view_count,created_at&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as AccountantGrant[];
+  return rows[0] ?? null;
+}
+
+// Record that the link was opened, so the user can see it being used. Never
+// throws: an audit write must not be able to break the accountant's view.
+export async function touchAccountantGrant(grantId: string): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/rpc/touch_accountant_grant`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_grant: grantId }),
+    });
+  } catch {
+    /* never block the view on the counter */
+  }
+}
+
+// Every confirmed entry for a user. The accountant view needs the whole picture,
+// not a date window, so this is deliberately unbounded by date but hard capped.
+export async function getConfirmedTransactionsForUser(userId: string): Promise<Record<string, unknown>[]> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+      `&confirmed=eq.true` +
+      `&select=amount,vendor,category,transaction_date,description,confirmed` +
+      `&order=transaction_date.desc&limit=5000`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  return (await res.json()) as Record<string, unknown>[];
+}

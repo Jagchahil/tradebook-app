@@ -54,6 +54,31 @@ ok('prefers the authoritative price.unit_amount over metadata', full && full.amo
 ok('renewal date converted from unix seconds to ISO', full && full.current_period_end === new Date(periodEnd * 1000).toISOString());
 ok('cancel_at_period_end preserved as boolean false', full && full.cancel_at_period_end === false);
 
+// The Stripe API version we actually run (2026-06-24.dahlia) puts current_period_end
+// on the subscription ITEM, not on the subscription. This is the shape a live webhook
+// now delivers. Reading only the subscription silently stored a null renewal date,
+// caught by the first real checkout on 11 July 2026.
+const itemPeriodEnd = 1794000000; // seconds
+const modern = S.subscriptionRowFrom({
+  id: 'sub_MODERN',
+  status: 'trialing',
+  customer: 'cus_modern',
+  metadata: { plan: 'monthly', phone: '447700900999' },
+  items: { data: [{ current_period_end: itemPeriodEnd, price: { unit_amount: 1299, recurring: { interval: 'month' } } }] },
+});
+ok('reads the renewal date from the subscription ITEM (current Stripe API)', modern && modern.current_period_end === new Date(itemPeriodEnd * 1000).toISOString());
+ok('the item shape still books the right amount', modern && modern.amount_pence === 1299);
+ok('the item shape still carries status and the account key', modern && modern.status === 'trialing' && modern.phone === '447700900999');
+
+// When both locations are present, the item is the newer and authoritative one.
+const both = S.subscriptionRowFrom({
+  id: 'sub_BOTH',
+  status: 'active',
+  current_period_end: 1700000000,
+  items: { data: [{ current_period_end: itemPeriodEnd, price: { unit_amount: 1299, recurring: { interval: 'month' } } }] },
+});
+ok('the item renewal date wins over the legacy subscription field', both && both.current_period_end === new Date(itemPeriodEnd * 1000).toISOString());
+
 // Metadata plan wins over the interval-derived plan when both are present.
 ok('metadata plan wins over interval', full && full.plan === 'annual');
 

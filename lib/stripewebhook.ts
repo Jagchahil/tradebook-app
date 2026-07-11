@@ -51,7 +51,17 @@ export function subscriptionRowFrom(sub: Record<string, unknown>): SubscriptionR
   const amountFromPrice = typeof price.unit_amount === 'number' ? (price.unit_amount as number) : undefined;
   const amountFromMeta = metadata.amount_pence ? Number(metadata.amount_pence) : undefined;
 
-  const periodEnd = typeof sub.current_period_end === 'number' ? (sub.current_period_end as number) : undefined;
+  // When the plan renews, or when a trial ends. Stripe MOVED current_period_end off
+  // the Subscription object and onto the subscription ITEM in its newer API versions
+  // (our webhook runs on 2026-06-24.dahlia), so reading it from the subscription
+  // alone silently yields null. Caught by the first live checkout on 11 July 2026:
+  // the row landed with a null renewal date. Read the item first, then fall back to
+  // the subscription for older API versions, so this holds whichever version
+  // delivers the event.
+  const itemPeriodEnd =
+    typeof items[0]?.current_period_end === 'number' ? (items[0].current_period_end as number) : undefined;
+  const subPeriodEnd = typeof sub.current_period_end === 'number' ? (sub.current_period_end as number) : undefined;
+  const periodEnd = itemPeriodEnd ?? subPeriodEnd;
 
   const row: SubscriptionRecord = {
     stripe_subscription_id: id,

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import ClientScript from '../_shared/ClientScript';
+import { filingBadge, bankBadge } from '../../lib/features';
 import Link from 'next/link';
 import OnboardingShow from './OnboardingShow';
 import {
@@ -378,9 +379,9 @@ export default function ProductPage() {
             <p className="lead">Every one keeps you in control, and never sends a thing without your yes.</p>
           </div>
           <div className="soongrid reveal">
-            <div className="sooncard"><div className="se"><Ic e="📤" color="var(--river)" size={24} /></div><h3>File straight to HMRC</h3><p>Submit your quarterly updates and return from Lekhio, when you approve, through a recognised route.</p><span className="rbadge prog">HMRC RECOGNITION IN PROGRESS</span></div>
+            <div className="sooncard"><div className="se"><Ic e="📤" color="var(--river)" size={24} /></div><h3>File straight to HMRC</h3><p>Submit your quarterly updates and return from Lekhio, when you approve, through a recognised route.</p><span className={filingBadge().live ? 'rbadge live' : 'rbadge prog'}>{filingBadge().text}</span></div>
             <div className="sooncard"><div className="se"><Ic e="📊" color="var(--saffron-deep)" size={24} /></div><h3>Your HMRC balance, live</h3><p>See exactly what you owe, what is due, and any refund building, right in the app.</p><span className="rbadge soon">COMING SOON</span></div>
-            <div className="sooncard"><div className="se"><Ic e="🏦" color="var(--green)" size={24} /></div><h3>Connect your bank</h3><p>Money in and out logs itself, read only, so your books stay up to date with no effort.</p><span className="rbadge soon">BUILT · SWITCHING ON SOON</span></div>
+            <div className="sooncard"><div className="se"><Ic e="🏦" color="var(--green)" size={24} /></div><h3>Connect your bank</h3><p>Money in and out logs itself, read only, so your books stay up to date with no effort.</p><span className={bankBadge().live ? 'rbadge live' : 'rbadge soon'}>{bankBadge().text}</span></div>
             <div className="sooncard"><div className="se"><Ic e="🛡️" color="var(--river)" size={24} /></div><h3>Rakha gets sharper</h3><p>Rakha already watches your thresholds. Soon it reads HMRC updates and the Budget the moment they land, and tells you exactly what changes for you.</p><span className="rbadge soon">COMING SOON</span></div>
           </div>
         </div>

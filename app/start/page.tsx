@@ -3,6 +3,37 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
+import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL } from '../../lib/features';
+
+// The app store buttons. Until the app is ACTUALLY in both stores these are dead,
+// dimmed "soon" chips, never links to nowhere. The day it lands, flip
+// NEXT_PUBLIC_APP_STORE_LIVE=true (and set the two URLs) and they become real
+// download buttons. One env var, no copy rewrite.
+// The line under the store buttons. Flips with the same flag, so we never tell
+// someone to "download the app" while pointing at a store that has not got it.
+function storeNote(): string {
+  return appStoreLive() && APP_STORE_URL && PLAY_STORE_URL
+    ? 'Grab the app, or just carry on in WhatsApp. Both work, and they stay in sync.'
+    : 'The app lands in the stores soon. You do not need to wait, everything works on WhatsApp right now.';
+}
+
+function StoreButtons() {
+  const live = appStoreLive() && APP_STORE_URL && PLAY_STORE_URL;
+  if (!live) {
+    return (
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', opacity: 0.5 }}>
+        <span style={badgeStore}>  App Store · soon</span>
+        <span style={badgeStore}>▶  Google Play · soon</span>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+      <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" style={badgeStore}>  Download on the App Store</a>
+      <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" style={badgeStore}>▶  Get it on Google Play</a>
+    </div>
+  );
+}
 
 const INK = '#111111';
 const RIVER = '#1B59A6';
@@ -212,14 +243,11 @@ export default function StartPage() {
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
               <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>Your plan is locked in.</h1>
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 28px' }}>
-                Your card is saved and your 14 day free trial is running. You will not be charged until it ends, and you can cancel any time before then and pay nothing. Download the app and say hello on WhatsApp to log your first receipt.
+                Your card is saved and your 14 day free trial is running. You will not be charged until it ends, and you can cancel any time before then and pay nothing. Say hello on WhatsApp to log your first receipt.
               </p>
               <div style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', opacity: 0.5 }}>
-                  <span style={badgeStore}>  App Store · soon</span>
-                  <span style={badgeStore}>▶  Google Play · soon</span>
-                </div>
-                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>The app lands in the stores soon. You do not need to wait, everything works on WhatsApp right now.</p>
+                <StoreButtons />
+                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>{storeNote()}</p>
               </div>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
@@ -231,11 +259,8 @@ export default function StartPage() {
                 No card added, and that is fine. Your 14 day free trial is active. You can add a card to keep Lekhio any time, from the app or the website.
               </p>
               <div style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', opacity: 0.5 }}>
-                  <span style={badgeStore}>  App Store · soon</span>
-                  <span style={badgeStore}>▶  Google Play · soon</span>
-                </div>
-                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>The app lands in the stores soon. You do not need to wait, everything works on WhatsApp right now.</p>
+                <StoreButtons />
+                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>{storeNote()}</p>
               </div>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
@@ -295,11 +320,8 @@ export default function StartPage() {
               </div>
 
               <div style={{ marginBottom: 18 }}>
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', opacity: 0.5 }}>
-                  <span style={badgeStore}>  App Store · soon</span>
-                  <span style={badgeStore}>▶  Google Play · soon</span>
-                </div>
-                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>The app lands in the stores soon. You do not need to wait, everything works on WhatsApp right now.</p>
+                <StoreButtons />
+                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>{storeNote()}</p>
               </div>
               <p style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>Prefer to decide later? Just download the app, your trial is already running.</p>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>

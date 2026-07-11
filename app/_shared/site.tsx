@@ -5,6 +5,7 @@
 // behaviour is injected as an idempotent inline script by <SharedHead />.
 import Link from 'next/link';
 import ClientScript from './ClientScript';
+import { filingFaqAnswer, filingMark, bankMark, hmrcFilingLive, bankFeedLive } from '../../lib/features';
 import type { CSSProperties } from 'react';
 import { TRADES } from '../../lib/trades';
 import { A11Y_CSS } from '../../lib/tokens';
@@ -331,8 +332,8 @@ export const compareRows = [
   { label: 'Plain English, built for the non accountant', lekhio: true, apps: false, diy: true },
   { label: 'One flat price, no receipt limits, no paywalls', lekhio: true, apps: false, diy: true },
   { label: 'Set up in minutes, cancel in one tap', lekhio: true, apps: false, diy: false },
-  { label: 'File straight to HMRC', lekhio: 'soon', apps: true, diy: false },
-  { label: 'Connect your bank, read only', lekhio: 'soon', apps: true, diy: false },
+  { label: 'File straight to HMRC', lekhio: filingMark(), apps: true, diy: false },
+  { label: 'Connect your bank, read only', lekhio: bankMark(), apps: true, diy: false },
 ];
 
 export const reviews = [
@@ -351,10 +352,17 @@ export const claimExamples = [
   { text: '£400 paid, £80 CIS deducted', result: 'gross logged, refund tracked' },
 ];
 
+// A capability drops OFF the "coming soon" list the moment its flag goes true, so
+// the day HMRC recognition (or the bank feed) lands it stops being advertised as
+// future and just becomes part of the product. One env var, no copy rewrite.
 export const comingSoon = [
-  { icon: '📤', title: 'File straight to HMRC', body: 'Submit your quarterly updates and your return from Lekhio, when you approve, through a recognised route.' },
+  ...(hmrcFilingLive()
+    ? []
+    : [{ icon: '📤', title: 'File straight to HMRC', body: 'Submit your quarterly updates and your return from Lekhio, when you approve, through a recognised route.' }]),
   { icon: '📊', title: 'Your HMRC balance, live', body: 'See exactly what you owe, what is due, and any refund building, right in the app.' },
-  { icon: '🏦', title: 'Connect your bank', body: 'Money in and out logs itself, read only, so your books stay up to date with no effort.' },
+  ...(bankFeedLive()
+    ? []
+    : [{ icon: '🏦', title: 'Connect your bank', body: 'Money in and out logs itself, read only, so your books stay up to date with no effort.' }]),
   { icon: '🧑‍💼', title: 'A real accountant, on tap', body: 'For the tricky bits, a qualified accountant inside Lekhio. No leaving for help, ever.' },
 ];
 
@@ -426,7 +434,7 @@ export const faqs = [
   { q: 'Do I have to be a tradesperson?', a: 'No. Lekhio is for anyone self employed in the UK. A barber, a driver, a tutor, a freelancer, a plumber. If you keep receipts or send invoices, it is for you.' },
   { q: 'What is Making Tax Digital?', a: 'From April 2026, HMRC wants self employed people over a certain income to keep digital records and send a short update each quarter instead of one big return. Lekhio keeps those records as you work.' },
   { q: 'Does this mean paying tax four times a year?', a: 'No, that is a common myth. You send four short updates a year, but you still pay your tax on the normal dates.' },
-  { q: 'Does Lekhio file my tax for me?', a: 'Lekhio prepares your figures and gets them ready. You always review and approve before anything is sent, and you stay responsible for your tax. Filing straight from Lekhio is coming: our HMRC recognition is in progress. Until it lands, Lekhio does all the preparation so filing takes minutes.' },
+  { q: 'Does Lekhio file my tax for me?', a: filingFaqAnswer() },
   { q: 'What if a receipt is read wrong?', a: 'You see every entry and can fix the amount, the shop, or the category in a tap. Nothing counts until you confirm it.' },
   { q: 'Is my financial data safe?', a: 'Yes. Your data is encrypted in transit and at rest, you can only ever see your own records, and you can export or delete everything whenever you want.' },
 ];

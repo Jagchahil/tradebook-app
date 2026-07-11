@@ -20,8 +20,16 @@ import {
 import { checkExpense, VERDICT_ICON, TAX_TIPS } from '../../../lib/taxrules';
 import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
 import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/email';
+import { hasBankFeedConfig } from '../../../lib/bankfeed';
+import {
+  busyMessage,
+  receiptMilestoneNudge,
+  NUDGE_AFTER_RECEIPTS,
+  type AiBlockReason,
+} from '../../../lib/banknudge';
 import {
   findUserIdByPhone,
+  listBankConnectionsForUser,
   claimMessage,
   insertTransaction,
   listUserProperties,
@@ -109,8 +117,11 @@ export const maxDuration = 60;
 // as the AI budget. A real user never sends 300 messages in a day; a runaway
 // script can, and we silently stop replying rather than fuel a storm.
 const PHONE_DAILY_MESSAGES = 300;
-const AI_BUSY =
-  'I am a bit busy right now. Give me a few minutes and try again. Nothing is lost.';
+
+// The refusal copy now lives in lib/banknudge.ts, where it can be unit tested and
+// where the wording can depend on WHY we refused. A single hardcoded "I am a bit
+// busy" string used to be sent for the user's own daily cap too, which told people
+// the product was broken when it was working exactly as designed.
 
 // The AI spend gate. Caps are DERIVED from the live paying base and the margin
 // floor (lib/margin.ts, lib/aicost.ts), not hardcoded: a flat global cap becomes
@@ -121,17 +132,29 @@ const AI_BUSY =
 // Fails CLOSED on the durable counters: if we cannot read the budget we do not
 // spend on AI. The deterministic paths (typed money, mileage, CIS, totals) still
 // work, so the user is never stuck, just not AI-parsed.
-async function aiBudgetBlocked(from: string): Promise<boolean> {
+// Returns WHY the budget refused, or null when the spend is allowed.
+//
+// It used to return a bare boolean, and every caller then sent the same "I am a
+// bit busy right now" line. That is honest for OUR caps (global cap, kill switch)
+// and a flat lie for the user's own daily cap: nothing is busy and nothing is
+// broken, they have simply used their allowance. Telling someone the product is
+// having a wobble, at the exact moment it declined to read their receipt, is the
+// worst thing we could say. So the reason now travels to the caller and
+// sendBudgetRefusal picks the truthful message. See lib/banknudge.ts.
+//
+// A database failure still fails CLOSED (we do not spend), and we attribute that
+// to ourselves, not to the user.
+async function aiBudgetBlocked(from: string): Promise<AiBlockReason | null> {
   const subs = await countActiveSubscribers();
   const caps = aiCapsFor(subs ?? 0);
-  if (caps.killed) return true;
+  if (caps.killed) return 'kill_switch';
 
   const userDay = await bumpAiUsage('phone', from);
-  if (userDay === null) return true;
+  if (userDay === null) return 'global_daily_cap';
   const globalDay = await bumpAiUsage('global', 'all');
-  if (globalDay === null) return true;
+  if (globalDay === null) return 'global_daily_cap';
   const globalMonth = await bumpAiUsage('globalmonth', monthKey());
-  if (globalMonth === null) return true;
+  if (globalMonth === null) return 'global_daily_cap';
 
   // decideSpend judges the counts BEFORE this call, so subtract our own bump.
   const decision = decideSpend(
@@ -140,9 +163,44 @@ async function aiBudgetBlocked(from: string): Promise<boolean> {
   );
   if (!decision.allowed) {
     console.warn(`[wa] AI refused: ${decision.reason} (subs=${subs ?? 'unknown'})`);
-    return true;
+    return decision.reason as AiBlockReason;
   }
-  return false;
+  return null;
+}
+
+// Send the right refusal, and take the one chance we get to offer the bank feed.
+//
+// A bank transaction costs us NO AI at all (rules based categorisation), while a
+// receipt photo costs about 0.5p. So the moment a user feels the daily cap is both
+// the most useful and the cheapest moment to suggest connecting a bank. We only
+// look the connection up when it can change the message, so the common path (our
+// own caps) stays a single send with no extra queries.
+//
+// The offer is gated on hasBankFeedConfig(), the REAL server capability, not on
+// the marketing flag: we must never offer a connection we cannot actually deliver.
+async function sendBudgetRefusal(from: string, reason: AiBlockReason): Promise<void> {
+  let bank = { available: false, connected: false };
+
+  // Only the user's own cap can change the message, so only that path pays for the
+  // lookups. Every other refusal is one send and no extra queries.
+  if (reason === 'user_daily_cap' && hasBankFeedConfig()) {
+    try {
+      const userId = await findUserIdByPhone(from);
+      if (userId) {
+        const connections = await listBankConnectionsForUser(userId);
+        bank = {
+          available: true,
+          connected: connections.some((c) => c.status === 'linked'),
+        };
+      }
+    } catch {
+      // If we cannot tell, say nothing about banks. A wrong offer is worse than
+      // no offer, and busyMessage stays honest and useful with available:false.
+      bank = { available: false, connected: false };
+    }
+  }
+
+  await sendText(from, busyMessage(reason, bank));
 }
 
 // Calendar month key for the monthly AI counter, e.g. "2026-07".
@@ -569,8 +627,9 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
     return;
   }
 
-  if (await aiBudgetBlocked(from)) {
-    await sendText(from, AI_BUSY);
+  const refused = await aiBudgetBlocked(from);
+  if (refused) {
+    await sendBudgetRefusal(from, refused);
     return;
   }
   const parsed = await parseReceipt(media.base64, media.mediaType);
@@ -597,10 +656,41 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
   });
 
   const amountText = `£${parsed.amount.toFixed(2)}`;
-  await sendText(
-    from,
-    `Logged. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. It is in your Lekhio.`,
-  );
+  const confirmation = `Logged. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. It is in your Lekhio.`;
+
+  // Once a day, and only for someone clearly doing this the hard way, offer the
+  // easy way. receiptMilestoneNudge fires on exactly the nth receipt, so it cannot
+  // become nagging however many they send. Appended to the confirmation rather
+  // than sent separately: an extra WhatsApp message would cost us real money (see
+  // lib/margin.ts) to say something we can say for free right here.
+  const nudge = await bankNudgeAfterReceipt(from, userId);
+  await sendText(from, nudge ? `${confirmation}\n\n${nudge}` : confirmation);
+}
+
+// Counts today's receipts for this phone and returns the milestone nudge, or null.
+//
+// The counter reuses the existing ai_usage table (one upsert, resets daily) rather
+// than a new query against transactions. A receipt already cost us an AI call, so
+// one more row upsert is noise. The bank lookup only happens on the milestone
+// itself, so 99% of receipts add a single write and nothing else.
+//
+// Never throws: a nudge is the least important thing in this handler and must
+// never cost someone their logged receipt.
+async function bankNudgeAfterReceipt(from: string, userId: string): Promise<string | null> {
+  try {
+    if (!hasBankFeedConfig()) return null;
+
+    const receiptsToday = await bumpAiUsage('receipt', from);
+    if (receiptsToday === null || receiptsToday !== NUDGE_AFTER_RECEIPTS) return null;
+
+    const connections = await listBankConnectionsForUser(userId);
+    return receiptMilestoneNudge(receiptsToday, {
+      available: true,
+      connected: connections.some((c) => c.status === 'linked'),
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function handleVoiceNote(from: string, messageId: string, mediaId: string): Promise<void> {
@@ -621,8 +711,9 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
     return;
   }
 
-  if (await aiBudgetBlocked(from)) {
-    await sendText(from, AI_BUSY);
+  const refused = await aiBudgetBlocked(from);
+  if (refused) {
+    await sendBudgetRefusal(from, refused);
     return;
   }
   const transcript = await transcribeAudio(media.base64, media.mediaType);
@@ -1465,8 +1556,9 @@ async function handleSchedule(from: string, body: string): Promise<void> {
     await sendText(from, 'Reminders are not switched on yet. Hang tight, they are coming very soon.');
     return;
   }
-  if (await aiBudgetBlocked(from)) {
-    await sendText(from, AI_BUSY);
+  const refused = await aiBudgetBlocked(from);
+  if (refused) {
+    await sendBudgetRefusal(from, refused);
     return;
   }
   const parsed = await parseSchedule(body, new Date().toISOString());
@@ -1522,8 +1614,9 @@ async function handleMoneyQuestion(from: string, body: string): Promise<void> {
     await sendText(from, 'I cannot answer questions just yet. Hang tight, it is coming very soon.');
     return;
   }
-  if (await aiBudgetBlocked(from)) {
-    await sendText(from, AI_BUSY);
+  const refused = await aiBudgetBlocked(from);
+  if (refused) {
+    await sendBudgetRefusal(from, refused);
     return;
   }
   const summary = await transactionSummaryForUser(userId);
@@ -1575,8 +1668,9 @@ async function handleExpenseCheck(from: string, body: string): Promise<void> {
     // cannot spend our AI budget by spamming questions. Unlinked callers still
     // get the safe general answer and a nudge to sign up.
     if (hasClaudeConfig() && linked) {
-      if (await aiBudgetBlocked(from)) {
-        await sendText(from, AI_BUSY);
+      const refused = await aiBudgetBlocked(from);
+      if (refused) {
+        await sendBudgetRefusal(from, refused);
         return;
       }
       const ai = await answerExpenseQuestion(body);
@@ -1732,8 +1826,9 @@ async function handleInvoiceFlow(from: string, body: string): Promise<boolean> {
       await sendText(from, 'Invoice building is not switched on yet. Hang tight.');
       return true;
     }
-    if (await aiBudgetBlocked(from)) {
-      await sendText(from, AI_BUSY);
+    const refused = await aiBudgetBlocked(from);
+    if (refused) {
+      await sendBudgetRefusal(from, refused);
       return true;
     }
     const drafted = await draftInvoice(body);

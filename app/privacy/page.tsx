@@ -55,7 +55,7 @@ export default function PrivacyPage() {
 
       <article style={{ maxWidth: 760, margin: '0 auto', padding: '24px 24px 80px' }}>
         <h1 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 8px' }}>Privacy Policy</h1>
-        <p style={{ fontSize: 14, color: MUTED, margin: '0 0 8px' }}>Last updated 9 July 2026</p>
+        <p style={{ fontSize: 14, color: MUTED, margin: '0 0 8px' }}>Last updated 11 July 2026</p>
         <p style={para}>
           This policy explains what Lekhio collects, why we collect it, and what we do with it. We
           handle your data under the UK General Data Protection Regulation and the Data Protection Act
@@ -76,6 +76,7 @@ export default function PrivacyPage() {
           <li style={li}>The receipts, photos, and voice notes you send us.</li>
           <li style={li}>The financial records we build from what you send, such as amounts, dates, merchants, and categories.</li>
           <li style={li}>Basic technical data needed to run the service, such as app version and error logs.</li>
+          <li style={li}>If, and only if, you choose to connect a bank: your account information, balance and transactions, read only. See &quot;Connecting your bank&quot; below.</li>
         </ul>
 
         <h2 style={heading}>Why we collect it</h2>
@@ -103,6 +104,28 @@ export default function PrivacyPage() {
           Your data is encrypted in transit and at rest. We store it with trusted infrastructure
           providers and limit access to the people and systems that need it. We do not store the
           content of your WhatsApp messages with any third party beyond our secure database.
+        </p>
+
+        <h2 style={heading}>Connecting your bank (optional)</h2>
+        <p style={para}>
+          You can choose to connect a bank account so your transactions arrive automatically
+          instead of you sending each one. This is optional. Lekhio works fully without it.
+        </p>
+        <p style={para}>
+          If you connect a bank, we use TrueLayer, a provider authorised and regulated by the
+          Financial Conduct Authority to provide account information services. You give consent
+          in your bank&apos;s own screens, not ours, and we never see your bank login details. The
+          access we ask for is READ ONLY: we can see your account information, balance and
+          transactions, and we cannot move money, make payments, or change anything in your
+          account.
+        </p>
+        <p style={para}>
+          We use that data for one purpose: to build your bookkeeping records so your tax figures
+          are right. Incoming transactions arrive as unconfirmed entries and count toward nothing
+          until you confirm them, exactly like a receipt you send us. The access tokens are
+          encrypted and stored on our servers only. You can disconnect at any time, in the app or
+          by emailing info@lekhio.app, and you can withdraw consent with your bank directly. Our
+          lawful basis is your consent, and performance of the contract to deliver the service.
         </p>
 
         <h2 style={heading}>Where we process your data</h2>

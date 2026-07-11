@@ -89,6 +89,28 @@ const PRICE_PENCE: Record<BillingPlan, { standard: number; founder: number; inte
   annual: { standard: 12900, founder: 12900, interval: 'year', label: 'Lekhio, annual' },
 };
 
+// The catalogue Price objects (added 11 July 2026). Stripe's recommended shape is
+// a real Product with real Prices, not ad hoc inline pricing: prices built inline
+// with price_data never appear in the Dashboard catalogue or product searches, so
+// revenue reporting by product is blind. The live catalogue is one product
+// "Lekhio" with two recurring prices, 12.99 a month and 129 a year.
+//
+// When a price id is configured we charge THROUGH it, which makes the Dashboard
+// the source of truth for the amount. When it is not set we fall back to the
+// inline price_data path below, so a missing or blank env var can never break
+// checkout. Price ids are not secrets, but they are kept in env so the code is
+// not welded to one Stripe account.
+//
+// KEEP IN SYNC: PRICE_PENCE above is what the marketing site displays and what we
+// stamp into metadata. If you change an amount in the Stripe Dashboard, change it
+// here too, or the site will advertise a price you no longer charge. The webhook
+// always prefers Stripe's authoritative price.unit_amount when writing the row, so
+// the stored record stays correct either way.
+const PRICE_IDS: Record<BillingPlan, string | undefined> = {
+  monthly: process.env.STRIPE_PRICE_MONTHLY,
+  annual: process.env.STRIPE_PRICE_ANNUAL,
+};
+
 // The default self serve trial. Fourteen days: long enough to reach the aha
 // moments (a first week of entries, a receipt, the CIS refund building), short
 // enough to keep momentum and filter tyre kickers.
@@ -124,6 +146,19 @@ export function subscriptionAmountPence(plan: BillingPlan, offer?: string | null
   return isFounderOffer(offer) ? p.founder : p.standard;
 }
 
+// Which catalogue Price id, if any, this checkout should charge through. Exported
+// so the decision is unit tested without touching the network. Returns null when
+// we must fall back to inline price_data: either no price id is configured, or the
+// amount is discounted below the standard price, in which case billing through the
+// full price catalogue entry would silently overcharge.
+export function cataloguePriceId(plan: BillingPlan, offer?: string | null): string | null {
+  const meta = PRICE_PENCE[plan];
+  if (!meta) return null;
+  const id = PRICE_IDS[plan];
+  if (!id) return null;
+  return subscriptionAmountPence(plan, offer) === meta.standard ? id : null;
+}
+
 export interface SubscriptionCheckoutInput {
   plan: BillingPlan;
   offer?: string | null;
@@ -152,10 +187,17 @@ export async function createSubscriptionCheckout(input: SubscriptionCheckoutInpu
   form.set('cancel_url', input.cancelUrl);
   if (input.email) form.set('customer_email', input.email);
   form.set('line_items[0][quantity]', '1');
-  form.set('line_items[0][price_data][currency]', 'gbp');
-  form.set('line_items[0][price_data][unit_amount]', String(amount));
-  form.set('line_items[0][price_data][recurring][interval]', meta.interval);
-  form.set('line_items[0][price_data][product_data][name]', meta.label);
+  // Charge through the catalogue Price when cataloguePriceId says we safely can,
+  // otherwise fall back to the inline price. See that function for the rules.
+  const priceId = cataloguePriceId(input.plan, offer);
+  if (priceId) {
+    form.set('line_items[0][price]', priceId);
+  } else {
+    form.set('line_items[0][price_data][currency]', 'gbp');
+    form.set('line_items[0][price_data][unit_amount]', String(amount));
+    form.set('line_items[0][price_data][recurring][interval]', meta.interval);
+    form.set('line_items[0][price_data][product_data][name]', meta.label);
+  }
   form.set('subscription_data[trial_period_days]', String(resolveTrialDays(input.repCode)));
   // Carry the plan and offer on the subscription so later webhook events keep them.
   form.set('subscription_data[metadata][plan]', input.plan);

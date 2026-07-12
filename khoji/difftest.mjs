@@ -1,0 +1,244 @@
+// The gate. Nothing else in Khoji gets built until this passes.
+//
+//   "Test it by regression: set FACTS.mileageCarFirst10k to 0.45 in a fixture and assert the
+//    differ screams. If it doesn't catch the bug we actually had, it is not built."   docs/105
+//
+// It runs on fixtures, never the network, so it is deterministic and it runs in CI. The mileage
+// fixture is the REAL page text, copied from the live GOV.UK page on 12 July 2026, decoys and all.
+//
+//   node difftest.mjs
+//
+// There are two tests that matter here and the second one is the one people forget.
+//
+//   TEST 1  Our engine says 45p, GOV.UK says 55p  ->  it must SCREAM.
+//           This is the bug we actually had. A differ that misses it is decoration.
+//
+//   TEST 2  Our engine says 55p (the truth), and the page contains the string "45p" TWICE
+//           ->  it must stay SILENT.
+//           This is the harder half. GOV.UK's own page carries the old rate in a bracket
+//           ("55p from 6 April 2026 (45p before 6 April 2026)") and again in a worked example
+//           it forgot to update ("10,000 x 45p"). A naive differ greps "45p", decides we are
+//           wrong, and cries wolf every night until somebody switches it off. Then we have no
+//           alarm AND we think we have one. Two human audits have already made exactly this
+//           mistake about exactly this number. The machine must not make it a third time.
+
+import assert from 'node:assert/strict';
+import { CHECKS, compareOne, runChecks, money, between } from './diff.mjs';
+
+// Collect, then run at the end, so an async test is actually AWAITED. A harness that fires a
+// promise and prints "ok" before it settles is a test suite that passes when the code is broken,
+// which is the same disease as everything else in this file: a green light that means nothing.
+const tests = [];
+const test = (name, fn) => tests.push([name, fn]);
+const section = (s) => tests.push([s, null]);
+
+// ---- fixtures ---------------------------------------------------------------
+// Verbatim from https://www.gov.uk/expenses-and-benefits-business-travel-mileage/rules-for-tax
+// on 12 July 2026. Note BOTH decoys: the bracket in the table cell, and the stale example.
+const MILEAGE_PAGE = `
+<h3>Tax: rates per business mile</h3>
+<table>
+  <thead><tr><th></th><th>First 10,000 miles</th><th>Above 10,000 miles</th></tr></thead>
+  <tbody>
+    <tr><td>Cars and vans</td><td>55p from 6 April 2026 (45p before 6 April 2026)</td><td>25p</td></tr>
+    <tr><td>Motorcycles</td><td>24p</td><td>24p</td></tr>
+    <tr><td>Bikes</td><td>20p</td><td>20p</td></tr>
+  </tbody>
+</table>
+<p>The rates for electric bikes are the same as the bike rates.</p>
+<p>Example: Your employee travels 12,000 business miles in their car. The approved amount for the
+year would be £5,000 (10,000 x 45p plus 2,000 x 25p).</p>
+`;
+
+// Verbatim from https://www.gov.uk/self-employed-national-insurance-rates on 12 July 2026.
+const NI_PAGE = `
+<h2>If your profits are £7,105 or more a year</h2>
+<p>Class 2 contributions are treated as having been paid to protect your National Insurance record.</p>
+<p>If your profits are more than £12,570 a year, you must pay Class 4 contributions.</p>
+<p>For tax year 2026 to 2027 you’ll pay:</p>
+<ul>
+  <li>6% on profits over £12,570 up to £50,270</li>
+  <li>2% on profits over £50,270</li>
+</ul>
+<h2>If your profits are less than £7,105 a year</h2>
+<p>The Class 2 rate for tax year 2026 to 2027 is £3.65 a week.</p>
+`;
+
+// Verbatim from https://www.gov.uk/what-you-must-do-as-a-cis-subcontractor on 12 July 2026.
+//
+// Both CIS extractors came back BROKEN on the first live run, because the first pass at them
+// assumed the page said "20% if you're registered, 30% if you're not". It does not. It never uses
+// the word "registered" for the 20% at all. That rate is the DEFAULT and being unregistered is the
+// exception. The two sentences are only distinguishable by "a contractor" against "contractors",
+// which is exactly the sort of thing you cannot guess from a schema and can only read off a page.
+const CIS_PAGE = `
+<p>Under CIS, a contractor must deduct 20% from your payments and pass it to HM Revenue and
+Customs. This is called 'net payment status' (also known as 'payment under deduction').</p>
+<p>These deductions count as advance payments towards your tax and National Insurance bill.</p>
+<p>If you do not register for the scheme, contractors must deduct 30% from your payments instead.</p>
+`;
+
+// GOV.UK restructures the page and the table is gone. We must NOT report "all clear".
+const MILEAGE_PAGE_RESTRUCTURED = `
+<h3>Mileage rates</h3>
+<p>Rates for business mileage are set out in the tables published in our annual rates bulletin.</p>
+`;
+
+const strip = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const check = (fact) => CHECKS.find((c) => c.fact === fact);
+const one = (fact, ours, page) => compareOne(check(fact), ours, strip(page));
+
+// ---- THE TWO THAT MATTER ----------------------------------------------------
+
+section('THE MILEAGE REGRESSION. This is the bug we actually shipped.');
+
+test('TEST 1: engine says 45p, GOV.UK says 55p -> DRIFT (it screams)', () => {
+  const r = one('mileageCarFirst10k', 0.45, MILEAGE_PAGE);
+  assert.equal(r.status, 'drift', `expected drift, got "${r.status}"`);
+  assert.equal(r.theirs, 0.55);
+  assert.equal(r.ours, 0.45);
+  assert.match(r.detail, /GOV\.UK says 0\.55.*[Oo]ur engine says 0\.45/);
+});
+
+test('TEST 2: engine says 55p, page contains "45p" twice -> AGREE (it does NOT cry wolf)', () => {
+  const r = one('mileageCarFirst10k', 0.55, MILEAGE_PAGE);
+  assert.equal(r.status, 'agree', `false alarm: the differ was fooled by a decoy "45p" (got "${r.status}")`);
+  assert.equal(r.theirs, 0.55);
+});
+
+test('TEST 3: page restructured, number gone -> EXTRACTOR_BROKEN, never "agree"', () => {
+  const r = one('mileageCarFirst10k', 0.55, MILEAGE_PAGE_RESTRUCTURED);
+  assert.equal(r.status, 'extractor_broken', `silence is the bug: got "${r.status}"`);
+  assert.notEqual(r.status, 'agree');
+});
+
+test('TEST 4: a fact the engine does not hold -> EXTRACTOR_BROKEN, never "agree"', () => {
+  const r = compareOne(check('mileageCarFirst10k'), undefined, strip(MILEAGE_PAGE));
+  assert.equal(r.status, 'extractor_broken');
+});
+
+// ---- every other extractor, against the real page text ----------------------
+
+section('The rest of the mileage table.');
+
+test('mileageCarOver10k reads 25p, not the 45p decoy next to it', () => {
+  assert.equal(one('mileageCarOver10k', 0.25, MILEAGE_PAGE).status, 'agree');
+  assert.equal(one('mileageCarOver10k', 0.45, MILEAGE_PAGE).theirs, 0.25);
+});
+test('mileageMotorcycle reads 24p', () => {
+  assert.equal(one('mileageMotorcycle', 0.24, MILEAGE_PAGE).status, 'agree');
+});
+test('mileageBicycle reads 20p, and does not run on into the example', () => {
+  assert.equal(one('mileageBicycle', 0.2, MILEAGE_PAGE).status, 'agree');
+});
+
+section('Self-employed National Insurance.');
+
+test('class2WeeklyRate reads £3.65', () => {
+  assert.equal(one('class2WeeklyRate', 3.65, NI_PAGE).status, 'agree');
+});
+test('class2SmallProfitsThreshold reads £7,105', () => {
+  assert.equal(one('class2SmallProfitsThreshold', 7105, NI_PAGE).status, 'agree');
+});
+test('class4MainRate reads 6%', () => {
+  assert.equal(one('class4MainRate', 0.06, NI_PAGE).status, 'agree');
+});
+test('class4LowerLimit reads £12,570', () => {
+  assert.equal(one('class4LowerLimit', 12570, NI_PAGE).status, 'agree');
+});
+test('class4UpperLimit reads £50,270', () => {
+  assert.equal(one('class4UpperLimit', 50270, NI_PAGE).status, 'agree');
+});
+
+// The backtracking trap. Without the (?![\d,]) anchor the regex matches "6% ... £12,57" and
+// reads the UPPER rate as 6%, then raises a false incident against our own correct 2%, nightly.
+test('class4UpperRate reads 2%, and is NOT fooled into reading 6%', () => {
+  const r = one('class4UpperRate', 0.02, NI_PAGE);
+  assert.equal(r.theirs, 0.02, `regex backtracked onto the main rate: read ${r.theirs}`);
+  assert.equal(r.status, 'agree');
+});
+test('class4UpperRate on a wrong engine (6%) -> DRIFT', () => {
+  assert.equal(one('class4UpperRate', 0.06, NI_PAGE).status, 'drift');
+});
+
+section('CIS. Our core trade, and the two the first live run came back BLIND on.');
+
+test('cisRegisteredRate reads 20%, off "a contractor must deduct 20%"', () => {
+  assert.equal(one('cisRegisteredRate', 0.2, CIS_PAGE).status, 'agree');
+});
+test('cisUnregisteredRate reads 30%, off "if you do not register ... deduct 30%"', () => {
+  assert.equal(one('cisUnregisteredRate', 0.3, CIS_PAGE).status, 'agree');
+});
+// The two rates sit four lines apart on one page. A sloppy regex reads whichever comes first and
+// is confidently wrong about a deduction taken from a subcontractor's pay on every invoice.
+test('the registered rate cannot be fooled into reading the 30%', () => {
+  assert.equal(one('cisRegisteredRate', 0.2, CIS_PAGE).theirs, 0.2);
+});
+test('the unregistered rate cannot be fooled into reading the 20%', () => {
+  assert.equal(one('cisUnregisteredRate', 0.3, CIS_PAGE).theirs, 0.3);
+});
+test('a wrong CIS rate in our engine -> DRIFT', () => {
+  assert.equal(one('cisRegisteredRate', 0.3, CIS_PAGE).status, 'drift');
+  assert.equal(one('cisUnregisteredRate', 0.2, CIS_PAGE).status, 'drift');
+});
+
+// ---- parsers ----------------------------------------------------------------
+
+section('Parsers.');
+
+test('money reads GOV.UK prose, including "£1 million" for the AIA', () => {
+  assert.equal(money('1,000'), 1000);
+  assert.equal(money('90,000'), 90000);
+  assert.equal(money('1 million'), 1_000_000);
+  assert.equal(money('3.65'), 3.65);
+});
+test('between pins to a row and stops at the next one', () => {
+  const t = strip(MILEAGE_PAGE);
+  const row = between(t, /Cars and vans/i, /Motorcycles/i);
+  assert.match(row, /55p/);
+  assert.doesNotMatch(row, /24p/, 'the extractor bled into the motorcycle row');
+});
+
+// ---- a whole run, offline ---------------------------------------------------
+
+section('A whole run, with a fetcher that never touches the network.');
+
+test('runChecks: a wrong mileage constant surfaces as exactly one drift', async () => {
+  const facts = { mileageCarFirst10k: 0.45, mileageCarOver10k: 0.25, mileageMotorcycle: 0.24, mileageBicycle: 0.2 };
+  const results = await runChecks(facts, async (url) =>
+    url.includes('mileage') ? MILEAGE_PAGE : '<p>nothing here</p>');
+  const drift = results.filter((r) => r.status === 'drift');
+  assert.equal(drift.length, 1, `expected exactly 1 drift, got ${drift.length}`);
+  assert.equal(drift[0].fact, 'mileageCarFirst10k');
+});
+
+test('runChecks: a page that will not fetch is BROKEN, not agreed', async () => {
+  const results = await runChecks({ mileageCarFirst10k: 0.55 }, async () => { throw new Error('ETIMEDOUT'); });
+  assert.ok(results.every((r) => r.status !== 'agree'), 'a dead network reported agreement');
+  assert.ok(results.some((r) => /could not fetch/.test(r.detail || '')));
+});
+
+// ---- run ---------------------------------------------------------------------
+
+let pass = 0;
+for (const [name, fn] of tests) {
+  if (!fn) { console.log(`\n${name}\n`); continue; }
+  try {
+    await fn();
+    console.log(`  ok    ${name}`);
+    pass++;
+  } catch (err) {
+    console.error(`  FAIL  ${name}\n        ${err.message}`);
+    process.exitCode = 1;
+  }
+}
+
+// House format, so test/run-all.mjs can count these assertions with everything else. The differ
+// is in CI now: a regression in an extractor fails the build instead of quietly reading the wrong
+// number off a page for six months.
+const fail = tests.filter((t) => t[1]).length - pass;
+console.log(`\n${pass} passed, ${fail} failed.\n`);
+if (!process.exitCode) {
+  console.log('The differ catches the bug we actually had, and is not fooled by the decoy that');
+  console.log('caught two human audits. Phase 3 and the dashboard are unblocked.\n');
+}

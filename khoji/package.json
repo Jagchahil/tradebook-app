@@ -1,0 +1,15 @@
+{
+  "name": "lekhio-khoji",
+  "version": "1.0.0",
+  "description": "Khoji watches GOV.UK and HMRC for tax changes, distils each into a clean sourced summary, and stores it in Supabase (for the app and the agent to read) and in Obsidian (for you to review). It is the \"overnight it learns\" engine from doc 82.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "pg": "^8.22.0"
+  }
+}

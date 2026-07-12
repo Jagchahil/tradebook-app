@@ -1,0 +1,19 @@
+{
+  "_comment": "type atom parses feed entries; type page fires only when a page content hash changes. /search/all.atom keyword feeds removed 8 Jul 2026 (that endpoint ignores keywords and returns site-wide noise). Organisation-scoped finder atoms filter correctly.",
+  "sources": [
+    { "name": "HMRC news and announcements", "type": "atom", "url": "https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=hm-revenue-customs&order=updated-newest" },
+    { "name": "HMRC guidance and regulation updates", "type": "atom", "url": "https://www.gov.uk/search/guidance-and-regulation.atom?organisations%5B%5D=hm-revenue-customs&order=updated-newest" },
+    { "name": "Income Tax rates and allowances", "type": "page", "url": "https://www.gov.uk/government/publications/rates-and-allowances-income-tax" },
+    { "name": "National Insurance rates and thresholds", "type": "page", "url": "https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027" },
+    { "name": "Self employed National Insurance rates", "type": "page", "url": "https://www.gov.uk/self-employed-national-insurance-rates" },
+    { "name": "Self employed expenses", "type": "page", "url": "https://www.gov.uk/expenses-if-youre-self-employed" },
+    { "name": "Tax free trading and property allowances", "type": "page", "url": "https://www.gov.uk/guidance/tax-free-allowances-on-property-and-trading-income" },
+    { "name": "CIS subcontractor rules", "type": "page", "url": "https://www.gov.uk/what-you-must-do-as-a-cis-subcontractor" },
+    { "name": "Annual Investment Allowance", "type": "page", "url": "https://www.gov.uk/capital-allowances/annual-investment-allowance" },
+    { "name": "Mileage allowance payments rates", "type": "page", "url": "https://www.gov.uk/expenses-and-benefits-business-travel-mileage/rules-for-tax" },
+    { "name": "VAT registration thresholds", "type": "page", "url": "https://www.gov.uk/vat-registration/when-to-register" },
+    { "name": "Student loan repayment thresholds", "type": "page", "url": "https://www.gov.uk/repaying-your-student-loan/what-you-pay" },
+    { "name": "Self Assessment deadlines", "type": "page", "url": "https://www.gov.uk/self-assessment-tax-returns/deadlines" },
+    { "name": "Making Tax Digital for Income Tax", "type": "page", "url": "https://www.gov.uk/guidance/using-making-tax-digital-for-income-tax" }
+  ]
+}

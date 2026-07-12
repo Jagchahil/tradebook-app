@@ -1,0 +1,16 @@
+# Khoji runs on the Mac mini. These three never belong in the repo.
+#
+# .env       holds KHOJI_DB_URL (the khoji_writer Postgres password) and ANTHROPIC_API_KEY.
+#            The mini is the only machine that ever holds them. Claude reads a mirror of this
+#            folder and .env is excluded from the rsync on purpose.
+# .node      a vendored 183MB Node runtime, downloaded by khoji-setup.sh so the mini needs no
+#            Homebrew and no admin password.
+# logs/      the nightly run log.
+.env
+.env.*
+!.env.example
+.node/
+logs/
+node_modules/
+*.bak
+.DS_Store

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Khoji launchd job. Runs the watcher once a day at 05:15, isolated under its own
+  label so it never clashes with the personal bot already on the mini.
+
+  REPLACE_WITH_ABSOLUTE_PATH is substituted by install-khoji.sh and khoji-setup.sh
+  with $HOME/lekhio-khoji, which is the folder that CONTAINS run.sh. It is NOT the
+  parent of that folder. This template used to append an extra /khoji to every path
+  below, which resolved to an empty subfolder, so the daily job fired into a void
+  from 7 to 12 July 2026 and never ran once. Every run in that period was Jag
+  running it by hand. If you touch these paths, check run.sh exists where you point.
+
+  Install:  the installer does this for you. By hand:
+    sed -i '' "s|REPLACE_WITH_ABSOLUTE_PATH|$HOME/lekhio-khoji|g" com.lekhio.khoji.plist
+    cp com.lekhio.khoji.plist ~/Library/LaunchAgents/
+    launchctl unload ~/Library/LaunchAgents/com.lekhio.khoji.plist 2>/dev/null
+    launchctl load ~/Library/LaunchAgents/com.lekhio.khoji.plist
+  Run once now:   launchctl kickstart -k gui/$(id -u)/com.lekhio.khoji
+  Stop / remove:  launchctl unload ~/Library/LaunchAgents/com.lekhio.khoji.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.lekhio.khoji</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>REPLACE_WITH_ABSOLUTE_PATH/run.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>REPLACE_WITH_ABSOLUTE_PATH</string>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>5</integer>
+    <key>Minute</key><integer>15</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>REPLACE_WITH_ABSOLUTE_PATH/logs/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>REPLACE_WITH_ABSOLUTE_PATH/logs/launchd.err.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

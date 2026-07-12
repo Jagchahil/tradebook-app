@@ -32,8 +32,18 @@ const mjsSuites = readdirSync(here)
   .sort()
   .map((f) => ({ name: f.replace(/\.test\.mjs$/, ''), file: path.join(here, f), kind: 'node' }));
 
+// Khoji's differ (khoji/difftest.mjs). It lives outside test/ because the SAME FILE runs on the
+// Mac mini, where there is no repo, and it must not drift from what the mini executes.
+//
+// It is in CI for one reason. The differ is the only thing that checks our tax constants against
+// the pages HMRC publishes them on, and its extractors are regexes against GOV.UK prose. A regex
+// that silently starts reading the wrong number off a page is not a crash, it is a lie that gets
+// quieter over time. It runs on fixtures, never the network, so it is deterministic.
+const khojiDiffer = path.join(repoRoot, 'khoji', 'difftest.mjs');
+
 const suites = [
   ...mjsSuites,
+  ...(existsSync(khojiDiffer) ? [{ name: 'khoji-differ', file: khojiDiffer, kind: 'node' }] : []),
   { name: 'exams', file: path.join(here, 'exams', 'run-exams.mjs'), kind: 'node' },
   { name: 'hmrc', file: path.join(here, 'hmrc', 'run-hmrc-test.mjs'), kind: 'node' },
   { name: 'logic', file: path.join(here, 'logic.test.js'), kind: 'logic' },

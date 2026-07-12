@@ -24,6 +24,7 @@
 
 import assert from 'node:assert/strict';
 import { CHECKS, compareOne, runChecks, money, between } from './diff.mjs';
+import { triageStatus } from './distill.mjs';
 
 // Collect, then run at the end, so an async test is actually AWAITED. A harness that fires a
 // promise and prints "ok" before it settles is a test suite that passes when the code is broken,
@@ -180,6 +181,45 @@ test('the unregistered rate cannot be fooled into reading the 20%', () => {
 test('a wrong CIS rate in our engine -> DRIFT', () => {
   assert.equal(one('cisRegisteredRate', 0.3, CIS_PAGE).status, 'drift');
   assert.equal(one('cisUnregisteredRate', 0.2, CIS_PAGE).status, 'drift');
+});
+
+// ---- triage: Khoji bins its own rubbish, but there is a trap in doing so ----
+
+section('Triage. Khoji bins its own rubbish, and must NEVER bin a rates page.');
+
+// A news item the model itself says affects nobody, at 0.13 confidence. Real example from the
+// queue on 12 July: "Teenager turning 16? Don't miss out on Child Benefit". Nobody needs to look
+// at that. Handing it to a human as a decision is not caution, it is noise wearing a uniform.
+const newsItem = (u) => ({ source_url: `https://www.gov.uk/${u}` });        // feed items have no #
+const pageItem = (u) => ({ source_url: `https://www.gov.uk/${u}#a1b2c3d4` }); // watched pages do
+
+test('a news item the model says affects nobody, at 0.13, is BINNED', () => {
+  assert.equal(triageStatus(newsItem('child-benefit-16'), { affects: 'not relevant', confidence: 0.13 }), 'dismissed');
+});
+test('a news item that DOES affect our users is kept, however unsure the model is', () => {
+  assert.equal(triageStatus(newsItem('cis-change'), { affects: 'CIS subcontractors', confidence: 0.2 }), 'distilled');
+});
+test('a news item the model says affects nobody but is CONFIDENT about is kept', () => {
+  assert.equal(triageStatus(newsItem('x'), { affects: 'not relevant', confidence: 0.8 }), 'distilled');
+});
+
+// ⚠️ THE ONE THAT MATTERS. The mileage row was a watched PAGE at 0.15 confidence, marked
+// "not relevant" because the page is written for employers. A confidence cull would have silently
+// deleted the single most important item this database has ever held. It must survive.
+test('THE MILEAGE ROW: a watched rates page at 0.15, marked "not relevant", is NEVER binned', () => {
+  const mileage = pageItem('expenses-and-benefits-business-travel-mileage/rules-for-tax');
+  const asKhojiSawIt = { affects: 'not relevant, this is for employers', confidence: 0.15, engine_impact: false };
+  assert.equal(triageStatus(mileage, asKhojiSawIt), 'distilled',
+    'a confidence-based cull just deleted the row that carried the bug we shipped');
+});
+test('no watched page is binned at ANY confidence, not even zero', () => {
+  for (const c of [0, 0.01, 0.1, 0.29]) {
+    assert.equal(triageStatus(pageItem('vat-registration/when-to-register'), { affects: 'nobody', confidence: c }),
+      'distilled', `a rates page was binned at confidence ${c}`);
+  }
+});
+test('an item that was never distilled stays in the backlog, it is not binned', () => {
+  assert.equal(triageStatus(newsItem('x'), null), 'needs_distillation');
 });
 
 // ---- parsers ----------------------------------------------------------------

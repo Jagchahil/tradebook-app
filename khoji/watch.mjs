@@ -172,20 +172,26 @@ async function main() {
 
     let engineChanged = false;
     let notes = 0;
+    let binned = 0;
     for (const it of fresh) {
       const d = await distill(it); // null when dormant
       if (d?.engine_impact) engineChanged = true;
+      // Khoji bins its own rubbish rather than parking it in a queue as a decision for a human.
+      // See triageStatus in distill.mjs, and read the warning above it before you widen the rule:
+      // a watched rates page is NEVER auto-dismissed, because the mileage row scored 0.15.
+      const status = triageStatus(it, d);
+      if (status === 'dismissed') binned++;
       await db.query(
         `insert into public.knowledge_items
            (source_url, source_name, title, summary, effective_date, affects, confidence, engine_impact, status, raw, distilled_at)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          on conflict (source_url) do nothing`,
         [it.source_url, it.source_name, it.title, d?.summary ?? null, d?.effective_date ?? null, d?.affects ?? null,
-         d?.confidence ?? null, d?.engine_impact ?? false, d ? 'distilled' : 'needs_distillation', it.raw ?? {}, d ? new Date() : null],
+         d?.confidence ?? null, d?.engine_impact ?? false, status, it.raw ?? {}, d ? new Date() : null],
       );
       if (writeNote(it, d)) notes++;
     }
-    log(`stored ${fresh.length}, wrote ${notes} Obsidian notes`);
+    log(`stored ${fresh.length} (${binned} binned as not relevant), wrote ${notes} Obsidian notes`);
 
     // Backlog: once distillation is on, work through items captured while dormant.
     if (distillEnabled()) {
@@ -198,8 +204,9 @@ async function main() {
         const d = await distill({ title: row.title, source_url: row.source_url, raw: row.raw });
         if (!d) continue;
         await db.query(
-          "update public.knowledge_items set summary=$1, effective_date=$2, affects=$3, confidence=$4, engine_impact=$5, status='distilled', distilled_at=now() where id=$6",
-          [d.summary, d.effective_date, d.affects, d.confidence, d.engine_impact, row.id],
+          'update public.knowledge_items set summary=$1, effective_date=$2, affects=$3, confidence=$4, engine_impact=$5, status=$6, distilled_at=now() where id=$7',
+          [d.summary, d.effective_date, d.affects, d.confidence, d.engine_impact,
+           triageStatus({ source_url: row.source_url }, d), row.id],
         );
         if (d.engine_impact) engineChanged = true;
         writeNote({ title: row.title, source_url: row.source_url, source_name: row.source_name, raw: row.raw }, d);

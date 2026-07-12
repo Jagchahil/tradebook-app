@@ -24,6 +24,36 @@ const SYSTEM = [
   'If the update is not actually about UK tax for our users, set affects to "not relevant" and confidence low.',
 ].join(' ');
 
+// What status a distilled item should land at. The best button is no button (docs/103).
+//
+// THE PILE. On 12 July 2026 the queue held 65 items and 48 of them were rubbish Khoji had ALREADY
+// judged rubbish: "VAT online: service availability and issues", "Teenager turning 16? Don't miss
+// out on Child Benefit", average confidence 0.12, `affects: not relevant`. Every one of those was
+// sitting there as a decision waiting for a human. That is not a queue. That is Khoji having
+// already decided and us refusing to listen to it. So it bins them itself.
+//
+// ⚠️ AND HERE IS THE TRAP, WHICH IS THE WHOLE REASON THIS FUNCTION IS SEVEN LINES AND NOT ONE.
+//
+// The obvious rule is "auto-dismiss anything below 0.5 confidence". THE MILEAGE ROW WAS 0.15.
+// The single most important item this database has ever held, the one carrying the number our tax
+// engine had wrong, would have been silently deleted by that rule. The model's confidence has been
+// PROVEN to run backwards on watched pages: 0.95 on three pages we already had right, 0.15 on the
+// one we had wrong.
+//
+// So: a WATCHED PAGE is never auto-dismissed. Not at any confidence. Not ever. Only news feed
+// items are, and only when the model says outright that they affect nobody.
+//
+// (Page items carry a content hash after a # in their source_url. Feed items do not. That is the
+// only way to tell them apart, so if you ever change how pageItem() builds a URL, change this.)
+export function triageStatus(item, d) {
+  if (!d) return 'needs_distillation';
+  const isWatchedPage = String(item.source_url || '').includes('#');
+  if (isWatchedPage) return 'distilled';
+  const saysNobody = /not relevant|nobody/i.test(d.affects || '');
+  const unsure = typeof d.confidence === 'number' && d.confidence < 0.3;
+  return saysNobody && unsure ? 'dismissed' : 'distilled';
+}
+
 // Distil one item. Returns the structured fields, or null when dormant or on any
 // error (the caller then leaves the row as needs_distillation).
 export async function distill(item) {

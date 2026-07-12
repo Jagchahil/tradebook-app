@@ -609,7 +609,9 @@ export async function getLastIncomeTransaction(
 ): Promise<{ vendor: string | null; amount: number; category: string | null } | null> {
   const { url } = config();
   const res = await fetch(
-    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&amount=gt.0&income_type=neq.property` +
+    // is_personal=false, because "invoice this" should never pre-fill from a child tax credit
+    // or a refund the user has already told us is not business money.
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&amount=gt.0&income_type=neq.property&is_personal=eq.false` +
       `&select=vendor,amount,category,created_at&order=created_at.desc&limit=1`,
     { headers: headers() },
   );
@@ -876,14 +878,25 @@ export async function verifyAccessToken(token: string): Promise<VerifiedUser | n
     // GoTrue marks these with is_anonymous: true (top level on the /auth/v1/user
     // response, and sometimes mirrored in app_metadata).
     //
-    // This is GATED so it can ship now without breaking the current app, which
-    // still logs in anonymously until phone OTP is switched on. Flip it on at
-    // launch, together with turning OFF anonymous sign in at the Supabase
-    // project and enforcing OTP, by setting REJECT_ANON_USERS=true. Until then
-    // the behaviour is unchanged.
-    const rejectAnon = process.env.REJECT_ANON_USERS === 'true';
+    // THIS NOW FAILS CLOSED. It used to fail OPEN.
+    //
+    // The old gate was `REJECT_ANON_USERS === 'true'`, so an anonymous JWT was accepted as a
+    // full user unless one env var said otherwise. A security control whose DEFAULT is "allow",
+    // and whose only enforcement is a single unasserted string, is one config drift away from
+    // being off. Phone OTP is live and anonymous sign in is disabled at the Supabase project, so
+    // there is no longer any reason for the permissive default to exist.
+    //
+    // The attack it closes: if anonymous sign in were ever re-enabled at the project (a
+    // dashboard toggle, not a deploy) an attacker could mint unlimited throwaway JWTs from
+    // /auth/v1/signup with no phone and no OTP, and hit every authenticated route. Not a
+    // cross-tenant read, but free AI, free WhatsApp, and an identity model that no longer means
+    // anything.
+    //
+    // Two locks now, not one: the project setting AND this. Set ALLOW_ANON_USERS=true only if
+    // you deliberately want anonymous accounts back.
+    const allowAnon = process.env.ALLOW_ANON_USERS === 'true';
     const isAnon = u.is_anonymous === true || u.app_metadata?.is_anonymous === true;
-    if (rejectAnon && isAnon) return null;
+    if (isAnon && !allowAnon) return null;
     return { id: u.id, email: u.email ?? null };
   } catch {
     return null;
@@ -1340,32 +1353,11 @@ export async function pruneOldRows(): Promise<{ pruned: number }> {
   return { pruned };
 }
 
-export async function listNudgeTargets(): Promise<NudgeTarget[]> {
-  const { url } = config();
-  const users: Array<{ id: string; phone_number: string }> = [];
-  let after = '';
-  // Keyset pagination so we never pull the whole users table in one giant response.
-  for (let page = 0; page < 200; page++) {
-    const cursor = after ? `&id=gt.${encodeURIComponent(after)}` : '';
-    const ures = await fetch(
-      `${url}/rest/v1/users?select=id,phone_number&phone_number=not.is.null&order=id.asc&limit=1000${cursor}`,
-      { headers: headers() },
-    );
-    if (!ures.ok) break;
-    const batch = (await ures.json()) as Array<{ id: string; phone_number: string }>;
-    if (batch.length === 0) break;
-    users.push(...batch);
-    if (batch.length < 1000) break;
-    after = batch[batch.length - 1].id;
-  }
-  const pres = await fetch(`${url}/rest/v1/reminder_prefs?select=user_id,daily_nudges,weekly_summary`, { headers: headers() });
-  const prefs = pres.ok ? ((await pres.json()) as Array<{ user_id: string; daily_nudges: boolean; weekly_summary: boolean }>) : [];
-  const pmap = new Map(prefs.map((p) => [p.user_id, p]));
-  return users.map((u) => {
-    const p = pmap.get(u.id);
-    return { user_id: u.id, phone: u.phone_number, daily_nudges: p ? p.daily_nudges : true, weekly_summary: p ? p.weekly_summary : true };
-  });
-}
+// listNudgeTargets was DELETED. It loaded the ENTIRE users table (200 x 1000) and the ENTIRE
+// reminder_prefs table with no filter, and nothing called it: the crons use listNudgeTargetsPage
+// and getNudgePrefsForUsers, which page properly. A function that would fall over at 100k users,
+// sitting unused in the hottest file in the codebase, is a loaded gun waiting for someone to pick
+// it up because the name reads well.
 
 // One grouped aggregate for every user's last-seven-day totals, replacing the
 // old one-query-per-user fan out in the weekly cron. Uses the weekly_totals_all
@@ -1587,6 +1579,16 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     ytdTradeExpenses: Math.round(ytdTradeExpenses * 100) / 100,
     ytdCisSuffered: Math.round(ytdCisSuffered * 100) / 100,
     employmentIncome: sl?.employmentIncome ?? 0,
+    // THE PLANS WERE ALREADY FETCHED AND THEN THROWN AWAY.
+    //
+    // `sl` has held the student loan settings all along; only `employmentIncome` was ever taken
+    // off it. So the optimiser could not net the loan off the CIS refund, and told a subbie with
+    // a student loan that a bigger refund was coming than he would actually get. Promising a man
+    // money he will not receive is the cruel way to be wrong: he may well have spent it.
+    studentPlans: [
+      ...(sl?.plan ? [sl.plan] : []),
+      ...(sl?.postgrad ? ['postgrad' as const] : []),
+    ],
     categoriesLogged,
     homeOfficeClaimed: categoriesLogged.some((c) => c.includes('home')),
     mileageClaimed: categoriesLogged.some((c) => c.includes('mile')),

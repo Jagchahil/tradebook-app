@@ -25,7 +25,10 @@ export const NI_FACTS = {
   class1UpperRate: 0.02, // above UEL
   // Lower earnings limit: earn above this and the year still counts for the
   // State Pension even though no NI is actually paid between LEL and PT.
-  class1LowerEarningsLimit: 6500, // £125 a week, unchanged from 2025/26
+  class1LowerEarningsLimit: 6708, // £129 a week for 2026/27 (was £125/£6,500 in 2025/26). Verified
+                                   // against GOV.UK 'Rates and thresholds for employers 2026 to 2027'.
+                                   // Above this the year counts for the State Pension even though no NI
+                                   // is actually paid between the LEL and the primary threshold.
   // Self employed figures live in taxengine FACTS (class4*, class2*). Re
   // exported through niPosition below so callers need only this module.
 } as const;

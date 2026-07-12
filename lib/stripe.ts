@@ -84,7 +84,10 @@ export async function createInvoiceCheckout(input: CheckoutInput): Promise<strin
 
 export type BillingPlan = 'monthly' | 'annual';
 
-const PRICE_PENCE: Record<BillingPlan, { standard: number; founder: number; interval: 'month' | 'year'; label: string }> = {
+// EXPORTED so it can be tested. public/llms.txt states our price to every AI model that reads
+// it, and test/llmstxt.test.mjs ties that statement to this constant. A price that drifts from
+// what we actually charge is a false claim published under our own name.
+export const PRICE_PENCE: Record<BillingPlan, { standard: number; founder: number; interval: 'month' | 'year'; label: string }> = {
   monthly: { standard: 1299, founder: 1299, interval: 'month', label: 'Lekhio, monthly' },
   annual: { standard: 12900, founder: 12900, interval: 'year', label: 'Lekhio, annual' },
 };

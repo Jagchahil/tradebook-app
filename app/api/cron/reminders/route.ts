@@ -164,6 +164,20 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
     // was zero when it was not.
     const totalsMap =
       job === 'weekly' ? await weeklyTotalsFor(wanted.map((t) => t.user_id)) : null;
+    // RESERVE THE SPEND BEFORE SPENDING IT. Same rule the digest follows.
+    //
+    // This used to count the sends AFTER the page had gone out. If the function died mid-page the
+    // messages were sent and the counter never moved, so the next hop believed it still had money
+    // it had already spent, and could go over the cap. Reserving up front means a crash makes us
+    // send LESS than we could, never more. When the failure mode is a bill, fail towards not
+    // spending.
+    //
+    // `wanted` is exactly who we are about to text, so this is not an estimate.
+    if (wanted.length > 0) {
+      const reserved = await addWaSend(wanted.length);
+      if (reserved != null) runningTotal = reserved;
+    }
+
     let pageSent = 0;
     if (job === 'nudge') {
       await mapLimit(wanted, 20, async (t) => {
@@ -180,11 +194,11 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
         pageSent++;
       });
     }
-    // One counter write per page (not per message) keeps the daily budget honest
-    // across hops and instances without a write per send.
-    if (pageSent > 0) {
-      const total = await addWaSend(pageSent);
-      if (total != null) runningTotal = total;
+    // Already counted, above, before the sends went out. If a send FAILED we have over-reserved
+    // by one, which costs us nothing but a slightly early stop. That is the safe direction and it
+    // is not worth a compensating write to correct.
+    if (pageSent !== wanted.length) {
+      console.error(`[cron] job=${job} sent ${pageSent} of ${wanted.length} reserved`);
     }
     if (!last) break; // final page done
     cursor = last;

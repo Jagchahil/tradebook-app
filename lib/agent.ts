@@ -473,7 +473,20 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
   }
 
   // 8. CIS refund milestones.
-  const refund = Math.max(0, d.ytdCis - taxDueYtd);
+  //
+  // THE STUDENT LOAN IS PART OF WHAT CIS PAYS OFF.
+  //
+  // On the actual Self Assessment return, the CIS already deducted by contractors is credited
+  // against income tax AND Class 4 AND the student loan repayment. This used to be
+  // `ytdCis - taxDueYtd`, which forgot the loan entirely, so a subbie with a student loan was
+  // told a refund bigger than the one he will actually get.
+  //
+  // Being wrong in that direction is the cruel one: he is not merely misinformed, he has been
+  // promised money. He may well have spent it. The SET ASIDE figure a few lines above already
+  // stacks the loan correctly (projTax + projSl - projCis); only this reassurance number was
+  // out of step with it, which meant the product quietly disagreed with itself.
+  const slDueYtd = plans.length > 0 ? studentLoanForSA(d.ytdProfit, salary, plans) : 0;
+  const refund = Math.max(0, d.ytdCis - taxDueYtd - slDueYtd);
   // The highest milestone the refund has passed: 250, 500, 1000, then every 500.
   const milestone =
     refund >= 1000

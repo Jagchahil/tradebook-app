@@ -50,6 +50,14 @@ export const CATEGORIES = [
   'marketing',
   'bank charges',
   'meals',
+  // A LANDLORD'S RESIDENTIAL MORTGAGE INTEREST. It is not an ordinary expense: Section 24
+  // restricts it to a 20% tax CREDIT rather than a deduction, so it must be kept apart from the
+  // other property costs or the relief is overstated.
+  //
+  // THERE IS NO AUTO RULE FOR IT, ON PURPOSE. A regex on "mortgage" would sweep up a man's OWN
+  // HOME mortgage and quietly claim tax relief on it. That is not a small error, it is a wrong
+  // claim on a real return. He chooses this one.
+  'mortgage interest',
   'other',
 ] as const;
 

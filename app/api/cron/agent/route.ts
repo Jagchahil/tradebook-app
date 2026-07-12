@@ -30,6 +30,8 @@ import {
   logAgentDelivery,
   getActiveGoals,
   listOverdueInvoices,
+  cronStarted,
+  cronFinished,
 } from '../../../../lib/supabase';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
 import { computeSignals, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
@@ -181,6 +183,14 @@ async function processUser(user: {
 // The resumable walk. Terminates on the final short page or the hop cap,
 // whichever comes first, exactly like the bank feed chain.
 async function agentFanOut(startAfter: string | null, hop: number): Promise<void> {
+  // THE WATCHDOG. This was the ONE walk nobody was watching.
+  //
+  // digest and reminders both record when they start and finish, so /api/health goes red if
+  // either goes quiet. The agent did not, which meant it could die mid-walk and every user past
+  // the cursor would silently stop getting signals, while the dashboard stayed green and the
+  // endpoint kept answering 200. That is the exact failure the watchdog exists to catch, and it
+  // was uncovered on the only cron that had no cover.
+  if (startAfter === null) await cronStarted('agent');
   const started = Date.now();
   let cursor = startAfter;
   let users = 0;
@@ -201,7 +211,9 @@ async function agentFanOut(startAfter: string | null, hop: number): Promise<void
     if (Date.now() - started > BUDGET_MS) {
       if (hop + 1 > MAX_HOPS) {
         console.error(`[cron] agent hop cap reached at hop=${hop}, stopping with cursor set`);
-        break;
+        // NOT ok. Everyone past the cursor got nothing, and somebody should hear about it.
+        await cronFinished('agent', false, hop, `hop cap reached at hop ${hop}, users after the cursor were not reached`);
+        return;
       }
       console.log(`[cron] agent hop=${hop} users=${users} inserted=${inserted} pinged=${pinged} continuing after=${cursor}`);
       await triggerContinuation(cursor, hop + 1);
@@ -209,6 +221,7 @@ async function agentFanOut(startAfter: string | null, hop: number): Promise<void
     }
   }
   console.log(`[cron] agent hop=${hop} users=${users} inserted=${inserted} pinged=${pinged} complete`);
+  await cronFinished('agent', true, hop);
 }
 
 export async function GET(req: NextRequest) {

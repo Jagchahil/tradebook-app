@@ -98,6 +98,14 @@ ok('a job absent from the table is not an alarm',
 
 // --- the ceilings match vercel.json ------------------------------------------------
 ok('due is daily', MAX_QUIET_HOURS.due === 26);
+// The agent walk is kicked by the daily `due` job. It was the ONLY cron with no watchdog: it
+// could die mid-chain and every user past the cursor silently stopped getting signals, while the
+// endpoint kept answering 200 and the dashboard stayed green.
+ok('the AGENT walk is watched too', MAX_QUIET_HOURS.agent === 26);
+ok('an agent that has gone quiet for 30h is an alarm',
+  cronAlarms([run('agent', 30)], NOW)[0].reason === 'stale');
+ok('and an agent that hit its hop cap is an alarm even though it just "finished"',
+  cronAlarms([run('agent', 1, false, 'hop cap reached at hop 100')], NOW)[0].reason === 'failed');
 ok('digest is daily', MAX_QUIET_HOURS.digest === 26);
 ok('nudge clears the 72h Friday-to-Monday gap', MAX_QUIET_HOURS.nudge > 72);
 ok('weekly clears the 168h week', MAX_QUIET_HOURS.weekly > 168);

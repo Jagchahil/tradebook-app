@@ -159,8 +159,10 @@ export async function sendText(toPhone: string, body: string): Promise<void> {
   }
 
   if (!res.ok) {
-    const text = await res.text();
-    console.error('[whatsapp] Send failed:', res.status, text);
+    // STATUS ONLY. Meta's Graph error body reflects the recipient wa_id (a phone number) and can
+    // echo the message. Vercel logs are an external service, and CLAUDE.md forbids sending
+    // WhatsApp content anywhere but Supabase.
+    console.error('[whatsapp] Send failed:', res.status);
   }
 }
 
@@ -208,8 +210,7 @@ export async function sendTemplate(
   }
 
   if (!res.ok) {
-    const text = await res.text();
-    console.error('[whatsapp] Template send failed:', res.status, text);
+    console.error('[whatsapp] Template send failed:', res.status); // status only, see above
   }
 }
 
@@ -248,7 +249,9 @@ export async function sendButtons(
         },
       }),
     });
-    if (!res.ok) console.error('[whatsapp] Buttons send failed:', res.status, await res.text());
+    // STATUS ONLY. The Graph error body reflects the recipient wa_id, which is a phone number,
+    // and Vercel logs are an external service.
+    if (!res.ok) console.error('[whatsapp] Buttons send failed:', res.status);
   } catch (err) {
     console.error('[whatsapp] Buttons send failed or timed out:', err instanceof Error ? err.message : err);
   }
@@ -273,7 +276,7 @@ export async function sendImageUrl(toPhone: string, link: string, caption?: stri
         image: { link, ...(caption ? { caption } : {}) },
       }),
     });
-    if (!res.ok) console.error('[whatsapp] Image send failed:', res.status, await res.text());
+    if (!res.ok) console.error('[whatsapp] Image send failed:', res.status); // status only, see above
   } catch (err) {
     console.error('[whatsapp] Image send failed or timed out:', err instanceof Error ? err.message : err);
   }

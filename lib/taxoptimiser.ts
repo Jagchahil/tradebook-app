@@ -14,6 +14,7 @@
 import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly } from './taxengine';
 import { compare } from './ltdengine';
 import { decideAction, type AutonomyLevel } from './autonomy';
+import { studentLoanForSA, type StudentPlan } from './nistudentloan';
 
 export interface OptimiserInput {
   startYear: number;
@@ -22,6 +23,10 @@ export interface OptimiserInput {
   ytdTradeExpenses: number;
   ytdCisSuffered: number;
   employmentIncome: number; // annual PAYE salary, 0 if none
+  // The student loan plans he is on. CIS is credited against income tax, Class 4 AND the student
+  // loan on the real return, so a refund figure that ignores the loan promises him money he will
+  // not get. Default [] so a caller that has no plans behaves exactly as before.
+  studentPlans?: StudentPlan[];
   categoriesLogged: string[]; // distinct trade expense categories seen this year, lowercased
   homeOfficeClaimed: boolean;
   mileageClaimed: boolean;
@@ -130,7 +135,7 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
     out.push({
       key: 'mileage',
       title: 'Claim your mileage',
-      detail: `You are logging fuel but no mileage. For a van or car you can often claim more by logging miles at 45p a mile for the first 10,000 instead. Text "log 24 miles" whenever you drive for work.`,
+      detail: `You are logging fuel but no mileage. For a van or car you can often claim more by logging miles at 55p a mile for the first 10,000 instead. Text "log 24 miles" whenever you drive for work.`,
       estSaving: 0,
       action: 'log_entry',
     });
@@ -139,12 +144,18 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   // 6. A CIS refund building. Pure information, no action, but a big reassurance
   //    for subbies who overpay through the year.
   const taxDue = soleTraderTax(tradeNet).total;
-  if (input.ytdCisSuffered > taxDue && input.ytdCisSuffered > 0) {
-    const refund = round(input.ytdCisSuffered - taxDue);
+  // CIS pays off the student loan too. See the note in lib/agent.ts.
+  const slDue =
+    (input.studentPlans ?? []).length > 0
+      ? studentLoanForSA(tradeNet, input.employmentIncome, input.studentPlans as StudentPlan[])
+      : 0;
+  const owedSoFar = taxDue + slDue;
+  if (input.ytdCisSuffered > owedSoFar && input.ytdCisSuffered > 0) {
+    const refund = round(input.ytdCisSuffered - owedSoFar);
     out.push({
       key: 'cis_refund',
       title: 'A CIS refund is building',
-      detail: `Contractors have deducted about £${round(input.ytdCisSuffered).toLocaleString('en-GB')} of CIS tax from you, more than the £${round(taxDue).toLocaleString('en-GB')} your profit owes so far. The difference, about £${refund.toLocaleString('en-GB')}, comes back when you file. Keep every deduction statement.`,
+      detail: `Contractors have deducted about £${round(input.ytdCisSuffered).toLocaleString('en-GB')} of CIS tax from you, more than the £${round(owedSoFar).toLocaleString('en-GB')} your profit owes so far. The difference, about £${refund.toLocaleString('en-GB')}, comes back when you file. Keep every deduction statement.`,
       estSaving: 0,
       info: true,
       action: 'confirm_prompt',

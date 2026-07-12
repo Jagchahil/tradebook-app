@@ -14,9 +14,13 @@ const stage = mkdtempSync(path.join(tmpdir(), 'opt-'));
 const fix = (s) => s
   .replace("from './taxengine'", "from './taxengine.ts'")
   .replace("from './autonomy'", "from './autonomy.ts'")
-  .replace("from './ltdengine'", "from './ltdengine.ts'");
+  .replace("from './ltdengine'", "from './ltdengine.ts'")
+  .replace("from './nistudentloan'", "from './nistudentloan.ts'");
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'autonomy.ts'), readFileSync(path.join(lib, 'autonomy.ts'), 'utf8'));
+// The optimiser now nets the STUDENT LOAN off the CIS refund, because CIS pays that off too on
+// the real return. Without this the deck under-staged and the whole suite exploded on import.
+writeFileSync(path.join(stage, 'nistudentloan.ts'), fix(readFileSync(path.join(lib, 'nistudentloan.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'ltdengine.ts'), fix(readFileSync(path.join(lib, 'ltdengine.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'taxoptimiser.ts'), fix(readFileSync(path.join(lib, 'taxoptimiser.ts'), 'utf8')));
 const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);
@@ -108,6 +112,28 @@ ok('no property prompt when expenses are already logged', !find(goodLandlord, 'p
 console.log('\n=== optimiser: no forbidden dashes in copy ===\n');
 const allText = rich.map((o) => o.title + o.detail).join(' ');
 ok('copy has no em/en/minus dashes', !/[–—−]/.test(allText));
+
+// --- CIS PAYS OFF THE STUDENT LOAN TOO -------------------------------------------------------
+//
+// On the real Self Assessment return, CIS already deducted by contractors is credited against
+// income tax AND Class 4 AND the student loan. The refund figure used to forget the loan, so a
+// subbie with one was PROMISED MONEY HE WOULD NOT GET. That is the cruel direction to be wrong
+// in: he may well have spent it.
+{
+  const withLoan = { ...base, ytdTradeIncome: 45000, ytdTradeExpenses: 5000, ytdCisSuffered: 12000, studentPlans: ['plan2'] };
+  const noLoan = { ...base, ytdTradeIncome: 45000, ytdTradeExpenses: 5000, ytdCisSuffered: 12000 };
+
+  const a = find(O.findOptimisations(withLoan), 'cis_refund');
+  const b = find(O.findOptimisations(noLoan), 'cis_refund');
+
+  ok('a CIS refund is still surfaced when there is a loan', Boolean(a));
+  ok('and without one', Boolean(b));
+
+  // Match the REFUND, not the first "about £" in the sentence (which is the CIS deducted).
+  const num = (o) => Number((o.detail.match(/difference, about £([\d,]+)/) || [])[1]?.replace(/,/g, '') || 0);
+  ok('the refund with a student loan is SMALLER than without', num(a) < num(b));
+  ok('and it is smaller by a real amount, not a rounding', num(b) - num(a) > 500);
+}
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

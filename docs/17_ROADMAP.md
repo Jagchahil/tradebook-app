@@ -1,5 +1,7 @@
 # 17: Roadmap
 
+> **PRICE CORRECTED 12 JUL 2026.** This doc carried £29 a month. The real launch price is **£12.99 a month / £129 a year**, 14-day trial, no card. `lib/stripe.ts` is the source of truth; `public/llms.txt` is tested against it.
+
 > Where Lekhio is today and what it takes to launch. A snapshot in time, written 2026-06-25. The build is in strong shape. What remains is mostly founder setup, wiring the live keys, and publishing. Work top to bottom.
 
 ---
@@ -18,7 +20,7 @@ A premium, animated, mobile-responsive marketing site:
 - An interactive HMRC and Making Tax Digital explainer with a year timeline.
 - A competitor comparison table.
 - A trust section with floating badges and a "we will / we will never" list, plus a slim trust bar across the top.
-- Pricing at £29, reviews, and an FAQ.
+- Pricing, reviews, and an FAQ. (The £29 that used to be written here is WRONG. The launch price is £12.99 a month or £129 a year, 14-day trial, no card. See `docs/93` and lib/stripe.ts, which is the source of truth.)
 - A single dropdown menu, and "Sign up now" calls to action throughout.
 
 ### Onboarding flow (live on the web, at /start)

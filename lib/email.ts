@@ -74,7 +74,13 @@ export async function sendInvoiceEmail(opts: InvoiceEmail): Promise<boolean> {
       body: JSON.stringify({ from: `${from} <${FROM.replace(/.*</, '').replace(/>.*/, '')}>`, to: [opts.to], subject, html }),
     });
     if (!res.ok) {
-      console.error('[email] send failed:', res.status, await res.text());
+// STATUS ONLY, NEVER THE BODY.
+      //
+      // Resend's error body can contain the DESTINATION ADDRESS, which on an invoice send is the
+      // trader's CUSTOMER's email. That is a third party's personal data, and Vercel logs are an
+      // external service. CLAUDE.md's rule ("never log message content to external services
+      // beyond Supabase") plainly covers the recipient too.
+      console.error('[email] send failed:', res.status);
       return false;
     }
     return true;
@@ -115,7 +121,7 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
       body: JSON.stringify({ from: `Lekhio <${fromAddr}>`, to: [to], subject: 'Welcome to Lekhio. Here is how to start.', html }),
     });
     if (!res.ok) {
-      console.error('[email] welcome failed:', res.status, await res.text());
+      console.error('[email] welcome failed:', res.status); // status only: the body carries the address
       return false;
     }
     return true;

@@ -29,11 +29,16 @@ export interface CronRun {
 //
 //   due     0 7 * * *        daily            -> 26h  (a day, plus room for a late run)
 //   digest  0 18 * * *       daily            -> 26h
+//   agent   (kicked by `due`) daily           -> 26h
 //   nudge   0 8 * * 1,3,5    Mon, Wed, Fri    -> 80h  (the real gap is Fri to Mon, 72h)
 //   weekly  0 17 * * 0       Sunday           -> 180h (a week, 168h, plus room)
 export const MAX_QUIET_HOURS: Record<string, number> = {
   due: 26,
   digest: 26,
+  // The agent walk. It has no cron entry of its own: the daily `due` job kicks it. It was the one
+  // walk with no watchdog at all, so it could die mid-chain and every user past the cursor would
+  // silently stop getting signals while /api/health stayed green.
+  agent: 26,
   nudge: 80,
   weekly: 180,
 };

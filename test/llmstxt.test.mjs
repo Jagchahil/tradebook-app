@@ -16,14 +16,39 @@
 //   * the price must equal what we actually charge.
 //   * the honesty section must still contain the things we promised not to claim.
 
-import { readFileSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { FACTS } from '../lib/taxengine.ts';
 import { PRICE_PENCE, TRIAL_DAYS } from '../lib/stripe.ts';
 
+// THE ROUTE, NOT A STATIC FILE.
+//
+// This test used to read `public/llms.txt`. THAT FILE WAS NEVER SERVED: app/llms.txt/route.ts
+// already existed, and in Next a route wins over a static file at the same path. So the tests were
+// green against a document no machine would ever read, while the live /llms.txt carried none of
+// the honesty section and none of the tax numbers.
+//
+// A test that passes against the wrong artefact is worse than no test: it is a green light on a
+// road that is not there. Now it asserts on the SAME string the route actually returns.
+//
+// Staged and rewritten because the route imports its siblings extensionless and Node's ESM cannot
+// resolve those. Same trick as test/taxoptimiser.test.mjs.
 const here = path.dirname(fileURLToPath(import.meta.url));
-const txt = readFileSync(path.resolve(here, '../public/llms.txt'), 'utf8');
+const lib = path.resolve(here, '../lib');
+const stage = mkdtempSync(path.join(tmpdir(), 'llms-'));
+const fix = (t) => t
+  .replace("from '../../lib/taxengine'", "from './taxengine.ts'")
+  .replace("from '../../lib/stripe'", "from './stripe.ts'");
+for (const f of ['taxengine', 'stripe']) {
+  writeFileSync(path.join(stage, `${f}.ts`), readFileSync(path.join(lib, `${f}.ts`), 'utf8'));
+}
+writeFileSync(
+  path.join(stage, 'route.ts'),
+  fix(readFileSync(path.resolve(here, '../app/llms.txt/route.ts'), 'utf8')),
+);
+const { BODY: txt } = await import(pathToFileURL(path.join(stage, 'route.ts')).href);
 
 let pass = 0;
 let fail = 0;
@@ -70,7 +95,7 @@ const monthly = (PRICE_PENCE.monthly.standard / 100).toFixed(2);
 const annual = String(Math.round(PRICE_PENCE.annual.standard / 100));
 ok(`the monthly price matches Stripe (£${monthly})`, txt.includes(`£${monthly} a month`));
 ok(`the annual price matches Stripe (£${annual})`, txt.includes(`£${annual} a year`));
-ok(`the trial length matches the code (${TRIAL_DAYS} days)`, txt.includes(`${TRIAL_DAYS}-day free trial`));
+ok(`the trial length matches the code (${TRIAL_DAYS} days)`, txt.includes(`${TRIAL_DAYS} day free trial`));
 
 // --- THE HONESTY SECTION. These are the claims we promised NOT to make. ------------------------
 //

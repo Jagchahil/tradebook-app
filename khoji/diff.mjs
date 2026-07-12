@@ -378,8 +378,13 @@ async function fetchText(url) {
 // `ours` is the value from FACTS. Returns exactly one of: agree | drift | extractor_broken.
 export function compareOne(check, ours, pageText) {
   if (ours === undefined || ours === null) {
+    // BE PRECISE ABOUT WHICH THING IS MISSING. This used to say "not in the engine's FACTS", which
+    // sent whoever read it at 6am to look in lib/taxengine.ts. The first time it fired, the engine
+    // held the constant perfectly well and /facts.json was serving a CACHED copy from before the
+    // deploy. An alarm that points at the wrong file wastes the one thing an alarm is for.
     return { ...check, status: 'extractor_broken', ours, theirs: null,
-             detail: `${check.fact} is not in the engine's FACTS. The check names a constant we do not hold.` };
+             detail: `${check.fact} is not in the published /facts.json. Either the engine does not hold it, `
+                   + `or /facts.json is stale and we just read an old copy of our own engine.` };
   }
   const got = check.extract(pageText);
   if (got.error || got.value == null || !Number.isFinite(got.value)) {
@@ -469,8 +474,25 @@ async function withDb(fn) {
 }
 
 async function main() {
-  log(`reading the engine's constants from ${FACTS_URL}`);
-  const res = await fetch(FACTS_URL, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(20000) });
+  // NEVER READ A CACHED COPY OF OUR OWN ENGINE.
+  //
+  // /facts.json is force-static with max-age=3600, and the very first live run of the student loan
+  // checks read a copy of facts.json from BEFORE the deploy that added them. It reported seven
+  // constants missing that the engine holds perfectly well.
+  //
+  // It failed loudly, which is the design working. But think about the version of this that does
+  // NOT fail loudly: a cached facts.json from last month, checked against this month's law, every
+  // number matching, "0 DRIFT", green light, and our engine quietly a Budget out of date. That is
+  // the sync step I said this design did not have, creeping back in through a CDN.
+  //
+  // So: cache-bust, and tell the CDN and the runtime not to serve us anything but the truth.
+  const url = `${FACTS_URL}${FACTS_URL.includes('?') ? '&' : '?'}t=${Date.now()}`;
+  log(`reading the engine's constants from ${FACTS_URL} (cache busted)`);
+  const res = await fetch(url, {
+    headers: { 'user-agent': UA, 'cache-control': 'no-cache', pragma: 'no-cache' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(20000),
+  });
   if (!res.ok) throw new Error(`could not read the engine's facts: HTTP ${res.status}`);
   const meta = await res.json();
   const facts = meta.facts || {};

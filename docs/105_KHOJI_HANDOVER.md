@@ -6,13 +6,58 @@
 
 ## STATUS, 12 July 2026, 22:30. Phases 1 and 2 are DONE and LIVE.
 
-The brain runs unattended and it can now tell us we are wrong. Tonight's unattended run:
+The brain runs unattended and it can now tell us we are wrong. Tonight's final run:
 
 ```
 [khoji] watch rc=0 diff rc=0
-[khoji:diff] 16 agree, 0 DRIFT, 0 BROKEN
+[khoji:diff] 57 constants published, 23 checked against GOV.UK, 33 with no extractor yet
+[khoji:diff] 23 agree, 0 DRIFT, 0 BROKEN
 GET /api/health -> {"ok":true,"db":true,"crons":"ok","knowledge":"ok"}
 ```
+
+**And it was proven in both directions, on live data, by accident.** When the student loan checks
+first ran, `/facts.json` served a CDN copy from before the deploy. The differ could not find seven
+constants that our engine holds perfectly well, so it refused to say we were fine:
+
+```
+BEFORE  {"ok":false, ... "knowledge":"blind"}      7 BROKEN, 7 incidents open
+AFTER   {"ok":true,  ... "knowledge":"ok"}         resolved 7 incident(s) that now agree
+```
+
+It went red because it could not verify us. It cleared **itself** the moment it could. Nobody
+reached in and silenced it. That is the only property that makes an alarm worth having at 05:15,
+and it has never been true of anything in this codebase before.
+
+It also exposed a real defect, which is now fixed: **the differ could read a cached copy of our own
+engine.** Imagine the version that does not fail loudly. A `facts.json` cached from before a Budget,
+checked against the law after it, every number matching, "0 DRIFT", green light, and the engine a
+year out of date. That is the sync step this design was supposed to abolish, creeping back in
+through a CDN. `diff.mjs` now cache-busts and sends `no-store`.
+
+### The coverage line, and why the number got worse
+
+We hold tax constants in **four** engines, and the differ was only ever reading one:
+
+| file | | checked |
+|---|---|---|
+| `lib/taxengine.ts` `FACTS` | 43 | 16 |
+| `lib/nistudentloan.ts` `STUDENT_PLANS` | 7 | **7** |
+| `lib/ltdengine.ts` `LTD` | CT, dividends, employer NI | 0 |
+| `lib/propertyengine.ts` | Apr 2027 rates, Section 24 | not publishable, future law |
+
+Publishing the other engines took the unchecked count from 26 to **33**, because we now admit to
+holding 57 constants instead of 43. **The number got worse by being honest**, which is the only
+direction honesty ever moves a number. `diff.mjs` prints it every night so that "0 DRIFT" can never
+quietly come to mean "we are right" when it means "the ones we look at are right".
+
+**The next three extractors, in priority order:**
+
+1. **`mtdThreshold2026 / 2027 / 2028`.** These decide **who is legally required to use us**. Wrong,
+   and we tell a man he does not need us when he does, or bill him for a duty he does not have.
+2. **`wdaMainRate`.** It moved **this April**, 18% to 14%. The class of change we have already
+   missed once.
+3. **`ctSmallRate` / `ctMainRate` / `dividendAllowance`.** The sole trader vs limited advice runs on
+   these, and that advice changes a life decision, not a line on a form.
 
 **What shipped** (web `6c0c4b06`, mini `~/lekhio-khoji/`, 39 web suites / 4,144 assertions green, TSC green):
 

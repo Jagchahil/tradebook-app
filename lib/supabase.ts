@@ -14,6 +14,7 @@ import { parseLevel, type AutonomyLevel } from './autonomy';
 import { quarterForDate, quarterBounds } from './quarterpack';
 import type { OptimiserInput } from './taxoptimiser';
 import { qaDedupeKey, qaPrunePaths } from './qaretention';
+import type { KnowledgeState } from './knowledgewatch';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -3297,5 +3298,52 @@ export async function confirmPile(userId: string, ids: string[], category: strin
     return typeof n === 'number' ? n : 0;
   } catch {
     return 0;
+  }
+}
+
+// --- Khoji, the knowledge brain (docs/105) -----------------------------------
+//
+// Read the state of the brain for /api/health. Three questions, and the third is the one that
+// did not exist until 12 July 2026 and is the reason Khoji was built:
+//
+//   1. Is it still learning?          (has any row arrived recently)
+//   2. Is anyone approving?           (only `reviewed` rows ever reach a user's tax answer)
+//   3. IS OUR TAX ENGINE WRONG?       (has the differ found a constant that disagrees with GOV.UK)
+//
+// Failure returns null, and the caller treats null as "unknown", never as "fine". A health check
+// that cannot read the brain has not confirmed the brain is healthy.
+export async function readKnowledgeState(): Promise<KnowledgeState | null> {
+  try {
+    const { url } = config();
+    const q = async (path: string) => {
+      const res = await fetch(`${url}/rest/v1/${path}`, { headers: headers(), signal: AbortSignal.timeout(4000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    };
+
+    const [newest, reviewed, incidents] = await Promise.all([
+      q('knowledge_items?select=created_at&order=created_at.desc&limit=1'),
+      // created_at, not a reviewed_at, because there is no such column. It is a proxy: it answers
+      // "has anything approved arrived lately", not "did somebody click approve lately". Good
+      // enough to catch a stalled queue, and honest about which question it is answering.
+      q('knowledge_items?status=eq.reviewed&select=created_at&order=created_at.desc&limit=1'),
+      q('knowledge_items?status=in.(drift,extractor_broken)&select=status,raw'),
+    ]);
+
+    const rows: { status: string; raw: { fact?: string; ours?: string | number; theirs?: string | number } | null }[] =
+      Array.isArray(incidents) ? incidents : [];
+
+    return {
+      newestItemAt: Array.isArray(newest) && newest[0] ? newest[0].created_at : null,
+      newestReviewedAt: Array.isArray(reviewed) && reviewed[0] ? reviewed[0].created_at : null,
+      openDrift: rows
+        .filter((r) => r.status === 'drift')
+        .map((r) => ({ fact: r.raw?.fact ?? 'unknown', ours: r.raw?.ours ?? null, theirs: r.raw?.theirs ?? null })),
+      openBlind: rows
+        .filter((r) => r.status === 'extractor_broken')
+        .map((r) => ({ fact: r.raw?.fact ?? 'unknown' })),
+    };
+  } catch {
+    return null;
   }
 }

@@ -183,6 +183,67 @@ test('a wrong CIS rate in our engine -> DRIFT', () => {
   assert.equal(one('cisUnregisteredRate', 0.2, CIS_PAGE).status, 'drift');
 });
 
+// ---- student loans: the worst decoy field on GOV.UK ------------------------
+
+section('Student loans. Three money columns and eleven worked examples, all trying to fool us.');
+
+// Verbatim from https://www.gov.uk/repaying-your-student-loan/what-you-pay on 12 July 2026.
+// Note what is here to trip an extractor: the table has YEARLY, MONTHLY and WEEKLY columns, and
+// the examples below it are full of pound signs that look exactly like thresholds. "£2,241" is a
+// monthly threshold. "£33,000" is a made-up salary. Land on either and we raise a false incident
+// against a correct engine, nightly, until somebody mutes the alarm.
+const STUDENT_PAGE = `
+<table>
+  <thead><tr><th>Plan type</th><th>Yearly income threshold</th><th>Monthly income threshold</th><th>Weekly income threshold</th></tr></thead>
+  <tbody>
+    <tr><td>Plan 1</td><td>£26,900</td><td>£2,241</td><td>£517</td></tr>
+    <tr><td>Plan 2</td><td>£29,385</td><td>£2,448</td><td>£565</td></tr>
+    <tr><td>Plan 4</td><td>£33,795</td><td>£2,816</td><td>£649</td></tr>
+    <tr><td>Plan 5</td><td>£25,000</td><td>£2,083</td><td>£480</td></tr>
+    <tr><td>Postgraduate Loan</td><td>£21,000</td><td>£1,750</td><td>£403</td></tr>
+  </tbody>
+</table>
+<p>You&rsquo;ll repay either:</p>
+<ul>
+  <li>9% of your income over the threshold if you&rsquo;re on Plan 1, 2, 4 or 5</li>
+  <li>6% of your income over the threshold if you&rsquo;re on a Postgraduate Loan plan</li>
+</ul>
+<p>Example: You&rsquo;re on Plan 1 and have an income of £33,000 a year, meaning you get paid £2,750
+each month. £2,750 &ndash; £2,241 (your income minus the Plan 1 threshold) = £509. 9% of £509 = £45.81.</p>
+<p>Example: You&rsquo;re on Plan 4 and have an income of £36,000 a year. £3,000 &ndash; £2,816 = £184.</p>
+<p>Interest: 3.2% if you&rsquo;re on Plan 1. 6.2% if you&rsquo;re on a Postgraduate Loan plan.</p>
+`;
+
+test('Plan 1 reads the YEARLY £26,900, not the monthly £2,241 next to it', () => {
+  const r = one('studentPlan1Threshold', 26900, STUDENT_PAGE);
+  assert.equal(r.theirs, 26900, `read ${r.theirs}: it took the wrong column`);
+  assert.equal(r.status, 'agree');
+});
+test('Plan 2 reads £29,385', () => {
+  assert.equal(one('studentPlan2Threshold', 29385, STUDENT_PAGE).status, 'agree');
+});
+test('Plan 4 reads £33,795, not the £36,000 salary from the example below', () => {
+  const r = one('studentPlan4Threshold', 33795, STUDENT_PAGE);
+  assert.equal(r.theirs, 33795, `read ${r.theirs}: it wandered into a worked example`);
+});
+test('Plan 5 reads £25,000', () => {
+  assert.equal(one('studentPlan5Threshold', 25000, STUDENT_PAGE).status, 'agree');
+});
+test('Postgraduate reads £21,000', () => {
+  assert.equal(one('studentPostgradThreshold', 21000, STUDENT_PAGE).status, 'agree');
+});
+test('the repayment rate is 9%, not the 3.2% interest rate further down', () => {
+  const r = one('studentPlanRate', 0.09, STUDENT_PAGE);
+  assert.equal(r.theirs, 0.09, `read ${r.theirs}: it grabbed an interest rate`);
+});
+test('the postgraduate rate is 6%, not the 6.2% postgraduate INTEREST rate', () => {
+  const r = one('studentPostgradRate', 0.06, STUDENT_PAGE);
+  assert.equal(r.theirs, 0.06, `read ${r.theirs}: it grabbed the postgraduate interest rate`);
+});
+test('a wrong student loan threshold in our engine -> DRIFT', () => {
+  assert.equal(one('studentPlan1Threshold', 25000, STUDENT_PAGE).status, 'drift');
+});
+
 // ---- triage: Khoji bins its own rubbish, but there is a trap in doing so ----
 
 section('Triage. Khoji bins its own rubbish, and must NEVER bin a rates page.');

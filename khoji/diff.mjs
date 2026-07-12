@@ -273,6 +273,62 @@ export const CHECKS = [
     },
   },
 
+  // --- Student loans. The page that was sitting in the queue at 0.05, unchecked. ---
+  //
+  // THIS PAGE IS THE WORST DECOY FIELD ON GOV.UK. The threshold table has THREE money columns
+  // (yearly, monthly, weekly), and then eleven worked examples below it stuffed with pound signs:
+  // "£2,750 - £2,241", "£3,000 - £2,816", "£38,400 a year", "9% of £959". A regex that looks for
+  // "Plan 1" and then the nearest number can land on a MONTHLY threshold, or on a salary out of an
+  // example, and be confidently wrong about a deduction taken from a man's tax return.
+  //
+  // So every one of these pins itself INSIDE the threshold table and nowhere else. The table is
+  // bounded by its own header and by the sentence that follows it.
+  //
+  // Our numbers are right. Nothing was checking that they stayed right, and this page is watched
+  // by watch.mjs, which means it has been looked at every night by something that never once
+  // compared it to us. That is the mileage story again, with a different number.
+  ...[
+    ['studentPlan1Threshold', 'Plan 1', /Plan 1/],
+    ['studentPlan2Threshold', 'Plan 2', /Plan 2/],
+    ['studentPlan4Threshold', 'Plan 4', /Plan 4/],
+    ['studentPlan5Threshold', 'Plan 5', /Plan 5/],
+    ['studentPostgradThreshold', 'Postgraduate Loan', /Postgraduate Loan/],
+  ].map(([fact, label, rowRe]) => ({
+    fact,
+    label: `Student loan repayment threshold, ${label}`,
+    url: 'https://www.gov.uk/repaying-your-student-loan/what-you-pay',
+    extract(text) {
+      const table = between(text, /Plan type\s+Yearly income threshold/i, /You.{0,3}ll repay either/i, 400);
+      if (!table) return { error: 'could not find the threshold table' };
+      // The YEARLY figure is the first of the three on the row. Take it, and nothing else.
+      const m = table.match(new RegExp(`${rowRe.source}\\s*£\\s*([\\d,]+)`, 'i'));
+      return m ? { value: money(m[1]) } : { error: `no row for ${label} in the threshold table` };
+    },
+  })),
+  {
+    fact: 'studentPlanRate',
+    label: 'Student loan repayment rate, plans 1, 2, 4 and 5',
+    url: 'https://www.gov.uk/repaying-your-student-loan/what-you-pay',
+    extract(text) {
+      // "you.{0,8}re" because the apostrophe arrives as a curly ’, a plain ', or the raw entity
+      // &rsquo; depending on how the page was served and stripped. Three characters was not enough
+      // and the check silently returned nothing, which the tests caught. Silence is the enemy.
+      const m = text.match(/(\d{1,2})% of your income over the threshold if you.{0,8}re on Plan/i);
+      return m ? { value: percent(m[1]) } : { error: 'could not read the plan repayment rate' };
+    },
+  },
+  {
+    fact: 'studentPostgradRate',
+    label: 'Student loan repayment rate, postgraduate',
+    url: 'https://www.gov.uk/repaying-your-student-loan/what-you-pay',
+    extract(text) {
+      // Anchored on "over the threshold", which the 6.2% postgraduate INTEREST rate further down
+      // the page does not say. Grab the wrong one and we would tell a man he repays 6.2%.
+      const m = text.match(/(\d{1,2})% of your income over the threshold if you.{0,8}re on a Postgraduate/i);
+      return m ? { value: percent(m[1]) } : { error: 'could not read the postgraduate repayment rate' };
+    },
+  },
+
   // --- CIS. Construction is our core trade, so these are the last two we want to be blind on. ---
   //
   // The first pass at these two guessed the page said "20% if you're registered, 30% if you're
@@ -418,7 +474,16 @@ async function main() {
   if (!res.ok) throw new Error(`could not read the engine's facts: HTTP ${res.status}`);
   const meta = await res.json();
   const facts = meta.facts || {};
-  log(`engine tax year ${meta.taxYear}, ${Object.keys(facts).length} constants`);
+
+  // COVERAGE, SAID OUT LOUD. The differ checks what it has an extractor for, and a constant with
+  // no extractor is not "fine", it is UNEXAMINED. Printing the number every night is what stops us
+  // drifting into believing that "0 DRIFT" means "our tax numbers are right", when it means "the
+  // ones we look at are right". Doc 104, standing question 5: is it TRUE, not is it defensible.
+  const checked = new Set(CHECKS.map((c) => c.fact));
+  const unchecked = Object.keys(facts).filter((k) => !checked.has(k) && k !== 'taxYear');
+  log(`engine tax year ${meta.taxYear}: ${Object.keys(facts).length} constants published, ` +
+      `${checked.size} checked against GOV.UK, ${unchecked.length} with no extractor yet`);
+  if (unchecked.length) log(`  not yet checked: ${unchecked.join(', ')}`);
 
   const results = await runChecks(facts);
   const drift = results.filter((r) => r.status === 'drift');

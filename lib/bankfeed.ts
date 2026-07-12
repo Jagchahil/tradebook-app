@@ -342,21 +342,30 @@ export interface MappedBankEntry {
 // payment and a Screwfix receipt land in the same category. Kept local (rather
 // than importing lib/waintents) so this module stays framework free too, and
 // covered by tests that assert the two stay aligned.
-const CATEGORY_MAP: Array<[RegExp, string]> = [
-  [/\b(shell|bp|esso|texaco|gulf|applegreen|fuel|petrol|diesel)\b/i, 'fuel'],
-  [/\b(screwfix|toolstation|wickes|b ?& ?q|jewson|travis perkins|selco|buildbase|mkm|howdens|city plumbing|plumb ?center)\b/i, 'materials'],
-  [/\b(machine mart|its\b|toolstop|sgs)\b/i, 'tools'],
-  [/\b(insurance|axa|aviva|admiral|direct line|simply business)\b/i, 'insurance'],
-  [/\b(ee|o2|vodafone|three|giffgaff|bt group|plusnet|sky|virgin media|broadband)\b/i, 'phone'],
-  [/\b(ringgo|justpark|ncp|parking|dartford|congestion|tfl|trainline)\b/i, 'travel'],
-  [/\b(dvla|mot|kwik ?fit|halfords|ats euromaster|national tyres)\b/i, 'van'],
-  [/\b(greggs|mcdonald|costa|starbucks|subway|kfc|cafe|coffee)\b/i, 'meals'],
-];
+// THE VENDOR RULES LIVE IN lib/categories.ts. There is not a second copy here.
+//
+// There used to be an eight regex CATEGORY_MAP in this file. It knew the fuel majors and the big
+// merchants and almost nothing else, so a real statement (Amazon, eBay, the local merchant, the
+// skip, the accountant, the tool hire) landed almost entirely as "other". "Other" means no
+// suggestion, and no suggestion means he picks the category by hand. The review deck we built to
+// save him two hundred taps would have handed most of them straight back.
+//
+// It is re-exported so nothing that imported it from here has to change.
+// THE VENDOR RULES ARE INJECTED, NOT IMPORTED.
+//
+// The node test runner loads these lib files directly, and Node's ESM cannot resolve an
+// extensionless sibling import, so `import from './categories'` breaks this file's own test
+// suite. And I am NOT keeping a second copy of the rules here: two definitions of the same fact
+// always drift, and one of them (TX_COLS vs TX_SELECT) drifted far enough tonight to break the
+// undo completely.
+//
+// So the caller supplies the categoriser. banksync passes the real one; the test passes the real
+// one too, which means the REAL rules are what gets tested. Same pattern as lib/reviewpile.ts.
+export type Categoriser = (text: string) => string;
 
-export function categoriseBankLine(text: string): string {
-  for (const [re, cat] of CATEGORY_MAP) if (re.test(text)) return cat;
-  return 'other';
-}
+// A mapper with no categoriser does not GUESS. It says it does not know, which is the truthful
+// answer and leaves the user to be asked.
+const UNKNOWN: Categoriser = () => 'other';
 
 // Map one settled TrueLayer transaction to our transactions row. Direction
 // comes from transaction_type (DEBIT is money out), never from the sign of
@@ -364,7 +373,7 @@ export function categoriseBankLine(text: string): string {
 // normalised_provider_transaction_id is preferred for idempotency; TrueLayer
 // documents that transaction_id itself may change between requests.
 // Returns null when the line is unusable.
-export function mapBankTransaction(t: BankTransaction): MappedBankEntry | null {
+export function mapBankTransaction(t: BankTransaction, categorise: Categoriser = UNKNOWN): MappedBankEntry | null {
   const id = t.normalised_provider_transaction_id || t.provider_transaction_id || t.transaction_id;
   if (!id) return null;
   const raw = Number(t.amount);
@@ -380,7 +389,7 @@ export function mapBankTransaction(t: BankTransaction): MappedBankEntry | null {
   const vendor = (t.merchant_name?.trim() || description || 'Bank transaction').slice(0, 120);
   const magnitude = Math.round(Math.abs(raw) * 100) / 100;
   const amount = type === 'DEBIT' ? -magnitude : magnitude;
-  const category = type === 'CREDIT' ? 'income' : categoriseBankLine(`${vendor} ${description}`);
+  const category = type === 'CREDIT' ? 'income' : categorise(`${vendor} ${description}`);
 
   return {
     external_id: `bank:${id}`.slice(0, 180),

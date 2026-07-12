@@ -18,6 +18,7 @@ import {
   applyBankTruthToCapture,
 } from './supabase';
 import { refreshAccess, getBookedTransactions, mapBankTransaction, isSandbox, taxYearStartISO } from './bankfeed';
+import { categoriseBankLine } from './categories';
 import { normaliseVendor, recall } from './memory';
 import { findDuplicate } from './dedupe';
 import { looksPersonal } from './personal';
@@ -65,7 +66,7 @@ export async function syncWithAccessToken(
     let taken = 0;
     for (const raw of booked) {
       if (taken >= MAX_ROWS_PER_ACCOUNT) break;
-      const entry = mapBankTransaction(raw);
+      const entry = mapBankTransaction(raw, categoriseBankLine);
       if (!entry) continue;
       // SANDBOX ONLY: Mock Bank dates are years in the past, so the app's
       // current period views would never show them. Respread them across the

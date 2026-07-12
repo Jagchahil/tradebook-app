@@ -10,6 +10,7 @@ import {
 import { buildPile, summarisePile, canBulkConfirm } from '../../../lib/reviewpile';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
+import { CATEGORIES } from '../../../lib/categories';
 
 // The pile: what a man faces the morning after he connects his bank.
 //
@@ -44,6 +45,13 @@ export async function GET(req: NextRequest) {
   const groups = buildPile(rows, normaliseVendor);
 
   return NextResponse.json({
+    // THE APP DOES NOT KEEP ITS OWN CATEGORY LIST. It renders what it is given.
+    //
+    // app/add.tsx has its own hard-coded list and it has ALREADY drifted: it offers "wages" and
+    // has never heard of "van", "insurance" or "equipment", so a bank line categorised "van" shows
+    // a category its picker cannot even select. Two lists that mean the same thing always drift.
+    // This one has a single home, in lib/categories.ts, and travels down the wire.
+    categories: CATEGORIES,
     summary: summarisePile(groups),
     groups: groups.map((g) => ({
       ...g,

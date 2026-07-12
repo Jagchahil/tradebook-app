@@ -17,7 +17,7 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { distill, distillEnabled } from './distill.mjs';
+import { distill, distillEnabled, triageStatus } from './distill.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DRY = process.argv.includes('--dry-run');
@@ -102,8 +102,21 @@ export function slug(s) {
   return (s || 'update').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'update';
 }
 
-function writeNote(item, d) {
+function writeNote(item, d, status) {
   if (!VAULT) return;
+
+  // DO NOT WRITE A NOTE FOR SOMETHING WE HAVE JUST BINNED.
+  //
+  // The vault is a HUMAN's second brain. It syncs to Jag's laptop and sits next to his own notes on
+  // Business, Daily and Nutrition. On 12 July it held 143 Khoji notes and most of them were
+  // "Preparing for Vaping Products Duty", "Currency codes for data element 4/10 of the customs
+  // declaration", "Customs Declaration Service: service availability" — every one marked
+  // `affects: not relevant`, `confidence: 0.15`, by Khoji itself.
+  //
+  // Binning an item in the database and then filing it in his vault anyway is not a bin, it is a
+  // redirect. If it is not worth a row, it is not worth a file in a man's own notes.
+  if (status === 'dismissed') return;
+
   const dir = path.join(VAULT, 'Khoji');
   mkdirSync(dir, { recursive: true });
   const date = (item.published || new Date().toISOString()).slice(0, 10);
@@ -113,7 +126,7 @@ function writeNote(item, d) {
     '---',
     `source: ${link}`,
     `source_name: ${item.source_name || ''}`,
-    `status: ${d ? 'distilled' : 'needs_distillation'}`,
+    `status: ${status || (d ? 'distilled' : 'needs_distillation')}`,
     d && d.effective_date ? `effective_date: ${d.effective_date}` : 'effective_date:',
     d && d.affects ? `affects: ${JSON.stringify(d.affects)}` : 'affects:',
     d ? `engine_impact: ${d.engine_impact}` : 'engine_impact: false',
@@ -143,7 +156,16 @@ async function main() {
   log(`collected ${items.length} candidate items; distillation ${distillEnabled() ? 'ON' : 'OFF (dormant)'}`);
 
   if (DRY) {
-    for (const it of items.slice(0, MAX_ITEMS)) log('WOULD STORE:', it.source_name, '::', it.title);
+    // A DRY RUN THAT DOES NOT EXERCISE THE CODE IS A DRY RUN THAT LIES.
+    //
+    // This block used to return before touching triageStatus. So when triageStatus was added to the
+    // write path and the import was forgotten, `node watch.mjs --dry-run` passed cleanly and the
+    // module imported cleanly, because a ReferenceError on a free variable only fires on the line
+    // that runs it. The break would have surfaced at 05:15, in the dark, on the one job nobody
+    // watches. Calling it here costs nothing and makes the dry run a real smoke test of the graph.
+    for (const it of items.slice(0, MAX_ITEMS)) {
+      log('WOULD STORE:', triageStatus(it, null), '::', it.source_name, '::', it.title);
+    }
     log(`dry run: ${Math.min(items.length, MAX_ITEMS)} would be stored, none written.`);
     return;
   }
@@ -189,7 +211,7 @@ async function main() {
         [it.source_url, it.source_name, it.title, d?.summary ?? null, d?.effective_date ?? null, d?.affects ?? null,
          d?.confidence ?? null, d?.engine_impact ?? false, status, it.raw ?? {}, d ? new Date() : null],
       );
-      if (writeNote(it, d)) notes++;
+      if (writeNote(it, d, status)) notes++;
     }
     log(`stored ${fresh.length} (${binned} binned as not relevant), wrote ${notes} Obsidian notes`);
 
@@ -209,7 +231,8 @@ async function main() {
            triageStatus({ source_url: row.source_url }, d), row.id],
         );
         if (d.engine_impact) engineChanged = true;
-        writeNote({ title: row.title, source_url: row.source_url, source_name: row.source_name, raw: row.raw }, d);
+        writeNote({ title: row.title, source_url: row.source_url, source_name: row.source_name, raw: row.raw },
+                  d, triageStatus({ source_url: row.source_url }, d));
         done++;
       }
       if (pend.rows.length) log(`re-distilled ${done} of ${pend.rows.length} pending`);

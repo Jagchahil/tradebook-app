@@ -45,10 +45,43 @@ const SYSTEM = [
 //
 // (Page items carry a content hash after a # in their source_url. Feed items do not. That is the
 // only way to tell them apart, so if you ever change how pageItem() builds a URL, change this.)
+// ⚠️ AND THE SECOND GUARD, WHICH I ONLY ADDED AFTER A DRY RUN CAUGHT ME ABOUT TO DELETE THE MOAT.
+//
+// The first version of this binned any news item the model called irrelevant. Run against the real
+// vault, here is what it wanted to throw away:
+//
+//     employment-income-manual.md
+//     cotax-manual.md
+//     cwg2-further-guide-to-paye-and-national-insurance-contributions.md
+//
+// HMRC'S INTERNAL MANUALS. Not news. The Phase 3 depth corpus. The thing doc 104 calls the actual
+// moat, the thing no competitor has, the entire reason Khoji exists beyond checking rates. The
+// distiller scored them "not relevant" at under 0.3, because it is a summariser being asked a
+// question about our business that it has no way to answer.
+//
+// THAT IS THE THIRD TIME TONIGHT. Mileage: 0.15, "not relevant", held the number we had wrong.
+// Student loans: 0.05, "not relevant", nothing was checking it. Now the manuals. The model's
+// confidence is not merely unreliable, it is ANTI-CORRELATED with what matters to us, and every
+// time it is allowed to decide something we lose the most valuable thing in the pile.
+//
+// So a manual is never binned. Ever. Whatever the model thinks of it.
+export function isManual(item) {
+  const url = String(item.source_url || '');
+  const title = String(item.title || '');
+  return /hmrc-internal-manuals/i.test(url) || /\bmanual\b/i.test(title);
+}
+
 export function triageStatus(item, d) {
   if (!d) return 'needs_distillation';
+
+  // 1. A watched rates page. Never binned, at any confidence. The mileage row was 0.15.
   const isWatchedPage = String(item.source_url || '').includes('#');
   if (isWatchedPage) return 'distilled';
+
+  // 2. An HMRC manual. Never binned, at any confidence. This IS the depth corpus.
+  if (isManual(item)) return 'distilled';
+
+  // 3. Otherwise: news the model itself says affects nobody, and is unsure about, is rubbish.
   const saysNobody = /not relevant|nobody/i.test(d.affects || '');
   const unsure = typeof d.confidence === 'number' && d.confidence < 0.3;
   return saysNobody && unsure ? 'dismissed' : 'distilled';

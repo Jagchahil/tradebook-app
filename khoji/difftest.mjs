@@ -283,6 +283,37 @@ test('an item that was never distilled stays in the backlog, it is not binned', 
   assert.equal(triageStatus(newsItem('x'), null), 'needs_distillation');
 });
 
+// ⚠️ THE THIRD TIME THE MODEL'S CONFIDENCE TRIED TO DELETE THE MOST VALUABLE THING IN THE PILE.
+//
+// The first version of the bin rule had only the rates-page guard. Run against the real vault, it
+// was about to throw away employment-income-manual.md, cotax-manual.md and cwg2-further-guide-to-
+// paye-and-national-insurance-contributions.md. HMRC's INTERNAL MANUALS. The Phase 3 depth corpus.
+// The moat in doc 104. The distiller had scored them "not relevant" at under 0.3.
+//
+// Mileage: 0.15, "not relevant", held the number we had wrong.
+// Student loans: 0.05, "not relevant", nothing was checking it.
+// The manuals: under 0.3, "not relevant", the only thing here a competitor cannot buy.
+//
+// The model's confidence is not unreliable. It is ANTI-CORRELATED with what matters to us.
+const manual = (u, t) => ({ source_url: `https://www.gov.uk/hmrc-internal-manuals/${u}`, title: t });
+const dismissive = { affects: 'not relevant', confidence: 0.1 };
+
+test('THE MOAT: an HMRC internal manual is NEVER binned, whatever the model thinks of it', () => {
+  assert.equal(triageStatus(manual('employment-income-manual', 'Employment Income Manual'), dismissive),
+    'distilled', 'the bin rule just deleted the depth corpus');
+});
+test('...caught by the URL, even if the title says nothing', () => {
+  assert.equal(triageStatus(manual('cotax-manual', 'COTAX'), dismissive), 'distilled');
+});
+test('...and caught by the title, even if it arrived from a news feed', () => {
+  assert.equal(triageStatus({ source_url: 'https://www.gov.uk/x', title: 'Self Assessment Manual' }, dismissive),
+    'distilled');
+});
+test('but ordinary news with "manually" in it is not mistaken for a manual', () => {
+  assert.equal(triageStatus({ source_url: 'https://www.gov.uk/y', title: 'File your return manually' }, dismissive),
+    'dismissed');
+});
+
 // ---- parsers ----------------------------------------------------------------
 
 section('Parsers.');

@@ -142,9 +142,34 @@ export async function getRelevantKnowledge(question: string, limit = 6): Promise
           .slice(0, 8),
       ),
     );
-    // The safety gate, never relaxed: reviewed, source-linked, distilled.
+    // THE SAFETY GATE. Read this before you touch the status list.
+    //
+    // It was `status=eq.reviewed` and nothing else, and the reason was right: nothing we ASSERT
+    // reaches a man's tax return until a human has approved it. That has not changed.
+    //
+    // 'verbatim' is admitted alongside it, and it is not a relaxation. It is the same principle
+    // arriving at a different answer, because a verbatim quotation of HMRC IS NOT OUR CLAIM.
+    //
+    // What the gate protects against is a SUMMARISER BEING WRONG. That is a real danger and we have
+    // the scars: the distiller read the mileage page, scored it 0.15, called it "not relevant", and
+    // was confidently wrong about the one number in our engine that was actually broken. A model's
+    // opinion must never reach a user unapproved.
+    //
+    // A 'verbatim' row contains no opinion. It is HMRC's own words, copied exactly, with the URL,
+    // written by khoji/corpus.mjs, which verifies the sentence is on the page before it stores it
+    // and raises an incident when it is not. There is nothing for a human to approve, because we
+    // have not said anything: we have POINTED. Approving it would be theatre, and a review step
+    // that exists to look diligent rather than to catch anything is how a gate becomes a habit and
+    // then a rubber stamp.
+    //
+    // Every page is Crown copyright under the Open Government Licence v3.0, so quoting it with
+    // attribution is licensed, not merely tolerated.
+    //
+    // THE RAIL: corpus.mjs will only ever write status='verbatim' for a gov.uk URL. If that rail
+    // ever breaks, we would be publishing a stranger's words under HMRC's authority, and no test in
+    // this repo would be more important than the one that catches it (test/rulesources.test.mjs).
     let path =
-      'knowledge_items?status=eq.reviewed&source_url=not.is.null&summary=not.is.null' +
+      'knowledge_items?status=in.(reviewed,verbatim)&source_url=not.is.null&summary=not.is.null' +
       `&select=title,summary,source_url,effective_date&order=effective_date.desc.nullslast&limit=${limit}`;
     // Surface items that relate to the question. With no usable words we fall back
     // to the most recent verified items.

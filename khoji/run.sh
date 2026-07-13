@@ -37,9 +37,17 @@ watch_rc=$?
 node diff.mjs "$@" >> logs/khoji.log 2>&1
 diff_rc=$?
 
-# Report the worst thing that happened, so launchd's exit code means something. A 2 from the
-# differ means our engine and GOV.UK disagree, which is an incident, not a crash: /api/health has
-# already gone red off the row it wrote. A 1 from either means the job itself is broken.
-echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc" >> logs/khoji.log
+# corpus.mjs is diff.mjs for PROSE. Our claim rules ("no, you cannot claim everyday clothes") rest
+# on exact sentences in HMRC's manuals, and HMRC rewrites those manuals constantly. This checks the
+# sentence is still there, word for word. The day it is not, a rule we tell a man to put on his tax
+# return has lost its authority, and nothing else in the world would tell us.
+node corpus.mjs "$@" >> logs/khoji.log 2>&1
+corpus_rc=$?
+
+# Report the worst thing that happened, so launchd's exit code means something. A 2 from the differ
+# or the corpus means the ground has moved under us, which is an incident, not a crash: /api/health
+# has already gone red off the row it wrote. A 1 from any of them means the job itself is broken.
+echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc" >> logs/khoji.log
 if [ "$watch_rc" -ne 0 ]; then exit "$watch_rc"; fi
-exit "$diff_rc"
+if [ "$diff_rc" -ne 0 ]; then exit "$diff_rc"; fi
+exit "$corpus_rc"

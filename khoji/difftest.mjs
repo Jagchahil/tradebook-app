@@ -25,6 +25,7 @@
 import assert from 'node:assert/strict';
 import { CHECKS, compareOne, runChecks, money, between } from './diff.mjs';
 import { triageStatus } from './distill.mjs';
+import { checkSource, normalise } from './corpus.mjs';
 
 // Collect, then run at the end, so an async test is actually AWAITED. A harness that fires a
 // promise and prints "ok" before it settles is a test suite that passes when the code is broken,
@@ -312,6 +313,64 @@ test('...and caught by the title, even if it arrived from a news feed', () => {
 test('but ordinary news with "manually" in it is not mistaken for a manual', () => {
   assert.equal(triageStatus({ source_url: 'https://www.gov.uk/y', title: 'File your return manually' }, dismissive),
     'dismissed');
+});
+
+// ---- the corpus: the differ, applied to prose ------------------------------
+
+section('The corpus. Is the HMRC sentence our rule rests on still on the page?');
+
+// Verbatim from BIM37910, 13 July 2026. The clothing rule is Mallalieu v Drummond, House of Lords.
+const BIM37910 = `You should disallow expenditure on ordinary clothing worn by a trader during the
+course of their trade. This remains so even where particular standards of dress are required.
+You should therefore allow a deduction for protective clothing and uniforms.`;
+
+const src = (quote, url = 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim37910') =>
+  ({ code: 'BIM37910', url, quote });
+
+test('the sentence is on the page -> cited', () => {
+  const r = checkSource(src('You should disallow expenditure on ordinary clothing worn by a trader'), BIM37910);
+  assert.equal(r.status, 'cited');
+});
+
+// THE ONE THAT MATTERS. HMRC rewrites these manuals constantly (BIM37910 was updated in March).
+// The day our sentence goes, the rule we tell a man to put on his tax return has lost its footing.
+test('LOST AUTHORITY: HMRC rewrites the page and our sentence is gone -> quote_missing', () => {
+  const rewritten = 'From April 2027 the treatment of ordinary clothing is under review.';
+  const r = checkSource(src('You should disallow expenditure on ordinary clothing worn by a trader'), rewritten);
+  assert.equal(r.status, 'quote_missing');
+  assert.match(r.detail, /NOT on the page/);
+});
+
+// THE TRAP FOR THE AUTHOR. A plausible "BIM45012" with a quote nobody read is a wrong answer
+// wearing HMRC's uniform, and a man believes it BECAUSE it looks like law. It must fail loudly.
+test('AN INVENTED CITATION fails loudly instead of shipping as false authority', () => {
+  const r = checkSource(src('HMRC allows a full deduction for everyday clothing worn at work'), BIM37910);
+  assert.equal(r.status, 'quote_missing');
+});
+
+test('curly apostrophes, entities and odd whitespace do not break a real match', () => {
+  const page = 'You’ll need to find&nbsp;a  reasonable   method of dividing your costs.';
+  const r = checkSource(src("You'll need to find a reasonable method of dividing your costs"), page);
+  assert.equal(r.status, 'cited', 'a typesetting change is not a change in the law');
+});
+
+test('a non gov.uk URL is never an authority', () => {
+  const r = checkSource(src('You should disallow expenditure on ordinary clothing worn by a trader',
+    'https://someaccountant.example.com/blog'), BIM37910);
+  assert.equal(r.status, 'quote_missing');
+  assert.match(r.detail, /not gov\.uk/);
+});
+
+// A fragment can survive a rewrite that REVERSES the meaning. "allow a deduction" is still present
+// in "we no longer allow a deduction". So a short quote is refused outright.
+test('a fragment is refused as an anchor, because it survives a reversal', () => {
+  const r = checkSource(src('allow a deduction'), BIM37910);
+  assert.equal(r.status, 'quote_missing');
+  assert.match(r.detail, /too short/);
+});
+
+test('normalise is not so loose that it stops being a quotation check', () => {
+  assert.notEqual(normalise('you should allow a deduction'), normalise('you should not allow a deduction'));
 });
 
 // ---- parsers ----------------------------------------------------------------

@@ -273,6 +273,41 @@ export const CHECKS = [
     },
   },
 
+  // --- MTD. THE NUMBERS THAT DECIDE WHO IS LEGALLY REQUIRED TO USE US. ---
+  //
+  // These are the most consequential unchecked constants we held. Get them wrong and we tell a man
+  // he does not have to do this when he does, and he misses a legal duty. Or we tell him he must,
+  // and bill him for a thing he did not need.
+  //
+  // ⚠️ AND THE PAGE WE HAVE BEEN WATCHING DOES NOT CONTAIN THEM.
+  //
+  // sources.json watches /guidance/using-making-tax-digital-for-income-tax. Two problems, found
+  // today by actually opening it:
+  //   1. GOV.UK REDIRECTS that URL. "using" became "use". Fetch follows redirects so nothing broke,
+  //      and we were one rename away from watching a 404 and never being told.
+  //   2. THE PAGE IS A TABLE OF CONTENTS. The thresholds are on a sub-page. So the watcher has been
+  //      diligently checking a page every night that has never held the number.
+  //
+  // That is the mileage story in its purest form. The differ goes to the page with the figure on it.
+  //
+  // The anchor is the START DATE, not the tax year label, because the prose above the table also
+  // says "income was over £50,000 ... from April 2026", and a regex that takes the first £50,000 it
+  // finds would be reading a sentence instead of the schedule. Anchor on what makes the row unique.
+  ...[
+    ['mtdThreshold2026', '6 April 2026', 'first mandated year'],
+    ['mtdThreshold2027', '6 April 2027', 'second mandated year'],
+    ['mtdThreshold2028', '6 April 2028', 'third mandated year'],
+  ].map(([fact, startDate, which]) => ({
+    fact,
+    label: `Making Tax Digital qualifying income threshold, ${which} (from ${startDate})`,
+    url: 'https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/before-you-use-this-guide',
+    extract(text) {
+      const m = text.match(new RegExp(`more than £\\s*([\\d,]+)\\s*${startDate.replace(/ /g, '\\s+')}`, 'i'));
+      return m ? { value: money(m[1]) }
+               : { error: `no row in the MTD table with a start date of ${startDate}` };
+    },
+  })),
+
   // --- Student loans. The page that was sitting in the queue at 0.05, unchecked. ---
   //
   // THIS PAGE IS THE WORST DECOY FIELD ON GOV.UK. The threshold table has THREE money columns
@@ -365,12 +400,25 @@ export const CHECKS = [
 
 // ---- the comparison ---------------------------------------------------------
 
+// WHERE A PAGE HAS MOVED TO. fetch() follows redirects in silence, so a stale URL keeps working
+// right up until the morning it 404s and we go blind on a constant.
+//
+// Not hypothetical: sources.json watched /guidance/USING-making-tax-digital-for-income-tax for six
+// days. GOV.UK had renamed it to /USE-... and was quietly redirecting us the whole time. Nothing
+// broke, nothing was said, and we were one cleanup away from watching nothing at all.
+//
+// This is NOT an incident, because nothing is wrong yet, and an alarm that fires when nothing is
+// wrong is how alarms get muted. It is a line in the log with the new URL in it, so the fix is a
+// copy and paste rather than an investigation.
+export const MOVED = new Map();
+
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: { 'user-agent': UA, accept: 'text/html' },
     signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (res.url && res.url.split('#')[0] !== url) MOVED.set(url, res.url);
   return res.text();
 }
 
@@ -517,6 +565,14 @@ async function main() {
     log(`${mark}  ${r.fact.padEnd(28)} ours=${String(r.ours).padEnd(10)} govuk=${String(r.theirs ?? '?').padEnd(10)} ${r.detail || ''}`);
   }
   log(`${agreed.length} agree, ${drift.length} DRIFT, ${broken.length} BROKEN`);
+
+  // A page that has moved is not an incident, but it is a countdown. Print it with the new URL so
+  // fixing it is a copy and paste, not an investigation.
+  for (const [from, to] of MOVED) {
+    log(`MOVED  GOV.UK has renamed a page we cite. Update the URL before it 404s.`);
+    log(`         from: ${from}`);
+    log(`         to:   ${to}`);
+  }
 
   if (DRY) { log('dry run, nothing written'); return; }
   if (!DB_URL) {

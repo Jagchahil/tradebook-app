@@ -185,6 +185,58 @@ test('a wrong CIS rate in our engine -> DRIFT', () => {
   assert.equal(one('cisUnregisteredRate', 0.2, CIS_PAGE).status, 'drift');
 });
 
+// ---- MTD: who is LEGALLY REQUIRED to use us ---------------------------------
+
+section('Making Tax Digital. The numbers that decide who is legally required to use us.');
+
+// Verbatim from /guidance/use-making-tax-digital-for-income-tax/before-you-use-this-guide, 13 July.
+//
+// TWO THINGS ABOUT THIS PAGE, AND BOTH ARE THE POINT.
+//
+// 1. sources.json has been watching /guidance/USING-making-tax-digital... which GOV.UK REDIRECTS to
+//    /USE-making-tax-digital..., and which is a TABLE OF CONTENTS. It has never held these numbers.
+//    A watcher checking a page every night that does not contain the figure. The mileage story,
+//    exactly, with a different number.
+//
+// 2. THE DECOY: the prose above the table says "over £50,000 ... from April 2026". A regex that
+//    grabs the first £50,000 on the page reads a sentence instead of the schedule, and would keep
+//    "working" if HMRC updated the table and forgot the sentence, which is precisely what they did
+//    to the mileage worked example. So anchor on the START DATE, which is what makes a row unique.
+const MTD_PAGE = `
+<p>If your 2024 to 2025 tax return showed your qualifying income was over £50,000, you need to use
+Making Tax Digital for Income Tax from April 2026.</p>
+<table>
+  <thead><tr><th>Self Assessment tax return</th><th>Qualifying income</th><th>Start date</th></tr></thead>
+  <tbody>
+    <tr><td>2024 to 2025 tax year</td><td>more than £50,000</td><td>6 April 2026</td></tr>
+    <tr><td>2025 to 2026 tax year</td><td>more than £30,000</td><td>6 April 2027</td></tr>
+    <tr><td>2026 to 2027 tax year</td><td>more than £20,000</td><td>6 April 2028</td></tr>
+  </tbody>
+</table>
+`;
+
+test('mtdThreshold2026 reads £50,000 off the SCHEDULE, not the sentence above it', () => {
+  const r = one('mtdThreshold2026', 50000, MTD_PAGE);
+  assert.equal(r.theirs, 50000);
+  assert.equal(r.status, 'agree');
+});
+test('mtdThreshold2027 reads £30,000', () => {
+  assert.equal(one('mtdThreshold2027', 30000, MTD_PAGE).status, 'agree');
+});
+test('mtdThreshold2028 reads £20,000, and does not stop at the first row', () => {
+  const r = one('mtdThreshold2028', 20000, MTD_PAGE);
+  assert.equal(r.theirs, 20000, `read ${r.theirs}: it took the wrong row`);
+});
+test('a wrong MTD threshold in our engine -> DRIFT. We would be telling a man he is exempt.', () => {
+  assert.equal(one('mtdThreshold2027', 50000, MTD_PAGE).status, 'drift');
+});
+// If HMRC changes the phasing (and this is a policy that has been delayed twice already), the row
+// disappears and we must go BLIND, never quietly agree with a number nobody is publishing.
+test('HMRC drops the 2028 stage -> BROKEN, never a silent pass', () => {
+  const withoutRow = MTD_PAGE.replace(/<tr><td>2026 to 2027[\s\S]*?<\/tr>/, '');
+  assert.equal(one('mtdThreshold2028', 20000, withoutRow).status, 'extractor_broken');
+});
+
 // ---- student loans: the worst decoy field on GOV.UK ------------------------
 
 section('Student loans. Three money columns and eleven worked examples, all trying to fool us.');

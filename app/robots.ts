@@ -20,7 +20,11 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       // /share/ is somebody's actual books behind a signed link. It carries a
       // noindex header too, but a crawler should never be following one at all.
-      disallow: ['/api/', '/start', '/early-access', '/invoice/', '/hmrc/', '/share/', '/accountant/'],
+      //
+      // /team is the internal dashboard. It is behind a magic link to an address that must already
+      // be in team_members, so a crawler could not read it anyway. But an internal tool that turns
+      // up in a Google result is an invitation, and there is no reason to send one.
+      disallow: ['/api/', '/start', '/early-access', '/invoice/', '/hmrc/', '/share/', '/accountant/', '/team'],
     },
     sitemap: `${BASE}/sitemap.xml`,
     host: BASE,

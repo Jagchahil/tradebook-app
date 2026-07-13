@@ -32,6 +32,7 @@ export interface CronRun {
 //   agent   (kicked by `due`) daily           -> 26h
 //   nudge   0 8 * * 1,3,5    Mon, Wed, Fri    -> 80h  (the real gap is Fri to Mon, 72h)
 //   weekly  0 17 * * 0       Sunday           -> 180h (a week, 168h, plus room)
+//   trial   0 9 * * *        daily            -> 26h
 export const MAX_QUIET_HOURS: Record<string, number> = {
   due: 26,
   digest: 26,
@@ -41,6 +42,14 @@ export const MAX_QUIET_HOURS: Record<string, number> = {
   agent: 26,
   nudge: 80,
   weekly: 180,
+  // The trial ending nudge (docs/39, lib/trialnudge.ts).
+  //
+  // A CRON THAT IS NOT IN THIS MAP IS A CRON NOBODY IS WATCHING. If this one stops, every man on a
+  // free trial reaches day fifteen, finds himself locked out of his own books with no warning, and
+  // blames us. It is the most expensive silence available to us: it takes the customer at the exact
+  // moment he had decided we were worth paying for. Registering it here is what makes /api/health
+  // go red instead of staying green while nothing happens.
+  trial: 26,
 };
 
 export interface CronAlarm {

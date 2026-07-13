@@ -11,6 +11,9 @@
 import { encryptSecret, decryptSecret } from './crypto';
 import { referralCode, sanitizeRefCode } from './referral';
 import { trialEndsAt } from './entitlement';
+import type { TrialRow } from './trialnudge';
+import { CUSTOMER_COLUMNS, normaliseSource } from './team';
+import type { TeamCustomer, TeamMember } from './team';
 import { parseLevel, type AutonomyLevel } from './autonomy';
 import { quarterForDate, quarterBounds } from './quarterpack';
 import type { OptimiserInput } from './taxoptimiser';
@@ -999,6 +1002,184 @@ export interface SubscriptionStatus {
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
 }
+// --- The team dashboard (lib/team.ts) ---------------------------------------------
+//
+// ⚠️ THE SELECT BELOW IS BUILT FROM CUSTOMER_COLUMNS. Do not hand-write a column list here.
+//
+// The team may see who a customer is and what he pays US. It may never see what he earns, what he
+// spends, or a single one of his transactions, because the app tells him "only you can see them"
+// and that has to stay true. lib/team.ts holds the allowlist and test/team.test.mjs fails the build
+// if a financial column is ever added to it.
+
+// Is this person on the team? Answered from the database on every request, so removing someone is
+// a DELETE and takes effect immediately. No cached roles, no JWT claims to go stale.
+export async function readTeamMember(email: string | null | undefined): Promise<TeamMember | null> {
+  if (!email) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/team_members?email=eq.${encodeURIComponent(email.toLowerCase())}&select=email,name,role,is_active`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as TeamMember[];
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// The customer list. Names, trades, where they came from, and what they pay us. Nothing else.
+export async function readTeamCustomers(): Promise<TeamCustomer[] | null> {
+  try {
+    const { url } = config();
+
+    // Built from the allowlist, so it CANNOT name a column the allowlist does not contain.
+    const cols = CUSTOMER_COLUMNS.join(',');
+    const [uRes, sRes] = await Promise.all([
+      fetch(`${url}/rest/v1/users?select=${cols}&order=created_at.desc&limit=2000`, { headers: headers() }),
+      fetch(
+        `${url}/rest/v1/subscriptions?select=phone,status,plan,current_period_end,cancel_at_period_end,updated_at&order=updated_at.desc&limit=5000`,
+        { headers: headers() },
+      ),
+    ]);
+    if (!uRes.ok || !sRes.ok) return null;
+
+    const users = (await uRes.json()) as Array<Record<string, string | null>>;
+    const subs = (await sRes.json()) as Array<{
+      phone: string | null; status: string | null; plan: string | null;
+      current_period_end: string | null; cancel_at_period_end: boolean | null;
+    }>;
+
+    // ⚠️ The subscription is keyed by PHONE, and the team is never shown a phone number. So we join
+    // here, on the server, and the phone never leaves this function. It is used as a key and then
+    // dropped on the floor.
+    //
+    // To do that we need each user's phone, which is NOT in CUSTOMER_COLUMNS, and must not be. So we
+    // fetch it separately, use it, and never put it in a TeamCustomer. The allowlist governs what
+    // LEAVES here, not what we may touch inside.
+    const pRes = await fetch(`${url}/rest/v1/users?select=id,phone_number&limit=2000`, { headers: headers() });
+    if (!pRes.ok) return null;
+    const phones = new Map(
+      ((await pRes.json()) as Array<{ id: string; phone_number: string | null }>).map((r) => [r.id, r.phone_number]),
+    );
+
+    // Latest subscription per phone. The list came back newest first, so the first one wins.
+    const byPhone = new Map<string, (typeof subs)[number]>();
+    for (const s of subs) {
+      if (s.phone && !byPhone.has(s.phone)) byPhone.set(s.phone, s);
+    }
+
+    return users.map((u): TeamCustomer => {
+      const phone = phones.get(String(u.id)) ?? '';
+      const sub = phone ? byPhone.get(phone) : undefined;
+      return {
+        id: String(u.id),
+        name: u.name ?? null,
+        trade: u.trade_type ?? null,
+        joined: u.created_at ?? null,
+        source: normaliseSource(u.acquisition_source),
+        sourceDetail: u.acquisition_detail ?? null,
+        status: sub?.status ?? 'none',
+        plan: sub?.plan ?? null,
+        renews: sub?.current_period_end ?? null,
+        cancelRequested: Boolean(sub?.cancel_at_period_end),
+      };
+    });
+  } catch {
+    return null;
+  }
+}
+
+// Record where a customer came from.
+//
+// Meta and organic can in principle be inferred one day from a landing page click. A BILLBOARD
+// CANNOT. Neither can a man Jag sold to in a merchant's yard. Those facts only exist in a human's
+// head, and if there is nowhere to put them they stay there, and then the advertising budget gets
+// decided by whoever remembers hardest.
+//
+// So the team can set it. It is the only write this dashboard has, and it touches two columns that
+// are about OUR marketing, never about his money.
+export async function setCustomerSource(
+  userId: string,
+  source: string,
+  detail: string | null,
+): Promise<boolean> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        acquisition_source: normaliseSource(source),
+        acquisition_detail: detail && detail.trim() ? detail.trim().slice(0, 120) : null,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// --- The trial ending (docs/39, lib/trialnudge.ts) --------------------------------
+
+// Every LOCAL trial that is close to ending or has ended, and has not already been told about it.
+//
+// Deliberately NOT filtered on the dates in SQL. The decision of what counts as "ending" is policy,
+// it lives in lib/trialnudge.ts where it is pinned by tests, and it is not going to be quietly
+// reimplemented as a `where` clause that nobody can test. This just hands over the candidates.
+//
+// stripe_subscription_id is null: only our own no-card grants. A man with a card on file is
+// Stripe's conversation, not ours.
+export async function trialsNeedingNudge(): Promise<TrialRow[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/subscriptions` +
+        `?status=eq.trialing&stripe_subscription_id=is.null` +
+        `&or=(trial_warn_sent_at.is.null,trial_end_sent_at.is.null)` +
+        `&select=phone,status,current_period_end,stripe_subscription_id,trial_warn_sent_at,trial_end_sent_at`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as TrialRow[];
+  } catch {
+    return null;
+  }
+}
+
+// Record that we have told him, BEFORE we tell him.
+//
+// The order matters and it is not paranoia. If we sent first and marked second, then a crash, a
+// timeout, or a Vercel function hitting its wall between the two would leave the row unmarked, and
+// tomorrow's cron would message him again. And again. A man being told three times that his trial
+// is ending is a man who blocks the number.
+//
+// So we mark first. The cost of the opposite failure, marking and then failing to send, is that he
+// misses one message. That is the cheaper mistake, and it is the one we choose.
+export async function markTrialNudged(phone: string, which: 'warn' | 'ended'): Promise<boolean> {
+  try {
+    const { url } = config();
+    const col = which === 'warn' ? 'trial_warn_sent_at' : 'trial_end_sent_at';
+    const res = await fetch(
+      `${url}/rest/v1/subscriptions?phone=eq.${encodeURIComponent(phone)}&${col}=is.null`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ [col]: new Date().toISOString() }),
+      },
+    );
+    if (!res.ok) return false;
+    // The `is.null` guard makes this a claim, not just an update: if two crons somehow ran at once,
+    // exactly one of them changes a row and gets it back. The other gets an empty array and sends
+    // nothing.
+    const rows = (await res.json()) as unknown[];
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 // GRANT THE FREE TRIAL. Once per phone number, for the whole life of that number.
 //
 // WHY THIS FUNCTION HAD TO BE WRITTEN, AND WHAT WAS HAPPENING WITHOUT IT

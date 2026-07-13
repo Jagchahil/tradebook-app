@@ -1,3 +1,40 @@
+-- ⚠️ THIS FILE IS A DESCRIPTION OF THE DATABASE. IT IS NOT THE DATABASE.
+--
+-- On 13 July 2026 we compared it against production for the first time and it was wrong in ways
+-- nobody had noticed, because nobody had ever looked:
+--
+--   . users.phone_number             file: nullable    production: NOT NULL
+--   . transactions.transaction_date  file: nullable    production: NOT NULL
+--   . transactions.user_id           file: NOT NULL    production: NULLABLE  <- the dangerous one
+--   . transactions                   production has is_personal, looks_personal, income_type,
+--                                    cis_deduction, property_id, external_id and more, which this
+--                                    file has never heard of
+--   . users                          production has business_name, address, student_loan_plan,
+--                                    autonomy_level, referral_code, expo_push_token and more
+--
+-- The user_id one was live: the database would accept a transaction belonging to NOBODY. A receipt
+-- sent on WhatsApp whose phone match failed would be written, made invisible by RLS (auth.uid() =
+-- NULL is never true), left off every total and every tax return, and confirmed to the sender.
+-- Fixed in APPLY_2026-07-13_user_id_not_null.sql.
+--
+-- HOW THE DRIFT HAPPENS: every change is made in the Supabase SQL editor, and updating this file is
+-- a separate act of discipline that has, understandably, not always happened. Six audits "reviewed
+-- the schema" and every one of them reviewed THIS FILE.
+--
+-- SO: when you need to know what the database IS, ASK THE DATABASE.
+--
+--   select table_name, column_name, is_nullable, column_default
+--   from information_schema.columns where table_schema = 'public' order by 1, ordinal_position;
+--
+--   select c.relname, c.relrowsecurity, count(p.polname)
+--   from pg_class c join pg_namespace n on n.oid = c.relnamespace
+--   left join pg_policy p on p.polrelid = c.oid
+--   where n.nspname = 'public' and c.relkind = 'r' group by 1, 2 order by 2, 3;
+--
+-- Verified 13 July 2026: all 32 public tables have RLS ENABLED. The 16 with zero policies are
+-- DENY-ALL, reachable only by the service role on the server, which is correct. A real cross-user
+-- attack (scripts/rls-attack.mjs) was blocked 7 times out of 7.
+
 -- TradeBook database schema and security.
 --
 -- This reflects the REAL tradebook-prod schema as observed on 2026-06-24. The
@@ -15,7 +52,7 @@
 
 create table if not exists public.users (
   id           uuid primary key,
-  phone_number text,
+  phone_number text not null,               -- NOT NULL in production
   name         text,
   trade_type   text,
   is_active    boolean,
@@ -29,7 +66,7 @@ create table if not exists public.transactions (
   amount           numeric,
   vendor           text,
   category         text,
-  transaction_date date,
+  transaction_date date not null,            -- NOT NULL in production
   description      text,
   source_type      text,
   raw_input_url    text,

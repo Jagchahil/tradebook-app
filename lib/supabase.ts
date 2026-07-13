@@ -10,6 +10,7 @@
 
 import { encryptSecret, decryptSecret } from './crypto';
 import { referralCode, sanitizeRefCode } from './referral';
+import { trialEndsAt } from './entitlement';
 import { parseLevel, type AutonomyLevel } from './autonomy';
 import { quarterForDate, quarterBounds } from './quarterpack';
 import type { OptimiserInput } from './taxoptimiser';
@@ -998,6 +999,62 @@ export interface SubscriptionStatus {
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
 }
+// GRANT THE FREE TRIAL. Once per phone number, for the whole life of that number.
+//
+// WHY THIS FUNCTION HAD TO BE WRITTEN, AND WHAT WAS HAPPENING WITHOUT IT
+//
+// The app showed a button that said "Start free trial". It called router.replace('/(tabs)') and
+// NOTHING ELSE. No row was created, anywhere, ever. So /api/billing/status answered {status:'none'}
+// and the paywall gate read that, correctly, as "not entitled". The moment paywall enforcement was
+// switched on, every single new user would have tapped "Start free trial" and been shown, on the
+// very next screen, "This account is not active".
+//
+// We were advertising fourteen days free, no card needed, and the fourteen days did not exist.
+//
+// ONCE PER PHONE, FOREVER. The grant happens only when the phone has NO subscription row at all.
+// A man whose trial ended, or who cancelled, has a row: he gets nothing new. So this cannot be
+// farmed by deleting the app, and a lapsed customer can never be handed a second free fortnight.
+//
+// THE RACE, AND WHY THE DATABASE SETTLES IT AND NOT THIS CODE. Two app launches a moment apart
+// would both read "no row" and both insert. So there is a UNIQUE INDEX on phone for rows with no
+// stripe_subscription_id (see supabase/APPLY_2026-07-13_trial_grant.sql), which makes a second
+// local grant physically impossible. The loser of the race gets a 409, which we swallow and then
+// re-read the row the winner wrote. The rule is enforced by the database, not by our good manners.
+//
+// No Stripe ids. This is a local grant, not a customer. It can never be billed, and it will never
+// appear in Stripe or in the revenue count in countPayingUsers.
+export async function grantTrialIfNone(phone: string): Promise<SubscriptionStatus | null> {
+  if (!phone) return null;
+  try {
+    const existing = await getSubscriptionByPhone(phone);
+    if (existing) return existing; // he has a history. Nothing is owed to him for free.
+
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/subscriptions`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=representation' }),
+      body: JSON.stringify({
+        phone,
+        plan: null, // he has not chosen one. Pretending otherwise would put a lie in the database.
+        status: 'trialing',
+        amount_pence: 0, // nothing is being charged. Not 1299. Nothing.
+        current_period_end: trialEndsAt(),
+        cancel_at_period_end: false,
+      }),
+    });
+
+    // 409: the unique index refused a second grant, which means another request won the race a
+    // millisecond ago. That is the system working. Read what he wrote and hand it back.
+    if (res.status === 409) return await getSubscriptionByPhone(phone);
+    if (!res.ok) return null;
+
+    const rows = (await res.json()) as SubscriptionStatus[];
+    return rows[0] ?? (await getSubscriptionByPhone(phone));
+  } catch {
+    return null;
+  }
+}
+
 export async function getSubscriptionByPhone(phone: string): Promise<SubscriptionStatus | null> {
   const { url } = config();
   if (!phone) return null;

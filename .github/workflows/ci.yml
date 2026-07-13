@@ -10,21 +10,87 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    # Everything runs from inside the web repo, which is checked out as a SUBDIRECTORY so that the
+    # mobile repo can sit next to it. That reproduces, exactly, the layout on the machine where
+    # these tests were written, and it is the whole reason for the shape of this file.
+    defaults:
+      run:
+        working-directory: tradebook
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out the website
+        uses: actions/checkout@v4
+        with:
+          path: tradebook
+
+      # ---------------------------------------------------------------------------------------
+      # THE MOBILE REPO, AS A SIBLING. THIS IS THE POINT OF THE WHOLE FILE.
+      #
+      # tax-parity holds 1,354 assertions that the app and the website compute the SAME tax bill
+      # for the same man. They are separate builds with no shared import, so the app keeps a
+      # hand-written copy of the maths. That suite is the only thing standing between us and the
+      # app quietly disagreeing with the website about what somebody owes.
+      #
+      # IT WAS SKIPPED IN CI. It ran on one laptop, because that is where the two repos happen to
+      # sit side by side. The most important cross-check we own was a guard by GEOGRAPHY, and it
+      # did not run in the one place that could stop a bad merge.
+      #
+      # test/run-all.mjs skips any suite that reaches across repos when the sibling is absent.
+      # With this step it is never absent, so tax-parity, ltd-parity, nisl-parity,
+      # property-parity and appfacts all actually RUN here.
+      #
+      # The directory MUST be named tradebook-app, because that is the path those suites resolve.
+      # The repo is called tradebook-mobile on GitHub and tradebook-app on disk. The names have
+      # been crossed over since the beginning. Do not "tidy" this.
+      #
+      # NEEDS A SECRET: MOBILE_REPO_TOKEN, a fine-grained PAT with read-only Contents access to
+      # Jagchahil/tradebook-mobile.
+      # ---------------------------------------------------------------------------------------
+      - name: Check out the mobile app, as a sibling, for the parity suites
+        uses: actions/checkout@v4
+        with:
+          repository: Jagchahil/tradebook-mobile
+          path: tradebook-app
+          token: ${{ secrets.MOBILE_REPO_TOKEN }}
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: tradebook/package-lock.json
+
       - run: npm ci
+
       - name: Typecheck
         run: npx tsc --noEmit
+
+      # FAIL IF THE PARITY SUITES WOULD SKIP.
+      #
+      # They are the reason the checkout above exists. If the sibling did not arrive, run-all.mjs
+      # would quietly skip them and print "All suites green", and we would have a CI that has
+      # stopped checking the most important thing it checks while telling us everything is fine.
+      #
+      # That is this codebase's signature failure and it is not welcome here. A CI that is red is
+      # annoying. A CI that is green for the wrong reason is dangerous.
+      - name: The parity suites must actually RUN, not skip
+        run: |
+          if [ ! -f ../tradebook-app/lib/tax.ts ]; then
+            echo "The mobile repo did not check out."
+            echo "tax-parity would SKIP, and the app could silently disagree with the website"
+            echo "about a man's tax bill while this job reported success."
+            echo "Check the MOBILE_REPO_TOKEN secret. Failing on purpose."
+            exit 1
+          fi
+          echo "Sibling present. The parity suites will run."
+
       - name: All test suites
-        # One runner covers every suite (engines, parity, agent, waintents,
-        # crypto, stripe, quarterpack, exams, hmrc, and logic.test.js, which runs
-        # here because the typescript module is installed). Exits non zero on any
-        # failure. New test/*.test.mjs files are picked up automatically.
+        # One runner covers every suite: the engines, the parity guards, the agent, waintents,
+        # crypto, stripe, quarterpack, the tax exams, the HMRC MTD suite, Khoji's differ, and
+        # logic.test.js (which runs here because the typescript module is installed). Exits non
+        # zero on any failure. New test/*.test.mjs files are picked up automatically.
         run: node test/run-all.mjs
+
       - name: Build
         run: npx next build
         env:

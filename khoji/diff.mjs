@@ -76,8 +76,10 @@ const FACTS_URL =
   process.env.KHOJI_FACTS_URL ||
   'https://lekhio.app/facts.json';
 
-// lekhio.app. NEVER lekhio.com: that is Lacspace Corporation, a different company in an adjacent
-// market, and we spent five days announcing their domain to HMRC's servers on every request.
+// lekhio.app. NEVER the .com: it belongs to Lacspace Corporation, a different company in an
+// adjacent market, and we spent five days announcing THEIR domain to HMRC's servers on every
+// request. The string is not written out here either: CLAUDE.md says never, and the exception you
+// grant yourself while warning about the rule is exactly how it gets back in.
 const UA = 'LekhioKhoji/1.0 (+https://lekhio.app)';
 
 function log(...a) { console.log('[khoji:diff]', ...a); }
@@ -256,17 +258,40 @@ export const CHECKS = [
     fact: 'annualInvestmentAllowance',
     label: 'Annual Investment Allowance',
     url: 'https://www.gov.uk/capital-allowances/annual-investment-allowance',
+    // ⚠️ THIS CHECK WAS GREEN FOR SIX DAYS FOR THE WRONG REASON. READ BEFORE TOUCHING.
+    //
+    // The old extractor looked for the phrase "annual investment allowance" and then a £ within 120
+    // characters. It reported `ok` every night. It was matching inside GOV.UK's JSON-LD <script>
+    // block, because stripTags used to keep the CONTENTS of script tags.
+    //
+    // The phrase does not appear next to the figure on the actual page at all. GOV.UK writes the
+    // expansion as an <abbr title="..."> ATTRIBUTE, and attributes die with the tag. So what the
+    // mini really sees is:
+    //
+    //     "Claim writing down allowances instead. The AIA amount The AIA amount is £1 million."
+    //
+    // The moment stripTags was fixed to drop script contents, this check went BROKEN, which is how
+    // we found out it had never been reading the page. A pass for the wrong reason is a lie that
+    // gets quieter over time, and the only thing that exposed it was making something else honest.
+    //
+    // TWO DECOYS ON THAT PAGE, and "is £" defeats both:
+    //   - a HISTORICAL TABLE: £1 million, £200,000, £500,000, £250,000, £25,000, £100,000, £50,000
+    //   - a WORKED EXAMPLE:   "the AIA will be 9/12 x £1,000,000 = £750,000"
+    // Neither says "amount is £". "has changed several times" does not either.
     extract(text) {
-      // GOV.UK writes this as "£1 million" in prose, not "£1,000,000".
-      const m = text.match(/annual investment allowance[^£]{0,120}£\s*([\d,.]+\s*(?:million)?)/i)
-        || text.match(/£\s*([\d,.]+\s*(?:million)?)[^.]{0,40}annual investment allowance/i);
-      return m ? { value: money(m[1]) } : { error: 'could not read the AIA limit' };
+      // GOV.UK writes this as "£1 million" in prose, never "£1,000,000".
+      const m = text.match(/The AIA amount is\s*£\s*([\d,.]+\s*(?:million)?)/i)
+        // Fallback if HMRC ever stops abbreviating. Kept deliberately narrow: it must still be the
+        // sentence that STATES the amount, not one that mentions it.
+        || text.match(/annual investment allowance amount is\s*£\s*([\d,.]+\s*(?:million)?)/i);
+      return m ? { value: money(m[1]) }
+               : { error: 'could not read the AIA limit. The page says "The AIA amount is £X" and we cannot see it.' };
     },
   },
   {
     fact: 'vatRegistrationThreshold',
     label: 'VAT registration threshold',
-    url: 'https://www.gov.uk/vat-registration/when-to-register',
+    url: 'https://www.gov.uk/register-for-vat',
     extract(text) {
       const m = text.match(/(?:taxable turnover|threshold)[^£]{0,80}£\s*([\d,]+)/i);
       return m ? { value: money(m[1]) } : { error: 'could not read the VAT registration threshold' };

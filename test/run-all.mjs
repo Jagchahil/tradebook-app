@@ -17,7 +17,7 @@
 // so this is safe to wire straight into CI or a pre-push hook.
 
 import { spawnSync } from 'node:child_process';
-import { readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
@@ -60,14 +60,37 @@ try {
   tsInstalled = false;
 }
 
-// The *-parity suites compare this repo's engine against the mobile app's engine,
-// which lives in a sibling checkout at ../tradebook-app/lib/tax.ts (the exact path
-// those tests resolve). That sibling exists locally, where both repos sit side by
-// side, but not in single-repo CI. When it is absent we skip the parity suites
-// rather than fail, the same way `logic` is skipped without `typescript`. The
-// parity guard still runs locally and anywhere both repos are checked out.
+// SOME SUITES REACH ACROSS INTO THE MOBILE REPO, which sits in a sibling checkout locally and does
+// not exist in single-repo CI. When it is absent they are skipped rather than failed, the same way
+// `logic` is skipped without `typescript`.
+//
+// ⚠️ THIS USED TO BE A NAMING CONVENTION: `if (suite.name.endsWith('-parity'))`. It worked for four
+// suites and then `appfacts` was added, which needs the sibling and is not called `-parity`, so CI
+// went red on a suite that passes perfectly well anywhere both repos exist.
+//
+// A safeguard that depends on somebody REMEMBERING A SUFFIX is not a safeguard, it is a trap with a
+// delay on it. So the rule is now structural: a suite that reaches across repos is detected by the
+// fact that it reaches across repos. It cannot be forgotten, because there is nothing to remember.
+//
+// (domain.test.mjs also touches the app, but guards itself with a try/catch and uses a different
+// path shape, so it correctly keeps running: it is the guard that keeps the rival's domain out of
+// shipping code, and half an answer to that question is still worth having.
+//
+// That guard caught THIS COMMENT. The first draft spelled the rival domain out while explaining a
+// test whose entire job is to forbid spelling it out. CLAUDE.md says never write it in code, copy,
+// config, or a doc, with no exceptions, and the exception you quietly grant yourself while writing
+// about the rule is exactly how it gets back in. The guard cannot tell a comment from a hardcoded
+// URL and it should not have to. Do not relax it. Fix the comment.)
 const parityAppEngine = path.resolve(repoRoot, '../tradebook-app/lib/tax.ts');
 const parityPossible = existsSync(parityAppEngine);
+
+function needsSiblingRepo(file) {
+  try {
+    return /\.\.\/tradebook-app/.test(readFileSync(file, 'utf8'));
+  } catch {
+    return false;
+  }
+}
 
 const results = [];
 const started = Date.now();
@@ -79,9 +102,9 @@ for (const suite of suites) {
     continue;
   }
 
-  if (suite.name.endsWith('-parity') && !parityPossible) {
-    results.push({ name: suite.name, status: 'skip', note: 'needs the sibling app engine (../tradebook-app/lib/tax.ts)', passed: 0, failed: 0 });
-    process.stdout.write(`  SKIP  ${suite.name.padEnd(16)} needs the sibling app engine, runs where both repos exist\n`);
+  if (!parityPossible && needsSiblingRepo(suite.file)) {
+    results.push({ name: suite.name, status: 'skip', note: 'needs the sibling mobile repo (../tradebook-app)', passed: 0, failed: 0 });
+    process.stdout.write(`  SKIP  ${suite.name.padEnd(16)} needs the sibling mobile repo, runs where both repos exist\n`);
     continue;
   }
 

@@ -185,6 +185,59 @@ test('a wrong CIS rate in our engine -> DRIFT', () => {
   assert.equal(one('cisUnregisteredRate', 0.2, CIS_PAGE).status, 'drift');
 });
 
+// ---- AIA: the check that was green for the wrong reason ---------------------
+
+section('Annual Investment Allowance. This check passed for six days without reading the page.');
+
+// The REAL stripped text, taken off the mini on 13 July. Note what is NOT in it: the words "annual
+// investment allowance" nowhere near the figure. GOV.UK puts the expansion in an <abbr title="">
+// ATTRIBUTE, and attributes die with the tag.
+//
+// The old extractor searched for that phrase and a £ within 120 characters, and reported ok every
+// night. It was matching inside the JSON-LD <script> block, which stripTags used to keep. Fixing
+// stripTags turned a silent pass into a loud failure, which is the ONLY reason we found out.
+//
+// A pass for the wrong reason is a lie that gets quieter over time.
+const AIA_PAGE = `
+<p>Claim <a href="/x">writing down allowances</a> instead.</p>
+<h2>The AIA amount</h2>
+<p>The AIA amount is £1 million.</p>
+<h2>Changes to the AIA</h2>
+<p>The AIA amount has changed several times since April 2008.</p>
+<table>
+  <tbody>
+    <tr><td>£1 million</td><td>From 1 January 2019</td></tr>
+    <tr><td>£200,000</td><td>1 January 2016 - 31 December 2018</td></tr>
+    <tr><td>£500,000</td><td>6 April 2014 - 31 December 2015</td></tr>
+    <tr><td>£25,000</td><td>6 April 2012 - 31 December 2012</td></tr>
+  </tbody>
+</table>
+<p>If your accounting period is 9 months, the AIA will be 9/12 x £1,000,000 = £750,000.</p>
+`;
+
+test('AIA reads £1 million off "The AIA amount is £1 million."', () => {
+  const r = one('annualInvestmentAllowance', 1000000, AIA_PAGE);
+  assert.equal(r.theirs, 1000000);
+  assert.equal(r.status, 'agree');
+});
+test('...and is NOT fooled by the historical table (£200,000, £500,000, £25,000)', () => {
+  assert.equal(one('annualInvestmentAllowance', 1000000, AIA_PAGE).theirs, 1000000);
+});
+test('...and is NOT fooled by the worked example (9/12 x £1,000,000 = £750,000)', () => {
+  const r = one('annualInvestmentAllowance', 1000000, AIA_PAGE);
+  assert.notEqual(r.theirs, 750000, 'it read a worked example instead of the law');
+});
+test('a wrong AIA in our engine -> DRIFT', () => {
+  assert.equal(one('annualInvestmentAllowance', 200000, AIA_PAGE).status, 'drift');
+});
+// THE REGRESSION THAT MATTERS: no script block, so no metadata to hide in. If someone reintroduces
+// a phrase-based extractor, it fails here rather than passing for six days on GOV.UK's JSON-LD.
+test('THE SILENT PASS: the phrase "annual investment allowance" is NOT next to the figure', () => {
+  const stripped = strip(AIA_PAGE);
+  assert.doesNotMatch(stripped, /annual investment allowance[^£]{0,120}£/i,
+    'if this ever matches, an extractor could pass without reading the sentence that states the amount');
+});
+
 // ---- MTD: who is LEGALLY REQUIRED to use us ---------------------------------
 
 section('Making Tax Digital. The numbers that decide who is legally required to use us.');

@@ -120,6 +120,122 @@ export function between(text, startRe, endRe, max = 300) {
 // that was never looking at the number.
 
 export const CHECKS = [
+  // ===============================================================================================
+  // INCOME TAX RATES AND BANDS. Added 13 July 2026.
+  //
+  // THESE WERE UNWATCHED, AND THEY SIT UNDER EVERY SINGLE FIGURE THE PRODUCT PRODUCES.
+  //
+  // Khoji was checking mileage, NI, the trading allowance, VAT and CIS: all real, all worth
+  // watching, and NONE of them touch the main income tax calculation. If basicRateBand or
+  // higherRate had drifted at a Budget, every tax estimate, every quarterly summary and every
+  // "what you owe" figure in the product would have been wrong, for every user, and Khoji would
+  // have reported GREEN because it was not looking.
+  //
+  // A differ that watches the interesting numbers and not the load-bearing ones is a differ that
+  // makes you feel watched. Doc 104, standing question 5: is it TRUE, not is it defensible.
+  //
+  // One page holds all of them: https://www.gov.uk/income-tax-rates
+  // ===============================================================================================
+  {
+    fact: 'basicRate',
+    label: 'Income tax, basic rate',
+    url: 'https://www.gov.uk/income-tax-rates',
+    extract(text) {
+      // The table row: "Basic rate £12,571 to £50,270 20%"
+      const row = between(text, /Basic rate/i, /Higher rate/i);
+      if (!row) return { error: 'could not find the "Basic rate" row' };
+      const m = row.match(/(\d{1,2})\s*%/);
+      return m ? { value: percent(m[1]) } : { error: 'no percentage in the basic rate row' };
+    },
+  },
+  {
+    fact: 'higherRate',
+    label: 'Income tax, higher rate',
+    url: 'https://www.gov.uk/income-tax-rates',
+    extract(text) {
+      const row = between(text, /Higher rate/i, /Additional rate/i);
+      if (!row) return { error: 'could not find the "Higher rate" row' };
+      const m = row.match(/(\d{1,2})\s*%/);
+      return m ? { value: percent(m[1]) } : { error: 'no percentage in the higher rate row' };
+    },
+  },
+  {
+    fact: 'additionalRate',
+    label: 'Income tax, additional rate',
+    url: 'https://www.gov.uk/income-tax-rates',
+    extract(text) {
+      const row = between(text, /Additional rate/i, /You can also see|If you.{0,3}re employed/i);
+      if (!row) return { error: 'could not find the "Additional rate" row' };
+      const m = row.match(/(\d{1,2})\s*%/);
+      return m ? { value: percent(m[1]) } : { error: 'no percentage in the additional rate row' };
+    },
+  },
+  {
+    fact: 'additionalRateThreshold',
+    label: 'Income tax, where the additional rate starts',
+    url: 'https://www.gov.uk/income-tax-rates',
+    extract(text) {
+      // "Additional rate over £125,140 45%"
+      const row = between(text, /Additional rate/i, /You can also see|If you.{0,3}re employed/i);
+      if (!row) return { error: 'could not find the "Additional rate" row' };
+      const m = row.match(/over\s*£\s*([\d,]+)/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read the additional rate threshold' };
+    },
+  },
+  {
+    fact: 'personalAllowanceTaperFloor',
+    label: 'Where the personal allowance starts to taper',
+    url: 'https://www.gov.uk/income-tax-rates',
+    extract(text) {
+      // "Your personal allowance goes down by £1 for every £2 that your adjusted net income is
+      //  above £100,000."
+      const m = text.match(/goes down by £1 for every £2[^.]{0,80}?above\s*£\s*([\d,]+)/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read the £100,000 taper floor' };
+    },
+  },
+  {
+    fact: 'personalAllowanceLostAt',
+    label: 'Where the personal allowance reaches nil',
+    url: 'https://www.gov.uk/income-tax-rates',
+    extract(text) {
+      // "This means your allowance is zero if your income is £125,140 or above."
+      const m = text.match(/allowance is zero if your income is\s*£\s*([\d,]+)/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read where the allowance hits nil' };
+    },
+  },
+  {
+    fact: 'basicRateBand',
+    label: 'Income tax, width of the basic rate band',
+    url: 'https://www.gov.uk/income-tax-rates',
+    // ⚠️ THE ONLY DERIVED CHECK IN THE FILE, AND IT HAS TO BE.
+    //
+    // GOV.UK never prints "£37,700" anywhere. It prints the BAND: "£12,571 to £50,270". Our engine
+    // stores the WIDTH, because that is what the tax calculation multiplies by 20%.
+    //
+    // So the check derives the width the way HMRC's own arithmetic does: the top of the basic band
+    // minus the personal allowance. 50,270 - 12,570 = 37,700.
+    //
+    // This is exactly the kind of check that is worth having and easy to get wrong. If a Budget
+    // moves EITHER number, this screams. And if HMRC ever restructure the table so we cannot read
+    // both ends, it reports BROKEN rather than quietly agreeing, which is the whole doctrine: not
+    // knowing is not the same as being fine.
+    extract(text) {
+      const row = between(text, /Basic rate/i, /Higher rate/i);
+      if (!row) return { error: 'could not find the "Basic rate" row' };
+      // "£12,571 to £50,270": the TOP of the band is the second figure.
+      const band = row.match(/£\s*([\d,]+)\s*to\s*£\s*([\d,]+)/i);
+      if (!band) return { error: 'could not read the basic rate band ("£x to £y")' };
+      const top = money(band[2]);
+
+      const pa = text.match(/standard Personal Allowance is\s*£\s*([\d,]+)/i);
+      if (!pa) return { error: 'could not read the personal allowance to subtract' };
+      const allowance = money(pa[1]);
+
+      if (top === null || allowance === null) return { error: 'unreadable figures in the band' };
+      return { value: top - allowance };
+    },
+  },
+
   // --- mileage. The one we got wrong. Note the decoy handling above. ---
   {
     fact: 'mileageCarFirst10k',

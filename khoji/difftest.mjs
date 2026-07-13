@@ -88,6 +88,36 @@ const MILEAGE_PAGE_RESTRUCTURED = `
 <p>Rates for business mileage are set out in the tables published in our annual rates bulletin.</p>
 `;
 
+// THE INCOME TAX PAGE, as GOV.UK actually publishes it. Copied from the live page on 13 July 2026.
+//
+// These seven constants were UNWATCHED until today, and they sit under EVERY figure the product
+// produces. Khoji was checking mileage, NI, VAT and CIS, and none of those touch the main income
+// tax calculation. If the basic rate band had moved at a Budget, every tax estimate in the product
+// would have been wrong for every user, and Khoji would have reported GREEN, because it was not
+// looking at that number.
+const INCOME_TAX_PAGE = `
+<h2>Your tax-free Personal Allowance</h2>
+<p>The standard Personal Allowance is £12,570, which is the amount of income you do not have to pay tax on.</p>
+<h3>If you earn more than £100,000</h3>
+<p>Your personal allowance goes down by £1 for every £2 that your <a href="/x">adjusted net income</a> is above £100,000. This means your allowance is zero if your income is £125,140 or above.</p>
+<h2>Income Tax rates and bands</h2>
+<table>
+  <tr><th>Band</th><th>Taxable income</th><th>Tax rate</th></tr>
+  <tr><td>Personal Allowance</td><td>Up to £12,570</td><td>0%</td></tr>
+  <tr><td>Basic rate</td><td>£12,571 to £50,270</td><td>20%</td></tr>
+  <tr><td>Higher rate</td><td>£50,271 to £125,140</td><td>40%</td></tr>
+  <tr><td>Additional rate</td><td>over £125,140</td><td>45%</td></tr>
+</table>
+<p>You can also see the rates and bands without the Personal Allowance.</p>
+`;
+
+// The same page after a redesign that drops the table. Every extractor must report BROKEN, and NOT
+// ONE of them may quietly say "agree". Not knowing is not the same as being fine.
+const INCOME_TAX_PAGE_RESTRUCTURED = `
+<h2>Income Tax</h2>
+<p>Rates and bands for the current year are published in our annual rates bulletin.</p>
+`;
+
 const strip = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const check = (fact) => CHECKS.find((c) => c.fact === fact);
 const one = (fact, ours, page) => compareOne(check(fact), ours, strip(page));
@@ -589,6 +619,62 @@ test('runChecks: a page that will not fetch is BROKEN, not agreed', async () => 
   assert.ok(results.every((r) => r.status !== 'agree'), 'a dead network reported agreement');
   assert.ok(results.some((r) => /could not fetch/.test(r.detail || '')));
 });
+
+// ================================================================================================
+section('INCOME TAX. Seven constants that were watching nothing, under every figure we produce.');
+
+test('the basic rate is read off the table: 20%', () => {
+  assert.equal(one('basicRate', 0.2, INCOME_TAX_PAGE).status, 'agree');
+});
+test('the higher rate is read off the table: 40%', () => {
+  assert.equal(one('higherRate', 0.4, INCOME_TAX_PAGE).status, 'agree');
+});
+test('the additional rate is read off the table: 45%', () => {
+  assert.equal(one('additionalRate', 0.45, INCOME_TAX_PAGE).status, 'agree');
+});
+test('the additional rate threshold: £125,140', () => {
+  assert.equal(one('additionalRateThreshold', 125140, INCOME_TAX_PAGE).status, 'agree');
+});
+test('the taper floor: £100,000', () => {
+  assert.equal(one('personalAllowanceTaperFloor', 100000, INCOME_TAX_PAGE).status, 'agree');
+});
+test('where the allowance hits nil: £125,140', () => {
+  assert.equal(one('personalAllowanceLostAt', 125140, INCOME_TAX_PAGE).status, 'agree');
+});
+
+// THE DERIVED ONE. GOV.UK never prints 37,700 anywhere. It prints the BAND, "£12,571 to £50,270".
+// Our engine stores the WIDTH, because that is what the calculation multiplies by 20%. So the check
+// does HMRC's own arithmetic: 50,270 - 12,570 = 37,700.
+test('the basic rate BAND is DERIVED from the page: 50,270 - 12,570 = 37,700', () => {
+  assert.equal(one('basicRateBand', 37700, INCOME_TAX_PAGE).status, 'agree');
+});
+
+// AND THE ONES THAT MATTER MOST: they must SCREAM when we are wrong.
+test('engine says the basic rate is 19% -> DRIFT', () => {
+  assert.equal(one('basicRate', 0.19, INCOME_TAX_PAGE).status, 'drift');
+});
+test('engine has a stale basic rate BAND (a Budget moved the threshold) -> DRIFT', () => {
+  // The classic: the Chancellor lifts the higher rate threshold, the band widens, and our engine
+  // still holds the old width. Every higher-rate customer is then overtaxed by our own arithmetic.
+  assert.equal(one('basicRateBand', 37700 - 1000, INCOME_TAX_PAGE).status, 'drift');
+});
+test('engine has the OLD additional rate threshold (150k, as it was before 2023) -> DRIFT', () => {
+  assert.equal(one('additionalRateThreshold', 150000, INCOME_TAX_PAGE).status, 'drift');
+});
+
+// AND THE HARDEST ONE, WHICH IS THE WHOLE DOCTRINE.
+section('If GOV.UK restructures the page, EVERY income tax check must say BROKEN, never "agree".');
+
+for (const fact of ['basicRate', 'higherRate', 'additionalRate', 'additionalRateThreshold',
+                    'personalAllowanceTaperFloor', 'personalAllowanceLostAt', 'basicRateBand']) {
+  test(`${fact}: page restructured -> extractor_broken, NOT a silent pass`, () => {
+    const r = one(fact, 999, INCOME_TAX_PAGE_RESTRUCTURED);
+    assert.equal(r.status, 'extractor_broken');
+    assert.notEqual(r.status, 'agree');
+  });
+}
+
+
 
 // ---- run ---------------------------------------------------------------------
 

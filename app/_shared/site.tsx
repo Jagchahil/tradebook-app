@@ -970,7 +970,20 @@ export function SiteFooter() {
           <div style={{ fontSize: 13, color: '#8A93A0', maxWidth: 640, lineHeight: 1.6 }}>
             Lekhio prepares your figures and keeps you ready for Making Tax Digital. You approve everything before it reaches HMRC. HMRC keeps you responsible for your tax. We never imply HMRC backs us. Built in the UK.
           </div>
-          <div style={{ fontSize: 13, color: '#8A93A0' }}>© 2026 Lekhio</div>
+          <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
+            {/*
+              The team door. Small, quiet, and at the bottom, because it is for us and not for him.
+
+              It is safe to have it in public. /team is a magic link to an email address that must
+              ALREADY be a row in team_members, so a stranger who clicks it gets a form that will
+              never send him anything, and the same message whether or not the address exists. He
+              cannot even use it to find out who works here. robots.ts disallows /team as well: a
+              crawler could not read it, but an internal tool showing up in a Google result is an
+              invitation and there is no reason to send one.
+            */}
+            <Link href="/team" style={{ fontSize: 13, color: '#5A6270' }}>Team</Link>
+            <div style={{ fontSize: 13, color: '#8A93A0' }}>© 2026 Lekhio</div>
+          </div>
         </div>
       </div>
     </footer>

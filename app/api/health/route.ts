@@ -65,19 +65,44 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // DOES THE DATABASE ANSWER, AND ARE WE ACTUALLY PRIVILEGED WHEN IT DOES?
+  //
+  // ⚠️ THIS USED TO BE A GREEN LIGHT THAT COULD MEAN NOTHING. It fetched /rest/v1/users?limit=1 and
+  // tested `res.ok`. But PostgREST answers an UNAUTHORISED read of an RLS-protected table with
+  // `200 []` — a perfectly successful HTTP response containing nothing at all.
+  //
+  // So if SUPABASE_SERVICE_ROLE_KEY were ever swapped for a publishable key, every server route
+  // would silently drop to anon privileges, every query would return empty instead of erroring, and
+  // THIS CHECK WOULD STAY GREEN. On 13 July we found exactly that key mix-up in the local .env, and
+  // the only reason we caught it was a script that tried to do something a publishable key cannot.
+  //
+  // A health check that cannot tell "the database said no" from "the database said nothing" is the
+  // same bug as the AIA differ passing by reading GOV.UK's JSON-LD. So we ask a question only a
+  // privileged key can answer: the Auth admin endpoint returns 401 to anything less.
   let db = false;
+  let privileged = false;
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (url && key) {
-      const res = await fetch(`${url}/rest/v1/users?select=id&limit=1`, {
-        headers: { apikey: key, Authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(4000),
-      });
-      db = res.ok;
+      const [rest, adminOnly] = await Promise.all([
+        fetch(`${url}/rest/v1/users?select=id&limit=1`, {
+          headers: { apikey: key, Authorization: `Bearer ${key}` },
+          signal: AbortSignal.timeout(4000),
+        }),
+        // 200 only for a service key. An anon or publishable key gets 401. There is no way to fake
+        // this one by returning an empty list.
+        fetch(`${url}/auth/v1/admin/users?per_page=1`, {
+          headers: { apikey: key, Authorization: `Bearer ${key}` },
+          signal: AbortSignal.timeout(4000),
+        }),
+      ]);
+      privileged = adminOnly.ok;
+      db = rest.ok && privileged;
     }
   } catch {
     db = false;
+    privileged = false;
   }
 
   // THE ALARM HAS TO BE WIRED TO SOMETHING THAT WAKES SOMEBODY UP.
@@ -122,6 +147,10 @@ export async function GET(req: NextRequest) {
     {
       ok: healthy,
       db,
+      // Told apart on purpose. `db: false, key: "not-privileged"` says the database is answering
+      // and we have LOST OUR PRIVILEGES, which is a completely different emergency from the
+      // database being down, and used to be indistinguishable from perfect health.
+      key: privileged ? 'ok' : 'not-privileged',
       crons: runs === null ? 'unknown' : cronsOk ? 'ok' : 'stale',
       // One word. Never which constant is wrong: that is a map for someone who wants to file
       // against a figure we have not corrected yet. The detail is behind the bearer, above.

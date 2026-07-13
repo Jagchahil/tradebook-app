@@ -964,26 +964,25 @@ export function SiteFooter() {
           {col('Product', [['/product', 'How it works'], ['/how-mtd-works', 'How MTD works'], ['/compare', 'Compare'], ['/pricing', 'Pricing'], ['/start', 'Sign up']])}
           {col('Free tools', [['/tax-calculator', 'Tax calculator'], ['/cis-calculator', 'CIS refund calculator'], ['/landlord-tax-calculator', 'Landlord tax calculator'], ['/rent-a-room-checker', 'Rent a Room checker'], ['/sole-trader-vs-limited', 'Sole trader vs limited'], ['/invoice-generator', 'Invoice maker'], ['/ni-checker', 'NI checker'], ['/student-loan-checker', 'Student loan checker'], ['/can-i-claim', 'Can I claim it?'], ['/file-your-tax-return', 'File your return'], ['/resources', 'All tools']])}
           {col('For your trade', [...TRADES.slice(0, 5).map((t) => [`/for/${t.slug}`, `For ${t.plural}`] as [string, string]), ['/for-landlords', 'For landlords'] as [string, string]])}
-          {col('Company', [['/security', 'Security and trust'], ['/register-your-business', 'Register your business'], ['/privacy', 'Privacy'], ['/terms', 'Terms']])}
+          {/*
+            The team door lives HERE now, in Company, not tucked in the copyright line.
+            It was there, at 13px grey next to "© 2026 Lekhio", and Jag could not find it while
+            LOOKING for it. That is not discretion, that is a bug. A door nobody can find is a
+            wall.
+
+            Safe in public: /team is a magic link to an address that must ALREADY be a row in
+            team_members, and it answers identically whether or not the address exists, so a
+            stranger cannot even use it to learn who works here. robots.ts disallows it too.
+          */}
+          {col('Company', [['/security', 'Security and trust'], ['/register-your-business', 'Register your business'], ['/privacy', 'Privacy'], ['/terms', 'Terms'], ['/team', 'Team sign in']])}
         </div>
         <div style={{ borderTop: '1px solid #2C2C2C', paddingTop: 24, display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 13, color: '#8A93A0', maxWidth: 640, lineHeight: 1.6 }}>
             Lekhio prepares your figures and keeps you ready for Making Tax Digital. You approve everything before it reaches HMRC. HMRC keeps you responsible for your tax. We never imply HMRC backs us. Built in the UK.
           </div>
-          <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
-            {/*
-              The team door. Small, quiet, and at the bottom, because it is for us and not for him.
-
-              It is safe to have it in public. /team is a magic link to an email address that must
-              ALREADY be a row in team_members, so a stranger who clicks it gets a form that will
-              never send him anything, and the same message whether or not the address exists. He
-              cannot even use it to find out who works here. robots.ts disallows /team as well: a
-              crawler could not read it, but an internal tool showing up in a Google result is an
-              invitation and there is no reason to send one.
-            */}
-            <Link href="/team" style={{ fontSize: 13, color: '#5A6270' }}>Team</Link>
-            <div style={{ fontSize: 13, color: '#8A93A0' }}>© 2026 Lekhio</div>
-          </div>
+          {/* The team link used to be here, at 13px grey, and it was invisible. It lives in the
+              Company column above now, where a person would actually look for it. */}
+          <div style={{ fontSize: 13, color: '#8A93A0' }}>© 2026 Lekhio</div>
         </div>
       </div>
     </footer>

@@ -113,33 +113,73 @@ export default function TeamPage() {
     return filter === 'all' ? data.customers : data.customers.filter((c) => c.source === filter);
   }, [data, filter]);
 
-  if (!ready) return <main style={S.wrap}><p style={S.muted}>Loading.</p></main>;
+  if (!ready) {
+    return (
+      <main style={S.signInPage}>
+        <div style={S.authCard}><p style={S.muted}>One moment.</p></div>
+      </main>
+    );
+  }
 
   // --- Not signed in -------------------------------------------------------------------------
+  //
+  // THE FIRST VERSION OF THIS WAS AN UNSTYLED FORM ON A WHITE PAGE. It worked, and it looked like a
+  // holding page somebody forgot to finish. This is the screen the team sees every morning, and it
+  // is the only page of ours that says "we are a company" rather than "we are a product".
+  //
+  // No password anywhere, on purpose. A shared admin password is a thing that ends up in a chat
+  // message. This is a link to an inbox that must already be a row in team_members.
   if (!data) {
     return (
-      <main style={S.wrap}>
-        <h1 style={S.h1}>Lekhio, the team</h1>
-        {sent ? (
-          <p style={S.muted}>
-            If that address is on the team, a sign in link is on its way. Open it on this device.
-          </p>
-        ) : (
-          <form onSubmit={signIn} style={{ maxWidth: 380 }}>
-            <p style={S.muted}>Sign in with your work email. We will send you a link.</p>
-            <input
-              type="email"
-              aria-label="Your work email address"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@lekhio.app"
-              style={S.input}
-            />
-            <button type="submit" style={S.button}>Send me a link</button>
-          </form>
-        )}
-        {error ? <p style={S.error}>{error}</p> : null}
+      <main style={S.signInPage}>
+        <div style={S.authCard}>
+          <div style={S.brandRow}>
+            <span style={S.wordmark}>Lekhio</span>
+            <span style={S.accent} aria-hidden="true" />
+          </div>
+
+          {sent ? (
+            <>
+              <h1 style={S.cardH1}>Check your email</h1>
+              <p style={S.cardSub}>
+                If <b style={{ color: INK }}>{email.trim().toLowerCase()}</b> is on the team, a sign
+                in link is on its way. Open it on this device and you are in.
+              </p>
+              <button type="button" style={S.ghost} onClick={() => { setSent(false); setError(null); }}>
+                Use a different email
+              </button>
+            </>
+          ) : (
+            <>
+              <h1 style={S.cardH1}>Team sign in</h1>
+              <p style={S.cardSub}>
+                No password. We email you a link and it signs you in.
+              </p>
+              <form onSubmit={signIn}>
+                <label htmlFor="team-email" style={S.label}>Work email</label>
+                <input
+                  id="team-email"
+                  type="email"
+                  autoComplete="email"
+                  autoFocus
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@lekhio.app"
+                  style={S.input}
+                />
+                <button type="submit" style={S.button}>Email me a sign in link</button>
+              </form>
+            </>
+          )}
+
+          {error ? <p style={S.error}>{error}</p> : null}
+        </div>
+
+        <p style={S.legal}>
+          For the Lekhio team. This page never shows a customer{"'"}s receipts, figures or phone
+          number, and it never will.
+        </p>
       </main>
     );
   }
@@ -277,15 +317,75 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 const Th = ({ children }: { children?: React.ReactNode }) => <th style={S.th}>{children}</th>;
 const Td = ({ children }: { children?: React.ReactNode }) => <td style={S.td}>{children}</td>;
 
+// The brand, the same River blue and Saffron the rest of the site uses.
+const INK = '#111111';
+const RIVER = '#1B59A6';
+const RIVER_DEEP = '#144a8d';
+const SAFFRON = '#E8973A';
+const PAPER = '#FBFAF7';
+const LINE = '#E8E5DE';
+const MUTED = '#6B7280';
+
 const S: Record<string, React.CSSProperties> = {
-  wrap: { maxWidth: 1100, margin: '0 auto', padding: '48px 24px 80px', fontFamily: 'system-ui, sans-serif', color: '#111' },
+  // --- the sign in screen -----------------------------------------------------------------------
+  signInPage: {
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 18,
+    padding: '40px 22px',
+    background: `radial-gradient(1100px 520px at 50% -8%, #EEF4FB 0%, ${PAPER} 62%)`,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+    color: INK,
+  },
+  // NOT `card`. The dashboard already had one (the KPI tiles), and two keys with the same name in
+  // one object literal is a TypeScript error, which is the only reason I found out. A silent
+  // last-one-wins overwrite would have been worse: the sign in card would have quietly rendered as
+  // a 150px KPI tile and I would have blamed the CSS.
+  authCard: {
+    width: '100%',
+    maxWidth: 420,
+    background: '#fff',
+    border: `1px solid ${LINE}`,
+    borderRadius: 20,
+    padding: '34px 32px 30px',
+    boxShadow: '0 18px 50px rgba(17,17,17,0.07), 0 2px 6px rgba(17,17,17,0.03)',
+  },
+  brandRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 },
+  wordmark: { fontSize: 22, fontWeight: 800, letterSpacing: -0.5, color: INK },
+  // The little Saffron stroke that runs under the wordmark everywhere else in the product.
+  accent: { width: 26, height: 3, borderRadius: 2, background: `linear-gradient(90deg, ${RIVER}, ${SAFFRON})`, display: 'inline-block' },
+  cardH1: { fontSize: 24, fontWeight: 800, letterSpacing: -0.6, margin: '0 0 6px' },
+  cardSub: { fontSize: 14.5, color: MUTED, lineHeight: 1.55, margin: '0 0 22px' },
+  label: { display: 'block', fontSize: 13, fontWeight: 700, color: INK, marginBottom: 7 },
+  ghost: {
+    width: '100%', padding: '12px', marginTop: 16, fontSize: 14, fontWeight: 700,
+    color: RIVER, background: 'transparent', border: `1px solid ${LINE}`, borderRadius: 12, cursor: 'pointer',
+    fontFamily: 'inherit',
+  },
+  legal: { fontSize: 12.5, color: '#9A968E', textAlign: 'center', maxWidth: 400, lineHeight: 1.6, margin: 0 },
+
+  // --- the dashboard ----------------------------------------------------------------------------
+  wrap: { maxWidth: 1100, margin: '0 auto', padding: '48px 24px 80px', fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif', color: '#111' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 },
   h1: { fontSize: 30, fontWeight: 800, letterSpacing: -0.6, margin: 0 },
   h2: { fontSize: 15, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: '#6B7280', marginTop: 40, marginBottom: 14 },
   muted: { color: '#6B7280', fontSize: 14, marginTop: 6 },
-  error: { color: '#C0392B', fontSize: 14, marginTop: 14, fontWeight: 600 },
-  input: { width: '100%', padding: '13px 14px', fontSize: 15, border: '1px solid #E5E7EB', borderRadius: 10, marginTop: 12 },
-  button: { width: '100%', padding: '14px', fontSize: 15, fontWeight: 700, color: '#fff', background: '#1B59A6', border: 0, borderRadius: 10, marginTop: 12, cursor: 'pointer' },
+  error: { color: '#C0392B', fontSize: 13.5, marginTop: 16, fontWeight: 600, lineHeight: 1.5 },
+  input: {
+    width: '100%', padding: '14px 15px', fontSize: 15.5, color: INK,
+    border: `1.5px solid ${LINE}`, borderRadius: 12, background: '#fff',
+    outline: 'none', fontFamily: 'inherit',
+  },
+  button: {
+    width: '100%', padding: '15px', marginTop: 14,
+    fontSize: 15.5, fontWeight: 700, color: '#fff', fontFamily: 'inherit',
+    background: `linear-gradient(135deg, ${RIVER}, ${RIVER_DEEP})`,
+    border: 0, borderRadius: 12, cursor: 'pointer',
+    boxShadow: '0 8px 20px rgba(27,89,166,0.25)',
+  },
   link: { background: 'none', border: 0, color: '#6B7280', fontSize: 14, cursor: 'pointer', fontWeight: 600 },
   healthRow: { display: 'flex', gap: 22, flexWrap: 'wrap', marginBottom: 18 },
   health: { display: 'flex', alignItems: 'center', gap: 8 },

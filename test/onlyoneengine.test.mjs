@@ -20,7 +20,7 @@
 //
 // So: no file outside lib/ may contain a tax constant. Import it.
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, lstatSync } from 'node:fs';
 import path from 'node:path';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
@@ -56,11 +56,33 @@ const ALLOWED = [
   /^app\/llms\.txt\//,     // quotes the figures for the machines, generated from the engine
 ];
 
+// ⚠️ THIS CRASHED THE WHOLE SUITE ON ITS FIRST REAL RUN, and it is worth saying why.
+//
+// It used statSync, and it walked EVERY directory it found. The khoji folder carries a bundled
+// node install with a DANGLING SYMLINK in it (.node/bin/corepack). statSync follows symlinks, the
+// target does not exist, and it throws ENOENT. Not "returns false". THROWS. So a test whose job is
+// to guard the tax engine took the entire test run down because of a broken shortcut in a folder it
+// had no business looking in.
+//
+// Two fixes, and both are the point:
+//   1. Do not walk what you do not need. Dot-directories and khoji are not TypeScript sources.
+//   2. lstat, not stat. It does not follow the link, so a dead one is just a dead file.
+//
+// A guard that can crash is not a guard. It is a second thing that can break.
+const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'khoji', '.node', 'ios', 'android']);
+
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
-    if (name === 'node_modules' || name === '.next' || name === '.git') continue;
+    if (SKIP_DIRS.has(name) || name.startsWith('.')) continue;
     const full = path.join(dir, name);
-    if (statSync(full).isDirectory()) walk(full, out);
+    let st;
+    try {
+      st = lstatSync(full); // lstat: a dangling symlink is a file, not an exception
+    } catch {
+      continue; // unreadable? it is not a tax constant. Move on.
+    }
+    if (st.isSymbolicLink()) continue;
+    if (st.isDirectory()) walk(full, out);
     else if (/\.(ts|tsx)$/.test(name)) out.push(full);
   }
   return out;

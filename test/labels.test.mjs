@@ -7,23 +7,30 @@
 //
 //     "Does your software meet accessibility standards?  Yes."
 //
-// At the moment we answered it, five files on the website had a <label> sitting NEAR an <input>
-// with nothing connecting them, and one had no label at all, only a placeholder. To a sighted man
-// they look labelled. To a screen reader they are announced as "edit text", with no clue whether
-// the box wants his income or his expenses, and the hint underneath is never read out at all.
+// At the moment we answered it, fourteen fields across five files had a <label> sitting NEAR an
+// <input> with nothing connecting them, and some had no label at all, only a placeholder. To a
+// sighted man they look labelled. To a screen reader they are announced as "edit text", with no clue
+// whether the box wants his income or his expenses, and the hint underneath is never read out.
 //
-// The signup form was the worst of it: it also had a honeypot field, invisible to a man, which a
-// screen reader would happily read aloud and invite a blind user to fill in. Filling it in is how
-// the honeypot decides you are a bot. We would have been silently rejecting the signups of blind
-// tradesmen and calling them robots.
+// A placeholder is not a label. It disappears the moment he starts typing.
 //
 // Doc 104, standing question five: is it TRUE? Not is it defensible. True. This test is what keeps
 // the answer we gave HMRC true after the next person adds a form in a hurry.
 //
+// ⚠️ AND A CORRECTION, LEFT HERE ON PURPOSE. An earlier version of this comment said the signup
+// honeypot was not aria-hidden, and told a story about blind users being read the bot trap, filling
+// it in, and being silently binned as robots. IT WAS ALREADY aria-hidden. I had grepped the first
+// few lines of the tag, not the whole of it, believed what I saw, and built a vivid story on top of
+// it. The only reason I found out was that my own script added a DUPLICATE aria-hidden and broke the
+// build.
+//
+// Fourteen real findings and one invented one. The invented one was the most convincing. That is
+// what makes it worth writing down.
+//
 // THE RULE: every input, select and textarea on the public site must be reachable by name. Either
 // a <label htmlFor> pointing at its id, or an aria-label, or wrapped inside its own <label>.
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, lstatSync } from 'node:fs';
 import path from 'node:path';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
@@ -36,11 +43,26 @@ function ok(name, cond) {
   else { fail++; console.log(`  FAIL ${name}`); }
 }
 
+// lstat, not stat, and skip what we do not need. See the long note in test/onlyoneengine.test.mjs:
+// its identical walk() took the WHOLE test suite down by calling statSync on a dangling symlink in a
+// bundled node install. statSync FOLLOWS the link and THROWS when the target is missing. This walk
+// had exactly the same bug sitting in it, waiting.
+//
+// A guard that can crash is not a guard. It is a second thing that can break.
+const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'test', 'scripts', 'khoji', '.node', 'ios', 'android']);
+
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
-    if (['node_modules', '.next', '.git', 'test', 'scripts'].includes(name)) continue;
+    if (SKIP_DIRS.has(name) || name.startsWith('.')) continue;
     const full = path.join(dir, name);
-    if (statSync(full).isDirectory()) walk(full, out);
+    let st;
+    try {
+      st = lstatSync(full);
+    } catch {
+      continue;
+    }
+    if (st.isSymbolicLink()) continue;
+    if (st.isDirectory()) walk(full, out);
     else if (/\.tsx$/.test(name)) out.push(full);
   }
   return out;

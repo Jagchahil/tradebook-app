@@ -93,9 +93,19 @@ export default function LeadCapture({
       <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.55, margin: '0 0 14px' }}>{sub}</p>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {/*
+          A PLACEHOLDER IS NOT A LABEL. It disappears the moment he starts typing, it is announced
+          by some screen readers and not others, and it fails WCAG 1.3.1 outright.
+
+          There is no visible label here on purpose (the heading above already says what it wants),
+          so the label is given to assistive technology directly. That is the correct fix, and it is
+          the one that makes our answer to HMRC true: "Does your software meet accessibility
+          standards? Yes."
+        */}
         <input
           type="email"
           inputMode="email"
+          aria-label="Your email address"
           value={email}
           onChange={(ev) => setEmail(ev.target.value)}
           placeholder="you@yourtrade.co.uk"

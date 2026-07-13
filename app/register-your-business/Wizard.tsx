@@ -213,6 +213,7 @@ export default function Wizard() {
                   })}
                 </div>
                 <input
+                  aria-label="Search for what your business does"
                   value={sicQuery}
                   onChange={(e) => setSicQuery(e.target.value)}
                   placeholder="Or type it, e.g. kitchen fitter, drainage, mobile mechanic"

@@ -129,6 +129,7 @@ export default function TeamPage() {
             <p style={S.muted}>Sign in with your work email. We will send you a link.</p>
             <input
               type="email"
+              aria-label="Your work email address"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}

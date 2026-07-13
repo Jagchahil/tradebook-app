@@ -237,43 +237,43 @@ export default function Generator() {
               ))}
             </div>
 
-            <label style={labelStyle}>Start from a ready made template</label>
-            <select onChange={(e) => { const p = e.target.value === 'blank' ? BLANK : PRESETS[parseInt(e.target.value, 10)]; if (p) loadPreset(p); }} defaultValue="0" style={{ ...inputStyle, marginBottom: 20 }}>
+            <label htmlFor="inv-preset" style={labelStyle}>Start from a ready made template</label>
+            <select id="inv-preset" onChange={(e) => { const p = e.target.value === 'blank' ? BLANK : PRESETS[parseInt(e.target.value, 10)]; if (p) loadPreset(p); }} defaultValue="0" style={{ ...inputStyle, marginBottom: 20 }}>
               {PRESETS.map((p, i) => (<option key={p.label} value={i}>{p.label}</option>))}
               <option value="blank">Blank, start fresh</option>
             </select>
 
-            <label style={labelStyle}>Your business</label>
-            <input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Your business name" style={{ ...inputStyle, marginBottom: 8 }} />
-            <textarea value={fromDetails} onChange={(e) => setFromDetails(e.target.value)} placeholder="Address, phone, email, bank details" rows={4} style={{ ...inputStyle, marginBottom: 18, resize: 'vertical' }} />
+            <label htmlFor="inv-from-name" style={labelStyle}>Your business</label>
+            <input id="inv-from-name" value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Your business name" style={{ ...inputStyle, marginBottom: 8 }} />
+            <textarea aria-label="Your business address, phone, email and bank details" value={fromDetails} onChange={(e) => setFromDetails(e.target.value)} placeholder="Address, phone, email, bank details" rows={4} style={{ ...inputStyle, marginBottom: 18, resize: 'vertical' }} />
 
-            <label style={labelStyle}>Bill to</label>
-            <input value={toName} onChange={(e) => setToName(e.target.value)} placeholder="Customer name" style={{ ...inputStyle, marginBottom: 8 }} />
-            <textarea value={toDetails} onChange={(e) => setToDetails(e.target.value)} placeholder="Customer address" rows={2} style={{ ...inputStyle, marginBottom: 18, resize: 'vertical' }} />
+            <label htmlFor="inv-to-name" style={labelStyle}>Bill to</label>
+            <input id="inv-to-name" value={toName} onChange={(e) => setToName(e.target.value)} placeholder="Customer name" style={{ ...inputStyle, marginBottom: 8 }} />
+            <textarea aria-label="Customer address" value={toDetails} onChange={(e) => setToDetails(e.target.value)} placeholder="Customer address" rows={2} style={{ ...inputStyle, marginBottom: 18, resize: 'vertical' }} />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
               <div>
-                <label style={labelStyle}>{docWord} number</label>
-                <input value={number} onChange={(e) => setNumber(e.target.value)} style={inputStyle} />
+                <label htmlFor="inv-number" style={labelStyle}>{docWord} number</label>
+                <input id="inv-number" value={number} onChange={(e) => setNumber(e.target.value)} style={inputStyle} />
               </div>
               <div>
-                <label style={labelStyle}>Date</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inputStyle} />
+                <label htmlFor="inv-date" style={labelStyle}>Date</label>
+                <input id="inv-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inputStyle} />
               </div>
             </div>
             {docType === 'invoice' ? (
               <div style={{ marginBottom: 18 }}>
-                <label style={labelStyle}>Payment due</label>
-                <input type="date" value={due} onChange={(e) => setDue(e.target.value)} style={inputStyle} />
+                <label htmlFor="inv-due" style={labelStyle}>Payment due</label>
+                <input id="inv-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} style={inputStyle} />
               </div>
             ) : null}
 
             <label style={labelStyle}>Lines</label>
             {items.map((it, i) => (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 52px 76px 28px', gap: 6, marginBottom: 8, alignItems: 'center' }}>
-                <input value={it.desc} onChange={(e) => updateItem(i, 'desc', e.target.value)} placeholder="Description" style={{ ...inputStyle, padding: '9px 10px' }} />
-                <input value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} placeholder="Qty" style={{ ...inputStyle, padding: '9px 6px', textAlign: 'center' }} />
-                <input value={it.price} onChange={(e) => updateItem(i, 'price', e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} placeholder="£ each" style={{ ...inputStyle, padding: '9px 8px', textAlign: 'right' }} />
+                <input aria-label={`Description, line ${i + 1}`} value={it.desc} onChange={(e) => updateItem(i, 'desc', e.target.value)} placeholder="Description" style={{ ...inputStyle, padding: '9px 10px' }} />
+                <input aria-label={`Quantity, line ${i + 1}`} value={it.qty} onChange={(e) => updateItem(i, 'qty', e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} placeholder="Qty" style={{ ...inputStyle, padding: '9px 6px', textAlign: 'center' }} />
+                <input aria-label={`Price each, line ${i + 1}`} value={it.price} onChange={(e) => updateItem(i, 'price', e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} placeholder="£ each" style={{ ...inputStyle, padding: '9px 8px', textAlign: 'right' }} />
                 <button onClick={() => removeItem(i)} aria-label="Remove line" style={{ border: `1px solid ${LINE}`, background: 'var(--panel)', borderRadius: 8, cursor: 'pointer', color: MUTED, fontSize: 16, height: 38 }}>×</button>
               </div>
             ))}
@@ -285,14 +285,14 @@ export default function Generator() {
               </label>
               {vat ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input value={vatRate} onChange={(e) => setVatRate(e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} style={{ ...inputStyle, width: 64, padding: '8px 8px', textAlign: 'center' }} />
+                  <input aria-label="VAT rate, percent" value={vatRate} onChange={(e) => setVatRate(e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'))} style={{ ...inputStyle, width: 64, padding: '8px 8px', textAlign: 'center' }} />
                   <span style={{ fontSize: 14, color: MUTED }}>%</span>
                 </div>
               ) : null}
             </div>
 
-            <label style={labelStyle}>Notes and payment terms</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+            <label htmlFor="inv-notes" style={labelStyle}>Notes and payment terms</label>
+            <textarea id="inv-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
 
             <button onClick={() => window.print()} style={{ marginTop: 20, width: '100%', background: RIVER, color: '#fff', border: 'none', borderRadius: 12, padding: '15px 0', fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Download or print {docWord.toLowerCase()}</button>
             <p style={{ fontSize: 12, color: MUTED, textAlign: 'center', marginTop: 10 }}>Free, no signup. Choose &ldquo;Save as PDF&rdquo; in the print window.</p>

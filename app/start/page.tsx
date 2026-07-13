@@ -225,9 +225,9 @@ export default function StartPage() {
           <input
             type="text"
             name="website"
+            aria-hidden="true"
             tabIndex={-1}
             autoComplete="off"
-            aria-hidden="true"
             value={hp}
             onChange={(e) => setHp(e.target.value)}
             style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
@@ -330,13 +330,13 @@ export default function StartPage() {
             <div key={step} className="step-anim">
               {step === 1 && (
                 <Step title="Let's set up your account" sub="Your mobile is your account. It links your WhatsApp, where the work happens. Email is optional.">
-                  <label style={fieldLabel}>Mobile number</label>
+                  <label htmlFor="signup-phone" style={fieldLabel}>Mobile number</label>
                   <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '15px 14px', backgroundColor: RIVER_TINT, color: RIVER, fontWeight: 700, fontSize: 16, borderRight: `1.5px solid ${LINE}` }}>🇬🇧 +44</span>
-                    <input className="field" inputMode="tel" placeholder="7700 900 000" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={14} style={{ flex: 1, border: 'none', padding: '15px 14px', fontSize: 17, color: INK, letterSpacing: '0.5px', background: 'transparent' }} />
+                    <input id="signup-phone" className="field" inputMode="tel" placeholder="7700 900 000" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={14} style={{ flex: 1, border: 'none', padding: '15px 14px', fontSize: 17, color: INK, letterSpacing: '0.5px', background: 'transparent' }} />
                   </div>
-                  <label style={{ ...fieldLabel, marginTop: 18 }}>Email (optional)</label>
-                  <input className="field" inputMode="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={fieldStyle} />
+                  <label htmlFor="signup-email" style={{ ...fieldLabel, marginTop: 18 }}>Email (optional)</label>
+                  <input id="signup-email" className="field" inputMode="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={fieldStyle} />
                   <p style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>Only if you want emailed receipts. Everything else happens on WhatsApp.</p>
                   <p style={{ fontSize: 12.5, color: MUTED, marginTop: 12 }}>We never share your details. We only ever message you in reply to you.</p>
                 </Step>
@@ -365,8 +365,8 @@ export default function StartPage() {
                   </div>
                   {tradeType && (
                     <div style={{ marginTop: 16 }}>
-                      <label style={fieldLabel}>{nameLabel}</label>
-                      <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={tradeType === 'ltd' ? 'Smith Electrical Ltd' : tradeType === 'business' ? 'Smith Electrical' : 'Sam Smith'} style={fieldStyle} />
+                      <label htmlFor="signup-name" style={fieldLabel}>{nameLabel}</label>
+                      <input id="signup-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={tradeType === 'ltd' ? 'Smith Electrical Ltd' : tradeType === 'business' ? 'Smith Electrical' : 'Sam Smith'} style={fieldStyle} />
                       {tradeType === 'ltd' && <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>We will verify your company details for you. No need to dig out paperwork.</p>}
                     </div>
                   )}
@@ -385,8 +385,8 @@ export default function StartPage() {
                   </div>
                   {trade === 'Something else' && (
                     <div style={{ marginTop: 18 }}>
-                      <label style={fieldLabel}>Tell us what you do</label>
-                      <input className="field" value={customTrade} onChange={(e) => setCustomTrade(e.target.value)} placeholder="e.g. Mobile dog groomer" style={fieldStyle} autoFocus />
+                      <label htmlFor="signup-trade" style={fieldLabel}>Tell us what you do</label>
+                      <input id="signup-trade" className="field" value={customTrade} onChange={(e) => setCustomTrade(e.target.value)} placeholder="e.g. Mobile dog groomer" style={fieldStyle} autoFocus />
                     </div>
                   )}
                 </Step>
@@ -419,10 +419,10 @@ export default function StartPage() {
 
               {step === 5 && (
                 <Step title="Your business address" sub="This shows at the top of your invoices. You can skip it and add it later.">
-                  <label style={fieldLabel}>Postcode</label>
-                  <input className="field" value={postcode} onChange={(e) => setPostcode(e.target.value.toUpperCase())} placeholder="LS1 4AB" style={fieldStyle} />
+                  <label htmlFor="signup-postcode" style={fieldLabel}>Postcode</label>
+                  <input id="signup-postcode" className="field" value={postcode} onChange={(e) => setPostcode(e.target.value.toUpperCase())} placeholder="LS1 4AB" style={fieldStyle} />
                   <label style={{ ...fieldLabel, marginTop: 16 }}>Address</label>
-                  <input className="field" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Unit 4, Mill Road, Leeds" style={fieldStyle} />
+                  <input className="field" aria-label="Your address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Unit 4, Mill Road, Leeds" style={fieldStyle} />
                   <p style={{ fontSize: 12.5, color: MUTED, marginTop: 12 }}>Optional. Tap Continue to skip and add it when you send your first invoice.</p>
                 </Step>
               )}

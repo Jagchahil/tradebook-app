@@ -62,6 +62,7 @@ export default function EarlyAccessPage() {
           <div style={styles.phoneRow}>
             <span style={styles.prefix}>🇬🇧 +44</span>
             <input
+              aria-label="Your mobile number"
               type="tel"
               placeholder="7700 900 000"
               value={phone}
@@ -72,6 +73,7 @@ export default function EarlyAccessPage() {
           </div>
 
           <input
+            aria-label="Your email address, optional"
             type="email"
             placeholder="Email (optional)"
             value={email}

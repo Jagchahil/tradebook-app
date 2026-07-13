@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { soleTraderTax, FACTS } from '../../lib/taxengine';
 import LeadCapture from '../../components/LeadCapture';
@@ -116,13 +116,20 @@ export default function Calc() {
   );
 }
 
+// htmlFor + id, and the hint wired in with aria-describedby. A label sitting NEAR an input is not a
+// label: a screen reader announces the field as "edit text" and never reads the hint at all. See the
+// long note on the same fix in app/tax-calculator/Calc.tsx.
 function Field({ label, hint, value, onChange, placeholder, autoFocus }: { label: string; hint: string; value: string; onChange: (v: string) => void; placeholder: string; autoFocus?: boolean }) {
+  const id = useId();
+  const hintId = `${id}-hint`;
   return (
     <div style={{ marginBottom: 18 }}>
-      <label style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 4 }}>{label}</label>
+      <label htmlFor={id} style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: INK, marginBottom: 4 }}>{label}</label>
       <div style={{ display: 'flex', alignItems: 'center', background: 'var(--panel)', border: `1.5px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
-        <span style={{ padding: '13px 12px', background: SURFACE, color: MUTED, fontWeight: 700, fontSize: 16, borderRight: `1.5px solid ${LINE}` }}>£</span>
+        <span aria-hidden="true" style={{ padding: '13px 12px', background: SURFACE, color: MUTED, fontWeight: 700, fontSize: 16, borderRight: `1.5px solid ${LINE}` }}>£</span>
         <input
+          id={id}
+          aria-describedby={hintId}
           className="cis-field"
           inputMode="decimal"
           value={value}
@@ -132,7 +139,7 @@ function Field({ label, hint, value, onChange, placeholder, autoFocus }: { label
           style={{ flex: 1, border: 'none', padding: '13px 14px', fontSize: 16, color: INK, background: 'transparent' }}
         />
       </div>
-      <p style={{ fontSize: 12, color: MUTED, margin: '6px 0 0', lineHeight: 1.45 }}>{hint}</p>
+      <p id={hintId} style={{ fontSize: 12, color: MUTED, margin: '6px 0 0', lineHeight: 1.45 }}>{hint}</p>
     </div>
   );
 }

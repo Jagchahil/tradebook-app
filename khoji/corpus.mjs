@@ -77,8 +77,53 @@ export function normalise(s) {
     .replace(/ /g, ' ')                    // non-breaking space
     .replace(/&nbsp;/gi, ' ')
     .replace(/\s+/g, ' ')
+    // THE SPACE THAT HTML STRIPPING INVENTS. A WHOLE CLASS OF PERMANENT FALSE ALARM.
+    //
+    // stripTags replaces every tag with a space. So `<a>simplified expenses</a>.` comes out as
+    // "simplified expenses ." with a space before the full stop. Our quote, copied CORRECTLY off
+    // the page, says "simplified expenses." and never matches.
+    //
+    // Not hypothetical: it is exactly how the `car` citation failed on the first live run, and it
+    // would have failed every night forever on a quote that was word-for-word right. Worse, it gets
+    // MORE likely the more carefully you cite, because HMRC links precisely the phrases that carry
+    // the meaning: "capital allowances", "simplified expenses", "cash basis accounting".
+    //
+    // A permanent false alarm is the exact thing this system exists to avoid. You mute it, and then
+    // you have no alarm AND you believe you have one. A space in front of a full stop is
+    // typesetting. It is not a change in the law.
+    .replace(/\s+([.,;:!?)])/g, '$1')
     .trim()
     .toLowerCase();
+}
+
+// WHERE, EXACTLY, DID OUR QUOTE STOP BEING TRUE?
+//
+// "The sentence is not on the page" is an alarm that makes you go and read the page yourself, and
+// the person who sees it at 6am will not bother. So we find the LONGEST PREFIX of our quote that IS
+// still on the page, and print HMRC's real words from that point on.
+//
+// That turns "something is wrong somewhere" into "you wrote X, HMRC says Y, the divergence starts
+// at word eleven". One glance and the fix is obvious. An alarm should hand you the answer, not a
+// research task.
+//
+// It found its first real bug immediately: a `car` quote copied out of a markdown RENDERING of the
+// page rather than the HTML the mini actually fetches.
+export function whereItDiverges(quote, pageText) {
+  const hay = normalise(pageText);
+  const words = normalise(quote).split(' ');
+  let matched = 0;
+  for (let n = words.length; n >= 4; n--) {
+    if (hay.includes(words.slice(0, n).join(' '))) { matched = n; break; }
+  }
+  if (!matched) return { matchedWords: 0, theirs: null };
+  const prefix = words.slice(0, matched).join(' ');
+  const at = hay.indexOf(prefix);
+  return {
+    matchedWords: matched,
+    ours: words.slice(matched).join(' ') || '(nothing, our quote ends here)',
+    theirs: pageText.slice(0, 0) || null, // placeholder, replaced below
+    theirsNormalised: hay.slice(at, at + prefix.length + 160),
+  };
 }
 
 // Exactly one of: cited | quote_missing | fetch_failed | uncited.
@@ -95,10 +140,17 @@ export function checkSource(source, pageText) {
     return { ...source, status: 'quote_missing',
              detail: 'the quote is too short to be an anchor. A fragment can survive a rewrite that reverses its meaning.' };
   }
-  return hay.includes(needle)
-    ? { ...source, status: 'cited', detail: null }
-    : { ...source, status: 'quote_missing',
-        detail: 'the sentence we rest this rule on is NOT on the page. Either HMRC rewrote it, or we cited something that never said it.' };
+  if (hay.includes(needle)) return { ...source, status: 'cited', detail: null };
+
+  // Not there. Say WHERE it stops being true, so the fix takes one glance and not an afternoon.
+  const d = whereItDiverges(source.quote, pageText);
+  const detail = d.matchedWords
+    ? `the sentence is NOT on the page. Our first ${d.matchedWords} words still match. `
+      + `HMRC actually says: "...${d.theirsNormalised}..." `
+      + `We claim it continues: "${d.ours}"`
+    : 'the sentence is NOT on the page, and not even its opening words are. Either HMRC rewrote it, '
+      + 'or we cited something that never said this at all.';
+  return { ...source, status: 'quote_missing', detail, diverged: d };
 }
 
 async function fetchText(url) {

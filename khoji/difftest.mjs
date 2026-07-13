@@ -373,6 +373,27 @@ test('normalise is not so loose that it stops being a quotation check', () => {
   assert.notEqual(normalise('you should allow a deduction'), normalise('you should not allow a deduction'));
 });
 
+// THE SPACE HTML STRIPPING INVENTS. A PERMANENT FALSE ALARM, AND IT WAS LIVE.
+//
+// stripTags turns every tag into a space, so `<a>simplified expenses</a>.` arrives as
+// "simplified expenses ." Our `car` quote was word-for-word correct off the page and failed on the
+// first live run because of that one space. It would have failed EVERY night, forever.
+//
+// And it gets more likely the more carefully you cite, because HMRC links exactly the phrases that
+// carry the meaning: "capital allowances", "simplified expenses", "cash basis accounting". A
+// citation ending on any of them was doomed. That is a false alarm that never goes away, which is
+// the one thing worse than no alarm: you mute it, and then you have no alarm and think you have one.
+test('THE CAR BUG: a link before a full stop leaves "expenses ." and must still match', () => {
+  const asStripped = 'buy a car for your business, claim the cost as a capital allowance as long as you’re not using simplified expenses . For all other types of vehicle';
+  const r = checkSource(src('claim the cost as a capital allowance as long as you’re not using simplified expenses.',
+    'https://www.gov.uk/expenses-if-youre-self-employed/travel'), asStripped);
+  assert.equal(r.status, 'cited', 'a space in front of a full stop is typesetting, not a change in the law');
+});
+test('...and the same for commas, semicolons and brackets, which links also sit before', () => {
+  const stripped = 'you can claim capital allowances , and simplified expenses ; or the flat rate ) instead';
+  assert.equal(normalise(stripped), 'you can claim capital allowances, and simplified expenses; or the flat rate) instead');
+});
+
 // ---- parsers ----------------------------------------------------------------
 
 section('Parsers.');

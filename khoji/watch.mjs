@@ -41,6 +41,27 @@ async function fetchText(url) {
 export function stripTags(s) {
   return (s || '')
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    // SCRIPT AND STYLE BLOCKS GO ENTIRELY, CONTENT AND ALL.
+    //
+    // This used to strip only the TAGS, which left everything INSIDE them. GOV.UK pages carry a
+    // <script type="application/ld+json"> block of structured data, so every page we have stored,
+    // hashed or read since 7 July has had a lump of JSON in the middle of it. It showed up in the
+    // knowledge Rakha reads as:  ...business-income-manual/bim37900" } } ] } Back to contents...
+    //
+    // Two consequences, and the second one is the serious one.
+    //
+    //   1. It is garbage in a man's tax answer, and it is garbage we pay tokens for.
+    //   2. pageItem() HASHES this text to decide whether a page has changed. So the change detector
+    //      has been watching GOV.UK's structured data and analytics metadata as if it were the law.
+    //      A page could "change" because a schema.org field moved, and the actual rates table could
+    //      sit there untouched. We have been listening to the wrong thing on the same frequency.
+    //
+    // Removing them will shift every watched page's hash ONCE, so tonight's run re-files the 12
+    // watched pages as new. That is expected, it is a one-off, and what it stores will be cleaner
+    // than anything stored before it.
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
     .replace(/\s+/g, ' ')

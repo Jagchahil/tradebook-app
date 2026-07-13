@@ -24,6 +24,7 @@
 
 import assert from 'node:assert/strict';
 import { CHECKS, compareOne, runChecks, money, between } from './diff.mjs';
+import { stripTags } from './watch.mjs';
 import { triageStatus } from './distill.mjs';
 import { checkSource, normalise } from './corpus.mjs';
 
@@ -392,6 +393,31 @@ test('THE CAR BUG: a link before a full stop leaves "expenses ." and must still 
 test('...and the same for commas, semicolons and brackets, which links also sit before', () => {
   const stripped = 'you can claim capital allowances , and simplified expenses ; or the flat rate ) instead';
   assert.equal(normalise(stripped), 'you can claim capital allowances, and simplified expenses; or the flat rate) instead');
+});
+
+section('stripTags. What a page actually says, and not what its scripts say.');
+
+// THE JSON-LD LEAK. Live since 7 July, found only by reading what we had actually stored.
+//
+// stripTags removed the TAGS and kept what was inside them, so the <script type="application/ld+json">
+// block on every GOV.UK page went straight into the text. It surfaced in the knowledge Rakha reads as
+//     ...business-income-manual/bim37900" } } ] } Back to contents...
+//
+// The second consequence is the one that matters: pageItem() HASHES this text to decide whether a
+// page has changed. The change detector has been watching GOV.UK's structured data and analytics
+// metadata as if it were the law. A page could "change" because a schema.org field moved while the
+// rates table sat there untouched. Listening carefully, on the wrong frequency.
+test('a <script type="application/ld+json"> block is removed ENTIRELY, content and all', () => {
+  const html = `<h1>BIM37910</h1>
+    <script type="application/ld+json">{"@context":"https://schema.org","name":"bim37900"}</script>
+    <p>You should disallow expenditure on ordinary clothing.</p>`;
+  const out = stripTags(html);
+  assert.doesNotMatch(out, /schema\.org|@context|\{|\}/, 'JSON-LD leaked into the page text');
+  assert.match(out, /You should disallow expenditure on ordinary clothing\./);
+});
+test('<style> and <noscript> go too', () => {
+  const out = stripTags('<style>.a{color:red}</style><noscript>Enable JS</noscript><p>The law.</p>');
+  assert.equal(out, 'The law.');
 });
 
 // ---- parsers ----------------------------------------------------------------

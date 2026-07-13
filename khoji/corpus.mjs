@@ -159,9 +159,51 @@ async function fetchText(url) {
   return res.text();
 }
 
-// The body of an HMRC page, verbatim, minus the furniture. This is what Rakha quotes.
+// The body of an HMRC page, stripped. Everything, furniture included.
 export function pageBody(html) {
-  return stripTags(html).slice(0, 12000);
+  return stripTags(html).slice(0, 40000);
+}
+
+// THE PASSAGE THAT AUTHORISES THE RULE. NOT THE PAGE.
+//
+// The first version stored stripTags(page).slice(0, 12000) as the knowledge Rakha reads. Checked
+// against the live database, that meant:
+//
+//   BIM37910: 12,000 characters stored, and the words "protective clothing" begin at CHARACTER
+//   4,233. Four thousand characters of cookie banner, navigation menu and footer before the law
+//   starts. And THREE rules (protective, uniform, everyday_clothes) each stored the same page in
+//   full, identically.
+//
+// Six of those go into the context of every question a man asks: roughly 72,000 characters, call it
+// 18,000 tokens, to answer "can I claim my boots", of which the part that authorises anything is one
+// paragraph. It is expensive, it buries the signal, and it gives the model a fair chance of quoting
+// GOV.UK's cookie policy to a plasterer.
+//
+// We already know the exact sentence. So take the passage AROUND it. Each rule now stores the few
+// hundred words that authorise THAT rule, which means the three BIM37910 rules stop being three
+// copies of one page and become three different passages: the one that disallows, the one that
+// allows, and the case that decided it.
+//
+// Doc 103, applied to a prompt: what did we take out to make room for it.
+// before/after: LOOK FORWARD, NOT BACK. The authorising sentence and what follows it is the law.
+// What precedes it, on a GOV.UK page, is as likely to be a cookie banner as a statute. 350 back is
+// enough to catch the section heading (on BIM37910 it catches "S34 Income Tax (Trading and Other
+// Income) Act 2005", which is the statute) without reaching the furniture.
+export function quoteWindow(text, quote, before = 350, after = 1500) {
+  // Find the quote in the ORIGINAL stripped text (not the normalised one, whose indices do not map
+  // back). Build a pattern from its words: flexible whitespace, and apostrophes that may be curly.
+  const words = quote.trim().split(/\s+/).slice(0, 10).map((w) =>
+    w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/['’‘]/g, "['’‘]"));
+  if (!words.length) return text.slice(0, 1800);
+  const re = new RegExp(words.join('[\\s]*'), 'i');
+  const m = re.exec(text);
+  if (!m) return text.slice(0, 1800); // cannot locate it: fall back, and the checker already shouted
+  const at = m.index;
+  const start = Math.max(0, at - before);
+  const end = Math.min(text.length, at + m[0].length + after);
+  const head = start > 0 ? '... ' : '';
+  const tail = end < text.length ? ' ...' : '';
+  return `${head}${text.slice(start, end).trim()}${tail}`;
 }
 
 export async function checkRules(rules, fetcher = fetchText) {
@@ -185,8 +227,10 @@ export async function checkRules(rules, fetcher = fetchText) {
         continue;
       }
       const text = pageBody(page);
-      out.push({ key: rule.key, title: rule.title, verdict: rule.verdict,
-                 ...checkSource(source, text), body: text });
+      const checked = checkSource(source, text);
+      out.push({ key: rule.key, title: rule.title, verdict: rule.verdict, ...checked,
+                 // The passage that authorises THIS rule, not the whole page with its cookie banner.
+                 body: checked.status === 'cited' ? quoteWindow(text, source.quote) : null });
     }
   }
   return out;

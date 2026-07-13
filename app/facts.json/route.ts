@@ -79,9 +79,27 @@ const ALL = {
   ctMainRate: LTD.ctMainRate,
   ctSmallLimit: LTD.ctSmallLimit,
   ctUpperLimit: LTD.ctUpperLimit,
+  ctMarginalFraction: LTD.ctMarginalFraction,
   dividendAllowance: LTD.dividendAllowance,
+  dividendBasic: LTD.dividendBasic,
+  dividendHigher: LTD.dividendHigher,
+  dividendAdditional: LTD.dividendAdditional,
   employerNIRate: LTD.employerNIRate,
   employerSecondaryThreshold: LTD.employerSecondaryThreshold,
+
+  // THE INCOME AT WHICH 40% STARTS. PUBLISHED EXPLICITLY, AND HERE IS WHY.
+  //
+  // The mobile app calls this `higherThreshold`. It is £50,270, and so is `class4UpperLimit`, and
+  // they are NOT THE SAME THING. One is where higher-rate income tax begins; the other is where
+  // Class 4 National Insurance drops to 2%. They have happened to coincide for years.
+  //
+  // If the app had simply been pointed at `class4UpperLimit` because the number matched, then the
+  // first Budget that decoupled them would feed a National Insurance threshold into an income tax
+  // calculation, on every phone, silently, and every one of our alarms would stay green because
+  // both files would still "agree".
+  //
+  // So it is derived from what it actually means, and published under the name the app uses.
+  higherRateThreshold: FACTS.personalAllowance + FACTS.basicRateBand,
 } as const;
 
 export const BODY = JSON.stringify(

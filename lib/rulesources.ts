@@ -77,6 +77,18 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       authority: 'S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL)',
     },
   ],
+  // We tell a man his client lunch is not allowable "however good for business it feels". That is a
+  // hard NO, and until today we said it on our own authority, which is nothing. Fetched from the
+  // live manual on 13 July 2026 and quoted verbatim, so Khoji checks it every night and screams if
+  // HMRC ever change the sentence under us.
+  entertainment: [
+    {
+      code: 'BIM45010',
+      url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim45010',
+      quote: 'Business entertainment means the provision of free or subsidised hospitality or entertainment. The person being entertained may be a customer, a potential customer or any other person.',
+      authority: 'S45 ITTOIA 2005; S1298 CTA 2009',
+    },
+  ],
   protective: [
     {
       code: 'BIM37910',

@@ -236,6 +236,136 @@ export const CHECKS = [
     },
   },
 
+  {
+    fact: 'higherRateThreshold',
+    label: 'Where the higher rate starts (personal allowance + basic rate band)',
+    url: 'https://www.gov.uk/income-tax-rates',
+    // Derived, like basicRateBand. It is the TOP of the basic rate band, which the table prints as
+    // the second half of "£12,571 to £50,270".
+    //
+    // ⚠️ IT IS NOT class4UpperLimit, EVEN THOUGH BOTH ARE £50,270 TODAY. They are different things
+    // that happen to be aligned, and an engine that treats them as one number will be wrong the
+    // first year the Chancellor moves one and not the other. /facts.json publishes them separately
+    // for exactly that reason.
+    extract(text) {
+      const row = between(text, /Basic rate/i, /Higher rate/i);
+      if (!row) return { error: 'could not find the "Basic rate" row' };
+      const band = row.match(/£\s*[\d,]+\s*to\s*£\s*([\d,]+)/i);
+      return band ? { value: money(band[1]) } : { error: 'could not read the top of the basic rate band' };
+    },
+  },
+
+  // ===============================================================================================
+  // CORPORATION TAX AND DIVIDENDS. Added 14 July 2026.
+  //
+  // These sit under the sole trader vs limited company tool, which is not a calculator. It is a
+  // recommendation. It tells a man whether to restructure his entire business.
+  //
+  // A wrong number here does not misstate a tax bill by a few pounds. It tells him to incorporate
+  // when he should not, and he does it, and he cannot easily undo it. That is a different order of
+  // harm from a mileage rate being 10p out, and it was unwatched.
+  //
+  // The engine is CORRECT today (checked 14 July: 19/25, £50k/£250k, 10.75/35.75/39.35, £500). The
+  // point is not that it was wrong. The point is that nothing would have told us when it became so.
+  // ===============================================================================================
+  {
+    fact: 'ctMainRate',
+    label: 'Corporation Tax, main rate',
+    url: 'https://www.gov.uk/corporation-tax-rates',
+    extract(text) {
+      // "The Corporation Tax rate for company profits is 25%"
+      const m = text.match(/Corporation Tax rate for company profits is\s*(\d{1,2}(?:\.\d+)?)\s*%/i);
+      return m ? { value: percent(m[1]) } : { error: 'could not read the main Corporation Tax rate' };
+    },
+  },
+  {
+    fact: 'ctSmallRate',
+    label: 'Corporation Tax, small profits rate',
+    url: 'https://www.gov.uk/corporation-tax-rates',
+    extract(text) {
+      // "you'll pay the 'small profits rate', which is 19%"
+      // The quotes around 'small profits rate' are CURLY on the live page, so we never match on
+      // them. Anchor on the words, and take the percentage that follows.
+      const row = between(text, /small profits rate/i, /Marginal Relief|You may be entitled/i);
+      if (!row) return { error: 'could not find the small profits rate sentence' };
+      const m = row.match(/(\d{1,2}(?:\.\d+)?)\s*%/);
+      return m ? { value: percent(m[1]) } : { error: 'no percentage after "small profits rate"' };
+    },
+  },
+  {
+    fact: 'ctSmallLimit',
+    label: 'Corporation Tax, small profits threshold',
+    url: 'https://www.gov.uk/corporation-tax-rates',
+    extract(text) {
+      // "If your company made a profit of £50,000 or less"
+      const m = text.match(/profit of\s*£\s*([\d,]+)\s*or less/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read the £50,000 small profits limit' };
+    },
+  },
+  {
+    fact: 'ctUpperLimit',
+    label: 'Corporation Tax, where the main rate starts',
+    url: 'https://www.gov.uk/corporation-tax-rates',
+    extract(text) {
+      // "If your company made more than £250,000 profit"
+      const m = text.match(/more than\s*£\s*([\d,]+)\s*profit/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read the £250,000 upper limit' };
+    },
+  },
+
+  // ⚠️ ctMarginalFraction (3/200) IS DELIBERATELY NOT CHECKED. It is not on the rates page. It lives
+  // on a separate Marginal Relief guidance page, and I will not point an extractor at a page I have
+  // not read, nor invent a sentence for it. It stays in the "not yet checked" list that the differ
+  // prints every night, by name, where it can be seen. An honest gap beats a confident guess.
+
+  {
+    fact: 'dividendAllowance',
+    label: 'Dividend allowance',
+    url: 'https://www.gov.uk/tax-on-dividends',
+    extract(text) {
+      // "You also get a dividend allowance of £500 each year."
+      const m = text.match(/dividend allowance of\s*£\s*([\d,]+)/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read the dividend allowance' };
+    },
+  },
+  {
+    fact: 'dividendBasic',
+    label: 'Dividend tax, basic rate',
+    url: 'https://www.gov.uk/tax-on-dividends',
+    // ⚠️ THE DECOY ON THIS PAGE. Further down there is a worked example containing "10.75% tax on
+    // £2,500 of dividends" AND "20% tax on £17,000 of wages". A naive grep for the first percentage
+    // could pick up the INCOME tax rate from the example. between() pins us to the table row, which
+    // comes first and is bounded by the next row.
+    extract(text) {
+      const row = between(text, /Basic rate/i, /Higher rate/i);
+      if (!row) return { error: 'could not find the "Basic rate" dividend row' };
+      const m = row.match(/(\d{1,2}(?:\.\d+)?)\s*%/);
+      return m ? { value: percent(m[1]) } : { error: 'no percentage in the basic rate dividend row' };
+    },
+  },
+  {
+    fact: 'dividendHigher',
+    label: 'Dividend tax, higher rate',
+    url: 'https://www.gov.uk/tax-on-dividends',
+    extract(text) {
+      const row = between(text, /Higher rate/i, /Additional rate/i);
+      if (!row) return { error: 'could not find the "Higher rate" dividend row' };
+      const m = row.match(/(\d{1,2}(?:\.\d+)?)\s*%/);
+      return m ? { value: percent(m[1]) } : { error: 'no percentage in the higher rate dividend row' };
+    },
+  },
+  {
+    fact: 'dividendAdditional',
+    label: 'Dividend tax, additional rate',
+    url: 'https://www.gov.uk/tax-on-dividends',
+    extract(text) {
+      const row = between(text, /Additional rate/i, /To work out your tax band/i);
+      if (!row) return { error: 'could not find the "Additional rate" dividend row' };
+      const m = row.match(/(\d{1,2}(?:\.\d+)?)\s*%/);
+      return m ? { value: percent(m[1]) } : { error: 'no percentage in the additional rate dividend row' };
+    },
+  },
+
   // --- mileage. The one we got wrong. Note the decoy handling above. ---
   {
     fact: 'mileageCarFirst10k',

@@ -118,6 +118,44 @@ const INCOME_TAX_PAGE_RESTRUCTURED = `
 <p>Rates and bands for the current year are published in our annual rates bulletin.</p>
 `;
 
+
+// CORPORATION TAX, from https://www.gov.uk/corporation-tax-rates on 14 July 2026.
+const CT_PAGE = `
+<h1>Rates</h1>
+<p>The Corporation Tax rate for company profits is <em>25%</em></p>
+<p>If your company made more than £250,000 profit, you&rsquo;ll pay the main rate of Corporation Tax.</p>
+<p>If your company made a profit of £50,000 or less, you&rsquo;ll pay the &lsquo;small profits rate&rsquo;, which is 19%.</p>
+<p>You may be entitled to <a href="/x">&lsquo;Marginal Relief&rsquo;</a> if your profits were between £50,000 and £250,000.</p>
+`;
+
+// DIVIDENDS, from https://www.gov.uk/tax-on-dividends on 14 July 2026.
+//
+// ⚠️ NOTE THE DECOY, and it is a real one on the live page. The worked example at the bottom
+// contains "20% tax on £17,000 of wages" — an INCOME tax rate — sitting only a few lines below the
+// dividend table. A naive grep for the first percentage after "Basic rate" could take it. between()
+// pins each extractor to its own table row.
+const DIVIDEND_PAGE = `
+<p>You also get a dividend allowance of £500 each year.</p>
+<table>
+  <tr><th>Tax band</th><th>Tax rate on dividends over the allowance</th></tr>
+  <tr><td>Basic rate</td><td>10.75%</td></tr>
+  <tr><td>Higher rate</td><td>35.75%</td></tr>
+  <tr><td>Additional rate</td><td>39.35%</td></tr>
+</table>
+<p>To work out your tax band, add your total dividend income to your other income.</p>
+<h3>Example</h3>
+<p>This is in the basic rate tax band, so you would pay:</p>
+<ul>
+  <li>20% tax on £17,000 of wages</li>
+  <li>no tax on £500 of dividends, because of the dividend allowance</li>
+  <li>10.75% tax on £2,500 of dividends</li>
+</ul>
+`;
+
+// Both pages after a redesign. Every check must say BROKEN, never "agree".
+const CT_PAGE_RESTRUCTURED = `<h1>Corporation Tax</h1><p>See our annual rates bulletin.</p>`;
+const DIVIDEND_PAGE_RESTRUCTURED = `<h1>Tax on dividends</h1><p>See our annual rates bulletin.</p>`;
+
 const strip = (s) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const check = (fact) => CHECKS.find((c) => c.fact === fact);
 const one = (fact, ours, page) => compareOne(check(fact), ours, strip(page));
@@ -677,6 +715,64 @@ for (const fact of ['basicRate', 'higherRate', 'additionalRate', 'additionalRate
 
 
 // ---- run ---------------------------------------------------------------------
+
+// ================================================================================================
+section('CORPORATION TAX AND DIVIDENDS. Under the tool that tells a man to restructure his business.');
+
+test('CT main rate: 25%', () => { assert.equal(one('ctMainRate', 0.25, CT_PAGE).status, 'agree'); });
+test('CT small profits rate: 19%', () => { assert.equal(one('ctSmallRate', 0.19, CT_PAGE).status, 'agree'); });
+test('CT small profits limit: £50,000', () => { assert.equal(one('ctSmallLimit', 50000, CT_PAGE).status, 'agree'); });
+test('CT upper limit: £250,000', () => { assert.equal(one('ctUpperLimit', 250000, CT_PAGE).status, 'agree'); });
+
+test('the dividend allowance: £500', () => { assert.equal(one('dividendAllowance', 500, DIVIDEND_PAGE).status, 'agree'); });
+test('dividend basic rate: 10.75%', () => { assert.equal(one('dividendBasic', 0.1075, DIVIDEND_PAGE).status, 'agree'); });
+test('dividend higher rate: 35.75%', () => { assert.equal(one('dividendHigher', 0.3575, DIVIDEND_PAGE).status, 'agree'); });
+test('dividend additional rate: 39.35%', () => { assert.equal(one('dividendAdditional', 0.3935, DIVIDEND_PAGE).status, 'agree'); });
+
+// THE DECOY. The worked example on the live dividends page says "20% tax on £17,000 of wages".
+// That is an INCOME tax rate, sitting a few lines under the dividend table. If the extractor drifts
+// to it, we would silently believe the dividend basic rate is 20%, and tell a man to incorporate on
+// the strength of it.
+test('THE DECOY: the "20% tax on wages" in the worked example is NOT taken as the dividend rate', () => {
+  const r = one('dividendBasic', 0.1075, DIVIDEND_PAGE);
+  assert.equal(r.status, 'agree', `fooled by the worked example (got "${r.status}", read ${r.theirs})`);
+  assert.equal(r.theirs, 0.1075);
+});
+
+// AND THEY MUST SCREAM WHEN WE ARE WRONG.
+test('engine still has the OLD dividend rates (8.75%, as before 2026) -> DRIFT', () => {
+  assert.equal(one('dividendBasic', 0.0875, DIVIDEND_PAGE).status, 'drift');
+});
+test('engine has the OLD single CT rate (19% for everyone, pre-2023) -> DRIFT', () => {
+  assert.equal(one('ctMainRate', 0.19, CT_PAGE).status, 'drift');
+});
+test('engine has a stale CT upper limit -> DRIFT', () => {
+  assert.equal(one('ctUpperLimit', 300000, CT_PAGE).status, 'drift');
+});
+
+section('Both pages restructured: every CT and dividend check says BROKEN, never "agree".');
+
+for (const [fact, page] of [
+  ['ctMainRate', CT_PAGE_RESTRUCTURED], ['ctSmallRate', CT_PAGE_RESTRUCTURED],
+  ['ctSmallLimit', CT_PAGE_RESTRUCTURED], ['ctUpperLimit', CT_PAGE_RESTRUCTURED],
+  ['dividendAllowance', DIVIDEND_PAGE_RESTRUCTURED], ['dividendBasic', DIVIDEND_PAGE_RESTRUCTURED],
+  ['dividendHigher', DIVIDEND_PAGE_RESTRUCTURED], ['dividendAdditional', DIVIDEND_PAGE_RESTRUCTURED],
+]) {
+  test(`${fact}: page restructured -> extractor_broken, NOT a silent pass`, () => {
+    const r = one(fact, 999, page);
+    assert.equal(r.status, 'extractor_broken');
+  });
+}
+
+// And the derived one from the income tax page.
+test('higherRateThreshold is read as the TOP of the basic band: £50,270', () => {
+  assert.equal(one('higherRateThreshold', 50270, INCOME_TAX_PAGE).status, 'agree');
+});
+test('higherRateThreshold: page restructured -> BROKEN', () => {
+  assert.equal(one('higherRateThreshold', 50270, INCOME_TAX_PAGE_RESTRUCTURED).status, 'extractor_broken');
+});
+
+
 
 let pass = 0;
 for (const [name, fn] of tests) {

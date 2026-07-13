@@ -27,6 +27,7 @@ import { CHECKS, compareOne, runChecks, money, between } from './diff.mjs';
 import { stripTags } from './watch.mjs';
 import { triageStatus } from './distill.mjs';
 import { checkSource, normalise } from './corpus.mjs';
+import { withPassword, POOLER_ATTEMPTS, POOLER_CACHE_WAIT_MS } from './rotate.mjs';
 
 // Collect, then run at the end, so an async test is actually AWAITED. A harness that fires a
 // promise and prints "ok" before it settles is a test suite that passes when the code is broken,
@@ -523,6 +524,34 @@ test('a <script type="application/ld+json"> block is removed ENTIRELY, content a
 test('<style> and <noscript> go too', () => {
   const out = stripTags('<style>.a{color:red}</style><noscript>Enable JS</noscript><p>The law.</p>');
   assert.equal(out, 'The law.');
+});
+
+section('Password rotation. The connection string must survive it.');
+
+// Rotating this by hand took FIVE attempts, and every failure was a human carrying a credential
+// between a terminal, a clipboard, a SQL editor and a file. The worst of them: `openssl rand
+// -base64 24` produces / + and =, which are STRUCTURAL CHARACTERS IN A URL. A slash in a password
+// ends the host portion of a connection string, and the failure looks like a wrong password.
+//
+// rotate.mjs mints hex only, and never lets a human touch it. These tests pin the string surgery.
+test('the password is swapped without touching the user, host, port or database', () => {
+  const before = 'postgresql://khoji_writer.abc123:OLDPASSWORD@aws-1-eu-west-2.pooler.supabase.com:5432/postgres';
+  const after = withPassword(before, 'deadbeef00112233');
+  assert.equal(after,
+    'postgresql://khoji_writer.abc123:deadbeef00112233@aws-1-eu-west-2.pooler.supabase.com:5432/postgres');
+});
+test('a password containing @ in the OLD string does not fool the swap', () => {
+  const before = 'postgresql://khoji_writer.abc123:pa55@word@host.supabase.com:5432/postgres';
+  // The regex is non-greedy on the user and stops at the FIRST @, which is the shape Postgres
+  // itself requires: an unencoded @ in a password is already an invalid connection string.
+  assert.match(withPassword(before, 'newhex'), /^postgresql:\/\/khoji_writer\.abc123:newhex@/);
+});
+test('the pooler cache is waited out, not treated as a failure', () => {
+  // THE FACT THAT COST AN AFTERNOON: Supabase's pooler caches the password verifier. For a couple
+  // of minutes after a change it returns 28P01, which is indistinguishable from a wrong password.
+  // Four manual retries inside that window looked like four failures and were not.
+  assert.ok(POOLER_ATTEMPTS * POOLER_CACHE_WAIT_MS >= 120_000,
+    'rotate.mjs must be patient for at least two minutes, or it will diagnose the cache as a failure');
 });
 
 // ---- parsers ----------------------------------------------------------------

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { EXPENSE_RULES, TAX_TIPS, VERDICT_LABEL, type Verdict } from '../../lib/taxrules';
+import { RULE_SOURCES } from '../../lib/rulesources';
 import LeadCapture from '../../components/LeadCapture';
 import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
@@ -56,6 +57,38 @@ const demo: { side: 'out' | 'in'; text: string }[] = [
   { side: 'in', text: 'Yes. A work van is allowable, the whole cost the year you buy it, or claim 55p a mile instead. 👍' },
 ];
 
+// THE LINE THAT SAYS IT IS NOT US SAYING SO.
+//
+// Every other app in this category tells a man what he can claim and expects to be believed. We
+// hand him the HMRC page and let him check. That is not a compliance ornament, it is the product:
+// doc 104, "honesty is not a constraint we tolerate, it is the product we are selling."
+//
+// It is also the only claim on this page a competitor cannot copy this afternoon, because most of
+// them could not survive somebody actually reading the source.
+//
+// SHOWN ONLY WHERE WE HAVE ONE. Eleven of the 24 rules are still uncited, and they are listed
+// openly at /rules.json. But a badge on the card reading "no source" would frighten a man about a
+// verdict that is almost certainly right, and he cannot act on it. Doc 103: a row he has to read
+// and dismiss before he gets to what he came for is a row that should not be there. The honesty
+// belongs on the public URL, where it is checkable. The card gets the authority or it gets nothing.
+function Citation({ ruleKey }: { ruleKey: string }) {
+  const sources = RULE_SOURCES[ruleKey];
+  if (!sources || sources.length === 0) return null;
+  const s = sources[0];
+  return (
+    <a
+      href={s.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ fontSize: 12, color: MUTED, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 2 }}
+    >
+      <span style={{ fontWeight: 600 }}>HMRC {s.code}</span>
+      {s.authority ? <span style={{ opacity: 0.75 }}>· {s.authority.split(';')[0]}</span> : null}
+      <span aria-hidden style={{ opacity: 0.6 }}>↗</span>
+    </a>
+  );
+}
+
 function RuleCard({ r }: { r: (typeof EXPENSE_RULES)[number] }) {
   const c = verdictColours(r.verdict);
   return (
@@ -65,6 +98,7 @@ function RuleCard({ r }: { r: (typeof EXPENSE_RULES)[number] }) {
         <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, letterSpacing: '0.3px', color: c.fg, background: c.bg, padding: '5px 10px', borderRadius: 12 }}>{VERDICT_LABEL[r.verdict]}</span>
       </div>
       <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.55, margin: 0 }}>{r.rule}</p>
+      <Citation ruleKey={r.key} />
     </div>
   );
 }

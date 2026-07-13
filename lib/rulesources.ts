@@ -89,6 +89,64 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       authority: 'S45 ITTOIA 2005; S1298 CTA 2009',
     },
   ],
+
+  // ---------------------------------------------------------------------------------------------
+  // ADDED 13 JULY 2026. Every quote below was FETCHED FROM THE LIVE PAGE and copied verbatim, then
+  // checked back against the page with scripts/verify-citations.mjs, which uses the SAME normaliser
+  // Khoji's nightly corpus check uses. A quote that has not survived that script does not go in.
+  //
+  // ONLY SINGLE, CONTIGUOUS SENTENCES. Several of HMRC's strongest statements live inside bullet
+  // lists, and a "quote" spanning bullets is not a sentence that exists on the page: it is one we
+  // assembled. It would never match, the check would scream forever, and we would learn to ignore
+  // the alarm. So where HMRC only says it in a list, we take the prose sentence that introduces the
+  // list, or we take nothing.
+  // ---------------------------------------------------------------------------------------------
+
+  insurance: [
+    {
+      code: 'Expenses if you are self-employed: legal and financial costs',
+      url: 'https://www.gov.uk/expenses-if-youre-self-employed/legal-financial',
+      quote: 'You can claim for any insurance policy for your business, for example public liability insurance.',
+      authority: 'S34 ITTOIA 2005 (wholly and exclusively)',
+    },
+  ],
+
+  fees: [
+    {
+      code: 'Expenses if you are self-employed: legal and financial costs',
+      url: 'https://www.gov.uk/expenses-if-youre-self-employed/legal-financial',
+      quote: "If you're self-employed - a sole trader or individual in a business partnership - accountancy, legal and other professional fees can count as allowable business expenses.",
+      authority: 'S34 ITTOIA 2005; fines and penalties disallowed, see the same page',
+    },
+  ],
+
+  // THE HARD NO WE HAD NO CASE FOR.
+  //
+  // We tell a man his haircut is not allowable. Read the quote: HMRC does not say "haircut", and it
+  // does not say "grooming". It says CLOTHING. What it gives us is the DOCTRINE, and the doctrine is
+  // the thing that actually decides it: keeping up appearances is a personal purpose that cannot be
+  // separated out, so the cost fails the wholly and exclusively test. That is Mallalieu, and it is
+  // why a barrister could not deduct the black clothes she wore only in court.
+  //
+  // So the citation is honest about what it is: the principle, not a named example. The gym is
+  // different, and it IS named, so it gets its own source.
+  grooming: [
+    {
+      code: 'BIM37910',
+      url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim37910',
+      quote: 'Most professionals have to keep up appearances but their clothing costs are not allowable (even where they amount to a quasi uniform as in Mallalieu v Drummond).',
+      authority: 'S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL). The principle, not a named example: HMRC nowhere names haircuts.',
+    },
+  ],
+
+  pension: [
+    {
+      code: 'Tax on your private pension contributions: tax relief',
+      url: 'https://www.gov.uk/tax-on-your-private-pension/pension-tax-relief',
+      quote: 'You can claim additional tax relief on your Self Assessment tax return for money you put into a private pension of:',
+      authority: 'S188 Finance Act 2004 (relief at source). ⚠️ This sources the RELIEF ONLY. We also tell him a personal pension is NOT a business expense, and HMRC nowhere says so in words we can quote: it is an argument from omission (pensions appear nowhere in the allowable expenses guide). That half of the rule remains OURS.',
+    },
+  ],
   protective: [
     {
       code: 'BIM37910',

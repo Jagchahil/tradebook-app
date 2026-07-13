@@ -27,6 +27,27 @@ const SIGNING_SECRETS = [
   'HMRC_STATE_SECRET',    // the OAuth state, i.e. the CSRF guard on tax filing
 ] as const;
 
+// CAN WE ACTUALLY TAKE MONEY, AND ARE WE ACTUALLY ENCRYPTING?
+//
+// Added 13 July 2026, after I told Jag the signing secrets were missing. They were not. I had read
+// it in a doc. The system said `missing: []` the moment anyone bothered to ask it.
+//
+// So stop asking .env.local, which describes ONE LAPTOP, and ask PRODUCTION, which is the only
+// machine that takes anyone's money. `echo $STRIPE_SECRET_KEY` on a developer's mac proves nothing
+// at all about whether a tradesman can pay us.
+//
+// PRESENCE AND MODE ONLY. Never the value, and never a prefix long enough to be a clue. The mode is
+// the load-bearing bit: a key that is present but says `sk_test_` means the checkout works, the
+// webhook fires, the subscription row appears, and NO MONEY EVER ARRIVES. Which is the house
+// failure mode wearing a bow tie: everything succeeds and nothing happened.
+function stripeMode(): 'live' | 'test' | 'missing' {
+  const k = process.env.STRIPE_SECRET_KEY || '';
+  if (!k) return 'missing';
+  if (k.startsWith('sk_live_') || k.startsWith('rk_live_')) return 'live';
+  if (k.startsWith('sk_test_') || k.startsWith('rk_test_')) return 'test';
+  return 'missing';
+}
+
 function authorised(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
@@ -53,6 +74,19 @@ export async function GET(req: NextRequest) {
       {
         ok,
         missing,
+        // Presence and mode. Never a value. See the note above stripeMode().
+        money: {
+          stripe: stripeMode(),                                  // live | test | missing
+          webhook: Boolean(process.env.STRIPE_WEBHOOK_SECRET),   // no secret, no verified webhook
+        },
+        encryption: {
+          // Unset means bank and HMRC tokens sit unencrypted in OUR layer. Supabase still encrypts
+          // the disk, so this is not a catastrophe, but we told HMRC on the production credentials
+          // form: "Do you encrypt all customer data that you handle? Yes." Setting this makes that
+          // answer unambiguously true rather than merely arguable, and we do not want to be
+          // arguing that point with HMRC.
+          bankTokenKey: Boolean(process.env.BANK_TOKEN_KEY),
+        },
         crons: runs ?? 'unreadable',
         alarms,
         // The detail on WHICH of our tax constants is currently wrong, and what GOV.UK says it

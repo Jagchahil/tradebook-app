@@ -85,8 +85,16 @@ export default function Brain() {
     const token = s.session?.access_token;
     if (!token) return;
     const res = await fetch('/api/team/brain', { headers: { Authorization: `Bearer ${token}` } });
+    // ⚠️ THE MESSAGE USED TO SAY "We could not reach the database". IT WAS GUESSING, AND IT WAS WRONG.
+    //
+    // The database was up. The rest of this page had already rendered from it. What had actually
+    // happened was that ONE side query 400d on a column that does not exist, and a bare catch turned
+    // "I could not read one thing" into a confident diagnosis of the whole system.
+    //
+    // A 503 here now means ONLY: we could not read khoji_runs or knowledge_items. That IS worth going
+    // dark for, and this sentence no longer claims to know why.
     if (res.status === 503) {
-      setErr('Could not read the brain. This is NOT "nothing has been checked". We could not reach the database, and we do not know what Khoji found.');
+      setErr('Could not read Khoji. This is NOT "nothing has been checked". The read failed and we do not know what Khoji found, so nothing on this panel can be trusted.');
       return;
     }
     if (!res.ok) { setErr('Could not load Khoji.'); return; }

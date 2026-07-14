@@ -3740,6 +3740,14 @@ export interface BrainState {
   subscribers: number;
   // THE QUEUE. Distilled, and waiting for a human to say yes.
   pending: PendingItem[];
+
+  // ⚠️ WHICH OF THE SIDE READS FAILED. Empty is the happy case.
+  //
+  // NOT a boolean, and NOT swallowed. If we could not count the subscribers, the console must say
+  // "we could not count the subscribers", by name, and NOT go dark over the tax engine. The old code
+  // reported a failed headcount as "we could not reach the database, and we do not know what Khoji
+  // found", which was false twice over: the database was plainly up, and Khoji was fine.
+  degraded: string[];
 }
 
 // ⚠️ THIS IS THE APPROVAL GATE, AND UNTIL TODAY IT WAS A NUMBER WITH NO BUTTON NEXT TO IT.
@@ -3763,6 +3771,34 @@ export interface PendingItem {
   created_at: string;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 14 JULY. THIS FUNCTION BLACKED OUT THE TAX ENGINE PANEL BECAUSE IT COULD NOT COUNT SUBSCRIBERS.
+//
+// The console showed "Tax knowledge: ok" in green and, six inches below it, "Could not read the
+// brain. We could not reach the database." Both on screen at once. Both wrong in different ways.
+//
+// THE CAUSE. This function asked for `users?select=id&subscription_status=in.(active,trialing)`.
+// THERE IS NO subscription_status COLUMN ON users. It lives on `subscriptions.status`, which is
+// where every other count in this file reads it from (see line ~77). I invented the column when I
+// built the console, and never opened the page.
+//
+// PostgREST 400s. The 400 threw. The throw was caught by a bare `catch { return null }`. Five
+// queries in a Promise.all, and ONE rejection took all five down.
+//
+// So the least important query on the screen, a HEADCOUNT, silenced the most important answer in
+// the company: whether our tax numbers still match GOV.UK. And then the copy invented a reason
+// ("could not reach the database") that it never established, while the database was plainly up and
+// rendering the rest of the page around it.
+//
+// TWO RULES COME OUT OF IT, AND THEY ARE THE SAME RULE TWICE:
+//
+//   1. A LOAD-BEARING READ MAY BLACK OUT THE BRAIN. A NICE-TO-HAVE MAY NOT.
+//      khoji_runs and knowledge_items are the brain. qa_cache and the subscriber count are garnish.
+//      Garnish that fails is a missing number, not a blind console.
+//
+//   2. "I COULD NOT READ THIS" IS NOT "THE DATABASE IS DOWN". Say which read failed. Never guess at
+//      the cause and print the guess as a fact. That is the sin of the whole week, in one catch.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
 export async function readBrain(days = 30): Promise<BrainState | null> {
   try {
     const { url } = config();
@@ -3779,7 +3815,12 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
     // "Nobody has asked anything yet" for ever, in a confident sentence, next to a real number of
     // real questions. A console that lies with a true-looking figure is worse than one that says
     // nothing, and it is the exact species of bug this whole screen exists to prevent.
-    const [runs, items, pending, qa, subs] = await Promise.all([
+    // 🔴 THE BRAIN. THESE THREE ARE LOAD-BEARING AND THEY STAY IN A Promise.all.
+    //
+    // If we cannot read khoji_runs or knowledge_items we genuinely do not know whether our tax
+    // engine agrees with GOV.UK, and the ONLY honest thing is to go dark and say so. That is the
+    // one case where the 503 was always right. NOT KNOWING IS NOT THE SAME AS BEING FINE.
+    const [runs, items, pending] = await Promise.all([
       // ⚠️ kind=eq.differ. THE CONSOLE RENDERS THIS ROW AS A SENTENCE ABOUT TAX CONSTANTS.
       //
       // vitals() takes the newest run here and tells a human "62 of 62 constants matched". The
@@ -3793,17 +3834,38 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
       // forty things to get to eventually, it is the reason the queue exists.
       q('knowledge_items?status=eq.distilled&select=id,title,summary,source_url,affects,effective_date,confidence,engine_impact,created_at'
         + '&order=engine_impact.desc,created_at.desc&limit=60'),
-
-      // PUCHIO'S PULSE. How many questions have actually been answered, and when the last one was.
-      // NO question text and NO answer text: this is a heartbeat, not a transcript, and the team
-      // console is forbidden anything that belongs to a user (task 13).
-      q('qa_cache?select=updated_at&order=updated_at.desc&limit=500'),
-
-      // LEKHIO, IN THE MIDDLE. The only number on this screen that is a PERSON and not a process.
-      q('users?select=id&subscription_status=in.(active,trialing)&limit=2000'),
     ]);
 
-    const qaRows = Array.isArray(qa) ? (qa as Array<{ updated_at: string }>) : [];
+    // ⚠️ AND THESE TWO ARE GARNISH. allSettled, NOT all.
+    //
+    // Puchio's question count and the subscriber headcount are worth having, and worth NOTHING next
+    // to the tax engine. A console that goes blind about GOV.UK because it could not count its own
+    // customers has its priorities exactly inverted, and that is what shipped last night.
+    const [qa, subs] = await Promise.allSettled([
+      // PUCHIO'S PULSE. How many questions have been answered, and when the last one was.
+      // NO question text and NO answer text: a heartbeat, not a transcript. The team console is
+      // forbidden anything that belongs to a user (task 13).
+      q('qa_cache?select=updated_at&order=updated_at.desc&limit=500'),
+
+      // LEKHIO, IN THE MIDDLE. The only number on this screen that is a PERSON, not a process.
+      //
+      // 🔴 THIS IS THE LINE THAT TOOK THE WHOLE CONSOLE DOWN. It read:
+      //        users?select=id&subscription_status=in.(active,trialing)
+      // and THERE IS NO subscription_status COLUMN ON users. It is `subscriptions.status`, which is
+      // what every other count in this file has always used. A column I invented, in the one query
+      // nobody ever ran, blacking out the one panel that actually matters.
+      q('subscriptions?select=stripe_subscription_id&status=in.(active,trialing)&limit=5000'),
+    ]);
+
+    // WHAT WE COULD NOT READ, BY NAME. Never a guess at the cause, and never a blank console.
+    const degraded: string[] = [];
+    if (qa.status !== 'fulfilled' || !Array.isArray(qa.value)) degraded.push('qa_cache');
+    if (subs.status !== 'fulfilled' || !Array.isArray(subs.value)) degraded.push('subscriptions');
+
+    const qaRows: Array<{ updated_at: string }> =
+      qa.status === 'fulfilled' && Array.isArray(qa.value) ? qa.value : [];
+    const subRows: unknown[] =
+      subs.status === 'fulfilled' && Array.isArray(subs.value) ? subs.value : [];
 
     return {
       runs: Array.isArray(runs) ? runs : [],
@@ -3811,10 +3873,13 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
       pending: Array.isArray(pending) ? pending : [],
       answered: qaRows.length,
       lastAnswerAt: qaRows[0]?.updated_at ?? null,
-      subscribers: Array.isArray(subs) ? subs.length : 0,
+      subscribers: subRows.length,
+      degraded,
     };
   } catch {
-    // null is "we could not read the brain". It is NOT "the brain is empty", and the page says so.
+    // null now means ONLY ONE THING: we could not read the brain ITSELF, khoji_runs or
+    // knowledge_items. It is not "the brain is empty", and it can no longer be reached by a failed
+    // headcount. THAT distinction is the whole point of this screen.
     return null;
   }
 }

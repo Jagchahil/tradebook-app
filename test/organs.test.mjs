@@ -18,13 +18,16 @@
 //   PUCHIO answers him.       qa_cache, conversations.               REAL.
 //   RAKHA  acts for him.      ...nothing. Nothing at all.
 //
-// Rakha's signals are computed on the way past a request and thrown away. There is no table. We
-// cannot tell you whether it fired this week or died on Tuesday. IF IT STOPPED, NOTHING WOULD GO RED.
+// ⚠️ CORRECTED 14 JULY. This header used to end "IF IT STOPPED, NOTHING WOULD GO RED", and that was
+// FALSE. A stopped Rakha IS caught: cronStarted/cronFinished('agent'), MAX_QUIET_HOURS.agent = 26,
+// and /api/health goes red. I wrote the dramatic version without checking.
 //
-// That is the exact disease that killed this brain for five days in July. The differ has a heartbeat
-// now. The amendment watcher has one. The Budget loop has one. THE ORGAN THAT ACTS ON THE USER'S
-// BEHALF HAS NONE, and it is the one whose silence costs the most: nobody is waiting for it, so
-// nobody notices it is gone.
+// The real hole is narrower and nastier. Rakha writes ONLY when it FINDS something, so a Rakha that
+// runs, considers NOBODY, and reports ok=true is indistinguishable in the database from a quiet week.
+// Both are zero rows. That IS the disease that killed this brain for five days in July, and the fix
+// is khoji_runs.checked: A RUN THAT CHECKED NOTHING IS NOT A RUN.
+//
+// AND THE SAME DISEASE PUT A SECOND HOLE IN THIS CONSOLE, WHICH IS ALSO TESTED BELOW.
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
@@ -187,6 +190,54 @@ ok('🔴 ...AND IT CARRIES NO FINANCIAL DATA. The team console rule does not ben
   // that it ran, when, and how many it looked at. Nothing about the man, nothing about his money.
   /NO financial data, ever/i.test(sqlSrc)
   && !/amount|balance|income|profit|tax_due/i.test(sqlSrc.replace(/--.*$/gm, '')));
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 6. THE HEADCOUNT THAT BLACKED OUT THE TAX ENGINE.
+//
+// LIVE, on lekhio.app/team, 14 July: "Tax knowledge: ok" in green, and six inches below it,
+// "Could not read the brain. We could not reach the database." Both on screen at once.
+//
+// readBrain() asked for `users?select=id&subscription_status=in.(active,trialing)`. THERE IS NO SUCH
+// COLUMN. Verified against production: information_schema returns 0. It lives on
+// `subscriptions.status`, which is where every other count in supabase.ts has always read it.
+//
+// PostgREST 400d, the throw was caught by a bare `catch { return null }`, and FIVE QUERIES IN A
+// Promise.all WENT DOWN WITH IT. So a HEADCOUNT silenced the one panel that says whether our tax
+// numbers still match GOV.UK. And then the copy invented a cause, "could not reach the database",
+// while the database was up and rendering the rest of the page around it.
+//
+// THREE ASSERTIONS, AND EACH ONE IS A RULE, NOT A LINE OF CODE.
+// ---------------------------------------------------------------------------------------------
+
+// ⚠️ COMMENTS STRIPPED FIRST. Eight tests today were broken by prose, and the prose that broke them
+// was ALWAYS the comment explaining the very rule being tested. This file is now full of the words
+// "users" and "subscription_status" in exactly that way.
+const dbSrc = readFileSync(path.join(root, 'lib/supabase.ts'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '');
+
+ok('🔴 THE SUBSCRIBER COUNT READS `subscriptions`, THE TABLE THAT EXISTS',
+  /q\('subscriptions\?select=[^']*status=in\.\(active,trialing\)/.test(dbSrc));
+
+ok('🔴 ...AND NOTHING ANYWHERE READS users.subscription_status, WHICH DOES NOT EXIST',
+  // The whole outage, in one absent column. Verified against production, not assumed.
+  !/subscription_status/.test(dbSrc));
+
+ok('🔴 A HEADCOUNT MAY NOT BLACK OUT THE BRAIN: the garnish reads are allSettled, not all',
+  // khoji_runs and knowledge_items stay in a Promise.all, because if we cannot read THOSE we truly
+  // do not know whether the tax engine agrees with GOV.UK, and going dark is the honest answer.
+  // qa_cache and the subscriber count are garnish. Garnish that fails is a missing number.
+  /Promise\.allSettled\(\[/.test(dbSrc)
+  && /degraded/.test(dbSrc));
+
+ok('🔴 AND THE ERROR NO LONGER GUESSES AT A CAUSE IT NEVER ESTABLISHED',
+  // "We could not reach the database" was a diagnosis, not an observation, and it was false. The
+  // sin of the entire week, sitting in one catch block: NOT KNOWING TURNED INTO A CONFIDENT CLAIM.
+  !/could not reach the database/i.test(
+    readFileSync(path.join(root, 'app/team/Brain.tsx'), 'utf8')
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ''),
+  ));
 
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

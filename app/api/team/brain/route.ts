@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken, readTeamMember, readBrain } from '../../../../lib/supabase';
 import { isTeam } from '../../../../lib/team';
 import { vitals, coverage, knowledge, growth } from '../../../../lib/brain';
+import { body } from '../../../../lib/organs';
 
 export const runtime = 'nodejs';
 
@@ -42,6 +43,19 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     vitals: v,
     coverage: coverage(v),
+
+    // 🔴 THE FOUR ORGANS. And the one that is drawn DARK, on purpose.
+    //
+    // An organ we cannot measure is never drawn green. Rakha, the organ that acts on the user's
+    // behalf, leaves no trace at all: its signals are computed on the way past a request and thrown
+    // away. If it stopped tonight, nothing anywhere would go red. So the console says so, in the
+    // loudest way it can, rather than glowing over the top of it.
+    //
+    // (Puchio's count comes from what the brain already reads. When qa_cache is not readable we pass
+    // zero, and organs.ts treats "nobody has asked" as a QUIET WEEK, not a fault: a console that
+    // shouts about silence is a console you learn to ignore.)
+    body: body(brain.runs, brain.items, { answered: brain.answered, lastAnswerAt: brain.lastAnswerAt }, brain.subscribers),
+
     knowledge: knowledge(brain.items),
     growth: growth(brain.items, 30),
     // THE QUEUE. Until today this was a number on a screen with no button beside it: "39 waiting for

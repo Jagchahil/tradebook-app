@@ -40,7 +40,23 @@ interface Pending {
   created_at: string;
 }
 
+interface Organ {
+  key: 'khoji' | 'rakha' | 'puchio';
+  name: string;
+  does: string;
+  pulse: 'alive' | 'attention' | 'broken' | 'unwired';
+  says: string;
+  redWhen: string | null;
+  count: number | null;
+}
+interface Body {
+  organs: Organ[];
+  centre: { subscribers: number; says: string };
+  blind: boolean;
+}
+
 interface Payload {
+  body: Body;
   vitals: Vitals;
   coverage: { pct: number; watched: number; total: number; blind: number };
   knowledge: Knowledge;
@@ -183,6 +199,65 @@ export default function Brain() {
       {/* THE REACTOR ------------------------------------------------------------------------ */}
       <div style={S.reactor}>
         <div style={S.glow} aria-hidden="true" />
+
+        {/* ═══════════════════════════════════════════════════════════════════════════════════
+            🔴 THE THREE ORGANS, AND LEKHIO IN THE MIDDLE.
+
+            AN ORGAN WE CANNOT MEASURE IS DRAWN DARK. IT IS NEVER DRAWN GREEN.
+
+            The obvious version of this screen is four rings, glowing, pulsing, growing. It would
+            look magnificent and it would be a screensaver: a ring that glows whether or not the
+            organ behind it is working is not a status light, and the day one of them dies the
+            console goes on glowing exactly as before.
+
+            So each organ answers one question: WHAT WOULD MAKE YOU GO RED? Khoji can answer it, and
+            every way it can go red has actually happened. Puchio can answer it.
+
+            RAKHA CANNOT. Its signals are computed on the way past a request and thrown away. There
+            is no table. If it stopped tonight, nothing anywhere would go red, and nobody would find
+            out, because nobody is waiting for it. So it is drawn DARK, with the reason underneath,
+            and the whole reactor says BLIND at the top rather than glowing over the top of it.
+            (supabase/APPLY_2026-07-14_rakha.sql closes it.)
+            ═══════════════════════════════════════════════════════════════════════════════════ */}
+        {d.body ? (
+          <>
+            {d.body.blind ? (
+              <div style={S.blindBanner}>
+                ONE ORGAN HAS NO HEARTBEAT. This console is not showing you a healthy system. It is
+                showing you the part of the system it can see.
+              </div>
+            ) : null}
+
+            <div style={S.organRow}>
+              {d.body.organs.map((o) => {
+                const tone = o.pulse === 'alive' ? '#3DDC84'
+                  : o.pulse === 'attention' ? '#FFB020'
+                    : o.pulse === 'broken' ? '#FF4D4D'
+                      : '#3A3F4B';           // unwired. Not a colour. An absence.
+                const dark = o.pulse === 'unwired';
+                return (
+                  <div key={o.key} style={{ ...S.organ, opacity: dark ? 0.72 : 1 }}>
+                    <div style={{ ...S.organRing, borderColor: tone, boxShadow: dark ? 'none' : `0 0 18px ${tone}55` }}>
+                      <span style={{ ...S.organDot, background: tone, animation: dark ? 'none' : 'khojiPulse 2.6s ease-out infinite' }} />
+                    </div>
+                    <div style={S.organName}>{o.name}</div>
+                    <div style={S.organDoes}>{o.does}</div>
+                    <div style={{ ...S.organSays, color: dark ? '#FF9F9F' : '#9AA3B2' }}>{o.says}</div>
+                    {/* The most honest line on the screen. An organ that cannot say how it would go
+                        red is an organ nobody is watching. */}
+                    <div style={S.organRed}>
+                      {o.redWhen ? `Goes red when: ${o.redWhen}` : 'Nothing would make this go red. That is the problem.'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* THE CENTRE. The only number here that is a PERSON and not a process. Everything else
+                in this reactor exists to be right for him. */}
+            <div style={S.centre}>{d.body.centre.says}</div>
+          </>
+        ) : null}
 
         <div style={S.topRow}>
           <div style={S.pulseWrap}>
@@ -512,6 +587,33 @@ const INK = '#0E1116';
 
 const S: Record<string, React.CSSProperties> = {
   err: { ...U.alarm },
+
+  blindBanner: {
+    position: 'relative' as const, zIndex: 1,
+    margin: '0 0 18px', padding: '10px 14px',
+    borderRadius: 10, border: '1px solid #FF4D4D55', background: '#FF4D4D14',
+    color: '#FF9F9F', fontSize: 12.5, lineHeight: 1.5, fontWeight: 600,
+  },
+  organRow: {
+    position: 'relative' as const, zIndex: 1,
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 18,
+    marginBottom: 18,
+  },
+  organ: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', textAlign: 'center' as const },
+  organRing: {
+    width: 44, height: 44, borderRadius: '50%', border: '2px solid',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10,
+  },
+  organDot: { width: 10, height: 10, borderRadius: '50%' },
+  organName: { fontSize: 14, fontWeight: 700, color: '#E8ECF3', letterSpacing: 0.4 },
+  organDoes: { fontSize: 11.5, color: '#7C8494', marginTop: 3, lineHeight: 1.45, maxWidth: 210 },
+  organSays: { fontSize: 12, marginTop: 8, lineHeight: 1.45, maxWidth: 210 },
+  organRed: { fontSize: 10.5, color: '#5C6373', marginTop: 8, lineHeight: 1.4, maxWidth: 210, fontStyle: 'italic' as const },
+  centre: {
+    position: 'relative' as const, zIndex: 1,
+    textAlign: 'center' as const, fontSize: 13, color: '#C9D1DC', fontWeight: 600,
+    padding: '12px 0 4px', borderTop: '1px solid #FFFFFF12', marginBottom: 4,
+  },
 
   // The reactor. Dark, so the lights mean something. A grid of green cells on white is a spreadsheet.
   reactor: {

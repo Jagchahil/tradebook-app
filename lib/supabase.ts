@@ -3733,6 +3733,11 @@ export interface BrainState {
     unwatched: string[]; ok: boolean;
   }>;
   items: Array<{ status: string; created_at: string; title: string | null; source_url: string | null }>;
+  /** Puchio's pulse. A COUNT and a TIMESTAMP. No question text, no answer text: a heartbeat, not a transcript. */
+  answered: number;
+  lastAnswerAt: string | null;
+  /** Lekhio, in the middle. The only number on the console that is a PERSON and not a process. */
+  subscribers: number;
   // THE QUEUE. Distilled, and waiting for a human to say yes.
   pending: PendingItem[];
 }
@@ -3768,7 +3773,13 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
       return res.json();
     };
 
-    const [runs, items, pending] = await Promise.all([
+    // ⚠️ AND PUCHIO'S NUMBER IS READ, NOT DEFAULTED TO ZERO.
+    //
+    // The route very nearly passed `brain.answered ?? 0`, which would have made the console say
+    // "Nobody has asked anything yet" for ever, in a confident sentence, next to a real number of
+    // real questions. A console that lies with a true-looking figure is worse than one that says
+    // nothing, and it is the exact species of bug this whole screen exists to prevent.
+    const [runs, items, pending, qa, subs] = await Promise.all([
       // ⚠️ kind=eq.differ. THE CONSOLE RENDERS THIS ROW AS A SENTENCE ABOUT TAX CONSTANTS.
       //
       // vitals() takes the newest run here and tells a human "62 of 62 constants matched". The
@@ -3782,12 +3793,25 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
       // forty things to get to eventually, it is the reason the queue exists.
       q('knowledge_items?status=eq.distilled&select=id,title,summary,source_url,affects,effective_date,confidence,engine_impact,created_at'
         + '&order=engine_impact.desc,created_at.desc&limit=60'),
+
+      // PUCHIO'S PULSE. How many questions have actually been answered, and when the last one was.
+      // NO question text and NO answer text: this is a heartbeat, not a transcript, and the team
+      // console is forbidden anything that belongs to a user (task 13).
+      q('qa_cache?select=updated_at&order=updated_at.desc&limit=500'),
+
+      // LEKHIO, IN THE MIDDLE. The only number on this screen that is a PERSON and not a process.
+      q('users?select=id&subscription_status=in.(active,trialing)&limit=2000'),
     ]);
+
+    const qaRows = Array.isArray(qa) ? (qa as Array<{ updated_at: string }>) : [];
 
     return {
       runs: Array.isArray(runs) ? runs : [],
       items: Array.isArray(items) ? items : [],
       pending: Array.isArray(pending) ? pending : [],
+      answered: qaRows.length,
+      lastAnswerAt: qaRows[0]?.updated_at ?? null,
+      subscribers: Array.isArray(subs) ? subs.length : 0,
     };
   } catch {
     // null is "we could not read the brain". It is NOT "the brain is empty", and the page says so.

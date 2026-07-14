@@ -87,6 +87,19 @@ const ALL = {
   employerNIRate: LTD.employerNIRate,
   employerSecondaryThreshold: LTD.employerSecondaryThreshold,
 
+  // 🔴 THE LOWER EARNINGS LIMIT. PUBLISHED, AND THEREFORE WATCHED, FROM TODAY.
+  //
+  // It was £6,708, written as a bare literal in four places across two repos, published nowhere and
+  // checked by nothing, while every other limited-company constant beside it was checked against
+  // GOV.UK nightly.
+  //
+  // It is the salary at which a director's year still counts toward his STATE PENSION although he
+  // pays no National Insurance on it. It is the entire reason we recommend that rung. Move it in a
+  // Budget without moving our copy and we would spend a year telling every director on the product
+  // to pay himself just UNDER the limit, and each of them would quietly lose a qualifying year worth
+  // roughly £300 a year for the rest of his life, and nothing anywhere would have gone red.
+  lowerEarningsLimit: LTD.lowerEarningsLimit,
+
   // THE INCOME AT WHICH 40% STARTS. PUBLISHED EXPLICITLY, AND HERE IS WHY.
   //
   // The mobile app calls this `higherThreshold`. It is £50,270, and so is `class4UpperLimit`, and

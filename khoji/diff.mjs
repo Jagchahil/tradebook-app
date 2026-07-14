@@ -856,6 +856,44 @@ export const CHECKS = [
     },
   },
 
+  {
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THE LOWER EARNINGS LIMIT. WATCHED FROM TONIGHT, AND IT SHOULD HAVE BEEN ALL ALONG.
+    //
+    // £6,708 sat as a bare literal in FOUR files across two repos, published in facts.json in none of
+    // them and checked by this differ in none of them, while every other limited-company constant
+    // beside it was compared to GOV.UK every single night.
+    //
+    // It is the salary at which a director's year still counts toward his STATE PENSION even though
+    // he pays no National Insurance on it. It is the whole reason we recommend that rung, and we
+    // recommend it to every director on the product.
+    //
+    // Move it in a Budget without moving our copy and here is what happens: nothing. Nothing goes
+    // red. Nothing is checked. We go on telling every director to pay himself just BELOW the limit,
+    // for a year, and each of them silently loses a qualifying year toward his state pension. Worth
+    // roughly £300 a year FOR LIFE. He would never find out, and neither would we.
+    //
+    // A number that decides a man's pension and is watched by nothing is the exact species of bug
+    // that put 45p in this engine while GOV.UK said 55p.
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    fact: 'lowerEarningsLimit',
+    label: 'Class 1 lower earnings limit (the State Pension qualifying rung)',
+    url: 'https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027',
+    // Same trap as the secondary threshold, on the same page, in the same shape: the row reads
+    //
+    //     Lower earnings limit £129 per week £560 per month £6,708 per year
+    //
+    // Take the first £ and you get 129, the WEEKLY figure, and the differ screams drift at a
+    // perfectly correct engine. Walk the row and take the figure that is explicitly PER YEAR.
+    extract(text) {
+      const m = text.match(
+        /lower earnings limit\s*£[\d,]+\s*per week\s*£[\d,]+\s*per month\s*£([\d,]+)\s*per year/i,
+      );
+      if (!m) return { error: 'could not find the lower earnings limit row with a per-year figure' };
+      return { value: money(m[1]) };
+    },
+  },
+
   // --- Simplified expenses -----------------------------------------------------------------------
   //
   // The flat rates a man claims for working from home. Small numbers, and he uses them every month.

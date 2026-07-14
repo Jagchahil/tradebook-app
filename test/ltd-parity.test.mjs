@@ -13,11 +13,39 @@ const applib = path.resolve(here, '../../tradebook-app/lib');
 
 const stage = mkdtempSync(path.join(tmpdir(), 'ltd-parity-'));
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(weblib, 'taxengine.ts'), 'utf8'));
+
+// 🔴 BOTH ENGINES NOW IMPORT THE LOWER EARNINGS LIMIT INSTEAD OF RETYPING IT.
+//
+// It was £6,708, a bare literal in an anonymous array in BOTH files, and it is the salary at which a
+// director's year still counts toward his STATE PENSION. Two copies of a number that decides a man's
+// pension, and this parity test could only ever have caught them DISAGREEING, never both being
+// stale together. Now there is one home for it and the engines import it, which is why the staging
+// below has to carry nistudentloan across for each side.
+writeFileSync(
+  path.join(stage, 'nistudentloan.ts'),
+  readFileSync(path.join(weblib, 'nistudentloan.ts'), 'utf8')
+    .replace("from './taxengine'", "from './taxengine.ts'"),
+);
+// The app's nistudentloan imports './tax', which in the staging dir is apptax.ts. Rewire it, or the
+// two sides of the parity test import two different files with the same name and the whole thing
+// quietly tests nothing.
+writeFileSync(
+  path.join(stage, 'appnistudentloan.ts'),
+  readFileSync(path.join(applib, 'nistudentloan.ts'), 'utf8')
+    .replace("from './tax'", "from './apptax.ts'"),
+);
+
 writeFileSync(
   path.join(stage, 'webltd.ts'),
-  readFileSync(path.join(weblib, 'ltdengine.ts'), 'utf8').replace("from './taxengine'", "from './taxengine.ts'"),
+  readFileSync(path.join(weblib, 'ltdengine.ts'), 'utf8')
+    .replace("from './taxengine'", "from './taxengine.ts'")
+    .replace("from './nistudentloan'", "from './nistudentloan.ts'"),
 );
-writeFileSync(path.join(stage, 'apptax.ts'), readFileSync(path.join(applib, 'tax.ts'), 'utf8'));
+writeFileSync(
+  path.join(stage, 'apptax.ts'),
+  readFileSync(path.join(applib, 'tax.ts'), 'utf8')
+    .replace("from './nistudentloan'", "from './appnistudentloan.ts'"),
+);
 const web = await import(pathToFileURL(path.join(stage, 'webltd.ts')).href);
 const app = await import(pathToFileURL(path.join(stage, 'apptax.ts')).href);
 
@@ -32,7 +60,10 @@ const agree = (name, a, b) => {
 };
 
 for (const profit of [0, 8000, 20000, 35000, 50270, 60000, 80000, 100000, 140000, 250000]) {
-  for (const salary of [12570, 6708, 5000]) {
+  // ⚠️ AND NOT [12570, 6708, 5000] HERE EITHER. A parity test that hardcodes the very numbers it is
+  // meant to be guarding will go on passing, in perfect agreement, on two engines that are both
+  // wrong. Take the rungs from the engine.
+  for (const salary of web.salaryRungs().map((r) => r.salary)) {
     const w = web.planLtd(profit, salary);
     const a = app.planLtd(profit, salary);
     const tag = `p${profit} s${salary}`;

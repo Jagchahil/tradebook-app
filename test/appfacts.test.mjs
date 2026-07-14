@@ -43,9 +43,21 @@ const applib = path.resolve(here, '../../tradebook-app/lib');
 // needed to test the mapping.
 const stage = mkdtempSync(path.join(tmpdir(), 'appfacts-'));
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(weblib, 'taxengine.ts'), 'utf8'));
+
+// The web ltdengine now IMPORTS the Lower Earnings Limit rather than retyping it, so the staging has
+// to carry nistudentloan across with it. (£6,708 was a bare literal in four files across two repos:
+// the salary at which a director's year still counts toward his State Pension, published nowhere and
+// watched by nothing.)
+writeFileSync(
+  path.join(stage, 'nistudentloan.ts'),
+  readFileSync(path.join(weblib, 'nistudentloan.ts'), 'utf8')
+    .replace("from './taxengine'", "from './taxengine.ts'"),
+);
 writeFileSync(
   path.join(stage, 'ltdengine.ts'),
-  readFileSync(path.join(weblib, 'ltdengine.ts'), 'utf8').replace("from './taxengine'", "from './taxengine.ts'"),
+  readFileSync(path.join(weblib, 'ltdengine.ts'), 'utf8')
+    .replace("from './taxengine'", "from './taxengine.ts'")
+    .replace("from './nistudentloan'", "from './nistudentloan.ts'"),
 );
 writeFileSync(path.join(stage, 'tax.ts'), readFileSync(path.join(applib, 'tax.ts'), 'utf8'));
 writeFileSync(

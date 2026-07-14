@@ -166,11 +166,41 @@ export async function POST(req: NextRequest) {
 
       const blocks: string[] = [];
 
-      // What actually governs his answer. An item with no date lives here too: not knowing when it
-      // bites is not a reason to hide it, and the summary itself will usually say.
-      const today = [...inForce, ...unknown];
-      if (today.length) {
-        blocks.push(`THE LAW AS IT STANDS TODAY. Use these to answer.\n${today.map(line).join('\n')}`);
+      // What actually governs his answer.
+      //
+      // ⚠️ AND `unknown` IS NOT IN HERE. THE LIVE DATA TAUGHT ME THIS AN HOUR AFTER I WROTE IT.
+      //
+      // My first version folded the undated items in with the in-force ones, on the reasoning that
+      // "not knowing when it bites is not a reason to hide it". That is true, and it is not a reason
+      // to call it the law either, which is what the heading on this block does.
+      //
+      // Here is HMRC's own Operative date section from a measure published on 13 July 2026:
+      //
+      //     "The operative date for the increase to the threshold is SUBJECT TO THE STATUTORY
+      //      INSTRUMENT that will make this change. The changes ... will apply to deliberate
+      //      non-compliance which takes place AFTER THE DATE OF ROYAL ASSENT to Finance Bill 2026-27."
+      //
+      // There is no calendar date because HMRC does not have one yet. So our extractor honestly
+      // returns null, and phase() honestly says `unknown` — and then I handed it to a language model
+      // under a heading reading THE LAW AS IT STANDS TODAY. A measure awaiting Royal Assent is not
+      // the law today. It is a draft.
+      //
+      // UNKNOWN IS NOT TODAY. It is its own answer and it gets its own block.
+      if (inForce.length) {
+        blocks.push(`THE LAW AS IT STANDS TODAY. Use these to answer.\n${inForce.map(line).join('\n')}`);
+      }
+
+      // We know it matters. We do not know when it starts. Both halves of that are worth saying, and
+      // neither of them is "this is the law".
+      if (unknown.length) {
+        blocks.push(
+          'WE DO NOT KNOW WHEN THESE START. The source does not give a date: usually it is waiting on '
+          + 'Royal Assent or a Statutory Instrument. Do NOT state any figure from this block as the '
+          + 'current rule, and do NOT tell him it is coming on a particular date. If one of them bears '
+          + 'on his question, say that a change is proposed, that the start date is not yet set, and '
+          + 'point him at the source.\n'
+          + unknown.map(line).join('\n'),
+        );
       }
 
       // Coming, but NOT YET LAW. He must not be given these as the answer.

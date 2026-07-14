@@ -117,9 +117,38 @@ ok('...and it is null for anything that has already landed, because that is not 
 ok('🔴 THE ROUTE SPLITS THE KNOWLEDGE BEFORE THE MODEL EVER SEES IT',
   /byPhase\(items\)/.test(askCode) && /const \{ inForce, announced, unknown \}/.test(askCode));
 
-ok('...and the two blocks are LABELLED, in words a model cannot misread',
+ok('...and the blocks are LABELLED, in words a model cannot misread',
   /THE LAW AS IT STANDS TODAY/.test(askCode)
-  && /ANNOUNCED BUT NOT YET IN FORCE/.test(askCode));
+  && /ANNOUNCED BUT NOT YET IN FORCE/.test(askCode)
+  && /WE DO NOT KNOW WHEN THESE START/.test(askCode));
+
+// 🔴 UNKNOWN IS NOT TODAY. The live data taught me this an hour after I wrote the first version.
+//
+// My first split folded the undated items in with the in-force ones, reasoning that "not knowing when
+// it bites is not a reason to hide it". True. And not a reason to call it THE LAW either, which is
+// what the heading on that block does.
+//
+// Here is HMRC's own Operative date section, from a measure published on 13 July 2026:
+//
+//     "The operative date ... is SUBJECT TO THE STATUTORY INSTRUMENT that will make this change. The
+//      changes ... will apply to deliberate non-compliance which takes place AFTER THE DATE OF ROYAL
+//      ASSENT to Finance Bill 2026-27."
+//
+// No calendar date, because HMRC does not have one. Our extractor honestly returns null. phase()
+// honestly says `unknown`. And then I handed it to a language model under a heading reading THE LAW
+// AS IT STANDS TODAY. A measure awaiting Royal Assent is a DRAFT. It is not the law today.
+ok('🔴 AN UNDATED ITEM IS NOT IN THE "LAW TODAY" BLOCK. Unknown is not today.',
+  /if \(inForce\.length\)[\s\S]{0,200}?THE LAW AS IT STANDS TODAY[\s\S]{0,120}?inForce\.map/.test(askCode)
+  && !/\[\.\.\.inForce, \.\.\.unknown\]/.test(askCode));
+
+ok('...it gets its OWN block, which says we do not know when it starts',
+  /if \(unknown\.length\)[\s\S]{0,400}?WE DO NOT KNOW WHEN THESE START/.test(askCode));
+
+ok('...and that block forbids stating it as the current rule OR as a dated change',
+  // Both errors are available here and they are opposite. "This is the rule" is wrong because it is a
+  // draft. "It starts on 6 April" is wrong because nobody has said that. Forbid both.
+  /Do NOT state any figure from this block as the[\s\S]{0,40}?current rule/.test(askCode)
+  && /do NOT tell him it is coming on a particular date/.test(askCode));
 
 ok('🔴 ...and the announced block is told, in terms, that it MUST NOT be used to answer',
   /MUST NOT be used to answer/.test(askCode) && /NOT the law today/.test(askCode));

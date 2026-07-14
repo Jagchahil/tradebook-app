@@ -86,10 +86,35 @@ export function operativeDate(text) {
   // wander into "Current law" and pick up the date some Act was passed in 1992.
   const window = text.slice(i, i + 400);
 
+  // ⚠️ AND THE CLAUSE IN THE MIDDLE IS THE WHOLE PROBLEM. I GOT THIS WRONG AND THE LIVE DATA CAUGHT ME.
+  //
+  // My first pattern allowed only a "for ..." clause between the verb and the date:
+  //
+  //     have effect (?:for[^.]*?)? (?:from|on or after) <date>
+  //
+  // Then I ran it against the twenty-five measures HMRC actually published on 13 July 2026 and
+  // FOURTEEN of them came back with NO OPERATIVE DATE. I nearly took that at face value. It is not
+  // true. Here is the Air Passenger Duty one, word for word:
+  //
+  //     "Operative date. This measure will have effect IN RELATION TO THE CARRIAGE OF PASSENGERS
+  //      on or after 1 April 2027."
+  //
+  // "in relation to the carriage of passengers" is not a "for" clause, so my regex walked straight
+  // past a date that was sitting right there, returned null, and the measure would have been filed
+  // with NO effective date. phase() calls that `unknown`. `unknown` goes into the block headed THE
+  // LAW AS IT STANDS TODAY. And Rakha would have answered a man, today, from a measure that does not
+  // bite until April 2027.
+  //
+  // That is precisely the bug this whole file was written to prevent, and my own extractor was
+  // producing it. A miss here does not look like a miss. It looks like a TIIN that simply did not
+  // say, which is a thing that genuinely happens, which is why it would have sat there for months.
+  //
+  // So: allow ANY clause between the verb and the preposition, as long as we do not cross a full
+  // stop into the next sentence. HMRC writes English, not a grammar we get to specify.
   const m = window.match(
-    /(?:have|has|takes?|taking)\s+effect\s+(?:for[^.]*?)?(?:from|on and after|on or after|on)\s+(\d{1,2}\s+\w+\s+\d{4})/i,
+    /(?:have|has|had|takes?|taking)\s+effect\b[^.]{0,160}?\b(?:from|on and after|on or after|with effect from|on)\s+(\d{1,2}\s+\w+\s+\d{4})/i,
   )
-    // Some TIINs skip the verb: "Operative date: 6 April 2027."
+    // Some TIINs skip the verb entirely: "Operative date: 6 April 2027."
     || window.match(/operative date[:\s]+(\d{1,2}\s+\w+\s+\d{4})/i);
 
   if (!m) return null;
@@ -98,6 +123,32 @@ export function operativeDate(text) {
   if (Number.isNaN(d.getTime())) return null;
 
   return d.toISOString().slice(0, 10);   // YYYY-MM-DD, which is what knowledge_items wants
+}
+
+// 🔴 WHAT HMRC ACTUALLY SAID ABOUT WHEN IT STARTS, WHETHER OR NOT THERE IS A DATE IN IT.
+//
+// Twelve of the twenty-five measures published on 13 July 2026 state no calendar date at all. That is
+// not our extractor failing. It is HMRC not knowing yet, and saying so, in these words:
+//
+//     "The operative date for the increase to the threshold is SUBJECT TO THE STATUTORY INSTRUMENT
+//      that will make this change. The changes ... will apply to deliberate non-compliance which
+//      takes place AFTER THE DATE OF ROYAL ASSENT to Finance Bill 2026-27."
+//
+// A parsed date would be a lie there. But throwing the sentence away would be a waste, because that
+// sentence IS the answer to "when does this start": it starts when Parliament says so, and nobody
+// knows when that is. Keep HMRC's words, hand them over unrewritten, and let the reader see exactly
+// how much is settled and how much is not.
+export function commencement(text) {
+  if (!text) return null;
+  const i = text.search(/operative date/i);
+  if (i < 0) return null;
+
+  // From the heading to the next section ("Current law" is the standard one), or 500 chars, whichever
+  // comes first. Long enough for the real sentence, short enough not to swallow the whole document.
+  const after = text.slice(i + 'operative date'.length, i + 600);
+  const end = after.search(/\bCurrent law\b|\bProposed revisions\b|\bSummary of impacts\b/i);
+  const said = (end > 0 ? after.slice(0, end) : after).trim();
+  return said ? said.replace(/\s+/g, ' ').slice(0, 500) : null;
 }
 
 // What the measure is actually ABOUT, in HMRC's own opening line. Not a summary we generated: the
@@ -156,12 +207,19 @@ async function main() {
 
   const measures = fresh.map((r) => {
     const effective = operativeDate(r.indexable_content);
+    const said = commencement(r.indexable_content);
     return {
       title: r.title,
       link: r.link,
       published: r.public_timestamp,
-      effective,                                  // null when the TIIN does not state one
-      summary: gist(r.indexable_content, r.description || ''),
+      effective,                                  // null when HMRC does not state a date. Often it does not.
+      said,                                       // HMRC's own words about when it starts, date or no date
+      // HMRC's opening line, then HMRC's own commencement sentence, both unrewritten. When there is
+      // no date, THAT SENTENCE IS THE ANSWER: it starts when Parliament says so, and nobody knows when.
+      summary: [
+        gist(r.indexable_content, r.description || ''),
+        said ? `\n\nOperative date, in HMRC's words: ${said}` : '',
+      ].join(''),
       bodyHash: createHash('sha256').update(r.indexable_content || '').digest('hex').slice(0, 16),
     };
   });
@@ -178,7 +236,9 @@ async function main() {
       log(`  ${m.effective ? `effective ${m.effective}` : 'NO OPERATIVE DATE '}  ${m.title}`);
     }
     const dated = measures.filter((m) => m.effective).length;
-    log(`\n${dated} of ${measures.length} stated an operative date in prose. That is the number no other source gives us.`);
+    log(`\n${dated} of ${measures.length} stated a CALENDAR DATE. The rest say things like "subject to the Statutory Instrument"`);
+    log('   or "after Royal Assent". That is not our extractor failing, it is HMRC not knowing yet, and');
+    log('   we keep its words rather than inventing a date. UNKNOWN IS NOT TODAY.');
     return;
   }
 
@@ -212,7 +272,7 @@ async function main() {
           null,
           false,
           'needs_distillation',
-          { tiin: true, published: m.published, effective: m.effective, bodyHash: m.bodyHash },
+          { tiin: true, published: m.published, effective: m.effective, commencement: m.said, bodyHash: m.bodyHash },
         ],
       );
       if (r.rowCount > 0) filed += 1;

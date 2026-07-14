@@ -15,7 +15,7 @@
 // Get that date wrong and the measure lands in the wrong half of lib/brain.ts phase(): a change
 // taking effect in 2027 gets filed as IN FORCE, and Rakha answers a man from it today.
 
-import { operativeDate, gist, isRecent } from './budget.mjs';
+import { operativeDate, commencement, gist, isRecent } from './budget.mjs';
 
 let pass = 0;
 let fail = 0;
@@ -71,6 +71,36 @@ ok('"will take effect from 6 April 2026"',
 ok('"Operative date: 6 April 2027" with no verb at all',
   operativeDate('Detailed proposal Operative date: 6 April 2027. Current law ...') === '2027-04-06');
 
+// 🔴 THE ONE THE LIVE DATA CAUGHT. Verbatim from the Air Passenger Duty TIIN, 13 July 2026.
+//
+// My first pattern allowed only a "for ..." clause between the verb and the date. Then I ran it
+// against the twenty-five measures HMRC actually published that day and FOURTEEN came back with NO
+// OPERATIVE DATE. I nearly took that at face value. It was not true.
+//
+// "in relation to the carriage of passengers" is not a "for" clause, so the regex walked straight
+// past a date sitting right there in the sentence and returned null. phase() calls null `unknown`,
+// `unknown` goes in the block headed THE LAW AS IT STANDS TODAY, and Rakha answers a man TODAY from
+// a measure that does not bite until APRIL 2027.
+//
+// That is exactly the bug this file exists to prevent, and my own extractor was producing it. And a
+// miss does not LOOK like a miss: it looks like a TIIN that did not say, which genuinely happens.
+// It would have sat there for months.
+ok('🔴 "have effect IN RELATION TO THE CARRIAGE OF PASSENGERS on or after 1 April 2027"',
+  operativeDate(
+    'Detailed proposal Operative date This measure will have effect in relation to the carriage '
+    + 'of passengers on or after 1 April 2027. Current law Section 30 of Finance Act 1994.',
+  ) === '2027-04-01');
+
+ok('...and any other clause HMRC feels like writing, because HMRC writes English',
+  operativeDate('Operative date The changes will have effect for accounting periods beginning on or after 1 January 2027.') === '2027-01-01'
+  && operativeDate('Operative date This measure has effect in respect of gains arising on or after 30 October 2024.') === '2024-10-30');
+
+ok('...but it still does not wander into the NEXT sentence to find a date',
+  // The clause may be anything, as long as it does not cross a full stop. "Current law ... Finance
+  // Act 1994" is a different sentence and a different date, and grabbing it would be worse than
+  // grabbing nothing.
+  operativeDate('Operative date This measure will have effect. Current law is in section 30 of the Act of 6 April 1994.') === null);
+
 ok('🔴 A TIIN WITH NO OPERATIVE DATE RETURNS NULL. It does not guess.',
   // And null is the honest answer. brain.ts phase() then calls it `unknown`, which is exactly right:
   // we do not know when it bites, and we say so, and nothing is quietly promoted into the law.
@@ -93,6 +123,40 @@ ok('the gist is HMRC\'s own opening line, unrewritten',
 
 ok('...and it falls back to the description rather than to nothing',
   gist('', 'A measure about vans.') === 'A measure about vans.');
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 2b. WHEN HMRC DOES NOT KNOW EITHER. Twelve of the twenty-five, and it is not a bug.
+// ---------------------------------------------------------------------------------------------
+//
+// Verbatim from the deliberate-defaulters TIIN, 13 July 2026. There is no calendar date in it
+// ANYWHERE, because HMRC does not have one yet.
+const UNDATED = `Detailed proposal Operative date The threshold at which HMRC can publish the details
+will increase to £50,000 potential lost revenue from the November 2026 publication. The operative date
+for the increase to the threshold is subject to the Statutory Instrument that will make this change.
+The changes which enable HMRC to publish more details will apply to deliberate non-compliance which
+takes place after the date of Royal Assent to Finance Bill 2026-27. Current law The current law is
+contained in Section 94 of the Finance Act 2009.`;
+
+ok('🔴 A MEASURE AWAITING ROYAL ASSENT HAS NO DATE, AND WE DO NOT INVENT ONE',
+  // "Subject to the Statutory Instrument." "After the date of Royal Assent." HMRC does not know when
+  // this starts, so neither do we, and a parsed date here would be a lie.
+  operativeDate(UNDATED) === null);
+
+ok('🔴 ...BUT WE KEEP HMRC\'S WORDS, BECAUSE THAT SENTENCE *IS* THE ANSWER',
+  // Throwing it away would be a waste. "It starts when Parliament says so, and nobody knows when"
+  // is a complete and useful answer to "when does this start". A man can act on that.
+  (() => {
+    const c = commencement(UNDATED);
+    return c
+      && /subject to the Statutory Instrument/i.test(c)
+      && /after the date of Royal Assent/i.test(c);
+  })());
+
+ok('...and it stops at the next heading rather than swallowing the whole document',
+  !/Section 94 of the Finance Act 2009/i.test(commencement(UNDATED) || ''));
+
+ok('a TIIN with a real date keeps its words too, so both halves always agree',
+  /6 April 2027/.test(commencement('Operative date This measure will have effect from 6 April 2027. Current law ...') || ''));
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 3. THE WINDOW. What counts as "just landed".

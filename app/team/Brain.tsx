@@ -5,6 +5,7 @@ import { browserSupabase } from '../../lib/supabasebrowser';
 import { C, T, S as U, FONT } from './ui';
 import { isLive } from '../../lib/brain';
 import type { Vitals, Day, Knowledge } from '../../lib/brain';
+import Constellation, { type BrainMapData } from './Constellation';
 
 // KHOJI. The brain, live.
 //
@@ -63,6 +64,7 @@ interface Payload {
   growth: Day[];
   runs: Array<{ ran_at: string; agreed: number; drifted: number; blind: number; ok: boolean }>;
   pending: Pending[];
+  brainMap?: BrainMapData;
 }
 
 const PULSE: Record<Vitals['pulse'], { tone: string; word: string; alive: boolean }> = {
@@ -373,6 +375,9 @@ export default function Brain() {
           </div>
         ) : null}
       </div>
+
+      {/* THE CONSTELLATION ------------------------------------------------------------------ */}
+      {d.brainMap ? <Constellation map={d.brainMap} /> : null}
 
       {/* THE APPROVAL GATE ------------------------------------------------------------------ */}
       <Deck

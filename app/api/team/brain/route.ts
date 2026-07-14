@@ -3,6 +3,7 @@ import { verifyAccessToken, readTeamMember, readBrain } from '../../../../lib/su
 import { isTeam } from '../../../../lib/team';
 import { vitals, coverage, knowledge, growth } from '../../../../lib/brain';
 import { body } from '../../../../lib/organs';
+import { buildBrainMap } from '../../../../lib/brainmap';
 
 export const runtime = 'nodejs';
 
@@ -76,5 +77,22 @@ export async function GET(req: NextRequest) {
     runs: brain.runs.slice(0, 14).reverse().map((r) => ({
       ran_at: r.ran_at, agreed: r.agreed, drifted: r.drifted, blind: r.blind, ok: r.ok,
     })),
+
+    // 🔴 THE CONSTELLATION. The shape of what Khoji watches: the tax brain (live) and the twelve
+    // legal fields (dim until lawwatch reports). The law nodes are DELIBERATELY unmeasured until the
+    // mini has run lawwatch and written its rows: we do not glow over a thing we have not checked.
+    brainMap: buildBrainMap({
+      tax: brain.runs[0]
+        ? {
+            checked: brain.runs[0].checked,
+            agreed: brain.runs[0].agreed,
+            drifted: brain.runs[0].drifted,
+            blind: brain.runs[0].blind,
+            ranHoursAgo: brain.runs[0].ran_at
+              ? (Date.now() - new Date(brain.runs[0].ran_at).getTime()) / 3_600_000
+              : null,
+          }
+        : undefined,
+    }),
   });
 }

@@ -63,7 +63,6 @@ const PULSE: Record<Vitals['pulse'], { tone: string; word: string; alive: boolea
 export default function Brain() {
   const [d, setD] = useState<Payload | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
 
   async function load() {
     const { data: s } = await browserSupabase.auth.getSession();
@@ -80,36 +79,79 @@ export default function Brain() {
 
   useEffect(() => { load(); }, []);
 
-  // APPROVE, or DISMISS. See app/api/team/review/route.ts for why this is one at a time and why
-  // there will never be an "approve all".
+  // ⚠️ THE COUNT WENT STALE, AND THE BUG WAS A RACE I BUILT MYSELF.
   //
-  // The row leaves the list the instant you click, because a queue that hesitates gets double
-  // clicked. But if the write FAILS it comes straight back, because the one thing worse than a slow
-  // approval is a human who believes he approved something and did not.
-  async function decide(item: Pending, decision: 'approve' | 'dismiss') {
-    if (!d || busy) return;
-    setBusy(item.id);
-    const before = d.pending;
-    setD({ ...d, pending: before.filter((p) => p.id !== item.id) });
+  // The first version re-read the whole brain after EVERY decision. Click fast, and an OLDER response
+  // lands after a newer one and overwrites the queue with a bigger, staler list. The database was
+  // perfectly correct: it said 26 waiting, 22 approved, every single click had landed. The SCREEN
+  // said 31 and would not move.
+  //
+  // Which is the worst possible failure for this particular button, because it looks exactly like
+  // "my approval did not save", and a man who does not trust the button stops using the gate.
+  //
+  // So the deck is the truth. One card at a time. A decision pops it locally, the POST goes off, and
+  // NOTHING re-reads the server unless something fails. There is no response left in flight that can
+  // arrive late and lie to you.
+  const [deck, setDeck] = useState<Pending[] | null>(null);
+  const [done, setDone] = useState<Array<{ item: Pending; decision: 'approve' | 'dismiss' }>>([]);
+  const [undoing, setUndoing] = useState(false);
 
+  useEffect(() => { if (d && deck === null) setDeck(d.pending); }, [d, deck]);
+
+  async function post(id: string, decision: 'approve' | 'dismiss' | 'undo') {
     const { data: s } = await browserSupabase.auth.getSession();
-    const res = await fetch('/api/team/review', {
+    return fetch('/api/team/review', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${s.session?.access_token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ id: item.id, decision }),
+      body: JSON.stringify({ id, decision }),
     });
-    setBusy(null);
+  }
+
+  // APPROVE, or NOT RELEVANT. One card leaves, the next arrives. See app/api/team/review/route.ts for
+  // why there is no Approve All and never will be: this is fast, not bulk. A human still reads each
+  // one. He just is not made to fight the interface while he does it.
+  async function decide(item: Pending, decision: 'approve' | 'dismiss') {
+    if (!deck) return;
+
+    // Pop it NOW. The card must not hesitate: a queue that lags gets double clicked, and a double
+    // click on this button is a thing we told our users twice.
+    setDeck(deck.filter((p) => p.id !== item.id));
+    setDone((prev) => [{ item, decision }, ...prev]);
+    setErr(null);
+
+    const res = await post(item.id, decision);
+
+    // A FAILED WRITE MUST NOT LOOK LIKE A SUCCESSFUL ONE. Put it back at the FRONT, where he will see
+    // it, not at the bottom of a deck he may never reach.
+    if (!res.ok) {
+      setDeck((cur) => (cur ? [item, ...cur.filter((p) => p.id !== item.id)] : [item]));
+      setDone((prev) => prev.filter((x) => x.item.id !== item.id));
+      setErr('That did not save. The card is back at the top. Nothing was approved.');
+    }
+  }
+
+  // UNDO. The reason a single click is acceptable on the most consequential button in the company.
+  //
+  // Speed without a way back is not seamless, it is dangerous. It puts the row straight back in the
+  // queue, at the front, exactly where it came from.
+  async function undo() {
+    const last = done[0];
+    if (!last || undoing) return;
+    setUndoing(true);
+
+    const res = await post(last.item.id, 'undo');
+    setUndoing(false);
 
     if (!res.ok) {
-      setD((cur) => (cur ? { ...cur, pending: before } : cur));
-      setErr('That did not save. The item is back in the queue. Nothing was approved.');
+      setErr('Could not undo that. It is still ' + (last.decision === 'approve' ? 'approved' : 'dismissed') + '.');
       return;
     }
+    setDeck((cur) => (cur ? [last.item, ...cur] : [last.item]));
+    setDone((prev) => prev.slice(1));
     setErr(null);
-    load();   // re-read, so the counts above move with it
   }
 
   if (err && !d) return <p style={S.err}>{err}</p>;
@@ -240,13 +282,28 @@ export default function Brain() {
       </div>
 
       {/* THE APPROVAL GATE ------------------------------------------------------------------ */}
-      <Queue items={d.pending} busy={busy} onDecide={decide} approved={d.knowledge.reviewed} />
+      <Deck
+        deck={deck ?? []}
+        doneCount={done.length}
+        canUndo={done.length > 0 && !undoing}
+        lastDecision={done[0]?.decision}
+        onDecide={decide}
+        onUndo={undo}
+        approvedBefore={d.knowledge.reviewed}
+      />
 
       {/* WHAT IT HOLDS ---------------------------------------------------------------------- */}
       <div style={{ ...U.panel, marginTop: 12 }}>
+        {/* ⚠️ THESE COUNT THE DECK, NOT A SNAPSHOT FROM PAGE LOAD.
+            The old version read `d.knowledge.waiting`, frozen at the moment the page loaded, while
+            the deck emptied underneath it. Two numbers on one screen, from one table, disagreeing.
+            That is the same bug as the growth chart and the 82 closed alarms, for the third time in
+            one day, and the answer is the same: ONE source, derived, never two. */}
         <div style={S.statRow}>
-          <Stat n={d.knowledge.reviewed} label="approved" tone={C.green} note="the only rows a user ever sees" />
-          <Stat n={d.knowledge.waiting} label="waiting for you" tone={d.knowledge.waiting > 0 ? C.amber : C.faint} />
+          <Stat n={d.knowledge.reviewed + done.filter((x) => x.decision === 'approve').length}
+                label="approved" tone={C.green} note="the only rows a user ever sees" />
+          <Stat n={deck?.length ?? d.knowledge.waiting}
+                label="waiting for you" tone={(deck?.length ?? 0) > 0 ? C.amber : C.faint} />
           <Stat n={d.knowledge.raw} label="not yet distilled" tone={C.faint} />
           <Stat n={d.knowledge.incidents} label="open incidents" tone={d.knowledge.incidents > 0 ? C.red : C.faint} note="not knowledge. Alarms." />
         </div>
@@ -261,32 +318,53 @@ export default function Brain() {
   );
 }
 
-// --- THE QUEUE ----------------------------------------------------------------------------------
+// --- THE DECK -----------------------------------------------------------------------------------
 //
 // ⚠️ THIS IS THE ONE BUTTON THE WHOLE DOCTRINE IS ABOUT.
 //
 // "One less button at a time. Until only one is left. Approve."
 //
-// A `reviewed` row is the ONLY kind that ever reaches a user's tax answer. So clicking Approve is
-// the moment a sentence Khoji scraped off GOV.UK becomes something we will say to a self-employed
-// man about the return he is legally responsible for. There is no Approve All, and there will not be
-// one: forty unread items becoming forty things we have told our users, in one thoughtless second,
-// is precisely what the human gate exists to prevent.
-function Queue({
-  items, busy, onDecide, approved,
+// A `reviewed` row is the ONLY kind that ever reaches a user's tax answer. So Approve is the moment
+// a sentence Khoji scraped off GOV.UK becomes something we will say to a self-employed man about the
+// return he is legally responsible for.
+//
+// IT IS A DECK, NOT A LIST, AND THAT IS NOT A UI PREFERENCE.
+//
+// A list of forty items asks him to hold forty decisions in his head and scroll. He scrolls, he
+// skims, and skimming is exactly the failure a human gate exists to prevent. One card fills the
+// screen: he can only be looking at the thing he is deciding.
+//
+// It is fast, and it is NOT bulk. There is no Approve All and there never will be. A human reads
+// every one. He is simply not made to fight the interface while he does it. And because it is fast,
+// the last decision is ALWAYS reversible with one click: speed without a way back is not seamless,
+// it is dangerous.
+function Deck({
+  deck, doneCount, canUndo, lastDecision, onDecide, onUndo, approvedBefore,
 }: {
-  items: Pending[];
-  busy: string | null;
+  deck: Pending[];
+  doneCount: number;
+  canUndo: boolean;
+  lastDecision?: 'approve' | 'dismiss';
   onDecide: (i: Pending, d: 'approve' | 'dismiss') => void;
-  approved: number;
+  onUndo: () => void;
+  approvedBefore: number;
 }) {
-  if (items.length === 0) {
+  const card = deck[0];
+  const total = deck.length + doneCount;
+  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 100;
+
+  if (!card) {
     return (
       <div style={{ ...U.panel, marginTop: 12 }}>
         <div style={S.emptyQ}>
           <b style={{ color: C.green }}>Nothing waiting for you.</b> Everything Khoji has distilled has
-          been read by a human. {approved} approved so far, and an approved row is the only kind that
-          ever reaches a user.
+          been read by a human. {approvedBefore + doneCount} approved in total, and an approved row is
+          the only kind that ever reaches a user.
+          {canUndo ? (
+            <button onClick={onUndo} style={{ ...S.undo, marginTop: 14 }}>
+              Undo the last one
+            </button>
+          ) : null}
         </div>
       </div>
     );
@@ -294,77 +372,70 @@ function Queue({
 
   return (
     <div style={{ ...U.panel, marginTop: 12, padding: 0, overflow: 'hidden' }}>
-      <div style={S.qHead}>
-        <div>
-          <div style={T.label}>Waiting for you</div>
-          <div style={S.qCount}>{items.length}</div>
+      {/* The bar is the whole point of a deck: he can see the end of it. A list of forty has no end. */}
+      <div style={S.deckHead}>
+        <div style={S.deckLeft}>
+          <span style={S.deckN}>{deck.length}</span>
+          <span style={S.deckLabel}>left to read</span>
         </div>
-        <p style={S.qWhy}>
-          Khoji found these on GOV.UK and put them in plain English. <b>Nothing here reaches a single
-          user until you say yes.</b> That is not a chore. That is the product.
-        </p>
+        <div style={S.bar} aria-hidden="true">
+          <div style={{ ...S.barFill, width: `${pct}%` }} />
+        </div>
+        {canUndo ? (
+          <button onClick={onUndo} style={S.undo}>
+            Undo {lastDecision === 'approve' ? 'approve' : 'dismiss'}
+          </button>
+        ) : null}
       </div>
 
-      {items.map((i) => (
-        <article key={i.id} style={{ ...S.card, opacity: busy === i.id ? 0.45 : 1 }}>
-          <div style={S.cardTop}>
-            {/* ⚠️ THE BADGE THAT LIED ON ITS FIRST DAY.
-                It said "CHANGES THE TAX ENGINE" on a page effective 1 JANUARY 2019, and on another
-                from 6 April 2017. The trading allowance has been £1,000 since 2017. Our engine holds
-                it. Khoji compares it to GOV.UK every single night.
+      {/* THE CARD. One. He can only be looking at the thing he is deciding. */}
+      <article key={card.id} style={S.card}>
+        <div style={S.cardTop}>
+          {/* ⚠️ THE BADGE THAT LIED ON ITS FIRST DAY. It said "CHANGES THE TAX ENGINE" on a page from
+              1 January 2019 and another from 6 April 2017. `engine_impact` is a MODEL'S GUESS and the
+              distiller had set it true on all 39 items: the loudest label on the screen was on
+              everything, which means it was on nothing. The shout is now reserved for a change that
+              is actually landing, decided by a fact the model cannot fudge: the effective date. */}
+          {card.engine_impact && isLive(card.effective_date) ? (
+            <span style={S.impact}>CHANGES THE TAX ENGINE</span>
+          ) : card.engine_impact ? (
+            <span style={S.touches}>touches the tax engine</span>
+          ) : null}
+          {card.effective_date ? (
+            <span style={S.when}>
+              from {new Date(card.effective_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </span>
+          ) : null}
+        </div>
 
-                `engine_impact` is a MODEL'S GUESS, and it had set it true on all 39 items. So the
-                loudest label on the screen was on everything, which means it was on nothing, and the
-                one item that genuinely moves a rate would have hidden inside the noise. That is the
-                same disease as an alarm that always fires: it gets muted, and then you have no alarm.
+        <h3 style={S.cardTitle}>{card.title || 'Untitled'}</h3>
+        {card.summary ? <p style={S.cardBody}>{card.summary}</p> : null}
+        {card.affects ? <p style={S.affects}>Affects: {card.affects}</p> : null}
 
-                The row carries a FACT the model cannot fudge: the effective date. So the shout is
-                reserved for a change that is actually landing. Anything older is quietly labelled
-                for what it is: relevant, and not news. */}
-            {i.engine_impact && isLive(i.effective_date) ? (
-              <span style={S.impact}>CHANGES THE TAX ENGINE</span>
-            ) : i.engine_impact ? (
-              <span style={S.touches}>touches the tax engine</span>
-            ) : null}
-            {i.effective_date ? (
-              <span style={S.when}>from {new Date(i.effective_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-            ) : null}
-          </div>
+        {/* THE SOURCE, ALWAYS, AND ABOVE THE BUTTONS. You are about to vouch for this in front of
+            HMRC. The summary is a MODEL'S account of a page, and on 8 July a model read the mileage
+            page, scored its own confidence at 0.95, and was flat wrong. */}
+        {card.source_url ? (
+          <a href={card.source_url} target="_blank" rel="noopener noreferrer" style={S.src}>
+            Read the GOV.UK page first &rarr;
+          </a>
+        ) : (
+          <p style={S.noSrc}>No source link. Do not approve this.</p>
+        )}
 
-          <h3 style={S.cardTitle}>{i.title || 'Untitled'}</h3>
-          {i.summary ? <p style={S.cardBody}>{i.summary}</p> : null}
-          {i.affects ? <p style={S.affects}>Affects: {i.affects}</p> : null}
+        <div style={S.actions}>
+          <button onClick={() => onDecide(card, 'approve')} style={S.approve}>Approve</button>
+          <button onClick={() => onDecide(card, 'dismiss')} style={S.dismiss}>Not relevant</button>
+        </div>
 
-          <div style={S.cardFoot}>
-            <div style={S.actions}>
-              <button
-                onClick={() => onDecide(i, 'approve')}
-                disabled={busy !== null}
-                style={{ ...S.approve, cursor: busy ? 'wait' : 'pointer' }}
-              >
-                Approve
-              </button>
-              <button
-                onClick={() => onDecide(i, 'dismiss')}
-                disabled={busy !== null}
-                style={{ ...S.dismiss, cursor: busy ? 'wait' : 'pointer' }}
-              >
-                Not relevant
-              </button>
-            </div>
+        <p style={S.stakes}>
+          <b>Nothing here reaches a single user until you say yes.</b> That is not a chore. That is the
+          product.
+        </p>
+      </article>
 
-            {/* THE SOURCE, ALWAYS. You are about to vouch for this in front of HMRC. Read it first.
-                A summary is a model's account of a page, and a model has been wrong before. */}
-            {i.source_url ? (
-              <a href={i.source_url} target="_blank" rel="noopener noreferrer" style={S.src}>
-                Read the GOV.UK page first &rarr;
-              </a>
-            ) : (
-              <span style={S.noSrc}>No source link. Do not approve this.</span>
-            )}
-          </div>
-        </article>
-      ))}
+      {/* The next card, peeking. It says: this ends, and here is how far away the end is. */}
+      {deck[1] ? <div style={S.peek}>Next: {deck[1].title || 'Untitled'}</div> : null}
     </div>
   );
 }
@@ -503,16 +574,25 @@ const S: Record<string, React.CSSProperties> = {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
   },
 
-  // --- the queue --------------------------------------------------------------------------------
-  qHead: {
-    display: 'flex', alignItems: 'flex-start', gap: 22, flexWrap: 'wrap',
-    padding: '20px 22px', borderBottom: `1px solid ${C.line}`, background: C.paper,
+  // --- the deck ---------------------------------------------------------------------------------
+  deckHead: {
+    display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap',
+    padding: '16px 22px', borderBottom: `1px solid ${C.line}`, background: C.paper,
   },
-  qCount: { ...T.metric, fontSize: 30, marginTop: 4, color: C.amber },
-  qWhy: { ...T.small, margin: 0, maxWidth: 560, flex: '1 1 320px' },
+  deckLeft: { display: 'flex', alignItems: 'baseline', gap: 8, flex: '0 0 auto' },
+  deckN: { ...T.metric, fontSize: 26, color: C.amber },
+  deckLabel: { ...T.tiny, fontWeight: 650 },
+  // He can see the end of it. A list of forty has no end, and a man who cannot see the end skims.
+  bar: { flex: '1 1 180px', height: 6, borderRadius: 3, background: C.lineSoft, overflow: 'hidden', minWidth: 120 },
+  barFill: { height: '100%', borderRadius: 3, background: `linear-gradient(90deg, ${C.river}, ${C.green})`, transition: 'width 220ms ease' },
+  undo: {
+    padding: '7px 13px', borderRadius: 9,
+    border: `1px solid ${C.line}`, background: C.panel, color: C.muted,
+    fontSize: 12.5, fontWeight: 650, fontFamily: FONT, cursor: 'pointer', flex: '0 0 auto',
+  },
 
-  card: { padding: '20px 22px', borderBottom: `1px solid ${C.lineSoft}` },
-  cardTop: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 9 },
+  card: { padding: '24px 24px 22px' },
+  cardTop: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 },
   impact: {
     fontSize: 10.5, fontWeight: 800, letterSpacing: 0.7,
     padding: '4px 8px', borderRadius: 5,
@@ -527,28 +607,31 @@ const S: Record<string, React.CSSProperties> = {
     background: C.lineSoft, color: C.muted,
   },
   when: { ...T.tiny, fontWeight: 650 },
-  cardTitle: { ...T.h2, fontSize: 16, margin: '0 0 8px' },
-  cardBody: { ...T.body, margin: 0, maxWidth: 760 },
-  affects: { ...T.small, margin: '9px 0 0', color: C.faint },
+  cardTitle: { ...T.h1, fontSize: 21, margin: '0 0 10px', lineHeight: 1.3 },
+  cardBody: { ...T.body, fontSize: 15, margin: 0, maxWidth: 760 },
+  affects: { ...T.small, margin: '10px 0 0', color: C.faint },
 
-  cardFoot: {
-    display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
-    marginTop: 16,
-  },
-  actions: { display: 'flex', gap: 8 },
+  src: { ...T.small, color: C.river, fontWeight: 700, textDecoration: 'none', display: 'inline-block', marginTop: 16 },
+  noSrc: { ...T.small, color: C.red, fontWeight: 700, marginTop: 16 },
+
+  actions: { display: 'flex', gap: 10, marginTop: 20 },
   approve: {
-    padding: '10px 22px', borderRadius: 10, border: 0,
+    padding: '13px 34px', borderRadius: 11, border: 0,
     background: C.green, color: '#fff',
-    fontSize: 14, fontWeight: 750, fontFamily: FONT,
-    boxShadow: '0 6px 16px rgba(15,123,79,0.24)',
+    fontSize: 15, fontWeight: 750, fontFamily: FONT, cursor: 'pointer',
+    boxShadow: '0 8px 20px rgba(15,123,79,0.26)',
   },
   dismiss: {
-    padding: '10px 16px', borderRadius: 10,
+    padding: '13px 20px', borderRadius: 11,
     border: `1px solid ${C.line}`, background: C.panel, color: C.muted,
-    fontSize: 14, fontWeight: 650, fontFamily: FONT,
+    fontSize: 15, fontWeight: 650, fontFamily: FONT, cursor: 'pointer',
   },
-  src: { ...T.small, color: C.river, fontWeight: 650, textDecoration: 'none' },
-  noSrc: { ...T.small, color: C.red, fontWeight: 650 },
+  stakes: { ...T.small, margin: '16px 0 0', maxWidth: 620 },
+
+  peek: {
+    padding: '12px 24px', background: C.paper, borderTop: `1px solid ${C.lineSoft}`,
+    ...T.tiny, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
 
   emptyQ: { ...T.small, maxWidth: 700 },
 

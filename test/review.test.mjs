@@ -53,11 +53,12 @@ console.log('\nthe approval gate: the one button the whole doctrine is about');
 // every downstream check (which rows reach a user, which are incidents, what the console counts)
 // would be quietly guessing.
 
-ok('the route accepts a DECISION, and only two of them',
-  route.includes("decision !== 'approve' && decision !== 'dismiss'"));
+ok('the route accepts a DECISION, and only three of them',
+  route.includes("decision !== 'approve' && decision !== 'dismiss' && decision !== 'undo'"));
 
 ok('THE BUG WE REFUSED TO SHIP: the status is derived on the SERVER, never read off the request',
-  db.includes("const status = decision === 'approve' ? 'reviewed' : 'dismissed';")
+  db.includes("decision === 'approve' ? 'reviewed'")
+  && db.includes("decision === 'dismiss' ? 'dismissed'")
   && !route.includes('body.status'));
 
 ok('a bad body is a 400, not a shrug',
@@ -103,8 +104,8 @@ ok('...and the UI has no Approve All control either',
 ok('a failed write is a 502, not an ok',
   db.includes('return res.ok;') && route.includes("{ error: 'write_failed' }, { status: 502 }"));
 
-ok('the row comes BACK into the queue when the save fails',
-  brain.includes('setD((cur) => (cur ? { ...cur, pending: before } : cur))'));
+ok('the card comes BACK, at the FRONT, when the save fails. Not the bottom of a deck he may never reach',
+  brain.includes('setDeck((cur) => (cur ? [item, ...cur.filter((p) => p.id !== item.id)] : [item]))'));
 
 ok('...and the human is told plainly that nothing was approved',
   brain.includes('Nothing was approved.'));
@@ -163,6 +164,57 @@ ok('the queue is ordered engine-impact first: a rate change is not one of forty 
 
 ok('the page says plainly what approving MEANS, so nobody clicks it as an inbox chore',
   brain.includes('Nothing here reaches a single'));
+
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE COUNT WENT STALE, AND THE RACE WAS MINE.
+// ---------------------------------------------------------------------------------------------
+//
+// The first version re-read the whole brain after EVERY decision. Click fast, and an OLDER response
+// lands after a newer one and overwrites the queue with a bigger, staler list.
+//
+// The database was perfectly correct: 26 waiting, 22 approved, every click had landed. THE SCREEN
+// SAID 31 AND WOULD NOT MOVE. Which is the worst possible failure for this particular button,
+// because it looks exactly like "my approval did not save", and a man who does not trust the button
+// stops using the gate.
+//
+// The deck is the truth now. A decision pops it locally and NOTHING re-reads the server unless
+// something fails. There is no response in flight that can arrive late and lie to you.
+
+ok('a decision does NOT trigger a re-read. There is no response that can land late and lie',
+  !/const res = await post\([\s\S]{0,400}?load\(\)/.test(brainCode));
+
+ok('the deck is local state, and it is what the screen counts',
+  brainCode.includes('const [deck, setDeck]')
+  && brainCode.includes('n={deck?.length ?? d.knowledge.waiting}'));
+
+ok('the approved count moves with the deck too, rather than freezing at page load',
+  brainCode.includes("d.knowledge.reviewed + done.filter((x) => x.decision === 'approve').length"));
+
+// --- UNDO. The reason one click is acceptable at all -------------------------------------------
+//
+// A deck is fast, and fast is how a man approves something he did not mean to. Speed without a way
+// back is not seamless, it is dangerous.
+
+ok('undo exists, and the server derives its status like every other decision',
+  db.includes("'distilled';   // undo: back into the queue"));
+
+ok('...it puts the card back at the FRONT of the deck, where he will see it',
+  brainCode.includes('setDeck((cur) => (cur ? [last.item, ...cur] : [last.item]))'));
+
+ok('...and a failed undo says so, rather than pretending it worked',
+  brain.includes('Could not undo that. It is still'));
+
+// --- one card, not a list -----------------------------------------------------------------------
+//
+// A list of forty asks him to hold forty decisions in his head and scroll. He scrolls, he skims, and
+// skimming is the exact failure a human gate exists to prevent.
+
+ok('ONE card is rendered, not a list. He can only be looking at the thing he is deciding',
+  brainCode.includes('const card = deck[0];') && !/deck\.map\(/.test(brainCode));
+
+ok('...and he can see the end of it, which is why he does not skim',
+  brainCode.includes('left to read'));
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

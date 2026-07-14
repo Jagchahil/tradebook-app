@@ -48,8 +48,12 @@ export async function POST(req: NextRequest) {
   const id = typeof body.id === 'string' ? body.id : '';
   const decision = body.decision;
 
-  // The allowlist. Two words, and nothing else gets through. Not a status, not a free string.
-  if (!id || (decision !== 'approve' && decision !== 'dismiss')) {
+  // The allowlist. THREE words, and nothing else gets through. Not a status, not a free string.
+  //
+  // 'undo' earned its place: the queue is a deck now, one card at a time, and a deck is fast. Fast
+  // is how a man approves something he did not mean to. So the last decision is always reversible
+  // with one click, and that is the only reason a single click is acceptable on this button at all.
+  if (!id || (decision !== 'approve' && decision !== 'dismiss' && decision !== 'undo')) {
     return NextResponse.json({ error: 'bad_request' }, { status: 400 });
   }
 

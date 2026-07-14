@@ -3775,7 +3775,15 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
 //
 // So: the server re-checks team membership on every call (a session is not a permission), it accepts
 // exactly two decisions and nothing else, and it records WHO. There is no bulk approve, on purpose.
-export type ReviewDecision = 'approve' | 'dismiss';
+// UNDO IS A DECISION, and it belongs on the allowlist with the other two.
+//
+// The queue is a deck now: one card, two buttons, and the next card. That is fast, and fast is how
+// you approve something you did not mean to. So the last decision is always reversible with one
+// click, and 'undo' puts the row straight back in the queue where it was.
+//
+// This is the ONLY reason a single click is acceptable on the most consequential button in the
+// company. Speed without a way back is not seamless, it is dangerous.
+export type ReviewDecision = 'approve' | 'dismiss' | 'undo';
 
 export async function reviewKnowledgeItem(
   id: string,
@@ -3787,7 +3795,10 @@ export async function reviewKnowledgeItem(
     // The status is derived from an allowlisted decision, never taken from the request body. A
     // client that posts status=whatever must not be able to invent a state the system has never
     // heard of.
-    const status = decision === 'approve' ? 'reviewed' : 'dismissed';
+    const status =
+      decision === 'approve' ? 'reviewed'
+      : decision === 'dismiss' ? 'dismissed'
+      : 'distilled';   // undo: back into the queue, exactly where it came from
 
     const res = await fetch(`${url}/rest/v1/knowledge_items?id=eq.${encodeURIComponent(id)}`, {
       method: 'PATCH',

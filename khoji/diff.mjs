@@ -667,7 +667,297 @@ export const CHECKS = [
       return m ? { value: percent(m[1]) } : { error: 'could not read the unregistered CIS rate' };
     },
   },
+
+  // ===============================================================================================
+  // THE NINETEEN. Added 14 July 2026, and the reason they were added is the reason they are here.
+  //
+  // The console's Khoji panel had just been built, and the first thing it printed was the number we
+  // liked least: 42 OF 62 CONSTANTS WATCHED, and the other twenty listed BY NAME. vatStandardRate,
+  // unwatched. The capital gains block, unwatched. poaThreshold, which decides whether a man makes
+  // payments on account, unwatched.
+  //
+  // "0 drift" had been reported every night for a week, and it meant: the ones we look at are right.
+  //
+  // Building a fourth screen while the third one says that would be avoiding the point.
+  // ===============================================================================================
+
+  // --- Capital allowances -------------------------------------------------------------------------
+  //
+  // ⚠️ THIS PAGE IS A DECOY, EXACTLY LIKE THE MILEAGE PAGE.
+  //
+  // It says, in a bullet: "main pool with a rate of 14% from April 2026, and 18% before". The 18 is
+  // right there in the same sentence. An extractor that grabs the first percentage on the page reads
+  // 18, disagrees with our (correct) 14, and screams DRIFT every night for ever. Which is worse than
+  // useless: an alarm that is always wrong is an alarm everyone learns to close.
+  //
+  // So the anchor is the phrase that carries the CURRENT rate, and the historical one is left alone.
+  {
+    fact: 'wdaMainRate',
+    label: 'Writing down allowance, main pool',
+    url: 'https://www.gov.uk/work-out-capital-allowances/rates-and-pools',
+    extract(text) {
+      const m = text.match(/main pool with a rate of\s*(\d{1,2})\s*%/i);
+      if (!m) return { error: 'could not find "main pool with a rate of N%"' };
+      return { value: percent(m[1]) };
+    },
+  },
+  {
+    fact: 'wdaSpecialRate',
+    label: 'Writing down allowance, special rate pool',
+    url: 'https://www.gov.uk/work-out-capital-allowances/rates-and-pools',
+    extract(text) {
+      const m = text.match(/special rate pool with a rate of\s*(\d{1,2})\s*%/i);
+      if (!m) return { error: 'could not find "special rate pool with a rate of N%"' };
+      return { value: percent(m[1]) };
+    },
+  },
+
+  // --- VAT ---------------------------------------------------------------------------------------
+  {
+    fact: 'vatStandardRate',
+    label: 'VAT, standard rate',
+    url: 'https://www.gov.uk/vat-rates',
+    extract(text) {
+      // The table: "Standard 20% Most goods and services".  The page also carries 5% and 0%, so the
+      // row must be pinned or we would read the reduced rate.
+      const row = between(text, /Standard/i, /Reduced rate|Zero rate/i, 120);
+      if (!row) return { error: 'could not find the "Standard" VAT row' };
+      const m = row.match(/(\d{1,2})\s*%/);
+      return m ? { value: percent(m[1]) } : { error: 'no percentage in the standard rate row' };
+    },
+  },
+  {
+    fact: 'vatDeregistrationThreshold',
+    label: 'VAT deregistration threshold',
+    url: 'https://www.gov.uk/register-for-vat/cancel-your-registration',
+    extract(text) {
+      const m = text.match(/deregistration threshold[^£]{0,120}£([\d,]+)/i)
+        || text.match(/(?:falls?|drops?|goes) below[^£]{0,80}£([\d,]+)/i)
+        || text.match(/less than\s*£([\d,]+)[^.]{0,60}(?:next 12 months|cancel)/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read the deregistration threshold' };
+    },
+  },
+  {
+    fact: 'vatFlatRateLimitedCost',
+    label: 'VAT flat rate scheme, limited cost business',
+    url: 'https://www.gov.uk/vat-flat-rate-scheme/how-much-you-pay',
+    extract(text) {
+      // Verbatim on the page: "This means you pay a higher rate of 16.5%."
+      const m = text.match(/higher rate of\s*(\d{1,2}(?:\.\d+)?)\s*%/i)
+        || text.match(/limited cost business[^%]{0,240}?(\d{1,2}\.\d)\s*%/i);
+      return m ? { value: Number(m[1]) / 100 } : { error: 'could not read the limited cost business rate' };
+    },
+  },
+
+  // --- Capital gains -----------------------------------------------------------------------------
+  //
+  // A tradesman sells a van, or the workshop, or shares. We quote him a number. Nothing has ever
+  // checked any of these.
+  {
+    fact: 'cgtAnnualExempt',
+    label: 'Capital gains tax, annual exempt amount',
+    url: 'https://www.gov.uk/capital-gains-tax/allowances',
+    extract(text) {
+      const m = text.match(/tax-free allowance[^£]{0,120}£([\d,]+)/i)
+        || text.match(/annual exempt amount[^£]{0,80}£([\d,]+)/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read the CGT annual exempt amount' };
+    },
+  },
+  {
+    fact: 'cgtBasicRate',
+    label: 'Capital gains tax, basic rate',
+    url: 'https://www.gov.uk/capital-gains-tax/rates',
+    extract(text) {
+      const m = text.match(/basic rate[^%]{0,160}?(\d{1,2})\s*%/i);
+      return m ? { value: percent(m[1]) } : { error: 'could not read the CGT basic rate' };
+    },
+  },
+  {
+    fact: 'cgtHigherRate',
+    label: 'Capital gains tax, higher rate',
+    url: 'https://www.gov.uk/capital-gains-tax/rates',
+    extract(text) {
+      const m = text.match(/higher(?: or additional)? rate[^%]{0,160}?(\d{1,2})\s*%/i);
+      return m ? { value: percent(m[1]) } : { error: 'could not read the CGT higher rate' };
+    },
+  },
+  {
+    fact: 'badrRate',
+    label: 'Business asset disposal relief, rate',
+    url: 'https://www.gov.uk/business-asset-disposal-relief',
+    extract(text) {
+      // ⚠️ ANOTHER DECOY. The page reads:
+      //     "you'll pay tax at either: 18% on all gains ... from 6 April 2026
+      //                                14% on all gains ... between ..."
+      // Both numbers are true. Only one of them is now. Anchor on the CURRENT sentence.
+      const m = text.match(/(\d{1,2})\s*%\s*on all gains on qualifying assets disposed of from\s*6 April 2026/i);
+      if (!m) return { error: 'could not find the "from 6 April 2026" BADR rate sentence' };
+      return { value: percent(m[1]) };
+    },
+  },
+  // badrLifetimeLimit: THE CHECK IS GONE BECAUSE THE CONSTANT IS GONE.
+  //
+  // GOV.UK's BADR guide carries the rates and, checked on 14 July 2026, not one £ figure anywhere in
+  // it, on the landing page or the "work out your tax" page. So we could not source the £1,000,000
+  // we were publishing at /facts.json. Then we looked at what used it: nothing. No calculation, no
+  // test, no citation.
+  //
+  // A number we assert publicly, cannot source, cannot check, and do not use is not a harmless
+  // leftover. It is a claim. It was deleted from lib/taxengine.ts rather than defended here.
+
+  // --- Employer NI -------------------------------------------------------------------------------
+  //
+  // The moment a sole trader takes on his first apprentice, this is his bill. We answer that
+  // question in the app, and nothing has ever checked the number we answer it with.
+  {
+    fact: 'employerNIRate',
+    label: 'Employer National Insurance, secondary rate',
+    url: 'https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027',
+    // ⚠️ MY FIRST TWO ATTEMPTS AT THIS BOTH CRIED WOLF, and they cried it differently.
+    //
+    // The page holds a full category-letter table. Category A is the ordinary employer. But the same
+    // table carries category D (Investment Zone deferment) at 0%, and several others at 0%, and it
+    // carries the EMPLOYEE rates immediately above. So a loose regex can read 0, or 8, or 2, and
+    // every one of those would report our correct 15% as ENGINE DRIFT, every night, for ever.
+    //
+    // Anchor on the employer heading, then take category A's first rate. Nothing looser survives.
+    extract(text) {
+      const m = text.match(/Employer \(secondary\) contribution rates[\s\S]{0,1500}?\sA\s+(\d{1,2}(?:\.\d+)?)\s*%/i);
+      if (!m) return { error: 'could not find category A under "Employer (secondary) contribution rates"' };
+      return { value: Number(m[1]) / 100 };
+    },
+  },
+  {
+    fact: 'employerSecondaryThreshold',
+    label: 'Employer NI, secondary threshold',
+    url: 'https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027',
+    // ⚠️ THIS EXTRACTOR CRIED WOLF ON ITS FIRST RUN AND I ALMOST SHIPPED IT.
+    //
+    // The row on the page reads, in one unbroken line:
+    //
+    //     Secondary threshold £96 per week £417 per month £5,000 per year
+    //
+    // My first regex took the first £ after the words. That is £96, the WEEKLY figure. It compared
+    // 96 to our 5000, and reported ENGINE DRIFT. Our engine was right. The differ was wrong.
+    //
+    // An alarm that is confidently wrong is worse than no alarm at all, because you switch it off,
+    // and then you have no alarm AND you believe you have one. It is the same failure as the 45p
+    // mileage decoy, arriving from the opposite direction.
+    //
+    // So: walk the whole row and take the figure that is explicitly PER YEAR. And the lookbehind is
+    // load-bearing too, because the page also carries "Freeport upper secondary threshold" and
+    // "Investment Zone upper secondary threshold", both £25,000, sitting two words away.
+    extract(text) {
+      const m = text.match(
+        /(?<!upper )secondary threshold\s*£[\d,]+\s*per week\s*£[\d,]+\s*per month\s*£([\d,]+)\s*per year/i,
+      );
+      if (!m) return { error: 'could not find the secondary threshold row with a per-year figure' };
+      return { value: money(m[1]) };
+    },
+  },
+
+  // --- Simplified expenses -----------------------------------------------------------------------
+  //
+  // The flat rates a man claims for working from home. Small numbers, and he uses them every month.
+  {
+    fact: 'homeFlatRate25to50',
+    label: 'Working from home flat rate, 25 to 50 hours',
+    // ⚠️ A GOV.UK "guide" landing page is a TABLE OF CONTENTS, not the content. Three URLs in a row
+    // gave a 200 and no number, which reads exactly like a working page with nothing on it.
+    url: 'https://www.gov.uk/simpler-income-tax-simplified-expenses/working-from-home',
+    extract(text) {
+      const row = between(text, /25\s*(?:to|-|–|—)\s*50/i, /51/i, 160);
+      if (!row) return { error: 'could not find the 25 to 50 hours row' };
+      const m = row.match(/£\s*([\d.]+)/);
+      return m ? { value: money(m[1]) } : { error: 'no amount in the 25 to 50 hours row' };
+    },
+  },
+  {
+    fact: 'homeFlatRate51to100',
+    label: 'Working from home flat rate, 51 to 100 hours',
+    url: 'https://www.gov.uk/simpler-income-tax-simplified-expenses/working-from-home',
+    extract(text) {
+      const row = between(text, /51\s*(?:to|-|–|—)\s*100/i, /101/i, 160);
+      if (!row) return { error: 'could not find the 51 to 100 hours row' };
+      const m = row.match(/£\s*([\d.]+)/);
+      return m ? { value: money(m[1]) } : { error: 'no amount in the 51 to 100 hours row' };
+    },
+  },
+  {
+    fact: 'homeFlatRate101plus',
+    label: 'Working from home flat rate, 101 hours or more',
+    url: 'https://www.gov.uk/simpler-income-tax-simplified-expenses/working-from-home',
+    extract(text) {
+      // Verbatim: "Hours of business use per month | Flat rate per month | 25 to 50 £10 | 51 to 100
+      // £18 | 101 and more £26". And DIRECTLY BELOW IT sits a worked Example repeating £10 and £18.
+      // Stop at "Example" or the decoy is inside the window.
+      const row = between(text, /101\s*(?:and more|or more|and over|\+)/i, /Example|Previous|Next/i, 120);
+      if (!row) return { error: 'could not find the "101 and more" hours row' };
+      const m = row.match(/£\s*([\d.]+)/);
+      return m ? { value: money(m[1]) } : { error: 'no amount in the 101 or more hours row' };
+    },
+  },
+
+  // --- Mileage: the band, not the rate -----------------------------------------------------------
+  //
+  // The RATES have been watched since the beginning. The BOUNDARY between them has not, and a man
+  // who drives 12,000 miles is charged at two rates either side of this number.
+  {
+    fact: 'mileageFirstBandMiles',
+    label: 'Mileage, first band boundary',
+    url: 'https://www.gov.uk/simpler-income-tax-simplified-expenses/vehicles',
+    extract(text) {
+      const m = text.match(/first\s*([\d,]+)\s*miles/i)
+        || text.match(/up to\s*([\d,]+)\s*miles/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read the first mileage band boundary' };
+    },
+  },
+
+  // --- Payments on account -----------------------------------------------------------------------
+  //
+  // Below this, he pays once. Above it, HMRC asks for half of next year's bill in January as well,
+  // and a man who was not told that is a man who cannot pay it.
+  {
+    fact: 'poaThreshold',
+    label: 'Payments on account, threshold',
+    url: 'https://www.gov.uk/understand-self-assessment-bill/payments-on-account',
+    extract(text) {
+      const m = text.match(/less than\s*£([\d,]+)/i) || text.match(/under\s*£([\d,]+)/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read the payments on account threshold' };
+    },
+  },
+
+  // --- ctMarginalFraction: DELIBERATELY NOT CHECKED, and here is why, in writing ---------------
+  //
+  // I wrote an extractor for it. It could not find the number, because GOV.UK's marginal relief
+  // guidance does not print the standard fraction anywhere: it gives you a calculator instead.
+  //
+  // The tempting move is to leave the broken check in, so the coverage number goes up. That would
+  // put a permanently BROKEN alarm on the board, every night, for ever. And an alarm that never
+  // clears is an alarm everybody learns to ignore, which quietly poisons the ones that matter.
+  //
+  // So it stays UNWATCHED, and the console prints its name every night with the rest of the gap.
+  // "We do not check this" is a true sentence. "We check this and it is broken" is a worse one.
+  // See UNCHECKABLE below.
 ];
+
+// ---- THE CONSTANTS WE CANNOT DIFF, AND THE REASON, IN WORDS ------------------
+//
+// A gap you can explain is not the same as a gap you have not noticed, and the console must be able
+// to tell a human which one it is looking at. Otherwise every unwatched constant looks like neglect,
+// the list stops being read, and the ones that ARE neglect hide inside it.
+//
+// These two are not neglect. They cannot be compared to a published number, because there is no
+// published number to compare them to.
+export const UNCHECKABLE = {
+  cisGrossRate:
+    'Gross payment status means NO deduction is made. GOV.UK states that as a sentence, not as a rate, '
+    + 'so there is no number on any page to subtract ours from. The SENTENCE is watched by corpus.mjs instead.',
+  ctMarginalFraction:
+    'GOV.UK does not print the standard marginal relief fraction anywhere. It gives you a calculator. '
+    + 'A check that can never succeed is a BROKEN alarm every night for ever, and an alarm that never '
+    + 'clears is one everybody learns to mute.',
+};
 
 // ---- the comparison ---------------------------------------------------------
 

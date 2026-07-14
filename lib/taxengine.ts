@@ -97,8 +97,9 @@ export const FACTS = {
   cgtAnnualExempt: 3000,
   cgtBasicRate: 0.18,
   cgtHigherRate: 0.24,
-  badrRate: 0.18, // Business Asset Disposal Relief, from 6 April 2026
-  badrLifetimeLimit: 1000000,
+  badrRate: 0.18, // Business Asset Disposal Relief, from 6 April 2026. Watched by Khoji, agrees.
+  // badrLifetimeLimit DELETED 14 July 2026. It was published here as a fact, used by nothing,
+  // sourced by nothing, and unfindable on GOV.UK. See capitalGainsTax() for the whole story.
   // VAT flat rate scheme
   vatFlatRateLimitedCost: 0.165, // the limited cost trader rate
 } as const;
@@ -291,6 +292,25 @@ export function lossCarriedForward(currentProfit: number, broughtForwardLoss: nu
 
 // CGT on a gain, 2026/27. £3,000 tax free, then 18% or 24% on other assets, or
 // 18% with Business Asset Disposal Relief on a qualifying business sale.
+//
+// ⚠️ WE DO NOT MODEL THE BADR LIFETIME LIMIT, AND WE CANNOT. SAY SO, DO NOT HIDE IT.
+//
+// BADR is capped over a person's LIFETIME. Beyond that cap the relief stops and the ordinary rate
+// applies. This function does not apply that cap, and here is the honest reason: the cap depends on
+// every qualifying disposal the man has ever made, across his whole life, most of them years before
+// he ever heard of us. We do not have that history and we never will.
+//
+// There was a `badrLifetimeLimit: 1000000` constant sitting in FACTS. It was published to the world
+// at /facts.json as a thing we know. Nothing in this engine used it, no test covered it, Khoji could
+// not find it on any GOV.UK page (the BADR guide carries the rates and, checked on 14 July 2026, not
+// one £ figure anywhere in it), and nothing anywhere recorded a source for it.
+//
+// So it was a number we asserted publicly, could not source, could not check, and did not use. It is
+// deleted. A constant nobody uses is not harmless: it is a claim, and we were making it.
+//
+// What is left is the truth: for a man selling his business, this figure ASSUMES he is still within
+// his lifetime allowance. If he is not, it is too low. Anyone selling a business at that scale has
+// an accountant, and should.
 export function capitalGainsTax(gain: number, opts: { higherRate?: boolean; badr?: boolean } = {}): number {
   const taxable = Math.max(0, gain - FACTS.cgtAnnualExempt);
   if (taxable <= 0) return 0;

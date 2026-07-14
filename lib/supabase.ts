@@ -3709,6 +3709,29 @@ export interface BrainState {
     unwatched: string[]; ok: boolean;
   }>;
   items: Array<{ status: string; created_at: string; title: string | null; source_url: string | null }>;
+  // THE QUEUE. Distilled, and waiting for a human to say yes.
+  pending: PendingItem[];
+}
+
+// ⚠️ THIS IS THE APPROVAL GATE, AND UNTIL TODAY IT WAS A NUMBER WITH NO BUTTON NEXT TO IT.
+//
+// The console said "39 waiting for a human" and there was no way for a human to do anything about
+// it. The gate existed in the schema (`status`), the rule was enforced (nothing but a `reviewed` row
+// ever reaches a user's tax answer), and the door had no handle.
+//
+// A queue nobody can approve is a brain that has stopped growing while looking busy. And an approval
+// gate with no approve button is not a safeguard, it is a bottleneck we built and then forgot to
+// open. Doc 104: one less button at a time, until only one is left. THIS is that one.
+export interface PendingItem {
+  id: string;
+  title: string | null;
+  summary: string | null;
+  source_url: string | null;
+  affects: string | null;
+  effective_date: string | null;
+  confidence: number | null;
+  engine_impact: boolean;
+  created_at: string;
 }
 
 export async function readBrain(days = 30): Promise<BrainState | null> {
@@ -3721,17 +3744,65 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
       return res.json();
     };
 
-    const [runs, items] = await Promise.all([
+    const [runs, items, pending] = await Promise.all([
       q(`khoji_runs?ran_at=gte.${since}&select=ran_at,tax_year,published,checked,agreed,drifted,blind,unwatched,ok&order=ran_at.desc&limit=200`),
       q('knowledge_items?select=status,created_at,title,source_url&order=created_at.desc&limit=1000'),
+      // Engine-impacting items FIRST. A rate change we must reflect in the tax engine is not one of
+      // forty things to get to eventually, it is the reason the queue exists.
+      q('knowledge_items?status=eq.distilled&select=id,title,summary,source_url,affects,effective_date,confidence,engine_impact,created_at'
+        + '&order=engine_impact.desc,created_at.desc&limit=60'),
     ]);
 
     return {
       runs: Array.isArray(runs) ? runs : [],
       items: Array.isArray(items) ? items : [],
+      pending: Array.isArray(pending) ? pending : [],
     };
   } catch {
     // null is "we could not read the brain". It is NOT "the brain is empty", and the page says so.
     return null;
+  }
+}
+
+// APPROVE, or DISMISS. The only two things a human can do to a row in the queue, and both are
+// reversible: they set a status, and a status can be set again.
+//
+// ⚠️ WHAT APPROVING ACTUALLY DOES, WRITTEN DOWN SO NOBODY CLICKS IT CASUALLY.
+//
+// A `reviewed` row is the ONLY kind that reaches a user's tax answer. Approving is therefore the
+// moment a sentence about tax law becomes something we will say to a man who is about to sign his
+// return. It is not an inbox chore. It is the gate.
+//
+// So: the server re-checks team membership on every call (a session is not a permission), it accepts
+// exactly two decisions and nothing else, and it records WHO. There is no bulk approve, on purpose.
+export type ReviewDecision = 'approve' | 'dismiss';
+
+export async function reviewKnowledgeItem(
+  id: string,
+  decision: ReviewDecision,
+  byEmail: string,
+): Promise<boolean> {
+  try {
+    const { url } = config();
+    // The status is derived from an allowlisted decision, never taken from the request body. A
+    // client that posts status=whatever must not be able to invent a state the system has never
+    // heard of.
+    const status = decision === 'approve' ? 'reviewed' : 'dismissed';
+
+    const res = await fetch(`${url}/rest/v1/knowledge_items?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        status,
+        // WHO said yes, and WHEN. Not for blame. For the day somebody asks why we told six thousand
+        // men something about their tax, and the only acceptable answer is a name and a date, not
+        // "the system decided". See supabase/APPLY_2026-07-14_knowledge_review.sql.
+        reviewed_by: byEmail,
+        reviewed_at: new Date().toISOString(),
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }

@@ -44,6 +44,10 @@ export async function GET(req: NextRequest) {
     coverage: coverage(v),
     knowledge: knowledge(brain.items),
     growth: growth(brain.items, 30),
+    // THE QUEUE. Until today this was a number on a screen with no button beside it: "39 waiting for
+    // a human", and no way for a human to do anything. An approval gate with no approve button is a
+    // bottleneck we built and then forgot to open.
+    pending: brain.pending,
     // The last fortnight of nights, oldest first, so the page can draw the heartbeat itself rather
     // than take our word for it.
     runs: brain.runs.slice(0, 14).reverse().map((r) => ({

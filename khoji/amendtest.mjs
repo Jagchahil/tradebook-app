@@ -23,7 +23,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compare, apiUrlFor, bodyOf, hashOf, changeHistoryOf, watchedPaths } from './amend.mjs';
+import { compare, apiUrlFor, bodyOf, hashOf, changeHistoryOf, watchedPaths, documents } from './amend.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -129,6 +129,35 @@ ok('🔴 THE LIST IS DERIVED FROM diff.mjs, so it can never fall behind it',
 
 ok('income-tax-rates is in there, because that is where the personal allowance comes from',
   pages.includes('https://www.gov.uk/income-tax-rates'));
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 3b. ONE DOCUMENT, ONE ALARM. Found by the first live dry run and by nothing else.
+// ---------------------------------------------------------------------------------------------
+
+const docs = documents(pages);
+
+ok('🔴 THE 23 PAGES COLLAPSE TO FEWER DOCUMENTS, because some are chapters of the same guide',
+  // Live proof, from GOV.UK: /capital-gains-tax/allowances and /capital-gains-tax/rates came back
+  // with IDENTICAL body hashes. They ARE the same document. So did the two VAT registration pages,
+  // and the two simplified-expenses pages. Six URLs, three documents.
+  docs.length < pages.length && docs.length >= 15);
+
+ok('...and no document is fetched twice',
+  new Set(docs.map((d) => d.apiUrl)).size === docs.length);
+
+ok('...and every page is still accounted for. Deduping must not LOSE one.',
+  docs.reduce((n, d) => n + d.pages.length, 0) === pages.length);
+
+ok('a shared guide carries the list of chapters we read off it, so the alarm can name the blast radius',
+  (() => {
+    const cgt = docs.find((d) => d.apiUrl.endsWith('/capital-gains-tax'));
+    return cgt && cgt.pages.length === 2;
+  })());
+
+ok('the incident is keyed on the DOCUMENT, so one edit raises exactly one alarm',
+  // An alarm that fires twice for one event is an alarm somebody learns to skim, and the whole point
+  // of this file is that it must never be skimmed.
+  /\$\{row\.apiUrl\}#amend-/.test(code));
 
 // ---------------------------------------------------------------------------------------------
 // 4. THE API PATH. A guide chapter is not a document.

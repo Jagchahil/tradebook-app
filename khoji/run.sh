@@ -44,10 +44,31 @@ diff_rc=$?
 node corpus.mjs "$@" >> logs/khoji.log 2>&1
 corpus_rc=$?
 
+# amend.mjs is the fourth question, and it is the only one that can catch a page being rewritten
+# UNDER a number that did not move.
+#
+# diff.mjs asks "is the NUMBER on the page still the number in our engine". corpus.mjs asks "is the
+# SENTENCE still there, word for word". Both are necessary and neither can see this: HMRC moves an
+# effective date, adds a band, or rewrites the footnote our extractor leans on, and every number and
+# every sentence we check still passes. All green, and we are working off a document that no longer
+# exists.
+#
+# Budget 2025's OOTLAR was silently amended FIVE TIMES IN NINE DAYS. "Figures in paragraph 1.7 have
+# been amended." No announcement, no new URL. BEING LATE IS RECOVERABLE. BEING CONFIDENTLY WRONG FOR
+# A FORTNIGHT IS NOT.
+#
+# It runs LAST because it is the cheapest and the least urgent of the four: it prompts a human to go
+# and LOOK at a page, it does not assert that anything is wrong. And it runs even if the others fail,
+# for the same reason they all do: "we could not fetch the news" is no reason to stop asking whether
+# the ground has moved.
+node amend.mjs "$@" >> logs/khoji.log 2>&1
+amend_rc=$?
+
 # Report the worst thing that happened, so launchd's exit code means something. A 2 from the differ
 # or the corpus means the ground has moved under us, which is an incident, not a crash: /api/health
 # has already gone red off the row it wrote. A 1 from any of them means the job itself is broken.
-echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc" >> logs/khoji.log
+echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc" >> logs/khoji.log
 if [ "$watch_rc" -ne 0 ]; then exit "$watch_rc"; fi
 if [ "$diff_rc" -ne 0 ]; then exit "$diff_rc"; fi
-exit "$corpus_rc"
+if [ "$corpus_rc" -ne 0 ]; then exit "$corpus_rc"; fi
+exit "$amend_rc"

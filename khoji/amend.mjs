@@ -92,6 +92,39 @@ export function watchedPaths(differSource) {
   return [...urls].sort();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE DOCUMENT IS THE UNIT. NOT THE URL WE HAPPEN TO SCRAPE.
+//
+// The first dry run against the real GOV.UK told me this, and nothing else would have:
+//
+//     d449ce0e  /capital-gains-tax/allowances
+//     d449ce0e  /capital-gains-tax/rates                          <- IDENTICAL HASH
+//     0f537a07  /register-for-vat
+//     0f537a07  /register-for-vat/cancel-your-registration        <- IDENTICAL HASH
+//     2fd180fd  /simpler-income-tax-simplified-expenses/vehicles
+//     2fd180fd  /simpler-income-tax-simplified-expenses/working-from-home
+//
+// Three documents, six URLs. The differ scrapes two constants off two CHAPTERS of the same guide,
+// so the same guide appeared twice in the watch list, was fetched twice, and would be stored twice.
+//
+// The day GOV.UK edits the capital gains guide, that raises TWO incidents for ONE amendment. Six of
+// twenty-three would double up. And an alarm that fires twice for one event is an alarm somebody
+// learns to skim, which is the one thing this file must never become. We have already killed one
+// check in this system (cisGrossRate) for exactly that sin.
+//
+// So we group by DOCUMENT, fetch each once, store each once, and carry the list of pages we read off
+// it, so the incident can say which constants are in the blast radius.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export function documents(webUrls) {
+  const byDoc = new Map();
+  for (const webUrl of webUrls) {
+    const apiUrl = apiUrlFor(webUrl);
+    if (!byDoc.has(apiUrl)) byDoc.set(apiUrl, { apiUrl, pages: [] });
+    byDoc.get(apiUrl).pages.push(webUrl);
+  }
+  return [...byDoc.values()].sort((a, b) => a.apiUrl.localeCompare(b.apiUrl));
+}
+
 // GOV.UK's Content API lives at /api/content + the path, and it takes the path of the PARENT
 // document. A guide chapter like /income-tax-rates/current-rates-and-allowances is served under
 // /api/content/income-tax-rates, with the chapter as one of `details.parts`. So we take the first
@@ -196,8 +229,12 @@ async function withDb(fn) {
 
 // The incident, on the SAME RAILS as the differ: knowledge_items, keyed by a url that carries the
 // hash, so the same amendment does not raise twice, and a fresh one always does.
+//
+// ⚠️ KEYED ON THE DOCUMENT, NOT ON A PAGE. Six of our twenty-three watched URLs are chapters of three
+// shared guides. Key this on the page and one edit to the capital gains guide raises two identical
+// incidents, and an alarm that fires twice for one event is an alarm somebody learns to skim.
 function incidentKey(row) {
-  return `${row.webUrl}#amend-${row.bodyHash}`;
+  return `${row.apiUrl}#amend-${row.bodyHash}`;
 }
 
 async function main() {
@@ -205,18 +242,23 @@ async function main() {
 
   const differSource = readFileSync(path.join(HERE, 'diff.mjs'), 'utf8');
   const pages = watchedPaths(differSource);
-  log(`watching ${pages.length} pages, taken straight from the differ's own source list`);
+
+  // THE DOCUMENT IS THE UNIT. 23 scraped pages collapse to 20 real GOV.UK documents, because three
+  // guides are each read twice for two different constants. One fetch, one row, one alarm.
+  const docs = documents(pages);
+  log(`${pages.length} pages the differ reads, which are ${docs.length} GOV.UK documents. Watching the documents.`);
 
   const seen = [];
   const failed = [];
 
-  for (const webUrl of pages) {
-    const apiUrl = apiUrlFor(webUrl);
+  for (const { apiUrl, pages: onIt } of docs) {
+    const webUrl = onIt[0];
     try {
       const doc = await fetchDoc(apiUrl);
       const ch = changeHistoryOf(doc);
       seen.push({
         webUrl,
+        pages: onIt,
         apiUrl,
         contentId: doc.content_id || null,
         schema: doc.schema_name || null,
@@ -233,8 +275,8 @@ async function main() {
       // It is the same rule as the differ's `blind` state, and the same rule as a null read in the
       // circumstances table: NOT KNOWING IS NOT THE SAME AS BEING FINE. It is counted, it is
       // reported, and if it persists the health check will say so out loud.
-      failed.push({ webUrl, error: e.message });
-      log(`COULD NOT READ ${webUrl}: ${e.message}`);
+      failed.push({ webUrl: apiUrl, error: e.message });
+      log(`COULD NOT READ ${apiUrl}: ${e.message}`);
     }
   }
 
@@ -247,14 +289,15 @@ async function main() {
     // the console bug that rendered a crashed differ as "0 of 0 matched, every one matched" in
     // GREEN. It found me again inside my own progress report. It gets a hard stop, not a footnote.
     if (seen.length === 0) {
-      console.error(`\n🔴 READ NOTHING. All ${pages.length} pages failed. This is not a clean run, it is a BLIND one.`);
+      console.error(`\n🔴 READ NOTHING. All ${docs.length} documents failed. This is not a clean run, it is a BLIND one.`);
       console.error('   NOT KNOWING IS NOT THE SAME AS BEING FINE.');
       process.exit(1);
     }
 
-    log(`dry run. read ${seen.length}, failed ${failed.length}. Nothing written.`);
+    log(`dry run. read ${seen.length} documents, failed ${failed.length}. Nothing written.`);
     for (const r of seen) {
-      log(`  ${String(r.schema).padEnd(18)} ch=${String(r.changeCount).padStart(2)} ${r.bodyHash} ${r.webUrl}`);
+      const also = r.pages.length > 1 ? `  (+${r.pages.length - 1} more chapter${r.pages.length > 2 ? 's' : ''})` : '';
+      log(`  ${String(r.schema).padEnd(18)} ch=${String(r.changeCount).padStart(2)} ${r.bodyHash} ${r.apiUrl.replace('https://www.gov.uk/api/content/', '/')}${also}`);
     }
 
     // The finding that shaped this file, printed every dry run so it cannot be forgotten.
@@ -277,8 +320,8 @@ async function main() {
   await withDb(async (db) => {
     for (const row of seen) {
       const { rows } = await db.query(
-        'select body_hash, change_count from public.khoji_documents where web_url = $1',
-        [row.webUrl],
+        'select body_hash, change_count from public.khoji_documents where api_url = $1',
+        [row.apiUrl],
       );
       const previous = rows[0]
         ? { bodyHash: rows[0].body_hash, changeCount: Number(rows[0].change_count) }
@@ -302,8 +345,12 @@ async function main() {
             [
               note,
               '',
-              `Page: ${row.webUrl}`,
+              `Document: ${row.webUrl}`,
               `Type: ${row.schema}`,
+              // THE BLAST RADIUS. One guide can carry several constants, read off several chapters.
+              // Say which, so whoever opens this at 7am knows what to go and check.
+              `The differ reads ${row.pages.length} page${row.pages.length > 1 ? 's' : ''} off this document:`,
+              ...row.pages.map((u) => `  . ${u}`),
               row.latestChangeAt ? `HMRC logged it at: ${row.latestChangeAt}` : 'HMRC logged nothing.',
               '',
               // Say plainly what this is and what it is NOT, because a reader at 7am needs to know
@@ -335,11 +382,11 @@ async function main() {
       // is lost for ever and the next run compares new against new and finds peace.
       await db.query(
         `insert into public.khoji_documents
-           (web_url, api_url, content_id, schema_name, body_hash, change_count,
+           (api_url, web_url, content_id, schema_name, body_hash, change_count,
             latest_note, latest_change_at, public_updated_at, updated_at, last_seen_at)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now())
-         on conflict (web_url) do update set
-           api_url = excluded.api_url,
+         on conflict (api_url) do update set
+           web_url = excluded.web_url,
            content_id = excluded.content_id,
            schema_name = excluded.schema_name,
            body_hash = excluded.body_hash,
@@ -349,7 +396,7 @@ async function main() {
            public_updated_at = excluded.public_updated_at,
            updated_at = excluded.updated_at,
            last_seen_at = now()`,
-        [row.webUrl, row.apiUrl, row.contentId, row.schema, row.bodyHash, row.changeCount,
+        [row.apiUrl, row.webUrl, row.contentId, row.schema, row.bodyHash, row.changeCount,
           row.latestNote, row.latestChangeAt, row.publicUpdatedAt, row.updatedAt],
       );
     }
@@ -384,8 +431,8 @@ async function main() {
        values ('amend',$1,$2,$3,$4,$5,$6,$7,$8,$9)`,
       [
         null,
-        pages.length,
-        seen.length,                              // pages actually READ
+        docs.length,
+        seen.length,                              // documents actually READ
         seen.length - raised.length,              // pages unchanged
         raised.filter((r) => r.verdict === 'silent').length,   // the fortnight problem, counted
         failed.length,                            // could not read: blind, not fine
@@ -396,7 +443,7 @@ async function main() {
     );
   });
 
-  log(`read ${seen.length} of ${pages.length}. ${raised.length} amended, ${failed.length} unreadable.`);
+  log(`read ${seen.length} of ${docs.length} documents. ${raised.length} amended, ${failed.length} unreadable.`);
   for (const r of raised) {
     log(`  ${r.verdict === 'silent' ? '🔴 SILENT' : '   noted '} ${r.webUrl}`);
     if (r.note) log(`            ${r.note.slice(0, 110)}`);

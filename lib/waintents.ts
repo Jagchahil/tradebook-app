@@ -412,26 +412,66 @@ export interface GoalSet {
   amount: number;
 }
 
-export function matchGoalSet(body: string): GoalSet | null {
+// 🔴 A GOAL'S AMOUNT IS NOT A TRANSACTION'S AMOUNT, AND THIS FUNCTION EXISTS BECAUSE THEY DIVERGED.
+//
+// A live test set the goal "earn 1 million" and it saved as £1.00, then "make a million pounds" was
+// logged as £1,000,000 of INCOME. Two failures, one root cause: extractMoneyAmount understands "k"
+// but not "million", so "1 million" grabbed the 1, and "a million" (no digit) parsed to nothing and
+// fell through to the transaction parser.
+//
+// Goals are also bigger than transactions by nature. "Turn over a million" is a normal ambition; a
+// single £1,000,000 receipt is almost always a typo. So the transaction parser keeps its tight cap,
+// and goals get their own parser that understands "million"/"m", "a million", "half a million", and
+// allows up to £10m.
+export function extractGoalAmount(body: string): number | null {
+  const s = body.toLowerCase();
+  const cap = (n: number): number | null =>
+    Number.isFinite(n) && n > 0 && n <= 10_000_000 ? Math.round(n * 100) / 100 : null;
+
+  if (/\bhalf a million\b/.test(s)) return 500_000;
+  const mil = s.match(/£?\s*(\d+(?:\.\d+)?)\s*(?:m|mil|million)\b/);
+  if (mil) return cap(parseFloat(mil[1]) * 1_000_000);
+  if (/\ba million\b/.test(s)) return 1_000_000;
+
+  const k = s.match(/£?\s*(\d+(?:\.\d+)?)\s*k\b/);
+  if (k) return cap(parseFloat(k[1]) * 1000);
+
+  const m = s.match(/£\s*(\d[\d,]*(?:\.\d{1,2})?)/) || s.match(/\b(\d[\d,]*(?:\.\d{1,2})?)\b/);
+  if (!m) return null;
+  return cap(parseFloat((m[1] || '').replace(/,/g, '')));
+}
+
+// Build a goal from free text WITHOUT requiring a trigger phrase. Used when we ALREADY know the
+// message is a goal, because the setup flow just asked for one and is holding a session open. In
+// that state "1 million" or "a van for 24k" is a goal, full stop, and must never be read as a
+// payment received.
+export function buildGoal(body: string): GoalSet | null {
   const low = body.trim().toLowerCase();
-  if (!/\b(my goal is|new goal|goal:|i am saving (for|up)|i'm saving (for|up)|saving up for)\b/.test(low)) return null;
-  const amount = extractMoneyAmount(low);
+  const amount = extractGoalAmount(low);
   if (!amount) return null;
   const kind: GoalSet['kind'] = /\b(earn|make|turnover|income)\b/.test(low)
     ? 'income'
     : /\b(save|savings|buffer|rainy)\b/.test(low)
       ? 'savings'
       : 'purchase';
-  // The title is what remains once the trigger phrase, the amount and filler
+  // The title is what remains once the trigger phrase, the amount (in any of its forms) and filler
   // words are stripped: "my goal is a van for 24k" leaves "van".
   const title = low
     .replace(/\b(my goal is|new goal|goal:|i am saving (for|up)|i'm saving (for|up)|saving up for)\b/g, ' ')
-    .replace(/£?\s*\d+(?:[,.]\d+)?\s*k?\b/g, ' ')
-    .replace(/\b(for|of|a|an|to|buy|get|save|the|new)\b/g, ' ')
+    .replace(/\bhalf a million\b|\ba million\b/g, ' ')
+    .replace(/£?\s*\d+(?:[,.]\d+)?\s*(?:k|m|mil|million)?\b/g, ' ')
+    .replace(/\b(for|of|a|an|to|buy|get|save|the|new|pound|pounds|quid)\b/g, ' ')
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   return { kind, title: title || 'my goal', amount };
+}
+
+export function matchGoalSet(body: string): GoalSet | null {
+  // The trigger is required OUTSIDE setup, so a stray "a van for 24k" is not mistaken for a goal.
+  // Inside setup the caller uses buildGoal() directly, because it has already asked.
+  if (!/\b(my goal is|new goal|goal:|i am saving (for|up)|i'm saving (for|up)|saving up for)\b/.test(body.toLowerCase())) return null;
+  return buildGoal(body);
 }
 
 export function isGoalQuestion(body: string): boolean {

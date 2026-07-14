@@ -95,6 +95,7 @@ import {
   niAnswer,
   studentLoanAnswer,
   matchGoalSet,
+  buildGoal,
   matchRentIn,
   isPropertyQuestion,
   propertyAnswer,
@@ -343,7 +344,14 @@ async function processMessage(message: IncomingMessage): Promise<void> {
       const handled = await handleInvoiceFlow(from, text);
       if (!handled) {
         const taxHandled = await handleTaxGuideFlow(from, text);
-        if (!taxHandled) {
+        // 🔴 THE SETUP GOAL. If we are holding a session open because setup just asked for a goal,
+        // this message IS the goal. It must be caught HERE, before the transaction parser, or a goal
+        // like "make a million pounds" gets logged as income (it did, in a live test). Catching it
+        // here is also what lets setup FINISH: saving the goal continues to sendSetupDone, which
+        // starts the reliefs questions. On the old path a man who set a goal was never asked whether
+        // he was married, because only "Maybe later" reached sendSetupDone.
+        const goalHandled = taxHandled ? false : await handleSetupGoalFlow(from, text);
+        if (!taxHandled && !goalHandled) {
           if (isGetStarted(text)) {
             await handleWelcome(from);
           } else if (isThanks(text)) {
@@ -615,6 +623,11 @@ async function handleButtonReply(from: string, buttonId: string): Promise<void> 
     return;
   }
   if (buttonId === 'su_goal_text') {
+    // 🔴 HOLD A SESSION OPEN. Without this, the next message he sends is left to a matcher to
+    // recognise, and a live test proved that fails: "make a million pounds" was read as £1,000,000 of
+    // INCOME because the goal fell through to the transaction parser. With the session set, his next
+    // message IS the goal, whatever words he uses, and it cannot be mistaken for a payment.
+    await setSession(from, 'setup', 'goal', {});
     await sendText(from, 'Go on then, in your own words: the thing and the number. "My goal is a van for 24k", "my goal is to earn 60k this year", whatever it really is.');
     return;
   }
@@ -1524,6 +1537,45 @@ async function handlePropertyQuestion(from: string): Promise<void> {
     jointShare: 1,
   });
   await sendText(from, propertyAnswer(totals.rents, d.now.taxCausedByProperty, d.extraPerYear, properties.length));
+}
+
+// 🔴 THE SETUP GOAL FLOW. Returns true if it consumed the message.
+//
+// Reached only while a 'setup'/'goal' session is open (set when he taps "Set a goal now"). It does
+// the two things the old code got wrong:
+//   1. It treats the message as a GOAL, with no trigger phrase required, so it can never be logged as
+//      a transaction. buildGoal understands "1 million", "a million", "24k".
+//   2. On success it CONTINUES to sendSetupDone, which starts the reliefs questions (married and the
+//      rest). The old path saved the goal and stopped, so a man who set a goal was never asked.
+async function handleSetupGoalFlow(from: string, text: string): Promise<boolean> {
+  const session = await getSession(from);
+  if (!session || session.flow !== 'setup' || session.step !== 'goal') return false;
+
+  const goal = buildGoal(text);
+  if (!goal) {
+    // We know he is answering the goal question; we just could not find a number. Ask for the number
+    // rather than dropping him into the transaction parser. The session stays open.
+    await sendText(from, 'Almost. Give me a number with it, like "a van for 24k", "earn 60k this year", or "a million". Or tap nothing and just say "skip" to move on.');
+    if (/\b(skip|later|no|nope|not now)\b/i.test(text)) {
+      await clearSession(from);
+      await sendSetupDone(from);
+    }
+    return true;
+  }
+
+  const userId = await findUserIdByPhone(from);
+  if (!userId) { await replyNotLinked(from); return true; }
+
+  const ok = await insertUserGoal(userId, goal);
+  await clearSession(from);
+  if (!ok) {
+    await sendText(from, 'I could not save that just now, but let us keep going. You can add the goal in the app under Money, Goals.');
+  } else {
+    await sendText(from, `Goal saved: "${goal.title}", ${formatGbp(goal.amount)}. Rakha keeps it in mind from tonight: progress, tax timing, the lot.`);
+  }
+  // 🔴 AND THIS IS THE LINE THAT WAS MISSING. Setup is now done, so ask the questions worth the money.
+  await sendSetupDone(from);
+  return true;
 }
 
 async function handleGoalSet(from: string, text: string): Promise<void> {

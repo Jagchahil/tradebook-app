@@ -26,6 +26,7 @@
 
 import { EXPENSE_RULES } from '../../lib/taxrules';
 import { RULE_SOURCES } from '../../lib/rulesources';
+import { synthesise } from '../../lib/synthesis';
 
 export const dynamic = 'force-static';
 
@@ -35,6 +36,23 @@ const rules = EXPENSE_RULES.map((r) => ({
   verdict: r.verdict,
   rule: r.rule,
   sources: RULE_SOURCES[r.key] ?? [],
+
+  // 🔴 HOW MUCH AUTHORITY DOES THIS RULE ACTUALLY CARRY? PUBLISHED, BECAUSE IT IS THIN.
+  //
+  // 'statute'   Parliament wrote it. This is the law.
+  // 'precedent' A court decided what it means. It binds HMRC.
+  // 'guidance'  HMRC said so, and nothing else. It is not the law, and HMRC has been wrong before.
+  //
+  // SEVENTEEN OF OUR TWENTY-FIVE RULES SAY 'guidance'. That is the honest number and it is worth
+  // publishing, because the alternative is letting every reader assume we have a statute behind
+  // every answer. We do not. "HMRC says so" is a perfectly respectable position and it is a
+  // completely different one from "the House of Lords decided this", and the man signing the return
+  // is entitled to know which he has been handed.
+  //
+  // (The first version of the classifier that produced this field counted HMRC page titles as
+  // statutes and reported 15. It was wrong in the direction that flatters us. A number that flatters
+  // you is the one to check twice.)
+  restsOn: synthesise(r.key)?.restsOn ?? null,
 }));
 
 const uncited = rules.filter((r) => r.sources.length === 0).map((r) => r.key);

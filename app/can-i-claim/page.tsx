@@ -83,7 +83,15 @@ function Citation({ ruleKey }: { ruleKey: string }) {
       style={{ fontSize: 12, color: MUTED, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 2 }}
     >
       <span style={{ fontWeight: 600 }}>HMRC {s.code}</span>
-      {s.authority ? <span style={{ opacity: 0.75 }}>· {s.authority.split(';')[0]}</span> : null}
+      {/* 🔴 THIS SAID:  s.authority.split(';')[0]
+          The authority field carries TWO different things, separated by a semicolon:
+              "S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL)"
+               ^^^^ the statute        ^^^^ the House of Lords deciding what it means
+          Taking [0] showed the statute and THREW THE CASE AWAY. So on the most contentious rule we
+          have, the single strongest thing we can say for it, a House of Lords decision, never
+          reached one user. Nobody meant to hide it. Nobody ever asked what the second half was for.
+          The court outranks the guidance. Show it. */}
+      {s.authority ? <span style={{ opacity: 0.75 }}>· {s.authority}</span> : null}
       <span aria-hidden style={{ opacity: 0.6 }}>↗</span>
     </a>
   );

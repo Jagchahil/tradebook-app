@@ -76,12 +76,27 @@ ok('🔴 RAKHA IS UNWIRED. Not "alive". Not "we assume it is fine". UNWIRED.',
   // five days while launchd reported success every morning.
   R.pulse === 'unwired');
 
-ok('...and it says so in a sentence a human can act on, not a status code',
-  /No heartbeat/.test(R.says)
-  && /whether it fired this week or died on Tuesday/.test(R.says));
+// 🔴 CORRECTED 14 JULY. THIS TEST USED TO ASSERT THAT RAKHA HAD "No heartbeat", AND THAT WAS FALSE.
+//
+// Rakha has a TRANSPORT heartbeat and always did: cronStarted('agent') / cronFinished('agent'), and
+// MAX_QUIET_HOURS.agent = 26 in cronwatch.ts, so a STOPPED Rakha already turns /api/health red.
+//
+// The hole is narrower and nastier than the one I claimed. processUser() returns early and writes
+// NOTHING when it finds no signals, and agent_signals is the only table Rakha touches. So a Rakha
+// that runs, walks every user, considers NOBODY, and finishes ok=true is indistinguishable, in the
+// database, from a genuinely quiet week. Both are zero rows. The cron says it finished. It did.
+//
+// So the sentence must claim the narrow thing, not the dramatic thing. An overstated finding is a
+// finding that gets disproved and then ignored.
+ok('...and it says the PRECISE thing: the walk finished, but we cannot show it looked at anybody',
+  /We know the walk finished/.test(R.says)
+  && /do not know that it looked at anybody/.test(R.says)
+  && /indistinguishable from a quiet week/.test(R.says));
 
-ok('🔴 ITS "WHAT WOULD MAKE YOU GO RED" IS NULL, WHICH IS THE HONEST ANSWER, AND IT IS THE PROBLEM',
-  // Nothing would make it go red. That is not reassurance. That is the finding.
+ok('🔴 ITS "WHAT WOULD MAKE THIS RING GO RED" IS STILL NULL, AND THAT IS STILL THE FINDING',
+  // Not because nothing anywhere would go red (the cron watchdog would). Because the only signal
+  // THIS RING could read is agent_signals, where zero rows means either "nobody needed telling" or
+  // "the engine is dead", and we cannot tell which. An organ we cannot measure is drawn dark.
   R.redWhen === null);
 
 ok('...while every organ that CAN go red says exactly how',

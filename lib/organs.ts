@@ -20,14 +20,32 @@
 //   PUCHIO answers him.           qa_cache, conversations. REAL.
 //   RAKHA  acts for him.          ...nothing. Nothing at all.
 //
-// 🔴 RAKHA LEAVES NO TRACE. Its signals are computed on the way past and thrown away. There is no
-// table. So we cannot tell you how many times Rakha has spoken to a user, whether it fired this week,
-// or whether it has been silently dead since Tuesday. If it stopped, NOTHING WOULD GO RED.
+// ⚠️ CORRECTED 14 JULY. THE FIRST VERSION OF THIS COMMENT SAID "IF IT STOPPED, NOTHING WOULD GO
+// RED." THAT WAS FALSE, AND I WROTE IT WITHOUT CHECKING.
 //
-// That is exactly the disease that killed this brain for five days in July: a component that only
-// writes when something happens is indistinguishable, from the database, from a component that is
-// dead. The differ has a heartbeat now. The amendment watcher has one. The Budget loop has one.
-// The organ that ACTS ON THE USER'S BEHALF has none, and it is the one whose silence costs the most.
+// Rakha DOES have a transport heartbeat. app/api/cron/agent/route.ts calls cronStarted('agent') and
+// cronFinished('agent'), MAX_QUIET_HOURS.agent = 26 in lib/cronwatch.ts, and /api/health goes red if
+// the walk has not finished in 26 hours. A STOPPED RAKHA IS ALREADY CAUGHT.
+//
+// 🔴 WHAT IS NOT CAUGHT IS A RAKHA THAT RUNS AND THINKS ABOUT NOBODY.
+//
+// processUser() has three early returns, and every one of them writes NOTHING:
+//
+//     if (!agg) return { inserted: 0, pinged: 0 };
+//     if (agg.months.length === 0 && agg.unconfirmed === 0) return ...;
+//     if (signals.length === 0) return { inserted: 0, pinged: 0 };   <- the whole hole, in one line
+//
+// The only table Rakha ever writes is agent_signals, ONE ROW PER FINDING. So if agentAggregates()
+// quietly began returning null for everyone, a renamed column, a changed RLS policy, a broken join,
+// the cron would walk every user, find nothing, call cronFinished('agent', TRUE), and the health
+// check would STAY GREEN. The job finished. Successfully. Having considered nobody.
+//
+// A quiet week and a lobotomised Rakha are the same thing in the database: ZERO ROWS.
+//
+// That is exactly the disease that killed this brain for five days in July, and the fix is the one
+// that worked there: khoji_runs.checked. A RUN THAT CHECKED NOTHING IS NOT A RUN. So rakha_runs
+// needs `considered` as its load-bearing column, and it does NOT need to detect a stopped cron,
+// because cron_runs already does.
 //
 // The console says so, in the loudest way it can: it draws Rakha DARK, with the reason underneath.
 // A blind spot you can see is a blind spot that gets closed. See supabase/APPLY_2026-07-14_rakha.sql.
@@ -164,9 +182,14 @@ function rakha(): Organ {
     // dead for five days while launchd reported success every single morning.
     pulse: 'unwired',
 
-    says: 'No heartbeat. Nothing Rakha does is recorded, so we cannot tell you whether it fired this week or died on Tuesday.',
+    says: 'We know the walk finished. We do not know that it looked at anybody. Nothing records how many people Rakha considered, so a Rakha that thinks about nobody is indistinguishable from a quiet week.',
 
-    // 🔴 THE HONEST ANSWER TO "WHAT WOULD MAKE YOU GO RED" IS: NOTHING WOULD. THAT IS THE PROBLEM.
+    // 🔴 THE PRECISE ANSWER TO "WHAT WOULD MAKE THIS RING GO RED".
+    //
+    // Not "nothing": the cron watchdog turns /api/health red if the agent walk stops for 26 hours,
+    // and that is real cover. But THIS RING cannot go red, because the only thing it could read is
+    // agent_signals, and zero rows there means either "nobody needed telling" or "the engine is
+    // dead", and we cannot tell which. An organ we cannot measure is drawn dark. Never green.
     redWhen: null,
 
     count: null,

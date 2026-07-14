@@ -64,11 +64,28 @@ corpus_rc=$?
 node amend.mjs "$@" >> logs/khoji.log 2>&1
 amend_rc=$?
 
+# budget.mjs is the FAST loop, and it runs here too so that a quiet week is still covered.
+#
+# A Tax Information and Impact Note is the ONLY document in UK tax that states its effective date
+# EXPLICITLY, IN PROSE: "Operative date. This measure will have effect from 6 April 2027." The Budget
+# speech does not say that. The guidance pages do not say that: they simply change, one day, and if
+# you were not watching the moment they changed you cannot tell WHEN the change bites.
+#
+# On a Budget day, run this on its own every couple of minutes:
+#
+#   */2 13-18 * * <budget day>   cd /Users/jagchahil/lekhio-khoji && ./run.sh --budget-only
+#
+# At 12:21, 12:22 and 12:24 on 13 July 2026, three measures landed three minutes apart. The nightly
+# job would have found them seventeen hours later.
+node budget.mjs "$@" >> logs/khoji.log 2>&1
+budget_rc=$?
+
 # Report the worst thing that happened, so launchd's exit code means something. A 2 from the differ
 # or the corpus means the ground has moved under us, which is an incident, not a crash: /api/health
 # has already gone red off the row it wrote. A 1 from any of them means the job itself is broken.
-echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc" >> logs/khoji.log
+echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc budget rc=$budget_rc" >> logs/khoji.log
 if [ "$watch_rc" -ne 0 ]; then exit "$watch_rc"; fi
 if [ "$diff_rc" -ne 0 ]; then exit "$diff_rc"; fi
 if [ "$corpus_rc" -ne 0 ]; then exit "$corpus_rc"; fi
-exit "$amend_rc"
+if [ "$amend_rc" -ne 0 ]; then exit "$amend_rc"; fi
+exit "$budget_rc"

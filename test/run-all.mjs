@@ -49,10 +49,19 @@ const khojiDiffer = path.join(repoRoot, 'khoji', 'difftest.mjs');
 // green. Being late is recoverable. Being confidently wrong for a fortnight is not.
 const khojiAmend = path.join(repoRoot, 'khoji', 'amendtest.mjs');
 
+// Khoji's BUDGET fast loop (khoji/budgettest.mjs). Same reasoning as the differ and the amendment
+// watcher: the same file runs on the Mac mini, where there is no repo, so it must not drift.
+//
+// It is in CI because operativeDate() decides which HALF of the law a measure lands in. Read the
+// wrong date off a TIIN and a change taking effect in 2027 is filed as IN FORCE, phase() agrees, and
+// Rakha answers a man from next year's law today.
+const khojiBudget = path.join(repoRoot, 'khoji', 'budgettest.mjs');
+
 const suites = [
   ...mjsSuites,
   ...(existsSync(khojiDiffer) ? [{ name: 'khoji-differ', file: khojiDiffer, kind: 'node' }] : []),
   ...(existsSync(khojiAmend) ? [{ name: 'khoji-amend', file: khojiAmend, kind: 'node' }] : []),
+  ...(existsSync(khojiBudget) ? [{ name: 'khoji-budget', file: khojiBudget, kind: 'node' }] : []),
   { name: 'exams', file: path.join(here, 'exams', 'run-exams.mjs'), kind: 'node' },
   { name: 'hmrc', file: path.join(here, 'hmrc', 'run-hmrc-test.mjs'), kind: 'node' },
   { name: 'logic', file: path.join(here, 'logic.test.js'), kind: 'logic' },

@@ -46,7 +46,9 @@ console.log('\nonboarding: ask once, tick, and never ask again');
 // ---------------------------------------------------------------------------------------------
 
 ok('EVERY key round trips through the button id, including the ones with underscores in them',
-  CIRCUMSTANCES.every((c) =>
+  // ...except the health question, which the parser REFUSES by design: it may never travel over
+  // WhatsApp in either direction. See test/specialcategory.test.mjs.
+  CIRCUMSTANCES.filter((c) => !c.specialCategory).every((c) =>
     ['yes', 'no', 'skip'].every((a) => {
       const p = parseButtonId(buttonId(c.key, a));
       return p && p.key === c.key && p.answer === a;

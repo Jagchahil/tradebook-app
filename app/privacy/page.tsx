@@ -99,11 +99,51 @@ export default function PrivacyPage() {
           remain legally responsible for your own tax at all times.
         </p>
 
+        {/* ⚠️ THE SENTENCE THAT USED TO BE HERE WAS NOT TRUE.
+            It read: "We do not store the content of your WhatsApp messages with any third party
+            beyond our secure database." Meanwhile every voice note went to a transcription provider
+            and every message we could not read with plain rules went to an AI provider. Both are
+            third parties. The claim was false the day it was written and it was published.
+            A privacy policy that overstates the protection is worse than one that admits the truth,
+            because he makes decisions on it. He decides to send the voice note. */}
         <h2 style={heading}>How we store and protect your data</h2>
         <p style={para}>
           Your data is encrypted in transit and at rest. We store it with trusted infrastructure
-          providers and limit access to the people and systems that need it. We do not store the
-          content of your WhatsApp messages with any third party beyond our secure database.
+          providers and limit access to the people and systems that need it. We do not sell your
+          data and we never use it to train anybody&apos;s AI models.
+        </p>
+
+        <h2 style={heading}>Reading your receipts and voice notes (AI)</h2>
+        <p style={para}>
+          Lekhio uses AI to read a photo of a receipt and to understand what you tell it. Two
+          providers do that work for us, under contract, on our instructions and nobody else&apos;s:
+        </p>
+        <p style={para}>
+          <strong>Anthropic</strong> reads receipt photos and messages, and works out what you are
+          asking. <strong>OpenAI</strong> turns a voice note into text, because that is the one
+          thing our main AI provider cannot do. Both are processors: they may not use your data for
+          their own purposes and they do not train their models on it.
+        </p>
+        <p style={para}>
+          <strong>We do not keep the text of your voice notes.</strong> A voice note is transcribed,
+          the amount, the vendor, the category and the date are taken from it, and the transcript is
+          discarded. It is not stored and it is not shown back to you in your books. Messages you
+          type yourself are stored, because they are your own words and you can see and correct
+          them.
+        </p>
+
+        <h2 style={heading}>Health information</h2>
+        <p style={para}>
+          A small number of tax allowances depend on a health condition. The Blind Person&apos;s
+          Allowance is the one that matters to our users. The law treats health information
+          differently from everything else, and rightly so.
+        </p>
+        <p style={para}>
+          We will never ask you about a health condition over WhatsApp. We ask in the app, on its
+          own, and only after you have said yes to a separate request that explains exactly what we
+          would do with the answer. If you say no, or say nothing, we do not ask and you lose
+          nothing else. If you say yes and later change your mind, you can delete it in the app and
+          it is erased, not hidden. Our lawful basis is your explicit consent, and nothing else.
         </p>
 
         <h2 style={heading}>Connecting your bank (optional)</h2>
@@ -141,9 +181,9 @@ export default function PrivacyPage() {
         <h2 style={heading}>Who we share it with</h2>
         <p style={para}>
           We do not sell your data. We share it only with the service providers that help us run
-          Lekhio, such as our hosting, database, payment, and messaging providers. They act on our
-          instructions and are bound to protect your data. If a recognised tax submission path is used,
-          it only happens after you approve.
+          Lekhio: our hosting, database, payment and messaging providers, and the two AI providers
+          above. They act on our instructions and are bound to protect your data. If a recognised
+          tax submission path is used, it only happens after you approve.
         </p>
 
         <h2 style={heading}>Sharing your books with someone (optional)</h2>

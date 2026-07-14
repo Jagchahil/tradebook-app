@@ -152,8 +152,13 @@ ok('the grandparent credit reaches back to 2011, which can be a decade of state 
 const DEPENDENT = CIRCUMSTANCES.filter((c) => c.dependsOn);
 const ans = (o) => Object.entries(o).map(([key, answer]) => ({ key, answer }));
 
-ok('a man who has told us nothing is asked everything EXCEPT the follow-ups, which have no premise yet',
-  unanswered([]).length === CIRCUMSTANCES.length - DEPENDENT.length);
+// Two kinds of question are held out of the queue, for two completely different reasons:
+//   a FOLLOW-UP waits for its premise (we do not ask a single man what his wife earns);
+//   a HEALTH question never enters the queue at all, on any channel (Article 9, see test/specialcategory).
+const HELD_BACK = CIRCUMSTANCES.filter((c) => c.dependsOn || c.specialCategory);
+
+ok('a man who has told us nothing is asked everything EXCEPT the follow-ups and the health question',
+  unanswered([]).length === CIRCUMSTANCES.length - HELD_BACK.length);
 
 ok('...and once he answers, we never ask him again',
   unanswered(ans({ married: 'yes', prior_employment: 'yes' }))

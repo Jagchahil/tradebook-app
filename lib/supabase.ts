@@ -3903,3 +3903,23 @@ export async function saveCircumstance(
     return false;
   }
 }
+
+// ERASURE. Article 17, and Article 7(3): withdrawing consent must be as easy as giving it.
+//
+// ⚠️ A REAL DELETE. The row goes. Not `answer = 'no'`, not a `deleted_at`, not an archive table.
+//
+// A tombstone would leave the fact that we once asked a man whether he was registered blind, and the
+// answer he gave, sitting in a database he has explicitly told us to forget. That is not erasure. It
+// is a filing cabinet with a note on the front saying we have stopped looking in it.
+export async function forgetCircumstance(userId: string, key: string): Promise<boolean> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/circumstances?user_id=eq.${encodeURIComponent(userId)}&key=eq.${encodeURIComponent(key)}`,
+      { method: 'DELETE', headers: { ...headers(), Prefer: 'return=minimal' } },
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

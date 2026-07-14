@@ -857,14 +857,41 @@ async function saveEntry(
   rawText: string,
 ): Promise<void> {
   const magnitude = Math.abs(parsed.amount);
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A VOICE NOTE'S TRANSCRIPT IS NOT STORED. THE PARSED FIGURES ARE.
+  //
+  // The date is still read off his words, in memory, a line below this. Then the words are dropped.
+  //
+  // WHY, when we happily keep what he TYPES: because typing is deliberate and speech is not. A man
+  // types "40 diesel". The same man, thumb on the mic, walking to the van, says "forty quid parking
+  // at the hospital, I was in for my scan, absolute joke what they charge". We would transcribe that
+  // through a third party in another country and write the whole sentence into a financial database,
+  // for ever, where it is displayed back to him in quotation marks on the home screen.
+  //
+  // That is a health record. Nobody decided to collect it. It arrived because `description` was set
+  // to whatever came out of the transcriber, and nothing ever said no.
+  //
+  // Article 5(1)(c), minimisation: we may hold what we need for the purpose. The purpose is his
+  // books, and his books need a vendor, an amount, a category and a date. Not the sentence. He
+  // verifies what we heard from the confirmation we send him on the spot, which is the moment it can
+  // actually be corrected, rather than from a quote in a list he never re-reads.
+  //
+  // ⚠️ AND I DID NOT REACH FOR A REDACTOR, WHICH WAS MY FIRST INSTINCT AND WAS WRONG. A regex that
+  // strips "hospital" and "scan" catches most of it, and the belief that we are covered is worth
+  // less than nothing, because the cases it misses are the ones that land in the database wearing a
+  // clean bill of health. Do not filter what you can simply decline to keep.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  const spoken = sourceType === 'whatsapp_voice';
+
   await insertTransaction({
     user_id: userId,
     vendor: parsed.merchant_name,
     amount: parsed.direction === 'income' ? magnitude : -magnitude,
     category: parsed.category,
-    transaction_date: entryDate(rawText),
+    transaction_date: entryDate(rawText),   // read from his words, then his words go no further
     source_type: sourceType,
-    description: rawText.slice(0, 280),
+    description: spoken ? '' : rawText.slice(0, 280),
     confirmed: false,
     raw_whatsapp_message_id: messageId,
   });

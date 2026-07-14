@@ -89,7 +89,40 @@ export interface Circumstance {
   //
   // One question, one fact. If you need two facts, you need two questions, and the second one waits.
   dependsOn?: { key: string; answer: Answer };
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 ARTICLE 9. THIS IS NOT A TAX QUESTION WITH A WARNING ON IT. IT IS A DIFFERENT KIND OF THING.
+  //
+  // "Are you registered blind?" is a health fact. UK GDPR Article 9 forbids processing it at all
+  // unless a specific condition is met, and the only one realistically open to us is Article 9(2)(a),
+  // EXPLICIT consent. Explicit means he was told it is health data, told what we do with it, and said
+  // yes to THAT, specifically. It does not mean he tapped a button in a chat.
+  //
+  // ⚠️ AND IT MUST NEVER BE ASKED ON WHATSAPP. TWO REASONS, AND THE SECOND ONE IS WORSE.
+  //
+  //   1. A green button in a messaging thread is not explicit consent by any reading of the statute.
+  //   2. THE QUESTION ITSELF IS A DISCLOSURE. It sits in his chat history for ever. His mate borrows
+  //      his phone. His kid scrolls up. A WhatsApp notification lights up his lock screen on a
+  //      building site and says "Are you registered blind or severely sight impaired?" We would have
+  //      broadcast a man's disability to a room, on his behalf, to save him £3,130 of allowance.
+  //
+  // So a special-category question is not part of the chain, on ANY channel. unanswered() will not
+  // return it. It lives behind its own consent gate in the app, and it can be erased on request,
+  // because Article 17 is not optional and a tax app is not a medical record.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  specialCategory?: true;
 }
+
+// The consent itself is stored as a circumstance, which is exactly right: Article 7(1) says we must
+// be able to DEMONSTRATE that he consented, and the circumstances table already logs the verbatim
+// wording he was shown, his answer, and the timestamp. That is the whole of Article 7 in one row.
+export const CONSENT_KEY = 'special_category_consent';
+
+export const CONSENT_ASK =
+  'The next question is about a health condition. The law treats that differently from everything '
+  + 'else you have told me, and I am not allowed to even ask it unless you say yes to this first. '
+  + 'If you say yes: I store your answer, I use it only to work out the allowance you are owed, I '
+  + 'never share it, and you can delete it whenever you like and I will forget it. Is that alright?';
 
 // ---------------------------------------------------------------------------------------------
 // THE LIST. Sorted by what it is worth, because that is the order we should be asking.
@@ -241,7 +274,16 @@ export const CIRCUMSTANCES: Circumstance[] = [
     source: 'GOV.UK, Small Business Rate Relief. Council by council: there is no national backdating rule.',
   },
   {
-    // Health data. Article 9. And a REAL document is genuinely required for this one, unlike marriage.
+    // 🔴 THE ONLY ARTICLE 9 QUESTION IN THIS FILE, AND FOR AN HOUR TODAY IT WAS IN THE WHATSAPP CHAIN.
+    //
+    // The chain I shipped this morning walks the list and sends the next question as a green button.
+    // It would, in time, have sent every man on the product a WhatsApp message reading "Are you
+    // registered blind or severely sight impaired?" and stored his tap as a health record, with no
+    // explicit consent, in a channel where the QUESTION ALONE is a disclosure to anyone holding his
+    // phone. Nothing in the code was wrong. The list simply did not know that one row was different.
+    //
+    // specialCategory is that knowledge, and unanswered() now refuses to hand it to any channel.
+    specialCategory: true,
     key: 'blind',
     ask: 'Are you registered blind or severely sight impaired with your council?',
     why: 'There is an extra tax free allowance for it, and if you cannot use it all, it transfers to your husband or wife.',
@@ -340,6 +382,14 @@ export function unanswered(answered: Array<{ key: string; answer: string }>): Ci
   const given = new Map(answered.map((a) => [a.key, a.answer]));
 
   return askingOrder().filter((c) => {
+    // 🔴 A SPECIAL CATEGORY QUESTION IS NEVER IN THE QUEUE. NOT ON WHATSAPP, NOT IN THE APP LIST.
+    //
+    // This is a REFUSAL, not a filter, and it lives here rather than in each caller for the reason
+    // every rule in this codebase ends up in one place: a rule enforced in three call sites is a rule
+    // that will one day be enforced in two. Health data does not get to depend on a new route
+    // remembering. See sensitive() for the gated path it is allowed to travel instead.
+    if (c.specialCategory) return false;
+
     if (given.has(c.key)) return false;
     if (!c.dependsOn) return true;
 
@@ -368,6 +418,22 @@ export function unanswered(answered: Array<{ key: string; answer: string }>): Ci
 // worked is: put the thing where a test can reach it, and write the test.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
+// THE GATED PATH. The questions unanswered() will not hand out.
+//
+// They are shown in ONE place, in the app, on their own, behind their own consent, with their own
+// delete button. Never in the list with the others, because putting a health question between "do
+// you pay into a pension" and "what do you drive" is precisely the move that makes it look ordinary,
+// and it is not ordinary. It is the one question in this product that the law says we may not ask.
+export function sensitive(): Circumstance[] {
+  return CIRCUMSTANCES.filter((c) => c.specialCategory);
+}
+
+// Has he given EXPLICIT consent to be asked at all? Nothing in sensitive() may be shown, asked,
+// stored, or acted on until this is true.
+export function hasSpecialConsent(answered: Array<{ key: string; answer: string }>): boolean {
+  return answered.some((a) => a.key === CONSENT_KEY && a.answer === 'yes');
+}
+
 export type Answer = 'yes' | 'no' | 'skip';
 
 const PREFIX = 'circ_';
@@ -390,7 +456,17 @@ export function parseButtonId(id: string): { key: string; answer: Answer } | nul
 
   // The key must be one WE asked. Anything else is not a circumstance, and guessing what an unknown
   // key means is how a wrong fact walks into a tax return that a man then signs himself.
-  if (!CIRCUMSTANCES.some((c) => c.key === key)) return null;
+  const c = CIRCUMSTANCES.find((x) => x.key === key);
+  if (!c) return null;
+
+  // 🔴 AND IT MUST NOT BE A HEALTH QUESTION, EVEN IF THE ID IS PERFECTLY WELL FORMED.
+  //
+  // unanswered() will never SEND one, so no honest button can carry one back. But "we would never
+  // send it" is not a control, it is a hope: an old message replayed, a hand-rolled id, a future
+  // flow that reaches for buttonId() without reading any of this. The parser refuses at the door, so
+  // that health data cannot enter through the WhatsApp webhook at all, by any route, ever.
+  if (c.specialCategory) return null;
+
   if (answer !== 'yes' && answer !== 'no' && answer !== 'skip') return null;
 
   return { key, answer };

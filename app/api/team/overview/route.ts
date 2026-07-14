@@ -6,7 +6,7 @@ import {
   listCronRuns,
   readKnowledgeState,
 } from '../../../../lib/supabase';
-import { isTeam, overview, PRICE_PENCE } from '../../../../lib/team';
+import { isTeam, overview } from '../../../../lib/team';
 import { cronAlarms } from '../../../../lib/cronwatch';
 import { knowledgeAlarms, knowledgeStatus } from '../../../../lib/knowledgewatch';
 
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     me: { email: member!.email, name: member!.name, role: member!.role },
-    overview: overview(customers, PRICE_PENCE),
+    overview: overview(customers),
     customers,
     health: {
       crons: runs === null ? 'unknown' : alarms.length === 0 ? 'ok' : 'stale',

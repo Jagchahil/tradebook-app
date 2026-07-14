@@ -188,9 +188,42 @@ export default function TeamPage() {
   // message. This is a link to an inbox that must already be a row in team_members.
   if (!data) {
     return (
-      <main style={S.signInPage}>
+      <main className="team-split" style={S.split}>
+        {/* INLINE STYLES CANNOT DO MEDIA QUERIES, and a two column layout with no breakpoint would
+            crush a phone. So the ONE thing that needs a query gets a real stylesheet: below 900px
+            there is no brand panel, and the wordmark moves onto the card instead. */}
+        <style>{`
+          .team-brand-mobile { display: flex; }
+          @media (min-width: 900px) {
+            .team-split { grid-template-columns: 440px minmax(0, 1fr) !important; }
+            .team-brand { display: flex !important; }
+            .team-brand-mobile { display: none !important; }
+          }
+        `}</style>
+
+        {/* THE LEFT PANEL. It is not decoration.
+            This is the only screen in the product where the company looks at itself, and the line
+            on it is the line the whole thing is built around. A sign in page that says nothing is a
+            sign in page that could belong to anybody. */}
+        <aside className="team-brand" style={S.brandPanel}>
+          <div>
+            <div style={S.brandRow}>
+              <span style={{ ...S.wordmark, color: '#fff', fontSize: 24 }}>Lekhio</span>
+              <span style={S.accent} aria-hidden="true" />
+            </div>
+            <p style={S.brandLine}>
+              One less button at a time.<br />Until only one is left.
+            </p>
+            <p style={S.brandApprove}>Approve.</p>
+          </div>
+          <p style={S.brandFoot}>
+            The team console. Customers, revenue, and whether the brain still agrees with HMRC.
+          </p>
+        </aside>
+
+        <div style={S.formPanel}>
         <div style={S.authCard}>
-          <div style={S.brandRow}>
+          <div className="team-brand-mobile" style={S.brandRow}>
             <span style={S.wordmark}>Lekhio</span>
             <span style={S.accent} aria-hidden="true" />
           </div>
@@ -251,10 +284,11 @@ export default function TeamPage() {
           {error ? <p style={S.error}>{error}</p> : null}
         </div>
 
-        <p style={S.legal}>
-          For the Lekhio team. This page never shows a customer{"'"}s receipts, figures or phone
-          number, and it never will.
-        </p>
+          <p style={S.legal}>
+            This page never shows a customer{"'"}s receipts, figures or phone number, and it never
+            will. We tell every user their records are theirs alone.
+          </p>
+        </div>
       </main>
     );
   }
@@ -295,6 +329,13 @@ export default function TeamPage() {
         <Card label="MRR" value={gbp(o.mrrPence)} />
         <Card label="Cancelling" value={String(o.cancelRequested)} tone={o.cancelRequested > 0 ? '#B4690E' : undefined} />
       </section>
+      {o.internal > 0 ? (
+        <p style={S.internalNote}>
+          Plus {o.internal} internal {o.internal === 1 ? 'account' : 'accounts'} (the App Review demo,
+          and any comp). Shown in the table below, counted in none of the figures above. It is not a
+          customer and it is not revenue.
+        </p>
+      ) : null}
 
       {/* WHERE THEY CAME FROM. This is the whole point of the marketing spend. */}
       <h2 style={S.h2}>Where they came from</h2>
@@ -320,7 +361,10 @@ export default function TeamPage() {
           <tbody>
             {customers.map((c) => (
               <tr key={c.id} style={S.tr}>
-                <Td>{c.name || 'No name yet'}</Td>
+                <Td>
+                  {c.name || 'No name yet'}
+                  {c.internal ? <span style={S.internalChip}>internal</span> : null}
+                </Td>
                 <Td>{c.trade || ''}</Td>
                 <Td>{when(c.joined)}</Td>
                 <Td>
@@ -340,7 +384,12 @@ export default function TeamPage() {
                   </select>
                   {c.sourceDetail ? <span style={S.detail}> · {c.sourceDetail}</span> : null}
                 </Td>
-                <Td>{c.plan || ''}</Td>
+                <Td>
+                  {c.plan || ''}
+                  {c.plan && c.amountPence > 0 ? (
+                    <span style={S.detail}> · {gbp(c.amountPence)}</span>
+                  ) : null}
+                </Td>
                 <Td>
                   <span style={{ color: STATUS_TONE[c.status] ?? '#111', fontWeight: 700 }}>{c.status}</span>
                   {c.cancelRequested ? <span style={S.cancel}> cancelling</span> : null}
@@ -403,14 +452,42 @@ const MUTED = '#6B7280';
 
 const S: Record<string, React.CSSProperties> = {
   // --- the sign in screen -----------------------------------------------------------------------
-  signInPage: {
+  //
+  // A split: the company on the left, the door on the right. The old one was a form floating on a
+  // white page, which is what a holding page looks like.
+  split: {
     minHeight: '100vh',
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr)',   // one column by default; the media query below adds two
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+    color: INK,
+    background: PAPER,
+  },
+  brandPanel: {
+    display: 'none',                          // hidden until there is room. See the media query.
     flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 18,
-    padding: '40px 22px',
+    justifyContent: 'space-between',
+    padding: '56px 48px',
+    background: `linear-gradient(150deg, #16324F 0%, ${RIVER_DEEP} 55%, ${RIVER} 100%)`,
+    color: '#fff',
+  },
+  brandLine: {
+    fontSize: 34, fontWeight: 800, lineHeight: 1.25, letterSpacing: -0.9,
+    margin: '38px 0 0', color: '#fff', maxWidth: 380,
+  },
+  brandApprove: {
+    fontSize: 34, fontWeight: 800, letterSpacing: -0.9, margin: '2px 0 0',
+    color: SAFFRON,
+  },
+  brandFoot: { fontSize: 13.5, color: 'rgba(255,255,255,0.62)', lineHeight: 1.6, margin: 0, maxWidth: 340 },
+  formPanel: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    gap: 18, padding: '48px 24px',
+    background: `radial-gradient(900px 420px at 50% -10%, #EEF4FB 0%, ${PAPER} 60%)`,
+  },
+  signInPage: {
+    minHeight: '100vh', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', gap: 18, padding: '40px 22px',
     background: `radial-gradient(1100px 520px at 50% -8%, #EEF4FB 0%, ${PAPER} 62%)`,
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
     color: INK,
@@ -486,6 +563,11 @@ const S: Record<string, React.CSSProperties> = {
   td: { padding: '13px 16px', borderBottom: '1px solid #F5F5F5', whiteSpace: 'nowrap' },
   tr: { background: '#fff' },
   detail: { color: '#8A8A8A' },
+  internalNote: { fontSize: 12.8, color: '#8A8A8A', margin: '12px 2px 0', lineHeight: 1.6, maxWidth: 720 },
+  internalChip: {
+    marginLeft: 8, fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase',
+    padding: '2px 6px', borderRadius: 5, background: '#F1F0EC', color: '#8A8A8A', verticalAlign: 1,
+  },
   select: { padding: '5px 8px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 13, background: '#fff', color: '#111' },
   cancel: { color: '#B4690E', fontWeight: 600, fontSize: 12.5, marginLeft: 6 },
   footnote: { marginTop: 32, fontSize: 12.5, color: '#8A8A8A', lineHeight: 1.7, maxWidth: 720 },

@@ -105,6 +105,21 @@ export interface TeamCustomer {
   plan: string | null;
   renews: string | null;
   cancelRequested: boolean;
+  // WHAT HE IS ACTUALLY BEING CHARGED, IN PENCE. Not what his plan is called.
+  //
+  // ⚠️ THE DASHBOARD LIED ABOUT MRR ON ITS FIRST DAY, and this field is why it will not again.
+  //
+  // overview() used to look the price up from a table keyed on the plan NAME: plan 'monthly' meant
+  // £12.99, always. So the demo account we created for Apple, which is a LOCAL GRANT with
+  // amount_pence = 0 and can never be billed by anyone, was counted as £12.99 of monthly recurring
+  // revenue. Zero real customers, and the dashboard said £13 MRR.
+  //
+  // A founder reading his own MRR off a screen that is inventing it is the worst possible version
+  // of a green light with nothing behind it. Now we read what Stripe says we are charging, and a
+  // comp is worth exactly what it is worth: nothing.
+  amountPence: number;
+  // A local grant with no Stripe id: the demo account, or a comp. Real to us, not revenue.
+  internal: boolean;
 }
 
 export interface TeamMember {
@@ -124,7 +139,8 @@ export function isTeam(m: TeamMember | null | undefined): boolean {
 // them is a fact about any individual's money.
 
 export interface TeamOverview {
-  customers: number;
+  customers: number;        // real customers. The demo account and comps are NOT customers.
+  internal: number;         // us. Shown, but never counted as a customer or as revenue.
   trialing: number;
   active: number;
   pastDue: number;
@@ -136,12 +152,30 @@ export interface TeamOverview {
 
 const PAYING = new Set(['active', 'past_due']);
 
-export function overview(customers: TeamCustomer[], pricePence: Record<string, number>): TeamOverview {
+// The annual plan is paid once but earned over twelve months. So an annual subscriber's amount_pence
+// is the YEARLY figure, and putting it straight into a MONTHLY recurring revenue total would
+// overstate him by a factor of twelve. Divide it, the way every honest SaaS dashboard does.
+export function monthlyValue(c: TeamCustomer): number {
+  if (!PAYING.has(c.status)) return 0;   // a trial is not revenue. A cancelled man is not revenue.
+  if (c.internal) return 0;              // a comp is worth what a comp is worth.
+  if (!c.amountPence) return 0;          // nothing is being charged. Say so.
+  return c.plan === 'annual' ? Math.round(c.amountPence / 12) : c.amountPence;
+}
+
+export function overview(customers: TeamCustomer[]): TeamOverview {
   const bySource = Object.fromEntries(SOURCES.map((s) => [s, 0])) as Record<AcquisitionSource, number>;
 
+  let real = 0, internal = 0;
   let trialing = 0, active = 0, pastDue = 0, canceled = 0, cancelRequested = 0, mrrPence = 0;
 
   for (const c of customers) {
+    // US, NOT THEM. The demo account we built for Apple is a person in the database and it is not a
+    // customer. Counting it as one is how "2 customers" appears on a screen on a day when nobody has
+    // ever paid us. Every number below skips it, and the dashboard shows it separately so nobody
+    // wonders where it went.
+    if (c.internal) { internal++; continue; }
+    real++;
+
     // NORMALISE AGAIN, even though readTeamCustomers already did.
     //
     // This function is pure and it trusts nobody. It used to do `bySource[c.source]++` straight off
@@ -161,24 +195,15 @@ export function overview(customers: TeamCustomer[], pricePence: Record<string, n
     }
     if (c.cancelRequested) cancelRequested++;
 
-    // MRR counts money we are ACTUALLY being paid. A trial is not revenue, and counting it as
-    // revenue is how a founder talks himself into a runway he does not have.
-    if (PAYING.has(c.status) && c.plan) {
-      mrrPence += pricePence[c.plan] ?? 0;
-    }
+    // WHAT WE ARE ACTUALLY BEING PAID. Read off the subscription, not looked up from the plan's name.
+    mrrPence += monthlyValue(c);
   }
 
   return {
-    customers: customers.length,
+    customers: real,
+    internal,
     trialing, active, pastDue, canceled, cancelRequested,
     mrrPence,
     bySource,
   };
 }
-
-// The annual plan is paid once but earned over twelve months. Dividing it is the honest way to put
-// it next to a monthly subscriber in the same MRR figure.
-export const PRICE_PENCE: Record<string, number> = {
-  monthly: 1299,
-  annual: Math.round(12900 / 12), // £129 a year, so £10.75 a month
-};

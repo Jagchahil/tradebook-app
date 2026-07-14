@@ -1039,7 +1039,7 @@ export async function readTeamCustomers(): Promise<TeamCustomer[] | null> {
     const [uRes, sRes] = await Promise.all([
       fetch(`${url}/rest/v1/users?select=${cols}&order=created_at.desc&limit=2000`, { headers: headers() }),
       fetch(
-        `${url}/rest/v1/subscriptions?select=phone,status,plan,current_period_end,cancel_at_period_end,updated_at&order=updated_at.desc&limit=5000`,
+        `${url}/rest/v1/subscriptions?select=phone,status,plan,amount_pence,current_period_end,cancel_at_period_end,stripe_subscription_id,updated_at&order=updated_at.desc&limit=5000`,
         { headers: headers() },
       ),
     ]);
@@ -1048,7 +1048,9 @@ export async function readTeamCustomers(): Promise<TeamCustomer[] | null> {
     const users = (await uRes.json()) as Array<Record<string, string | null>>;
     const subs = (await sRes.json()) as Array<{
       phone: string | null; status: string | null; plan: string | null;
+      amount_pence: number | null;
       current_period_end: string | null; cancel_at_period_end: boolean | null;
+      stripe_subscription_id: string | null;
     }>;
 
     // ⚠️ The subscription is keyed by PHONE, and the team is never shown a phone number. So we join
@@ -1084,6 +1086,13 @@ export async function readTeamCustomers(): Promise<TeamCustomer[] | null> {
         plan: sub?.plan ?? null,
         renews: sub?.current_period_end ?? null,
         cancelRequested: Boolean(sub?.cancel_at_period_end),
+        // WHAT STRIPE IS ACTUALLY CHARGING HIM. Not what his plan is called.
+        amountPence: sub?.amount_pence ?? 0,
+        // NO STRIPE ID = NOT A CUSTOMER. It is the demo account we built for Apple, or a comp we
+        // granted. It is a real row and it is not revenue, and the difference is the whole point:
+        // on its first day this dashboard showed "2 customers, MRR £13" on a morning when nobody
+        // had ever paid us a penny.
+        internal: Boolean(sub) && !sub!.stripe_subscription_id,
       };
     });
   } catch {

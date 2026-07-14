@@ -51,7 +51,9 @@ const STATUS_TONE: Record<string, string> = {
 export default function TeamPage() {
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);   // a reset link went out
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<AcquisitionSource | 'all'>('all');
@@ -62,26 +64,81 @@ export default function TeamPage() {
     if (!token) { setReady(true); return; }
 
     const res = await fetch('/api/team/overview', { headers: { Authorization: `Bearer ${token}` } });
-    if (res.status === 403) setError('That email is not on the team.');
-    else if (res.status === 503) setError('Could not read the database. This is NOT "no customers". Do not trust a zero here.');
-    else if (!res.ok) setError('Could not load.');
-    else setData((await res.json()) as Payload);
+
+    if (res.status === 403) {
+      // HE HAS A VALID SESSION AND NO ROW IN team_members.
+      //
+      // This is not an edge case, it is the NORMAL state of the world: anybody at all can create a
+      // Supabase auth account, and almost nobody is on the team. A password is a key to a door that
+      // is not there, and the door is team_members, checked on the server on every request.
+      //
+      // So do not leave him holding a session. Throw it away and put him back at the sign in screen.
+      // A stranger with a live session and an empty screen will assume the page is broken and go
+      // looking for the bug. There is no bug. He is simply not on the team.
+      await browserSupabase.auth.signOut();
+      setError('That account is not on the Lekhio team.');
+    } else if (res.status === 503) {
+      setError('Could not read the database. This is NOT "no customers". Do not trust a zero here.');
+    } else if (!res.ok) {
+      setError('Could not load.');
+    } else {
+      setData((await res.json()) as Payload);
+    }
     setReady(true);
   }
 
   useEffect(() => { load(); }, []);
 
+  // EMAIL AND PASSWORD. Jag asked for it, and he is right that the magic link was a faff.
+  //
+  // ⚠️ WHAT A PASSWORD COSTS US, WRITTEN DOWN SO NOBODY HAS TO REDISCOVER IT.
+  //
+  // A team password is the single most likely way this dashboard ever leaks, because a password is
+  // a thing that gets shared. It goes in a WhatsApp message to a new starter, it gets reused from
+  // another site that has already been breached, and it outlives the person who chose it.
+  //
+  // So the password is not the only thing standing between a stranger and our customer list, and it
+  // never was. THE REAL GATE IS team_members, CHECKED ON THE SERVER ON EVERY SINGLE REQUEST. Anyone
+  // can create a Supabase auth account. Almost nobody has a row in team_members. Signing in gets you
+  // a session and nothing else: /api/team/* answers 403 to a session with no row, and removing
+  // somebody is a DELETE that bites on their very next click.
+  //
+  // What we DO get from that: a password being guessed is not a breach of the books. It is a
+  // stranger holding a key to a door that is not there.
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const { error: err } = await browserSupabase.auth.signInWithOtp({
+    setBusy(true);
+
+    const { error: err } = await browserSupabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: `${window.location.origin}/team` },
+      password,
     });
-    // The same answer whether or not the email is on the team. A stranger must not be able to use
-    // this form to discover who works here.
-    if (err) setError('Could not send the link. Try again in a minute.');
-    else setSent(true);
+
+    setBusy(false);
+
+    if (err) {
+      // ONE MESSAGE FOR BOTH FAILURES, on purpose. "No such user" and "wrong password" are different
+      // facts, and telling them apart lets a stranger use this form to find out who works here.
+      setError('That email and password do not match.');
+      return;
+    }
+    setPassword('');  // never leave it sitting in state longer than the request needs it
+    load();           // the server decides whether he is actually on the team
+  }
+
+  // Forgotten it. This is the ONE place an email link survives, and it should: a reset link that
+  // arrives in your inbox is exactly the right amount of friction for the one moment you are
+  // locked out.
+  async function forgot() {
+    const addr = email.trim().toLowerCase();
+    if (!addr) { setError('Type your email above first, then tap this.'); return; }
+    setError(null);
+    await browserSupabase.auth.resetPasswordForEmail(addr, {
+      redirectTo: `${window.location.origin}/team/reset`,
+    });
+    // Same answer whether or not the address exists. See above.
+    setSent(true);
   }
 
   // Save the source, and show it changed straight away. If the save fails we put it BACK, rather
@@ -142,25 +199,24 @@ export default function TeamPage() {
             <>
               <h1 style={S.cardH1}>Check your email</h1>
               <p style={S.cardSub}>
-                If <b style={{ color: INK }}>{email.trim().toLowerCase()}</b> is on the team, a sign
-                in link is on its way. Open it on this device and you are in.
+                If <b style={{ color: INK }}>{email.trim().toLowerCase()}</b> is on the team, a link
+                to set a new password is on its way.
               </p>
               <button type="button" style={S.ghost} onClick={() => { setSent(false); setError(null); }}>
-                Use a different email
+                Back to sign in
               </button>
             </>
           ) : (
             <>
               <h1 style={S.cardH1}>Team sign in</h1>
-              <p style={S.cardSub}>
-                No password. We email you a link and it signs you in.
-              </p>
+              <p style={S.cardSub}>For the Lekhio team.</p>
+
               <form onSubmit={signIn}>
-                <label htmlFor="team-email" style={S.label}>Work email</label>
+                <label htmlFor="team-email" style={S.label}>Email</label>
                 <input
                   id="team-email"
                   type="email"
-                  autoComplete="email"
+                  autoComplete="username"
                   autoFocus
                   required
                   value={email}
@@ -168,8 +224,27 @@ export default function TeamPage() {
                   placeholder="you@lekhio.app"
                   style={S.input}
                 />
-                <button type="submit" style={S.button}>Email me a sign in link</button>
+
+                <label htmlFor="team-password" style={{ ...S.label, marginTop: 16 }}>Password</label>
+                <input
+                  id="team-password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  style={S.input}
+                />
+
+                <button type="submit" style={{ ...S.button, opacity: busy ? 0.6 : 1 }} disabled={busy}>
+                  {busy ? 'Signing in…' : 'Sign in'}
+                </button>
               </form>
+
+              <button type="button" style={S.textLink} onClick={forgot}>
+                Forgotten your password?
+              </button>
             </>
           )}
 
@@ -364,6 +439,11 @@ const S: Record<string, React.CSSProperties> = {
     width: '100%', padding: '12px', marginTop: 16, fontSize: 14, fontWeight: 700,
     color: RIVER, background: 'transparent', border: `1px solid ${LINE}`, borderRadius: 12, cursor: 'pointer',
     fontFamily: 'inherit',
+  },
+  textLink: {
+    display: 'block', width: '100%', marginTop: 16, padding: 0,
+    background: 'none', border: 0, cursor: 'pointer', fontFamily: 'inherit',
+    fontSize: 13.5, fontWeight: 600, color: MUTED, textAlign: 'center',
   },
   legal: { fontSize: 12.5, color: '#9A968E', textAlign: 'center', maxWidth: 400, lineHeight: 1.6, margin: 0 },
 

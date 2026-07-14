@@ -11,7 +11,7 @@
 // Every assertion below that looks paranoid is there because the alternative is a green light on a
 // screen, above a tax engine nobody has checked, in front of a man who is about to sign his return.
 
-import { vitals, coverage, knowledge, growth, didCheck, STALE_HOURS } from '../lib/brain.ts';
+import { vitals, coverage, knowledge, growth, didCheck, isKnowledge, STALE_HOURS } from '../lib/brain.ts';
 
 let pass = 0;
 let fail = 0;
@@ -198,6 +198,49 @@ ok('a real DRIFT still outranks a broken job: being wrong beats the job being do
 
 ok('didCheck is the one rule, and it is about comparisons, not exit codes',
   didCheck(goodRun) === true && didCheck(CRASHED) === false);
+
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE TWO NUMBERS ON ONE PANEL THAT DISAGREED BY 82. Read off the live page, not the code.
+// ---------------------------------------------------------------------------------------------
+//
+// The console showed, three inches apart, from one table:
+//
+//     9 approved. 39 waiting. 0 raw.        <- knowledge(): an ALLOWLIST of three statuses
+//     "130 things Khoji has learned"        <- growth():    a BLOCKLIST of two statuses
+//
+// The gap was 82 rows with status `resolved`: drift incidents the differ CLOSED when we fixed the
+// engine and the constant agreed again. An alarm that has been switched off. growth() had never
+// heard of the status, so every one of them fell through into "things the brain has learned", and
+// the console's reading was: our tax engine went wrong and was fixed, therefore the brain grew.
+//
+// The comment above knowledge() had warned about that exact sentence, while the code beneath it did
+// it. A blocklist is a bet that you have already thought of every status that will ever exist.
+//
+// THE INVARIANT BELOW IS THE REAL FIX. Not the allowlist: the allowlist can be got wrong again. The
+// invariant cannot be satisfied by two functions that disagree about what a fact is.
+
+const RESOLVED = { status: 'resolved', created_at: daysAgo(1), title: 'was drift, now agrees', source_url: 'r' };
+
+ok('THE BUG: a RESOLVED alarm is not a thing the brain learned',
+  knowledge([...items, RESOLVED]).total === 3);
+
+ok('...and it is not on the growth chart either. Fixing our own bug is not learning',
+  growth([...items, RESOLVED], 30, NOW).at(-1).total === 3);
+
+ok('THE INVARIANT: growth and knowledge must agree about what a fact is, ALWAYS',
+  growth([...items, RESOLVED], 30, NOW).at(-1).total === knowledge([...items, RESOLVED]).total);
+
+ok('...and it holds for a status nobody has invented yet, because the list is an ALLOWLIST',
+  growth([...items, { status: 'some_future_status', created_at: daysAgo(1), title: 'x', source_url: 'f' }], 30, NOW).at(-1).total
+  === knowledge([...items, { status: 'some_future_status', created_at: daysAgo(1), title: 'x', source_url: 'f' }]).total);
+
+ok('a dismissed item is not knowledge either. A human looked at it and said no',
+  isKnowledge({ status: 'dismissed', created_at: daysAgo(1), title: 'x', source_url: 'd' }) === false);
+
+ok('and the four real statuses ARE knowledge, so the fix did not simply hide everything',
+  ['needs_distillation', 'distilled', 'reviewed', 'actioned']
+    .every((status) => isKnowledge({ status, created_at: daysAgo(1), title: 'x', source_url: 'k' })));
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

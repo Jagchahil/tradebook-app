@@ -180,7 +180,32 @@ export interface Knowledge {
   newestAt: string | null;
 }
 
-const INCIDENT = new Set(['drift', 'extractor_broken']);
+// ⚠️ AN ALLOWLIST, NOT A BLOCKLIST, AND THE DIFFERENCE COST US 82 IMAGINARY FACTS.
+//
+// This was a blocklist: everything except `drift` and `extractor_broken` counted as knowledge. It
+// read as careful. It was not, because a blocklist is a bet that you have thought of every status
+// that will ever exist, and the differ had quietly invented one: `resolved`.
+//
+// `resolved` is what a drift incident becomes when we fix the engine and the constant agrees again.
+// It is an alarm that has been switched off. And with a blocklist, every one of them fell through
+// into the "things the brain has learned" pile. The console said:
+//
+//     9 approved. 39 waiting. 0 raw.        <- knowledge(), the allowlisted three
+//     "130 things Khoji has learned"        <- growth(), everything that was not drift
+//
+// Two numbers, one panel, one table, three inches apart, disagreeing by 82. And the 82 were closed
+// alarms, so the reading was: OUR TAX ENGINE WENT WRONG AND WAS FIXED, THEREFORE THE BRAIN GREW.
+//
+// That is exactly the sentence the comment on this function already warned about, and it warned
+// about it while the code underneath was doing it.
+//
+// A status not on this list is not knowledge. If the differ invents another one tomorrow, it does
+// not silently become a fact we know.
+const KNOWLEDGE_STATUS = new Set(['needs_distillation', 'distilled', 'reviewed', 'actioned']);
+const INCIDENT_STATUS = new Set(['drift', 'extractor_broken']);
+
+export const isKnowledge = (i: Item) => KNOWLEDGE_STATUS.has((i.status || '').toLowerCase());
+export const isIncident = (i: Item) => INCIDENT_STATUS.has((i.status || '').toLowerCase());
 
 export function knowledge(items: Item[]): Knowledge {
   let reviewed = 0, waiting = 0, raw = 0, incidents = 0;
@@ -189,10 +214,13 @@ export function knowledge(items: Item[]): Knowledge {
   for (const i of items) {
     const s = (i.status || '').toLowerCase();
 
-    // ⚠️ AN INCIDENT IS NOT A THING THE BRAIN HAS LEARNED. They share a table because the differ
-    // needed somewhere to shout, and if they are counted together then the day our tax engine goes
-    // wrong is the day the console reports that the brain grew.
-    if (INCIDENT.has(s)) { incidents++; continue; }
+    // An incident is not a thing the brain has learned. They share a table because the differ needed
+    // somewhere to shout. Counted here, separately, where they belong.
+    if (isIncident(i)) { incidents++; continue; }
+
+    // Anything that is neither knowledge nor an OPEN incident (a `resolved` alarm, a `dismissed`
+    // item) is simply not counted. It is not a fact and it is not a problem. It is history.
+    if (!isKnowledge(i)) continue;
 
     if (s === 'reviewed' || s === 'actioned') reviewed++;
     else if (s === 'distilled') waiting++;
@@ -214,7 +242,9 @@ export function growth(items: Item[], days = 30, now: Date = new Date()): Day[] 
   cutoff.setUTCHours(0, 0, 0, 0);
 
   for (const i of items) {
-    if (INCIDENT.has((i.status || '').toLowerCase())) continue;   // alarms are not growth
+    // THE SAME PREDICATE knowledge() USES. Not a similar one. The last time these two functions each
+    // decided for themselves what counted, they disagreed by 82 on the same panel.
+    if (!isKnowledge(i)) continue;
     if (!i.created_at) continue;
     const d = new Date(i.created_at);
     if (Number.isNaN(d.getTime())) continue;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { answerAccountantQuestion, hasClaudeConfig } from '../../../lib/claude';
 import { verifyAccessToken, bumpAiUsage, countActiveSubscribers, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised } from '../../../lib/supabase';
+import { byPhase, daysUntil } from '../../../lib/brain';
 import { rateLimitedShared } from '../../../lib/ratelimit';
 import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
@@ -132,15 +133,62 @@ export async function POST(req: NextRequest) {
   // knowledge base simply yields nothing and Puchio answers from its static,
   // exam-verified rules exactly as before. This is how the brain grows into the
   // answers without ever letting an unchecked summary become advice.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT IS THE LAW TODAY, AND WHAT IS MERELY COMING. TWO LISTS. NEVER ONE.
+  //
+  // This block used to hand the model a single list, every item written as
+  //
+  //     "- Mileage rate change (effective 2027-04-06): ... [source: ...]"
+  //
+  // under a prompt that says "treat these as the latest confirmed position, PREFER them where they
+  // are relevant". So a Budget change announced in November and biting the following April went in
+  // as a preferred fact, with the date sitting there as decoration, and the model was left to work
+  // out on its own that it had not happened yet.
+  //
+  // A man asks in January what he can claim per mile. The model does as it is told, prefers the
+  // "latest confirmed position", and gives him next year's rate. He logs three months of mileage at
+  // a number that is not the law, and he signs the return himself.
+  //
+  // ⚠️ A MODEL MUST NEVER BE ASKED TO DO THE DATE ARITHMETIC THAT DECIDES WHICH LAW APPLIES.
+  //
+  // The comparison happens HERE, in TypeScript, against a real clock (lib/brain.ts phase()). The
+  // model receives the conclusion, already reasoned, in two blocks it cannot confuse.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   let knowledge = '';
   let sourceUrls: string[] = [];
   try {
     const items = await getRelevantKnowledge(question, 6);
     if (items.length) {
       sourceUrls = items.map((k) => k.source_url).filter(Boolean);
-      knowledge = items
-        .map((k) => `- ${k.title}${k.effective_date ? ` (effective ${k.effective_date})` : ''}: ${k.summary} [source: ${k.source_url}]`)
-        .join('\n');
+
+      const { inForce, announced, unknown } = byPhase(items);
+      const line = (k: typeof items[number]) => `- ${k.title}: ${k.summary} [source: ${k.source_url}]`;
+
+      const blocks: string[] = [];
+
+      // What actually governs his answer. An item with no date lives here too: not knowing when it
+      // bites is not a reason to hide it, and the summary itself will usually say.
+      const today = [...inForce, ...unknown];
+      if (today.length) {
+        blocks.push(`THE LAW AS IT STANDS TODAY. Use these to answer.\n${today.map(line).join('\n')}`);
+      }
+
+      // Coming, but NOT YET LAW. He must not be given these as the answer.
+      if (announced.length) {
+        blocks.push(
+          'ANNOUNCED BUT NOT YET IN FORCE. These are NOT the law today and MUST NOT be used to answer '
+          + 'his question. Do not quote these figures as current. If one of them is about to change the '
+          + 'answer you have just given him, add ONE short line at the end telling him what changes and '
+          + 'from when, so he can plan. Otherwise say nothing about them.\n'
+          + announced.map((k) => {
+            const days = daysUntil(k.effective_date);
+            const when = `from ${k.effective_date}${days !== null ? `, which is ${days} days away` : ''}`;
+            return `- ${k.title} (${when}): ${k.summary} [source: ${k.source_url}]`;
+          }).join('\n'),
+        );
+      }
+
+      knowledge = blocks.join('\n\n');
     }
   } catch {
     knowledge = '';

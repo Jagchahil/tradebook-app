@@ -199,6 +199,84 @@ export function isLive(effectiveDate: string | null | undefined, now: Date = new
   return days < LANDING_WINDOW_DAYS;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 IS IT THE LAW YET? OR IS IT ONLY ANNOUNCED?
+//
+// THE BUG THIS EXISTS TO KILL, AND IT IS A WRONG-MONEY BUG:
+//
+// Every reviewed knowledge item gets folded into Rakha's prompt under this instruction (lib/claude.ts):
+//
+//     "Treat these as the latest confirmed position, PREFER them where they are relevant."
+//
+// and the effective date is passed as a bare string in the middle of a sentence: "(effective
+// 2027-04-06)". So a Budget change ANNOUNCED in November 2026 and taking effect the following APRIL
+// is handed to a language model, under an instruction to prefer it, with the date as decoration, and
+// the model is left to work out for itself that it has not happened yet.
+//
+// Picture the man. It is January. He asks what he can claim per mile. Khoji has correctly distilled
+// a Budget announcement that the rate changes on 6 April. Rakha, doing as it was told, prefers the
+// latest confirmed position and quotes him the NEW rate. He logs three months of mileage at a number
+// that is not the law yet, and every one of those entries is wrong, and he will sign the return.
+//
+// ⚠️ A MODEL MUST NEVER BE ASKED TO DO THE DATE ARITHMETIC THAT DECIDES WHICH LAW APPLIES.
+//
+// It is the same rule as everywhere else in this codebase: ARITHMETIC AND PROVENANCE DECIDE, THE
+// MODEL ONLY DESCRIBES. So we do the comparison here, in TypeScript, against a real clock, and hand
+// the model two clearly separated lists with the reasoning already done.
+//
+// AND THE SECOND HALF IS THE PRODUCT. "Announced, not yet law" is not a nuisance category to be
+// filtered out and forgotten. It is the ANSWER TO "what is coming that will affect me", which is the
+// thing every accountant charges for in March and nobody gets in January. Khoji already collects it.
+// Nothing has ever read it. (doc 108: predicting the future.)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+export type Phase = 'in_force' | 'announced' | 'unknown';
+
+export function phase(effectiveDate: string | null | undefined, now: Date = new Date()): Phase {
+  // ⚠️ NO DATE IS `unknown`, NOT `in_force`.
+  //
+  // isLive() treats a missing date as live, and that is right for ITS question ("should a human look
+  // at this?"): the cost of a false shout is one page read. This question is different. Here a wrong
+  // answer changes a number on a tax return, so an item with no date is not quietly promoted into the
+  // law. It goes to the model labelled as what it is: we do not know when this bites.
+  if (!effectiveDate) return 'unknown';
+
+  const d = new Date(effectiveDate);
+  if (Number.isNaN(d.getTime())) return 'unknown';
+
+  // Strictly after today = not law yet. Today itself IS in force: a rate that starts on 6 April is
+  // the law on 6 April, and a man asking that morning must be told the new number, not the old one.
+  return d.getTime() > now.getTime() ? 'announced' : 'in_force';
+}
+
+export interface Dated { effective_date: string | null }
+
+// Split a pile of knowledge into what governs him TODAY and what is merely coming.
+//
+// Returned separately and never merged, because the whole point is that the caller cannot
+// accidentally hand a language model one list and hope.
+export function byPhase<T extends Dated>(items: T[], now: Date = new Date()): {
+  inForce: T[];
+  announced: T[];
+  unknown: T[];
+} {
+  return {
+    inForce: items.filter((i) => phase(i.effective_date, now) === 'in_force'),
+    announced: items.filter((i) => phase(i.effective_date, now) === 'announced'),
+    unknown: items.filter((i) => phase(i.effective_date, now) === 'unknown'),
+  };
+}
+
+// How long until it bites. Null when it already has, or when we do not know.
+//
+// This is what turns "announced" into something a man can act on: "from 6 April, in 83 days" is a
+// sentence he can plan around. "Effective 2027-04-06" is a database column.
+export function daysUntil(effectiveDate: string | null | undefined, now: Date = new Date()): number | null {
+  if (phase(effectiveDate, now) !== 'announced') return null;
+  const d = new Date(effectiveDate as string);
+  return Math.ceil((d.getTime() - now.getTime()) / 86_400_000);
+}
+
 // WHAT THE BRAIN HOLDS. knowledge_items, grouped the way a human asks about it.
 export interface Knowledge {
   total: number;

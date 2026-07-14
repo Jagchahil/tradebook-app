@@ -494,7 +494,18 @@ export async function answerAccountantQuestion(question: string, context?: strin
 
   const userContent = [
     knowledge
-      ? `Verified recent updates from official sources (GOV.UK and HMRC), reviewed and carrying a primary source link. Treat these as the latest confirmed position, prefer them where they are relevant, name the change, and cite the source. Ignore this section if none are relevant:\n${knowledge}\n`
+      // ⚠️ THE OLD INSTRUCTION READ: "Treat these as the latest confirmed position, PREFER them where
+      // they are relevant." Over a list that could contain a Budget change not yet in force.
+      //
+      // So a model doing exactly as it was told would quote a man next April's mileage rate in
+      // January, and he would log three months of journeys at a number that is not the law and sign
+      // the return himself. The date was in there, as a bare string, and the model was left to do the
+      // arithmetic that decides which law applies. That is not a job for a language model.
+      //
+      // The caller (app/api/ask) now splits the list in TypeScript, against a real clock, and hands
+      // over two blocks with the reasoning already done. This instruction must respect that split and
+      // must never invite it to prefer whichever item looks newest.
+      ? `Verified updates from official sources (GOV.UK and HMRC), reviewed and carrying a primary source link. They are already split for you into what is IN FORCE and what is only ANNOUNCED. Answer his question using ONLY the in-force block. NEVER quote a figure from the announced block as if it were the law today. Name the change and cite the source. Ignore this section if none are relevant:\n${knowledge}\n`
       : '',
     context ? `My recent figures (newest first, pounds):\n${context}\n` : '',
     `My question: ${question}`,

@@ -66,6 +66,9 @@ import {
   insertUserGoal,
   completeLatestGoal,
   setEmploymentIncome,
+  setBusinessType,
+  setPartnershipShare,
+  getBusinessProfile,
   getOrCreateReferralCode,
   getRelevantKnowledge,
   getOptimiserInput,
@@ -109,6 +112,7 @@ import {
   isInvoiceThis,
 } from '../../../lib/waintents';
 import { soleTraderTax } from '../../../lib/taxengine';
+import { corporationTax } from '../../../lib/ltdengine';
 import { aprilDelta } from '../../../lib/propertyengine';
 import { niPosition, studentLoanRepayment, studentLoanForSA, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
@@ -351,7 +355,10 @@ async function processMessage(message: IncomingMessage): Promise<void> {
         // starts the reliefs questions. On the old path a man who set a goal was never asked whether
         // he was married, because only "Maybe later" reached sendSetupDone.
         const goalHandled = taxHandled ? false : await handleSetupGoalFlow(from, text);
-        if (!taxHandled && !goalHandled) {
+        // The partnership share, same session discipline as the goal: caught before the transaction
+        // parser so "50" is a share, not a £50 payment.
+        const shareHandled = (taxHandled || goalHandled) ? false : await handleSetupPartnerShareFlow(from, text);
+        if (!taxHandled && !goalHandled && !shareHandled) {
           if (isGetStarted(text)) {
             await handleWelcome(from);
           } else if (isThanks(text)) {
@@ -533,25 +540,38 @@ async function handleButtonReply(from: string, buttonId: string): Promise<void> 
     await handleSetupStart(from);
     return;
   }
-  if (buttonId === 'su_work_trade' || buttonId === 'su_work_both') {
+  // 🔴 STEP 1: THE BUSINESS STRUCTURE. It decides which tax engine applies, so it is stored, and each
+  // path is acknowledged truthfully rather than pretending one size fits all.
+  if (buttonId === 'su_biz_sole') {
+    const uid = await findUserIdByPhone(from);
+    if (uid) await setBusinessType(uid, 'sole_trader');
     await sendText(
       from,
-      buttonId === 'su_work_both'
-        ? 'Good to know. Your job and your business are taxed together: the salary uses your allowance and bands first, and the business profit stacks on top. Lekhio works all of it as one picture.'
-        : 'Noted. Everything you log builds one picture: income tax plus Class 4 National Insurance on your profit, and one honest figure for what to set aside.',
+      'Sole trader, the simplest to run. Everything you log builds one picture: income tax plus Class 4 National Insurance on your profit, and one honest figure for what to set aside.',
     );
-    await sendButtons(from, 'Do you work in construction with tax taken off before you are paid? That is CIS, the Construction Industry Scheme.', [
-      { id: 'su_cis_yes', title: 'Yes, CIS' },
-      { id: 'su_cis_no', title: 'No' },
-    ], 'Lekhio setup · 2 of 6');
+    await askSetupCis(from);
     return;
   }
-  if (buttonId === 'su_work_prop') {
+  if (buttonId === 'su_biz_ltd') {
+    const uid = await findUserIdByPhone(from);
+    if (uid) await setBusinessType(uid, 'limited_company');
     await sendText(
       from,
-      'Then you are in the right place. Rental income is its own stream with its own rules: no National Insurance on rent, mortgage interest works as a tax credit rather than an expense, and new property rates arrive in April 2027. Lekhio handles all three and prices the 2027 change on your numbers a year early.',
+      'Limited company. Different rules, and I know them: the company pays corporation tax on its profit, then YOU are taxed on how you take money out, salary and dividends. There is a split that keeps the most, and I work it out for you. Reply "pay yourself" any time and I will show you the numbers.',
     );
-    await askSetupLoan(from);
+    await askSetupCis(from);
+    return;
+  }
+  if (buttonId === 'su_biz_partner') {
+    const uid = await findUserIdByPhone(from);
+    if (uid) await setBusinessType(uid, 'partnership');
+    // The share is the one fact that changes a partner's tax, so we ask for it, holding a session so
+    // the number cannot be mistaken for a transaction.
+    await setSession(from, 'setup', 'partner_share', {});
+    await sendText(
+      from,
+      'Partnership. You are taxed on YOUR share of the profit, not the whole thing, so I need one number: what percentage of the profit is yours? Just the number, like 50. If you split it evenly two ways, that is 50.',
+    );
     return;
   }
   if (buttonId === 'su_cis_yes') {
@@ -1094,23 +1114,47 @@ async function handleTotals(from: string, body: string): Promise<void> {
     await sendText(from, `${q.periodLabel === 'all time' ? 'All time' : `For ${q.periodLabel}`}: ${formatGbp(totals.income)} in, ${formatGbp(totals.expenses)} out, so ${formatGbp(profit)} profit.`);
     return;
   }
+  // 🔴 THE ANSWER BRANCHES ON BUSINESS STRUCTURE. A sole trader, a partner and a company director on
+  // the same profit owe three different amounts, and giving all three the sole-trader number was the
+  // gap Jag caught. getBusinessProfile defaults to sole_trader, so an account that never set a
+  // structure is unchanged.
+  const profile = await getBusinessProfile(userId).catch(() => null);
+
+  // A LIMITED COMPANY is a different calculation entirely: the COMPANY pays corporation tax on its
+  // profit, and the director's personal tax depends on how they extract it. We give the company's
+  // liability plainly and point to the Pay Yourself engine for the extraction, rather than pretending
+  // it is a sole trader and quoting a wrong number.
+  if (profile?.businessType === 'limited_company') {
+    const ct = corporationTax(Math.max(0, profit));
+    await sendText(
+      from,
+      `As a limited company, on ${formatGbp(profit)} profit so far this tax year the corporation tax is about ${formatGbp(ct)}. That is the company's bill. What YOU pay depends on how you take the money out, salary and dividends, and there is a split that keeps the most. Reply "pay yourself" and I will show you the numbers. A rough guide from your logged entries, not a final figure.`,
+    );
+    return;
+  }
+
+  // A PARTNER is taxed on their SHARE of the profit, not the whole thing.
+  const share = profile?.businessType === 'partnership' ? profile.partnershipShare / 100 : 1;
+  const taxableProfit = Math.max(0, profit * share);
+  const shareNote = share < 1 ? ` (your ${Math.round(share * 100)}% share of the ${formatGbp(profit)} partnership profit)` : '';
+
   // Tax estimate for the year to date. Includes to-review entries, says so, and
   // credits CIS already deducted. A guide, not a bill. Once a student loan plan
   // is stored, the loan folds in automatically so the number is the whole
   // January picture, not a surprise minus one line.
-  const est = soleTraderTax(Math.max(0, profit));
+  const est = soleTraderTax(taxableProfit);
   const slSettings = await getStudentLoanSettings(userId).catch(() => null);
   const slPlans: StudentPlan[] = [];
   if (slSettings?.plan) slPlans.push(slSettings.plan);
   if (slSettings?.postgrad) slPlans.push('postgrad');
-  const slDue = slPlans.length > 0 ? studentLoanForSA(Math.max(0, profit), slSettings?.employmentIncome ?? 0, slPlans) : 0;
+  const slDue = slPlans.length > 0 ? studentLoanForSA(taxableProfit, slSettings?.employmentIncome ?? 0, slPlans) : 0;
   const totalDue = est.total + slDue;
   const afterCis = Math.max(0, totalDue - totals.cis);
   const slLine = slDue > 0 ? ` including ${formatGbp(slDue)} of student loan` : '';
   const cisLine = totals.cis > 0 ? ` You have already had ${formatGbp(totals.cis)} taken in CIS, so the bill after that is about ${formatGbp(afterCis)}.` : '';
   await sendText(
     from,
-    `On ${formatGbp(profit)} profit so far this tax year, the rough bill is ${formatGbp(totalDue)} (income tax plus National Insurance${slLine}).${cisLine} A rough guide from your logged entries, including ones you have not confirmed yet, not a final figure.`,
+    `On ${formatGbp(taxableProfit)} profit so far this tax year${shareNote}, the rough bill is ${formatGbp(totalDue)} (income tax plus National Insurance${slLine}).${cisLine} A rough guide from your logged entries, including ones you have not confirmed yet, not a final figure.`,
   );
 }
 
@@ -1206,15 +1250,22 @@ async function handleSetupStart(from: string): Promise<void> {
     [
       'Right, let us set your numbers up properly. Six short questions, most are one tap, and each one makes your tax figures sharper: the bands, the set aside, the January bill.',
       '',
-      'First: how does your money come in?',
+      'First, and it is the big one: how is your business set up? This decides which tax rules I use for you.',
     ].join('\n'),
     [
-      { id: 'su_work_trade', title: '🔧 Self employed' },
-      { id: 'su_work_both', title: '💼 Job + my own work' },
-      { id: 'su_work_prop', title: '🏠 Mostly property' },
+      { id: 'su_biz_sole', title: '🔧 Sole trader' },
+      { id: 'su_biz_ltd', title: '🏢 Limited company' },
+      { id: 'su_biz_partner', title: '🤝 Partnership' },
     ],
     'Lekhio setup · 1 of 6',
   );
+}
+
+async function askSetupCis(from: string): Promise<void> {
+  await sendButtons(from, 'Do you work in construction with tax taken off before you are paid? That is CIS, the Construction Industry Scheme.', [
+    { id: 'su_cis_yes', title: 'Yes, CIS' },
+    { id: 'su_cis_no', title: 'No' },
+  ], 'Lekhio setup · 2 of 6');
 }
 
 async function askSetupLoan(from: string): Promise<void> {
@@ -1547,6 +1598,31 @@ async function handlePropertyQuestion(from: string): Promise<void> {
 //      a transaction. buildGoal understands "1 million", "a million", "24k".
 //   2. On success it CONTINUES to sendSetupDone, which starts the reliefs questions (married and the
 //      rest). The old path saved the goal and stopped, so a man who set a goal was never asked.
+// 🔴 THE PARTNERSHIP SHARE. Returns true if it consumed the message. Reached only while a
+// 'setup'/'partner_share' session is open. Like the goal flow, it holds a session so the percentage
+// can never be logged as a transaction, and it continues setup once captured.
+async function handleSetupPartnerShareFlow(from: string, text: string): Promise<boolean> {
+  const session = await getSession(from);
+  if (!session || session.flow !== 'setup' || session.step !== 'partner_share') return false;
+
+  // A percentage, plain: "50", "50%", "a third" is too vague so we ask for a number.
+  const m = text.match(/(\d{1,3}(?:\.\d+)?)\s*%?/);
+  const pct = m ? parseFloat(m[1]) : NaN;
+  if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+    await sendText(from, 'Just the number for now, like 50 for an even two-way split, or 33 for three ways. You can fine-tune it in the app later.');
+    return true;
+  }
+
+  const userId = await findUserIdByPhone(from);
+  if (!userId) { await replyNotLinked(from); return true; }
+  await setPartnershipShare(userId, pct);
+  await clearSession(from);
+  await sendText(from, `Got it, ${Math.round(pct)}% is yours. From now on I tax your share, not the whole partnership. You can change it in the app under your profile.`);
+  // Continue setup where the other structures do: the CIS question.
+  await askSetupCis(from);
+  return true;
+}
+
 async function handleSetupGoalFlow(from: string, text: string): Promise<boolean> {
   const session = await getSession(from);
   if (!session || session.flow !== 'setup' || session.step !== 'goal') return false;

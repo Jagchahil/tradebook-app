@@ -2574,6 +2574,65 @@ export async function setEmploymentIncome(userId: string, amount: number): Promi
   return res.ok;
 }
 
+// 🔴 THE BUSINESS STRUCTURE. It changes which tax engine applies, so it is stored, not guessed.
+//
+// sole_trader     -> soleTraderTax on the whole profit (the default the engine always assumed).
+// partnership     -> soleTraderTax on the PARTNER'S SHARE of profit. The partnership itself files
+//                    separately; the individual is taxed on their slice.
+// limited_company -> a different animal entirely: corporation tax on company profit, then the
+//                    director's personal tax on however they extract it (salary + dividends). That is
+//                    the Pay Yourself engine (lib/payyourself.ts, lib/ltdengine.ts).
+export type BusinessType = 'sole_trader' | 'limited_company' | 'partnership';
+
+export interface BusinessProfile {
+  businessType: BusinessType;
+  /** For a partnership only: the individual's percentage share of profit. 100 for everyone else. */
+  partnershipShare: number;
+}
+
+export async function getBusinessProfile(userId: string): Promise<BusinessProfile | null> {
+  const { url } = config();
+  const query = `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=business_type,partnership_share&limit=1`;
+  const res = await fetch(query, { headers: headers() });
+  if (!res.ok) return null;
+  const rows = (await res.json().catch(() => null)) as Array<{
+    business_type: string | null;
+    partnership_share: number | string | null;
+  }> | null;
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const r = rows[0];
+  const bt: BusinessType =
+    r.business_type === 'limited_company' || r.business_type === 'partnership' ? r.business_type : 'sole_trader';
+  // A share is only meaningful for a partnership, and defaults to the whole thing until told
+  // otherwise, so a half-answered setup never quietly halves a sole trader's tax.
+  const share = Number(r.partnership_share);
+  return {
+    businessType: bt,
+    partnershipShare: bt === 'partnership' && Number.isFinite(share) && share > 0 && share <= 100 ? share : 100,
+  };
+}
+
+export async function setBusinessType(userId: string, businessType: BusinessType): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ business_type: businessType }),
+  });
+  return res.ok;
+}
+
+export async function setPartnershipShare(userId: string, share: number): Promise<boolean> {
+  const { url } = config();
+  const clamped = Math.max(1, Math.min(100, Math.round(share)));
+  const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ partnership_share: clamped }),
+  });
+  return res.ok;
+}
+
 // --- The Agentic Accountant v1 (doc 84) --------------------------------------
 
 export interface AgentUserRow {

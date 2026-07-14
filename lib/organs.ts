@@ -237,13 +237,25 @@ function rakha(runs: RakhaRun[] | null, subscribers: number, now: Date): Organ {
   }
 
   // 5. ALIVE. And it says the NUMBERS, not an adjective.
+  //
+  // ⚠️ "ACCOUNTS", NOT "PEOPLE". THE FIRST LIVE RUN SAID "Rakha looked at 2 people" WHILE THE CENTRE
+  // OF THE SAME REACTOR SAID "1 person is trusting this with his tax". Two counts of the same
+  // population, disagreeing, six inches apart, for the third time today.
+  //
+  // Neither number was wrong. listAgentUsersPage walks EVERY row in `users`, which is exactly right
+  // for a heartbeat (the question is "did the machinery run", not "did it bill anyone"), so it
+  // legitimately includes the App Review demo and anyone who has never subscribed. The CENTRE counts
+  // paying and trialing humans and excludes internal accounts.
+  //
+  // So the fix is not the number. IT IS THE NOUN. On this console "people" means customers, and it
+  // must not quietly mean something else in one ring. A word that drifts is a number that drifts.
   const spoke = real.sent > 0
     ? `${real.sent} of them heard from it.`
     : 'Nobody needed telling.';
   return {
     ...base,
     pulse: 'alive',
-    says: `Rakha looked at ${real.considered === 1 ? '1 person' : `${real.considered} people`}. ${spoke}`,
+    says: `Rakha looked at ${real.considered === 1 ? '1 account' : `${real.considered} accounts`}, every record we hold. ${spoke}`,
     count: real.considered,
   };
 }

@@ -88,8 +88,23 @@ const rakhaOf = (runs, subs = 12) => body([goodRun], [], qa, subs, runs, NOW).or
 
 ok('🔴 RAKHA IS ALIVE, AND IT SAYS THE NUMBERS RATHER THAN AN ADJECTIVE',
   R.pulse === 'alive'
-  && /looked at 12 people/.test(R.says)
+  && /looked at 12 accounts/.test(R.says)
   && /1 of them heard from it/.test(R.says));
+
+// 🔴 FOUND ON THE FIRST LIVE RUN, THIRTY SECONDS AFTER IT SHIPPED, BY LOOKING AT THE PAGE.
+//
+// The ring said "Rakha looked at 2 PEOPLE" while the centre of the same reactor said "1 PERSON is
+// trusting this with his tax". Two counts of the same population, disagreeing, six inches apart.
+//
+// NEITHER NUMBER WAS WRONG. listAgentUsersPage walks EVERY row in `users`, which is correct for a
+// heartbeat (the question is "did the machinery run"), so it includes the App Review demo. The
+// centre counts customers and excludes it.
+//
+// THE BUG WAS THE NOUN. On this console "people" means customers. A word that drifts becomes a
+// number that drifts, and this is the third time today two readers of one population have disagreed
+// on screen. The ring now says ACCOUNTS, and says that it means every record we hold.
+ok('🔴 ...AND IT SAYS "ACCOUNTS", BECAUSE ON THIS CONSOLE "PEOPLE" MEANS CUSTOMERS',
+  !/\bpeople\b/.test(R.says) && /every record we hold/.test(R.says));
 
 ok('🔴 ...AND IT CAN FINALLY ANSWER "WHAT WOULD MAKE YOU GO RED", WHICH IS THE WHOLE TEST',
   // It was `null` this morning. An organ that cannot answer this question is an organ nobody is

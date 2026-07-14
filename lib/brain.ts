@@ -170,6 +170,35 @@ export function coverage(v: Vitals): { pct: number; watched: number; total: numb
   };
 }
 
+// IS THIS ACTUALLY LANDING, OR IS IT JUST RELEVANT?
+//
+// ⚠️ THE BADGE THAT LIED ON ITS FIRST DAY.
+//
+// The review queue shouted "CHANGES THE TAX ENGINE" on a GOV.UK page effective 1 JANUARY 2019, and
+// on another from 6 April 2017. The trading allowance has been £1,000 since 2017. Our engine holds
+// it. Khoji compares it to GOV.UK every single night. Nothing was changing.
+//
+// `engine_impact` is a MODEL'S GUESS, and the distiller had set it true on all 39 items in the
+// queue. So the loudest label on the screen was on everything, which means it was on nothing, and
+// the one item that genuinely moves a rate would have hidden inside the noise. It is the same
+// disease as an alarm that always fires: somebody mutes it, and then there is no alarm.
+//
+// The row carries a FACT the model cannot fudge: the effective date. Use it. A change that already
+// happened years ago is not news, it is the law we already implement and already check.
+export const LANDING_WINDOW_DAYS = 120;
+
+export function isLive(effectiveDate: string | null | undefined, now: Date = new Date()): boolean {
+  // No date at all means we do not know when it bites. Treat it as LIVE: not knowing is not the same
+  // as being fine, and the cost of a false shout here is one person reading one extra page. The cost
+  // of a false silence is a rate change nobody looked at.
+  if (!effectiveDate) return true;
+  const d = new Date(effectiveDate);
+  if (Number.isNaN(d.getTime())) return true;
+  const days = (now.getTime() - d.getTime()) / 86_400_000;
+  // In the future, or landed recently enough that we might not have acted on it yet.
+  return days < LANDING_WINDOW_DAYS;
+}
+
 // WHAT THE BRAIN HOLDS. knowledge_items, grouped the way a human asks about it.
 export interface Knowledge {
   total: number;

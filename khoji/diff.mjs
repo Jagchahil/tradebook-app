@@ -1176,8 +1176,20 @@ async function main() {
   // drifting into believing that "0 DRIFT" means "our tax numbers are right", when it means "the
   // ones we look at are right". Doc 104, standing question 5: is it TRUE, not is it defensible.
   const checked = new Set(CHECKS.map((c) => c.fact));
-  const unchecked = Object.keys(facts).filter((k) => !checked.has(k) && k !== 'taxYear');
-  log(`engine tax year ${meta.taxYear}: ${Object.keys(facts).length} constants published, ` +
+
+  // ⚠️ `taxYear` IS NOT A TAX CONSTANT. IT IS A LABEL, AND IT WAS BEING COUNTED AS ONE.
+  //
+  // The console draws one cell per published constant: lit if it was compared to GOV.UK, dark if
+  // nothing is watching it. Tonight it drew THREE dark cells and could only name two, because this
+  // count included `taxYear` ("2026/27"), a string that nothing can drift and nothing can check.
+  //
+  // A phantom unexamined constant. Small, and a lie: it told us something was unwatched that does
+  // not exist, and it dragged coverage from 59/61 down to 59/62 for no reason on earth.
+  //
+  // The GRID caught it, because a grid cannot round. A percentage would have hidden it for months.
+  const constants = Object.keys(facts).filter((k) => k !== 'taxYear');
+  const unchecked = constants.filter((k) => !checked.has(k));
+  log(`engine tax year ${meta.taxYear}: ${constants.length} constants published, ` +
       `${checked.size} checked against GOV.UK, ${unchecked.length} with no extractor yet`);
   if (unchecked.length) log(`  not yet checked: ${unchecked.join(', ')}`);
 
@@ -1259,7 +1271,7 @@ async function main() {
     // every night is what stops us quietly starting to believe the first one.
     await recordRun(db, {
       taxYear: meta.taxYear ?? null,
-      published: Object.keys(facts).length,
+      published: constants.length,
       checked: checked.size,
       agreed: agreed.length,
       drifted: drift.length,

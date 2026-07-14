@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { browserSupabase } from '../../lib/supabasebrowser';
 import { C, T, S as U, FONT } from './ui';
+import { isLive } from '../../lib/brain';
 import type { Vitals, Day, Knowledge } from '../../lib/brain';
 
 // KHOJI. The brain, live.
@@ -307,7 +308,24 @@ function Queue({
       {items.map((i) => (
         <article key={i.id} style={{ ...S.card, opacity: busy === i.id ? 0.45 : 1 }}>
           <div style={S.cardTop}>
-            {i.engine_impact ? <span style={S.impact}>CHANGES THE TAX ENGINE</span> : null}
+            {/* ⚠️ THE BADGE THAT LIED ON ITS FIRST DAY.
+                It said "CHANGES THE TAX ENGINE" on a page effective 1 JANUARY 2019, and on another
+                from 6 April 2017. The trading allowance has been £1,000 since 2017. Our engine holds
+                it. Khoji compares it to GOV.UK every single night.
+
+                `engine_impact` is a MODEL'S GUESS, and it had set it true on all 39 items. So the
+                loudest label on the screen was on everything, which means it was on nothing, and the
+                one item that genuinely moves a rate would have hidden inside the noise. That is the
+                same disease as an alarm that always fires: it gets muted, and then you have no alarm.
+
+                The row carries a FACT the model cannot fudge: the effective date. So the shout is
+                reserved for a change that is actually landing. Anything older is quietly labelled
+                for what it is: relevant, and not news. */}
+            {i.engine_impact && isLive(i.effective_date) ? (
+              <span style={S.impact}>CHANGES THE TAX ENGINE</span>
+            ) : i.engine_impact ? (
+              <span style={S.touches}>touches the tax engine</span>
+            ) : null}
             {i.effective_date ? (
               <span style={S.when}>from {new Date(i.effective_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
             ) : null}
@@ -499,6 +517,14 @@ const S: Record<string, React.CSSProperties> = {
     fontSize: 10.5, fontWeight: 800, letterSpacing: 0.7,
     padding: '4px 8px', borderRadius: 5,
     background: C.redTint, color: '#8C2A20',
+  },
+  // The same fact, told honestly. It touches a rate we hold, and it is not news: the change landed
+  // years ago, our engine has it, and Khoji compares it to GOV.UK every night. Worth reading. Not
+  // worth shouting.
+  touches: {
+    fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5,
+    padding: '4px 8px', borderRadius: 5,
+    background: C.lineSoft, color: C.muted,
   },
   when: { ...T.tiny, fontWeight: 650 },
   cardTitle: { ...T.h2, fontSize: 16, margin: '0 0 8px' },

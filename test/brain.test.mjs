@@ -11,7 +11,7 @@
 // Every assertion below that looks paranoid is there because the alternative is a green light on a
 // screen, above a tax engine nobody has checked, in front of a man who is about to sign his return.
 
-import { vitals, coverage, knowledge, growth, didCheck, isKnowledge, STALE_HOURS } from '../lib/brain.ts';
+import { vitals, coverage, knowledge, growth, didCheck, isKnowledge, isLive, LANDING_WINDOW_DAYS, STALE_HOURS } from '../lib/brain.ts';
 
 let pass = 0;
 let fail = 0;
@@ -241,6 +241,45 @@ ok('a dismissed item is not knowledge either. A human looked at it and said no',
 ok('and the four real statuses ARE knowledge, so the fix did not simply hide everything',
   ['needs_distillation', 'distilled', 'reviewed', 'actioned']
     .every((status) => isKnowledge({ status, created_at: daysAgo(1), title: 'x', source_url: 'k' })));
+
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE BADGE THAT LIED ON ITS FIRST DAY. Read off the live queue, an hour after shipping it.
+// ---------------------------------------------------------------------------------------------
+//
+// The review queue shouted "CHANGES THE TAX ENGINE" on a GOV.UK page effective 1 JANUARY 2019, and
+// on another from 6 April 2017. The trading allowance has been £1,000 since 2017. Our engine holds
+// it. Khoji compares it to GOV.UK every single night. NOTHING WAS CHANGING.
+//
+// `engine_impact` is a MODEL'S GUESS and the distiller had set it true on all 39 items. The loudest
+// label on the screen was on everything, which means it was on nothing, and the one item that
+// genuinely moves a rate would have hidden inside the noise.
+//
+// An alarm that always fires gets muted, and then you have no alarm AND you think you have one. So
+// the shout is reserved for a change that is actually landing, decided by a FACT the model cannot
+// fudge: the effective date on the row.
+
+ok('THE BUG: a change that landed in 2017 is not news, and is not shouted about',
+  isLive('2017-04-06', NOW) === false);
+
+ok('...nor one from 2019',
+  isLive('2019-01-01', NOW) === false);
+
+ok('a change landing in the FUTURE is live. That is the whole point of the queue',
+  isLive('2027-04-06', NOW) === true);
+
+ok('a change that landed last week is live: we may not have acted on it yet',
+  isLive(daysAgo(7), NOW) === true);
+
+ok('the window is 120 days, and either side of it behaves',
+  isLive(daysAgo(LANDING_WINDOW_DAYS - 1), NOW) === true
+  && isLive(daysAgo(LANDING_WINDOW_DAYS + 1), NOW) === false);
+
+ok('NO DATE means LIVE. Not knowing when it bites is not the same as it being harmless',
+  isLive(null, NOW) === true && isLive(undefined, NOW) === true);
+
+ok('...and so does a date we cannot parse. We shout rather than quietly swallow it',
+  isLive('not a date', NOW) === true);
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

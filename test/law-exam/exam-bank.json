@@ -1,0 +1,201 @@
+{
+  "meta": {
+    "title": "Lekhio law exam bank",
+    "note": "The legal sibling of test/exams. Where the accounting bank proves our tax ENGINE against a number, this proves our legal KNOWLEDGE against the primary source: every question is anchored to a statute section or a named case, on a host we are licensed to cite (see lib/lawsources.ts). Answers are kept QUALITATIVE and pinned to a provision, never a bare threshold, because a number can be amended under us and the point of Khoji is to catch that, not to enshrine it. Coverage is counted honestly: 'rule' = cross-checked against lib/rulesources.ts, 'knowledge' = we hold the source and could answer, 'uncovered' = a gap we admit and count. Drawn from the syllabus TOPICS of the professional exams in lib/lawsources.ts; no past-paper text is reproduced.",
+    "discipline": "Broad to examine ourselves on. Narrow to assert to a user. Nothing in this file is an answer sent to anyone; it is how we test that we are right."
+  },
+  "questions": [
+    {
+      "id": "L01", "field": "tax", "qualification": "CIOT CTA", "topic": "Deductibility of everyday clothing",
+      "prompt": "A self-employed electrician buys ordinary trousers and a shirt worn only for work. Deductible against trading profit?",
+      "answer": "No. Ordinary clothing fails the wholly-and-exclusively test because it also serves the everyday human need for warmth and decency.",
+      "authority": "Mallalieu v Drummond [1983] 57 TC 330 (HL)",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2005/5/section/34",
+      "answered": "rule"
+    },
+    {
+      "id": "L02", "field": "tax", "qualification": "ACCA ATX", "topic": "Wholly and exclusively",
+      "prompt": "What is the statutory test for whether a trading expense is deductible for income tax?",
+      "answer": "It must be incurred wholly and exclusively for the purposes of the trade.",
+      "authority": "s34(1)(a) ITTOIA 2005",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2005/5/section/34",
+      "answered": "rule"
+    },
+    {
+      "id": "L03", "field": "company", "qualification": "ACCA LW", "topic": "Unlawful distributions",
+      "prompt": "A company with no distributable profits pays a dividend. What is the position?",
+      "answer": "The distribution is unlawful; a member who knew or had reasonable grounds to know is liable to repay it.",
+      "authority": "s830 and s847 Companies Act 2006",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2006/46/section/830",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L04", "field": "company", "qualification": "SQE1 FLK1", "topic": "Directors' general duties",
+      "prompt": "Where are a director's core general duties codified?",
+      "answer": "In the seven general duties, including to promote the success of the company and to exercise reasonable care, skill and diligence.",
+      "authority": "ss171-177 Companies Act 2006",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2006/46/part/10/chapter/2",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L05", "field": "company", "qualification": "ICSA", "topic": "Confirmation statement",
+      "prompt": "What ongoing filing confirms a company's information to Companies House at least annually?",
+      "answer": "The confirmation statement (which replaced the annual return).",
+      "authority": "s853A Companies Act 2006",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2006/46/section/853A",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L06", "field": "employment", "qualification": "SQE1 FLK1", "topic": "Unfair dismissal framework",
+      "prompt": "Which statute and part govern an ordinary unfair dismissal claim, and where is the qualifying period set?",
+      "answer": "Part X of the Employment Rights Act 1996; the qualifying period of continuous employment is set by s108. (The length is a live figure Khoji watches, not enshrined here.)",
+      "authority": "Part X and s108 Employment Rights Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/18/section/108",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L07", "field": "employment", "qualification": "CILEX Employment", "topic": "Automatically unfair dismissal",
+      "prompt": "Name a reason for dismissal that is automatically unfair with no qualifying period.",
+      "answer": "Dismissal for making a protected disclosure (whistleblowing), or for a reason connected with pregnancy or maternity.",
+      "authority": "s103A and s99 Employment Rights Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/18/section/103A",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L08", "field": "employment", "qualification": "SQE1 FLK1", "topic": "Statutory minimum notice",
+      "prompt": "How is an employee's statutory minimum notice period structured?",
+      "answer": "One week after one month's service, then one additional week per complete year up to a statutory maximum of twelve weeks.",
+      "authority": "s86 Employment Rights Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/18/section/86",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L09", "field": "employment", "qualification": "CIPD", "topic": "Protected characteristics",
+      "prompt": "Under what statute are the protected characteristics for discrimination defined?",
+      "answer": "The Equality Act 2010, which lists nine protected characteristics including age, disability, sex, and race.",
+      "authority": "s4 Equality Act 2010",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2010/15/section/4",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L10", "field": "consumer", "qualification": "SQE1", "topic": "Satisfactory quality",
+      "prompt": "A tradesman sells goods to a consumer. What statutory quality standard must the goods meet?",
+      "answer": "They must be of satisfactory quality, fit for particular purpose, and as described.",
+      "authority": "ss9-11 Consumer Rights Act 2015",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2015/15/section/9",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L11", "field": "consumer", "qualification": "CTSI", "topic": "Short-term right to reject",
+      "prompt": "A consumer receives faulty goods. What immediate remedy does the Consumer Rights Act give?",
+      "answer": "A short-term right to reject the goods and obtain a refund, exercisable within the statutory period.",
+      "authority": "s20 and s22 Consumer Rights Act 2015",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2015/15/section/22",
+      "answered": "uncovered"
+    },
+    {
+      "id": "L12", "field": "consumer", "qualification": "SQE1", "topic": "Services with reasonable care and skill",
+      "prompt": "What standard must a trader meet when supplying a service to a consumer?",
+      "answer": "The service must be performed with reasonable care and skill.",
+      "authority": "s49 Consumer Rights Act 2015",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2015/15/section/49",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L13", "field": "contract", "qualification": "CILEX Contract", "topic": "Limitation, simple contract",
+      "prompt": "What is the limitation period for an action founded on a simple contract?",
+      "answer": "Six years from the date the cause of action accrued.",
+      "authority": "s5 Limitation Act 1980",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1980/58/section/5",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L14", "field": "tort", "qualification": "SQE1 FLK1", "topic": "Limitation, personal injury",
+      "prompt": "What is the limitation period for a personal injury claim in negligence?",
+      "answer": "Three years from the date of the injury or the date of knowledge, if later.",
+      "authority": "s11 Limitation Act 1980",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1980/58/section/11",
+      "answered": "uncovered"
+    },
+    {
+      "id": "L15", "field": "tort", "qualification": "SQE1 FLK1", "topic": "Duty of care, origin",
+      "prompt": "Which case established the modern neighbour principle for a duty of care in negligence?",
+      "answer": "Donoghue v Stevenson, establishing that one owes a duty to persons so closely and directly affected that one ought reasonably to have them in contemplation.",
+      "authority": "Donoghue v Stevenson [1932] AC 562 (HL)",
+      "source_url": "https://caselaw.nationalarchives.gov.uk/",
+      "answered": "uncovered"
+    },
+    {
+      "id": "L16", "field": "intellectual_property", "qualification": "SQE2", "topic": "Copyright subsistence",
+      "prompt": "Does a photographer need to register a photograph to hold copyright in it?",
+      "answer": "No. Copyright arises automatically on creation of a qualifying original work; there is no registration system for copyright in the UK.",
+      "authority": "s1 Copyright, Designs and Patents Act 1988",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1988/48/section/1",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L17", "field": "intellectual_property", "qualification": "CIPA", "topic": "Copyright duration",
+      "prompt": "How long does copyright in a literary, dramatic, musical or artistic work last?",
+      "answer": "For the life of the author plus 70 years from the end of the year of death.",
+      "authority": "s12 Copyright, Designs and Patents Act 1988",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1988/48/section/12",
+      "answered": "uncovered"
+    },
+    {
+      "id": "L18", "field": "data_protection", "qualification": "IAPP CIPP/E", "topic": "Lawful basis",
+      "prompt": "A tradesman keeps customer contact details. What must they have to process that personal data?",
+      "answer": "A lawful basis for processing, such as consent, contract, or legitimate interests.",
+      "authority": "Article 6 UK GDPR, as applied by the Data Protection Act 2018",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2018/12/contents",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L19", "field": "data_protection", "qualification": "BCS Data Protection", "topic": "Subject access",
+      "prompt": "A customer asks a business for a copy of the personal data it holds on them. What is this and what is the response deadline anchored to?",
+      "answer": "A subject access request; the controller must respond without undue delay and within the statutory period set by the UK GDPR.",
+      "authority": "Article 15 UK GDPR, Data Protection Act 2018",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2018/12/contents",
+      "answered": "uncovered"
+    },
+    {
+      "id": "L20", "field": "health_and_safety", "qualification": "NEBOSH", "topic": "General duty of employer",
+      "prompt": "What is the primary statutory duty of an employer regarding the health and safety of employees?",
+      "answer": "To ensure, so far as is reasonably practicable, the health, safety and welfare at work of all employees.",
+      "authority": "s2 Health and Safety at Work etc. Act 1974",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1974/37/section/2",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L21", "field": "health_and_safety", "qualification": "IOSH", "topic": "Duty to non-employees",
+      "prompt": "Does a self-employed builder owe a health and safety duty to members of the public affected by the work?",
+      "answer": "Yes. There is a duty to conduct the undertaking so that persons not in your employment are not exposed to risks to their health or safety, so far as is reasonably practicable.",
+      "authority": "s3 Health and Safety at Work etc. Act 1974",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1974/37/section/3",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L22", "field": "construction", "qualification": "CIOB", "topic": "Right to adjudication",
+      "prompt": "A dispute arises under a construction contract. What dispute mechanism does the party have a statutory right to?",
+      "answer": "A right to refer the dispute to adjudication at any time.",
+      "authority": "s108 Housing Grants, Construction and Regeneration Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/53/section/108",
+      "answered": "uncovered"
+    },
+    {
+      "id": "L23", "field": "insolvency", "qualification": "JIEB", "topic": "Wrongful trading",
+      "prompt": "A director continues trading when they knew there was no reasonable prospect of avoiding insolvent liquidation. What is the exposure?",
+      "answer": "Potential personal liability to contribute to the company's assets for wrongful trading.",
+      "authority": "s214 Insolvency Act 1986",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1986/45/section/214",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L24", "field": "property", "qualification": "CILEX Conveyancing", "topic": "Landlord repairing obligation",
+      "prompt": "In a short residential lease, who is responsible for repairing the structure and exterior, and the supply of water, gas and electricity?",
+      "answer": "The landlord, under an implied repairing covenant that cannot be contracted out of.",
+      "authority": "s11 Landlord and Tenant Act 1985",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1985/70/section/11",
+      "answered": "uncovered"
+    }
+  ]
+}

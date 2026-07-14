@@ -96,13 +96,26 @@ budget_rc=$?
 node tribunal.mjs "$@" >> logs/khoji.log 2>&1
 tribunal_rc=$?
 
+# lawwatch.mjs. Khoji watches the LAW ITSELF, not just the tax pages.
+#
+# The others read GOV.UK. This reads the primary law the LAW EXAM BANK is anchored to: the statutes
+# on legislation.gov.uk and the judgments at the National Archives. The exam bank answers with
+# PROVISIONS on purpose ("the qualifying period is set by ERA 1996 s108"), so a threshold changing
+# does not make it quietly wrong. But that only holds if something watches the provision. This is it.
+# Same honesty rules as amend: a republish is not a change, a page we could not read is BLIND not
+# fine, and a run that read nothing exits loud. Only licensed hosts (legislation.gov.uk, gov.uk,
+# National Archives caselaw), enforced in code.
+node lawwatch.mjs "$@" >> logs/khoji.log 2>&1
+lawwatch_rc=$?
+
 # Report the worst thing that happened, so launchd's exit code means something. A 2 from the differ
 # or the corpus means the ground has moved under us, which is an incident, not a crash: /api/health
 # has already gone red off the row it wrote. A 1 from any of them means the job itself is broken.
-echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc budget rc=$budget_rc tribunal rc=$tribunal_rc" >> logs/khoji.log
+echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc budget rc=$budget_rc tribunal rc=$tribunal_rc lawwatch rc=$lawwatch_rc" >> logs/khoji.log
 if [ "$watch_rc" -ne 0 ]; then exit "$watch_rc"; fi
 if [ "$diff_rc" -ne 0 ]; then exit "$diff_rc"; fi
 if [ "$corpus_rc" -ne 0 ]; then exit "$corpus_rc"; fi
 if [ "$amend_rc" -ne 0 ]; then exit "$amend_rc"; fi
 if [ "$budget_rc" -ne 0 ]; then exit "$budget_rc"; fi
-exit "$tribunal_rc"
+if [ "$tribunal_rc" -ne 0 ]; then exit "$tribunal_rc"; fi
+exit "$lawwatch_rc"

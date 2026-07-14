@@ -66,13 +66,25 @@ const khojiBudget = path.join(repoRoot, 'khoji', 'budgettest.mjs');
 // judgment that reverses the van rule sits in an unread queue.
 const khojiTribunal = path.join(repoRoot, 'khoji', 'tribunaltest.mjs');
 
+// Khoji's LAW freshness watcher (khoji/lawwatchtest.mjs). Sibling of amend, for the primary law the
+// law exam bank is anchored to. It also holds the PARITY test: the watcher's own copy of the watched
+// list must equal lib/lawsources.ts, or a law gets silently dropped from the watch.
+const khojiLawWatch = path.join(repoRoot, 'khoji', 'lawwatchtest.mjs');
+
 const suites = [
   ...mjsSuites,
   ...(existsSync(khojiDiffer) ? [{ name: 'khoji-differ', file: khojiDiffer, kind: 'node' }] : []),
   ...(existsSync(khojiAmend) ? [{ name: 'khoji-amend', file: khojiAmend, kind: 'node' }] : []),
   ...(existsSync(khojiBudget) ? [{ name: 'khoji-budget', file: khojiBudget, kind: 'node' }] : []),
   ...(existsSync(khojiTribunal) ? [{ name: 'khoji-tribunal', file: khojiTribunal, kind: 'node' }] : []),
+  ...(existsSync(khojiLawWatch) ? [{ name: 'khoji-lawwatch', file: khojiLawWatch, kind: 'node' }] : []),
   { name: 'exams', file: path.join(here, 'exams', 'run-exams.mjs'), kind: 'node' },
+  // The LAW exam bank. Sibling of the accounting exams: where that proves our tax ENGINE against a
+  // number, this proves our legal KNOWLEDGE is anchored to a licensed primary source, ties every
+  // 'rule' answer back to code our engine actually rests on, and counts the coverage gaps honestly.
+  // Broad to examine ourselves on, narrow to assert (lib/lawsources.ts). Watched fresh by
+  // khoji/lawwatch.mjs, the same way the tax law is.
+  { name: 'law-exam', file: path.join(here, 'law-exam', 'run-law-exam.mjs'), kind: 'node' },
   { name: 'hmrc', file: path.join(here, 'hmrc', 'run-hmrc-test.mjs'), kind: 'node' },
   { name: 'logic', file: path.join(here, 'logic.test.js'), kind: 'logic' },
 ];

@@ -587,3 +587,32 @@ export function matchSalarySet(body: string): number | null {
   if (!amount || amount < 1000 || amount > 1000000) return null;
   return amount;
 }
+
+// --- "What have you actually saved me?" ---------------------------------------------------------
+//
+// ⚠️ THIS IS THE MOST IMPORTANT QUESTION A CUSTOMER WILL EVER ASK US, and it is the one that decides
+// whether he keeps paying.
+//
+// "£12.99 saves you £2,000" is not a slogan. It is a SPECIFICATION (doc 108). If he texts us this
+// question and we cannot answer it with a number, the sentence was a lie and he cancels.
+//
+// It goes through an INTENT, not an AI call, for two reasons. It is arithmetic on his own confirmed
+// figures, so a model has nothing to add and everything to get wrong. And the answer to "what have
+// you saved me" must be the SAME number he sees in the app, every single time. A model would
+// paraphrase it, and a paraphrased money figure is a different money figure.
+const SAVED_ME = /\b(saved?|saving|savings)\b/i;
+const SAVED_ME_SUBJECT = /\b(me|us|my tax|so far|this year|anything)\b/i;
+
+export function isSavingsQuestion(body: string): boolean {
+  const b = (body || '').toLowerCase().trim();
+  if (!b || b.length > 90) return false;
+
+  // "what have you saved me", "how much have you saved me", "have you saved me anything",
+  // "what am I saving", "how much has lekhio saved me this year"
+  if (SAVED_ME.test(b) && SAVED_ME_SUBJECT.test(b)) return true;
+
+  // "was it worth it", "is this worth 12.99" — the same question, asked by a man about to cancel.
+  if (/\bworth it\b/.test(b)) return true;
+
+  return false;
+}

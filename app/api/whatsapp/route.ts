@@ -18,6 +18,7 @@ import {
   hasClaudeConfig,
 } from '../../../lib/claude';
 import { checkExpense, VERDICT_ICON, TAX_TIPS } from '../../../lib/taxrules';
+import { ledger, headline } from '../../../lib/ledger';
 import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
 import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/email';
 import { hasBankFeedConfig } from '../../../lib/bankfeed';
@@ -64,6 +65,7 @@ import {
   setEmploymentIncome,
   getOrCreateReferralCode,
   getRelevantKnowledge,
+  getOptimiserInput,
 } from '../../../lib/supabase';
 import { isReferRequest, referralInvite } from '../../../lib/referral';
 import {
@@ -82,6 +84,7 @@ import {
   isDeadlineQuestion,
   deadlineAnswer,
   matchTotalsQuestion,
+  isSavingsQuestion,
   formatGbp,
   isNiQuestion,
   isStudentLoanQuestion,
@@ -396,6 +399,8 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handleNiQuestion(from);
           } else if (isReferRequest(text)) {
             await handleReferRequest(from);
+          } else if (isSavingsQuestion(text)) {
+            await handleSavingsQuestion(from);
           } else if (matchTotalsQuestion(text)) {
             await handleTotals(from, text);
           } else if (isQuestion(text)) {
@@ -1755,6 +1760,64 @@ async function handleMoneyQuestion(from: string, body: string): Promise<void> {
 
   const answer = await answerMoneyQuestion(body, summary, knowledge);
   await sendText(from, answer ?? 'I could not work that out. Try asking another way.');
+}
+
+// --- "What have you actually saved me?" ---------------------------------------------------------
+//
+// ⚠️ THE QUESTION THAT DECIDES WHETHER HE KEEPS PAYING, and the one we could not answer until today.
+//
+// "£12.99 saves you £2,000" is a SPECIFICATION, not a slogan (doc 108). A man texts this the month
+// his card is due, and if the answer is a shrug, he cancels. He is right to.
+//
+// NO AI. It is arithmetic on his own confirmed figures, so a model has nothing to add and everything
+// to get wrong, and the number MUST be the same one he sees in the app. A model would paraphrase it,
+// and a paraphrased money figure is a different money figure.
+async function handleSavingsQuestion(from: string) {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(from, 'Send me a receipt or two first and I will show you exactly what I have saved you.');
+    return;
+  }
+
+  const input = await getOptimiserInput(userId);
+  const l = ledger({
+    monthsElapsed: input.monthsElapsed,
+    grossIncome: input.ytdTradeIncome,
+    expenses: input.ytdTradeExpenses,
+    // Honest zeros. They UNDERSTATE what we saved him. They never overstate it. See app/api/ledger.
+    mileage: 0, homeOffice: 0, capitalAllowances: 0, pension: 0,
+    cisSuffered: input.ytdCisSuffered,
+  });
+
+  // NOT ENOUGH IS NOT ZERO. Two weeks in we do not proudly announce that we saved him £14.
+  if (!l.enough) {
+    await sendText(from, l.note ?? 'Too early to say yet.');
+    return;
+  }
+
+  const lines: string[] = [];
+  lines.push(headline(l));
+  lines.push('');
+  // THE TESLA SCREEN. Two numbers, side by side. The gap is the product.
+  lines.push(`Claiming nothing: £${l.withoutLekhio.toLocaleString('en-GB')} of tax`);
+  lines.push(`With Lekhio: £${l.withLekhio.toLocaleString('en-GB')}`);
+
+  if (l.lines.length) {
+    lines.push('');
+    lines.push('Where it came from:');
+    for (const x of l.lines.slice(0, 4)) {
+      lines.push(`  ${x.label}: £${x.saved.toLocaleString('en-GB')}`);
+    }
+  }
+
+  // HIS OWN MONEY. Separate, always, and never added to the saving. This product has already once
+  // quoted a man a CIS refund that did not exist.
+  if (l.refundDue > 0) {
+    lines.push('');
+    lines.push(`And £${l.refundDue.toLocaleString('en-GB')} of CIS is sitting with HMRC. That is your money, not a saving. You get it back when you file.`);
+  }
+
+  await sendText(from, lines.join('\n'));
 }
 
 // --- "Can I claim this?" expense checker ----------------------------------

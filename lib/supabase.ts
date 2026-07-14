@@ -3521,6 +3521,70 @@ export async function cronFinished(job: string, ok: boolean, pages: number, erro
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 RAKHA'S HEARTBEAT. The organ that acts for the user, and until now it left no trace.
+//
+// Khoji has one. The amendment watcher has one. The Budget loop has one. All three got them because
+// this brain once sat DEAD FOR FIVE DAYS while launchd reported success every morning.
+//
+// Rakha had the TRANSPORT half (cronStarted/cronFinished, so a stopped walk turns /api/health red)
+// and not the COGNITIVE half. processUser() returns early and writes NOTHING when it finds no
+// signals, so a Rakha that walks every user and thinks about NOBODY is identical, in the database,
+// to a genuinely quiet week. Both are zero rows in agent_signals.
+//
+// ⚠️ `considered` IS THE LOAD-BEARING FIELD, exactly as `checked` is for the differ.
+// A RUN THAT LOOKED AT NOBODY IS NOT A RUN.
+//
+// NO financial data. It ran, when, how many it looked at, how many it told. Nothing about the man.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+export interface RakhaRun {
+  ran_at: string;
+  considered: number;
+  signalled: number;
+  sent: number;
+  ok: boolean;
+}
+
+export async function recordRakhaRun(r: {
+  considered: number; signalled: number; sent: number; ok: boolean; durationMs: number;
+}): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/rakha_runs`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        considered: r.considered,
+        signalled: r.signalled,
+        sent: r.sent,
+        ok: r.ok,
+        duration_ms: r.durationMs,
+      }),
+    });
+  } catch {
+    // A heartbeat must NEVER be the thing that kills the organ it is listening to. Same rule as the
+    // cron watchdog above.
+  }
+}
+
+// ⚠️ null means WE COULD NOT READ THE HEARTBEAT. It does not mean there isn't one, and the console
+// must not draw those two the same. That distinction is the whole reason this console exists.
+export async function readRakhaRuns(limit = 30): Promise<RakhaRun[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/rakha_runs?select=ran_at,considered,signalled,sent,ok&order=ran_at.desc&limit=${limit}`,
+      { headers: headers(), signal: AbortSignal.timeout(4000) },
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface OverdueCron {
   job: string;
   last_finished: string | null;
@@ -3741,6 +3805,12 @@ export interface BrainState {
   // THE QUEUE. Distilled, and waiting for a human to say yes.
   pending: PendingItem[];
 
+  /**
+   * 🔴 RAKHA'S HEARTBEAT. null is "WE COULD NOT READ IT", NOT "there isn't one".
+   * Those are different facts and the console draws them differently. See organs.ts.
+   */
+  rakha: RakhaRun[] | null;
+
   // ⚠️ WHICH OF THE SIDE READS FAILED. Empty is the happy case.
   //
   // NOT a boolean, and NOT swallowed. If we could not count the subscribers, the console must say
@@ -3841,7 +3911,7 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
     // Puchio's question count and the subscriber headcount are worth having, and worth NOTHING next
     // to the tax engine. A console that goes blind about GOV.UK because it could not count its own
     // customers has its priorities exactly inverted, and that is what shipped last night.
-    const [qa, subs] = await Promise.allSettled([
+    const [qa, subs, rakha] = await Promise.allSettled([
       // PUCHIO'S PULSE. How many questions have been answered, and when the last one was.
       // NO question text and NO answer text: a heartbeat, not a transcript. The team console is
       // forbidden anything that belongs to a user (task 13).
@@ -3875,12 +3945,17 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
       // ═══════════════════════════════════════════════════════════════════════════════════════════
       q('subscriptions?select=stripe_subscription_id&status=in.(active,trialing)'
         + '&stripe_subscription_id=not.is.null&limit=5000'),
+
+      // 🔴 RAKHA'S HEARTBEAT. Garnish for the TAX ENGINE (a failure here must never black out
+      // GOV.UK drift), and load-bearing for RAKHA'S OWN RING, which is the point.
+      q('rakha_runs?select=ran_at,considered,signalled,sent,ok&order=ran_at.desc&limit=30'),
     ]);
 
     // WHAT WE COULD NOT READ, BY NAME. Never a guess at the cause, and never a blank console.
     const degraded: string[] = [];
     if (qa.status !== 'fulfilled' || !Array.isArray(qa.value)) degraded.push('qa_cache');
     if (subs.status !== 'fulfilled' || !Array.isArray(subs.value)) degraded.push('subscriptions');
+    if (rakha.status !== 'fulfilled' || !Array.isArray(rakha.value)) degraded.push('rakha_runs');
 
     const qaRows: Array<{ updated_at: string }> =
       qa.status === 'fulfilled' && Array.isArray(qa.value) ? qa.value : [];
@@ -3894,6 +3969,14 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
       answered: qaRows.length,
       lastAnswerAt: qaRows[0]?.updated_at ?? null,
       subscribers: subRows.length,
+
+      // ⚠️ null, NOT []. An empty array says "Rakha has never run". null says "we could not ask".
+      // Collapsing those two is precisely how a console lies, and it is the bug this whole screen
+      // was built to make impossible.
+      rakha: rakha.status === 'fulfilled' && Array.isArray(rakha.value)
+        ? (rakha.value as RakhaRun[])
+        : null,
+
       degraded,
     };
   } catch {

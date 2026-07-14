@@ -32,6 +32,7 @@ import {
   listOverdueInvoices,
   cronStarted,
   cronFinished,
+  recordRakhaRun,
 } from '../../../../lib/supabase';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
 import { computeSignals, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
@@ -197,31 +198,71 @@ async function agentFanOut(startAfter: string | null, hop: number): Promise<void
   let inserted = 0;
   let pinged = 0;
 
-  for (;;) {
-    const page = await listAgentUsersPage(cursor, PAGE_SIZE);
-    if (page.users.length === 0) break;
-    await mapLimit(page.users, CONCURRENCY, async (u) => {
-      const r = await processUser(u);
-      inserted += r.inserted;
-      pinged += r.pinged;
-    });
-    users += page.users.length;
-    if (!page.last) break; // short page: the walk is complete
-    cursor = page.last;
-    if (Date.now() - started > BUDGET_MS) {
-      if (hop + 1 > MAX_HOPS) {
-        console.error(`[cron] agent hop cap reached at hop=${hop}, stopping with cursor set`);
-        // NOT ok. Everyone past the cursor got nothing, and somebody should hear about it.
-        await cronFinished('agent', false, hop, `hop cap reached at hop ${hop}, users after the cursor were not reached`);
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 RAKHA'S HEARTBEAT. THE COGNITIVE HALF, WHICH THE CRON WATCHDOG ABOVE CANNOT GIVE US.
+  //
+  // cronFinished('agent') proves the WALK ran. It does not prove Rakha THOUGHT. processUser()
+  // returns early and writes NOTHING when it finds no signals, and agent_signals is the only table
+  // Rakha touches, so:
+  //
+  //     a quiet week            -> zero rows
+  //     a Rakha thinking about nobody -> zero rows
+  //
+  // Identical. If agentAggregates() silently began returning null for everyone (a renamed column, a
+  // changed RLS policy), this walk would visit every user, find nothing, report cronFinished(ok),
+  // and the health check would STAY GREEN. The job finished. Successfully. Having considered nobody.
+  //
+  // `considered` is the field that tells those two apart, exactly as khoji_runs.checked does.
+  //
+  // ⚠️ AND THE ROW IS WRITTEN IN A `finally`, ON PURPOSE.
+  //
+  // A heartbeat that is only written on the happy path is not a heartbeat, it is a congratulation.
+  // A run that THREW must leave a loud row saying so, because a silent absence and a loud failure
+  // look identical from the database if only success ever writes. That is the disease that killed
+  // this brain for five days in July, and it is not being rebuilt here.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════
+  let ok = true;
+
+  try {
+    for (;;) {
+      const page = await listAgentUsersPage(cursor, PAGE_SIZE);
+      if (page.users.length === 0) break;
+      await mapLimit(page.users, CONCURRENCY, async (u) => {
+        const r = await processUser(u);
+        inserted += r.inserted;
+        pinged += r.pinged;
+      });
+      users += page.users.length;
+      if (!page.last) break; // short page: the walk is complete
+      cursor = page.last;
+      if (Date.now() - started > BUDGET_MS) {
+        if (hop + 1 > MAX_HOPS) {
+          console.error(`[cron] agent hop cap reached at hop=${hop}, stopping with cursor set`);
+          // NOT ok. Everyone past the cursor got nothing, and somebody should hear about it.
+          ok = false;
+          await cronFinished('agent', false, hop, `hop cap reached at hop ${hop}, users after the cursor were not reached`);
+          return;
+        }
+        console.log(`[cron] agent hop=${hop} users=${users} inserted=${inserted} pinged=${pinged} continuing after=${cursor}`);
+        await triggerContinuation(cursor, hop + 1);
         return;
       }
-      console.log(`[cron] agent hop=${hop} users=${users} inserted=${inserted} pinged=${pinged} continuing after=${cursor}`);
-      await triggerContinuation(cursor, hop + 1);
-      return;
     }
+    console.log(`[cron] agent hop=${hop} users=${users} inserted=${inserted} pinged=${pinged} complete`);
+    await cronFinished('agent', true, hop);
+  } catch (err) {
+    // A THROWN RUN IS NOT AN ABSENT RUN. Record it, loudly, then let it propagate exactly as before.
+    ok = false;
+    throw err;
+  } finally {
+    await recordRakhaRun({
+      considered: users,
+      signalled: inserted,
+      sent: pinged,
+      ok,
+      durationMs: Date.now() - started,
+    });
   }
-  console.log(`[cron] agent hop=${hop} users=${users} inserted=${inserted} pinged=${pinged} complete`);
-  await cronFinished('agent', true, hop);
 }
 
 export async function GET(req: NextRequest) {

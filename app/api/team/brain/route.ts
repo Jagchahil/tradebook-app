@@ -44,17 +44,26 @@ export async function GET(req: NextRequest) {
     vitals: v,
     coverage: coverage(v),
 
-    // 🔴 THE FOUR ORGANS. And the one that is drawn DARK, on purpose.
+    // 🔴 THE THREE ORGANS. An organ we cannot measure is never drawn green.
     //
-    // An organ we cannot measure is never drawn green. Rakha, the organ that acts on the user's
-    // behalf, leaves no trace at all: its signals are computed on the way past a request and thrown
-    // away. If it stopped tonight, nothing anywhere would go red. So the console says so, in the
-    // loudest way it can, rather than glowing over the top of it.
+    // Rakha used to be drawn DARK here, because it left no trace: it could have been dead since
+    // Tuesday and nothing would have said so. It now writes rakha_runs on EVERY run, pass or fail,
+    // and `considered` is the load-bearing field: a run that looked at nobody is not a run.
+    //
+    // ⚠️ brain.rakha IS null WHEN WE COULD NOT READ IT, AND [] WHEN IT HAS NEVER RUN. Those are
+    // different facts and organs.ts draws them differently: the first is dark, the second is red.
+    // Collapsing them is the exact lie this console exists to prevent.
     //
     // (Puchio's count comes from what the brain already reads. When qa_cache is not readable we pass
     // zero, and organs.ts treats "nobody has asked" as a QUIET WEEK, not a fault: a console that
     // shouts about silence is a console you learn to ignore.)
-    body: body(brain.runs, brain.items, { answered: brain.answered, lastAnswerAt: brain.lastAnswerAt }, brain.subscribers),
+    body: body(
+      brain.runs,
+      brain.items,
+      { answered: brain.answered, lastAnswerAt: brain.lastAnswerAt },
+      brain.subscribers,
+      brain.rakha,
+    ),
 
     knowledge: knowledge(brain.items),
     growth: growth(brain.items, 30),

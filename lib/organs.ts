@@ -42,15 +42,27 @@
 //
 // A quiet week and a lobotomised Rakha are the same thing in the database: ZERO ROWS.
 //
-// That is exactly the disease that killed this brain for five days in July, and the fix is the one
-// that worked there: khoji_runs.checked. A RUN THAT CHECKED NOTHING IS NOT A RUN. So rakha_runs
-// needs `considered` as its load-bearing column, and it does NOT need to detect a stopped cron,
-// because cron_runs already does.
+// ✅ CLOSED, 14 JULY, LATE. `rakha_runs` is now written by app/api/cron/agent/route.ts, in a
+// `finally`, EVERY run, pass or fail. `considered` is the load-bearing column, exactly as
+// khoji_runs.checked is: A RUN THAT LOOKED AT NOBODY IS NOT A RUN.
+//
+// So all three organs now answer "what would make you go red", and the console has no dark rings.
+// Which means the next thing it says will be worth believing, and that was the entire point.
 //
 // The console says so, in the loudest way it can: it draws Rakha DARK, with the reason underneath.
 // A blind spot you can see is a blind spot that gets closed. See supabase/APPLY_2026-07-14_rakha.sql.
 
 import { type Run, type Item, didCheck, isKnowledge } from './brain';
+
+/** Rakha's heartbeat row. Structurally identical to lib/supabase.ts RakhaRun, declared here so this
+ *  file stays pure policy with no I/O and the node test runner can load it directly. */
+export interface RakhaRun {
+  ran_at: string;
+  considered: number;
+  signalled: number;
+  sent: number;
+  ok: boolean;
+}
 
 export type Pulse =
   /** Running, recently, and nothing is wrong. */
@@ -167,32 +179,72 @@ function puchio(answered: number, lastAnswerAt: string | null, now: Date): Organ
 // ---------------------------------------------------------------------------------------------
 // 🔴 RAKHA. THE HOLE.
 // ---------------------------------------------------------------------------------------------
-function rakha(): Organ {
-  return {
-    key: 'rakha',
+// ⚠️ FOUR STATES THAT USED TO LOOK IDENTICAL, AND THE WHOLE JOB IS TELLING THEM APART.
+//
+//   runs === null            we could not READ the heartbeat.  NOT the same as not having one.
+//   no run with considered>0 Rakha ran and looked at NOBODY.   A run that looked at nobody is not a run.
+//   considered 0, 0 people   there is nobody to look at yet.   NOT a fault. A quiet start.
+//   stale / ok === false     it stopped, or it died.
+//
+// Every one of those was, until tonight, "zero rows in agent_signals", i.e. a quiet week, i.e. green.
+function rakha(runs: RakhaRun[] | null, subscribers: number, now: Date): Organ {
+  const base = {
+    key: 'rakha' as const,
     name: 'Rakha',
     does: 'Watches his figures and speaks up first. The organ that acts on his behalf.',
+    redWhen: 'It stops running, it dies mid-walk, or it runs and looks at nobody while there are people to look at.',
+  };
 
-    // ⚠️ `unwired` IS NOT A DEGRADED `alive`. IT IS A DIFFERENT ANSWER TO A DIFFERENT QUESTION.
-    //
-    // `alive` says: I checked, and it is working.
-    // `unwired` says: I CANNOT CHECK. There is nothing to check.
-    //
-    // Collapsing the two is how a console lies. And it is precisely the lie that let this brain sit
-    // dead for five days while launchd reported success every single morning.
-    pulse: 'unwired',
+  // 1. WE COULD NOT ASK. This is the one state that is still genuinely dark, and it is honest: a
+  //    failed read is not evidence of a failed organ, and it must not be drawn as one, in EITHER
+  //    direction. Not green, and not red.
+  if (runs === null) {
+    return {
+      ...base,
+      pulse: 'unwired',
+      says: 'We could not read Rakha\'s heartbeat. That is not the same as Rakha being dead, and it is not the same as Rakha being fine. We do not know.',
+      redWhen: null,
+      count: null,
+    };
+  }
 
-    says: 'We know the walk finished. We do not know that it looked at anybody. Nothing records how many people Rakha considered, so a Rakha that thinks about nobody is indistinguishable from a quiet week.',
+  // 2. IT HAS NEVER RUN, OR EVERY RUN LOOKED AT NOBODY.
+  //
+  // ⚠️ AND THE EMPTY CASE IS NOT A FAULT. With no subscribers there is nobody for Rakha to watch, and
+  // a console that shouts about that is a console you learn to ignore (doc 103, the empty test).
+  const real = runs.find((r) => r.considered > 0);
+  if (!real) {
+    if (subscribers === 0) {
+      return { ...base, pulse: 'alive', says: 'Nobody to watch yet. Rakha starts the day the first man does.', count: 0 };
+    }
+    return {
+      ...base,
+      pulse: 'broken',
+      says: `Rakha has looked at nobody, and there ${subscribers === 1 ? 'is 1 person' : `are ${subscribers} people`} to look at. It is running and thinking about no one.`,
+      count: 0,
+    };
+  }
 
-    // 🔴 THE PRECISE ANSWER TO "WHAT WOULD MAKE THIS RING GO RED".
-    //
-    // Not "nothing": the cron watchdog turns /api/health red if the agent walk stops for 26 hours,
-    // and that is real cover. But THIS RING cannot go red, because the only thing it could read is
-    // agent_signals, and zero rows there means either "nobody needed telling" or "the engine is
-    // dead", and we cannot tell which. An organ we cannot measure is drawn dark. Never green.
-    redWhen: null,
+  // 3. IT RAN, AND IT DIED.
+  if (!real.ok) {
+    return { ...base, pulse: 'broken', says: 'The last real run did not finish. People past the cursor were never reached.', count: real.considered };
+  }
 
-    count: null,
+  // 4. IT RAN, AND THEN IT STOPPED.
+  const h = hoursSince(real.ran_at, now);
+  if (h !== null && h > STALE_HOURS) {
+    return { ...base, pulse: 'broken', says: `Rakha has not looked at anybody for ${Math.round(h)} hours.`, count: real.considered };
+  }
+
+  // 5. ALIVE. And it says the NUMBERS, not an adjective.
+  const spoke = real.sent > 0
+    ? `${real.sent} of them heard from it.`
+    : 'Nobody needed telling.';
+  return {
+    ...base,
+    pulse: 'alive',
+    says: `Rakha looked at ${real.considered === 1 ? '1 person' : `${real.considered} people`}. ${spoke}`,
+    count: real.considered,
   };
 }
 
@@ -203,9 +255,15 @@ export function body(
   items: Item[],
   qa: { answered: number; lastAnswerAt: string | null },
   subscribers: number,
+  // ⚠️ null is "we could not read it", NOT "there is none". The whole console turns on that.
+  rakhaRuns: RakhaRun[] | null = null,
   now: Date = new Date(),
 ): Body {
-  const organs = [khoji(runs, items, now), rakha(), puchio(qa.answered, qa.lastAnswerAt, now)];
+  const organs = [
+    khoji(runs, items, now),
+    rakha(rakhaRuns, subscribers, now),
+    puchio(qa.answered, qa.lastAnswerAt, now),
+  ];
 
   return {
     organs,

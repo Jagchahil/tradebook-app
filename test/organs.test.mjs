@@ -27,6 +27,10 @@
 // Both are zero rows. That IS the disease that killed this brain for five days in July, and the fix
 // is khoji_runs.checked: A RUN THAT CHECKED NOTHING IS NOT A RUN.
 //
+// ✅ AND TONIGHT IT IS CLOSED. rakha_runs is written by app/api/cron/agent/route.ts, in a `finally`,
+// EVERY run, pass or fail. All three organs can now answer "what would make you go red", and the
+// console has no dark rings left. Which is what makes the next thing it says worth believing.
+//
 // AND THE SAME DISEASE PUT A SECOND HOLE IN THIS CONSOLE, WHICH IS ALSO TESTED BELOW.
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -56,7 +60,7 @@ let pass = 0;
 let fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; console.log(`  ok  ${name}`); } else { fail++; console.log(`  FAIL ${name}`); } };
 
-console.log('\norgans: Lekhio in the middle, and the one that has no pulse');
+console.log('\norgans: Lekhio in the middle, and three organs that can all now say how they go red');
 
 const NOW = new Date('2026-07-14T09:00:00Z');
 const goodRun = {
@@ -64,60 +68,100 @@ const goodRun = {
 };
 const qa = { answered: 41, lastAnswerAt: '2026-07-14T08:00:00Z' };
 
-const healthy = body([goodRun], [], qa, 12, NOW);
-
-// ---------------------------------------------------------------------------------------------
-// 🔴 1. RAKHA IS DARK, AND THE CONSOLE SAYS WHY.
-// ---------------------------------------------------------------------------------------------
+const rakhaRun = { ran_at: '2026-07-14T05:20:00Z', considered: 12, signalled: 3, sent: 1, ok: true };
+const healthy = body([goodRun], [], qa, 12, [rakhaRun], NOW);
 
 const R = healthy.organs.find((o) => o.key === 'rakha');
+const rakhaOf = (runs, subs = 12) => body([goodRun], [], qa, subs, runs, NOW).organs.find((o) => o.key === 'rakha');
 
-ok('🔴 RAKHA IS UNWIRED. Not "alive". Not "we assume it is fine". UNWIRED.',
-  // `alive` says: I checked, and it is working.
-  // `unwired` says: I CANNOT CHECK. There is nothing to check.
-  // Collapsing the two is how a console lies, and it is the lie that let this brain sit dead for
-  // five days while launchd reported success every morning.
-  R.pulse === 'unwired');
-
-// 🔴 CORRECTED 14 JULY. THIS TEST USED TO ASSERT THAT RAKHA HAD "No heartbeat", AND THAT WAS FALSE.
+// ---------------------------------------------------------------------------------------------
+// 🔴 1. RAKHA HAS A HEARTBEAT AT LAST, AND IT TELLS FOUR THINGS APART THAT USED TO BE ONE THING.
 //
-// Rakha has a TRANSPORT heartbeat and always did: cronStarted('agent') / cronFinished('agent'), and
-// MAX_QUIET_HOURS.agent = 26 in cronwatch.ts, so a STOPPED Rakha already turns /api/health red.
+// Every state below was, until tonight, the SAME state: zero rows in agent_signals. Which read as
+// a quiet week. Which read as GREEN.
 //
-// The hole is narrower and nastier than the one I claimed. processUser() returns early and writes
-// NOTHING when it finds no signals, and agent_signals is the only table Rakha touches. So a Rakha
-// that runs, walks every user, considers NOBODY, and finishes ok=true is indistinguishable, in the
-// database, from a genuinely quiet week. Both are zero rows. The cron says it finished. It did.
-//
-// So the sentence must claim the narrow thing, not the dramatic thing. An overstated finding is a
-// finding that gets disproved and then ignored.
-ok('...and it says the PRECISE thing: the walk finished, but we cannot show it looked at anybody',
-  /We know the walk finished/.test(R.says)
-  && /do not know that it looked at anybody/.test(R.says)
-  && /indistinguishable from a quiet week/.test(R.says));
+//   we could not READ the heartbeat  ->  dark. Not green, and not red. WE DO NOT KNOW.
+//   it ran and looked at NOBODY      ->  RED. A run that looked at nobody is not a run.
+//   there is nobody to look at yet   ->  alive. Not a fault. (doc 103: the empty test.)
+//   it stopped, or it died           ->  RED.
+// ---------------------------------------------------------------------------------------------
 
-ok('🔴 ITS "WHAT WOULD MAKE THIS RING GO RED" IS STILL NULL, AND THAT IS STILL THE FINDING',
-  // Not because nothing anywhere would go red (the cron watchdog would). Because the only signal
-  // THIS RING could read is agent_signals, where zero rows means either "nobody needed telling" or
-  // "the engine is dead", and we cannot tell which. An organ we cannot measure is drawn dark.
-  R.redWhen === null);
+ok('🔴 RAKHA IS ALIVE, AND IT SAYS THE NUMBERS RATHER THAN AN ADJECTIVE',
+  R.pulse === 'alive'
+  && /looked at 12 people/.test(R.says)
+  && /1 of them heard from it/.test(R.says));
 
-ok('...while every organ that CAN go red says exactly how',
-  healthy.organs
-    .filter((o) => o.pulse !== 'unwired')
-    .every((o) => typeof o.redWhen === 'string' && o.redWhen.length > 30));
+ok('🔴 ...AND IT CAN FINALLY ANSWER "WHAT WOULD MAKE YOU GO RED", WHICH IS THE WHOLE TEST',
+  // It was `null` this morning. An organ that cannot answer this question is an organ nobody is
+  // watching, and Rakha is the one that ACTS ON THE USER'S BEHALF.
+  typeof R.redWhen === 'string' && /looks at nobody/.test(R.redWhen));
+
+ok('🔴 A RAKHA THAT RUNS AND CONSIDERS NOBODY IS RED, NOT GREEN. THE WHOLE POINT.',
+  // The lobotomy case. It walked every user, thought about none of them, and reported success.
+  // cronFinished said ok. /api/health stayed green. THIS is the ring that catches it.
+  (() => {
+    const dead = rakhaOf([{ ran_at: '2026-07-14T05:20:00Z', considered: 0, signalled: 0, sent: 0, ok: true }], 12);
+    return dead.pulse === 'broken' && /looked at nobody/.test(dead.says) && /12 people/.test(dead.says);
+  })());
+
+ok('...but NOBODY TO LOOK AT is not a fault, and the console does not shout about it',
+  // doc 103, the empty test. A row that cries wolf on an empty database teaches you to stop reading
+  // the console, and then you miss the week it matters.
+  (() => {
+    const quiet = rakhaOf([], 0);
+    return quiet.pulse === 'alive' && /Nobody to watch yet/.test(quiet.says);
+  })());
+
+ok('🔴 A RUN THAT DIED IS RED, because a run that threw still writes a row (the `finally`)',
+  rakhaOf([{ ran_at: '2026-07-14T05:20:00Z', considered: 40, signalled: 0, sent: 0, ok: false }]).pulse === 'broken');
+
+ok('🔴 A RAKHA THAT STOPPED IS RED. 36 hours of silence is not a quiet week.',
+  rakhaOf([{ ran_at: '2026-07-10T05:20:00Z', considered: 12, signalled: 1, sent: 1, ok: true }]).pulse === 'broken');
+
+ok('🔴 AND A HEARTBEAT WE COULD NOT READ IS DARK. NOT GREEN, AND NOT RED.',
+  // null is "we could not ask". [] is "it has never run". THEY ARE DIFFERENT FACTS. A failed read is
+  // not evidence of a failed organ, in either direction, and this is the distinction the entire
+  // console was built to hold on to.
+  (() => {
+    const unknown = rakhaOf(null);
+    return unknown.pulse === 'unwired' && unknown.redWhen === null
+      && /not the same as Rakha being dead/.test(unknown.says)
+      && /not the same as Rakha being fine/.test(unknown.says);
+  })());
+
+ok('...and a crashed run does NOT count as a heartbeat just because it is the newest row',
+  // Same rule as the differ: the newest run is not evidence that anything was looked at. We take the
+  // newest run WITH considered > 0. A crash-looping Rakha writes a fresh row every night.
+  rakhaOf([
+    { ran_at: '2026-07-14T05:20:00Z', considered: 0, signalled: 0, sent: 0, ok: false },
+    { ran_at: '2026-07-13T05:20:00Z', considered: 12, signalled: 2, sent: 0, ok: true },
+  ]).pulse === 'alive');
+
+ok('🔴 THE CONSOLE IS NO LONGER HALF BLIND: every organ can say how it goes red',
+  healthy.blind === false
+  && healthy.organs.every((o) => typeof o.redWhen === 'string' && o.redWhen.length > 30));
 
 ok('🔴 THE WHOLE BODY IS FLAGGED BLIND WHILE ANY ORGAN IS DARK',
-  // Three green rings and one dark one, with no comment, reads as "mostly fine". It is not mostly
-  // fine. It is three things we can see and one we cannot, and the one we cannot see is the one that
-  // talks to users without being asked.
-  healthy.blind === true);
+  // Two green rings and one dark one, with no comment, reads as "mostly fine". It is not mostly
+  // fine. It is two things we can see and one we cannot, and the one we cannot see is the one that
+  // talks to users without being asked. This is now only reachable when a READ fails, which is the
+  // only honest reason left to be dark.
+  body([goodRun], [], qa, 12, null, NOW).blind === true);
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 2. KHOJI CAN GO RED, AND EVERY WAY IT CAN HAS ACTUALLY HAPPENED.
 // ---------------------------------------------------------------------------------------------
 
-const K = (runs, items = []) => body(runs, items, qa, 12, NOW).organs.find((o) => o.key === 'khoji');
+// ⚠️ [rakhaRun] BEFORE NOW. A POSITIONAL ARGUMENT I ADDED IN THE MIDDLE, AND THIS IS WHY IT BLEW UP.
+//
+// Adding `rakhaRuns` before `now` silently pushed a Date into the array slot in every existing call
+// site. Two of them I fixed. This one I missed, and `runs.find is not a function` was the result.
+//
+// It is worth noting WHICH WAY IT FAILED, because it is the good way: it threw, loudly, at once. Had
+// the parameter been optional and forgiving, `now` would have quietly defaulted to the real clock and
+// every staleness assertion in this file would have gone on passing FOR THE WRONG REASON, right up
+// until a night when it mattered. A test that passes for the wrong reason is worse than no test.
+const K = (runs, items = []) => body(runs, items, qa, 12, [rakhaRun], NOW).organs.find((o) => o.key === 'khoji');
 
 ok('a clean night is ALIVE, and it says the numbers, not an adjective',
   K([goodRun]).pulse === 'alive'
@@ -146,7 +190,7 @@ ok('no runs at all is BROKEN, never "alive with nothing to report"',
 // 🔴 3. PUCHIO. And the discipline of NOT crying wolf.
 // ---------------------------------------------------------------------------------------------
 
-const P = (q) => body([goodRun], [], q, 12, NOW).organs.find((o) => o.key === 'puchio');
+const P = (q) => body([goodRun], [], q, 12, [rakhaRun], NOW).organs.find((o) => o.key === 'puchio');
 
 ok('a quiet week is NOT a fault. It is a quiet week.',
   // A console that shouts about silence teaches you to ignore the console. cisGrossRate died of this.
@@ -164,7 +208,7 @@ ok('the middle of the reactor counts PEOPLE, and says what they are trusting us 
   /12 people are trusting this with their tax/.test(healthy.centre.says));
 
 ok('...and it gets the grammar right for one man, because one man is the whole point',
-  /1 person is trusting this with his tax/.test(body([goodRun], [], qa, 1, NOW).centre.says));
+  /1 person is trusting this with his tax/.test(body([goodRun], [], qa, 1, [rakhaRun], NOW).centre.says));
 
 ok('every organ says what it is FOR, in words you would use to a person',
   healthy.organs.every((o) => o.does.length > 30 && !/API|endpoint|service|module/i.test(o.does)));
@@ -175,6 +219,20 @@ ok('every organ says what it is FOR, in words you would use to a person',
 
 ok('there is a migration that gives Rakha a heartbeat',
   /create table if not exists public\.rakha_runs/.test(sqlSrc));
+
+// 🔴 AND SOMETHING ACTUALLY WRITES TO IT NOW. A table nobody writes to is not a heartbeat, it is
+// furniture, and it sat there as furniture for most of today while I told Jag it was "the fix".
+const agentSrc = readFileSync(path.join(root, 'app/api/cron/agent/route.ts'), 'utf8');
+const agentCode = agentSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+ok('🔴 THE AGENT CRON WRITES RAKHA\'S HEARTBEAT',
+  /recordRakhaRun\(\{/.test(agentCode) && /considered:\s*users/.test(agentCode));
+
+ok('🔴 ...AND IT WRITES IT IN A `finally`, SO A RUN THAT THREW STILL LEAVES A ROW',
+  // A heartbeat written only on the happy path is not a heartbeat, it is a congratulation. A silent
+  // absence and a loud failure look IDENTICAL from the database if only success ever writes, and
+  // that is the disease that killed this brain for five days in July.
+  /\}\s*finally\s*\{[\s\S]*recordRakhaRun/.test(agentCode));
 
 ok('🔴 ...with the load-bearing field: A RUN THAT LOOKED AT NOBODY IS NOT A RUN',
   // Same rule as khoji_runs.checked. It is the field that stops a crash-loop from holding the light

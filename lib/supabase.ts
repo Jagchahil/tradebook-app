@@ -3685,7 +3685,16 @@ export async function readKnowledgeState(): Promise<KnowledgeState | null> {
       //
       // So we ask for the newest run THAT ACTUALLY CHECKED SOMETHING. A run that compared nothing to
       // anything is not a heartbeat.
-      q('khoji_runs?checked=gt.0&select=ran_at&order=ran_at.desc&limit=1'),
+      //
+      // ⚠️ AND IT MUST BE THE DIFFER'S OWN RUN. kind=eq.differ, not just any row in the table.
+      //
+      // khoji_runs now carries the amendment watcher's runs as well (khoji/amend.mjs). Both are
+      // Khoji, both write here, and both write a row every night. Drop the kind filter and a healthy
+      // amendment watcher would hold this timestamp green while the constant differ lay dead: the
+      // page-change watcher would be saying "I am alive" and the reader would hear "your tax numbers
+      // have been checked against GOV.UK". Two writers, one signal, and the reader believing
+      // whichever spoke last. That is the house disease, and it is the third time in two days.
+      q('khoji_runs?kind=eq.differ&checked=gt.0&select=ran_at&order=ran_at.desc&limit=1'),
     ]);
 
     const rows: { status: string; raw: { fact?: string; ours?: string | number; theirs?: string | number } | null }[] =
@@ -3760,7 +3769,14 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
     };
 
     const [runs, items, pending] = await Promise.all([
-      q(`khoji_runs?ran_at=gte.${since}&select=ran_at,tax_year,published,checked,agreed,drifted,blind,unwatched,ok&order=ran_at.desc&limit=200`),
+      // ⚠️ kind=eq.differ. THE CONSOLE RENDERS THIS ROW AS A SENTENCE ABOUT TAX CONSTANTS.
+      //
+      // vitals() takes the newest run here and tells a human "62 of 62 constants matched". The
+      // amendment watcher (khoji/amend.mjs) also writes to khoji_runs, every night, and its `checked`
+      // is a count of PAGES, not constants. Without this filter the console would one day say
+      // "23 of 23 constants matched" on a night when the differ was dead and nothing had gone
+      // anywhere near a tax constant. The number would be real. The sentence would be a lie.
+      q(`khoji_runs?kind=eq.differ&ran_at=gte.${since}&select=ran_at,tax_year,published,checked,agreed,drifted,blind,unwatched,ok&order=ran_at.desc&limit=200`),
       q('knowledge_items?select=status,created_at,title,source_url&order=created_at.desc&limit=1000'),
       // Engine-impacting items FIRST. A rate change we must reflect in the tax engine is not one of
       // forty things to get to eventually, it is the reason the queue exists.

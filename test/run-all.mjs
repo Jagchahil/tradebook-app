@@ -41,9 +41,18 @@ const mjsSuites = readdirSync(here)
 // quieter over time. It runs on fixtures, never the network, so it is deterministic.
 const khojiDiffer = path.join(repoRoot, 'khoji', 'difftest.mjs');
 
+// Khoji's AMENDMENT watcher (khoji/amendtest.mjs). Same reasoning as the differ: the same file runs
+// on the Mac mini, where there is no repo, so it must not be allowed to drift from what the mini
+// executes. It is in CI because it decides whether we ever notice that a GOV.UK page was rewritten
+// under us. diff.mjs checks the NUMBERS; this checks the DOCUMENT. A footnote, an effective date or
+// a new band can move without moving a single number we extract, and the differ would report all
+// green. Being late is recoverable. Being confidently wrong for a fortnight is not.
+const khojiAmend = path.join(repoRoot, 'khoji', 'amendtest.mjs');
+
 const suites = [
   ...mjsSuites,
   ...(existsSync(khojiDiffer) ? [{ name: 'khoji-differ', file: khojiDiffer, kind: 'node' }] : []),
+  ...(existsSync(khojiAmend) ? [{ name: 'khoji-amend', file: khojiAmend, kind: 'node' }] : []),
   { name: 'exams', file: path.join(here, 'exams', 'run-exams.mjs'), kind: 'node' },
   { name: 'hmrc', file: path.join(here, 'hmrc', 'run-hmrc-test.mjs'), kind: 'node' },
   { name: 'logic', file: path.join(here, 'logic.test.js'), kind: 'logic' },

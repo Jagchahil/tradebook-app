@@ -14,6 +14,7 @@ import { trialEndsAt } from './entitlement';
 import type { TrialRow } from './trialnudge';
 import { CUSTOMER_COLUMNS, normaliseSource } from './team';
 import type { TeamCustomer, TeamMember } from './team';
+import type { Snapshot } from './metrics';
 import { parseLevel, type AutonomyLevel } from './autonomy';
 import { quarterForDate, quarterBounds } from './quarterpack';
 import type { OptimiserInput } from './taxoptimiser';
@@ -1123,6 +1124,58 @@ export async function setCustomerSource(
         acquisition_source: normaliseSource(source),
         acquisition_detail: detail && detail.trim() ? detail.trim().slice(0, 120) : null,
       }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// --- The numbers (lib/metrics.ts) -------------------------------------------------
+
+// Every signup date. This IS real history: a created_at is written once and never rewritten, so a
+// man who signed up on 3 July signed up on 3 July however many times he later changes his mind.
+//
+// It is the ONLY historical series we can honestly draw from the existing tables.
+export async function readSignupDates(): Promise<string[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/users?select=created_at&order=created_at.asc&limit=20000`, {
+      headers: headers(),
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ created_at: string | null }>;
+    return rows.map((r) => r.created_at ?? '').filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
+// The recorded history. Empty until the cron has run at least once, and the page says so rather
+// than drawing a shape it invented. See supabase/APPLY_2026-07-14_metrics_daily.sql.
+export async function readSnapshots(days = 90): Promise<Snapshot[] | null> {
+  try {
+    const { url } = config();
+    const from = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+    const res = await fetch(
+      `${url}/rest/v1/metrics_daily?day=gte.${from}&select=day,customers,paying,trialing,mrr_pence&order=day.asc`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Snapshot[];
+  } catch {
+    return null;
+  }
+}
+
+// Write today down. Upsert on the day, so running twice corrects rather than duplicates.
+export async function writeSnapshot(s: Snapshot): Promise<boolean> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/metrics_daily`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'resolution=merge-duplicates' }),
+      body: JSON.stringify({ ...s, recorded_at: new Date().toISOString() }),
     });
     return res.ok;
   } catch {

@@ -33,6 +33,7 @@ export interface CronRun {
 //   nudge   0 8 * * 1,3,5    Mon, Wed, Fri    -> 80h  (the real gap is Fri to Mon, 72h)
 //   weekly  0 17 * * 0       Sunday           -> 180h (a week, 168h, plus room)
 //   trial   0 9 * * *        daily            -> 26h
+//   metrics 5 23 * * *       daily            -> 26h  (and it CANNOT be backfilled. See below.)
 export const MAX_QUIET_HOURS: Record<string, number> = {
   due: 26,
   digest: 26,
@@ -42,6 +43,14 @@ export const MAX_QUIET_HOURS: Record<string, number> = {
   agent: 26,
   nudge: 80,
   weekly: 180,
+  // The daily metrics snapshot. THE HISTORY CANNOT BE BACKFILLED.
+  //
+  // Every other cron in this list can be re-run and catch up. This one cannot. If it stops for a
+  // week, that week of the company's revenue history is gone FOREVER, because the subscriptions
+  // table only holds the CURRENT status of each row. A hole in a revenue chart is not a gap, it is
+  // a fabrication waiting to happen: somebody will draw a straight line across it.
+  metrics: 26,
+
   // The trial ending nudge (docs/39, lib/trialnudge.ts).
   //
   // A CRON THAT IS NOT IN THIS MAP IS A CRON NOBODY IS WATCHING. If this one stops, every man on a

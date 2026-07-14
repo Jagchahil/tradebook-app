@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { browserSupabase } from '../../lib/supabasebrowser';
 import { sourceLabel, SOURCES } from '../../lib/team';
+import Numbers from './Numbers';
 import type { TeamCustomer, TeamOverview, AcquisitionSource } from '../../lib/team';
 
 // THE TEAM DASHBOARD.
@@ -336,6 +337,11 @@ export default function TeamPage() {
           customer and it is not revenue.
         </p>
       ) : null}
+
+      {/* THE NUMBERS. Growth, the funnel, which channel pays, and MRR over time.
+          Above the customer list on purpose: the list is what you dig into, the numbers are what you
+          came for. */}
+      <Numbers />
 
       {/* WHERE THEY CAME FROM. This is the whole point of the marketing spend. */}
       <h2 style={S.h2}>Where they came from</h2>

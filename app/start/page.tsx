@@ -367,7 +367,14 @@ export default function StartPage() {
                     <div style={{ marginTop: 16 }}>
                       <label htmlFor="signup-name" style={fieldLabel}>{nameLabel}</label>
                       <input id="signup-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={tradeType === 'ltd' ? 'Smith Electrical Ltd' : tradeType === 'business' ? 'Smith Electrical' : 'Sam Smith'} style={fieldStyle} />
-                      {tradeType === 'ltd' && <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>We will verify your company details for you. No need to dig out paperwork.</p>}
+                      {/* 🔴 THIS SAID: "We will verify your company details for you."
+                          We do not verify anything. Verification is a WARRANTY: it says we checked
+                          this and we vouch for it. What we actually do is look your company up on
+                          the public Companies House register and read back what it says. If that
+                          register is wrong, or he types a name that matches somebody else's company,
+                          we have "verified" nothing at all, and he has our word for it.
+                          Say what we do. It is still the good bit: he does not dig out paperwork. */}
+                      {tradeType === 'ltd' && <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>We will look your company up on the Companies House register and fill the details in for you. No need to dig out paperwork.</p>}
                     </div>
                   )}
                 </Step>

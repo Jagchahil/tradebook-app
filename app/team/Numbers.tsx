@@ -53,9 +53,25 @@ export default function Numbers() {
   }, []);
 
   if (err) return <p style={S.err}>{err}</p>;
-  if (!d) return <p style={S.muted}>Reading the numbers.</p>;
+
+  // Loading is a state, not an absence. It used to be a bare grey sentence floating between two
+  // sections with no panel around it, and it looked like the page had broken halfway down. It holds
+  // the shape of what is coming instead.
+  if (!d) {
+    return (
+      <section style={U.section}>
+        <div style={U.sectionHead}>
+          <h2 style={T.h2}>Signups</h2>
+          <span style={U.sectionNote}>reading</span>
+        </div>
+        <div style={{ ...S.panel, height: 168 }} aria-busy="true" />
+      </section>
+    );
+  }
 
   const f = d.funnel;
+  const total = d.signups.at(-1)?.total ?? 0;
+  const recent = d.signups.reduce((n, p) => n + p.n, 0);
 
   return (
     <>
@@ -68,8 +84,12 @@ export default function Numbers() {
         <div style={S.panel}>
         <Bars points={d.signups} />
         <div style={S.legend}>
-          <b style={{ color: C.ink }}>{d.signups.at(-1)?.total ?? 0}</b> people have signed up in total.
-          {' '}<b style={{ color: C.ink }}>{d.signups.reduce((n, p) => n + p.n, 0)}</b> of them in the last 30 days.
+          {/* "1 people have signed up" is what a template looks like. A man reads that and stops
+              trusting the number next to it, and he is right to. */}
+          <b style={{ color: C.ink }}>{total}</b> {total === 1 ? 'person has' : 'people have'} signed
+          up in total{recent === total
+            ? '.'
+            : <>, <b style={{ color: C.ink }}>{recent}</b> of them in the last 30 days.</>}
         </div>
       </div>
 

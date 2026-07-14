@@ -160,10 +160,22 @@ export default function TeamPage() {
     return filter === 'all' ? data.customers : data.customers.filter((c) => c.source === filter);
   }, [data, filter]);
 
+  // THE FIRST HALF SECOND, and it is not nothing.
+  //
+  // It used to be a bare white card with the words "One moment." floating in it, which is what an
+  // unfinished thing looks like, and it was the FIRST thing anybody saw. A door you are proud of
+  // does not go blank while it decides whether to open. So it carries the wordmark: the same one on
+  // the sign in card and the same one in the console header, so the three moments are one product.
   if (!ready) {
     return (
       <main style={S.signInPage}>
-        <div style={S.authCard}><p style={S.muted}>One moment.</p></div>
+        <div style={S.authCard}>
+          <div style={S.brandRow}>
+            <span style={S.wordmark}>Lekhio</span>
+            <span style={S.accent} aria-hidden="true" />
+          </div>
+          <p style={S.muted}>One moment.</p>
+        </div>
       </main>
     );
   }

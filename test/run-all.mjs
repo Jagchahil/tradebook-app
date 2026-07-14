@@ -57,11 +57,21 @@ const khojiAmend = path.join(repoRoot, 'khoji', 'amendtest.mjs');
 // Rakha answers a man from next year's law today.
 const khojiBudget = path.join(repoRoot, 'khoji', 'budgettest.mjs');
 
+// Khoji's TRIBUNAL watcher (khoji/tribunaltest.mjs). The only watcher that can see a JUDGE.
+//
+// On 6 April 2025 double-cab pickups became CARS because the Court of Appeal said so, not because
+// HMRC edited a page. Every other watcher reads GOV.UK and would have reported green. Our clothing
+// rule IS Mallalieu v Drummond; our illegal-dividend block IS Global Corporate v Hale. The triage is
+// in CI because a watcher that flags every pipeline case is a watcher nobody opens, and then the one
+// judgment that reverses the van rule sits in an unread queue.
+const khojiTribunal = path.join(repoRoot, 'khoji', 'tribunaltest.mjs');
+
 const suites = [
   ...mjsSuites,
   ...(existsSync(khojiDiffer) ? [{ name: 'khoji-differ', file: khojiDiffer, kind: 'node' }] : []),
   ...(existsSync(khojiAmend) ? [{ name: 'khoji-amend', file: khojiAmend, kind: 'node' }] : []),
   ...(existsSync(khojiBudget) ? [{ name: 'khoji-budget', file: khojiBudget, kind: 'node' }] : []),
+  ...(existsSync(khojiTribunal) ? [{ name: 'khoji-tribunal', file: khojiTribunal, kind: 'node' }] : []),
   { name: 'exams', file: path.join(here, 'exams', 'run-exams.mjs'), kind: 'node' },
   { name: 'hmrc', file: path.join(here, 'hmrc', 'run-hmrc-test.mjs'), kind: 'node' },
   { name: 'logic', file: path.join(here, 'logic.test.js'), kind: 'logic' },

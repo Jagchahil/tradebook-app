@@ -80,12 +80,29 @@ amend_rc=$?
 node budget.mjs "$@" >> logs/khoji.log 2>&1
 budget_rc=$?
 
+# tribunal.mjs. THE ONLY WATCHER THAT CAN SEE A JUDGE.
+#
+# On 6 April 2025 double-cab pickups became CARS. Not because HMRC edited a page: because the COURT
+# OF APPEAL decided Payne / Coca-Cola. A judgment changed the tax answer for tens of thousands of
+# tradesmen and every watcher above this line would have gone on reporting green, because they all
+# read GOV.UK and GOV.UK had not changed yet.
+#
+# Our clothing rule IS Mallalieu v Drummond. Our illegal-dividend block IS Global Corporate v Hale.
+# Any of them can be distinguished next month and the first thing that would happen is NOTHING.
+#
+# It reads GOV.UK's own tax_tribunal_decision feed (Open Government Licence, 1,415 decisions, the
+# same search endpoint budget.mjs uses). It does NOT touch the Find Case Law API, whose licence
+# restricts bulk programmatic discovery. Different publisher, different licence, nothing to apply for.
+node tribunal.mjs "$@" >> logs/khoji.log 2>&1
+tribunal_rc=$?
+
 # Report the worst thing that happened, so launchd's exit code means something. A 2 from the differ
 # or the corpus means the ground has moved under us, which is an incident, not a crash: /api/health
 # has already gone red off the row it wrote. A 1 from any of them means the job itself is broken.
-echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc budget rc=$budget_rc" >> logs/khoji.log
+echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc budget rc=$budget_rc tribunal rc=$tribunal_rc" >> logs/khoji.log
 if [ "$watch_rc" -ne 0 ]; then exit "$watch_rc"; fi
 if [ "$diff_rc" -ne 0 ]; then exit "$diff_rc"; fi
 if [ "$corpus_rc" -ne 0 ]; then exit "$corpus_rc"; fi
 if [ "$amend_rc" -ne 0 ]; then exit "$amend_rc"; fi
-exit "$budget_rc"
+if [ "$budget_rc" -ne 0 ]; then exit "$budget_rc"; fi
+exit "$tribunal_rc"

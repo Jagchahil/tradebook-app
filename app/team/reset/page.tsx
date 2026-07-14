@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { browserSupabase } from '../../../lib/supabasebrowser';
+import { C, FONT } from '../ui';
 
 // SET A NEW PASSWORD. Where the reset link from /team lands.
 //
@@ -21,13 +22,6 @@ import { browserSupabase } from '../../../lib/supabasebrowser';
 // is the least we can do while we cannot check.
 const MIN = 12;
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#144a8d';
-const SAFFRON = '#E8973A';
-const PAPER = '#FBFAF7';
-const LINE = '#E8E5DE';
-const MUTED = '#6B7280';
 
 export default function ResetPage() {
   const [ready, setReady] = useState(false);
@@ -109,7 +103,7 @@ export default function ResetPage() {
                 required
                 value={pw}
                 onChange={(e) => setPw(e.target.value)}
-                style={{ ...S.input, borderColor: tooShort ? '#E0A9A2' : LINE }}
+                style={{ ...S.input, borderColor: tooShort ? '#E0A9A2' : C.line }}
               />
               <p style={S.hint}>
                 {pw.length === 0
@@ -127,7 +121,7 @@ export default function ResetPage() {
                 required
                 value={pw2}
                 onChange={(e) => setPw2(e.target.value)}
-                style={{ ...S.input, borderColor: mismatch ? '#E0A9A2' : LINE }}
+                style={{ ...S.input, borderColor: mismatch ? '#E0A9A2' : C.line }}
               />
               {mismatch ? <p style={{ ...S.hint, color: '#C0392B' }}>These do not match.</p> : null}
 
@@ -152,31 +146,31 @@ const S: Record<string, React.CSSProperties> = {
   page: {
     minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: '40px 22px',
-    background: `radial-gradient(1100px 520px at 50% -8%, #EEF4FB 0%, ${PAPER} 62%)`,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
-    color: INK,
+    background: `radial-gradient(1100px 520px at 50% -8%, #EEF4FB 0%, ${C.paper} 62%)`,
+    fontFamily: FONT,
+    color: C.ink,
   },
   card: {
     width: '100%', maxWidth: 420, background: '#fff',
-    border: `1px solid ${LINE}`, borderRadius: 20, padding: '34px 32px 30px',
+    border: `1px solid ${C.line}`, borderRadius: 20, padding: '34px 32px 30px',
     boxShadow: '0 18px 50px rgba(17,17,17,0.07), 0 2px 6px rgba(17,17,17,0.03)',
   },
   brandRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 },
-  wordmark: { fontSize: 22, fontWeight: 800, letterSpacing: -0.5, color: INK },
-  accent: { width: 26, height: 3, borderRadius: 2, background: `linear-gradient(90deg, ${RIVER}, ${SAFFRON})`, display: 'inline-block' },
+  wordmark: { fontSize: 22, fontWeight: 800, letterSpacing: -0.5, color: C.ink },
+  accent: { width: 26, height: 3, borderRadius: 2, background: `linear-gradient(90deg, ${C.river}, ${C.saffron})`, display: 'inline-block' },
   h1: { fontSize: 24, fontWeight: 800, letterSpacing: -0.6, margin: '0 0 6px' },
-  sub: { fontSize: 14.5, color: MUTED, lineHeight: 1.55, margin: '0 0 22px' },
-  label: { display: 'block', fontSize: 13, fontWeight: 700, color: INK, marginBottom: 7 },
+  sub: { fontSize: 14.5, color: C.muted, lineHeight: 1.55, margin: '0 0 22px' },
+  label: { display: 'block', fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 7 },
   input: {
-    width: '100%', padding: '14px 15px', fontSize: 15.5, color: INK,
-    border: `1.5px solid ${LINE}`, borderRadius: 12, background: '#fff',
+    width: '100%', padding: '14px 15px', fontSize: 15.5, color: C.ink,
+    border: `1.5px solid ${C.line}`, borderRadius: 12, background: '#fff',
     outline: 'none', fontFamily: 'inherit',
   },
-  hint: { fontSize: 12.5, color: MUTED, margin: '7px 2px 0' },
+  hint: { fontSize: 12.5, color: C.muted, margin: '7px 2px 0' },
   button: {
     display: 'block', width: '100%', padding: '15px', marginTop: 14, textAlign: 'center',
     fontSize: 15.5, fontWeight: 700, color: '#fff', fontFamily: 'inherit', textDecoration: 'none',
-    background: `linear-gradient(135deg, ${RIVER}, ${RIVER_DEEP})`,
+    background: `linear-gradient(135deg, ${C.river}, ${C.riverDeep})`,
     border: 0, borderRadius: 12, cursor: 'pointer',
     boxShadow: '0 8px 20px rgba(27,89,166,0.25)',
   },

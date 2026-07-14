@@ -3817,3 +3817,74 @@ export async function reviewKnowledgeItem(
     return false;
   }
 }
+
+// --- THE CIRCUMSTANCES. What a man has told us about himself. ------------------------------------
+//
+// ⚠️ WRITING ONE OF THESE IS WRITING AN EXHIBIT, NOT SAVING A PREFERENCE.
+//
+// Finance Act 2026 Sch 22 (live since 1 April) makes it sanctionable conduct to act with intent to
+// bring about a loss of tax revenue, expressly including a client "obtaining more tax relief than
+// they are entitled to obtain by law". The only thing that proves we did not intend that is the log:
+// what we ASKED, in the words he SAW, what he ANSWERED, and WHEN.
+//
+// So `asked` is passed in by the caller and stored verbatim. It is NOT looked up from
+// lib/circumstances.ts at write time and it is NEVER re-derived at read time. If we reword a question
+// next year, every existing row still carries the sentence THAT MAN actually read. A log that stores
+// a key and resolves the current text later proves nothing at all.
+
+export interface Answered {
+  key: string;
+  answer: string;
+  asked: string;
+  answered_at: string;
+}
+
+export async function readCircumstances(userId: string): Promise<Answered[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/circumstances?user_id=eq.${encodeURIComponent(userId)}&select=key,answer,asked,answered_at`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Answered[];
+  } catch {
+    // null is "we could not read", NEVER "he has answered nothing". The difference decides whether we
+    // ask him a question he has already answered, which is how a man learns we are not listening.
+    return null;
+  }
+}
+
+export async function saveCircumstance(
+  userId: string,
+  key: string,
+  answer: string,
+  asked: string,
+  channel: string,
+): Promise<boolean> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/circumstances?on_conflict=user_id,key`, {
+      method: 'POST',
+      headers: {
+        ...headers(),
+        'Content-Type': 'application/json',
+        // He can change his mind: a divorce, a new van, VAT registration. The row is UPDATED, so
+        // there is never more than one live answer to argue about.
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        key,
+        answer,
+        asked,                      // VERBATIM. The exhibit.
+        channel,
+        answered_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

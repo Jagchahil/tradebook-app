@@ -289,3 +289,49 @@ export function unanswered(answered: string[]): Circumstance[] {
   const seen = new Set(answered);
   return askingOrder().filter((c) => !seen.has(c.key));
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE WHATSAPP BUTTON ID. He taps Yes, and this is the entire round trip.
+//
+// ⚠️ IT LIVES HERE, NOT IN THE WEBHOOK, FOR ONE REASON: SO A TEST CAN RUN IT.
+//
+// The keys have underscores in them. `prior_employment`. `vat_registered`. `home_office`. A parser
+// that splits on the FIRST underscore turns every one of the three most valuable questions we ask
+// into an unknown button id, and an unknown button id in that handler falls through to the help
+// menu. So a man taps "Yes, I was employed before", and gets sent a list of commands, and his answer
+// is never written, and the single biggest relief in this product never fires. For anybody. Ever.
+//
+// It would not crash. It would not log. Nothing would go red. It would just quietly not work, and we
+// would find out in a year when a customer's accountant asked why we never claimed his terminal loss.
+//
+// That is the entire class of bug this codebase keeps producing, and the only fix that has ever
+// worked is: put the thing where a test can reach it, and write the test.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+export type Answer = 'yes' | 'no' | 'skip';
+
+const PREFIX = 'circ_';
+
+export function buttonId(key: string, answer: Answer): string {
+  return `${PREFIX}${key}_${answer}`;
+}
+
+export function parseButtonId(id: string): { key: string; answer: Answer } | null {
+  if (!id.startsWith(PREFIX)) return null;
+
+  const rest = id.slice(PREFIX.length);
+
+  // lastIndexOf. NOT indexOf. Read the block above before you change this.
+  const cut = rest.lastIndexOf('_');
+  if (cut <= 0) return null;
+
+  const key = rest.slice(0, cut);
+  const answer = rest.slice(cut + 1);
+
+  // The key must be one WE asked. Anything else is not a circumstance, and guessing what an unknown
+  // key means is how a wrong fact walks into a tax return that a man then signs himself.
+  if (!CIRCUMSTANCES.some((c) => c.key === key)) return null;
+  if (answer !== 'yes' && answer !== 'no' && answer !== 'skip') return null;
+
+  return { key, answer };
+}

@@ -30,7 +30,10 @@ import {
   NUDGE_AFTER_RECEIPTS,
   type AiBlockReason,
 } from '../../../lib/banknudge';
+import { CIRCUMSTANCES, unanswered, buttonId, parseButtonId } from '../../../lib/circumstances';
 import {
+  readCircumstances,
+  saveCircumstance,
   findUserIdByPhone,
   listBankConnectionsForUser,
   recentUnconfirmedForMatch,
@@ -619,6 +622,10 @@ async function handleButtonReply(from: string, buttonId: string): Promise<void> 
     await sendSetupDone(from);
     return;
   }
+  // The circumstance chain. Checked LAST of the known ids and BEFORE the fallthrough, because a
+  // circumstance id that fell through to the help list would hand a man a menu instead of recording
+  // the answer he just gave, and he would never know it had not landed.
+  if (await handleCircumstanceButton(from, buttonId)) return;
   // An unknown button id (future flows): fall back to the help list.
   await handleHelp(from);
 }
@@ -1231,6 +1238,151 @@ async function sendSetupDone(from: string): Promise<void> {
       '',
       'Everything lands in your app for your yes. Nothing counts until you approve it, and nothing ever goes to HMRC without you. That is the deal, always.',
     ].join('\n'),
+  );
+
+  // The setup he asked for is finished. Now the questions he did not ask for, and they are the ones
+  // worth the money. One at a time, biggest first, and it stops the second he stops.
+  const uid = await findUserIdByPhone(from);
+  if (uid) await startCircumstances(from, uid);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE CIRCUMSTANCES: the facts no receipt will ever tell us.
+//
+// A bank feed can see he bought diesel. It cannot see that he was a PAYE electrician until eighteen
+// months ago, and that a loss this year therefore carries back three years against those wages and
+// HMRC post him a cheque. There is no OCR for that. The only way to know is to ASK HIM.
+//
+// ⚠️ AND THE ASKING IS THE WHOLE RISK. Ask him eleven questions in a row and he stops reading, and
+// then we have a man who has learned to ignore us and STILL cannot claim the relief. Doc 103: every
+// question is a decision handed to a man up a ladder with one hand on the rail.
+//
+// So: ONE question. He answers, he gets the next one. HE STOPS, WE STOP. There is no timer, no nag,
+// no "you have 8 questions remaining". The chain is driven entirely by him, which means it can never
+// become a thing that pesters him, which means it is still there, unpoisoned, when he comes back.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// The framing, sent ONCE, before the first question. Not on every question: a man who has already
+// agreed to answer does not need to be re-sold on answering.
+async function startCircumstances(from: string, userId: string): Promise<void> {
+  const rows = await readCircumstances(userId);
+
+  // ⚠️ NULL IS "COULD NOT READ", NOT "HE HAS ANSWERED NOTHING". If the read fails and we treat it as
+  // an empty slate, we ask a man a question he answered last month. He notices. And a man who notices
+  // that we do not listen stops telling us things, which costs him the reliefs and costs us him.
+  if (rows === null) return;
+  if (rows.length > 0) return; // he is already in the chain. Do not restart it at him.
+
+  await sendText(
+    from,
+    [
+      'One more thing, and it is the part that actually saves you money.',
+      '',
+      'Most of what you can claim has nothing to do with your receipts. It depends on things only you know. What you did before this, when you really started, whether you are married. Nobody ever asks, so nobody ever claims it.',
+      '',
+      'I will ask one at a time. Answer when you fancy, ignore me when you do not, and I will stop.',
+    ].join('\n'),
+  );
+
+  await askNextCircumstance(from, userId);
+}
+
+// Ask the single highest-value thing we do not know. Returns false when there is nothing left.
+async function askNextCircumstance(from: string, userId: string): Promise<boolean> {
+  const rows = await readCircumstances(userId);
+  if (rows === null) return false;
+
+  const next = unanswered(rows.map((r) => r.key))[0];
+  if (!next) return false;
+
+  // ⚠️ THE BODY IS EXACTLY `next.ask` AND NOTHING ELSE.
+  //
+  // Because `next.ask` is the string we write into the `asked` column, and that column is the
+  // exhibit. Finance Act 2026 Sch 22 made the record of what we asked and what he answered our only
+  // proof that we did not intend a loss of tax revenue. If we dress the question up here with a
+  // footer or a "this could be worth £252" line, the log no longer holds what he actually read, and
+  // the one thing it exists to do is the one thing it cannot do.
+  //
+  // The reason WHY it matters goes in the reply, AFTER he answers. Which is better product anyway:
+  // you do not sell a man on a question, you reward him for answering it.
+  await sendButtons(from, next.ask, [
+    { id: buttonId(next.key, 'yes'), title: 'Yes' },
+    { id: buttonId(next.key, 'no'), title: 'No' },
+    { id: buttonId(next.key, 'skip'), title: 'Not now' },
+  ]);
+  return true;
+}
+
+// A circumstance button came back. Returns true if we handled it.
+//
+// The id is written by buttonId() and read by parseButtonId(), both in lib/circumstances.ts, and
+// deliberately NOT reimplemented here. Two parsers over the same string will drift, and the one that
+// drifts is always the one that is not under test. This codebase has done that with money three
+// times in a single day.
+async function handleCircumstanceButton(from: string, id: string): Promise<boolean> {
+  const parsed = parseButtonId(id);
+  if (!parsed) return false;
+
+  const { key, answer } = parsed;
+  const c = CIRCUMSTANCES.find((x) => x.key === key);
+  if (!c) return false;
+
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return true;
+  }
+
+  // `c.ask` comes from the SERVER, not from the button. What we log is what this codebase put in
+  // front of him, not what a client claims it showed him.
+  const ok = await saveCircumstance(userId, key, answer, c.ask, 'whatsapp');
+  if (!ok) {
+    // A FAILED WRITE MUST NOT LOOK LIKE A SAVED ONE. Say "no" to us, have it not save, and he
+    // believes we know. We do not. He loses the money while thanking us for asking.
+    await sendText(from, 'That did not save just then. Nothing is lost, I will ask you again.');
+    return true;
+  }
+
+  if (answer === 'skip') {
+    // "Not now" means not now. The chain ends here, and it is HIS to restart.
+    await sendText(from, 'No bother. It is in your app under Settings whenever you fancy it.');
+    return true;
+  }
+
+  if (answer === 'no') {
+    // Nothing to chase. Straight on, no ceremony. A "no" is a real answer and it saves him from
+    // ever being asked again, which is worth something on its own.
+    const more = await askNextCircumstance(from, userId);
+    if (!more) await sendCircumstancesDone(from);
+    return true;
+  }
+
+  // A YES. Tell him what he has just unlocked, in his words, and be straight about who claims it.
+  const lines: string[] = [`Good. ${c.why}`];
+
+  if (c.claimant !== 'him') {
+    // ⚠️ WE DO NOT CLAIM WHAT IS NOT OURS TO CLAIM.
+    //
+    // Marriage Allowance is claimed by the TRANSFEROR, the lower earner, and she is not our customer.
+    // Small Business Rate Relief is granted by his COUNCIL, and that is why almost nobody has it: no
+    // annual form reminds anyone, and it is not on the accountant's list either. The honest, and the
+    // only lawful, move is: find it, tell him, hand it over. Pretending we can file it for him wastes
+    // his evening and he would be right to blame us.
+    lines.push('', `⚠️ This one is not mine to claim. ${c.claimant === 'his partner' ? 'Your partner' : c.claimant === 'his council' ? 'Your council' : 'Someone other than me'} has to do it. I will walk you through exactly how in the app.`);
+  }
+
+  lines.push('', `What I need next: ${c.evidence}`);
+  await sendText(from, lines.join('\n'));
+
+  const more = await askNextCircumstance(from, userId);
+  if (!more) await sendCircumstancesDone(from);
+  return true;
+}
+
+async function sendCircumstancesDone(from: string): Promise<void> {
+  await sendText(
+    from,
+    'That is the lot. I will not ask again. Anything that changes, a marriage, a van, VAT, just tell me and I will pick it up.',
   );
 }
 

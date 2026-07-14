@@ -230,14 +230,45 @@ ok('🔴 A HEADCOUNT MAY NOT BLACK OUT THE BRAIN: the garnish reads are allSettl
   /Promise\.allSettled\(\[/.test(dbSrc)
   && /degraded/.test(dbSrc));
 
+const brainTsx = readFileSync(path.join(root, 'app/team/Brain.tsx'), 'utf8')
+  .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+  .replace(/^\s*\/\/.*$/gm, '');
+
 ok('🔴 AND THE ERROR NO LONGER GUESSES AT A CAUSE IT NEVER ESTABLISHED',
   // "We could not reach the database" was a diagnosis, not an observation, and it was false. The
   // sin of the entire week, sitting in one catch block: NOT KNOWING TURNED INTO A CONFIDENT CLAIM.
-  !/could not reach the database/i.test(
-    readFileSync(path.join(root, 'app/team/Brain.tsx'), 'utf8')
-      .replace(/^\s*\/\/.*$/gm, '')
-      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ''),
-  ));
+  !/could not reach the database/i.test(brainTsx));
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 7. THE DEMO ACCOUNT WAS BEING COUNTED AS A MAN TRUSTING US WITH HIS TAX.
+//
+// LIVE on the console, 14 July, minutes after the fix above shipped:
+//
+//     CUSTOMERS  1                 (the box, which excludes internal accounts)
+//     "2 people are trusting this with their tax."   (the reactor, which did not)
+//
+// An INTERNAL account is a subscription row with no Stripe id: the App Review demo, and any comp.
+// It is `active`. So the query counted it as a person, and DOUBLED the only number that means
+// anything this early, on the screen we would use to decide whether to keep going.
+//
+// ⚠️ THIS IS THE THIRD TIME. The warning about the SECOND time is a comment in supabase.ts, ~1,100
+// lines above the query I wrote, and I read straight past it.
+//
+// TWO QUERIES OVER THE SAME PEOPLE WILL DRIFT, AND THE ONE THAT DRIFTS IS THE ONE THAT FLATTERS YOU.
+// That is not luck. A number that comes in too LOW gets investigated by lunchtime.
+// ---------------------------------------------------------------------------------------------
+
+ok('🔴 THE SUBSCRIBER COUNT EXCLUDES INTERNAL ACCOUNTS. THE DEMO IS NOT A CUSTOMER.',
+  // No Stripe id means no money means not a person trusting us with his tax. It means US.
+  /subscriptions\?select=stripe_subscription_id[^']*'\s*\+\s*'&stripe_subscription_id=not\.is\.null/.test(dbSrc)
+  || /stripe_subscription_id=not\.is\.null/.test(dbSrc));
+
+ok('🔴 AND THE RAKHA RING NO LONGER CLAIMS "NOTHING WOULD MAKE THIS GO RED"',
+  // It was false, it was on the live console an hour after I disproved it, and Jag saw it before I
+  // did. A stopped Rakha IS caught by the cron watchdog. Overstate a finding and it gets disproved,
+  // and the real finding gets thrown out with it.
+  !/Nothing would make this go red/i.test(brainTsx)
+  && /cron watchdog/i.test(brainTsx));
 
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

@@ -3854,7 +3854,27 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
       // and THERE IS NO subscription_status COLUMN ON users. It is `subscriptions.status`, which is
       // what every other count in this file has always used. A column I invented, in the one query
       // nobody ever ran, blacking out the one panel that actually matters.
-      q('subscriptions?select=stripe_subscription_id&status=in.(active,trialing)&limit=5000'),
+      //
+      // ═══════════════════════════════════════════════════════════════════════════════════════════
+      // ⚠️ AND THEN, FIXING IT, I WROTE THE OTHER BUG. THE ONE DESCRIBED AT LINE ~1143 OF THIS FILE.
+      //
+      // stripe_subscription_id=not.is.null IS THE WHOLE OF IT.
+      //
+      // An INTERNAL account is a subscription row with no Stripe id: the App Review demo, and any
+      // comp (see line ~1096). It is `active`, so without this filter it is counted as a person.
+      //
+      // The console went live saying "2 PEOPLE ARE TRUSTING THIS WITH THEIR TAX" while the CUSTOMERS
+      // box on the same screen said 1, and the difference was OUR OWN DEMO ACCOUNT. A hundred per
+      // cent inflation of the only number that means anything this early.
+      //
+      // It has now happened THREE TIMES, and the comment at line ~1143 is the warning about the
+      // second, sitting in this same file, which I read past on my way to writing the third.
+      //
+      // TWO QUERIES OVER THE SAME PEOPLE WILL DRIFT, AND THE ONE THAT DRIFTS IS THE ONE THAT
+      // FLATTERS YOU. That is not a coincidence: a number that is too low gets investigated.
+      // ═══════════════════════════════════════════════════════════════════════════════════════════
+      q('subscriptions?select=stripe_subscription_id&status=in.(active,trialing)'
+        + '&stripe_subscription_id=not.is.null&limit=5000'),
     ]);
 
     // WHAT WE COULD NOT READ, BY NAME. Never a guess at the cause, and never a blank console.

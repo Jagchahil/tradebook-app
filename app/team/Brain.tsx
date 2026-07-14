@@ -251,10 +251,20 @@ export default function Brain() {
                     <div style={S.organName}>{o.name}</div>
                     <div style={S.organDoes}>{o.does}</div>
                     <div style={{ ...S.organSays, color: dark ? '#FF9F9F' : '#9AA3B2' }}>{o.says}</div>
-                    {/* The most honest line on the screen. An organ that cannot say how it would go
-                        red is an organ nobody is watching. */}
+                    {/* An organ that cannot say how it would go red is an organ nobody is watching.
+                        ⚠️ AND THIS FALLBACK USED TO SAY "Nothing would make this go red." IT WAS
+                        FALSE, IT WAS STILL ON THE SCREEN AN HOUR AFTER I DISPROVED IT, AND JAG SAW IT
+                        BEFORE I DID.
+                        A stopped Rakha IS caught: the cron watchdog turns /api/health red after 26
+                        quiet hours. What nothing catches is a Rakha that RUNS and considers NOBODY,
+                        because it only ever writes a row when it FINDS something. Zero rows is both
+                        "a quiet week" and "the engine is dead", and we cannot tell which.
+                        Overstate a finding and it gets disproved, and then the real one gets ignored
+                        with it. Claim the narrow thing. The narrow thing is bad enough. */}
                     <div style={S.organRed}>
-                      {o.redWhen ? `Goes red when: ${o.redWhen}` : 'Nothing would make this go red. That is the problem.'}
+                      {o.redWhen
+                        ? `Goes red when: ${o.redWhen}`
+                        : 'This ring cannot go red. A stopped Rakha is caught by the cron watchdog, but a Rakha that runs and looks at nobody is not, and this ring has no way to tell the two apart.'}
                     </div>
                   </div>
                 );

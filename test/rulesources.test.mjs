@@ -18,6 +18,11 @@
 // loudly instead of shipping. These tests make sure the anchor is strong enough to hold.
 
 import { EXPENSE_RULES } from '../lib/taxrules.ts';
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 import { RULE_SOURCES } from '../lib/rulesources.ts';
 
 let pass = 0;
@@ -49,11 +54,36 @@ ok('every quote is long enough to be an anchor, not a fragment',
 ok('no quote is a single word or a bare heading',
   allSources.every((s) => s.quote.trim().split(/\s+/).length >= 4));
 
-// --- 3. Every source belongs to a rule that actually exists -------------------
+// --- 3. Every source belongs to a claim that actually exists ------------------
 //
 // A citation attached to a rule we deleted is a citation nobody checks, and it will rot silently.
-ok('every cited key is a real rule in EXPENSE_RULES',
-  Object.keys(RULE_SOURCES).every((k) => keys.includes(k)));
+//
+// ⚠️ NOT EVERY CLAIM WE MAKE IS AN EXPENSE RULE, and this guard used to assume they all were.
+//
+// Marriage Allowance is not a business expense. It is a relief, and we now tell a man about it with
+// his own numbers, so it is a CLAIM and it needs a source exactly as much as "you cannot deduct
+// everyday clothes" does. The guard was right to fire when the citation appeared: an orphan citation
+// rots. So it is widened, not weakened, and the widening is itself checked.
+//
+// The rule now: a cited key is either an EXPENSE_RULE, or it is a claim whose name appears somewhere
+// in lib/. A citation for something that exists nowhere in the code still fails, which is the whole
+// point of the guard.
+const libDir = path.resolve(here, '../lib');
+const libText = readdirSync(libDir)
+  .filter((f) => f.endsWith('.ts'))
+  .map((f) => readFileSync(path.join(libDir, f), 'utf8'))
+  .join('\n');
+
+const orphans = Object.keys(RULE_SOURCES).filter(
+  (k) => !keys.includes(k) && !libText.includes(k),
+);
+
+ok('every cited key is a real rule, or a real claim named in lib/. No orphan citations',
+  orphans.length === 0);
+
+ok('the marriage allowance claim is cited, and it is NOT an expense rule',
+  Boolean(RULE_SOURCES.marriage_allowance) && !keys.includes('marriage_allowance')
+  && libText.includes('marriage_allowance'));
 
 // --- 4. THE ONES THAT ARE ACTUALLY CASE LAW ----------------------------------
 //

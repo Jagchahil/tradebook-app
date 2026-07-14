@@ -97,6 +97,18 @@ export const FACTS = {
   cgtAnnualExempt: 3000,
   cgtBasicRate: 0.18,
   cgtHigherRate: 0.24,
+  // MARRIAGE ALLOWANCE. The lowest-paid trick in the book and the most commonly missed.
+  //
+  // A spouse or civil partner who earns under the personal allowance can hand 10% of it across. It
+  // is worth £252 a year to the man who receives it, which is more than a month and a half of what
+  // we charge him, and it is the single most common shape of our customer: a self-employed trade,
+  // a partner at home or working part time.
+  //
+  // Until 14 July 2026 this existed in the product as ONE SENTENCE OF ADVICE in lib/taxrules.ts
+  // ("free money many people miss") with nothing whatsoever behind it. No constant, no calculation,
+  // nothing watching it. We told him it existed and left him to it. That is a leaflet, not an
+  // employee.
+  marriageAllowanceTransfer: 1260,
   badrRate: 0.18, // Business Asset Disposal Relief, from 6 April 2026. Watched by Khoji, agrees.
   // badrLifetimeLimit DELETED 14 July 2026. It was published here as a fact, used by nothing,
   // sourced by nothing, and unfindable on GOV.UK. See capitalGainsTax() for the whole story.
@@ -286,6 +298,65 @@ export function lossCarriedForward(currentProfit: number, broughtForwardLoss: nu
     taxableProfit: round2(Math.max(0, currentProfit) - used),
     lossRemaining: round2(Math.max(0, broughtForwardLoss) - used),
   };
+}
+
+// --- Marriage Allowance -----------------------------------------------------
+
+export type MarriageRole =
+  | 'receiver'    // he earns in the basic rate band: a partner earning under the PA can transfer to HIM
+  | 'giver'       // he earns under the PA himself: HE can transfer to a basic rate partner
+  | 'none';       // higher rate, or otherwise outside it
+
+export interface MarriageAllowance {
+  role: MarriageRole;
+  // £252. Whoever receives it, this is what it is worth. NOT a saving we may add to any total, and
+  // the reason is in the comment below.
+  worth: number;
+  transfer: number;
+}
+
+// WHO, IF ANYONE, THIS APPLIES TO, GIVEN ONLY HIS OWN INCOME.
+//
+// ⚠️ WE DO NOT KNOW IF HE IS MARRIED, AND WE ARE NOT GOING TO ASK HIM WITH A FORM.
+//
+// This function answers the only question we can honestly answer from what we hold: given his
+// income, WHICH SIDE of the transfer would he be on, if there is a partner at all. Everything past
+// that is his to know and ours to explain.
+//
+// So the £252 NEVER enters an estimated-saving total. A total is a promise, and a promise built on
+// a fact we do not have is exactly how the CIS refund once told a man he was owed money that did
+// not exist. It goes in the words instead, with the condition attached, in the same sentence.
+//
+// The other half, which almost everybody gets wrong: THE LOWER EARNER APPLIES. HMRC will not take
+// the claim from the receiver. So there is nothing here for us to prepare and nothing for him to
+// approve. We can only tell him, plainly, and tell him who has to do it.
+export function marriageAllowance(totalIncome: number): MarriageAllowance {
+  const worth = round2(FACTS.marriageAllowanceTransfer * FACTS.basicRate);
+  const base = { worth, transfer: FACTS.marriageAllowanceTransfer };
+
+  // ⚠️ THERE IS NO FACTS.higherRateThreshold, AND I WROTE ONE ANYWAY.
+  //
+  // My first version compared his income to `FACTS.higherRateThreshold`, a constant that does not
+  // exist in this file. In JavaScript that is not an error, it is `undefined`, and `income <=
+  // undefined` is silently FALSE. So every basic rate tradesman in the country was told nothing,
+  // and the function returned 'none' while looking perfectly reasonable.
+  //
+  // The threshold is not a constant here, it is a CONSEQUENCE: where the personal allowance ends
+  // plus the width of the basic rate band. Derive it, so a Budget that moves either one moves this
+  // too, and Khoji is already watching both halves.
+  const higherRateStarts = FACTS.personalAllowance + FACTS.basicRateBand;
+
+  // He is over the personal allowance and not yet a higher rate payer. He can RECEIVE.
+  if (totalIncome > FACTS.personalAllowance && totalIncome <= higherRateStarts) {
+    return { ...base, role: 'receiver' };
+  }
+  // He earns less than his own allowance, so part of it is going to waste. He can GIVE.
+  if (totalIncome > 0 && totalIncome < FACTS.personalAllowance) {
+    return { ...base, role: 'giver' };
+  }
+  // A higher rate taxpayer cannot receive it. Saying nothing is the correct behaviour here: an
+  // optimiser that suggests something he is barred from is one he stops reading.
+  return { ...base, role: 'none' };
 }
 
 // --- Capital gains tax ------------------------------------------------------

@@ -41,9 +41,23 @@ ok('basic rate band = 0.26', O.marginalRate(30000) === 0.26);
 ok('higher rate band = 0.42', O.marginalRate(60000) === 0.42);
 ok('taper zone = 0.62', O.marginalRate(110000) === 0.62);
 
-console.log('\n=== optimiser: nothing to suggest for a tidy low earner ===\n');
+console.log('\n=== optimiser: the tidy low earner used to get NOTHING ===\n');
+//
+// ⚠️ THIS TEST USED TO ASSERT ZERO LEVERS, AND IT PASSED, AND THAT WAS THE PROBLEM.
+//
+// £6,000 net, everything claimed, nothing owing. The optimiser had not one word for him. And he is
+// the man with the MOST to gain from the thing we were not telling him: he is not using all of his
+// tax free allowance, and if he is married he can hand £1,260 of it to his partner and save THEM
+// £252 a year, for nothing, because he was never going to use it.
+//
+// So "no levers" was not restraint. It was a silence with £252 sitting inside it.
 const quiet = O.findOptimisations({ ...base, ytdTradeIncome: 8000, ytdTradeExpenses: 2000, categoriesLogged: ['fuel', 'phone', 'insurance', 'tools'] });
-ok('no levers when everything is claimed and income is low', quiet.length === 0);
+ok('he now gets exactly ONE thing, and it is the one that helps him',
+  quiet.length === 1 && quiet[0].key === 'marriage_allowance_give');
+ok('...and it is INFORMATION, not a quantified saving, because we do not know if he is married',
+  quiet[0].info === true && quiet[0].estSaving === 0);
+ok('...so the headline saving for a tidy low earner is still, correctly, zero',
+  O.totalEstimatedSaving(quiet) === 0);
 
 console.log('\n=== optimiser: the levers fire on real gaps ===\n');
 // Higher earner, missing costs, no home office, logs fuel but no mileage, has a van goal.

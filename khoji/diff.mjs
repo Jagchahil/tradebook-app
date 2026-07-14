@@ -939,6 +939,25 @@ export const CHECKS = [
   // So it stays UNWATCHED, and the console prints its name every night with the rest of the gap.
   // "We do not check this" is a true sentence. "We check this and it is broken" is a worse one.
   // See UNCHECKABLE below.
+  // --- Marriage Allowance -------------------------------------------------------------------------
+  //
+  // Added the same night the badrLifetimeLimit constant was DELETED for being unsourceable. The
+  // lesson was still warm: do not put a number in a man's tax figures unless you can point at the
+  // sentence on GOV.UK that says it.
+  //
+  // So this one arrives with its watcher already attached.
+  {
+    fact: 'marriageAllowanceTransfer',
+    label: 'Marriage Allowance, amount transferable',
+    url: 'https://www.gov.uk/marriage-allowance',
+    extract(text) {
+      // "Marriage Allowance lets you transfer £1,260 of your Personal Allowance to your husband,
+      // wife or civil partner."
+      const m = text.match(/transfer\s*£([\d,]+)\s*of your Personal Allowance/i)
+        || text.match(/Marriage Allowance lets you transfer\s*£([\d,]+)/i);
+      return m ? { value: money(m[1]) } : { error: 'could not read the transferable amount' };
+    },
+  },
 ];
 
 // ---- THE CONSTANTS WE CANNOT DIFF, AND THE REASON, IN WORDS ------------------

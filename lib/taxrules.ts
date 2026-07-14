@@ -253,6 +253,11 @@ export const TAX_TIPS: { title: string; body: string }[] = [
   { title: 'A pension', body: 'Paying into a pension gets you tax relief and cuts your bill. One of the most tax efficient moves there is for the self employed.' },
   { title: 'Claim your CIS back', body: 'If contractors deduct CIS from your pay, that is tax already handed over. It comes off your bill at tax time, and is often a refund.' },
   { title: 'The £1,000 trading allowance', body: 'If your costs are tiny, you can claim a flat £1,000 instead of your actual expenses. Lekhio uses whichever leaves you better off.' },
-  { title: 'Marriage allowance', body: 'If your husband or wife earns little or nothing, they can pass you part of their tax free allowance. Free money many people miss.' },
+  // This used to be the WHOLE of our marriage allowance support: a sentence telling him free money
+  // existed, and no help getting it. As of 14 July 2026 lib/taxengine.ts works out which side of the
+  // transfer he is on and the optimiser tells him, with his own numbers and who has to apply.
+  // The tip stays, because he may read it before he has any numbers at all, but it now says the
+  // thing that actually unlocks it: THE LOWER EARNER MAKES THE CLAIM.
+  { title: 'Marriage allowance', body: 'If your husband or wife earns under £12,570, they can pass you £1,260 of their tax free allowance. That is £252 off your bill every year, and you can backdate it four years. They have to apply, not you. HMRC will not take it from the person receiving it.' },
   { title: 'Time big buys before 5 April', body: 'A large tool or van bought just before the tax year ends brings the relief forward a whole year. Timing matters.' },
 ];

@@ -11,7 +11,7 @@
 // classed irreversible, so applyDial can never auto-execute it, only draft it
 // for the user's yes. Timing and tax-treatment guidance only. You decide.
 
-import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly } from './taxengine';
+import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly, marriageAllowance } from './taxengine';
 import { compare } from './ltdengine';
 import { decideAction, type AutonomyLevel } from './autonomy';
 import { studentLoanForSA, type StudentPlan } from './nistudentloan';
@@ -206,6 +206,51 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
       title: 'Property costs you may not be claiming',
       detail: `You have rental income but very little logged against it. Mortgage interest (a 20% tax credit), repairs, agent fees, insurance and ground rent all reduce your property tax. Log them and Lekhio applies the £1,000 property allowance or your actual costs, whichever leaves you better off.`,
       estSaving: 0,
+      action: 'log_entry',
+    });
+  }
+
+  // MARRIAGE ALLOWANCE. £252 a year, and until today the product's entire treatment of it was one
+  // sentence in a tips list saying "free money many people miss". We were the ones missing it.
+  //
+  // ⚠️ estSaving IS ZERO ON PURPOSE, AND IT IS THE MOST IMPORTANT LINE IN THIS BLOCK.
+  //
+  // £252 is real, but it depends on a fact we do not have: whether he is married at all, and what
+  // his partner earns. totalEstimatedSaving() sums estSaving into a headline number, and a headline
+  // number is a promise. Putting a conditional £252 in it would tell a single man he is owed money
+  // he is not owed, which is precisely how the CIS refund once quoted a figure that did not exist.
+  //
+  // So the money goes in the WORDS, with the condition welded to it in the same sentence, and never
+  // into a total. See lib/taxengine.ts marriageAllowance().
+  const ma = marriageAllowance(projTotalIncome);
+
+  if (ma.role === 'receiver') {
+    out.push({
+      key: 'marriage_allowance_receive',
+      title: 'If your wife or husband earns little, they can hand you £252',
+      detail:
+        `If you are married or in a civil partnership and they earn under £${FACTS.personalAllowance.toLocaleString('en-GB')} a year, `
+        + `they can transfer £${ma.transfer.toLocaleString('en-GB')} of their tax free allowance to you. `
+        + `That is £${ma.worth} off your tax bill, every year, and it can be backdated four years. `
+        + `THEY have to make the claim, not you. HMRC will not take it from the receiving partner. `
+        + `It takes about ten minutes at gov.uk/marriage-allowance and you need both National Insurance numbers.`,
+      estSaving: 0,
+      info: true,
+      action: 'log_entry',
+    });
+  }
+
+  if (ma.role === 'giver') {
+    out.push({
+      key: 'marriage_allowance_give',
+      title: `You are not using all of your tax free allowance`,
+      detail:
+        `You are on course to earn under £${FACTS.personalAllowance.toLocaleString('en-GB')}, so part of your tax free allowance is going to waste. `
+        + `If you are married or in a civil partnership and they pay basic rate tax, you can transfer £${ma.transfer.toLocaleString('en-GB')} of it to them. `
+        + `It saves THEM about £${ma.worth} a year and costs you nothing, because you were not going to use it. `
+        + `You are the one who has to apply: gov.uk/marriage-allowance.`,
+      estSaving: 0,
+      info: true,
       action: 'log_entry',
     });
   }

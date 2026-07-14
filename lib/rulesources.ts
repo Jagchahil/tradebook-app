@@ -64,6 +64,24 @@ export interface RuleSource {
 
 // Keyed by ExpenseRule.key in lib/taxrules.ts.
 export const RULE_SOURCES: Record<string, RuleSource[]> = {
+  // --- Marriage Allowance. Cited on the day the feature was born, not bolted on later. ------
+  //
+  // The claim we make: £1,260 transfers, it is worth £252, and THE LOWER EARNER APPLIES. That last
+  // clause is the one that actually gets him the money and the one everybody gets wrong, so it had
+  // better be HMRC's sentence and not ours.
+  //
+  // This block exists because of what happened four hours earlier: badrLifetimeLimit was deleted
+  // from the tax engine for being a number we published, could not source on any GOV.UK page, could
+  // not check, and did not use. A new number arrives with its source and its watcher attached, or it
+  // does not arrive.
+  marriage_allowance: [
+    {
+      code: 'Marriage Allowance',
+      url: 'https://www.gov.uk/marriage-allowance',
+      quote: 'Marriage Allowance lets you transfer £1,260 of your Personal Allowance to your husband, wife or civil partner.',
+      authority: 'GOV.UK, Marriage Allowance. Watched nightly by Khoji (fact: marriageAllowanceTransfer).',
+    },
+  ],
   // --- Clothing. The contentious one, and the one that is actually case law. ---------------
   //
   // VERIFIED against the live page, 13 July 2026. BIM37910 is titled "Wholly and exclusively:

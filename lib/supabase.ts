@@ -1923,6 +1923,21 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     purchaseGoal: purchase ? { title: purchase.title, amount: purchase.amount } : null,
     ytdPropertyIncome: Math.round(ytdPropertyIncome * 100) / 100,
     ytdPropertyExpenses: Math.round(ytdPropertyExpenses * 100) / 100,
+
+    // WHAT HE HAS TOLD US ABOUT HIMSELF. Read HERE, once, so that every caller of the optimiser gets
+    // it without knowing it exists: the app, the WhatsApp reply, the ledger.
+    //
+    // ⚠️ IT IS READ IN THIS FUNCTION AND NOT IN THE THREE ROUTES, AND THAT IS THE WHOLE POINT.
+    //
+    // Two readers over the same money WILL drift, and the one that drifts is always the one he
+    // happens to be looking at. This codebase produced that bug three times in a single day: the
+    // signups count, the knowledge count, the review queue. Marriage is money. It gets one reader.
+    //
+    // A failed read yields {} which means UNKNOWN everywhere downstream, never "no". A man does not
+    // become single because Postgres timed out.
+    circumstances: Object.fromEntries(
+      ((await readCircumstances(userId)) ?? []).map((c) => [c.key, c.answer]),
+    ),
   };
 }
 

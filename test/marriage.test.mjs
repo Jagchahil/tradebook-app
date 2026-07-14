@@ -153,5 +153,105 @@ ok('the claim carries a primary source, from birth, not bolted on in an audit la
 ok('...and the quote is HMRC\'s sentence, not ours',
   RULE_SOURCES.marriage_allowance[0].quote.includes('£1,260'));
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 NOW WE HAVE ASKED HIM. ONE QUESTION ABOUT HER INCOME. FOUR DIFFERENT MEN.
+//
+// Everything above this line is the behaviour of a product that does not know anything about the man
+// it is talking to. It hedges, correctly, and it puts £0 in the total, correctly, and it says the
+// same hedged thing to a married man and a single man for ever, WHICH IS THE BIT THAT WAS BROKEN.
+//
+// Doc 103's empty test: a row that does not apply to him most of the time teaches him to stop
+// reading the page, and then he misses the week it does apply. The fix is not better wording. The
+// fix is asking, and then ACTING on the answer, and the acting is what these tests guard.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+
+// The four men. His income is the same in each; only what he told us differs.
+const receiver = { ...base };                                                    // ~£30k projected
+const giver = { ...base, ytdTradeIncome: 5_000, ytdTradeExpenses: 1_000 };       // under the allowance
+
+const withCirc = (who, circumstances) => findOptimisations({ ...who, circumstances });
+const marriageCards = (o) => o.filter((x) => x.key.startsWith('marriage_allowance'));
+
+// 1. HE SAID NO. -----------------------------------------------------------------------------
+ok('🔴 A SINGLE MAN IS NEVER SHOWN IT AGAIN. He told us. That is what asking is FOR.',
+  marriageCards(withCirc(receiver, { married: 'no' })).length === 0);
+
+ok('...and neither is a single man who earns under the allowance',
+  marriageCards(withCirc(giver, { married: 'no' })).length === 0);
+
+// 2. HE WOULD NOT SAY. -----------------------------------------------------------------------
+ok('🔴 "NOT NOW" IS NOT "NO". A skip must not quietly delete £252 from a married man\'s product.',
+  marriageCards(withCirc(receiver, { married: 'skip' })).length === 1);
+
+ok('...and a skip is still a "could", never a promise: £0 in the total',
+  marriageCards(withCirc(receiver, { married: 'skip' }))[0].estSaving === 0);
+
+ok('...and a caller that never read the circumstances behaves exactly as it did before they existed',
+  JSON.stringify(marriageCards(findOptimisations(receiver)))
+    === JSON.stringify(marriageCards(withCirc(receiver, {}))));
+
+// 3. HE SAID YES, AND SO DID SHE. THE ONLY BRANCH THAT BECOMES A NUMBER. ----------------------
+const confirmed = withCirc(receiver, { married: 'yes', partner_low_earner: 'yes' });
+const conf = marriageCards(confirmed)[0];
+
+ok('🔴 CONFIRMED: married, and she earns under the allowance. The £252 finally enters the total.',
+  conf.estSaving === 252 && conf.info !== true);
+
+ok('...and it is in the total for real, not just on the card',
+  totalEstimatedSaving(confirmed) - totalEstimatedSaving(withCirc(receiver, { married: 'skip' })) === 252);
+
+ok('...it stops saying "if" and starts saying "can", because the condition is gone',
+  conf.detail.startsWith('You told me you are married') && conf.title.includes('can hand you'));
+
+ok('🔴 ...AND IT STILL SAYS SHE HAS TO CLAIM IT. Being sure does not make it ours to file.',
+  conf.detail.includes('THEY have to make the claim, not you and not me'));
+
+ok('...and it still asks for two NI numbers and NOT a marriage certificate',
+  conf.detail.includes('National Insurance numbers') && conf.detail.includes('No certificate'));
+
+// 4. HE SAID YES, SHE EARNS WELL. NOTHING TO SEE. --------------------------------------------
+ok('🔴 MARRIED, BUT SHE EARNS OVER THE ALLOWANCE: there is no relief, so there is no card.',
+  marriageCards(withCirc(receiver, { married: 'yes', partner_low_earner: 'no' })).length === 0);
+
+// 5. THE REVERSAL. He is under the allowance, so HE is the one who transfers, and HE claims. ---
+const gives = marriageCards(withCirc(giver, { married: 'yes', partner_low_earner: 'no' }))[0];
+
+ok('🔴 THE ONE BRANCH WHERE OUR OWN CUSTOMER IS THE CLAIMANT: he is under the allowance, she is not.',
+  gives?.key === 'marriage_allowance_give' && gives.detail.includes('You are the one who has to apply'));
+
+ok('...and it knows he is married now, so it stops saying "if you are married"',
+  gives.detail.includes('You told me you are married'));
+
+ok('🔴 ...BUT IT STILL WILL NOT QUANTIFY IT, because we never asked whether SHE is a higher rate payer',
+  gives.estSaving === 0 && gives.detail.includes('basic rate tax and not higher rate'));
+
+ok('BOTH UNDER THE ALLOWANCE: neither pays a penny of tax, so there is nothing to transfer. Say nothing.',
+  marriageCards(withCirc(giver, { married: 'yes', partner_low_earner: 'yes' })).length === 0);
+
+// 6. THE LEDGER MUST NOT COUNT IT. -----------------------------------------------------------
+//
+// ⚠️ THE OPTIMISER SAYS "£252 IS ON THE TABLE". THE LEDGER SAYS "LEKHIO SAVED YOU £X". THOSE ARE
+// DIFFERENT SENTENCES AND ONLY ONE OF THEM IS A CLAIM ABOUT THE PAST.
+//
+// His wife has to go to gov.uk and apply. Until she does, not a penny has moved. If the £252 ever
+// leaks into the ledger, we are taking credit for money he has not received, from a claim we did not
+// make, on a form we cannot see. That is the CIS refund bug wearing a different hat, and it is why
+// LedgerInput has no field it could possibly arrive through.
+// ⚠️ AND THIS TEST READS THE INTERFACE, NOT THE FILE, BECAUSE I WROTE IT THE LAZY WAY FIRST.
+//
+// The first version grepped the whole of ledger.ts for the word "marriage" and failed instantly, on
+// a COMMENT explaining why the ledger must never count Marriage Allowance. That is the fourth time a
+// test in this repo has been broken by the prose warning about the thing the test was checking for.
+// The domain guard did it. The "no Approve All" test did it. It is a genuinely reliable way to be
+// wrong, so: read the SHAPE. There must be no FIELD it could arrive through, comments be damned.
+const ledgerSrc = readFileSync(path.join(lib, 'ledger.ts'), 'utf8');
+const ledgerInput = ledgerSrc
+  .slice(ledgerSrc.indexOf('interface LedgerInput'))
+  .slice(0, ledgerSrc.slice(ledgerSrc.indexOf('interface LedgerInput')).indexOf('}'))
+  .replace(/\/\/.*$/gm, '');   // fields only. The comments are allowed to say the word.
+
+ok('🔴 THE LEDGER HAS NO FIELD THE £252 COULD ARRIVE THROUGH, and that is deliberate: he has not received it yet',
+  ledgerInput.length > 50 && !/marriage|circumstance|allowanceTransfer/i.test(ledgerInput));
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

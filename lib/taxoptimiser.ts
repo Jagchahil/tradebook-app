@@ -34,6 +34,13 @@ export interface OptimiserInput {
   // Property stream this year, for the property levers. Default 0.
   ytdPropertyIncome?: number;
   ytdPropertyExpenses?: number;
+
+  // WHAT HE HAS TOLD US ABOUT HIMSELF. { married: 'yes', partner_low_earner: 'no', ... }
+  //
+  // Optional, and absent means UNKNOWN, never NO. A caller that has not read the circumstances gets
+  // exactly the behaviour it got before this field existed: the conditional wording, no promise, no
+  // suppression. Silence from a caller must never be mistaken for an answer from a man.
+  circumstances?: Record<string, string>;
 }
 
 export interface Optimisation {
@@ -210,49 +217,111 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
     });
   }
 
-  // MARRIAGE ALLOWANCE. £252 a year, and until today the product's entire treatment of it was one
-  // sentence in a tips list saying "free money many people miss". We were the ones missing it.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // MARRIAGE ALLOWANCE. £252 a year, and the whole point of having asked him anything.
   //
-  // ⚠️ estSaving IS ZERO ON PURPOSE, AND IT IS THE MOST IMPORTANT LINE IN THIS BLOCK.
+  // Until we had the facts, this block could only ever say "IF you are married, and IF they earn
+  // little, THEN...". It said that to every man, married or not, for ever. Doc 103 calls that the
+  // empty test: a row that does not apply to him most of the time teaches him to stop reading, and
+  // then he misses the week it does apply.
   //
-  // £252 is real, but it depends on a fact we do not have: whether he is married at all, and what
-  // his partner earns. totalEstimatedSaving() sums estSaving into a headline number, and a headline
-  // number is a promise. Putting a conditional £252 in it would tell a single man he is owed money
-  // he is not owed, which is precisely how the CIS refund once quoted a figure that did not exist.
+  // Now we have asked. So there are exactly three states, and the difference between them is the
+  // difference between a tool and a leaflet:
   //
-  // So the money goes in the WORDS, with the condition welded to it in the same sentence, and never
-  // into a total. See lib/taxengine.ts marriageAllowance().
+  //   HE SAID NO       -> say NOTHING. He is not married. It is not a relief, it is clutter.
+  //   HE HAS NOT SAID  -> exactly what we did before: the conditional wording, and £0 in the total.
+  //   HE SAID YES      -> the condition is gone, so we can finally be specific about HIS situation.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  const circ = input.circumstances ?? {};
+  const married = circ.married;                       // 'yes' | 'no' | 'skip' | undefined
+  const partnerLow = circ.partner_low_earner;         // 'yes' | 'no' | 'skip' | undefined
   const ma = marriageAllowance(projTotalIncome);
 
-  if (ma.role === 'receiver') {
-    out.push({
-      key: 'marriage_allowance_receive',
-      title: 'If your wife or husband earns little, they can hand you £252',
-      detail:
-        `If you are married or in a civil partnership and they earn under £${FACTS.personalAllowance.toLocaleString('en-GB')} a year, `
-        + `they can transfer £${ma.transfer.toLocaleString('en-GB')} of their tax free allowance to you. `
-        + `That is £${ma.worth} off your tax bill, every year, and it can be backdated four years. `
-        + `THEY have to make the claim, not you. HMRC will not take it from the receiving partner. `
-        + `It takes about ten minutes at gov.uk/marriage-allowance and you need both National Insurance numbers.`,
-      estSaving: 0,
-      info: true,
-      action: 'log_entry',
-    });
+  // ⚠️ 'no' SUPPRESSES. 'skip' AND undefined DO NOT.
+  //
+  // "Not now" is not "no". A man who would not answer has not told us he is single, and treating his
+  // silence as a denial quietly deletes £252 a year from a married man's product and he never learns
+  // it was there. Only an explicit no closes the door, which is exactly why the answer column is
+  // text and not a boolean.
+  const notMarried = married === 'no';
+
+  if (!notMarried && ma.role === 'receiver') {
+    // He earns between the personal allowance and the higher rate threshold, so he is the one who
+    // can RECEIVE. Whether there is anything to receive turns entirely on what she earns.
+    const confirmed = married === 'yes' && partnerLow === 'yes';
+    const ruledOut = married === 'yes' && partnerLow === 'no';
+
+    if (!ruledOut) {
+      out.push({
+        key: 'marriage_allowance_receive',
+        title: confirmed
+          ? `Your partner can hand you £${ma.worth}. They have to be the one to do it.`
+          : 'If your wife or husband earns little, they can hand you £252',
+        detail: confirmed
+          ? // THE CONDITION IS GONE. He told us he is married and that she earns under the allowance,
+            // we logged both answers in his own words, and now we may finally say "can" instead of "if".
+            `You told me you are married and that they earn under £${FACTS.personalAllowance.toLocaleString('en-GB')}. `
+            + `That means they can transfer £${ma.transfer.toLocaleString('en-GB')} of their tax free allowance to you, `
+            + `worth £${ma.worth} off your bill every year, and they can backdate it four years. `
+            + `⚠️ THEY have to make the claim, not you and not me. HMRC will not accept it from the partner receiving it. `
+            + `Ten minutes at gov.uk/marriage-allowance, and they need both of your National Insurance numbers. Nothing else. No certificate.`
+          : `If you are married or in a civil partnership and they earn under £${FACTS.personalAllowance.toLocaleString('en-GB')} a year, `
+            + `they can transfer £${ma.transfer.toLocaleString('en-GB')} of their tax free allowance to you. `
+            + `That is £${ma.worth} off your tax bill, every year, and it can be backdated four years. `
+            + `THEY have to make the claim, not you. HMRC will not take it from the receiving partner. `
+            + `It takes about ten minutes at gov.uk/marriage-allowance and you need both National Insurance numbers.`,
+
+        // ⚠️ THE ONE PLACE IN THIS FILE WHERE A CIRCUMSTANCE BECOMES A NUMBER.
+        //
+        // estSaving feeds totalEstimatedSaving(), and a total is a promise. It was 0 here from the
+        // day this block was written, on purpose, because £252 hung on a fact we did not have. We
+        // have it now: he was asked, in plain words, and his answer is on the record with the exact
+        // question he read next to it.
+        //
+        // So it goes in the total ONLY when both facts are yes. Not on a skip. Not on a guess. Not
+        // on his income alone. This is the difference between the maximiser and a repayment agent.
+        estSaving: confirmed ? ma.worth : 0,
+        info: !confirmed,
+        action: 'log_entry',
+      });
+    }
   }
 
-  if (ma.role === 'giver') {
-    out.push({
-      key: 'marriage_allowance_give',
-      title: `You are not using all of your tax free allowance`,
-      detail:
-        `You are on course to earn under £${FACTS.personalAllowance.toLocaleString('en-GB')}, so part of your tax free allowance is going to waste. `
-        + `If you are married or in a civil partnership and they pay basic rate tax, you can transfer £${ma.transfer.toLocaleString('en-GB')} of it to them. `
-        + `It saves THEM about £${ma.worth} a year and costs you nothing, because you were not going to use it. `
-        + `You are the one who has to apply: gov.uk/marriage-allowance.`,
-      estSaving: 0,
-      info: true,
-      action: 'log_entry',
-    });
+  if (!notMarried && ma.role === 'giver') {
+    // He is under his own personal allowance, so part of it is going to waste. HE is the transferor,
+    // and the transferor is the one HMRC takes the claim from. This is the ONE branch of Marriage
+    // Allowance where our own customer is the claimant, which makes it the one we can actually walk
+    // him through instead of handing off.
+    //
+    // But he is only the giver if she has tax to pay. If she is under the allowance too, neither of
+    // them pays a penny of income tax and there is nothing to transfer to. Say nothing at all: an
+    // optimisation that cannot possibly save him money is an advert.
+    const bothSkint = married === 'yes' && partnerLow === 'yes';
+
+    if (!bothSkint) {
+      const askedAndMarried = married === 'yes';
+      out.push({
+        key: 'marriage_allowance_give',
+        title: 'You are not using all of your tax free allowance',
+        detail:
+          `You are on course to earn under £${FACTS.personalAllowance.toLocaleString('en-GB')}, so part of your tax free allowance is going to waste. `
+          + (askedAndMarried
+            ? `You told me you are married, so you can transfer £${ma.transfer.toLocaleString('en-GB')} of it to them, `
+            : `If you are married or in a civil partnership, you can transfer £${ma.transfer.toLocaleString('en-GB')} of it to them, `)
+          // ⚠️ THE CONDITION WE HAVE NOT ASKED ABOUT IS WELDED TO THE SENTENCE, NOT DROPPED.
+          //
+          // A higher rate partner cannot receive it. We never asked whether she is a higher rate
+          // payer, only whether she is under the allowance, so we do not know, so we say so in the
+          // same breath and we do NOT quantify it. The moment we start filling gaps with optimism
+          // this becomes a leaflet.
+          + `as long as they pay basic rate tax and not higher rate. `
+          + `It saves THEM about £${ma.worth} a year and costs you nothing, because you were not going to use it. `
+          + `You are the one who has to apply, and that is the good news: gov.uk/marriage-allowance, ten minutes, both National Insurance numbers.`,
+        estSaving: 0, // The saving lands on HER bill, not his. It is not his money, so it is not his total.
+        info: true,
+        action: 'log_entry',
+      });
+    }
   }
 
   // Richest quantified saving first; information items sink to the bottom.

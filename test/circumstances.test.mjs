@@ -149,15 +149,39 @@ ok('the grandparent credit reaches back to 2011, which can be a decade of state 
 
 // --- unanswered: the gap IS the money -----------------------------------------------------------
 
-ok('a man who has told us nothing has every question still to answer',
-  unanswered([]).length === CIRCUMSTANCES.length);
+const DEPENDENT = CIRCUMSTANCES.filter((c) => c.dependsOn);
+const ans = (o) => Object.entries(o).map(([key, answer]) => ({ key, answer }));
+
+ok('a man who has told us nothing is asked everything EXCEPT the follow-ups, which have no premise yet',
+  unanswered([]).length === CIRCUMSTANCES.length - DEPENDENT.length);
 
 ok('...and once he answers, we never ask him again',
-  unanswered(['married', 'prior_employment']).every((c) => c.key !== 'married' && c.key !== 'prior_employment'));
+  unanswered(ans({ married: 'yes', prior_employment: 'yes' }))
+    .every((c) => c.key !== 'married' && c.key !== 'prior_employment'));
 
 ok('what is left is still sorted with the biggest money first',
-  unanswered(['prior_employment']).length === CIRCUMSTANCES.length - 1
-  && unanswered(['prior_employment'])[0].worthOrder === 'huge');
+  unanswered(ans({ prior_employment: 'yes' }))[0].worthOrder === 'huge');
+
+// --- 🔴 THE FOLLOW-UP. The reason a compound question was a bug. -------------------------------
+//
+// "Are you married? AND does your partner earn under the allowance?" was ONE tap for TWO facts. A
+// Yes was fine. A NO was a black hole: not married, or married to someone who earns well? Different
+// men, different reliefs, recorded identically, AND NEVER ASKED AGAIN.
+
+ok('we never ask a single man what his wife earns',
+  unanswered(ans({ married: 'no' })).every((c) => c.key !== 'partner_low_earner'));
+
+ok('...and we do not ask it before we have asked whether he is married, either',
+  unanswered([]).every((c) => c.key !== 'partner_low_earner'));
+
+ok('a "not now" on the premise HOLDS the follow-up. It does not release it and it does not deny it.',
+  unanswered(ans({ married: 'skip' })).every((c) => c.key !== 'partner_low_earner'));
+
+ok('a YES releases it, and it is the very next thing worth asking about',
+  unanswered(ans({ married: 'yes' })).some((c) => c.key === 'partner_low_earner'));
+
+ok('every dependent question depends on a key that actually exists',
+  DEPENDENT.every((c) => CIRCUMSTANCES.some((x) => x.key === c.dependsOn.key)));
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

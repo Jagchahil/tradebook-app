@@ -26,15 +26,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'unreadable' }, { status: 503 });
   }
 
-  const answeredKeys = rows.map((r) => r.key);
-
   return NextResponse.json({
     answered: rows,
     // Sorted with the biggest money first, ALWAYS. A man will answer three questions on a good day,
     // and WHICH three decides whether this product is worth £12.99 to him. Asking about his home
     // office before asking what he did for a living last year is how you leave four figures on the
     // floor and feel thorough.
-    toAsk: unanswered(answeredKeys),
+    // The ANSWERS go in, not just the keys: a question about his wife is not a question until he has
+    // told us he has one.
+    toAsk: unanswered(rows),
     total: CIRCUMSTANCES.length,
     // The ones we can never claim for him: his wife has to, or his council does. We tell him and we
     // get out of the way. A feature that tries to claim what it has no standing to claim gets

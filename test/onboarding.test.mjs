@@ -116,15 +116,20 @@ ok('a NO rolls straight on, because a no is an answer and it spares him ever bei
 // 🔴 4. NEVER TWICE. And never out of order, because he will answer three on a good day.
 // ---------------------------------------------------------------------------------------------
 
+const ans = (o) => Object.entries(o).map(([key, answer]) => ({ key, answer }));
+
 ok('a question he has answered is never asked again',
-  unanswered(['prior_employment']).every((c) => c.key !== 'prior_employment'));
+  unanswered(ans({ prior_employment: 'yes' })).every((c) => c.key !== 'prior_employment'));
 
 ok('answering every question leaves nothing to ask',
-  unanswered(CIRCUMSTANCES.map((c) => c.key)).length === 0);
+  unanswered(CIRCUMSTANCES.map((c) => ({ key: c.key, answer: 'yes' }))).length === 0);
 
 ok('the FIRST thing we ask is the biggest thing, always',
   unanswered([])[0].key === askingOrder()[0].key
   && unanswered([])[0].worthOrder === 'huge');
+
+ok('a follow-up is never the FIRST thing asked, because its premise has not been established',
+  unanswered([]).every((c) => !c.dependsOn));
 
 ok('the unique index makes a second answer an UPDATE, never a second row to argue about',
   /unique index[\s\S]{0,120}circumstances \(user_id, key\)/.test(sqlSrc));

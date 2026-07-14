@@ -74,6 +74,21 @@ export interface Circumstance {
   // The primary source. A claim with no source does not go in this file. badrLifetimeLimit was
   // deleted from the tax engine on 14 July for exactly that reason.
   source: string;
+
+  // ⚠️ A QUESTION THAT ONLY MAKES SENSE AFTER ANOTHER ONE.
+  //
+  // "Does your husband or wife earn less than £12,570?" is an absurd thing to ask a single man, and
+  // asking it anyway is how he learns we are not really listening, just running a list at him.
+  //
+  // It also exists to stop us writing COMPOUND QUESTIONS, which is the mistake this file made on its
+  // first day. The married question used to read: "Are you married? AND does your partner earn under
+  // the personal allowance?" One tap, two facts. A Yes was fine. But a NO was a black hole: no to
+  // which half? Not married, or married to someone who earns well? Those are completely different
+  // men with completely different reliefs, and we would have recorded them identically AND NEVER
+  // ASKED AGAIN. The log would have been useless the day we needed it, which is the day HMRC asks.
+  //
+  // One question, one fact. If you need two facts, you need two questions, and the second one waits.
+  dependsOn?: { key: string; answer: Answer };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -139,13 +154,42 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // return and we corrupt HMRC's own calculation. Our whole job here is to TELL HIM and get out
     // of the way. HMRC does not want a certificate either: it wants two NI numbers.
     key: 'married',
-    ask: 'Are you married or in a civil partnership? And does your partner earn under the personal allowance?',
-    why: 'If so, they can hand you part of their tax free allowance. It is worth £252 a year and it backdates four years.',
+    ask: 'Are you married or in a civil partnership?',
+    why: 'If you are, one of you may be able to hand the other part of their tax free allowance. It is worth £252 a year and it backdates four years.',
     worthOrder: 'real',
     claimant: 'his partner',
     backYears: 4,
     evidence: 'Nothing. HMRC asks for both National Insurance numbers, not a marriage certificate.',
     source: 'GOV.UK Marriage Allowance. The LOWER earner applies. ATT/Agent Update 111: do not also put it on the recipient’s return.',
+  },
+  {
+    // ⚠️ ONE QUESTION. FOUR DIFFERENT MEN. AND IT ANSWERS ALL FOUR CORRECTLY.
+    //
+    // Marriage Allowance is not one relief, it is a direction of travel, and which way it flows
+    // depends on two incomes. We already know HIS to the penny. So this single question about HERS
+    // resolves every branch, and we never have to ask him a third thing:
+    //
+    //   He earns 12,570 to 50,270, she earns under 12,570  -> SHE transfers to HIM. £252 to him.
+    //                                                          She claims it. Not ours. Hand off.
+    //   He earns 12,570 to 50,270, she earns more          -> Nothing here. Say nothing. Never ask again.
+    //   He earns under 12,570, she earns more              -> HE transfers to HER, and HE is the one
+    //                                                          who claims, which makes it the one
+    //                                                          branch we can actually walk him through.
+    //   He earns under 12,570, she earns under 12,570      -> Neither of them pays tax. There is no
+    //                                                          relief. A card here would be an advert.
+    //
+    // The old compound question could not tell these apart, and so it showed the same "if you are
+    // married..." card to a single man for ever, which doc 103 calls the empty test and which teaches
+    // him to stop reading the page.
+    key: 'partner_low_earner',
+    ask: 'Does your husband or wife earn less than £12,570 a year?',
+    why: 'That is the personal allowance. Whichever of you is under it can hand the other £1,260 of it, and it is worth £252 a year to the one who receives it.',
+    worthOrder: 'real',
+    claimant: 'both of them',
+    backYears: 4,
+    evidence: 'Nothing. Two National Insurance numbers and ten minutes at gov.uk/marriage-allowance.',
+    source: 'GOV.UK Marriage Allowance. ITA 2007 s55A to s55E. The TRANSFEROR, the lower earner, is the one who applies.',
+    dependsOn: { key: 'married', answer: 'yes' },
   },
   {
     // A tick box that DEFAULTS TO OFF. A bad year silently costs him a state pension year, for ever.
@@ -285,9 +329,25 @@ export function notOurs(): Circumstance[] {
 }
 
 // WHAT HE HAS NOT TOLD US YET. The gap is the money.
-export function unanswered(answered: string[]): Circumstance[] {
-  const seen = new Set(answered);
-  return askingOrder().filter((c) => !seen.has(c.key));
+//
+// ⚠️ IT TAKES THE ANSWERS, NOT JUST THE KEYS, AND THAT IS NOT A CONVENIENCE.
+//
+// A dependent question is only a real question once its premise holds. Ask a single man whether his
+// wife earns under the personal allowance and you have not asked him a question, you have read him a
+// list. He will notice, and the price of him noticing is that he stops answering the ones that are
+// worth thousands.
+export function unanswered(answered: Array<{ key: string; answer: string }>): Circumstance[] {
+  const given = new Map(answered.map((a) => [a.key, a.answer]));
+
+  return askingOrder().filter((c) => {
+    if (given.has(c.key)) return false;
+    if (!c.dependsOn) return true;
+
+    // The premise must be ANSWERED and it must be answered the right way. An unanswered premise
+    // holds the follow-up back, it does not release it: we ask whether he is married before we ask
+    // anything about his wife, and never the other way round.
+    return given.get(c.dependsOn.key) === c.dependsOn.answer;
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

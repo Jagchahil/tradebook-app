@@ -1292,7 +1292,9 @@ async function askNextCircumstance(from: string, userId: string): Promise<boolea
   const rows = await readCircumstances(userId);
   if (rows === null) return false;
 
-  const next = unanswered(rows.map((r) => r.key))[0];
+  // The ANSWERS, not the keys. A follow-up is held back until its premise holds: we do not ask a
+  // single man what his wife earns.
+  const next = unanswered(rows)[0];
   if (!next) return false;
 
   // ⚠️ THE BODY IS EXACTLY `next.ask` AND NOTHING ELSE.

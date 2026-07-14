@@ -324,9 +324,25 @@ export async function draftInvoice(description: string): Promise<DraftedInvoice 
   }
 }
 
-// Answer a plain money question from the user's own figures. We pass a compact
-// summary of their transactions and let Claude reply in one or two short lines.
-export async function answerMoneyQuestion(question: string, summary: string): Promise<string | null> {
+// Answer a plain money question from the user's own figures.
+//
+// ⚠️ THE BRAIN NOW REACHES WHATSAPP, AND UNTIL 14 JULY 2026 IT DID NOT.
+//
+// `getRelevantKnowledge` reads the GOV.UK items a human has APPROVED in the console, and it was
+// wired into exactly one place: /api/ask, the Ask screen in the app.
+//
+// WhatsApp is the product. "Text it. It's in your Lekhio." So every night Khoji read GOV.UK, every
+// morning a human approved what it found, and the man who TEXTED US a tax question got none of it,
+// while the same man opening the app got the answer with the source attached. The brain was growing
+// into a channel almost nobody uses.
+//
+// `knowledge` is optional and defaults to empty, so a caller that does not pass it behaves exactly
+// as before and an empty knowledge base changes nothing. That is the safe direction of failure.
+export async function answerMoneyQuestion(
+  question: string,
+  summary: string,
+  knowledge = '',
+): Promise<string | null> {
   if (!ready() || !KEY) return null;
 
   const prompt = [
@@ -340,6 +356,23 @@ export async function answerMoneyQuestion(question: string, summary: string): Pr
     '',
     'Their figures (confirmed and to-review entries, newest first):',
     summary || '(no entries yet)',
+    // THE APPROVED KNOWLEDGE. Every line here was read off GOV.UK by Khoji and approved by a human in
+    // the console. Nothing unapproved can reach this string: the query is hard filtered.
+    //
+    // The instruction to CITE is not decoration. We are not HMRC and we never imply we are. If we are
+    // going to tell a man something about the return he is legally responsible for, he gets the link
+    // to the page it came from, and he can go and read it himself. That is the difference between an
+    // answer and an assertion.
+    ...(knowledge
+      ? [
+          '',
+          'Verified GOV.UK updates a human on our team has approved. Use these if they bear on the',
+          'question, and when you do, END your reply with the source link on its own line, like:',
+          'Source: https://www.gov.uk/...',
+          'If none of them are relevant, ignore them completely and do not mention them.',
+          knowledge,
+        ]
+      : []),
   ].join('\n');
 
   // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.

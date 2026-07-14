@@ -63,6 +63,7 @@ import {
   completeLatestGoal,
   setEmploymentIncome,
   getOrCreateReferralCode,
+  getRelevantKnowledge,
 } from '../../../lib/supabase';
 import { isReferRequest, referralInvite } from '../../../lib/referral';
 import {
@@ -1728,7 +1729,31 @@ async function handleMoneyQuestion(from: string, body: string): Promise<void> {
     return;
   }
   const summary = await transactionSummaryForUser(userId);
-  const answer = await answerMoneyQuestion(body, summary);
+
+  // ⚠️ THE BRAIN, ON WHATSAPP. It was not here, and WhatsApp is the product.
+  //
+  // Khoji reads GOV.UK every night. A human approves what it finds, one card at a time, in the
+  // console. And until today all of that reached exactly ONE surface: the Ask screen in the app.
+  //
+  // So a man who TEXTED "has the mileage rate changed?" got an answer from static rules, while the
+  // same man opening the app got the answer with the GOV.UK link attached. Every approval we made
+  // was invisible on the channel the entire product is named after.
+  //
+  // Reviewed and source-linked rows only, and it degrades to nothing on any failure: an empty
+  // knowledge base answers exactly as it did before. The brain can only ever ADD.
+  let knowledge = '';
+  try {
+    const items = await getRelevantKnowledge(body, 4);
+    if (items.length) {
+      knowledge = items
+        .map((k) => `- ${k.title}${k.effective_date ? ` (effective ${k.effective_date})` : ''}: ${k.summary} [source: ${k.source_url}]`)
+        .join('\n');
+    }
+  } catch {
+    knowledge = '';
+  }
+
+  const answer = await answerMoneyQuestion(body, summary, knowledge);
   await sendText(from, answer ?? 'I could not work that out. Try asking another way.');
 }
 

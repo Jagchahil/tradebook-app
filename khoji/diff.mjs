@@ -792,7 +792,53 @@ async function withDb(fn) {
   try { return await fn(client); } finally { await client.end(); }
 }
 
+// KHOJI'S HEARTBEAT. Written EVERY RUN, whether or not anything is wrong.
+//
+// ⚠️ THE FAILURE THIS EXISTS TO CLOSE, AND IT IS THE HOUSE DISEASE.
+//
+// Everything below writes to knowledge_items ONLY WHEN SOMETHING IS WRONG. When all 42 constants
+// agree with GOV.UK it writes nothing at all. That is right for an incident log, and it is
+// catastrophic as a sign of life, because the health check upstream reads "no incident rows, and
+// the feed watcher is fresh" and prints OK.
+//
+// So picture the differ dying tonight while the feed watcher carries on. No incident rows. Fresh
+// knowledge. Light stays GREEN. And green now means: we have no idea whether a single one of our
+// tax constants is right, and NOTHING IS LOOKING. That is not a hypothetical, it is precisely how
+// this brain sat dead from 7 to 12 July while launchd reported success every single morning.
+//
+// NOT KNOWING IS NOT THE SAME AS BEING FINE. A run that does not happen leaves no row, the newest
+// row goes stale, and the light goes red on its own. Nothing to remember. Nothing to maintain.
+async function recordRun(db, row) {
+  await db.query(
+    `insert into public.khoji_runs
+       (tax_year, published, checked, agreed, drifted, blind, unwatched, duration_ms, ok)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [row.taxYear, row.published, row.checked, row.agreed, row.drifted, row.blind,
+     row.unwatched, row.durationMs, row.ok],
+  );
+}
+
+// The heartbeat for a run that DIED, so a differ that cannot reach GOV.UK, or cannot parse its own
+// engine's facts.json, still says so out loud instead of simply not existing that night. A silent
+// absence and a loud failure look identical from the database if only the healthy path writes.
+async function recordFailedRun(message) {
+  if (!DB_URL || DRY) return;
+  try {
+    await withDb((db) => recordRun(db, {
+      taxYear: null, published: 0, checked: 0, agreed: 0, drifted: 0, blind: 0,
+      unwatched: [], durationMs: null, ok: false,
+    }));
+    log(`recorded a FAILED run: ${message}`);
+  } catch (e) {
+    // If we cannot even write the failure, the row is missing, the heartbeat goes stale, and the
+    // light goes red anyway. The design degrades to the safe answer.
+    console.error('[khoji:diff] could not record the failed run:', e.message);
+  }
+}
+
 async function main() {
+  const startedAt = Date.now();
+
   // NEVER READ A CACHED COPY OF OUR OWN ENGINE.
   //
   // /facts.json is force-static with max-age=3600, and the very first live run of the student loan
@@ -895,6 +941,26 @@ async function main() {
     }
 
     log(`${open.length} open incident(s) recorded`);
+
+    // THE HEARTBEAT. Last thing, unconditionally, whether the news was good or bad.
+    //
+    // Note what it carries beyond the counts: `unwatched`. The constants we publish and DO NOT
+    // check, by name. "0 drift" does not mean our tax numbers are right, it means the ones we look
+    // at are right, and the difference between those two sentences is a Budget. Printing the gap
+    // every night is what stops us quietly starting to believe the first one.
+    await recordRun(db, {
+      taxYear: meta.taxYear ?? null,
+      published: Object.keys(facts).length,
+      checked: checked.size,
+      agreed: agreed.length,
+      drifted: drift.length,
+      blind: broken.length,
+      unwatched: unchecked,
+      durationMs: Date.now() - startedAt,
+      // A run is only OK if it both completed AND found nothing. A run that completed and found
+      // drift is a successful run of a watcher and a failing tax engine, and `drifted` says so.
+      ok: drift.length === 0 && broken.length === 0,
+    });
   });
 
   // A non-zero exit so launchd records the failure and the log is not a wall of green.
@@ -903,5 +969,13 @@ async function main() {
 
 const invokedDirectly = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (invokedDirectly) {
-  main().catch((err) => { console.error('[khoji:diff] fatal:', err.message); process.exit(1); });
+  main().catch(async (err) => {
+    console.error('[khoji:diff] fatal:', err.message);
+    // SAY SO IN THE DATABASE, NOT JUST IN A LOG FILE ON A MAC MINI UNDER A DESK.
+    //
+    // The whole reason the brain could die for five days is that its failures only ever existed
+    // somewhere nobody was looking. A run that throws now leaves a row saying it threw.
+    await recordFailedRun(err.message);
+    process.exit(1);
+  });
 }

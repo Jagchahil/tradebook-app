@@ -49,9 +49,22 @@ create index if not exists khoji_runs_kind_ran_at_idx
 -- hash moves, the document really changed.
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════
 
+-- ⚠️ THE PRIMARY KEY IS THE DOCUMENT (api_url), NOT THE PAGE WE SCRAPE (web_url).
+--
+-- The first live dry run taught me this and nothing else would have. Six of the twenty-three URLs the
+-- differ reads are CHAPTERS of three shared guides:
+--
+--     /capital-gains-tax/allowances  and  /capital-gains-tax/rates            -> one document
+--     /register-for-vat              and  /register-for-vat/cancel...          -> one document
+--     /simpler-income-tax.../vehicles and /simpler-income-tax.../working-from-home -> one document
+--
+-- They came back with IDENTICAL body hashes, because they ARE the same document. Key this table on
+-- web_url and the day GOV.UK edits the capital gains guide we raise TWO incidents for ONE amendment.
+-- An alarm that fires twice for one event is an alarm somebody learns to skim, and this codebase has
+-- already had to kill a check (cisGrossRate) for exactly that sin.
 create table if not exists public.khoji_documents (
-  web_url           text primary key,
-  api_url           text not null,
+  api_url           text primary key,
+  web_url           text not null,
   content_id        text,
 
   -- 🔴 THE FINDING THAT SHAPED THE WHOLE DESIGN.

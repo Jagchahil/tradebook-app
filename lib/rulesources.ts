@@ -302,15 +302,107 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
   // a time, each read off the live page. Same as the mileage decoy, the CIS extractors, the
   // manuals: ARITHMETIC AND PROVENANCE DECIDE, THE MODEL ONLY DESCRIBES.
 
-  // --- STILL UNCITED. Counted, not hidden. ------------------------------------------------
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // THE SIX THAT KHOJI CALLED OUT EVERY NIGHT. Closed 14 July 2026.
   //
-  // van, car, fuel, travel, parking, grooming, pension.
+  // corpus.mjs printed this, nightly, in these words:
   //
-  // These are NOT "fine". Every one of them is a thing we tell a man on our own authority, and
-  // several are the ones he is most likely to get wrong: a car is a capital allowance question and
-  // not a simple yes; a parking FINE is never allowable while parking is; and "grooming: no" is a
-  // rule we assert with the confidence of case law and no case behind it.
+  //     UNCITED premises      we assert this on our own authority, and our authority is nothing
+  //     UNCITED training      we assert this on our own authority, and our authority is nothing
+  //     UNCITED materials     ...
+  //     UNCITED bankfinance   ...
+  //     UNCITED marketing     ...
+  //     UNCITED subscriptions ...
   //
-  // The count is printed by the tests and by Khoji every night. It is here to be closed, not to
-  // be tolerated.
+  // A counted gap is a gap that gets closed. And going and reading the six live pages, which took
+  // twenty minutes, turned up TWO RULES THAT WERE ACTIVELY WRONG and one that was self-serving.
+  // Nobody would have found those by re-reading our own code, because our own code was internally
+  // consistent and confidently mistaken. THE SOURCE IS NOT A FOOTNOTE. IT IS THE CHECK.
+  //
+  // Every quote below is read off the live GOV.UK page on 14 July 2026 and pasted whole. Not
+  // reconstructed, not tidied, not padded to pass the length test. If HMRC rewrites the sentence,
+  // corpus.mjs breaks tomorrow morning and says so, which is the entire point.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+
+  premises: [
+    {
+      code: 'Office, property and equipment',
+      url: 'https://www.gov.uk/expenses-if-youre-self-employed/office-property',
+      quote: 'If you’re self-employed - a sole trader or individual in a business partnership - you can claim items you’d normally use for less than 2 years as allowable expenses, for example:',
+      authority: 'GOV.UK, Expenses if you are self-employed. The list under it is: stationery; rent, rates, power and insurance costs.',
+    },
+  ],
+
+  // 🔴 THE RULE THAT WAS WRONG. HMRC widened this in 2024 and we were still running the old line,
+  // telling a sparky he could not claim an EV course and a plumber he could not claim bookkeeping.
+  // The quote below is the one that reverses us, and it is the third bullet on HMRC's own list.
+  training: [
+    {
+      code: 'Training courses',
+      url: 'https://www.gov.uk/expenses-if-youre-self-employed/training-courses',
+      quote: 'develop new skills and knowledge to support your business - this includes administrative skills',
+      authority: 'GOV.UK, Expenses if you are self-employed: Training courses. HMRC BROADENED this in 2024. New skills ARE allowable where they relate to changes in the industry or support the existing business. Only training to START a new business, or to expand into an area not directly related to the industry, is excluded.',
+    },
+    {
+      code: 'Training courses (the limit)',
+      url: 'https://www.gov.uk/expenses-if-youre-self-employed/training-courses',
+      quote: 'You cannot claim for training courses that help you:',
+      authority: 'The list under it is: start a new business; expand into new areas of business that are not directly related to your industry. That is the whole of the restriction now.',
+    },
+  ],
+
+  materials: [
+    {
+      code: 'Reselling goods',
+      url: 'https://www.gov.uk/expenses-if-youre-self-employed/reselling-goods',
+      quote: 'You cannot claim for:',
+      authority: 'GOV.UK, Expenses if you are self-employed: Reselling goods. Allowable: goods for resale (stock); raw materials; direct costs from producing goods. NOT allowable: goods or materials bought for private use; depreciation of equipment.',
+    },
+  ],
+
+  // 🔴 THE PHANTOM CAP. We warned him about a cash-basis interest restriction that was removed on
+  // 6 April 2024. HMRC's live page lists the allowable finance costs and mentions no cap at all.
+  bankfinance: [
+    {
+      code: 'Legal and financial costs',
+      url: 'https://www.gov.uk/expenses-if-youre-self-employed/legal-financial',
+      quote: 'You cannot claim for repayments of loans, overdrafts or finance arrangements.',
+      authority: 'GOV.UK, Legal and financial costs. Allowable: bank, overdraft and credit card charges; interest on bank and business loans; hire purchase interest; leasing payments. NO CAP is stated. The old cash-basis interest restriction went with the cash basis reform on 6 April 2024.',
+    },
+  ],
+
+  marketing: [
+    {
+      code: 'Marketing, entertainment and subscriptions',
+      url: 'https://www.gov.uk/expenses-if-youre-self-employed/marketing-entertainment-subscriptions',
+      quote: 'If you’re self-employed - a sole trader or individual in a business partnership - you can claim allowable business expenses for costs such as:',
+      authority: 'GOV.UK. The list under it is: advertising in newspapers or directories; bulk mail advertising (mailshots); free samples; website costs. NOT allowable: entertaining clients, suppliers and customers; event hospitality; most gifts.',
+    },
+  ],
+
+  subscriptions: [
+    {
+      code: 'Subscriptions',
+      url: 'https://www.gov.uk/expenses-if-youre-self-employed/marketing-entertainment-subscriptions',
+      quote: 'trade body or professional organisation membership if related to your business',
+      authority: 'GOV.UK, Marketing, entertainment and subscriptions. Also allowable: trade or professional journals. NOT allowable: payments to political parties; gym membership fees; donations to charity.',
+    },
+  ],
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 24 OF 24 RULES CITED. 0 UNCITED. 14 July 2026.
+  //
+  // ⚠️ THE COMMENT THAT USED TO SIT HERE WAS A LIE, AND IT WAS A LIE IN THE FILE ABOUT HONESTY.
+  //
+  // It read: "STILL UNCITED: van, car, fuel, travel, parking, grooming, pension." Every one of those
+  // seven had been cited days earlier. Nobody updated the prose. So a developer opening this file to
+  // check our coverage would have read a confident list of gaps that did not exist, in the one place
+  // in the codebase whose entire purpose is to be straight about what we cannot back up.
+  //
+  // Which is the whole lesson of this file in miniature. A NUMBER THAT IS COMPUTED CANNOT GO STALE.
+  // A SENTENCE THAT IS TYPED ALWAYS CAN. That is why the count is printed by test/compliance,
+  // test/rulesources and khoji/corpus.mjs every single night, and why no human number appears here.
+  //
+  // Do not write the coverage figure in this comment. Let the machine say it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
 };

@@ -113,12 +113,39 @@ export const EXPENSE_RULES: ExpenseRule[] = [
     detail: 'A workshop, unit, yard or storage you rent for the business is fully allowable, along with its rates, power and insurance.',
   },
   {
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THIS RULE WAS WRONG, AND IT WAS WRONG IN THE DIRECTION THAT COSTS HIM MONEY.
+    //
+    // What it used to say: "Training for a brand new trade or skill is not [allowable]."
+    // That was the law until 2024. HMRC BROADENED IT, and nobody told us, because nothing was
+    // watching this rule: it was one of the six we asserted on our own authority, and our authority
+    // is nothing. corpus.mjs printed "UNCITED training" every night and it was right to.
+    //
+    // HMRC's live words, /expenses-if-youre-self-employed/training-courses, verified 14 July 2026.
+    // You CAN claim for training that helps you:
+    //   . improve skills and knowledge you currently use for your business
+    //   . keep up-to-date with technology used in your industry
+    //   . DEVELOP NEW SKILLS AND KNOWLEDGE RELATED TO CHANGES IN YOUR INDUSTRY
+    //   . DEVELOP NEW SKILLS AND KNOWLEDGE TO SUPPORT YOUR BUSINESS, INCLUDING ADMINISTRATIVE SKILLS
+    //
+    // So the sparky who takes an EV charge-point course, and the plumber who takes a bookkeeping
+    // course, are BOTH allowable now. We were telling both of them no.
+    //
+    // The line did not disappear. It MOVED. What you still cannot claim is training to START A NEW
+    // BUSINESS, or to expand into an area NOT DIRECTLY RELATED to your industry.
+    //
+    // ⚠️ NOTE THE DIRECTION OF THE ERROR. Finance Act 2026 Sch 22 punishes helping a man claim MORE
+    // than he is entitled to. This was the opposite: we were talking him out of a relief he was
+    // owed. The law will never fine us for that, and it is still a failure of the only thing this
+    // product is for. Doc 108: the maximiser answers "how much of my money am I giving away that I
+    // did not have to". An over-cautious wrong answer is still a wrong answer.
+    // ═════════════════════════════════════════════════════════════════════════════════════════
     key: 'training',
     title: 'Training and courses',
     verdict: 'depends',
     aliases: ['training', 'course', 'courses', 'qualification', 'certification', 'cscs', 'gas safe course', 'ticket', 'refresher'],
-    rule: 'Depends. Updating or keeping up the skills you already use is allowable. Training for a brand new trade or skill is not.',
-    detail: 'A refresher or an update to the skills your business already uses is fine. A course to start a completely new trade, or to get a qualification you did not have, is treated as setting up something new and is not allowable.',
+    rule: 'Mostly yes. Keeping your skills current, keeping up with the tech in your trade, and even new skills that support the business, like bookkeeping, are allowable. Training to start a different business is not.',
+    detail: 'HMRC widened this in 2024 and most people have not caught up. Refreshers and tickets are allowable, obviously. But so is learning something NEW, as long as it relates to how your industry is changing or it supports the business you already run. An electrician taking an EV charging course, or any trade taking a bookkeeping or admin course, can claim it. What you cannot claim is training to start a different business, or to move into an area that has nothing to do with your trade.',
   },
   {
     key: 'meals',
@@ -161,20 +188,55 @@ export const EXPENSE_RULES: ExpenseRule[] = [
     detail: 'Cover you take for the business, public liability, tools, professional indemnity, is allowable. Van insurance is covered if you claim actual vehicle costs rather than mileage.',
   },
   {
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 WE TOLD HIM OUR OWN FEE WAS ALLOWABLE. HMRC'S PAGE SAYS PART OF IT IS NOT.
+    //
+    // The old line ended: "Lekhio itself is allowable." Flat, confident, and about the invoice we
+    // send him. Meanwhile GOV.UK's own legal and financial costs page, live today, lists under
+    // "You cannot claim for":
+    //
+    //     "the cost of preparing and submitting your Self Assessment tax return"
+    //
+    // Read Finance Act 2026 Sch 22 and then read that sentence of ours again. Sanctionable conduct
+    // is acting with intent to bring about a loss of tax revenue, and it expressly includes a client
+    // "obtaining more tax relief than they are entitled to obtain by law". We were nudging a man
+    // toward a deduction HMRC's own guidance excludes. FOR OUR OWN FEE. It is the single most
+    // self-serving sentence in this codebase and I do not think anybody meant it that way, which is
+    // exactly how these things happen: it reads like a nice fact about the product.
+    //
+    // ⚠️ THE FIX IS NOT TO ARGUE THE POINT. It is arguable. HMRC's own manual (BIM46435) is softer
+    // than this page, and in practice most accountants put the whole subscription through and are
+    // never challenged. That is precisely the reasoning we are not allowed to have. Doc 104, Q5:
+    // "Is it TRUE? Not is it defensible. TRUE."
+    //
+    // So: say what HMRC says, tell him plainly which part is which, and let him decide. We do not
+    // get to be the one who marks our own homework on our own invoice.
+    // ═════════════════════════════════════════════════════════════════════════════════════════
     key: 'fees',
     title: 'Accountant and professional fees',
     verdict: 'yes',
     aliases: ['accountant', 'bookkeeper', 'accountancy', 'professional fees', 'solicitor', 'legal fees', 'software', 'subscription to software'],
     rule: 'Yes. Accountant and bookkeeping fees, and software you use for the business, are allowable.',
-    detail: 'Accountancy, bookkeeping and most legal fees for the running of the business are allowable, as is business software. Lekhio itself is allowable.',
+    detail: 'Accountancy, bookkeeping and most legal fees for running the business are allowable, as is business software. One thing HMRC is specific about, and it applies to us too: the cost of preparing and submitting your Self Assessment tax return itself is NOT allowable. The bookkeeping is. We are not going to tell you our own bill is fully deductible when HMRC\'s own page says that part of it is not.',
   },
   {
+    // 🔴 WE WERE WARNING HIM ABOUT A CAP THAT NO LONGER EXISTS.
+    //
+    // The old text said "There is a cap on interest under the simpler cash basis, but most sole
+    // traders are well inside it." That was the £500 cash-basis interest restriction, and it went
+    // with the cash basis reform on 6 APRIL 2024. GOV.UK's cash basis page now lists "interest and
+    // bank charges" as an allowable expense with no cap mentioned anywhere on it, and cash basis is
+    // now the DEFAULT method, not the "simpler" alternative.
+    //
+    // Harmless? Not quite. A man who reads "there is a cap" and does not know the number stops
+    // logging his loan interest, because he assumes he is near it. The vaguer the warning, the more
+    // he leaves on the table. A caveat you cannot act on is not caution, it is noise.
     key: 'bankfinance',
     title: 'Bank charges and interest',
     verdict: 'yes',
     aliases: ['bank charges', 'bank fees', 'interest', 'overdraft', 'card fees', 'finance charges', 'loan interest'],
-    rule: 'Yes, within limits. Business bank charges and interest on business borrowing are allowable.',
-    detail: 'Charges on a business account and interest on business loans or finance are allowable. There is a cap on interest under the simpler cash basis, but most sole traders are well inside it.',
+    rule: 'Yes. Business bank charges and interest on business borrowing are allowable. Repaying the loan itself is not.',
+    detail: 'Charges on a business account, overdraft and card fees, interest on business loans, hire purchase interest and leasing payments are all allowable. What you cannot claim is the repayment of the loan itself, only the interest and the charges on it. The old cap on interest under the cash basis was removed on 6 April 2024.',
   },
   {
     key: 'marketing',

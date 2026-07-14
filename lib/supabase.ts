@@ -1133,23 +1133,25 @@ export async function setCustomerSource(
 
 // --- The numbers (lib/metrics.ts) -------------------------------------------------
 
-// Every signup date. This IS real history: a created_at is written once and never rewritten, so a
-// man who signed up on 3 July signed up on 3 July however many times he later changes his mind.
+// ⚠️ THERE IS NO readSignupDates(), AND THERE MUST NOT BE ONE. HERE IS WHY, WRITTEN DOWN SO NOBODY
+// PUTS IT BACK.
 //
-// It is the ONLY historical series we can honestly draw from the existing tables.
-export async function readSignupDates(): Promise<string[] | null> {
-  try {
-    const { url } = config();
-    const res = await fetch(`${url}/rest/v1/users?select=created_at&order=created_at.asc&limit=20000`, {
-      headers: headers(),
-    });
-    if (!res.ok) return null;
-    const rows = (await res.json()) as Array<{ created_at: string | null }>;
-    return rows.map((r) => r.created_at ?? '').filter(Boolean);
-  } catch {
-    return null;
-  }
-}
+// There used to be. It read `select=created_at from users`, which is every row in the table, and it
+// fed the growth chart: the first thing anybody looks at, and the one number that tells you whether
+// there is a business here at all.
+//
+// Every OTHER figure on the console excludes internal accounts, because the App Review demo account
+// is not a customer and a comp is not revenue. The growth chart did not, because it came from a
+// SECOND query that had never heard of the word "internal".
+//
+// So on the day we looked at it, the page said CUSTOMERS 1 in a box, and two inches below said
+// "2 people have signed up". The difference was our own demo account. A hundred per cent inflation
+// of the only number that matters early, on the screen we would use to decide whether to keep going.
+//
+// The lesson is not "remember to filter". It is that TWO QUERIES OVER THE SAME PEOPLE WILL DRIFT,
+// and one of them will be the one you believe. Signups now come from the SAME list of customers as
+// every other figure on the page, in app/api/team/metrics/route.ts. One read, one truth, and the
+// internal flag is applied once. See test/metrics.test.mjs, which fails if a comp is ever counted.
 
 // The recorded history. Empty until the cron has run at least once, and the page says so rather
 // than drawing a shape it invented. See supabase/APPLY_2026-07-14_metrics_daily.sql.

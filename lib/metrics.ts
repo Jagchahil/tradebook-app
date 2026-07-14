@@ -68,6 +68,30 @@ export interface Point {
   total: number; // running total
 }
 
+// WHO COUNTS AS A SIGNUP. One function, because we got this wrong once.
+//
+// ⚠️ THE BUG THIS EXISTS TO PREVENT, AND IT SHIPPED.
+//
+// The growth chart used to come from its own query: every created_at in the users table. Every other
+// figure on the console excludes internal accounts (the App Review demo, any comp), because a demo
+// account is not a customer and a comp is not revenue. That query had never heard of the word.
+//
+// So the page said CUSTOMERS 1 in a box, and two inches below it said "2 people have signed up". The
+// second one was our own demo account, and it was a hundred per cent inflation of the only number
+// that matters in the first month. Nobody would have spotted it at 400 users. Everybody would still
+// have been reading it.
+//
+// The fix is not a filter. It is that THERE IS ONLY ONE LIST OF PEOPLE NOW, and this is the only
+// door out of it.
+export interface SignupRow {
+  joined: string | null;
+  internal: boolean;
+}
+
+export function signupDates(rows: SignupRow[]): string[] {
+  return rows.filter((r) => !r.internal).map((r) => r.joined ?? '').filter(Boolean);
+}
+
 export function daily(dates: Array<string | null | undefined>, days = 30, now: Date = new Date()): Point[] {
   const counts = new Map<string, number>();
   let before = 0; // everything older than the window, so the running total starts honest

@@ -17,7 +17,7 @@
 // because a number was DERIVED from a lookup table instead of READ from what is true. These tests
 // exist so the metrics page cannot do the same thing in a more sophisticated way.
 
-import { confidence, rate, daily, funnel, byChannel, historyNote, ENOUGH } from '../lib/metrics.ts';
+import { confidence, rate, daily, signupDates, funnel, byChannel, historyNote, ENOUGH } from '../lib/metrics.ts';
 
 let pass = 0;
 let fail = 0;
@@ -136,6 +136,38 @@ ok('referral brought 2 and BOTH pay', ch.find((c) => c.source === 'referral').pa
 ok('but with 3 and 2 people, NEITHER gets a percentage. This is the whole point: the channel that ' +
    'LOOKS best on five people is how an advertising budget gets set on a coin flip.',
   ch.every((c) => c.conversion.pct === null));
+
+
+// --- WHO COUNTS AS A SIGNUP ---------------------------------------------------------------------
+//
+// ⚠️ THIS BLOCK IS A REGRESSION TEST FOR A BUG THAT SHIPPED AND WAS FOUND BY LOOKING AT THE PAGE.
+//
+// The console said "CUSTOMERS 1" in one box and "2 people have signed up" three inches below it.
+// The extra man was our own App Review demo account. Every other figure excluded internal accounts;
+// the growth chart came from a SECOND query that had never heard of the word, so it counted him.
+//
+// A hundred per cent inflation of the only number that matters in month one, on the screen we would
+// use to decide whether to keep going. Six code-reading passes had walked straight past it.
+const DEMO = { joined: '2026-07-13T09:00:00Z', internal: true };
+const REAL = { joined: '2026-06-30T09:00:00Z', internal: false };
+
+ok('THE BUG: the App Review demo account is NOT a signup',
+  signupDates([DEMO, REAL]).length === 1);
+
+ok('the real man survives',
+  signupDates([DEMO, REAL])[0] === REAL.joined);
+
+ok('a comp is internal too, and a comp is not growth',
+  signupDates([{ joined: '2026-07-01T00:00:00Z', internal: true }]).length === 0);
+
+ok('a man with no joined date does not become a signup on a phantom day',
+  signupDates([{ joined: null, internal: false }]).length === 0);
+
+ok('THE WHOLE POINT: the chart and the customer count now agree',
+  daily(signupDates([DEMO, REAL, REAL]), 30, new Date('2026-07-14T12:00:00Z')).at(-1).total === 2);
+
+ok('nobody real is lost when EVERY account is internal',
+  daily(signupDates([DEMO]), 30, new Date('2026-07-14T12:00:00Z')).at(-1).total === 0);
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

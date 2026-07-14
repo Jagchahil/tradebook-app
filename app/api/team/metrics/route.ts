@@ -3,11 +3,10 @@ import {
   verifyAccessToken,
   readTeamMember,
   readTeamCustomers,
-  readSignupDates,
   readSnapshots,
 } from '../../../../lib/supabase';
 import { isTeam } from '../../../../lib/team';
-import { daily, funnel, byChannel, historyNote } from '../../../../lib/metrics';
+import { daily, signupDates, funnel, byChannel, historyNote } from '../../../../lib/metrics';
 
 export const runtime = 'nodejs';
 
@@ -35,18 +34,25 @@ export async function GET(req: NextRequest) {
   const member = await readTeamMember(user.email);
   if (!isTeam(member)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
 
-  const [customers, signups, snaps] = await Promise.all([
+  const [customers, snaps] = await Promise.all([
     readTeamCustomers(),
-    readSignupDates(),
     readSnapshots(90),
   ]);
 
   // WE COULD NOT READ. Not "you have no customers". A metrics page that draws a confident zero
   // because the database did not answer is the single most dangerous screen we could build.
-  if (customers === null || signups === null) {
+  if (customers === null) {
     return NextResponse.json({ error: 'unreadable' }, { status: 503 });
   }
 
+  // ⚠️ ONE LIST OF PEOPLE. EVERY FIGURE ON THE PAGE IS DERIVED FROM IT.
+  //
+  // The signups chart used to have its own query, and that query counted our App Review demo
+  // account, so the page said "1 customer" in one box and "2 signups" in the next. Both were drawn
+  // from the same database, three inches apart, and they disagreed.
+  //
+  // Two reads over the same people WILL drift, and the one that drifts is the one you believe. So
+  // there is one read now, and lib/metrics.ts owns the single decision about who counts.
   const rows = customers.map((c) => ({
     status: c.status,
     stripeId: null,
@@ -55,7 +61,7 @@ export async function GET(req: NextRequest) {
   }));
 
   return NextResponse.json({
-    signups: daily(signups, 30),
+    signups: daily(signupDates(customers), 30),
     funnel: funnel(rows),
     channels: byChannel(rows),
     // `snaps === null` means the table is not there yet (the migration has not been run) or we could

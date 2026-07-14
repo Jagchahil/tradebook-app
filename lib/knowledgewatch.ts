@@ -28,14 +28,46 @@ export interface KnowledgeState {
   openDrift: { fact: string; ours: string | number | null; theirs: string | number | null }[];
   // Facts the differ could not read off the page at all. We are not right, we are BLIND.
   openBlind: { fact: string }[];
+
+  // ⚠️ THE DIFFER'S HEARTBEAT, AND EVERY GREEN LIGHT ON THIS SYSTEM NOW DEPENDS ON IT.
+  //
+  // Read the three fields above again and notice what they have in common: every one of them is
+  // evidence of a PROBLEM. openDrift, openBlind, and a knowledge_items row from the feed watcher.
+  // There was nothing here that was evidence of the differ WORKING, because a differ that finds
+  // nothing wrong writes nothing at all.
+  //
+  // So the differ could have died on a Tuesday, the feed watcher carried on ingesting GOV.UK all
+  // week, newestItemAt stayed fresh, no incident row ever appeared, and knowledgeStatus() would
+  // have returned 'ok' every morning. Green. Meaning: nobody has checked a single one of our tax
+  // constants since Monday, and nothing anywhere knows that.
+  //
+  // That is not a theory. It is exactly the shape of the five-day death in July, in which a job
+  // exited 0 having written nothing and every downstream check read the silence as health.
+  //
+  // The differ now writes a row to khoji_runs EVERY RUN, pass or fail. So this field is the ONLY
+  // thing on the page that is positive evidence, and if it goes stale the light goes red on its
+  // own. NOT KNOWING IS NOT THE SAME AS BEING FINE.
+  lastDifferRunAt: string | null;
 }
 
 // How long the brain may be quiet before it is a problem (docs/105, K5).
 export const MAX_QUIET_HOURS_CAPTURE = 48;   // it runs daily; two missed days is a fault
 export const MAX_QUIET_DAYS_REVIEW = 14;     // nothing approved in a fortnight is a stalled queue
 
+// The differ runs nightly. 36 hours is one missed night plus most of a day of slack, so a single
+// late run is not an alarm and a job that has actually stopped is caught the same day.
+export const MAX_QUIET_HOURS_DIFFER = 36;
+
 export interface KnowledgeAlarm {
-  reason: 'engine_drift' | 'cannot_check' | 'not_learning' | 'nothing_reviewed' | 'never_run';
+  reason:
+    | 'engine_drift'
+    | 'cannot_check'
+    | 'not_learning'
+    | 'nothing_reviewed'
+    | 'never_run'
+    // NOBODY IS CHECKING. The differ has not run. We are not saying our constants are wrong. We are
+    // saying we do not know, which is the more dangerous of the two, because it feels like nothing.
+    | 'differ_dead';
   detail: string;
 }
 
@@ -43,6 +75,32 @@ export interface KnowledgeAlarm {
 // compared to its primary GOV.UK page and matched.
 export function knowledgeAlarms(s: KnowledgeState, now: Date = new Date()): KnowledgeAlarm[] {
   const out: KnowledgeAlarm[] = [];
+
+  // 0. NOBODY IS CHECKING. This is FIRST, ahead of drift, and the order is the argument.
+  //
+  //    "We found no drift" and "nothing has looked for drift since Monday" produce an identical
+  //    database: no incident rows. They are opposite facts. One says our tax engine agrees with
+  //    GOV.UK. The other says we have not the faintest idea whether it does, and every quarterly
+  //    summary we send in the meantime is signed by a man who trusts us.
+  //
+  //    An empty incident table is only good news if something was looking. So we check that FIRST,
+  //    and everything below it is only meaningful because this passed.
+  if (!s.lastDifferRunAt) {
+    out.push({
+      reason: 'differ_dead',
+      detail: 'the differ has NEVER recorded a run: no constant has been compared to GOV.UK',
+    });
+  } else {
+    const hours = (now.getTime() - new Date(s.lastDifferRunAt).getTime()) / 3_600_000;
+    if (hours > MAX_QUIET_HOURS_DIFFER) {
+      out.push({
+        reason: 'differ_dead',
+        detail:
+          `nothing has checked our tax constants against GOV.UK for ${Math.round(hours)}h ` +
+          `(ceiling ${MAX_QUIET_HOURS_DIFFER}h). We are not saying we are wrong. We are saying nobody is looking.`,
+      });
+    }
+  }
 
   // 1. WE ARE WRONG. The loudest thing this system can say, and the only reason it was built.
   for (const d of s.openDrift) {
@@ -93,9 +151,23 @@ export function knowledgeAlarms(s: KnowledgeState, now: Date = new Date()): Know
 // One word for the public health body. Never the detail: which of our tax constants is currently
 // wrong is a useful thing for a stranger to know and no use at all to you, who gets the email
 // either way. The detail lives behind the CRON_SECRET bearer, like the rest of it.
-export function knowledgeStatus(alarms: KnowledgeAlarm[]): 'ok' | 'drift' | 'blind' | 'stale' {
+export function knowledgeStatus(
+  alarms: KnowledgeAlarm[],
+): 'ok' | 'drift' | 'blind' | 'unwatched' | 'stale' {
   if (alarms.some((a) => a.reason === 'engine_drift')) return 'drift';
   if (alarms.some((a) => a.reason === 'cannot_check')) return 'blind';
+
+  // ⚠️ ABOVE 'stale', AND IT IS NOT A JUDGEMENT CALL.
+  //
+  // 'stale' means the brain has not learned anything new lately, which is a shrug. 'unwatched'
+  // means NOTHING HAS CHECKED WHETHER OUR TAX ENGINE IS RIGHT, which is the condition under which
+  // every other green light on this page becomes meaningless. It must not be filed under the same
+  // word as a quiet week.
+  if (alarms.some((a) => a.reason === 'differ_dead')) return 'unwatched';
+
   if (alarms.length) return 'stale';
+
+  // AND ONLY NOW does 'ok' mean what it says: something looked, recently, and every constant it
+  // could read agreed with GOV.UK.
   return 'ok';
 }

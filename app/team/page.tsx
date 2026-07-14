@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { browserSupabase } from '../../lib/supabasebrowser';
 import { sourceLabel, SOURCES } from '../../lib/team';
 import Numbers from './Numbers';
+import Brain from './Brain';
 import { C, T, S as U, FONT, gbp, shortDate } from './ui';
 import type { TeamCustomer, TeamOverview, AcquisitionSource } from '../../lib/team';
 
@@ -370,7 +371,8 @@ export default function TeamPage() {
 
         {/* THE NUMBERS. Above the customer list on purpose: the list is what you dig into, the
             numbers are what you came for. */}
-        <Numbers />
+        <Brain />
+      <Numbers />
 
         {/* WHERE THEY CAME FROM. The whole point of the marketing spend. */}
         <section style={U.section}>

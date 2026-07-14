@@ -3648,13 +3648,17 @@ export async function readKnowledgeState(): Promise<KnowledgeState | null> {
       return res.json();
     };
 
-    const [newest, reviewed, incidents] = await Promise.all([
+    const [newest, reviewed, incidents, lastRun] = await Promise.all([
       q('knowledge_items?select=created_at&order=created_at.desc&limit=1'),
       // created_at, not a reviewed_at, because there is no such column. It is a proxy: it answers
       // "has anything approved arrived lately", not "did somebody click approve lately". Good
       // enough to catch a stalled queue, and honest about which question it is answering.
       q('knowledge_items?status=eq.reviewed&select=created_at&order=created_at.desc&limit=1'),
       q('knowledge_items?status=in.(drift,extractor_broken)&select=status,raw'),
+      // ⚠️ THE ONLY POSITIVE EVIDENCE ON THIS PAGE. Every other query above finds PROBLEMS, and a
+      // differ that has died finds no problems at all. This is the one that can tell the difference
+      // between "we checked and we are right" and "nothing has looked since Monday".
+      q('khoji_runs?select=ran_at&order=ran_at.desc&limit=1'),
     ]);
 
     const rows: { status: string; raw: { fact?: string; ours?: string | number; theirs?: string | number } | null }[] =
@@ -3669,8 +3673,53 @@ export async function readKnowledgeState(): Promise<KnowledgeState | null> {
       openBlind: rows
         .filter((r) => r.status === 'extractor_broken')
         .map((r) => ({ fact: r.raw?.fact ?? 'unknown' })),
+      lastDifferRunAt: Array.isArray(lastRun) && lastRun[0] ? lastRun[0].ran_at : null,
     };
   } catch {
+    return null;
+  }
+}
+
+// THE BRAIN, FOR THE CONSOLE. What Khoji knows, what it checked, and what it has never looked at.
+//
+// This is the one thing in the product that nobody else in the category has, and the temptation is
+// therefore to make it look impressive. It shows three things and they are all uncomfortable:
+//
+//   what it checked last night, and whether that was recent enough to mean anything
+//   what it has NEVER checked, by name, because "0 drift" means the ones we look at are right
+//   what it has learned, and how much of that is sitting unreviewed
+//
+// A dashboard that only shows what is going well is a screensaver.
+export interface BrainState {
+  runs: Array<{
+    ran_at: string; tax_year: string | null;
+    published: number; checked: number; agreed: number; drifted: number; blind: number;
+    unwatched: string[]; ok: boolean;
+  }>;
+  items: Array<{ status: string; created_at: string; title: string | null; source_url: string | null }>;
+}
+
+export async function readBrain(days = 30): Promise<BrainState | null> {
+  try {
+    const { url } = config();
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    const q = async (path: string) => {
+      const res = await fetch(`${url}/rest/v1/${path}`, { headers: headers(), signal: AbortSignal.timeout(6000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    };
+
+    const [runs, items] = await Promise.all([
+      q(`khoji_runs?ran_at=gte.${since}&select=ran_at,tax_year,published,checked,agreed,drifted,blind,unwatched,ok&order=ran_at.desc&limit=200`),
+      q('knowledge_items?select=status,created_at,title,source_url&order=created_at.desc&limit=1000'),
+    ]);
+
+    return {
+      runs: Array.isArray(runs) ? runs : [],
+      items: Array.isArray(items) ? items : [],
+    };
+  } catch {
+    // null is "we could not read the brain". It is NOT "the brain is empty", and the page says so.
     return null;
   }
 }

@@ -15,7 +15,7 @@
 // whether our engine is right", and that is an alarm. A watchdog that treats "no answer" as "no
 // problem" is the bug it was built to catch, wearing the uniform of the fix.
 
-import { knowledgeAlarms, knowledgeStatus, MAX_QUIET_HOURS_CAPTURE, MAX_QUIET_DAYS_REVIEW } from '../lib/knowledgewatch.ts';
+import { knowledgeAlarms, knowledgeStatus, MAX_QUIET_HOURS_CAPTURE, MAX_QUIET_DAYS_REVIEW, MAX_QUIET_HOURS_DIFFER } from '../lib/knowledgewatch.ts';
 
 let pass = 0;
 let fail = 0;
@@ -33,6 +33,9 @@ const healthy = {
   newestReviewedAt: daysAgo(1),
   openDrift: [],
   openBlind: [],
+  // SOMETHING LOOKED, LAST NIGHT. Until 14 July this field did not exist, and without it every
+  // other green light in this file was an assumption wearing a uniform.
+  lastDifferRunAt: hoursAgo(9),
 };
 
 // --- the happy path has to be genuinely quiet, or nobody trusts the loud one ---
@@ -85,12 +88,68 @@ ok('a fortnight is the ceiling, and a week inside it is fine',
 //
 // The watcher had stopped AND our mileage constant was wrong AND every safeguard read green,
 // because the only thing anyone was measuring was whether a model felt confident.
-ok('the real 8 July state raises BOTH the drift and the stoppage, not one of them',
+//
+// ⚠️ THIS TEST USED TO ASSERT TWO ALARMS. It now asserts THREE, and the third one is the point.
+//
+// On 8 July there was ALSO nothing comparing our constants to GOV.UK at all. That was not a second
+// symptom of the stopped watcher, it was a separate hole, and it stayed open for another six days
+// after the watcher was fixed: right up until the differ was given a heartbeat on 14 July, "nobody
+// has checked" and "we checked and we are fine" produced an identical database.
+//
+// Three things were wrong that morning and the system could name one of them.
+ok('the real 8 July state raises THREE alarms: we were wrong, the watcher had stopped, and NOTHING WAS CHECKING',
   knowledgeAlarms(
     { newestItemAt: hoursAgo(96), newestReviewedAt: daysAgo(4),
-      openDrift: [{ fact: 'mileageCarFirst10k', ours: 0.45, theirs: 0.55 }], openBlind: [] },
+      openDrift: [{ fact: 'mileageCarFirst10k', ours: 0.45, theirs: 0.55 }], openBlind: [],
+      lastDifferRunAt: null },
     NOW,
-  ).length === 2);
+  ).length === 3);
+
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 NOBODY IS CHECKING. The alarm that did not exist, and the one that would have killed us.
+// ---------------------------------------------------------------------------------------------
+//
+// Every other signal in this file is evidence of a PROBLEM: a drift row, a blind row, a stale feed.
+// A differ that has DIED produces none of them. It produces an empty incident table, which is
+// character for character what a differ that ran and found everything correct produces.
+//
+// The state of the world on 14 July: the differ wrote a row ONLY when something was wrong; the feed
+// watcher wrote rows daily regardless; the health check read "no incidents, fresh feed" and printed
+// OK. Kill the differ on a Tuesday and the light stays green for ever, and green would mean "we have
+// no idea whether our tax engine is right, and nothing is looking."
+//
+// That is the five-day July death rebuilt, with a reassuring pill on top of it.
+
+const noHeartbeat = { ...healthy, lastDifferRunAt: null };
+
+ok('THE BUG: a differ that has NEVER run is an ALARM, not a clean bill of health',
+  knowledgeAlarms(noHeartbeat, NOW).some((a) => a.reason === 'differ_dead'));
+
+ok('...and it is emphatically not called ok',
+  knowledgeStatus(knowledgeAlarms(noHeartbeat, NOW)) !== 'ok');
+
+ok('a differ silent past the ceiling is an alarm',
+  knowledgeAlarms({ ...healthy, lastDifferRunAt: hoursAgo(MAX_QUIET_HOURS_DIFFER + 1) }, NOW)
+    .some((a) => a.reason === 'differ_dead'));
+
+ok('a single LATE run is not: it runs nightly, and a watchdog that cries wolf gets muted',
+  knowledgeAlarms({ ...healthy, lastDifferRunAt: hoursAgo(25) }, NOW)
+    .every((a) => a.reason !== 'differ_dead'));
+
+ok('THE WHOLE POINT: an empty incident table with a DEAD differ must not read like a healthy one',
+  knowledgeStatus(knowledgeAlarms(noHeartbeat, NOW)) !==
+  knowledgeStatus(knowledgeAlarms(healthy, NOW)));
+
+ok('"nobody is looking" is not filed under "quiet week". It is blindness and it gets its own word',
+  knowledgeStatus(knowledgeAlarms(noHeartbeat, NOW)) === 'unwatched');
+
+ok('but a real DRIFT still outranks a dead differ: being wrong beats not knowing',
+  knowledgeStatus(knowledgeAlarms(
+    { ...noHeartbeat, openDrift: [{ fact: 'mileageFirst10k', ours: 55, theirs: 45 }] }, NOW)) === 'drift');
+
+ok('the detail is English, because a reason code fixes nothing at three in the morning',
+  knowledgeAlarms(noHeartbeat, NOW).find((a) => a.reason === 'differ_dead').detail.includes('NEVER'));
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

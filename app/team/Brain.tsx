@@ -36,6 +36,9 @@ const PULSE: Record<Vitals['pulse'], { tone: string; tint: string; word: string 
   // Deliberately RED, not amber. "Nobody is looking" is not a degraded state, it is the state in
   // which every other light on this page stops meaning anything.
   unwatched: { tone: C.red,    tint: C.redTint,    word: 'Nobody is looking' },
+  // The job ran and compared nothing. Red, because "it crashed" and "it is fine" must never share
+  // a colour, and for about an hour on 14 July they shared a colour and a sentence.
+  failed:    { tone: C.red,    tint: C.redTint,    word: 'The run did not finish' },
   never:     { tone: C.red,    tint: C.redTint,    word: 'Never run' },
 };
 
@@ -100,16 +103,34 @@ export default function Brain() {
             checked. It is the one chart on this page you want to be boring. */}
         {d.runs.length > 0 ? (
           <div style={S.nights}>
-            {d.runs.map((r) => (
-              <span
-                key={r.ran_at}
-                title={`${new Date(r.ran_at).toLocaleString('en-GB')}: ${r.agreed} agreed, ${r.drifted} drift, ${r.blind} blind`}
-                style={{
-                  ...S.night,
-                  background: r.drifted > 0 ? C.red : r.blind > 0 ? C.amber : C.green,
-                }}
-              />
-            ))}
+            {d.runs.map((r) => {
+              // ⚠️ A CRASHED RUN IS NOT A GREEN NIGHT, and it rendered as one for about an hour.
+              //
+              // The colour used to be: red if drifted, amber if blind, otherwise green. A run that
+              // crashed before checking anything has drifted 0 and blind 0, so it painted itself
+              // green. My own crash sat on this page as a healthy night, on the strip whose entire
+              // job is to show you the nights nobody checked.
+              //
+              // A night with no comparisons in it is a HOLE, and it is drawn as one.
+              const checked = r.agreed + r.drifted + r.blind;
+              const dead = checked === 0;
+              return (
+                <span
+                  key={r.ran_at}
+                  title={dead
+                    ? `${new Date(r.ran_at).toLocaleString('en-GB')}: the run did not check anything. It started and did not finish.`
+                    : `${new Date(r.ran_at).toLocaleString('en-GB')}: ${r.agreed} agreed, ${r.drifted} drift, ${r.blind} blind`}
+                  style={{
+                    ...S.night,
+                    background: dead ? 'transparent'
+                      : r.drifted > 0 ? C.red
+                      : r.blind > 0 ? C.amber
+                      : C.green,
+                    border: dead ? `1.5px dashed ${C.red}` : 'none',
+                  }}
+                />
+              );
+            })}
             <span style={S.nightsNote}>the last {d.runs.length} nights</span>
           </div>
         ) : null}

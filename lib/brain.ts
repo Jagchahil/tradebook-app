@@ -48,7 +48,21 @@ export interface Item {
 // reads and the alarm that emails him must not be able to disagree about whether the brain is alive.
 export const STALE_HOURS = 36;
 
-export type Pulse = 'checking' | 'wrong' | 'blind' | 'unwatched' | 'never';
+// ⚠️ 'failed' EXISTS BECAUSE I WROTE THIS FILE WITHOUT IT AND IT LIED WITHIN THE HOUR.
+//
+// The differ crashed on a typo of mine, and the failure recorder did its job: it wrote an honest
+// row saying the run had checked nothing. published 0, checked 0, agreed 0, drifted 0, blind 0.
+//
+// And this function read that row and returned:
+//
+//     Checking. "0 of 0 constants were compared to their GOV.UK page and every one matched."
+//
+// Green. A crashed differ, rendered as a perfect night, by the very screen built to make a dead
+// differ impossible to miss. Zero drift out of zero checks is not a clean bill of health, it is an
+// empty set wearing one.
+//
+// A RUN THAT CHECKED NOTHING IS NOT A RUN. It is a night on which nobody looked.
+export type Pulse = 'checking' | 'wrong' | 'blind' | 'unwatched' | 'failed' | 'never';
 
 export interface Vitals {
   pulse: Pulse;
@@ -71,51 +85,73 @@ const EMPTY: Vitals = {
   published: 0, checked: 0, agreed: 0, drifted: 0, blind: 0, unwatched: [],
 };
 
+// A run that compared nothing to anything. It happened, it wrote a row, and it is NOT a heartbeat.
+export const didCheck = (r: Run) => r.checked > 0;
+
 export function vitals(runs: Run[], now: Date = new Date()): Vitals {
-  const last = runs[0];   // the reader hands them newest first
+  const attempt = runs[0];                  // the reader hands them newest first
+  const real = runs.find(didCheck);         // the newest run that actually LOOKED at something
 
   // NEVER. Not "fine". This is the state the whole heartbeat exists to make visible: no incident
   // rows, nothing wrong anywhere, and nothing has ever looked.
-  if (!last) {
+  //
+  // Note the denominator: a night full of CRASHED runs lands here too, and it should. A differ that
+  // has crash-looped since Monday has written a row every night, and not one of them contains a
+  // single comparison. It has been busy. It has not been checking.
+  if (!real) {
     return {
       ...EMPTY,
       pulse: 'never',
-      says: 'Nothing has ever compared our tax constants to GOV.UK. We are not saying we are wrong. We are saying nobody has looked.',
+      lastRunAt: attempt?.ran_at ?? null,
+      says: attempt
+        ? 'The differ has run and checked NOTHING. Not one constant has been compared to GOV.UK. It is failing, not idle.'
+        : 'Nothing has ever compared our tax constants to GOV.UK. We are not saying we are wrong. We are saying nobody has looked.',
     };
   }
 
-  const hours = (now.getTime() - new Date(last.ran_at).getTime()) / 3_600_000;
+  // STALENESS IS MEASURED FROM THE LAST RUN THAT ACTUALLY CHECKED SOMETHING, never from the last
+  // run that merely happened. Measure it from the attempt and a differ crashing every night at 3am
+  // keeps the clock permanently fresh, which is a heartbeat monitor wired to the fact that the
+  // patient is still in the bed.
+  const hours = (now.getTime() - new Date(real.ran_at).getTime()) / 3_600_000;
   const base = {
-    lastRunAt: last.ran_at,
+    lastRunAt: real.ran_at,
     hoursAgo: Math.max(0, Math.round(hours)),
-    published: last.published,
-    checked: last.checked,
-    agreed: last.agreed,
-    drifted: last.drifted,
-    blind: last.blind,
-    unwatched: last.unwatched ?? [],
+    published: real.published,
+    checked: real.checked,
+    agreed: real.agreed,
+    drifted: real.drifted,
+    blind: real.blind,
+    unwatched: real.unwatched ?? [],
   };
 
   // ORDER IS THE ARGUMENT, and it is the same order as the alarms.
   //
-  // WRONG beats BLIND beats NOBODY IS LOOKING beats fine. Being wrong is worse than not knowing,
-  // and not knowing is worse than a quiet night. What must never happen is any of the three
-  // arriving dressed as the fourth.
-  if (last.drifted > 0) {
+  // WRONG beats BLIND beats THE JOB IS BROKEN beats NOBODY IS LOOKING beats fine. Being wrong is
+  // worse than not knowing. What must never happen is any of them arriving dressed as the last one.
+  if (real.drifted > 0) {
     return { ...base, pulse: 'wrong',
-      says: `${last.drifted} of our tax constants disagree with GOV.UK right now. The engine is wrong and every figure resting on it is wrong.` };
+      says: `${real.drifted} of our tax constants disagree with GOV.UK right now. The engine is wrong and every figure resting on it is wrong.` };
   }
-  if (last.blind > 0) {
+  if (real.blind > 0) {
     return { ...base, pulse: 'blind',
-      says: `${last.blind} constants could not be read off their GOV.UK page. We do not know whether we are right about them, and a differ that reports "all clear" when it cannot see is lying by omission.` };
+      says: `${real.blind} constants could not be read off their GOV.UK page. We do not know whether we are right about them, and a differ that reports "all clear" when it cannot see is lying by omission.` };
   }
+
+  // THE MOST RECENT ATTEMPT DID NOT CHECK ANYTHING. The job is broken right now, and the reassuring
+  // numbers below it are from the last night it worked. Say both, in that order.
+  if (attempt && !didCheck(attempt)) {
+    return { ...base, pulse: 'failed',
+      says: `The last run compared NOTHING to GOV.UK. It started and it did not finish. The figures below are from ${Math.round(hours)}h ago, the last time anything actually looked.` };
+  }
+
   if (hours > STALE_HOURS) {
     return { ...base, pulse: 'unwatched',
       says: `Nothing has checked our tax constants for ${Math.round(hours)} hours. It runs nightly. It has stopped.` };
   }
 
   return { ...base, pulse: 'checking',
-    says: `${last.agreed} of ${last.checked} constants were compared to their GOV.UK page and every one matched.` };
+    says: `${real.agreed} of ${real.checked} constants were compared to their GOV.UK page and every one matched.` };
 }
 
 // COVERAGE, SAID OUT LOUD AND WITHOUT FLATTERY.

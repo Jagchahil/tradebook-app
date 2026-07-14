@@ -11,7 +11,7 @@
 // Every assertion below that looks paranoid is there because the alternative is a green light on a
 // screen, above a tax engine nobody has checked, in front of a man who is about to sign his return.
 
-import { vitals, coverage, knowledge, growth, STALE_HOURS } from '../lib/brain.ts';
+import { vitals, coverage, knowledge, growth, didCheck, STALE_HOURS } from '../lib/brain.ts';
 
 let pass = 0;
 let fail = 0;
@@ -136,6 +136,68 @@ ok('a row with no date is dropped rather than landing on a day the parser invent
 
 ok('an empty brain draws a flat zero and does not crash',
   growth([], 30, NOW).length === 30 && growth([], 30, NOW).at(-1).total === 0);
+
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 A RUN THAT CHECKED NOTHING IS NOT A RUN. Written from the row that was on the live page.
+// ---------------------------------------------------------------------------------------------
+//
+// 14 July, about an hour after the heartbeat shipped. The differ crashed on a typo of mine. The
+// failure recorder worked perfectly and wrote an honest row: published 0, checked 0, agreed 0,
+// drifted 0, blind 0, ok false.
+//
+// And this file read that row and rendered:
+//
+//     Checking. "0 of 0 constants were compared to their GOV.UK page and every one matched."
+//
+// GREEN. A crashed differ shown as a perfect night, by the screen built to make a dead differ
+// impossible to miss. Zero drift out of zero checks is not a clean bill of health. It is an empty
+// set wearing one, and I had walked straight past it because the numbers were all zero and zero
+// looks like nothing is wrong.
+//
+// Worse, the same hole was in the alarm: lastDifferRunAt read the newest row of ANY kind, so a
+// differ crash-looping at 3am every morning would write a fresh row nightly, hold the clock
+// permanently green, and never compare a single constant to GOV.UK. A heartbeat monitor wired to
+// the fact that the patient is still in the bed.
+
+const CRASHED = {
+  ran_at: hoursAgo(1), tax_year: null,
+  published: 0, checked: 0, agreed: 0, drifted: 0, blind: 0, unwatched: [], ok: false,
+};
+
+ok('THE BUG: a crashed run must NOT read as "checking"',
+  vitals([CRASHED], NOW).pulse !== 'checking');
+
+ok('...and it must never say "every one matched", because nothing was compared to anything',
+  !vitals([CRASHED], NOW).says.includes('matched'));
+
+ok('a night of nothing but crashes is NEVER RUN, not a clean night',
+  vitals([CRASHED, { ...CRASHED, ran_at: hoursAgo(25) }], NOW).pulse === 'never');
+
+ok('...and it says the differ is FAILING, not idle. Busy is not the same as working',
+  vitals([CRASHED], NOW).says.includes('failing, not idle'));
+
+ok('a crash on top of a good night says the job is broken NOW',
+  vitals([CRASHED, goodRun], NOW).pulse === 'failed');
+
+ok('...and it still shows the good night\'s numbers, but dated, so nobody reads them as current',
+  vitals([CRASHED, goodRun], NOW).checked === 42
+  && vitals([CRASHED, goodRun], NOW).says.includes('did not finish'));
+
+ok('THE CLOCK: staleness is measured from the last run that CHECKED something, not the last that ran',
+  vitals([{ ...CRASHED, ran_at: hoursAgo(1) },
+          { ...goodRun, ran_at: hoursAgo(200) }], NOW).hoursAgo === 200);
+
+ok('so a differ crash-looping nightly cannot hold the clock green for ever',
+  vitals([{ ...CRASHED, ran_at: hoursAgo(1) },
+          { ...CRASHED, ran_at: hoursAgo(25) },
+          { ...goodRun, ran_at: hoursAgo(200) }], NOW).hoursAgo > STALE_HOURS);
+
+ok('a real DRIFT still outranks a broken job: being wrong beats the job being down',
+  vitals([CRASHED, { ...goodRun, drifted: 1 }], NOW).pulse === 'wrong');
+
+ok('didCheck is the one rule, and it is about comparisons, not exit codes',
+  didCheck(goodRun) === true && didCheck(CRASHED) === false);
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

@@ -3655,10 +3655,22 @@ export async function readKnowledgeState(): Promise<KnowledgeState | null> {
       // enough to catch a stalled queue, and honest about which question it is answering.
       q('knowledge_items?status=eq.reviewed&select=created_at&order=created_at.desc&limit=1'),
       q('knowledge_items?status=in.(drift,extractor_broken)&select=status,raw'),
-      // ⚠️ THE ONLY POSITIVE EVIDENCE ON THIS PAGE. Every other query above finds PROBLEMS, and a
-      // differ that has died finds no problems at all. This is the one that can tell the difference
-      // between "we checked and we are right" and "nothing has looked since Monday".
-      q('khoji_runs?select=ran_at&order=ran_at.desc&limit=1'),
+      // ⚠️ THE ONLY POSITIVE EVIDENCE ON THIS PAGE, AND NOTE `checked=gt.0`. IT IS THE WHOLE THING.
+      //
+      // Every other query above finds PROBLEMS, and a differ that has died finds no problems at all.
+      // This is the one row that can tell "we checked and we are right" apart from "nothing has
+      // looked since Monday".
+      //
+      // But the differ records a row when it CRASHES too, which is right: a failure that leaves no
+      // trace is how this system died the first time. Which means "the newest row in khoji_runs" is
+      // NOT evidence that anything was checked. A differ crash-looping at 3am every morning would
+      // write a fresh row every night, hold this timestamp permanently green, and never once compare
+      // a constant to GOV.UK. That is a heartbeat monitor wired to the fact that the patient is
+      // still in the bed.
+      //
+      // So we ask for the newest run THAT ACTUALLY CHECKED SOMETHING. A run that compared nothing to
+      // anything is not a heartbeat.
+      q('khoji_runs?checked=gt.0&select=ran_at&order=ran_at.desc&limit=1'),
     ]);
 
     const rows: { status: string; raw: { fact?: string; ours?: string | number; theirs?: string | number } | null }[] =

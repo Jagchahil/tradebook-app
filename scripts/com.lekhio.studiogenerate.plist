@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The Content Studio GENERATION agent (Path A), as a launchd job on the Mac mini.
+     Runs a headless Claude session that generates approved storyboards through Higgsfield. Isolated
+     from the personal bot and from the drafting agent: its own Label and its own logs. Edit the
+     absolute path to the wrapper below, then install as in STUDIO_GENERATION_SETUP.md.
+     Runs at 09:00, after the morning drafting and your approvals. It never posts or spends. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.lekhio.studiogenerate</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/ABSOLUTE/PATH/TO/tradebook/scripts/studio-generate.sh</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>9</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/lekhio-studiogenerate.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/lekhio-studiogenerate.err</string>
+</dict>
+</plist>

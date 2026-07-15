@@ -4667,3 +4667,41 @@ export async function readLatestStudioAgentRun(): Promise<StudioAgentRun | null>
     return rows[0] ?? null;
   } catch { return null; }
 }
+
+// --- Studio generation: approved storyboards that still need a video made -----------------------
+
+// Assets that Jag has APPROVED (state scheduled) but that have no finished file yet. This is the
+// generation agent's work queue. It never sees anything unapproved, so it can only ever put effort
+// into things Jag already said yes to.
+export async function readAssetsPendingGeneration(): Promise<Asset[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_assets?state=eq.scheduled&file_url=is.null&select=*&order=updated_at.asc&limit=50`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Asset[];
+  } catch { return null; }
+}
+
+// Attach a generated file to an approved asset. The `file_url=is.null` guard makes this a claim: if
+// two agent runs overlap, the first one to write wins and the second changes nothing, so a piece is
+// never generated twice or its file overwritten. Approval is NOT touched here: generating a video
+// does not post it, and posting still needs a human.
+export async function setStudioAssetMedia(id: string, fileUrl: string): Promise<Asset | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_assets?id=eq.${encodeURIComponent(id)}&file_url=is.null`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ file_url: fileUrl, updated_at: new Date().toISOString() }),
+      },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Asset[];
+    return rows[0] ?? null;
+  } catch { return null; }
+}

@@ -122,10 +122,27 @@ export function compare(previous, now) {
 export function watchedUrls() { return WATCHED_LEGAL.map((w) => w.url); }
 
 // ---------------------------------------------------------------------------------------------
-// THE RUN. Structurally parallel to amend.mjs: fetch, hash, compare against the stored row, write a
-// kind='lawwatch' heartbeat EVERY run, and exit LOUD on empty or unreadable. Left runnable on the
-// mini; the pure functions above are what CI exercises.
+// THE RUN. Structurally parallel to amend.mjs: fetch, hash, compare against the STORED row, upsert
+// the new state, and write a kind='lawwatch' heartbeat EVERY run. Left runnable on the mini; the
+// pure functions above are what CI exercises.
+//
+// ⚠️ THIS PERSISTS NOW. The first version of this file fetched and hashed and then wrote NOTHING:
+// the DB line was a comment. So it ran nightly and lit nothing, while I claimed the console would
+// light up. That is fixed here: khoji_law holds each source's latest hash + verdict (what the
+// console reads to colour the law fields), and khoji_runs carries the heartbeat.
 // ---------------------------------------------------------------------------------------------
+const DB_URL = process.env.KHOJI_DB_URL || '';
+const DRY = process.argv.includes('--dry-run');
+
+// `pg` imported lazily, exactly as amend.mjs and diff.mjs do, so this file imports cleanly in CI on a
+// machine with no node_modules and no database.
+async function withDb(fn) {
+  const { default: pg } = await import('pg');
+  const client = new pg.Client({ connectionString: DB_URL, ssl: { rejectUnauthorized: false } });
+  await client.connect();
+  try { return await fn(client); } finally { await client.end(); }
+}
+
 async function fetchBody(url) {
   const res = await fetch(dataUrlFor(url), {
     headers: { 'user-agent': 'lekhio-khoji-lawwatch (+https://lekhio.app)' },
@@ -136,8 +153,7 @@ async function fetchBody(url) {
 }
 
 async function main() {
-  const dbUrl = process.env.KHOJI_DB_URL;
-  if (!dbUrl) {
+  if (!DB_URL) {
     log('🔴 NO KHOJI_DB_URL. This run cannot record anything, so it is not a run.');
     process.exit(1);
   }
@@ -149,35 +165,94 @@ async function main() {
     process.exit(1);
   }
 
-  let checked = 0, changed = 0, blind = 0;
-  const findings = [];
+  const started = Date.now();
+
+  // Read every source first (network), THEN write once (db), so a slow fetch never holds a
+  // connection open. failed = blind; read = what we could hash this run.
+  const read = [];
+  const failed = [];
   for (const w of WATCHED_LEGAL) {
     try {
       const body = await fetchBody(w.url);
-      const bodyHash = hashOf(body);
-      checked++;
-      // (On the mini: read the previous row for w.url, compare, and upsert. Left to the DB layer.)
-      findings.push({ url: w.url, field: w.field, bodyHash });
+      read.push({ url: w.url, field: w.field, kind: w.kind, bodyHash: hashOf(body) });
     } catch (e) {
-      // A PAGE WE COULD NOT READ IS BLIND, NEVER 'unchanged'.
-      blind++;
+      failed.push({ url: w.url, field: w.field });
       log(`  BLIND ${w.field.padEnd(20)} ${w.url}  (${e.message})`);
     }
   }
 
   // 🔴 A RUN THAT READ NOTHING IS NOT A RUN.
-  if (checked === 0) {
+  if (read.length === 0) {
     log('🔴 READ NOTHING. Every source was unreachable. Exiting loud, not green.');
+    if (!DRY) {
+      await withDb((db) => db.query(
+        `insert into public.khoji_runs (kind, tax_year, published, checked, agreed, drifted, blind, unwatched, duration_ms, ok)
+         values ('lawwatch', null, $1, 0, 0, 0, $1, $2, $3, false)`,
+        [WATCHED_LEGAL.length, failed.map((f) => f.url), Date.now() - started],
+      )).catch(() => {});
+    }
     process.exit(1);
   }
 
-  log(`checked=${checked} changed=${changed} blind=${blind} of ${WATCHED_LEGAL.length} sources`);
-  // The DB write (kind='lawwatch' into khoji_runs, plus per-source hashes) happens here on the mini.
+  let revised = 0;
+  let silent = 0;
+
+  if (!DRY) {
+    await withDb(async (db) => {
+      for (const r of read) {
+        const prev = await db.query('select body_hash from public.khoji_law where url = $1 limit 1', [r.url]);
+        const previous = prev.rows[0] ? { bodyHash: prev.rows[0].body_hash } : null;
+        const { verdict, note } = compare(previous, r);
+        if (verdict === 'revised') revised++;
+        if (verdict === 'silent') silent++;
+        if (verdict === 'silent') log(`  🔴 SILENT ${r.field.padEnd(18)} ${r.url}${note ? '  ' + note.slice(0, 90) : ''}`);
+
+        // Upsert the source's latest state. This row is what the console reads to colour the field.
+        await db.query(
+          `insert into public.khoji_law (url, field, kind, body_hash, verdict, ok, checked_at)
+             values ($1,$2,$3,$4,$5,true,now())
+           on conflict (url) do update set
+             field = excluded.field, kind = excluded.kind, body_hash = excluded.body_hash,
+             verdict = excluded.verdict, ok = true, checked_at = now()`,
+          [r.url, r.field, r.kind, r.bodyHash, verdict],
+        );
+      }
+
+      // The heartbeat. checked = sources hashed, drifted = silent changes (the fortnight problem for
+      // the law), blind = unreadable. kind='lawwatch' keeps it out of the differ's pulse.
+      await db.query(
+        `insert into public.khoji_runs (kind, tax_year, published, checked, agreed, drifted, blind, unwatched, duration_ms, ok)
+         values ('lawwatch', null, $1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          WATCHED_LEGAL.length,
+          read.length,
+          read.length - revised - silent,
+          silent,
+          failed.length,
+          failed.map((f) => f.url),
+          Date.now() - started,
+          failed.length === 0,
+        ],
+      );
+    });
+  }
+
+  log(`read ${read.length} of ${WATCHED_LEGAL.length} law sources. ${revised} revised, ${silent} silent, ${failed.length} unreadable.${DRY ? ' (dry run, nothing written)' : ''}`);
   // Exit non-zero if anything was blind: not knowing is not the same as being fine.
-  process.exit(blind > 0 ? 1 : 0);
+  process.exit(failed.length > 0 ? 1 : 0);
 }
 
 // Only run main() when executed directly, so the test can import the pure functions cleanly.
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((e) => { log('🔴 THREW:', e.message); process.exit(1); });
+  main().catch(async (e) => {
+    log('🔴 THREW:', e.message);
+    // A run that died still says so out loud, or a silent absence looks like a quiet success.
+    if (DB_URL && !DRY) {
+      await withDb((db) => db.query(
+        `insert into public.khoji_runs (kind, tax_year, published, checked, agreed, drifted, blind, unwatched, duration_ms, ok)
+         values ('lawwatch', null, 0, 0, 0, 0, 0, '{}', null, false)`,
+      )).catch(() => {});
+    }
+    process.exit(1);
+  });
 }

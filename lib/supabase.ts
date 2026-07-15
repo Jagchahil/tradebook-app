@@ -2633,6 +2633,46 @@ export async function setPartnershipShare(userId: string, share: number): Promis
   return res.ok;
 }
 
+// 🔴 THE LAW FRESHNESS FOR THE CONSTELLATION. Reads khoji_law (written nightly by khoji/lawwatch.mjs)
+// and turns it into a per-field pulse the brain map can colour with. A field with NO row here is left
+// out of the map, so the console draws it DIM (unmeasured), which is the honest state until lawwatch
+// has actually reported on it. null means "we could not read it", which the console also draws dark.
+export interface LawFieldFreshness { pulse: 'fresh' | 'attention' | 'stale'; says: string }
+
+export async function readLawFreshness(): Promise<Record<string, LawFieldFreshness> | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/khoji_law?select=field,verdict,ok,checked_at`,
+      { headers: headers(), signal: AbortSignal.timeout(4000) },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{
+      field: string; verdict: string | null; ok: boolean | null; checked_at: string | null;
+    }> | null;
+    if (!Array.isArray(rows)) return null;
+
+    const rank: Record<LawFieldFreshness['pulse'], number> = { fresh: 0, attention: 1, stale: 2 };
+    const byField: Record<string, LawFieldFreshness> = {};
+
+    for (const r of rows) {
+      const hrs = r.checked_at ? (Date.now() - new Date(r.checked_at).getTime()) / 3_600_000 : Infinity;
+      let f: LawFieldFreshness;
+      if (r.ok === false) f = { pulse: 'stale', says: 'A source could not be read last night. Not knowing is not the same as being fine.' };
+      else if (hrs > 40) f = { pulse: 'stale', says: `Not checked for ${Math.round(hrs)} hours.` };
+      else if (r.verdict === 'silent') f = { pulse: 'attention', says: 'The law text changed and nothing announced it. A human should read it.' };
+      else if (r.verdict === 'revised') f = { pulse: 'attention', says: 'A new revised version was published. The provision may have moved.' };
+      else f = { pulse: 'fresh', says: 'Checked against legislation.gov.uk last night, unchanged.' };
+
+      // Keep the WORST state per field: a field is only as fresh as its least-fresh source.
+      if (!byField[r.field] || rank[f.pulse] > rank[byField[r.field].pulse]) byField[r.field] = f;
+    }
+    return byField;
+  } catch {
+    return null;
+  }
+}
+
 // --- The Agentic Accountant v1 (doc 84) --------------------------------------
 
 export interface AgentUserRow {

@@ -90,5 +90,34 @@ if (LS) {
     LS.watchedLegalUrls().every((u) => isAllowed(u)));
 }
 
+// --- 4. 🔴 IT ACTUALLY PERSISTS. The test that would have caught the stub. ---------------------
+//
+// The first version of main() fetched, hashed, and wrote NOTHING: the DB line was a comment. The
+// parity tests above were all green while the watcher lit nothing, because they only exercise the
+// pure functions. So this asserts, against the SOURCE (comments stripped, or a comment describing
+// the write would pass for the write), that main() really does persist.
+const src = readFileSync(path.resolve(HERE, 'lawwatch.mjs'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '');
+
+ok('🔴 lawwatch WRITES per-source freshness to khoji_law (not a comment, real SQL)',
+  /insert into public\.khoji_law/.test(src) && /on conflict \(url\) do update/.test(src));
+
+ok('🔴 ...and writes a kind=\'lawwatch\' heartbeat to khoji_runs EVERY run',
+  /insert into public\.khoji_runs/.test(src) && /'lawwatch'/.test(src));
+
+ok('...and it opens a real db connection (withDb / pg), so those inserts can actually run',
+  /async function withDb/.test(src) && /import\('pg'\)/.test(src));
+
+// And the console must READ that freshness, or the nodes stay dim no matter what lawwatch writes.
+const brainRoute = path.resolve(HERE, '../tradebook-web/app/api/team/brain/route.ts');
+const brainRouteAlt = path.resolve(HERE, '../app/api/team/brain/route.ts');
+let routeSrc = '';
+try { routeSrc = readFileSync(brainRoute, 'utf8'); } catch { try { routeSrc = readFileSync(brainRouteAlt, 'utf8'); } catch { /* not present in this layout */ } }
+if (routeSrc) {
+  ok('🔴 THE CONSOLE FEEDS LAW FRESHNESS INTO THE CONSTELLATION (readLawFreshness -> buildBrainMap)',
+    /readLawFreshness/.test(routeSrc) && /law:/.test(routeSrc));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, readTeamMember, readBrain } from '../../../../lib/supabase';
+import { verifyAccessToken, readTeamMember, readBrain, readLawFreshness } from '../../../../lib/supabase';
 import { isTeam } from '../../../../lib/team';
 import { vitals, coverage, knowledge, growth } from '../../../../lib/brain';
 import { body } from '../../../../lib/organs';
@@ -93,6 +93,11 @@ export async function GET(req: NextRequest) {
               : null,
           }
         : undefined,
+      // 🔴 THE LAW FIELDS, LIT BY WHAT LAWWATCH ACTUALLY REPORTED. null (could not read) and absent
+      // (a field lawwatch has not covered) both leave the field out, so buildBrainMap draws it dim
+      // rather than green. This is the wiring that was missing: lawwatch persists to khoji_law, and
+      // this reads it. Before, the law nodes were dim for ever because nothing fed them.
+      law: (await readLawFreshness().catch(() => null)) ?? undefined,
     }),
   });
 }

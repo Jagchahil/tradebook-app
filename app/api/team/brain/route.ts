@@ -4,8 +4,36 @@ import { isTeam } from '../../../../lib/team';
 import { vitals, coverage, knowledge, growth } from '../../../../lib/brain';
 import { body } from '../../../../lib/organs';
 import { buildBrainMap } from '../../../../lib/brainmap';
+import { buildUniverse, type StarPulse } from '../../../../lib/universe';
+import { FACTS } from '../../../../lib/taxengine';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 export const runtime = 'nodejs';
+
+// How many questions the accounting exam bank holds right now, read at request time so the universe
+// grows the moment the bank does, with no constant to keep in sync. Best effort: a bad read just
+// leaves the exam star sizeless, never throws.
+function examCount(): number | undefined {
+  try {
+    const raw = readFileSync(path.join(process.cwd(), 'test', 'exams', 'exam-bank.json'), 'utf8');
+    const arr = JSON.parse(raw) as unknown[];
+    return Array.isArray(arr) ? arr.length : undefined;
+  } catch { return undefined; }
+}
+
+// Reshape lawwatch's freshness into the universe's law input: field -> { pulse }, dropping fields
+// lawwatch has not reported (they stay dim). A plain typed loop, so tsc has nothing to infer wrong.
+function lawForUniverse(
+  law: Awaited<ReturnType<typeof readLawFreshness>> | undefined,
+): { [field: string]: { pulse: Exclude<StarPulse, 'unmeasured'> } } | undefined {
+  if (!law) return undefined;
+  const out: { [field: string]: { pulse: Exclude<StarPulse, 'unmeasured'> } } = {};
+  for (const [field, f] of Object.entries(law)) {
+    if (f) out[field] = { pulse: f.pulse };
+  }
+  return out;
+}
 
 // KHOJI, FOR THE TEAM.
 //
@@ -40,6 +68,28 @@ export async function GET(req: NextRequest) {
   }
 
   const v = vitals(brain.runs);
+
+  // 🔴 THE LAW FRESHNESS, read once and shared by the constellation and the universe. null (could
+  // not read) and absent (a field lawwatch has not covered) both leave a field dim, never green.
+  const law = (await readLawFreshness().catch(() => null)) ?? undefined;
+
+  // 🔴 THE UNIVERSE'S HONEST TAX PULSE. A tax constant only glows when the differ actually looked
+  // tonight: checking -> fresh, drift/blind -> attention. Anything else (never ran, crashed, went
+  // dark) hands NO watch list, so every constant is drawn dim rather than lit over an assumption.
+  const taxLive: StarPulse | null =
+    v.pulse === 'checking' ? 'fresh' :
+    v.pulse === 'wrong' || v.pulse === 'blind' ? 'attention' : null;
+  const watchedKeys = taxLive ? Object.keys(FACTS).filter((k) => !v.unwatched.includes(k)) : [];
+
+  // Which day of the brain's life this is: days since the earliest thing it learned. 1 when unknown.
+  let earliest = Number.POSITIVE_INFINITY;
+  for (const it of brain.items) {
+    const ts = it.created_at ? new Date(it.created_at).getTime() : NaN;
+    if (!Number.isNaN(ts) && ts < earliest) earliest = ts;
+  }
+  const day = Number.isFinite(earliest)
+    ? Math.max(1, Math.floor((Date.now() - earliest) / 86_400_000) + 1)
+    : 1;
 
   return NextResponse.json({
     vitals: v,
@@ -97,7 +147,18 @@ export async function GET(req: NextRequest) {
       // (a field lawwatch has not covered) both leave the field out, so buildBrainMap draws it dim
       // rather than green. This is the wiring that was missing: lawwatch persists to khoji_law, and
       // this reads it. Before, the law nodes were dim for ever because nothing fed them.
-      law: (await readLawFreshness().catch(() => null)) ?? undefined,
+      law,
+    }),
+
+    // 🔴 THE UNIVERSE. The same brain the constellation draws, drawn whole: four suns, every fact a
+    // star, bright only where we have a live reading tonight. It reads the SAME live state as
+    // everything above (the differ's pulse, the law freshness, the exam bank's size), so it grows on
+    // its own and never disagrees with the numbers three inches above it.
+    universe: buildUniverse({
+      tax: taxLive ? { pulse: taxLive, watchedKeys } : undefined,
+      law: lawForUniverse(law),
+      examCount: examCount(),
+      day,
     }),
   });
 }

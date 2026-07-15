@@ -6,6 +6,8 @@ import { C, T, S as U, FONT } from './ui';
 import { isLive } from '../../lib/brain';
 import type { Vitals, Day, Knowledge } from '../../lib/brain';
 import Constellation, { type BrainMapData } from './Constellation';
+import Universe from './Universe';
+import type { Universe as UniverseData } from '../../lib/universe';
 
 // KHOJI. The brain, live.
 //
@@ -65,6 +67,7 @@ interface Payload {
   runs: Array<{ ran_at: string; agreed: number; drifted: number; blind: number; ok: boolean }>;
   pending: Pending[];
   brainMap?: BrainMapData;
+  universe?: UniverseData;
 }
 
 const PULSE: Record<Vitals['pulse'], { tone: string; word: string; alive: boolean }> = {
@@ -377,6 +380,7 @@ export default function Brain() {
       </div>
 
       {/* THE CONSTELLATION ------------------------------------------------------------------ */}
+      {d.universe ? <Universe data={d.universe} /> : null}
       {d.brainMap ? <Constellation map={d.brainMap} /> : null}
 
       {/* THE APPROVAL GATE ------------------------------------------------------------------ */}

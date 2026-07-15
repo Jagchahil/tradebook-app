@@ -87,6 +87,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'A valid mobile number is required.' }, { status: 400 });
     }
 
+    // The income streams the user ticked (job, property, loan). Kept now, not dropped:
+    // they are the reliefs reconcileSignupToUser carries into the app so nothing is asked twice.
+    const streams = Array.isArray(b.streams)
+      ? (b.streams as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 10)
+      : null;
+
     try {
       await createSignup({
         phone,
@@ -97,6 +103,7 @@ export async function POST(req: NextRequest) {
         postcode: str(b.postcode, 12),
         address: str(b.address, 300),
         vat_registered: typeof b.vat === 'boolean' ? b.vat : null,
+        streams,
         offer: str(b.offer, 40),
         referred_by_code: str(b.ref, 12), // sanitised in createSignup
       });

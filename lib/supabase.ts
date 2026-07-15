@@ -846,6 +846,10 @@ export interface OnboardSignup {
   postcode?: string | null;
   address?: string | null;
   vat_registered?: boolean | null;
+  // The income streams the user ticked on /start (job, property, loan). These used
+  // to be dropped on the floor; they are the reliefs we carry into the app so nothing
+  // is asked twice. See reconcileSignupToUser.
+  streams?: string[] | null;
   offer?: string | null;
   referred_by_code?: string | null;
 }
@@ -861,6 +865,7 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
   if (signup.postcode) record.postcode = signup.postcode;
   if (signup.address) record.address = signup.address;
   if (signup.vat_registered !== undefined && signup.vat_registered !== null) record.vat_registered = signup.vat_registered;
+  if (Array.isArray(signup.streams) && signup.streams.length) record.streams = signup.streams;
   if (signup.offer) record.offer = signup.offer;
   // Attribution only. Store the sanitised referral code they arrived through, if
   // it is a valid code. Reward is a separate gated decision (doc 82).
@@ -877,6 +882,108 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
     // phone/email back, and that personal data must never reach the logs.
     throw new Error(`Signup insert failed: ${res.status}`);
   }
+}
+
+// The web /start structure choice, mapped to the tax engine's business type. "A business name"
+// is still a sole trader for tax; only a registered company is a limited company. Partnership is
+// not offered on the web, so it never arrives here.
+function tradeTypeToBusinessType(t: string | null | undefined): BusinessType {
+  return t === 'ltd' ? 'limited_company' : 'sole_trader';
+}
+
+export interface ReconcileResult { reconciled: boolean; applied: string[] }
+
+// 🔴 SEAMLESS ONBOARDING. Pull what the user already told us on the web /start signup into their
+// account, so the app never asks it a second time.
+//
+// Keyed by phone, the account key. IDEMPOTENT: it runs once, is marked with reconciled_at, and can
+// never double-apply. It runs BEFORE the app first-run wizard, so it never overwrites a later
+// in-app answer. Everything it writes is logged honestly: circumstances are stored with the wording
+// the user actually saw on the web and channel 'web', because the log is the defence (Finance Act
+// 2026 Sch 22), and a record must say what he really answered, on the surface he really answered it.
+//
+// It carries the facts that map cleanly: the business structure, the name/address, VAT status, and a
+// PAYE job alongside the trade. The 'property' and 'loan' streams need details the web did not
+// collect (rent figures, the student loan plan), so those stay as in-app prompts rather than guesses.
+export async function reconcileSignupToUser(userId: string): Promise<ReconcileResult> {
+  const { url } = config();
+
+  // The phone is the join key, and it lives on the user, not in the request.
+  const ures = await fetch(
+    `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=phone_number&limit=1`,
+    { headers: headers() },
+  );
+  if (!ures.ok) return { reconciled: false, applied: [] };
+  const urows = (await ures.json().catch(() => null)) as Array<{ phone_number: string | null }> | null;
+  const phone = Array.isArray(urows) && urows[0]?.phone_number ? urows[0].phone_number : '';
+  const e164 = normalizeUkPhone(phone);
+  if (!e164) return { reconciled: false, applied: [] };
+
+  // The most recent signup for this phone that has not been reconciled yet.
+  const res = await fetch(
+    `${url}/rest/v1/signups?phone=eq.${encodeURIComponent(e164)}&reconciled_at=is.null` +
+      `&select=trade_type,name,address,postcode,vat_registered,streams&order=created_at.desc&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return { reconciled: false, applied: [] };
+  const rows = (await res.json().catch(() => null)) as Array<{
+    trade_type: string | null; name: string | null; address: string | null; postcode: string | null;
+    vat_registered: boolean | null; streams: string[] | null;
+  }> | null;
+  if (!Array.isArray(rows) || rows.length === 0) return { reconciled: false, applied: [] };
+  const s = rows[0];
+  const applied: string[] = [];
+
+  // 1. Business structure -> the tax engine branch. The biggest question, and now never asked twice.
+  if (s.trade_type) {
+    if (await setBusinessType(userId, tradeTypeToBusinessType(s.trade_type))) applied.push('business_type');
+  }
+
+  // 2. Name and address onto the profile, for invoices and the quarter pack header.
+  const patch: Record<string, unknown> = {};
+  if (s.name) {
+    if (s.trade_type === 'ltd' || s.trade_type === 'business') patch.business_name = s.name;
+    else patch.name = s.name;
+  }
+  const addr = [s.address, s.postcode].filter(Boolean).join(', ');
+  if (addr) patch.address = addr;
+  if (Object.keys(patch).length > 0) {
+    const pr = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(patch),
+    });
+    if (pr.ok) applied.push('profile');
+  }
+
+  // 3. VAT status -> a circumstance, logged with the wording he saw on the web.
+  if (s.vat_registered !== null && s.vat_registered !== undefined) {
+    if (await saveCircumstance(
+      userId, 'vat_registered', s.vat_registered ? 'yes' : 'no',
+      'Are you VAT registered? (you answered this when you signed up on the Lekhio website)', 'web',
+    )) applied.push('vat_registered');
+  }
+
+  // 4. A PAYE job alongside the trade -> the other_job circumstance. The salary itself is asked later.
+  const streams = Array.isArray(s.streams) ? s.streams : [];
+  if (streams.includes('job')) {
+    if (await saveCircumstance(
+      userId, 'other_job', 'yes',
+      'You told us at signup that you also have a job on the payroll alongside your self-employed work.', 'web',
+    )) applied.push('other_job');
+  }
+
+  // Mark reconciled, so a second app launch never re-applies any of the above.
+  await fetch(
+    `${url}/rest/v1/signups?phone=eq.${encodeURIComponent(e164)}&reconciled_at=is.null`,
+    {
+      method: 'PATCH',
+      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ reconciled_at: new Date().toISOString() }),
+    },
+  );
+
+  return { reconciled: applied.length > 0, applied };
 }
 
 // Verify a Supabase access token and return the verified user (id and email), or

@@ -995,6 +995,23 @@ export async function getStripeCustomerByEmail(email: string): Promise<string | 
   return rows[0]?.stripe_customer_id ?? null;
 }
 
+// The account key is the phone (E.164 +44), so this is the reliable way to open
+// the billing portal for a user who signed in by phone and has no email on their
+// Supabase account. Checkout stored the phone on the subscription alongside the
+// customer id, so this finds the same customer getStripeCustomerByEmail would.
+export async function getStripeCustomerByPhone(phone: string): Promise<string | null> {
+  const { url } = config();
+  const e164 = normalizeUkPhone(phone);
+  if (!e164) return null;
+  const res = await fetch(
+    `${url}/rest/v1/subscriptions?phone=eq.${encodeURIComponent(e164)}&select=stripe_customer_id&order=updated_at.desc&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ stripe_customer_id?: string | null }>;
+  return rows[0]?.stripe_customer_id ?? null;
+}
+
 // Resolve a phone (E.164 +44) to its latest subscription state, so entitlement can
 // be checked for a phone-only account that has no email. Service role only.
 export interface SubscriptionStatus {

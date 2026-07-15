@@ -493,11 +493,11 @@ async function handleWelcome(from: string): Promise<void> {
       '🎯 "my goal is a van for 24k" and I plan around it',
       '❓ Or ask me anything, like "can I claim my boots?"',
       '',
-      'It all lands in your app ready for tax. Pick one to try right now:',
+      'It all lands in your Lekhio app, ready for tax, and anything worth setting up (your bank, the bits about you) is waiting in there too. Pick one to start right now:',
     ].join('\n'),
     [
       { id: 'wk_receipt', title: '📸 Log a receipt' },
-      { id: 'wk_setup', title: '⚙️ Set me up right' },
+      { id: 'wk_goal', title: '🎯 Set a goal' },
       { id: 'wk_help', title: '❓ Everything I do' },
     ],
     'Lekhio · text it, sorted',
@@ -533,11 +533,23 @@ async function handleButtonReply(from: string, buttonId: string): Promise<void> 
     await handleHelp(from);
     return;
   }
-  // The deep setup chain (stateless: every button carries the next step, and
-  // the free text setters, "plan 4", "salary 32000", "my goal is...", already
-  // exist as intents, so nothing needs conversation state).
-  if (buttonId === 'wk_setup') {
-    await handleSetupStart(from);
+  // GET STARTED WITH A GOAL. The structured setup (business type, the bits about
+  // you) now lives in the app's first-run wizard, so WhatsApp does not interrogate
+  // any more. It welcomes, and the first action it invites is a real one: a goal.
+  // This reuses the existing "my goal is..." intent, so nothing needs a session.
+  if (buttonId === 'wk_goal') {
+    await sendText(
+      from,
+      [
+        'Love it. Tell me what you are working towards and I will keep it in view and shape your tax around it. Say it however feels natural:',
+        '',
+        '"my goal is a van for 24k"',
+        '"I want to save 10k this year"',
+        '"goal: take home 3k a month"',
+        '',
+        'Send yours now and I will set it.',
+      ].join('\n'),
+    );
     return;
   }
   // 🔴 STEP 1: THE BUSINESS STRUCTURE. It decides which tax engine applies, so it is stored, and each

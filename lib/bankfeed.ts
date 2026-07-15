@@ -30,6 +30,17 @@ const API_BASE = SANDBOX ? 'https://api.truelayer-sandbox.com' : 'https://api.tr
 const CLIENT_ID = process.env.BANK_CLIENT_ID;
 const CLIENT_SECRET = process.env.BANK_CLIENT_SECRET;
 
+// The OAuth redirect_uri. It must EXACTLY match a redirect URI registered in the
+// TrueLayer console, and it points at the API host that serves /api/bank/callback,
+// which is NOT necessarily the public marketing site (NEXT_PUBLIC_APP_URL is now
+// lekhio.app, but the callback lives on the app deployment). Defined ONCE so the
+// authorize link and the token exchange can never drift out of step, and set
+// explicitly by BANK_REDIRECT_URI so a change to the public site URL can never
+// silently break the bank connect flow with an "Invalid redirect_uri".
+const REDIRECT_URI =
+  process.env.BANK_REDIRECT_URI ??
+  `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app'}/api/bank/callback`;
+
 export function hasBankFeedConfig(): boolean {
   return Boolean(CLIENT_ID && CLIENT_SECRET);
 }
@@ -142,7 +153,7 @@ export function historyFromISO(choice: BankHistory, now: Date = new Date()): str
 // real bank account.
 export function buildAuthLink(state: string): string | null {
   if (!CLIENT_ID) return null;
-  const redirect = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app'}/api/bank/callback`;
+  const redirect = REDIRECT_URI;
   const providers = SANDBOX ? 'uk-cs-mock uk-ob-all uk-oauth-all' : 'uk-ob-all uk-oauth-all';
   const params = new URLSearchParams({
     response_type: 'code',
@@ -175,7 +186,7 @@ function toTokenSet(data: { access_token?: string; refresh_token?: string; expir
 // Exchange the one-time code from the callback for tokens.
 export async function exchangeCode(code: string): Promise<TokenSet | null> {
   if (!CLIENT_ID || !CLIENT_SECRET) return null;
-  const redirect = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app'}/api/bank/callback`;
+  const redirect = REDIRECT_URI;
   try {
     const res = await truelayerFetch(`${AUTH_BASE}/connect/token`, {
       method: 'POST',

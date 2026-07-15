@@ -275,8 +275,8 @@ export default function StartPage() {
               <div style={{ textAlign: 'left', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 18, maxWidth: 460, margin: '0 auto 18px' }}>
                 {[
                   ['1', 'Download the app', 'Your books, your figures, your yes on every entry.'],
-                  ['2', 'Take the 60 second tour', 'It opens on first launch: how capture works, who Puchio and Rakha are, and why January stops hurting.'],
-                  ['3', 'Finish setup on WhatsApp', 'Six quick questions: your work, CIS, student loan, salary, property, a goal. Each answer sharpens your numbers.'],
+                  ['2', 'It sets you up on first open', 'A quick, skippable walk-through: confirm your business, the bits about you, connect your bank if you want, and see what Lekhio has already saved you.'],
+                  ['3', 'Say hello on WhatsApp', 'Then just send a receipt or a voice note as things happen. That is the whole job, day to day.'],
                 ].map(([n, t, d]) => (
                   <div key={n} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '8px 0' }}>
                     <span style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: RIVER_TINT, color: RIVER, fontSize: 12.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{n}</span>
@@ -286,7 +286,7 @@ export default function StartPage() {
                     </span>
                   </div>
                 ))}
-                <a href={`https://wa.me/447593214044?text=${encodeURIComponent('setup')}`} style={{ display: 'block', textAlign: 'center', backgroundColor: '#25D366', color: '#fff', fontSize: 15, fontWeight: 700, padding: '13px 0', borderRadius: 12, marginTop: 10 }}>💬 Start the WhatsApp setup now</a>
+                <a href={`https://wa.me/447593214044?text=${encodeURIComponent('Hi')}`} style={{ display: 'block', textAlign: 'center', backgroundColor: '#25D366', color: '#fff', fontSize: 15, fontWeight: 700, padding: '13px 0', borderRadius: 12, marginTop: 10 }}>💬 Say hello on WhatsApp</a>
               </div>
 
               {/* Optional: add a card so Lekhio carries on after the free trial. */}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createBillingPortal, hasStripeConfig } from '../../../../lib/stripe';
-import { getStripeCustomerByEmail, verifyAccessToken } from '../../../../lib/supabase';
+import { getStripeCustomerByEmail, getStripeCustomerByPhone, verifyAccessToken } from '../../../../lib/supabase';
 
 // Open the Stripe billing portal for the SIGNED-IN subscriber only. The email is
 // taken from the verified Supabase token, never from the request body, so nobody
@@ -18,12 +18,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
+  // The account key is the phone, but some accounts also carry an email. Try email
+  // first (how Stripe historically keyed the customer), then fall back to the phone
+  // from the verified token, so a phone-only account can still reach its portal.
   const email = (verified.email || '').trim().toLowerCase();
-  if (!email) {
-    return NextResponse.json({ error: 'no_email_on_account' }, { status: 400 });
+  const phone = ((verified as { phone?: string | null }).phone || '').trim();
+  if (!email && !phone) {
+    return NextResponse.json({ error: 'no_identifier_on_account' }, { status: 400 });
   }
 
-  const customerId = await getStripeCustomerByEmail(email);
+  let customerId = email ? await getStripeCustomerByEmail(email) : null;
+  if (!customerId && phone) customerId = await getStripeCustomerByPhone(phone);
   if (!customerId) {
     return NextResponse.json({ error: 'no_subscription' }, { status: 404 });
   }

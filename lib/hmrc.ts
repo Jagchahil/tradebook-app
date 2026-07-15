@@ -526,6 +526,38 @@ export async function retrieveCalculation(
   return res.json().catch(() => null);
 }
 
+// 🔴 PRE-POPULATION: RETRIEVE CIS DEDUCTIONS. The flagship read — the CIS tax deducted at source that
+// a subcontractor is most owed and least likely to claim. HMRC holds it because every contractor who
+// paid him reported it.
+//
+// Verified against HMRC's OpenAPI spec (CIS Deductions MTD v3.0, 15 Jul 2026):
+//   GET /individuals/deductions/cis/{nino}/current-position/{taxYear}/{source}
+//   scope read:self-assessment (authorizeUrl already requests it), Accept vnd.hmrc.3.0+json.
+//
+// 🔴 THE ERROR DISCIPLINE, verbatim from every read in this file: a figure we could not read is NOT a
+// zero. A 404 is HMRC saying "no CIS on record", which IS a real answer ({found:false}). Any other
+// non-2xx is "we do not know", returned as null, so the caller never tells a man he is owed nothing
+// on the strength of a failed request.
+const CIS_VERSION = 'application/vnd.hmrc.3.0+json';
+
+export async function retrieveCisDeductions(
+  nino: string,
+  taxYear: string,
+  accessToken: string,
+  fraud: FraudContext,
+  source: 'all' | 'contractor' | 'customer' = 'all',
+): Promise<{ status: number; body: unknown | null; notFound: boolean } | null> {
+  if (!isHmrcConfigured()) return null;
+  const url = `${BASE}/individuals/deductions/cis/${encodeURIComponent(nino)}/current-position/${encodeURIComponent(taxYear)}/${encodeURIComponent(source)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: CIS_VERSION, ...fraudPreventionHeaders(fraud) },
+  });
+  // 404 = no CIS on record for that year. A real answer, not a failure.
+  if (res.status === 404) return { status: 404, body: null, notFound: true };
+  if (!res.ok) return null; // could not read: NOT a zero.
+  return { status: res.status, body: await res.json().catch(() => null), notFound: false };
+}
+
 // Final declaration (crystallisation), behind the approval gate. The user first
 // triggers an intent-to-finalise calculation (triggerCalculation) to get a
 // calculationId, reviews the figures, and only then agrees. This POSTs the final

@@ -155,7 +155,12 @@ export default function StudioPage() {
           <Board assets={assets} onOpen={setOpenId} />
         )}
         {!empty && tab === 'ideas' && (
-          <Ideas ideas={ideas} onAdd={async (b) => { if (await mutate({ action: 'add_idea', ...b })) load(); }} onVote={async (id) => { if (await mutate({ action: 'vote_idea', id })) load(); }} />
+          <Ideas
+            ideas={ideas}
+            onAdd={async (b) => { if (await mutate({ action: 'add_idea', ...b })) load(); }}
+            onVote={async (id) => { if (await mutate({ action: 'vote_idea', id })) load(); }}
+            onDraft={async (id) => { await mutate({ action: 'draft', id }); load(); }}
+          />
         )}
         {!empty && tab === 'scoreboard' && (
           <Scoreboard rows={scoreboard} hasMetrics={data?.hasMetrics ?? false} onOpen={setOpenId} />
@@ -218,17 +223,19 @@ function Board({ assets, onOpen }: { assets: Asset[]; onOpen: (id: string) => vo
 // --- ideas -------------------------------------------------------------------------------------
 
 function Ideas({
-  ideas, onAdd, onVote,
+  ideas, onAdd, onVote, onDraft,
 }: {
   ideas: Idea[];
   onAdd: (b: { title: string; trade: string | null; format: Format; promise: Promise3; note: string | null }) => void;
   onVote: (id: string) => void;
+  onDraft: (id: string) => Promise<void>;
 }) {
   const [title, setTitle] = useState('');
   const [trade, setTrade] = useState('');
   const [format, setFormat] = useState<Format>('video');
   const [promise, setPromise] = useState<Promise3>('money');
   const [note, setNote] = useState('');
+  const [draftingId, setDraftingId] = useState<string | null>(null);
 
   return (
     <div style={S.section}>
@@ -267,6 +274,13 @@ function Ideas({
                 {i.note && <span style={{ ...T.tiny, color: C.muted }}>{i.note}</span>}
               </div>
             </div>
+            <button
+              disabled={draftingId === i.id}
+              onClick={async () => { setDraftingId(i.id); try { await onDraft(i.id); } finally { setDraftingId(null); } }}
+              style={{ ...S.chip, ...S.chipOn, opacity: draftingId === i.id ? 0.6 : 1 }}
+            >
+              {draftingId === i.id ? 'Drafting' : 'Draft with Claude'}
+            </button>
           </div>
         ))}
         {ideas.length === 0 && <div style={S.honest}>No ideas yet. Add the first one above.</div>}

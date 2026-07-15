@@ -7,6 +7,7 @@
 
 import { FACTS } from './taxengine';
 import { aiEnabled } from './aicost';
+import { storyboardPrompt, parseStoryboardDraft, type DraftInput, type DraftResult } from './studioagent';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 // Two tiers. The structured extraction tasks (receipt fields, entry parsing,
@@ -629,4 +630,59 @@ export async function parseSchedule(text: string, nowIso: string): Promise<Parse
     console.error('[claude] Could not parse schedule JSON.');
     return null;
   }
+}
+
+// DRAFT A STORYBOARD FROM AN IDEA. The creative half of the content engine (docs 110, 111).
+//
+// Runs on the SMART model, because this is the brand voice reaching real people, not a field
+// extraction, and a clip that sounds like a software company is worse than no clip. The prompt and
+// the parser live in lib/studioagent.ts so the rails and the JSON shape can be tested without a
+// network. Degrades to null on any failure, exactly like every other call here, so a hung or
+// refused draft never throws into the request that asked for it.
+export async function draftStoryboard(input: DraftInput): Promise<DraftResult | null> {
+  if (!ready() || !KEY) return null;
+
+  let res: Response;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: MODEL_SMART,
+        max_tokens: 1500,
+        system: [
+          {
+            type: 'text',
+            text:
+              'You are the content writer for Lekhio. You write honest, blunt, British short form ' +
+              'marketing for UK tradespeople. You obey the rules given in the user message without ' +
+              'exception, and you return only the JSON asked for.',
+          },
+        ],
+        messages: [{ role: 'user', content: storyboardPrompt(input) }],
+      }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[claude] Storyboard draft request failed or timed out:', message);
+    return null;
+  }
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[claude] Storyboard draft failed:', res.status, errText);
+    return null;
+  }
+
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  logUsage('storyboard_draft', data);
+  const textBlock = data.content?.find((c) => c.type === 'text')?.text;
+  if (!textBlock) return null;
+
+  return parseStoryboardDraft(textBlock, input);
 }

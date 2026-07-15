@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The Content Studio daily agent, as a launchd job on the Mac mini.
+     ISOLATED from the personal bot: its own Label, its own logs, its own process. Edit the two
+     ABSOLUTE paths below (node, and the repo), then install as described in STUDIO_AGENT_SETUP.md.
+     Runs once a day at 07:00. It only adds drafts to awaiting_approval. It never posts or spends. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.lekhio.studioagent</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/ABSOLUTE/PATH/TO/tradebook/scripts/studio-agent.mjs</string>
+    <string>--count</string>
+    <string>3</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>7</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/lekhio-studioagent.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/lekhio-studioagent.err</string>
+</dict>
+</plist>

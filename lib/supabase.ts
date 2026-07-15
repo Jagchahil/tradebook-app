@@ -4597,3 +4597,73 @@ export async function attributionByTag(): Promise<Record<string, { trials: numbe
     return out;
   } catch { return null; }
 }
+
+// --- Studio agent: idea lookup, promotion, and the heartbeat -----------------------------------
+
+export async function readStudioIdea(id: string): Promise<Idea | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_ideas?id=eq.${encodeURIComponent(id)}&select=*`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Idea[];
+    return rows[0] ?? null;
+  } catch { return null; }
+}
+
+// Mark an idea promoted once an asset has been drafted from it, so it is not drafted again. Best
+// effort: a failure here does not undo the asset that was already made.
+export async function markIdeaPromoted(id: string): Promise<boolean> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_ideas?id=eq.${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=minimal' }),
+        body: JSON.stringify({ status: 'promoted' }),
+      },
+    );
+    return res.ok;
+  } catch { return false; }
+}
+
+export interface StudioAgentRun {
+  ran_at: string;
+  drafted: number;
+  considered: number;
+  ok: boolean;
+}
+
+// THE HEARTBEAT WRITE. Called on EVERY agent run, success or failure. A run that drafted nothing
+// still writes a row: the bot looked, and that is the fact the console needs to know it is alive.
+export async function insertStudioAgentRun(input: {
+  drafted: number; considered: number; ok: boolean; note: string | null; duration_ms: number | null;
+}): Promise<boolean> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/studio_agent_runs`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify(input),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+// The newest heartbeat, for a console light later. Null means the table is empty, which for a bot
+// that has never run is the honest answer, not a green light.
+export async function readLatestStudioAgentRun(): Promise<StudioAgentRun | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/studio_agent_runs?select=ran_at,drafted,considered,ok&order=ran_at.desc&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as StudioAgentRun[];
+    return rows[0] ?? null;
+  } catch { return null; }
+}

@@ -6,12 +6,16 @@ import {
   voteStudioIdea,
   insertStudioAsset,
   readStudioAsset,
+  readStudioIdea,
+  markIdeaPromoted,
   setStudioAssetState,
   insertStudioApproval,
   insertStudioMetric,
   countStudioAssets,
 } from '../../../../../lib/supabase';
 import { isTeam } from '../../../../../lib/team';
+import { draftStoryboard } from '../../../../../lib/claude';
+import type { DraftInput } from '../../../../../lib/studioagent';
 import {
   SEED_ASSETS, defaultPlatforms, isLegalAdvance, isPublishGate,
   type Format, type Promise3, type AssetState, type Platform, type Storyboard,
@@ -126,6 +130,44 @@ export async function POST(req: NextRequest) {
       created_by: me,
     });
     if (!asset) return NextResponse.json({ error: 'insert failed' }, { status: 503 });
+    return NextResponse.json({ asset });
+  }
+
+  // --- draft a storyboard from an idea with Claude. Any team member. Lands in awaiting_approval. -
+  if (action === 'draft') {
+    let input: DraftInput;
+    let ideaId: string | null = null;
+    if (body.id) {
+      const idea = await readStudioIdea(body.id);
+      if (!idea) return NextResponse.json({ error: 'not found' }, { status: 404 });
+      ideaId = idea.id;
+      input = { title: idea.title, trade: idea.trade, format: idea.format, promise: idea.promise };
+    } else {
+      const title = (body.title || '').trim();
+      if (!title) return NextResponse.json({ error: 'title or id required' }, { status: 400 });
+      input = { title, trade: (body.trade || '').trim() || null, format: asFormat(body.format), promise: asPromise(body.promise) };
+    }
+
+    const draft = await draftStoryboard(input);
+    if (!draft) return NextResponse.json({ error: 'draft failed' }, { status: 503 });
+
+    const asset = await insertStudioAsset({
+      idea_id: ideaId,
+      title: input.title,
+      trade: input.trade,
+      format: input.format,
+      promise: input.promise,
+      script: draft.script,
+      scene: draft.scene || null,
+      caption: draft.caption,
+      platforms: defaultPlatforms(input.format),
+      source_tag: draft.source_tag,
+      storyboard: draft.storyboard,
+      state: 'awaiting_approval',
+      created_by: me,
+    });
+    if (!asset) return NextResponse.json({ error: 'insert failed' }, { status: 503 });
+    if (ideaId) await markIdeaPromoted(ideaId);
     return NextResponse.json({ asset });
   }
 

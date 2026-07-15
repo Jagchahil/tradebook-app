@@ -891,7 +891,10 @@ function tradeTypeToBusinessType(t: string | null | undefined): BusinessType {
   return t === 'ltd' ? 'limited_company' : 'sole_trader';
 }
 
-export interface ReconcileResult { reconciled: boolean; applied: string[] }
+// `prompts` are the streams we could NOT fully apply because the web only captured a flag, not the
+// detail: 'property' needs rent figures, 'loan' needs the plan. The app nudges the user to add those
+// in their own screens, so even these do not feel like starting from scratch.
+export interface ReconcileResult { reconciled: boolean; applied: string[]; prompts?: string[] }
 
 // 🔴 SEAMLESS ONBOARDING. Pull what the user already told us on the web /start signup into their
 // account, so the app never asks it a second time.
@@ -983,7 +986,11 @@ export async function reconcileSignupToUser(userId: string): Promise<ReconcileRe
     },
   );
 
-  return { reconciled: applied.length > 0, applied };
+  return {
+    reconciled: applied.length > 0,
+    applied,
+    prompts: streams.filter((x) => x === 'property' || x === 'loan'),
+  };
 }
 
 // Verify a Supabase access token and return the verified user (id and email), or

@@ -20,6 +20,9 @@ import { quarterForDate, quarterBounds } from './quarterpack';
 import type { OptimiserInput } from './taxoptimiser';
 import { qaDedupeKey, qaPrunePaths } from './qaretention';
 import type { KnowledgeState } from './knowledgewatch';
+import type {
+  Idea, Asset, Approval, Metric, AssetState, Format, Promise3, Platform, Storyboard,
+} from './studio';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -4246,4 +4249,244 @@ export async function forgetCircumstance(userId: string, key: string): Promise<b
   } catch {
     return false;
   }
+}
+
+// ================================================================================================
+// THE CONTENT STUDIO (docs 110, 111, 112). Server only, service role, exactly like the rest of this
+// file. Every function here reaches tables that carry NO customer data. The single bridge to the
+// customer world is read only and aggregate: attributionByTag counts how many people arrived under a
+// post's own tag, never who they are and never a figure about their money.
+// ================================================================================================
+
+export async function readStudioIdeas(): Promise<Idea[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_ideas?select=*&order=votes.desc,created_at.desc&limit=500`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Idea[];
+  } catch { return null; }
+}
+
+export async function insertStudioIdea(input: {
+  title: string; trade: string | null; format: Format; promise: Promise3; note: string | null; author: string | null;
+}): Promise<Idea | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/content_ideas`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=representation' }),
+      body: JSON.stringify({
+        title: input.title, trade: input.trade, format: input.format,
+        promise: input.promise, note: input.note, author: input.author,
+      }),
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Idea[];
+    return rows[0] ?? null;
+  } catch { return null; }
+}
+
+// A vote is read then write. If two votes race, one increment can be lost, and that is completely
+// fine: a backlog vote is a nudge, not an accounting entry. We do not add a database function and a
+// migration to make a popularity counter perfect.
+export async function voteStudioIdea(id: string): Promise<boolean> {
+  try {
+    const { url } = config();
+    const cur = await fetch(
+      `${url}/rest/v1/content_ideas?id=eq.${encodeURIComponent(id)}&select=votes`,
+      { headers: headers() },
+    );
+    if (!cur.ok) return false;
+    const rows = (await cur.json()) as Array<{ votes: number }>;
+    if (!rows[0]) return false;
+    const res = await fetch(
+      `${url}/rest/v1/content_ideas?id=eq.${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=minimal' }),
+        body: JSON.stringify({ votes: rows[0].votes + 1 }),
+      },
+    );
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function countStudioAssets(): Promise<number | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_assets?select=id`,
+      { headers: headers({ Prefer: 'count=exact', Range: '0-0' }) },
+    );
+    if (!res.ok) return null;
+    const range = res.headers.get('content-range') || '';
+    const total = range.split('/')[1];
+    return total ? parseInt(total, 10) : 0;
+  } catch { return null; }
+}
+
+export async function readStudioAssets(): Promise<Asset[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_assets?select=*&order=updated_at.desc&limit=1000`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Asset[];
+  } catch { return null; }
+}
+
+export async function readStudioAsset(id: string): Promise<Asset | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_assets?id=eq.${encodeURIComponent(id)}&select=*`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Asset[];
+    return rows[0] ?? null;
+  } catch { return null; }
+}
+
+export async function insertStudioAsset(input: {
+  idea_id: string | null; title: string; trade: string | null; format: Format; promise: Promise3;
+  script: string | null; scene: string | null; caption: string | null;
+  platforms: Platform[]; source_tag: string | null; storyboard: Storyboard;
+  state: AssetState; created_by: string | null;
+}): Promise<Asset | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/content_assets`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=representation' }),
+      body: JSON.stringify({
+        idea_id: input.idea_id, title: input.title, trade: input.trade,
+        format: input.format, promise: input.promise, script: input.script,
+        scene: input.scene, caption: input.caption, platforms: input.platforms,
+        source_tag: input.source_tag, storyboard: input.storyboard,
+        state: input.state, created_by: input.created_by,
+      }),
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Asset[];
+    return rows[0] ?? null;
+  } catch { return null; }
+}
+
+// Advance an asset ONE step. The `state=eq.from` guard makes this a claim, not a blind write: if the
+// card already moved, we change nothing and return null, so two clicks cannot skip a state or move a
+// card that someone else already moved. The server, not the client, decides `to` is legal.
+export async function setStudioAssetState(id: string, from: AssetState, to: AssetState): Promise<Asset | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_assets?id=eq.${encodeURIComponent(id)}&state=eq.${encodeURIComponent(from)}`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ state: to, updated_at: new Date().toISOString() }),
+      },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Asset[];
+    return rows[0] ?? null;
+  } catch { return null; }
+}
+
+export async function insertStudioApproval(input: {
+  asset_id: string; kind: 'publish' | 'promote'; decision: 'approve' | 'reject' | 'changes';
+  note: string | null; spend_cap_pence: number | null; decided_by: string;
+}): Promise<Approval | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/content_approvals`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=representation' }),
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Approval[];
+    return rows[0] ?? null;
+  } catch { return null; }
+}
+
+export async function readStudioApprovals(assetId: string): Promise<Approval[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_approvals?asset_id=eq.${encodeURIComponent(assetId)}&select=*&order=created_at.desc`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Approval[];
+  } catch { return null; }
+}
+
+export async function insertStudioMetric(input: {
+  asset_id: string; platform: Platform; as_of: string;
+  reach: number; saves: number; shares: number; clicks: number; trials: number; entered_by: string | null;
+}): Promise<Metric | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/content_metrics`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=representation' }),
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Metric[];
+    return rows[0] ?? null;
+  } catch { return null; }
+}
+
+export async function readStudioMetrics(): Promise<Metric[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_metrics?select=*&order=as_of.desc&limit=5000`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Metric[];
+  } catch { return null; }
+}
+
+// THE REAL MONEY NUMBER, and the only place the studio touches the customer world.
+//
+// It counts, per attribution tag, how many people arrived under it and how many of those pay us now.
+// It reads acquisition_detail (the granular tag a post carries) and joins subscriptions by phone on
+// the server, the same join readTeamCustomers does, so the phone never leaves this function. The
+// output is two counts per tag. Never a name, never a figure about any individual. Until real posts
+// are live carrying real tags, every count is honestly zero.
+export async function attributionByTag(): Promise<Record<string, { trials: number; paying: number }> | null> {
+  try {
+    const { url } = config();
+    const [uRes, sRes] = await Promise.all([
+      fetch(`${url}/rest/v1/users?select=phone,acquisition_detail&acquisition_detail=not.is.null&limit=20000`, { headers: headers() }),
+      fetch(`${url}/rest/v1/subscriptions?select=phone,status&limit=20000`, { headers: headers() }),
+    ]);
+    if (!uRes.ok || !sRes.ok) return null;
+    const users = (await uRes.json()) as Array<{ phone: string | null; acquisition_detail: string | null }>;
+    const subs = (await sRes.json()) as Array<{ phone: string | null; status: string | null }>;
+
+    const paying = new Set(['active', 'past_due']);
+    const statusByPhone = new Map<string, string>();
+    for (const s of subs) if (s.phone) statusByPhone.set(s.phone, s.status || 'none');
+
+    const out: Record<string, { trials: number; paying: number }> = {};
+    for (const u of users) {
+      const tag = (u.acquisition_detail || '').trim();
+      if (!tag) continue;
+      const row = (out[tag] ??= { trials: 0, paying: 0 });
+      row.trials += 1;
+      const st = u.phone ? statusByPhone.get(u.phone) : undefined;
+      if (st && paying.has(st)) row.paying += 1;
+    }
+    return out;
+  } catch { return null; }
 }

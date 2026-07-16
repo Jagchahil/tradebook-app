@@ -90,11 +90,13 @@ export default function Universe({ data }: { data: UniverseData }) {
           // DENSITY FALLS OFF WITH DISTANCE, so the cloud is thick and bright near its sun and thins
           // to a scatter at the rim, the way a real galaxy does. pow>1 pulls most stars inward.
           const t = b();
-          const rad = 96 + 360 * Math.pow(t, 1.7);
+          // Spread over a wide reach with only a gentle inward lean, so stars sit apart with clear
+          // gaps between them: each one is its own thing to hover and read, not a clump.
+          const rad = 150 + 540 * Math.pow(t, 1.08);
           // a gentle spiral sweep down the arm, so the cloud curls into the sun rather than sitting
           // as a straight wedge. The whole galaxy turns the same way.
-          const curl = ((rad - 96) / 360) * 30;
-          const ang = centre + (a() - 0.5) * band * 0.86 + curl;
+          const curl = ((rad - 150) / 540) * 24;
+          const ang = centre + (a() - 0.5) * band * 0.92 + curl;
           const x = coreX + rad * Math.cos(ang * RAD);
           const y = coreY + rad * Math.sin(ang * RAD);
           const { color, bright } = toneColor(star.pulse, hue);
@@ -288,8 +290,8 @@ export default function Universe({ data }: { data: UniverseData }) {
               return (
                 <line key={'ln' + p.star.id} x1={c.x} y1={c.y} x2={p.x} y2={p.y}
                       stroke={isActive ? '#ffffff' : p.color}
-                      strokeOpacity={isActive ? 0.6 : p.bright ? 0.085 : 0.04}
-                      strokeWidth={isActive ? 1.4 : 0.6} />
+                      strokeOpacity={isActive ? 0.75 : p.bright ? 0.24 : 0.12}
+                      strokeWidth={isActive ? 1.6 : 0.8} />
               );
             })}
 
@@ -310,8 +312,8 @@ export default function Universe({ data }: { data: UniverseData }) {
               const isActive = active?.id === p.star.id;
               const h = hash(p.star.id);
               const hero = p.bright && h % 11 === 0;             // ~1 in 11 of the lit stars
-              const jitter = ((h % 7) - 3) * 0.16;               // ±0.5px, deterministic
-              const baseR = (p.star.kind === 'constant' || p.star.kind === 'rule' ? 3.1 : 4.2) + (hero ? 1.8 : 0) + jitter;
+              const jitter = ((h % 7) - 3) * 0.14;
+              const baseR = (p.star.kind === 'constant' || p.star.kind === 'rule' ? 2.9 : 3.8) + (hero ? 1.6 : 0) + jitter;
               const r = isActive ? baseR + 2.4 : baseR;
               return (
                 <g key={p.star.id}
@@ -320,7 +322,7 @@ export default function Universe({ data }: { data: UniverseData }) {
                    onClick={() => { if (!drag.current?.moved) setPin((q) => (q?.id === p.star.id ? null : focusStar(p))); }}
                    style={{ cursor: 'pointer' }}>
                   {p.bright ? (
-                    <circle cx={p.x} cy={p.y} r={r + (hero ? 13 : 6.5)} fill={p.color} fillOpacity={hero ? 0.22 : 0.15}
+                    <circle cx={p.x} cy={p.y} r={r + (hero ? 9 : 4)} fill={p.color} fillOpacity={hero ? 0.2 : 0.12}
                             filter={hero ? 'url(#uniBloom)' : 'url(#uniSoft)'}
                             style={{ animation: `uniPulse ${3 + (h % 20) / 10}s ease-in-out infinite` }} />
                   ) : null}

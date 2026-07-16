@@ -389,6 +389,26 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
     },
   ],
 
+  // ADDED 16 July 2026. Both quotes were FETCHED FROM THE LIVE HMRC manual and copied verbatim, each
+  // a single standalone sentence (not one spanning bullets), so Khoji's nightly corpus check can find
+  // it word for word. The statute is named so the answer is law and not an opinion.
+  bad_debt: [
+    {
+      code: 'BIM42701',
+      url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim42701',
+      quote: 'A deduction for a bad or doubtful debt is to be made in arriving at the profits of the year in which the debt becomes bad or doubtful.',
+      authority: 'S35 Income Tax (Trading and Other Income) Act 2005. A SPECIFIC bad debt is allowable; a general reserve is not (same page: "A general reserve ... should not be admitted as a deduction").',
+    },
+  ],
+  pretrading: [
+    {
+      code: 'BIM46351',
+      url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim46351',
+      quote: 'The above legislation provides relief in respect of certain expenditure of a revenue nature incurred for the purposes of a trade, profession or vocation before it is commenced.',
+      authority: 'S57 Income Tax (Trading and Other Income) Act 2005. Revenue costs in the seven years before commencement, allowable as if incurred on the first day of trading. Capital is handled separately.',
+    },
+  ],
+
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 24 OF 24 RULES CITED. 0 UNCITED. 14 July 2026.
   //

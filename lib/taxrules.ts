@@ -278,6 +278,22 @@ export const EXPENSE_RULES: ExpenseRule[] = [
     rule: 'Not an expense, but a tax saver. A personal pension is not a business cost, but it gets you tax relief and cuts your bill. Well worth it.',
     detail: 'You do not put a personal pension through as a business expense, but paying in gets you tax relief, 20% added automatically and more reclaimed if you are a higher rate payer. One of the best legal ways to cut your tax.',
   },
+  {
+    key: 'bad_debt',
+    title: 'A customer who never paid',
+    verdict: 'yes',
+    aliases: ['bad debt', 'bad debts', 'unpaid invoice', 'unpaid invoices', 'never paid', 'did not pay', 'didnt pay', 'customer never paid', 'write off', 'write-off', 'writeoff', 'wont pay', 'refuses to pay'],
+    rule: 'Yes, once it is genuinely bad. A specific invoice you have given up on can be written off and deducted in the year it goes bad. A general "some might not pay" reserve cannot.',
+    detail: 'HMRC allows a deduction for a specific bad or doubtful debt in the year it becomes bad, but not a blanket reserve across all your customers. So a named invoice you have chased and given up on comes off your profit. If they pay later, it goes back on. Watched nightly against the HMRC manual.',
+  },
+  {
+    key: 'pretrading',
+    title: 'Costs before you started trading',
+    verdict: 'yes',
+    aliases: ['before i started', 'before trading', 'pre trading', 'pre-trading', 'setup costs', 'start up costs', 'startup costs', 'start-up', 'before i was self employed', 'costs before starting'],
+    rule: 'Yes, up to seven years back. Everyday running costs you paid before your first day of trading are treated as if incurred on that first day, so they are allowable.',
+    detail: 'Revenue costs (not equipment) incurred in the seven years before you started, that would have been allowable once trading, are relieved as if spent on day one. Tools and equipment are handled separately as capital. Watched nightly against the HMRC manual.',
+  },
 ];
 
 export function checkExpense(query: string): ExpenseRule | null {

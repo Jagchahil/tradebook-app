@@ -196,6 +196,310 @@
       "authority": "s11 Landlord and Tenant Act 1985",
       "source_url": "https://www.legislation.gov.uk/ukpga/1985/70/section/11",
       "answered": "uncovered"
+    },
+    {
+      "id": "L25", "field": "employment", "qualification": "CILEX Employment Law", "topic": "Written statement of particulars",
+      "prompt": "A tradesperson takes on their first employee. When must a written statement of the main employment terms be given?",
+      "answer": "On or before the first day of employment. The principal statement is a day-one right, pinned to the provision rather than to any current list of particulars.",
+      "authority": "s1 Employment Rights Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/18/section/1",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L26", "field": "employment", "qualification": "CIPD Employment Law", "topic": "Unfair dismissal qualifying period",
+      "prompt": "An employee is dismissed. What continuous-service condition must ordinarily be met before an ordinary unfair dismissal claim can be brought?",
+      "answer": "A qualifying period of continuous employment (currently two years) is generally required, save for automatically-unfair reasons which need no qualifying period. The requirement is set by the provision, which is what we watch.",
+      "authority": "s108 Employment Rights Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/18/section/108",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L27", "field": "employment", "qualification": "CILEX Employment Law", "topic": "Statutory minimum notice",
+      "prompt": "How is the statutory minimum notice an employer must give an employee determined?",
+      "answer": "By length of continuous service: one week once a month has passed, then one week for each complete year, up to a statutory maximum. The scheme is fixed by the provision, not by us.",
+      "authority": "s86 Employment Rights Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/18/section/86",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L28", "field": "employment", "qualification": "CIPD Employment Law", "topic": "Fair reasons for dismissal",
+      "prompt": "On what basis can a dismissal be defended as fair?",
+      "answer": "It must be for one of the potentially fair reasons (capability, conduct, redundancy, statutory bar or some other substantial reason) and the employer must have acted reasonably in treating it as sufficient.",
+      "authority": "s98 Employment Rights Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/18/section/98",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L29", "field": "employment", "qualification": "CILEX Employment Law", "topic": "Redundancy pay entitlement",
+      "prompt": "What service condition must an employee meet to be entitled to a statutory redundancy payment?",
+      "answer": "A qualifying period of continuous employment (currently two years) ending with the relevant date. The condition lives in the provision.",
+      "authority": "s155 Employment Rights Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/18/section/155",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L30", "field": "employment", "qualification": "SQE1 FLK1", "topic": "Protected characteristics",
+      "prompt": "Under the Equality Act, discrimination is unlawful only where it relates to a protected characteristic. Where are those characteristics defined?",
+      "answer": "In the Act itself, which lists the protected characteristics (age, disability, gender reassignment, marriage and civil partnership, pregnancy and maternity, race, religion or belief, sex, and sexual orientation).",
+      "authority": "s4 Equality Act 2010",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2010/15/section/4",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L31", "field": "employment", "qualification": "SQE1 FLK1", "topic": "Direct discrimination",
+      "prompt": "What is direct discrimination?",
+      "answer": "Treating a person less favourably than others are or would be treated, because of a protected characteristic.",
+      "authority": "s13 Equality Act 2010",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2010/15/section/13",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L32", "field": "employment", "qualification": "CIPD Employment Law", "topic": "Paid annual leave",
+      "prompt": "What is a worker's statutory paid annual leave entitlement?",
+      "answer": "Paid annual leave (currently 5.6 weeks in total, combining the basic and additional entitlements) provided by the Working Time Regulations, which is the instrument we watch for change.",
+      "authority": "regs 13 and 13A Working Time Regulations 1998",
+      "source_url": "https://www.legislation.gov.uk/uksi/1998/1833/regulation/13",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L33", "field": "employment", "qualification": "CIPD Employment Law", "topic": "National minimum wage",
+      "prompt": "An employer pays a worker below the national minimum wage for their age. What is the position?",
+      "answer": "Unlawful. A worker of the qualifying age must be paid at least the applicable National Minimum or National Living Wage rate, with arrears and penalties for underpayment.",
+      "authority": "GOV.UK National Minimum Wage rates (National Minimum Wage Act 1998)",
+      "source_url": "https://www.gov.uk/national-minimum-wage-rates",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L34", "field": "contract", "qualification": "CILEX Contract Law", "topic": "Limitation, simple contract",
+      "prompt": "A customer refuses to pay an invoice for completed work. How long is there to sue on the contract?",
+      "answer": "Six years from the date the cause of action accrued, for an action founded on a simple contract. The period is set by the provision.",
+      "authority": "s5 Limitation Act 1980",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1980/58/section/5",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L35", "field": "contract", "qualification": "SQE1 FLK1", "topic": "Limitation, specialty",
+      "prompt": "How does the limitation period differ where the obligation is contained in a deed rather than a simple contract?",
+      "answer": "An action on a specialty (a contract by deed) has a longer limitation period, currently twelve years from accrual, under the provision.",
+      "authority": "s8 Limitation Act 1980",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1980/58/section/8",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L36", "field": "tort", "qualification": "CILEX Law of Tort", "topic": "Limitation, tort",
+      "prompt": "Within what period must an action in tort for damage to property generally be brought?",
+      "answer": "Six years from the date the cause of action accrued, for actions founded on tort (other than personal injury, which is shorter). The period is fixed by the provision.",
+      "authority": "s2 Limitation Act 1980",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1980/58/section/2",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L37", "field": "tort", "qualification": "CILEX Law of Tort", "topic": "Limitation, personal injury",
+      "prompt": "A worker is injured on site. What is the ordinary limitation period for a personal injury claim?",
+      "answer": "Three years, running from the date of the injury or the claimant's date of knowledge, whichever is later, subject to the court's discretion to extend. The period sits in the provision.",
+      "authority": "s11 Limitation Act 1980",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1980/58/section/11",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L38", "field": "tort", "qualification": "SQE1 FLK1", "topic": "Duty of care",
+      "prompt": "How do the courts decide whether a duty of care exists in a novel negligence situation?",
+      "answer": "By the threefold test of reasonable foreseeability of harm, a relationship of sufficient proximity, and whether it is fair, just and reasonable to impose a duty.",
+      "authority": "Caparo Industries plc v Dickman [1990] 2 AC 605 (HL)",
+      "source_url": "https://caselaw.nationalarchives.gov.uk/",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L39", "field": "consumer", "qualification": "CTSI Trading Standards", "topic": "Satisfactory quality",
+      "prompt": "A tradesperson supplies goods to a consumer as part of a job. What quality standard is implied?",
+      "answer": "That the goods are of satisfactory quality, judged by what a reasonable person would regard as satisfactory, taking account of description, price and other relevant circumstances. It is a statutory term that cannot be excluded against a consumer.",
+      "authority": "s9 Consumer Rights Act 2015",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2015/15/section/9",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L40", "field": "consumer", "qualification": "SQE1", "topic": "Services with reasonable care and skill",
+      "prompt": "What standard does a consumer service contract imply about how the work is done?",
+      "answer": "That the trader will perform the service with reasonable care and skill. It is a term treated as included in every consumer service contract and cannot be excluded to the consumer's detriment.",
+      "authority": "s49 Consumer Rights Act 2015",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2015/15/section/49",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L41", "field": "consumer", "qualification": "CTSI Trading Standards", "topic": "Reasonable price",
+      "prompt": "No price was agreed for a job before it was done. What price is a consumer obliged to pay?",
+      "answer": "A reasonable price, and no more, where the price has not been fixed by the contract or a course of dealing. Reasonableness is a question of fact under the provision.",
+      "authority": "s51 Consumer Rights Act 2015",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2015/15/section/51",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L42", "field": "consumer", "qualification": "CTSI Trading Standards", "topic": "Reasonable time",
+      "prompt": "No completion date was agreed. By when must a consumer service be performed?",
+      "answer": "Within a reasonable time, treated as a term of the contract where no time is fixed. What is reasonable is a question of fact.",
+      "authority": "s52 Consumer Rights Act 2015",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2015/15/section/52",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L43", "field": "consumer", "qualification": "SQE1", "topic": "Short-term right to reject",
+      "prompt": "Goods supplied to a consumer are faulty. Is there a short window in which they can simply reject them?",
+      "answer": "Yes. A consumer has a short-term right to reject non-conforming goods (currently within 30 days) and obtain a refund, in addition to later rights to repair, replacement or price reduction. The window is set by the provisions.",
+      "authority": "ss20 and 22 Consumer Rights Act 2015",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2015/15/section/22",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L44", "field": "construction", "qualification": "JCT contract administration", "topic": "Right to adjudication",
+      "prompt": "A dispute arises on a construction contract over a payment. What quick dispute route does either party have?",
+      "answer": "A statutory right to refer the dispute to adjudication at any time, giving a decision that binds until finally determined by litigation, arbitration or agreement.",
+      "authority": "s108 Housing Grants, Construction and Regeneration Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/53/section/108",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L45", "field": "construction", "qualification": "CIOB", "topic": "Right to stage payments",
+      "prompt": "A construction contract for work lasting more than 45 days is silent on payment timing. Is the contractor entitled to interim payment?",
+      "answer": "Yes. There is a statutory right to payment by instalments, stage or periodic payments for such contracts; if the contract does not provide an adequate mechanism, the Scheme for Construction Contracts applies.",
+      "authority": "s109 Housing Grants, Construction and Regeneration Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/53/section/109",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L46", "field": "construction", "qualification": "JCT contract administration", "topic": "Pay less notice",
+      "prompt": "A payer wants to pay less than the notified sum on a construction contract. What must they do?",
+      "answer": "Give a valid pay less notice, in time and specifying the sum considered due and the basis of calculation. Absent a valid notice, the notified sum falls due in full.",
+      "authority": "s111 Housing Grants, Construction and Regeneration Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/53/section/111",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L47", "field": "construction", "qualification": "CIOB", "topic": "Right to suspend for non-payment",
+      "prompt": "A contractor has not been paid a sum due and no pay less notice was given. Can they stop work?",
+      "answer": "Yes. After giving the required notice of intention, the payee may suspend performance of any or all obligations until payment, with an entitlement to reasonable costs and an extension of time.",
+      "authority": "s112 Housing Grants, Construction and Regeneration Act 1996",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1996/53/section/112",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L48", "field": "health_and_safety", "qualification": "NEBOSH", "topic": "Employer duty to employees",
+      "prompt": "What is the general health and safety duty an employer owes its own workers?",
+      "answer": "To ensure, so far as is reasonably practicable, the health, safety and welfare at work of all employees. It is a qualified but non-delegable general duty.",
+      "authority": "s2 Health and Safety at Work etc. Act 1974",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1974/37/section/2",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L49", "field": "health_and_safety", "qualification": "IOSH", "topic": "Duty to non-employees",
+      "prompt": "A sole trader's work could affect members of the public and other trades on site. What do they owe them?",
+      "answer": "A duty to conduct the undertaking so as to ensure, so far as is reasonably practicable, that persons not in their employment are not exposed to risks to their health or safety.",
+      "authority": "s3 Health and Safety at Work etc. Act 1974",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1974/37/section/3",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L50", "field": "health_and_safety", "qualification": "NEBOSH", "topic": "Duty of employees",
+      "prompt": "Do workers themselves owe health and safety duties?",
+      "answer": "Yes. An employee must take reasonable care for their own safety and that of others affected by their acts, and cooperate with the employer so far as needed to comply with duties.",
+      "authority": "s7 Health and Safety at Work etc. Act 1974",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1974/37/section/7",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L51", "field": "company", "qualification": "ICSA/CGI", "topic": "Duty to promote success",
+      "prompt": "A tradesperson runs their business through a limited company and is its sole director. What core duty do they owe the company?",
+      "answer": "To act in the way they consider, in good faith, would be most likely to promote the success of the company for the benefit of its members as a whole, having regard to the listed factors.",
+      "authority": "s172 Companies Act 2006",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2006/46/section/172",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L52", "field": "company", "qualification": "ACCA LW", "topic": "Duty of care, skill and diligence",
+      "prompt": "What standard of care does a company director owe?",
+      "answer": "Reasonable care, skill and diligence, judged by both an objective standard (what may reasonably be expected of a person in the role) and any higher subjective standard given the director's actual knowledge and experience.",
+      "authority": "s174 Companies Act 2006",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2006/46/section/174",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L53", "field": "company", "qualification": "ICSA/CGI", "topic": "Filing annual accounts",
+      "prompt": "What is the directors' obligation regarding the company's annual accounts and the registrar?",
+      "answer": "To deliver the company's annual accounts and reports to the registrar of companies within the statutory filing period, an obligation resting on the directors.",
+      "authority": "s441 Companies Act 2006",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2006/46/section/441",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L54", "field": "company", "qualification": "ICSA/CGI", "topic": "Confirmation statement",
+      "prompt": "Besides accounts, what periodic statement must a company deliver to Companies House to confirm its information is up to date?",
+      "answer": "A confirmation statement, delivered at least once in each review period, confirming that the company information on the register is up to date.",
+      "authority": "s853A Companies Act 2006",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2006/46/section/853A",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L55", "field": "insolvency", "qualification": "JIEB", "topic": "Wrongful trading",
+      "prompt": "A director keeps trading when they knew, or ought to have concluded, there was no reasonable prospect of avoiding insolvent liquidation. What is the exposure?",
+      "answer": "On liquidation, the court may order the director to contribute to the company's assets for wrongful trading, unless they took every step to minimise loss to creditors after that point.",
+      "authority": "s214 Insolvency Act 1986",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1986/45/section/214",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L56", "field": "insolvency", "qualification": "JIEB", "topic": "Fraudulent trading",
+      "prompt": "How does fraudulent trading differ from wrongful trading?",
+      "answer": "Fraudulent trading requires carrying on business with intent to defraud creditors or for any fraudulent purpose; it carries both civil liability to contribute and criminal liability, and turns on dishonest intent rather than mere unreasonableness.",
+      "authority": "s213 Insolvency Act 1986",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1986/45/section/213",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L57", "field": "insolvency", "qualification": "JIEB", "topic": "Preferences",
+      "prompt": "Before insolvency a company pays one creditor ahead of others, wishing to prefer them. Can that be unwound?",
+      "answer": "Yes. A liquidator or administrator may challenge a preference given within the relevant time where the company was influenced by a desire to put that creditor in a better position; the court may restore the position.",
+      "authority": "s239 Insolvency Act 1986",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1986/45/section/239",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L58", "field": "intellectual_property", "qualification": "SQE2", "topic": "Copyright subsistence",
+      "prompt": "A tradesperson designs a logo and marketing materials. Do they need to register copyright to be protected?",
+      "answer": "No. Copyright subsists automatically on creation of a qualifying original work recorded in some form; there is no registration system for copyright in the UK.",
+      "authority": "ss1 and 3 Copyright, Designs and Patents Act 1988",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1988/48/section/1",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L59", "field": "intellectual_property", "qualification": "CIPA", "topic": "First ownership of copyright",
+      "prompt": "An employee creates a work in the course of their employment. Who owns the copyright?",
+      "answer": "The author is first owner as a general rule, but where a work is made by an employee in the course of employment the employer is first owner, subject to any agreement to the contrary.",
+      "authority": "s11 Copyright, Designs and Patents Act 1988",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1988/48/section/11",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L60", "field": "intellectual_property", "qualification": "SQE2", "topic": "Duration of copyright",
+      "prompt": "How long does copyright in a literary, dramatic, musical or artistic work last?",
+      "answer": "For the life of the author plus a period of years after death (currently 70), set by the provision.",
+      "authority": "s12 Copyright, Designs and Patents Act 1988",
+      "source_url": "https://www.legislation.gov.uk/ukpga/1988/48/section/12",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L61", "field": "data_protection", "qualification": "BCS/ISEB Data Protection", "topic": "Unlawful obtaining of personal data",
+      "prompt": "Someone knowingly obtains or discloses a customer's personal data without the controller's consent. Is that an offence?",
+      "answer": "Yes. It is a criminal offence to knowingly or recklessly obtain, disclose or procure the disclosure of personal data without the consent of the controller, subject to defences.",
+      "authority": "s170 Data Protection Act 2018",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2018/12/section/170",
+      "answered": "knowledge"
+    },
+    {
+      "id": "L62", "field": "tax", "qualification": "ATT", "topic": "Wholly and exclusively rule",
+      "prompt": "What is the statutory test for whether a business expense is deductible in computing trading profits?",
+      "answer": "The expense must be incurred wholly and exclusively for the purposes of the trade; expenditure with a non-trade or dual purpose is disallowed unless a definite part is wholly and exclusively for the trade.",
+      "authority": "s34 Income Tax (Trading and Other Income) Act 2005",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2005/5/section/34",
+      "answered": "knowledge"
     }
   ]
 }

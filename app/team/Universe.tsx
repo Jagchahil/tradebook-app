@@ -203,6 +203,7 @@ export default function Universe({ data }: { data: UniverseData }) {
   const focusCore = (c: CorePt): Focus => ({ id: 'core:' + c.key, label: c.name, says: c.role, color: c.hue, bright: true });
 
   const active = hover ?? pin;
+  const coreByKey = useMemo(() => Object.fromEntries(cores.map((c) => [c.key, { x: c.x, y: c.y }])) as Record<string, { x: number; y: number }>, [cores]);
 
   return (
     <section style={{ marginTop: 26 }}>
@@ -276,6 +277,21 @@ export default function Universe({ data }: { data: UniverseData }) {
               <circle key={'amb' + i} cx={s.x} cy={s.y} r={s.r} fill={s.hue} fillOpacity={s.o}
                       style={{ animation: `uniTwinkle ${s.tw}s ease-in-out infinite`, animationDelay: `${s.dl}s` }} />
             ))}
+
+            {/* THE WEB. Every fact runs on a thread back to the sun it belongs to, so the whole thing
+                reads as one connected brain, not a scatter. Faint by default; the thread you are
+                hovering lights up so you can trace a fact home. */}
+            {placed.map((p) => {
+              const c = coreByKey[p.star.core];
+              if (!c) return null;
+              const isActive = active?.id === p.star.id;
+              return (
+                <line key={'ln' + p.star.id} x1={c.x} y1={c.y} x2={p.x} y2={p.y}
+                      stroke={isActive ? '#ffffff' : p.color}
+                      strokeOpacity={isActive ? 0.6 : p.bright ? 0.085 : 0.04}
+                      strokeWidth={isActive ? 1.4 : 0.6} />
+              );
+            })}
 
             {/* comet tails, under the stars so a star sits on top of its own history */}
             {placed.map((p) => p.tail.length ? (

@@ -228,6 +228,7 @@ const CONSTANT_HISTORY: Record<string, StarHistory[]> = {
 // The engines Lekhio computes for a user. Each is a real subsystem with its own tested suite.
 const ENGINES: { id: string; label: string; says: string }[] = [
   { id: 'sole-trader',   label: 'Sole trader return',    says: 'Income tax and Class 2/4 NIC on trading profit, year by year.' },
+  { id: 'whole-person',  label: 'Whole-person tax',      says: 'Employment, self-employment, savings and dividends stacked in the right order, every allowance in its place.' },
   { id: 'limited',       label: 'Limited company',       says: 'Corporation tax, and the salary-then-dividends question, with the £100k taper.' },
   { id: 'property',      label: 'Property',               says: 'Rental profit and the Section 24 finance-cost restriction.' },
   { id: 'cis',           label: 'CIS',                    says: 'Deductions suffered, set against the bill, refund or shortfall.' },

@@ -114,6 +114,13 @@ export const FACTS = {
   // sourced by nothing, and unfindable on GOV.UK. See capitalGainsTax() for the whole story.
   // VAT flat rate scheme
   vatFlatRateLimitedCost: 0.165, // the limited cost trader rate
+  // Savings income, 2026/27. Source: GOV.UK, Tax on savings interest
+  // (https://www.gov.uk/apply-tax-free-interest-on-savings). These are the nil-rate allowances that
+  // sit ON TOP of the personal allowance for interest, and they are what make a whole-person tax
+  // computation (lib/personalincome.ts) correct rather than a sole-trader approximation.
+  savingsStartingRateBand: 5000,       // 0% band on savings, reduced £1 for every £1 of non-savings income above the PA (nil once other income reaches £17,570)
+  personalSavingsAllowanceBasic: 1000, // basic-rate taxpayer
+  personalSavingsAllowanceHigher: 500, // higher-rate taxpayer; nil for an additional-rate taxpayer
 } as const;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;

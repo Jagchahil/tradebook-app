@@ -2034,6 +2034,17 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   const monthsElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (30.44 * 86400000)));
   const purchase = goals.find((g) => g.kind === 'purchase');
 
+  // WHAT HE HAS TOLD US ABOUT HIMSELF, read ONCE (see the note on the return): the answers as a map,
+  // and the two that are amounts (savings interest, dividends) parsed out so the whole-person tax
+  // (taxPosition) can add them. A missing or non-numeric answer is 0, which is the sole-trader case,
+  // so nothing moves for a man who has told us nothing.
+  const circList = (await readCircumstances(userId)) ?? [];
+  const circMap = Object.fromEntries(circList.map((c) => [c.key, c.answer]));
+  const amountOf = (key: string): number => {
+    const n = Number(String(circMap[key] ?? '').replace(/[^0-9.]/g, ''));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+
   return {
     startYear,
     monthsElapsed,
@@ -2058,6 +2069,11 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     ytdPropertyIncome: Math.round(ytdPropertyIncome * 100) / 100,
     ytdPropertyExpenses: Math.round(ytdPropertyExpenses * 100) / 100,
 
+    // The rest of his income, so taxPosition() shows his WHOLE tax. Captured as amounts he tells us
+    // (the reliefs chain), 0 until he does, which is the sole-trader case.
+    savingsIncome: amountOf('savings_income'),
+    dividendIncome: amountOf('dividend_income'),
+
     // WHAT HE HAS TOLD US ABOUT HIMSELF. Read HERE, once, so that every caller of the optimiser gets
     // it without knowing it exists: the app, the WhatsApp reply, the ledger.
     //
@@ -2069,9 +2085,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     //
     // A failed read yields {} which means UNKNOWN everywhere downstream, never "no". A man does not
     // become single because Postgres timed out.
-    circumstances: Object.fromEntries(
-      ((await readCircumstances(userId)) ?? []).map((c) => [c.key, c.answer]),
-    ),
+    circumstances: circMap,
   };
 }
 

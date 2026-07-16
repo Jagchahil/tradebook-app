@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken, getOptimiserInput, getAutonomyLevel } from '../../../lib/supabase';
-import { findOptimisations, applyDial, totalEstimatedSaving } from '../../../lib/taxoptimiser';
+import { findOptimisations, applyDial, totalEstimatedSaving, taxPosition } from '../../../lib/taxoptimiser';
 
 // Ways to save. The app calls this with the user's own token and gets back every
 // legitimate tax-lowering lever on their real numbers, each already run through
@@ -20,5 +20,8 @@ export async function GET(req: NextRequest) {
     level,
     totalSaving: totalEstimatedSaving(optimisations),
     optimisations,
+    // HIS WHOLE TAX, across every income stream we know about, not just his trade. The app can show
+    // this as "your tax, all in". When the only income is a trade it equals the sole-trader figure.
+    taxPosition: taxPosition(input),
   });
 }

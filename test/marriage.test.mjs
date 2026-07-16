@@ -28,8 +28,9 @@ const fix = (s) => s
   .replace("from './taxengine'", "from './taxengine.ts'")
   .replace("from './autonomy'", "from './autonomy.ts'")
   .replace("from './ltdengine'", "from './ltdengine.ts'")
+  .replace("from './personalincome'", "from './personalincome.ts'")
   .replace("from './nistudentloan'", "from './nistudentloan.ts'");
-for (const f of ['taxengine', 'autonomy', 'nistudentloan', 'ltdengine', 'taxoptimiser']) {
+for (const f of ['taxengine', 'autonomy', 'nistudentloan', 'ltdengine', 'personalincome', 'taxoptimiser']) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
 const E = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);

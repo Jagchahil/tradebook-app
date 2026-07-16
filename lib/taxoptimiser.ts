@@ -13,6 +13,7 @@
 
 import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly, marriageAllowance } from './taxengine';
 import { compare } from './ltdengine';
+import { combinedIncomeTax, type PersonalIncomeResult } from './personalincome';
 import { decideAction, type AutonomyLevel } from './autonomy';
 import { studentLoanForSA, type StudentPlan } from './nistudentloan';
 
@@ -34,6 +35,14 @@ export interface OptimiserInput {
   // Property stream this year, for the property levers. Default 0.
   ytdPropertyIncome?: number;
   ytdPropertyExpenses?: number;
+
+  // THE REST OF HIS INCOME, so the tax we show is his WHOLE tax and not just his trade. Default 0,
+  // which means a caller that has not captured these behaves exactly as before: no savings, no
+  // dividends, and the figure is the sole-trader figure. Employment is already carried above.
+  //   savingsIncome    bank/building-society interest (NOT ISAs, which are tax free)
+  //   dividendIncome   dividends, e.g. from his own company
+  savingsIncome?: number;
+  dividendIncome?: number;
 
   // WHAT HE HAS TOLD US ABOUT HIMSELF. { married: 'yes', partner_low_earner: 'no', ... }
   //
@@ -66,6 +75,27 @@ export function marginalRate(projectedTotalIncome: number): number {
   return 0;
 }
 
+// HIS WHOLE TAX, not just his trade. The figure an accountant puts at the bottom of the return:
+// income tax across employment, self-employment, property, savings and dividends, stacked in the
+// legal order (lib/personalincome.ts), plus Class 4 NIC on the trade. Projected to the full year the
+// same way the levers are, and it says so, because a projection dressed as a fact is a lie. When the
+// only income is a trade it equals soleTraderTax, so nothing an existing user sees moves.
+export function taxPosition(input: OptimiserInput): PersonalIncomeResult & { projected: boolean } {
+  const tradeNet = Math.max(0, input.ytdTradeIncome - input.ytdTradeExpenses);
+  const canProject = input.monthsElapsed >= 3;
+  const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
+  const projTradeNet = tradeNet * factor;
+  const propertyNet = Math.max(0, (input.ytdPropertyIncome ?? 0) - (input.ytdPropertyExpenses ?? 0)) * factor;
+  const result = combinedIncomeTax({
+    employment: Math.max(0, input.employmentIncome),
+    selfEmployment: projTradeNet,
+    otherNonSavings: propertyNet,
+    savings: Math.max(0, input.savingsIncome ?? 0),
+    dividends: Math.max(0, input.dividendIncome ?? 0),
+  });
+  return { ...result, projected: canProject };
+}
+
 // The common allowable costs a tradesperson usually has. Missing two or more of
 // these while trading is a strong signal of unclaimed, tax-reducing spend.
 const COMMON_COSTS = ['fuel', 'phone', 'insurance', 'tools'];
@@ -78,7 +108,14 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   const canProject = input.monthsElapsed >= 3;
   const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
   const projTradeNet = tradeNet * factor;
-  const projTotalIncome = projTradeNet + Math.max(0, input.employmentIncome);
+  // His projected income across every stream we know about. Employment was always here; savings and
+  // dividends are added so the marginal-rate levers below judge his rate on his WHOLE income, not
+  // just the trade. All three default to zero, so nothing changes for a caller that has not set them.
+  const projTotalIncome =
+    projTradeNet +
+    Math.max(0, input.employmentIncome) +
+    Math.max(0, input.savingsIncome ?? 0) +
+    Math.max(0, input.dividendIncome ?? 0);
   const mRate = marginalRate(projTotalIncome);
   const cats = input.categoriesLogged.map((c) => c.toLowerCase());
 

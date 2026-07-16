@@ -84,19 +84,19 @@ export default function Universe({ data }: { data: UniverseData }) {
         const centre = cursor + band / 2;
         cursor += band;
 
-        arr.forEach((star) => {
-          const a = rng(hash(star.id));
-          const b = rng(hash(star.id + '#r'));
-          // DENSITY FALLS OFF WITH DISTANCE, so the cloud is thick and bright near its sun and thins
-          // to a scatter at the rim, the way a real galaxy does. pow>1 pulls most stars inward.
-          const t = b();
-          // Spread over a wide reach with only a gentle inward lean, so stars sit apart with clear
-          // gaps between them: each one is its own thing to hover and read, not a clump.
-          const rad = 150 + 540 * Math.pow(t, 1.08);
-          // a gentle spiral sweep down the arm, so the cloud curls into the sun rather than sitting
-          // as a straight wedge. The whole galaxy turns the same way.
-          const curl = ((rad - 150) / 540) * 24;
-          const ang = centre + (a() - 0.5) * band * 0.92 + curl;
+        const n = arr.length;
+        arr.forEach((star, i) => {
+          const j = rng(hash(star.id));
+          // EVEN FILL, not a random scatter. The radius follows sqrt (so the surface density is
+          // constant, never a clump in the middle) and the angle hops by the golden ratio (so
+          // consecutive stars land far apart, spreading evenly across the wedge). A little jitter
+          // keeps it organic rather than gridded. The result is clear gaps between every star, so
+          // each one is easy to land on and read.
+          const fr = Math.sqrt((i + 0.5) / n);
+          const ga = (i * 0.6180339887498949) % 1;
+          const rad = 150 + 500 * fr + (j() - 0.5) * 16;
+          const curl = fr * 14;                     // a gentle spiral sweep down the arm
+          const ang = centre - band / 2 + band * ga + (j() - 0.5) * (band / Math.max(7, n)) + curl;
           const x = coreX + rad * Math.cos(ang * RAD);
           const y = coreY + rad * Math.sin(ang * RAD);
           const { color, bright } = toneColor(star.pulse, hue);

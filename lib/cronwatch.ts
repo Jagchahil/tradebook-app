@@ -23,17 +23,23 @@ export interface CronRun {
 
 // How long a job may be quiet before it is a problem.
 //
-// These are derived from vercel.json and they MUST stay in step with it. A ceiling that is
-// too tight cries wolf, and an alarm that cries wolf gets muted, and a muted alarm is worse
-// than no alarm because it looks like cover.
+// Since 16 July these jobs are no longer six separate cron entries. Vercel Hobby permits only TWO
+// crons, and running six on it silently stopped half of them (this file's whole reason to exist).
+// So vercel.json now holds two DISPATCHERS (app/api/cron/daily) that kick the real jobs, and the
+// ceilings below are the windows those jobs still run within. A ceiling too tight cries wolf, and an
+// alarm that cries wolf gets muted, and a muted alarm is worse than no alarm because it looks like
+// cover. The two dispatch slots, and what each still triggers:
 //
-//   due     0 7 * * *        daily            -> 26h  (a day, plus room for a late run)
-//   digest  0 18 * * *       daily            -> 26h
-//   agent   (kicked by `due`) daily           -> 26h
-//   nudge   0 8 * * 1,3,5    Mon, Wed, Fri    -> 80h  (the real gap is Fri to Mon, 72h)
-//   weekly  0 17 * * 0       Sunday           -> 180h (a week, 168h, plus room)
-//   trial   0 9 * * *        daily            -> 26h
-//   metrics 5 23 * * *       daily            -> 26h  (and it CANNOT be backfilled. See below.)
+//   am   0 7  * * *   -> due, trial, and (Mon/Wed/Fri) nudge
+//   pm   0 23 * * *   -> metrics, digest, and (Sunday) weekly
+//
+//   due     kicked am, daily            -> 26h  (a day, plus room for a late run)
+//   digest  kicked pm, daily            -> 26h
+//   agent   kicked by `due`, daily      -> 26h
+//   nudge   kicked am, Mon/Wed/Fri      -> 80h  (the real gap is Fri to Mon, 72h)
+//   weekly  kicked pm, Sunday           -> 180h (a week, 168h, plus room)
+//   trial   kicked am, daily            -> 26h
+//   metrics kicked pm, daily            -> 26h  (and it CANNOT be backfilled. See below.)
 export const MAX_QUIET_HOURS: Record<string, number> = {
   due: 26,
   digest: 26,

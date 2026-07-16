@@ -33,9 +33,10 @@ function rng(seed: number): () => number {
 const RAD = Math.PI / 180;
 const VW = 1600, VH = 1080, CX = VW / 2, CY = VH / 2;
 
-// The four suns sit in a clean diamond, each well clear of the next, and each throws its arms out
-// into its own corner of the sky so the four coloured clouds do not pile onto one another.
-const CORE_ANGLE: Record<string, number> = { khoji: 214, lekhio: 326, rakha: 146, puchio: 34 };
+// The four suns sit in a clean diamond and each owns a quarter of the sky (a 90° sector on its own
+// diagonal), so the four coloured clouds fill four even quadrants and never pile onto one another.
+const CORE_ANGLE: Record<string, number> = { khoji: 225, lekhio: 315, rakha: 135, puchio: 45 };
+const SECTOR = 86;          // degrees each sun's cloud spreads across, just shy of its 90° quarter
 const CORE_HUE: Record<string, string> = { khoji: '#43E08A', lekhio: '#5B8DEF', rakha: '#FFB020', puchio: '#B98BFF' };
 const CORE_R = 168;         // how far each sun sits from the dead centre
 
@@ -60,43 +61,46 @@ export default function Universe({ data }: { data: UniverseData }) {
     const starsByArm = new Map<string, Star[]>();
     for (const s of data.stars) { if (!starsByArm.has(s.arm)) starsByArm.set(s.arm, []); starsByArm.get(s.arm)!.push(s); }
 
-    const armAngle = new Map<string, number>();
+    // 🔴 EACH SUN FILLS ITS OWN QUARTER OF THE SKY. Every star belonging to a sun is scattered across
+    // that sun's 86° wedge, so a sun with little to hold (Puchio, four answers) still spreads into a
+    // small cloud rather than a thin line, and a sun with a lot (Khoji) fills densely. Within a sun,
+    // each arm gets an angular band weighted by the square root of how many stars it has, so the big
+    // tax arm gets a wide cloud and a single-source field gets a small cluster beside it, and the
+    // whole quarter reads as one galaxy, not one streak.
+    const out: Placed[] = [];
     for (const [core, armIds] of armsByCore) {
       const base = CORE_ANGLE[core] ?? 0;
-      const m = armIds.length;
-      // Enough of a fan to read as several streams, but kept inside the sun's own corner so Khoji's
-      // twelve arms never spill across Rakha's or Lekhio's cloud.
-      const fan = Math.min(88, 16 * m);
-      armIds.forEach((id, k) => {
-        armAngle.set(id, base + (m === 1 ? 0 : (k - (m - 1) / 2) * (fan / (m - 1))));
-      });
-    }
-
-    const out: Placed[] = [];
-    for (const [armId, arr] of starsByArm) {
-      const baseAng = armAngle.get(armId) ?? 0;
-      const core = arr[0].core;
       const hue = CORE_HUE[core] ?? '#8fb4ff';
-      const coreX = CX + CORE_R * Math.cos(baseAng * RAD);
-      const coreY = CY + CORE_R * Math.sin(baseAng * RAD);
-      const n = arr.length;
-      const reach = 210 + Math.sqrt(n) * 66;
-      arr.forEach((star, i) => {
-        const r = rng(hash(star.id));
-        const frac = n === 1 ? 0.42 : i / (n - 1);
-        const rad = 120 + frac * reach + (r() - 0.5) * 30;
-        const spread = (r() - 0.5) * 24;         // tighter than before: an arm reads as a stream
-        const curl = frac * 20;                  // a gentle galactic sweep down the arm
-        const ang = baseAng + spread + curl;
-        const x = coreX + rad * Math.cos(ang * RAD);
-        const y = coreY + rad * Math.sin(ang * RAD);
-        const { color, bright } = toneColor(star.pulse, hue);
-        const tail: { x: number; y: number }[] = [];
-        (star.history ?? []).forEach((_h, m) => {
-          const tr = rad + (m + 1) * 32;
-          tail.push({ x: coreX + tr * Math.cos(ang * RAD), y: coreY + tr * Math.sin(ang * RAD) });
+      const coreX = CX + CORE_R * Math.cos(base * RAD);
+      const coreY = CY + CORE_R * Math.sin(base * RAD);
+
+      const weights = armIds.map((id) => Math.sqrt((starsByArm.get(id)?.length ?? 0) || 1));
+      const total = weights.reduce((a, b) => a + b, 0) || 1;
+      let cursor = base - SECTOR / 2;
+
+      armIds.forEach((armId, k) => {
+        const arr = starsByArm.get(armId) ?? [];
+        const band = SECTOR * (weights[k] / total);
+        const centre = cursor + band / 2;
+        cursor += band;
+
+        arr.forEach((star) => {
+          const a = rng(hash(star.id));
+          const b = rng(hash(star.id + '#r'));
+          // scatter across the band (angle) and across the reach (radius): a filled wedge, not a line
+          const ang = centre + (a() - 0.5) * band * 0.84;
+          const rad = 118 + b() * 372;
+          const x = coreX + rad * Math.cos(ang * RAD);
+          const y = coreY + rad * Math.sin(ang * RAD);
+          const { color, bright } = toneColor(star.pulse, hue);
+          // the comet tail: prior values pushed further out along the same radial
+          const tail: { x: number; y: number }[] = [];
+          (star.history ?? []).forEach((_h, hi) => {
+            const tr = rad + (hi + 1) * 32;
+            tail.push({ x: coreX + tr * Math.cos(ang * RAD), y: coreY + tr * Math.sin(ang * RAD) });
+          });
+          out.push({ star, x, y, ang, rad, color, bright, tail });
         });
-        out.push({ star, x, y, ang, rad, color, bright, tail });
       });
     }
 

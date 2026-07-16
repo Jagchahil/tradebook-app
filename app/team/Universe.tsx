@@ -55,7 +55,7 @@ const hostOf = (u: string): string => { try { return new URL(u).host.replace(/^w
 
 export default function Universe({ data }: { data: UniverseData }) {
   // ── LAY OUT THE SKY, and work out the frame that holds all of it. Memoised on the data. ────────
-  const { placed, cores, fit } = useMemo(() => {
+  const { placed, cores, fit, nebulae, ambient } = useMemo(() => {
     const armsByCore = new Map<string, string[]>();
     for (const a of data.arms) { if (!armsByCore.has(a.core)) armsByCore.set(a.core, []); armsByCore.get(a.core)!.push(a.id); }
     const starsByArm = new Map<string, Star[]>();
@@ -87,9 +87,14 @@ export default function Universe({ data }: { data: UniverseData }) {
         arr.forEach((star) => {
           const a = rng(hash(star.id));
           const b = rng(hash(star.id + '#r'));
-          // scatter across the band (angle) and across the reach (radius): a filled wedge, not a line
-          const ang = centre + (a() - 0.5) * band * 0.84;
-          const rad = 118 + b() * 372;
+          // DENSITY FALLS OFF WITH DISTANCE, so the cloud is thick and bright near its sun and thins
+          // to a scatter at the rim, the way a real galaxy does. pow>1 pulls most stars inward.
+          const t = b();
+          const rad = 96 + 360 * Math.pow(t, 1.7);
+          // a gentle spiral sweep down the arm, so the cloud curls into the sun rather than sitting
+          // as a straight wedge. The whole galaxy turns the same way.
+          const curl = ((rad - 96) / 360) * 30;
+          const ang = centre + (a() - 0.5) * band * 0.86 + curl;
           const x = coreX + rad * Math.cos(ang * RAD);
           const y = coreY + rad * Math.sin(ang * RAD);
           const { color, bright } = toneColor(star.pulse, hue);
@@ -109,6 +114,31 @@ export default function Universe({ data }: { data: UniverseData }) {
       return { key: c.key, name: c.name, role: c.role, x: CX + CORE_R * Math.cos(a * RAD), y: CY + CORE_R * Math.sin(a * RAD), hue: CORE_HUE[c.key] ?? '#8fb4ff' };
     });
 
+    // A NEBULA behind each sun, tinted its colour, sitting under its cloud so the stars glow off a
+    // bed of light rather than floating on black. Placed a little outward, where the cloud is thickest.
+    const nebulae = cores.map((c) => {
+      const a = CORE_ANGLE[c.key] ?? 0;
+      return { hue: c.hue, x: c.x + 150 * Math.cos(a * RAD), y: c.y + 150 * Math.sin(a * RAD), r: 360, key: c.key };
+    });
+
+    // THE DEEP FIELD. A few hundred faint far-off stars scattered well beyond the frame, so wherever
+    // you pan there is depth, not a void. Purely ambience: not data, not hoverable, drawn tiny and
+    // dim. Deterministic, so the sky does not reshuffle on every render.
+    const af = rng(0x9E3779B1);
+    const ambient: { x: number; y: number; r: number; o: number; hue: string; tw: number; dl: number }[] = [];
+    for (let i = 0; i < 340; i++) {
+      const t = af();
+      ambient.push({
+        x: -520 + af() * (VW + 1040),
+        y: -420 + af() * (VH + 840),
+        r: 0.5 + af() * 1.4,
+        o: 0.10 + af() * 0.40,
+        hue: t > 0.9 ? '#a8c4ff' : t > 0.8 ? '#ffe0bd' : '#e9eefc',
+        tw: 2.4 + af() * 3.4,
+        dl: af() * 4,
+      });
+    }
+
     // The frame: the smallest centred box that holds every star, tail and sun, then fitted with a
     // margin so nothing sits on the edge. This is what keeps the galaxy centred however it grows.
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -121,7 +151,7 @@ export default function Universe({ data }: { data: UniverseData }) {
     const cxw = (minX + maxX) / 2, cyw = (minY + maxY) / 2;
     const fit: View = { s, tx: CX - cxw * s, ty: CY - cyw * s };
 
-    return { placed: out, cores, fit };
+    return { placed: out, cores, fit, nebulae, ambient };
   }, [data]);
 
   const [view, setView] = useState<View>(fit);
@@ -209,23 +239,43 @@ export default function Universe({ data }: { data: UniverseData }) {
         <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" style={{ display: 'block', height: 600 }} role="img"
              aria-label="The Lekhio brain, drawn as a galaxy of four suns and the facts they hold">
           <defs>
-            <radialGradient id="uniNebula" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#233a68" stopOpacity="0.5" />
-              <stop offset="55%" stopColor="#14203e" stopOpacity="0.2" />
+            <radialGradient id="uniBulge" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#cde0ff" stopOpacity="0.32" />
+              <stop offset="35%" stopColor="#5c7fd0" stopOpacity="0.16" />
               <stop offset="100%" stopColor="#0a1020" stopOpacity="0" />
             </radialGradient>
             {Object.entries(CORE_HUE).map(([k, hue]) => (
               <radialGradient key={k} id={`coreGlow-${k}`} cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor={hue} stopOpacity="0.7" />
+                <stop offset="0%" stopColor={hue} stopOpacity="0.72" />
                 <stop offset="42%" stopColor={hue} stopOpacity="0.24" />
                 <stop offset="100%" stopColor={hue} stopOpacity="0" />
               </radialGradient>
             ))}
+            {Object.entries(CORE_HUE).map(([k, hue]) => (
+              <radialGradient key={'n' + k} id={`neb-${k}`} cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor={hue} stopOpacity="0.20" />
+                <stop offset="45%" stopColor={hue} stopOpacity="0.07" />
+                <stop offset="100%" stopColor={hue} stopOpacity="0" />
+              </radialGradient>
+            ))}
             <filter id="uniSoft"><feGaussianBlur stdDeviation="3" /></filter>
+            <filter id="uniBloom" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="6" /></filter>
           </defs>
 
           <g transform={`translate(${view.tx} ${view.ty}) scale(${view.s})`}>
-            <circle cx={CX} cy={CY} r={470} fill="url(#uniNebula)" />
+            {/* the luminous heart the four suns sit inside */}
+            <circle cx={CX} cy={CY} r={520} fill="url(#uniBulge)" />
+
+            {/* a coloured nebula bed behind each sun's cloud */}
+            {nebulae.map((n) => (
+              <circle key={'neb' + n.key} cx={n.x} cy={n.y} r={n.r} fill={`url(#neb-${n.key})`} />
+            ))}
+
+            {/* THE DEEP FIELD: faint far stars, so wherever you fly there is depth, not a void */}
+            {ambient.map((s, i) => (
+              <circle key={'amb' + i} cx={s.x} cy={s.y} r={s.r} fill={s.hue} fillOpacity={s.o}
+                      style={{ animation: `uniTwinkle ${s.tw}s ease-in-out infinite`, animationDelay: `${s.dl}s` }} />
+            ))}
 
             {/* comet tails, under the stars so a star sits on top of its own history */}
             {placed.map((p) => p.tail.length ? (
@@ -238,25 +288,32 @@ export default function Universe({ data }: { data: UniverseData }) {
               </g>
             ) : null)}
 
-            {/* the stars */}
+            {/* the stars: sized with a little variety, and a rare bright "hero" so the eye has
+                somewhere to land, the way a real field has a few standout stars among the many */}
             {placed.map((p) => {
               const isActive = active?.id === p.star.id;
-              const baseR = p.star.kind === 'constant' || p.star.kind === 'rule' ? 3.2 : 4.2;
+              const h = hash(p.star.id);
+              const hero = p.bright && h % 11 === 0;             // ~1 in 11 of the lit stars
+              const jitter = ((h % 7) - 3) * 0.16;               // ±0.5px, deterministic
+              const baseR = (p.star.kind === 'constant' || p.star.kind === 'rule' ? 3.1 : 4.2) + (hero ? 1.8 : 0) + jitter;
               const r = isActive ? baseR + 2.4 : baseR;
               return (
                 <g key={p.star.id}
                    onMouseEnter={() => { if (!drag.current?.moved) setHover(focusStar(p)); }}
-                   onMouseLeave={() => setHover((h) => (h?.id === p.star.id ? null : h))}
+                   onMouseLeave={() => setHover((h2) => (h2?.id === p.star.id ? null : h2))}
                    onClick={() => { if (!drag.current?.moved) setPin((q) => (q?.id === p.star.id ? null : focusStar(p))); }}
                    style={{ cursor: 'pointer' }}>
                   {p.bright ? (
-                    <circle cx={p.x} cy={p.y} r={r + 6} fill={p.color} fillOpacity={0.15} filter="url(#uniSoft)"
-                            style={{ animation: `uniPulse ${3 + (hash(p.star.id) % 20) / 10}s ease-in-out infinite` }} />
+                    <circle cx={p.x} cy={p.y} r={r + (hero ? 13 : 6.5)} fill={p.color} fillOpacity={hero ? 0.22 : 0.15}
+                            filter={hero ? 'url(#uniBloom)' : 'url(#uniSoft)'}
+                            style={{ animation: `uniPulse ${3 + (h % 20) / 10}s ease-in-out infinite` }} />
                   ) : null}
                   <circle cx={p.x} cy={p.y} r={r} fill={p.color}
-                          fillOpacity={p.bright ? 0.95 : 0.42}
+                          fillOpacity={p.bright ? 0.96 : 0.4}
                           stroke={isActive ? '#fff' : 'none'} strokeWidth={isActive ? 1.3 : 0}
-                          style={p.bright ? undefined : { animation: `uniTwinkle ${2.4 + (hash(p.star.id) % 30) / 10}s ease-in-out infinite`, animationDelay: `${(hash(p.star.id) % 100) / 40}s` }} />
+                          style={p.bright ? undefined : { animation: `uniTwinkle ${2.4 + (h % 30) / 10}s ease-in-out infinite`, animationDelay: `${(h % 100) / 40}s` }} />
+                  {/* a tiny white core on the hero stars, for that sharp point of light */}
+                  {hero && !isActive ? <circle cx={p.x} cy={p.y} r={Math.max(1, r - 2)} fill="#ffffff" fillOpacity={0.9} /> : null}
                   {isActive ? (
                     <text x={p.x} y={p.y - r - 8} textAnchor="middle" fontSize={13} fontWeight={700}
                           fill="#e7eefc" style={{ paintOrder: 'stroke', stroke: '#04060c', strokeWidth: 3 }}>

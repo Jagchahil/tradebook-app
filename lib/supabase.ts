@@ -2034,16 +2034,13 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   const monthsElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (30.44 * 86400000)));
   const purchase = goals.find((g) => g.kind === 'purchase');
 
-  // WHAT HE HAS TOLD US ABOUT HIMSELF, read ONCE (see the note on the return): the answers as a map,
-  // and the two that are amounts (savings interest, dividends) parsed out so the whole-person tax
-  // (taxPosition) can add them. A missing or non-numeric answer is 0, which is the sole-trader case,
-  // so nothing moves for a man who has told us nothing.
+  // WHAT HE HAS TOLD US ABOUT HIMSELF, read ONCE (see the note on the return): the answers as a map.
+  // The two income amounts (savings interest, dividends) are NOT here. They live on his profile next
+  // to the salary, entered on the NI hub, read off `sl` below, because they are amounts he types and
+  // edits, not a yes/no answer to a question we asked. A circumstance is the wording we showed him
+  // and his answer to it; a running total of bank interest is neither.
   const circList = (await readCircumstances(userId)) ?? [];
   const circMap = Object.fromEntries(circList.map((c) => [c.key, c.answer]));
-  const amountOf = (key: string): number => {
-    const n = Number(String(circMap[key] ?? '').replace(/[^0-9.]/g, ''));
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  };
 
   return {
     startYear,
@@ -2069,10 +2066,10 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     ytdPropertyIncome: Math.round(ytdPropertyIncome * 100) / 100,
     ytdPropertyExpenses: Math.round(ytdPropertyExpenses * 100) / 100,
 
-    // The rest of his income, so taxPosition() shows his WHOLE tax. Captured as amounts he tells us
-    // (the reliefs chain), 0 until he does, which is the sole-trader case.
-    savingsIncome: amountOf('savings_income'),
-    dividendIncome: amountOf('dividend_income'),
+    // The rest of his income, so taxPosition() shows his WHOLE tax. Entered on the NI hub next to the
+    // salary, 0 until he does, which is the sole-trader case.
+    savingsIncome: sl?.savingsIncome ?? 0,
+    dividendIncome: sl?.dividendIncome ?? 0,
 
     // WHAT HE HAS TOLD US ABOUT HIMSELF. Read HERE, once, so that every caller of the optimiser gets
     // it without knowing it exists: the app, the WhatsApp reply, the ledger.
@@ -2673,17 +2670,23 @@ export interface StudentLoanSettings {
   plan: 'plan1' | 'plan2' | 'plan4' | 'plan5' | null;
   postgrad: boolean;
   employmentIncome: number;
+  // The rest of his income, entered on the NI hub alongside the salary, read here so the whole-person
+  // tax (taxPosition) can add it. Zero until he tells us, which is the sole-trader case.
+  savingsIncome: number;
+  dividendIncome: number;
 }
 
 export async function getStudentLoanSettings(userId: string): Promise<StudentLoanSettings | null> {
   const { url } = config();
-  const query = `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=student_loan_plan,student_loan_postgrad,employment_income&limit=1`;
+  const query = `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=student_loan_plan,student_loan_postgrad,employment_income,savings_income,dividend_income&limit=1`;
   const res = await fetch(query, { headers: headers() });
   if (!res.ok) return null;
   const rows = (await res.json().catch(() => null)) as Array<{
     student_loan_plan: string | null;
     student_loan_postgrad: boolean | null;
     employment_income: number | string | null;
+    savings_income: number | string | null;
+    dividend_income: number | string | null;
   }> | null;
   if (!Array.isArray(rows) || rows.length === 0) return null;
   const r = rows[0];
@@ -2691,10 +2694,16 @@ export async function getStudentLoanSettings(userId: string): Promise<StudentLoa
     r.student_loan_plan === 'plan1' || r.student_loan_plan === 'plan2' || r.student_loan_plan === 'plan4' || r.student_loan_plan === 'plan5'
       ? r.student_loan_plan
       : null;
+  const amount = (v: number | string | null): number => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
   return {
     plan,
     postgrad: Boolean(r.student_loan_postgrad),
-    employmentIncome: Number(r.employment_income) || 0,
+    employmentIncome: amount(r.employment_income),
+    savingsIncome: amount(r.savings_income),
+    dividendIncome: amount(r.dividend_income),
   };
 }
 

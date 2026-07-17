@@ -80,20 +80,41 @@ export function marginalRate(projectedTotalIncome: number): number {
 // legal order (lib/personalincome.ts), plus Class 4 NIC on the trade. Projected to the full year the
 // same way the levers are, and it says so, because a projection dressed as a fact is a lie. When the
 // only income is a trade it equals soleTraderTax, so nothing an existing user sees moves.
-export function taxPosition(input: OptimiserInput): PersonalIncomeResult & { projected: boolean } {
+export function taxPosition(
+  input: OptimiserInput,
+): PersonalIncomeResult & { projected: boolean; employmentTax: number; selfAssessmentTax: number } {
   const tradeNet = Math.max(0, input.ytdTradeIncome - input.ytdTradeExpenses);
   const canProject = input.monthsElapsed >= 3;
   const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
   const projTradeNet = tradeNet * factor;
   const propertyNet = Math.max(0, (input.ytdPropertyIncome ?? 0) - (input.ytdPropertyExpenses ?? 0)) * factor;
+  const employment = Math.max(0, input.employmentIncome);
   const result = combinedIncomeTax({
-    employment: Math.max(0, input.employmentIncome),
+    employment,
     selfEmployment: projTradeNet,
     otherNonSavings: propertyNet,
     savings: Math.max(0, input.savingsIncome ?? 0),
     dividends: Math.max(0, input.dividendIncome ?? 0),
   });
-  return { ...result, projected: canProject };
+
+  // WHAT SELF ASSESSMENT ACTUALLY COLLECTS, which is not the whole bill.
+  //
+  // result.totalTax is his WHOLE income tax plus Class 4. But his employer already takes the tax on
+  // his salary off the payslip through PAYE every month. If we told him to set aside the whole
+  // number he would be setting aside tax that has already left his wages, and putting by far too
+  // much of his trade income. So the set-aside, and the January bill, is the whole tax MINUS the
+  // income tax PAYE already covers on the salary alone. Class 4 stays in full: it is only ever
+  // collected through Self Assessment, never the payslip.
+  //
+  // Salary-alone income tax is the right stand-in for PAYE: it is what a tax code on that salary
+  // deducts across the year. Any extra tax on the salary caused by the rest of his income losing him
+  // his personal allowance is a real Self Assessment liability, and this subtraction leaves it in,
+  // exactly as HMRC would. When the salary is zero this term is zero and the SA figure equals the
+  // whole bill, so nothing moves for a pure sole trader.
+  const employmentTax = employment > 0 ? combinedIncomeTax({ employment }).incomeTax.total : 0;
+  const selfAssessmentTax = Math.max(0, round(result.totalTax - employmentTax));
+
+  return { ...result, projected: canProject, employmentTax: round(employmentTax), selfAssessmentTax };
 }
 
 // The common allowable costs a tradesperson usually has. Missing two or more of

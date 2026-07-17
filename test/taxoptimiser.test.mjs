@@ -159,11 +159,17 @@ const near = (a, b) => Math.abs(a - b) <= 0.01;
   // has no employment, savings or dividends. £30,000 profit -> £3,486 income tax + £1,045.80 Class 4.
   const soleOnly = O.taxPosition({ ...base, ytdTradeIncome: 30000, ytdTradeExpenses: 0 });
   ok('trade-only whole tax equals the sole-trader figure (nothing moves)', near(soleOnly.totalTax, 4531.8));
+  // With no job there is no PAYE, so the Self Assessment bill IS the whole bill.
+  ok('sole trader: Self Assessment tax equals the whole tax', soleOnly.employmentTax === 0 && near(soleOnly.selfAssessmentTax, 4532));
 
   // Trade + a PAYE job. £20k profit + £30k salary = £50k non-savings. Income tax 20% on £37,430 =
   // £7,486. Class 4 on the £20k trade only = £445.80. Whole tax £7,931.80. The job is now IN the sum.
   const withJob = O.taxPosition({ ...base, ytdTradeIncome: 20000, ytdTradeExpenses: 0, employmentIncome: 30000 });
   ok('a PAYE job is now included in the whole tax', near(withJob.incomeTax.total, 7486) && near(withJob.class4NIC, 445.8) && near(withJob.totalTax, 7931.8));
+  // But PAYE already took the £3,486 income tax on the £30k salary. Self Assessment collects the rest:
+  // 7,931.80 whole tax - 3,486 already paid = 4,446 (to the pound). Setting aside the whole 7,931.80
+  // would have him hoarding tax that has already left his wages.
+  ok('Self Assessment tax leaves out the PAYE already paid on the salary', withJob.employmentTax === 3486 && near(withJob.selfAssessmentTax, 4446));
 
   // Savings and dividends flow when captured. £40k trade + £2k interest (higher-rate: £500 PSA, £1,500
   // at 40% = £600) + £3k dividends (£500 allowance, £2,500 at 35.75% = £893.75).

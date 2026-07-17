@@ -418,7 +418,7 @@ export default function TeamPage() {
                       {c.name || <span style={{ color: C.faint, fontWeight: 400 }}>No name yet</span>}
                       {c.internal ? <span style={chipInternal}>internal</span> : null}
                     </td>
-                    <td style={{ ...U.td, color: C.muted }}>{c.trade || '—'}</td>
+                    <td style={{ ...U.td, color: C.muted }}>{c.trade || 'None'}</td>
                     <td style={{ ...U.td, color: C.muted }}>{shortDate(c.joined)}</td>
                     <td style={U.td}>
                       {/* Editable, because a BILLBOARD cannot be inferred from a click, and neither
@@ -445,7 +445,7 @@ export default function TeamPage() {
                             <span style={{ color: C.faint }}> · {gbp(c.amountPence)}</span>
                           ) : null}
                         </>
-                      ) : <span style={{ color: C.faint }}>—</span>}
+                      ) : <span style={{ color: C.faint }}>None</span>}
                     </td>
                     <td style={U.td}>
                       <StatusTag status={c.status} />

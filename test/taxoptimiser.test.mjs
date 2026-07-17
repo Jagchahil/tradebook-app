@@ -89,7 +89,7 @@ const refund = find(subbie, 'cis_refund');
 ok('CIS refund detected when deductions exceed tax due', !!refund);
 ok('CIS refund is flagged as information', refund.info === true && refund.estSaving === 0);
 
-console.log('\n=== optimiser: THE DIAL — money levers can never auto-run ===\n');
+console.log('\n=== optimiser: THE DIAL, money levers can never auto-run ===\n');
 for (const level of ['suggest', 'draft', 'auto']) {
   const dialled = O.applyDial(rich, level);
   for (const o of dialled) {

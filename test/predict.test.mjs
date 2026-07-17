@@ -25,7 +25,7 @@
 //
 // AND THE SECOND HALF IS THE PRODUCT, not a filter.
 //
-// "Announced but not yet law" is the answer to "what is coming that will affect me" — the thing an
+// "Announced but not yet law" is the answer to "what is coming that will affect me", the thing an
 // accountant charges for in March and nobody gets told in January. Khoji has been collecting it for
 // weeks. Nothing had ever read it.
 

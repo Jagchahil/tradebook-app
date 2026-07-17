@@ -61,7 +61,7 @@ npx vercel --prod                          # forces the production build; prints
 - `npx vercel --prod` is what makes it go live reliably. Don't trust the git auto-deploy alone.
 - Wait for `Ready in ~1m` and the `Aliased  https://tradebook-app-five.vercel.app` line.
 - Sanity check: the commit summary should say a **small** number of files changed. If it
-  says dozens of new files, STOP — you're in the wrong folder (see the trap above).
+  says dozens of new files, STOP, you're in the wrong folder (see the trap above).
 
 ## 4. How to run / deploy the MOBILE app
 

@@ -61,7 +61,7 @@ export default async function DashboardPage() {
     <main className="min-h-screen bg-gray-950 text-gray-100 p-6">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-2xl font-bold text-white mb-1">Tradebook Dashboard</h1>
-        <p className="text-gray-400 text-sm mb-6">Internal — Phase 0</p>
+        <p className="text-gray-400 text-sm mb-6">Internal, Phase 0</p>
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

@@ -4,7 +4,7 @@
 
 ---
 
-## 1. Phone OTP login (the security gate) — Twilio trial + Supabase
+## 1. Phone OTP login (the security gate), Twilio trial + Supabase
 
 **Why first:** until this is on, sign-in is anonymous and unsafe. This makes login prove the phone with a real code.
 
@@ -26,7 +26,7 @@ Note: the trial only texts your verified number, which is perfect for testing an
 
 ---
 
-## 2. Stripe (test, free) — so it can take money
+## 2. Stripe (test, free), so it can take money
 
 1. Go to stripe.com and sign up with your personal email.
 2. Stay in **Test mode** (toggle, top right). Developers, API keys, copy the **test secret key** (`sk_test_...`).
@@ -37,7 +37,7 @@ Note: the trial only texts your verified number, which is perfect for testing an
 
 ---
 
-## 3. HMRC Developer Hub (free) — start the long one now
+## 3. HMRC Developer Hub (free), start the long one now
 
 **Why now:** production recognition takes up to 10 working days of HMRC review, so the sooner the better.
 
@@ -51,7 +51,7 @@ Note: the trial only texts your verified number, which is perfect for testing an
 
 ---
 
-## 4. Meta WhatsApp (free dev setup) — the core loop
+## 4. Meta WhatsApp (free dev setup), the core loop
 
 1. Go to developers.facebook.com, create a Meta Business account and a new App, type Business, with WhatsApp added.
 2. In the app's WhatsApp section you get a **free test number** and a temporary token. For real use later, register a number (your spare phone works if it is not already on a personal WhatsApp).

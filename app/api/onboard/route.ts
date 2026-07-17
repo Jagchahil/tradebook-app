@@ -82,9 +82,12 @@ export async function POST(req: NextRequest) {
     }
 
     const phone = cleanPhone(b.phone);
-    const email = cleanEmail(b.email); // optional now: phone is the account
+    const email = cleanEmail(b.email); // required: one account tied to a name, a mobile AND an email
     if (!phone) {
       return NextResponse.json({ error: 'A valid mobile number is required.' }, { status: 400 });
+    }
+    if (!email) {
+      return NextResponse.json({ error: 'A valid email is required.' }, { status: 400 });
     }
 
     // The income streams the user ticked (job, property, loan). Kept now, not dropped:

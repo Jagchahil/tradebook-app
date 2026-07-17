@@ -6,7 +6,7 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey)
 
-// Server-side only — bypasses RLS. Never import in client components.
+// Server-side only, bypasses RLS. Never import in client components.
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,

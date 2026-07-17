@@ -81,8 +81,8 @@ Most of these are point-in-time. **The findings are applied; the docs are the re
 
 **The code is the truth. The docs describe it.** Where they disagree, believe:
 
-- `lib/taxengine.ts` and `lib/nistudentloan.ts` — for any tax figure.
-- `lib/margin.ts` — for unit economics.
-- `lib/stripe.ts` — for the price.
-- `lib/categories.ts` — for what a cost can be.
-- `public/llms.txt` — for what we tell the world, and it is tested against the three above.
+- `lib/taxengine.ts` and `lib/nistudentloan.ts`, for any tax figure.
+- `lib/margin.ts`, for unit economics.
+- `lib/stripe.ts`, for the price.
+- `lib/categories.ts`, for what a cost can be.
+- `public/llms.txt`, for what we tell the world, and it is tested against the three above.

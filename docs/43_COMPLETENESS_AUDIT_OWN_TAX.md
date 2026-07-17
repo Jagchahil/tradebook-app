@@ -31,7 +31,7 @@ Today we are a brilliant bookkeeper that prepares figures. To own tax, we become
 
 ## The three territories we are missing
 
-### 1. The HMRC connection (file, view, pay) — HMRC gives us the APIs
+### 1. The HMRC connection (file, view, pay), HMRC gives us the APIs
 
 This is the big one, and the research is clear: **HMRC publishes the exact APIs to do all of this.** Get recognised once, build these, and the user never logs into HMRC again.
 
@@ -43,7 +43,7 @@ This is the big one, and the research is clear: **HMRC publishes the exact APIs 
 
 **The catch:** all of this needs **HMRC software recognition** (the Software Choices listing) and the developer hub onboarding. It is a process, not a blocker, and it is exactly how untied, FreeAgent and Coconut got there. This is the single most important roadmap item.
 
-### 2. The human layer — the thing that stops anyone going elsewhere
+### 2. The human layer, the thing that stops anyone going elsewhere
 
 A tool, however good, hits a wall on the complex 10%: a tricky year, a property sale, an HMRC enquiry, a "should I go Ltd" moment. When it does, people leave for an accountant. **TaxScouts built a £169 a year business purely on this:** connect you to an accountant who files for you. We should own that moment instead of losing it.
 
@@ -52,7 +52,7 @@ A tool, however good, hits a wall on the complex 10%: a tricky year, a property 
 
 **The catch:** giving tax advice carries liability and needs qualified people. Employ or partner with accountants, and keep the line clear between the software (information) and the human (regulated advice).
 
-### 3. Completeness of income and reliefs — own all of their tax, not just self employment
+### 3. Completeness of income and reliefs, own all of their tax, not just self employment
 
 Many trades have more than self employment income, and a complete product handles the whole return.
 

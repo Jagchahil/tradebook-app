@@ -961,7 +961,7 @@ export function SiteFooter() {
     <footer style={{ background: INK_BG, color: '#fff' }}>
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: '52px 24px 40px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 32, marginBottom: 40 }}>
-          {col('Product', [['/product', 'How it works'], ['/how-mtd-works', 'How MTD works'], ['/compare', 'Compare'], ['/pricing', 'Pricing'], ['/start', 'Sign up']])}
+          {col('Product', [['/product', 'How it works'], ['/how-mtd-works', 'How MTD works'], ['/compare', 'Compare'], ['/pricing', 'Pricing'], ['/start', 'Sign up'], ['/account', 'Manage subscription']])}
           {col('Free tools', [['/tax-calculator', 'Tax calculator'], ['/cis-calculator', 'CIS refund calculator'], ['/landlord-tax-calculator', 'Landlord tax calculator'], ['/rent-a-room-checker', 'Rent a Room checker'], ['/sole-trader-vs-limited', 'Sole trader vs limited'], ['/invoice-generator', 'Invoice maker'], ['/ni-checker', 'NI checker'], ['/student-loan-checker', 'Student loan checker'], ['/can-i-claim', 'Can I claim it?'], ['/file-your-tax-return', 'File your return'], ['/resources', 'All tools']])}
           {col('For your trade', [...TRADES.slice(0, 5).map((t) => [`/for/${t.slug}`, `For ${t.plural}`] as [string, string]), ['/for-landlords', 'For landlords'] as [string, string]])}
           {/*

@@ -175,10 +175,10 @@ function buildReply(parsed: ParsedReceipt, monthTotal: number): string {
   const monthName = new Date(parsed.date).toLocaleString('en-GB', { month: 'long' })
 
   if (parsed.confidence < 0.7) {
-    return `I got a ${vendor} receipt for £${amount} — is that right? Reply YES to confirm or correct me.`
+    return `I got a ${vendor} receipt for £${amount}, is that right? Reply YES to confirm or correct me.`
   }
 
-  return `✓ £${amount} — ${vendor}, ${category}, ${date}. ${monthName} total: £${total}.`
+  return `✓ £${amount}, ${vendor}, ${category}, ${date}. ${monthName} total: £${total}.`
 }
 
 function formatDate(dateStr: string): string {

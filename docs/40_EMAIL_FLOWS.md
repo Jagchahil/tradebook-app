@@ -12,7 +12,7 @@ Trigger each on behaviour where you can (Klaviyo, Customer.io), or on a simple t
 
 ---
 
-## 1. Welcome (Day 0, on signup) — LIVE, sends automatically
+## 1. Welcome (Day 0, on signup), LIVE, sends automatically
 
 Subject: Welcome to Lekhio. Here is how to start.
 

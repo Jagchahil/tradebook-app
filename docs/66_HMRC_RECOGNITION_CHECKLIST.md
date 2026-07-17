@@ -1,4 +1,4 @@
-# 66: HMRC MTD Recognition — Sandbox Demo and Production Application Checklist
+# 66: HMRC MTD Recognition, Sandbox Demo and Production Application Checklist
 
 > Written 1 July 2026. This is the exact, ordered path to take Lekhio's built-but-dormant HMRC filing from "code exists" to "recognised by HMRC for live MTD for Income Tax filing". It pairs with doc 55 (the foundation) and doc 65 section 6a (why this is the top strategic blocker). The whole sandbox demo can be done NOW, for free, on the current Vercel URL, without waiting for lekhio.app. Recognition has a lead time of roughly ten working days, so the value is in starting it early.
 >
@@ -29,13 +29,13 @@ You will need to be logged in to the HMRC Developer Hub as the account that owns
 
 In the Developer Hub, open the sandbox application and add API subscriptions for all of these. Without the subscription, calls return 403 even in the sandbox.
 
-- **Self Employment Business (MTD)** — carries the cumulative period summary submission (the core file step).
-- **Obligations (MTD)** — tells you what quarters are due and when.
-- **Individual Calculations (MTD)** — triggers the year-end calculation and the final declaration.
-- **Self Assessment BSAS (MTD)** — the year-end business source adjustable summary (annual adjustments).
-- **Individual Losses (MTD)** — brought forward losses and loss claims. Easy to forget: a missing subscription here returns 403 on the losses calls.
-- **Create Test User** — mints sandbox test taxpayers with a NINO and MTD ITSA enrolment.
-- **Test Fraud Prevention Headers** — validates the Gov-Client and Gov-Vendor headers. This is how you prove header compliance before recognition.
+- **Self Employment Business (MTD)**, carries the cumulative period summary submission (the core file step).
+- **Obligations (MTD)**, tells you what quarters are due and when.
+- **Individual Calculations (MTD)**, triggers the year-end calculation and the final declaration.
+- **Self Assessment BSAS (MTD)**, the year-end business source adjustable summary (annual adjustments).
+- **Individual Losses (MTD)**, brought forward losses and loss claims. Easy to forget: a missing subscription here returns 403 on the losses calls.
+- **Create Test User**, mints sandbox test taxpayers with a NINO and MTD ITSA enrolment.
+- **Test Fraud Prevention Headers**, validates the Gov-Client and Gov-Vendor headers. This is how you prove header compliance before recognition.
 
 ---
 
@@ -125,7 +125,7 @@ Capture screenshots or logs of each step. The recognition reviewer will ask for 
 
 ---
 
-## 7c. Recognition evidence — sandbox run of 1 July 2026 (PASSED)
+## 7c. Recognition evidence, sandbox run of 1 July 2026 (PASSED)
 
 The full round trip was driven end to end against the HMRC sandbox on 1 July 2026 using `scripts/hmrc-sandbox-demo.mjs`, exercising the real `lib/hmrc.ts` code path. Every step succeeded. This is the evidence to attach to the production credentials application.
 
@@ -135,7 +135,7 @@ The full round trip was driven end to end against the HMRC sandbox on 1 July 202
 - **List businesses**: self-employment business `XBIS12345678901` resolved from the NINO (Business Details MTD v2.0).
 - **Retrieve obligations**: returned the quarterly obligation periods with due dates and open/fulfilled status (Obligations MTD v3.0).
 - **Submit cumulative period summary** (Self Employment Business MTD v5.0, `/cumulative/{taxYear}`), behind the explicit approval gate: dry run sent nothing; with `--approve` HMRC responded **HTTP 204 (accepted and stored)**.
-- **Fraud prevention headers** (Test Fraud Prevention Headers v1.0, WEB_APP_VIA_SERVER): validator returned **`VALID_HEADERS`** — "All headers required for your connection method have been supplied and all appear to be valid."
+- **Fraud prevention headers** (Test Fraud Prevention Headers v1.0, WEB_APP_VIA_SERVER): validator returned **`VALID_HEADERS`**, "All headers required for your connection method have been supplied and all appear to be valid."
 - **Year-end calculation** (Individual Calculations v8.0): triggered an intent calculation (**HTTP 202**) and retrieved the full income tax calculation, including the end-of-year estimate to show the user. Verified 2 July 2026.
 - **Final declaration / crystallisation** (Individual Calculations v8.0, `/{calculationId}/final-declaration`), behind the approval gate: dry run sent nothing; with `--approve` HMRC accepted it with **HTTP 204**. The stress test also caught and fixed a wrong endpoint (`trigger/final-declaration`) before this pass, which is the process working as intended. Verified 2 July 2026.
 - **BSAS** (Self Assessment BSAS v7.0): triggered a business source adjustable summary, **HTTP 200** with a calculationId. Verified 2 July 2026.

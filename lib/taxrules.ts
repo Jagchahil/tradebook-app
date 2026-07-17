@@ -1,4 +1,4 @@
-// Allowable expenses knowledge base — now a thin re-export of the ONE canonical corpus.
+// Allowable expenses knowledge base, now a thin re-export of the ONE canonical corpus.
 //
 // The rules used to live here as a hand-typed array, and a second hand-typed array lived in the
 // mobile app. They drifted, and the drift shipped wrong answers to the phone. So the data moved to

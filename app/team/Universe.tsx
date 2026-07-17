@@ -377,7 +377,7 @@ export default function Universe({ data }: { data: UniverseData }) {
             <div style={{ fontSize: 12.3, color: '#aeb9d4', marginTop: 5, lineHeight: 1.5 }}>{active.says}</div>
             {active.history?.length ? (
               <div style={{ fontSize: 11.5, color: '#7f8bab', marginTop: 6 }}>
-                was {active.history.map((h) => `${h.value}${h.from ? ` (${h.from}${h.to ? `–${h.to}` : ''})` : ''}`).join(', ')}
+                was {active.history.map((h) => `${h.value}${h.from ? ` (${h.from}${h.to ? ` to ${h.to}` : ''})` : ''}`).join(', ')}
               </div>
             ) : null}
             {active.source ? <div style={{ fontSize: 11, color: '#6b7793', marginTop: 6 }}>{hostOf(active.source)}</div> : null}

@@ -11,7 +11,7 @@
 // THE BUG THIS FIXES. The counters lived in a Map in module memory. On Vercel that memory
 // belongs to ONE warm instance. Fourteen endpoints were guarded by it, and under load Vercel
 // runs many instances, each with its own private count. So the real ceiling was
-// `limit x however many instances happen to be warm` — a number nobody chose, nobody set,
+// `limit x however many instances happen to be warm`, a number nobody chose, nobody set,
 // and nobody could see. It looked like a rate limit and it read like a rate limit, and the
 // harder you pushed it the more it let through, which is the exact opposite of the job.
 //

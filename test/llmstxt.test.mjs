@@ -1,4 +1,4 @@
-// public/llms.txt — what an AI model reads when it is asked about Lekhio.
+// public/llms.txt, what an AI model reads when it is asked about Lekhio.
 //
 // WHY THIS FILE IS TESTED AT ALL.
 //

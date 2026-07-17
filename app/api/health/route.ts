@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
   //
   // ⚠️ THIS USED TO BE A GREEN LIGHT THAT COULD MEAN NOTHING. It fetched /rest/v1/users?limit=1 and
   // tested `res.ok`. But PostgREST answers an UNAUTHORISED read of an RLS-protected table with
-  // `200 []` — a perfectly successful HTTP response containing nothing at all.
+  // `200 []`, a perfectly successful HTTP response containing nothing at all.
   //
   // So if SUPABASE_SERVICE_ROLE_KEY were ever swapped for a publishable key, every server route
   // would silently drop to anon privileges, every query would return empty instead of erroring, and

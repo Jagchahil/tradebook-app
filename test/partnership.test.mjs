@@ -1,4 +1,4 @@
-// Tests for lib/partnership.ts — the partnership allocation engine over the sole-trader tax maths.
+// Tests for lib/partnership.ts, the partnership allocation engine over the sole-trader tax maths.
 //   node test/partnership.test.mjs
 // It imports the canonical engine (extensionless), so we stage and rewrite the relative imports,
 // the same pattern as test/taxoptimiser.test.mjs.

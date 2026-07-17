@@ -1,4 +1,4 @@
-# 63: Launch Readiness — Where We Are and the Order to Go Live
+# 63: Launch Readiness, Where We Are and the Order to Go Live
 
 > NOTE (7 Jul 2026): doc 81 is now THE current master picture and launch checklist. Keep this as the 30 June readiness snapshot only. Doc 60, which this once superseded, has been deleted. Read doc 81 first.
 
@@ -30,18 +30,18 @@ These are working in production right now, verified today.
 
 ---
 
-## 3. The go-live runbook — in order, the day the money is in
+## 3. The go-live runbook, in order, the day the money is in
 
 Each step is independent unless noted. Costs are approximate.
 
-1. **Vercel Pro** (~£16/mo). Unlocks the 15-minute reminder cron cadence and headroom. (On Hobby today the cron falls back to ~daily — fine for testing.)
-2. **AI credit.** `ANTHROPIC_API_KEY` already in Vercel — add a few pounds of Anthropic credit. Add `OPENAI_API_KEY` + a little credit for voice notes. Redeploy. Photos, voice, and the accountant bot come alive.
+1. **Vercel Pro** (~£16/mo). Unlocks the 15-minute reminder cron cadence and headroom. (On Hobby today the cron falls back to ~daily, fine for testing.)
+2. **AI credit.** `ANTHROPIC_API_KEY` already in Vercel, add a few pounds of Anthropic credit. Add `OPENAI_API_KEY` + a little credit for voice notes. Redeploy. Photos, voice, and the accountant bot come alive.
 3. **Stripe live.** Swap the test `STRIPE_SECRET_KEY` for the **live** key, add a **live** webhook endpoint → `STRIPE_WEBHOOK_SECRET`. Add the Lekhio logo + brand colour in Stripe → Settings → Branding. Run one real-card test, then you can charge.
 4. **Meta Business Verification.** Needed to message beyond a handful of test recipients. Wants the company registered (step 6). Until verified, you can soft-launch to a small number.
 5. **Domain + email** (~£10/yr + a few £/mo). Buy lekhio.app, set up email, point the apps at it. Optional to operate (the Vercel URL works) but needed to look the part.
-6. **Incorporate Lekhio Ltd** (£50, Companies House) — or keep trading as a sole trader to start. Then the **ICO data protection fee** (~£40/yr) before real members of the public, and a **business bank account**.
-7. **HMRC Developer Hub** — register, get sandbox creds, start the production **MTD recognition** application (longest lead time, up to ~10 working days — start it as early as possible).
-8. **App stores** — Apple Developer (£79/yr) + Google Play (£20 once). Build with EAS, submit (review queues, so submit early).
+6. **Incorporate Lekhio Ltd** (£50, Companies House), or keep trading as a sole trader to start. Then the **ICO data protection fee** (~£40/yr) before real members of the public, and a **business bank account**.
+7. **HMRC Developer Hub**, register, get sandbox creds, start the production **MTD recognition** application (longest lead time, up to ~10 working days, start it as early as possible).
+8. **App stores**, Apple Developer (£79/yr) + Google Play (£20 once). Build with EAS, submit (review queues, so submit early).
 9. **Flip the paywall on** (`EXPO_PUBLIC_PAYWALL_ENABLED=true`) and do a **soft launch** to a few friendly tradespeople before any marketing.
 
 ---
@@ -55,4 +55,4 @@ Each step is independent unless noted. Costs are approximate.
 
 ---
 
-**Bottom line:** engineering is essentially done and hardened. Launch is now a sequence of paid accounts and approvals, taken in the order above. The day funds arrive, steps 1–3 alone make it a real, charging product; steps 4–9 make it a fully public one.
+**Bottom line:** engineering is essentially done and hardened. Launch is now a sequence of paid accounts and approvals, taken in the order above. The day funds arrive, steps 1 to 3 alone make it a real, charging product; steps 4 to 9 make it a fully public one.

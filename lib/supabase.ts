@@ -1001,6 +1001,7 @@ export async function reconcileSignupToUser(userId: string): Promise<ReconcileRe
 export interface VerifiedUser {
   id: string;
   email: string | null;
+  phone: string | null;
 }
 
 export async function verifyAccessToken(token: string): Promise<VerifiedUser | null> {
@@ -1016,6 +1017,7 @@ export async function verifyAccessToken(token: string): Promise<VerifiedUser | n
     const u = (await res.json()) as {
       id?: string;
       email?: string | null;
+      phone?: string | null;
       is_anonymous?: boolean;
       app_metadata?: { is_anonymous?: boolean } | null;
     };
@@ -1045,7 +1047,10 @@ export async function verifyAccessToken(token: string): Promise<VerifiedUser | n
     const allowAnon = process.env.ALLOW_ANON_USERS === 'true';
     const isAnon = u.is_anonymous === true || u.app_metadata?.is_anonymous === true;
     if (isAnon && !allowAnon) return null;
-    return { id: u.id, email: u.email ?? null };
+    // Return the phone too. GoTrue puts it on the /auth/v1/user response, and the billing portal
+    // resolves a phone-only Stripe customer from it. Without this the phone fallback could never fire,
+    // so an account with no email got 400 no_identifier_on_account and could never reach its billing.
+    return { id: u.id, email: u.email ?? null, phone: (u.phone ? String(u.phone) : null) };
   } catch {
     return null;
   }

@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-// THE CLAIM CORPUS — THE ONE SOURCE OF TRUTH.  (Puchio's answers, the WhatsApp "can I claim X?",
-// the web page, the mobile Can-I-claim screen — all of them read THIS FILE.)
+// THE CLAIM CORPUS, THE ONE SOURCE OF TRUTH.  (Puchio's answers, the WhatsApp "can I claim X?",
+// the web page, the mobile Can-I-claim screen, all of them read THIS FILE.)
 //
 // ⚠️ THIS FILE IS BYTE-IDENTICAL IN BOTH REPOS AND THAT IS THE WHOLE POINT.
 //

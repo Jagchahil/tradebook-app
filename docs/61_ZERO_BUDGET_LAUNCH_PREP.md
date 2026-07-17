@@ -12,19 +12,19 @@ You do not need much to start. The website and app already run on the free Verce
 
 ## Free now, in priority order
 
-### 1. Stripe (free, personal email) — so you can take money
+### 1. Stripe (free, personal email), so you can take money
 Create a Stripe account with your personal email. It starts in test mode for free. Put the test secret key in Vercel, add the webhook, and run a full trial-to-paid purchase with the test card `4242 4242 4242 4242`. Stripe never charges you a fee to exist; it only takes a small cut of real payments, so you can even go fully live for free and pay nothing until a real customer pays you.
 
-### 2. Phone OTP login via Twilio free trial (free, your spare phone) — the security gate
+### 2. Phone OTP login via Twilio free trial (free, your spare phone), the security gate
 This is the most important one. Sign up for a Twilio free trial with your personal email; you get free credit. In the trial you can only send texts to a number you have verified, so verify your spare phone. Then in Supabase, Authentication, Providers, Phone, plug in the Twilio details. Set `EXPO_PUBLIC_OTP_ENABLED=true` in the app. Now log in on your spare phone with a real code. That closes the one critical security hole, for free, for testing. (Going live to the public later needs a small paid Twilio top-up so it can text anyone, but for testing and a private soft launch the trial is enough.)
 
-### 3. HMRC Developer Hub (free, personal email) — start the long one now
+### 3. HMRC Developer Hub (free, personal email), start the long one now
 Register as a developer on the HMRC Developer Hub with your personal email. Sandbox access is free. Begin the application for Making Tax Digital recognition. This has the longest lead time of anything, and it costs nothing to start, so starting today is the single highest-leverage free move you can make.
 
-### 4. Meta WhatsApp, developer setup (free) — the core loop
+### 4. Meta WhatsApp, developer setup (free), the core loop
 Create a Meta Business account and a WhatsApp app for free. During development Meta gives you a free test number, and the first chunk of conversations each month is free. If your spare phone number is not already on a personal WhatsApp, you can later register it as the business number. Set the webhook to the Vercel URL and send yourself a test message. All free to set up and test.
 
-### 5. TrueLayer sandbox (free, low priority) — bank feeds, later
+### 5. TrueLayer sandbox (free, low priority), bank feeds, later
 Free to sign up for the sandbox if you want to start exploring bank feeds. Not a blocker, do it whenever.
 
 ---

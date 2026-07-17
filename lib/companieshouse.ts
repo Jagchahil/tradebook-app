@@ -1,4 +1,4 @@
-// COMPANIES HOUSE — auto-fill a limited company's details from its name, so a director types almost
+// COMPANIES HOUSE, auto-fill a limited company's details from its name, so a director types almost
 // nothing at onboarding. The public register is live, real-time and free; we read, never write.
 //
 // A director selects "Limited company" and types the business name. We search the register, show the

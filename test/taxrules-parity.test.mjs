@@ -78,7 +78,7 @@ const webKeys = Object.keys(web).sort();
 const appKeys = Object.keys(app).sort();
 
 // 0. THE ONE THAT MAKES DRIFT IMPOSSIBLE: the canonical corpus is byte-identical in both repos. Not
-//    "the same rules", not "the same verdicts" — the same FILE. If this passes, everything below is
+//    "the same rules", not "the same verdicts", the same FILE. If this passes, everything below is
 //    guaranteed; the checks below stay as documentation of what we would otherwise have to trust.
 ok('the claim corpus is byte-identical in web and mobile (run scripts/sync-corpus.mjs if not)', webText === appText);
 

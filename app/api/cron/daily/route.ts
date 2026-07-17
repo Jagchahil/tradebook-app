@@ -15,8 +15,8 @@ import crypto from 'crypto';
 // "rides along with the daily run so no extra cron entry is needed (the Hobby plan caps cron jobs)".
 // This file just makes that the whole arrangement.
 //
-//   ?slot=am   0 7  * * *   due, trial, and (Mon/Wed/Fri) nudge      — the morning messages
-//   ?slot=pm   0 23 * * *   metrics, digest, and (Sunday) weekly     — the end-of-day work
+//   ?slot=am   0 7  * * *   due, trial, and (Mon/Wed/Fri) nudge     , the morning messages
+//   ?slot=pm   0 23 * * *   metrics, digest, and (Sunday) weekly    , the end-of-day work
 //
 // 🔴 EACH KICK IS INDEPENDENT, AND THE DISPATCHER GATES ON NOTHING. metrics is the reason: the daily
 // revenue snapshot cannot be backfilled and must run even on a day WhatsApp is down, so it is never

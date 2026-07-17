@@ -42,18 +42,18 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     if (error.code === '23505') {
-      // Duplicate — treat as success so we don't leak whether a number is registered
+      // Duplicate, treat as success so we don't leak whether a number is registered
       return NextResponse.json({ ok: true })
     }
     console.error('Waitlist insert error:', error)
     return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 })
   }
 
-  // WhatsApp confirmation — only runs once credentials are configured
+  // WhatsApp confirmation, only runs once credentials are configured
   if (normalizedPhone && process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID) {
     sendTextMessage(
       normalizedPhone,
-      "You're on the TradeBook waitlist 👍 We'll text you when we launch — you'll get 60 days free. Any questions? Just reply here.",
+      "You're on the TradeBook waitlist 👍 We'll text you when we launch, you'll get 60 days free. Any questions? Just reply here.",
     ).catch((err) => console.error('Waitlist WhatsApp send failed:', err))
   }
 

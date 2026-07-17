@@ -51,7 +51,7 @@ Four classes. **£205 for the first, £60 for each of the other three = £385.**
 
 Use the wording below verbatim. It is drawn from the IPO's own pre approved terms wherever possible, which is what keeps an application moving without an examiner query.
 
-### Class 9 — the downloadable software (the mobile app)
+### Class 9, the downloadable software (the mobile app)
 ```
 Computer software; downloadable computer software; downloadable mobile
 applications; computer software for bookkeeping, accounting and tax preparation;
@@ -62,7 +62,7 @@ software for preparing and submitting tax returns; downloadable software for
 invoicing; computer software for artificial intelligence.
 ```
 
-### Class 35 — the bookkeeping and accountancy services (what we actually do)
+### Class 35, the bookkeeping and accountancy services (what we actually do)
 ```
 Bookkeeping; accountancy services; accounting; computerised bookkeeping;
 preparation of business records; business administration services; compilation
@@ -71,7 +71,7 @@ record keeping services; providing business information; business advisory
 services relating to accounting and record keeping.
 ```
 
-### Class 36 — the financial and tax services (and everything the bank thesis needs)
+### Class 36, the financial and tax services (and everything the bank thesis needs)
 ```
 Financial services; financial information; financial analysis; tax preparation
 services; tax consultancy; tax assessment services; preparation of tax returns;
@@ -80,7 +80,7 @@ forecasting; providing financial information via a website; electronic payment
 services.
 ```
 
-### Class 42 — the software AS A SERVICE (lekhio.app itself)
+### Class 42, the software AS A SERVICE (lekhio.app itself)
 ```
 Software as a service [SaaS]; platform as a service [PaaS]; providing temporary
 use of non-downloadable software for bookkeeping, accounting and tax

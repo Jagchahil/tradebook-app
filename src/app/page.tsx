@@ -274,7 +274,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Chat mockup — desktop only */}
+            {/* Chat mockup, desktop only */}
             <div className="hidden shrink-0 lg:block">
               <ChatMockup />
             </div>

@@ -13,7 +13,7 @@
 //
 // So this is not marketing copy, it is a set of CHECKABLE CLAIMS. The tax figures below are tied
 // by test to lib/taxengine.ts, and the price to lib/stripe.ts. If someone changes a constant and
-// forgets this file, the build fails — rather than us publishing a false tax fact under our own
+// forgets this file, the build fails, rather than us publishing a false tax fact under our own
 // name to every model on earth. HMRC moved the mileage rate 45p -> 55p in May 2026, so that is
 // not a hypothetical.
 //

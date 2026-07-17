@@ -1,4 +1,4 @@
-// Tests for lib/companieshouse.ts — the parsers that turn a Companies House response into the fields
+// Tests for lib/companieshouse.ts, the parsers that turn a Companies House response into the fields
 // onboarding needs. Pure, fixture-based, no network and no API key. The fixtures match the shapes the
 // live register returns (https://developer-specs.company-information.service.gov.uk).
 //   node test/companieshouse.test.mjs

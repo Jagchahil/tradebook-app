@@ -83,7 +83,7 @@ for (const q of bank.questions) {
 const total = bank.questions.length;
 const pct = ((pass / total) * 100).toFixed(1);
 
-console.log(`\n=== Lekhio Professional Exam Suite — ${bank.meta.taxYear} ===\n`);
+console.log(`\n=== Lekhio Professional Exam Suite, ${bank.meta.taxYear} ===\n`);
 console.log(`Engine under test: lib/taxengine.ts`);
 console.log(`Questions: ${total}   Passed: ${pass}   Failed: ${total - pass}   Score: ${pct}%\n`);
 

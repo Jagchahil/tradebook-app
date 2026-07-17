@@ -4,7 +4,7 @@
 
 ---
 
-> **Latest sessions (read after this doc):** doc 95 (brain/memory + agent design), doc 96 (hard-test audit), and **doc 97 (8 July: Phase 1.5 Rakha one-tap actions + credit cache, the full premium icon redesign of app AND website, and the security audit vs the "vibe-coded sites get hacked" checklist — clean, MFA now enabled)**. Doc 97 has the commit map and current state. Net since this doc was written: the app and website were fully redesigned to a premium line-icon set (Ionicons in the app, an inline-SVG `Ic` set on the web, crane removed, WhatsApp emoji kept), Rakha now prepares one-tap actions, Puchio has a credit-saving general-answer cache, and Supabase MFA is on. The one open launch gate remains `REJECT_ANON_USERS` after Stripe.
+> **Latest sessions (read after this doc):** doc 95 (brain/memory + agent design), doc 96 (hard-test audit), and **doc 97 (8 July: Phase 1.5 Rakha one-tap actions + credit cache, the full premium icon redesign of app AND website, and the security audit vs the "vibe-coded sites get hacked" checklist, clean, MFA now enabled)**. Doc 97 has the commit map and current state. Net since this doc was written: the app and website were fully redesigned to a premium line-icon set (Ionicons in the app, an inline-SVG `Ic` set on the web, crane removed, WhatsApp emoji kept), Rakha now prepares one-tap actions, Puchio has a credit-saving general-answer cache, and Supabase MFA is on. The one open launch gate remains `REJECT_ANON_USERS` after Stripe.
 
 ---
 

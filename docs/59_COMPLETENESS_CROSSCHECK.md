@@ -9,11 +9,11 @@
 A code-level verification of our tax engine against the 20 expert exam topics found we were over-claiming: the engine fully covered about 9 of 20, the bot was narrating the rest from the LLM, and four topics were missing from tested code entirely. The high-frequency gaps a real sole trader actually hits were the worst offenders. So before writing this, we closed them.
 
 **Now fixed and exam-tested (suite expanded to 87 questions, still 100%):**
-- **Payments on account** — the two 50% instalments due 31 January and 31 July once the bill tops £1,000. This surprises every sole trader; now computed and explained.
-- **Capital allowances beyond AIA** — writing down allowances, 18% main pool and 6% special rate pool.
-- **Trading losses** — carry forward against future profits, with the s64 sideways option explained.
-- **Capital gains tax and Business Asset Disposal Relief** — £3,000 exempt, 18% or 24%, BADR at 18% up to £1m.
-- **VAT flat rate scheme** — pay a percentage of turnover, with the 16.5% limited-cost-trader rate.
+- **Payments on account**, the two 50% instalments due 31 January and 31 July once the bill tops £1,000. This surprises every sole trader; now computed and explained.
+- **Capital allowances beyond AIA**, writing down allowances, 18% main pool and 6% special rate pool.
+- **Trading losses**, carry forward against future profits, with the s64 sideways option explained.
+- **Capital gains tax and Business Asset Disposal Relief**, £3,000 exempt, 18% or 24%, BADR at 18% up to £1m.
+- **VAT flat rate scheme**, pay a percentage of turnover, with the 16.5% limited-cost-trader rate.
 
 The accountant bot's knowledge was upgraded to match, so it now answers these accurately rather than guessing.
 
@@ -27,7 +27,7 @@ Net: we exceed every competitor on the experience and the advice, and trail only
 
 ## Lens 2: vs a real accountant
 
-We now cover most of what a high-street accountant does for a sole trader: keep the books, categorise, prepare the quarter and the year, answer questions in plain English, advise on expenses and tax efficiency, model the incorporation decision, and produce proof of income. What an accountant still does that we do not: **actually file** (pending recognition), carry **professional liability and a signature**, and handle the genuinely complex edges (intricate CGT, inheritance tax, company restructuring, HMRC disputes, payroll) — which our bot correctly refuses and refers to a human. That referral is the right answer, not a gap to paper over.
+We now cover most of what a high-street accountant does for a sole trader: keep the books, categorise, prepare the quarter and the year, answer questions in plain English, advise on expenses and tax efficiency, model the incorporation decision, and produce proof of income. What an accountant still does that we do not: **actually file** (pending recognition), carry **professional liability and a signature**, and handle the genuinely complex edges (intricate CGT, inheritance tax, company restructuring, HMRC disputes, payroll), which our bot correctly refuses and refers to a human. That referral is the right answer, not a gap to paper over.
 
 ## Lens 3: vs the exams we studied
 

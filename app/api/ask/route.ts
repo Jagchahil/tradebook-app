@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
       //      non-compliance which takes place AFTER THE DATE OF ROYAL ASSENT to Finance Bill 2026-27."
       //
       // There is no calendar date because HMRC does not have one yet. So our extractor honestly
-      // returns null, and phase() honestly says `unknown` — and then I handed it to a language model
+      // returns null, and phase() honestly says `unknown`, and then I handed it to a language model
       // under a heading reading THE LAW AS IT STANDS TODAY. A measure awaiting Royal Assent is not
       // the law today. It is a draft.
       //

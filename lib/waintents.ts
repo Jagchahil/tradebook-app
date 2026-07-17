@@ -651,7 +651,7 @@ export function isSavingsQuestion(body: string): boolean {
   // "what am I saving", "how much has lekhio saved me this year"
   if (SAVED_ME.test(b) && SAVED_ME_SUBJECT.test(b)) return true;
 
-  // "was it worth it", "is this worth 12.99" — the same question, asked by a man about to cancel.
+  // "was it worth it", "is this worth 12.99", the same question, asked by a man about to cancel.
   if (/\bworth it\b/.test(b)) return true;
 
   return false;

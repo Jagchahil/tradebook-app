@@ -1,4 +1,4 @@
-// PARTNERSHIP TAX — the third UK trading structure, alongside the sole trader and the limited company.
+// PARTNERSHIP TAX, the third UK trading structure, alongside the sole trader and the limited company.
 //
 // A general partnership is TRANSPARENT: it pays no tax of its own. GOV.UK, /set-up-business-partnership:
 // "Partners share the business's profits, and each partner pays tax on their share." The partnership
@@ -36,7 +36,7 @@ export interface PartnerResult {
   name: string;
   salary: number; // the prior slice they were allocated off the top
   residualShare: number; // their slice of the balance after salaries
-  profitShare: number; // salary + residualShare — their total slice of the profit (can be negative)
+  profitShare: number; // salary + residualShare, their total slice of the profit (can be negative)
   incomeTax: number; // income tax on their share, as a sole trader
   class4: number; // Class 4 NIC on their share
   total: number; // incomeTax + class4 on their share

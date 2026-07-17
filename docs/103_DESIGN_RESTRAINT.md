@@ -54,7 +54,7 @@ Apply these to anything on a screen. If it fails one, it goes.
 
 **2. The empty test.** What does this say when there is nothing to say? A row that reads "nothing to check" most of the time teaches him to stop looking at it, and then he misses the one week it matters. **Things to check now only appears when there is something to check.** If a thing has no useful empty state, it should not be permanently present.
 
-**3. The honesty test.** Does this button do something? *"File straight to HMRC — SOON"* opened an alert saying the feature does not exist. That is not a button, it is an advert for our own roadmap, and it was taking up a row on the tax screen. **It comes back the day it works.**
+**3. The honesty test.** Does this button do something? *"File straight to HMRC, SOON"* opened an alert saying the feature does not exist. That is not a button, it is an advert for our own roadmap, and it was taking up a row on the tax screen. **It comes back the day it works.**
 
 **4. The alignment test.** Does this reward him for the thing we are trying to remove? The streak card said *"7 day logging streak! Two more days to unlock Tidy Books."* Connect a bank feed and a logging streak measures nothing, because we have taken over the logging. **We were congratulating him for doing the work we exist to do for him.** And "Tidy Books" was an achievement we invented, that unlocks nothing, from a system that does not exist.
 
@@ -82,12 +82,12 @@ There is a hard limit on this, and it is the approval gate. **Money, tax filing,
 
 | Cut | Test it failed |
 |---|---|
-| Money tab: 14 destinations to 6 | **once** — nine calculators he uses once a year were parked on his daily screen |
-| "File straight to HMRC, SOON" | **honesty** — a button whose only function was an alert saying it does not work |
-| The streak card | **alignment** — rewarded him for manual work the product exists to abolish |
-| Wrapped, permanent to seasonal | **honesty** — it claimed to be "ready" in August, which is neither true nor interesting |
+| Money tab: 14 destinations to 6 | **once**, nine calculators he uses once a year were parked on his daily screen |
+| "File straight to HMRC, SOON" | **honesty**, a button whose only function was an alert saying it does not work |
+| The streak card | **alignment**, rewarded him for manual work the product exists to abolish |
+| Wrapped, permanent to seasonal | **honesty**, it claimed to be "ready" in August, which is neither true nor interesting |
 | `achievements.tsx`, `year-summary.tsx` | dead. **Zero** links pointed at them. 340 lines shipping in the binary |
-| "Shall I remember this shop?" | **no button** — the category he chose was already the answer |
+| "Shall I remember this shop?" | **no button**, the category he chose was already the answer |
 
 ---
 

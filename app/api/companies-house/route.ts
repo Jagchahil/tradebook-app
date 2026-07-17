@@ -11,6 +11,14 @@ import { searchCompanies, getCompany, companiesHouseEnabled } from '../../../lib
 // a man halfway through signing up.
 
 export async function GET(req: NextRequest) {
+  // A no-auth health probe. Returns ONLY whether a key is configured on this deployment (a boolean,
+  // never the key, never any register data), so we can confirm the env var actually baked into the
+  // running build after a deploy. `curl https://lekhio.app/api/companies-house?diag=1`.
+  const diag = new URL(req.url).searchParams.get('diag');
+  if (diag === '1') {
+    return NextResponse.json({ enabled: companiesHouseEnabled() });
+  }
+
   const auth = req.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   const user = token ? await verifyAccessToken(token) : null;

@@ -696,12 +696,11 @@ html,body{background:var(--bg)}
 body{transition:background-color .35s ease,color .35s ease}
 *{box-sizing:border-box} body{margin:0}
 a{text-decoration:none}
-/* brand mark: the real logo, the "Lekhio" wordmark with its river underline.
-   Live text (not the SVG file) so the wordmark flips colour in dark mode via
-   var(--tx); the river underline reproduces public/lekhio-logo.svg. No "L" chip. */
-.brandmark{display:inline-flex;flex-direction:column;align-items:stretch;gap:1px;line-height:1}
-.brandword{font-size:24px;font-weight:800;letter-spacing:-1.4px;color:var(--tx)}
-.brandriver{display:block;width:100%;height:9px;margin-top:1px}
+/* brand mark: gradient L chip + wordmark. The L is the primary logo (Jag's
+   call, 17 Jul): the same gradient mark the app uses, one logo everywhere. */
+.brandrow{display:inline-flex;align-items:center;gap:10px}
+.logo-chip{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--river),var(--saffron));display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:19px;box-shadow:0 6px 16px rgba(27,89,166,.35)}
+.logo-word{font-size:23px;font-weight:900;letter-spacing:-1px;color:var(--tx)}
 /* dark/light toggle in the nav */
 .theme-toggle{display:none !important}
 .theme-toggle:hover{transform:translateY(-2px)}
@@ -898,19 +897,9 @@ const NAV_LINKS: [string, string][] = [
 export function SiteNav() {
   return (
     <nav style={{ position: 'relative', maxWidth: 1320, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Link href="/" aria-label="Lekhio home" className="brandmark">
-        <span className="brandword">Lekhio</span>
-        <svg className="brandriver" viewBox="0 0 320 20" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="navriver" x1="0" y1="0" x2="320" y2="0" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stopColor="#1B59A6" />
-              <stop offset="0.55" stopColor="#2E7BBF" />
-              <stop offset="1" stopColor="#E0A33E" />
-            </linearGradient>
-          </defs>
-          <path d="M4 11 C 60 3, 100 17, 160 11 S 264 3, 316 11" stroke="url(#navriver)" strokeWidth="4" fill="none" strokeLinecap="round" />
-          <path d="M4 16 C 66 9, 106 20, 164 16 S 262 9, 316 15" stroke="url(#navriver)" strokeWidth="2.5" fill="none" strokeLinecap="round" opacity="0.45" />
-        </svg>
+      <Link href="/" aria-label="Lekhio home" className="brandrow">
+        <span className="logo-chip">L</span>
+        <span className="logo-word">Lekhio</span>
       </Link>
 
       <input type="checkbox" id="navtoggle" className="nav-toggle" aria-label="Toggle menu" />

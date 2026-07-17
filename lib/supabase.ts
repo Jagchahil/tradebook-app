@@ -2002,10 +2002,11 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   const taxYearStart = quarterBounds(startYear, 1).start;
   const todayISO = now.toISOString().slice(0, 10);
 
-  const [rows, sl, goals] = await Promise.all([
+  const [rows, sl, goals, biz] = await Promise.all([
     getConfirmedTransactionsForRange(userId, taxYearStart, todayISO),
     getStudentLoanSettings(userId),
     getActiveGoals(userId),
+    getBusinessProfile(userId),
   ]);
 
   let ytdTradeIncome = 0;
@@ -2030,6 +2031,18 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     if (Number.isFinite(c) && c > 0) ytdCisSuffered += c;
   }
   const categoriesLogged = [...cats];
+
+  // 🔴 A PARTNERSHIP SHARES ONE SET OF BOOKS. The app sees the WHOLE partnership's income and expenses
+  // (the shared account), but this man is taxed only on HIS SLICE of the profit. GOV.UK,
+  // /set-up-business-partnership: "each partner pays tax on their share." So we scale his trade figures
+  // by his share BEFORE any tax is worked out. It is 100% for a sole trader and a director, so nothing
+  // moves for them. Without this a partner is set-aside for tax on his partners' profit too, which ties
+  // up money he does not owe. His share was captured at setup and has been sitting unused until now.
+  const partnerFactor = biz && biz.businessType === 'partnership' ? biz.partnershipShare / 100 : 1;
+  ytdTradeIncome *= partnerFactor;
+  ytdTradeExpenses *= partnerFactor;
+  ytdCisSuffered *= partnerFactor;
+
   const start = new Date(`${taxYearStart}T00:00:00Z`);
   const monthsElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (30.44 * 86400000)));
   const purchase = goals.find((g) => g.kind === 'purchase');

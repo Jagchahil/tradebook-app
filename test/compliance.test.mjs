@@ -45,7 +45,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 
 const R = await import(pathToFileURL(path.join(root, 'lib/rulesources.ts')).href);
-const T = await import(pathToFileURL(path.join(root, 'lib/taxrules.ts')).href);
+// The corpus is now the canonical data file; taxrules.ts is a thin re-export. Load the data directly
+// (Node type stripping needs a self-contained module with the explicit .ts extension).
+const T = await import(pathToFileURL(path.join(root, 'lib/claimrules.data.ts')).href);
 const { RULE_SOURCES } = R;
 const RULES = T.EXPENSE_RULES || T.RULES || T.default;
 

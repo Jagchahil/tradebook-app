@@ -17,7 +17,9 @@
 // khoji/corpus.mjs checks it verbatim against the live page every night, so an invented one fails
 // loudly instead of shipping. These tests make sure the anchor is strong enough to hold.
 
-import { EXPENSE_RULES } from '../lib/taxrules.ts';
+// The corpus is now the canonical data file (taxrules.ts is a thin re-export of it). We import the
+// data directly, because Node's type stripping needs the explicit .ts and a self-contained module.
+import { EXPENSE_RULES } from '../lib/claimrules.data.ts';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';

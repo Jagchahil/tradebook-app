@@ -19,7 +19,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 import { FACTS } from './taxengine';
-import { EXPENSE_RULES } from './taxrules';
+import { EXPENSE_RULES } from './claimrules.data';
 import {
   LEGAL_FIELDS,
   LEGAL_SOURCES,

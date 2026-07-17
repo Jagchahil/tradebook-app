@@ -16,8 +16,8 @@ import assert from 'node:assert';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const stage = mkdtempSync(path.join(tmpdir(), 'universe-'));
-const rewrite = (src) => src.replace(/from '\.\/([a-zA-Z0-9_]+)'/g, "from './$1.ts'");
-for (const f of ['lawsources', 'taxengine', 'taxrules', 'universe']) {
+const rewrite = (src) => src.replace(/from '\.\/([a-zA-Z0-9_.-]+)'/g, "from './$1.ts'");
+for (const f of ['lawsources', 'taxengine', 'claimrules.data', 'universe']) {
   writeFileSync(path.join(stage, f + '.ts'), rewrite(readFileSync(path.join(root, 'lib', f + '.ts'), 'utf8')));
 }
 const U = await import(pathToFileURL(path.join(stage, 'universe.ts')).href);

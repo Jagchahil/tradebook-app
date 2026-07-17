@@ -56,6 +56,7 @@ import {
   bumpAiUsage,
   countActiveSubscribers,
   totalsForUser,
+  pendingSummaryForUser,
   latestUnconfirmed,
   deleteTransactionById,
   updateTransactionAmount,
@@ -1109,6 +1110,22 @@ async function handleTotals(from: string, body: string): Promise<void> {
     return;
   }
   if (totals.count === 0) {
+    // Nothing CONFIRMED yet. But a man who just texted a handful of things and then asks "what do I
+    // owe" should hear that they are waiting for his tick, not a flat "nothing". Acknowledge the
+    // pending captures with their figures, and be plain that nothing counts until he approves it.
+    const pending = await pendingSummaryForUser(userId, q.sinceISO).catch(() => null);
+    if (pending && pending.count > 0) {
+      const bits: string[] = [];
+      if (pending.income > 0) bits.push(`${formatGbp(pending.income)} coming in`);
+      if (pending.expenses > 0) bits.push(`${formatGbp(pending.expenses)} of costs`);
+      const detail = bits.length ? ` (${bits.join(' and ')})` : '';
+      const n = pending.count;
+      await sendText(
+        from,
+        `You have ${n} thing${n === 1 ? '' : 's'} waiting for your approval in the app${detail}. Nothing counts towards your tax until you confirm it, so the tally is £0 for now. Approve them and ask me again.`,
+      );
+      return;
+    }
     await sendText(from, `Nothing logged ${q.periodLabel === 'all time' ? 'yet' : q.periodLabel}. Send me a receipt or what you spent and I will start the tally.`);
     return;
   }
@@ -1762,6 +1779,12 @@ function confirmationLine(parsed: {
     const namedPayer = payer.length > 1 && !/^(a\s+)?(customer|client|someone|cash|payment|them|they)$/i.test(payer);
     const offer = namedPayer ? ` Want it as an invoice for ${payer}? Reply "invoice this".` : '';
     return `Got it. Income of ${amountText} from ${parsed.merchant_name}. Check it in the app and confirm.${offer}`;
+  }
+  // We could not confidently place it (Tesco, Amazon, a bare name all land here). A trade's spend at
+  // these is as often the weekly shop as a job cost, so we do NOT quietly file it as a business "other"
+  // and invite a tick. We ASK. Nothing counts until he confirms, so leaving it is the safe default.
+  if (parsed.category === 'other') {
+    return `Got it. ${parsed.merchant_name} for ${amountText}. Was this a business cost? If so, open the app and set what it was for, materials, fuel and the like. If it was personal, just leave it, nothing counts until you confirm it.`;
   }
   return `Got it. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. Check it in the app and confirm.`;
 }

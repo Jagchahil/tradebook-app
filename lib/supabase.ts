@@ -2283,6 +2283,33 @@ export async function totalsForUser(
   };
 }
 
+// What is CAPTURED but not yet approved. The confirmed-only totals above are the settled figure, but a
+// man who has just texted five things and then asks "what do I owe" should not be told "nothing", he
+// should be told his entries are waiting for his tick. This sums the unconfirmed, non-personal rows so
+// the WhatsApp reply can acknowledge them without ever counting them as settled.
+export async function pendingSummaryForUser(
+  userId: string,
+  sinceISO: string | null,
+): Promise<{ count: number; income: number; expenses: number } | null> {
+  const { url } = config();
+  const since = sinceISO ? `&transaction_date=gte.${encodeURIComponent(sinceISO)}` : '';
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.false&is_personal=eq.false${since}&select=amount&limit=1000`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json().catch(() => null)) as Array<{ amount: number | string | null }> | null;
+  if (!Array.isArray(rows)) return null;
+  let income = 0;
+  let expenses = 0;
+  for (const r of rows) {
+    const a = Number(r.amount) || 0;
+    if (a >= 0) income += a;
+    else expenses += Math.abs(a);
+  }
+  return { count: rows.length, income, expenses };
+}
+
 // The user's most recent unconfirmed entry, so "delete that" and "change it to
 // 40" can act on the thing they just logged. Confirmed entries are never touched
 // from WhatsApp; those are edited in the app where the user can see them.

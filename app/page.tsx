@@ -6,12 +6,12 @@ import {
 } from './_shared/site';
 
 export const metadata: Metadata = {
-  title: 'Lekhio. Never do your books again. Just text it.',
+  title: 'Lekhio. Your first employee. The one that saves you money.',
   description:
-    'Lekhio is the WhatsApp back office for the UK self employed. Snap a receipt, say an expense, or text what you got paid. Lekhio logs it, sorts it, writes your invoices, and keeps your tax ready. You just approve. 14 days free.',
+    'Lekhio is the first employee your business hires, and the first that pays for itself. Connect your bank and it works in the background, finding every legal way to lower your tax and keeping you ready to file. Filing is the easy part. Saving you money is the job. You approve. 14 days free.',
   openGraph: {
-    title: 'Lekhio. Never do your books again. Just text it.',
-    description: 'The WhatsApp back office for the UK self employed. Snap it, say it, or text it. Lekhio does the books.',
+    title: 'Lekhio. Your first employee. The one that saves you money.',
+    description: 'Not software you buy. The first employee your business hires. It finds the money, you approve, it keeps you ready to file.',
     type: 'website',
   },
 };
@@ -197,8 +197,8 @@ export default function HomePage() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@graph': [
-              { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: 'WhatsApp-first bookkeeping and Making Tax Digital prep for the UK self-employed: trades, freelancers, drivers, carers, consultants and landlords.' },
-              { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'iOS, Android, Web', url: SITE, description: 'Text a receipt, voice note or invoice to WhatsApp. Lekhio logs it, categorises it, and keeps you ready for Making Tax Digital. You approve before anything reaches HMRC.', offers: [ { '@type': 'Offer', price: '12.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '129', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
+              { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: 'The first employee for the UK self-employed. Connect your bank and it sorts every transaction, finds the reliefs you are owed, and keeps you ready for Making Tax Digital. For trades, freelancers, drivers, carers, consultants and landlords.' },
+              { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'iOS, Android, Web', url: SITE, description: 'Connect your bank and Lekhio sorts every transaction, finds every legal way to lower your tax, and keeps you ready for Making Tax Digital. You approve before anything reaches HMRC.', offers: [ { '@type': 'Offer', price: '12.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '129', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
               { '@type': 'FAQPage', mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
             ],
           }),
@@ -216,9 +216,9 @@ export default function HomePage() {
       <section className="hero">
         <div className="wrap grid">
           <div>
-            <span className="pill"><span className="dot" /> The tax assistant that lives in WhatsApp</span>
-            <h1>Never do your<br />books again.<br /><span className="gt">Just text it.<svg className="squig" viewBox="0 0 320 16" preserveAspectRatio="none"><path d="M4 11 C 60 3, 110 3, 150 9 S 260 15, 316 6" /></svg></span></h1>
-            <p className="sub">Snap a receipt, say an expense, or text what you got paid. Lekhio logs it, sorts it, writes your invoices, and keeps your tax ready. You just approve.</p>
+            <span className="pill"><span className="dot" /> Your first employee. The one that pays for itself.</span>
+            <h1>Your first<br />employee.<br />The one that <span className="gt">saves you money.<svg className="squig" viewBox="0 0 320 16" preserveAspectRatio="none"><path d="M4 11 C 60 3, 110 3, 150 9 S 260 15, 316 6" /></svg></span></h1>
+            <p className="sub">Connect your bank and it works in the background, sorting every payment and finding the tax you never need to pay. Filing is the easy part. Saving you money is the job. You approve, it does the rest.</p>
             <div className="cta-row">
               <Link href="/start" className="btn primary">Start free</Link>
               <Link href="/product" className="btn ghost">See how it works</Link>
@@ -256,19 +256,19 @@ export default function HomePage() {
               <ul>
                 <li><span className="m">✕</span> A shoebox of receipts you dread opening.</li>
                 <li><span className="m">✕</span> A lost weekend every January.</li>
-                <li><span className="m">✕</span> Spreadsheets you forget to update.</li>
-                <li><span className="m">✕</span> A £150 to £900 accountant bill just to file.</li>
-                <li><span className="m">✕</span> Never quite knowing what you owe.</li>
+                <li><span className="m">✕</span> An accountant who takes days to reply.</li>
+                <li><span className="m">✕</span> A £150 to £900 bill, just to file.</li>
+                <li><span className="m">✕</span> Paying more tax than you needed to.</li>
               </ul>
             </div>
             <div className="new">
               <h3>The Lekhio way</h3>
               <ul>
-                <li><span className="m">✓</span> Snap it, say it, or text it. Done in seconds.</li>
-                <li><span className="m">✓</span> Your books build themselves all year.</li>
-                <li><span className="m">✓</span> Tax figures always sat there, ready.</li>
+                <li><span className="m">✓</span> Connect your bank. Every payment sorted for you.</li>
+                <li><span className="m">✓</span> It finds the reliefs you are owed, all year.</li>
+                <li><span className="m">✓</span> Your tax figures always sat there, ready.</li>
                 <li><span className="m">✓</span> One flat price, everything in.</li>
-                <li><span className="m">✓</span> Always know your number.</li>
+                <li><span className="m">✓</span> Always know your number, and never overpay.</li>
               </ul>
             </div>
           </div>
@@ -280,12 +280,12 @@ export default function HomePage() {
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 44 }}>
             <h2 className="h2">Three steps. That is the whole thing.</h2>
-            <p className="lead">If you can send a text, you can run your books.</p>
+            <p className="lead">Connect it once. It works in the background from then on.</p>
           </div>
           <div className="steps reveal">
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--river),var(--river-deep))', boxShadow: '0 12px 26px rgba(27,89,166,.32)' }}>1</div><h3>Snap it, say it, text it</h3><p className="mut" style={{ fontSize: 15 }}>A photo of a receipt, a voice note, or a quick line on WhatsApp. That is the whole job.</p></div>
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--saffron),var(--saffron-deep))', boxShadow: '0 12px 26px rgba(224,163,62,.32)' }}>2</div><h3>Lekhio sorts it</h3><p className="mut" style={{ fontSize: 15 }}>It reads it, pulls the total, sorts the category, and logs it. It even writes your invoices.</p></div>
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--green),#0F5C2E)', boxShadow: '0 12px 26px rgba(21,128,61,.32)' }}>3</div><h3>You approve</h3><p className="mut" style={{ fontSize: 15 }}>Your tax is prepared as you go. You check it and send it. Nothing reaches HMRC without your yes.</p></div>
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--river),var(--river-deep))', boxShadow: '0 12px 26px rgba(27,89,166,.32)' }}>1</div><h3>Connect your bank</h3><p className="mut" style={{ fontSize: 15 }}>Every card payment is read and sorted automatically. Paid cash? Snap the receipt on WhatsApp. That is the whole job.</p></div>
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--saffron),var(--saffron-deep))', boxShadow: '0 12px 26px rgba(224,163,62,.32)' }}>2</div><h3>It finds your money</h3><p className="mut" style={{ fontSize: 15 }}>It sorts every transaction, claims the reliefs you are owed, tracks your refund, and keeps your tax ready as you go.</p></div>
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--green),#0F5C2E)', boxShadow: '0 12px 26px rgba(21,128,61,.32)' }}>3</div><h3>You approve</h3><p className="mut" style={{ fontSize: 15 }}>Your figures sit there ready. You check them and send them. Nothing reaches HMRC without your yes.</p></div>
           </div>
         </div>
       </section>
@@ -327,36 +327,37 @@ export default function HomePage() {
       <section>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 44 }}>
-            <h2 className="h2">Everything your accountant nags you for.</h2>
-            <p className="lead">Done as you work, not at the end of the year.</p>
+            <h2 className="h2">More than an accountant. An employee.</h2>
+            <p className="lead">It keeps the books, and then it does the bit that actually puts money back in your pocket.</p>
           </div>
 
           <div className="drow reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--river)' }}>Receipt capture</div>
-              <h3>Snap it. It reads itself.</h3>
-              <p>Photograph any receipt on WhatsApp. Lekhio pulls the total, the VAT and the category, and logs it in seconds. No typing, no app to open.</p>
+              <div className="eyebrow" style={{ color: 'var(--river)' }}>The whole point</div>
+              <h3>It finds you legal ways to pay less.</h3>
+              <p>This is the job. Lekhio reads your own numbers and surfaces the real reliefs you are entitled to: use of home, mileage, kit timing, a pension to step out of the 40% band. The legitimate ones only, and always your call. Anyone can file a return. This finds the money inside it.</p>
             </div>
             <div className="dvis">
-              <div className="dbub out"><div className="rc">🧾</div>Screwfix receipt</div>
-              <div className="dbub in">Logged. £42.60, materials ✅</div>
-              <div className="dbub in" style={{ background: 'transparent', fontSize: 12, color: 'var(--tx-mut)' }}>VAT £7.10 · category Materials · 3 Jul</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>WAYS TO SAVE · ON YOUR NUMBERS</div>
+              <div className="splitrow"><span>Claim use of home</span><span style={{ color: 'var(--green)' }}>save ~£190</span></div>
+              <div className="splitrow"><span>Mileage instead of fuel</span><span style={{ color: 'var(--tx-mut)' }}>worth a look</span></div>
+              <div className="splitrow"><span>Pension, step out of 40%</span><span style={{ color: 'var(--green)' }}>save ~£1,200</span></div>
+              <div className="splitrow"><span>On the table this year</span><span style={{ color: 'var(--green)' }}>£1,390</span></div>
             </div>
           </div>
 
           <div className="drow flip reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--saffron-deep)' }}>Voice notes</div>
-              <h3>Hands full? Just say it.</h3>
-              <p>On a roof or under a sink, talking is the only input that works. Say what you spent and carry on. It is logged before you have put the phone down.</p>
+              <div className="eyebrow" style={{ color: 'var(--river)' }}>Bank connected</div>
+              <h3>Connect it once. It reads everything.</h3>
+              <p>Connect your bank and every card payment is read, sorted and logged for you, automatically. No typing, no chasing. Paid cash? Snap the receipt on WhatsApp and it does the rest.</p>
             </div>
             <div className="dvis">
-              <div className="diconrow">
-                <div className="dicon"><Ic e="🎙️" color="var(--saffron-deep)" size={30} /></div>
-                <div className="wf">{[10, 22, 14, 28, 18, 24, 12, 20, 10].map((h, i) => (<i key={i} style={{ height: h }} />))}</div>
-              </div>
-              <div className="dbub out">&quot;spent forty on diesel&quot;</div>
-              <div className="dbub in">£40 fuel, logged ✅</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>THIS WEEK · SORTED FOR YOU</div>
+              <div className="splitrow"><span>Screwfix · card</span><span style={{ color: 'var(--tx-mut)' }}>Materials</span></div>
+              <div className="splitrow"><span>Shell · card</span><span style={{ color: 'var(--tx-mut)' }}>Fuel</span></div>
+              <div className="splitrow"><span>🧾 Cash receipt</span><span style={{ color: 'var(--tx-mut)' }}>Materials</span></div>
+              <div className="splitrow"><span>34 payments this week</span><span style={{ color: 'var(--green)' }}>all sorted ✅</span></div>
             </div>
           </div>
 
@@ -376,16 +377,17 @@ export default function HomePage() {
 
           <div className="drow flip reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--river)' }}>Ways to save</div>
-              <h3>It finds you legal ways to pay less.</h3>
-              <p>Lekhio reads your own numbers and surfaces the real reliefs you are entitled to: use of home, mileage, kit timing, a pension to step out of the 40% band. The legitimate ones only, and always your call.</p>
+              <div className="eyebrow" style={{ color: 'var(--saffron-deep)' }}>Hands full</div>
+              <h3>On a job? Just say it.</h3>
+              <p>On a roof or under a sink, talking is the only input that works. Say what you spent and carry on. It is logged before you have put the phone down.</p>
             </div>
             <div className="dvis">
-              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>WAYS TO SAVE · ON YOUR NUMBERS</div>
-              <div className="splitrow"><span>Claim use of home</span><span style={{ color: 'var(--green)' }}>save ~£190</span></div>
-              <div className="splitrow"><span>Mileage instead of fuel</span><span style={{ color: 'var(--tx-mut)' }}>worth a look</span></div>
-              <div className="splitrow"><span>Pension, step out of 40%</span><span style={{ color: 'var(--green)' }}>save ~£1,200</span></div>
-              <div className="splitrow"><span>On the table this year</span><span style={{ color: 'var(--green)' }}>£1,390</span></div>
+              <div className="diconrow">
+                <div className="dicon"><Ic e="🎙️" color="var(--saffron-deep)" size={30} /></div>
+                <div className="wf">{[10, 22, 14, 28, 18, 24, 12, 20, 10].map((h, i) => (<i key={i} style={{ height: h }} />))}</div>
+              </div>
+              <div className="dbub out">&quot;spent forty on diesel&quot;</div>
+              <div className="dbub in">£40 fuel, logged ✅</div>
             </div>
           </div>
 
@@ -414,7 +416,7 @@ export default function HomePage() {
           <div className="center reveal" style={{ marginBottom: 40 }}>
             <div className="eyebrow">The expert in your pocket</div>
             <h2 className="h2">Two helpers. Day and night.</h2>
-            <p className="lead">The brains of an accountant, in the chat you already use. One answers the second you ask. One speaks up before you have to.</p>
+            <p className="lead">The brains of an accountant, in the chat you already use. One answers the second you ask. One watches your money and speaks up before you have to.</p>
           </div>
           <div className="helpers reveal">
             <div className="hcard">
@@ -487,11 +489,11 @@ export default function HomePage() {
           <div className="incl-panel reveal">
             <h3>Everything, in both plans</h3>
             <ul className="incl-grid">
+              <li><span className="t">✓</span> Bank connected, every payment sorted for you</li>
+              <li><span className="t">✓</span> Reliefs found on your own numbers, all year</li>
               <li><span className="t">✓</span> Unlimited receipts, voice notes and mileage</li>
-              <li><span className="t">✓</span> Invoices created and sent from WhatsApp</li>
-              <li><span className="t">✓</span> MTD ready quarterly summaries, you approve</li>
+              <li><span className="t">✓</span> MTD ready summaries and invoices, you approve</li>
               <li><span className="t">✓</span> CIS split, deduction and refund tracking</li>
-              <li><span className="t">✓</span> Instant replies, in the same chat</li>
               <li><span className="t">✓</span> Cancel in one tap, export any time</li>
             </ul>
           </div>
@@ -502,8 +504,8 @@ export default function HomePage() {
       <section style={{ paddingTop: 20 }}>
         <div className="wrap">
           <div className="final reveal">
-            <h2>Text it. It&apos;s in your Lekhio.</h2>
-            <p>Your whole back office, sorted from a text. 14 days free, no card needed.</p>
+            <h2>Your first employee starts today.</h2>
+            <p>Connect your bank and it goes to work, finding your money and keeping you ready to file. 14 days free, no card needed.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
           </div>
         </div>

@@ -15,6 +15,8 @@ import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly } from './taxengine';
 import { studentLoanForSA, STUDENT_PLANS, type StudentPlan } from './nistudentloan';
 import { aprilDelta, PROPERTY_FACTS } from './propertyengine';
 import { chaseMessage } from './waintents';
+import { savingsMoves, type Move } from './rakhamoves';
+import type { BusinessType, OwnerInput } from './position';
 
 // --- Input ---------------------------------------------------------------------
 
@@ -58,6 +60,15 @@ export interface AgentInput {
   employmentIncome: number; // annual PAYE salary saved on the account, 0 if none
   // Active goals (doc 82 section 5b). Empty array when none.
   goals: UserGoal[];
+
+  // --- Structure (doc: structure-aware returns, 19 Jul). All optional and defaulting to the
+  // sole-trader case, so an existing caller that omits them gets EXACTLY the old behaviour. The route
+  // fills them from the user's profile so a limited company owner gets the right brain.
+  businessType?: BusinessType; // 'sole_trader' (default) | 'limited_company' | 'partnership'
+  dividendIncome?: number;     // dividends the owner draws (a company) or holds (other)
+  savingsIncome?: number;      // savings interest, for the whole-person stack
+  married?: boolean;           // for the Marriage Allowance move
+  spouseHasSpareAllowance?: boolean; // their spouse earns under the personal allowance
 }
 
 export type SignalPriority = 'ping' | 'card';
@@ -824,4 +835,102 @@ export function applyPingCaps(signals: AgentSignal[], pingsSentLast7Days: number
   const kept = pings.slice(0, allowed);
   const demoted = pings.slice(allowed).map((s) => ({ ...s, priority: 'card' as SignalPriority }));
   return [...kept, ...demoted, ...cards];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// STRUCTURE-AWARE RAKHA (doc: structure-aware returns, 19 Jul).
+//
+// computeSignals() above is, and stays, the SOLE-TRADER brain. It is deep, tested (187 assertions) and
+// correct for a sole trader, and a partner is taxed on their share exactly like a sole trader, so it is
+// right for them too. What it CANNOT be right about is a LIMITED COMPANY: there the profit belongs to
+// the company, corporation tax comes first, and the owner is taxed personally on the salary and
+// dividends they draw. Firing "you are heading into the 40% band" on the company's profit, or a
+// payments-on-account figure from soleTraderTax(), is simply the wrong number for a director.
+//
+// So rather than surgically rewrite the sole-trader engine (and risk the numbers it already gets
+// right), we wrap it: for a limited company we DROP the signals that assume profit == personal income,
+// and ADD the structure-correct money moves from lib/rakhamoves.ts (which compute across BOTH returns
+// via lib/position.ts). Sole traders and partnerships are returned unchanged.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// The sole-trader signals that assume the trading profit IS the person's income. Wrong for a company,
+// where that profit is the company's and the owner's income is their salary plus dividends.
+const LTD_SUPPRESSED_SIGNALS = new Set<string>([
+  'higher_rate_approach', 'pa_taper', 'class2_pension_year', 'poa_cliff', 'sl_threshold_cross',
+  'cis_refund_milestone', 'aia_timing', 'home_office_saving', 'expense_completeness',
+  'mtd_mandation', 'mtd_combined_trap', 'january_rehearsal', 'year_end_countdown',
+  'goal_threshold_combo', 'goal_purchase_timing', 'goal_within_reach', 'goal_progress',
+]);
+
+function slugName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+// Turn a rakhamoves Move into an AgentSignal the walk can store and render, same shape as every other.
+function moveToSignal(m: Move, year: string): AgentSignal {
+  const linkLines = m.links.length ? '\n\n' + m.links.map((l) => `${l.label}:\n${l.url}`).join('\n\n') : '';
+  const saved = m.estSaving > 0 ? `${m.isEstimate ? 'about ' : ''}${gbp(m.estSaving)}` : '';
+  return {
+    signalKey: m.ownerName ? `${m.key}_${slugName(m.ownerName)}` : m.key,
+    periodKey: `${year}#mv`,
+    priority: m.urgency === 'now' ? 'ping' : 'card',
+    title: m.title,
+    body: m.why + linkLines,
+    waText: saved ? `${m.title} (${saved})` : m.title,
+    numbers: { estSaving: m.estSaving },
+  };
+}
+
+// Build the structure-aware money moves for this user from what the walk already holds. Single-owner
+// today (the account holder); the co-owners arrive with the Companies House link (Layer 4).
+export function moneyMoveSignals(input: AgentInput): AgentSignal[] {
+  const structure: BusinessType = input.businessType ?? 'sole_trader';
+  const d = derive(input);
+  const canProject = d.monthsElapsed >= 3;
+  const projProfit = canProject ? projectAnnual(d.ytdProfit, d) : d.ytdProfit;
+  const year = taxYearLabel(input.today);
+  const salary = Math.max(0, input.employmentIncome);
+  const dividends = Math.max(0, input.dividendIncome ?? 0);
+  const savings = Math.max(0, input.savingsIncome ?? 0);
+
+  const owners: OwnerInput[] = [{
+    name: 'You',
+    // In a company the salary and dividends the owner DRAWS are the company's, and their PAYE job (if
+    // any) is separate; for a sole trader / partner the salary is an outside job that stacks on top.
+    salary: structure === 'limited_company' ? salary : undefined,
+    dividends: structure === 'limited_company' ? dividends : undefined,
+    other: {
+      employment: structure === 'limited_company' ? 0 : salary,
+      savings,
+      dividends: structure === 'limited_company' ? 0 : dividends,
+    },
+  }];
+
+  const purchase = input.goals.find((g) => g.kind === 'purchase');
+  const moves = savingsMoves(
+    { type: structure, profit: Math.max(0, projProfit), owners },
+    {
+      today: input.today,
+      plannedPurchase: purchase ? { title: purchase.title, amount: purchase.amount } : null,
+      equipmentSpendYtd: input.equipmentSpendYtd,
+      married: input.married,
+      spouseHasSpareAllowance: input.spouseHasSpareAllowance,
+    },
+  );
+  return moves.map((m) => moveToSignal(m, year));
+}
+
+// THE ENTRY POINT THE WALK CALLS. Routes by structure: sole traders and partnerships get the existing
+// engine unchanged; a limited company gets the same engine minus the signals that assume its profit is
+// personal income, plus the structure-correct money moves.
+export function computeSignalsForStructure(input: AgentInput): AgentSignal[] {
+  const structure: BusinessType = input.businessType ?? 'sole_trader';
+  const base = computeSignals(input);
+  if (structure !== 'limited_company') return base;
+  const kept = base.filter((s) => !LTD_SUPPRESSED_SIGNALS.has(s.signalKey));
+  const moves = moneyMoveSignals(input);
+  const moveKeys = new Set(moves.map((m) => m.signalKey));
+  // Moves first (they carry the real savings), then the neutral operational signals (VAT, invoices,
+  // quarter close, the Monday brief) that apply to any structure.
+  return [...moves, ...kept.filter((s) => !moveKeys.has(s.signalKey))];
 }

@@ -33,9 +33,11 @@ import {
   cronStarted,
   cronFinished,
   recordRakhaRun,
+  getBusinessProfile,
+  getStudentLoanSettings,
 } from '../../../../lib/supabase';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
-import { computeSignals, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
+import { computeSignalsForStructure, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -114,7 +116,12 @@ async function processUser(user: {
   // A user with no data produces no signals; skip the engine's edge cases early.
   if (agg.months.length === 0 && agg.unconfirmed === 0) return { inserted: 0, pinged: 0 };
 
-  const [goals, overdue] = await Promise.all([getActiveGoals(user.id), listOverdueInvoices(user.id)]);
+  const [goals, overdue, profile, income] = await Promise.all([
+    getActiveGoals(user.id),
+    listOverdueInvoices(user.id),
+    getBusinessProfile(user.id),
+    getStudentLoanSettings(user.id),
+  ]);
   const input: AgentInput = {
     today: new Date(),
     months: agg.months,
@@ -128,8 +135,14 @@ async function processUser(user: {
     studentLoanPostgrad: user.student_loan_postgrad,
     employmentIncome: user.employment_income,
     goals: goals.map((g) => ({ id: g.id, kind: g.kind, title: g.title, amount: g.amount, targetDate: g.target_date })),
+    // Structure-aware Rakha (19 Jul): a limited company owner gets the money-moves brain, not the
+    // sole-trader signals that would read its profit as personal income. Sole traders/partnerships
+    // are unaffected (computeSignalsForStructure returns the existing engine for them).
+    businessType: profile?.businessType ?? 'sole_trader',
+    dividendIncome: income?.dividendIncome ?? 0,
+    savingsIncome: income?.savingsIncome ?? 0,
   };
-  let signals = computeSignals(input);
+  let signals = computeSignalsForStructure(input);
   if (signals.length === 0) return { inserted: 0, pinged: 0 };
 
   // The noise caps demote surplus pings to cards BEFORE insert, so the stored

@@ -9,17 +9,12 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'agent-'));
-const fix = (s) =>
-  s
-    .replace("from './taxengine'", "from './taxengine.ts'")
-    .replace("from './nistudentloan'", "from './nistudentloan.ts'")
-    .replace("from './propertyengine'", "from './propertyengine.ts'")
-    .replace("from './waintents'", "from './waintents.ts'");
-writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
-writeFileSync(path.join(stage, 'nistudentloan.ts'), fix(readFileSync(path.join(lib, 'nistudentloan.ts'), 'utf8')));
-writeFileSync(path.join(stage, 'propertyengine.ts'), fix(readFileSync(path.join(lib, 'propertyengine.ts'), 'utf8')));
-writeFileSync(path.join(stage, 'waintents.ts'), fix(readFileSync(path.join(lib, 'waintents.ts'), 'utf8')));
-writeFileSync(path.join(stage, 'agent.ts'), fix(readFileSync(path.join(lib, 'agent.ts'), 'utf8')));
+// agent.ts now composes the structure-aware spine (position.ts) and the money-moves engine
+// (rakhamoves.ts) too, so stage the whole chain and rewrite every relative import to .ts.
+const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
+for (const f of ['taxengine', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'agent']) {
+  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
+}
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);
 
 let pass = 0;

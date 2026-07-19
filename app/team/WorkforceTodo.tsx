@@ -24,9 +24,15 @@ export default function WorkforceTodo({
   onApprove?: (id: string) => Promise<void> | void;
   onDoneToggle?: (id: string, done: boolean) => void;
 }) {
-  const [done, setDone] = useState<Set<string>>(new Set());       // needs-you ticked
+  // Seed from what the server already has cleared, so a reload keeps ticked and approved items cleared.
+  // The parent renders this only once the list has loaded, so `items` is populated on first mount.
+  const [done, setDone] = useState<Set<string>>(
+    () => new Set(items.filter((i) => i.kind === 'needs' && i.done).map((i) => i.id)),
+  );
   const [working, setWorking] = useState<Set<string>>(new Set()); // approve in flight
-  const [handled, setHandled] = useState<Set<string>>(new Set()); // approve finished
+  const [handled, setHandled] = useState<Set<string>>(
+    () => new Set(items.filter((i) => i.kind === 'approve' && i.done).map((i) => i.id)),
+  );
 
   const approve = items.filter((i) => i.kind === 'approve');
   const needs = items.filter((i) => i.kind === 'needs');

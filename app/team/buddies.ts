@@ -68,8 +68,11 @@ export interface TodoItem {
   where?: string;        // 'needs your Mac', '2 min on your phone'
   prio: TodoPrio;
   doneLabel?: string;    // for approve: 'Published by Gyani', else a default is used
+  done?: boolean;        // already cleared on the server, so it renders done on load
 }
 
+// A fallback the console shows only if the live list cannot be read. The real list now comes from
+// GET /api/team/todos (the team_todos table), which Munshi replaces each morning.
 export const SEED_TODOS: TodoItem[] = [
   // approve, a bot finishes it
   { id: 'gyani-vat', kind: 'approve', buddyKey: 'gyani', prio: 'md',

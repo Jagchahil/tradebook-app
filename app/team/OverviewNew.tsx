@@ -8,6 +8,8 @@
 // so integration is a one-line swap in page.tsx: render <OverviewNew data={data} onSignOut={...} />
 // inside the signed-in branch, in place of the old stacked dashboard.
 
+import { useEffect, useState } from 'react';
+import { browserSupabase } from '../../lib/supabasebrowser';
 import { C, T, S as U, gbp } from './ui';
 import Buddy from './Buddy';
 import WorkforceMap from './WorkforceMap';
@@ -46,16 +48,42 @@ const TAG: Record<string, React.CSSProperties> = {
 const TAG_LABEL: Record<string, string> = { live: 'Live', next: 'Build next', plan: 'Parked' };
 
 export default function OverviewNew({
-  data, onSignOut, todos = SEED_TODOS,
-}: { data: OverviewPayload; onSignOut: () => void; todos?: TodoItem[] }) {
+  data, onSignOut,
+}: { data: OverviewPayload; onSignOut: () => void }) {
   const o = data.overview;
   const h = data.health;
   const brainOk = h.knowledge === 'ok';
   const cronsOk = h.crons === 'ok';
 
-  // list counts per buddy, for the flags and the "on your list" chips
+  // The CEO to-do list, live from the server (Munshi fills it each morning). Null while loading.
+  const [todos, setTodos] = useState<TodoItem[] | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await browserSupabase.auth.getSession();
+      const tok = s.session?.access_token;
+      if (!tok) { setTodos([]); return; }
+      const res = await fetch('/api/team/todos', { headers: { Authorization: `Bearer ${tok}` } });
+      if (!res.ok) { setTodos(SEED_TODOS); return; } // fall back to the seed only if it cannot be read
+      const j = await res.json();
+      setTodos((j.todos as TodoItem[]) ?? []);
+    })();
+  }, []);
+
+  async function persist(bodyObj: Record<string, unknown>) {
+    const { data: s } = await browserSupabase.auth.getSession();
+    const tok = s.session?.access_token;
+    if (!tok) return;
+    await fetch('/api/team/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+      body: JSON.stringify(bodyObj),
+    });
+  }
+
+  // flags = OPEN items per buddy (not yet done), for the constellation flags and the "on your list" chips
   const flags: Record<string, number> = {};
-  for (const t of todos) flags[t.buddyKey] = (flags[t.buddyKey] ?? 0) + 1;
+  for (const t of todos ?? []) if (!t.done) flags[t.buddyKey] = (flags[t.buddyKey] ?? 0) + 1;
 
   function scrollToList() {
     document.getElementById('team-list')?.scrollIntoView({ behavior: 'smooth' });
@@ -87,7 +115,15 @@ export default function OverviewNew({
 
         {/* YOUR LIST */}
         <div id="team-list" style={{ marginTop: 22 }}>
-          <WorkforceTodo items={todos} />
+          {todos === null ? (
+            <div style={U.honest}>Loading your list.</div>
+          ) : (
+            <WorkforceTodo
+              items={todos}
+              onApprove={(id) => persist({ id, done: true })}
+              onDoneToggle={(id, done) => persist({ id, done })}
+            />
+          )}
         </div>
 
         {/* HEALTH */}

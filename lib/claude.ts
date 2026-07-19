@@ -538,7 +538,11 @@ export async function answerAccountantQuestion(question: string, context?: strin
         // mid-thought and emit no text block, which surfaced to users as
         // "I could not work that out". A roomier ceiling lets a full answer land;
         // real accountant replies are short, so the extra headroom is rarely used.
-        max_tokens: 2000,
+        // Raised 2000 -> 4000 (19 Jul): a structure-aware "compute my corporation tax
+        // AND my personal dividend tax" question is a multi-step calculation that can
+        // spend the whole 2000 on reasoning and emit no text. Verified live: the VAT
+        // question answered, the two-return calculation returned empty. Headroom fixes it.
+        max_tokens: 4000,
         // The system prompt is long and stable, so cache it. Repeat questions then
         // pay a tenth of the input price for it.
         system: [{ type: 'text', text: ACCOUNTANT_SYSTEM, cache_control: { type: 'ephemeral' } }],

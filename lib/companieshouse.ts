@@ -126,6 +126,89 @@ export async function getCompany(companyNumber: string): Promise<CompanyProfile 
   return parseProfile(json);
 }
 
+// ── THE OWNERS (doc: multi-owner accounts, 19 Jul) ──────────────────────────────────────────────
+// A limited company belongs to its OWNERS, and Companies House publishes them: the persons with
+// significant control (the beneficial owners, over 25% of shares or votes) and the officers (the
+// directors who run it). This is how one paid company account learns how many people are entitled to
+// a personal return under it, and who they are, without anyone typing it. Read-only, public, free.
+
+export interface CompanyOwner {
+  name: string;
+  kind: 'person-with-significant-control' | 'officer';
+  role: string;               // 'owner', or the officer role ('director', 'secretary', ...)
+  controlBand: 'over-75' | '50-to-75' | '25-to-50' | 'under-25' | 'unknown';
+  isPerson: boolean;          // false for a corporate owner (a holding company, not a human)
+  ceasedOn: string | null;    // null = still active
+}
+
+// The PSC register reports control in bands, e.g. "ownership-of-shares-75-to-100-percent".
+function shareBand(natures: string[]): CompanyOwner['controlBand'] {
+  const j = natures.join(' ');
+  if (j.includes('75-to-100')) return 'over-75';
+  if (j.includes('50-to-75')) return '50-to-75';
+  if (j.includes('25-to-50')) return '25-to-50';
+  return natures.length ? 'under-25' : 'unknown';
+}
+
+export function parsePscs(json: unknown): CompanyOwner[] {
+  const items = (json as { items?: unknown })?.items;
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((it): CompanyOwner => {
+      const o = (it ?? {}) as Record<string, unknown>;
+      const kind = str(o.kind);
+      const natures = Array.isArray(o.natures_of_control) ? o.natures_of_control.filter((x): x is string => typeof x === 'string') : [];
+      return {
+        name: str(o.name),
+        kind: 'person-with-significant-control',
+        role: 'owner',
+        controlBand: shareBand(natures),
+        isPerson: kind.includes('individual'),
+        ceasedOn: str(o.ceased_on) || null,
+      };
+    })
+    .filter((p) => p.name);
+}
+
+export function parseOfficers(json: unknown): CompanyOwner[] {
+  const items = (json as { items?: unknown })?.items;
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((it): CompanyOwner => {
+      const o = (it ?? {}) as Record<string, unknown>;
+      const identification = (o.identification ?? {}) as Record<string, unknown>;
+      return {
+        name: str(o.name),
+        kind: 'officer',
+        role: str(o.officer_role) || 'officer',
+        controlBand: 'unknown',
+        // A corporate director carries an identification block; a human does not.
+        isPerson: !identification || Object.keys(identification).length === 0,
+        ceasedOn: str(o.resigned_on) || null,
+      };
+    })
+    .filter((p) => p.name);
+}
+
+async function getPscs(n: string): Promise<CompanyOwner[]> {
+  return parsePscs(await chGet(`/company/${encodeURIComponent(n)}/persons-with-significant-control`));
+}
+
+async function getOfficers(n: string): Promise<CompanyOwner[]> {
+  return parseOfficers(await chGet(`/company/${encodeURIComponent(n)}/officers`));
+}
+
+// THE WORKING OWNER LIST. Prefers the beneficial owners (PSCs); when a company reports none, falls back
+// to its active directors. Humans only, active only. This is the set of people who each get a personal
+// return under the one paid company account. Empty on any failure (fails soft, like the rest).
+export async function getCompanyOwners(companyNumber: string): Promise<CompanyOwner[]> {
+  const n = companyNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!n) return [];
+  const pscs = (await getPscs(n)).filter((p) => p.isPerson && !p.ceasedOn);
+  if (pscs.length > 0) return pscs;
+  return (await getOfficers(n)).filter((o) => o.isPerson && !o.ceasedOn && o.role === 'director');
+}
+
 // Is Companies House configured on this deployment? Onboarding can hide the auto-fill if not.
 export function companiesHouseEnabled(): boolean {
   return Boolean(process.env.CH_API_KEY);

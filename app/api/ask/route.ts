@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { answerAccountantQuestion, hasClaudeConfig } from '../../../lib/claude';
-import { verifyAccessToken, bumpAiUsage, countActiveSubscribers, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised } from '../../../lib/supabase';
+import { verifyAccessToken, bumpAiUsage, countActiveSubscribers, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised, getBusinessProfile, getStudentLoanSettings } from '../../../lib/supabase';
+import { pocketHistoryBrief } from '../../../lib/pocket';
 import { byPhase, daysUntil } from '../../../lib/brain';
 import { rateLimitedShared } from '../../../lib/ratelimit';
 import { decideSpend } from '../../../lib/aicost';
@@ -225,7 +226,39 @@ export async function POST(req: NextRequest) {
     sourceUrls = [];
   }
 
-  const answer = await answerAccountantQuestion(question, context, knowledge);
+  // The user's structure and income mix, so a company director gets company answers, not sole-trader
+  // ones by default. A cheap read; on any failure Puchio answers structure-agnostic exactly as before.
+  let profile = '';
+  try {
+    const [bp, inc] = await Promise.all([getBusinessProfile(userId), getStudentLoanSettings(userId)]);
+    if (bp) {
+      const parts = [`Business structure: ${bp.businessType.replace('_', ' ')}`];
+      if (bp.businessType === 'partnership' && bp.partnershipShare < 100) {
+        parts.push(`their share of the partnership profit is about ${bp.partnershipShare}%`);
+      }
+      if (inc) {
+        if (inc.employmentIncome > 0) parts.push(`salary or PAYE income about £${inc.employmentIncome.toLocaleString('en-GB')}`);
+        if (inc.dividendIncome > 0) parts.push(`dividends about £${inc.dividendIncome.toLocaleString('en-GB')}`);
+        if (inc.savingsIncome > 0) parts.push(`savings interest about £${inc.savingsIncome.toLocaleString('en-GB')}`);
+      }
+      profile = parts.join('; ') + '.';
+    }
+  } catch {
+    profile = '';
+  }
+
+  // Khoji's memory (the pocket), but ONLY when the question is about a past or changed figure, so an
+  // ordinary question never pays for the lookup.
+  let history = '';
+  if (/\b(was|before|used to|last year|previous|previously|changed|back then|history|prior|old rate)\b/i.test(question)) {
+    try {
+      history = await pocketHistoryBrief();
+    } catch {
+      history = '';
+    }
+  }
+
+  const answer = await answerAccountantQuestion(question, context, knowledge, profile, history);
   if (!answer) {
     return NextResponse.json({ error: 'failed', answer: 'I could not work that out just now. Try rewording it, or ask me something else.' }, { status: 502 });
   }

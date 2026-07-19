@@ -209,3 +209,20 @@ export async function valueOn(factKey: string, isoDate: string): Promise<string 
   if (rows === null) return null;
   return valueOnFrom(rows, factKey, isoDate);
 }
+
+// A compact, plain-English history of the figures that have actually MOVED, for Puchio to answer
+// "what was the rate before / when did it change" from Khoji's memory rather than a guess. Empty
+// string when the pocket is unreadable or nothing has changed yet, so the caller degrades safely.
+export async function pocketHistoryBrief(maxFacts = 12): Promise<string> {
+  const rows = await readPocketRows();
+  if (rows === null) return '';
+  const moved = toTimelines(rows).filter((t) => t.hasHistory).slice(0, maxFacts);
+  const lines: string[] = [];
+  for (const t of moved) {
+    for (const c of t.changes.filter((x) => !x.baseline)) {
+      const when = c.effectiveFrom ?? c.noticedAt.slice(0, 10);
+      lines.push(`${t.label}: was ${c.from}, became ${c.to} (from ${when})`);
+    }
+  }
+  return lines.join('\n');
+}

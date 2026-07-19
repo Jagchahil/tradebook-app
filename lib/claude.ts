@@ -6,6 +6,7 @@
 // Env var: ANTHROPIC_API_KEY
 
 import { FACTS } from './taxengine';
+import { LTD } from './ltdengine';
 import { aiEnabled } from './aicost';
 import { storyboardPrompt, parseStoryboardDraft, type DraftInput, type DraftResult } from './studioagent';
 
@@ -469,6 +470,11 @@ const ACCOUNTANT_SYSTEM = [
   '- Profits are taxed on the tax-year basis from 2024/25. The cash basis (money in and out when it moves) is the default for small businesses; accruals counts income and costs when invoiced or incurred. Opening and closing years can create overlap, so the first and last year need care.',
   '- Payments on account: once a Self Assessment bill is over £1,000, you also make two payments on account towards next year, each half this year\'s bill, due 31 January and 31 July, on top of the balancing payment. This is the bill that surprises people.',
   `- Capital allowances: the Annual Investment Allowance gives 100% relief on most plant and machinery up to £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')}. Above that, or for cars, you claim a writing down allowance each year, ${Math.round(FACTS.wdaMainRate * 100)}% on the main pool (reduced from 18% from April 2026), ${Math.round(FACTS.wdaSpecialRate * 100)}% on the special rate pool (most cars, integral features).`,
+  '',
+  'BUSINESS STRUCTURE matters, and the user profile below tells you which one applies. Answer for THEIR structure, not sole-trader rules by default.',
+  '- SOLE TRADER: no separate business return. The trade goes on their own Self Assessment (SA103). Income tax and Class 4 NIC on the profit, as above. One return, one bill.',
+  '- LIMITED COMPANY: the company is a separate taxpayer. It files a Corporation Tax return (CT600) and pays corporation tax on its profit (19% up to £50,000 of profit, 25% above £250,000, with marginal relief in between, an effective rate of about 26.5% on the slice between). Salary the company pays a director is a deductible cost; most directors take a small salary around the £' + FACTS.personalAllowance.toLocaleString('en-GB') + ' personal allowance. Dividends are paid from POST-corporation-tax profit and are taxed on the person: a £' + LTD.dividendAllowance.toLocaleString('en-GB') + ' dividend allowance at 0%, then ' + (LTD.dividendBasic * 100) + '% (basic), ' + (LTD.dividendHigher * 100) + '% (higher), ' + (LTD.dividendAdditional * 100) + '% (additional). A dividend can only be paid from distributable profit (Companies Act 2006 s830); taking more is a director\'s loan with a 33.75% s455 charge if unpaid nine months after the year end. So a company owner has TWO returns: the company\'s CT600 and their own SA100. Weigh both together.',
+  '- PARTNERSHIP: transparent, pays no tax itself, files an SA800 showing the profit split. EACH partner is taxed on their share exactly like a sole trader (income tax plus Class 4 NIC) through their own Self Assessment. A partner\'s other income stacks on top of their share.',
   '- Trading losses: a loss can be carried forward against future profits of the same trade, or set against your total income of this year or last year (s64), whichever saves the most. It is a choice worth thinking about.',
   '- Capital gains tax, 2026/27: the first £3,000 of gains is tax free, then 18% or 24% on most assets, or 18% with Business Asset Disposal Relief when you sell a qualifying business, up to a £1,000,000 lifetime limit.',
   '- VAT flat rate scheme: instead of tracking input VAT, you pay a single percentage of your VAT-inclusive turnover. The percentage depends on your trade, with 16.5% for limited cost traders, and a 1% discount in your first year.',
@@ -490,7 +496,7 @@ const ACCOUNTANT_SYSTEM = [
 // Answer a free-text accountant question. `context` is an optional compact summary
 // of the user\'s own figures, so money questions get real numbers. Returns the
 // answer text, or null on failure.
-export async function answerAccountantQuestion(question: string, context?: string, knowledge?: string): Promise<string | null> {
+export async function answerAccountantQuestion(question: string, context?: string, knowledge?: string, profile?: string, history?: string): Promise<string | null> {
   if (!ready() || !KEY) return null;
 
   const userContent = [
@@ -509,6 +515,12 @@ export async function answerAccountantQuestion(question: string, context?: strin
       ? `Verified updates from official sources (GOV.UK and HMRC), reviewed and carrying a primary source link. They are already split for you into what is IN FORCE and what is only ANNOUNCED. Answer his question using ONLY the in-force block. NEVER quote a figure from the announced block as if it were the law today. Name the change and cite the source. Ignore this section if none are relevant:\n${knowledge}\n`
       : '',
     context ? `My recent figures (newest first, pounds):\n${context}\n` : '',
+    // Their structure and income mix, so a company director gets company answers, not sole-trader ones.
+    profile ? `About me (answer for THIS structure, not sole-trader rules by default):\n${profile}\n` : '',
+    // The pocket: how key tax figures have changed over time, so "what was the rate before / when did
+    // it change" is answered from Khoji's memory rather than guessed. Each line is old value, new value,
+    // and the date it took effect.
+    history ? `How key figures have changed over time (only use if the question is about a past or changed figure):\n${history}\n` : '',
     `My question: ${question}`,
   ].filter(Boolean).join('\n');
 

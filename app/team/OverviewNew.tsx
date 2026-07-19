@@ -73,7 +73,6 @@ export default function OverviewNew({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <span style={U.headerRole}>{data.me.name || data.me.email} · {data.me.role}</span>
-            <a href="/team/studio" style={{ ...U.headerBtn, textDecoration: 'none' }}>Studio</a>
             <button style={U.headerBtn} onClick={onSignOut}>Sign out</button>
           </div>
         </div>

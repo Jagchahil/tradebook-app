@@ -79,24 +79,26 @@ export const S = {
     color: C.ink,
   } as React.CSSProperties,
 
-  // The dark header. It is what makes this a console and not a page.
+  // The header. Light and quiet, the Apple way — a white bar with a single hairline. It used to be a
+  // dark band ("what makes this a console"); the console reads calmer and more finished light, which is
+  // the whole point of the room the team opens every morning.
   header: {
-    background: C.band,
-    borderBottom: `1px solid rgba(255,255,255,0.06)`,
+    background: C.panel,
+    borderBottom: `1px solid ${C.line}`,
   } as React.CSSProperties,
   headerInner: {
     maxWidth: 1180, margin: '0 auto', padding: '0 26px',
     height: 62, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
   } as React.CSSProperties,
-  wordmark: { fontSize: 18, fontWeight: 800, letterSpacing: -0.4, color: '#fff' } as React.CSSProperties,
+  wordmark: { fontSize: 18, fontWeight: 800, letterSpacing: -0.4, color: C.ink } as React.CSSProperties,
   accent: {
     width: 22, height: 3, borderRadius: 2, display: 'inline-block',
     background: `linear-gradient(90deg, ${C.river}, ${C.saffron})`,
   } as React.CSSProperties,
-  headerRole: { fontSize: 12.5, color: 'rgba(255,255,255,0.5)', fontWeight: 600 } as React.CSSProperties,
+  headerRole: { fontSize: 12.5, color: C.muted, fontWeight: 600 } as React.CSSProperties,
   headerBtn: {
-    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)',
-    color: 'rgba(255,255,255,0.86)', fontSize: 12.8, fontWeight: 650, fontFamily: FONT,
+    background: C.paper, border: `1px solid ${C.line}`,
+    color: C.ink2, fontSize: 12.8, fontWeight: 650, fontFamily: FONT,
     padding: '7px 13px', borderRadius: 9, cursor: 'pointer',
   } as React.CSSProperties,
 

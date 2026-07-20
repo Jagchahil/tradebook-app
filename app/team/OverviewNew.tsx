@@ -1,18 +1,22 @@
 'use client';
 
-// THE NEW OVERVIEW. The slim front page: your list first, then the health line, the money you came for,
-// the workforce in a constellation, and a card per buddy reporting in. The heavy detail (the brain, the
-// charts, the customer list) lives on its own page now and is one tap away from each card.
+// THE OVERVIEW — the CEO's front page, kept deliberately calm. The day, your list, the business in a
+// glance, and the team as one quiet grid you tap into.
 //
-// This composes the pieces and takes the SAME `data` the console already loads from /api/team/overview,
-// so integration is a one-line swap in page.tsx: render <OverviewNew data={data} onSignOut={...} />
-// inside the signed-in branch, in place of the old stacked dashboard.
+// WHAT CHANGED (20 Jul, the "make it like Apple" pass):
+//   - The node-constellation is GONE. It drew the team TWICE (once as orbiting chips, once as cards
+//     below), and its layout had six fixed seats, so the moment the workforce grew past six the extra
+//     chips piled onto the top seat and their labels collided. One clean grid, one source of truth.
+//   - Health folds into the business line instead of a separate band of pills.
+//   - Each worker is a whole-card tap target, and shows its LIVE status when the Bridge has a heartbeat
+//     for it (falling back to a calm one-liner until its bot starts reporting).
+//
+// Same data contract as before: takes the payload the console already loads from /api/team/overview.
 
 import { useEffect, useState } from 'react';
 import { browserSupabase } from '../../lib/supabasebrowser';
 import { C, T, S as U, gbp } from './ui';
 import Buddy from './Buddy';
-import WorkforceMap from './WorkforceMap';
 import WorkforceTodo from './WorkforceTodo';
 import { BUDDIES, SEED_TODOS, type TodoItem } from './buddies';
 import type { TeamOverview } from '../../lib/team';
@@ -30,22 +34,24 @@ export interface OverviewPayload {
   health: Health;
 }
 
-// per-buddy report line for the cards. Real numbers get folded in below where we have them.
-const REPORT: Record<string, { tag: 'live' | 'next' | 'plan'; bubble: string }> = {
-  gyani:     { tag: 'live', bubble: 'Engine still agrees with GOV.UK. One quick fix ready for your yes.' },
-  mistri:    { tag: 'live', bubble: 'Site up, jobs on time, nothing red. A couple of chores only you can do.' },
-  munshi:    { tag: 'next', bubble: "Spec's written. Approve me to start, and decide my setup when you get a sec." },
-  hoka:      { tag: 'plan', bubble: "Dreaming of viral clips. Left you the App Store screenshots so we're ready." },
-  khazanchi: { tag: 'plan', bubble: "Nothing to count yet, nothing for your list. Wake me when there's money." },
-  saudagar:  { tag: 'plan', bubble: "No trials to chase, nothing for your list. Real customers, and I'm up." },
+// A calm one-liner per worker for when the Bridge has no live heartbeat for it yet. A real heartbeat,
+// when it arrives, overrides this — that is the difference between "here is what this worker is for"
+// and "here is what it is doing right now".
+const BUBBLE: Record<string, string> = {
+  gyani: 'Watches our tax knowledge against GOV.UK, nightly.',
+  mistri: 'Site, deploys and scheduled jobs — the quiet watch.',
+  munshi: 'Your chief of staff. Approve to start the morning brief.',
+  pehredaar: 'Security sweeps every couple of hours, once switched on.',
+  kanjoos: 'Hunts the AI and Supabase bill for savings, daily.',
+  dakiya: 'Reads and drafts replies to info@ and sales@.',
+  hoka: 'Marketing and content. Napping until hired.',
+  khazanchi: 'Unit economics and margin. Wakes when there’s money.',
+  saudagar: 'Sales pipeline and CRM. Wakes with real customers.',
 };
 
-const TAG: Record<string, React.CSSProperties> = {
-  live: { background: C.greenTint, color: C.green },
-  next: { background: C.saffronTint, color: C.amber },
-  plan: { background: C.lineSoft, color: C.faint },
-};
-const TAG_LABEL: Record<string, string> = { live: 'Live', next: 'Build next', plan: 'Parked' };
+interface Beat { status: string; headline: string; stale: boolean }
+
+const STATUS_TONE: Record<string, string> = { ok: C.green, warn: C.amber, alert: C.red, offline: C.faint };
 
 export default function OverviewNew({
   data, onSignOut,
@@ -54,20 +60,42 @@ export default function OverviewNew({
   const h = data.health;
   const brainOk = h.knowledge === 'ok';
   const cronsOk = h.crons === 'ok';
+  const first = data.me.name ? data.me.name.split(' ')[0] : '';
 
-  // The CEO to-do list, live from the server (Munshi fills it each morning). Null while loading.
   const [todos, setTodos] = useState<TodoItem[] | null>(null);
+  const [beats, setBeats] = useState<Record<string, Beat>>({});
 
+  // The CEO to-do list (Munshi fills it each morning).
   useEffect(() => {
     (async () => {
       const { data: s } = await browserSupabase.auth.getSession();
       const tok = s.session?.access_token;
       if (!tok) { setTodos([]); return; }
       const res = await fetch('/api/team/todos', { headers: { Authorization: `Bearer ${tok}` } });
-      if (!res.ok) { setTodos(SEED_TODOS); return; } // fall back to the seed only if it cannot be read
+      if (!res.ok) { setTodos(SEED_TODOS); return; }
       const j = await res.json();
       setTodos((j.todos as TodoItem[]) ?? []);
     })();
+  }, []);
+
+  // The Bridge: live heartbeats off the mini, so a card can show what its worker is doing right now.
+  // Polled gently so the "watch them work" view stays current without hammering the server.
+  useEffect(() => {
+    let alive = true;
+    async function pull() {
+      const { data: s } = await browserSupabase.auth.getSession();
+      const tok = s.session?.access_token;
+      if (!tok) return;
+      const res = await fetch('/api/team/bridge', { headers: { Authorization: `Bearer ${tok}` } });
+      if (!res.ok || !alive) return;
+      const j = (await res.json()) as { heartbeats?: Array<{ workerKey: string; status: string; headline: string; stale: boolean }> };
+      const map: Record<string, Beat> = {};
+      for (const b of j.heartbeats ?? []) map[b.workerKey] = { status: b.status, headline: b.headline, stale: b.stale };
+      if (alive) setBeats(map);
+    }
+    pull();
+    const id = setInterval(pull, 15000);
+    return () => { alive = false; clearInterval(id); };
   }, []);
 
   async function persist(bodyObj: Record<string, unknown>) {
@@ -81,17 +109,25 @@ export default function OverviewNew({
     });
   }
 
-  // flags = OPEN items per buddy (not yet done), for the constellation flags and the "on your list" chips
+  // Open items per worker (not done), for the little count on each card.
   const flags: Record<string, number> = {};
-  for (const t of todos ?? []) if (!t.done) flags[t.buddyKey] = (flags[t.buddyKey] ?? 0) + 1;
-
-  function scrollToList() {
-    document.getElementById('team-list')?.scrollIntoView({ behavior: 'smooth' });
+  let needsOpen = 0;
+  for (const t of todos ?? []) {
+    if (t.done) continue;
+    flags[t.buddyKey] = (flags[t.buddyKey] ?? 0) + 1;
+    if (t.kind === 'needs') needsOpen += 1;
   }
+
+  const hour = new Date().getHours();
+  const partOfDay = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const dateLine = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const statusLine =
+    todos === null ? 'Bringing your day together…'
+      : needsOpen > 0 ? `${needsOpen} ${needsOpen === 1 ? 'thing needs' : 'things need'} you today. The team has the rest in hand.`
+        : 'Nothing needs you today. The team has it.';
 
   return (
     <div style={U.page}>
-      {/* header, unchanged shape from the old console */}
       <header style={U.header}>
         <div style={U.headerInner}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -107,16 +143,15 @@ export default function OverviewNew({
       </header>
 
       <main style={U.main}>
-        <div style={T.label}>Overview</div>
-        <h1 style={{ ...T.h1, marginTop: 4 }}>Morning{data.me.name ? `, ${data.me.name.split(' ')[0]}` : ''}. The team&apos;s in.</h1>
-        <p style={{ ...T.small, marginTop: 6, maxWidth: 640 }}>
-          The team prepared everything it can. Approve the ones it can finish, the rest it just tells you.
-        </p>
+        {/* THE DAY */}
+        <div style={T.label}>{dateLine}</div>
+        <h1 style={hero}>{partOfDay}{first ? `, ${first}` : ''}.</h1>
+        <p style={{ ...T.body, color: C.muted, marginTop: 8, maxWidth: 620 }}>{statusLine}</p>
 
         {/* YOUR LIST */}
-        <div id="team-list" style={{ marginTop: 22 }}>
+        <div id="team-list" style={{ marginTop: 26 }}>
           {todos === null ? (
-            <div style={U.honest}>Loading your list.</div>
+            <div style={U.honest}>Bringing your list together…</div>
           ) : (
             <WorkforceTodo
               items={todos}
@@ -126,19 +161,15 @@ export default function OverviewNew({
           )}
         </div>
 
-        {/* HEALTH */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 26 }}>
-          <Pill label="Tax knowledge" value={h.knowledge} tone={brainOk ? C.green : h.knowledge === 'unknown' ? C.faint : C.red} />
-          <Pill label="Scheduled jobs" value={h.crons} tone={cronsOk ? C.green : h.crons === 'unknown' ? C.faint : C.red} />
-        </div>
-        {!brainOk && h.knowledge !== 'unknown' ? (
-          <p style={{ ...U.alarm, marginTop: 14 }}>
-            Khoji says our tax engine disagrees with GOV.UK, or cannot check it. Every figure is suspect until this is green.
-          </p>
-        ) : null}
-
-        {/* MONEY */}
-        <section style={{ ...U.section, marginTop: 26 }}>
+        {/* THE BUSINESS */}
+        <section style={U.section}>
+          <div style={U.sectionHead}>
+            <h2 style={T.h2}>The business</h2>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginLeft: 'auto', flexWrap: 'wrap' }}>
+              <StatusDot label="Tax knowledge" ok={brainOk} unknown={h.knowledge === 'unknown'} />
+              <StatusDot label="Systems" ok={cronsOk} unknown={h.crons === 'unknown'} />
+            </span>
+          </div>
           <div style={U.cards}>
             <Metric label="Customers" value={String(o.customers)} />
             <Metric label="Paying" value={String(o.active + o.pastDue)} tone={o.active + o.pastDue > 0 ? C.green : undefined} />
@@ -146,56 +177,53 @@ export default function OverviewNew({
             <Metric label="MRR" value={gbp(o.mrrPence)} />
             <Metric label="Cancelling" value={String(o.cancelRequested)} tone={o.cancelRequested > 0 ? C.amber : undefined} />
           </div>
+          {!brainOk && h.knowledge !== 'unknown' ? (
+            <p style={{ ...U.alarm, marginTop: 14 }}>
+              Khoji says our tax engine disagrees with GOV.UK, or cannot check it. Every figure is suspect until this is green.
+            </p>
+          ) : null}
         </section>
 
-        {/* THE WORKFORCE */}
-        <section style={U.section}>
-          <WorkforceMap flags={flags} />
-        </section>
-
-        {/* REPORTING IN */}
+        {/* THE TEAM */}
         <section style={U.section}>
           <div style={U.sectionHead}>
-            <h2 style={T.h2}>Reporting in</h2>
-            <span style={U.sectionNote}>the flagged ones put something on your list</span>
+            <h2 style={T.h2}>The team</h2>
+            <span style={U.sectionNote}>tap any to open</span>
           </div>
-          <div style={S.grid}>
+          <div style={grid}>
             {BUDDIES.map((b) => {
-              const rep = REPORT[b.key] ?? { tag: 'plan', bubble: '' };
+              const beat = beats[b.key];
+              const live = beat && !beat.stale;
               const count = flags[b.key] ?? 0;
-              const parked = b.status === 'asleep';
+              const line = live && beat.headline ? beat.headline : (BUBBLE[b.key] ?? '');
+              const dotColor = live ? (STATUS_TONE[beat.status] ?? C.green)
+                : b.status === 'live' ? C.green : b.status === 'waking' ? C.amber : C.faint;
+              const word = live ? 'reporting live' : b.statusWord;
               return (
-                <div key={b.key} style={S.bc}>
-                  <div style={S.bcTop}>
-                    <Buddy def={b} size={56} />
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: C.muted }}>{b.role}</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: -0.3 }}>{b.name}</div>
+                <a key={b.key} href={b.href} style={card}>
+                  <div style={cardTop}>
+                    <Buddy def={b} size={44} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={cardName}>{b.name}</div>
+                      <div style={cardRole}>{b.role}</div>
                     </div>
-                    <span style={{ ...S.tag, ...TAG[rep.tag], marginLeft: 'auto' }}>{TAG_LABEL[rep.tag]}</span>
+                    {count > 0 ? <span style={countBadge}>{count}</span> : null}
                   </div>
-                  <div style={S.bubble}>{rep.bubble}</div>
-                  {count > 0 ? (
-                    <button style={S.foryou} onClick={scrollToList}>
-                      <span style={S.foryouN}>{count}</span> on your list
-                    </button>
-                  ) : parked ? (
-                    <div style={{ ...T.tiny, marginTop: 10 }}>Nothing for you today.</div>
-                  ) : null}
-                  <div style={S.foot}>
-                    <span style={S.stt}>
-                      <span style={{ width: 7, height: 7, borderRadius: 5, background: b.status === 'live' ? C.green : b.status === 'waking' ? C.amber : C.faint, display: 'inline-block', animation: b.status === 'live' ? 'lkBeat 1.8s ease-in-out infinite' : 'none' }} />
-                      {b.statusWord}
+                  <div style={cardLine}>{line}</div>
+                  <div style={cardFoot}>
+                    <span style={cardStatus}>
+                      <span style={{ width: 7, height: 7, borderRadius: 5, background: dotColor, display: 'inline-block', animation: live ? 'lkBeat 1.8s ease-in-out infinite' : 'none' }} />
+                      {word}
                     </span>
-                    <a href={b.href} style={S.open}>Open →</a>
+                    <span style={{ color: C.river, fontWeight: 700, fontSize: 15 }} aria-hidden="true">→</span>
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
         </section>
 
-        <p style={{ ...T.tiny, marginTop: 40, maxWidth: 700 }}>
+        <p style={{ ...T.tiny, marginTop: 44, maxWidth: 700 }}>
           This page shows who our customers are and what they pay us. It never shows anyone&apos;s receipts,
           income, expenses, tax figures or phone number, and it never will.
         </p>
@@ -212,26 +240,39 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: s
     </div>
   );
 }
-function Pill({ label, value, tone }: { label: string; value: string; tone: string }) {
+
+function StatusDot({ label, ok, unknown }: { label: string; ok: boolean; unknown: boolean }) {
+  const tone = ok ? C.green : unknown ? C.faint : C.red;
   return (
-    <span style={U.pill}>
-      <span style={{ ...U.dot, background: tone }} />
-      <span style={{ color: C.muted, fontWeight: 600 }}>{label}</span>
-      <span style={{ color: tone, fontWeight: 750 }}>{value}</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: C.muted }}>
+      <span style={{ width: 8, height: 8, borderRadius: 5, background: tone, display: 'inline-block' }} />
+      {label}
     </span>
   );
 }
 
-const S: Record<string, React.CSSProperties> = {
-  // flex-wrap instead of a fixed grid, so it collapses on a phone with no media query (inline styles cannot do queries)
-  grid: { display: 'flex', flexWrap: 'wrap', gap: 15 },
-  bc: { flex: '1 1 260px', minWidth: 240, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 18, padding: '18px 18px 14px', boxShadow: '0 1px 2px rgba(17,17,17,.03)', display: 'flex', flexDirection: 'column', minHeight: 200 },
-  bcTop: { display: 'flex', alignItems: 'center', gap: 13 },
-  tag: { fontSize: 9.5, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', padding: '3px 8px', borderRadius: 999, whiteSpace: 'nowrap', alignSelf: 'flex-start' },
-  bubble: { position: 'relative', marginTop: 14, background: C.paper, border: `1px solid ${C.line}`, borderRadius: 13, padding: '11px 13px', fontSize: 12.8, color: C.ink2, lineHeight: 1.5 },
-  foryou: { display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 10, fontSize: 11, fontWeight: 750, color: C.river, cursor: 'pointer', background: 'none', border: 0, fontFamily: 'inherit' },
-  foryouN: { background: C.river, color: '#fff', borderRadius: 999, minWidth: 16, height: 16, fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' },
-  foot: { marginTop: 'auto', paddingTop: 12, borderTop: `1px solid ${C.lineSoft}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  stt: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, color: C.muted },
-  open: { fontSize: 12.8, fontWeight: 700, color: C.river, textDecoration: 'none' },
+const hero: React.CSSProperties = { fontSize: 30, fontWeight: 700, letterSpacing: -0.9, color: C.ink, margin: '6px 0 0', lineHeight: 1.1 };
+
+const grid: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(248px, 1fr))',
+  gap: 14,
 };
+
+const card: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column',
+  background: C.panel, border: `1px solid ${C.line}`, borderRadius: 16,
+  padding: 18, textDecoration: 'none', color: 'inherit',
+  boxShadow: '0 1px 2px rgba(17,17,17,.03)', minHeight: 158,
+};
+const cardTop: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12 };
+const cardName: React.CSSProperties = { fontSize: 16.5, fontWeight: 750, letterSpacing: -0.3, color: C.ink };
+const cardRole: React.CSSProperties = { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', color: C.faint, marginTop: 2 };
+const countBadge: React.CSSProperties = {
+  marginLeft: 'auto', minWidth: 20, height: 20, padding: '0 6px', borderRadius: 999,
+  background: C.river, color: '#fff', fontSize: 11.5, fontWeight: 800,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+};
+const cardLine: React.CSSProperties = { marginTop: 13, fontSize: 13, color: C.ink2, lineHeight: 1.5, flex: 1 };
+const cardFoot: React.CSSProperties = { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.lineSoft}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' };
+const cardStatus: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, fontWeight: 600, color: C.muted };

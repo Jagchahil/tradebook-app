@@ -166,6 +166,11 @@ export default function DakiyaPage() {
           Dakiya reads and drafts. He never sends anything on his own — every reply below waits for your
           approval, and goes out branded from the address it came in on.
         </p>
+        <div style={{ marginTop: 14 }}>
+          <a href="/team/newsletter" style={{ ...U.headerBtn, textDecoration: 'none', display: 'inline-block' }}>
+            Newsletter · broadcast to subscribers &rarr;
+          </a>
+        </div>
       </section>
 
       {error ? (

@@ -1,7 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { verifyStripeSignature, getStripeSubscription } from '../../../../lib/stripe';
 import { markInvoicePaidServer, upsertSubscription } from '../../../../lib/supabase';
 import { claimResultFromStatus, subscriptionRowFrom, ClaimResult } from '../../../../lib/stripewebhook';
+import { hasEmailConfig, sendPaymentConfirmedEmail, sendPaymentFailedEmail } from '../../../../lib/email';
+
+// The end of the period a paid invoice line covers = the next renewal date. Formatted UK-long for the
+// receipt email, or undefined if the invoice does not carry a usable period (then the email omits it).
+function nextRenewalLabel(obj: Record<string, unknown>): string | undefined {
+  try {
+    const lines = (obj.lines as { data?: Array<{ period?: { end?: number } }> } | undefined)?.data;
+    const end = lines?.[0]?.period?.end;
+    if (typeof end === 'number' && end > 0) {
+      return new Date(end * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+  } catch {
+    /* no date, no problem */
+  }
+  return undefined;
+}
 
 // Stripe calls this for two kinds of money:
 //   1. A customer paying one of our users' invoices (mode: payment).
@@ -136,6 +152,45 @@ export async function POST(req: NextRequest) {
       if (row) {
         if (event.type === 'customer.subscription.deleted') row.status = 'canceled';
         await upsertSubscription(row);
+      }
+    } else if (event.type === 'invoice.payment_succeeded') {
+      // A real charge cleared — the first charge after the trial, or a renewal. Send the receipt.
+      // Guarded on amount > 0 so £0 trial-start invoices never trigger a "payment received" email.
+      // Sent AFTER the 200 so Stripe is never held waiting and never retries into a duplicate email
+      // (event-id idempotency above already makes each event single-shot).
+      const email = (obj.customer_email as string | undefined) || null;
+      const amountPaid = typeof obj.amount_paid === 'number' ? (obj.amount_paid as number) : 0;
+      if (email && amountPaid > 0 && hasEmailConfig()) {
+        const nextDate = nextRenewalLabel(obj);
+        after(async () => {
+          try {
+            await sendPaymentConfirmedEmail({ to: email, amountPence: amountPaid, nextDate });
+          } catch (e) {
+            console.error('[stripe webhook] payment-ok email failed:', e instanceof Error ? e.message : 'unknown');
+          }
+        });
+      }
+    } else if (event.type === 'invoice.payment_failed') {
+      // A charge did not clear. Nudge them to update their card via Stripe's own hosted invoice page.
+      const email = (obj.customer_email as string | undefined) || null;
+      const amountDue =
+        typeof obj.amount_due === 'number'
+          ? (obj.amount_due as number)
+          : typeof obj.amount_remaining === 'number'
+          ? (obj.amount_remaining as number)
+          : 0;
+      const updateUrl =
+        typeof obj.hosted_invoice_url === 'string' && obj.hosted_invoice_url
+          ? (obj.hosted_invoice_url as string)
+          : 'https://lekhio.app';
+      if (email && hasEmailConfig()) {
+        after(async () => {
+          try {
+            await sendPaymentFailedEmail({ to: email, amountPence: amountDue, updateUrl });
+          } catch (e) {
+            console.error('[stripe webhook] payment-fail email failed:', e instanceof Error ? e.message : 'unknown');
+          }
+        });
       }
     }
   } catch (err) {

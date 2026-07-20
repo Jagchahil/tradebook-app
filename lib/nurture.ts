@@ -23,10 +23,10 @@ export const NURTURE_SEQUENCE: NurtureEmail[] = [
     afterDays: 3,
     subject: 'The tax number most people get wrong',
     bodyHtml: `
-      <p style="font-size:19px;font-weight:700;margin:0 0 12px;color:${INK}">The number most people get wrong.</p>
-      <p style="font-size:15px;line-height:1.6">When you worked out your tax the other day, the figure that moved it most was your expenses. Every pound of genuine business cost comes off your taxable profit — and most sole traders lose hundreds every year simply because a receipt goes missing, or they never knew a cost counted.</p>
-      <p style="font-size:15px;line-height:1.6">Mileage. Use of home. Tools, materials, phone, a share of the van. It adds up faster than people think, and it is all money you keep instead of handing to HMRC.</p>
-      <p style="font-size:15px;line-height:1.6">That is the whole job Lekhio does: snap a receipt or send a quick text, and it captures every cost across the year, so nothing is missed by January.</p>
+      <p style="font-size:20px;font-weight:800;letter-spacing:-0.3px;margin:0 0 14px;color:${INK}">The number most people get wrong.</p>
+      <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">When you worked out your tax the other day, the figure that moved it most was your expenses. Every pound of genuine business cost comes off your taxable profit — and most sole traders lose hundreds every year simply because a receipt goes missing, or they never knew a cost counted.</p>
+      <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">Mileage. Use of home. Tools, materials, phone, a share of the van. It adds up faster than people think, and it is all money you keep instead of handing to HMRC.</p>
+      <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">That is the whole job Lekhio does: snap a receipt or send a quick text, and it captures every cost across the year, so nothing is missed by January.</p>
     `,
   },
   {
@@ -34,10 +34,10 @@ export const NURTURE_SEQUENCE: NurtureEmail[] = [
     afterDays: 4,
     subject: 'Whenever you are ready',
     bodyHtml: `
-      <p style="font-size:19px;font-weight:700;margin:0 0 12px;color:${INK}">Whenever you are ready.</p>
-      <p style="font-size:15px;line-height:1.6">No pressure and no hard sell. But when the shoebox starts to nag, or a deadline creeps up on a Sunday night, Lekhio is here: your books and tax handled from WhatsApp, the reliefs found for you, and you approve everything before anything moves.</p>
-      <p style="font-size:15px;line-height:1.6">Your first 14 days are free, and there is no card to start.</p>
-      <p style="margin:22px 0"><a href="${APP}" style="background:${RIVER};color:#fff;text-decoration:none;font-weight:600;padding:13px 24px;border-radius:10px;display:inline-block">See how it works</a></p>
+      <p style="font-size:20px;font-weight:800;letter-spacing:-0.3px;margin:0 0 14px;color:${INK}">Whenever you are ready.</p>
+      <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">No pressure and no hard sell. But when the shoebox starts to nag, or a deadline creeps up on a Sunday night, Lekhio is here: your books and tax handled from WhatsApp, the reliefs found for you, and you approve everything before anything moves.</p>
+      <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">Your first 14 days are free, and there is no card to start.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 8px"><tr><td style="background:${RIVER};border-radius:10px"><a href="${APP}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">See how it works</a></td></tr></table>
     `,
   },
 ];

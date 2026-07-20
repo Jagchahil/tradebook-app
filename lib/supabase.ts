@@ -4802,3 +4802,31 @@ export async function confirmLeadAndGetResult(email: string): Promise<{ ok: bool
     return { ok: true, resultNote: null };
   }
 }
+
+// --- Lead nurture (ships dark; content + timing in lib/nurture.ts) --------
+export interface NurtureCandidate { email: string; stage: number; confirmedAt: string | null; lastAt: string | null; }
+
+// Confirmed, consented, non-unsubscribed leads who have not finished the sequence. The route decides
+// which are actually DUE using the per-stage delays in lib/nurture.ts. nurture_stage < 2 matches the
+// two-email NURTURE_SEQUENCE; widen if the sequence grows.
+export async function listNurtureCandidates(limit = 200): Promise<NurtureCandidate[]> {
+  const { url } = config();
+  const n = Math.min(500, Math.max(1, limit));
+  const res = await fetch(
+    `${url}/rest/v1/marketing_leads?select=email,nurture_stage,confirmed_at,nurture_last_at&consent=is.true&unsubscribed_at=is.null&confirmed_at=not.is.null&nurture_stage=lt.2&order=confirmed_at.asc&limit=${n}`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  const rows = (await res.json()) as Array<{ email: string; nurture_stage: number | null; confirmed_at: string | null; nurture_last_at: string | null }>;
+  return rows.map((r) => ({ email: r.email, stage: r.nurture_stage ?? 0, confirmedAt: r.confirmed_at, lastAt: r.nurture_last_at }));
+}
+
+export async function markNurtureSent(email: string, newStage: number): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/marketing_leads?email=eq.${encodeURIComponent(email.toLowerCase())}`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ nurture_stage: newStage, nurture_last_at: new Date().toISOString() }),
+  });
+  return res.ok;
+}

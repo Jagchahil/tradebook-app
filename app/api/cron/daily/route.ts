@@ -61,7 +61,7 @@ function jobsFor(slot: string, day: number): string[] {
   }
   if (slot === 'pm') {
     // The end-of-day work. metrics first: it is the one that must never be skipped.
-    const jobs = ['/api/cron/metrics', '/api/cron/digest'];
+    const jobs = ['/api/cron/metrics', '/api/cron/digest', '/api/cron/nurture'];
     if (day === 0) jobs.push('/api/cron/reminders?job=weekly'); // Sunday
     return jobs;
   }

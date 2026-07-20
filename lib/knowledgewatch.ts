@@ -120,15 +120,35 @@ export function knowledgeAlarms(s: KnowledgeState, now: Date = new Date()): Know
     });
   }
 
-  // 3. The watcher has stopped.
+  // 3. THE KNOWLEDGE FEED. `never_run` (the table is EMPTY) is always an alarm. But a merely STALE
+  //    feed — new rows have stopped arriving — is where the old logic cried wolf, and crying wolf on
+  //    the one screen the CEO must trust is its own kind of failure.
+  //
+  //    "No new knowledge in 48h" and "the brain has stopped" are different facts. GOV.UK does not
+  //    change its tax pages every day; on a quiet week the capture watcher runs perfectly and ingests
+  //    nothing because there is nothing to ingest. Meanwhile the differ has just compared every
+  //    constant to GOV.UK and they all agree. Painting that red — "your engine disagrees with GOV.UK"
+  //    — while the engine has been positively confirmed correct, teaches the reader to ignore the
+  //    light, which is exactly how the five-day death went unnoticed.
+  //
+  //    So a stale feed is a fault ONLY WHEN THE BRAIN HAS ALSO GONE QUIET, i.e. the differ heartbeat
+  //    above is stale. Every watcher runs together in the nightly job, so a fresh differ is positive
+  //    proof the capture watcher ran too. If the whole job dies, the differ goes stale and
+  //    `differ_dead` fires — the loud alarm — so a real death is never hidden, it just gets the
+  //    louder, more accurate word.
   if (!s.newestItemAt) {
     out.push({ reason: 'never_run', detail: 'knowledge_items is empty: the watcher has never written a row' });
   } else {
-    const hours = (now.getTime() - new Date(s.newestItemAt).getTime()) / 3_600_000;
-    if (hours > MAX_QUIET_HOURS_CAPTURE) {
+    const feedHours = (now.getTime() - new Date(s.newestItemAt).getTime()) / 3_600_000;
+    const differFresh =
+      !!s.lastDifferRunAt &&
+      (now.getTime() - new Date(s.lastDifferRunAt).getTime()) / 3_600_000 <= MAX_QUIET_HOURS_DIFFER;
+    if (feedHours > MAX_QUIET_HOURS_CAPTURE && !differFresh) {
       out.push({
         reason: 'not_learning',
-        detail: `no new knowledge for ${Math.round(hours)}h, ceiling is ${MAX_QUIET_HOURS_CAPTURE}h`,
+        detail:
+          `no new knowledge for ${Math.round(feedHours)}h (ceiling ${MAX_QUIET_HOURS_CAPTURE}h) ` +
+          `AND the brain is not running — the capture watcher has stopped, not just gone quiet`,
       });
     }
   }

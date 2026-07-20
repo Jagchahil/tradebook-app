@@ -58,8 +58,25 @@ export default function OverviewNew({
 }: { data: OverviewPayload; onSignOut: () => void }) {
   const o = data.overview;
   const h = data.health;
-  const brainOk = h.knowledge === 'ok';
   const cronsOk = h.crons === 'ok';
+  // The tax-knowledge light, honest about degree. 'stale' is AMBER — a queue/feed lag, not a wrong
+  // number — and only drift/blind/unwatched are red. Each red state says exactly what it is instead of
+  // the old generic "your engine disagrees with GOV.UK", which used to fire even on a quiet week when
+  // the engine had in fact just been confirmed correct.
+  const knowTone =
+    h.knowledge === 'ok' ? C.green
+      : h.knowledge === 'unknown' ? C.faint
+        : h.knowledge === 'stale' ? C.amber
+          : C.red;
+  const knowAlarm =
+    h.knowledge === 'drift'
+      ? 'Khoji found a tax constant that disagrees with GOV.UK. Every figure is suspect until this is fixed.'
+      : h.knowledge === 'blind'
+        ? 'Khoji could not read one of its GOV.UK pages, so a constant is unconfirmed. Treat figures with care until this is green.'
+        : h.knowledge === 'unwatched'
+          ? 'Nothing has checked our tax constants against GOV.UK recently. We are not saying we are wrong — we are saying nobody is looking.'
+          : null;
+  const cronTone = cronsOk ? C.green : h.crons === 'unknown' ? C.faint : C.red;
   const first = data.me.name ? data.me.name.split(' ')[0] : '';
 
   const [todos, setTodos] = useState<TodoItem[] | null>(null);
@@ -166,8 +183,8 @@ export default function OverviewNew({
           <div style={U.sectionHead}>
             <h2 style={T.h2}>The business</h2>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginLeft: 'auto', flexWrap: 'wrap' }}>
-              <StatusDot label="Tax knowledge" ok={brainOk} unknown={h.knowledge === 'unknown'} />
-              <StatusDot label="Systems" ok={cronsOk} unknown={h.crons === 'unknown'} />
+              <StatusDot label="Tax knowledge" tone={knowTone} />
+              <StatusDot label="Systems" tone={cronTone} />
             </span>
           </div>
           <div style={U.cards}>
@@ -177,10 +194,8 @@ export default function OverviewNew({
             <Metric label="MRR" value={gbp(o.mrrPence)} />
             <Metric label="Cancelling" value={String(o.cancelRequested)} tone={o.cancelRequested > 0 ? C.amber : undefined} />
           </div>
-          {!brainOk && h.knowledge !== 'unknown' ? (
-            <p style={{ ...U.alarm, marginTop: 14 }}>
-              Khoji says our tax engine disagrees with GOV.UK, or cannot check it. Every figure is suspect until this is green.
-            </p>
+          {knowAlarm ? (
+            <p style={{ ...U.alarm, marginTop: 14 }}>{knowAlarm}</p>
           ) : null}
         </section>
 
@@ -241,8 +256,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: s
   );
 }
 
-function StatusDot({ label, ok, unknown }: { label: string; ok: boolean; unknown: boolean }) {
-  const tone = ok ? C.green : unknown ? C.faint : C.red;
+function StatusDot({ label, tone }: { label: string; tone: string }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: C.muted }}>
       <span style={{ width: 8, height: 8, borderRadius: 5, background: tone, display: 'inline-block' }} />

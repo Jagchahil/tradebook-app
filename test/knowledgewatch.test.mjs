@@ -67,9 +67,15 @@ ok('...and a blind brain never reports ok',
 
 // --- 3. IT HAS STOPPED. What actually happened, for five days, unnoticed. ---
 
-ok('a watcher that has written nothing for 3 days is an alarm',
-  knowledgeAlarms({ ...healthy, newestItemAt: hoursAgo(72) }, NOW).some((a) => a.reason === 'not_learning'));
-ok('a watcher that ran this morning is not',
+// A stale feed is only a fault when the BRAIN has ALSO stopped. Same 3-day-quiet feed, two worlds:
+// with the differ dead the capture pipeline died with it (alarm); with the differ fresh this morning
+// GOV.UK simply did not change its tax pages, which is a normal quiet week and must read green — or
+// the CEO learns to ignore the one light that must never be ignored.
+ok('a stale feed WHILE THE BRAIN HAS ALSO STOPPED (differ dead) is an alarm',
+  knowledgeAlarms({ ...healthy, newestItemAt: hoursAgo(72), lastDifferRunAt: null }, NOW).some((a) => a.reason === 'not_learning'));
+ok('but the SAME stale feed while the differ ran this morning is a QUIET GOV.UK, not a fault',
+  !knowledgeAlarms({ ...healthy, newestItemAt: hoursAgo(72) }, NOW).some((a) => a.reason === 'not_learning'));
+ok('a watcher that ran this morning is not an alarm either',
   !knowledgeAlarms({ ...healthy, newestItemAt: hoursAgo(20) }, NOW).some((a) => a.reason === 'not_learning'));
 ok('the ceiling clears a single missed day, so one late run does not cry wolf',
   MAX_QUIET_HOURS_CAPTURE > 24);

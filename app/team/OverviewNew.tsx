@@ -18,7 +18,8 @@ import { browserSupabase } from '../../lib/supabasebrowser';
 import { C, T, S as U, gbp } from './ui';
 import Buddy from './Buddy';
 import WorkforceTodo from './WorkforceTodo';
-import { BUDDIES, SEED_TODOS, type TodoItem } from './buddies';
+import TeamTabs from './TeamTabs';
+import { BUDDIES, BUBBLE, SEED_TODOS, type TodoItem } from './buddies';
 import type { TeamOverview } from '../../lib/team';
 
 interface Health {
@@ -33,21 +34,6 @@ export interface OverviewPayload {
   overview: TeamOverview;
   health: Health;
 }
-
-// A calm one-liner per worker for when the Bridge has no live heartbeat for it yet. A real heartbeat,
-// when it arrives, overrides this — that is the difference between "here is what this worker is for"
-// and "here is what it is doing right now".
-const BUBBLE: Record<string, string> = {
-  gyani: 'Watches our tax knowledge against GOV.UK, nightly.',
-  mistri: 'Site, deploys and scheduled jobs — the quiet watch.',
-  munshi: 'Your chief of staff. Approve to start the morning brief.',
-  pehredaar: 'Security sweeps every couple of hours, once switched on.',
-  kanjoos: 'Hunts the AI and Supabase bill for savings, daily.',
-  dakiya: 'Reads and drafts replies to info@ and sales@.',
-  hoka: 'Marketing and content. Napping until hired.',
-  khazanchi: 'Unit economics and margin. Wakes when there’s money.',
-  saudagar: 'Sales pipeline and CRM. Wakes with real customers.',
-};
 
 interface Beat { status: string; headline: string; stale: boolean }
 
@@ -164,6 +150,9 @@ export default function OverviewNew({
         <div style={T.label}>{dateLine}</div>
         <h1 style={hero}>{partOfDay}{first ? `, ${first}` : ''}.</h1>
         <p style={{ ...T.body, color: C.muted, marginTop: 8, maxWidth: 620 }}>{statusLine}</p>
+
+        {/* TABS — Today (your list + the team) or the live CEO brief. */}
+        <TeamTabs active="today" />
 
         {/* YOUR LIST */}
         <div id="team-list" style={{ marginTop: 26 }}>

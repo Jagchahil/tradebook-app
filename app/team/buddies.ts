@@ -29,7 +29,7 @@ export const BUDDIES: BuddyDef[] = [
   { key: 'gyani',     name: 'Gyani',     role: 'CKO · Knowledge',   g1: '#0F7B4F', g2: '#22B573', status: 'live',   statusWord: 'watching',   emblem: 'search',    href: '/team/knowledge', reportsToList: 'approve' },
   { key: 'mistri',    name: 'Mistri',    role: 'CTO · Watch',       g1: '#1B59A6', g2: '#3B82D6', status: 'live',   statusWord: 'quiet watch',emblem: 'spanner',   href: '/team/system',    reportsToList: 'needs' },
   { key: 'munshi',    name: 'Munshi',    role: 'Chief of Staff',    g1: '#3F51B5', g2: '#6172D6', status: 'waking', statusWord: 'warming up',  emblem: 'clipboard', href: '/team',           reportsToList: 'approve' },
-  { key: 'pehredaar', name: 'Pehredaar', role: 'Security · 24/7',   g1: '#3B4A5A', g2: '#5C7186', status: 'waking', statusWord: 'warming up',  emblem: 'shield',    href: '/team',           reportsToList: 'needs' },
+  { key: 'pehredaar', name: 'Pehredaar', role: 'Security · 24/7',   g1: '#3B4A5A', g2: '#5C7186', status: 'waking', statusWord: 'warming up',  emblem: 'shield',    href: '/team/pehredaar', reportsToList: 'needs' },
   { key: 'kanjoos',   name: 'Kanjoos',   role: 'Cost · AI spend',   g1: '#C6871A', g2: '#E8B34C', status: 'asleep', statusWord: 'napping',     emblem: 'coin',      href: '/team',           reportsToList: 'approve' },
   { key: 'dakiya',    name: 'Dakiya',    role: 'Front Desk · Email',g1: '#2C7A7B', g2: '#48A9AA', status: 'asleep', statusWord: 'napping',     emblem: 'people',    href: '/team',           reportsToList: 'approve' },
   { key: 'hoka',      name: 'Hoka',      role: 'CMO · Marketing',   g1: '#E8973A', g2: '#F6B95C', status: 'asleep', statusWord: 'napping',     emblem: 'megaphone', href: '/team',    reportsToList: 'needs' },
@@ -40,6 +40,21 @@ export const BUDDIES: BuddyDef[] = [
 export function buddy(key: string): BuddyDef {
   return BUDDIES.find((b) => b.key === key) ?? BUDDIES[0];
 }
+
+// A calm one-liner per worker for when the Bridge has no live heartbeat for it yet. A real heartbeat,
+// when it arrives, overrides this — that is the difference between "here is what this worker is for" and
+// "here is what it is doing right now". Shared by the overview and the CEO brief so the two never drift.
+export const BUBBLE: Record<string, string> = {
+  gyani: 'Watches our tax knowledge against GOV.UK, nightly.',
+  mistri: 'Site, deploys and scheduled jobs — the quiet watch.',
+  munshi: 'Your chief of staff. Approve to start the morning brief.',
+  pehredaar: 'Security sweeps every couple of hours, once switched on.',
+  kanjoos: 'Hunts the AI and Supabase bill for savings, daily.',
+  dakiya: 'Reads and drafts replies to info@ and sales@.',
+  hoka: 'Marketing and content. Napping until hired.',
+  khazanchi: 'Unit economics and margin. Wakes when there’s money.',
+  saudagar: 'Sales pipeline and CRM. Wakes with real customers.',
+};
 
 // EVERY social platform Hoka publishes to, once each is connected and approved. Jag: "run up all forms
 // of social media." Each carries whether it needs a platform app review (the long pole, docs/115).

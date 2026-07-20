@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { insertWaitlistSignup } from '../../../lib/supabase';
 import { rateLimitedShared, clientIp } from '../../../lib/ratelimit';
+import { sendWaitlistWelcomeEmail } from '../../../lib/email';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -55,6 +56,18 @@ export async function POST(req: NextRequest) {
       const detail = dbErr instanceof Error ? dbErr.message : 'unknown';
       console.error('[waitlist] Save error:', detail);
       return NextResponse.json({ error: 'Could not save. Please try again.' }, { status: 500 });
+    }
+
+    // A warm "you are on the list" email, sent after the response so it never slows the signup or
+    // fails it. Only if they gave an email. Dormant until Resend is configured.
+    if (email) {
+      after(async () => {
+        try {
+          await sendWaitlistWelcomeEmail(email);
+        } catch {
+          /* best effort */
+        }
+      });
     }
 
     // Do not log the phone or email. It is personal data.

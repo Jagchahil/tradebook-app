@@ -252,3 +252,74 @@ export async function sendReplyEmail(opts: ReplyEmail): Promise<{ ok: boolean; i
     return { ok: false };
   }
 }
+
+// --- Waitlist welcome -----------------------------------------------------
+// Sent when someone joins the waitlist WITH an email. A pure service message (no marketing), so it
+// stands on the signup itself: they asked to be told when Lekhio opens, this confirms they will be.
+// Best effort, dormant until Resend is configured.
+export async function sendWaitlistWelcomeEmail(to: string, name?: string | null): Promise<boolean> {
+  if (!KEY || !looksLikeEmail(to)) return false;
+  const fromAddr = FROM.replace(/.*</, '').replace(/>.*/, '');
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
+  const hi = name ? `You are on the list, ${esc(name)}.` : 'You are on the list.';
+  const html = `
+  <div style="font-family:Inter,-apple-system,'Segoe UI',sans-serif;color:${INK};max-width:520px;margin:0 auto;padding:24px">
+    <p style="font-size:19px;font-weight:700;margin:0 0 12px">${hi}</p>
+    <p style="font-size:15px;line-height:1.6;color:${MUTED}">Thanks for putting your name down for Lekhio. You will be one of the first we let in.</p>
+    <p style="font-size:15px;line-height:1.6">Lekhio is your first employee: it connects to your bank, sorts every payment in the background, and finds the tax you never need to pay. The shoebox and the January panic are done. It all happens in WhatsApp, and you approve everything.</p>
+    <p style="font-size:15px;line-height:1.6;color:${INK}"><strong>What happens next:</strong> we will message you the moment your spot is ready. Your first 14 days are free, and there is no card to enter to start.</p>
+    <p style="margin:24px 0"><a href="${appUrl}" style="background:${RIVER};color:#fff;text-decoration:none;font-weight:600;padding:13px 24px;border-radius:10px;display:inline-block">See how it works</a></p>
+    <p style="font-size:12px;color:${MUTED};margin-top:28px">Lekhio is a real UK company, not HMRC, and nothing is ever sent to HMRC without your say-so. We look after your details and never sell them. If you did not sign up, just reply and we will take you off.</p>
+  </div>`;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: `Lekhio <${fromAddr}>`, to: [to], subject: 'You are on the Lekhio list.', html }),
+    });
+    if (!res.ok) { console.error('[email] waitlist welcome failed:', res.status); return false; }
+    return true;
+  } catch (e) {
+    console.error('[email] waitlist welcome exception:', e instanceof Error ? e.message : 'unknown');
+    return false;
+  }
+}
+
+// --- The result we promised ----------------------------------------------
+// After a free-tool lead confirms, we send the result they actually asked for ("email me my result").
+// Carries the exact figures they saw, plus a working unsubscribe and the List-Unsubscribe headers,
+// because it doubles as the first message of the consented relationship. Dormant until Resend is set.
+export async function sendLeadResultEmail(to: string, resultNote: string, unsubscribeLink: string): Promise<boolean> {
+  if (!KEY || !looksLikeEmail(to)) return false;
+  const fromAddr = FROM.replace(/.*</, '').replace(/>.*/, '');
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
+  const note = esc(resultNote).replace(/\r?\n/g, '<br>');
+  const html = `
+  <div style="font-family:Inter,-apple-system,'Segoe UI',sans-serif;color:${INK};max-width:520px;margin:0 auto;padding:24px">
+    <p style="font-size:19px;font-weight:700;margin:0 0 12px">Here is your result.</p>
+    <p style="font-size:15px;line-height:1.6;color:${MUTED}">You asked us to send this over, so here it is, saved for whenever you need it.</p>
+    <div style="background:#F4F7FB;border:1px solid #E3EAF3;border-radius:12px;padding:18px 20px;margin:18px 0;font-size:16px;line-height:1.7;color:${INK}">${note}</div>
+    <p style="font-size:15px;line-height:1.6">These are estimates to give you the shape of it. The number that really moves is your expenses: every business cost you claim comes off your tax, and most people lose hundreds because a receipt goes missing. That is the whole job Lekhio does, from a text, all year.</p>
+    <p style="margin:24px 0"><a href="${appUrl}" style="background:${RIVER};color:#fff;text-decoration:none;font-weight:600;padding:13px 24px;border-radius:10px;display:inline-block">Start free, no card</a></p>
+    <hr style="border:none;border-top:1px solid #ECECEC;margin:28px 0 14px" />
+    <p style="font-size:12px;color:${MUTED};line-height:1.6">You are getting this because you asked Lekhio for your result and tax reminders. <a href="${unsubscribeLink}" style="color:${MUTED}">Unsubscribe</a> any time. Lekhio is an independent UK company, not HMRC.</p>
+  </div>`;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: `Lekhio <${fromAddr}>`,
+        to: [to],
+        subject: 'Your result from Lekhio',
+        html,
+        headers: { 'List-Unsubscribe': `<${unsubscribeLink}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+      }),
+    });
+    if (!res.ok) { console.error('[email] result failed:', res.status); return false; }
+    return true;
+  } catch (e) {
+    console.error('[email] result exception:', e instanceof Error ? e.message : 'unknown');
+    return false;
+  }
+}

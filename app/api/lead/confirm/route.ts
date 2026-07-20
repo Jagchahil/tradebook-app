@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyLeadToken } from '../../../../lib/leadtoken';
-import { setLeadConfirmed } from '../../../../lib/supabase';
+import { NextRequest, NextResponse, after } from 'next/server';
+import { verifyLeadToken, unsubscribeUrl } from '../../../../lib/leadtoken';
+import { confirmLeadAndGetResult } from '../../../../lib/supabase';
+import { sendLeadResultEmail } from '../../../../lib/email';
 import { rateLimitedShared, clientIp } from '../../../../lib/ratelimit';
 
 // The double opt in confirmation link. The signed token proves the request is
@@ -14,7 +15,22 @@ export async function GET(req: NextRequest) {
   const t = req.nextUrl.searchParams.get('t') || '';
   const email = e.trim().toLowerCase();
 
-  const ok = email && verifyLeadToken('confirm', email, t) ? await setLeadConfirmed(email) : false;
+  let ok = false;
+  if (email && verifyLeadToken('confirm', email, t)) {
+    const r = await confirmLeadAndGetResult(email);
+    ok = r.ok;
+    // Now actually send the result we promised them, after the response so this page never waits on it.
+    if (r.ok && r.resultNote) {
+      const note = r.resultNote;
+      after(async () => {
+        try {
+          await sendLeadResultEmail(email, note, unsubscribeUrl(email));
+        } catch {
+          /* best effort */
+        }
+      });
+    }
+  }
 
   const body = ok
     ? { title: 'You are confirmed', msg: 'All set. We will send your result and keep you right on the deadlines that matter.' }

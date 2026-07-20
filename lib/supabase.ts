@@ -4780,3 +4780,25 @@ export async function setStudioAssetMedia(id: string, fileUrl: string): Promise<
     return rows[0] ?? null;
   } catch { return null; }
 }
+
+// Mark a lead double-opt-in confirmed AND return their stored result note in one round trip, so the
+// confirm route can finally send the result we promised them ("email me my result"). return=representation
+// gives us the patched row back. Additive: setLeadConfirmed above is untouched for existing callers.
+export async function confirmLeadAndGetResult(email: string): Promise<{ ok: boolean; resultNote: string | null }> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/marketing_leads?email=eq.${encodeURIComponent(email.toLowerCase())}&select=result_note`,
+    {
+      method: 'PATCH',
+      headers: headers({ Prefer: 'return=representation' }),
+      body: JSON.stringify({ confirmed_at: new Date().toISOString() }),
+    },
+  );
+  if (!res.ok) return { ok: false, resultNote: null };
+  try {
+    const rows = (await res.json()) as Array<{ result_note: string | null }>;
+    return { ok: true, resultNote: rows[0]?.result_note ?? null };
+  } catch {
+    return { ok: true, resultNote: null };
+  }
+}

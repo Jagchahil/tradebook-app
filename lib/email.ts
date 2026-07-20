@@ -193,3 +193,62 @@ export async function sendMarketingEmail(to: string, subject: string, bodyHtml: 
     return false;
   }
 }
+
+// --- Front desk replies (Dakiya) -----------------------------------------
+// A one-to-one reply from the front desk, sent BRANDED from the lane address the enquiry came in on
+// (e.g. sales@lekhio.app). This is correspondence, not marketing: no unsubscribe footer, and it is not
+// gated on the marketing consent list — someone who emails us gets an answer. Threading headers keep it
+// in the same conversation in the recipient's inbox. Dormant until RESEND_API_KEY is set.
+export interface ReplyEmail {
+  fromAddress: string;        // must be an @lekhio.app address
+  fromName?: string;
+  to: string;
+  subject: string;
+  bodyText: string;           // plain text; newlines become <br>
+  inReplyTo?: string | null;  // Message-ID of the email we are answering
+}
+
+export async function sendReplyEmail(opts: ReplyEmail): Promise<{ ok: boolean; id?: string }> {
+  if (!KEY) return { ok: false };
+  if (!looksLikeEmail(opts.to)) return { ok: false };
+  // Only ever send FROM our own verified domain. Never let a caller send as an arbitrary address.
+  const fromAddr = String(opts.fromAddress || '').trim().toLowerCase();
+  if (!/^[a-z0-9._-]+@lekhio\.app$/.test(fromAddr)) return { ok: false };
+
+  const name = (opts.fromName || 'Lekhio').replace(/[<>\r\n]/g, '').slice(0, 60);
+  const bodyHtml = esc(opts.bodyText).replace(/\r?\n/g, '<br>');
+  const html = `
+  <div style="font-family:Inter,-apple-system,'Segoe UI',sans-serif;color:${INK};max-width:560px;margin:0 auto;padding:8px 0;font-size:15px;line-height:1.6">
+    ${bodyHtml}
+  </div>`;
+
+  const extraHeaders: Record<string, string> = {};
+  if (opts.inReplyTo && /^<?[^\s<>]+>?$/.test(opts.inReplyTo)) {
+    const mid = opts.inReplyTo.startsWith('<') ? opts.inReplyTo : `<${opts.inReplyTo}>`;
+    extraHeaders['In-Reply-To'] = mid;
+    extraHeaders['References'] = mid;
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: `${name} <${fromAddr}>`,
+        to: [opts.to],
+        subject: opts.subject.slice(0, 300),
+        html,
+        ...(Object.keys(extraHeaders).length ? { headers: extraHeaders } : {}),
+      }),
+    });
+    if (!res.ok) {
+      console.error('[email] reply failed:', res.status); // status only: the body can carry the recipient
+      return { ok: false };
+    }
+    const data = (await res.json().catch(() => ({}))) as { id?: string };
+    return { ok: true, id: data.id };
+  } catch (e) {
+    console.error('[email] reply exception:', e instanceof Error ? e.message : 'unknown');
+    return { ok: false };
+  }
+}

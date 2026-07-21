@@ -85,5 +85,12 @@ ok('reply route only sends on explicit action', /action === 'send'/.test(reply))
 const readRoute = readFileSync(path.join(repoWeb, 'app/api/team/support/route.ts'), 'utf8');
 ok('read route is team-gated', /verifyAccessToken/.test(readRoute) && /isTeam/.test(readRoute));
 
+// --- open tickets surface on the CEO to-do list ----------------------------
+const todos = readFileSync(path.join(repoWeb, 'app/api/team/todos/route.ts'), 'utf8');
+ok('to-do list merges open support tickets', /readTickets/.test(todos) && /openSupportTodos/.test(todos));
+ok('support to-do items are synthetic (support: prefix)', /support:\$\{k\.id\}/.test(todos));
+ok('support to-do items are needs-you, not approve', /kind: 'needs'/.test(todos));
+ok('ticking a support to-do is a no-op (resolved in the desk)', /startsWith\('support:'\)/.test(todos));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

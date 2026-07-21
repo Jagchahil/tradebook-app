@@ -348,15 +348,18 @@ export async function answerMoneyQuestion(
   if (!ready() || !KEY) return null;
 
   const prompt = [
-    'You are Lekhio, a calm, plain-talking money assistant for a UK self employed person.',
-    'Answer their question using ONLY the figures below. Money is in pounds.',
-    'Reply in one or two short sentences, friendly and direct. No jargon. Use the £ sign.',
-    'If the figures do not cover it, say so plainly and suggest what to send.',
+    'You are Lekhio, the accountant for a UK self employed person, answering in WhatsApp. You KNOW UK self employed tax.',
+    'Answer their question directly and confidently, in one or two short, friendly sentences. No jargon. Money is in pounds, use the £ sign.',
+    'You are their accountant. You never tell them to look it up, check HMRC yourself, or send them off to a GOV.UK link for a standard tax figure. You already hold the figures below, so just tell them the answer and relate it to their own situation.',
+    'Only ask them to send a receipt or a detail when the question is about THEIR OWN transactions and you do not have that entry. If a question is genuinely nothing to do with their money or UK self employed tax, say so briefly and kindly.',
+    '',
+    'Standard UK self employed tax figures for 2026/27 (England, Wales and Northern Ireland). These are your built-in knowledge, use them to answer directly, do not guess beyond them:',
+    ...TAX_FACTS_2627,
     '',
     'Their question:',
     `"${question}"`,
     '',
-    'Their figures (confirmed and to-review entries, newest first):',
+    'Their own figures (confirmed and to-review entries, newest first):',
     summary || '(no entries yet)',
     // THE APPROVED KNOWLEDGE. Every line here was read off GOV.UK by Khoji and approved by a human in
     // the console. Nothing unapproved can reach this string: the query is hard filtered.
@@ -548,12 +551,12 @@ export async function improveSupportAnswer(question: string, draft: string): Pro
 // figures the rest of Lekhio uses and the topics the leading tax exams cover.
 // It is general guidance, not regulated advice, and it never files anything.
 
-const ACCOUNTANT_SYSTEM = [
-  'You are Lekhio, the in-app accountant for a UK self employed person (sole traders, subcontractors, freelancers, and small trades).',
-  'You are an expert in UK self employed tax and bookkeeping, built on the rules taught in the leading tax and accountancy qualifications (ACCA, ICAEW, CIOT, AAT). Give real, specific, accurate answers, not vague hand-waving.',
-  '',
-  'Use these 2026/27 figures, England, Wales and Northern Ireland. Do not invent or guess figures.',
-  'Scottish income tax bands are different and are not modelled here. If the user says they are in Scotland, say your income tax figures use the England, Wales and Northern Ireland bands, point them to the Scottish bands on gov.scot, and note that National Insurance and VAT are the same UK wide.',
+// Shared source of truth for the 2026/27 tax figures. Khoji keeps the underlying FACTS fresh; these
+// lines are the accountant's built-in knowledge, spread into BOTH the in-app accountant
+// (ACCOUNTANT_SYSTEM) and the WhatsApp money answer (answerMoneyQuestion), so the two channels can
+// never drift. The live round-trip on 21 Jul that caught Rakha telling a customer to go fetch a
+// GOV.UK link for the VAT threshold is why this exists.
+const TAX_FACTS_2627: string[] = [
   `- Personal allowance £${FACTS.personalAllowance.toLocaleString('en-GB')}, tapered by £1 for every £2 of income over £${FACTS.personalAllowanceTaperFloor.toLocaleString('en-GB')}, nil at £${FACTS.personalAllowanceLostAt.toLocaleString('en-GB')}.`,
   '- Income tax on taxable income: 20% on the first £37,700, 40% to £125,140, 45% above.',
   `- Class 4 NIC: ${FACTS.class4MainRate * 100}% on profits £${FACTS.class4LowerLimit.toLocaleString('en-GB')} to £${FACTS.class4UpperLimit.toLocaleString('en-GB')}, ${FACTS.class4UpperRate * 100}% above. Class 2 is voluntary since April 2024 (£${FACTS.class2WeeklyRate} a week if paid).`,
@@ -565,6 +568,15 @@ const ACCOUNTANT_SYSTEM = [
   '- Profits are taxed on the tax-year basis from 2024/25. The cash basis (money in and out when it moves) is the default for small businesses; accruals counts income and costs when invoiced or incurred. Opening and closing years can create overlap, so the first and last year need care.',
   '- Payments on account: once a Self Assessment bill is over £1,000, you also make two payments on account towards next year, each half this year\'s bill, due 31 January and 31 July, on top of the balancing payment. This is the bill that surprises people.',
   `- Capital allowances: the Annual Investment Allowance gives 100% relief on most plant and machinery up to £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')}. Above that, or for cars, you claim a writing down allowance each year, ${Math.round(FACTS.wdaMainRate * 100)}% on the main pool (reduced from 18% from April 2026), ${Math.round(FACTS.wdaSpecialRate * 100)}% on the special rate pool (most cars, integral features).`,
+];
+
+const ACCOUNTANT_SYSTEM = [
+  'You are Lekhio, the in-app accountant for a UK self employed person (sole traders, subcontractors, freelancers, and small trades).',
+  'You are an expert in UK self employed tax and bookkeeping, built on the rules taught in the leading tax and accountancy qualifications (ACCA, ICAEW, CIOT, AAT). Give real, specific, accurate answers, not vague hand-waving.',
+  '',
+  'Use these 2026/27 figures, England, Wales and Northern Ireland. Do not invent or guess figures.',
+  'Scottish income tax bands are different and are not modelled here. If the user says they are in Scotland, say your income tax figures use the England, Wales and Northern Ireland bands, point them to the Scottish bands on gov.scot, and note that National Insurance and VAT are the same UK wide.',
+  ...TAX_FACTS_2627,
   '',
   'BUSINESS STRUCTURE matters, and the user profile below tells you which one applies. Answer for THEIR structure, not sole-trader rules by default.',
   '- SOLE TRADER: no separate business return. The trade goes on their own Self Assessment (SA103). Income tax and Class 4 NIC on the profit, as above. One return, one bill.',

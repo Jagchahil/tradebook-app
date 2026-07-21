@@ -77,5 +77,23 @@ ok('knowledge is OPTIONAL, so a caller that does not pass it behaves exactly as 
 ok('a failed knowledge read falls back to an empty string, never to an error the user sees',
   /catch \{\s*knowledge = '';\s*\}/.test(wa));
 
+
+// --- THE ACCOUNTANT KNOWS THE FIGURES, ON EVERY CHANNEL ----------------------------------------
+//
+// 21 Jul, a live round-trip caught Rakha telling a WhatsApp customer to "send me a recent GOV.UK
+// link" about the VAT registration threshold: a figure Khoji watches every night and the engine
+// already holds. The WhatsApp answer had the customer's own figures and the approved updates, but NOT
+// the built-in tax constants, so it punted. An accountant that asks the client to go fetch a link is
+// backwards. Both channels now share ONE figures block, and the money answer is told never to send a
+// customer off to look up a standard figure it already holds.
+ok('the 2026/27 figures live in ONE shared block, so the two channels cannot drift',
+  claude.includes('const TAX_FACTS_2627'));
+ok('the shared figures block is spread into BOTH brains (app accountant and WhatsApp money answer)',
+  claude.split('...TAX_FACTS_2627').length - 1 >= 2);
+ok('the VAT registration threshold is one of those built-in figures',
+  claude.includes('- VAT registration at £'));
+ok('the WhatsApp accountant is told never to send a customer off to look up a figure it already holds',
+  claude.toLowerCase().includes('you never tell them to look it up'));
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
-import { claimNextVoiceJob, sweepVoiceJobs } from '../../../../lib/voicejobs';
+import { claimNextVoiceJob, reapStaleVoiceJobs } from '../../../../lib/voicejobs';
+import { sendText } from '../../../../lib/whatsapp';
 
 export const runtime = 'nodejs';
 
@@ -23,8 +24,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  // Housekeeping: rescue notes stuck on a mini that died, and drop old finished rows. Fire-and-forget.
-  void sweepVoiceJobs();
+  // First, reap any note that has gone stale (mini was down when it arrived, or died mid-transcription):
+  // apologise to the customer so they are never left on a silent "writing it up now". This runs whenever
+  // the mini is polling, which — thanks to the webhook's liveness check — is exactly when there is anyone
+  // to say sorry to. Kept off the response path: the mini gets its job without waiting on the apologies.
+  const stale = await reapStaleVoiceJobs();
+  for (const s of stale) {
+    void sendText(
+      s.fromPhone,
+      'Sorry — I could not write up that voice note in time. Send it again, or a photo of the receipt, and I will get it.',
+    );
+  }
 
   const job = await claimNextVoiceJob();
   if (!job) return NextResponse.json({ job: null });

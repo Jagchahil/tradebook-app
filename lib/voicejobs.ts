@@ -26,6 +26,11 @@ function h(extra: Record<string, string> = {}): Record<string, string> {
 
 export type VoiceJobStatus = 'pending' | 'processing' | 'done' | 'error';
 
+// A note not turned into an entry within this window is "stale": either the mini was down when it landed,
+// or it died mid-transcription. Past this line the customer has waited too long, so we stop trying and
+// apologise. Set beyond the worker's own 120s Whisper timeout so a legitimately long note is never reaped.
+const STALE_MS = 3 * 60 * 1000;
+
 export interface VoiceJobRow {
   id: string;
   user_id: string;
@@ -75,9 +80,12 @@ export async function createVoiceJob(j: NewVoiceJob): Promise<string | null> {
 export async function claimNextVoiceJob(): Promise<VoiceJobRow | null> {
   try {
     // Find the oldest pending id first (PATCH cannot order), then claim it by id AND status so the flip
-    // is still conditional — if another run claimed it in between, our PATCH matches nothing.
+    // is still conditional — if another run claimed it in between, our PATCH matches nothing. Only claim
+    // notes younger than the stale window: an older pending note means the mini was down when it arrived,
+    // and a late confirmation is worse than an honest apology, so the reaper handles those instead.
+    const freshCutoff = new Date(Date.now() - STALE_MS).toISOString();
     const look = await fetch(
-      `${base()}/rest/v1/voice_jobs?status=eq.pending&select=id&order=created_at.asc&limit=1`,
+      `${base()}/rest/v1/voice_jobs?status=eq.pending&created_at=gt.${encodeURIComponent(freshCutoff)}&select=id&order=created_at.asc&limit=1`,
       { headers: h() },
     );
     if (!look.ok) return null;
@@ -128,22 +136,31 @@ export async function finishVoiceJob(id: string, status: 'done' | 'error'): Prom
   }
 }
 
-// Housekeeping: drop finished jobs, and rescue notes stuck 'processing' (a mini that died mid-note) back
-// to 'pending' so they are retried. Fire-and-forget from the pending endpoint.
-export async function sweepVoiceJobs(): Promise<void> {
-  const cutoffDone = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const cutoffStuck = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+// Reap notes that have gone stale (mini was down when they landed, or it died mid-transcription): flip
+// them to 'error' and WIPE the audio in one atomic PATCH, and return who was waiting so the caller can
+// send an honest apology. return=representation means we only ever get — and so only ever apologise for —
+// the rows THIS call actually flipped, so two overlapping polls can never double-message a customer.
+export async function reapStaleVoiceJobs(): Promise<Array<{ id: string; fromPhone: string }>> {
+  const cutoff = new Date(Date.now() - STALE_MS).toISOString();
   try {
+    const res = await fetch(
+      `${base()}/rest/v1/voice_jobs?status=in.(pending,processing)&created_at=lt.${encodeURIComponent(cutoff)}`,
+      {
+        method: 'PATCH',
+        headers: h({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ status: 'error', audio_base64: null }),
+      },
+    );
+    if (!res.ok) return [];
+    const rows = (await res.json()) as VoiceJobRow[];
+    // Drop long-finished rows so the table stays small. Fire-and-forget.
+    const cutoffDone = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     void fetch(`${base()}/rest/v1/voice_jobs?status=in.(done,error)&created_at=lt.${encodeURIComponent(cutoffDone)}`, {
       method: 'DELETE',
       headers: h({ Prefer: 'return=minimal' }),
     }).catch(() => {});
-    void fetch(`${base()}/rest/v1/voice_jobs?status=eq.processing&created_at=lt.${encodeURIComponent(cutoffStuck)}`, {
-      method: 'PATCH',
-      headers: h({ Prefer: 'return=minimal' }),
-      body: JSON.stringify({ status: 'pending' }),
-    }).catch(() => {});
+    return rows.map((r) => ({ id: r.id, fromPhone: r.from_phone }));
   } catch {
-    /* best effort */
+    return [];
   }
 }

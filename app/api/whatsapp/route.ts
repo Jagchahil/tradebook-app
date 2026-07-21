@@ -22,6 +22,7 @@ import { checkExpense, VERDICT_ICON, TAX_TIPS } from '../../../lib/taxrules';
 import { ledger, headline } from '../../../lib/ledger';
 import { createVoiceJob } from '../../../lib/voicejobs';
 import { confirmationLine } from '../../../lib/voiceflow';
+import { isWorkerLive } from '../../../lib/bridge';
 import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/email';
 import { hasBankFeedConfig } from '../../../lib/bankfeed';
 import { findDuplicate } from '../../../lib/dedupe';
@@ -830,6 +831,17 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
   // Parsing the spoken amount still needs Claude; if that is off, voice cannot work, so say so plainly.
   if (!hasClaudeConfig()) {
     await sendText(from, 'Voice notes are not switched on yet. Send a photo of the receipt for now.');
+    return;
+  }
+
+  // The transcriber runs on the mini. If it is not beating right now (mini down, or restarting), do NOT
+  // promise "writing it up now" for a note nobody will pick up — tell the customer plainly and let them
+  // send a photo or type it instead. Fails closed: no fresh heartbeat, no promise.
+  if (!(await isWorkerLive('voice'))) {
+    await sendText(
+      from,
+      'Voice notes are briefly unavailable — send a photo of the receipt or just type it, and I will log it now.',
+    );
     return;
   }
 

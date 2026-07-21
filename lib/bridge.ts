@@ -84,6 +84,25 @@ export async function readHeartbeats(now = Date.now()): Promise<HeartbeatDTO[] |
   } catch { return null; }
 }
 
+// Is a given worker alive right now? Reads its heartbeat and checks it beat within maxAgeMs. Used by the
+// webhook to decide whether to promise a customer "writing it up now" — if the voice transcriber on the
+// mini is not beating, we must not make a promise we cannot keep. Fails CLOSED: any doubt reads as "not
+// live", so we tell the customer plainly rather than park a note nobody will pick up.
+export async function isWorkerLive(workerKey: string, maxAgeMs = 180000, now = Date.now()): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${base()}/rest/v1/worker_heartbeats?worker_key=eq.${encodeURIComponent(workerKey)}&select=updated_at`,
+      { headers: h() },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json()) as Array<{ updated_at: string }>;
+    const updated = rows[0]?.updated_at ? Date.parse(rows[0].updated_at) : NaN;
+    return Number.isFinite(updated) && now - updated <= maxAgeMs;
+  } catch {
+    return false;
+  }
+}
+
 export async function readActivity(limit = 40): Promise<ActivityDTO[] | null> {
   try {
     const n = Math.min(200, Math.max(1, limit));

@@ -14,6 +14,13 @@
     { "name": "VAT registration thresholds", "type": "page", "url": "https://www.gov.uk/register-for-vat" },
     { "name": "Student loan repayment thresholds", "type": "page", "url": "https://www.gov.uk/repaying-your-student-loan/what-you-pay" },
     { "name": "Self Assessment deadlines", "type": "page", "url": "https://www.gov.uk/self-assessment-tax-returns/deadlines" },
-    { "name": "Making Tax Digital for Income Tax", "type": "page", "url": "https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/before-you-use-this-guide" }
+    { "name": "Making Tax Digital for Income Tax", "type": "page", "url": "https://www.gov.uk/guidance/use-making-tax-digital-for-income-tax/before-you-use-this-guide" },
+    { "name": "Simplified expenses (flat rates: home, vehicle, living on premises)", "type": "page", "url": "https://www.gov.uk/simpler-income-tax-simplified-expenses" },
+    { "name": "Working from home tax relief", "type": "page", "url": "https://www.gov.uk/tax-relief-for-employees/working-at-home" },
+    { "name": "Capital Gains Tax rates and allowances", "type": "page", "url": "https://www.gov.uk/capital-gains-tax/allowances" },
+    { "name": "Tax on dividends (dividend allowance)", "type": "page", "url": "https://www.gov.uk/tax-on-dividends" },
+    { "name": "Marriage Allowance", "type": "page", "url": "https://www.gov.uk/marriage-allowance" },
+    { "name": "Pension tax relief limits", "type": "page", "url": "https://www.gov.uk/tax-on-your-private-pension/pension-tax-relief" },
+    { "name": "Class 4 National Insurance rates", "type": "page", "url": "https://www.gov.uk/self-employed-national-insurance-rates" }
   ]
 }

@@ -446,6 +446,51 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
   return textBlock ? textBlock.trim() : null;
 }
 
+// --- WhatsApp support draft. When a customer asks for a human or reports a problem in WhatsApp, we open
+// a ticket for Jag and pre-draft a warm reply for him to edit before sending. It NEVER invents account
+// details, figures, a refund, or a promise Lekhio cannot keep — it acknowledges, reassures, and signals
+// a person is on it. Only a starting point; Jag edits and approves every reply.
+export async function draftSupportReply(customerMessage: string, customerName?: string | null): Promise<string | null> {
+  if (!ready() || !KEY) return null;
+  const who = customerName && customerName.trim() ? customerName.trim().split(/\s+/)[0] : '';
+  const prompt = [
+    'You are the front desk for Lekhio, a UK bookkeeping and tax app for sole traders that runs in WhatsApp.',
+    'A customer has messaged asking for help. Draft a SHORT reply for a human on the team to review and send from WhatsApp.',
+    'Rules:',
+    '- Warm, plain, professional UK English. A few short sentences, like a helpful human on the team, not a bot.',
+    '- Acknowledge what they said and reassure them a person is on it. Do NOT invent account details, figures, refunds, dates, or any promise you cannot verify.',
+    '- If they report something broken, say the team is looking into it and will get back to them shortly.',
+    '- No sign-off name, no subject line, just the message body. No placeholders like [name].',
+    who ? `- You may open by first name: ${who}.` : '- You do not know their name; open warmly without one.',
+    '',
+    'Their message:',
+    `"${customerMessage}"`,
+  ].join('\n');
+
+  let res: Response;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      body: JSON.stringify({ model: MODEL_SMART, max_tokens: 300, messages: [{ role: 'user', content: prompt }] }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[claude] Support draft request failed or timed out:', message);
+    return null;
+  }
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[claude] Support draft failed:', res.status, errText);
+    return null;
+  }
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  logUsage('support_draft', data);
+  const textBlock = data.content?.find((c) => c.type === 'text')?.text;
+  return textBlock ? textBlock.trim() : null;
+}
+
 // --- The in-app accountant. Expert tax and bookkeeping Q&A for the self employed ---
 //
 // This is the chat box in the app. It answers any UK self employed tax or

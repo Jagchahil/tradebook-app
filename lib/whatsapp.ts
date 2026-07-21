@@ -166,6 +166,34 @@ export async function sendText(toPhone: string, body: string): Promise<void> {
   }
 }
 
+// The same free-form in-window send, but it reports whether the message actually left. The support
+// console needs an honest yes/no so it never marks a ticket answered when the send was rejected. Same
+// timeout, same status-only logging as sendText.
+export async function sendTextResult(toPhone: string, body: string): Promise<boolean> {
+  if (!TOKEN || !PHONE_NUMBER_ID) {
+    console.warn('[whatsapp] Send skipped. Token or phone number id missing.');
+    return false;
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: toPhone, type: 'text', text: { body } }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[whatsapp] Send failed or timed out:', message);
+    return false;
+  }
+  if (!res.ok) {
+    console.error('[whatsapp] Send failed:', res.status);
+    return false;
+  }
+  return true;
+}
+
 // Send an approved WhatsApp message template. Required for any proactive message
 // sent outside the 24 hour customer service window, such as reminders. The
 // template must be registered and approved in the Meta dashboard first. See

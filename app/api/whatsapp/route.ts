@@ -16,6 +16,7 @@ import {
   answerExpenseQuestion,
   parseSchedule,
   hasClaudeConfig,
+  draftSupportReply,
 } from '../../../lib/claude';
 import { checkExpense, VERDICT_ICON, TAX_TIPS } from '../../../lib/taxrules';
 import { ledger, headline } from '../../../lib/ledger';
@@ -111,7 +112,10 @@ import {
   isGoalDone,
   goalAnswer,
   isInvoiceThis,
+  isSupportRequest,
+  supportReason,
 } from '../../../lib/waintents';
+import { openTicket } from '../../../lib/support';
 import { soleTraderTax } from '../../../lib/taxengine';
 import { corporationTax } from '../../../lib/ltdengine';
 import { aprilDelta } from '../../../lib/propertyengine';
@@ -382,6 +386,8 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handlePhoneShare(from, messageId, text);
           } else if (isSchedule(text)) {
             await handleSchedule(from, text);
+          } else if (isSupportRequest(text)) {
+            await handleSupportRequest(from, text);
           } else if (isHelp(text)) {
             await handleHelp(from);
           } else if (isTaxTips(text)) {
@@ -941,6 +947,46 @@ async function saveEntry(
     confirmed: false,
     raw_whatsapp_message_id: messageId,
   });
+}
+
+// --- Support escalation. The customer asked for a human, complained, or reported a problem. Lift them
+// out of the automated flow: acknowledge in-thread, and open a ticket for Jag to answer from the console
+// with a Claude-drafted reply. The reply goes back into THIS thread, free-form, inside Meta's 24-hour
+// window. Nothing is ever sent on its own — Jag approves every reply. Only linked customers open a
+// ticket; an unknown number is pointed to the team instead, so the desk never fills with strangers.
+async function handleSupportRequest(from: string, text: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await sendText(
+      from,
+      'For a hand from the team, email support@lekhio.app and a person will help. If you are not set up yet, you can start at lekhio.app.',
+    );
+    return;
+  }
+
+  const reason = supportReason(text);
+
+  // Pre-draft a warm reply for Jag to edit. Best effort: if AI is off or the call fails, the draft is
+  // empty and Jag writes from scratch — the customer's own message is right there in the console.
+  let draft = '';
+  try {
+    if (hasClaudeConfig()) draft = (await draftSupportReply(text)) || '';
+  } catch {
+    draft = '';
+  }
+
+  await openTicket({
+    phone: from,
+    userId,
+    reason,
+    customerMessage: text.slice(0, 2000),
+    draftReply: draft,
+  });
+
+  await sendText(
+    from,
+    "Thanks — I've passed this straight to a real person on the Lekhio team, and they'll reply right here shortly. Feel free to add anything else in the meantime and I'll pass it on.",
+  );
 }
 
 // --- Small talk, acks, and fixing the last entry (all deterministic) ---------

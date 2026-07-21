@@ -656,3 +656,43 @@ export function isSavingsQuestion(body: string): boolean {
 
   return false;
 }
+
+// --- Support escalation -------------------------------------------------------------------------
+// When a customer asks for a human, complains, or reports something broken, we lift them out of the
+// automated flow and open a support ticket for Jag to answer. DELIBERATELY SPECIFIC: a false positive
+// drags a paying customer onto the desk for nothing, so these require a real cry for help, not an
+// ordinary question or a logged entry. Bare "help" is NOT here — that is the help menu (isHelp), and
+// this is checked before it so an explicit escalation wins over the generic menu.
+const SUPPORT_HUMAN =
+  /(speak|talk|chat|connect|put me through|through to)[^.?!]{0,25}(human|person|someone|agent|advisor|adviser|representative|\brep\b|real person)|(human|real person|a person)[^.?!]{0,25}(talk|speak|chat)/;
+const SUPPORT_COMPLAINT = /\b(complain|complaint|terrible|awful|disgusting|rubbish|useless|joke|scam|furious|unacceptable)\b/;
+const SUPPORT_BILLING =
+  /\b(refund|money back|overcharged|double[- ]?charged|wrong charge|billing (issue|problem|error))\b|charged? me (twice|again)|cancel( my)? (account|subscription|plan|membership)/;
+const SUPPORT_PROBLEM =
+  /\b(not working|isn'?t working|does ?n'?t work|won'?t work|is broken|broken|stopped working|not syncing|isn'?t syncing|can'?t (log ?in|login|access)|glitch|frozen|crash)\b|\b(there'?s|i have|i'?ve got|having) a problem\b|\bproblem with\b/;
+const SUPPORT_WRONG = /\b(made a mistake|you'?re wrong|that'?s wrong|this (is|figure is|amount is) wrong|incorrect)\b/;
+
+export function isSupportRequest(body: string): boolean {
+  const t = String(body || '').trim().toLowerCase();
+  if (!t) return false;
+  return (
+    SUPPORT_HUMAN.test(t) ||
+    SUPPORT_COMPLAINT.test(t) ||
+    SUPPORT_BILLING.test(t) ||
+    SUPPORT_PROBLEM.test(t) ||
+    SUPPORT_WRONG.test(t)
+  );
+}
+
+export type SupportReason = 'human' | 'complaint' | 'problem' | 'billing' | 'other';
+
+// The lane label for the ticket. Order is deliberate: a request to reach a human is classified as
+// 'human' even if it also mentions a problem, because that is what they actually asked for.
+export function supportReason(body: string): SupportReason {
+  const t = String(body || '').trim().toLowerCase();
+  if (SUPPORT_HUMAN.test(t)) return 'human';
+  if (SUPPORT_BILLING.test(t)) return 'billing';
+  if (SUPPORT_COMPLAINT.test(t)) return 'complaint';
+  if (SUPPORT_PROBLEM.test(t) || SUPPORT_WRONG.test(t)) return 'problem';
+  return 'other';
+}

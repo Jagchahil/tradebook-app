@@ -157,6 +157,11 @@ export default function SupportPage() {
           reply. You edit and send; the reply goes back into their WhatsApp thread from the Lekhio number.
           Nothing is sent without your tap.
         </p>
+        <div style={{ marginTop: 14 }}>
+          <a href="/team/playbook" style={{ ...U.headerBtn, textDecoration: 'none', display: 'inline-block' }}>
+            Playbook · common issues &rarr;
+          </a>
+        </div>
       </section>
 
       {error ? <div style={{ ...U.panel, borderColor: C.red, color: C.red, marginTop: 14 }}>{error}</div> : null}

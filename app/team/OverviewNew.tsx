@@ -227,6 +227,30 @@ export default function OverviewNew({
           </div>
         </section>
 
+        {/* THE BRAIN — knowledge surfaces the desk draws on */}
+        <section style={U.section}>
+          <div style={U.sectionHead}>
+            <h2 style={T.h2}>The brain</h2>
+            <span style={U.sectionNote}>what the desk knows</span>
+          </div>
+          <div style={grid}>
+            <a href="/team/playbook" style={card}>
+              <div style={cardTop}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#2C7A7B,#48A9AA)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 18 }} aria-hidden="true">P</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={cardName}>Playbook</div>
+                  <div style={cardRole}>Common issues · FAQs</div>
+                </div>
+              </div>
+              <div style={cardLine}>The answers the front desk gives again and again — grounds the drafts and fills the pick-list, from your Obsidian brain.</div>
+              <div style={cardFoot}>
+                <span style={cardStatus}>support desk knowledge</span>
+                <span style={{ color: C.river, fontWeight: 700, fontSize: 15 }} aria-hidden="true">→</span>
+              </div>
+            </a>
+          </div>
+        </section>
+
         <p style={{ ...T.tiny, marginTop: 44, maxWidth: 700 }}>
           This page shows who our customers are and what they pay us. It never shows anyone&apos;s receipts,
           income, expenses, tax figures or phone number, and it never will.

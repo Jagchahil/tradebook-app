@@ -116,6 +116,7 @@ import {
   supportReason,
 } from '../../../lib/waintents';
 import { openTicket } from '../../../lib/support';
+import { matchKb } from '../../../lib/supportkb';
 import { soleTraderTax } from '../../../lib/taxengine';
 import { corporationTax } from '../../../lib/ltdengine';
 import { aprilDelta } from '../../../lib/propertyengine';
@@ -966,11 +967,15 @@ async function handleSupportRequest(from: string, text: string): Promise<void> {
 
   const reason = supportReason(text);
 
-  // Pre-draft a warm reply for Jag to edit. Best effort: if AI is off or the call fails, the draft is
-  // empty and Jag writes from scratch — the customer's own message is right there in the console.
+  // Pre-draft a warm reply for Jag to edit, grounded in his own playbook (the common-issue notes he
+  // keeps in Obsidian) when a known issue matches. Best effort: if AI is off or the call fails, the
+  // draft is empty and Jag writes from scratch — the customer's own message is right there in the console.
   let draft = '';
   try {
-    if (hasClaudeConfig()) draft = (await draftSupportReply(text)) || '';
+    if (hasClaudeConfig()) {
+      const kb = await matchKb(text).catch(() => []);
+      draft = (await draftSupportReply(text, kb)) || '';
+    }
   } catch {
     draft = '';
   }

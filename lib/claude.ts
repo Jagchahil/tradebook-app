@@ -450,9 +450,17 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
 // a ticket for Jag and pre-draft a warm reply for him to edit before sending. It NEVER invents account
 // details, figures, a refund, or a promise Lekhio cannot keep — it acknowledges, reassures, and signals
 // a person is on it. Only a starting point; Jag edits and approves every reply.
-export async function draftSupportReply(customerMessage: string, customerName?: string | null): Promise<string | null> {
+export async function draftSupportReply(
+  customerMessage: string,
+  kb?: Array<{ title: string; body: string }>,
+  customerName?: string | null,
+): Promise<string | null> {
   if (!ready() || !KEY) return null;
   const who = customerName && customerName.trim() ? customerName.trim().split(/\s+/)[0] : '';
+  // Ground the draft in Jag's own playbook when a known issue matches, so the reply reflects the real
+  // fix (authored in Obsidian), not generic reassurance. Empty when nothing matches — then it degrades
+  // to the warm-acknowledgement behaviour it had before.
+  const known = (kb || []).slice(0, 3).map((k) => `- ${k.title}: ${k.body}`).join('\n');
   const prompt = [
     'You are the front desk for Lekhio, a UK bookkeeping and tax app for sole traders that runs in WhatsApp.',
     'A customer has messaged asking for help. Draft a SHORT reply for a human on the team to review and send from WhatsApp.',
@@ -462,6 +470,9 @@ export async function draftSupportReply(customerMessage: string, customerName?: 
     '- If they report something broken, say the team is looking into it and will get back to them shortly.',
     '- No sign-off name, no subject line, just the message body. No placeholders like [name].',
     who ? `- You may open by first name: ${who}.` : '- You do not know their name; open warmly without one.',
+    known
+      ? `\nOur playbook for issues like this (use it if it fits, in your own words; do not quote it verbatim, do not mention a playbook):\n${known}`
+      : '',
     '',
     'Their message:',
     `"${customerMessage}"`,

@@ -14,6 +14,12 @@ import TeamShell from '../TeamShell';
 type Reason = 'human' | 'complaint' | 'problem' | 'billing' | 'other';
 type Status = 'open' | 'answered' | 'dismissed';
 
+interface Suggestion {
+  id: string;
+  slug: string;
+  title: string;
+  body: string;
+}
 interface Ticket {
   id: string;
   phone: string;
@@ -26,6 +32,7 @@ interface Ticket {
   lastInboundAt: string;
   decidedAt: string | null;
   windowOpen: boolean;
+  suggestions?: Suggestion[];
 }
 
 const REASON_LABEL: Record<Reason, string> = {
@@ -186,6 +193,25 @@ export default function SupportPage() {
                     <div style={{ ...T.small, color: C.ink, whiteSpace: 'pre-wrap' }}>{t.customerMessage}</div>
                   </div>
 
+                  {t.suggestions && t.suggestions.length > 0 ? (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ ...T.tiny, color: C.faint, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 }}>From your playbook — tap to use</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {t.suggestions.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => setEdits((e) => ({ ...e, [t.id]: s.body }))}
+                            disabled={disabled}
+                            title={s.body}
+                            style={chip}
+                          >
+                            {s.title}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div style={{ marginTop: 12 }}>
                     <div style={{ ...T.tiny, color: C.faint, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 }}>Your reply — edit before you send</div>
                     <textarea
@@ -260,3 +286,8 @@ const btn: React.CSSProperties = {
 };
 const btnSend: React.CSSProperties = { background: C.ink, color: '#fff' };
 const btnGhost: React.CSSProperties = { background: 'transparent', color: C.muted, borderColor: C.line };
+const chip: React.CSSProperties = {
+  fontSize: 12.5, fontWeight: 650, color: C.river, background: C.riverTint,
+  border: `1px solid ${C.line}`, borderRadius: 999, padding: '6px 12px', cursor: 'pointer',
+  maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+};

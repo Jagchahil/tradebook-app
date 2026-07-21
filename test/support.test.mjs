@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { isSupportRequest, supportReason } from '../lib/waintents.ts';
 import { windowOpen, cleanReason, WINDOW_MS } from '../lib/support.ts';
+import { scoreKb } from '../lib/supportkb.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoWeb = path.resolve(here, '..');
@@ -91,6 +92,17 @@ ok('to-do list merges open support tickets', /readTickets/.test(todos) && /openS
 ok('support to-do items are synthetic (support: prefix)', /support:\$\{k\.id\}/.test(todos));
 ok('support to-do items are needs-you, not approve', /kind: 'needs'/.test(todos));
 ok('ticking a support to-do is a no-op (resolved in the desk)', /startsWith\('support:'\)/.test(todos));
+
+// --- knowledge-base matching -----------------------------------------------
+const bankIssue = { title: 'Bank feed not syncing', keywords: ['bank feed', 'not syncing', 'reconnect'] };
+ok('kb matches a relevant message', scoreKb(bankIssue, 'my bank feed is not working and not syncing') > 0);
+ok('kb keyword hit scores higher than none', scoreKb(bankIssue, 'help with reconnect my bank feed') > scoreKb(bankIssue, 'how much tax do I owe'));
+ok('kb ignores an unrelated message', scoreKb(bankIssue, 'what is my profit this year') === 0);
+ok('kb stopwords do not create false hits', scoreKb({ title: 'The your this', keywords: [] }, 'the your this that') === 0);
+
+const kbIngest = readFileSync(path.join(repoWeb, 'app/api/team/support-kb/ingest/route.ts'), 'utf8');
+ok('kb ingest is secret-gated', /x-munshi-secret/.test(kbIngest) && /timingSafeEqual/.test(kbIngest));
+ok('kb ingest replaces the table', /replaceKb/.test(kbIngest));
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

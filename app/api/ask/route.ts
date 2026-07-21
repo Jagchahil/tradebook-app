@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { answerAccountantQuestion, hasClaudeConfig } from '../../../lib/claude';
-import { verifyAccessToken, bumpAiUsage, countActiveSubscribers, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised, getBusinessProfile, getStudentLoanSettings } from '../../../lib/supabase';
+import { verifyAccessToken, bumpAiUsage, countActiveSubscribers, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised, getBusinessProfile, getStudentLoanSettings, refreshFactsFromDb } from '../../../lib/supabase';
 import { pocketHistoryBrief } from '../../../lib/pocket';
 import { byPhase, daysUntil } from '../../../lib/brain';
 import { rateLimitedShared } from '../../../lib/ratelimit';
@@ -43,6 +43,9 @@ export async function POST(req: NextRequest) {
   if (await rateLimitedShared(`ask:${userId}`, 4, 60 * 1000)) {
     return NextResponse.json({ error: 'slow_down', answer: 'One sec, give me a moment to catch up and ask again.' }, { status: 429 });
   }
+
+  // Answer on the latest approved facts.
+  await refreshFactsFromDb();
 
   let body: Record<string, unknown> = {};
   try {

@@ -35,6 +35,7 @@ import {
   recordRakhaRun,
   getBusinessProfile,
   getStudentLoanSettings,
+  refreshFactsFromDb,
 } from '../../../../lib/supabase';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
 import { computeSignalsForStructure, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
@@ -287,6 +288,9 @@ export async function GET(req: NextRequest) {
   if (hop > MAX_HOPS) {
     return NextResponse.json({ error: 'Hop cap reached.' }, { status: 400 });
   }
+
+  // Every user's signals below are computed on the latest approved facts.
+  await refreshFactsFromDb();
 
   // Acknowledge immediately, work in after(), exactly like cron/reminders: no
   // invocation ever waits for another, so durations never chain across hops.

@@ -76,6 +76,7 @@ import {
   getOrCreateReferralCode,
   getRelevantKnowledge,
   getOptimiserInput,
+  refreshFactsFromDb,
 } from '../../../lib/supabase';
 import { isReferRequest, referralInvite } from '../../../lib/referral';
 import {
@@ -279,6 +280,11 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: true });
   }
+
+  // Every calculation and answer below runs on the latest approved facts: Khoji learns, you approve
+  // in the console, and the new figure is live here. Cheap (cached) and safe (a failed read keeps the
+  // current facts).
+  await refreshFactsFromDb();
 
   const message = firstMessage(body);
 

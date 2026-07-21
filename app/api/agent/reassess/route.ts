@@ -7,6 +7,7 @@ import {
   getBusinessProfile,
   getStudentLoanSettings,
   insertAgentSignals,
+  refreshFactsFromDb,
 } from '../../../../lib/supabase';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
 import { computeSignalsForStructure, type AgentInput } from '../../../../lib/agent';
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
   const verified = await verifyAccessToken(token);
   if (!verified) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const userId = verified.id;
+  await refreshFactsFromDb();
 
   // A light burst guard: an input storm should not become a compute storm. Reassessing at most a few
   // times a minute is plenty; the nightly walk is the backstop for anything skipped here.

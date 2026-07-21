@@ -121,7 +121,9 @@ export const FACTS = {
   savingsStartingRateBand: 5000,       // 0% band on savings, reduced £1 for every £1 of non-savings income above the PA (nil once other income reaches £17,570)
   personalSavingsAllowanceBasic: 1000, // basic-rate taxpayer
   personalSavingsAllowanceHigher: 500, // higher-rate taxpayer; nil for an additional-rate taxpayer
-} as const;
+// NOT `as const`: FACTS is live-overridable at runtime by lib/facts.ts (an approved, in-force
+// Khoji change assigns onto these properties). See lib/facts.ts for the four safeties.
+};
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 

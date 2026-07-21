@@ -23,6 +23,7 @@ import type { KnowledgeState } from './knowledgewatch';
 import type {
   Idea, Asset, Approval, Metric, AssetState, Format, Promise3, Platform, Storyboard,
 } from './studio';
+import { refreshFacts, isOverridableKey, isInBounds, type FactOverride } from './facts';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -4309,6 +4310,89 @@ export async function readBrain(days = 30): Promise<BrainState | null> {
 // company. Speed without a way back is not seamless, it is dangerous.
 export type ReviewDecision = 'approve' | 'dismiss' | 'undo';
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE LIVE FACTS LOOP. Khoji learns, a human approves here, and the number is live everywhere.
+// The pure merge + guardrails live in lib/facts.ts; this is the database side of it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// Read the approved, not-superseded overrides. lib/facts filters these to the in-force ones.
+export async function loadFactOverrides(): Promise<FactOverride[]> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/fact_overrides?superseded=eq.false&select=fact_key,value,effective_from,effective_to,source_url&order=effective_from.desc`,
+    { headers: headers(), signal: AbortSignal.timeout(6000) },
+  );
+  if (!res.ok) throw new Error(`fact_overrides HTTP ${res.status}`);
+  const rows = (await res.json()) as Array<{ fact_key: string; value: number; effective_from: string | null; effective_to: string | null; source_url: string | null }>;
+  return rows.map((r) => ({ key: r.fact_key, value: r.value, effective_from: r.effective_from, effective_to: r.effective_to, source_url: r.source_url }));
+}
+
+// Wired refresh: apply the latest approved, in-force overrides onto FACTS. Call at the top of any
+// handler that computes tax or answers a question. Cheap (cached, short TTL); a failed read keeps the
+// current FACTS. With no rows it is a no-op and FACTS is exactly the hardcoded defaults.
+export async function refreshFactsFromDb(): Promise<string[]> {
+  return refreshFacts(loadFactOverrides);
+}
+
+// Write ONE approved change to an engine constant. Refuses a key the engine does not hold, a value out
+// of bounds, or a missing date: the human gate is the primary defence, this is the second. Returns
+// false on any refusal so the caller never believes an override landed when it did not.
+export async function writeFactOverride(o: {
+  key: string; value: number; effectiveFrom: string; sourceUrl?: string | null; note?: string | null; knowledgeItemId?: string | null; approvedBy: string;
+}): Promise<boolean> {
+  if (!isOverridableKey(o.key) || !isInBounds(o.key, o.value)) return false;
+  if (!o.effectiveFrom || !Number.isFinite(Date.parse(o.effectiveFrom))) return false;
+  if (!o.approvedBy) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/fact_overrides`, {
+      method: 'POST',
+      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        fact_key: o.key,
+        value: o.value,
+        effective_from: o.effectiveFrom,
+        source_url: o.sourceUrl ?? null,
+        note: o.note ?? null,
+        knowledge_item_id: o.knowledgeItemId ?? null,
+        approved_by: o.approvedBy,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// On approval, if the card carried a structured change to a known constant (the differ/budget watcher
+// puts { key, value, effective_from } in raw.proposed_fact), write the override so the new figure is
+// live everywhere the moment it is approved. A card with no proposal is an ordinary knowledge item and
+// does nothing here. Best effort and never throws: the approval is the record of record.
+async function maybeWriteOverrideFromApprovedItem(id: string, byEmail: string): Promise<void> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/knowledge_items?id=eq.${encodeURIComponent(id)}&select=raw,source_url,effective_date&limit=1`, { headers: headers(), signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return;
+    const rows = (await res.json()) as Array<{ raw: unknown; source_url: string | null; effective_date: string | null }>;
+    const row = rows[0];
+    if (!row) return;
+    let raw: Record<string, unknown> | null = null;
+    if (typeof row.raw === 'string') { try { raw = JSON.parse(row.raw) as Record<string, unknown>; } catch { raw = null; } }
+    else if (row.raw && typeof row.raw === 'object') raw = row.raw as Record<string, unknown>;
+    const pf = raw?.proposed_fact as { key?: unknown; value?: unknown; effective_from?: unknown } | undefined;
+    if (!pf || typeof pf.key !== 'string' || typeof pf.value !== 'number') return;
+    // Effective date: the proposal's own, else the item's effective_date, else today (a drift against
+    // the current GOV.UK page is the law as it stands today).
+    const eff = (typeof pf.effective_from === 'string' && pf.effective_from ? pf.effective_from : null)
+      || row.effective_date
+      || new Date().toISOString().slice(0, 10);
+    const wrote = await writeFactOverride({ key: pf.key, value: pf.value, effectiveFrom: eff, sourceUrl: row.source_url, knowledgeItemId: id, approvedBy: byEmail, note: 'auto from approved Khoji card' });
+    if (!wrote) console.error('[facts] approved a fact change but the override write was refused:', pf.key, String(pf.value));
+  } catch (e) {
+    console.error('[facts] maybeWriteOverrideFromApprovedItem error:', e instanceof Error ? e.message : 'unknown');
+  }
+}
+
 export async function reviewKnowledgeItem(
   id: string,
   decision: ReviewDecision,
@@ -4336,7 +4420,13 @@ export async function reviewKnowledgeItem(
         reviewed_at: new Date().toISOString(),
       }),
     });
-    return res.ok;
+    if (!res.ok) return false;
+    // 🔴 THE FACT MOVES. On approval, if this card carried a structured change to a known engine
+    // constant, write the override so the new figure is live everywhere the moment it is approved.
+    if (decision === 'approve') {
+      await maybeWriteOverrideFromApprovedItem(id, byEmail);
+    }
+    return true;
   } catch {
     return false;
   }

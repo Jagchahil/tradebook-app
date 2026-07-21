@@ -31,6 +31,7 @@ function score(e: Entry, q: string): number {
 
 export default function PlaybookPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [missingFaqs, setMissingFaqs] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [query, setQuery] = useState('');
   const [edits, setEdits] = useState<Record<string, Draft>>({});
@@ -50,8 +51,9 @@ export default function PlaybookPage() {
     try {
       const res = await fetch('/api/team/support-kb', { headers: { Authorization: `Bearer ${tok}` } });
       if (res.ok) {
-        const j = (await res.json()) as { entries?: Entry[] };
+        const j = (await res.json()) as { entries?: Entry[]; health?: { missingFaqs?: string[] } };
         setEntries(j.entries ?? []);
+        setMissingFaqs(j.health?.missingFaqs ?? []);
       }
     } finally {
       setLoaded(true);
@@ -172,6 +174,27 @@ export default function PlaybookPage() {
         </div>
       </section>
 
+      {loaded && missingFaqs.length > 0 ? (
+        <section style={U.section}>
+          <div style={sweep}>
+            <div style={{ ...T.tiny, color: '#8a5a00', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 700, marginBottom: 6 }}>
+              Website check
+            </div>
+            <div style={{ ...T.small, color: '#5c4200', lineHeight: 1.55 }}>
+              {missingFaqs.length} {missingFaqs.length === 1 ? 'topic' : 'topics'} on the Lekhio site {missingFaqs.length === 1 ? 'is' : 'are'}n&rsquo;t in your playbook yet.
+              Add an answer so the desk can ground on it:
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              {missingFaqs.map((q) => (
+                <button key={q} onClick={() => setAdding({ title: q, keywords: '', body: '' })} style={sweepChip}>
+                  {q} &nbsp;+
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {adding ? (
         <section style={U.section}>
           <div style={card}>
@@ -249,3 +272,10 @@ const btn: React.CSSProperties = {
 };
 const btnDark: React.CSSProperties = { background: C.ink, color: '#fff' };
 const btnGhost: React.CSSProperties = { background: 'transparent', color: C.muted, borderColor: C.line };
+const sweep: React.CSSProperties = {
+  background: '#fff8ec', border: '1px solid #f0dcae', borderRadius: 14, padding: 18,
+};
+const sweepChip: React.CSSProperties = {
+  fontSize: 12.5, fontWeight: 600, color: '#5c4200', background: '#fff',
+  border: '1px solid #e6cf95', borderRadius: 999, padding: '6px 12px', cursor: 'pointer',
+};

@@ -106,5 +106,20 @@ ok('the old "Reply NEXT ... or STOP" trap message is gone from the walk step',
 ok('at the trade prompt, a question steps out rather than being filed as the trade',
   wa.includes('if (!TAXGUIDE_SKIP.test(body) && (isDeadlineQuestion(body) || isQuestion(body))) {'));
 
+
+// --- THE WHATSAPP ACCOUNTANT COVERS COMPANIES TOO, AND HOLDS THE HOUSE STYLE --------------------
+// 21 Jul flood: "how are my dividends taxed?" got "that's outside my wheelhouse, see a company
+// accountant" on WhatsApp, though the app answers it fully; and the answers used em dashes the app
+// bans. The money answer is now framed as a small business accountant, carries the company figures,
+// and is told to hold the no-dash house style.
+ok('the WhatsApp money answer is framed for small business owners, not sole traders only',
+  claude.includes('You are Lekhio, the accountant for a UK small business owner'));
+ok('a limited company question is explicitly IN scope for the WhatsApp answer',
+  claude.includes('A limited company question is NOT out of scope'));
+ok('the company figures (Corporation Tax, dividends) are spread into the WhatsApp money answer',
+  claude.includes('...LTD_FACTS_2627') && claude.includes('const LTD_FACTS_2627'));
+ok('the WhatsApp money answer is told not to use em or en dashes',
+  claude.includes('Never use an em dash or an en dash'));
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

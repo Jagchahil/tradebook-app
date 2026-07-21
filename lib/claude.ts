@@ -348,13 +348,16 @@ export async function answerMoneyQuestion(
   if (!ready() || !KEY) return null;
 
   const prompt = [
-    'You are Lekhio, the accountant for a UK self employed person, answering in WhatsApp. You KNOW UK self employed tax.',
-    'Answer their question directly and confidently, in one or two short, friendly sentences. No jargon. Money is in pounds, use the £ sign.',
+    'You are Lekhio, the accountant for a UK small business owner, answering in WhatsApp. Most are sole traders or subcontractors; some run a limited company. You KNOW UK small business tax.',
+    'Answer their question directly and confidently, in one or two short, friendly sentences. No jargon. Money is in pounds, use the £ sign. Never use an em dash or an en dash; use a comma or a full stop instead.',
     'You are their accountant. You never tell them to look it up, check HMRC yourself, or send them off to a GOV.UK link for a standard tax figure. You already hold the figures below, so just tell them the answer and relate it to their own situation.',
-    'Only ask them to send a receipt or a detail when the question is about THEIR OWN transactions and you do not have that entry. If a question is genuinely nothing to do with their money or UK self employed tax, say so briefly and kindly.',
+    'Only ask them to send a receipt or a detail when the question is about THEIR OWN transactions and you do not have that entry. If a question is genuinely nothing to do with their money or UK small business tax, say so briefly and kindly. A limited company question is NOT out of scope: answer it from the company figures below.',
     '',
-    'Standard UK self employed tax figures for 2026/27 (England, Wales and Northern Ireland). These are your built-in knowledge, use them to answer directly, do not guess beyond them:',
+    'Standard UK small business tax figures for 2026/27 (England, Wales and Northern Ireland). These are your built-in knowledge, use them to answer directly, do not guess beyond them:',
     ...TAX_FACTS_2627,
+    '',
+    'If they run a limited company, these company figures apply too:',
+    ...LTD_FACTS_2627,
     '',
     'Their question:',
     `"${question}"`,
@@ -568,6 +571,14 @@ const TAX_FACTS_2627: string[] = [
   '- Profits are taxed on the tax-year basis from 2024/25. The cash basis (money in and out when it moves) is the default for small businesses; accruals counts income and costs when invoiced or incurred. Opening and closing years can create overlap, so the first and last year need care.',
   '- Payments on account: once a Self Assessment bill is over £1,000, you also make two payments on account towards next year, each half this year\'s bill, due 31 January and 31 July, on top of the balancing payment. This is the bill that surprises people.',
   `- Capital allowances: the Annual Investment Allowance gives 100% relief on most plant and machinery up to £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')}. Above that, or for cars, you claim a writing down allowance each year, ${Math.round(FACTS.wdaMainRate * 100)}% on the main pool (reduced from 18% from April 2026), ${Math.round(FACTS.wdaSpecialRate * 100)}% on the special rate pool (most cars, integral features).`,
+];
+
+// The limited-company figures, taken from the LTD engine so they track it, spread into the WhatsApp
+// money answer alongside TAX_FACTS_2627 so a company director gets a real answer instead of "that is
+// outside my wheelhouse" (caught live on the 21 Jul flood).
+const LTD_FACTS_2627: string[] = [
+  '- Limited company: the company pays Corporation Tax on its profit, 19% up to £50,000, 25% above £250,000, with marginal relief between (about 26.5% on the slice). A director usually takes a small salary plus dividends.',
+  `- Dividends are paid from post-Corporation-Tax profit and taxed on the person: a £${LTD.dividendAllowance.toLocaleString('en-GB')} allowance at 0%, then ${LTD.dividendBasic * 100}% basic, ${LTD.dividendHigher * 100}% higher, ${LTD.dividendAdditional * 100}% additional. A dividend needs distributable profit; taking more is a director's loan with a 33.75% charge if it is unpaid nine months after the year end.`,
 ];
 
 const ACCOUNTANT_SYSTEM = [

@@ -78,6 +78,68 @@ export async function matchKb(text: string, limit = 3): Promise<KbDTO[]> {
     .map((x) => toDTO(x.r));
 }
 
+export function slugifyTitle(title: string): string {
+  return (
+    String(title || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'entry'
+  );
+}
+
+// Create or edit one entry from the console. With an id it edits that row; without, it inserts a new
+// row keyed by a slug from the title (upsert on the slug, so re-adding the same title updates it rather
+// than erroring). support_kb is the source of truth now — the vault mirror is written from it.
+export interface UpsertInput {
+  id?: string;
+  title: string;
+  keywords: string[];
+  body: string;
+}
+export async function upsertEntry(input: UpsertInput): Promise<KbRow | null> {
+  const title = (input.title || '').trim();
+  const body = (input.body || '').trim();
+  if (!title || !body) return null;
+  const keywords = (input.keywords || []).map((k) => String(k).trim().toLowerCase()).filter(Boolean);
+  try {
+    if (input.id) {
+      const res = await fetch(`${base()}/rest/v1/support_kb?id=eq.${encodeURIComponent(input.id)}`, {
+        method: 'PATCH',
+        headers: h({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ title, keywords, body, updated_at: new Date().toISOString() }),
+      });
+      if (!res.ok) return null;
+      const rows = (await res.json()) as KbRow[];
+      return rows[0] ?? null;
+    }
+    const slug = slugifyTitle(title);
+    const res = await fetch(`${base()}/rest/v1/support_kb?on_conflict=slug`, {
+      method: 'POST',
+      headers: h({ Prefer: 'resolution=merge-duplicates,return=representation' }),
+      body: JSON.stringify({ slug, title, keywords, body, updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as KbRow[];
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteEntry(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${base()}/rest/v1/support_kb?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: h({ Prefer: 'return=minimal' }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export interface KbInput {
   slug: string;
   title: string;

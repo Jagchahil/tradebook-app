@@ -1,25 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken, readTeamMember } from '../../../../lib/supabase';
 import { isTeam } from '../../../../lib/team';
-import { readAllKb } from '../../../../lib/supportkb';
+import { readAllKb, upsertEntry, deleteEntry } from '../../../../lib/supportkb';
 
 export const runtime = 'nodejs';
 
-// THE PLAYBOOK, read side. The console's Playbook node reads this to show every common-issue entry the
-// support desk knows — the same rows that ground the drafts and fill the pick-list. Team-gated, same as
-// the rest of the console. Read-only here: the entries are authored in Obsidian and synced in, so the
-// vault stays the single source of truth. No customer data — only our own playbook.
-export async function GET(req: NextRequest) {
+// THE PLAYBOOK. The console's Playbook node reads and edits every common-issue entry — the same rows that
+// ground the drafts and fill the pick-list. Team-gated, same as the rest of the console. support_kb is
+// the source of truth (a mini job mirrors it back into the Obsidian vault). GET lists; POST saves one
+// (edit with id, add without); DELETE removes one. No customer data — only our own playbook.
+async function gate(req: NextRequest): Promise<NextResponse | null> {
   const auth = req.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   const user = token ? await verifyAccessToken(token) : null;
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-
   const member = await readTeamMember(user.email);
   if (!isTeam(member)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  return null;
+}
 
+export async function GET(req: NextRequest) {
+  const denied = await gate(req);
+  if (denied) return denied;
   const rows = await readAllKb();
   return NextResponse.json({
     entries: rows.map((r) => ({ id: r.id, title: r.title, body: r.body, keywords: r.keywords, updatedAt: r.updated_at })),
   });
+}
+
+export async function POST(req: NextRequest) {
+  const denied = await gate(req);
+  if (denied) return denied;
+  const b = (await req.json().catch(() => ({}))) as { id?: string; title?: string; keywords?: unknown; body?: string };
+  const keywords = Array.isArray(b.keywords)
+    ? b.keywords.map((k) => String(k))
+    : typeof b.keywords === 'string'
+    ? b.keywords.split(',')
+    : [];
+  const row = await upsertEntry({ id: b.id, title: b.title || '', keywords, body: b.body || '' });
+  if (!row) return NextResponse.json({ error: 'save failed (title and answer are required)' }, { status: 400 });
+  return NextResponse.json({ entry: { id: row.id, title: row.title, body: row.body, keywords: row.keywords, updatedAt: row.updated_at } });
+}
+
+export async function DELETE(req: NextRequest) {
+  const denied = await gate(req);
+  if (denied) return denied;
+  const id = req.nextUrl.searchParams.get('id') || ((await req.json().catch(() => ({}))) as { id?: string }).id;
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+  const ok = await deleteEntry(id);
+  return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: 'delete failed' }, { status: 500 });
 }

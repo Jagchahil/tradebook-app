@@ -502,6 +502,45 @@ export async function draftSupportReply(
   return textBlock ? textBlock.trim() : null;
 }
 
+// --- Sharpen a playbook answer. Jag writes or pastes a rough answer to a common question in the console
+// and taps "improve"; this returns a tighter, warm, customer-ready version he can accept or edit. It only
+// rewrites what he gave it — it never invents figures, promises, or facts that were not in his draft.
+export async function improveSupportAnswer(question: string, draft: string): Promise<string | null> {
+  if (!ready() || !KEY) return null;
+  const prompt = [
+    'You are the front desk for Lekhio, a UK bookkeeping and tax app for sole traders that runs in WhatsApp.',
+    'Below is a common customer question and a rough answer the founder wrote. Rewrite the answer so it is ready to send to a customer.',
+    'Rules:',
+    '- Warm, plain, professional UK English. A few short sentences. Like a helpful human on the team, not a bot.',
+    '- Keep it TRUE to the founder’s draft. Do NOT add figures, prices, dates, promises, or facts that are not in the draft. If the draft is vague, keep it vague rather than inventing specifics.',
+    '- No sign-off, no subject line, no placeholders. Just the improved answer text.',
+    '',
+    `Question: "${question}"`,
+    `Rough answer: "${draft}"`,
+  ].join('\n');
+
+  let res: Response;
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
+      body: JSON.stringify({ model: MODEL_SMART, max_tokens: 400, messages: [{ role: 'user', content: prompt }] }),
+    });
+  } catch (err) {
+    console.error('[claude] Improve answer failed or timed out:', err instanceof Error ? err.message : 'unknown');
+    return null;
+  }
+  if (!res.ok) {
+    console.error('[claude] Improve answer failed:', res.status);
+    return null;
+  }
+  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  logUsage('support_improve', data);
+  const textBlock = data.content?.find((c) => c.type === 'text')?.text;
+  return textBlock ? textBlock.trim() : null;
+}
+
 // --- The in-app accountant. Expert tax and bookkeeping Q&A for the self employed ---
 //
 // This is the chat box in the app. It answers any UK self employed tax or

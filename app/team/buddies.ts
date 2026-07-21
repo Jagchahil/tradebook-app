@@ -28,13 +28,13 @@ export interface BuddyDef {
 export const BUDDIES: BuddyDef[] = [
   { key: 'gyani',     name: 'Gyani',     role: 'CKO · Knowledge',   g1: '#0F7B4F', g2: '#22B573', status: 'live',   statusWord: 'watching',   emblem: 'search',    href: '/team/knowledge', reportsToList: 'approve' },
   { key: 'mistri',    name: 'Mistri',    role: 'CTO · Watch',       g1: '#1B59A6', g2: '#3B82D6', status: 'live',   statusWord: 'quiet watch',emblem: 'spanner',   href: '/team/system',    reportsToList: 'needs' },
-  { key: 'munshi',    name: 'Munshi',    role: 'Chief of Staff',    g1: '#3F51B5', g2: '#6172D6', status: 'waking', statusWord: 'warming up',  emblem: 'clipboard', href: '/team',           reportsToList: 'approve' },
-  { key: 'pehredaar', name: 'Pehredaar', role: 'Security · 24/7',   g1: '#3B4A5A', g2: '#5C7186', status: 'waking', statusWord: 'warming up',  emblem: 'shield',    href: '/team/pehredaar', reportsToList: 'needs' },
-  { key: 'kanjoos',   name: 'Kanjoos',   role: 'Cost · AI spend',   g1: '#C6871A', g2: '#E8B34C', status: 'waking', statusWord: 'warming up',  emblem: 'coin',      href: '/team/kanjoos',   reportsToList: 'approve' },
-  { key: 'dakiya',    name: 'Dakiya',    role: 'Front Desk · Email',g1: '#2C7A7B', g2: '#48A9AA', status: 'waking', statusWord: 'warming up',  emblem: 'people',    href: '/team/dakiya',    reportsToList: 'approve' },
+  { key: 'munshi',    name: 'Munshi',    role: 'Chief of Staff',    g1: '#3F51B5', g2: '#6172D6', status: 'live',   statusWord: 'on the brief', emblem: 'clipboard', href: '/team',           reportsToList: 'approve' },
+  { key: 'pehredaar', name: 'Pehredaar', role: 'Security · 24/7',   g1: '#3B4A5A', g2: '#5C7186', status: 'live',   statusWord: 'on watch',    emblem: 'shield',    href: '/team/pehredaar', reportsToList: 'needs' },
+  { key: 'kanjoos',   name: 'Kanjoos',   role: 'Cost · AI spend',   g1: '#C6871A', g2: '#E8B34C', status: 'live',   statusWord: 'counting',    emblem: 'coin',      href: '/team/kanjoos',   reportsToList: 'approve' },
+  { key: 'dakiya',    name: 'Dakiya',    role: 'Front Desk · Email',g1: '#2C7A7B', g2: '#48A9AA', status: 'live',   statusWord: 'at the desk',  emblem: 'people',    href: '/team/dakiya',    reportsToList: 'approve' },
   { key: 'hoka',      name: 'Hoka',      role: 'CMO · Marketing',   g1: '#E8973A', g2: '#F6B95C', status: 'asleep', statusWord: 'napping',     emblem: 'megaphone', href: '/team',    reportsToList: 'needs' },
-  { key: 'khazanchi', name: 'Khazanchi', role: 'CFO · Finance',     g1: '#0E7C86', g2: '#1AA5B0', status: 'asleep', statusWord: 'napping',     emblem: 'coin',      href: '/team/numbers',   reportsToList: 'none' },
-  { key: 'saudagar',  name: 'Saudagar',  role: 'CRO · Revenue',     g1: '#7E5AC2', g2: '#9E7BE0', status: 'asleep', statusWord: 'napping',     emblem: 'tag',       href: '/team/customers', reportsToList: 'none' },
+  { key: 'khazanchi', name: 'Khazanchi', role: 'CFO · Finance',     g1: '#0E7C86', g2: '#1AA5B0', status: 'live',   statusWord: 'on the numbers',emblem: 'coin',     href: '/team/numbers',   reportsToList: 'none' },
+  { key: 'saudagar',  name: 'Saudagar',  role: 'CRO · Revenue',     g1: '#7E5AC2', g2: '#9E7BE0', status: 'live',   statusWord: 'on growth',   emblem: 'tag',       href: '/team/customers', reportsToList: 'none' },
 ];
 
 export function buddy(key: string): BuddyDef {

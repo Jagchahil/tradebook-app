@@ -669,6 +669,34 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
     }
   }
 
+  // 18b. The trading allowance, made VISIBLE. The engine already deducts the better of actual expenses
+  // or the flat £1,000 (taxengine.taxableTradingProfit), so a low-cost trader never LOSES it. What they
+  // never SEE is that Rakha secured it. This surfaces that saving: when projected trade costs are running
+  // under £1,000, the flat allowance beats the receipts, and we say by how much, and that it is already
+  // applied. Trade only (property has its own £1,000 allowance); sole trader only (a company does not get
+  // it, so it sits in LTD_SUPPRESSED_SIGNALS). Read from the same figures the MTD and use-of-home signals
+  // use, so no new aggregate is needed. Waits until the year is mature enough to project a cost base.
+  if (canProject && d.monthsElapsed >= 6 && marginalRate > 0) {
+    const propExpenses = input.property ? Math.max(0, input.property.expenses) + Math.max(0, input.property.finance) : 0;
+    const tradeExpensesYtd = Math.max(0, d.ytdExpenses - propExpenses);
+    const projTradeGross = projectAnnual(tradeGrossYtd, d);
+    const projTradeExpenses = projectAnnual(tradeExpensesYtd, d);
+    if (projTradeGross > FACTS.tradingAllowance && projTradeExpenses < FACTS.tradingAllowance) {
+      const benefit = Math.round((FACTS.tradingAllowance - projTradeExpenses) * marginalRate);
+      if (benefit >= 30) {
+        out.push({
+          signalKey: 'trading_allowance_saving',
+          periodKey: `${year}#tra`,
+          priority: 'card',
+          title: 'The £1,000 trading allowance is beating your costs',
+          body: `Your business costs this year are running under £1,000 (about ${gbp(projTradeExpenses)} at this pace). On your return the flat £1,000 trading allowance beats totting up your actual expenses, so Lekhio uses it automatically, worth roughly ${gbp(benefit)} less tax than your logged costs alone. Nothing for you to do. Keep snapping receipts though: the day your real costs pass £1,000, Lekhio switches to whichever leaves you better off. A suggestion from your numbers, not advice. You decide.`,
+          waText: `your costs are running under £1,000, so Lekhio uses the flat £1,000 trading allowance instead, worth about ${gbp(benefit)} less tax. Keep logging receipts and it switches the day your costs pass £1,000`,
+          numbers: { benefit, projExpenses: projTradeExpenses, marginalRatePct: Math.round(marginalRate * 100) },
+        });
+      }
+    }
+  }
+
   // 16. The invoice chaser (doc 82 s5e item 3): Rakha DRAFTS, the user sends.
   // A nudge tier at 14 days and a firmer tier at 30, each firing once per
   // invoice per tier, at most two invoices per walk so nobody gets flooded.
@@ -857,7 +885,7 @@ export function applyPingCaps(signals: AgentSignal[], pingsSentLast7Days: number
 // where that profit is the company's and the owner's income is their salary plus dividends.
 const LTD_SUPPRESSED_SIGNALS = new Set<string>([
   'higher_rate_approach', 'pa_taper', 'class2_pension_year', 'poa_cliff', 'sl_threshold_cross',
-  'cis_refund_milestone', 'aia_timing', 'home_office_saving', 'expense_completeness',
+  'cis_refund_milestone', 'aia_timing', 'home_office_saving', 'trading_allowance_saving', 'expense_completeness',
   'mtd_mandation', 'mtd_combined_trap', 'january_rehearsal', 'year_end_countdown',
   'goal_threshold_combo', 'goal_purchase_timing', 'goal_within_reach', 'goal_progress',
 ]);

@@ -520,6 +520,29 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   ok('use of home copy has no forbidden dashes', noHome && !/[–—−]/.test(noHome.title + noHome.body + noHome.waText));
 }
 
+// --- signal 18b: trading allowance surfaced ---------------------------------------------
+{
+  const today = new Date('2026-12-15T00:00:00Z');
+  // Gross well over £1,000, costs running well under it: the flat allowance beats the receipts.
+  const s = find(A.computeSignals(input(today, monthsFor(today, 8, { incomePerMonth: 3000, expensesPerMonth: 40 }))), 'trading_allowance_saving');
+  ok('trading allowance fires when costs run under the flat rate', s && s.priority === 'card');
+  ok('trading allowance names a real saving and the projected costs', s && s.numbers.benefit > 0 && s.numbers.projExpenses < 1000);
+  ok('trading allowance saving equals headroom x marginal rate', s && s.numbers.benefit === Math.round((1000 - s.numbers.projExpenses) * (s.numbers.marginalRatePct / 100)));
+  ok('trading allowance body carries a pound figure', s && /£\d/.test(s.body));
+  ok('trading allowance copy has no forbidden dashes', s && !/[–—−]/.test(s.title + s.body + s.waText));
+  ok('trading allowance makes no certainty claim', s && !/you will save|guaranteed/i.test(s.body));
+  // Costs comfortably over £1,000: actual expenses win, nothing to surface.
+  ok('stays quiet when costs are over the flat rate', !find(A.computeSignals(input(today, monthsFor(today, 8, { incomePerMonth: 3000, expensesPerMonth: 600 }))), 'trading_allowance_saving'));
+  // Income below the personal allowance: a deduction saves nothing, so stay quiet.
+  ok('stays quiet when no tax is due', !find(A.computeSignals(input(today, monthsFor(today, 8, { incomePerMonth: 120, expensesPerMonth: 10 }))), 'trading_allowance_saving'));
+  // Too early in the year to project a full-year cost base.
+  const early = new Date('2026-06-10T00:00:00Z');
+  ok('waits for enough of the year before claiming a low cost base', !find(
+    A.computeSignals(input(early, monthsFor(early, 3, { incomePerMonth: 3000, expensesPerMonth: 40 }))),
+    'trading_allowance_saving',
+  ));
+}
+
 // --- undated goals still get the monthly pulse ------------------------------------------
 {
   const today = new Date('2026-12-15T00:00:00Z');

@@ -90,9 +90,22 @@ export interface LegalSource {
  *  map, and the freshness watcher (khoji/lawwatch.mjs) hashes exactly these. */
 export const LEGAL_SOURCES: Record<LegalField, LegalSource[]> = {
   tax: [
+    // The statutes the reliefs actually live in. Expanded 21 Jul: the money for a self-employed person
+    // is in capital allowances (the van, the tools) and in gains (selling the van, the premises), so the
+    // two Acts that govern them now sit beside the income Acts as primary sources.
     { url: 'https://www.legislation.gov.uk/ukpga/2005/5/contents', title: 'Income Tax (Trading and Other Income) Act 2005', kind: 'statute' },
     { url: 'https://www.legislation.gov.uk/ukpga/2007/3/contents', title: 'Income Tax Act 2007', kind: 'statute' },
+    { url: 'https://www.legislation.gov.uk/ukpga/2001/2/contents', title: 'Capital Allowances Act 2001', kind: 'statute' },
+    { url: 'https://www.legislation.gov.uk/ukpga/1992/12/contents', title: 'Taxation of Chargeable Gains Act 1992', kind: 'statute' },
+    // The HMRC manuals where a relief is spelled out claim by claim. All Crown copyright under the OGL,
+    // so we may read AND quote them. This is where "we know every relief" is actually earned.
     { url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual', title: 'HMRC Business Income Manual', kind: 'guidance' },
+    { url: 'https://www.gov.uk/hmrc-internal-manuals/capital-allowances-manual', title: 'HMRC Capital Allowances Manual', kind: 'guidance' },
+    { url: 'https://www.gov.uk/hmrc-internal-manuals/employment-income-manual', title: 'HMRC Employment Income Manual', kind: 'guidance' },
+    { url: 'https://www.gov.uk/hmrc-internal-manuals/property-income-manual', title: 'HMRC Property Income Manual', kind: 'guidance' },
+    { url: 'https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual', title: 'HMRC Capital Gains Manual', kind: 'guidance' },
+    { url: 'https://www.gov.uk/hmrc-internal-manuals/vat-input-tax', title: 'HMRC VAT Input Tax Manual', kind: 'guidance' },
+    { url: 'https://www.gov.uk/hmrc-internal-manuals/national-insurance-manual', title: 'HMRC National Insurance Manual', kind: 'guidance' },
   ],
   employment: [
     { url: 'https://www.legislation.gov.uk/ukpga/1996/18/contents', title: 'Employment Rights Act 1996', kind: 'statute' },

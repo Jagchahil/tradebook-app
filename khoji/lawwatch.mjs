@@ -34,10 +34,20 @@ function log(...a) { console.log('[khoji:lawwatch]', ...a); }
 // FAILS if these two lists ever drift apart, exactly the way ltd-parity guards the two engines. A
 // list you keep in two places without a parity test is a list that will disagree with itself.
 export const WATCHED_LEGAL = [
-  // tax
+  // tax — the income Acts, plus (21 Jul) the two Acts the reliefs live in and the HMRC manuals that
+  // spell each relief out. Kept in lockstep with lib/lawsources.ts; lawwatchtest.mjs fails the build if
+  // this list and the registry ever disagree, so a source is never watched-but-undeclared or the reverse.
   { url: 'https://www.legislation.gov.uk/ukpga/2005/5/contents', field: 'tax', kind: 'statute' },
   { url: 'https://www.legislation.gov.uk/ukpga/2007/3/contents', field: 'tax', kind: 'statute' },
+  { url: 'https://www.legislation.gov.uk/ukpga/2001/2/contents', field: 'tax', kind: 'statute' },
+  { url: 'https://www.legislation.gov.uk/ukpga/1992/12/contents', field: 'tax', kind: 'statute' },
   { url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual', field: 'tax', kind: 'guidance' },
+  { url: 'https://www.gov.uk/hmrc-internal-manuals/capital-allowances-manual', field: 'tax', kind: 'guidance' },
+  { url: 'https://www.gov.uk/hmrc-internal-manuals/employment-income-manual', field: 'tax', kind: 'guidance' },
+  { url: 'https://www.gov.uk/hmrc-internal-manuals/property-income-manual', field: 'tax', kind: 'guidance' },
+  { url: 'https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual', field: 'tax', kind: 'guidance' },
+  { url: 'https://www.gov.uk/hmrc-internal-manuals/vat-input-tax', field: 'tax', kind: 'guidance' },
+  { url: 'https://www.gov.uk/hmrc-internal-manuals/national-insurance-manual', field: 'tax', kind: 'guidance' },
   // employment
   { url: 'https://www.legislation.gov.uk/ukpga/1996/18/contents', field: 'employment', kind: 'statute' },
   { url: 'https://www.legislation.gov.uk/ukpga/2010/15/contents', field: 'employment', kind: 'statute' },

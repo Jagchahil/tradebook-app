@@ -91,7 +91,18 @@ export async function GET(req: NextRequest) {
     ? Math.max(1, Math.floor((Date.now() - earliest) / 86_400_000) + 1)
     : 1;
 
+  // RECENT LEARNINGS, in plain words. The constellation shows the SHAPE of the brain; this shows the
+  // CONTENT — the actual things Khoji distilled and a human kept, newest first, with the source it rests
+  // on. Dismissed items are noise a human already cleared, so they are not "learnings"; only what was
+  // kept (reviewed) or is a live verbatim anchor counts. This is the "so this is actually working" view.
+  const recentLearnings = [...brain.items]
+    .filter((i) => { const s = (i.status || '').toLowerCase(); return s === 'reviewed' || s === 'verbatim'; })
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    .slice(0, 15)
+    .map((i) => ({ title: i.title, sourceUrl: i.source_url, status: i.status, at: i.created_at }));
+
   return NextResponse.json({
+    recentLearnings,
     vitals: v,
     coverage: coverage(v),
 

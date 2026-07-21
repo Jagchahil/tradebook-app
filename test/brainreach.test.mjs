@@ -95,5 +95,16 @@ ok('the VAT registration threshold is one of those built-in figures',
 ok('the WhatsApp accountant is told never to send a customer off to look up a figure it already holds',
   claude.toLowerCase().includes('you never tell them to look it up'));
 
+
+// --- THE WALKTHROUGH MUST NOT TRAP, NOR HIJACK A QUESTION ---------------------------------------
+// 21 Jul flood: "when is my tax return due?" started a 7-step guide instead of answering, and once
+// inside, every following question was swallowed with "Reply NEXT or STOP" until the user found STOP.
+ok('a deadline question never starts the tax-return walkthrough',
+  wa.includes('if (!inFlow && isDeadlineQuestion(body)) return false;'));
+ok('the old "Reply NEXT ... or STOP" trap message is gone from the walk step',
+  !wa.includes('Reply NEXT for the next step, or STOP to finish.'));
+ok('at the trade prompt, a question steps out rather than being filed as the trade',
+  wa.includes('if (!TAXGUIDE_SKIP.test(body) && (isDeadlineQuestion(body) || isQuestion(body))) {'));
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

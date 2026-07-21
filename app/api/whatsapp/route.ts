@@ -2479,6 +2479,13 @@ async function handleTaxGuideFlow(from: string, body: string): Promise<boolean> 
 
   if (!inFlow && !isTrigger) return false;
 
+  // 🔴 A QUESTION IS NOT A REQUEST TO BE WALKED THROUGH. "When is my tax return due?" mentions
+  // "tax return", so the trigger fires, but the person wants an ANSWER, not a seven step guide. If
+  // we are not already in the flow and this is a deadline question, do not start the walkthrough:
+  // return false so the deadline handler downstream answers it. (Live on 21 Jul a deadline question
+  // started the guide, whose state then swallowed every following question until the user found STOP.)
+  if (!inFlow && isDeadlineQuestion(body)) return false;
+
   // Finish on request.
   if (inFlow && TAXGUIDE_STOP.test(body)) {
     await clearSession(from);
@@ -2504,6 +2511,12 @@ async function handleTaxGuideFlow(from: string, body: string): Promise<boolean> 
 
   // Waiting for their trade.
   if (session?.step === 'await_trade') {
+    // If they asked a question instead of naming a trade, they have changed their mind. Step out and
+    // let it be answered, rather than filing "when is my return due?" as their trade.
+    if (!TAXGUIDE_SKIP.test(body) && (isDeadlineQuestion(body) || isQuestion(body))) {
+      await clearSession(from);
+      return false;
+    }
     const trade = TAXGUIDE_SKIP.test(body) ? null : matchTrade(body);
     await setSession(from, 'taxguide', 'walk', { idx: 0, trade });
     await sendText(from, trade ? `Great, ${trade.name}. Here we go.` : 'No problem, here we go.');
@@ -2514,8 +2527,11 @@ async function handleTaxGuideFlow(from: string, body: string): Promise<boolean> 
   // Walking through the cards.
   if (session?.step === 'walk') {
     if (!TAXGUIDE_NEXT.test(body)) {
-      await sendText(from, 'Reply NEXT for the next step, or STOP to finish.');
-      return true;
+      // 🔴 NEVER TRAP THEM. If they did not say NEXT, they have moved on to a real question. Step out
+      // of the walkthrough and let the message route normally, instead of swallowing every question
+      // with "Reply NEXT or STOP" until they stumble on the word STOP. (STOP is handled above.)
+      await clearSession(from);
+      return false;
     }
     const nextIdx = (data.idx ?? 0) + 1;
     const last = totalCards() - 1;

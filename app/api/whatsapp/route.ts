@@ -20,7 +20,8 @@ import {
 } from '../../../lib/claude';
 import { checkExpense, VERDICT_ICON, TAX_TIPS } from '../../../lib/taxrules';
 import { ledger, headline } from '../../../lib/ledger';
-import { transcribeAudio, hasTranscribeConfig } from '../../../lib/transcribe';
+import { createVoiceJob } from '../../../lib/voicejobs';
+import { confirmationLine } from '../../../lib/voiceflow';
 import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/email';
 import { hasBankFeedConfig } from '../../../lib/bankfeed';
 import { findDuplicate } from '../../../lib/dedupe';
@@ -814,6 +815,11 @@ async function bankNudgeAfterReceipt(from: string, userId: string): Promise<stri
   }
 }
 
+// A voice note cannot be transcribed by Claude, and we will not ship a customer's audio to a third party.
+// So we PARK it: download the audio, drop it in the voice_jobs queue, and tell the customer we are on it.
+// The Mac mini claims the note, transcribes it LOCALLY with Whisper, and posts the words back to
+// /api/voice/complete, which logs the entry and confirms. The audio never leaves our own hardware, and is
+// wiped the instant it is transcribed.
 async function handleVoiceNote(from: string, messageId: string, mediaId: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
@@ -821,7 +827,8 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
     return;
   }
 
-  if (!hasTranscribeConfig() || !hasClaudeConfig()) {
+  // Parsing the spoken amount still needs Claude; if that is off, voice cannot work, so say so plainly.
+  if (!hasClaudeConfig()) {
     await sendText(from, 'Voice notes are not switched on yet. Send a photo of the receipt for now.');
     return;
   }
@@ -837,23 +844,20 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
     await sendBudgetRefusal(from, refused);
     return;
   }
-  const transcript = await transcribeAudio(media.base64, media.mediaType);
-  if (!transcript) {
-    await sendText(from, 'I could not make out that voice note. Try saying it again, nice and clear.');
+
+  const jobId = await createVoiceJob({
+    userId,
+    fromPhone: from,
+    messageId,
+    audioBase64: media.base64,
+    mimeType: media.mediaType,
+  });
+  if (!jobId) {
+    await sendText(from, 'I could not take that voice note just now. Try again, or send a photo of the receipt.');
     return;
   }
 
-  const parsed = await parseSpokenTransaction(transcript);
-  if (!parsed || parsed.amount <= 0) {
-    await sendText(
-      from,
-      'I heard you, but I could not catch the amount. Try again, for example "forty quid of diesel at the BP".',
-    );
-    return;
-  }
-
-  await saveEntry(userId, messageId, parsed, 'whatsapp_voice', transcript);
-  await sendText(from, confirmationLine(parsed));
+  await sendText(from, 'Got your voice note — writing it up now, one sec.');
 }
 
 // The deterministic money-entry parser now lives in lib/waintents.ts with unit
@@ -1818,27 +1822,8 @@ async function handleStudentLoanPlanSet(from: string, text: string): Promise<voi
   );
 }
 
-function confirmationLine(parsed: {
-  merchant_name: string;
-  amount: number;
-  category: string;
-  direction: 'income' | 'expense';
-}): string {
-  const amountText = `£${Math.abs(parsed.amount).toFixed(2)}`;
-  if (parsed.direction === 'income') {
-    const payer = (parsed.merchant_name ?? '').trim();
-    const namedPayer = payer.length > 1 && !/^(a\s+)?(customer|client|someone|cash|payment|them|they)$/i.test(payer);
-    const offer = namedPayer ? ` Want it as an invoice for ${payer}? Reply "invoice this".` : '';
-    return `Got it. Income of ${amountText} from ${parsed.merchant_name}. Check it in the app and confirm.${offer}`;
-  }
-  // We could not confidently place it (Tesco, Amazon, a bare name all land here). A trade's spend at
-  // these is as often the weekly shop as a job cost, so we do NOT quietly file it as a business "other"
-  // and invite a tick. We ASK. Nothing counts until he confirms, so leaving it is the safe default.
-  if (parsed.category === 'other') {
-    return `Got it. ${parsed.merchant_name} for ${amountText}. Was this a business cost? If so, open the app and set what it was for, materials, fuel and the like. If it was personal, just leave it, nothing counts until you confirm it.`;
-  }
-  return `Got it. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. Check it in the app and confirm.`;
-}
+// confirmationLine now lives in lib/voiceflow.ts (shared with the voice-complete endpoint) and is imported
+// at the top of this file, so a spoken note and a typed note confirm in exactly the same words.
 
 // --- Mileage ---------------------------------------------------------------
 // Text "log 24 miles" or "drove 24 miles to the job" and we log the claim at

@@ -190,8 +190,13 @@ ok('🔴 WE DID NOT BUILD A REDACTOR, AND THAT WAS THE POINT',
 ok('🔴 THE FALSE SENTENCE IS GONE',
   !/do not store the content of your WhatsApp messages with any third party/i.test(privacyCode));
 
-ok('...and it names BOTH AI providers, because both of them see his messages',
-  /Anthropic/.test(privacyCode) && /OpenAI/.test(privacyCode));
+ok('...and it names Anthropic, the AI provider that sees his messages',
+  /Anthropic/.test(privacyCode));
+
+// Voice is now transcribed in-house on our own hardware, not by OpenAI. The policy must say so and must
+// NOT name a third-party transcriber, because the audio never leaves our systems.
+ok('...and it is honest that voice notes are transcribed in-house, with no third party',
+  /never leave our systems/i.test(privacyCode) && !/OpenAI/.test(privacyCode));
 
 ok('...and it says plainly that we do not keep the text of his voice notes',
   /do not keep the text of your voice notes/i.test(privacyCode));

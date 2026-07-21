@@ -115,14 +115,20 @@ export default function PrivacyPage() {
 
         <h2 style={heading}>Reading your receipts and voice notes (AI)</h2>
         <p style={para}>
-          Lekhio uses AI to read a photo of a receipt and to understand what you tell it. Two
-          providers do that work for us, under contract, on our instructions and nobody else&apos;s:
+          Lekhio uses AI to read a photo of a receipt and to understand what you tell it. One
+          provider does that work for us, under contract, on our instructions and nobody
+          else&apos;s &mdash; and your voice notes we transcribe ourselves:
         </p>
         <p style={para}>
           <strong>Anthropic</strong> reads receipt photos and messages, and works out what you are
-          asking. <strong>OpenAI</strong> turns a voice note into text, because that is the one
-          thing our main AI provider cannot do. Both are processors: they may not use your data for
-          their own purposes and they do not train their models on it.
+          asking. It is a processor: it may not use your data for its own purposes and does not
+          train its models on it.
+        </p>
+        <p style={para}>
+          <strong>Your voice notes never leave our systems.</strong> Turning speech into text is
+          the one thing our AI provider cannot do, so instead of handing your audio to another
+          company, we run the transcription on our own hardware. No third party ever hears your
+          voice note, and the audio is deleted the moment it has been read.
         </p>
         <p style={para}>
           <strong>We do not keep the text of your voice notes.</strong> A voice note is transcribed,

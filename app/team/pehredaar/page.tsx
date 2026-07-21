@@ -109,12 +109,28 @@ export default function PehredaarPage() {
   }
 
   async function copyPrompt(key: string, text: string) {
+    let ok = false;
     try {
       await navigator.clipboard.writeText(text);
+      ok = true;
+    } catch {
+      // clipboard API can reject (focus/permission) — fall back to selecting the box and execCommand.
+      try {
+        const el = document.getElementById(`kb-prompt-${key}`) as HTMLTextAreaElement | null;
+        if (el) {
+          el.focus();
+          el.select();
+          ok = document.execCommand('copy');
+          el.setSelectionRange(0, 0);
+          el.blur();
+        }
+      } catch {
+        /* leave ok false; the box is still selectable by hand */
+      }
+    }
+    if (ok) {
       setCopied(key);
       setTimeout(() => setCopied((c) => (c === key ? null : c)), 2000);
-    } catch {
-      /* clipboard blocked — the prompt box is selectable as a fallback */
     }
   }
 
@@ -219,6 +235,7 @@ export default function PehredaarPage() {
                     Copy this to Claude to get it fixed
                   </div>
                   <textarea
+                    id={`kb-prompt-${def.key}`}
                     readOnly
                     value={prompt}
                     onFocus={(e) => e.currentTarget.select()}

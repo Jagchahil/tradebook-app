@@ -3,8 +3,65 @@ import { verifyAccessToken, readTeamMember } from '../../../../lib/supabase';
 import { isTeam } from '../../../../lib/team';
 import { readTeamTodos, setTodoDone, type TodoItemDTO } from '../../../../lib/todos';
 import { readTickets } from '../../../../lib/support';
+import { readHeartbeats } from '../../../../lib/bridge';
 
 export const runtime = 'nodejs';
+
+function cap(s: string): string {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+interface SurfaceRow { key?: string; label?: string; status?: string; note?: string }
+
+// SECURITY GOES TO THE TOP, STRAIGHT AWAY. Any live worker reporting a warning — either a whole-worker
+// warn/alert, or (for Pehredaar) a single watched surface in warn/alert — becomes a hi-priority item at
+// the very top of the CEO list, above everything else. These rows are SYNTHETIC (id prefixed
+// "security:"), never team_todos: they appear the instant a bot flags something and clear themselves the
+// moment the next sweep reads clean. A stale (resting) worker is not an alarm, so it is skipped.
+async function openSecurityTodos(): Promise<TodoItemDTO[]> {
+  try {
+    const beats = await readHeartbeats();
+    if (!beats) return [];
+    const out: TodoItemDTO[] = [];
+    for (const b of beats) {
+      if (b.stale) continue;
+      const surfaces = Array.isArray((b.detail as { surfaces?: SurfaceRow[] })?.surfaces)
+        ? ((b.detail as { surfaces?: SurfaceRow[] }).surfaces as SurfaceRow[])
+        : [];
+      const flagged = surfaces.filter((s) => s?.status === 'warn' || s?.status === 'alert');
+      if (flagged.length) {
+        for (const s of flagged) {
+          const label = String(s.label ?? s.key ?? 'A surface');
+          const note = String(s.note ?? '').slice(0, 220);
+          out.push({
+            id: `security:${b.workerKey}:${s.key ?? label}`,
+            kind: 'needs',
+            buddyKey: b.workerKey,
+            text: note ? `${label} needs a look — ${note}` : `${label} needs a look.`,
+            from: `${cap(b.workerKey)} · security watch`,
+            where: cap(b.workerKey),
+            prio: 'hi',
+            done: false,
+          });
+        }
+      } else if (b.status === 'warn' || b.status === 'alert') {
+        out.push({
+          id: `security:${b.workerKey}`,
+          kind: 'needs',
+          buddyKey: b.workerKey,
+          text: b.headline || `${cap(b.workerKey)} flagged something — open the desk.`,
+          from: `${cap(b.workerKey)} · security watch`,
+          where: cap(b.workerKey),
+          prio: 'hi',
+          done: false,
+        });
+      }
+    }
+    return out;
+  } catch {
+    return []; // best-effort; a bridge hiccup must never break the CEO list
+  }
+}
 
 // THE CEO TO-DO LIST the console reads. Same gate as the rest of the console: a row in team_members,
 // read fresh on THIS request. GET returns the list; POST marks one done or reopens it (any team
@@ -51,10 +108,18 @@ export async function GET(req: NextRequest) {
   const member = await readTeamMember(user.email);
   if (!isTeam(member)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
 
-  const [todos, support] = await Promise.all([readTeamTodos(), openSupportTodos()]);
+  const [todos, support, security] = await Promise.all([
+    readTeamTodos(),
+    openSupportTodos(),
+    openSecurityTodos(),
+  ]);
   if (todos === null) return NextResponse.json({ error: 'unreadable' }, { status: 503 });
-  // Support items first: a person waiting on a human is the most time-sensitive thing on the list.
-  return NextResponse.json({ todos: [...support, ...todos] });
+  // Done team_todos drop off the list entirely (the row stays in the DB, so it is reversible — reopen by
+  // ticking again). A completed task is not clutter Jag should keep scanning past.
+  const open = todos.filter((t) => !t.done);
+  // Order of urgency: a security warning first (straight to the top), then a customer waiting on a human,
+  // then the prepared day's list.
+  return NextResponse.json({ todos: [...security, ...support, ...open] });
 }
 
 interface Body { id?: string; done?: boolean; }
@@ -76,10 +141,12 @@ export async function POST(req: NextRequest) {
   }
   if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-  // Support items are live pointers to open tickets — resolved by answering or dismissing in the
-  // Support desk, not by ticking here. Accept the tap so the UI stays smooth, but change nothing; the
-  // item clears itself on the next poll once the ticket is actually handled.
-  if (body.id.startsWith('support:')) return NextResponse.json({ ok: true });
+  // Support and security items are live pointers, not team_todos — a support item is resolved by
+  // answering in the Support desk, a security item by fixing the cause and re-running the sweep. Accept
+  // the tap so the UI stays smooth, but change nothing; each clears itself on the next poll once handled.
+  if (body.id.startsWith('support:') || body.id.startsWith('security:')) {
+    return NextResponse.json({ ok: true });
+  }
 
   const ok = await setTodoDone(body.id, body.done === true);
   return NextResponse.json({ ok });

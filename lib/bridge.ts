@@ -144,3 +144,47 @@ export async function appendActivity(items: ActivityInput[]): Promise<boolean> {
     return true;
   } catch { return false; }
 }
+
+// --- RE-RUN REQUESTS -----------------------------------------------------------------------------
+// The reusable half of the "warning -> prompt + retry" pattern. When Jag hits Retry under a bot's
+// warning, we record ONE pending request per worker (upsert on worker_key). The worker claims it at the
+// top of its next run and clears it, so a fix can be re-checked off-schedule without waiting for the
+// bot's normal working hours. No customer data — just "please look again", plus who asked.
+export interface RerunRow { worker_key: string; requested_at: string; requested_by: string | null }
+
+export async function requestRerun(workerKey: string, requestedBy: string | null): Promise<boolean> {
+  try {
+    const row = { worker_key: workerKey, requested_at: new Date().toISOString(), requested_by: requestedBy ?? null };
+    const res = await fetch(`${base()}/rest/v1/worker_reruns`, {
+      method: 'POST',
+      headers: h({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify(row),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+// Read + clear the pending request for one worker (the mini bot calls this at the top of a run).
+// Delete-then-report so the same request is never claimed twice. Returns true when one was pending.
+export async function claimRerun(workerKey: string): Promise<boolean> {
+  try {
+    const key = encodeURIComponent(workerKey);
+    const res = await fetch(`${base()}/rest/v1/worker_reruns?worker_key=eq.${key}`, {
+      method: 'DELETE',
+      headers: h({ Prefer: 'return=representation' }),
+    });
+    if (!res.ok) return false;
+    const rows = (await res.json()) as RerunRow[];
+    return Array.isArray(rows) && rows.length > 0;
+  } catch { return false; }
+}
+
+// Which workers currently have a rerun pending — so the console can show "re-check queued".
+export async function readPendingReruns(): Promise<string[]> {
+  try {
+    const res = await fetch(`${base()}/rest/v1/worker_reruns?select=worker_key`, { headers: h() });
+    if (!res.ok) return [];
+    const rows = (await res.json()) as Array<{ worker_key: string }>;
+    return rows.map((r) => r.worker_key);
+  } catch { return []; }
+}

@@ -4,6 +4,8 @@ import {
   readTeamCustomers,
   listCronRuns,
   readKnowledgeState,
+  readStudioIdeas,
+  readStudioAssets,
 } from '../../../../../lib/supabase';
 import { overview } from '../../../../../lib/team';
 import { funnel } from '../../../../../lib/metrics';
@@ -103,12 +105,33 @@ export async function GET(req: NextRequest) {
     detail: { cronsOk, cronAlarms: cAlarms.length, knowledge: kStatus },
   };
 
-  // Beat all three. Best-effort — a failed beat just means a stale card until the next pass.
+  // --- Hoka · marketing -------------------------------------------------------------------------
+  // The make loop, read off the studio backend the retired studio left behind. His headline is the state
+  // of the workshop: ideas banked, drafts waiting on Jag, and pieces live. Best-effort — if the studio is
+  // unreadable he simply reports "warming up" rather than a false empty.
+  const [ideas, assets] = await Promise.all([readStudioIdeas(), readStudioAssets()]);
+  let hoka;
+  if (ideas === null || assets === null) {
+    hoka = { status: 'ok' as WorkerStatus, headline: 'Studio warming up.', detail: {} };
+  } else {
+    const openIdeas = ideas.filter((i) => i.status === 'open').length;
+    const awaiting = assets.filter((a) => a.state === 'awaiting_approval').length;
+    const live = assets.filter((a) => a.state === 'live' || a.state === 'measured').length;
+    hoka = {
+      status: (awaiting > 0 ? 'warn' : 'ok') as WorkerStatus,
+      headline:
+        `${openIdeas} idea${openIdeas === 1 ? '' : 's'} banked · ${awaiting} awaiting your approval · ${live} live.`,
+      detail: { openIdeas, awaiting, live },
+    };
+  }
+
+  // Beat them all. Best-effort — a failed beat just means a stale card until the next pass.
   await Promise.all([
     upsertHeartbeat({ worker_key: 'khazanchi', status: khazanchi.status, headline: khazanchi.headline, detail: khazanchi.detail }),
     upsertHeartbeat({ worker_key: 'saudagar', status: saudagar.status, headline: saudagar.headline, detail: saudagar.detail }),
     upsertHeartbeat({ worker_key: 'mistri', status: mistri.status, headline: mistri.headline, detail: mistri.detail }),
+    upsertHeartbeat({ worker_key: 'hoka', status: hoka.status, headline: hoka.headline, detail: hoka.detail }),
   ]);
 
-  return NextResponse.json({ ok: true, khazanchi, saudagar, mistri });
+  return NextResponse.json({ ok: true, khazanchi, saudagar, mistri, hoka });
 }

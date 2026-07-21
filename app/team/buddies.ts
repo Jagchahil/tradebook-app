@@ -32,7 +32,7 @@ export const BUDDIES: BuddyDef[] = [
   { key: 'pehredaar', name: 'Pehredaar', role: 'Security · 24/7',   g1: '#3B4A5A', g2: '#5C7186', status: 'live',   statusWord: 'on watch',    emblem: 'shield',    href: '/team/pehredaar', reportsToList: 'needs' },
   { key: 'kanjoos',   name: 'Kanjoos',   role: 'Cost · AI spend',   g1: '#C6871A', g2: '#E8B34C', status: 'live',   statusWord: 'counting',    emblem: 'coin',      href: '/team/kanjoos',   reportsToList: 'approve' },
   { key: 'dakiya',    name: 'Dakiya',    role: 'Front Desk · Email',g1: '#2C7A7B', g2: '#48A9AA', status: 'live',   statusWord: 'at the desk',  emblem: 'people',    href: '/team/dakiya',    reportsToList: 'approve' },
-  { key: 'hoka',      name: 'Hoka',      role: 'CMO · Marketing',   g1: '#E8973A', g2: '#F6B95C', status: 'asleep', statusWord: 'napping',     emblem: 'megaphone', href: '/team',    reportsToList: 'needs' },
+  { key: 'hoka',      name: 'Hoka',      role: 'CMO · Marketing',   g1: '#E8973A', g2: '#F6B95C', status: 'live',   statusWord: 'drafting',    emblem: 'megaphone', href: '/team/hoka',      reportsToList: 'needs' },
   { key: 'khazanchi', name: 'Khazanchi', role: 'CFO · Finance',     g1: '#0E7C86', g2: '#1AA5B0', status: 'live',   statusWord: 'on the numbers',emblem: 'coin',     href: '/team/numbers',   reportsToList: 'none' },
   { key: 'saudagar',  name: 'Saudagar',  role: 'CRO · Revenue',     g1: '#7E5AC2', g2: '#9E7BE0', status: 'live',   statusWord: 'on growth',   emblem: 'tag',       href: '/team/customers', reportsToList: 'none' },
 ];

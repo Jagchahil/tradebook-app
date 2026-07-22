@@ -96,5 +96,38 @@ console.log('\n=== sourceShare: honest percentages ===\n');
   ok('an empty database is 0% everywhere, never NaN', empty.every((s) => s.pct === 0));
 }
 
+console.log('\n=== normaliseLeafletCode ===\n');
+{
+  ok('cleans and uppercases a code', G.normaliseLeafletCode(' cam-01 ') === 'CAM01');
+  ok('rejects too short', G.normaliseLeafletCode('ab') === null);
+  ok('rejects empty', G.normaliseLeafletCode('') === null && G.normaliseLeafletCode(null) === null);
+  ok('keeps a good code', G.normaliseLeafletCode('LEEDS-NORTH-7') === 'LEEDSNORTH7');
+}
+
+console.log('\n=== buildInPersonLead ===\n');
+{
+  const base = { businessName: 'Ace Plumbing', contactName: 'Ravi', email: 'RAVI@ace.co', whatsapp: '+447700900123', notes: 'keen', leaflet: 'CAM-01', emailConsent: true, waConsent: true, signedUp: false, repEmail: 'jag@lekhio.app' };
+  const r = G.buildInPersonLead(base, '2026-07-22T10:00:00Z');
+  ok('valid capture', r.ok === true && !!r.capture);
+  ok('email is lowercased', r.capture.email === 'ravi@ace.co');
+  ok('source is in_person', r.capture.source === 'in_person');
+  ok('leaflet code drives the entry point', r.capture.entryPoint === 'leaflet:CAM01');
+  ok('source tag carries the leaflet code', r.capture.sourceTag === 'CAM01');
+  ok('name prefers the contact', r.capture.name === 'Ravi');
+  ok('business name is kept in meta', r.capture.meta.business_name === 'Ace Plumbing');
+  ok('consent line is auditable', r.capture.consentText.includes('email and WhatsApp') && r.capture.consentText.includes('jag@lekhio.app') && r.capture.consentText.includes('2026-07-22'));
+  ok('email consent enrols them', r.enroll === true);
+}
+{
+  const r = G.buildInPersonLead({ businessName: 'X', contactName: '', email: 'nope', whatsapp: '', notes: '', leaflet: '', emailConsent: true, waConsent: false, signedUp: false, repEmail: 'r@lekhio.app' }, '2026-07-22T10:00:00Z');
+  ok('a bad email is refused, not stored', r.ok === false && !r.capture);
+}
+{
+  const r = G.buildInPersonLead({ businessName: 'Y Ltd', contactName: 'Sam', email: 's@y.co', whatsapp: '', notes: 'no email ok', leaflet: '', emailConsent: false, waConsent: false, signedUp: true, repEmail: 'r@lekhio.app' }, '2026-07-22T10:00:00Z');
+  ok('no consent means no enrolment', r.enroll === false && r.capture.consent === false && r.capture.consentText === null);
+  ok('no leaflet falls back to door_b2b', r.capture.entryPoint === 'door_b2b' && r.capture.sourceTag === 'in_person_door');
+  ok('signed-up note is recorded', r.capture.resultNote.includes('started the app'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exit(fail ? 1 : 0);

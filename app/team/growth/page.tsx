@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import TeamShell from '../TeamShell';
 import { browserSupabase } from '../../../lib/supabasebrowser';
-import { C, T, S as U, gbp, shortDate } from '../ui';
+import { C, T, S as U, FONT, gbp, shortDate } from '../ui';
 import { sourceLabel } from '../../../lib/team';
 import type { TeamOverview, AcquisitionSource } from '../../../lib/team';
 import {
@@ -21,6 +21,7 @@ import {
 interface Platform { platform: string; configured: boolean; connected: boolean; }
 interface StudioAsset { id: string; title: string; format: string; state: string; scheduled_for: string | null; platforms: string[]; }
 interface CalPost { asset_id: string; title: string; format: string; scheduled_for: string | null; platforms: string[]; }
+interface RecentLead { email: string; name: string | null; business: string | null; stage: string; created_at: string | null; }
 
 export default function GrowthPage() {
   return (
@@ -38,6 +39,8 @@ function GrowthInner() {
   const [assets, setAssets] = useState<StudioAsset[] | null>(null);
   const [ideas, setIdeas] = useState<number>(0);
   const [calendar, setCalendar] = useState<CalPost[]>([]);
+  const [crm, setCrm] = useState<{ pipeline: Record<string, number> | null; recent: RecentLead[] | null }>({ pipeline: null, recent: null });
+  const [reloadKey, setReloadKey] = useState(0);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,6 +61,16 @@ function GrowthInner() {
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      const { data: s } = await browserSupabase.auth.getSession();
+      const tok = s.session?.access_token;
+      if (!tok) return;
+      const r = await fetch('/api/team/growth', { headers: { Authorization: `Bearer ${tok}` } });
+      if (r.ok) { const j = await r.json(); setCrm({ pipeline: j.pipeline ?? null, recent: j.recent ?? null }); }
+    })();
+  }, [reloadKey]);
+
   const o = overview;
   const assetStates = useMemo(() => (assets ?? []).map((a) => a.state), [assets]);
 
@@ -73,7 +86,8 @@ function GrowthInner() {
     });
   }, [o, platforms, isOwner, enabled, assetStates, calendar.length]);
 
-  const pipe = o ? pipelineFrom(o) : null;
+  const cp = crm.pipeline;
+  const pipe = o ? pipelineFrom(o, cp ? { lead: cp.lead ?? null, warming: cp.warming ?? null, checkout: cp.checkout ?? null } : undefined) : null;
   const mix = o ? sourceShare(o.bySource) : [];
 
   const bucket = (states: string[]) => (assets ?? []).filter((a) => states.includes(a.state)).length;
@@ -148,6 +162,38 @@ function GrowthInner() {
           <Col stage="Trial" tone={C.river} count={pipe?.trial ?? null} />
           <Col stage="Paid" tone={C.green} count={pipe?.paid ?? null} highlight />
         </div>
+      </section>
+
+      {/* IN-PERSON CAPTURE — door to door B2B */}
+      <section style={U.section}>
+        <div style={U.sectionHead}>
+          <h2 style={T.h2}>Add a lead (in person)</h2>
+          <span style={U.sectionNote}>door to door &middot; B2B &middot; consent taken at the door</span>
+        </div>
+        <AddLeadForm onAdded={() => setReloadKey((k) => k + 1)} />
+        {crm.recent && crm.recent.length > 0 ? (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ ...T.label, marginBottom: 8 }}>Recently added</div>
+            <div style={{ ...U.panel, padding: 0, overflowX: 'auto' }}>
+              <table style={U.table}>
+                <thead><tr>
+                  <th style={{ ...U.th, paddingLeft: 18 }}>Business</th><th style={U.th}>Contact</th>
+                  <th style={U.th}>Stage</th><th style={{ ...U.th, paddingRight: 18 }}>Added</th>
+                </tr></thead>
+                <tbody>
+                  {crm.recent.map((r) => (
+                    <tr key={r.email}>
+                      <td style={{ ...U.td, paddingLeft: 18, fontWeight: 650 }}>{r.business || <span style={{ color: C.faint, fontWeight: 400 }}>&mdash;</span>}</td>
+                      <td style={{ ...U.td, color: C.muted }}>{r.name || '—'}</td>
+                      <td style={U.td}><span style={{ fontSize: 12, fontWeight: 750, color: C.river }}>{r.stage}</span></td>
+                      <td style={{ ...U.td, paddingRight: 18, color: C.muted }}>{shortDate(r.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {/* CONNECTED CHANNELS */}
@@ -286,6 +332,75 @@ function Stat({ label, n, tone }: { label: string; n: number; tone?: string }) {
     </div>
   );
 }
+
+function AddLeadForm({ onAdded }: { onAdded: () => void }) {
+  const [f, setF] = useState({ businessName: '', contactName: '', email: '', whatsapp: '', leaflet: '', notes: '', emailConsent: true, waConsent: false, signedUp: false });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const set = (k: string, v: string | boolean) => setF((p) => ({ ...p, [k]: v }));
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setMsg(null);
+    const { data: s } = await browserSupabase.auth.getSession();
+    const tok = s.session?.access_token;
+    const res = await fetch('/api/team/growth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+      body: JSON.stringify(f),
+    });
+    setBusy(false);
+    if (res.ok) {
+      const j = await res.json();
+      setMsg({ ok: true, text: j.enrolled ? 'Added and enrolled in the nurture flow.' : 'Added to the CRM.' });
+      // Keep the leaflet code between entries — a rep works one batch at a time.
+      setF((p) => ({ businessName: '', contactName: '', email: '', whatsapp: '', leaflet: p.leaflet, notes: '', emailConsent: true, waConsent: false, signedUp: false }));
+      onAdded();
+    } else {
+      const j = await res.json().catch(() => ({} as { error?: string }));
+      setMsg({ ok: false, text: (j as { error?: string }).error || 'Could not add that lead.' });
+    }
+  }
+
+  return (
+    <form onSubmit={submit} style={{ ...U.panel }}>
+      <div style={formGrid}>
+        <Field label="Business name"><input aria-label="Business name" style={fieldStyle} value={f.businessName} onChange={(e) => set('businessName', e.target.value)} placeholder="Ace Plumbing" /></Field>
+        <Field label="Contact name"><input aria-label="Contact name" style={fieldStyle} value={f.contactName} onChange={(e) => set('contactName', e.target.value)} placeholder="Ravi" /></Field>
+        <Field label="Email (required)"><input aria-label="Email" style={fieldStyle} type="email" value={f.email} onChange={(e) => set('email', e.target.value)} placeholder="ravi@ace.co" /></Field>
+        <Field label="Phone / WhatsApp"><input aria-label="Phone or WhatsApp" style={fieldStyle} value={f.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} placeholder="+44 7700 900123" /></Field>
+        <Field label="Leaflet code"><input aria-label="Leaflet code" style={fieldStyle} value={f.leaflet} onChange={(e) => set('leaflet', e.target.value)} placeholder="CAM-01" /></Field>
+        <Field label="Notes"><input aria-label="Notes" style={fieldStyle} value={f.notes} onChange={(e) => set('notes', e.target.value)} placeholder="keen, van signage" /></Field>
+      </div>
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
+        <Check checked={f.emailConsent} onChange={(v) => set('emailConsent', v)}>Agreed to email</Check>
+        <Check checked={f.waConsent} onChange={(v) => set('waConsent', v)}>Agreed to WhatsApp</Check>
+        <Check checked={f.signedUp} onChange={(v) => set('signedUp', v)}>Started the app there</Check>
+        <button type="submit" disabled={busy} style={{ ...submitBtn, opacity: busy ? 0.6 : 1, marginLeft: 'auto' }}>{busy ? 'Adding…' : 'Add lead'}</button>
+      </div>
+      <p style={{ ...T.tiny, marginTop: 12 }}>
+        Consent is taken verbally at the door and recorded against the lead (who took it, when). Email consent enrols them straight into the flow — the verbal consent is the opt-in.
+      </p>
+      {msg ? <p style={{ marginTop: 10, fontSize: 13, fontWeight: 650, color: msg.ok ? C.green : C.red }}>{msg.text}</p> : null}
+    </form>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label style={{ display: 'block' }}><span style={{ ...T.label, display: 'block', marginBottom: 6 }}>{label}</span>{children}</label>;
+}
+function Check({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode }) {
+  return (
+    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: C.ink2, cursor: 'pointer' }}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.river }} />
+      {children}
+    </label>
+  );
+}
+
+const formGrid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 };
+const fieldStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', fontSize: 14, color: C.ink, border: `1.5px solid ${C.line}`, borderRadius: 10, background: C.panel, outline: 'none', fontFamily: FONT };
+const submitBtn: React.CSSProperties = { padding: '11px 22px', fontSize: 14, fontWeight: 700, color: '#fff', fontFamily: FONT, background: `linear-gradient(135deg, ${C.river}, ${C.riverDeep})`, border: 0, borderRadius: 10, cursor: 'pointer' };
 
 const linkStyle: React.CSSProperties = { color: C.river, fontWeight: 700, fontSize: 12.8, textDecoration: 'none' };
 

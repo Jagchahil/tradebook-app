@@ -848,6 +848,7 @@ export async function listMarketableLeads(confirmedOnly = false): Promise<string
 export interface CaptureContactInput {
   email: string;
   name?: string | null;
+  source?: string | null;         // acquisition source (marketing_leads.source): in_person | meta | organic | ...
   whatsapp?: string | null;
   consent: boolean;               // email marketing consent (the existing column)
   consentText?: string | null;
@@ -871,6 +872,7 @@ export async function captureContact(input: CaptureContactInput): Promise<boolea
   const wa = normaliseWhatsapp(input.whatsapp);
   const record: Record<string, unknown> = { email, consent: input.consent };
   if (input.name != null) record.name = input.name;
+  if (input.source != null) record.source = input.source;
   if (wa) { record.whatsapp = wa; if (input.waConsent) { record.wa_consent = true; record.wa_consent_at = new Date().toISOString(); } }
   if (input.consent) record.consent_at = new Date().toISOString();
   if (input.consentText != null) record.consent_text = input.consentText;
@@ -922,6 +924,49 @@ export async function setContactStage(email: string, next: ContactStage): Promis
       });
     }
     return resolved;
+  } catch { return null; }
+}
+
+// Count contacts by lifecycle stage, for the CRM pipeline board. A row with no stage set yet is a
+// lead (that is where captureContact leaves them). Returns null on a read failure so the desk can say
+// "could not read" rather than draw a confident, wrong zero. Bounded read: fine at today's volume, and
+// the place to add a server-side aggregate the day the leads table is large.
+export async function countContactsByStage(): Promise<Record<string, number> | null> {
+  const { url } = config();
+  try {
+    const res = await fetch(`${url}/rest/v1/marketing_leads?select=stage&limit=10000`, { headers: headers() });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ stage: string | null }>;
+    const out: Record<string, number> = { lead: 0, warming: 0, checkout: 0, trial: 0, paid: 0, dormant: 0 };
+    for (const r of rows) {
+      const st = r.stage && isContactStage(r.stage) ? r.stage : 'lead';
+      out[st] = (out[st] ?? 0) + 1;
+    }
+    return out;
+  } catch { return null; }
+}
+
+// The most recent in-person (door to door) leads, for the field-capture panel. CRM contact fields
+// ONLY (who they are, when, how far) — never a customer's receipts, income, tax or phone. These are
+// marketing contacts who gave consent to be contacted, which is a different thing from a customer's
+// private books; the financial allowlist in lib/team.ts still governs anything about a paying user.
+export interface RecentLead {
+  email: string; name: string | null; business: string | null; stage: string; created_at: string | null;
+}
+export async function listRecentInPersonLeads(limit = 12): Promise<RecentLead[] | null> {
+  const { url } = config();
+  const n = Math.min(50, Math.max(1, limit));
+  try {
+    const res = await fetch(`${url}/rest/v1/marketing_leads?source=eq.in_person&select=email,name,stage,created_at,meta&order=created_at.desc&limit=${n}`, { headers: headers() });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ email: string; name: string | null; stage: string | null; created_at: string | null; meta: Record<string, unknown> | null }>;
+    return rows.map((r) => ({
+      email: r.email,
+      name: r.name,
+      business: (r.meta && typeof r.meta.business_name === 'string') ? (r.meta.business_name as string) : null,
+      stage: r.stage && isContactStage(r.stage) ? r.stage : 'lead',
+      created_at: r.created_at,
+    }));
   } catch { return null; }
 }
 

@@ -172,3 +172,90 @@ export function sourceShare(bySource: Record<AcquisitionSource, number>): Array<
     .map(([source, count]) => ({ source, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 }))
     .sort((a, b) => b.count - a.count);
 }
+
+// --- in-person B2B capture (door to door) ------------------------------------------------------
+// The field rep's leads. Verbal consent is taken at the door and recorded here as an auditable line,
+// then the contact is enrolled into the same nurture flow as everyone else. A leaflet code ties the
+// lead to the exact leaflet handed over, so a later scan or form-fill on that code matches this record.
+
+// A leaflet / referral code: what is printed on one batch of leaflets (or one rep, one area). Kept to
+// a short, unambiguous, url-safe token so it reads on a QR and cannot collide with words. Returns null
+// for anything that is not a real code, so we never attribute a lead to junk.
+export function normaliseLeafletCode(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const s = String(raw).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return s.length >= 3 && s.length <= 16 ? s : null;
+}
+
+export interface InPersonLeadInput {
+  businessName: string;
+  contactName: string;
+  email: string;
+  whatsapp: string;
+  notes: string;
+  leaflet: string;        // the code printed on the leaflet handed over (optional)
+  emailConsent: boolean;  // rep confirms they agreed to email
+  waConsent: boolean;     // rep confirms they agreed to WhatsApp
+  signedUp: boolean;      // they started the app there and then
+  repEmail: string;       // who took it, for the consent record
+}
+
+// The capture payload, shaped for captureContact() plus the source column. Kept as a plain object so
+// the endpoint stays a thin wrapper and this decision is unit tested.
+export interface InPersonCapture {
+  email: string;
+  name: string | null;
+  whatsapp: string | null;
+  consent: boolean;
+  waConsent: boolean;
+  consentText: string | null;
+  source: string;
+  stream: string;
+  entryPoint: string;
+  sourceTag: string;
+  resultNote: string | null;
+  meta: Record<string, unknown>;
+}
+export interface InPersonLeadResult {
+  ok: boolean;
+  error?: string;
+  enroll: boolean;        // enter the email nurture flow now (email consent given)
+  capture?: InPersonCapture;
+}
+
+// Build the capture from what the rep typed. PURE: same input, same result, so the consent line we
+// store is exactly what the test says it is. Requires a real email (the leads table is keyed on it);
+// a phone-only capture is a schema change and a separate decision, not a silent placeholder.
+export function buildInPersonLead(i: InPersonLeadInput, nowIso: string): InPersonLeadResult {
+  const email = (i.email || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    return { ok: false, enroll: false, error: 'A real email is needed to add this lead.' };
+  }
+  const code = normaliseLeafletCode(i.leaflet);
+  const business = (i.businessName || '').trim();
+  const contact = (i.contactName || '').trim();
+  const channels = [i.emailConsent ? 'email' : null, i.waConsent ? 'WhatsApp' : null].filter(Boolean).join(' and ');
+  const consentText = channels
+    ? `In person, door to door. Verbal consent to ${channels} marketing, taken by ${i.repEmail || 'a rep'} on ${nowIso.slice(0, 10)}.`
+    : null;
+  const noteBits = [i.notes.trim(), i.signedUp ? '[started the app on the spot]' : ''].filter(Boolean);
+
+  return {
+    ok: true,
+    enroll: i.emailConsent,
+    capture: {
+      email,
+      name: contact || business || null,
+      whatsapp: i.whatsapp || null,
+      consent: i.emailConsent,
+      waConsent: i.waConsent,
+      consentText,
+      source: 'in_person',
+      stream: 'in_person',
+      entryPoint: code ? `leaflet:${code}` : 'door_b2b',
+      sourceTag: code || 'in_person_door',
+      resultNote: noteBits.length ? noteBits.join(' ') : null,
+      meta: { business_name: business || null, contact_name: contact || null, taken_by: i.repEmail || null, signed_up: i.signedUp, leaflet: code },
+    },
+  };
+}

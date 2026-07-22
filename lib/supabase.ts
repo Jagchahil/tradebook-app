@@ -851,6 +851,7 @@ export interface CaptureContactInput {
   whatsapp?: string | null;
   consent: boolean;               // email marketing consent (the existing column)
   consentText?: string | null;
+  resultNote?: string | null;
   waConsent?: boolean;            // separate WhatsApp consent, captured on the same form
   stream?: string | null;        // attribution: ad-barbers | organic | free-tool | ...
   entryPoint?: string | null;    // which tool / form / landing captured them
@@ -873,6 +874,7 @@ export async function captureContact(input: CaptureContactInput): Promise<boolea
   if (wa) { record.whatsapp = wa; if (input.waConsent) { record.wa_consent = true; record.wa_consent_at = new Date().toISOString(); } }
   if (input.consent) record.consent_at = new Date().toISOString();
   if (input.consentText != null) record.consent_text = input.consentText;
+  if (input.resultNote != null) record.result_note = input.resultNote;
   if (input.stream != null) record.stream = input.stream;
   if (input.entryPoint != null) record.entry_point = input.entryPoint;
   if (input.sourceTag != null) record.source_tag = input.sourceTag;

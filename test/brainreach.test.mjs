@@ -121,5 +121,14 @@ ok('the company figures (Corporation Tax, dividends) are spread into the WhatsAp
 ok('the WhatsApp money answer is told not to use em or en dashes',
   claude.includes('Never use an em dash or an en dash'));
 
+// 21 Jul, app-side live round-trip: the company/dividend answer LEAKED the model's own
+// self-correction into the customer reply ("8.75% is wrong, ignore that, let me redo that
+// clearly...") because the 2026/27 dividend rates rose 2pp and fight the rate the model learned
+// in training. The numbers were right; the working must never show. Both prompts now forbid it.
+ok('the app accountant prompt forbids showing working or self-correcting',
+  claude.includes('Do NOT show your working') && claude.includes('trust the figure above'));
+ok('the WhatsApp money answer also forbids showing working or self-correcting',
+  claude.includes('Do not show your working or correct yourself in the reply'));
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

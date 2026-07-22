@@ -28,6 +28,23 @@ So the two gates stay yours: approve the storyboard, and post the video.
   NEXT_PUBLIC_APP_URL=https://lekhio.app
   ```
 
+- **The master switch and the caps on Vercel.** Generation stays dark until you set, in the Vercel
+  project env:
+
+  ```
+  STUDIO_GEN_ENABLED=true
+  ```
+
+  While that is unset or not the literal `true`, the queue hands the worker nothing, so nothing is
+  generated and nothing is spent. Two optional caps ride on top, with safe defaults if unset:
+
+  ```
+  STUDIO_GEN_MAX_PER_BRIEF=8    most renders one queue pass hands out
+  STUDIO_GEN_MAX_PER_DAY=24     most renders in a UTC day, across every pass
+  ```
+
+  These are the standing spend ceiling. The worker cannot exceed them however often it wakes.
+
 ## Run it by hand first
 
 Make the wrapper executable, then run one pass:

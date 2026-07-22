@@ -4994,6 +4994,24 @@ export async function readAssetsPendingGeneration(): Promise<Asset[] | null> {
   } catch { return null; }
 }
 
+// How many videos were generated (a file attached) since the given ISO time. The generation queue
+// uses this to hold the day inside the standing spend cap, so total renders in a day cannot exceed
+// STUDIO_GEN_MAX_PER_DAY however many times the worker runs. Null means the count could not be read,
+// and the caller treats that as "assume the day is spent" and hands out nothing, failing safe.
+export async function countStudioAssetsGeneratedSince(iso: string): Promise<number | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_assets?file_url=not.is.null&updated_at=gte.${encodeURIComponent(iso)}&select=id`,
+      { method: 'HEAD', headers: headers({ Prefer: 'count=exact', Range: '0-0' }) },
+    );
+    if (!res.ok) return null;
+    const range = res.headers.get('content-range') || '';
+    const n = parseInt((range.split('/')[1] || ''), 10);
+    return Number.isFinite(n) ? n : null;
+  } catch { return null; }
+}
+
 // Attach a generated file to an approved asset. The `file_url=is.null` guard makes this a claim: if
 // two agent runs overlap, the first one to write wins and the second changes nothing, so a piece is
 // never generated twice or its file overwritten. Approval is NOT touched here: generating a video

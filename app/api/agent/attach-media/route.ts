@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { setStudioAssetMedia } from '../../../../lib/supabase';
+import { acceptRenderResult } from '../../../../lib/higgsfield';
 
 export const runtime = 'nodejs';
 
@@ -10,6 +11,12 @@ export const runtime = 'nodejs';
 // not already have one (the guard is in setStudioAssetMedia). It does NOT post, does NOT advance to
 // live, and does NOT spend. Generating the video and putting it in front of a customer are two
 // different acts, and the second one still needs a human.
+//
+// STEP 4: the incoming url passes acceptRenderResult first, the same validator the whole engine
+// shares. It refuses to store anything while the master switch STUDIO_GEN_ENABLED is off (reason
+// disabled), and it refuses a url that is not real https (reason bad_url). We pass configured true
+// on purpose: the Higgsfield key lives in the Mac mini's MCP config, not in Vercel env, so on the
+// server the only meaningful gates are the master switch and the url shape.
 export async function POST(req: NextRequest) {
   const secret = process.env.AGENT_SECRET;
   if (!secret) return NextResponse.json({ error: 'agent not configured' }, { status: 503 });
@@ -27,10 +34,14 @@ export async function POST(req: NextRequest) {
   const assetId = (body.asset_id || '').trim();
   const fileUrl = (body.file_url || '').trim();
   if (!assetId || !fileUrl) return NextResponse.json({ error: 'asset_id and file_url required' }, { status: 400 });
-  // Only accept a real hosted URL. We store a reference, never a blob, and never a local path.
-  if (!/^https:\/\//i.test(fileUrl)) return NextResponse.json({ error: 'file_url must be https' }, { status: 400 });
 
-  const asset = await setStudioAssetMedia(assetId, fileUrl);
+  const check = acceptRenderResult(fileUrl, { configured: true });
+  if (!check.ok || !check.file_url) {
+    const status = check.reason === 'bad_url' ? 400 : 200;
+    return NextResponse.json({ updated: false, reason: check.reason }, { status });
+  }
+
+  const asset = await setStudioAssetMedia(assetId, check.file_url);
   if (!asset) {
     // Either the asset does not exist, or it already had a file (the guard held). Both are safe: we
     // tell the agent nothing changed so it moves on rather than retrying forever.

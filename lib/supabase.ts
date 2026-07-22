@@ -24,6 +24,7 @@ import type {
   Idea, Asset, Approval, Metric, AssetState, Format, Promise3, Platform, Storyboard,
 } from './studio';
 import { refreshFacts, resolveOverrides, isOverridableKey, isInBounds, type FactOverride } from './facts';
+import { advanceStage, normaliseWhatsapp, isContactStage, isCheckoutStage, isEventKind, type ContactStage, type CheckoutStage, type EventKind } from './crm';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -836,6 +837,105 @@ export async function listMarketableLeads(confirmedOnly = false): Promise<string
   if (!res.ok) return [];
   const rows = (await res.json()) as Array<{ email: string }>;
   return rows.map((r) => r.email).filter(Boolean);
+}
+
+// --- CRM contacts (marketing_leads, extended) -------------------------------------------------
+// The contact model layered on marketing_leads: a lead captured from a free tool or an ad, with
+// consent, an attribution trail, a lifecycle stage, and a timeline (contact_events). captureContact
+// upserts on email and never nulls a field it was not given, so a later touch enriches, not wipes.
+// All server side, service role only.
+
+export interface CaptureContactInput {
+  email: string;
+  name?: string | null;
+  whatsapp?: string | null;
+  consent: boolean;               // email marketing consent (the existing column)
+  consentText?: string | null;
+  waConsent?: boolean;            // separate WhatsApp consent, captured on the same form
+  stream?: string | null;        // attribution: ad-barbers | organic | free-tool | ...
+  entryPoint?: string | null;    // which tool / form / landing captured them
+  sourceTag?: string | null;     // campaign / utm, mirrors Hoka's source_tag
+  meta?: Record<string, unknown> | null;
+  ip?: string | null;
+  userAgent?: string | null;
+}
+
+// Upsert a contact and log the capture on its timeline. Merges on email: only provided fields are
+// written, so re-capturing the same person enriches the record instead of clearing it. Returns false
+// on a bad email or a failed write.
+export async function captureContact(input: CaptureContactInput): Promise<boolean> {
+  const { url } = config();
+  const email = input.email.trim().toLowerCase();
+  if (!email || !email.includes('@')) return false;
+  const wa = normaliseWhatsapp(input.whatsapp);
+  const record: Record<string, unknown> = { email, consent: input.consent };
+  if (input.name != null) record.name = input.name;
+  if (wa) { record.whatsapp = wa; if (input.waConsent) { record.wa_consent = true; record.wa_consent_at = new Date().toISOString(); } }
+  if (input.consent) record.consent_at = new Date().toISOString();
+  if (input.consentText != null) record.consent_text = input.consentText;
+  if (input.stream != null) record.stream = input.stream;
+  if (input.entryPoint != null) record.entry_point = input.entryPoint;
+  if (input.sourceTag != null) record.source_tag = input.sourceTag;
+  if (input.meta != null) record.meta = input.meta;
+  if (input.ip != null) record.ip = input.ip;
+  if (input.userAgent != null) record.user_agent = input.userAgent;
+  const res = await fetch(`${url}/rest/v1/marketing_leads?on_conflict=email`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify(record),
+  });
+  if (!res.ok) return false;
+  await logContactEvent(email, 'form_submitted', { channel: 'web', detail: input.entryPoint ?? null, payload: { stream: input.stream ?? null } });
+  return true;
+}
+
+// Append one event to a contact's timeline. Best effort, never throws, silently ignores an unknown kind.
+export async function logContactEvent(email: string, kind: EventKind | string, opts?: { channel?: string | null; detail?: string | null; payload?: Record<string, unknown> | null }): Promise<void> {
+  if (!isEventKind(String(kind))) return;
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/contact_events`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ email: email.trim().toLowerCase(), kind, channel: opts?.channel ?? null, detail: opts?.detail ?? null, payload: opts?.payload ?? {} }),
+    });
+  } catch { /* best effort */ }
+}
+
+// Move a contact's lifecycle stage, FORWARD ONLY (advanceStage guards regressions). Reads the current
+// stage, computes the new one, writes only on a change. Returns the resulting stage, or null on error.
+export async function setContactStage(email: string, next: ContactStage): Promise<ContactStage | null> {
+  if (!isContactStage(next)) return null;
+  const { url } = config();
+  const key = email.trim().toLowerCase();
+  try {
+    const res = await fetch(`${url}/rest/v1/marketing_leads?email=eq.${encodeURIComponent(key)}&select=stage`, { headers: headers() });
+    const rows = res.ok ? ((await res.json()) as Array<{ stage: string }>) : [];
+    const current: ContactStage = rows[0]?.stage && isContactStage(rows[0].stage) ? (rows[0].stage as ContactStage) : 'lead';
+    const resolved = advanceStage(current, next);
+    if (resolved !== current) {
+      await fetch(`${url}/rest/v1/marketing_leads?email=eq.${encodeURIComponent(key)}`, {
+        method: 'PATCH', headers: headers({ Prefer: 'return=minimal' }),
+        body: JSON.stringify({ stage: resolved }),
+      });
+    }
+    return resolved;
+  } catch { return null; }
+}
+
+// Record how far a contact got in checkout, and flip them to the paid lifecycle stage when they pay.
+export async function setContactCheckout(email: string, checkout: CheckoutStage): Promise<void> {
+  if (!isCheckoutStage(checkout)) return;
+  const { url } = config();
+  const key = email.trim().toLowerCase();
+  try {
+    await fetch(`${url}/rest/v1/marketing_leads?email=eq.${encodeURIComponent(key)}`, {
+      method: 'PATCH', headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ checkout_stage: checkout }),
+    });
+    await logContactEvent(key, checkout === 'abandoned' ? 'checkout_abandoned' : checkout === 'paid' ? 'paid' : 'checkout_opened', { channel: 'web', detail: checkout });
+    if (checkout === 'paid') await setContactStage(key, 'paid');
+  } catch { /* best effort */ }
 }
 
 export interface OnboardSignup {

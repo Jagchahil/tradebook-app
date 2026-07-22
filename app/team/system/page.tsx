@@ -37,10 +37,15 @@ function ago(iso?: string | null): string {
   return `${Math.round(h / 24)}d ago`;
 }
 
+interface ConnRow { platform: string; configured: boolean; connected: boolean; connected_by: string | null; expires_at: string | null }
+
 export default function SystemPage() {
   const [mistri, setMistri] = useState<Beat | null>(null);
   const [pehredaar, setPehredaar] = useState<Beat | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [conns, setConns] = useState<ConnRow[]>([]);
+  const [connEnabled, setConnEnabled] = useState(false);
+  const [connOwner, setConnOwner] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -62,6 +67,30 @@ export default function SystemPage() {
     const id = setInterval(pull, 15000);
     return () => { alive = false; clearInterval(id); };
   }, []);
+
+  useEffect(() => {
+    let on = true;
+    (async () => {
+      const { data: s } = await browserSupabase.auth.getSession();
+      const tok = s.session?.access_token;
+      if (!tok) return;
+      const res = await fetch('/api/team/connectors', { headers: { Authorization: `Bearer ${tok}` } });
+      if (!res.ok || !on) return;
+      const j = (await res.json()) as { enabled?: boolean; isOwner?: boolean; platforms?: ConnRow[] };
+      if (on) { setConnEnabled(!!j.enabled); setConnOwner(!!j.isOwner); setConns(j.platforms ?? []); }
+    })();
+    return () => { on = false; };
+  }, []);
+
+  async function connect(platform: string) {
+    const { data: s } = await browserSupabase.auth.getSession();
+    const tok = s.session?.access_token;
+    if (!tok) return;
+    const res = await fetch(`/api/connectors/${platform}/start`, { headers: { Authorization: `Bearer ${tok}` } });
+    if (!res.ok) return;
+    const j = (await res.json()) as { url?: string };
+    if (j.url) window.location.href = j.url;
+  }
 
   const headTone = !mistri ? C.faint : mistri.stale ? C.faint : (TONE[mistri.status] ?? C.green);
   const headWord = !mistri ? 'not reporting yet' : mistri.stale ? 'resting' : 'on watch';
@@ -149,6 +178,39 @@ export default function SystemPage() {
           })}
         </div>
       </section>
+      <section style={U.section}>
+        <div style={U.sectionHead}>
+          <h2 style={T.h2}>Connectors</h2>
+          <span style={U.sectionNote}>{connEnabled ? 'live' : 'off'}</span>
+        </div>
+        <div style={grid}>
+          {conns.map((c) => {
+            const tone = c.connected ? C.green : c.configured ? C.amber : C.faint;
+            const word = c.connected ? 'connected' : c.configured ? 'ready' : 'not set up';
+            const label = c.platform === 'meta' ? 'Meta (Facebook + Instagram)' : c.platform === 'tiktok' ? 'TikTok' : c.platform === 'google' ? 'Google' : c.platform;
+            const canConnect = connOwner && connEnabled && c.configured && !c.connected;
+            return (
+              <div key={c.platform} style={card}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ ...pillDot, background: tone }} />
+                  <span style={{ fontSize: 15, fontWeight: 750, letterSpacing: -0.2, color: C.ink }}>{label}</span>
+                  <span style={{ ...statusWord, color: tone, marginLeft: 'auto' }}>{word}</span>
+                </div>
+                <button
+                  onClick={() => connect(c.platform)}
+                  disabled={!canConnect}
+                  style={{ marginTop: 12, width: '100%', padding: '9px 12px', borderRadius: 10, border: `1px solid ${C.line}`, background: canConnect ? C.ink : C.panel, color: canConnect ? '#fff' : C.faint, fontWeight: 700, fontSize: 13, cursor: canConnect ? 'pointer' : 'not-allowed' }}>
+                  {c.connected ? 'Connected' : 'Connect'}
+                </button>
+                <p style={{ ...T.tiny, marginTop: 8, marginBottom: 0, color: C.faint }}>
+                  {!connEnabled ? 'Connectors are off until CONNECTORS_ENABLED is set.' : !c.configured ? 'Add this platform\u2019s keys in the environment first.' : c.connected ? `Linked${c.connected_by ? ' by ' + c.connected_by : ''}.` : connOwner ? 'Ready to connect.' : 'The owner connects this one.'}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
     </TeamShell>
   );
 }

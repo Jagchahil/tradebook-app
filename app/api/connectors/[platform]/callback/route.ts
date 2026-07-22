@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 export async function GET(req: NextRequest, { params }: { params: Promise<{ platform: string }> }) {
   const { platform } = await params;
   const base = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
-  const back = (q: string) => NextResponse.redirect(`${base}/team?${q}`);
+  const back = (q: string) => NextResponse.redirect(`${base}/team/system?${q}`);
 
   if (!isConnector(platform)) return back('connect_error=unknown_platform');
   if (!CONNECTORS_ENABLED()) return back('connect_error=disabled');

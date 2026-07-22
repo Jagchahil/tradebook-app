@@ -4814,6 +4814,26 @@ export async function setStudioAssetState(id: string, from: AssetState, to: Asse
   } catch { return null; }
 }
 
+// Approve and book in one write. Moves an asset from awaiting_approval to scheduled AND stamps its
+// go live time. Guarded on the from state so a double click cannot book it twice or move a card
+// someone else already moved. This is the publish gate's write.
+export async function setStudioAssetScheduled(id: string, whenISO: string): Promise<Asset | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/content_assets?id=eq.${encodeURIComponent(id)}&state=eq.awaiting_approval`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ state: 'scheduled', scheduled_for: whenISO, updated_at: new Date().toISOString() }),
+      },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Asset[];
+    return rows[0] ?? null;
+  } catch { return null; }
+}
+
 export async function insertStudioApproval(input: {
   asset_id: string; kind: 'publish' | 'promote'; decision: 'approve' | 'reject' | 'changes';
   note: string | null; spend_cap_pence: number | null; decided_by: string;

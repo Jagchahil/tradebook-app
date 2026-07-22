@@ -9,6 +9,8 @@ import {
   readStudioIdea,
   markIdeaPromoted,
   setStudioAssetState,
+  readStudioAssets,
+  setStudioAssetScheduled,
   insertStudioApproval,
   insertStudioMetric,
   countStudioAssets,
@@ -20,6 +22,7 @@ import {
   SEED_ASSETS, defaultPlatforms, isLegalAdvance, isPublishGate,
   type Format, type Promise3, type AssetState, type Platform, type Storyboard,
 } from '../../../../../lib/studio';
+import { nextFreeSlot } from '../../../../../lib/calendar';
 
 export const runtime = 'nodejs';
 
@@ -214,7 +217,14 @@ export async function POST(req: NextRequest) {
     // request for changes records the decision and leaves the card where it is, for a redraft.
     let updated = asset;
     if (kind === 'publish' && decision === 'approve' && asset.state === 'awaiting_approval') {
-      const moved = await setStudioAssetState(body.id, 'awaiting_approval', 'scheduled');
+      // Book it onto the go live calendar as we approve it. Read what is already scheduled so the new
+      // post lands on the next free slot, not on top of one already there.
+      const all = await readStudioAssets();
+      const taken = (all || [])
+        .filter((x) => x.state === 'scheduled' && x.scheduled_for)
+        .map((x) => x.scheduled_for as string);
+      const when = nextFreeSlot(taken, new Date().toISOString());
+      const moved = await setStudioAssetScheduled(body.id, when);
       if (moved) updated = moved;
     }
     return NextResponse.json({ approval, asset: updated });

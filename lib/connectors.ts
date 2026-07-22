@@ -1,19 +1,19 @@
-// THE AD AND POST CONNECTORS, the single wrapper for Meta, TikTok and Google. Every OAuth handshake,
-// every webhook check, and every token exchange for the three platforms goes through this one file,
-// the same posture as lib/claude.ts, lib/whatsapp.ts and lib/higgsfield.ts.
+// THE AD AND POST CONNECTORS, the single wrapper for Meta, TikTok, Google, LinkedIn, X and Reddit.
+// Every OAuth handshake, every webhook check, and every token exchange for these platforms goes
+// through this one file, the same posture as lib/claude.ts, lib/whatsapp.ts and lib/higgsfield.ts.
 //
 // It ships DARK. CONNECTORS_ENABLED is off by default, so exchangeCode refuses and the start route
 // will not redirect. Nothing here posts a thing or spends a penny: it is the plumbing that lets Jag
 // connect the accounts by OAuth, and the live posting and ad spend still sit behind their own gates
-// that do not exist yet. Two authorisations, and this only carries the platform's, never Jag's.
+// that do not exist yet.
 //
-// The pure parts (the authorize URL, the config check, the state signing, the Meta signature) are
-// tested without a network. Only exchangeCode reaches out, and it is guarded and isolated.
+// The pure parts (the authorize URL, the config check, the state signing, the PKCE pair, the Meta
+// signature) are tested without a network. Only exchangeCode reaches out, and it is guarded.
 
 import crypto from 'node:crypto';
 
-export type Connector = 'meta' | 'tiktok' | 'google';
-export const CONNECTORS: Connector[] = ['meta', 'tiktok', 'google'];
+export type Connector = 'meta' | 'tiktok' | 'google' | 'linkedin' | 'twitter' | 'reddit';
+export const CONNECTORS: Connector[] = ['meta', 'tiktok', 'google', 'linkedin', 'twitter', 'reddit'];
 
 export function isConnector(v: string): v is Connector {
   return (CONNECTORS as string[]).includes(v);
@@ -32,13 +32,20 @@ interface OAuthConfig {
 
 function cfg(platform: Connector): OAuthConfig {
   const e = process.env;
-  if (platform === 'meta') {
-    return { clientId: e.META_APP_ID || '', clientSecret: e.META_APP_SECRET || '', redirectUri: e.META_REDIRECT_URI || '' };
+  switch (platform) {
+    case 'meta':
+      return { clientId: e.META_APP_ID || '', clientSecret: e.META_APP_SECRET || '', redirectUri: e.META_REDIRECT_URI || '' };
+    case 'tiktok':
+      return { clientId: e.TIKTOK_CLIENT_KEY || '', clientSecret: e.TIKTOK_CLIENT_SECRET || '', redirectUri: e.TIKTOK_REDIRECT_URI || '' };
+    case 'google':
+      return { clientId: e.GOOGLE_CLIENT_ID || '', clientSecret: e.GOOGLE_CLIENT_SECRET || '', redirectUri: e.GOOGLE_REDIRECT_URI || '' };
+    case 'linkedin':
+      return { clientId: e.LINKEDIN_CLIENT_ID || '', clientSecret: e.LINKEDIN_CLIENT_SECRET || '', redirectUri: e.LINKEDIN_REDIRECT_URI || '' };
+    case 'twitter':
+      return { clientId: e.TWITTER_CLIENT_ID || '', clientSecret: e.TWITTER_CLIENT_SECRET || '', redirectUri: e.TWITTER_REDIRECT_URI || '' };
+    case 'reddit':
+      return { clientId: e.REDDIT_CLIENT_ID || '', clientSecret: e.REDDIT_CLIENT_SECRET || '', redirectUri: e.REDDIT_REDIRECT_URI || '' };
   }
-  if (platform === 'tiktok') {
-    return { clientId: e.TIKTOK_CLIENT_KEY || '', clientSecret: e.TIKTOK_CLIENT_SECRET || '', redirectUri: e.TIKTOK_REDIRECT_URI || '' };
-  }
-  return { clientId: e.GOOGLE_CLIENT_ID || '', clientSecret: e.GOOGLE_CLIENT_SECRET || '', redirectUri: e.GOOGLE_REDIRECT_URI || '' };
 }
 
 // True when a platform has its id, secret and redirect all set. The start route needs this before it
@@ -48,32 +55,43 @@ export function connectorConfigured(platform: Connector): boolean {
   return Boolean(c.clientId && c.clientSecret && c.redirectUri);
 }
 
-// The scopes we ask for. Meta wants ads plus Instagram content publishing. TikTok wants to publish
-// video. Google wants Ads and a YouTube upload. Kept in one place so a review note can cite them.
+// The scopes we ask for, one place so a review note can cite them. Meta wants ads plus Instagram
+// content publishing. TikTok wants to publish video. Google wants Ads and a YouTube upload. LinkedIn
+// wants to post as the member. X wants to read and write tweets with an offline refresh. Reddit wants
+// identity and submit.
 const SCOPES: Record<Connector, string> = {
   meta: 'ads_management,ads_read,business_management,instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement',
   tiktok: 'video.publish,video.upload',
   google: 'https://www.googleapis.com/auth/adwords https://www.googleapis.com/auth/youtube.upload',
+  linkedin: 'openid profile email w_member_social',
+  twitter: 'tweet.read tweet.write users.read offline.access',
+  reddit: 'identity submit read',
 };
 
 const AUTH_BASE: Record<Connector, string> = {
   meta: 'https://www.facebook.com/v21.0/dialog/oauth',
   tiktok: 'https://www.tiktok.com/v2/auth/authorize/',
   google: 'https://accounts.google.com/o/oauth2/v2/auth',
+  linkedin: 'https://www.linkedin.com/oauth/v2/authorization',
+  twitter: 'https://twitter.com/i/oauth2/authorize',
+  reddit: 'https://www.reddit.com/api/v1/authorize',
 };
 
 const TOKEN_URL: Record<Connector, string> = {
   meta: 'https://graph.facebook.com/v21.0/oauth/access_token',
   tiktok: 'https://open.tiktokapis.com/v2/oauth/token/',
   google: 'https://oauth2.googleapis.com/token',
+  linkedin: 'https://www.linkedin.com/oauth/v2/accessToken',
+  twitter: 'https://api.twitter.com/2/oauth2/token',
+  reddit: 'https://www.reddit.com/api/v1/access_token',
 };
 
-// Build the authorize URL the user is sent to. Pure. `state` must be a signed token from signState,
-// so the callback can prove the round trip is ours and not a forged one.
-export function authorizeUrl(platform: Connector, state: string): string {
+// Build the authorize URL the user is sent to. Pure. `state` must be a signed token from signState.
+// For X, pass the PKCE code challenge so the token exchange can prove the round trip is ours.
+export function authorizeUrl(platform: Connector, state: string, opts?: { codeChallenge?: string }): string {
   const c = cfg(platform);
   const p = new URLSearchParams();
-  // TikTok names the id client_key, the other two client_id.
+  // TikTok names the id client_key, everyone else client_id.
   if (platform === 'tiktok') p.set('client_key', c.clientId);
   else p.set('client_id', c.clientId);
   p.set('redirect_uri', c.redirectUri);
@@ -81,11 +99,31 @@ export function authorizeUrl(platform: Connector, state: string): string {
   p.set('scope', SCOPES[platform]);
   p.set('state', state);
   if (platform === 'google') {
-    // Offline plus consent so Google returns a refresh token we can keep.
     p.set('access_type', 'offline');
     p.set('prompt', 'consent');
   }
+  if (platform === 'reddit') {
+    // Permanent so Reddit returns a refresh token we can keep.
+    p.set('duration', 'permanent');
+  }
+  if (platform === 'twitter' && opts?.codeChallenge) {
+    p.set('code_challenge', opts.codeChallenge);
+    p.set('code_challenge_method', 'S256');
+  }
   return `${AUTH_BASE[platform]}?${p.toString()}`;
+}
+
+// --- PKCE, for X which requires it ---------------------------------------------------------------
+
+// A fresh code verifier. Kept inside the signed state and never sent in the authorize request, so the
+// token exchange can present it.
+export function pkceVerifier(): string {
+  return crypto.randomBytes(32).toString('base64url');
+}
+
+// The S256 challenge for a verifier. This is what rides in the authorize URL.
+export function pkceChallenge(verifier: string): string {
+  return crypto.createHash('sha256').update(verifier).digest('base64url');
 }
 
 // --- OAuth state, signed so the callback cannot be forged --------------------------------------
@@ -103,7 +141,7 @@ export function signState(payload: string, secret?: string): string {
 }
 
 // Verify a state token and return its payload, or null if the signature does not check out. A missing
-// secret returns null, failing closed: without a secret we cannot trust any callback.
+// secret returns null, failing closed.
 export function verifyState(token: string | null | undefined, secret?: string): string | null {
   const s = stateSecret(secret);
   if (!s || !token) return null;
@@ -124,17 +162,15 @@ export function verifyState(token: string | null | undefined, secret?: string): 
 
 // --- webhooks ----------------------------------------------------------------------------------
 
-// The Meta webhook handshake. Meta sends a GET with these params on setup. Echo the challenge only if
-// the verify token matches ours.
+// The Meta webhook handshake. Echo the challenge only if the verify token matches ours.
 export function verifyMetaWebhook(mode: string | null, token: string | null, challenge: string | null): string | null {
   const vt = (process.env.META_VERIFY_TOKEN || '').trim();
   if (mode === 'subscribe' && token && vt && token === vt) return challenge;
   return null;
 }
 
-// Validate a Meta x-hub-signature-256 header against the raw body, the same scheme as the WhatsApp
-// webhook. The marketing app can share the WhatsApp app secret, so we fall back to it. Fails closed
-// with no secret.
+// Validate a Meta x-hub-signature-256 header against the raw body. Falls back to the WhatsApp app
+// secret since the marketing app can share it. Fails closed with no secret.
 export function verifyMetaSignature(rawBody: string, header: string | null, secret?: string): boolean {
   const s = (secret || process.env.META_APP_SECRET || process.env.WHATSAPP_APP_SECRET || '').trim();
   if (!s || !header || !header.startsWith('sha256=')) return false;
@@ -146,8 +182,7 @@ export function verifyMetaSignature(rawBody: string, header: string | null, secr
   return crypto.timingSafeEqual(a, b);
 }
 
-// A shared secret check for the TikTok webhook, sent in a header we configure on their side. TikTok
-// does not sign the body the way Meta does, so a shared secret is the pragmatic gate for the scaffold.
+// A shared secret check for the TikTok webhook, sent in a header we configure on their side.
 export function verifyTikTokWebhook(header: string | null, secret?: string): boolean {
   const s = (secret || process.env.TIKTOK_WEBHOOK_SECRET || '').trim();
   if (!s || !header) return false;
@@ -170,9 +205,18 @@ function fail(error: string): TokenResult {
   return { ok: false, access_token: null, refresh_token: null, expires_in: null, error };
 }
 
-// Swap an authorization code for tokens. Guarded by the master switch and the per platform config, so
-// it cannot run while dark or half set up. Isolated so the rest of the module tests with no network.
-export async function exchangeCode(platform: Connector, code: string): Promise<TokenResult> {
+function basicAuth(id: string, secret: string): string {
+  return 'Basic ' + Buffer.from(`${id}:${secret}`).toString('base64');
+}
+
+// Swap an authorization code for tokens. Guarded by the master switch and the per platform config.
+// For X, codeVerifier completes the PKCE round trip. Isolated so the rest of the module tests with no
+// network.
+export async function exchangeCode(
+  platform: Connector,
+  code: string,
+  opts?: { codeVerifier?: string },
+): Promise<TokenResult> {
   if (!CONNECTORS_ENABLED()) return fail('disabled');
   if (!connectorConfigured(platform)) return fail('not_configured');
   const c = cfg(platform);
@@ -194,8 +238,23 @@ export async function exchangeCode(platform: Connector, code: string): Promise<T
           grant_type: 'authorization_code', redirect_uri: c.redirectUri,
         }).toString(),
       });
+    } else if (platform === 'reddit') {
+      res = await fetch(TOKEN_URL.reddit, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: basicAuth(c.clientId, c.clientSecret), 'User-Agent': 'lekhio/1.0' },
+        body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: c.redirectUri }).toString(),
+      });
+    } else if (platform === 'twitter') {
+      res = await fetch(TOKEN_URL.twitter, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: basicAuth(c.clientId, c.clientSecret) },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code', code, redirect_uri: c.redirectUri, code_verifier: opts?.codeVerifier || '',
+        }).toString(),
+      });
     } else {
-      res = await fetch(TOKEN_URL.google, {
+      // google and linkedin share the standard body form
+      res = await fetch(TOKEN_URL[platform], {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({

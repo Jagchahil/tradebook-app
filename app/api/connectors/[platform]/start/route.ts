@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { verifyAccessToken, readTeamMember } from '../../../../../lib/supabase';
 import { isTeam } from '../../../../../lib/team';
 import {
-  CONNECTORS_ENABLED, connectorConfigured, isConnector, authorizeUrl, signState,
+  CONNECTORS_ENABLED, connectorConfigured, isConnector, authorizeUrl, signState, pkceVerifier, pkceChallenge,
 } from '../../../../../lib/connectors';
 
 export const runtime = 'nodejs';
@@ -31,6 +31,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ plat
   if (!connectorConfigured(platform)) return NextResponse.json({ error: 'not configured', platform }, { status: 503 });
 
   const nonce = crypto.randomBytes(12).toString('hex');
-  const state = signState(`${platform}:${member!.email}:${nonce}`);
-  return NextResponse.json({ url: authorizeUrl(platform, state) });
+  // X requires PKCE. The verifier rides inside the signed state and never in the authorize request,
+  // so only the token exchange can present it. Other platforms carry no verifier.
+  const verifier = platform === 'twitter' ? pkceVerifier() : '';
+  const challenge = verifier ? pkceChallenge(verifier) : undefined;
+  const state = signState(`${platform}:${member!.email}:${nonce}${verifier ? ':' + verifier : ''}`);
+  return NextResponse.json({ url: authorizeUrl(platform, state, challenge ? { codeChallenge: challenge } : undefined) });
 }

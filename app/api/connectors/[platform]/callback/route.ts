@@ -28,10 +28,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ plat
   const payload = verifyState(state);
   if (!code || !payload) return back('connect_error=bad_state');
 
-  const [statePlatform, email] = payload.split(':');
+  const parts = payload.split(':');
+  const statePlatform = parts[0];
+  const email = parts[1];
+  const codeVerifier = parts[3] || undefined; // present only for X (PKCE)
   if (statePlatform !== platform) return back('connect_error=platform_mismatch');
 
-  const tok = await exchangeCode(platform, code);
+  const tok = await exchangeCode(platform, code, codeVerifier ? { codeVerifier } : undefined);
   if (!tok.ok || !tok.access_token) return back(`connect_error=${encodeURIComponent(tok.error || 'exchange_failed')}`);
 
   const expiresAt = tok.expires_in ? new Date(Date.now() + tok.expires_in * 1000).toISOString() : null;

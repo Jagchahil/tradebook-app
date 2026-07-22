@@ -1,4 +1,4 @@
-// THE AD AND POST CONNECTORS, the single wrapper for Meta, TikTok, Google, LinkedIn, X and Reddit.
+// THE AD AND POST CONNECTORS, the single wrapper for Meta, TikTok, Google, LinkedIn and X.
 // Every OAuth handshake, every webhook check, and every token exchange for these platforms goes
 // through this one file, the same posture as lib/claude.ts, lib/whatsapp.ts and lib/higgsfield.ts.
 //
@@ -12,8 +12,8 @@
 
 import crypto from 'node:crypto';
 
-export type Connector = 'meta' | 'tiktok' | 'google' | 'linkedin' | 'twitter' | 'reddit';
-export const CONNECTORS: Connector[] = ['meta', 'tiktok', 'google', 'linkedin', 'twitter', 'reddit'];
+export type Connector = 'meta' | 'tiktok' | 'google' | 'linkedin' | 'twitter';
+export const CONNECTORS: Connector[] = ['meta', 'tiktok', 'google', 'linkedin', 'twitter'];
 
 export function isConnector(v: string): v is Connector {
   return (CONNECTORS as string[]).includes(v);
@@ -43,8 +43,6 @@ function cfg(platform: Connector): OAuthConfig {
       return { clientId: e.LINKEDIN_CLIENT_ID || '', clientSecret: e.LINKEDIN_CLIENT_SECRET || '', redirectUri: e.LINKEDIN_REDIRECT_URI || '' };
     case 'twitter':
       return { clientId: e.TWITTER_CLIENT_ID || '', clientSecret: e.TWITTER_CLIENT_SECRET || '', redirectUri: e.TWITTER_REDIRECT_URI || '' };
-    case 'reddit':
-      return { clientId: e.REDDIT_CLIENT_ID || '', clientSecret: e.REDDIT_CLIENT_SECRET || '', redirectUri: e.REDDIT_REDIRECT_URI || '' };
   }
 }
 
@@ -57,15 +55,13 @@ export function connectorConfigured(platform: Connector): boolean {
 
 // The scopes we ask for, one place so a review note can cite them. Meta wants ads plus Instagram
 // content publishing. TikTok wants to publish video. Google wants Ads and a YouTube upload. LinkedIn
-// wants to post as the member. X wants to read and write tweets with an offline refresh. Reddit wants
-// identity and submit.
+// wants to post as the member. X wants to read and write tweets with an offline refresh.
 const SCOPES: Record<Connector, string> = {
   meta: 'ads_management,ads_read,business_management,instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement',
   tiktok: 'video.publish,video.upload',
   google: 'https://www.googleapis.com/auth/adwords https://www.googleapis.com/auth/youtube.upload',
   linkedin: 'openid profile email w_member_social',
   twitter: 'tweet.read tweet.write users.read offline.access',
-  reddit: 'identity submit read',
 };
 
 const AUTH_BASE: Record<Connector, string> = {
@@ -74,7 +70,6 @@ const AUTH_BASE: Record<Connector, string> = {
   google: 'https://accounts.google.com/o/oauth2/v2/auth',
   linkedin: 'https://www.linkedin.com/oauth/v2/authorization',
   twitter: 'https://twitter.com/i/oauth2/authorize',
-  reddit: 'https://www.reddit.com/api/v1/authorize',
 };
 
 const TOKEN_URL: Record<Connector, string> = {
@@ -83,7 +78,6 @@ const TOKEN_URL: Record<Connector, string> = {
   google: 'https://oauth2.googleapis.com/token',
   linkedin: 'https://www.linkedin.com/oauth/v2/accessToken',
   twitter: 'https://api.twitter.com/2/oauth2/token',
-  reddit: 'https://www.reddit.com/api/v1/access_token',
 };
 
 // Build the authorize URL the user is sent to. Pure. `state` must be a signed token from signState.
@@ -101,10 +95,6 @@ export function authorizeUrl(platform: Connector, state: string, opts?: { codeCh
   if (platform === 'google') {
     p.set('access_type', 'offline');
     p.set('prompt', 'consent');
-  }
-  if (platform === 'reddit') {
-    // Permanent so Reddit returns a refresh token we can keep.
-    p.set('duration', 'permanent');
   }
   if (platform === 'twitter' && opts?.codeChallenge) {
     p.set('code_challenge', opts.codeChallenge);
@@ -237,12 +227,6 @@ export async function exchangeCode(
           client_key: c.clientId, client_secret: c.clientSecret, code,
           grant_type: 'authorization_code', redirect_uri: c.redirectUri,
         }).toString(),
-      });
-    } else if (platform === 'reddit') {
-      res = await fetch(TOKEN_URL.reddit, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: basicAuth(c.clientId, c.clientSecret), 'User-Agent': 'lekhio/1.0' },
-        body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: c.redirectUri }).toString(),
       });
     } else if (platform === 'twitter') {
       res = await fetch(TOKEN_URL.twitter, {

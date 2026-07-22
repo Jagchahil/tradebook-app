@@ -187,7 +187,7 @@ export default function SystemPage() {
           {conns.map((c) => {
             const tone = c.connected ? C.green : c.configured ? C.amber : C.faint;
             const word = c.connected ? 'connected' : c.configured ? 'ready' : 'not set up';
-            const label = c.platform === 'meta' ? 'Meta (Facebook + Instagram)' : c.platform === 'tiktok' ? 'TikTok' : c.platform === 'google' ? 'Google' : c.platform === 'linkedin' ? 'LinkedIn' : c.platform === 'twitter' ? 'X (Twitter)' : c.platform === 'reddit' ? 'Reddit' : c.platform;
+            const label = c.platform === 'meta' ? 'Meta (Facebook + Instagram)' : c.platform === 'tiktok' ? 'TikTok' : c.platform === 'google' ? 'Google' : c.platform === 'linkedin' ? 'LinkedIn' : c.platform === 'twitter' ? 'X (Twitter)' : c.platform;
             const canConnect = connOwner && connEnabled && c.configured && !c.connected;
             return (
               <div key={c.platform} style={card}>

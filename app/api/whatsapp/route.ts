@@ -77,6 +77,7 @@ import {
   getRelevantKnowledge,
   getOptimiserInput,
   refreshFactsFromDb,
+  factUpdateNote,
 } from '../../../lib/supabase';
 import { isReferRequest, referralInvite } from '../../../lib/referral';
 import {
@@ -2213,6 +2214,15 @@ async function handleSavingsQuestion(from: string) {
   if (l.refundDue > 0) {
     lines.push('');
     lines.push(`And £${l.refundDue.toLocaleString('en-GB')} of CIS is sitting with HMRC. That is your money, not a saving. You get it back when you file.`);
+  }
+
+  // THE FINAL-CHECK LINE. When Khoji has learned of a change and you have approved it, the figures
+  // above were worked on that latest law, and we say so, so the number a man files is provably the
+  // current one. Silent when nothing has changed, so an ordinary answer is unchanged.
+  const factNote = await factUpdateNote();
+  if (factNote) {
+    lines.push('');
+    lines.push(`These are worked on the current tax rules, ${factNote}. Nothing goes to HMRC without you.`);
   }
 
   await sendText(from, lines.join('\n'));

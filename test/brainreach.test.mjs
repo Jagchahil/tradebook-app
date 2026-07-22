@@ -87,9 +87,9 @@ ok('a failed knowledge read falls back to an empty string, never to an error the
 // backwards. Both channels now share ONE figures block, and the money answer is told never to send a
 // customer off to look up a standard figure it already holds.
 ok('the 2026/27 figures live in ONE shared block, so the two channels cannot drift',
-  claude.includes('const TAX_FACTS_2627'));
+  claude.includes('function taxFacts2627'));
 ok('the shared figures block is spread into BOTH brains (app accountant and WhatsApp money answer)',
-  claude.split('...TAX_FACTS_2627').length - 1 >= 2);
+  claude.split('...taxFacts2627()').length - 1 >= 2);
 ok('the VAT registration threshold is one of those built-in figures',
   claude.includes('- VAT registration at £'));
 ok('the WhatsApp accountant is told never to send a customer off to look up a figure it already holds',
@@ -117,7 +117,7 @@ ok('the WhatsApp money answer is framed for small business owners, not sole trad
 ok('a limited company question is explicitly IN scope for the WhatsApp answer',
   claude.includes('A limited company question is NOT out of scope'));
 ok('the company figures (Corporation Tax, dividends) are spread into the WhatsApp money answer',
-  claude.includes('...LTD_FACTS_2627') && claude.includes('const LTD_FACTS_2627'));
+  claude.includes('...ltdFacts2627()') && claude.includes('function ltdFacts2627'));
 ok('the WhatsApp money answer is told not to use em or en dashes',
   claude.includes('Never use an em dash or an en dash'));
 

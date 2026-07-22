@@ -26,8 +26,9 @@
 import { FACTS, TAX_YEAR, TAX_YEAR_VALID_UNTIL } from '../../lib/taxengine';
 import { STUDENT_PLANS } from '../../lib/nistudentloan';
 import { LTD } from '../../lib/ltdengine';
+import { refreshFactsFromDb } from '../../lib/supabase';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 // The file lib/taxengine.ts lives at, as the differ should report it to a human. If the engine
 // moves, this string moves with it, because an incident that says "fix line 70 of a file that no
@@ -61,7 +62,8 @@ const PARITY_FILE = 'tradebook-app/lib/tax.ts';
 // NOT PUBLISHED, and this is deliberate: the April 2027 property rates (22/42/47) and the Section 24
 // credit rate. They are FUTURE law. There is no live GOV.UK page stating them as current, so there
 // is nothing to subtract from, and a check that cannot fail is theatre. They go in when they land.
-const ALL = {
+function buildAll() {
+  return {
   ...FACTS,
 
   // Student loans. The thresholds a self-employed person repays over through Self Assessment.
@@ -113,9 +115,11 @@ const ALL = {
   //
   // So it is derived from what it actually means, and published under the name the app uses.
   higherRateThreshold: FACTS.personalAllowance + FACTS.basicRateBand,
-} as const;
+  };
+}
 
-export const BODY = JSON.stringify(
+function buildBody(): string {
+  return JSON.stringify(
   {
     _comment:
       'Every tax constant Lekhio computes with, generated from the engines themselves. Read by Khoji (docs/105), which fetches this, fetches the primary GOV.UK page for each figure, and raises an incident when they disagree. We prepare, the user approves. Not HMRC, not endorsed by HMRC.',
@@ -125,17 +129,21 @@ export const BODY = JSON.stringify(
     parityFile: PARITY_FILE,
     generatedFrom: ['lib/taxengine.ts FACTS', 'lib/nistudentloan.ts STUDENT_PLANS', 'lib/ltdengine.ts LTD'],
     notPublished: 'lib/propertyengine.ts April 2027 rates: future law, no live GOV.UK page to check against yet',
-    facts: ALL,
+    facts: buildAll(),
   },
   null,
   2,
-);
+  );
+}
 
-export function GET() {
-  return new Response(BODY, {
+export async function GET() {
+  // Serve LIVE facts: an approved override is reflected here too, so Khoji compares GOV.UK to what the
+  // engine actually uses now, not a value baked at build time. Falls back to defaults on any read fail.
+  await refreshFactsFromDb();
+  return new Response(buildBody(), {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'no-store',
     },
   });
 }

@@ -23,7 +23,7 @@ import type { KnowledgeState } from './knowledgewatch';
 import type {
   Idea, Asset, Approval, Metric, AssetState, Format, Promise3, Platform, Storyboard,
 } from './studio';
-import { refreshFacts, isOverridableKey, isInBounds, type FactOverride } from './facts';
+import { refreshFacts, resolveOverrides, isOverridableKey, isInBounds, type FactOverride } from './facts';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -4332,6 +4332,29 @@ export async function loadFactOverrides(): Promise<FactOverride[]> {
 // current FACTS. With no rows it is a no-op and FACTS is exactly the hardcoded defaults.
 export async function refreshFactsFromDb(): Promise<string[]> {
   return refreshFacts(loadFactOverrides);
+}
+
+// A short, human line naming the figures that are LIVE OVERRIDES right now: what Khoji found and a
+// human approved since the hardcoded baseline. Empty when nothing has been changed (so a normal
+// answer is unchanged). Used to tell a customer, when they check before filing, that their numbers
+// were run on the very latest law. Never throws.
+const FACT_LABELS: Record<string, string> = {
+  vatRegistrationThreshold: 'VAT registration threshold', vatDeregistrationThreshold: 'VAT deregistration threshold',
+  personalAllowance: 'personal allowance', tradingAllowance: 'trading allowance',
+  mileageCarFirst10k: 'mileage rate', class4MainRate: 'Class 4 National Insurance rate', class4UpperRate: 'Class 4 upper rate',
+  annualInvestmentAllowance: 'Annual Investment Allowance', cgtAnnualExempt: 'Capital Gains tax-free amount',
+  marriageAllowanceTransfer: 'Marriage Allowance', poaThreshold: 'payments on account threshold',
+};
+export async function factUpdateNote(): Promise<string> {
+  try {
+    const live = resolveOverrides(await loadFactOverrides(), new Date());
+    const keys = Object.keys(live);
+    if (!keys.length) return '';
+    const labels = keys.slice(0, 3).map((k) => FACT_LABELS[k] ?? k);
+    return `including the latest ${labels.join(', ')}`;
+  } catch {
+    return '';
+  }
 }
 
 // Write ONE approved change to an engine constant. Refuses a key the engine does not hold, a value out

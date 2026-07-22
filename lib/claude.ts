@@ -354,10 +354,10 @@ export async function answerMoneyQuestion(
     'Only ask them to send a receipt or a detail when the question is about THEIR OWN transactions and you do not have that entry. If a question is genuinely nothing to do with their money or UK small business tax, say so briefly and kindly. A limited company question is NOT out of scope: answer it from the company figures below.',
     '',
     'Standard UK small business tax figures for 2026/27 (England, Wales and Northern Ireland). These are your built-in knowledge, use them to answer directly, do not guess beyond them:',
-    ...TAX_FACTS_2627,
+    ...taxFacts2627(),
     '',
     'If they run a limited company, these company figures apply too:',
-    ...LTD_FACTS_2627,
+    ...ltdFacts2627(),
     '',
     'Their question:',
     `"${question}"`,
@@ -559,7 +559,8 @@ export async function improveSupportAnswer(question: string, draft: string): Pro
 // (ACCOUNTANT_SYSTEM) and the WhatsApp money answer (answerMoneyQuestion), so the two channels can
 // never drift. The live round-trip on 21 Jul that caught Rakha telling a customer to go fetch a
 // GOV.UK link for the VAT threshold is why this exists.
-const TAX_FACTS_2627: string[] = [
+function taxFacts2627(): string[] {
+  return [
   `- Personal allowance £${FACTS.personalAllowance.toLocaleString('en-GB')}, tapered by £1 for every £2 of income over £${FACTS.personalAllowanceTaperFloor.toLocaleString('en-GB')}, nil at £${FACTS.personalAllowanceLostAt.toLocaleString('en-GB')}.`,
   '- Income tax on taxable income: 20% on the first £37,700, 40% to £125,140, 45% above.',
   `- Class 4 NIC: ${FACTS.class4MainRate * 100}% on profits £${FACTS.class4LowerLimit.toLocaleString('en-GB')} to £${FACTS.class4UpperLimit.toLocaleString('en-GB')}, ${FACTS.class4UpperRate * 100}% above. Class 2 is voluntary since April 2024 (£${FACTS.class2WeeklyRate} a week if paid).`,
@@ -571,23 +572,27 @@ const TAX_FACTS_2627: string[] = [
   '- Profits are taxed on the tax-year basis from 2024/25. The cash basis (money in and out when it moves) is the default for small businesses; accruals counts income and costs when invoiced or incurred. Opening and closing years can create overlap, so the first and last year need care.',
   '- Payments on account: once a Self Assessment bill is over £1,000, you also make two payments on account towards next year, each half this year\'s bill, due 31 January and 31 July, on top of the balancing payment. This is the bill that surprises people.',
   `- Capital allowances: the Annual Investment Allowance gives 100% relief on most plant and machinery up to £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')}. Above that, or for cars, you claim a writing down allowance each year, ${Math.round(FACTS.wdaMainRate * 100)}% on the main pool (reduced from 18% from April 2026), ${Math.round(FACTS.wdaSpecialRate * 100)}% on the special rate pool (most cars, integral features).`,
-];
+  ];
+}
 
 // The limited-company figures, taken from the LTD engine so they track it, spread into the WhatsApp
 // money answer alongside TAX_FACTS_2627 so a company director gets a real answer instead of "that is
 // outside my wheelhouse" (caught live on the 21 Jul flood).
-const LTD_FACTS_2627: string[] = [
+function ltdFacts2627(): string[] {
+  return [
   '- Limited company: the company pays Corporation Tax on its profit, 19% up to £50,000, 25% above £250,000, with marginal relief between (about 26.5% on the slice). A director usually takes a small salary plus dividends.',
   `- Dividends are paid from post-Corporation-Tax profit and taxed on the person: a £${LTD.dividendAllowance.toLocaleString('en-GB')} allowance at 0%, then ${LTD.dividendBasic * 100}% basic, ${LTD.dividendHigher * 100}% higher, ${LTD.dividendAdditional * 100}% additional. A dividend needs distributable profit; taking more is a director's loan with a 33.75% charge if it is unpaid nine months after the year end.`,
-];
+  ];
+}
 
-const ACCOUNTANT_SYSTEM = [
+function accountantSystem(): string {
+  return [
   'You are Lekhio, the in-app accountant for a UK self employed person (sole traders, subcontractors, freelancers, and small trades).',
   'You are an expert in UK self employed tax and bookkeeping, built on the rules taught in the leading tax and accountancy qualifications (ACCA, ICAEW, CIOT, AAT). Give real, specific, accurate answers, not vague hand-waving.',
   '',
   'Use these 2026/27 figures, England, Wales and Northern Ireland. Do not invent or guess figures.',
   'Scottish income tax bands are different and are not modelled here. If the user says they are in Scotland, say your income tax figures use the England, Wales and Northern Ireland bands, point them to the Scottish bands on gov.scot, and note that National Insurance and VAT are the same UK wide.',
-  ...TAX_FACTS_2627,
+  ...taxFacts2627(),
   '',
   'BUSINESS STRUCTURE matters, and the user profile below tells you which one applies. Answer for THEIR structure, not sole-trader rules by default.',
   '- SOLE TRADER: no separate business return. The trade goes on their own Self Assessment (SA103). Income tax and Class 4 NIC on the profit, as above. One return, one bill.',
@@ -609,7 +614,8 @@ const ACCOUNTANT_SYSTEM = [
   'Style: plain English, warm and direct, the way a good accountant talks to a tradesperson. Use the £ sign. Short paragraphs or a few steps. Be complete but do not waffle.',
   'Format: plain text only. Do not use any markdown. No bold, no asterisks, no headers, no hash symbols. The app shows your reply as plain text, so any markdown symbols appear on screen as literal characters. A short list may start lines with a simple hyphen and a space.',
   'Never use an em dash or an en dash, and never use a hyphen as a sentence dash. Use a full stop or a comma instead. For a number range use the word to, for example £12,570 to £50,270. For subtraction write minus or less, not a dash. Keep hyphens only for hyphenated words and simple list bullets.',
-].join('\n');
+  ].join('\n');
+}
 
 // Answer a free-text accountant question. `context` is an optional compact summary
 // of the user\'s own figures, so money questions get real numbers. Returns the
@@ -663,7 +669,7 @@ export async function answerAccountantQuestion(question: string, context?: strin
         max_tokens: 4000,
         // The system prompt is long and stable, so cache it. Repeat questions then
         // pay a tenth of the input price for it.
-        system: [{ type: 'text', text: ACCOUNTANT_SYSTEM, cache_control: { type: 'ephemeral' } }],
+        system: [{ type: 'text', text: accountantSystem(), cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: userContent.slice(0, 4000) }],
       }),
     });

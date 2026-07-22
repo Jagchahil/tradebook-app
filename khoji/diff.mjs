@@ -1262,6 +1262,14 @@ async function main() {
     const open = [...drift, ...broken];
 
     for (const r of open) {
+      // The raw payload the console reads. On a DRIFT we also attach a STRUCTURED proposal: on
+      // approval, app/api/team/review writes a fact_override from raw.proposed_fact and lib/facts makes
+      // the new value live everywhere, no deploy. GOV.UK already shows `theirs`, so it is the law as
+      // it stands today: effective from today. Numeric only; lib/facts re-checks the bounds on write.
+      const raw = { fact: r.fact, ours: r.ours, theirs: r.theirs, url: r.url, engineFile: meta.engineFile, parityFile: meta.parityFile };
+      if (r.status === 'drift' && typeof r.theirs === 'number' && Number.isFinite(r.theirs)) {
+        raw.proposed_fact = { key: r.fact, value: r.theirs, effective_from: new Date().toISOString().slice(0, 10) };
+      }
       await db.query(
         `insert into public.knowledge_items
            (source_url, source_name, title, summary, affects, confidence, engine_impact, status, raw, distilled_at)
@@ -1279,7 +1287,7 @@ async function main() {
           r.status === 'drift' ? 1 : null,
           r.status === 'drift',
           r.status,
-          { fact: r.fact, ours: r.ours, theirs: r.theirs, url: r.url, engineFile: meta.engineFile, parityFile: meta.parityFile },
+          raw,
         ],
       );
     }

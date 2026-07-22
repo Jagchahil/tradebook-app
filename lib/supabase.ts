@@ -5136,3 +5136,59 @@ export async function markPresaleSent(email: string, newStage: number): Promise<
   });
   return res.ok;
 }
+
+// --- Marketing connectors (Meta, TikTok, Google) ------------------------------------------------
+
+// Store or refresh a platform's OAuth tokens, one row per platform. Tokens are encrypted at rest
+// (encryptSecret is a no op without a key, so this is safe either way). Upsert on the platform key,
+// so reconnecting a platform replaces its tokens rather than piling up rows. Never called from the
+// browser: this is service role only, like the rest of this file.
+export async function upsertConnectorToken(input: {
+  platform: string; account_id?: string | null; access_token: string; refresh_token?: string | null;
+  expires_at?: string | null; scope?: string | null; connected_by?: string | null;
+}): Promise<boolean> {
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/marketing_connectors?on_conflict=platform`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({
+        platform: input.platform,
+        account_id: input.account_id ?? null,
+        access_token: encryptSecret(input.access_token),
+        refresh_token: input.refresh_token ? encryptSecret(input.refresh_token) : null,
+        expires_at: input.expires_at ?? null,
+        scope: input.scope ?? null,
+        connected_by: input.connected_by ?? null,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+// A platform's connection STATUS, safe to show a console: whether it is connected, when it expires,
+// the scope, who connected it. It never returns the token itself. Null means the row could not be read.
+export async function readConnectorStatus(platform: string): Promise<
+  { platform: string; connected: boolean; expires_at: string | null; scope: string | null; connected_by: string | null; updated_at: string | null } | null
+> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/marketing_connectors?platform=eq.${encodeURIComponent(platform)}&select=platform,access_token,expires_at,scope,connected_by,updated_at`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ platform: string; access_token: string | null; expires_at: string | null; scope: string | null; connected_by: string | null; updated_at: string | null }>;
+    const row = rows[0];
+    if (!row) return { platform, connected: false, expires_at: null, scope: null, connected_by: null, updated_at: null };
+    return {
+      platform: row.platform,
+      connected: Boolean(row.access_token),
+      expires_at: row.expires_at,
+      scope: row.scope,
+      connected_by: row.connected_by,
+      updated_at: row.updated_at,
+    };
+  } catch { return null; }
+}

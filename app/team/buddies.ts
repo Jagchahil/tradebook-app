@@ -32,9 +32,8 @@ export const BUDDIES: BuddyDef[] = [
   { key: 'pehredaar', name: 'Pehredaar', role: 'Security · 24/7',   g1: '#3B4A5A', g2: '#5C7186', status: 'live',   statusWord: 'on watch',    emblem: 'shield',    href: '/team/pehredaar', reportsToList: 'needs' },
   { key: 'kanjoos',   name: 'Kanjoos',   role: 'Cost · AI spend',   g1: '#C6871A', g2: '#E8B34C', status: 'live',   statusWord: 'counting',    emblem: 'coin',      href: '/team/kanjoos',   reportsToList: 'approve' },
   { key: 'dakiya',    name: 'Dakiya',    role: 'Front Desk · Email',g1: '#2C7A7B', g2: '#48A9AA', status: 'live',   statusWord: 'at the desk',  emblem: 'people',    href: '/team/dakiya',    reportsToList: 'approve' },
-  { key: 'hoka',      name: 'Hoka',      role: 'CMO · Marketing',   g1: '#E8973A', g2: '#F6B95C', status: 'live',   statusWord: 'drafting',    emblem: 'megaphone', href: '/team/hoka',      reportsToList: 'needs' },
   { key: 'khazanchi', name: 'Khazanchi', role: 'CFO · Finance',     g1: '#0E7C86', g2: '#1AA5B0', status: 'live',   statusWord: 'on the numbers',emblem: 'coin',     href: '/team/numbers',   reportsToList: 'none' },
-  { key: 'saudagar',  name: 'Saudagar',  role: 'CRO · Revenue',     g1: '#7E5AC2', g2: '#9E7BE0', status: 'live',   statusWord: 'on growth',   emblem: 'tag',       href: '/team/customers', reportsToList: 'none' },
+  { key: 'saudagar',  name: 'Saudagar',  role: 'CGO · Growth',      g1: '#E8973A', g2: '#9E7BE0', status: 'live',   statusWord: 'working the funnel', emblem: 'megaphone', href: '/team/growth', reportsToList: 'needs' },
 ];
 
 export function buddy(key: string): BuddyDef {
@@ -51,9 +50,8 @@ export const BUBBLE: Record<string, string> = {
   pehredaar: 'Security sweeps every couple of hours, once switched on.',
   kanjoos: 'Hunts the AI and Supabase bill for savings, daily.',
   dakiya: 'Reads sales@, support@ and info@ three times a day, drafts replies for you to approve.',
-  hoka: 'Marketing and content. Napping until hired.',
   khazanchi: 'Unit economics and margin. Wakes when there’s money.',
-  saudagar: 'Sales pipeline and CRM. Wakes with real customers.',
+  saudagar: 'The whole funnel in one desk: marketing brings people in, the CRM works them to paid.',
 };
 
 // EVERY social platform Hoka publishes to, once each is connected and approved. Jag: "run up all forms
@@ -106,9 +104,9 @@ export const SEED_TODOS: TodoItem[] = [
   { id: 'munshi-setup', kind: 'needs', buddyKey: 'munshi', prio: 'hi',
     text: 'Decide my five setup choices (channel, time, name, cadence, install), so you can hire me.',
     from: 'from Munshi · doc 114', where: '2 min, on your phone' },
-  { id: 'hoka-shots', kind: 'needs', buddyKey: 'hoka', prio: 'md',
+  { id: 'hoka-shots', kind: 'needs', buddyKey: 'saudagar', prio: 'md',
     text: 'Redo the App Store screenshots: real wordmark, one WhatsApp frame, benchmark vs Xero, QuickBooks, Monzo.',
-    from: "from Hoka · yours until I'm hired" },
+    from: "from Saudagar · yours until I'm hired" },
   { id: 'mistri-openai', kind: 'needs', buddyKey: 'mistri', prio: 'md',
     text: 'Paste the OpenAI key into Vercel and redeploy, to switch voice notes on.',
     from: 'from Mistri', where: 'needs your Mac' },

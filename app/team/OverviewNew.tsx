@@ -19,6 +19,7 @@ import { C, T, S as U, gbp } from './ui';
 import Buddy from './Buddy';
 import WorkforceTodo from './WorkforceTodo';
 import TeamTabs from './TeamTabs';
+import GrowthBrief from './GrowthBrief';
 import { BUDDIES, BUBBLE, SEED_TODOS, type TodoItem } from './buddies';
 import type { TeamOverview } from '../../lib/team';
 
@@ -187,6 +188,9 @@ export default function OverviewNew({
             <p style={{ ...U.alarm, marginTop: 14 }}>{knowAlarm}</p>
           ) : null}
         </section>
+
+        {/* FROM THE GROWTH DESK — Saudagar reports what needs a human, straight onto the front page. */}
+        <GrowthBrief overview={o} />
 
         {/* THE TEAM */}
         <section style={U.section}>

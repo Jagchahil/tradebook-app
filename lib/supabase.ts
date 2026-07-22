@@ -5064,3 +5064,37 @@ export async function markNurtureSent(email: string, newStage: number): Promise<
   });
   return res.ok;
 }
+
+// --- Pre-sale follow-up candidates (ships dark; the ladder lives in lib/presale.ts) ----------------
+export interface PresaleCandidate {
+  email: string; name: string | null; whatsapp: string | null; wa_consent: boolean;
+  presale_stage: number; presale_last_at: string | null; consent_at: string | null; consent: boolean;
+}
+
+// Leads still in the presale window: consented, not unsubscribed, not yet paid, ladder not exhausted
+// (presale_stage < 3 matches PRESALE_LADDER.length). Oldest capture first.
+export async function listPresaleCandidates(limit = 300): Promise<PresaleCandidate[]> {
+  const { url } = config();
+  const n = Math.min(500, Math.max(1, limit));
+  const res = await fetch(
+    `${url}/rest/v1/marketing_leads?select=email,name,whatsapp,wa_consent,presale_stage,presale_last_at,consent_at,consent&consent=is.true&unsubscribed_at=is.null&stage=neq.paid&presale_stage=lt.3&order=consent_at.asc&limit=${n}`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  const rows = (await res.json()) as Array<Record<string, unknown>>;
+  return rows.map((r) => ({
+    email: String(r.email), name: (r.name as string) ?? null, whatsapp: (r.whatsapp as string) ?? null,
+    wa_consent: r.wa_consent === true, presale_stage: Number(r.presale_stage ?? 0),
+    presale_last_at: (r.presale_last_at as string) ?? null, consent_at: (r.consent_at as string) ?? null, consent: r.consent === true,
+  }));
+}
+
+// Advance a contact's presale step and stamp the send time. Best effort.
+export async function markPresaleSent(email: string, newStage: number): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/marketing_leads?email=eq.${encodeURIComponent(email.toLowerCase())}`, {
+    method: 'PATCH', headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ presale_stage: newStage, presale_last_at: new Date().toISOString() }),
+  });
+  return res.ok;
+}

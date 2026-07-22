@@ -155,5 +155,26 @@ const cut = Q.buildQuarterPack({ transactions: [{ amount: 100, category: 'income
 ok('truncated flag carries through', cut.truncated === true);
 ok('truncated pack renders a clear warning', Q.renderQuarterPackHtml(cut).includes('may be incomplete'));
 
+console.log('\n=== quarterpack: MTD threshold reads live FACTS (override honesty) ===\n');
+// The displayed MTD threshold must come from FACTS, not a hard-coded literal, so an
+// approved override to the threshold moves the year-end document too. FACTS is mutable.
+const savedMtd = E.FACTS.mtdThreshold2026;
+E.FACTS.mtdThreshold2026 = 90000;
+const pMoved = Q.buildQuarterPack({ transactions: [{ amount: 100, category: 'income', transaction_date: '2026-05-01' }], startYear: 2026, quarter: 1 });
+ok('2026 MTD threshold follows an override to FACTS (90000)', pMoved.ytd.mtdThreshold === 90000);
+ok('override MTD threshold renders in the document', Q.renderQuarterPackHtml(pMoved).includes('£90,000'));
+E.FACTS.mtdThreshold2026 = savedMtd;
+const pRestored = Q.buildQuarterPack({ transactions: [{ amount: 100, category: 'income', transaction_date: '2026-05-01' }], startYear: 2026, quarter: 1 });
+ok('threshold returns to 50000 once the override is cleared', pRestored.ytd.mtdThreshold === 50000);
+
+console.log('\n=== quarterpack: pre-filing final-check line ===\n');
+const withCheck = Q.buildQuarterPack({ transactions: [{ amount: 5000, category: 'income', transaction_date: '2026-05-01' }], startYear: 2026, quarter: 1, finalCheck: 'SWEEP-RAN-2026' });
+ok('finalCheck carries onto the pack', withCheck.finalCheck === 'SWEEP-RAN-2026');
+const checkHtml = Q.renderQuarterPackHtml(withCheck);
+ok('document shows the final-check heading', checkHtml.includes('Final check before you file'));
+ok('document shows the assurance text', checkHtml.includes('SWEEP-RAN-2026'));
+const noCheck = Q.buildQuarterPack({ transactions: [{ amount: 5000, category: 'income', transaction_date: '2026-05-01' }], startYear: 2026, quarter: 1 });
+ok('no final-check block when none supplied', !Q.renderQuarterPackHtml(noCheck).includes('Final check before you file'));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

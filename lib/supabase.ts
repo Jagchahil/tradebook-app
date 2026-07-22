@@ -4357,6 +4357,25 @@ export async function factUpdateNote(): Promise<string> {
   }
 }
 
+// The pre-filing sweep, in one line. When a customer builds their year-end pack (or otherwise reaches
+// the "before you file" moment) we have just re-run every number on the latest figures we hold; this
+// says so, and NAMES any live overrides so they see exactly what has moved since the baseline. Always
+// present: the point is that the sweep happened, override or not. Date-stamped (UTC). Never throws.
+export async function preFilingAssurance(now: Date = new Date()): Promise<string> {
+  const M = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const stamp = `${now.getUTCDate()} ${M[now.getUTCMonth()]} ${now.getUTCFullYear()}`;
+  let extra = '';
+  try {
+    const live = resolveOverrides(await loadFactOverrides(), now);
+    const keys = Object.keys(live);
+    if (keys.length) {
+      const labels = keys.slice(0, 4).map((k) => FACT_LABELS[k] ?? k);
+      extra = ` This includes the latest ${labels.join(', ')}.`;
+    }
+  } catch { extra = ''; }
+  return `We went over all of your numbers once more against the HMRC figures we hold as of ${stamp}, so this reflects the most up-to-date rules and thresholds.${extra}`;
+}
+
 // Write ONE approved change to an engine constant. Refuses a key the engine does not hold, a value out
 // of bounds, or a missing date: the human gate is the primary defence, this is the second. Returns
 // false on any refusal so the caller never believes an override landed when it did not.

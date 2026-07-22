@@ -15,7 +15,7 @@
 // filing to HMRC, and the tax figure is a clearly labelled running estimate, not
 // a calculation submitted anywhere. Lekhio prepares, the user approves.
 
-import { soleTraderTax, class2Voluntary, mtdForIncomeTaxRequired } from './taxengine';
+import { soleTraderTax, class2Voluntary, mtdForIncomeTaxRequired, FACTS } from './taxengine';
 
 // A confirmed transaction, in the engine's sign convention: a positive amount is
 // income, a negative amount is an expense. Everything is optional and read
@@ -66,6 +66,7 @@ export interface QuarterPack {
   txCount: number;
   hasProperty: boolean;
   truncated: boolean; // the source data may be incomplete (row limit hit)
+  finalCheck?: string; // pre-filing assurance line, set by the route after a live-facts refresh
   // Year to date, up to and including this quarter, for the running tax picture.
   ytd: {
     trade: StreamSummary;
@@ -204,12 +205,15 @@ export interface BuildInput {
   // True when the transaction fetch hit its row limit and may be incomplete, so
   // the document warns rather than silently handing an accountant a short summary.
   truncated?: boolean;
+  // A one-line pre-filing assurance, filled in by the route once it has refreshed the
+  // live facts, so the year-end document can say the numbers were just re-checked.
+  finalCheck?: string;
 }
 
 // The MTD for Income Tax gross qualifying income threshold by tax year opening
 // year: 50k (April 2026), 30k (April 2027), 20k (April 2028+).
 function mtdThresholdFor(startYear: number): number {
-  return startYear >= 2028 ? 20000 : startYear >= 2027 ? 30000 : 50000;
+  return startYear >= 2028 ? FACTS.mtdThreshold2028 : startYear >= 2027 ? FACTS.mtdThreshold2027 : FACTS.mtdThreshold2026;
 }
 function mtdYearFor(startYear: number): 2026 | 2027 | 2028 {
   return startYear >= 2028 ? 2028 : startYear >= 2027 ? 2027 : 2026;
@@ -273,6 +277,7 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
     txCount: quarterTx.length,
     hasProperty: ytdProperty.income > 0 || ytdProperty.expenses > 0,
     truncated: Boolean(input.truncated),
+    finalCheck: input.finalCheck,
     ytd: {
       trade: ytdTrade,
       property: ytdProperty,
@@ -345,7 +350,7 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
 
   const mtdLine = pack.ytd.mtdApplies
     ? `Your gross income so far this year (${gbp(pack.ytd.grossQualifyingIncome)}) is over the ${gbp(pack.ytd.mtdThreshold)} Making Tax Digital for Income Tax threshold for ${esc(pack.taxYear)}, so quarterly updates apply.`
-    : `Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}. Making Tax Digital for Income Tax applies from £50,000 gross (from April 2026), £30,000 (April 2027), then £20,000 (April 2028).`;
+    : `Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}. Making Tax Digital for Income Tax applies from £${FACTS.mtdThreshold2026.toLocaleString('en-GB')} gross (from April 2026), £${FACTS.mtdThreshold2027.toLocaleString('en-GB')} (April 2027), then £${FACTS.mtdThreshold2028.toLocaleString('en-GB')} (April 2028).`;
 
   // A safety banner if the underlying data may have been capped, so a truncated
   // summary is never presented to an accountant as complete.
@@ -429,6 +434,7 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
       </table>
       <p class="muted" style="font-size:13px;margin-top:8px">${esc(est.note)}</p>
       <p class="muted" style="font-size:13px">${esc(mtdLine)}</p>
+      ${pack.finalCheck ? `<p style="font-size:13px;margin-top:12px;padding:10px 12px;background:${OFF_WHITE};border:1px solid ${BORDER};border-radius:8px;color:${INK}"><strong>Final check before you file.</strong> ${esc(pack.finalCheck)}</p>` : ''}
 
       <div class="foot">
         Prepared by Lekhio from ${pack.txCount} confirmed ${pack.txCount === 1 ? 'entry' : 'entries'} in this quarter and the published HMRC figures for ${esc(pack.taxYear)}. These figures are for your records and your accountant. Lekhio prepares, you approve. This is not a submission to HMRC.

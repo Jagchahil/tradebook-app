@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, getConfirmedTransactionsForRange, getBusinessName } from '../../../lib/supabase';
+import { verifyAccessToken, getConfirmedTransactionsForRange, getBusinessName, refreshFactsFromDb, preFilingAssurance } from '../../../lib/supabase';
 import { buildQuarterPack, quarterBounds, quarterForDate, renderQuarterPackHtml } from '../../../lib/quarterpack';
 import { packUrl, verifyPackToken } from '../../../lib/packtoken';
 
@@ -80,7 +80,11 @@ export async function GET(req: NextRequest) {
   // If the fetch hit its 20000-row cap the summary may be short, so flag it and
   // the document shows a warning rather than passing an accountant a partial pack.
   const truncated = transactions.length >= 20000;
-  const pack = buildQuarterPack({ transactions, startYear, quarter, businessName, truncated });
+  // The pre-filing sweep: refresh the live facts so the year-end document computes on the very latest
+  // approved figures, then compose the one-line assurance that says we just did (naming any overrides).
+  await refreshFactsFromDb();
+  const finalCheck = await preFilingAssurance();
+  const pack = buildQuarterPack({ transactions, startYear, quarter, businessName, truncated, finalCheck });
 
   if (sp.get('format') === 'json') {
     return NextResponse.json(pack);

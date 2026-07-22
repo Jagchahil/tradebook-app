@@ -121,7 +121,7 @@ import {
 } from '../../../lib/waintents';
 import { openTicket } from '../../../lib/support';
 import { matchKb } from '../../../lib/supportkb';
-import { soleTraderTax } from '../../../lib/taxengine';
+import { soleTraderTax, FACTS } from '../../../lib/taxengine';
 import { corporationTax } from '../../../lib/ltdengine';
 import { aprilDelta } from '../../../lib/propertyengine';
 import { niPosition, studentLoanRepayment, studentLoanForSA, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
@@ -1850,9 +1850,12 @@ async function handleStudentLoanPlanSet(from: string, text: string): Promise<voi
 // Simplified expenses mileage rates, 2026/27. Car or van 55p (first 10,000),
 // motorcycle 24p, bicycle 20p. We read the vehicle from the message.
 function mileageRate(body: string): { pence: number; vehicle: string } {
-  if (/\b(motorbike|motorcycle|moped|scooter)\b/i.test(body)) return { pence: 24, vehicle: 'motorcycle' };
-  if (/\b(bicycle|pushbike|push bike|cycling|on (?:the|my) bike|by bike|on (?:the|my) cycle)\b/i.test(body)) return { pence: 20, vehicle: 'bicycle' };
-  return { pence: 55, vehicle: 'car or van' };
+  // Read the rate from FACTS, so an approved change to the mileage rate is live here too, not stuck at
+  // a hardcoded 55p. (The live round-trip on 22 Jul logged 100 miles at 55p while an approved override
+  // said 60p; this closes that.)
+  if (/\b(motorbike|motorcycle|moped|scooter)\b/i.test(body)) return { pence: Math.round(FACTS.mileageMotorcycle * 100), vehicle: 'motorcycle' };
+  if (/\b(bicycle|pushbike|push bike|cycling|on (?:the|my) bike|by bike|on (?:the|my) cycle)\b/i.test(body)) return { pence: Math.round(FACTS.mileageBicycle * 100), vehicle: 'bicycle' };
+  return { pence: Math.round(FACTS.mileageCarFirst10k * 100), vehicle: 'car or van' };
 }
 const MILEAGE_RE = /\b(\d{1,4})\s*miles?\b/i;
 
@@ -1931,7 +1934,7 @@ async function handleCIS(from: string, messageId: string, body: string): Promise
   let assumed = false;
   if (amounts.length >= 2) deduction = amounts[1];
   else if (pctM) deduction = Math.round(gross * Math.min(parseInt(pctM[1], 10), 100)) / 100;
-  else { deduction = Math.round(gross * 0.2 * 100) / 100; assumed = true; }
+  else { deduction = Math.round(gross * FACTS.cisRegisteredRate * 100) / 100; assumed = true; }
   if (deduction >= gross) {
     await sendText(from, 'That CIS deduction looks bigger than the payment. Try "£400 paid, £80 CIS".');
     return;

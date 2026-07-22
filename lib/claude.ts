@@ -9,6 +9,7 @@ import { FACTS } from './taxengine';
 import { LTD } from './ltdengine';
 import { aiEnabled } from './aicost';
 import { storyboardPrompt, parseStoryboardDraft, type DraftInput, type DraftResult } from './studioagent';
+import { houseCopy } from './housestyle';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 // Two tiers. The structured extraction tasks (receipt fields, entry parsing,
@@ -406,7 +407,7 @@ export async function answerMoneyQuestion(
   const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
   logUsage('money_question', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
-  return textBlock ? textBlock.trim() : null;
+  return houseCopy(textBlock);
 }
 
 // Answer a "can I claim X?" expense question for a UK sole trader. Strictly
@@ -450,7 +451,7 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
   const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
   logUsage('expense_check', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
-  return textBlock ? textBlock.trim() : null;
+  return houseCopy(textBlock);
 }
 
 // --- WhatsApp support draft. When a customer asks for a human or reports a problem in WhatsApp, we open
@@ -506,7 +507,7 @@ export async function draftSupportReply(
   const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
   logUsage('support_draft', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
-  return textBlock ? textBlock.trim() : null;
+  return houseCopy(textBlock);
 }
 
 // --- Sharpen a playbook answer. Jag writes or pastes a rough answer to a common question in the console
@@ -545,7 +546,7 @@ export async function improveSupportAnswer(question: string, draft: string): Pro
   const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
   logUsage('support_improve', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
-  return textBlock ? textBlock.trim() : null;
+  return houseCopy(textBlock);
 }
 
 // --- The in-app accountant. Expert tax and bookkeeping Q&A for the self employed ---

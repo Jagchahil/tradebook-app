@@ -109,6 +109,9 @@ export async function POST(req: NextRequest) {
         streams,
         offer: str(b.offer, 40),
         referred_by_code: str(b.ref, 12), // sanitised in createSignup
+        // A SIC code lib/siccodes matched on the web from what they typed about their trade.
+        // createSignup re-derives the label from this code itself; nothing here is trusted verbatim.
+        sic_code: str(b.sicCode, 10),
       });
     } catch (dbErr) {
       const detail = dbErr instanceof Error ? dbErr.message : 'unknown';

@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
 import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL } from '../../lib/features';
+import { findSic } from '../../lib/siccodes';
 
 // The app store buttons. Until the app is ACTUALLY in both stores these are dead,
 // dimmed "soon" chips, never links to nowhere. The day it lands, flip
@@ -74,6 +75,9 @@ export default function StartPage() {
   const [name, setName] = useState('');
   const [trade, setTrade] = useState('');
   const [customTrade, setCustomTrade] = useState('');
+  // Which of the SIC suggestions is on screen, 0 = the best match. "Not quite?" steps through the
+  // rest rather than us guessing again; never sent anywhere until he sees and keeps this one.
+  const [sicPick, setSicPick] = useState(0);
   const [postcode, setPostcode] = useState('');
   const [address, setAddress] = useState('');
   const [vat, setVat] = useState<boolean | null>(false);
@@ -133,6 +137,17 @@ export default function StartPage() {
     return false;
   }, [step, phoneReady, emailValid, tradeType, name, trade, customTrade, vat]);
 
+  // What they actually typed or picked, for the SIC matcher. Only a limited company needs a SIC
+  // code at all (Companies House asks for it; a sole trader never does, see lib/siccodes), so this
+  // only shows and only travels with the signup when tradeType is 'ltd'. Never filed anywhere by
+  // us: it is a head start for when he registers himself, which the copy says plainly.
+  const effectiveTrade = trade === 'Something else' ? customTrade : trade;
+  const sicMatches = useMemo(
+    () => (tradeType === 'ltd' && effectiveTrade.trim().length > 1 ? findSic(effectiveTrade, 3) : []),
+    [tradeType, effectiveTrade],
+  );
+  const sicChoice = sicMatches[Math.min(sicPick, sicMatches.length - 1)] ?? null;
+
   function submitSignup() {
     // Fire and forget. The success screen shows regardless, so the experience
     // never breaks if the backend is not switched on yet.
@@ -154,6 +169,9 @@ export default function StartPage() {
           ts: Date.now() - t0,
           offer,
           ref,
+          // Only ever sent once he has actually SEEN the suggestion on screen (sicChoice is only set
+          // when the box above rendered). Never guessed silently server side.
+          sicCode: sicChoice ? sicChoice.code : undefined,
         }),
       }).catch(() => {});
     } catch {
@@ -387,14 +405,28 @@ export default function StartPage() {
                     {trades.map((t) => {
                       const active = trade === t;
                       return (
-                        <button key={t} className="chip" onClick={() => setTrade(t)} style={{ cursor: 'pointer', fontSize: 14.5, fontWeight: 600, color: active ? '#fff' : INK, backgroundColor: active ? RIVER : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 22, padding: '10px 16px' }}>{t}</button>
+                        <button key={t} className="chip" onClick={() => { setTrade(t); setSicPick(0); }} style={{ cursor: 'pointer', fontSize: 14.5, fontWeight: 600, color: active ? '#fff' : INK, backgroundColor: active ? RIVER : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 22, padding: '10px 16px' }}>{t}</button>
                       );
                     })}
                   </div>
                   {trade === 'Something else' && (
                     <div style={{ marginTop: 18 }}>
                       <label htmlFor="signup-trade" style={fieldLabel}>Tell us what you do</label>
-                      <input id="signup-trade" className="field" value={customTrade} onChange={(e) => setCustomTrade(e.target.value)} placeholder="e.g. Mobile dog groomer" style={fieldStyle} autoFocus />
+                      <input id="signup-trade" className="field" value={customTrade} onChange={(e) => { setCustomTrade(e.target.value); setSicPick(0); }} placeholder="e.g. Mobile dog groomer" style={fieldStyle} autoFocus />
+                    </div>
+                  )}
+                  {sicChoice && (
+                    <div style={{ marginTop: 18, backgroundColor: RIVER_TINT, border: `1.5px solid ${RIVER}`, borderRadius: 14, padding: '14px 16px' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: RIVER_DEEP, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Your likely SIC code</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: INK, marginTop: 6 }}>{sicChoice.code} &middot; {sicChoice.label}</div>
+                      <p style={{ fontSize: 12.5, color: MUTED, marginTop: 6, lineHeight: 1.5 }}>
+                        Companies House will ask for this when you register your limited company. You will confirm it yourself there, we are just saving you the look up.
+                      </p>
+                      {sicMatches.length > 1 && (
+                        <button type="button" onClick={() => setSicPick((p) => (p + 1) % sicMatches.length)} style={{ marginTop: 8, background: 'none', border: 'none', color: RIVER, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
+                          Not quite right? Try another
+                        </button>
+                      )}
                     </div>
                   )}
                 </Step>

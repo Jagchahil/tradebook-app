@@ -73,3 +73,17 @@ export function findSic(query: string, limit = 3): TradeSic[] {
   }
   return scored.slice(0, limit);
 }
+
+// Look a code up against the known list (primary or alt), so a server can trust the LABEL it
+// stores against a code without trusting client-supplied text for it. Never guessed, never
+// fuzzy: an exact match on the code or null. Used to validate a SIC code a signup form posts back,
+// so what we store is always our own canonical wording for that code, not whatever a client sent.
+export function sicByCode(code: string): { code: string; label: string } | null {
+  const c = code.trim();
+  if (!c) return null;
+  for (const t of TRADE_SIC) {
+    if (t.code === c) return { code: t.code, label: t.label };
+    if (t.alt && t.alt.code === c) return { code: t.alt.code, label: t.alt.label };
+  }
+  return null;
+}

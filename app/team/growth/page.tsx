@@ -283,12 +283,67 @@ function GrowthInner() {
         )}
       </section>
 
+      {/* CEO INSIGHT BOX — a place data cannot see: what Jag noticed. */}
+      <section style={U.section}>
+        <div style={U.sectionHead}><h2 style={T.h2}>Drop an insight</h2><span style={U.sectionNote}>from Marketplace, a forum, a chat</span></div>
+        <InsightBox />
+      </section>
+
       {err ? <p style={{ ...U.alarm, marginTop: 22 }}>{err}</p> : null}
 
       <p style={{ ...T.tiny, marginTop: 44, maxWidth: 720 }}>
         This desk shows who our customers are, what they pay us, and the state of our own marketing. It never shows a customer&rsquo;s receipts, income, tax figures or phone number, and it never will.
       </p>
     </>
+  );
+}
+
+function InsightBox() {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function save() {
+    if (!text.trim() || busy) return;
+    setBusy(true); setMsg(null);
+    const { data: s } = await browserSupabase.auth.getSession();
+    const tok = s.session?.access_token;
+    try {
+      const res = await fetch('/api/team/growth/insight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) {
+        setText('');
+        setMsg({ ok: true, text: 'Saved.' });
+      } else {
+        const j = await res.json().catch(() => ({} as { error?: string }));
+        setMsg({ ok: false, text: (j as { error?: string }).error || 'Could not save that.' });
+      }
+    } catch {
+      setMsg({ ok: false, text: 'Could not reach the server.' });
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div style={U.panel}>
+      <textarea
+        aria-label="Add an insight"
+        value={text}
+        onChange={(e) => { setText(e.target.value); setMsg(null); }}
+        placeholder="Something you noticed that the numbers wouldn't show…"
+        rows={3}
+        style={{ ...fieldStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: FONT }}
+      />
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 10 }}>
+        <button type="button" disabled={busy || !text.trim()} onClick={save} style={{ ...submitBtn, opacity: busy || !text.trim() ? 0.5 : 1 }}>
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+        {msg ? <span style={{ fontSize: 13, fontWeight: 650, color: msg.ok ? C.green : C.red }}>{msg.text}</span> : null}
+      </div>
+    </div>
   );
 }
 

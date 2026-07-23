@@ -25,6 +25,7 @@ import type {
 } from './studio';
 import { refreshFacts, resolveOverrides, isOverridableKey, isInBounds, type FactOverride } from './facts';
 import { advanceStage, normaliseWhatsapp, isContactStage, isCheckoutStage, isEventKind, type ContactStage, type CheckoutStage, type EventKind } from './crm';
+import { sicByCode } from './siccodes';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1000,6 +1001,11 @@ export interface OnboardSignup {
   streams?: string[] | null;
   offer?: string | null;
   referred_by_code?: string | null;
+  // The Companies House SIC code lib/siccodes matched from what a limited-company signup typed
+  // about their trade, and its label. Informational only: nobody files this anywhere, the person
+  // confirms it themselves at Companies House. sic_label is set by createSignup itself from the
+  // code, via lib/siccodes.sicByCode, never trusted verbatim from the caller.
+  sic_code?: string | null;
 }
 
 // Save a completed web onboarding. Written with the service role key, server side only.
@@ -1011,6 +1017,12 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
   if (signup.name) record.name = signup.name;
   if (signup.trade) record.trade = signup.trade;
   if (signup.postcode) record.postcode = signup.postcode;
+  // The label is ALWAYS re-derived here from our own canonical list, never taken as free text from
+  // the caller, so a stored label can never disagree with the code sitting next to it.
+  if (signup.sic_code) {
+    const sic = sicByCode(signup.sic_code);
+    if (sic) { record.sic_code = sic.code; record.sic_label = sic.label; }
+  }
   if (signup.address) record.address = signup.address;
   if (signup.vat_registered !== undefined && signup.vat_registered !== null) record.vat_registered = signup.vat_registered;
   if (Array.isArray(signup.streams) && signup.streams.length) record.streams = signup.streams;

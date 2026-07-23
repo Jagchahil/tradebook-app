@@ -40,6 +40,7 @@ const tools = [
   { href: '/rent-a-room-checker', icon: '🛏️', title: 'Rent a Room checker', body: 'A lodger in your own home can earn you £7,500 tax free. Over the limit there is an election most people never make. Check yours in seconds.', tint: GREEN_TINT, fg: GREEN, tag: 'Checker' },
   { href: '/sole-trader-vs-limited', icon: '⚖️', title: 'Sole trader vs limited', body: 'The honest 2026/27 comparison: corporation tax, the new dividend rates, employer NI, and the costs the folklore forgets. Your number decides.', tint: RIVER_TINT, fg: RIVER, tag: 'Calculator' },
   { href: '/file-your-tax-return', icon: '📋', title: 'File your own return', body: 'A step by step walkthrough by trade, so you can do your Self Assessment yourself and stop paying for a short job.', tint: RIVER_TINT, fg: RIVER, tag: 'Guide' },
+  { href: '/free-mtd-filing', icon: '🆓', title: 'Free MTD filing', body: 'For a straightforward return, profits, losses and the essentials, we will prepare and file it free, forever. Join the list.', tint: GREEN_TINT, fg: GREEN, tag: 'Coming soon' },
   { href: '/register-your-business', icon: '🏁', title: 'Register your business', body: 'Sole trader, limited, VAT, PAYE and CIS, explained simply with the real 2026 costs and deadlines.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Guide' },
 ];
 

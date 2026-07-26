@@ -56,7 +56,7 @@ export function isReferRequest(body: string): boolean {
 }
 
 export function siteBase(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || 'https://tradebook-app-five.vercel.app';
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
 }
 
 export interface ReferralInvite {

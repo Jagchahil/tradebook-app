@@ -43,7 +43,7 @@ import { computeSignalsForStructure, applyPingCaps, type AgentInput, type AgentS
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
 const BUDGET_MS = 40_000;
 const PAGE_SIZE = 200; // one RPC per user, so smaller pages than the send jobs
 const MAX_HOPS = 100;

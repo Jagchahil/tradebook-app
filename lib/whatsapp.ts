@@ -127,71 +127,96 @@ export async function downloadMedia(mediaId: string): Promise<MediaPayload | nul
   };
 }
 
+// --- Outbound transport, with retry ------------------------------------------
+//
+// EVERY send goes through this one function. It used to be five copies of the same fetch, each
+// firing once and giving up, and that is the gap this closes.
+//
+// WHAT WENT WRONG WITHOUT IT. Meta throttles us in two ways: a per second ceiling on the Cloud
+// API, and a messaging tier tied to our number's quality rating. Cross either and the Graph API
+// answers 429. The old code logged that number and returned, and the message was gone: no retry,
+// no queue, no record. One inbound burst, one backlog draining at once, one marketing push, and
+// an arbitrary slice of users simply never get the reply they are waiting for, while our logs say
+// only "Send failed: 429". Silent, uneven, and invisible, which is the failure mode this whole
+// codebase is built to refuse.
+//
+// WHAT IT DOES NOW. On 429 or any 5xx, or on a network error or timeout, it waits and tries
+// again, up to three attempts. The wait honours Meta's own Retry-After header when it sends one,
+// otherwise it backs off exponentially with jitter so a whole page of workers cannot resynchronise
+// and hammer the same second twice.
+//
+// WHAT IT DELIBERATELY DOES NOT DO. It does not retry a 4xx other than 429. A 400 (bad number,
+// malformed template, outside the 24 hour window) is a real answer, not a blip; retrying it just
+// spends the budget again to be told the same thing.
+//
+// This mirrors lib/bankfeed.ts's TrueLayer transport, which the same reasoning already made
+// load bearing there.
+const SEND_ATTEMPTS = 3;
+const SEND_BACKOFF_BASE_MS = 400;
+const SEND_BACKOFF_MAX_MS = 4000;
+
+function backoffFor(attempt: number, retryAfterHeader: string | null): number {
+  const retryAfter = Number(retryAfterHeader);
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(retryAfter * 1000, SEND_BACKOFF_MAX_MS);
+  }
+  const exponential = Math.min(SEND_BACKOFF_BASE_MS * 2 ** attempt, SEND_BACKOFF_MAX_MS);
+  return exponential / 2 + Math.random() * (exponential / 2); // full-ish jitter
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Post one message payload to the Graph API. Returns true only if Meta accepted it.
+// `label` names the kind of send for the log line; the payload itself is NEVER logged, because
+// it contains the recipient's number and the message body (CLAUDE.md: WhatsApp content goes to
+// Supabase and nowhere else).
+async function graphSend(label: string, payload: Record<string, unknown>): Promise<boolean> {
+  if (!TOKEN || !PHONE_NUMBER_ID) {
+    console.warn(`[whatsapp] ${label} skipped. Token or phone number id missing.`);
+    return false;
+  }
+
+  for (let attempt = 0; attempt < SEND_ATTEMPTS; attempt += 1) {
+    const last = attempt === SEND_ATTEMPTS - 1;
+    try {
+      const res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+        body: JSON.stringify({ messaging_product: 'whatsapp', ...payload }),
+      });
+
+      if (res.ok) return true;
+
+      const transient = res.status === 429 || res.status >= 500;
+      if (!transient || last) {
+        // STATUS ONLY. Meta's Graph error body reflects the recipient wa_id (a phone number) and
+        // can echo the message. Vercel logs are an external service.
+        console.error(`[whatsapp] ${label} failed:`, res.status, last && transient ? '(gave up after retries)' : '');
+        return false;
+      }
+      await sleep(backoffFor(attempt, res.headers.get('retry-after')));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'unknown error';
+      if (last) {
+        console.error(`[whatsapp] ${label} failed or timed out:`, message, '(gave up after retries)');
+        return false;
+      }
+      await sleep(backoffFor(attempt, null));
+    }
+  }
+  return false;
+}
+
 // Send a plain text WhatsApp message back to the sender.
 export async function sendText(toPhone: string, body: string): Promise<void> {
-  if (!TOKEN || !PHONE_NUMBER_ID) {
-    console.warn('[whatsapp] Send skipped. Token or phone number id missing.');
-    return;
-  }
-
-  // A timeout aborts the fetch with an AbortError. The send is wrapped so a hung
-  // Graph call is logged and swallowed rather than rejecting out of the webhook.
-  let res: Response;
-  try {
-    res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: toPhone,
-        type: 'text',
-        text: { body },
-      }),
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'unknown error';
-    console.error('[whatsapp] Send failed or timed out:', message);
-    return;
-  }
-
-  if (!res.ok) {
-    // STATUS ONLY. Meta's Graph error body reflects the recipient wa_id (a phone number) and can
-    // echo the message. Vercel logs are an external service, and CLAUDE.md forbids sending
-    // WhatsApp content anywhere but Supabase.
-    console.error('[whatsapp] Send failed:', res.status);
-  }
+  await graphSend('Send', { to: toPhone, type: 'text', text: { body } });
 }
 
 // The same free-form in-window send, but it reports whether the message actually left. The support
-// console needs an honest yes/no so it never marks a ticket answered when the send was rejected. Same
-// timeout, same status-only logging as sendText.
+// console needs an honest yes/no so it never marks a ticket answered when the send was rejected.
 export async function sendTextResult(toPhone: string, body: string): Promise<boolean> {
-  if (!TOKEN || !PHONE_NUMBER_ID) {
-    console.warn('[whatsapp] Send skipped. Token or phone number id missing.');
-    return false;
-  }
-  let res: Response;
-  try {
-    res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-      body: JSON.stringify({ messaging_product: 'whatsapp', to: toPhone, type: 'text', text: { body } }),
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'unknown error';
-    console.error('[whatsapp] Send failed or timed out:', message);
-    return false;
-  }
-  if (!res.ok) {
-    console.error('[whatsapp] Send failed:', res.status);
-    return false;
-  }
-  return true;
+  return graphSend('Send', { to: toPhone, type: 'text', text: { body } });
 }
 
 // Send an approved WhatsApp message template. Required for any proactive message
@@ -204,42 +229,15 @@ export async function sendTemplate(
   languageCode: string,
   bodyParams: string[] = [],
 ): Promise<void> {
-  if (!TOKEN || !PHONE_NUMBER_ID) {
-    console.warn('[whatsapp] Template send skipped. Token or phone number id missing.');
-    return;
-  }
-
   const components = bodyParams.length
     ? [{ type: 'body', parameters: bodyParams.map((t) => ({ type: 'text', text: t })) }]
     : [];
 
-  // A timeout aborts the fetch with an AbortError. The send is wrapped so a hung
-  // Graph call is logged and swallowed rather than rejecting out of the caller.
-  let res: Response;
-  try {
-    res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: toPhone,
-        type: 'template',
-        template: { name: templateName, language: { code: languageCode }, components },
-      }),
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'unknown error';
-    console.error('[whatsapp] Template send failed or timed out:', message);
-    return;
-  }
-
-  if (!res.ok) {
-    console.error('[whatsapp] Template send failed:', res.status); // status only, see above
-  }
+  await graphSend('Template send', {
+    to: toPhone,
+    type: 'template',
+    template: { name: templateName, language: { code: languageCode }, components },
+  });
 }
 
 // Send an interactive message with up to three quick reply buttons. Only valid
@@ -251,61 +249,29 @@ export async function sendButtons(
   buttons: Array<{ id: string; title: string }>,
   footer?: string,
 ): Promise<void> {
-  if (!TOKEN || !PHONE_NUMBER_ID) {
-    console.warn('[whatsapp] Send skipped. Token or phone number id missing.');
-    return;
-  }
-  try {
-    const res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: toPhone,
-        type: 'interactive',
-        interactive: {
-          type: 'button',
-          body: { text: body },
-          ...(footer ? { footer: { text: footer } } : {}),
-          action: {
-            buttons: buttons.slice(0, 3).map((b) => ({
-              type: 'reply',
-              reply: { id: b.id, title: b.title.slice(0, 20) },
-            })),
-          },
-        },
-      }),
-    });
-    // STATUS ONLY. The Graph error body reflects the recipient wa_id, which is a phone number,
-    // and Vercel logs are an external service.
-    if (!res.ok) console.error('[whatsapp] Buttons send failed:', res.status);
-  } catch (err) {
-    console.error('[whatsapp] Buttons send failed or timed out:', err instanceof Error ? err.message : err);
-  }
+  await graphSend('Buttons send', {
+    to: toPhone,
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: body },
+      ...(footer ? { footer: { text: footer } } : {}),
+      action: {
+        buttons: buttons.slice(0, 3).map((b) => ({
+          type: 'reply',
+          reply: { id: b.id, title: b.title.slice(0, 20) },
+        })),
+      },
+    },
+  });
 }
 
 // Send an image by public URL with an optional caption. Used for the welcome
 // brand card; in-session media needs no template.
 export async function sendImageUrl(toPhone: string, link: string, caption?: string): Promise<void> {
-  if (!TOKEN || !PHONE_NUMBER_ID) {
-    console.warn('[whatsapp] Send skipped. Token or phone number id missing.');
-    return;
-  }
-  try {
-    const res = await fetch(`${GRAPH}/${PHONE_NUMBER_ID}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: toPhone,
-        type: 'image',
-        image: { link, ...(caption ? { caption } : {}) },
-      }),
-    });
-    if (!res.ok) console.error('[whatsapp] Image send failed:', res.status); // status only, see above
-  } catch (err) {
-    console.error('[whatsapp] Image send failed or timed out:', err instanceof Error ? err.message : err);
-  }
+  await graphSend('Image send', {
+    to: toPhone,
+    type: 'image',
+    image: { link, ...(caption ? { caption } : {}) },
+  });
 }

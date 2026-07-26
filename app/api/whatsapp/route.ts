@@ -131,7 +131,7 @@ import { rateLimitedShared } from '../../../lib/ratelimit';
 import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
 
 // Node runtime (we use crypto for signature checks). Allow the function to live
 // long enough to finish the after() work (AI/transcription) once it is switched

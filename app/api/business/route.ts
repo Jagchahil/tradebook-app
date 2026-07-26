@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { userBurst } from '../../../lib/ratelimit';
 import {
   verifyAccessToken,
   getBusinessProfile,
@@ -31,6 +32,9 @@ async function userFrom(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const user = await userFrom(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (await userBurst('business', user.id)) {
+    return NextResponse.json({ error: 'slow down' }, { status: 429 });
+  }
   const profile = await getBusinessProfile(user.id);
   // A missing profile is a real answer: he has not told us yet. getBusinessProfile
   // defaults to sole trader when a row exists (the safe read for the tax engine),
@@ -44,6 +48,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await userFrom(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (await userBurst('business', user.id)) {
+    return NextResponse.json({ error: 'slow down' }, { status: 429 });
+  }
 
   let body: { business_type?: unknown; partnership_share?: unknown } = {};
   try {

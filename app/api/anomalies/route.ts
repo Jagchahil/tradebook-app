@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { userBurst } from '../../../lib/ratelimit';
 import { verifyAccessToken, getConfirmedTransactionsForRange, getAllConfirmedForReview } from '../../../lib/supabase';
 import { findAnomalies, summariseAnomalies, type Anomaly } from '../../../lib/anomaly';
 import { findPersonal } from '../../../lib/personal';
@@ -32,6 +33,9 @@ export async function GET(req: NextRequest) {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   const user = token ? await verifyAccessToken(token) : null;
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (await userBurst('anomalies', user.id)) {
+    return NextResponse.json({ error: 'slow down' }, { status: 429 });
+  }
 
   const now = new Date();
   const todayISO = now.toISOString().slice(0, 10);

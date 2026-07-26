@@ -830,14 +830,35 @@ export async function setLeadUnsubscribed(email: string): Promise<boolean> {
 // The list we may lawfully email: consented and not unsubscribed. Confirmed only
 // is stricter and better for deliverability; pass confirmedOnly true once double
 // opt in is live.
-export async function listMarketableLeads(confirmedOnly = false): Promise<string[]> {
+//
+// BOUNDED, because an unbounded read of a growing table is a silent truncation waiting to happen.
+// PostgREST will cap a large response itself, and when it does it does not tell you it has: you
+// get a short array that looks exactly like "that is everyone", and a send goes out to a slice of
+// the list while the rest are quietly never contacted. So the ceiling is ours, explicit, and the
+// caller is told when it was hit rather than left to assume completeness.
+const MARKETABLE_LEADS_CAP = 5000;
+
+export async function listMarketableLeads(
+  confirmedOnly = false,
+  limit = MARKETABLE_LEADS_CAP,
+): Promise<string[]> {
   const { url } = config();
+  const n = Math.max(1, Math.min(limit, MARKETABLE_LEADS_CAP));
   let q = `${url}/rest/v1/marketing_leads?select=email&consent=is.true&unsubscribed_at=is.null`;
   if (confirmedOnly) q += '&confirmed_at=not.is.null';
+  q += `&order=email.asc&limit=${n}`;
   const res = await fetch(q, { headers: headers() });
   if (!res.ok) return [];
   const rows = (await res.json()) as Array<{ email: string }>;
-  return rows.map((r) => r.email).filter(Boolean);
+  const emails = rows.map((r) => r.email).filter(Boolean);
+  if (emails.length === n) {
+    // Say it out loud. A capped list that nobody knows is capped is how a mailing quietly reaches
+    // the first five thousand people alphabetically and nobody else, for months.
+    console.warn(
+      `[leads] listMarketableLeads hit the ${n} cap. The list is TRUNCATED; page this query before sending to everyone.`,
+    );
+  }
+  return emails;
 }
 
 // --- CRM contacts (marketing_leads, extended) -------------------------------------------------
@@ -932,17 +953,45 @@ export async function setContactStage(email: string, next: ContactStage): Promis
 // lead (that is where captureContact leaves them). Returns null on a read failure so the desk can say
 // "could not read" rather than draw a confident, wrong zero. Bounded read: fine at today's volume, and
 // the place to add a server-side aggregate the day the leads table is large.
+// COUNTED IN POSTGRES, NOT IN JAVASCRIPT.
+//
+// This used to pull up to ten thousand rows back just to tally them here, and its own comment
+// admitted the plan: "fine at today's volume, and the place to add a server-side aggregate the
+// day the leads table is large". That day is the one we are preparing for, and the failure it
+// causes is the nasty kind: past ten thousand leads the board does not error, it just shows
+// numbers that are quietly too low, forever, and a wrong number on a dashboard is worse than no
+// number because somebody makes a decision on it.
+//
+// So each stage is now a HEAD count with the total read off the Content-Range header. No rows
+// cross the wire at all, the count is exact at any size, and a failure on any one stage returns
+// null for the whole thing rather than a partial tally that reads like a real one.
 export async function countContactsByStage(): Promise<Record<string, number> | null> {
   const { url } = config();
+  const stages = ['lead', 'warming', 'checkout', 'trial', 'paid', 'dormant'] as const;
   try {
-    const res = await fetch(`${url}/rest/v1/marketing_leads?select=stage&limit=10000`, { headers: headers() });
-    if (!res.ok) return null;
-    const rows = (await res.json()) as Array<{ stage: string | null }>;
-    const out: Record<string, number> = { lead: 0, warming: 0, checkout: 0, trial: 0, paid: 0, dormant: 0 };
-    for (const r of rows) {
-      const st = r.stage && isContactStage(r.stage) ? r.stage : 'lead';
-      out[st] = (out[st] ?? 0) + 1;
-    }
+    const counts = await Promise.all(
+      stages.map(async (stage) => {
+        // A row with no stage set yet is a lead: that is where captureContact leaves them, so the
+        // lead bucket has to count nulls as well as the explicit value.
+        const filter =
+          stage === 'lead'
+            ? `or=(stage.eq.lead,stage.is.null)`
+            : `stage=eq.${encodeURIComponent(stage)}`;
+        const res = await fetch(`${url}/rest/v1/marketing_leads?select=email&${filter}`, {
+          method: 'HEAD',
+          headers: headers({ Prefer: 'count=exact', Range: '0-0' }),
+        });
+        if (!res.ok) return null;
+        const total = (res.headers.get('content-range') ?? '').split('/')[1];
+        const n = Number(total);
+        return Number.isFinite(n) ? n : null;
+      }),
+    );
+    if (counts.some((c) => c === null)) return null;
+    const out: Record<string, number> = {};
+    stages.forEach((stage, i) => {
+      out[stage] = counts[i] as number;
+    });
     return out;
   } catch { return null; }
 }
@@ -1494,18 +1543,47 @@ export async function writeSnapshot(s: Snapshot): Promise<boolean> {
 //
 // stripe_subscription_id is null: only our own no-card grants. A man with a card on file is
 // Stripe's conversation, not ours.
-export async function trialsNeedingNudge(): Promise<TrialRow[] | null> {
+//
+// PAGED, WITH A KEYSET CURSOR. This used to take no arguments and no limit: one query, the whole
+// trialing population, in one array. At a few dozen trials that is fine and it is how it shipped.
+// At ten thousand it is a single unbounded read feeding a serial loop that cannot finish inside a
+// function timeout, so the run gets killed part way and the men it never reached are simply never
+// told their trial is ending. They find out by being locked out. Same shape as the digest bug.
+//
+// So it hands over one ordered page at a time, and the caller hops with the cursor. Ordering by
+// id is what makes the walk finite: every page asks for id greater than the last one seen, so no
+// row is ever visited twice and the id space runs out.
+export interface TrialPage {
+  rows: TrialRow[];
+  lastId: string | null;
+  more: boolean;
+}
+
+export async function trialsNeedingNudgePage(
+  afterId: string | null,
+  limit = 200,
+): Promise<TrialPage | null> {
   try {
     const { url } = config();
+    const cursor = afterId ? `&id=gt.${encodeURIComponent(afterId)}` : '';
     const res = await fetch(
       `${url}/rest/v1/subscriptions` +
         `?status=eq.trialing&stripe_subscription_id=is.null` +
         `&or=(trial_warn_sent_at.is.null,trial_end_sent_at.is.null)` +
-        `&select=phone,status,current_period_end,stripe_subscription_id,trial_warn_sent_at,trial_end_sent_at`,
+        `&select=id,phone,status,current_period_end,stripe_subscription_id,trial_warn_sent_at,trial_end_sent_at` +
+        `&order=id.asc&limit=${limit}${cursor}`,
       { headers: headers() },
     );
     if (!res.ok) return null;
-    return (await res.json()) as TrialRow[];
+    const rows = (await res.json()) as Array<TrialRow & { id: string }>;
+    if (!Array.isArray(rows)) return null;
+    return {
+      rows,
+      lastId: rows.length ? rows[rows.length - 1].id : afterId,
+      // A short page means the cursor has reached the end of the set. Driven by page size, never
+      // by a time budget, so a run that stops early can never be mistaken for a run that finished.
+      more: rows.length === limit,
+    };
   } catch {
     return null;
   }

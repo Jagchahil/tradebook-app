@@ -3,6 +3,7 @@ import { insertStudioAsset, insertStudioAgentRun } from '../../../../lib/supabas
 import { draftStoryboard } from '../../../../lib/claude';
 import { buildStrategy, type Brief } from '../../../../lib/brief';
 import { defaultPlatforms, type Format, type Promise3 } from '../../../../lib/studio';
+import { sharedSecretMatches } from '../../../../lib/connectors';
 
 export const runtime = 'nodejs';
 // Drafting a whole slate on the smart model takes real seconds. Give the function room so a brief
@@ -27,7 +28,8 @@ const PROMISES: Promise3[] = ['money', 'zero_habit', 'honesty'];
 export async function POST(req: NextRequest) {
   const secret = process.env.AGENT_SECRET;
   if (!secret) return NextResponse.json({ error: 'agent not configured' }, { status: 503 });
-  if ((req.headers.get('x-agent-secret') || '') !== secret) {
+  // Constant time, so the comparison cannot leak how much of the secret a caller got right.
+  if (!sharedSecretMatches(req.headers.get('x-agent-secret'), secret)) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 

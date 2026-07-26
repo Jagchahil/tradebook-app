@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { TRADES } from '../lib/trades';
 
-const BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://tradebook-app-five.vercel.app';
+const BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
 
 // Public marketing + free-tool routes. The /for/[trade] long-tail pages are added
 // from the single TRADES source so this never drifts out of sync with the pages.

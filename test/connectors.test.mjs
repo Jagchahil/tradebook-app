@@ -86,5 +86,16 @@ ok('x carries the pkce challenge and S256', xu.searchParams.get('code_challenge'
 ok('x with no challenge omits the pkce params', !new URL(K.authorizeUrl('twitter', st)).searchParams.has('code_challenge'));
 ok('x asks tweet.write with offline access', (xu.searchParams.get('scope') || '').includes('tweet.write') && (xu.searchParams.get('scope') || '').includes('offline.access'));
 
+// THE GAP THIS CLOSES (26 Jul audit). Two agent routes compared their shared secret with !==,
+// which bails at the first differing byte and so leaks, through timing, how much of the secret a
+// caller guessed right. One line to close a whole class of attack, so it is closed.
+console.log('\n=== a shared secret is compared in constant time ===\n');
+ok('the right secret matches', K.sharedSecretMatches('s3cret-value', 's3cret-value') === true);
+ok('a wrong secret of the same length does not', K.sharedSecretMatches('s3cret-valuX', 's3cret-value') === false);
+ok('a wrong length does not', K.sharedSecretMatches('short', 's3cret-value') === false);
+ok('a missing header does not', K.sharedSecretMatches(null, 's3cret-value') === false);
+ok('an unconfigured secret fails closed', K.sharedSecretMatches('anything', undefined) === false);
+ok('an empty configured secret fails closed', K.sharedSecretMatches('x', '') === false);
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exit(fail ? 1 : 0);

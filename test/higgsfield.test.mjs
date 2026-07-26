@@ -61,5 +61,19 @@ ok('a plain http url is refused', H.acceptRenderResult('http://x/y.mp4', { enabl
 ok('a data url is refused', H.acceptRenderResult('data:video/mp4;base64,AAAA', { enabled: true, configured: true }).reason === 'bad_url');
 ok('a real https url is accepted', H.acceptRenderResult('https://cdn.higgsfield.ai/x.mp4', { enabled: true, configured: true }).ok === true);
 
+// THE GAP THIS CLOSES (26 Jul audit). The only check used to be "is it https", and https says
+// nothing about WHOSE url it is. This value is stored on a content asset and later embedded on
+// something customer facing, so the host has to be one we actually expect, exactly as
+// lib/whatsapp.ts already requires for Meta's media urls.
+console.log('\n=== the render url must be on a host we expect ===\n');
+ok('a higgsfield host is allowed', H.isAllowedRenderHost('https://cdn.higgsfield.ai/a/b.mp4') === true);
+ok('a subdomain of an allowed host is allowed', H.isAllowedRenderHost('https://x.y.amazonaws.com/f.png') === true);
+ok('an arbitrary host is refused', H.isAllowedRenderHost('https://evil.example.com/f.png') === false);
+ok('plain http is refused', H.isAllowedRenderHost('http://cdn.higgsfield.ai/f.png') === false);
+ok('userinfo cannot be used to fake the host', H.isAllowedRenderHost('https://cdn.higgsfield.ai@evil.example.com/f.png') === false);
+ok('a link local address is refused', H.isAllowedRenderHost('https://169.254.169.254/latest/meta-data') === false);
+ok('junk is refused', H.isAllowedRenderHost('not a url') === false);
+ok('acceptRenderResult refuses a foreign host as bad_host', H.acceptRenderResult('https://evil.example.com/x.mp4', { enabled: true, configured: true }).reason === 'bad_host');
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exit(fail ? 1 : 0);

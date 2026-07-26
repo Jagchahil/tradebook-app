@@ -88,7 +88,7 @@ export function verifyPackToken(token: string | null, now: Date = new Date()): P
 }
 
 export function siteBase(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || 'https://tradebook-app-five.vercel.app';
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
 }
 
 // The full capability URL the app opens in the browser.

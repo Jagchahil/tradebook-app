@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (!agg) return NextResponse.json({ ok: true, signals: [] });
   if (agg.months.length === 0 && agg.unconfirmed === 0) return NextResponse.json({ ok: true, signals: [] });
 
-  const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
+  const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
   const [goals, overdue, profile, income] = await Promise.all([
     getActiveGoals(userId),
     listOverdueInvoices(userId),

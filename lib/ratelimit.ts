@@ -80,3 +80,28 @@ export async function rateLimitedShared(
   if (shared === null) return false; // fail open, and we have already applied the local cap
   return shared;
 }
+
+// A ceiling on a SIGNED IN caller, per route.
+//
+// Being logged in is not the same as being trusted. Every read behind these routes costs database
+// time and Supabase compute, and one account, scripted or simply stuck in a retry loop in a bad
+// build of the app, can generate more load than a thousand real plumbers. The open endpoints have
+// been throttled per IP since the scale audit; this is the same idea applied to the authenticated
+// ones, keyed on the user id, so one bad account pays for itself and nobody else does.
+//
+// Deliberately generous. 120 calls a minute is two a second sustained, which no honest screen in
+// the app comes close to, so no real person will ever see this fire.
+//
+// Same failure posture as everything else in this file: it fails OPEN. It is abuse control, and a
+// database wobble must never lock a man out of his own books. The auth gate above it is the thing
+// that fails closed.
+const PER_USER_DEFAULT = 120;
+const PER_USER_WINDOW_MS = 60 * 1000;
+
+export async function userBurst(
+  route: string,
+  userId: string,
+  limit = PER_USER_DEFAULT,
+): Promise<boolean> {
+  return rateLimitedShared(`u:${route}:${userId}`, limit, PER_USER_WINDOW_MS);
+}

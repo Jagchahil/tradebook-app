@@ -55,7 +55,7 @@ function authorised(req: NextRequest): boolean {
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
 const SEND_BUDGET_MS = 40_000; // stop sending well inside the 60s Hobby limit
 const PAGE_SIZE = 500;
 const MAX_HOPS = 100; // 100 hops x thousands of sends per hop is far beyond 20k

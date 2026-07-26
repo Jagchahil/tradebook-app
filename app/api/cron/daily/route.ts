@@ -48,7 +48,7 @@ function authorised(req: NextRequest): boolean {
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
 
 // Which endpoints a slot fans out to. Weekday-gated jobs are decided at call time in UTC, because
 // UTC is the clock Vercel's scheduler runs on. getUTCDay: 0 = Sunday ... 5 = Friday.

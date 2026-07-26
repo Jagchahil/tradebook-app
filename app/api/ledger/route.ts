@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { userBurst } from '../../../lib/ratelimit';
 import { verifyAccessToken, getOptimiserInput } from '../../../lib/supabase';
 import { ledger, headline } from '../../../lib/ledger';
 
@@ -31,6 +32,9 @@ export async function GET(req: NextRequest) {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   const user = token ? await verifyAccessToken(token) : null;
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (await userBurst('ledger', user.id)) {
+    return NextResponse.json({ error: 'slow down' }, { status: 429 });
+  }
 
   const input = await getOptimiserInput(user.id);
 

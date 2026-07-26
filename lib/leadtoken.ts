@@ -38,7 +38,7 @@ export function verifyLeadToken(purpose: 'confirm' | 'unsub', email: string, tok
 
 // The public site base, for building absolute links in emails.
 export function siteBase(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || 'https://tradebook-app-five.vercel.app';
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
 }
 
 export function confirmUrl(email: string): string {

@@ -572,7 +572,6 @@ export async function submitFinalDeclaration(args: {
   calculationId: string;
   accessToken: string;
   approved: boolean;
-  declarationType?: 'final-declaration' | 'confirm-amendment';
   fraud: FraudContext;
   govTestScenario?: string;
   userId?: string; // our internal user id, recorded in the approval audit trail
@@ -585,13 +584,13 @@ export async function submitFinalDeclaration(args: {
   // most here.
   await recordApproval({
     userId: args.userId,
-    submissionType: args.declarationType || 'final-declaration',
+    submissionType: 'final-declaration',
     calculationId: args.calculationId,
     periodKey: args.taxYear,
     figures: { taxYear: args.taxYear, calculationId: args.calculationId },
   });
 
-  const url = `${BASE}/individuals/calculations/${encodeURIComponent(args.nino)}/self-assessment/${encodeURIComponent(args.taxYear)}/${encodeURIComponent(args.calculationId)}/${encodeURIComponent(args.declarationType || 'final-declaration')}`;
+  const url = `${BASE}/individuals/calculations/${encodeURIComponent(args.nino)}/self-assessment/${encodeURIComponent(args.taxYear)}/${encodeURIComponent(args.calculationId)}/final-declaration`;
   const headers: Record<string, string> = {
     Authorization: `Bearer ${args.accessToken}`,
     Accept: CALC_VERSION,
@@ -744,147 +743,4 @@ export async function listLossClaims(nino: string, taxYearClaimedFor: string, ac
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: LOSS_VERSION, ...fraudPreventionHeaders(fraud) } });
   if (!res.ok) return null;
   return res.json().catch(() => null);
-}
-
-// --- Business Details (MTD) v2.0 ---------------------------------------------
-const BUSINESS_DETAILS_VERSION = 'application/vnd.hmrc.2.0+json';
-
-export async function listBusinesses(nino: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
-  if (!isHmrcConfigured()) return null;
-  const url = `${BASE}/individuals/business/details/${encodeURIComponent(nino)}/list`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: BUSINESS_DETAILS_VERSION, ...fraudPreventionHeaders(fraud) } });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-export async function retrieveBusinessDetails(nino: string, businessId: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
-  if (!isHmrcConfigured()) return null;
-  const url = `${BASE}/individuals/business/details/${encodeURIComponent(nino)}/${encodeURIComponent(businessId)}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: BUSINESS_DETAILS_VERSION, ...fraudPreventionHeaders(fraud) } });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-export async function listCalculations(nino: string, taxYear: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
-  if (!isHmrcConfigured()) return null;
-  const url = `${BASE}/individuals/calculations/${encodeURIComponent(nino)}/self-assessment/${encodeURIComponent(taxYear)}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: CALC_VERSION, ...fraudPreventionHeaders(fraud) } });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-export async function retrievePeriodsOfAccount(nino: string, businessId: string, taxYear: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
-  if (!isHmrcConfigured()) return null;
-  const url = `${BASE}/individuals/business/details/${encodeURIComponent(nino)}/${encodeURIComponent(businessId)}/${encodeURIComponent(taxYear)}/periods-of-account`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: BUSINESS_DETAILS_VERSION, ...fraudPreventionHeaders(fraud) } });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-export async function createAmendPeriodsOfAccount(args: { nino: string; businessId: string; taxYear: string; body: Record<string, unknown>; accessToken: string; fraud: FraudContext; approved: boolean; userId?: string }): Promise<{ ok: boolean; status: number; body?: unknown }> {
-  if (args.approved !== true) throw new ApprovalRequiredError();
-  if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
-  await recordApproval({ userId: args.userId, submissionType: 'periods-of-account', periodKey: args.taxYear, figures: { taxYear: args.taxYear, businessId: args.businessId, body: args.body } });
-  const url = `${BASE}/individuals/business/details/${encodeURIComponent(args.nino)}/${encodeURIComponent(args.businessId)}/${encodeURIComponent(args.taxYear)}/periods-of-account`;
-  const res = await fetch(url, { method: 'PUT', headers: { Authorization: `Bearer ${args.accessToken}`, Accept: BUSINESS_DETAILS_VERSION, 'Content-Type': 'application/json', ...fraudPreventionHeaders(args.fraud) }, body: JSON.stringify(args.body) });
-  const body = await res.json().catch(() => undefined);
-  return { ok: res.ok, status: res.status, body };
-}
-
-export async function retrieveAccountingType(nino: string, businessId: string, taxYear: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
-  if (!isHmrcConfigured()) return null;
-  const url = `${BASE}/individuals/business/details/${encodeURIComponent(nino)}/${encodeURIComponent(businessId)}/${encodeURIComponent(taxYear)}/accounting-type`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: BUSINESS_DETAILS_VERSION, ...fraudPreventionHeaders(fraud) } });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-export async function updateAccountingType(args: { nino: string; businessId: string; taxYear: string; body: Record<string, unknown>; accessToken: string; fraud: FraudContext; approved: boolean; userId?: string }): Promise<{ ok: boolean; status: number; body?: unknown }> {
-  if (args.approved !== true) throw new ApprovalRequiredError();
-  if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
-  await recordApproval({ userId: args.userId, submissionType: 'accounting-type', periodKey: args.taxYear, figures: { taxYear: args.taxYear, businessId: args.businessId, body: args.body } });
-  const url = `${BASE}/individuals/business/details/${encodeURIComponent(args.nino)}/${encodeURIComponent(args.businessId)}/${encodeURIComponent(args.taxYear)}/accounting-type`;
-  const res = await fetch(url, { method: 'PUT', headers: { Authorization: `Bearer ${args.accessToken}`, Accept: BUSINESS_DETAILS_VERSION, 'Content-Type': 'application/json', ...fraudPreventionHeaders(args.fraud) }, body: JSON.stringify(args.body) });
-  const body = await res.json().catch(() => undefined);
-  return { ok: res.ok, status: res.status, body };
-}
-
-export async function retrieveLateAccountingDateRule(nino: string, businessId: string, taxYear: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
-  if (!isHmrcConfigured()) return null;
-  const url = `${BASE}/individuals/business/details/${encodeURIComponent(nino)}/${encodeURIComponent(businessId)}/${encodeURIComponent(taxYear)}/late-accounting-date-rule-election`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: BUSINESS_DETAILS_VERSION, ...fraudPreventionHeaders(fraud) } });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-async function lateAccountingDateRuleAction(action: 'disapply' | 'withdraw', args: { nino: string; businessId: string; taxYear: string; accessToken: string; fraud: FraudContext; approved: boolean; userId?: string }): Promise<{ ok: boolean; status: number; body?: unknown }> {
-  if (args.approved !== true) throw new ApprovalRequiredError();
-  if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
-  await recordApproval({ userId: args.userId, submissionType: `late-accounting-date-rule-${action}`, periodKey: args.taxYear, figures: { taxYear: args.taxYear, businessId: args.businessId, action } });
-  const url = `${BASE}/individuals/business/details/${encodeURIComponent(args.nino)}/${encodeURIComponent(args.businessId)}/${encodeURIComponent(args.taxYear)}/late-accounting-date-rule-election/${action}`;
-  const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${args.accessToken}`, Accept: BUSINESS_DETAILS_VERSION, ...fraudPreventionHeaders(args.fraud) } });
-  const body = await res.json().catch(() => undefined);
-  return { ok: res.ok, status: res.status, body };
-}
-export function disapplyLateAccountingDateRule(args: { nino: string; businessId: string; taxYear: string; accessToken: string; fraud: FraudContext; approved: boolean; userId?: string }) { return lateAccountingDateRuleAction('disapply', args); }
-export function withdrawLateAccountingDateRule(args: { nino: string; businessId: string; taxYear: string; accessToken: string; fraud: FraudContext; approved: boolean; userId?: string }) { return lateAccountingDateRuleAction('withdraw', args); }
-
-const TAX_LIABILITY_VERSION = 'application/vnd.hmrc.1.0+json';
-
-export async function retrieveTaxLiabilityAdjustments(nino: string, taxYear: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
-  if (!isHmrcConfigured()) return null;
-  const url = `${BASE}/individuals/tax-liability/adjustments/${encodeURIComponent(nino)}/${encodeURIComponent(taxYear)}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: TAX_LIABILITY_VERSION, ...fraudPreventionHeaders(fraud) } });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-export async function createAmendTaxLiabilityAdjustments(args: { nino: string; taxYear: string; body: Record<string, unknown>; accessToken: string; fraud: FraudContext; approved: boolean; userId?: string }): Promise<{ ok: boolean; status: number; body?: unknown }> {
-  if (args.approved !== true) throw new ApprovalRequiredError();
-  if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
-  await recordApproval({ userId: args.userId, submissionType: 'tax-liability-adjustments', periodKey: args.taxYear, figures: { taxYear: args.taxYear, body: args.body } });
-  const url = `${BASE}/individuals/tax-liability/adjustments/${encodeURIComponent(args.nino)}/${encodeURIComponent(args.taxYear)}`;
-  const res = await fetch(url, { method: 'PUT', headers: { Authorization: `Bearer ${args.accessToken}`, Accept: TAX_LIABILITY_VERSION, 'Content-Type': 'application/json', ...fraudPreventionHeaders(args.fraud) }, body: JSON.stringify(args.body) });
-  const body = await res.json().catch(() => undefined);
-  return { ok: res.ok, status: res.status, body };
-}
-
-export async function deleteTaxLiabilityAdjustments(args: { nino: string; taxYear: string; accessToken: string; fraud: FraudContext; approved: boolean; userId?: string }): Promise<{ ok: boolean; status: number; body?: unknown }> {
-  if (args.approved !== true) throw new ApprovalRequiredError();
-  if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
-  await recordApproval({ userId: args.userId, submissionType: 'tax-liability-adjustments-delete', periodKey: args.taxYear, figures: { taxYear: args.taxYear } });
-  const url = `${BASE}/individuals/tax-liability/adjustments/${encodeURIComponent(args.nino)}/${encodeURIComponent(args.taxYear)}`;
-  const res = await fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${args.accessToken}`, Accept: TAX_LIABILITY_VERSION, ...fraudPreventionHeaders(args.fraud) } });
-  const body = await res.json().catch(() => undefined);
-  return { ok: res.ok, status: res.status, body };
-}
-
-const SE_ANNUAL_VERSION = 'application/vnd.hmrc.5.0+json';
-
-export async function retrieveSelfEmploymentAnnual(nino: string, businessId: string, taxYear: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
-  if (!isHmrcConfigured()) return null;
-  const url = `${BASE}/individuals/business/self-employment/${encodeURIComponent(nino)}/${encodeURIComponent(businessId)}/annual/${encodeURIComponent(taxYear)}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}`, Accept: SE_ANNUAL_VERSION, ...fraudPreventionHeaders(fraud) } });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-export async function createAmendSelfEmploymentAnnual(args: { nino: string; businessId: string; taxYear: string; body: Record<string, unknown>; accessToken: string; fraud: FraudContext; approved: boolean; userId?: string }): Promise<{ ok: boolean; status: number; body?: unknown }> {
-  if (args.approved !== true) throw new ApprovalRequiredError();
-  if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
-  await recordApproval({ userId: args.userId, submissionType: 'self-employment-annual', periodKey: args.taxYear, figures: { taxYear: args.taxYear, businessId: args.businessId, body: args.body } });
-  const url = `${BASE}/individuals/business/self-employment/${encodeURIComponent(args.nino)}/${encodeURIComponent(args.businessId)}/annual/${encodeURIComponent(args.taxYear)}`;
-  const res = await fetch(url, { method: 'PUT', headers: { Authorization: `Bearer ${args.accessToken}`, Accept: SE_ANNUAL_VERSION, 'Content-Type': 'application/json', ...fraudPreventionHeaders(args.fraud) }, body: JSON.stringify(args.body) });
-  const body = await res.json().catch(() => undefined);
-  return { ok: res.ok, status: res.status, body };
-}
-
-export async function deleteSelfEmploymentAnnual(args: { nino: string; businessId: string; taxYear: string; accessToken: string; fraud: FraudContext; approved: boolean; userId?: string }): Promise<{ ok: boolean; status: number; body?: unknown }> {
-  if (args.approved !== true) throw new ApprovalRequiredError();
-  if (!isHmrcConfigured()) return { ok: false, status: 0, body: 'hmrc_not_configured' };
-  await recordApproval({ userId: args.userId, submissionType: 'self-employment-annual-delete', periodKey: args.taxYear, figures: { taxYear: args.taxYear, businessId: args.businessId } });
-  const url = `${BASE}/individuals/business/self-employment/${encodeURIComponent(args.nino)}/${encodeURIComponent(args.businessId)}/annual/${encodeURIComponent(args.taxYear)}`;
-  const res = await fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${args.accessToken}`, Accept: SE_ANNUAL_VERSION, ...fraudPreventionHeaders(args.fraud) } });
-  const body = await res.json().catch(() => undefined);
-  return { ok: res.ok, status: res.status, body };
 }

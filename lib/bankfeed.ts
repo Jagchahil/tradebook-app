@@ -23,6 +23,12 @@
 // no policies, the same posture as hmrc_connections. Never logged.
 //
 // No SDK. Raw fetch, same as the rest of the codebase.
+//
+// AND NO SIBLING IMPORTS. test/bankfeed.test.mjs loads this file directly through Node's type
+// stripping, and Node's ESM resolver will not resolve an extensionless relative import, so adding
+// one here breaks that whole suite. That is why the encryption key check below reads the
+// environment variable rather than calling isEncryptionEnabled() from lib/crypto.ts. The two are
+// equivalent: crypto.ts treats any non empty value as a usable key.
 
 const SANDBOX = process.env.BANK_SANDBOX === 'true';
 const AUTH_BASE = SANDBOX ? 'https://auth.truelayer-sandbox.com' : 'https://auth.truelayer.com';
@@ -39,10 +45,43 @@ const CLIENT_SECRET = process.env.BANK_CLIENT_SECRET;
 // silently break the bank connect flow with an "Invalid redirect_uri".
 const REDIRECT_URI =
   process.env.BANK_REDIRECT_URI ??
-  `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://tradebook-app-five.vercel.app'}/api/bank/callback`;
+  `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app'}/api/bank/callback`;
 
+// Has the "bank feed configured but no encryption key" alarm already fired in this process?
+let warnedNoTokenKey = false;
+
+// Is the bank feed switched on AND safe to switch on?
+//
+// THE KEY IS PART OF THE CONFIGURATION, NOT AN OPTIONAL EXTRA.
+//
+// This used to ask only whether we had a client id and secret. That is the question "can we
+// talk to TrueLayer", and it is the wrong question, because the answer being yes is exactly
+// what starts the flow that ends with a bank refresh token sitting in our database. If
+// BANK_TOKEN_KEY is missing at that moment, lib/crypto.ts stores that token in plain text.
+//
+// So the gate moved to the door. No key, no bank feed: /api/bank/connect will not hand out an
+// authorize link, so no new token can be created that we are not able to encrypt. The feed goes
+// dormant, which is recoverable in one env var, instead of quietly accumulating plaintext
+// banking credentials, which is not.
+//
+// And it says so out loud. Dormant-because-nothing-is-configured is the normal pre-launch state
+// and stays silent. Dormant-because-someone-set-the-TrueLayer-keys-but-not-the-encryption-key is
+// a misconfiguration on a live system, and this codebase's entire failure history is green
+// lights with nothing behind them, so that case shouts once per instance.
 export function hasBankFeedConfig(): boolean {
-  return Boolean(CLIENT_ID && CLIENT_SECRET);
+  if (!CLIENT_ID || !CLIENT_SECRET) return false;
+  if (!(process.env.BANK_TOKEN_KEY || '').trim()) {
+    if (!warnedNoTokenKey) {
+      warnedNoTokenKey = true;
+      console.error(
+        '[bankfeed] REFUSING TO RUN: BANK_CLIENT_ID and BANK_CLIENT_SECRET are set but ' +
+          'BANK_TOKEN_KEY is not, so bank tokens could not be encrypted at rest. The bank feed ' +
+          'is dormant until BANK_TOKEN_KEY is set.',
+      );
+    }
+    return false;
+  }
+  return true;
 }
 
 // --- TrueLayer transport resilience ------------------------------------------

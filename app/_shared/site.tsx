@@ -34,7 +34,7 @@ export const PANEL = 'var(--panel)';
 // A deep contrast band (footer, feature-dark sections) in both themes.
 export const INK_BG = 'var(--band)';
 export const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-export const SITE = process.env.NEXT_PUBLIC_APP_URL || 'https://tradebook-app-five.vercel.app';
+export const SITE = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
 
 // --- Icons (premium line set, to match the app) ----------------------------
 // Keyed by the emoji they replace, so a render site can swap {x.icon} for

@@ -181,6 +181,26 @@ export function verifyTikTokWebhook(header: string | null, secret?: string): boo
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+// Compare a header-supplied shared secret against the configured one WITHOUT leaking, through
+// how long the comparison takes, how much of it was right.
+//
+// A plain `given !== secret` bails at the first byte that differs, so the time it takes is a
+// (very noisy, but real) function of how many leading bytes the caller guessed correctly. That
+// is the entire mechanism behind a timing attack: guess a byte, measure, keep whichever guess is
+// consistently slower, repeat. Over a network this is hard and slow, and against a long random
+// secret it is close to hopeless, which is exactly why it is worth not arguing about: this is one
+// line and the whole class of attack goes away.
+//
+// Fails closed. No configured secret, no header, or a length mismatch is a no, and the length
+// check is unavoidable because timingSafeEqual throws on differing lengths.
+export function sharedSecretMatches(header: string | null, configured: string | undefined): boolean {
+  const s = (configured || '').trim();
+  if (!s || !header) return false;
+  const a = Buffer.from(header);
+  const b = Buffer.from(s);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 // --- token exchange, the only networked part ---------------------------------------------------
 
 export interface TokenResult {

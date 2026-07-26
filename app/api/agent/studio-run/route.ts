@@ -10,6 +10,7 @@ import { draftStoryboard } from '../../../../lib/claude';
 import { pickDraftIdeas } from '../../../../lib/studioagent';
 import { defaultPlatforms } from '../../../../lib/studio';
 import { sendText, hasSendConfig } from '../../../../lib/whatsapp';
+import { sharedSecretMatches } from '../../../../lib/connectors';
 
 export const runtime = 'nodejs';
 // Drafting a few storyboards on the smart model takes real seconds. Give the function room so a
@@ -29,8 +30,10 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   const secret = process.env.AGENT_SECRET;
   if (!secret) return NextResponse.json({ error: 'agent not configured' }, { status: 503 });
-  const given = req.headers.get('x-agent-secret') || '';
-  if (given !== secret) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  // Constant time, so the comparison cannot leak how much of the secret a caller got right.
+  if (!sharedSecretMatches(req.headers.get('x-agent-secret'), secret)) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  }
 
   const started = Date.now();
 

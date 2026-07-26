@@ -147,13 +147,38 @@ export function planRenders(
 export interface RenderResult {
   ok: boolean;
   file_url: string | null;
-  // When not ok: disabled, no_key, or bad_url.
+  // When not ok: disabled, no_key, bad_url, or bad_host.
   reason: string | null;
 }
 
+// WHERE A RENDERED ASSET IS ALLOWED TO LIVE.
+//
+// "It is https" was the only test, and https is not an answer to the question that actually
+// matters here, which is WHOSE url is this. The value arriving is chosen by the render worker,
+// and it ends up stored against a content asset and later embedded on something customer facing.
+// So the check is the same one lib/whatsapp.ts's downloadMedia already applies to Meta's media
+// urls: the host must be one we actually expect, not merely a well formed one.
+//
+// Today the worker is ours and the endpoint is secret gated, so this is defence in depth rather
+// than a live hole. It is worth having anyway, because the cost of being wrong later (a rogue or
+// compromised worker pointing an asset at an arbitrary host, and us embedding it) is far higher
+// than the cost of an allowlist now. Suffix matched, so subdomains count.
+const RENDER_HOSTS = ['higgsfield.ai', 'hf-asset.com', 'cloudfront.net', 'amazonaws.com'];
+
+export function isAllowedRenderHost(url: string): boolean {
+  const m = /^https:\/\/([^/?#\s]+)/i.exec((url || '').trim());
+  if (!m) return false;
+  let host = m[1].toLowerCase();
+  host = host.split('@').pop() || ''; // drop any userinfo before the host
+  host = host.split(':')[0]; // drop any port
+  if (!/^[a-z0-9.-]+$/.test(host)) return false; // reject non hostname junk
+  return RENDER_HOSTS.some((h) => host === h || host.endsWith('.' + h));
+}
+
 // Validate a file_url the render worker hands back before it is stored on an asset. It must be a real
-// https url. We never store a data url or a plain http link on a customer facing post. The dark
-// switch and the missing key both refuse here too, so a stray result cannot slip in while off. Pure.
+// https url ON A HOST WE EXPECT. We never store a data url or a plain http link on a customer facing
+// post. The dark switch and the missing key both refuse here too, so a stray result cannot slip in
+// while off. Pure.
 export function acceptRenderResult(
   url: string | null | undefined,
   opts?: { enabled?: boolean; configured?: boolean },
@@ -164,5 +189,6 @@ export function acceptRenderResult(
   if (!configured) return { ok: false, file_url: null, reason: 'no_key' };
   const u = (url || '').trim();
   if (!/^https:\/\/[^\s]+$/i.test(u)) return { ok: false, file_url: null, reason: 'bad_url' };
+  if (!isAllowedRenderHost(u)) return { ok: false, file_url: null, reason: 'bad_host' };
   return { ok: true, file_url: u, reason: null };
 }

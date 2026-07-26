@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
-const BASE = APP_URL || 'https://tradebook-app-five.vercel.app';
+const BASE = APP_URL || 'https://lekhio.app';
 
 // Tell crawlers what to index and where the sitemap is. Keep the funnel/account
 // and API paths out of the index; everything marketing/tool is fair game.

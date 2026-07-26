@@ -83,6 +83,10 @@ export function isEncryptionEnabled(): boolean {
   return resolveKey() !== null;
 }
 
+// Has the "storing a secret with no key" alarm already gone off in this process? Logged once
+// per instance, not once per token, so a busy sync leaves one clear line rather than thousands.
+let warnedNoKey = false;
+
 // Encrypt a plaintext secret for storage.
 //
 // With no key configured this returns the plaintext unchanged, so enabling this
@@ -90,9 +94,37 @@ export function isEncryptionEnabled(): boolean {
 //   enc:v1: + base64(iv) + ':' + base64(authTag) + ':' + base64(ciphertext)
 // A fresh random 12 byte IV is used per call (the standard GCM nonce size), so
 // encrypting the same secret twice yields different ciphertext.
+//
+// THE SILENT FAILURE THIS NOW REFUSES TO BE.
+//
+// The no-key branch below returns the token unchanged. That is correct and deliberate for the
+// rollout: it is what let this code ship before the key existed. But it used to happen in
+// COMPLETE SILENCE, and that is a different thing entirely once we are live.
+//
+// Picture the failure. Somebody renames an environment variable, or a rollback drops it, or it
+// is set on Preview and not on Production. Nothing breaks. No error, no red light, no failed
+// deploy. Bank access and refresh tokens simply start landing in Postgres in plain text, and
+// they keep doing it, and the only way anyone would ever find out is if a person happened to
+// open that table and look. The read path already shouts when it meets ciphertext with no key.
+// The write path, which is the one that actually creates the exposure, said nothing at all.
+//
+// So it shouts now. It still does not throw: throwing here would take out the bank connect flow
+// entirely for anyone mid-connect, and refusing a man his own bank feed is a worse outcome than
+// a token written unencrypted for the minutes it takes to notice. The alarm is the fix; the
+// hard gate belongs at the door, in bankFeedReady() in lib/bankfeed.ts, which now refuses to
+// start an OAuth flow at all when the key is missing.
 export function encryptSecret(plain: string): string {
   const key = resolveKey();
-  if (!key) return plain; // encryption off: store as is
+  if (!key) {
+    if (!warnedNoKey) {
+      warnedNoKey = true;
+      console.error(
+        '[crypto] SECURITY: BANK_TOKEN_KEY is not set, so third party OAuth tokens are being ' +
+          'stored UNENCRYPTED. Set BANK_TOKEN_KEY and rotate every stored bank and HMRC token.',
+      );
+    }
+    return plain; // encryption off: store as is
+  }
 
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);

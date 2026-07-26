@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { userBurst } from '../../../lib/ratelimit';
 import { verifyAccessToken, getOptimiserInput, getAutonomyLevel } from '../../../lib/supabase';
 import { findOptimisations, applyDial, totalEstimatedSaving, taxPosition } from '../../../lib/taxoptimiser';
 
@@ -13,6 +14,9 @@ export async function GET(req: NextRequest) {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   const user = token ? await verifyAccessToken(token) : null;
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  if (await userBurst('optimise', user.id)) {
+    return NextResponse.json({ error: 'slow down' }, { status: 429 });
+  }
 
   const [input, level] = await Promise.all([getOptimiserInput(user.id), getAutonomyLevel(user.id)]);
   const optimisations = applyDial(findOptimisations(input), level);

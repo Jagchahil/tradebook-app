@@ -55,7 +55,7 @@ export default function PrivacyPage() {
 
       <article style={{ maxWidth: 760, margin: '0 auto', padding: '24px 24px 80px' }}>
         <h1 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 8px' }}>Privacy Policy</h1>
-        <p style={{ fontSize: 14, color: MUTED, margin: '0 0 8px' }}>Last updated 11 July 2026</p>
+        <p style={{ fontSize: 14, color: MUTED, margin: '0 0 8px' }}>Last updated 26 July 2026</p>
         <p style={para}>
           This policy explains what Lekhio collects, why we collect it, and what we do with it. We
           handle your data under the UK General Data Protection Regulation and the Data Protection Act
@@ -172,6 +172,11 @@ export default function PrivacyPage() {
           encrypted and stored on our servers only. You can disconnect at any time, in the app or
           by emailing info@lekhio.app, and you can withdraw consent with your bank directly. Our
           lawful basis is your consent, and performance of the contract to deliver the service.
+        </p>
+        <p style={para}>
+          Lekhio Ltd is registered with the Information Commissioner&apos;s Office as a data
+          controller, reference <strong>ZC198977</strong>, which you can check on the public
+          register at ico.org.uk.
         </p>
 
         <h2 style={heading}>Where we process your data</h2>

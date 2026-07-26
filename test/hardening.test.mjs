@@ -116,6 +116,48 @@ console.log('\n=== dead code: the Phase 0 scaffold stays deleted ===\n');
   );
 }
 
+// --- 4. No path that ships customer audio to a third party --------------------------------------
+//
+// THE FAILURE THIS GUARDS AGAINST. lib/transcribe.ts uploaded customer voice notes to the OpenAI
+// Whisper API. By 26 July nothing imported it: transcription had moved to the Mac mini, which does
+// the work locally, and the published privacy policy says in writing that voice notes "never leave
+// our systems" and that "no third party ever hears your voice note". The file stayed in the tree
+// anyway, complete and ready to work the moment anyone imported it or set OPENAI_API_KEY, and the
+// team console carried a card telling Jag to paste that very key into Vercel. That is worse than
+// ordinary dead code, because the blast radius is a promise made to a customer in a legal document.
+// All of it is deleted. This stops it returning quietly.
+console.log('\n=== voice: no path that ships customer audio to a third party ===\n');
+{
+  const { existsSync, readFileSync, readdirSync } = await import('node:fs');
+  const repo = path.resolve(here, '..');
+  ok('lib/transcribe.ts does not exist', !existsSync(path.join(repo, 'lib/transcribe.ts')));
+
+  const offenders = [];
+  const walk = (dir) => {
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) { walk(full); continue; }
+      if (!entry.isFile() || !/\.(ts|tsx)$/.test(entry.name)) continue;
+      let src;
+      try { src = readFileSync(full, 'utf8'); } catch { continue; }
+      for (const line of src.split('\n')) {
+        // The capability, not the mention. A comment explaining why we do NOT do this is
+        // deliberate and must stay readable, so only a real endpoint or key read counts.
+        if (/['"`]https:\/\/api\.openai\.com/.test(line) || /process\.env\.OPENAI_API_KEY/.test(line)) {
+          offenders.push(`${path.relative(repo, full)}: ${line.trim()}`);
+        }
+      }
+    }
+  };
+  ['../app', '../lib'].map((r) => path.resolve(here, r)).forEach(walk);
+  if (offenders.length) offenders.forEach((o) => console.log(`        ${o}`));
+  ok('no OpenAI audio endpoint or key read in app/ or lib/', offenders.length === 0);
+}
+
 // The other two fixes from this pass are pinned in the suites that already own those modules,
 // because both files need staging to load under type stripping and duplicating that machinery
 // here would be a second place to maintain it:

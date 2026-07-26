@@ -62,7 +62,7 @@ A WhatsApp-first bookkeeping and tax-prep tool for UK sole traders in trade and 
 
 **Do not use** Twilio, 360dialog, or any WhatsApp middleware. Go direct with Meta Cloud API.
 
-**One AI exception.** Voice note transcription uses OpenAI Whisper, because Anthropic has no speech to text. It is isolated in `lib/transcribe.ts`. Everything else stays on Claude. To swap the transcription provider, change only that file.
+**One AI exception, and it does NOT leave our hardware.** Claude has no speech to text, so voice notes need Whisper. We do not send customer audio to a third party. The webhook parks the audio in the `voice_jobs` queue, the Mac mini claims it, transcribes it LOCALLY, and posts the words back to `/api/voice/complete`; the audio is wiped the instant it is read. See `lib/voicejobs.ts` and the voice section of `app/api/whatsapp/route.ts`. **The privacy policy states this in writing** ("your voice notes never leave our systems", "no third party ever hears your voice note"), so transcription may never be moved to a third party API without changing that policy first. Everything else stays on Claude.
 
 ---
 
@@ -115,7 +115,6 @@ WHATSAPP_APP_SECRET=         # Meta app secret, used to verify the x-hub-signatu
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-OPENAI_API_KEY=             # Whisper, voice note transcription only. Claude has no speech to text.
 STRIPE_SECRET_KEY=          # Stripe, for subscription and invoice card payments
 STRIPE_WEBHOOK_SECRET=      # Stripe, verifies the payment webhook signature
 RESEND_API_KEY=            # Resend, to email invoices straight to customers. Optional, invoicing falls back to a shareable link without it.

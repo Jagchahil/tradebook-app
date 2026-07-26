@@ -1,8 +1,8 @@
 'use client';
 
 // KANJOOS — the money desk. Tap the coin on the overview and you land here: a card for every place the
-// company spends (Anthropic first, that's the big one, then OpenAI when voice notes go live, then
-// Supabase against its Free-plan ceiling), each showing the actual number, and under them his live feed.
+// company spends (Anthropic first, that's the big one, then Supabase against its Free-plan
+// ceiling), each showing the actual number, and under them his live feed.
 //
 // THE RULE, same as the guard: Kanjoos never changes what you spend. He reads the meter and reports. A
 // spike, a budget overrun, a database filling toward a paid upgrade — each becomes a line for you to
@@ -21,7 +21,6 @@ import TeamShell from '../TeamShell';
 // exists for each even before the first sweep.
 const SOURCES: Array<{ key: string; label: string; hint: string }> = [
   { key: 'anthropic', label: 'Anthropic (Claude)', hint: 'Your Claude API spend — the big one' },
-  { key: 'openai', label: 'OpenAI', hint: 'Voice-note transcription spend, once it is switched on' },
   { key: 'supabase', label: 'Supabase', hint: 'Database size against the Free-plan ceiling' },
 ];
 

@@ -46,7 +46,6 @@ Two tracks run at once.
 9. **Load API credit and keys, then redeploy after each:**
    - **Anthropic**, add 5 to 10 dollars, create the key, set `ANTHROPIC_API_KEY`. This is the receipt brain.
    - **WhatsApp (Meta)**, create the app, set the webhook to https://lekhio.app/api/whatsapp, add the four WhatsApp env vars.
-   - **OpenAI Whisper** (optional, for voice notes), add a little credit and the key.
    - **Stripe**, add `STRIPE_SECRET_KEY` and the webhook secret. Test mode first.
    - **`CRON_SECRET`**, set it, and point a free external cron (cron-job.org) at the reminder URLs.
 
@@ -84,7 +83,7 @@ Two tracks run at once.
 | Email forwarding | Free |
 | Anthropic credit | ~£5 to start |
 | Vercel Pro | ~£16 / mo |
-| Stripe, OpenAI, WhatsApp | Pay as you go |
+| Stripe, WhatsApp | Pay as you go |
 
 Bare minimum to be live and legal is roughly **£185 plus Vercel Pro**, most of it the one-off company incorporation. The structure track (accountant fees, the Ecom reorg, the trademark) follows as revenue allows and does not block launch.
 

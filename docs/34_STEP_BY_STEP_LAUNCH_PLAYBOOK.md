@@ -99,9 +99,8 @@ If doing it yourself:
 - [ ] In Meta, set the webhook to `https://lekhio.app/api/whatsapp`, enter the same verify token, save, and subscribe to **messages**.
 - [ ] Add your own mobile as a test recipient.
 
-### Step 12. OpenAI Whisper, voice notes (optional)  [You]
-- [ ] At **platform.openai.com**, add a little credit, create a key.
-- [ ] In Vercel set `OPENAI_API_KEY`, redeploy. Skip if you are launching without voice.
+### Step 12. Voice notes
+Nothing to do here. Voice notes are transcribed locally on the Mac mini and never leave our systems. There is no key to add, and adding one would contradict the privacy policy.
 
 ### Step 13. Stripe, payments  [You]
 - [ ] At **stripe.com**, create the account in the **Lekhio Ltd** name, complete business details, connect the bank from step 6.
@@ -123,7 +122,7 @@ If doing it yourself:
 Run every line. Do not launch until all pass.
 - [ ] Sign in on the app with your number, land on the dashboard.
 - [ ] WhatsApp a receipt photo to the number, get the confirmation, see it appear in the app.
-- [ ] Send a voice note expense, it logs (if Whisper is on).
+- [ ] Send a voice note expense, it logs (transcribed locally on the Mac mini).
 - [ ] Type "spent £30 on screws at Screwfix", it logs as an expense.
 - [ ] Type "got paid £400 by Dave", it logs as income.
 - [ ] Text "remind me to price up Dave's job tomorrow at 8am", it lands in the diary and fires.

@@ -10,7 +10,7 @@
 - [ ] Point the domain at the Vercel project. In Vercel, add the domain and follow the DNS steps.
 - [ ] Set `NEXT_PUBLIC_APP_URL` to `https://lekhio.app` in Vercel, and `EXPO_PUBLIC_WEB_URL` in the app `.env.local`. Swap the placeholder Vercel URLs in the app's two `SIGNUP_URL` constants to `https://lekhio.app`.
 - [ ] Upgrade Vercel to **Pro** (needed for function time and cron frequency at scale, see doc 21).
-- [ ] Create the accounts, no keys live yet: Meta developer, Anthropic, OpenAI, Stripe. All free to open.
+- [ ] Create the accounts, no keys live yet: Meta developer, Anthropic, Stripe. All free to open.
 - [ ] Set up **support@lekhio.app** (a forwarding alias is fine to start).
 - [ ] Pay the **ICO data protection fee**, about £52. This is the legal must do. See doc 14.
 - [ ] Register as a **sole trader** with HMRC. Free.
@@ -41,9 +41,9 @@
 
 ---
 
-## Day 1. Switch on voice notes (OpenAI Whisper). Optional.
+## Day 1. Voice notes
 
-- [ ] Add a little credit at platform.openai.com, create a key, add `OPENAI_API_KEY` in Vercel. Redeploy.
+Nothing to switch on. Voice notes are transcribed locally on the Mac mini and never leave our systems. There is no key to add, and none should ever be added here: doing so would contradict the privacy policy's promise that a voice note never leaves our systems.
 
 ---
 
@@ -116,7 +116,6 @@ NEXT_PUBLIC_APP_URL
 NEXT_PUBLIC_SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
 ANTHROPIC_API_KEY
-OPENAI_API_KEY
 WHATSAPP_TOKEN
 WHATSAPP_PHONE_NUMBER_ID
 WHATSAPP_VERIFY_TOKEN

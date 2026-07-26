@@ -192,7 +192,7 @@ export default function PrivacyPage() {
         <h2 style={heading}>Who we share it with</h2>
         <p style={para}>
           We do not sell your data. We share it only with the service providers that help us run
-          Lekhio: our hosting, database, payment and messaging providers, and the two AI providers
+          Lekhio: our hosting, database, payment and messaging providers, and the AI provider
           above. They act on our instructions and are bound to protect your data. If a recognised
           tax submission path is used, it only happens after you approve.
         </p>

@@ -73,6 +73,15 @@ export default function StartPage() {
   const [email, setEmail] = useState('');
   const [tradeType, setTradeType] = useState<TradeType>(null);
   const [name, setName] = useState('');
+  // ⚠️ THE HUMAN BEING, SEPARATE FROM THE BUSINESS. Added 27 July 2026 after a real signup on
+  // lekhio.app was greeted as "Test", the first word of "Test Coffee Shop Ltd".
+  //
+  // There was one `name` field with its LABEL swapped by trade type, which reads like a tidy bit of
+  // reuse and is not: for a limited company it captured the company and nothing else, so a man
+  // called Dave who runs Smith Electrical Ltd got "Hi Smith" from a product whose entire pitch is
+  // that it feels like a person. A sole trader still answers once, because for him the two ARE the
+  // same name and asking twice would be the sort of pointless question doc 103 forbids.
+  const [personName, setPersonName] = useState('');
   const [trade, setTrade] = useState('');
   const [customTrade, setCustomTrade] = useState('');
   // Which of the SIC suggestions is on screen, 0 = the best match. "Not quite?" steps through the
@@ -126,16 +135,22 @@ export default function StartPage() {
   // person is ever split across two records. It must be present and valid to move on.
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const nameLabel = tradeType === 'ltd' ? 'Company name' : tradeType === 'business' ? 'Trading name' : 'Your full name';
+  // A limited company and a trading name are not the person. A sole trader trades under his own
+  // name, so his one answer is both.
+  const needsPersonName = tradeType === 'ltd' || tradeType === 'business';
+  // Who we greet, everywhere. One expression, so the success screen, the email and the app can
+  // never disagree about what to call him.
+  const greetName = (needsPersonName ? personName : name).trim();
 
   const canContinue = useMemo(() => {
     if (step === 1) return phoneReady && emailValid;
-    if (step === 2) return tradeType !== null && name.trim().length > 1;
+    if (step === 2) return tradeType !== null && name.trim().length > 1 && (!needsPersonName || personName.trim().length > 1);
     if (step === 3) return trade !== '' && (trade !== 'Something else' || customTrade.trim().length > 1);
     if (step === 4) return true; // streams optional, none is a fine answer
     if (step === 5) return true; // address optional
     if (step === 6) return vat !== null;
     return false;
-  }, [step, phoneReady, emailValid, tradeType, name, trade, customTrade, vat]);
+  }, [step, phoneReady, emailValid, tradeType, name, personName, needsPersonName, trade, customTrade, vat]);
 
   // What they actually typed or picked, for the SIC matcher. Only a limited company needs a SIC
   // code at all (Companies House asks for it; a sole trader never does, see lib/siccodes), so this
@@ -160,6 +175,9 @@ export default function StartPage() {
           email: email.trim(),
           tradeType,
           name: name.trim(),
+          // The person, sent alongside the business name. app/api/onboard falls back to `name` when
+          // this is empty, which is exactly right for a sole trader.
+          personName: greetName,
           trade: trade === 'Something else' ? customTrade.trim() : trade,
           postcode: postcode.trim(),
           address: address.trim(),
@@ -286,7 +304,7 @@ export default function StartPage() {
           ) : done ? (
             <div className="step-anim" style={{ textAlign: 'center', paddingTop: 24 }}>
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
-              <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>You are all set{name ? `, ${name.split(' ')[0]}` : ''}.</h1>
+              <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>You are all set{greetName ? `, ${greetName.split(' ')[0]}` : ''}.</h1>
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 420, margin: '0 auto 18px' }}>
                 Your 14 day free trial has started. No card needed. Three steps and your back office runs itself:
               </p>
@@ -393,7 +411,29 @@ export default function StartPage() {
                           register is wrong, or he types a name that matches somebody else's company,
                           we have "verified" nothing at all, and he has our word for it.
                           Say what we do. It is still the good bit: he does not dig out paperwork. */}
-                      {tradeType === 'ltd' && <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>We will look your company up on the Companies House register and fill the details in for you. No need to dig out paperwork.</p>}
+                      {/* 🔴 THIS COPY WAS A PROMISE THE PAGE DID NOT KEEP, and it was live for weeks.
+                          It read: "We will look your company up on the Companies House register and
+                          fill the details in for you." app/start never called anything. The lookup
+                          is real and it works, but in the MOBILE setup flow, which can call
+                          /api/companies-house because by then the user is signed in.
+
+                          This page has no session at any point, and opening that endpoint to
+                          anonymous callers would reopen the hole the 26 July audit closed: one
+                          shared key, 600 requests per five minutes, and lookup quietly dying for
+                          every real customer mid signup.
+
+                          So the lookup now runs SERVER SIDE when this form is submitted, and the
+                          copy says what actually happens: we do the looking, he does not dig out
+                          paperwork, and nothing fills in on screen because nothing can yet. The
+                          live type ahead comes to the web app's own setup screen at item 6. */}
+                      {tradeType === 'ltd' && <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>Type it as it appears on the register. We look your company up on the Companies House register ourselves once you finish, so there is no paperwork to dig out.</p>}
+                      {needsPersonName && (
+                        <div style={{ marginTop: 16 }}>
+                          <label htmlFor="signup-person" style={fieldLabel}>Your full name</label>
+                          <input id="signup-person" aria-label="Your full name" className="field" value={personName} onChange={(e) => setPersonName(e.target.value)} placeholder="Sam Smith" style={fieldStyle} />
+                          <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>So we can talk to you like a person, not like a company.</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </Step>

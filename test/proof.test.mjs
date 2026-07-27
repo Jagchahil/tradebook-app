@@ -99,6 +99,20 @@ ok('🔴 AND THE WORD IS GONE FROM THE SIGNUP PAGE TOO',
 ok('...and it now says what we actually do, which is still the good bit',
   /look your company up on the Companies House register/i.test(strip(read('app/start/page.tsx'))));
 
+ok('🔴 AND IT NO LONGER PROMISES TO FILL THE DETAILS IN ON SCREEN, BECAUSE NOTHING DOES',
+  // Live for weeks: "We will look your company up ... and fill the details in for you." app/start
+  // never called anything. The lookup is real but it lives in the MOBILE setup flow, which can call
+  // /api/companies-house because the user is signed in by then. This page has no session at any
+  // point, and opening that endpoint to anonymous callers would reopen the hole the 26 July audit
+  // closed. The lookup now runs server side inside /api/onboard, and the copy says so.
+  !/fill the details in for you/i.test(strip(read('app/start/page.tsx'))));
+
+ok('...and the signup actually performs the lookup it now describes',
+  // The copy is only honest because this call exists. If somebody removes the lookup, the promise
+  // becomes a lie again and this fails.
+  /lookUpCompany\(/.test(read('app/api/onboard/route.ts'))
+  && /searchCompanies/.test(read('app/api/onboard/route.ts')));
+
 // ---------------------------------------------------------------------------------------------
 // 🔴 2. A DOCUMENT WE DO NOT NEED IS A DOCUMENT WE DO NOT ASK FOR.
 // ---------------------------------------------------------------------------------------------

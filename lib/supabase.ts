@@ -1040,7 +1040,21 @@ export interface OnboardSignup {
   phone: string;
   email?: string | null;
   trade_type?: string | null;
+  // The BUSINESS name, or the person's name for a sole trader. Kept as `name` because that is what
+  // the column has always been and renaming it would be a migration for no gain.
   name?: string | null;
+  // ⚠️ THE HUMAN BEING, captured separately since 27 July 2026. Before this, a limited company
+  // signup stored only the company, so the success screen greeted a man called Dave who runs Smith
+  // Electrical Ltd as "Hi Smith". For a sole trader this is the same as `name`.
+  person_name?: string | null;
+  // What the server side Companies House lookup found, and how it went. See
+  // supabase/APPLY_2026-07-27_signup_person_and_company.sql for why the OUTCOME is stored and not
+  // just the result: found, found nothing, nothing to find, and could not look are four different
+  // facts that would otherwise all be three nulls.
+  company_number?: string | null;
+  company_name?: string | null;
+  registered_office?: string | null;
+  company_lookup?: 'matched' | 'no_match' | 'not_ltd' | 'unavailable' | null;
   trade?: string | null;
   postcode?: string | null;
   address?: string | null;
@@ -1065,6 +1079,11 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
   if (signup.email) record.email = signup.email;
   if (signup.trade_type) record.trade_type = signup.trade_type;
   if (signup.name) record.name = signup.name;
+  if (signup.person_name) record.person_name = signup.person_name;
+  if (signup.company_number) record.company_number = signup.company_number;
+  if (signup.company_name) record.company_name = signup.company_name;
+  if (signup.registered_office) record.registered_office = signup.registered_office;
+  if (signup.company_lookup) record.company_lookup = signup.company_lookup;
   if (signup.trade) record.trade = signup.trade;
   if (signup.postcode) record.postcode = signup.postcode;
   // The label is ALWAYS re-derived here from our own canonical list, never taken as free text from

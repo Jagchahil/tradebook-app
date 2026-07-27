@@ -30,6 +30,10 @@ export interface OptimiserInput {
   studentPlans?: StudentPlan[];
   categoriesLogged: string[]; // distinct trade expense categories seen this year, lowercased
   homeOfficeClaimed: boolean;
+  // The £ of use of home he has actually accrued this year, from his election. Realised, never
+  // projected: lib/elections.ts useOfHomeToDate() counts only months that have happened. Default 0
+  // means no election, which is what a man who has never been asked has.
+  ytdHomeOffice?: number;
   mileageClaimed: boolean;
   purchaseGoal?: { title: string; amount: number } | null;
 

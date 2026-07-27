@@ -749,3 +749,58 @@ export function isWeeklySummaryRequest(body: string): boolean {
 
   return false;
 }
+
+// --- Claiming use of home, by text --------------------------------------------------------
+//
+// Added 27 July 2026 with the election itself. lib/taxoptimiser.ts rule 4 has been telling every
+// customer to claim use of home since it was written, and there was no way to say yes. WhatsApp is
+// the surface that exists today, so this is where a man can actually take the money.
+//
+// ⚠️ A QUESTION IS NOT AN INSTRUCTION, AND THIS IS THE WHOLE SUBTLETY.
+//
+// "Can I claim working from home?" is a claim CHECK. It has an answer in lib/claimrules.data.ts and
+// it must keep going there, because the man is asking what the rules are, not telling us to act.
+// "Claim use of home" is an INSTRUCTION. Acting on the first would be us electing something on his
+// behalf off the back of a question, which is exactly the conduct the whole product is built to
+// avoid. So anything phrased as a question is refused here and falls through to the checker.
+export interface UseOfHomeElection {
+  // The hours a month he told us, or null when he said none and has to be asked.
+  hoursPerMonth: number | null;
+}
+
+const HOME_WORDS = /\b(use of home|working from home|work from home|home office|home as office|wfh)\b/;
+const ASKING = /^(can|could|could i|am i|is it|do i|would|should|what|how|does)\b|\?\s*$/;
+
+export function matchUseOfHomeElection(body: string): UseOfHomeElection | null {
+  const b = (body || '').trim().toLowerCase();
+  if (!b) return null;
+  // He is asking, not instructing. Let the claim checker answer it.
+  if (ASKING.test(b)) return null;
+  if (!HOME_WORDS.test(b)) return null;
+
+  // It has to read like he wants it claimed, or like he is stating his hours. Bare "home office"
+  // on its own is not an instruction to elect anything.
+  const instructs = /\b(claim|start claiming|add|apply|yes|do it|sort it|set up)\b/.test(b);
+
+  // "30 hours a month", "30 hrs per month", "i do 30 hours a month at home". A number of hours is
+  // only read when it is EXPLICITLY monthly: a weekly figure would land him in the wrong band, and
+  // the wrong band is a wrong figure on a return he is legally responsible for.
+  const m = b.match(/(\d{1,3}(?:\.\d+)?)\s*(?:hours?|hrs?)\s*(?:a|per|each)\s*month\b/);
+  const hours = m ? Number(m[1]) : null;
+
+  if (hours === null && !instructs) return null;
+  return { hoursPerMonth: Number.isFinite(hours) ? hours : null };
+}
+
+// What we ask when he has not told us the hours. THREE real answers, so asking is right: doc 103
+// forbids a question with only one sensible answer, not a question with a real choice behind it.
+// The rates are NOT written here, the caller fills them from lib/elections.ts bandOptions(), which
+// reads them from the watched engine.
+export function useOfHomeHoursQuestion(options: Array<{ band: number; label: string; monthly: number }>): string {
+  const lines = options.map((o) => `${o.label}: £${Math.round(o.monthly)} a month`);
+  return [
+    'Happy to claim that. HMRC sets the amount by how many hours a month you work at home.',
+    ...lines,
+    'Roughly how many hours a month is it? Just tell me the number.',
+  ].join('\n');
+}

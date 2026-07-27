@@ -38,6 +38,7 @@ import {
   readCircumstances,
   saveCircumstance,
   findUserIdByPhone,
+  writeAllowanceElection,
   weeklyTotals,
   weeklyUpdateFactsFor,
   listBankConnectionsForUser,
@@ -99,6 +100,8 @@ import {
   deadlineAnswer,
   matchTotalsQuestion,
   isWeeklySummaryRequest,
+  matchUseOfHomeElection,
+  useOfHomeHoursQuestion,
   isSavingsQuestion,
   formatGbp,
   isNiQuestion,
@@ -123,6 +126,8 @@ import {
   supportReason,
 } from '../../../lib/waintents';
 import { weeklySummaryText } from '../../../lib/weeklyupdate';
+import { bandForHours, bandOptions, electionConfirmation } from '../../../lib/elections';
+import { quarterForDate } from '../../../lib/quarterpack';
 import { openTicket } from '../../../lib/support';
 import { matchKb } from '../../../lib/supportkb';
 import { soleTraderTax, FACTS } from '../../../lib/taxengine';
@@ -412,6 +417,8 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handlePricing(from);
           } else if (isDeadlineQuestion(text)) {
             await sendText(from, deadlineAnswer());
+          } else if (matchUseOfHomeElection(text)) {
+            await handleUseOfHomeElection(from, text);
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);
           } else if (isSetupRequest(text)) {
@@ -1172,6 +1179,60 @@ async function handlePricing(from: string): Promise<void> {
       `That covers receipt capture, bookkeeping, invoicing, CIS, mileage, and your quarterly tax prep. Get started at ${APP_URL.replace('https://', '')}.`,
     ].join('\n'),
   );
+}
+
+// CLAIMING USE OF HOME, BY TEXT. The money nobody was getting.
+//
+// lib/taxoptimiser.ts rule 4 has been telling every customer to claim this since it was written, and
+// emitting the action 'apply_allowance_election'. Nothing implemented it, so the suggestion fired
+// forever and not one man ever took the money. Between £120 and £312 a year for a tradesman who does
+// his quotes at the kitchen table, which is all of them.
+//
+// ⚠️ WE CANNOT DO THIS ONE FOR HIM, AND THAT IS NOT A COP OUT.
+//
+// Doc 103 says the best button is no button: do the thing and tell him plainly what you did. But the
+// amount depends on a fact only he knows, how many hours a month he actually works from home, and
+// HMRC bands it. So we ask, once, and everything after the answer is automatic. That is a question
+// with three real answers, which is the kind doc 103 permits.
+//
+// The confirmation text comes from lib/elections.ts, the SAME function /api/elections returns, so he
+// reads the same words whether he elects here or on a screen.
+async function handleUseOfHomeElection(from: string, body: string): Promise<void> {
+  const asked = matchUseOfHomeElection(body);
+  if (!asked) return;
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+
+  // He said he wants it but not how much. Ask, with the three real options and what each is worth.
+  if (asked.hoursPerMonth === null) {
+    await sendText(from, useOfHomeHoursQuestion(bandOptions()));
+    return;
+  }
+
+  const band = bandForHours(asked.hoursPerMonth);
+  if (band === null) {
+    // UNDER THE THRESHOLD IS NOT AN ERROR. He has done nothing wrong, HMRC's flat rate simply starts
+    // at 25 hours a month. Saying so beats a silence he would read as us ignoring him.
+    await sendText(
+      from,
+      "HMRC's flat rate starts at 25 hours a month, so there is nothing to claim that way at those hours. If it goes up, just tell me and I will put it on.",
+    );
+    return;
+  }
+
+  const startYear = quarterForDate(new Date()).startYear;
+  const months = Math.max(0, Math.min(12, Math.floor((Date.now() - Date.UTC(startYear, 3, 6)) / (30.44 * 86_400_000))));
+  const done = await writeAllowanceElection(userId, 'use_of_home', startYear, band);
+  if (!done) {
+    // A FAILED WRITE MUST NOT LOOK LIKE A SUCCESSFUL ONE. Telling him it is claimed when the row
+    // never landed is how a man finds a hole in his return months later.
+    await sendText(from, 'I could not save that just now. Try me again in a minute and it will go on.');
+    return;
+  }
+  await sendText(from, electionConfirmation(band, months));
 }
 
 // THE WEEKLY SUMMARY, ASKED FOR RATHER THAN PUSHED.

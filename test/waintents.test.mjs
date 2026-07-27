@@ -5,6 +5,7 @@
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const W = await import(`${pathToFileURL(path.resolve(here, '../lib/waintents.ts')).href}`);
@@ -340,6 +341,80 @@ ok('no goals answer invites one', /my goal is/.test(gb));
     .every((s) => W.isWeeklySummaryRequest(s) === false));
   ok('a weekly request is never parsed as a money entry', ['weekly summary', 'how was my week']
     .every((s) => W.parseMoneyEntryRegex(s) === null));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// matchUseOfHomeElection: claiming use of home by text (27 July 2026).
+//
+// 🔴 THE ONE THING THIS MUST NOT DO IS ACT ON A QUESTION. "Can I claim working from home?" is a
+// claim CHECK with an answer in lib/claimrules.data.ts. Electing off the back of it would be us
+// making a tax choice on a man's behalf because he asked what the rules were, which is precisely
+// the conduct the whole product exists to avoid.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  console.log('\n=== claiming use of home by text ===\n');
+  const M = W.matchUseOfHomeElection;
+  const elects = (s, hours) => ok(`elects (${hours === null ? 'no hours' : hours + 'h'}): "${s}"`, (() => {
+    const r = M(s);
+    return r !== null && r.hoursPerMonth === hours;
+  })());
+  const no = (s) => ok(`does NOT elect: "${s}"`, M(s) === null);
+
+  // Instructions.
+  elects('claim use of home', null);
+  elects('claim working from home', null);
+  elects('yes claim use of home', null);
+  elects('add home office', null);
+  elects('start claiming use of home', null);
+  elects('sort it, work from home', null);
+
+  // Instructions carrying his hours. Monthly only, on purpose.
+  elects('claim use of home, 30 hours a month', 30);
+  elects('i work from home 60 hours per month', 60);
+  elects('work from home 120 hrs a month', 120);
+  elects('use of home 25 hours each month', 25);
+
+  // 🔴 QUESTIONS. Every one of these belongs to the claim checker.
+  no('can i claim working from home?');
+  no('can i claim use of home');
+  no('could i claim for my home office');
+  no('do i get anything for working from home');
+  no('what can i claim for working from home?');
+  no('how much is use of home');
+  no('is it worth claiming use of home?');
+  no('am i able to claim home office');
+
+  // Not about use of home at all.
+  no('claim my mileage');
+  no('spent £40 on fuel');
+  no('home');
+  no('');
+
+  // A WEEKLY figure is deliberately NOT read as monthly. Reading "10 hours a week" as 10 hours a
+  // month would put a man in no band at all when he belongs in the middle one, and the wrong band is
+  // a wrong figure on a return he is legally responsible for.
+  // A bare statement of weekly hours is not an instruction at all, so it does not elect. And even
+  // WITH an instruction, the weekly figure is not read: treating "10 hours a week" as 10 a month
+  // would put a man in no band when he belongs in the middle one, and the wrong band is a wrong
+  // figure on a return he is legally responsible for. He gets asked instead.
+  no('i work from home 10 hours a week');
+  ok('an instruction with weekly hours asks rather than guessing', M('claim use of home, 10 hours a week').hoursPerMonth === null);
+  ok('a bare number with no period is not read', M('claim use of home 30 hours').hoursPerMonth === null);
+
+  // The question we ask when he has not said. The rates are passed in, never written in waintents.
+  const q = W.useOfHomeHoursQuestion([
+    { band: 25, label: '25 to 50 hours a month', monthly: 10 },
+    { band: 51, label: '51 to 100 hours a month', monthly: 18 },
+    { band: 101, label: '101 hours a month or more', monthly: 26 },
+  ]);
+  ok('the question offers all three bands', ['25 to 50', '51 to 100', '101 hours'].every((t) => q.includes(t)));
+  ok('the question asks for a number', /how many hours/i.test(q));
+  ok('the question carries no forbidden dash', !/[–—−]|\s-\s/.test(q));
+  ok('waintents writes down no rate of its own', (() => {
+    const src = readFileSync(path.resolve(here, '../lib/waintents.ts'), 'utf8');
+    const fn = src.slice(src.indexOf('export function useOfHomeHoursQuestion'));
+    return !/\b(10|18|26)\b/.test(fn.slice(0, fn.indexOf('\n}')));
+  })());
 }
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

@@ -58,17 +58,31 @@ export async function GET(req: NextRequest) {
     expenses: Math.max(0, input.ytdTradeExpenses - mileage),
     mileage,
 
+    // 🔴 USE OF HOME IS ADDED, NOT MOVED, AND THAT IS THE OPPOSITE OF THE MILEAGE LINE ABOVE.
+    //
+    // Read the mileage comment again: it is SUBTRACTED from expenses before being passed, because a
+    // mileage claim is already sitting inside expenses as an ordinary transaction, and adding it
+    // would count it twice and overstate what Lekhio saved him.
+    //
+    // Use of home is the opposite case and the difference is not a style choice, it is a fact about
+    // the data. It is an ELECTION, not a transaction: lib/categories.ts refuses to create a 'home'
+    // category on purpose, because a rule on rent or a household energy bill would sweep up a man's
+    // OWN HOUSE and claim tax relief on it. So it cannot be inside expenses, and subtracting it here
+    // the way mileage is subtracted would UNDERSTATE his deductions by exactly the amount he elected.
+    //
+    // test/elections.test.mjs asserts both directions against this file's real output, so a future
+    // refactor that "makes them consistent" has to break a test that explains why they are not.
+    homeOffice: Math.max(0, input.ytdHomeOffice ?? 0),
+
     // STILL NOT WIRED, AND THESE ZEROS ARE HONEST RATHER THAN LAZY.
     //
-    // homeOffice and pension are genuinely NOT CAPTURED ANYWHERE: there is no 'home' or 'pension'
-    // category, and no allowance election exists. These zeros really do understate him, and the fix
-    // is upstream (build the election), not here.
+    // pension is genuinely NOT CAPTURED ANYWHERE: there is no category and no election for it yet.
+    // That zero really does understate him, and the fix is upstream, not here.
     //
     // capitalAllowances is a different case and the zero is LOAD BEARING. Tools and equipment are
     // logged as ordinary expense categories, so their cost is ALREADY inside the expenses line above.
     // Passing a figure here as well would count them twice. Splitting them out properly is the same
     // move the mileage line just had, and it needs its own pass over what actually qualifies as plant.
-    homeOffice: 0,
     capitalAllowances: 0,
     pension: 0,
 

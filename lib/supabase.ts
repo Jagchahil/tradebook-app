@@ -26,6 +26,7 @@ import type {
 import { refreshFacts, resolveOverrides, isOverridableKey, isInBounds, type FactOverride } from './facts';
 import { advanceStage, normaliseWhatsapp, isContactStage, isCheckoutStage, isEventKind, type ContactStage, type CheckoutStage, type EventKind } from './crm';
 import { sicByCode } from './siccodes';
+import { useOfHomeToDate } from './elections';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -2366,6 +2367,13 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
 
   const start = new Date(`${taxYearStart}T00:00:00Z`);
   const monthsElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (30.44 * 86400000)));
+
+  // The use of home election for THIS tax year. Best effort: a read that fails is logged and treated
+  // as no election, so the optimiser keeps reminding him rather than silently dropping a claim.
+  const election = await readAllowanceElection(userId, 'use_of_home', startYear).catch((e) => {
+    console.error('[optimiser] could not read the use of home election:', e instanceof Error ? e.message : 'unknown');
+    return null;
+  });
   const purchase = goals.find((g) => g.kind === 'purchase');
 
   // WHAT HE HAS TOLD US ABOUT HIMSELF, read ONCE (see the note on the return): the answers as a map.
@@ -2394,18 +2402,24 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
       ...(sl?.postgrad ? ['postgrad' as const] : []),
     ],
     categoriesLogged,
-    // ⚠️ homeOfficeClaimed IS STILL ALWAYS FALSE, AND THAT IS A KNOWN GAP, NOT AN OVERSIGHT.
+    // ✅ THE GAP IS CLOSED (27 July 2026). This used to read: homeOfficeClaimed is STILL ALWAYS
+    // FALSE, a known gap, because taxoptimiser rule 4 emitted 'apply_allowance_election' and nothing
+    // implemented it. There is now an election (lib/elections.ts, public.allowance_elections), so a
+    // man can say yes and this reflects whether he has.
     //
-    // There is no 'home' category in lib/categories.ts and no allowance-election mechanism anywhere:
-    // taxoptimiser rule 4 emits action 'apply_allowance_election' and NOTHING IMPLEMENTS IT. So a man
-    // cannot claim use of home even if he wants to, the suggestion fires forever, and unlike mileage
-    // this one is real money he is genuinely not getting.
+    // ⚠️ IT IS THE ELECTION, NOT A CATEGORY, and the old fallback is deliberately gone. It read
+    // `categoriesLogged.some((c) => c.includes('home'))`, which could only ever be true if somebody
+    // created a 'home' expense category, and lib/categories.ts refuses to create one ON PURPOSE: a
+    // rule on rent or a household energy bill would sweep up a man's OWN HOUSE and claim tax relief
+    // on it. So the old test could never fire, and if it ever had, it would have fired on the one
+    // thing we must never claim.
     //
-    // Left false deliberately rather than papered over: a flag flipped to true without a mechanism
-    // behind it would silently STOP telling him about a deduction he still has not had. Better to
-    // over-remind than to quietly drop it. Fixing it properly means building the election, which is
-    // its own piece of work, scoped and not started.
-    homeOfficeClaimed: categoriesLogged.some((c) => c.includes('home')),
+    // A FAILED READ IS NOT "HE DID NOT ELECT". readAllowanceElection throws rather than returning
+    // null on a bad read, and this catch turns it into a logged null. That is the safe direction:
+    // he keeps being reminded about a deduction he has already taken, which is a nuisance, rather
+    // than silently losing a deduction he elected, which is money.
+    homeOfficeClaimed: !!election,
+    ytdHomeOffice: election ? useOfHomeToDate(election.hoursBand as 25 | 51 | 101, monthsElapsed) : 0,
     mileageClaimed: ytdMileage > 0,
     ytdMileage: Math.round(ytdMileage * 100) / 100,
     purchaseGoal: purchase ? { title: purchase.title, amount: purchase.amount } : null,
@@ -5623,5 +5637,97 @@ export async function readAnnouncementsForTeam(limit = 40): Promise<
     return (await res.json()) as Array<AnnouncementManualRow & { created_by: string | null; created_at: string | null }>;
   } catch {
     return null;
+  }
+}
+
+// --- ALLOWANCE ELECTIONS -------------------------------------------------------------------------
+//
+// The mechanism lib/taxoptimiser.ts rule 4 has been asking for since it was written. It emitted the
+// action 'apply_allowance_election' and nothing implemented it, so homeOfficeClaimed was false
+// forever and no customer ever claimed a penny of use of home.
+//
+// ⚠️ THE BAND IS STORED, NEVER THE MONEY. If HMRC moves the flat rate, nothing here goes stale,
+// because the rate is read from lib/taxengine.ts at call time and watched nightly by khoji/diff.mjs.
+// A rate copied into a second place is a rate that goes wrong in silence: that is how the live
+// mileage page came to say 45p while the engine said 55p.
+
+export interface AllowanceElection {
+  key: 'use_of_home';
+  startYear: number;
+  hoursBand: number;
+  electedAt: string;
+}
+
+// Null means NO ELECTION. It does not mean the read failed, and the difference matters: a failed
+// read that returned null would silently stop claiming a deduction he elected, and he would never
+// know. So a failure throws to the caller's catch rather than being flattened into "he did not
+// elect". Callers that cannot tolerate a throw wrap it, and getOptimiserInput does.
+export async function readAllowanceElection(
+  userId: string,
+  key: 'use_of_home',
+  startYear: number,
+): Promise<AllowanceElection | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/allowance_elections?user_id=eq.${encodeURIComponent(userId)}`
+    + `&key=eq.${encodeURIComponent(key)}&start_year=eq.${startYear}`
+    + '&select=key,start_year,hours_band,elected_at&limit=1',
+    { headers: headers(), signal: AbortSignal.timeout(6000) },
+  );
+  if (!res.ok) throw new Error(`allowance_elections read failed: HTTP ${res.status}`);
+  const rows = (await res.json()) as Array<{ key: string; start_year: number; hours_band: number; elected_at: string }>;
+  const r = rows[0];
+  if (!r) return null;
+  return { key: 'use_of_home', startYear: r.start_year, hoursBand: r.hours_band, electedAt: r.elected_at };
+}
+
+// Elect, or change the band. Idempotent on (user, key, year), so saying it twice is not an error and
+// changing his mind is the same call. The band is validated by the CHECK constraint in the table as
+// well as by the caller: two gates, because a bad band would be a wrong figure on a tax return.
+export async function writeAllowanceElection(
+  userId: string,
+  key: 'use_of_home',
+  startYear: number,
+  hoursBand: number,
+): Promise<boolean> {
+  if (!userId || ![25, 51, 101].includes(hoursBand)) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/allowance_elections`, {
+      method: 'POST',
+      headers: {
+        ...headers(),
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        user_id: userId, key, start_year: startYear,
+        hours_band: hoursBand, updated_at: new Date().toISOString(),
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// HE CAN TAKE IT BACK. Doc 103: acting for a man is only kindness when it is reversible and it is
+// his. An election made in error comes off in one step, and his figures move back the same day.
+export async function clearAllowanceElection(
+  userId: string,
+  key: 'use_of_home',
+  startYear: number,
+): Promise<boolean> {
+  if (!userId) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/allowance_elections?user_id=eq.${encodeURIComponent(userId)}`
+      + `&key=eq.${encodeURIComponent(key)}&start_year=eq.${startYear}`,
+      { method: 'DELETE', headers: { ...headers(), Prefer: 'return=minimal' } },
+    );
+    return res.ok;
+  } catch {
+    return false;
   }
 }

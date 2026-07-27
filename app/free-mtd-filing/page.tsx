@@ -17,11 +17,11 @@ import { filingFaqAnswer } from '../../lib/features';
 // ready. Everything else is honest "this is coming, here is what it will be."
 
 export const metadata: Metadata = {
-  title: 'Free Making Tax Digital Filing, Coming Soon | Lekhio',
+  title: 'Free Making Tax Digital Filing, Built and In Testing | Lekhio',
   description:
     'For straightforward UK sole trader returns, just profits, losses and the essentials, Lekhio will prepare and file your Making Tax Digital return for free. No AI in this path, so it costs us nothing to run. Join the list.',
   openGraph: {
-    title: 'Free Making Tax Digital Filing, Coming Soon',
+    title: 'Free Making Tax Digital Filing, Built and In Testing',
     description: 'Basic Self Assessment, prepared and filed free, forever. No AI, no catch. Join the list to be first.',
     type: 'website',
   },
@@ -77,10 +77,50 @@ export default function FreeMtdFilingPage() {
       {/* Hero */}
       <section style={{ maxWidth: 1080, margin: '0 auto', padding: '30px 24px 8px' }}>
         <div style={{ maxWidth: 720 }}>
-          <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE, FOREVER &middot; COMING SOON</span>
+          <span style={{ display: 'inline-block', backgroundColor: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE, FOREVER &middot; BUILT AND IN TESTING</span>
           <h1 className="h1c" style={{ fontWeight: 700, margin: '0 0 16px' }}>Free Making Tax Digital filing. For the basics, at no cost, ever.</h1>
           <p style={{ fontSize: 18, color: MUTED, lineHeight: 1.6, margin: 0 }}>
             If your return is straightforward, just profits, losses and the essentials HMRC asks for, we will prepare and file it for free. Not a trial, not a taster. Free because it costs us nothing to run.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════════════════
+          WHERE THIS HAS ACTUALLY GOT TO.
+
+          "Coming soon" is what you write when you have nothing to say. We have something to say,
+          and it is more reassuring than a date would be: the filing is BUILT, and it has been
+          tested against HMRC's own sandbox with valid fraud prevention headers. What is missing is
+          HMRC's permission, not the software, and when it arrives it is an environment change
+          rather than a build.
+
+          ⚠️ THREE THINGS THIS COPY MAY NEVER DO, and test/mtdclaims.test.mjs fails the build over
+          each of them:
+            1. Never "HMRC approved", "accredited", "certified" or "endorsed". HMRC's own terms
+               permit exactly one phrase, "HMRC recognised", and only once it is true.
+            2. Never imply we file on his behalf. We PREPARE, he APPROVES. HMRC keeps the taxpayer
+               legally responsible at all times, and no wording of ours gets to blur that.
+            3. Never imply we can file today, because we cannot.
+          ═══════════════════════════════════════════════════════════════════════════════════ */}
+      <section style={{ maxWidth: 1080, margin: '0 auto', padding: '26px 24px 0' }}>
+        <div style={{ maxWidth: 720, background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 16, padding: '22px 24px' }}>
+          <h2 style={{ fontSize: 19, fontWeight: 700, margin: '0 0 10px', letterSpacing: '-0.3px' }}>Where this has got to</h2>
+          <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: '0 0 12px' }}>
+            The filing itself is built. Every step it needs has been run against HMRC&rsquo;s own test
+            systems, end to end, with the fraud prevention headers HMRC requires on every call. What
+            is left is HMRC&rsquo;s permission to connect to the live service, and that is a switch
+            rather than a build.
+          </p>
+          <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: '0 0 12px' }}>
+            We are deliberately taking the extra time over it. Getting a man&rsquo;s tax return right
+            matters more than being first to say we can send one, and a return is not a thing to
+            rush. Until that permission lands, Lekhio prepares everything and you keep filing the way
+            you do now.
+          </p>
+          <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: 0 }}>
+            The date worth having in your head is <strong style={{ color: INK }}>7 November 2026</strong>,
+            the next quarterly update deadline. Getting your books straight before then is the thing
+            that actually saves you a scramble, and that part works today.
           </p>
         </div>
       </section>

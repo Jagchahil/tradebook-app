@@ -31,6 +31,15 @@
 //   not_submitted nobody has created it yet. A send WILL FAIL.
 export type MetaStatus = 'approved' | 'in_review' | 'not_submitted';
 
+// ✅ OBSERVED IN WHATSAPP MANAGER ON 27 JULY 2026, not inferred. Every status below was read off
+// Meta's own console that evening. Meta shows an approved template as "Active", sometimes as
+// "Active, quality pending", which means approved and sendable with no quality data accumulated yet.
+//
+// One leftover worth knowing about: a SECOND lekhio_reminder exists in plain "English" as well as
+// English (UK), from a mis-set language on a first attempt. It was deliberately NOT deleted, because
+// Meta blocks reuse of a deleted template name for up to 30 days and that would have left reminders
+// dead until late August. The code sends en_GB and finds the right one. Tidy it up after that.
+
 export interface WaTemplate {
   name: string;
   // Meta matches on name AND language. 'en' and 'en_GB' are different templates to Meta, and
@@ -89,7 +98,11 @@ export const WA_TEMPLATES: WaTemplate[] = [
     name: T_TRIAL_ENDING,
     language: 'en_GB',
     params: 1,
-    meta: 'not_submitted',
+    meta: 'approved',
+    // ⚠️ APPROVED BUT STILL GATED, AND THAT IS DELIBERATE. The invariant only requires that an
+    // UNAPPROVED template be gated; a gate on an approved one is just a switch nobody has flipped
+    // yet. Dropping GATE_TRIAL and GATE_AGENT starts real paid proactive messages going to real
+    // customers, which is Jag's call to make when he is watching, not a tidy-up.
     gate: GATE_TRIAL,
     purpose: 'The trial is about to end, {{1}} is the date.',
   },
@@ -97,7 +110,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
     name: T_TRIAL_ENDED,
     language: 'en_GB',
     params: 0,
-    meta: 'not_submitted',
+    meta: 'approved',
     gate: GATE_TRIAL,
     purpose: 'The trial has ended.',
   },
@@ -105,7 +118,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
     name: T_AGENT_THRESHOLD,
     language: 'en_GB',
     params: 1,
-    meta: 'not_submitted',
+    meta: 'approved',
     gate: GATE_AGENT,
     purpose: 'A threshold he is approaching or has crossed, {{1}} is the sentence.',
   },
@@ -113,7 +126,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
     name: T_AGENT_DEADLINE,
     language: 'en_GB',
     params: 1,
-    meta: 'not_submitted',
+    meta: 'approved',
     gate: GATE_AGENT,
     purpose: 'A deadline coming up, {{1}} is the sentence.',
   },
@@ -121,7 +134,7 @@ export const WA_TEMPLATES: WaTemplate[] = [
     name: T_AGENT_OPPORTUNITY,
     language: 'en_GB',
     params: 1,
-    meta: 'not_submitted',
+    meta: 'approved',
     gate: GATE_AGENT,
     purpose: 'Something he could claim, {{1}} is the sentence.',
   },

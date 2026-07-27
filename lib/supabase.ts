@@ -5414,3 +5414,211 @@ export async function readConnectorStatus(platform: string): Promise<
     };
   } catch { return null; }
 }
+
+// --- THE ANNOUNCEMENTS FEED ----------------------------------------------------------------------
+//
+// The reads behind the banner that finally makes Khoji visible. Four of them, and only one is
+// load-bearing enough to fail the request.
+//
+// ⚠️ THE APPROVED KNOWLEDGE IS READ LIVE, NEVER COPIED. There is no announcements table holding a
+// tax fact. A second copy of a figure is a second copy that can drift, and this codebase has been
+// caught with two readers over the same number three separate times (see readBrain's header). The
+// gate is applied in ONE place, lib/announcements.ts, over rows read straight from knowledge_items.
+//
+// ⚠️ AND NOTHING HERE JOINS ANYTHING ABOUT THE CUSTOMER except his own dismissals. An announcement
+// is a fact about the law, identical for every reader. The only per-user query in this function is
+// "which of these has he already cleared".
+
+export interface AnnouncementSources {
+  knowledge: AnnouncementKnowledgeRow[];
+  manual: AnnouncementManualRow[];
+  appliedItemIds: string[];
+  dismissedKeys: string[];
+}
+
+// Structurally identical to KnowledgeRow / ManualRow in lib/announcements.ts. Declared here rather
+// than imported so this file keeps its existing import list and the two stay checked against each
+// other by tsc at the one call site that passes one to the other.
+export interface AnnouncementKnowledgeRow {
+  id: string;
+  status: string | null;
+  title: string | null;
+  summary: string | null;
+  source_url: string | null;
+  effective_date: string | null;
+  created_at: string | null;
+  engine_impact: boolean | null;
+}
+
+export interface AnnouncementManualRow {
+  id: string;
+  title: string | null;
+  body: string | null;
+  source_url: string | null;
+  knowledge_item_id: string | null;
+  published_at: string | null;
+  expires_at: string | null;
+}
+
+// How far back the queries reach. Wider than lib/announcements.ts's MAX_AGE_DAYS on purpose: the
+// window that decides what a customer SEES belongs in the pure module where it is tested, not in a
+// query string. This is only here to keep the row count sane.
+const ANNOUNCEMENT_QUERY_DAYS = 120;
+
+// Returns null ONLY when the approved-knowledge read itself failed. A banner that silently shows
+// nothing because a query timed out looks exactly like a banner with nothing to say, and this
+// codebase's whole disease is silent success. The caller renders nothing either way, but it can
+// tell the two apart in a log.
+export async function readAnnouncementSources(userId: string): Promise<AnnouncementSources | null> {
+  try {
+    const { url } = config();
+    const since = new Date(Date.now() - ANNOUNCEMENT_QUERY_DAYS * 86_400_000).toISOString();
+    const q = async (path: string) => {
+      const res = await fetch(`${url}/rest/v1/${path}`, { headers: headers(), signal: AbortSignal.timeout(6000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    };
+
+    // 🔴 LOAD-BEARING. status=eq.reviewed is belt AND braces: lib/announcements.ts refuses anything
+    // else regardless, and this narrows the read so an unapproved row never even leaves the
+    // database. Two gates, because the cost of the second one is a query string.
+    const knowledge = (await q(
+      'knowledge_items?status=eq.reviewed'
+      + '&select=id,status,title,summary,source_url,effective_date,created_at,engine_impact'
+      + `&created_at=gte.${since}&order=created_at.desc&limit=40`,
+    )) as AnnouncementKnowledgeRow[];
+
+    // GARNISH. allSettled, not all. A dismissals read that fails must not blank the banner, and a
+    // manual note that fails to load must not take the law with it. The worst case of each failing
+    // is a card he has already cleared coming back once, which is a nuisance, not a lie.
+    const [manualR, appliedR, dismissedR] = await Promise.allSettled([
+      q(`announcements?select=id,title,body,source_url,knowledge_item_id,published_at,expires_at&published_at=gte.${since}&order=published_at.desc&limit=20`),
+      // PROOF THAT THE FIGURE ACTUALLY MOVED. Only an item with a real fact_overrides row may carry
+      // "your figures already reflect this". engine_impact records what somebody INTENDED; this
+      // records what happened. Saying the first while meaning the second is the exact species of
+      // confident wrongness the whole product is built to avoid.
+      q(`fact_overrides?select=knowledge_item_id&knowledge_item_id=not.is.null&created_at=gte.${since}&limit=200`),
+      q(`announcement_dismissals?user_id=eq.${encodeURIComponent(userId)}&select=announcement_key&limit=500`),
+    ]);
+
+    const manual = (manualR.status === 'fulfilled' ? manualR.value : []) as AnnouncementManualRow[];
+    const appliedRows = (appliedR.status === 'fulfilled' ? appliedR.value : []) as Array<{ knowledge_item_id: string | null }>;
+    const dismissedRows = (dismissedR.status === 'fulfilled' ? dismissedR.value : []) as Array<{ announcement_key: string }>;
+
+    return {
+      knowledge,
+      manual,
+      appliedItemIds: appliedRows.map((r) => r.knowledge_item_id).filter((v): v is string => !!v),
+      dismissedKeys: dismissedRows.map((r) => r.announcement_key),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// HE CLEARED IT, IT STAYS CLEARED. Idempotent by primary key, so a double tap on a phone with a bad
+// signal is not an error. Returns false on a failed write so the surface can leave the card up
+// rather than fade it out over a write that never landed.
+export async function dismissAnnouncement(userId: string, key: string): Promise<boolean> {
+  if (!userId || !key) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/announcement_dismissals`, {
+      method: 'POST',
+      headers: {
+        ...headers(),
+        'Content-Type': 'application/json',
+        // Already dismissed is a success, not a conflict.
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({ user_id: userId, announcement_key: key }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// THE UNDO. Doc 103: acting for him is only kindness when it is reversible. A dismissal is his own
+// decision about his own screen, so he may take it back.
+export async function undismissAnnouncement(userId: string, key: string): Promise<boolean> {
+  if (!userId || !key) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/announcement_dismissals?user_id=eq.${encodeURIComponent(userId)}&announcement_key=eq.${encodeURIComponent(key)}`,
+      { method: 'DELETE', headers: { ...headers(), Prefer: 'return=minimal' } },
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// PUBLISHING, FROM /team. Every customer reads what this writes, so it carries a name and a date for
+// the same reason reviewKnowledgeItem does. `byEmail` is required by the signature, not defaulted:
+// an announcement we cannot attribute is "the system decided", which is what we are here to prevent.
+export async function writeAnnouncement(a: {
+  title: string;
+  body?: string | null;
+  sourceUrl?: string | null;
+  knowledgeItemId?: string | null;
+  expiresAt?: string | null;
+  byEmail: string;
+}): Promise<boolean> {
+  if (!a.title?.trim() || !a.byEmail) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/announcements`, {
+      method: 'POST',
+      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        title: a.title.trim(),
+        body: a.body?.trim() || null,
+        source_url: a.sourceUrl?.trim() || null,
+        knowledge_item_id: a.knowledgeItemId || null,
+        expires_at: a.expiresAt || null,
+        created_by: a.byEmail,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// TAKING ONE DOWN. Expiring, never deleting: an announcement that was read by six thousand people is
+// a thing we said, and the record of having said it does not get to disappear because we changed our
+// minds. It stops showing, and the row stays.
+export async function retireAnnouncement(id: string): Promise<boolean> {
+  if (!id) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/announcements?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ expires_at: new Date().toISOString() }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// What /team shows: everything published, live or retired, newest first, with who wrote it. Null
+// means the read failed, which is not the same as "nothing published yet".
+export async function readAnnouncementsForTeam(limit = 40): Promise<
+  Array<AnnouncementManualRow & { created_by: string | null; created_at: string | null }> | null
+> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/announcements?select=id,title,body,source_url,knowledge_item_id,published_at,expires_at,created_by,created_at&order=published_at.desc&limit=${limit}`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Array<AnnouncementManualRow & { created_by: string | null; created_at: string | null }>;
+  } catch {
+    return null;
+  }
+}

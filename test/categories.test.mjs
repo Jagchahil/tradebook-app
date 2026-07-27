@@ -183,10 +183,61 @@ ok(`there are meaningfully more than the old 8 rules (${RULE_COUNT})`, RULE_COUN
 
 // Every category the map can EMIT must be in the canonical list, or the app will render a
 // category its picker does not have and he will not be able to change it back.
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE BUSINESS THAT WORKS FROM PREMISES, NOT A VAN.
+// ---------------------------------------------------------------------------------------------
+//
+// Every category in this file was a tradesman's: materials, tools, van, workwear. Good for a plumber,
+// and it left a coffee shop with nowhere to put the two biggest costs in its business. The lease and
+// the beans both landed in 'other', the bucket named after not knowing: the review pile cannot reason
+// about it, the optimiser cannot suggest against it, and he cannot check it.
+
+ok('a business energy supplier is utilities, not other',
+  cat('BRITISH GAS BUSINESS') === 'utilities' && cat('EDF ENERGY') === 'utilities');
+
+ok('a water company and a business broadband line are utilities too',
+  cat('THAMES WATER') === 'utilities' && cat('BT BUSINESS BROADBAND') === 'utilities');
+
+ok('a serviced office and a storage unit are rent',
+  cat('REGUS UK LTD') === 'rent' && cat('BIG YELLOW SELF STORAGE') === 'rent');
+
+ok('an unambiguous premises phrase is rent',
+  cat('SHOP RENT MARCH') === 'rent' && cat('COMMERCIAL RENT') === 'rent');
+
+ok('a wholesaler and a food service supplier are STOCK, not materials',
+  cat('BOOKER WHOLESALE') === 'stock' && cat('BIDFOOD') === 'stock');
+
+ok('...because stock is SOLD ON and materials are CONSUMED: different lines, different stocktake',
+  cat('GOODS FOR RESALE') === 'stock' && cat('TRAVIS PERKINS') === 'materials');
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE GUARD THAT MATTERS MOST IN THIS WHOLE FILE.
+// ---------------------------------------------------------------------------------------------
+//
+// A rule on the bare word "rent" would sweep up A MAN'S OWN HOUSE RENT and claim tax relief on it.
+// That is not a misfiling to tidy up later. It is a WRONG CLAIM ON A REAL RETURN, in his name, that
+// he signed and is legally responsible for. Same reasoning that leaves 'mortgage interest' with no
+// auto rule at all. Use of home is a FLAT RATE; it is never his actual rent.
+//
+// If these ever start matching, someone has added a loose rule, and this test is the only thing
+// standing between that and a false claim.
+
+ok('🔴 A MAN\'S OWN HOME RENT IS NEVER AUTO CLAIMED AS BUSINESS RENT',
+  cat('RENT') !== 'rent' && cat('MONTHLY RENT') !== 'rent'
+  && cat('RENT PAYMENT') !== 'rent' && cat('LANDLORD RENT DD') !== 'rent');
+
+ok('...and a letting agent taking his HOME rent is not swept up either',
+  cat('RENT TO CONNELLS') !== 'rent' && cat('HAART RENT') !== 'rent');
+
+ok('🔴 the trades are not misfiled to serve the shops: "gas" and "electric" stay a plumber\'s words',
+  cat('GAS FITTINGS LTD') !== 'utilities' && cat('ELECTRIC SUPPLIES CO') !== 'utilities');
+
 const emitted = [
   'fuel', 'materials', 'tools', 'equipment', 'van', 'travel', 'subcontractor', 'wages',
   'insurance', 'phone', 'software', 'workwear', 'waste', 'training', 'accountancy',
   'marketing', 'bank charges', 'meals', 'other',
+  // Added 27 Jul when the cost sheet stopped being a tradesman's only.
+  'rent', 'utilities', 'stock',
 ];
 ok('every category the map emits is in the canonical list', emitted.every(isCategory));
 

@@ -50,6 +50,34 @@ export const CATEGORIES = [
   'marketing',
   'bank charges',
   'meals',
+
+  // 🔴 THE THREE THAT DID NOT EXIST, AND THE HOLE THEY LEFT.
+  //
+  // Everything above this line is a TRADESMAN'S cost sheet: materials, tools, van, workwear. It is a
+  // good cost sheet, and for a plumber in a van it is close to complete. For anybody who works from
+  // PREMISES it was missing the three biggest lines in their business, and they had nowhere to go
+  // but 'other'.
+  //
+  // A coffee shop's two largest costs are the lease and the beans. A restaurant's are the lease and
+  // the food. A barber's are the chair rent and the products. Not one of them had a category, so the
+  // most important money in those businesses landed in a bucket named after not knowing.
+  //
+  // That is not a tidiness problem. 'other' is the category the review pile cannot reason about, the
+  // optimiser cannot suggest against, and a man cannot check. We were quietly telling every
+  // premises-based business that we did not understand their books.
+  //
+  // ⚠️ 'rent' IS BUSINESS PREMISES ONLY, AND THE AUTO RULES ARE DELIBERATELY NARROW FOR THE SAME
+  // REASON 'mortgage interest' has none at all: a regex on the word "rent" would sweep up a man's own
+  // HOUSE rent and claim tax relief on it. Use of home is a flat rate, not his rent. So the rules
+  // below match commercial landlords, agents and serviced offices, never the bare word.
+  'rent',
+  // Light, heat, water, broadband at the business premises. Same caution: never his home bills.
+  'utilities',
+  // GOODS FOR RESALE. The single biggest line for retail, hospitality and ecommerce, and it is not
+  // 'materials': materials get consumed doing a job, stock gets SOLD ON. They are different lines on
+  // a return and different numbers for a stocktake.
+  'stock',
+
   // A LANDLORD'S RESIDENTIAL MORTGAGE INTEREST. It is not an ordinary expense: Section 24
   // restricts it to a 20% tax CREDIT rather than a deduction, so it must be kept apart from the
   // other property costs or the relief is overstated.
@@ -70,6 +98,51 @@ export function isCategory(c: string | null | undefined): boolean {
 // Order matters: the FIRST match wins. So the specific rules come before the loose ones, and
 // anything that could be caught by a generic word sits above it.
 const CATEGORY_MAP: Array<[RegExp, Category]> = [
+  // --- UTILITIES: the business premises bills --------------------------------------------
+  //
+  // Named suppliers only. There is no rule on the bare words "electric", "gas" or "water", and that
+  // is deliberate: "gas" is a plumber's stock in trade and "electric" is half an electrician's
+  // vocabulary, so a loose rule here would misfile the trades to serve the shops. Named energy and
+  // telecoms suppliers are unambiguous.
+  //
+  // ⚠️ THESE MAY STILL BE HIS HOME BILLS. The auto rule proposes, the review pile disposes, exactly
+  // like every other rule in this file. Use of home is a FLAT RATE, never his actual household
+  // energy bill, so if this lands on a home supply he unticks it and lib/memory.ts learns.
+  [/\b(british gas|edf energy|e\.?on|octopus energy|ovo energy|scottish power|sse\b|utilita|shell energy|so ?energy|bulb energy|npower|good energy|ecotricity|opus energy|crown gas|corona energy|smartest energy|total gas)\b/i, 'utilities'],
+  [/\b(thames water|severn trent|anglian water|yorkshire water|united utilities|south west water|wessex water|northumbrian water|scottish water|affinity water|castle water|water plus|business stream)\b/i, 'utilities'],
+  [/\b(bt business|btbusiness|virgin media business|sky business|talktalk business|zen internet|plusnet business|gigaclear|hyperoptic|community fibre)\b/i, 'utilities'],
+  [/\b(business rates|water rates|standing charge)\b/i, 'utilities'],
+
+  // --- RENT: BUSINESS PREMISES ONLY -------------------------------------------------------
+  //
+  // 🔴 THERE IS NO RULE ON THE BARE WORD "rent", AND THERE MUST NEVER BE ONE.
+  //
+  // Same reasoning that leaves 'mortgage interest' with no auto rule at all. A man's own house rent
+  // is not a business cost, and a regex on "rent" would sweep it up and claim tax relief on it. That
+  // is not a misfiling, it is a WRONG CLAIM ON A REAL RETURN, in his name, that he signed.
+  //
+  // So these match the commercial world only: agents and landlords who let business space, serviced
+  // office and workspace operators, self storage, and the unambiguous compound phrases. "rent" on its
+  // own reaches 'other' and he chooses, which is the correct outcome for a word that means two
+  // completely different things depending on which door it is paying for.
+  [/\b(regus|iwg\b|spaces works|wework|workspace group|bizspace|the office group|landmark space|orega|clockwise offices|huckletree|patch work)\b/i, 'rent'],
+  [/\b(big yellow|safestore|access self storage|storage king|shurgard|lok'?n ?store)\b/i, 'rent'],
+  [/\b(unit rent|shop rent|premises rent|office rent|studio rent|workshop rent|yard rent|rent (?:for|on) (?:the )?(?:unit|shop|premises|office|studio|workshop|yard)|commercial rent|ground rent|service charge)\b/i, 'rent'],
+
+  // --- STOCK: GOODS FOR RESALE ------------------------------------------------------------
+  //
+  // Not 'materials'. Materials are consumed doing a job; stock is bought to be SOLD ON. A cafe's
+  // beans, a shop's shelves, an online seller's inventory. Different line on the return, different
+  // number at stocktake, and for anyone selling goods it is the largest cost in the business.
+  //
+  // Wholesalers and cash and carries first, then the food service names, then the plain words. Note
+  // Costco already appears under fuel above for its PETROL specifically, which is why that rule is
+  // narrowed to the pump: a Costco trolley is stock, a Costco fill up is fuel.
+  [/\b(booker|bestway|batleys|dhamecha|parfetts|blakemore|landmark wholesale|today'?s group|sugro|confex)\b/i, 'stock'],
+  [/\b(brakes\b|bidfood|bidvest|sysco|creed foodservice|turner price|jj foodservice|reynolds catering|total produce|smithfield|billingsgate|new covent garden)\b/i, 'stock'],
+  [/\b(matthew algie|union hand|pact coffee|rave coffee|lavazza|illy\b|beans? supplier|coffee bean|roastery|roasters)\b/i, 'stock'],
+  [/\b(stock purchase|goods for resale|wholesale|cash ?and ?carry|inventory purchase)\b/i, 'stock'],
+
   // --- FUEL ------------------------------------------------------------------------------
   // The forecourts, the supermarket pumps, and the chargers. EV charging is fuel: it is the
   // same expense doing the same job, and a man with an electric van should not have to argue.

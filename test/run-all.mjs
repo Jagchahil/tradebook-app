@@ -71,6 +71,13 @@ const khojiTribunal = path.join(repoRoot, 'khoji', 'tribunaltest.mjs');
 // list must equal lib/lawsources.ts, or a law gets silently dropped from the watch.
 const khojiLawWatch = path.join(repoRoot, 'khoji', 'lawwatchtest.mjs');
 
+// Khoji's BODIES watcher (khoji/bodiestest.mjs). Card A: "beyond gov.uk". Same reasoning as the
+// others: the same file runs on the Mac mini, so it must not drift. It is in CI because it is the
+// only thing that fails the build if bodies.json is ever pointed at a host the 27 Jul 2026 terms-of-
+// use sweep did not clear, or if one of the explicitly excluded sources (FCA, ICAS, NICEIC and the
+// rest) ever sneaks back into ALLOWED_HOSTS.
+const khojiBodies = path.join(repoRoot, 'khoji', 'bodiestest.mjs');
+
 const suites = [
   ...mjsSuites,
   ...(existsSync(khojiDiffer) ? [{ name: 'khoji-differ', file: khojiDiffer, kind: 'node' }] : []),
@@ -78,6 +85,7 @@ const suites = [
   ...(existsSync(khojiBudget) ? [{ name: 'khoji-budget', file: khojiBudget, kind: 'node' }] : []),
   ...(existsSync(khojiTribunal) ? [{ name: 'khoji-tribunal', file: khojiTribunal, kind: 'node' }] : []),
   ...(existsSync(khojiLawWatch) ? [{ name: 'khoji-lawwatch', file: khojiLawWatch, kind: 'node' }] : []),
+  ...(existsSync(khojiBodies) ? [{ name: 'khoji-bodies', file: khojiBodies, kind: 'node' }] : []),
   { name: 'exams', file: path.join(here, 'exams', 'run-exams.mjs'), kind: 'node' },
   // The LAW exam bank. Sibling of the accounting exams: where that proves our tax ENGINE against a
   // number, this proves our legal KNOWLEDGE is anchored to a licensed primary source, ties every

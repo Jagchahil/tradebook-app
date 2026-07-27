@@ -108,14 +108,25 @@ tribunal_rc=$?
 node lawwatch.mjs "$@" >> logs/khoji.log 2>&1
 lawwatch_rc=$?
 
+# bodies.mjs. Card A: "beyond gov.uk". Khoji is not just HMRC and the law: it is every professional
+# and regulatory body a UK sole trader tradesperson is actually bound by or should know about. None
+# of it is government-licensed text, so nothing it finds is ever trusted verbatim: a change here is
+# always status='needs_distillation', a human has to read it and approve it on /team, same desk as
+# everything else. Only the hosts the 27 Jul 2026 terms-of-use + robots.txt sweep actually cleared,
+# enforced in code, and a change here can never be an unlicensed source because bodies.mjs refuses
+# to run at all if bodies.json ever points at one.
+node bodies.mjs "$@" >> logs/khoji.log 2>&1
+bodies_rc=$?
+
 # Report the worst thing that happened, so launchd's exit code means something. A 2 from the differ
 # or the corpus means the ground has moved under us, which is an incident, not a crash: /api/health
 # has already gone red off the row it wrote. A 1 from any of them means the job itself is broken.
-echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc budget rc=$budget_rc tribunal rc=$tribunal_rc lawwatch rc=$lawwatch_rc" >> logs/khoji.log
+echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc budget rc=$budget_rc tribunal rc=$tribunal_rc lawwatch rc=$lawwatch_rc bodies rc=$bodies_rc" >> logs/khoji.log
 if [ "$watch_rc" -ne 0 ]; then exit "$watch_rc"; fi
 if [ "$diff_rc" -ne 0 ]; then exit "$diff_rc"; fi
 if [ "$corpus_rc" -ne 0 ]; then exit "$corpus_rc"; fi
 if [ "$amend_rc" -ne 0 ]; then exit "$amend_rc"; fi
 if [ "$budget_rc" -ne 0 ]; then exit "$budget_rc"; fi
 if [ "$tribunal_rc" -ne 0 ]; then exit "$tribunal_rc"; fi
-exit "$lawwatch_rc"
+if [ "$lawwatch_rc" -ne 0 ]; then exit "$lawwatch_rc"; fi
+exit "$bodies_rc"

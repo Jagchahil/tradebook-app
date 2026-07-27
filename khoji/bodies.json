@@ -1,0 +1,32 @@
+{
+  "_comment": "27 Jul 2026: the professional/regulatory body sweep, card A. Every URL here passed BOTH the terms-of-use + robots.txt check (same discipline lawwatch.mjs applies to ALLOWED_HOSTS) AND a second, separate pass: fetched and read, by a human proxy, to confirm the page is real substantive on-topic guidance and not a 404, a landing/navigation shell, or the wrong topic. sources.json taught us this the hard way once already with the MTD redirect; this file's FIRST draft repeated the exact same mistake on 10 of 11 URLs, caught only when the dry run was actually run for real and every 'successful' fetch was read back. WHEN YOU ADD A SOURCE, OPEN IT AND CHECK THE FIGURE IS ON IT. Every source below was opened and the figure, or the rule, is actually on it.",
+  "_excluded": [
+    { "name": "FCA", "reason": "terms explicitly prohibit bots/scrapers/automated monitoring without prior written consent; same reasoning Khoji already applies to exclude the Find Case Law API." },
+    { "name": "OPBAS", "reason": "hosted on fca.org.uk, same prohibition applies." },
+    { "name": "ICAEW Tax Faculty", "reason": "the actual guidance (TAXguides) is members-only, behind login. Nothing public worth watching." },
+    { "name": "IAB", "reason": "resources gated behind membership login." },
+    { "name": "AAT", "reason": "terms explicitly state 'this includes the prohibition of data-scraping'. Unambiguous no." },
+    { "name": "ICAS", "reason": "robots.txt explicitly names and blocks anthropic-ai, Claude-Web, GPTBot, CCBot and others. An explicit anti-AI-crawler stance should be respected, not routed around under a different user agent." },
+    { "name": "NICEIC", "reason": "robots.txt (Content-Signal format) explicitly disallows ClaudeBot, GPTBot, Google-Extended, CCBot and others by name. Same reasoning as ICAS." },
+    { "name": "CIOT", "reason": "terms-and-conditions page returns HTTP 403 to automated fetches (confirmed on two separate attempts), so the actual clause could not be read. Needs a real-browser check before it can be added." },
+    { "name": "ACCA", "reason": "broad 'no reproduction or storage without ACCA's prior written permission' clause, no automated-access carve-out. Needs a legal sign-off, not assumed clean." },
+    { "name": "IFA", "reason": "robots.txt fetch was blocked (403) rather than confirmed absent, mirroring CIOT's pattern. Needs a real-browser check." },
+    { "name": "Gas Safe Register", "reason": "terms-of-use page returned 403 to automated fetch; robots.txt looked fine but the clause itself is unconfirmed." },
+    { "name": "TrustMark", "reason": "robots.txt could not be retrieved; terms language on reproduction is broad. Needs verification." },
+    { "name": "The Pensions Regulator", "reason": "does not claim OGL despite the .gov.uk domain, unlike HSE/ACAS which do explicitly. Needs a licence confirmation before relying on it." },
+    { "name": "GLAA", "reason": "gla.gov.uk now redirects to the new Fair Work Agency's gov.uk page following the April 2026 transfer of functions; the FWA's gov.uk page is already covered by the core gov.uk watch, nothing distinct to add here." },
+    { "name": "NCA", "reason": "no page on nationalcrimeagency.gov.uk itself is real small-business-facing AML guidance; every candidate read as a landing page pointing at the SAR portal. The actual guidance a tradesperson-adjacent 'high value dealer' would need (registration, thresholds, risk factors) lives on gov.uk under HMRC's economic crime supervision handbook, already covered by the core gov.uk watch. Nothing distinct to add here, same reasoning as GLAA." },
+    { "name": "Small Business Commissioner", "reason": "the original /late-payments/ URL turned out to be a mental-health-support page, not late payment rules. Every other page checked (Legal Action for Late Payments, Late Payments Consultation Guidance, FAQs) is procedural (how to raise a complaint, how to sue) rather than the substantive law (the Late Payment of Commercial Debts Act, the statutory interest rate). That substantive law already lives on gov.uk / legislation.gov.uk, covered by the existing watches. Dropped rather than watch a page with nothing on it." },
+    { "name": "ICB (Institute of Certified Bookkeepers)", "reason": "the original /Membership/Compliance URL was a 404 rendered with a 200 status. No replacement public guidance page was found on bookkeepers.org.uk; its real content appears to be members-only. Dropped rather than force a weak source in." }
+  ],
+  "sources": [
+    { "name": "ATT tax reliefs, allowances and expenses for businesses", "type": "page", "url": "https://www.att.org.uk/employers/welcome-employer-focus/tax-reliefs-allowances-and-expenses-businesses", "field": "tax" },
+    { "name": "ICO: 15 things all small businesses need to know about data protection", "type": "page", "url": "https://ico.org.uk/for-organisations/advice-for-small-organisations/news-blogs-and-events/blogs/15-things-all-small-businesses-need-to-know-about-data-protection/", "field": "data_protection" },
+    { "name": "HSE: are you a small builder?", "type": "page", "url": "https://www.hse.gov.uk/construction/areyou/builder.htm", "field": "health_and_safety" },
+    { "name": "CITB levy: what you pay and why", "type": "page", "url": "https://www.citb.co.uk/levy/what-you-pay-and-why", "field": "construction" },
+    { "name": "NAPIT competent person scheme", "type": "page", "url": "https://www.napit.org.uk/schemes/competent-person-scheme.aspx", "field": "construction" },
+    { "name": "CSCS: types of CSCS cards", "type": "page", "url": "https://www.cscs.uk.com/types-of-cscs-cards/", "field": "construction" },
+    { "name": "ACAS national minimum wage and employment guidance", "type": "page", "url": "https://www.acas.org.uk/national-minimum-wage-entitlement", "field": "employment" },
+    { "name": "Business Companion (CTSI): supplying services", "type": "page", "url": "https://www.businesscompanion.info/en/quick-guides/services/supplying-services", "field": "consumer" }
+  ]
+}

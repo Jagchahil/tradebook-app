@@ -68,9 +68,21 @@ export function findSic(query: string, limit = 3): TradeSic[] {
     .sort((a, b) => b.score - a.score)
     .map((s) => s.t);
 
-  if (scored.length === 0) {
-    return [TRADE_SIC[TRADE_SIC.length - 1]]; // the generic fallback
-  }
+  // 🔴 NO CONFIDENT MATCH MEANS NO SUGGESTION. THIS USED TO RETURN A FALLBACK AND IT WAS WRONG.
+  //
+  // The old line was `return [TRADE_SIC[TRADE_SIC.length - 1]]`, the generic entry, which is
+  // 43999 "Other specialised construction". app/start renders whatever comes back under the
+  // heading "Your likely SIC code", so on 27 July 2026 a cafe, a restaurant, and the literal
+  // string "qwertyuiop" were all being told, confidently, that they were specialised
+  // construction. That code goes onto a Companies House incorporation filing.
+  //
+  // It is the same failure this codebase keeps catching in other clothes: a function that cannot
+  // answer, answering anyway. lib/weeklyupdate.ts prints nothing rather than invent a deadline.
+  // lib/ledger.ts says "not enough" rather than draw a confident number. lib/announcements.ts
+  // drops a summary whole rather than render half a rule. An empty array is the honest answer,
+  // and app/start already renders nothing when there is nothing, because sicChoice is null.
+  //
+  // Do not put a fallback back. If the coverage is too thin for a trade, widen TRADE_SIC.
   return scored.slice(0, limit);
 }
 

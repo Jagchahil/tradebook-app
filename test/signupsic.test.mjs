@@ -45,8 +45,27 @@ ok('empty and whitespace are refused the same way',
 ok('every code findSic can ever return also resolves via sicByCode, so the two never disagree',
   TRADE_SIC.every((t) => sicByCode(t.code)?.code === t.code));
 
-ok('findSic still returns the generic fallback for gibberish, so the UI is never left with nothing',
-  findSic('xyxyxyxyx').length === 1);
+// 🔴 REVERSED ON 27 JULY 2026. This used to assert the OPPOSITE, and the old reasoning was
+// "so the UI is never left with nothing".
+//
+// That is the wrong instinct for this particular field. The fallback was TRADE_SIC's last entry,
+// 43999 "Other specialised construction", and app/start renders whatever comes back under the
+// heading "Your likely SIC code". So a cafe, a restaurant and the literal string "qwertyuiop"
+// were all being told, confidently, that they were specialised construction, and that code goes
+// onto a Companies House incorporation filing.
+//
+// An empty UI is not a failure here, it is the honest answer. Every other part of this codebase
+// already works this way: weeklyupdate prints nothing rather than invent a deadline, ledger says
+// "not enough" rather than draw a confident number, announcements drops a summary whole rather
+// than render half a rule. app/start renders no card when sicChoice is null, which is correct.
+ok('findSic gives NO suggestion rather than a wrong one, for anything it cannot match',
+  ['xyxyxyxyx', 'qwertyuiop', 'Cafe', 'Restaurant', 'Coffee shop'].every((q) => findSic(q).length === 0));
+
+ok('a real trade still matches, so the rule above is not just breaking the matcher',
+  findSic('Electrician')[0]?.code === '43210' && findSic('barber')[0]?.code === '96020');
+
+ok('no returned suggestion is ever the generic construction catch all for a non construction trade',
+  findSic('online seller').every((t) => t.code !== '43999'));
 
 // ---------------------------------------------------------------------------------------------
 // The server side: the LABEL is always re-derived, never trusted as free text from the client.

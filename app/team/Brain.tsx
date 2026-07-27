@@ -420,6 +420,26 @@ export default function Brain() {
   );
 }
 
+// ⚠️ THE SOURCE LABEL MUST NAME THE ACTUAL SOURCE, NOT ASSUME ONE.
+//
+// This card used to say "Read the GOV.UK page first" unconditionally, because until 27 Jul every
+// pending item WAS off GOV.UK. Khoji now also watches ACAS, HSE, CITB, Business Companion and more
+// (khoji/bodies.mjs), so a hardcoded "GOV.UK" would tell the one person about to vouch for a claim
+// that its source is a government page when it might be a trade body's. The whole point of "the
+// source, always, above the buttons" is that he can check it; a mislabelled source defeats that
+// before he has even clicked through. Same host-from-URL approach as app/team/Learnings.tsx's
+// host(), kept local here rather than shared, since the two components' fallback strings differ.
+function sourceHost(url?: string | null): string {
+  if (!url) return 'the source';
+  try {
+    const h = new URL(url).host.replace(/^www\./, '');
+    if (h.includes('legislation')) return 'legislation.gov.uk';
+    if (h.includes('caselaw') || h.includes('nationalarchives')) return 'the courts';
+    if (h.includes('gov.uk')) return 'GOV.UK';
+    return h;
+  } catch { return 'the source'; }
+}
+
 // --- THE DECK -----------------------------------------------------------------------------------
 //
 // ⚠️ THIS IS THE ONE BUTTON THE WHOLE DOCTRINE IS ABOUT.
@@ -519,7 +539,7 @@ function Deck({
             page, scored its own confidence at 0.95, and was flat wrong. */}
         {card.source_url ? (
           <a href={card.source_url} target="_blank" rel="noopener noreferrer" style={S.src}>
-            Read the GOV.UK page first &rarr;
+            Read the {sourceHost(card.source_url)} page first &rarr;
           </a>
         ) : (
           <p style={S.noSrc}>No source link. Do not approve this.</p>

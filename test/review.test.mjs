@@ -145,9 +145,24 @@ ok('...and nobody has quietly patched it with an empty string',
 //
 // A model read this page and wrote a sentence. On 8 July a model read the mileage page, scored its
 // own confidence at 0.95, and was flat wrong. You are about to vouch for this in front of HMRC.
+//
+// 🔴 27 JUL: THE LABEL USED TO LIE. It said "Read the GOV.UK page first" unconditionally, which was
+// true until the day it was not: Khoji now also watches ACAS, HSE, CITB, Business Companion and more
+// (khoji/bodies.mjs), none of them GOV.UK. A hardcoded "GOV.UK" would tell the one person about to
+// vouch for a claim that its source is a government page when it might be a trade body's, at exactly
+// the moment he is meant to be checking that. It must name the ACTUAL host, derived from the URL,
+// never assumed.
 
-ok('every card links to the primary GOV.UK page, and says to read it FIRST',
-  brain.includes('Read the GOV.UK page first'));
+ok('every card links to the primary source page, and says to read it FIRST',
+  /page first/.test(brain));
+
+ok('🔴 THE SOURCE LABEL IS DYNAMIC, NOT HARDCODED TO GOV.UK — a bodies.mjs source (ACAS, HSE, CITB, Business Companion) must show its own name',
+  /Read the \{sourceHost\(card\.source_url\)\} page first/.test(brainCode)
+  && !/Read the GOV\.UK page first/.test(brainCode));
+
+ok('sourceHost() names legislation.gov.uk and the courts distinctly, and falls back to the real host for anything else, never a hardcoded GOV.UK',
+  /function sourceHost/.test(brainCode)
+  && /legislation/.test(brainCode.split('function sourceHost')[1]?.split('\n\n')[0] ?? ''));
 
 ok('an item with NO source says so, and says not to approve it',
   brain.includes('No source link. Do not approve this.'));

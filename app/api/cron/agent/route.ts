@@ -38,6 +38,7 @@ import {
   refreshFactsFromDb,
 } from '../../../../lib/supabase';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
+import { T_AGENT_THRESHOLD, T_AGENT_DEADLINE, T_AGENT_OPPORTUNITY } from '../../../../lib/watemplates';
 import { computeSignalsForStructure, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
 
 export const runtime = 'nodejs';
@@ -65,15 +66,15 @@ function authorised(req: NextRequest): boolean {
 // Which approved Meta template carries each ping. One variable ({{1}}), the
 // signal's waText. Doc 84 section 6.
 const TEMPLATE_FOR: Record<string, string> = {
-  vat_approach: 'agent_threshold_alert',
-  mtd_mandation: 'agent_threshold_alert',
-  mtd_combined_trap: 'agent_threshold_alert',
-  pa_taper: 'agent_threshold_alert',
-  class2_pension_year: 'agent_deadline_alert',
-  poa_cliff: 'agent_deadline_alert',
-  quarter_unconfirmed: 'agent_deadline_alert',
-  invoice_chase: 'agent_deadline_alert',
-  aia_timing: 'agent_opportunity',
+  vat_approach: T_AGENT_THRESHOLD,
+  mtd_mandation: T_AGENT_THRESHOLD,
+  mtd_combined_trap: T_AGENT_THRESHOLD,
+  pa_taper: T_AGENT_THRESHOLD,
+  class2_pension_year: T_AGENT_DEADLINE,
+  poa_cliff: T_AGENT_DEADLINE,
+  quarter_unconfirmed: T_AGENT_DEADLINE,
+  invoice_chase: T_AGENT_DEADLINE,
+  aia_timing: T_AGENT_OPPORTUNITY,
 };
 
 async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {

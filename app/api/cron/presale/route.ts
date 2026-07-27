@@ -2,17 +2,20 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import crypto from 'crypto';
 import { listPresaleCandidates, markPresaleSent, logContactEvent } from '../../../../lib/supabase';
 import { hasEmailConfig, sendMarketingEmail } from '../../../../lib/email';
-import { hasSendConfig, sendTemplate } from '../../../../lib/whatsapp';
-import { PRESALE_ENABLED, nextPresaleStep, presaleDue, stepSendable, presaleMessage, firstName, PRESALE_WA_LANG } from '../../../../lib/presale';
+// No WhatsApp import. The presale ladder went email only on 27 July 2026: a lead who has not paid
+// us anything yet is the last person worth spending a paid template on. See lib/presale.ts.
+import { PRESALE_ENABLED, nextPresaleStep, presaleDue, stepSendable, presaleMessage } from '../../../../lib/presale';
 import { unsubscribeUrl } from '../../../../lib/leadtoken';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 // THE PRE-SALE FOLLOW-UP SENDER. Sends the next due step of the presale ladder to freshly captured
-// leads: WhatsApp first via an approved template, email alongside. SHIPS DARK behind PRESALE_ENABLED;
-// the WhatsApp arm also needs the presale_welcome template approved in Meta. Same Bearer CRON_SECRET
-// gate as every other cron. Every email carries a working unsubscribe. Not configured means CLOSED.
+// leads. EMAIL ONLY since 27 July 2026: every business-initiated WhatsApp message is paid for, and a
+// presale lead has by definition not paid us anything yet, so he is the last person worth spending a
+// paid template on. He can message us on WhatsApp whenever he likes, and a reply costs nothing.
+// SHIPS DARK behind PRESALE_ENABLED. Same Bearer CRON_SECRET gate as every other cron. Every email
+// carries a working unsubscribe. Not configured means CLOSED.
 function authorised(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
@@ -43,12 +46,12 @@ export async function GET(req: NextRequest) {
         const sendable = stepSendable(step, { hasWhatsapp: !!c.whatsapp, waConsent: c.wa_consent, hasEmail: !!c.email, emailOk: c.consent });
         if (!sendable) { await markPresaleSent(c.email, c.presale_stage + 1); continue; } // skip a channel they cannot receive, never get stuck
         const text = presaleMessage(step, c.name);
+        // EMAIL ONLY since 27 July 2026. A step on any other channel is skipped rather than
+        // improvised onto email: a ladder that quietly redirects a channel is a ladder nobody can
+        // reason about. Today every step is email, so this never skips.
         let delivered = false;
         if (step.channel === 'email' && hasEmailConfig()) {
           delivered = await sendMarketingEmail(c.email, step.subject || 'Getting started with Lekhio', emailHtml(text), unsubscribeUrl(c.email));
-        } else if (step.channel === 'whatsapp' && hasSendConfig() && c.whatsapp && step.waTemplate) {
-          await sendTemplate(c.whatsapp, step.waTemplate, PRESALE_WA_LANG, [firstName(c.name)]);
-          delivered = true;
         }
         if (delivered) {
           await markPresaleSent(c.email, c.presale_stage + 1);

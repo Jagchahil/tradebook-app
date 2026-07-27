@@ -103,8 +103,13 @@ export function humanDate(iso: string | null | undefined): string {
 //
 // lekhio_trial_ending   {{1}} = the date it ends, e.g. "27 July"
 // lekhio_trial_ended    no parameters
-export const TEMPLATE_WARN = 'lekhio_trial_ending';
-export const TEMPLATE_ENDED = 'lekhio_trial_ended';
+// The names themselves live in lib/watemplates.ts, with every other template the code can send,
+// their parameter counts and their Meta status. A template name may not be written as a string
+// literal anywhere else: test/watemplates.test.mjs fails the build if one escapes.
+import { T_TRIAL_ENDING, T_TRIAL_ENDED } from './watemplates';
+
+export const TEMPLATE_WARN = T_TRIAL_ENDING;
+export const TEMPLATE_ENDED = T_TRIAL_ENDED;
 
 export function templateFor(n: Exclude<Nudge, null>): string {
   return n === 'warn' ? TEMPLATE_WARN : TEMPLATE_ENDED;

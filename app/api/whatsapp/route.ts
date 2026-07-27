@@ -38,6 +38,8 @@ import {
   readCircumstances,
   saveCircumstance,
   findUserIdByPhone,
+  weeklyTotals,
+  weeklyUpdateFactsFor,
   listBankConnectionsForUser,
   recentUnconfirmedForMatch,
   mergeIntoTransaction,
@@ -96,6 +98,7 @@ import {
   isDeadlineQuestion,
   deadlineAnswer,
   matchTotalsQuestion,
+  isWeeklySummaryRequest,
   isSavingsQuestion,
   formatGbp,
   isNiQuestion,
@@ -119,6 +122,7 @@ import {
   isSupportRequest,
   supportReason,
 } from '../../../lib/waintents';
+import { weeklySummaryText } from '../../../lib/weeklyupdate';
 import { openTicket } from '../../../lib/support';
 import { matchKb } from '../../../lib/supportkb';
 import { soleTraderTax, FACTS } from '../../../lib/taxengine';
@@ -436,6 +440,8 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handleReferRequest(from);
           } else if (isSavingsQuestion(text)) {
             await handleSavingsQuestion(from);
+          } else if (isWeeklySummaryRequest(text)) {
+            await handleWeeklySummary(from);
           } else if (matchTotalsQuestion(text)) {
             await handleTotals(from, text);
           } else if (isQuestion(text)) {
@@ -1165,6 +1171,46 @@ async function handlePricing(from: string): Promise<void> {
       '',
       `That covers receipt capture, bookkeeping, invoicing, CIS, mileage, and your quarterly tax prep. Get started at ${APP_URL.replace('https://', '')}.`,
     ].join('\n'),
+  );
+}
+
+// THE WEEKLY SUMMARY, ASKED FOR RATHER THAN PUSHED.
+//
+// Until 27 July 2026 this went out every Sunday as a paid business-initiated template, to everybody,
+// whether they read it or not. Two things were wrong with that. The template did not exist in Meta,
+// so it had been failing silently for weeks. And more expensively: every proactive WhatsApp message
+// is paid for, and at an 85% target margin a weekly send to every customer forever is a permanent
+// cost for something most of them could simply look at.
+//
+// So it became a pull. The figures live in the product, free. WhatsApp carries them when he ASKS,
+// and this reply lands inside the 24 hour inbound window, which needs no template and costs nothing.
+// The man who wants it on WhatsApp still gets it. The eight who never read it stop being billed for.
+//
+// ⚠️ DETERMINISTIC, OFF HIS OWN ROWS, NEVER A MODEL. Same rule as handleTotals below. A language
+// model paraphrasing a money figure is a language model getting a money figure wrong in front of a
+// man who is legally responsible for it. The wording comes from lib/weeklyupdate.ts, which is the
+// SAME function the app and the web app render, so the three surfaces cannot drift.
+async function handleWeeklySummary(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const totals = await weeklyTotals(userId);
+  // The personal line facts are best effort. Null means the RPC could not answer, and the branches
+  // that need them simply stay shut: he gets his figures and an honest quiet line, never a guess.
+  const factsMap = await weeklyUpdateFactsFor([userId]).catch(() => null);
+  const facts = factsMap?.get(userId);
+  await sendText(
+    from,
+    weeklySummaryText({
+      now: new Date(),
+      income: totals.income,
+      expenses: totals.expenses,
+      rolling12mTaxableTurnover: facts?.rolling12mTaxableTurnover ?? null,
+      vatRegistered: facts?.vatRegistered ?? false,
+      ytdGrossQualifyingIncome: facts?.ytdGrossQualifyingIncome ?? null,
+    }),
   );
 }
 

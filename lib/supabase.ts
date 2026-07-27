@@ -1978,17 +1978,20 @@ export interface NudgeTarget {
 export async function listNudgeTargetsPage(
   afterId: string | null,
   limit = 500,
-): Promise<{ targets: Array<{ user_id: string; phone: string }>; last: string | null }> {
+): Promise<{ targets: Array<{ user_id: string; phone: string; expo_push_token: string | null }>; last: string | null }> {
   const { url } = config();
   const cursor = afterId ? `&id=gt.${encodeURIComponent(afterId)}` : '';
+  // expo_push_token joined the select on 27 July 2026, when the weekly summary stopped being a paid
+  // WhatsApp template and became a free push saying the numbers are ready. Same read, one more
+  // column, no extra round trip.
   const res = await fetch(
-    `${url}/rest/v1/users?select=id,phone_number&phone_number=not.is.null&order=id.asc&limit=${limit}${cursor}`,
+    `${url}/rest/v1/users?select=id,phone_number,expo_push_token&phone_number=not.is.null&order=id.asc&limit=${limit}${cursor}`,
     { headers: headers() },
   );
   if (!res.ok) return { targets: [], last: null };
-  const batch = (await res.json()) as Array<{ id: string; phone_number: string }>;
+  const batch = (await res.json()) as Array<{ id: string; phone_number: string; expo_push_token: string | null }>;
   return {
-    targets: batch.map((u) => ({ user_id: u.id, phone: u.phone_number })),
+    targets: batch.map((u) => ({ user_id: u.id, phone: u.phone_number, expo_push_token: u.expo_push_token ?? null })),
     last: batch.length === limit ? batch[batch.length - 1].id : null,
   };
 }

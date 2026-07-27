@@ -719,3 +719,33 @@ export function supportReason(body: string): SupportReason {
   if (SUPPORT_PROBLEM.test(t) || SUPPORT_WRONG.test(t)) return 'problem';
   return 'other';
 }
+
+// --- The weekly summary, asked for rather than pushed --------------------------------------
+//
+// Added 27 July 2026, when the weekly summary stopped being a paid business-initiated template and
+// became something he pulls. Asking is free: a reply inside the 24 hour inbound window needs no
+// template and costs nothing, so the man who actually wants it on WhatsApp still gets it, and the
+// eight who never read it stop being billed for.
+//
+// ⚠️ THIS MUST BE CHECKED BEFORE matchTotalsQuestion IN THE ROUTER, and the reason is the overlap.
+// "How much did I make this week" is a TOTALS question and must stay one. "Send me my weekly
+// summary" is this. The matcher below is deliberately narrow so the two cannot both fire: it wants
+// the word summary, update, figures, numbers or round up sitting next to the word week, or one of
+// two fixed phrasings. A bare "this week" never reaches it.
+export function isWeeklySummaryRequest(body: string): boolean {
+  const b = (body || '').trim().toLowerCase();
+  if (!b) return false;
+  // An amount means he is logging something, not asking for a report.
+  if (/£\s*\d/.test(b)) return false;
+
+  // "weekly summary", "week summary", "weekly update", "weekly numbers", "weekly round up"
+  if (/\bweek(ly)?\s+(summary|update|figures|numbers|round\s?up)\b/.test(b)) return true;
+  // "summary for this week", "update for the week", "numbers for last week"
+  if (/\b(summary|update|figures|numbers)\s+for\s+(the|this|last)\s+week\b/.test(b)) return true;
+  // "how was my week", "how did my week go"
+  if (/\bhow (was|did) my week\b/.test(b)) return true;
+  // "my weekly", as in "send me my weekly"
+  if (/\bmy weekly\b/.test(b)) return true;
+
+  return false;
+}

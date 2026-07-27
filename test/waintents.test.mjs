@@ -293,5 +293,53 @@ ok('no goals answer invites one', /my goal is/.test(gb));
   ok('no numbers gives empty', W.moneyAmounts('nothing here').length === 0);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// isWeeklySummaryRequest: the free inbound pull that replaced the paid Sunday push (27 July 2026).
+//
+// THE ONE THING THIS MUST NOT DO is swallow a totals question. "How much did I make this week" is
+// a totals question and has its own answer; "send me my weekly summary" is this. They are routed
+// one after the other, so a matcher that is too greedy silently changes what a man gets back.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  console.log('\n=== the weekly summary, asked for ===\n');
+  const yes = (s) => ok(`asks for the weekly summary: "${s}"`, W.isWeeklySummaryRequest(s) === true);
+  const no = (s) => ok(`does NOT ask for the weekly summary: "${s}"`, W.isWeeklySummaryRequest(s) === false);
+
+  yes('send me my weekly summary');
+  yes('weekly summary');
+  yes('can i have my week summary please');
+  yes('weekly update');
+  yes('weekly figures');
+  yes('weekly numbers');
+  yes('weekly round up');
+  yes('weekly roundup');
+  yes('summary for this week');
+  yes('numbers for last week');
+  yes('how was my week');
+  yes('how did my week go');
+  yes('send me my weekly');
+  yes('WEEKLY SUMMARY');
+
+  // 🔴 The overlap. Every one of these belongs to another intent and must stay there.
+  no('how much did i make this week');
+  no('how much have i spent this week');
+  no('what did i earn this week');
+  no('this week');
+  no('week');
+  no('spent £40 on fuel this week');
+  no('£120 weekly summary');
+  no('how much do i owe');
+  no('what is my profit');
+  no('');
+  no('   ');
+
+  // And the pairing that actually matters, asserted rather than assumed: a totals question must not
+  // match this, and the weekly request must not look like a money entry.
+  ok('a totals question never matches the weekly request', ['how much did i make this week', 'how much have i spent this month', 'what did i earn']
+    .every((s) => W.isWeeklySummaryRequest(s) === false));
+  ok('a weekly request is never parsed as a money entry', ['weekly summary', 'how was my week']
+    .every((s) => W.parseMoneyEntryRegex(s) === null));
+}
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

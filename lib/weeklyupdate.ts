@@ -243,3 +243,72 @@ export function weeklyLine(input: WeeklyUpdateInput): string {
 //    safe and some are health data, and the safe ones are not worth building a channel that could
 //    ever carry the others.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE WHOLE SUMMARY, IN ONE PLACE. Added 27 July 2026, when the weekly update stopped being a
+// business-initiated WhatsApp push and became something he pulls.
+//
+// WHY THE CHANGE. Every proactive WhatsApp message is paid for. At an 85% target margin, pushing a
+// summary at every customer every week, forever, is a real and permanent line of cost for
+// something most of them could simply look at. So the figures live in the product, where they are
+// free and we control every word, and WhatsApp carries them only when he ASKS. A reply inside the
+// inbound window needs no template and costs nothing. Push is expensive, pull is free.
+//
+// ⚠️ AND THIS IS WHY THE TEXT LIVES HERE RATHER THAN AT THE THREE PLACES THAT SHOW IT.
+//
+// The same summary is now read in the app, on the web, and over WhatsApp. Three renderers over one
+// set of figures is three chances to disagree, and the one that disagrees is the one he believes.
+// This codebase has been caught with two readers over the same money three separate times, which is
+// documented at length in readBrain() and in app/api/ledger/route.ts. So there is ONE function that
+// turns his week into words, and every surface calls it.
+//
+// DETERMINISTIC. No model, ever. A language model paraphrasing a money figure is a language model
+// getting a money figure wrong in front of a man who is legally responsible for it.
+
+export interface WeeklySummaryInput extends WeeklyUpdateInput {
+  // Confirmed money in and out for the week, in pounds. CONFIRMED, never pending: nothing counts
+  // towards his figures until he has ticked it, which is the same rule the ledger and the totals
+  // reply already follow.
+  income: number;
+  expenses: number;
+}
+
+// Whole pounds with a sign that reads like English rather than like a spreadsheet. gbp() above
+// prints a bare number and would render a loss as "£-140", which is not a sentence.
+function money(n: number): string {
+  return gbp(Math.abs(Number.isFinite(n) ? n : 0));
+}
+
+// The figures line on its own, so a surface that draws its own layout can take the numbers without
+// the prose. Used by the app and the web app; WhatsApp takes the whole thing below.
+export function weeklyFigures(input: WeeklySummaryInput): { income: number; expenses: number; profit: number } {
+  const income = Number.isFinite(input.income) ? input.income : 0;
+  const expenses = Number.isFinite(input.expenses) ? input.expenses : 0;
+  return { income, expenses, profit: income - expenses };
+}
+
+// THE SUMMARY, as a man reads it. Three short lines at most: what came in and went out, what that
+// leaves, and the one thing about his own situation worth knowing this week.
+//
+// House style throughout: no em dash, no en dash, no hyphen used as a sentence dash.
+export function weeklySummaryText(input: WeeklySummaryInput): string {
+  const { income, expenses, profit } = weeklyFigures(input);
+
+  const lines: string[] = [`Your week: ${money(income)} in, ${money(expenses)} out.`];
+
+  // A week with nothing in it is said plainly rather than dressed up as £0.00 of profit. A man who
+  // was on holiday does not need a profit figure, and a man who forgot to log needs to notice.
+  if (income === 0 && expenses === 0) {
+    lines[0] = 'Your week: nothing logged.';
+  } else if (profit >= 0) {
+    lines.push(`That leaves ${money(profit)}.`);
+  } else {
+    lines.push(`That is ${money(profit)} more out than in.`);
+  }
+
+  // The one sentence, or the honest nothing. Same function the push used, so moving the summary
+  // from a push to a pull changed the channel and not a word of the reasoning.
+  lines.push(weeklyLine(input));
+
+  return lines.join('\n');
+}

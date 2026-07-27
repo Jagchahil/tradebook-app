@@ -8,11 +8,15 @@ export function PRESALE_ENABLED(): boolean {
   return (process.env.PRESALE_ENABLED || '').trim().toLowerCase() === 'true';
 }
 
-// The WhatsApp template name that must be approved in Meta before business-initiated sends work. Until
-// it is approved AND the flag is on, the WhatsApp arm stays dark; the email arm still flows.
-export const PRESALE_WA_TEMPLATE = 'presale_welcome';
-export const PRESALE_WA_LANG = 'en';
-
+// ⚠️ THE LADDER WENT EMAIL ONLY ON 27 JULY 2026, and the WhatsApp template was retired with it.
+//
+// Every business-initiated WhatsApp message is paid for. A presale lead is, by definition, somebody
+// who has not yet given us a penny, so he is the last person on the list worth spending a paid
+// template on. Email costs effectively nothing, the ladder already supported it, and a lead who
+// wants to talk can message us on WhatsApp any time, which is a free inbound reply.
+//
+// The channel type is deliberately KEPT. If a WhatsApp step ever earns its place back, it returns
+// as a step, not as a rewrite. See RETIRED_TEMPLATES in lib/watemplates.ts.
 export type PresaleChannel = 'whatsapp' | 'email';
 
 export interface PresaleStep {
@@ -23,12 +27,12 @@ export interface PresaleStep {
   subject: string | null;     // subject for an email step, else null
 }
 
-// The ladder: WhatsApp now, email at +20h, a final WhatsApp nudge at +3 days, then it rests. Short on
-// purpose. A lead who has not bitten after three touches is left alone, never hounded.
+// The ladder: email now, email at +20h, a final email at +3 days, then it rests. Short on purpose.
+// A lead who has not bitten after three touches is left alone, never hounded.
 export const PRESALE_LADDER: PresaleStep[] = [
-  { step: 1, channel: 'whatsapp', afterHours: 0,  waTemplate: PRESALE_WA_TEMPLATE, subject: null },
-  { step: 2, channel: 'email',    afterHours: 20, waTemplate: null,                subject: 'Any questions on getting started?' },
-  { step: 3, channel: 'whatsapp', afterHours: 72, waTemplate: PRESALE_WA_TEMPLATE, subject: null },
+  { step: 1, channel: 'email', afterHours: 0,  waTemplate: null, subject: 'Thanks for trying Lekhio' },
+  { step: 2, channel: 'email', afterHours: 20, waTemplate: null, subject: 'Any questions on getting started?' },
+  { step: 3, channel: 'email', afterHours: 72, waTemplate: null, subject: 'Anything we can work out for you?' },
 ];
 
 export function firstName(name: string | null | undefined): string {
@@ -41,13 +45,13 @@ export function firstName(name: string | null | undefined): string {
 // style even here.
 export function presaleMessage(step: PresaleStep, name: string | null): string {
   const who = firstName(name);
-  if (step.channel === 'whatsapp' && step.step === 1) {
+  if (step.step === 1) {
     return houseCopy(`Hi ${who}, it's Lekhio. We just got your details, thanks for trying our free tool. Reaching out to see how you are getting on and whether you have any questions about getting started. What is on your mind?`) || '';
   }
-  if (step.channel === 'email') {
+  if (step.step === 2) {
     return houseCopy(`Hi ${who}, thanks for trying our free tool. We wanted to check whether you have any questions about getting started with Lekhio, or anything we can help you work out. Just reply and a real answer comes back.`) || '';
   }
-  return houseCopy(`Hi ${who}, quick one from Lekhio. Still happy to answer anything about your tax or getting set up, no pressure at all. Reply here whenever suits.`) || '';
+  return houseCopy(`Hi ${who}, quick one from Lekhio. Still happy to answer anything about your tax or getting set up, no pressure at all. Reply whenever suits.`) || '';
 }
 
 // Given how many presale steps have already been sent, the next step, or null when the ladder is

@@ -6,9 +6,6 @@ import {
   getPhoneForUser,
   listNudgeTargetsPage,
   getNudgePrefsForUsers,
-  weeklyTotals,
-  weeklyTotalsFor,
-  weeklyUpdateFactsFor,
   cronStarted,
   cronFinished,
   sweepRateHits,
@@ -18,9 +15,10 @@ import {
 } from '../../../../lib/supabase';
 import { waSendsEnabled, waBudgetExceeded, globalDailyCapFor } from '../../../../lib/margin';
 import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
+import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
+import { T_NUDGE, T_REMINDER, templateSendable } from '../../../../lib/watemplates';
 import { hasBankFeedConfig } from '../../../../lib/bankfeed';
 import { syncPageResumable } from '../../../../lib/banksync';
-import { weeklyLine } from '../../../../lib/weeklyupdate';
 
 // The reminder engine. Hit on a schedule (Vercel Cron, Supabase pg_cron, or any
 // external cron such as cron-job.org). Guarded by CRON_SECRET.
@@ -62,21 +60,32 @@ const SEND_BUDGET_MS = 40_000; // stop sending well inside the 60s Hobby limit
 const PAGE_SIZE = 500;
 const MAX_HOPS = 100; // 100 hops x thousands of sends per hop is far beyond 20k
 
-function gbp(n: number): string {
-  return `£${Math.abs(n).toFixed(2)}`;
-}
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 27 JULY 2026: THE WEEKLY SUMMARY STOPPED BEING A PUSH.
+//
+// It used to send the figures as a paid WhatsApp template every Sunday, to everybody. Two things
+// were wrong with that and only one of them was a bug.
+//
+// THE BUG: 'lekhio_weekly' and 'lekhio_weekly_v2' did not exist in Meta. Every Sunday send had
+// been failing silently for weeks, and nothing anywhere knew. lib/watemplates.ts and its test now
+// make that class of failure impossible to reintroduce.
+//
+// THE DESIGN ERROR, which is the more expensive one: every business-initiated WhatsApp message is
+// paid for. At an 85% target margin, pushing a summary at every customer every week, forever, is a
+// permanent line of cost for something most of them could simply look at. So the summary now lives
+// in the product, free, where we control every word, and it is COMPUTED ON DEMAND rather than
+// posted. WhatsApp carries it only when he asks, which is a reply inside the free inbound window
+// and needs no template at all. Push is expensive, pull is free.
+//
+// What is left on a Sunday is a push notification that says the numbers are in, and nothing else.
+// It carries no figures, so it needs no reads: this job no longer touches weeklyTotals or the
+// weekly facts RPC, which is a page of database work per Sunday that simply stopped existing.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 
-// Card B: "Weekly WhatsApp update, toggle-able". The one sentence lib/weeklyupdate.ts adds is a
-// FOURTH template parameter, and Meta template parameters are fixed shape: the existing
-// 'lekhio_weekly' template only has three ({{1}} income, {{2}} expenses, {{3}} profit), so the
-// richer message needs a NEW template ('lekhio_weekly_v2', a fourth {{4}} body parameter)
-// submitted to and approved by Meta before it can ever be sent. That is a manual step for Jag,
-// not an engineering one, so this ships the same way PRESALE_ENABLED and NURTURE_ENABLED did:
-// fully wired, dark by default, one env flag away from live once the template is actually
-// approved. Off by default means nothing about today's weekly message changes until Jag flips it.
-function weeklyLineTemplateApproved(): boolean {
-  return process.env.WEEKLY_LINE_TEMPLATE_APPROVED === 'true';
-}
+// The Sunday notification. Deliberately the whole message: what changed is that his numbers are
+// ready, and the figures are one tap away in a place that is free to read.
+const WEEKLY_PUSH_TITLE = 'Your week is ready';
+const WEEKLY_PUSH_BODY = 'Your numbers for the week are in. Open Lekhio to see them.';
 
 // Run an async task over a list with a fixed number of workers, so we never
 // loop thousands of sequential awaits. Concurrency 20 keeps us under Meta's
@@ -118,10 +127,24 @@ async function triggerContinuation(job: string, afterId: string | null, hop: num
 async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: number): Promise<void> {
   const started = Date.now();
   let sent = 0;
+  // ⚠️ ONLY THE NUDGE SPENDS MONEY NOW. The weekly job sends a push notification, which is free,
+  // so the WhatsApp kill switch, the daily cap and the send budget below all apply to the nudge and
+  // not to it. Gating a free send on a cost brake would mean a man stops hearing that his numbers
+  // are ready because we are watching a bill he is not on.
+  const usesWhatsApp = job === 'nudge';
+
   // Emergency brake: if proactive sends are switched off, do nothing. This is the
   // cost kill switch (scale audit); inbound service replies are unaffected.
-  if (!waSendsEnabled()) {
+  if (usesWhatsApp && !waSendsEnabled()) {
     console.log(`[cron] job=${job} proactive WhatsApp sends disabled (WHATSAPP_SENDS_ENABLED=false), skipping`);
+    return;
+  }
+
+  // A nudge cannot go out until Meta has approved the template. This is the gate the reminder
+  // engine never had, and its absence is exactly why four bad template names sat here unnoticed:
+  // there was nothing that had to be switched on, so there was nothing anybody had to check.
+  if (usesWhatsApp && !templateSendable(T_NUDGE)) {
+    console.log(`[cron] job=${job} skipped: ${T_NUDGE} is not approved in Meta yet (set REMINDER_TEMPLATES_APPROVED=true once it is)`);
     return;
   }
   // The day's send ceiling, DERIVED from the live paying base and the margin
@@ -172,17 +195,10 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
       return job === 'nudge' ? (p ? p.daily_nudges : true) : (p ? p.weekly_summary : true);
     });
 
-    // Totals for this page only, and only for the people who actually want the brief.
-    // Null means the RPC could not answer, and we fall back to asking per user, because an
-    // empty map would mean "everybody earned nothing" and we would text a man that his week
-    // was zero when it was not.
-    const totalsMap =
-      job === 'weekly' ? await weeklyTotalsFor(wanted.map((t) => t.user_id)) : null;
-    // The personal line facts, only fetched once the richer template is actually approved: no
-    // point spending an extra RPC round trip on a page whose users are getting the plain three
-    // line message anyway. See weeklyLineTemplateApproved() above.
-    const lineApproved = job === 'weekly' && weeklyLineTemplateApproved();
-    const factsMap = lineApproved ? await weeklyUpdateFactsFor(wanted.map((t) => t.user_id)) : null;
+    // No figures are read here any more. The Sunday notification says the numbers are ready and
+    // nothing else, so the two per page RPC round trips this job used to make (weeklyTotalsFor and
+    // weeklyUpdateFactsFor) are gone. The figures are computed when he actually opens them, for the
+    // few who do, instead of for everybody every week whether they look or not.
     // RESERVE THE SPEND BEFORE SPENDING IT. Same rule the digest follows.
     //
     // This used to count the sends AFTER the page had gone out. If the function died mid-page the
@@ -192,42 +208,43 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
     // spending.
     //
     // `wanted` is exactly who we are about to text, so this is not an estimate.
-    if (wanted.length > 0) {
+    if (usesWhatsApp && wanted.length > 0) {
       const reserved = await addWaSend(wanted.length);
       if (reserved != null) runningTotal = reserved;
     }
 
     let pageSent = 0;
+    let pageNoToken = 0;
     if (job === 'nudge') {
       await mapLimit(wanted, 20, async (t) => {
-        await sendTemplate(t.phone, 'lekhio_nudge', 'en_GB', []);
+        await sendTemplate(t.phone, T_NUDGE, 'en_GB', []);
         sent++;
         pageSent++;
       });
     } else {
+      // THE SUNDAY NOTIFICATION. Free, and it says one thing: your numbers are in.
+      //
+      // ⚠️ A USER WITH NO PUSH TOKEN GETS NOTHING, AND THAT IS COUNTED OUT LOUD.
+      //
+      // The token arrives when the app registers for notifications, so today most rows have none.
+      // The dangerous version of this loop is the one that skips them silently and reports a
+      // cheerful `sent` figure: the job would look healthy while reaching nobody, which is the
+      // exact shape of every silent failure in this codebase's history. So the skip is counted and
+      // logged beside the sends, and the two numbers are meant to be read together.
       await mapLimit(wanted, 20, async (t) => {
-        const row = totalsMap ? totalsMap.get(t.user_id) ?? { income: 0, expenses: 0 } : await weeklyTotals(t.user_id);
-        const profit = row.income - row.expenses;
-        if (lineApproved) {
-          const facts = factsMap?.get(t.user_id);
-          const line = weeklyLine({
-            now: new Date(),
-            rolling12mTaxableTurnover: facts?.rolling12mTaxableTurnover ?? null,
-            vatRegistered: facts?.vatRegistered ?? false,
-            ytdGrossQualifyingIncome: facts?.ytdGrossQualifyingIncome ?? null,
-          });
-          await sendTemplate(t.phone, 'lekhio_weekly_v2', 'en_GB', [gbp(row.income), gbp(row.expenses), gbp(profit), line]);
-        } else {
-          await sendTemplate(t.phone, 'lekhio_weekly', 'en_GB', [gbp(row.income), gbp(row.expenses), gbp(profit)]);
-        }
+        if (!isExpoPushToken(t.expo_push_token)) { pageNoToken++; return; }
+        await sendExpoPush(t.expo_push_token, WEEKLY_PUSH_TITLE, WEEKLY_PUSH_BODY);
         sent++;
         pageSent++;
       });
     }
+    if (pageNoToken > 0) {
+      console.log(`[cron] job=${job} ${pageNoToken} of ${wanted.length} on this page have no push token, they were not notified`);
+    }
     // Already counted, above, before the sends went out. If a send FAILED we have over-reserved
     // by one, which costs us nothing but a slightly early stop. That is the safe direction and it
     // is not worth a compensating write to correct.
-    if (pageSent !== wanted.length) {
+    if (usesWhatsApp && pageSent !== wanted.length) {
       console.error(`[cron] job=${job} sent ${pageSent} of ${wanted.length} reserved`);
     }
     if (!last) break; // final page done
@@ -354,7 +371,10 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
       let sent = 0;
       // Respect the proactive-send kill switch. Due reminders are not claimed
       // when sends are off, so they stay due and go out once sending resumes.
-      const dueSendsOn = waSendsEnabled();
+      // Same two gates as the nudge: the cost kill switch, and Meta having actually approved the
+      // template. A due reminder is not claimed when either is off, so it stays due and goes out
+      // once sending resumes, rather than being burned on a send that cannot land.
+      const dueSendsOn = waSendsEnabled() && templateSendable(T_REMINDER);
       for (; dueSendsOn; ) {
         const due = await getDueReminders(new Date().toISOString(), PAGE_SIZE);
         if (due.length === 0) break;
@@ -362,7 +382,7 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
           if (!(await claimDueReminder(r.id))) return; // another run took it
           const phone = await getPhoneForUser(r.user_id);
           if (!phone) return;
-          await sendTemplate(phone, 'lekhio_reminder', 'en_GB', [r.title]);
+          await sendTemplate(phone, T_REMINDER, 'en_GB', [r.title]);
           sent++;
         });
         if (due.length < PAGE_SIZE) break; // final page

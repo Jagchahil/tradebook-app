@@ -18,7 +18,26 @@
 // converts by itself and Stripe emails him about it. Telling him to "pick a plan" would be
 // confusing and faintly insulting.
 
-import { decideTrialNudge, daysLeft, humanDate, templateFor, paramsFor, WARN_DAYS_BEFORE } from '../lib/trialnudge.ts';
+// lib/trialnudge.ts imports lib/watemplates.ts with an extensionless specifier (the Next
+// convention), which Node's type stripping cannot resolve, so both files are staged to a temp dir
+// with the import rewritten. Same approach as test/presale.test.mjs and test/weeklyupdate.test.mjs.
+//
+// The registry import is not incidental: the trial template NAMES now live in lib/watemplates.ts
+// with every other template the code can send, so that test/watemplates.test.mjs can fail the build
+// when a name in the code has no declaration behind it.
+import { pathToFileURL, fileURLToPath as _fu } from 'node:url';
+import { mkdtempSync as _mk, readFileSync as _rf, writeFileSync as _wf } from 'node:fs';
+import { tmpdir as _tmp } from 'node:os';
+import _path from 'node:path';
+const _lib = _path.resolve(_path.dirname(_fu(import.meta.url)), '../lib');
+const _stage = _mk(_path.join(_tmp(), 'trialnudge-'));
+_wf(_path.join(_stage, 'watemplates.ts'), _rf(_path.join(_lib, 'watemplates.ts'), 'utf8'));
+_wf(
+  _path.join(_stage, 'trialnudge.ts'),
+  _rf(_path.join(_lib, 'trialnudge.ts'), 'utf8').replace("from './watemplates'", "from './watemplates.ts'"),
+);
+const { decideTrialNudge, daysLeft, humanDate, templateFor, paramsFor, WARN_DAYS_BEFORE } =
+  await import(pathToFileURL(_path.join(_stage, 'trialnudge.ts')).href);
 
 let pass = 0;
 let fail = 0;

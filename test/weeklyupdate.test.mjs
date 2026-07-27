@@ -207,5 +207,49 @@ ok(`every produced line is clean (${produced.length} checked)`, produced.every((
 ok('the module source contains no em dash, en dash or minus sign, comments included',
   !/[–—−]/.test(SRC));
 
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// weeklySummaryText: THE WHOLE SUMMARY, now that it is pulled rather than pushed (27 July 2026).
+//
+// The same function renders in the app, on the web, and in the WhatsApp reply when he asks. Three
+// renderers over one set of figures is three chances to disagree, and the one that disagrees is the
+// one he believes, so what is asserted here is asserted for every surface at once.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== the whole summary (pull) ===\n');
+
+const sum = (over) => W.weeklySummaryText({ ...base, income: 0, expenses: 0, ...over });
+
+ok('the figures are printed in whole pounds', sum({ income: 1200, expenses: 340 }).startsWith('Your week: £1,200 in, £340 out.'));
+ok('a profitable week says what it leaves', sum({ income: 1200, expenses: 340 }).includes('That leaves £860.'));
+ok('a losing week is not dressed up as profit', sum({ income: 100, expenses: 400 }).includes('£300 more out than in.'));
+ok('a losing week never prints a minus sign', !/[-−]\d/.test(sum({ income: 100, expenses: 400 })));
+ok('an empty week says nothing was logged, not zero profit', sum().startsWith('Your week: nothing logged.'));
+ok('an empty week prints no profit line', !sum().includes('That leaves'));
+ok('a week with only costs still reports them', sum({ expenses: 55 }).includes('£0 in, £55 out'));
+
+// The personal line is the same sentence the push used, so moving channel changed no reasoning.
+ok('a quiet week carries the honest quiet line', sum({ income: 10, expenses: 1 }).includes(W.QUIET_LINE));
+ok('the VAT line reaches the summary', sum({ income: 10, expenses: 1, rolling12mTaxableTurnover: E.FACTS.vatRegistrationThreshold + 1 }).includes('VAT registration threshold'));
+ok('the summary is exactly three lines when there are figures', sum({ income: 5, expenses: 2 }).split('\n').length === 3);
+ok('the summary is two lines on an empty week', sum().split('\n').length === 2);
+
+ok('weeklyFigures agrees with the text', (() => {
+  const f = W.weeklyFigures({ ...base, income: 900, expenses: 250 });
+  return f.income === 900 && f.expenses === 250 && f.profit === 650;
+})());
+ok('weeklyFigures treats a non finite figure as zero rather than NaN', (() => {
+  const f = W.weeklyFigures({ ...base, income: Number.NaN, expenses: 10 });
+  return f.income === 0 && f.profit === -10;
+})());
+
+ok('the same input always gives the same words', sum({ income: 77, expenses: 3 }) === sum({ income: 77, expenses: 3 }));
+ok('no forbidden dash anywhere in the summary', !H.hasForbiddenDash([
+  sum(), sum({ income: 1200, expenses: 340 }), sum({ income: 1, expenses: 900 }),
+  sum({ income: 10, expenses: 1, rolling12mTaxableTurnover: E.FACTS.vatRegistrationThreshold + 1 }),
+].join('\n')));
+
+// It still cannot carry anything personal beyond his own money, because the input shape has no
+// field for one. Same structural guarantee as the line it wraps.
+ok('the summary input still carries no circumstance', !/circumstance|answers|specialCategory/i.test(SRC.replace(/^\s*\/\/.*$/gm, '')));
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

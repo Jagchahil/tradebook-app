@@ -2123,6 +2123,54 @@ export async function weeklyTotalsFor(userIds: string[]): Promise<Map<string, We
   }
 }
 
+// The facts lib/weeklyupdate.ts's personalLine() needs, for THE PAGE WE ARE ABOUT TO SEND TO.
+// Same shape and the same reason as weeklyTotalsFor just above: one round trip for the whole
+// page via the weekly_update_facts_for RPC (supabase/APPLY_2026-07-27_weekly_update_facts.sql),
+// never one query per user.
+//
+// null means the RPC is not applied yet (or the call failed), and the caller must fall back to
+// sending the plain totals only, exactly as it did before this card existed. An empty map would
+// wrongly read as "these users have no facts", which is not the same thing as "we don't know".
+export interface WeeklyUpdateFactsRow {
+  user_id: string;
+  rolling12mTaxableTurnover: number | null; // null: RPC says not enough account history yet
+  vatRegistered: boolean;
+  ytdGrossQualifyingIncome: number | null;
+}
+export async function weeklyUpdateFactsFor(userIds: string[]): Promise<Map<string, WeeklyUpdateFactsRow> | null> {
+  if (userIds.length === 0) return new Map();
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/rpc/weekly_update_facts_for`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_user_ids: userIds.filter((i) => UUID.test(i)) }),
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{
+      user_id: string;
+      rolling12m_taxable_turnover: number | string | null;
+      vat_registered: boolean | null;
+      ytd_gross_qualifying_income: number | string | null;
+    }>;
+    if (!Array.isArray(rows)) return null;
+    const out = new Map<string, WeeklyUpdateFactsRow>();
+    for (const r of rows) {
+      const turnover = r.rolling12m_taxable_turnover;
+      const gross = r.ytd_gross_qualifying_income;
+      out.set(r.user_id, {
+        user_id: r.user_id,
+        rolling12mTaxableTurnover: turnover === null || turnover === undefined ? null : Number(turnover) || 0,
+        vatRegistered: Boolean(r.vat_registered),
+        ytdGrossQualifyingIncome: gross === null || gross === undefined ? null : Number(gross) || 0,
+      });
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 export async function weeklyTotals(userId: string): Promise<{ income: number; expenses: number }> {
   const { url } = config();
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();

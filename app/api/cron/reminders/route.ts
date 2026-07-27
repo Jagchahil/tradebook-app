@@ -8,6 +8,7 @@ import {
   getNudgePrefsForUsers,
   weeklyTotals,
   weeklyTotalsFor,
+  weeklyUpdateFactsFor,
   cronStarted,
   cronFinished,
   sweepRateHits,
@@ -19,6 +20,7 @@ import { waSendsEnabled, waBudgetExceeded, globalDailyCapFor } from '../../../..
 import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
 import { hasBankFeedConfig } from '../../../../lib/bankfeed';
 import { syncPageResumable } from '../../../../lib/banksync';
+import { weeklyLine } from '../../../../lib/weeklyupdate';
 
 // The reminder engine. Hit on a schedule (Vercel Cron, Supabase pg_cron, or any
 // external cron such as cron-job.org). Guarded by CRON_SECRET.
@@ -62,6 +64,18 @@ const MAX_HOPS = 100; // 100 hops x thousands of sends per hop is far beyond 20k
 
 function gbp(n: number): string {
   return `£${Math.abs(n).toFixed(2)}`;
+}
+
+// Card B: "Weekly WhatsApp update, toggle-able". The one sentence lib/weeklyupdate.ts adds is a
+// FOURTH template parameter, and Meta template parameters are fixed shape: the existing
+// 'lekhio_weekly' template only has three ({{1}} income, {{2}} expenses, {{3}} profit), so the
+// richer message needs a NEW template ('lekhio_weekly_v2', a fourth {{4}} body parameter)
+// submitted to and approved by Meta before it can ever be sent. That is a manual step for Jag,
+// not an engineering one, so this ships the same way PRESALE_ENABLED and NURTURE_ENABLED did:
+// fully wired, dark by default, one env flag away from live once the template is actually
+// approved. Off by default means nothing about today's weekly message changes until Jag flips it.
+function weeklyLineTemplateApproved(): boolean {
+  return process.env.WEEKLY_LINE_TEMPLATE_APPROVED === 'true';
 }
 
 // Run an async task over a list with a fixed number of workers, so we never
@@ -164,6 +178,11 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
     // was zero when it was not.
     const totalsMap =
       job === 'weekly' ? await weeklyTotalsFor(wanted.map((t) => t.user_id)) : null;
+    // The personal line facts, only fetched once the richer template is actually approved: no
+    // point spending an extra RPC round trip on a page whose users are getting the plain three
+    // line message anyway. See weeklyLineTemplateApproved() above.
+    const lineApproved = job === 'weekly' && weeklyLineTemplateApproved();
+    const factsMap = lineApproved ? await weeklyUpdateFactsFor(wanted.map((t) => t.user_id)) : null;
     // RESERVE THE SPEND BEFORE SPENDING IT. Same rule the digest follows.
     //
     // This used to count the sends AFTER the page had gone out. If the function died mid-page the
@@ -189,7 +208,18 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
       await mapLimit(wanted, 20, async (t) => {
         const row = totalsMap ? totalsMap.get(t.user_id) ?? { income: 0, expenses: 0 } : await weeklyTotals(t.user_id);
         const profit = row.income - row.expenses;
-        await sendTemplate(t.phone, 'lekhio_weekly', 'en_GB', [gbp(row.income), gbp(row.expenses), gbp(profit)]);
+        if (lineApproved) {
+          const facts = factsMap?.get(t.user_id);
+          const line = weeklyLine({
+            now: new Date(),
+            rolling12mTaxableTurnover: facts?.rolling12mTaxableTurnover ?? null,
+            vatRegistered: facts?.vatRegistered ?? false,
+            ytdGrossQualifyingIncome: facts?.ytdGrossQualifyingIncome ?? null,
+          });
+          await sendTemplate(t.phone, 'lekhio_weekly_v2', 'en_GB', [gbp(row.income), gbp(row.expenses), gbp(profit), line]);
+        } else {
+          await sendTemplate(t.phone, 'lekhio_weekly', 'en_GB', [gbp(row.income), gbp(row.expenses), gbp(profit)]);
+        }
         sent++;
         pageSent++;
       });

@@ -2287,6 +2287,29 @@ export async function getBusinessName(userId: string): Promise<string | null> {
 // Assemble the tax optimiser's input from the user's confirmed data and profile
 // for the current tax year. Trade stream only (the optimiser's levers are trade
 // side); home-office and mileage are inferred from the categories they have used.
+// 🔴 IS THIS ROW A MILEAGE CLAIM? THE CATEGORY CANNOT TELL YOU, AND THAT WAS A REAL BUG.
+//
+// A mileage claim is inserted (app/api/whatsapp/route.ts, handleMileage) as vendor 'Mileage' under
+// category 'travel', because there IS no 'mileage' category in lib/categories.ts and never has been.
+//
+// getOptimiserInput used to decide `mileageClaimed` with categoriesLogged.some(c => c.includes('mile')).
+// 'travel'.includes('mile') is FALSE. So mileageClaimed was false for EVERY user who has ever existed,
+// including one who logs his miles religiously every week.
+//
+// That is not cosmetic. lib/taxoptimiser.ts rule 5 reads that flag and tells a man "You are logging
+// fuel but no mileage, text log 24 miles whenever you drive for work." He gets nagged, forever, to do
+// the thing he already does, by the feature whose entire job is proving we are paying attention to
+// his money. The Maximiser is the differentiator; a Maximiser that cannot see what he already claimed
+// is worse than no Maximiser, because it tells him we are not looking.
+//
+// So it is decided on the VENDOR, which is the literal the inserter writes, plus a category check
+// kept only so that adding a real 'mileage' category later works without another bug.
+export function isMileageRow(r: { vendor?: unknown; category?: unknown }): boolean {
+  const vendor = String(r.vendor ?? '').trim().toLowerCase();
+  const category = String(r.category ?? '').trim().toLowerCase();
+  return vendor === 'mileage' || category.includes('mile');
+}
+
 export async function getOptimiserInput(userId: string): Promise<OptimiserInput> {
   const now = new Date();
   const { startYear } = quarterForDate(now);
@@ -2306,6 +2329,9 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   let ytdPropertyIncome = 0;
   let ytdPropertyExpenses = 0;
   const cats = new Set<string>();
+  // 🔴 THE MILEAGE, COUNTED SEPARATELY BUT NOT COUNTED TWICE. See the note on OptimiserInput.ytdMileage.
+  // This is a SLICE of ytdTradeExpenses, never an addition to it.
+  let ytdMileage = 0;
   for (const r of rows) {
     const amt = Number(r.amount) || 0;
     if ((r.income_type ?? '').toLowerCase() === 'property') {
@@ -2317,6 +2343,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     else if (amt < 0) {
       ytdTradeExpenses += -amt;
       if (r.category) cats.add(String(r.category).toLowerCase());
+      if (isMileageRow(r)) ytdMileage += -amt;
     }
     const c = Number(r.cis_deduction);
     if (Number.isFinite(c) && c > 0) ytdCisSuffered += c;
@@ -2364,8 +2391,20 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
       ...(sl?.postgrad ? ['postgrad' as const] : []),
     ],
     categoriesLogged,
+    // ⚠️ homeOfficeClaimed IS STILL ALWAYS FALSE, AND THAT IS A KNOWN GAP, NOT AN OVERSIGHT.
+    //
+    // There is no 'home' category in lib/categories.ts and no allowance-election mechanism anywhere:
+    // taxoptimiser rule 4 emits action 'apply_allowance_election' and NOTHING IMPLEMENTS IT. So a man
+    // cannot claim use of home even if he wants to, the suggestion fires forever, and unlike mileage
+    // this one is real money he is genuinely not getting.
+    //
+    // Left false deliberately rather than papered over: a flag flipped to true without a mechanism
+    // behind it would silently STOP telling him about a deduction he still has not had. Better to
+    // over-remind than to quietly drop it. Fixing it properly means building the election, which is
+    // its own piece of work, scoped and not started.
     homeOfficeClaimed: categoriesLogged.some((c) => c.includes('home')),
-    mileageClaimed: categoriesLogged.some((c) => c.includes('mile')),
+    mileageClaimed: ytdMileage > 0,
+    ytdMileage: Math.round(ytdMileage * 100) / 100,
     purchaseGoal: purchase ? { title: purchase.title, amount: purchase.amount } : null,
     ytdPropertyIncome: Math.round(ytdPropertyIncome * 100) / 100,
     ytdPropertyExpenses: Math.round(ytdPropertyExpenses * 100) / 100,

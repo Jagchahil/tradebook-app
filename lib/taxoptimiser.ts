@@ -32,6 +32,21 @@ export interface OptimiserInput {
   homeOfficeClaimed: boolean;
   mileageClaimed: boolean;
   purchaseGoal?: { title: string; amount: number } | null;
+
+  // 🔴 THE MILEAGE ALREADY INSIDE ytdTradeExpenses, CARRIED SEPARATELY SO THE LEDGER CAN NAME IT.
+  //
+  // A mileage claim is inserted as an ordinary transaction (vendor 'Mileage', category 'travel', a
+  // negative amount), so its £ value is ALREADY counted in ytdTradeExpenses and already reducing his
+  // tax. This field does NOT add anything. It says how much of that total was mileage, so the ledger
+  // can show it on its own line instead of burying it in "Costs you logged".
+  //
+  // ⚠️ NEVER ADD THIS TO ytdTradeExpenses. It is a slice of that number, not an addition to it. The
+  // ledger subtracts it from the expenses line and shows it separately, and the total is unchanged
+  // to the penny. Adding it would overstate what we saved him, which is the one direction of error
+  // this product does not get to make twice.
+  //
+  // Default 0, so a caller that does not compute it behaves exactly as before.
+  ytdMileage?: number;
   // Property stream this year, for the property levers. Default 0.
   ytdPropertyIncome?: number;
   ytdPropertyExpenses?: number;

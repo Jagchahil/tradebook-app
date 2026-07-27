@@ -41,17 +41,33 @@ export async function GET(req: NextRequest) {
   // ⚠️ EVERY FIGURE BELOW IS ONE HE HAS CONFIRMED. Nothing "to review", nothing projected, nothing
   // conditional. lib/ledger.ts has no field you could put a "could" in, which is the strongest
   // guarantee available: you cannot pass one in even by accident.
+  // 🔴 THE MILEAGE IS MOVED, NOT ADDED. THE TOTAL DOES NOT CHANGE BY A PENNY.
+  //
+  // A mileage claim is already an ordinary transaction inside ytdTradeExpenses, so it has ALWAYS been
+  // reducing his tax correctly. What it was not doing was showing up by name: the ledger's whole job
+  // is to tell him WHERE the money came from, and mileage was buried inside "Costs you logged".
+  //
+  // So it is subtracted from the expenses line and passed on its own. Same deduction, same tax, same
+  // `saved`, one more line he can read. If you are ever tempted to pass ytdMileage WITHOUT subtracting
+  // it here, stop: that would count it twice and overstate what we saved him, and this file's own
+  // header explains why that is the one lie the product cannot afford.
+  const mileage = Math.max(0, input.ytdMileage ?? 0);
   const l = ledger({
     monthsElapsed: input.monthsElapsed,
     grossIncome: input.ytdTradeIncome,
-    expenses: input.ytdTradeExpenses,
+    expenses: Math.max(0, input.ytdTradeExpenses - mileage),
+    mileage,
 
-    // NOT YET WIRED, AND THE ZEROS ARE HONEST RATHER THAN LAZY.
+    // STILL NOT WIRED, AND THESE ZEROS ARE HONEST RATHER THAN LAZY.
     //
-    // A zero here UNDERSTATES what we saved him. It never overstates it. That is the direction of
-    // failure we choose every time: the number is a floor, and when we wire these in it goes UP.
-    // The opposite mistake, a ledger that flatters us on its first day, is the one he never forgives.
-    mileage: 0,
+    // homeOffice and pension are genuinely NOT CAPTURED ANYWHERE: there is no 'home' or 'pension'
+    // category, and no allowance election exists. These zeros really do understate him, and the fix
+    // is upstream (build the election), not here.
+    //
+    // capitalAllowances is a different case and the zero is LOAD BEARING. Tools and equipment are
+    // logged as ordinary expense categories, so their cost is ALREADY inside the expenses line above.
+    // Passing a figure here as well would count them twice. Splitting them out properly is the same
+    // move the mileage line just had, and it needs its own pass over what actually qualifies as plant.
     homeOffice: 0,
     capitalAllowances: 0,
     pension: 0,

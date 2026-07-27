@@ -197,6 +197,65 @@ ok('there is an API route, so the app can show it',
 ok('...and it reuses getOptimiserInput rather than assembling a SECOND set of figures',
   api.includes('getOptimiserInput') && !api.includes('getConfirmedTransactionsForUser'));
 
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE FIFTH WAY IT COULD BECOME AN ADVERT: COUNTING THE SAME DEDUCTION TWICE.
+// ---------------------------------------------------------------------------------------------
+//
+// A mileage claim is inserted as an ORDINARY TRANSACTION (vendor 'Mileage', category 'travel', a
+// negative amount), so its value is already inside ytdTradeExpenses and already reducing his tax.
+// It was invisible on the ledger, buried in "Costs you logged", so it now gets its own line.
+//
+// The only safe way to do that is to MOVE it, not ADD it. Passing input.ytdMileage into `mileage`
+// while leaving ytdTradeExpenses whole would count every business mile twice and inflate `saved` by
+// the tax on it. That is failure mode 2 in this file's header wearing a new coat, and it would be
+// the most flattering possible bug: bigger number, happier customer, completely false.
+//
+// So both callers are pinned to the subtraction, in source. Arithmetic below proves the invariant.
+
+const movedNotAdded = (src) => /expenses:\s*Math\.max\(0,\s*input\.ytdTradeExpenses\s*-\s*mileage\)/.test(src);
+
+ok('🔴 the API route MOVES the mileage out of expenses, it does not ADD it on top',
+  movedNotAdded(api) && /\bmileage,/.test(api));
+
+ok('🔴 the WhatsApp route does the identical thing, because two readers over one number always drift',
+  movedNotAdded(wa) && /\bmileage,/.test(wa));
+
+ok('...and neither route passes a raw ytdMileage straight into the ledger without the subtraction',
+  !/expenses:\s*input\.ytdTradeExpenses,[\s\S]{0,120}mileage:\s*input\.ytdMileage/.test(api)
+  && !/expenses:\s*input\.ytdTradeExpenses,[\s\S]{0,120}mileage:\s*input\.ytdMileage/.test(wa));
+
+// THE INVARIANT, AS ARITHMETIC. Splitting a deduction onto its own line is presentation. It must not
+// move a single penny of tax. If this ever fails, the ledger has started flattering us.
+const whole = ledger({ ...base, expenses: 12_300, mileage: 0 });
+const split = ledger({ ...base, expenses: 9_000, mileage: 3_300 });
+
+ok('🔴 SPLITTING A LINE OUT CHANGES THE BREAKDOWN, NEVER THE TOTAL. Same deduction, same tax saved.',
+  whole.saved === split.saved && whole.withLekhio === split.withLekhio);
+
+ok('...but he can now actually SEE the mileage, which was the entire point',
+  split.lines.some((x) => x.key === 'mileage' && x.deducted === 3_300)
+  && !whole.lines.some((x) => x.key === 'mileage'));
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE FLAG THAT WAS FALSE FOR EVERY USER WHO EVER EXISTED.
+// ---------------------------------------------------------------------------------------------
+//
+// mileageClaimed was `categoriesLogged.some(c => c.includes('mile'))`. Mileage files under category
+// 'travel'. There is no 'mileage' category in lib/categories.ts and never has been. So the flag was
+// false always, and lib/taxoptimiser.ts rule 5 told a man who logs his miles every week that he was
+// "logging fuel but no mileage". The Maximiser is the differentiator; one that cannot see what he
+// already claimed tells him nobody is looking.
+const db = rf(path.join(root, 'lib/supabase.ts'), 'utf8');
+
+ok('🔴 mileageClaimed is no longer decided by a category string that can never match',
+  !/mileageClaimed:\s*categoriesLogged\.some/.test(db));
+
+ok('...it is decided by the mileage actually found on his rows',
+  /mileageClaimed:\s*ytdMileage\s*>\s*0/.test(db));
+
+ok('...and isMileageRow reads the VENDOR the inserter really writes, not a category that does not exist',
+  /export function isMileageRow/.test(db) && /vendor === 'mileage'/.test(db));
+
 ok('WHATSAPP can answer "what have you saved me", which is where he actually is',
   wa.includes('isSavingsQuestion') && wa.includes('handleSavingsQuestion'));
 

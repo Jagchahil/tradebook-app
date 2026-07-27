@@ -2182,12 +2182,19 @@ async function handleSavingsQuestion(from: string) {
   }
 
   const input = await getOptimiserInput(userId);
+  // ⚠️ THIS MUST MATCH app/api/ledger/route.ts EXACTLY. Two readers over one number always drift, and
+  // here the two readers are the app screen and the WhatsApp reply: the two places he would compare.
+  // The mileage is MOVED out of expenses onto its own line, never added. The total is unchanged.
+  const mileage = Math.max(0, input.ytdMileage ?? 0);
   const l = ledger({
     monthsElapsed: input.monthsElapsed,
     grossIncome: input.ytdTradeIncome,
-    expenses: input.ytdTradeExpenses,
-    // Honest zeros. They UNDERSTATE what we saved him. They never overstate it. See app/api/ledger.
-    mileage: 0, homeOffice: 0, capitalAllowances: 0, pension: 0,
+    expenses: Math.max(0, input.ytdTradeExpenses - mileage),
+    mileage,
+    // Honest zeros. homeOffice and pension are never captured at all, so they genuinely understate.
+    // capitalAllowances is already inside the expenses line, so its zero prevents double counting.
+    // See app/api/ledger/route.ts for the full reasoning.
+    homeOffice: 0, capitalAllowances: 0, pension: 0,
     cisSuffered: input.ytdCisSuffered,
   });
 

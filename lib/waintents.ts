@@ -71,6 +71,29 @@ const MONEY_EXPENSE_RE = /\b(spent|spend|bought|buy|buying|paid\s+for|paying\s+f
 function tidyName(s: string): string {
   return s
     .replace(/\b(today|yesterday|this morning|this afternoon|just now|earlier|please|thanks|ta|mate)\b.*$/i, '')
+    .trim()
+    // 🔴 THE NAME ENDS WHERE THE NEXT CLAUSE BEGINS.
+    //
+    // The capture class in parseMoneyEntryRegex INCLUDES SPACES on purpose, because real merchants
+    // have them: "travis perkins", "b & q", "screwfix direct". The price of that is a greedy match
+    // that runs straight through the next preposition and keeps going.
+    //
+    // "bought a drill from screwfix for £129" was filed under the merchant name "screwfix for", and
+    // the reply to the customer read "screwfix for for £129.00". Chasing that one turned up the
+    // bigger version of the same fault: "spent £80 at travis perkins for cement" was being filed
+    // under "travis perkins for cement". Not cosmetic. The merchant name is what he searches his own
+    // books by at year end, and what an inspector reads back to him.
+    //
+    // So the name is cut at the FIRST preposition, not just a trailing one.
+    //
+    // ⚠️ "and" IS DELIBERATELY NOT IN THIS LIST. Cutting on it would turn "bath and body works" into
+    // "bath", and "b and q" into "b". A fix that mangles real shop names to tidy up a parse is a
+    // worse bug than the one it replaces.
+    //
+    // Found on 27 Jul 2026 by the WhatsApp end to end test, on a live number, sending the messages a
+    // real customer would actually send. No unit test caught it because every fixture in
+    // test/waintents.test.mjs used a SINGLE WORD merchant. That gap is the lesson, not the regex.
+    .replace(/\s+\b(?:for|on|at|in|from|to|with)\b.*$/i, '')
     .replace(/[.,!]+$/, '')
     .trim()
     .replace(/\s{2,}/g, ' ')

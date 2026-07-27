@@ -47,6 +47,33 @@ ok('refund received is income', e5 && e5.direction === 'income' && e5.amount ===
 const e6 = W.parseMoneyEntryRegex('spent £1,250.75 at Jewson on timber');
 ok('comma amount entry', e6 && e6.amount === 1250.75 && e6.category === 'materials');
 
+// 🔴 THE MERCHANT NAME RAN INTO THE NEXT CLAUSE. Found 27 Jul 2026 by the WhatsApp end to end test,
+// on a LIVE number, not by any fixture in this file.
+//
+// The merchant capture class includes spaces (real merchants have them: "travis perkins", "b & q"),
+// so a greedy match ran straight through the following preposition. "bought a drill from screwfix
+// for £129" was filed under the merchant name "screwfix for", and the reply to the customer read
+// "screwfix for for £129.00".
+//
+// Every fixture above used a SINGLE WORD merchant, which is exactly why a hundred and sixty passing
+// assertions said nothing. The bug lived in the gap between how we write test data and how a man
+// actually texts. These fixtures are deliberately messier.
+const e7 = W.parseMoneyEntryRegex('bought a drill from screwfix for £129');
+ok('🔴 the name is cut at the next clause, not filed with the preposition attached',
+  e7 && e7.merchant_name.toLowerCase() === 'screwfix');
+ok('...and the amount still parses on the same message', e7 && e7.amount === 129);
+
+const e8 = W.parseMoneyEntryRegex('spent £80 at travis perkins for cement');
+ok('🔴 a genuine multi word merchant survives, and the trailing clause is dropped',
+  e8 && e8.merchant_name.toLowerCase() === 'travis perkins');
+
+// ⚠️ THE REGRESSION THIS FIX COULD EASILY HAVE CAUSED. Cutting on "and" as well would have been the
+// obvious tidier rule, and it would have filed "bath and body works" as "bath". A fix that mangles
+// real shop names to clean up a parse is worse than the bug.
+const e9 = W.parseMoneyEntryRegex('spent £45 at bath and body works');
+ok('🔴 "and" is NOT a cut point: a real shop name containing it survives whole',
+  e9 && e9.merchant_name.toLowerCase() === 'bath and body works');
+
 console.log('\n=== waintents: dates ===\n');
 const now = new Date('2026-07-02T10:00:00Z');
 eq('today by default', W.entryDate('spent £40 on diesel', now), '2026-07-02');

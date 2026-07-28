@@ -296,5 +296,26 @@ ok('the form answer is a 303, not a 302', /NextResponse\.redirect\([^)]*,\s*303\
 // Reporting 14 filed when 11 were filed is how a man ends up with three he believes are in his books.
 ok('🔴 A PARTIAL APPLY IS TOLD APART FROM A FULL ONE', pileRoute.includes("'partial'") && pile.includes("case 'partial'"));
 
+// 🔴 NEVER MAKE HIM CHOOSE SOMETHING WE ALREADY KNOW.
+//
+// After the merchant rule landed, Trainline stopped being one tap, correctly: whether a journey was
+// work is his to say, not the shop's. But the card then offered "Choose one" and made him hunt
+// travel out of twenty four options for a merchant we had just recognised. Refusing to bulk file
+// something is not the same as not knowing what it is, and throwing the answer away is the exact
+// tedium that made him stop the first time.
+ok('the category select is pre-filled from what we worked out', /defaultValue=\{g\.suggested \?\? ''\}/.test(pile));
+ok('🔴 AND "CHOOSE ONE" ONLY APPEARS WHEN WE GENUINELY HAVE NO IDEA', /\{!g\.suggested && <option value="">Choose one<\/option>\}/.test(pile));
+// The screen must not claim it has never seen a merchant it has just categorised.
+// Comments stripped: the code carries a comment QUOTING the old wording to explain why it changed,
+// and reading an explanation as a violation is the third time this suite has taught me that.
+ok('it never claims not to have seen these before', !/have not seen/.test(stripComments(pile)));
+// And the current map is what decides, not whatever map ran the day the row arrived.
+ok('the page reads rows against the CURRENT keyword map', pile.includes('categoriseBankLine'));
+ok('so does the api', pileRoute.includes('categoriseBankLine'));
+// The account gate reaches both surfaces, or one of them would presume what the other refuses.
+ok('the page partitions by what the account is for', /partitionPile\(groups, accountUse\)/.test(pile));
+ok('the api gates the one tap by it too', /canBulkConfirm\(g, accountUse\)/.test(pileRoute));
+ok('🔴 AND THE BULK PLAN IS GATED BY IT', /bulkConfirmPlan\(\s*[\s\S]{0,160}accountUse,/.test(pileRoute));
+
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

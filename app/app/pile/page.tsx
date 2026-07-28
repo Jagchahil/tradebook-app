@@ -200,12 +200,18 @@ export default async function PilePage({
               in it, answering it clears most of the pile without categorising anything. So Not
               business money is the FIRST thing on the card, and the category is underneath for the
               ones he keeps. */}
+          {/* ⚠️ NOT "we have not seen these before" ANY MORE, AND THE WORDING MATTERED.
+              After the merchant rule landed, this section holds two different things: merchants we
+              have genuinely never seen, AND merchants we know perfectly well whose category depends
+              on the circumstance rather than the shop. Trainline is travel, and whether that travel
+              is claimable depends on the journey. Telling a man we have not seen Trainline before is
+              simply untrue, and he can see that it is. */}
           {unknown.length > 0 && (
             <section style={S.card}>
-              <h2 style={S.h2}>We have not seen {unknown.length === 1 ? 'this one' : 'these'} before</h2>
+              <h2 style={S.h2}>{unknown.length === 1 ? 'This one needs' : 'These need'} you</h2>
               <p style={S.sub}>
                 Quickest way through: knock out anything that was not business first, then say what
-                the rest were.
+                the rest were. Where we have a good idea we have filled it in for you.
               </p>
             </section>
           )}
@@ -215,7 +221,16 @@ export default async function PilePage({
                 <span style={S.vendor}>{g.vendor}</span>
                 <span style={S.amount}>{gbp0(g.total)}</span>
               </div>
-              <p style={S.meta}>{g.count === 1 ? 'One payment' : `${g.count} payments`}.</p>
+              {/* ⚠️ REFUSING TO BULK FILE IT IS NOT THE SAME AS NOT KNOWING WHAT IT IS.
+                  Trainline is travel. We will not file it in a screenful because whether the journey
+                  was work is his to say, not the shop's. But making him hunt "travel" out of twenty
+                  four options when we already know is throwing away the one thing we do know, and it
+                  is the exact tedium that made him stop the first time. So the answer is filled in
+                  and he presses once. */}
+              <p style={S.meta}>
+                {g.count === 1 ? 'One payment' : `${g.count} payments`}
+                {g.suggested ? `, and this looks like ${g.suggested}. Only you know if it was work.` : '.'}
+              </p>
 
               <form action="/api/pile" method="post" style={S.form}>
                 <input type="hidden" name="ids" value={g.ids.join(',')} />
@@ -228,9 +243,11 @@ export default async function PilePage({
                 <input type="hidden" name="ids" value={g.ids.join(',')} />
                 <input type="hidden" name="vendor" value={g.vendor} />
                 <input type="hidden" name="verdict" value="business" />
-                <label htmlFor={`cat-${g.key}`} style={S.label}>Or file it as</label>
-                <select id={`cat-${g.key}`} name="category" defaultValue="" style={S.select} required>
-                  <option value="">Choose one</option>
+                <label htmlFor={`cat-${g.key}`} style={S.label}>
+                  {g.suggested ? 'Or it was work, file it as' : 'Or file it as'}
+                </label>
+                <select id={`cat-${g.key}`} name="category" defaultValue={g.suggested ?? ''} style={S.select} required>
+                  {!g.suggested && <option value="">Choose one</option>}
                   {CATEGORIES.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}

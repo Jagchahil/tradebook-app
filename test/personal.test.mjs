@@ -109,5 +109,52 @@ const allCopy = found.map((f) => f.why).join(' ') + Object.values(['benefit','re
 ok('no em dashes or en dashes in the copy', !/[–—−]/.test(allCopy));
 ok('never says we changed it ourselves', !/we have removed|we removed|we took it out/i.test(allCopy));
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 HIS OWN NAME. Found on the live site, 28 July 2026, on real data.
+//
+// The web pile put "Jag, £496, money out" at the top with a one tap File it button under it. That
+// is a transfer to his own second account. Drawings are not a business expense, so filing it takes
+// £496 off his taxable profit that should not come off, and UNDERSTATES his tax. Of the two ways to
+// be wrong, that is the one he does not notice, because the number moved in his favour.
+//
+// The existing person matcher could never have caught it: it requires a title (mr, mrs, dr), which
+// is deliberate so a sole trader trading under his own name is not swept up. That guesses at whether
+// a string is a person. This does not guess. We know his name and we were not asking.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nHIS OWN NAME');
+
+const NAMES = ['Jag', 'Jag Chahil', 'Chahil Electrical Ltd'];
+
+ok('🔴 A PAYMENT TO HIMSELF IS CAUGHT', P.looksPersonal('Jag', null, NAMES)?.reason === 'self');
+ok('the full name is caught', P.looksPersonal('JAG CHAHIL', null, NAMES)?.reason === 'self');
+ok('the name inside a longer bank line is caught', P.looksPersonal('PAYMENT TO JAG CHAHIL', null, NAMES)?.reason === 'self');
+ok('punctuation and case do not matter', P.looksPersonal('J.A.G.  CHAHIL', null, ['J A G Chahil'])?.reason === 'self');
+ok('the business he trades under is him too', P.looksPersonal('CHAHIL ELECTRICAL LTD', null, NAMES)?.reason === 'self');
+
+// ⚠️ THE FALSE POSITIVE DIRECTION IS THE EXPENSIVE ONE HERE, and it is the opposite of everywhere
+// else in this file. Wrongly flagging a supplier does not tell him a job was not real work: it
+// quietly costs him a deduction he was entitled to. A naive includes() would do exactly that to
+// every one of these.
+ok('🔴 JAGUAR IS NOT JAG', P.looksPersonal('JAGUAR LAND ROVER', null, NAMES) === null);
+ok('Jagged Edge Roofing is a supplier, not him', P.looksPersonal('JAGGED EDGE ROOFING', null, NAMES) === null);
+ok('a longer word starting with the name is not the name', P.looksPersonal('CHAHILS CASH AND CARRY', null, NAMES) === null);
+ok('an ordinary merchant is untouched', P.looksPersonal('SCREWFIX DIRECT', null, NAMES) === null);
+ok('no names on file means the check never fires', P.looksPersonal('Jag', null, []) === null);
+ok('the old behaviour is unchanged when no names are passed', P.looksPersonal('Jag') === null);
+
+// Initials belong to too many suppliers to be worth the risk of a wrong refusal.
+ok('a name under three characters is ignored', P.looksPersonal('JC BUILDING SUPPLIES', null, ['JC']) === null);
+
+// ⚠️ THE VENDOR ONLY. A description can carry his name for ordinary reasons, and treating that as a
+// transfer to himself throws away a real cost.
+ok('🔴 HIS NAME IN THE DESCRIPTION IS NOT A TRANSFER', P.looksPersonal('SCREWFIX', 'invoice for Jag Chahil', NAMES) === null);
+
+// The sentence has to tell him WHY, in words he can argue with, and it must not claim we changed
+// anything on his behalf.
+const selfWhy = P.looksPersonal('Jag', null, NAMES)?.why ?? '';
+ok('the reason explains drawings rather than just refusing', /drawings/i.test(selfWhy));
+ok('the self reason carries no dashes', !/[–—−]/.test(selfWhy));
+ok('there is a short label for it', P.personalLabel('self') === 'Looks like your own account');
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

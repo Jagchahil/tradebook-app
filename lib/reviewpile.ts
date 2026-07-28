@@ -28,6 +28,8 @@
 //
 // So it is passed in. The caller supplies the real normaliser, and so does the test, which
 // means the real one is what gets tested.
+import { matchesOwnName } from './personal';
+
 export type KeyOf = (vendor: string) => string;
 
 export interface PileEntry {
@@ -68,14 +70,22 @@ export interface PileGroup {
 //
 // The 'careful' ones come FIRST regardless. They are the ones that will cost him if he gets
 // them wrong, and they are the ones he must not be able to rush past.
-export function buildPile(entries: PileEntry[], keyOf: KeyOf): PileGroup[] {
+export function buildPile(entries: PileEntry[], keyOf: KeyOf, ownNames: string[] = []): PileGroup[] {
   const map = new Map<string, PileGroup>();
 
   for (const e of entries) {
     const vendor = (e.vendor ?? '').trim() || 'Unknown';
     const key = keyOf(vendor) || vendor.toLowerCase();
 
-    const kind: GroupKind = e.looks_personal ? 'careful' : e.amount >= 0 ? 'income' : 'ask';
+    // ⚠️ TWO SOURCES FOR THE SAME FACT, AND BOTH ARE NEEDED.
+    //
+    // looks_personal is set on the ROW at import time, which is what the SQL in confirm_pile checks,
+    // so it is the guard that actually holds. But it only ever applied to rows imported AFTER the
+    // check existed, and the own name check is new. Reading it again here means a row already
+    // sitting in the database is classified correctly the next time he opens the pile, rather than
+    // waiting for a backfill nobody runs.
+    const self = matchesOwnName(e.vendor, ownNames);
+    const kind: GroupKind = (e.looks_personal || self) ? 'careful' : e.amount >= 0 ? 'income' : 'ask';
 
     // The kind is part of the key. A refund FROM Screwfix and a purchase AT Screwfix are the
     // same shop and completely different questions, and answering one must never answer the

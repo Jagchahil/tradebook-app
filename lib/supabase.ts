@@ -1326,6 +1326,60 @@ export async function readAuthUserIdentity(userId: string): Promise<AuthIdentity
   }
 }
 
+// EVERY NAME THAT MEANS HIM. Used to spot money moving between his own accounts.
+//
+// Three sources, because a bank line can carry any of them: the name he gave us, the name he trades
+// under, and the person name captured at web signup before an account existed. All three are him, so
+// a payment to any of them is drawings rather than a cost. See matchesOwnName in lib/personal.ts,
+// which compares whole words so a short name can never match a longer supplier.
+//
+// Returns an empty list on any failure. A missing name means the check simply does not fire, which
+// leaves behaviour exactly as it was rather than guessing.
+export async function readOwnNames(userId: string): Promise<string[]> {
+  if (!userId) return [];
+  const { url } = config();
+  const out = new Set<string>();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=name,business_name&limit=1`,
+      { headers: headers() },
+    );
+    if (res.ok) {
+      const rows = (await res.json().catch(() => null)) as Array<{ name?: string | null; business_name?: string | null }> | null;
+      const r = Array.isArray(rows) ? rows[0] : null;
+      if (r?.name) out.add(r.name);
+      if (r?.business_name) out.add(r.business_name);
+    }
+  } catch {
+    /* a missing name only means the check does not fire */
+  }
+  try {
+    const ures = await fetch(
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=phone_number&limit=1`,
+      { headers: headers() },
+    );
+    if (ures.ok) {
+      const urows = (await ures.json().catch(() => null)) as Array<{ phone_number?: string | null }> | null;
+      const phone = Array.isArray(urows) ? urows[0]?.phone_number : null;
+      if (phone) {
+        const sres = await fetch(
+          `${url}/rest/v1/signups?phone=eq.${encodeURIComponent(phone)}&select=person_name,name&limit=1`,
+          { headers: headers() },
+        );
+        if (sres.ok) {
+          const srows = (await sres.json().catch(() => null)) as Array<{ person_name?: string | null; name?: string | null }> | null;
+          const sr = Array.isArray(srows) ? srows[0] : null;
+          if (sr?.person_name) out.add(sr.person_name);
+          if (sr?.name) out.add(sr.name);
+        }
+      }
+    }
+  } catch {
+    /* same */
+  }
+  return [...out].filter((n) => n.trim().length > 0);
+}
+
 // --- The web session (the customer web app) --------------------------------
 //
 // The phone app carries a Supabase session in the device keystore. A browser cannot safely do

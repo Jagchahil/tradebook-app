@@ -16,6 +16,7 @@ import {
   getUserRules,
   getVendorPatterns,
   applyBankTruthToCapture,
+  readOwnNames,
 } from './supabase';
 import { refreshAccess, getBookedTransactions, mapBankTransaction, isSandbox, taxYearStartISO } from './bankfeed';
 import { categoriseBankLine } from './categories';
@@ -141,8 +142,20 @@ export async function syncWithAccessToken(
     // call, not ours, and the false positive direction here is the dangerous one: a supplier
     // refund wrongly excluded means he under-declares income, which is a worse problem to have
     // than paying a little too much tax. So we flag, and we ask, and we never bulk-confirm it.
+    // Every name that means HIM, read once for the whole sync rather than per row. A payment to his
+    // own account is drawings, and drawings are not a business cost, so it is flagged here at import
+    // where the flag lands on the ROW. That matters: confirm_pile re-applies its rules in SQL against
+    // that column, so flagging only on the screen would leave a guard that the database does not
+    // enforce, which is a suggestion rather than a guard.
+    let ownNames: string[] = [];
+    try {
+      ownNames = await readOwnNames(conn.user_id);
+    } catch {
+      ownNames = [];
+    }
+
     for (const entry of toInsert) {
-      if (looksPersonal(entry.vendor, entry.description) !== null) {
+      if (looksPersonal(entry.vendor, entry.description, ownNames) !== null) {
         entry.looks_personal = true;
       }
     }
@@ -182,7 +195,11 @@ export async function syncWithAccessToken(
           shouldAutoFile({
             source: known.source,
             knownPersonal: known.isPersonal,
-            looksPersonal: looksPersonal(entry.vendor, entry.description) !== null,
+            // ⚠️ AND THE AUTO FILE PATH MUST SEE IT. shouldAutoFile refuses anything that looks
+            // personal, which is the whole reason a benefit never slips into the books unseen. His
+            // own name has to be part of that answer or a learned rule could file his drawings
+            // without ever asking, which is the one thing this gate exists to stop.
+            looksPersonal: looksPersonal(entry.vendor, entry.description, ownNames) !== null,
           })
         ) {
           entry.confirmed = true;

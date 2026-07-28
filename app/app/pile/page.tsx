@@ -2,9 +2,10 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { pileEntries } from '../../../lib/supabase';
+import { pileEntries, readOwnNames } from '../../../lib/supabase';
 import { buildPile, summarisePile, canBulkConfirm } from '../../../lib/reviewpile';
 import { normaliseVendor } from '../../../lib/memory';
+import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES } from '../../../lib/categories';
 import { gbp0 } from '../../../lib/money';
 import { A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_TINT } from '../../../lib/tokens';
@@ -75,8 +76,8 @@ export default async function PilePage({
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
   const note = message(one('done'), one('n'));
 
-  const rows = await pileEntries(user.id);
-  const groups = buildPile(rows, normaliseVendor);
+  const [rows, ownNames] = await Promise.all([pileEntries(user.id), readOwnNames(user.id)]);
+  const groups = buildPile(rows, normaliseVendor, ownNames);
   const summary = summarisePile(groups);
 
   // Money in is never bundled with the spending, and confirm_pile refuses it outright, so there is
@@ -108,8 +109,15 @@ export default async function PilePage({
             {/* THE TRUTH ABOUT WHAT THIS COSTS HIM, BEFORE HE STARTS. He went to the same merchant
                 fourteen times: that is one question, not fourteen, and saying so is the difference
                 between a screen he opens and a screen he closes. */}
+            {/* ⚠️ THE COUNT IS OF WHAT IS ON THIS PAGE, NOT OF EVERY GROUP.
+                Caught on Jag's real data: summarisePile() counts every group including money in,
+                so the heading promised 36 questions above a page showing 29 cards. Seven of them
+                were income, which this screen deliberately does not ask about. A number that does
+                not match what is underneath it is the fastest way to stop being believed, and it is
+                worse here than anywhere because the whole point of the grouping is the claim that
+                there are fewer questions than there are rows. */}
             <h1 style={S.h1}>
-              {summary.entries} to check, and {summary.decisions === 1 ? 'one question' : `only ${summary.decisions} questions`}.
+              {summary.entries} to check, and {decidable.length === 1 ? 'one question' : `only ${decidable.length} questions`}.
             </h1>
             <p style={S.sub}>
               We have grouped them by who you paid. Answer once for a shop and we will file every
@@ -139,7 +147,7 @@ export default async function PilePage({
 
                 {/* HIS WORDS, NOT OURS. lib/personal.ts writes the sentence, so a man can argue with
                     the reason rather than be silently refused. */}
-                {careful && g.reason && <p style={S.reason}>{g.reason}</p>}
+                {careful && <p style={S.reason}>{looksPersonal(g.vendor, null, ownNames)?.why ?? g.reason}</p>}
 
                 {/* ⚠️ TWO DIFFERENT ACTS, AND THE FIRST DRAFT OF THIS PAGE CONFLATED THEM.
                     canBulkConfirm() answers "may he simply AGREE to our guess", and it is false when

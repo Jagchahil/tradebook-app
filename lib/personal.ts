@@ -26,6 +26,9 @@
 // testable. It only ever SUGGESTS.
 
 export type PersonalReason =
+  // Money moving between his OWN accounts. The most confident call in this file, because it is the
+  // only one we do not have to infer from the shape of a word: we know his name.
+  | 'self'
   | 'benefit'
   | 'refund'
   | 'gambling'
@@ -62,11 +65,73 @@ const LOAN = /\b(loan repayment|klarna|clearpay|laybuy|zilch|afterpay)\b/i;
 // sole trader trading under their own name is not swept up by accident.
 const PERSON_NAME = /\b(mr|mrs|miss|ms|dr)\.? [a-z]/i;
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 HIS OWN NAME. Found 28 July 2026, on Jag's real second account, on the live site.
+//
+// The pile put a card at the top reading "Jag, £496, money out" with a blue File it button under
+// it. That is a transfer to his own account. Drawings are not a business expense, so filing it
+// takes £496 off his taxable profit that should not come off, which UNDERSTATES his tax. Of the two
+// directions to be wrong in, that is the dangerous one, and it is the one a man does not notice
+// because the number moved in his favour.
+//
+// Nothing above catches it. PERSON_NAME requires a title, deliberately, so that a sole trader
+// trading under his own name is not swept up by accident, and that reasoning is sound. But it means
+// the matcher can only ever guess at whether a string is a person. THIS check does not guess. We
+// know who he is, and we were simply never asking.
+//
+// ⚠️ WHOLE WORDS, NEVER A SUBSTRING. A customer called "Jag" must not turn every payment to Jaguar,
+// Jagged Edge Roofing or Jag Tools into a personal transfer, which is what a naive includes() would
+// do, and it would quietly cost him real relief on real materials. Tokens are compared in sequence,
+// so "jag" matches "jag" and never "jaguar".
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// Lowercase, punctuation to spaces, runs of space collapsed. "J. CHAHIL  LTD" -> "j chahil ltd".
+export function normaliseNameKey(value: string | null | undefined): string {
+  return (value ?? '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Is this vendor line HIM? Compares whole word sequences, so a name is found inside a longer line
+// ("PAYMENT TO J CHAHIL") without ever matching a longer word that merely starts the same way.
+//
+// A name under three characters is ignored outright: initials belong to too many suppliers, and the
+// cost of a false positive here is a business cost he never gets to claim.
+export function matchesOwnName(vendor: string | null | undefined, ownNames: string[] = []): boolean {
+  const v = normaliseNameKey(vendor);
+  if (!v) return false;
+  const vTokens = v.split(' ');
+  for (const raw of ownNames) {
+    const n = normaliseNameKey(raw);
+    if (n.length < 3) continue;
+    const nTokens = n.split(' ');
+    for (let i = 0; i + nTokens.length <= vTokens.length; i += 1) {
+      if (nTokens.every((t, j) => t === vTokens[i + j])) return true;
+    }
+  }
+  return false;
+}
+
 // Returns why this looks personal, or null when it looks like business.
 //
 // Order matters: the most specific and most confident checks come first, so the
 // reason the user is shown is the most useful one available.
-export function looksPersonal(vendor: string | null | undefined, description?: string | null): PersonalHit | null {
+export function looksPersonal(
+  vendor: string | null | undefined,
+  description?: string | null,
+  ownNames: string[] = [],
+): PersonalHit | null {
+  // FIRST, because it is the only check here that is not an inference. Everything below reads the
+  // shape of a word and decides what it probably is. This one knows.
+  //
+  // ⚠️ THE VENDOR ONLY, NEVER THE DESCRIPTION. A description can carry his name for perfectly
+  // ordinary reasons ("invoice for J Chahil"), and treating that as a transfer to himself would
+  // throw away a real cost.
+  if (matchesOwnName(vendor, ownNames)) {
+    return {
+      reason: 'self',
+      why: 'This looks like money moving between your own accounts rather than a business cost. Money you move to yourself is drawings, and drawings are not an expense.',
+    };
+  }
+
   const text = `${vendor ?? ''} ${description ?? ''}`.trim();
   if (!text) return null;
 
@@ -128,6 +193,8 @@ export function personalLabel(reason: PersonalReason): string {
       return 'Looks like your own money';
     case 'loan':
       return 'Looks personal';
+    case 'self':
+      return 'Looks like your own account';
     case 'transfer':
       return 'Looks like a personal transfer';
   }

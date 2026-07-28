@@ -6,7 +6,23 @@
 // The feature is a speed feature. Speed features are how careful people make fast mistakes, and
 // the mistake here has HMRC's name on it. So the guard is tested harder than the grouping.
 
-import { buildPile as build, canBulkConfirm, summarisePile } from '../lib/reviewpile.ts';
+// STAGED RATHER THAN IMPORTED DIRECTLY, because lib/reviewpile.ts now imports lib/personal.ts to
+// answer "is this vendor him". Next resolves an extensionless import; bare Node under type
+// stripping does not, so both files are copied to a temp dir and the import gains its .ts on the
+// way in. Same fix as test/announcements.test.mjs and test/routing.test.mjs.
+import { pathToFileURL, fileURLToPath as fileURLToPathStage } from 'node:url';
+import { mkdtempSync, readFileSync as readStage, writeFileSync as writeStage } from 'node:fs';
+import { tmpdir as tmpdirStage } from 'node:os';
+import pathStage from 'node:path';
+
+const libStage = pathStage.join(pathStage.resolve(pathStage.dirname(fileURLToPathStage(import.meta.url)), '..'), 'lib');
+const stageDir = mkdtempSync(pathStage.join(tmpdirStage(), 'reviewpile-'));
+writeStage(pathStage.join(stageDir, 'personal.ts'), readStage(pathStage.join(libStage, 'personal.ts'), 'utf8'));
+writeStage(
+  pathStage.join(stageDir, 'reviewpile.ts'),
+  readStage(pathStage.join(libStage, 'reviewpile.ts'), 'utf8').replace("from './personal'", "from './personal.ts'"),
+);
+const { buildPile: build, canBulkConfirm, summarisePile } = await import(pathToFileURL(pathStage.join(stageDir, 'reviewpile.ts')).href);
 // The REAL normaliser, not a stand-in. If normaliseVendor ever changes how it collapses shop
 // names, these tests feel it, which is the whole reason it is injected rather than copied.
 import { normaliseVendor } from '../lib/memory.ts';
@@ -129,6 +145,32 @@ ok('and it summarises to zero', summarisePile([]).decisions === 0);
 // --- a missing vendor does not become a black hole --------------------------------
 const noVendor = buildPile([tx('n1', null, -20, 'materials'), tx('n2', '', -30, 'materials')]);
 ok('rows with no vendor still group, and are printable', noVendor[0].vendor === 'Unknown');
+
+// 🔴 A PAYMENT TO HIMSELF CAN NEVER REACH THE ONE TAP PATH.
+//
+// Found on the live site on 28 July 2026: the web pile offered "Jag, £496" with a File it button.
+// That is his own second account. Drawings are not a business cost, and filing them understates his
+// tax, which is the direction he does not notice.
+//
+// The classification happens HERE rather than only at import, because a row already sitting in the
+// database was imported before the check existed and would otherwise wait for a backfill nobody
+// runs. Reading it again on the way out means his pile is right the next time he opens it.
+console.log('\nHIS OWN ACCOUNT IS NEVER A ONE TAP FILE');
+const selfRows = [
+  { id: 'a', vendor: 'Jag', amount: -496, category: null, looks_personal: false },
+  { id: 'b', vendor: 'Screwfix', amount: -40, category: 'materials', looks_personal: false },
+];
+const selfGroups = build(selfRows, (v) => v.toLowerCase().trim(), ['Jag Chahil', 'Jag']);
+const own = selfGroups.find((g) => g.vendor === 'Jag');
+const shop = selfGroups.find((g) => g.vendor === 'Screwfix');
+ok('his own account becomes a careful group', own?.kind === 'careful');
+ok('🔴 AND SO IT CAN NEVER BE BULK CONFIRMED', canBulkConfirm(own) === false);
+ok('the shop next to it is untouched', shop?.kind === 'ask');
+ok('the shop can still be filed in one tap', canBulkConfirm(shop) === true);
+
+// The old signature still behaves exactly as it did, so every existing caller is unaffected.
+const noNames = build(selfRows, (v) => v.toLowerCase().trim());
+ok('with no names passed, nothing changes', noNames.find((g) => g.vendor === 'Jag')?.kind === 'ask');
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

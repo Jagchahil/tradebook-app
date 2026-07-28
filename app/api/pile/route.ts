@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rateLimitedShared } from '../../../lib/ratelimit';
 import {
   pileEntries,
+  readOwnNames,
   confirmPile,
   setManyPersonal,
   learnVendor,
@@ -39,8 +40,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
   }
 
-  const rows = await pileEntries(user.id);
-  const groups = buildPile(rows, normaliseVendor);
+  // In parallel: the rows, and every name that means him. A payment to himself is drawings, and
+  // drawings are never a business cost, so it must never reach the one tap path.
+  const [rows, ownNames] = await Promise.all([pileEntries(user.id), readOwnNames(user.id)]);
+  const groups = buildPile(rows, normaliseVendor, ownNames);
 
   return NextResponse.json({
     // THE APP DOES NOT KEEP ITS OWN CATEGORY LIST. It renders what it is given.
@@ -64,7 +67,7 @@ export async function GET(req: NextRequest) {
       // and the app translating an enum back into English would be a second copy of the same
       // fact, drifting quietly out of step with the first. That is exactly how TX_COLS and
       // TX_SELECT drifted and blinded the detail screen to is_personal tonight.
-      reason: g.kind === 'careful' ? looksPersonal(g.vendor)?.why ?? null : null,
+      reason: g.kind === 'careful' ? looksPersonal(g.vendor, null, ownNames)?.why ?? null : null,
     })),
   });
 }

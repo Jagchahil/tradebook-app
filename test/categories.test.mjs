@@ -241,5 +241,22 @@ const emitted = [
 ];
 ok('every category the map emits is in the canonical list', emitted.every(isCategory));
 
+// 🔴 A MERCHANT WE CLAIM TO KNOW, WRITTEN THE WAY A BANK ACTUALLY WRITES IT.
+//
+// Found on the live pile on 28 July 2026, on Jag's real feed: "Transport for London, 3 payments"
+// came through as an unknown and offered him a 24 option dropdown. The rule knew "tfl" and nothing
+// else. One bank sends TFL TRAVEL CH, another spells it out.
+//
+// This is worse than never having claimed the merchant. The whole promise of the pile is that we
+// recognise the ones anybody would recognise, and being asked about Transport for London is the
+// moment a man decides the grouping does not work.
+console.log('\nBANKS DO NOT AGREE ON HOW A MERCHANT IS SPELLED');
+ok('🔴 TRANSPORT FOR LONDON, SPELLED OUT', cat('TRANSPORT FOR LONDON') === 'travel');
+ok('and the abbreviation a different bank sends', cat('TFL TRAVEL CH') === 'travel');
+ok('mixed case and a reference do not break it', cat('Transport for London 1234567') === 'travel');
+// The full name must not have widened the rule into things that are not travel.
+ok('it did not start swallowing unrelated lines', cat('LONDON STONE PAVING') !== 'travel');
+ok('a merchant in another rule is untouched', cat('SCREWFIX DIRECT') === 'materials');
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

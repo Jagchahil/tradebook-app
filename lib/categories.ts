@@ -174,7 +174,13 @@ const CATEGORY_MAP: Array<[RegExp, Category]> = [
   [/\b(dvla|dvsa|mot\b|kwik ?fit|halfords|ats euromaster|national tyres|formula one autocentre|euro car parts|gsf car parts|motor ?parts|autoglass|national windscreens|rac\b|aa breakdown|green flag|vehicle tax|road tax|car parts)\b/i, 'van'],
 
   // --- TRAVEL (getting there, not driving there) -------------------------------------------
-  [/\b(ringgo|justpark|paybyphone|ncp\b|apcoa|parkingeye|q-?park|parking|dartford|dart charge|congestion|ulez|clean air zone|tfl\b|trainline|national rail|lner|avanti|northern rail|transpennine|megabus|national express|uber|bolt\b|addison lee|premier inn|travelodge|holiday inn)\b/i, 'travel'],
+  // ⚠️ BOTH THE ABBREVIATION AND THE FULL NAME. Found on Jag's live pile, 28 July 2026.
+  // "Transport for London, 3 payments" arrived as an unknown offering him a 24 option dropdown,
+  // because this rule only knew "tfl". Banks do not agree on how they write a merchant: one
+  // sends TFL TRAVEL CH, another spells it out in full. A merchant we claim to know and then
+  // ask about anyway is worse than one we never claimed, because it is the moment he decides
+  // the grouping does not work and goes back to a shoebox.
+  [/\b(ringgo|justpark|paybyphone|ncp\b|apcoa|parkingeye|q-?park|parking|dartford|dart charge|congestion|ulez|clean air zone|tfl\b|transport for london|trainline|national rail|lner|avanti|northern rail|transpennine|megabus|national express|uber|bolt\b|addison lee|premier inn|travelodge|holiday inn)\b/i, 'travel'],
 
   // --- SUBCONTRACTOR and WAGES --------------------------------------------------------------
   // Deliberately narrow. A payment to "Dave" is NOT automatically a subcontractor: it might be

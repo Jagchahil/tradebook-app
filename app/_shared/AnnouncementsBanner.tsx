@@ -31,6 +31,12 @@ const GREEN_TINT = '#EAF5EF';
 export interface BannerItem {
   key: string;
   source: 'khoji' | 'lekhio';
+  // The words on the tag, decided in lib/announcements.ts. NOT derived here from the source: this
+  // component used to render "The law changed" for anything Khoji found, which put that headline
+  // over an HMRC webinar announcement on the live site. What we are willing to CALL a finding is
+  // the same kind of decision as whether we may show it at all, and it lives in the same place.
+  tag: string;
+  kind: 'law_changed' | 'worth_knowing' | 'product';
   title: string;
   body: string;
   sourceUrl: string | null;
@@ -115,8 +121,10 @@ export function AnnouncementsBanner({
         {items.map((a, i) => (
           <article key={a.key} className="lek-ann-card" aria-label={`Update ${i + 1} of ${items.length}`}>
             <div style={S.head}>
-              <span style={a.source === 'khoji' ? S.tagKhoji : S.tagLekhio}>
-                {a.source === 'khoji' ? 'The law changed' : 'New in Lekhio'}
+              {/* The colour follows the strength of the claim: the river blue for a change that
+                  really moved his figures, quieter for everything else, green for a product note. */}
+              <span style={a.kind === 'law_changed' ? S.tagKhoji : a.kind === 'product' ? S.tagLekhio : S.tagQuiet}>
+                {a.tag}
               </span>
               {onDismiss && (
                 <button
@@ -243,6 +251,10 @@ const S: Record<string, React.CSSProperties> = {
   tagKhoji: {
     fontSize: 10.5, fontWeight: 800, letterSpacing: 0.7, textTransform: 'uppercase',
     color: RIVER, background: RIVER_TINT, padding: '4px 9px', borderRadius: 999,
+  },
+  tagQuiet: {
+    fontSize: 10.5, fontWeight: 800, letterSpacing: 0.7, textTransform: 'uppercase',
+    color: MUTED, background: '#F2F0EA', padding: '4px 9px', borderRadius: 999,
   },
   tagLekhio: {
     fontSize: 10.5, fontWeight: 800, letterSpacing: 0.7, textTransform: 'uppercase',

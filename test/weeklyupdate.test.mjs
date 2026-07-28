@@ -31,10 +31,14 @@ const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'weekly-'));
 
 const SRC = readFileSync(path.join(lib, 'weeklyupdate.ts'), 'utf8');
-const fix = (s) =>
-  s.replace("from './taxengine'", "from './taxengine.ts'").replace("from './quarterpack'", "from './quarterpack.ts'");
+// Rewrite EVERY relative import to .ts rather than naming them one at a time. Listing them by
+// hand meant that adding a single new dependency to a module under test broke this suite with a
+// module-not-found rather than a real failure, which is noise that teaches people to ignore red.
+const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
+// lib/money.ts is staged too: the one money formatter every conversational surface now uses.
+writeFileSync(path.join(stage, 'money.ts'), readFileSync(path.join(lib, 'money.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'quarterpack.ts'), fix(readFileSync(path.join(lib, 'quarterpack.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'circumstances.ts'), readFileSync(path.join(lib, 'circumstances.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'housestyle.ts'), readFileSync(path.join(lib, 'housestyle.ts'), 'utf8'));

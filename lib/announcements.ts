@@ -101,7 +101,45 @@ export interface Announcement {
   // figures already reflect it. Never inferred from engine_impact: that flag means SOMEONE THOUGHT
   // it should change a constant, not that a constant changed.
   applied: boolean;
+  // What we are willing to CALL this. See kindOf below: the strongest claim needs the same proof
+  // the reassurance sentence needs, and everything else is told plainly instead.
+  kind: AnnouncementKind;
   at: string;
+}
+
+// ⚠️ WHAT WE ARE WILLING TO CALL A THING. Added 28 July 2026, off a live screen.
+//
+// The banner tagged every Khoji finding "THE LAW CHANGED". On the deployed site that headline sat
+// above "HMRC videos and webinars for Making Tax Digital for Income Tax". HMRC publishing training
+// videos is not the law changing.
+//
+// The gate was working perfectly. The row was reviewed, cited and in date. What was wrong was the
+// CLAIM we hung on it, and the cost is specific: a man who reads "the law changed" twice and finds
+// a webinar announcement stops reading the banner. That banner is the only place Khoji is visible,
+// and Khoji is the one thing no competitor has. Overselling it is how we lose it.
+//
+// So the strongest claim now needs the same proof the reassurance sentence needs: a fact override
+// that actually exists, meaning a constant in the engine really moved. Anything else Khoji found is
+// "Worth knowing", which is honest for a genuine rule change we have not encoded AND for a press
+// release. It understates rather than overstates, and understating is the safe direction on a
+// screen about a man's tax.
+export type AnnouncementKind = 'law_changed' | 'worth_knowing' | 'product';
+
+export function kindOf(source: AnnouncementSource, applied: boolean): AnnouncementKind {
+  if (source === 'lekhio') return 'product';
+  return applied ? 'law_changed' : 'worth_knowing';
+}
+
+// The words themselves, here rather than in a component, for the same reason the gate is here:
+// there is one place that decides what a customer is told about tax law.
+export const KIND_LABEL: Record<AnnouncementKind, string> = {
+  law_changed: 'The law changed',
+  worth_knowing: 'Worth knowing',
+  product: 'New in Lekhio',
+};
+
+export function tagFor(a: Announcement): string {
+  return KIND_LABEL[a.kind];
 }
 
 export interface AnnouncementsInput {
@@ -210,6 +248,7 @@ export function selectAnnouncements(input: AnnouncementsInput): Announcement[] {
       effectiveDate: null,
       // A human writing a sentence is not proof a constant moved. Only the override table is.
       applied: !!(m.knowledge_item_id && applied.has(m.knowledge_item_id)),
+      kind: kindOf('lekhio', false),
       at: m.published_at as string,
     });
   }
@@ -227,6 +266,7 @@ export function selectAnnouncements(input: AnnouncementsInput): Announcement[] {
       sourceUrl: (k.source_url as string).trim(),
       effectiveDate: k.effective_date || null,
       applied: applied.has(k.id),
+      kind: kindOf('khoji', applied.has(k.id)),
       at: k.created_at as string,
     });
   }

@@ -12,7 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'agentstruct-'));
 const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'agent']) {
+for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'agent']) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);

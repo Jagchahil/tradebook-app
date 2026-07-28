@@ -7,7 +7,7 @@ import {
 } from '../../lib/supabase';
 import { ledgerFor, headline } from '../../lib/ledger';
 import { weeklyInput, weeklyFigures, weeklyLine } from '../../lib/weeklyupdate';
-import { selectAnnouncements, appliedLineFor } from '../../lib/announcements';
+import { selectAnnouncements, appliedLineFor, tagFor } from '../../lib/announcements';
 import { AnnouncementsBanner, type BannerItem } from '../_shared/AnnouncementsBanner';
 import { A11Y_CSS, FONT, GREEN, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP } from '../../lib/tokens';
 
@@ -70,6 +70,8 @@ export default async function MoneyPage() {
       }).map((a) => ({
         key: a.key,
         source: a.source,
+        tag: tagFor(a),
+        kind: a.kind,
         title: a.title,
         body: a.body,
         sourceUrl: a.sourceUrl,

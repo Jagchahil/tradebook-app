@@ -42,6 +42,7 @@
 // nightly by khoji/diff.mjs against GOV.UK. Not one number is written down in this file.
 
 import { homeOfficeFlatRateMonthly, FACTS } from './taxengine';
+import { gbp0 } from './money';
 
 // The only election this file knows about today. A named union rather than a free string, so a
 // caller cannot invent one and quietly get a zero back.
@@ -119,7 +120,7 @@ export function useOfHomeFullYear(band: HoursBand): number {
 export function electionConfirmation(band: HoursBand, monthsElapsed: number): string {
   const monthly = homeOfficeFlatRateMonthly(band);
   const toDate = useOfHomeToDate(band, monthsElapsed);
-  const money = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`;
+  const money = gbp0;
   return [
     `Done. You are claiming use of home at ${money(monthly)} a month, HMRC's flat rate for ${bandLabel(band)}.`,
     toDate > 0

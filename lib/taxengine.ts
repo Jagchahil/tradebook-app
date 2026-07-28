@@ -475,3 +475,30 @@ const CONCEPTS: Record<string, string | number> = {
 export function concept(key: string): string | number | null {
   return key in CONCEPTS ? CONCEPTS[key] : null;
 }
+
+// ── Rates, as a human reads them ────────────────────────────────────────────────────────────────
+//
+// 🔴 FOUND ON A LIVE SCREEN, 28 JULY 2026. The ledger told a customer his mileage was worth
+// "55.00000000000001p a mile".
+//
+// Rates are held as fractions, and 0.55 * 100 is 55.00000000000001 in IEEE 754 floating point.
+// Nothing was wrong with the maths: the tax figure was right to the penny. What was wrong was the
+// SENTENCE, and it appeared in the one place the ledger exists to be believed, the line where we
+// show a man our working.
+//
+// A number like that reads as a machine that does not know what it is doing, on a screen whose
+// entire job is to be believable. lib/ledger.ts's own header says it: the moment he catches one
+// figure looking wrong, he never believes another one we show him.
+//
+// Only two of our rates trip it, 0.55 and 0.14, which is exactly why nobody caught it by reading.
+// So the formatting lives here, next to the constants, and every display site uses it rather than
+// each one remembering to round.
+export function asPence(rate: number): string {
+  if (!Number.isFinite(rate)) return '0';
+  return String(Math.round(rate * 10000) / 100);
+}
+
+export function asPercent(rate: number): string {
+  if (!Number.isFinite(rate)) return '0';
+  return String(Math.round(rate * 10000) / 100);
+}

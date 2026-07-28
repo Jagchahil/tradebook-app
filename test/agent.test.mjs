@@ -12,7 +12,7 @@ const stage = mkdtempSync(path.join(tmpdir(), 'agent-'));
 // agent.ts now composes the structure-aware spine (position.ts) and the money-moves engine
 // (rakhamoves.ts) too, so stage the whole chain and rewrite every relative import to .ts.
 const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'agent']) {
+for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'agent']) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);

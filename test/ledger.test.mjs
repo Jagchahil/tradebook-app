@@ -247,6 +247,30 @@ ok('🔴 THE USE OF HOME ELECTION REACHES THE LEDGER, and no caller hardcodes it
   /homeOffice:\s*Math\.max\(0,\s*input\.ytdHomeOffice\s*\?\?\s*0\)/.test(ledgerSrc)
   && !/homeOffice:\s*0/.test(api) && !/homeOffice:\s*0/.test(wa));
 
+// ---------------------------------------------------------------------------------------------
+// 🔴 NO FLOATING POINT TAIL IN ANYTHING A MAN READS. Found on a live screen, 28 July 2026.
+// ---------------------------------------------------------------------------------------------
+//
+// The deployed ledger told a customer his mileage was worth "55.00000000000001p a mile". The tax
+// was right to the penny. The SENTENCE was wrong, and it was the sentence that shows him our
+// working, on the one screen whose entire job is to be believed.
+//
+// Rates are held as fractions and 0.55 * 100 is 55.00000000000001 in IEEE 754. Only two of our
+// rates trip it, 0.55 and 0.14, which is precisely why nobody caught it by reading the code. So it
+// is caught by looking at the OUTPUT instead: six or more decimal places in anything customer
+// facing is a float artifact, never a real figure. Nothing about tax is quoted to a millionth.
+{
+  const everyLine = ledger({ ...base, expenses: 9_000, mileage: 3_300, homeOffice: 312, pension: 2_400, capitalAllowances: 1_500 });
+  const words = [
+    headline(everyLine),
+    ...everyLine.lines.map((l) => `${l.label} ${l.basis}`),
+  ].join(' ');
+  ok('🔴 NO CUSTOMER FACING LEDGER STRING CARRIES A FLOATING POINT TAIL', !/\d\.\d{6,}/.test(words));
+  ok('...and the mileage line still names the real rate in pence', /\d+(\.\d+)?p a mile/.test(words));
+  ok('...formatted through the ONE formatter, so a new display site cannot forget',
+     ledgerSrc.includes('asPence(FACTS.mileageCarFirst10k)'));
+}
+
 // THE INVARIANT, AS ARITHMETIC. Splitting a deduction onto its own line is presentation. It must not
 // move a single penny of tax. If this ever fails, the ledger has started flattering us.
 const whole = ledger({ ...base, expenses: 12_300, mileage: 0 });

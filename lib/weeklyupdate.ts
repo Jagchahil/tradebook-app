@@ -40,6 +40,7 @@
 
 import { FACTS, vatRegistrationRequired, mtdForIncomeTaxRequired, concept } from './taxengine';
 import { quarterBounds, quarterForDate } from './quarterpack';
+import { gbp0 } from './money';
 
 // The honest nothing. Sent when no verified fact applies to him this week.
 //
@@ -51,8 +52,9 @@ export const QUIET_LINE = 'All logged. Nothing new needs your attention this wee
 // (`const gbp = (n: number) => ...`), so the weekly line reads identically to every nudge and
 // card the product already sends. Pence on a Sunday evening is noise.
 export function gbp(n: number): string {
-  const v = Number.isFinite(n) ? n : 0;
-  return `£${Math.round(v).toLocaleString('en-GB')}`;
+  // One formatter, in lib/money.ts. This wrapper stays because it is imported by name in several
+  // places and the export is part of this module's shape.
+  return gbp0(n);
 }
 
 export interface WeeklyUpdateInput {

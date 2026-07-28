@@ -25,9 +25,10 @@
 import { FACTS } from './taxengine';
 import { corporationTax } from './ltdengine';
 import { computePosition, type PositionInput } from './position';
+import { gbp0 } from './money';
 
 const r0 = (n: number) => Math.round(n);
-const gbp = (n: number) => `£${r0(n).toLocaleString('en-GB')}`;
+const gbp = (n: number) => gbp0(n);
 
 // Where 40% starts on total income, and where the £100k allowance taper begins. Derived from watched
 // constants, never re-typed.

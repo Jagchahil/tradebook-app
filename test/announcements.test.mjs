@@ -320,5 +320,36 @@ ok(`${checked} unapproved row shapes, ${leaked} reached a customer`, leaked === 
 // function that returns nothing at all.
 ok('an approved row does render (the sweep is not vacuous)', select({ knowledge: [kRow()] }).length === 1);
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n🔴 WHAT WE ARE WILLING TO CALL A THING. Added 28 July 2026, off a live screen.');
+//
+// The banner tagged every Khoji finding "THE LAW CHANGED", and on the deployed site that headline
+// sat above "HMRC videos and webinars for Making Tax Digital for Income Tax". The gate was working;
+// the CLAIM was not. A man who reads "the law changed" twice and finds a webinar announcement stops
+// reading the banner, and that banner is the only place Khoji is ever visible.
+{
+  ok('a Lekhio note is a product note', A.kindOf('lekhio', false) === 'product');
+  ok('...and stays one even if an override exists', A.kindOf('lekhio', true) === 'product');
+  ok('🔴 A KHOJI FINDING WITH NO PROVEN OVERRIDE IS ONLY "WORTH KNOWING"', A.kindOf('khoji', false) === 'worth_knowing');
+  ok('🔴 ONLY A PROVEN OVERRIDE MAY SAY THE LAW CHANGED', A.kindOf('khoji', true) === 'law_changed');
+  ok('the words live in the module, not in a component', A.KIND_LABEL.law_changed === 'The law changed');
+  ok('...and the quiet one is honest rather than dramatic', A.KIND_LABEL.worth_knowing === 'Worth knowing');
+
+  // The real shape, end to end: the same row, with and without a fact override behind it.
+  const row = {
+    id: 'k-webinar', status: 'reviewed', title: 'HMRC videos and webinars for Making Tax Digital',
+    summary: 'HMRC has published videos to help sole traders understand MTD.',
+    source_url: 'https://www.gov.uk/guidance/mtd-videos', effective_date: null,
+    created_at: new Date().toISOString(), engine_impact: true,
+  };
+  const unproven = A.selectAnnouncements({ knowledge: [row], manual: [] })[0];
+  ok('🔴 THE EXACT ITEM THAT SHIPPED WRONG IS NOW "Worth knowing"', A.tagFor(unproven) === 'Worth knowing');
+  ok('...and engine_impact alone does NOT promote it, because that flag is an intention', unproven.kind === 'worth_knowing');
+
+  const proven = A.selectAnnouncements({ knowledge: [row], manual: [], appliedItemIds: ['k-webinar'] })[0];
+  ok('...while a real override does promote it', A.tagFor(proven) === 'The law changed');
+  ok('...and only then does the reassurance sentence appear', !!A.appliedLineFor(proven) && !A.appliedLineFor(unproven));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exitCode = fail === 0 ? 0 : 1;

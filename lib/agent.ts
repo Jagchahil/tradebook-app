@@ -17,6 +17,7 @@ import { aprilDelta, PROPERTY_FACTS } from './propertyengine';
 import { chaseMessage } from './waintents';
 import { savingsMoves, type Move } from './rakhamoves';
 import type { BusinessType, OwnerInput } from './position';
+import { gbp0 } from './money';
 
 // --- Input ---------------------------------------------------------------------
 
@@ -213,7 +214,8 @@ export function projectAnnual(ytd: number, d: Derived): number {
   return Math.round((ytd / d.daysElapsed) * d.daysInYear);
 }
 
-const gbp = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`;
+// One formatter, in lib/money.ts. This used to print "£-4,200" for a projected loss.
+const gbp = (n: number) => gbp0(n);
 
 // --- The engine -------------------------------------------------------------------
 

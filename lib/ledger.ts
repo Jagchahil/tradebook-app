@@ -59,7 +59,7 @@
 //
 // If anyone ever proposes pricing on this figure, the answer is no, and the reason is a statute.
 
-import { FACTS, soleTraderTax } from './taxengine';
+import { FACTS, soleTraderTax, asPence } from './taxengine';
 
 // Below this, a "saved" figure is noise dressed as a fact. Three months is when the projection in
 // lib/taxoptimiser.ts is allowed to speak, and the same honesty applies here.
@@ -115,7 +115,7 @@ export function ledger(input: LedgerInput): Ledger {
     },
     {
       key: 'mileage', label: 'Mileage', amount: Math.max(0, input.mileage),
-      basis: `Your business miles at HMRC's rate. ${FACTS.mileageCarFirst10k * 100}p a mile for the first ${FACTS.mileageFirstBandMiles.toLocaleString('en-GB')}.`,
+      basis: `Your business miles at HMRC's rate. ${asPence(FACTS.mileageCarFirst10k)}p a mile for the first ${FACTS.mileageFirstBandMiles.toLocaleString('en-GB')}.`,
     },
     {
       key: 'home_office', label: 'Use of home', amount: Math.max(0, input.homeOffice),

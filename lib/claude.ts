@@ -5,7 +5,7 @@
 //
 // Env var: ANTHROPIC_API_KEY
 
-import { FACTS } from './taxengine';
+import { FACTS, asPence, asPercent } from './taxengine';
 import { LTD } from './ltdengine';
 import { aiEnabled } from './aicost';
 import { storyboardPrompt, parseStoryboardDraft, type DraftInput, type DraftResult } from './studioagent';
@@ -565,15 +565,15 @@ function taxFacts2627(): string[] {
   return [
   `- Personal allowance £${FACTS.personalAllowance.toLocaleString('en-GB')}, tapered by £1 for every £2 of income over £${FACTS.personalAllowanceTaperFloor.toLocaleString('en-GB')}, nil at £${FACTS.personalAllowanceLostAt.toLocaleString('en-GB')}.`,
   `- Income tax on taxable income: ${Math.round(FACTS.basicRate * 100)}% on the first £${FACTS.basicRateBand.toLocaleString('en-GB')}, ${Math.round(FACTS.higherRate * 100)}% to £${FACTS.additionalRateThreshold.toLocaleString('en-GB')}, ${Math.round(FACTS.additionalRate * 100)}% above.`,
-  `- Class 4 NIC: ${FACTS.class4MainRate * 100}% on profits £${FACTS.class4LowerLimit.toLocaleString('en-GB')} to £${FACTS.class4UpperLimit.toLocaleString('en-GB')}, ${FACTS.class4UpperRate * 100}% above. Class 2 is voluntary since April 2024 (£${FACTS.class2WeeklyRate} a week if paid).`,
+  `- Class 4 NIC: ${asPercent(FACTS.class4MainRate)}% on profits £${FACTS.class4LowerLimit.toLocaleString('en-GB')} to £${FACTS.class4UpperLimit.toLocaleString('en-GB')}, ${asPercent(FACTS.class4UpperRate)}% above. Class 2 is voluntary since April 2024 (£${FACTS.class2WeeklyRate} a week if paid).`,
   `- Trading allowance £${FACTS.tradingAllowance.toLocaleString('en-GB')}. Annual Investment Allowance £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')} (100% relief on qualifying plant).`,
   `- VAT registration at £${FACTS.vatRegistrationThreshold.toLocaleString('en-GB')} rolling 12-month turnover, deregistration £${FACTS.vatDeregistrationThreshold.toLocaleString('en-GB')}.`,
-  `- CIS: ${FACTS.cisRegisteredRate * 100}% deduction for registered subcontractors, ${FACTS.cisUnregisteredRate * 100}% unregistered, on labour only, never materials.`,
-  `- Mileage (simplified): car or van ${Math.round(FACTS.mileageCarFirst10k * 100)}p first ${FACTS.mileageFirstBandMiles.toLocaleString('en-GB')} miles then ${Math.round(FACTS.mileageCarOver10k * 100)}p, motorcycle ${Math.round(FACTS.mileageMotorcycle * 100)}p. Home office flat rate £${FACTS.homeFlatRate25to50}/£${FACTS.homeFlatRate51to100}/£${FACTS.homeFlatRate101plus} a month by hours.`,
+  `- CIS: ${asPercent(FACTS.cisRegisteredRate)}% deduction for registered subcontractors, ${asPercent(FACTS.cisUnregisteredRate)}% unregistered, on labour only, never materials.`,
+  `- Mileage (simplified): car or van ${asPence(FACTS.mileageCarFirst10k)}p first ${FACTS.mileageFirstBandMiles.toLocaleString('en-GB')} miles then ${asPence(FACTS.mileageCarOver10k)}p, motorcycle ${asPence(FACTS.mileageMotorcycle)}p. Home office flat rate £${FACTS.homeFlatRate25to50}/£${FACTS.homeFlatRate51to100}/£${FACTS.homeFlatRate101plus} a month by hours.`,
   `- MTD for Income Tax: from April 2026 if qualifying income over £${FACTS.mtdThreshold2026.toLocaleString('en-GB')}, April 2027 over £${FACTS.mtdThreshold2027.toLocaleString('en-GB')}, April 2028 over £${FACTS.mtdThreshold2028.toLocaleString('en-GB')}. Quarterly updates due 7 Aug, 7 Nov, 7 Feb, 7 May. Self Assessment for 2024/25 due 31 Jan 2026.`,
   '- Profits are taxed on the tax-year basis from 2024/25. The cash basis (money in and out when it moves) is the default for small businesses; accruals counts income and costs when invoiced or incurred. Opening and closing years can create overlap, so the first and last year need care.',
   '- Payments on account: once a Self Assessment bill is over £1,000, you also make two payments on account towards next year, each half this year\'s bill, due 31 January and 31 July, on top of the balancing payment. This is the bill that surprises people.',
-  `- Capital allowances: the Annual Investment Allowance gives 100% relief on most plant and machinery up to £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')}. Above that, or for cars, you claim a writing down allowance each year, ${Math.round(FACTS.wdaMainRate * 100)}% on the main pool (reduced from 18% from April 2026), ${Math.round(FACTS.wdaSpecialRate * 100)}% on the special rate pool (most cars, integral features).`,
+  `- Capital allowances: the Annual Investment Allowance gives 100% relief on most plant and machinery up to £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')}. Above that, or for cars, you claim a writing down allowance each year, ${asPercent(FACTS.wdaMainRate)}% on the main pool (reduced from 18% from April 2026), ${asPercent(FACTS.wdaSpecialRate)}% on the special rate pool (most cars, integral features).`,
   ];
 }
 
@@ -583,7 +583,7 @@ function taxFacts2627(): string[] {
 function ltdFacts2627(): string[] {
   return [
   '- Limited company: the company pays Corporation Tax on its profit, 19% up to £50,000, 25% above £250,000, with marginal relief between (about 26.5% on the slice). A director usually takes a small salary plus dividends.',
-  `- Dividends are paid from post-Corporation-Tax profit and taxed on the person: a £${LTD.dividendAllowance.toLocaleString('en-GB')} allowance at 0%, then ${LTD.dividendBasic * 100}% basic, ${LTD.dividendHigher * 100}% higher, ${LTD.dividendAdditional * 100}% additional. A dividend needs distributable profit; taking more is a director's loan with a 33.75% charge if it is unpaid nine months after the year end.`,
+  `- Dividends are paid from post-Corporation-Tax profit and taxed on the person: a £${LTD.dividendAllowance.toLocaleString('en-GB')} allowance at 0%, then ${asPercent(LTD.dividendBasic)}% basic, ${asPercent(LTD.dividendHigher)}% higher, ${asPercent(LTD.dividendAdditional)}% additional. A dividend needs distributable profit; taking more is a director's loan with a 33.75% charge if it is unpaid nine months after the year end.`,
   ];
 }
 
@@ -598,7 +598,7 @@ function accountantSystem(): string {
   '',
   'BUSINESS STRUCTURE matters, and the user profile below tells you which one applies. Answer for THEIR structure, not sole-trader rules by default.',
   '- SOLE TRADER: no separate business return. The trade goes on their own Self Assessment (SA103). Income tax and Class 4 NIC on the profit, as above. One return, one bill.',
-  '- LIMITED COMPANY: the company is a separate taxpayer. It files a Corporation Tax return (CT600) and pays corporation tax on its profit (19% up to £50,000 of profit, 25% above £250,000, with marginal relief in between, an effective rate of about 26.5% on the slice between). Salary the company pays a director is a deductible cost; most directors take a small salary around the £' + FACTS.personalAllowance.toLocaleString('en-GB') + ' personal allowance. Dividends are paid from POST-corporation-tax profit and are taxed on the person: a £' + LTD.dividendAllowance.toLocaleString('en-GB') + ' dividend allowance at 0%, then ' + (LTD.dividendBasic * 100) + '% (basic), ' + (LTD.dividendHigher * 100) + '% (higher), ' + (LTD.dividendAdditional * 100) + '% (additional). A dividend can only be paid from distributable profit (Companies Act 2006 s830); taking more is a director\'s loan with a 33.75% s455 charge if unpaid nine months after the year end. So a company owner has TWO returns: the company\'s CT600 and their own SA100. Weigh both together.',
+  '- LIMITED COMPANY: the company is a separate taxpayer. It files a Corporation Tax return (CT600) and pays corporation tax on its profit (19% up to £50,000 of profit, 25% above £250,000, with marginal relief in between, an effective rate of about 26.5% on the slice between). Salary the company pays a director is a deductible cost; most directors take a small salary around the £' + FACTS.personalAllowance.toLocaleString('en-GB') + ' personal allowance. Dividends are paid from POST-corporation-tax profit and are taxed on the person: a £' + LTD.dividendAllowance.toLocaleString('en-GB') + ' dividend allowance at 0%, then ' + (asPercent(LTD.dividendBasic)) + '% (basic), ' + (asPercent(LTD.dividendHigher)) + '% (higher), ' + (asPercent(LTD.dividendAdditional)) + '% (additional). A dividend can only be paid from distributable profit (Companies Act 2006 s830); taking more is a director\'s loan with a 33.75% s455 charge if unpaid nine months after the year end. So a company owner has TWO returns: the company\'s CT600 and their own SA100. Weigh both together.',
   '- PARTNERSHIP: transparent, pays no tax itself, files an SA800 showing the profit split. EACH partner is taxed on their share exactly like a sole trader (income tax plus Class 4 NIC) through their own Self Assessment. A partner\'s other income stacks on top of their share.',
   '- Trading losses: a loss can be carried forward against future profits of the same trade, or set against your total income of this year or last year (s64), whichever saves the most. It is a choice worth thinking about.',
   '- Capital gains tax, 2026/27: the first £3,000 of gains is tax free, then 18% or 24% on most assets, or 18% with Business Asset Disposal Relief when you sell a qualifying business, up to a £1,000,000 lifetime limit.',

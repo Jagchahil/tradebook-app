@@ -12,7 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'rakhamoves-'));
 const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'nistudentloan', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves']) {
+for (const f of ['taxengine', 'money', 'nistudentloan', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves']) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
 const M = await import(pathToFileURL(path.join(stage, 'rakhamoves.ts')).href);

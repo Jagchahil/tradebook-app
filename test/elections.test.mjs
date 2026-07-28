@@ -28,9 +28,14 @@ const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'elections-'));
 
 const SRC = readFileSync(path.join(lib, 'elections.ts'), 'utf8');
-const fix = (s) => s.replace("from './taxengine'", "from './taxengine.ts'");
+// Rewrite EVERY relative import to .ts rather than naming them one at a time. Listing them by
+// hand meant that adding a single new dependency to a module under test broke this suite with a
+// module-not-found rather than a real failure, which is noise that teaches people to ignore red.
+const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
+// lib/money.ts is staged too: the one money formatter every conversational surface now uses.
+writeFileSync(path.join(stage, 'money.ts'), readFileSync(path.join(lib, 'money.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'elections.ts'), fix(SRC));
 writeFileSync(path.join(stage, 'ledger.ts'), fix(readFileSync(path.join(lib, 'ledger.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'housestyle.ts'), readFileSync(path.join(lib, 'housestyle.ts'), 'utf8'));
@@ -177,9 +182,23 @@ ok('the source file contains no em dash or en dash', !/[–—]/.test(SRC));
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n6. STRUCTURAL');
 
-ok('the module imports only the tax engine', (() => {
+// THE POINT OF THIS ASSERTION IS PURITY, NOT A HEADCOUNT.
+//
+// It used to demand exactly one import, './taxengine'. That was a proxy for the thing that actually
+// matters: this module must never reach for I/O, a clock, a database or a network, so it can be
+// reasoned about and swept by a test. On 28 July it started importing './money', the one money
+// formatter, which is just as pure and is the whole reason "£-33" cannot reach a screen any more.
+//
+// A count is a brittle way to say "pure". An allowlist says it directly, and it still fails loudly
+// the day somebody imports supabase or whatsapp in here.
+ok('the module imports nothing but pure helpers', (() => {
+  const PURE = new Set(['./taxengine', './money', './housestyle']);
   const imports = [...SRC.matchAll(/^import .* from '([^']+)';$/gm)].map((m) => m[1]);
-  return imports.length === 1 && imports[0] === './taxengine';
+  return imports.length > 0 && imports.every((i) => PURE.has(i));
+})());
+ok('...and reaches for nothing that touches the outside world', (() => {
+  const imports = [...SRC.matchAll(/^import .* from '([^']+)';$/gm)].map((m) => m[1]);
+  return !imports.some((i) => /supabase|whatsapp|claude|stripe|email|fetch/i.test(i));
 })());
 ok('an election is tied to ONE tax year, never rolled forward silently', /startYear/.test(SRC) && /it forward silently/i.test(SRC));
 ok('nothing special category can be near this, it is hours and a year', !/health|disab|circumstance|specialCategory/i.test(code));

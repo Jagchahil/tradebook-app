@@ -312,3 +312,36 @@ export function weeklySummaryText(input: WeeklySummaryInput): string {
 
   return lines.join('\n');
 }
+
+// ── One assembler, every surface ─────────────────────────────────────────────────────────────────
+//
+// ⚠️ THE SAME REASON lib/ledger.ts HAS ledgerFor(). This shaping used to live inside
+// app/api/weekly/route.ts, and the server rendered web app would have been a second copy of it.
+//
+// The interesting part is not the arithmetic, it is the null handling. A fact we could not read is
+// NOT a zero: "we do not know" and "it is nothing" are different sentences, and the branches above
+// stay shut on a null rather than telling a man something confident and wrong about his VAT.
+// Written once, so a surface cannot quietly turn a missing fact into a false one by defaulting it.
+export interface WeeklyFacts {
+  rolling12mTaxableTurnover: number | null;
+  vatRegistered: boolean | null;
+  ytdGrossQualifyingIncome: number | null;
+}
+
+export function weeklyInput(
+  totals: { income: number; expenses: number },
+  facts: WeeklyFacts | null | undefined,
+  now: Date,
+): WeeklySummaryInput {
+  return {
+    now,
+    income: totals.income,
+    expenses: totals.expenses,
+    rolling12mTaxableTurnover: facts?.rolling12mTaxableTurnover ?? null,
+    // Not registered is the safe default here, and it is the only default in this function that is
+    // a value rather than a null. Treating unknown as registered would silence the threshold
+    // warning for a man heading straight past it, which is the expensive direction of the error.
+    vatRegistered: facts?.vatRegistered ?? false,
+    ytdGrossQualifyingIncome: facts?.ytdGrossQualifyingIncome ?? null,
+  };
+}

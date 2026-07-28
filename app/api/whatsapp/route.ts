@@ -19,7 +19,7 @@ import {
   draftSupportReply,
 } from '../../../lib/claude';
 import { checkExpense, VERDICT_ICON, TAX_TIPS } from '../../../lib/taxrules';
-import { ledger, headline } from '../../../lib/ledger';
+import { headline, ledgerFor } from '../../../lib/ledger';
 import { createVoiceJob } from '../../../lib/voicejobs';
 import { confirmationLine } from '../../../lib/voiceflow';
 import { isWorkerLive } from '../../../lib/bridge';
@@ -2289,21 +2289,20 @@ async function handleSavingsQuestion(from: string) {
   }
 
   const input = await getOptimiserInput(userId);
-  // ⚠️ THIS MUST MATCH app/api/ledger/route.ts EXACTLY. Two readers over one number always drift, and
-  // here the two readers are the app screen and the WhatsApp reply: the two places he would compare.
-  // The mileage is MOVED out of expenses onto its own line, never added. The total is unchanged.
-  const mileage = Math.max(0, input.ytdMileage ?? 0);
-  const l = ledger({
-    monthsElapsed: input.monthsElapsed,
-    grossIncome: input.ytdTradeIncome,
-    expenses: Math.max(0, input.ytdTradeExpenses - mileage),
-    mileage,
-    // Honest zeros. homeOffice and pension are never captured at all, so they genuinely understate.
-    // capitalAllowances is already inside the expenses line, so its zero prevents double counting.
-    // See app/api/ledger/route.ts for the full reasoning.
-    homeOffice: 0, capitalAllowances: 0, pension: 0,
-    cisSuffered: input.ytdCisSuffered,
-  });
+
+  // 🔴 THIS USED TO BE A HAND WRITTEN COPY OF THE LEDGER ASSEMBLY, AND IT HAD ALREADY DRIFTED.
+  //
+  // The old comment here said "THIS MUST MATCH app/api/ledger/route.ts EXACTLY", which is the sort
+  // of instruction that is true right up until it is not. It passed a hardcoded zero for use of home,
+  // alongside a comment saying it was "never captured at all". That stopped being true on 27 July 2026,
+  // when lib/elections.ts shipped and the API route started passing the real figure. From that moment a
+  // man who had elected use of home saw one total on his ledger and a SMALLER one in the WhatsApp
+  // reply, which are the two places he would actually compare.
+  //
+  // Nobody wrote a bug. Two readers over one number drifted, exactly as the header on
+  // app/api/ledger/route.ts says they always do. So there is now one assembler, ledgerFor(), and
+  // this call site cannot fall behind again because it no longer knows how the sum is made.
+  const l = ledgerFor(input);
 
   // NOT ENOUGH IS NOT ZERO. Two weeks in we do not proudly announce that we saved him £14.
   if (!l.enough) {

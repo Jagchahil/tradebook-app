@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
 import { verifyAccessToken, getOptimiserInput } from '../../../lib/supabase';
-import { ledger, headline } from '../../../lib/ledger';
+import { ledgerFor, headline } from '../../../lib/ledger';
 
 export const runtime = 'nodejs';
 
@@ -41,55 +41,14 @@ export async function GET(req: NextRequest) {
   // ⚠️ EVERY FIGURE BELOW IS ONE HE HAS CONFIRMED. Nothing "to review", nothing projected, nothing
   // conditional. lib/ledger.ts has no field you could put a "could" in, which is the strongest
   // guarantee available: you cannot pass one in even by accident.
-  // 🔴 THE MILEAGE IS MOVED, NOT ADDED. THE TOTAL DOES NOT CHANGE BY A PENNY.
   //
-  // A mileage claim is already an ordinary transaction inside ytdTradeExpenses, so it has ALWAYS been
-  // reducing his tax correctly. What it was not doing was showing up by name: the ledger's whole job
-  // is to tell him WHERE the money came from, and mileage was buried inside "Costs you logged".
+  // ⚠️ AND THE ASSEMBLY ITSELF NOW LIVES IN lib/ledger.ts, WHICH IS THE POINT OF THIS HEADER.
   //
-  // So it is subtracted from the expenses line and passed on its own. Same deduction, same tax, same
-  // `saved`, one more line he can read. If you are ever tempted to pass ytdMileage WITHOUT subtracting
-  // it here, stop: that would count it twice and overstate what we saved him, and this file's own
-  // header explains why that is the one lie the product cannot afford.
-  const mileage = Math.max(0, input.ytdMileage ?? 0);
-  const l = ledger({
-    monthsElapsed: input.monthsElapsed,
-    grossIncome: input.ytdTradeIncome,
-    expenses: Math.max(0, input.ytdTradeExpenses - mileage),
-    mileage,
-
-    // 🔴 USE OF HOME IS ADDED, NOT MOVED, AND THAT IS THE OPPOSITE OF THE MILEAGE LINE ABOVE.
-    //
-    // Read the mileage comment again: it is SUBTRACTED from expenses before being passed, because a
-    // mileage claim is already sitting inside expenses as an ordinary transaction, and adding it
-    // would count it twice and overstate what Lekhio saved him.
-    //
-    // Use of home is the opposite case and the difference is not a style choice, it is a fact about
-    // the data. It is an ELECTION, not a transaction: lib/categories.ts refuses to create a 'home'
-    // category on purpose, because a rule on rent or a household energy bill would sweep up a man's
-    // OWN HOUSE and claim tax relief on it. So it cannot be inside expenses, and subtracting it here
-    // the way mileage is subtracted would UNDERSTATE his deductions by exactly the amount he elected.
-    //
-    // test/elections.test.mjs asserts both directions against this file's real output, so a future
-    // refactor that "makes them consistent" has to break a test that explains why they are not.
-    homeOffice: Math.max(0, input.ytdHomeOffice ?? 0),
-
-    // STILL NOT WIRED, AND THESE ZEROS ARE HONEST RATHER THAN LAZY.
-    //
-    // pension is genuinely NOT CAPTURED ANYWHERE: there is no category and no election for it yet.
-    // That zero really does understate him, and the fix is upstream, not here.
-    //
-    // capitalAllowances is a different case and the zero is LOAD BEARING. Tools and equipment are
-    // logged as ordinary expense categories, so their cost is ALREADY inside the expenses line above.
-    // Passing a figure here as well would count them twice. Splitting them out properly is the same
-    // move the mileage line just had, and it needs its own pass over what actually qualifies as plant.
-    capitalAllowances: 0,
-    pension: 0,
-
-    // HIS OWN MONEY, HELD BY HMRC. It gets its own number on the screen and it is never, ever added
-    // to "saved". This product has already once quoted a man a CIS refund that did not exist.
-    cisSuffered: input.ytdCisSuffered,
-  });
+  // The mileage subtraction and the use of home addition used to be written out here. The web app
+  // needs exactly the same five lines, server rendered, and a second copy of them would have been
+  // the fourth time this codebase put two readers over one figure. ledgerFor() is that one reader,
+  // and it carries the reasoning for both directions with it.
+  const l = ledgerFor(input);
 
   return NextResponse.json({ ...l, headline: headline(l) });
 }

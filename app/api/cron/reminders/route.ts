@@ -9,6 +9,7 @@ import {
   cronStarted,
   cronFinished,
   sweepRateHits,
+  sweepAuthSends,
   pruneOldRows,
   addWaSend,
   countActiveSubscribers,
@@ -170,6 +171,10 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
   if (startAfter === null) {
     await cronStarted(job);
     await sweepRateHits(); // housekeeping, piggybacked. No separate schedule to forget.
+    // Ninety days of hashed login attempts is enough to investigate an incident and short enough
+    // that we are not keeping a record of every sign in for ever. Wired here rather than left as a
+    // function nobody calls: this codebase's disease is a job that exists and never runs.
+    await sweepAuthSends();
   }
 
   let cursor = startAfter;

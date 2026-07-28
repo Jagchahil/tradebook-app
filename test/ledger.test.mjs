@@ -210,19 +210,42 @@ ok('...and it reuses getOptimiserInput rather than assembling a SECOND set of fi
 // the tax on it. That is failure mode 2 in this file's header wearing a new coat, and it would be
 // the most flattering possible bug: bigger number, happier customer, completely false.
 //
-// So both callers are pinned to the subtraction, in source. Arithmetic below proves the invariant.
+// 🔴 AND ON 27 JULY 2026 THIS TEST CAUGHT THE DRIFT IT WAS WRITTEN TO PREDICT.
+//
+// The rule used to be enforced by pinning the SUBTRACTION into both call sites and asserting the
+// source of each. That is a rule maintained by copying, and the copies drifted: the WhatsApp reply
+// passed `homeOffice: 0` with a comment saying use of home was "never captured at all", which
+// stopped being true the day lib/elections.ts shipped. From that moment a man who had elected use
+// of home saw one total on his ledger and a SMALLER one in the WhatsApp reply. Two totals, and the
+// two places he would actually compare.
+//
+// So the assembly moved into ONE function, lib/ledger.ts ledgerFor(), and what is asserted now is
+// stronger: the invariant lives in exactly one place, and every caller DELEGATES rather than
+// reimplementing. A future surface cannot fall behind, because it no longer knows how the sum is
+// made.
 
+const ledgerSrc = rf(path.join(root, 'lib/ledger.ts'), 'utf8');
 const movedNotAdded = (src) => /expenses:\s*Math\.max\(0,\s*input\.ytdTradeExpenses\s*-\s*mileage\)/.test(src);
 
-ok('🔴 the API route MOVES the mileage out of expenses, it does not ADD it on top',
-  movedNotAdded(api) && /\bmileage,/.test(api));
+ok('🔴 THE SUBTRACTION LIVES IN lib/ledger.ts, ONCE', movedNotAdded(ledgerSrc) && /\bmileage,/.test(ledgerSrc));
 
-ok('🔴 the WhatsApp route does the identical thing, because two readers over one number always drift',
-  movedNotAdded(wa) && /\bmileage,/.test(wa));
+ok('🔴 the API route DELEGATES rather than assembling its own figures',
+  api.includes('ledgerFor(input)') && !movedNotAdded(api));
 
-ok('...and neither route passes a raw ytdMileage straight into the ledger without the subtraction',
+ok('🔴 the WhatsApp reply DELEGATES to the same function, so the two surfaces cannot disagree',
+  wa.includes('ledgerFor(input)') && !movedNotAdded(wa));
+
+ok('🔴 the web app money screen DELEGATES to it too',
+  rf(path.join(root, 'app/app/page.tsx'), 'utf8').includes('ledgerFor('));
+
+ok('...and no caller passes a raw ytdMileage into the ledger without the subtraction',
   !/expenses:\s*input\.ytdTradeExpenses,[\s\S]{0,120}mileage:\s*input\.ytdMileage/.test(api)
   && !/expenses:\s*input\.ytdTradeExpenses,[\s\S]{0,120}mileage:\s*input\.ytdMileage/.test(wa));
+
+// The use of home half of the same lesson, pinned so it cannot silently go back to zero anywhere.
+ok('🔴 THE USE OF HOME ELECTION REACHES THE LEDGER, and no caller hardcodes it to zero',
+  /homeOffice:\s*Math\.max\(0,\s*input\.ytdHomeOffice\s*\?\?\s*0\)/.test(ledgerSrc)
+  && !/homeOffice:\s*0/.test(api) && !/homeOffice:\s*0/.test(wa));
 
 // THE INVARIANT, AS ARITHMETIC. Splitting a deduction onto its own line is presentation. It must not
 // move a single penny of tax. If this ever fails, the ledger has started flattering us.

@@ -105,3 +105,23 @@ export async function userBurst(
 ): Promise<boolean> {
   return rateLimitedShared(`u:${route}:${userId}`, limit, PER_USER_WINDOW_MS);
 }
+
+// ⚠️ A CAP THAT FAILS CLOSED. The opposite posture to everything else in this file, on purpose.
+//
+// Every limiter above fails OPEN: they are abuse control, and a database wobble must never lock a
+// man out of his own books. This one guards a thing that costs REAL MONEY per call, a Twilio SMS at
+// roughly 7p to 10p, and the failure modes are not symmetric:
+//
+//   fail open  on a database wobble, an attacker who is already hammering the login gets an
+//              unlimited run at our card until someone notices from a bill.
+//   fail closed on a database wobble, sign in by text stops for a few minutes and says so, and the
+//              email door, which costs nothing, keeps working.
+//
+// So a null from the shared counter, which means "we could not count", is treated as "we cannot
+// safely spend". The same reasoning as add_ai_usage, whose callers treat null as blocked for AI
+// spend and as allowed for plain message counting.
+export async function spendCapReached(key: string, limit: number, windowSeconds: number): Promise<boolean> {
+  const shared = await rateHit(key, limit, windowSeconds);
+  if (shared === null) return true;
+  return shared;
+}

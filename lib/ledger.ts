@@ -199,3 +199,73 @@ export function headline(l: Ledger): string {
   if (l.saved <= 0) return 'Nothing saved yet. Log a cost and this starts moving.';
   return `Lekhio has kept £${l.saved.toLocaleString('en-GB')} out of the taxman's hands this year.`;
 }
+
+// ── One assembler, every surface ─────────────────────────────────────────────────────────────────
+//
+// ⚠️ THIS FUNCTION EXISTS BECAUSE THE ASSEMBLY BELOW USED TO LIVE INSIDE app/api/ledger/route.ts,
+// AND THE WEB APP WOULD HAVE BEEN THE SECOND COPY OF IT.
+//
+// The route's own header says it plainly: two readers over the same money will drift, and the one
+// that drifts is the one he believes. It has happened three times in this codebase already. A
+// server rendered page that rebuilt these five lines for itself would be the fourth, and it would
+// be the worst of them, because the disagreement would be between the number on his screen and the
+// number in his quarter pack.
+//
+// So the route calls this, the web app calls this, and there is one place where the mileage is
+// subtracted and the use of home is added.
+export interface LedgerSource {
+  monthsElapsed: number;
+  ytdTradeIncome: number;
+  ytdTradeExpenses: number;
+  ytdCisSuffered: number;
+  ytdMileage?: number;
+  ytdHomeOffice?: number;
+}
+
+export function ledgerFor(input: LedgerSource): Ledger {
+  // 🔴 THE MILEAGE IS MOVED, NOT ADDED. THE TOTAL DOES NOT CHANGE BY A PENNY.
+  //
+  // A mileage claim is already an ordinary transaction inside ytdTradeExpenses, so it has ALWAYS
+  // been reducing his tax correctly. What it was not doing was showing up by name: the ledger's
+  // whole job is to tell him WHERE the money came from, and mileage was buried inside "Costs you
+  // logged". So it is subtracted from the expenses line and passed on its own. Same deduction,
+  // same tax, same saved, one more line he can read.
+  //
+  // If you are ever tempted to pass ytdMileage WITHOUT subtracting it here, stop: that would count
+  // it twice and overstate what we saved him, and this file's header explains why that is the one
+  // lie the product cannot afford.
+  const mileage = Math.max(0, input.ytdMileage ?? 0);
+
+  return ledger({
+    monthsElapsed: input.monthsElapsed,
+    grossIncome: input.ytdTradeIncome,
+    expenses: Math.max(0, input.ytdTradeExpenses - mileage),
+    mileage,
+
+    // 🔴 USE OF HOME IS ADDED, NOT MOVED, AND THAT IS THE OPPOSITE OF THE MILEAGE LINE ABOVE.
+    //
+    // The difference is not a style choice, it is a fact about the data. Use of home is an
+    // ELECTION, not a transaction: lib/categories.ts refuses to create a 'home' category on
+    // purpose, because a rule on rent or a household energy bill would sweep up a man's OWN HOUSE
+    // and claim tax relief on it. So it cannot be inside expenses, and subtracting it the way
+    // mileage is subtracted would UNDERSTATE his deductions by exactly the amount he elected.
+    //
+    // test/elections.test.mjs asserts both directions against this file's real output, so a future
+    // refactor that "makes them consistent" has to break a test that explains why they are not.
+    homeOffice: Math.max(0, input.ytdHomeOffice ?? 0),
+
+    // STILL NOT WIRED, AND THESE ZEROS ARE HONEST RATHER THAN LAZY.
+    //
+    // pension is genuinely NOT CAPTURED ANYWHERE: there is no category and no election for it yet.
+    // That zero really does understate him, and the fix is upstream, not here.
+    //
+    // capitalAllowances is a different case and the zero is LOAD BEARING. Tools and equipment are
+    // logged as ordinary expense categories, so their cost is ALREADY inside the expenses line
+    // above. Passing a figure here as well would count them twice.
+    capitalAllowances: 0,
+    pension: 0,
+
+    // HIS OWN MONEY, HELD BY HMRC. Its own number on the screen, never added to "saved".
+    cisSuffered: input.ytdCisSuffered,
+  });
+}

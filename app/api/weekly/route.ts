@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
 import { verifyAccessToken, weeklyTotals, weeklyUpdateFactsFor } from '../../../lib/supabase';
-import { weeklySummaryText, weeklyFigures, weeklyLine } from '../../../lib/weeklyupdate';
+import { weeklySummaryText, weeklyFigures, weeklyLine, weeklyInput } from '../../../lib/weeklyupdate';
 
 export const runtime = 'nodejs';
 
@@ -39,14 +39,10 @@ export async function GET(req: NextRequest) {
   const factsMap = await weeklyUpdateFactsFor([user.id]).catch(() => null);
   const facts = factsMap?.get(user.id);
 
-  const input = {
-    now: new Date(),
-    income: totals.income,
-    expenses: totals.expenses,
-    rolling12mTaxableTurnover: facts?.rolling12mTaxableTurnover ?? null,
-    vatRegistered: facts?.vatRegistered ?? false,
-    ytdGrossQualifyingIncome: facts?.ytdGrossQualifyingIncome ?? null,
-  };
+  // ⚠️ THE SHAPING LIVES IN lib/weeklyupdate.ts, NOT HERE, for the same reason the text does. The
+  // web app builds the identical input server side, and two places deciding what a missing fact
+  // means is two places that can decide differently. A null is never quietly turned into a zero.
+  const input = weeklyInput(totals, facts, new Date());
 
   return NextResponse.json({
     // The raw figures, for a surface that draws its own layout.

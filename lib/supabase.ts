@@ -1285,6 +1285,134 @@ export async function verifyAccessToken(token: string): Promise<VerifiedUser | n
   }
 }
 
+// --- The web session (the customer web app) --------------------------------
+//
+// The phone app carries a Supabase session in the device keystore. A browser cannot safely do
+// that, so lekhio.app holds an HttpOnly cookie carrying a session id, and these four functions are
+// the only things that read or write what that id means. The cookie signing itself is pure and
+// lives in lib/websession.ts; per CLAUDE.md rule 2, the database never leaves this file.
+//
+// ⚠️ SERVICE ROLE ONLY, BY DESIGN. public.web_sessions has RLS on and NO policy, so the anon and
+// authenticated roles can touch nothing in it. A credential store its own holder can query is one
+// injection away from being every credential store.
+
+export interface WebSessionRow {
+  id: string;
+  userId: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+}
+
+// Open a session for a user whose phone we have just proved with a one time code. Returns the
+// session id to put in the cookie, or null if the write failed, so the caller can say "could not
+// sign you in" rather than handing out a cookie that means nothing.
+export async function createWebSession(userId: string, sessionId: string, expiresAt: Date): Promise<boolean> {
+  const { url } = config();
+  if (!userId || !sessionId) return false;
+  const res = await fetch(`${url}/rest/v1/web_sessions`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ id: sessionId, user_id: userId, expires_at: expiresAt.toISOString() }),
+  });
+  if (!res.ok) {
+    // Never log the id. It is a live credential.
+    console.error('[createWebSession] failed:', res.status);
+    return false;
+  }
+  return true;
+}
+
+// ⚠️ THE TENANCY BOUNDARY FOR THE WHOLE WEB APP IS THIS ONE QUERY.
+//
+// The cookie says which session. This says whose. Every page and every route gets its user id from
+// here and never from a query parameter, a path segment or anything else the client can type. That
+// is the same discipline /api/ledger already follows with verifyAccessToken, and it is why
+// changing an id in a URL cannot reach another customer's figures: there is no id in the URL.
+//
+// A revoked or expired row reads as signed out. Returns null on a failed read too, which is the
+// safe direction: worst case a man signs in again, rather than a database wobble handing a session
+// to the wrong person.
+export async function readWebSession(sessionId: string): Promise<WebSessionRow | null> {
+  const { url } = config();
+  if (!sessionId) return null;
+  const res = await fetch(
+    `${url}/rest/v1/web_sessions?id=eq.${encodeURIComponent(sessionId)}` +
+      `&revoked_at=is.null&select=id,user_id,created_at,last_seen_at,expires_at&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json().catch(() => null)) as Array<{
+    id: string; user_id: string; created_at: string; last_seen_at: string; expires_at: string;
+  }> | null;
+  const row = Array.isArray(rows) ? rows[0] : null;
+  if (!row) return null;
+  const exp = Date.parse(row.expires_at);
+  if (!Number.isFinite(exp) || exp <= Date.now()) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    createdAt: row.created_at,
+    lastSeenAt: row.last_seen_at,
+    expiresAt: row.expires_at,
+  };
+}
+
+// Slide the session forward. Called at most once a day per session, never on every page view, so
+// a man reading his ledger three times in an afternoon costs one write and not three.
+export async function touchWebSession(sessionId: string, expiresAt: Date): Promise<void> {
+  const { url } = config();
+  if (!sessionId) return;
+  await fetch(`${url}/rest/v1/web_sessions?id=eq.${encodeURIComponent(sessionId)}&revoked_at=is.null`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ last_seen_at: new Date().toISOString(), expires_at: expiresAt.toISOString() }),
+  }).catch(() => {
+    // A failed slide is not worth an error on his screen. The session still works until it expires,
+    // and the next page view tries again.
+  });
+}
+
+// Sign out. The row is marked, never deleted, so "this session ended and when" stays answerable.
+export async function revokeWebSession(sessionId: string): Promise<boolean> {
+  const { url } = config();
+  if (!sessionId) return false;
+  const res = await fetch(`${url}/rest/v1/web_sessions?id=eq.${encodeURIComponent(sessionId)}`, {
+    method: 'PATCH',
+    headers: headers({ Prefer: 'return=minimal' }),
+    body: JSON.stringify({ revoked_at: new Date().toISOString() }),
+  });
+  return res.ok;
+}
+
+// ⚠️ THE USERS ROW, CREATED SERVER SIDE, AND WHY THIS FUNCTION HAD TO EXIST.
+//
+// Until the web app, public.users was only ever created by the PHONE APP, client side, in
+// saveUserPhone(). A man who finished the web signup at /start had a signups row, an unverified
+// number, and no account at all: nothing to sign in to and nothing for reconcileSignupToUser to
+// reconcile onto. That is the real gap behind "the web app is the product", and this closes it.
+//
+// The phone comes from the verified GoTrue user, never from the form, so a man cannot claim a
+// number he has not proved. Upsert, because he may already have an account from the app and this
+// must not disturb it: nothing here overwrites a name, a business or a figure.
+export async function ensureUserRow(userId: string, phoneE164: string): Promise<boolean> {
+  const { url } = config();
+  if (!userId) return false;
+  const body: Record<string, unknown> = { id: userId };
+  const e164 = normalizeUkPhone(phoneE164);
+  if (e164) body.phone_number = e164;
+  const res = await fetch(`${url}/rest/v1/users?on_conflict=id`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    console.error('[ensureUserRow] failed:', res.status);
+    return false;
+  }
+  return true;
+}
+
 // --- Subscriptions (Stripe billing) ---------------------------------------
 
 export interface SubscriptionRecord {
@@ -5748,5 +5876,149 @@ export async function clearAllowanceElection(
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+// --- The login door (web and app) ------------------------------------------
+//
+// ⚠️ THE MOST VALUABLE ABUSE CONTROL IN THE PRODUCT IS THE NEXT FUNCTION, AND IT IS A LOOKUP.
+//
+// Every rate limit in the codebase answers "how often", which caps the damage. This one answers
+// "is this contact even ours", which changes the shape of the problem: it collapses the attack
+// surface from every phone number and address on earth to the small finite list of people who
+// already have a Lekhio account. A fraudster cannot pump a number we will not text.
+//
+// Nothing about the answer is ever shown to the caller. An unknown contact and a known one produce
+// the identical screen, because a login page that tells a stranger which numbers are customers is
+// a customer list with a search box on it.
+export interface KnownContact {
+  // The account this contact belongs to, when there is one. Null means we know the contact (a web
+  // signup that has not become an account yet) but there is no auth user for it yet.
+  userId: string | null;
+  // The phone on file, which stays the account key throughout. See attachEmailToAuthUser.
+  phone: string | null;
+}
+
+// Returns the account, or null when we do not know this contact, or THROWS when we could not read.
+//
+// 🔴 THE THROW IS DELIBERATE AND THE CALLER MUST NOT SWALLOW IT. "We could not check" is not "he is
+// a stranger" and it is not "he is a customer". A read failure that quietly returned null would
+// refuse every real customer during a database wobble; one that quietly returned a match would
+// hand an attacker the send. The route turns this into "try again in a minute".
+export async function findContactAccount(channel: 'sms' | 'email', value: string): Promise<KnownContact | null> {
+  const { url } = config();
+
+  if (channel === 'sms') {
+    const e164 = normalizeUkPhone(value);
+    if (!e164) return null;
+
+    const ures = await fetch(
+      `${url}/rest/v1/users?phone_number=eq.${encodeURIComponent(e164)}&select=id,phone_number&limit=1`,
+      { headers: headers() },
+    );
+    if (!ures.ok) throw new Error('contact_lookup_failed');
+    const urows = (await ures.json().catch(() => null)) as Array<{ id: string; phone_number: string }> | null;
+    if (Array.isArray(urows) && urows[0]) return { userId: urows[0].id, phone: urows[0].phone_number };
+
+    // No account yet, but he may have finished the web signup, which writes a signups row and no
+    // auth user. Those people are exactly who the web app exists for, so they must be able to get
+    // in. The account is created on a proved code, in /api/auth/verify, never here.
+    const sres = await fetch(
+      `${url}/rest/v1/signups?phone=eq.${encodeURIComponent(e164)}&select=phone&limit=1`,
+      { headers: headers() },
+    );
+    if (!sres.ok) throw new Error('contact_lookup_failed');
+    const srows = (await sres.json().catch(() => null)) as Array<{ phone: string }> | null;
+    if (Array.isArray(srows) && srows[0]) return { userId: null, phone: e164 };
+
+    return null;
+  }
+
+  // EMAIL. public.users has no email column, so the address is matched against the signups row it
+  // was collected on, and the PHONE on that row is what finds the account. That is not a detour, it
+  // is the point: the phone is the account key because WhatsApp matches inbound messages by number,
+  // and an email must resolve to the same account rather than beside it.
+  const email = value.trim().toLowerCase();
+  if (!email) return null;
+
+  const sres = await fetch(
+    `${url}/rest/v1/signups?email=eq.${encodeURIComponent(email)}&select=phone&order=created_at.desc&limit=1`,
+    { headers: headers() },
+  );
+  if (!sres.ok) throw new Error('contact_lookup_failed');
+  const srows = (await sres.json().catch(() => null)) as Array<{ phone: string | null }> | null;
+  const phone = Array.isArray(srows) && srows[0]?.phone ? normalizeUkPhone(srows[0].phone as string) : '';
+  if (!phone) return null;
+
+  const ures = await fetch(
+    `${url}/rest/v1/users?phone_number=eq.${encodeURIComponent(phone)}&select=id&limit=1`,
+    { headers: headers() },
+  );
+  if (!ures.ok) throw new Error('contact_lookup_failed');
+  const urows = (await ures.json().catch(() => null)) as Array<{ id: string }> | null;
+  const userId = Array.isArray(urows) && urows[0] ? urows[0].id : null;
+  return { userId, phone };
+}
+
+// 🔴 THE ONE THAT COULD ACTUALLY SPLIT A MAN'S BOOKS IN TWO.
+//
+// Supabase treats a phone identity and an email identity as separate things. Sign a man up by phone
+// in the app, then let him sign in by email on the web, and the naive implementation gives him TWO
+// auth users and therefore TWO accounts. His WhatsApp receipts land on one and his web session
+// shows the other. Both look like they are working. He would find out at his tax return.
+//
+// So the email door never creates anything. It finds the EXISTING account by phone and attaches the
+// address to that auth user, which makes GoTrue resolve the email OTP to the same person. Called
+// only after the address has been matched to an account we already hold.
+export async function attachEmailToAuthUser(userId: string, email: string): Promise<boolean> {
+  const { url, key } = config();
+  if (!userId || !email) return false;
+  try {
+    const res = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+      // email_confirm, because the address is not being asserted by a stranger: it was already on
+      // his own signup record, and he is about to prove he can read it by returning the code.
+      body: JSON.stringify({ email, email_confirm: true }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// One row per code we were asked to send, so the login door has a cost we can see and an attack has
+// evidence. NEVER the number or the address: lib/logindoor.ts hashes it first.
+export async function logAuthSend(
+  channel: 'sms' | 'email',
+  targetHash: string,
+  outcome: 'sent' | 'refused_unknown' | 'refused_capped' | 'refused_rate' | 'failed',
+): Promise<void> {
+  if (!targetHash) return;
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/auth_sends`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ channel, target_hash: targetHash, outcome }),
+    });
+  } catch {
+    // Evidence, not a gate. A man must never fail to sign in because the audit write did.
+  }
+}
+
+// Ninety days of hashed login attempts is enough to investigate an incident and short enough that
+// we are not keeping a record of every sign in for ever. Called from the daily cron beside
+// sweepRateHits, so it is wired rather than sitting here waiting for someone to remember it.
+export async function sweepAuthSends(): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/rpc/auth_sends_sweep`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({}),
+    });
+  } catch {
+    // Housekeeping. Never worth failing a cron over.
   }
 }

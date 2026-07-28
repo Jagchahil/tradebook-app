@@ -121,5 +121,73 @@ withEnv(CLEAN, () => {
   ok(`a user can parse a real day's receipts (${calls}/mo, ~${(calls / 30).toFixed(1)}/day)`, calls / 30 >= 5);
 });
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n🔴 THE 1 OCTOBER 2026 CHANGE. Modelled BEFORE it happens, which is the point.');
+//
+// Meta begins charging for free-form service replies on 1 October 2026, at the same per message
+// rate as utility and authentication templates. Until today this file's own comment said service
+// replies "cost nothing and are NOT gated by any of this", which was true when written and has an
+// expiry date on it. And it is a change of UNIT, not a price rise: a twenty message conversation
+// goes from ONE conversation charge to TWENTY message charges.
+{
+  const BEFORE = new Date('2026-09-30T12:00:00Z');
+  const AFTER = new Date('2026-10-01T12:00:00Z');
+  delete process.env.WA_PER_MESSAGE_PRICING;
+
+  ok('the change date is pinned', G.PER_MESSAGE_PRICING_FROM === '2026-10-01');
+  ok('the day before, we are on conversation pricing', G.perMessagePricing(BEFORE) === false);
+  ok('🔴 ON THE DAY, IT SWITCHES ITSELF, with nobody remembering to flip it', G.perMessagePricing(AFTER) === true);
+  ok('and it stays switched for ever after', G.perMessagePricing(new Date('2027-04-06T12:00:00Z')) === true);
+
+  ok('before the change a service reply is free', G.outboundCostPence('service', BEFORE) === 0);
+  ok('before the change a proactive send opens a billable conversation', G.outboundCostPence('proactive', BEFORE) > 0);
+  ok('🔴 AFTER THE CHANGE A SERVICE REPLY COSTS THE SAME AS A PROACTIVE ONE',
+     G.outboundCostPence('service', AFTER) === G.outboundCostPence('proactive', AFTER));
+  ok('...and it is no longer free', G.outboundCostPence('service', AFTER) > 0);
+
+  // THE SHAPE PROBLEM, AS ARITHMETIC. Same customer, same behaviour, two regimes.
+  const chatty = { serviceReplies: 100, proactiveSends: 4, aiCalls: 40 };
+  const before = G.marginForUsage(chatty, BEFORE);
+  const after = G.marginForUsage(chatty, AFTER);
+  ok('a chatty customer clears the floor comfortably today', before >= G.marginTargetPct());
+  ok('🔴 THE SAME CUSTOMER, UNCHANGED, BREACHES IT AFTER THE CHANGE', after < G.marginTargetPct());
+  ok('...and the gap is large, not marginal', before - after > 10);
+
+  // A quiet customer is fine either way, which is exactly why this is a SHAPE problem: the cost
+  // lands on the people who use the product most, which is the opposite of what you want.
+  const quiet = { serviceReplies: 4, proactiveSends: 4, aiCalls: 6 };
+  ok('a quiet customer is fine before', G.marginForUsage(quiet, BEFORE) >= G.marginTargetPct());
+  ok('🔴 AND A QUIET CUSTOMER IS STILL FINE AFTER. The cost lands on your BEST customers.',
+     G.marginForUsage(quiet, AFTER) >= G.marginTargetPct());
+
+  // The headroom number, for the console.
+  const headroomBefore = G.messagesBeforeFloorBreached(40, BEFORE);
+  const headroomAfter = G.messagesBeforeFloorBreached(40, AFTER);
+  ok('before the change there is effectively no per message ceiling', headroomBefore === Number.POSITIVE_INFINITY);
+  ok('after the change there is a real one', Number.isFinite(headroomAfter) && headroomAfter > 0);
+  ok('🔴 AND IT IS INSIDE THE RANGE A NORMAL CUSTOMER REACHES, which is the whole argument for moving the conversation in house',
+     headroomAfter < 100);
+
+  // The forcing switch, so the before and after can both be modelled on demand.
+  process.env.WA_PER_MESSAGE_PRICING = 'true';
+  ok('the regime can be forced on to model the future', G.perMessagePricing(BEFORE) === true);
+  process.env.WA_PER_MESSAGE_PRICING = 'false';
+  ok('and forced off to model the present', G.perMessagePricing(AFTER) === false);
+  delete process.env.WA_PER_MESSAGE_PRICING;
+
+  ok('the rate is overridable, because 2.2p is inferred and not from Meta', (() => {
+    process.env.WA_COST_PER_MESSAGE_PENCE = '5';
+    const v = G.costPerMessagePence();
+    delete process.env.WA_COST_PER_MESSAGE_PENCE;
+    return v === 5;
+  })());
+  ok('a blank override falls back rather than becoming zero', (() => {
+    process.env.WA_COST_PER_MESSAGE_PENCE = '';
+    const v = G.costPerMessagePence();
+    delete process.env.WA_COST_PER_MESSAGE_PENCE;
+    return v > 0;
+  })());
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

@@ -41,8 +41,16 @@ const DEFAULT_MARGIN_TARGET_PCT = 82;
 const DEFAULT_WA_SHARE_OF_VARIABLE = 0.40;
 
 // Unit costs, rounded UP so an estimate is never rosier than the bill.
-const DEFAULT_COST_PER_SEND_PENCE = 3;   // Meta utility conversation, UK
+const DEFAULT_COST_PER_SEND_PENCE = 3;   // Meta utility CONVERSATION, UK, pre 1 Oct 2026
 const DEFAULT_COST_PER_AI_CALL_PENCE = 0.5; // Haiku vision parse carries the bulk
+
+// Per MESSAGE, from 1 October 2026. Inferred from industry sources, not from Meta. Set this to the
+// real figure once Meta publishes per-market rates, promised for 1 September 2026.
+const DEFAULT_COST_PER_MESSAGE_PENCE = 2.2;
+
+// The date the unit changes. Held as a constant rather than hidden in a comment so the model can
+// answer "what will this cost us" BEFORE it happens, which is the entire point of having a model.
+export const PER_MESSAGE_PRICING_FROM = '2026-10-01';
 
 // A small floor so an early, tiny user base still works (spend there is pennies).
 export const MIN_DAILY_FLOOR = 500;
@@ -107,10 +115,33 @@ export function dailyCapFor(activeSubscribers: number, perUserPerMonth: number):
   return Math.max(derived, MIN_DAILY_FLOOR);
 }
 
-// --- WhatsApp (proactive template sends) ------------------------------------
-// Meta bills per 24h conversation, so every proactive template opens a billable
-// conversation. Inbound SERVICE replies (the user texts first, we answer inside
-// the free 24h window) cost nothing and are NOT gated by any of this.
+// --- WhatsApp -----------------------------------------------------------------
+//
+// 🔴 READ THIS BEFORE TRUSTING ANY NUMBER BELOW. THE BILLING UNIT CHANGES ON 1 OCTOBER 2026.
+//
+// This section used to end with the sentence: "Inbound SERVICE replies (the user texts first, we
+// answer inside the free 24h window) cost nothing and are NOT gated by any of this."
+//
+// That was true when it was written and it stops being true on 1 October 2026, when Meta begins
+// charging for free-form service replies at the same per-message rate as utility and authentication
+// templates. So the single largest source of WhatsApp messages in this product was DELIBERATELY
+// UNMETERED, on an assumption with an expiry date on it.
+//
+// ⚠️ AND IT IS NOT A PRICE RISE, IT IS A CHANGE OF UNIT, WHICH IS MUCH WORSE.
+//
+// Today Meta bills per 24 HOUR CONVERSATION: one charge covers all the back and forth inside the
+// window. From 1 October it bills per MESSAGE. So a conversation of twenty messages goes from ONE
+// charge of about 3p to TWENTY charges of about 2.2p, which is roughly 44p. That is about fifteen
+// times more for a chatty customer, not a modest increase, and it is why "cost scales with
+// engagement and revenue does not" is the shape problem rather than the rate being the problem.
+//
+// ⚠️ THE 2.2p IS INFERRED, NOT OBSERVED. Industry sources quote it for the UK; Meta's own pricing
+// page still describes service messages as free. Meta committed to publishing exact per-market
+// rates by 1 SEPTEMBER 2026. Check it then and set WA_COST_PER_MESSAGE_PENCE to the real figure.
+//
+// The strategic answer is not to budget harder, it is to move the conversation off a metered
+// channel entirely: the Lekhio thread on the web and in the app, with WhatsApp keeping capture
+// (inbound is free for ever) and the few alerts that must be read.
 
 export function sendsPerUserPerMonth(): number {
   const cost = costPerSendPence();
@@ -172,4 +203,68 @@ export function aiCapsFor(activeSubscribers: number): DerivedAiCaps {
     globalMonthly: envNum('AI_GLOBAL_MONTHLY', derivedMonthly, 0, Number.MAX_SAFE_INTEGER),
     userDaily: envNum('AI_USER_DAILY', DEFAULT_USER_DAILY_BURST, 0, Number.MAX_SAFE_INTEGER),
   };
+}
+
+// --- The 1 October change, modelled ------------------------------------------------------------
+//
+// Everything here exists so the answer to "what happens to our margin on 1 October" is a number on
+// a screen today, rather than a surprise on a statement in November.
+
+export function costPerMessagePence(): number {
+  return envNum('WA_COST_PER_MESSAGE_PENCE', DEFAULT_COST_PER_MESSAGE_PENCE, 0.01, 100);
+}
+
+// Which billing regime applies. Defaults to the DATE, so this becomes true on its own without
+// anybody remembering to flip it, and can be forced either way to model the before and after.
+//
+// The date is compared as an ISO string on purpose: no timezone, no clock arithmetic, no chance of
+// a machine in the wrong region switching a day early or late on something that costs money.
+export function perMessagePricing(now: Date = new Date()): boolean {
+  const forced = (process.env.WA_PER_MESSAGE_PRICING ?? '').trim().toLowerCase();
+  if (forced === 'true') return true;
+  if (forced === 'false') return false;
+  return now.toISOString().slice(0, 10) >= PER_MESSAGE_PRICING_FROM;
+}
+
+// What one outbound WhatsApp message actually costs us right now. Before the change a service reply
+// is free and only a proactive template opens a billable conversation; after it, every outbound
+// message is billed the same whether we started the conversation or he did.
+export function outboundCostPence(kind: 'service' | 'proactive', now: Date = new Date()): number {
+  if (perMessagePricing(now)) return costPerMessagePence();
+  return kind === 'proactive' ? costPerSendPence() : 0;
+}
+
+// 🔴 THE NUMBER THIS WHOLE FILE EXISTS TO PRODUCE.
+//
+// Given how a real customer actually behaves in a month, what margin do we run at? Feed it real
+// counts from public.auth_sends and the message log and it stops being a model and becomes a
+// measurement. The team console shows it per customer so a heavy user is visible BY NAME, months
+// before an aggregate invoice would show it.
+export interface UsageMonth {
+  // Outbound WhatsApp messages we sent in reply to him, inside his 24 hour window.
+  serviceReplies: number;
+  // Outbound WhatsApp messages we started: alerts, nudges, anything template based.
+  proactiveSends: number;
+  aiCalls: number;
+}
+
+export function whatsappSpendPence(u: UsageMonth, now: Date = new Date()): number {
+  const service = Math.max(0, u.serviceReplies) * outboundCostPence('service', now);
+  const proactive = Math.max(0, u.proactiveSends) * outboundCostPence('proactive', now);
+  return service + proactive;
+}
+
+export function marginForUsage(u: UsageMonth, now: Date = new Date()): number {
+  return projectedMarginPct(whatsappSpendPence(u, now), Math.max(0, u.aiCalls) * costPerAiCallPence());
+}
+
+// How many outbound messages a month a single customer can have before HE ALONE breaches the floor.
+// Not a cap to enforce, a number to look at: when it drops into the range a normal customer reaches,
+// the channel is the wrong shape and no amount of budgeting fixes it.
+export function messagesBeforeFloorBreached(aiCalls: number, now: Date = new Date()): number {
+  const perMessage = outboundCostPence('service', now);
+  if (perMessage <= 0) return Number.POSITIVE_INFINITY;
+  const allowed = REVENUE_PENCE_PER_USER_MONTH * (1 - marginTargetPct() / 100);
+  const left = allowed - FIXED_COGS_PENCE_PER_USER_MONTH - Math.max(0, aiCalls) * costPerAiCallPence();
+  return Math.max(0, Math.floor(left / perMessage));
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
 import { getCompanyOwners, companiesHouseEnabled } from '../../../../lib/companieshouse';
 import { listCompanyMembers, seedCompanyMembers } from '../../../../lib/companymembers';
@@ -13,8 +13,7 @@ export const runtime = 'nodejs';
 // owner to their own login is a separate, deliberate step.
 
 export async function GET(req: NextRequest) {
-  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  const verified = await verifyAccessToken(token);
+  const verified = await sessionUser(req);
   if (!verified) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const members = await listCompanyMembers(verified.id);
@@ -25,8 +24,7 @@ export async function GET(req: NextRequest) {
 interface Body { number?: string }
 
 export async function POST(req: NextRequest) {
-  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  const verified = await verifyAccessToken(token);
+  const verified = await sessionUser(req);
   if (!verified) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   if (await rateLimitedShared(`members:${verified.id}`, 6, 60 * 1000)) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
-import { verifyAccessToken, getOptimiserInput } from '../../../lib/supabase';
+import { getOptimiserInput } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { ledgerFor, headline } from '../../../lib/ledger';
 
 export const runtime = 'nodejs';
@@ -28,9 +29,7 @@ export const runtime = 'nodejs';
 // computed from the same figures, by construction, and they can never contradict each other on his
 // screen.
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (await userBurst('ledger', user.id)) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });

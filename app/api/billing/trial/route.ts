@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, getPhoneForUser, grantTrialIfNone } from '../../../../lib/supabase';
+import { getPhoneForUser, grantTrialIfNone } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 import { isEntitled } from '../../../../lib/entitlement';
 
 // Start the free trial. This is what makes the button in the app TRUE.
@@ -18,9 +19,7 @@ import { isEntitled } from '../../../../lib/entitlement';
 // Idempotent, and once per phone for the life of that number. Tapping twice, reinstalling, or
 // coming back a year later gets him exactly one trial. See grantTrialIfNone.
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const phone = await getPhoneForUser(user.id);

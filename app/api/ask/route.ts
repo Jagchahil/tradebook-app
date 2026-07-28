@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { answerAccountantQuestion, hasClaudeConfig } from '../../../lib/claude';
-import { verifyAccessToken, bumpAiUsage, countActiveSubscribers, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised, getBusinessProfile, getStudentLoanSettings, refreshFactsFromDb } from '../../../lib/supabase';
+import { bumpAiUsage, countActiveSubscribers, transactionSummaryForUser, getRelevantKnowledge, createConversation, conversationOwnedBy, saveConversationTurn, logQaCandidate, normaliseQuestion, isGeneralQuestion, lookupQaCache, bumpQaCacheHit, upsertQaCache, allSourcesRecognised, getBusinessProfile, getStudentLoanSettings, refreshFactsFromDb } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { pocketHistoryBrief } from '../../../lib/pocket';
 import { byPhase, daysUntil } from '../../../lib/brain';
 import { rateLimitedShared } from '../../../lib/ratelimit';
@@ -32,8 +33,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'unavailable', answer: 'The accountant is not switched on yet. Please try again later.' }, { status: 503 });
   }
 
-  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  const verified = await verifyAccessToken(token);
+  const verified = await sessionUser(req);
   if (!verified) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }

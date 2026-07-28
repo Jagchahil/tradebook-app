@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  verifyAccessToken,
   agentAggregates,
   getActiveGoals,
   listOverdueInvoices,
@@ -9,6 +8,7 @@ import {
   insertAgentSignals,
   refreshFactsFromDb,
 } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
 import { computeSignalsForStructure, type AgentInput } from '../../../../lib/agent';
 
@@ -26,8 +26,7 @@ export const runtime = 'nodejs';
 // One way, one gate: the user's own access token. It only ever reads and writes that user's own data.
 
 export async function POST(req: NextRequest) {
-  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  const verified = await verifyAccessToken(token);
+  const verified = await sessionUser(req);
   if (!verified) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const userId = verified.id;
   await refreshFactsFromDb();

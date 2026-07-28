@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, saveHmrcFraud } from '../../../../lib/supabase';
+import { saveHmrcFraud } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 import { rateLimitedShared, clientIp } from '../../../../lib/ratelimit';
 import { sanitizeClientFraud, fraudContextFromRequest } from '../../../../lib/fraud';
 import { missingFraudHeaders } from '../../../../lib/hmrc';
@@ -17,9 +18,7 @@ import { missingFraudHeaders } from '../../../../lib/hmrc';
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   // Light hygiene throttle. The durable protection is that this is authed and

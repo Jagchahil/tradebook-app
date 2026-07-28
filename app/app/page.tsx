@@ -9,6 +9,7 @@ import { ledgerFor, headline } from '../../lib/ledger';
 import { weeklyInput, weeklyFigures, weeklyLine } from '../../lib/weeklyupdate';
 import { selectAnnouncements, appliedLineFor, tagFor } from '../../lib/announcements';
 import { AnnouncementsBanner, type BannerItem } from '../_shared/AnnouncementsBanner';
+import { gbp0, gbpAbs0 } from '../../lib/money';
 import { A11Y_CSS, FONT, GREEN, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP } from '../../lib/tokens';
 
 export const runtime = 'nodejs';
@@ -41,7 +42,10 @@ export const dynamic = 'force-dynamic';
 // lib/webauth.ts and test/webauth.test.mjs, which fails the build if any page under app/app starts
 // reading one.
 
-const money = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`;
+// ⚠️ NO LOCAL MONEY FORMATTER HERE. This page had one, written the same day lib/money.ts was
+// created to replace the seventeen the 28 July sweep found. It would print "£-33" for a negative,
+// which is the exact bug that sweep existed to remove, and it survived only because nothing on
+// this screen happens to go negative today. A formatter that is correct by luck is the eighteenth.
 
 export default async function MoneyPage() {
   const jar = await cookies();
@@ -108,11 +112,11 @@ export default async function MoneyPage() {
             <div style={S.two}>
               <div>
                 <div style={S.small}>Without Lekhio</div>
-                <div style={S.big}>{money(l.withoutLekhio)}</div>
+                <div style={S.big}>{gbp0(l.withoutLekhio)}</div>
               </div>
               <div>
                 <div style={S.small}>With Lekhio</div>
-                <div style={{ ...S.big, color: GREEN }}>{money(l.withLekhio)}</div>
+                <div style={{ ...S.big, color: GREEN }}>{gbp0(l.withLekhio)}</div>
               </div>
             </div>
 
@@ -123,9 +127,9 @@ export default async function MoneyPage() {
                 <li key={line.key} style={S.line}>
                   <div style={S.lineTop}>
                     <span style={S.lineLabel}>{line.label}</span>
-                    <span style={S.lineSaved}>{money(line.saved)} saved</span>
+                    <span style={S.lineSaved}>{gbp0(line.saved)} saved</span>
                   </div>
-                  <div style={S.basis}>{money(line.deducted)} off your profit. {line.basis}</div>
+                  <div style={S.basis}>{gbp0(line.deducted)} off your profit. {line.basis}</div>
                 </li>
               ))}
             </ul>
@@ -140,7 +144,7 @@ export default async function MoneyPage() {
             product has already once quoted a man a CIS refund that did not exist. */}
         {l.refundDue > 0 && (
           <p style={S.refund}>
-            <b>{money(l.refundDue)}</b> of CIS has been taken off your pay this year. That is your
+            <b>{gbp0(l.refundDue)}</b> of CIS has been taken off your pay this year. That is your
             money, and it comes back to you when your return is filed.
           </p>
         )}
@@ -149,19 +153,22 @@ export default async function MoneyPage() {
       <section style={S.card}>
         <h2 style={S.h2}>Your week</h2>
         <p style={S.week}>
-          {money(figures.income)} in, {money(figures.expenses)} out.{' '}
+          {gbp0(figures.income)} in, {gbp0(figures.expenses)} out.{' '}
           {figures.profit >= 0
-            ? `That leaves ${money(figures.profit)}.`
-            : `That is ${money(Math.abs(figures.profit))} more out than in.`}
+            ? `That leaves ${gbp0(figures.profit)}.`
+            : `That is ${gbpAbs0(figures.profit)} more out than in.`}
         </p>
         {/* THE SAME SENTENCE WHATSAPP SENDS, from the same function. If he asks for his weekly
             summary by text and then opens this page, the two must not disagree by a word. */}
         <p style={S.line2}>{weeklyLine(week)}</p>
       </section>
 
+      {/* THE WAY THROUGH TO THE PILE. Everything on the screen above is money he has CONFIRMED, so
+          if anything is waiting on him this line is the only reason the figures are not the whole
+          truth. It is a plain link because looking at a list changes nothing. */}
       <p style={S.foot}>
-        Everything here is money you have confirmed. Send a receipt on WhatsApp any time and it
-        lands on this page.
+        Everything here is money you have confirmed. <a href="/app/pile" style={S.footLink}>Anything
+        waiting on you</a> is not counted yet. Send a receipt on WhatsApp any time and it lands here.
       </p>
     </main>
   );
@@ -194,4 +201,5 @@ const S: Record<string, React.CSSProperties> = {
   week: { fontSize: 17, fontWeight: 700, margin: '0 0 8px' },
   line2: { fontSize: 14.5, lineHeight: 1.55, color: MUTED, margin: 0 },
   foot: { fontSize: 13, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
+  footLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },
 };

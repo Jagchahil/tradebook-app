@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, getConfirmedTransactionsForRange, getBusinessName } from '../../../lib/supabase';
+import { getConfirmedTransactionsForRange, getBusinessName } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { buildIncomeProof, renderIncomeProofHtml } from '../../../lib/incomeproof';
 import { packToken, verifyPackToken, siteBase } from '../../../lib/packtoken';
 
@@ -36,9 +37,7 @@ export async function GET(req: NextRequest) {
     userId = claim.userId;
     year = claim.year;
   } else {
-    const auth = req.headers.get('authorization') || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    const user = token ? await verifyAccessToken(token) : null;
+    const user = await sessionUser(req);
     if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     userId = user.id;
     const q = Number(sp.get('year'));

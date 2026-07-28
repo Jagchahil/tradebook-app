@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hasBankFeedConfig, buildAuthLink, historyFromISO, type BankHistory } from '../../../../lib/bankfeed';
-import { verifyAccessToken, createBankConnection } from '../../../../lib/supabase';
+import { createBankConnection } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 import { signState } from '../../../../lib/hmrc';
 
 // Start a bank connection. The app posts with the user's Supabase token; we
@@ -11,9 +12,7 @@ import { signState } from '../../../../lib/hmrc';
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   if (!hasBankFeedConfig()) {

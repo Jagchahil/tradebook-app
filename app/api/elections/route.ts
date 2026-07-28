@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
 import {
-  verifyAccessToken, readAllowanceElection, writeAllowanceElection, clearAllowanceElection,
+  readAllowanceElection, writeAllowanceElection, clearAllowanceElection,
 } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { quarterForDate } from '../../../lib/quarterpack';
 import {
   bandForHours, bandOptions, bandLabel, isHoursBand,
@@ -141,7 +142,5 @@ export async function DELETE(req: NextRequest) {
 }
 
 async function auth(req: NextRequest) {
-  const a = req.headers.get('authorization') || '';
-  const token = a.startsWith('Bearer ') ? a.slice(7) : '';
-  return token ? verifyAccessToken(token) : null;
+  return sessionUser(req);
 }

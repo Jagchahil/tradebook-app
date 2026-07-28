@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, getPhoneForUser, getSubscriptionByPhone, grantTrialIfNone } from '../../../../lib/supabase';
+import { getPhoneForUser, getSubscriptionByPhone, grantTrialIfNone } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 import { isEntitled } from '../../../../lib/entitlement';
 
 // The one question the app asks about money: may this man open his books?
@@ -21,9 +22,7 @@ import { isEntitled } from '../../../../lib/entitlement';
 //
 // A man is never locked out of his own books because one of our requests did not arrive.
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const phone = await getPhoneForUser(user.id);

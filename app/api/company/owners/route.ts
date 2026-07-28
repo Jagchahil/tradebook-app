@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
 import { getCompanyOwners, companiesHouseEnabled } from '../../../../lib/companieshouse';
 
@@ -14,8 +14,7 @@ export const runtime = 'nodejs';
 // company reports none). Empty on any failure, so a caller never breaks on a slow register.
 
 export async function GET(req: NextRequest) {
-  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  const verified = await verifyAccessToken(token);
+  const verified = await sessionUser(req);
   if (!verified) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   if (!companiesHouseEnabled()) return NextResponse.json({ ok: true, owners: [], enabled: false });

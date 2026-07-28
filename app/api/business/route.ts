@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
 import {
-  verifyAccessToken,
   getBusinessProfile,
   setBusinessType,
   setPartnershipShare,
 } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 
 // The business structure: sole trader, limited company, or partnership.
 //
@@ -24,9 +24,7 @@ type BizType = 'sole_trader' | 'limited_company' | 'partnership';
 const VALID: BizType[] = ['sole_trader', 'limited_company', 'partnership'];
 
 async function userFrom(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  return token ? verifyAccessToken(token) : null;
+  return sessionUser(req);
 }
 
 export async function GET(req: NextRequest) {

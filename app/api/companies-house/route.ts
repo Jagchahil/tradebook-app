@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { searchCompanies, getCompany, companiesHouseEnabled } from '../../../lib/companieshouse';
 import { rateLimitedShared } from '../../../lib/ratelimit';
 
@@ -25,9 +25,7 @@ import { rateLimitedShared } from '../../../lib/ratelimit';
 const LOOKUPS_PER_MINUTE = 60;
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   if (await rateLimitedShared(`ch:${user.id}`, LOOKUPS_PER_MINUTE, 60 * 1000)) {

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimitedShared } from '../../../lib/ratelimit';
 import {
-  verifyAccessToken,
   pileEntries,
   confirmPile,
   setManyPersonal,
   learnVendor,
 } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { buildPile, summarisePile, canBulkConfirm } from '../../../lib/reviewpile';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
@@ -28,9 +28,7 @@ import { CATEGORIES } from '../../../lib/categories';
 export const runtime = 'nodejs';
 
 async function userFrom(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  return token ? await verifyAccessToken(token) : null;
+  return sessionUser(req);
 }
 
 export async function GET(req: NextRequest) {
@@ -83,6 +81,15 @@ interface Decision {
   remember?: boolean;
 }
 
+// 303 AND NOT 302, AND THAT IS NOT PEDANTRY. A 303 tells the browser to follow with a GET, so his
+// back button and a refresh do not re-post the decision and file the same rows twice. The outcome
+// rides in the query string because this page ships no script and has nowhere else to put it, and
+// it carries a count and never an id: see test/webauth.test.mjs section 1.
+function backToPile(req: NextRequest, done: string, n: number) {
+  const url = new URL(`/app/pile?done=${done}&n=${n}`, req.url);
+  return NextResponse.redirect(url, 303);
+}
+
 export async function POST(req: NextRequest) {
   const user = await userFrom(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -91,11 +98,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
   }
 
+  // ⚠️ TWO ENCODINGS, ONE DECISION. The phone app posts JSON. The web page posts a plain HTML form,
+  // because it ships no client script: a man on a bad signal must be able to answer a question
+  // before JavaScript has arrived, and a form needs none.
+  //
+  // What must NOT happen is a second route for the web, because then there are two implementations
+  // of "file these under materials and remember it", and the one that drifts is the one he used.
+  // Everything below this block is identical for both callers.
+  const form = (req.headers.get('content-type') || '').includes('application/x-www-form-urlencoded');
   let body: Decision;
-  try {
-    body = (await req.json()) as Decision;
-  } catch {
-    return NextResponse.json({ error: 'Bad request.' }, { status: 400 });
+  if (form) {
+    const f = await req.formData().catch(() => null);
+    if (!f) return NextResponse.json({ error: 'Bad request.' }, { status: 400 });
+    body = {
+      ids: String(f.get('ids') ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+      vendor: String(f.get('vendor') ?? ''),
+      verdict: f.get('verdict') === 'personal' ? 'personal' : 'business',
+      category: String(f.get('category') ?? ''),
+    };
+  } else {
+    try {
+      body = (await req.json()) as Decision;
+    } catch {
+      return NextResponse.json({ error: 'Bad request.' }, { status: 400 });
+    }
   }
 
   const ids = Array.isArray(body?.ids) ? body.ids.slice(0, 500) : [];
@@ -112,6 +138,7 @@ export async function POST(req: NextRequest) {
     if (remember && key) {
       await learnVendor(user.id, key, null, true, false); // never shared with anyone else
     }
+    if (form) return backToPile(req, n > 0 ? 'personal' : 'nothing', n);
     return NextResponse.json({ ok: true, applied: n, learned: remember && Boolean(key) });
   }
 
@@ -133,6 +160,15 @@ export async function POST(req: NextRequest) {
 
   // Tell him the truth if we did fewer than he asked for. Silently applying 11 of 14 and
   // reporting success is how a man ends up with three transactions he thinks are filed.
+  if (form) {
+    // The three outcomes are told apart on purpose. A partial apply is the one that matters: SQL
+    // refuses rows that look like they might not be business money, so "filed 14" when 11 were
+    // filed is how a man ends up with three transactions he believes are in his books.
+    if (applied === 0) return backToPile(req, 'nothing', 0);
+    if (applied < ids.length) return backToPile(req, 'partial', applied);
+    return backToPile(req, 'filed', applied);
+  }
+
   return NextResponse.json({
     ok: true,
     applied,

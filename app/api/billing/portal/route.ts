@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createBillingPortal, hasStripeConfig } from '../../../../lib/stripe';
-import { getStripeCustomerByEmail, getStripeCustomerByPhone, verifyAccessToken } from '../../../../lib/supabase';
+import { getStripeCustomerByEmail, getStripeCustomerByPhone } from '../../../../lib/supabase';
+import { sessionUser, identityForUser } from '../../../../lib/webauth';
 
 // Open the Stripe billing portal for the SIGNED-IN subscriber only. The email is
 // taken from the verified Supabase token, never from the request body, so nobody
@@ -12,8 +13,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'billing_not_configured' }, { status: 503 });
   }
 
-  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  const verified = await verifyAccessToken(token);
+  const verified = await sessionUser(req);
   if (!verified) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
@@ -21,8 +21,14 @@ export async function POST(req: NextRequest) {
   // The account key is the phone, but some accounts also carry an email. Try email
   // first (how Stripe historically keyed the customer), then fall back to the phone
   // from the verified token, so a phone-only account can still reach its portal.
-  const email = (verified.email || '').trim().toLowerCase();
-  const phone = ((verified as { phone?: string | null }).phone || '').trim();
+  // ⚠️ BOTH COME FROM identityForUser, NOT FROM THE SESSION. The cast that used to read the phone
+  // off the verified token would have quietly become undefined the moment this route accepted a
+  // cookie, and the phone fallback exists precisely for accounts that have no email. A fallback that
+  // silently stops firing is worse than no fallback: the man just gets 400 no_identifier_on_account
+  // on his own billing page and nothing in a log says why.
+  const identity = await identityForUser(verified);
+  const email = (identity.email || '').trim().toLowerCase();
+  const phone = (identity.phone || '').trim();
   if (!email && !phone) {
     return NextResponse.json({ error: 'no_identifier_on_account' }, { status: 400 });
   }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hasBankFeedConfig } from '../../../../lib/bankfeed';
-import { verifyAccessToken } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 
 // TrueLayer hosts the bank picker inside its own auth dialog, so the app does
 // not need a real institutions list. This endpoint exists for two jobs: the
@@ -11,9 +11,7 @@ import { verifyAccessToken } from '../../../../lib/supabase';
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   if (!hasBankFeedConfig()) {

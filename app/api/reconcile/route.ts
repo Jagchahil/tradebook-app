@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, reconcileSignupToUser } from '../../../lib/supabase';
+import { reconcileSignupToUser } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 
 export const runtime = 'nodejs';
 
@@ -12,9 +13,7 @@ export const runtime = 'nodejs';
 // side, never from the request body, so nobody can reconcile another person's signup.
 
 async function userFrom(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  return token ? verifyAccessToken(token) : null;
+  return sessionUser(req);
 }
 
 export async function POST(req: NextRequest) {

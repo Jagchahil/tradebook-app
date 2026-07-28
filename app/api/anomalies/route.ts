@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
-import { verifyAccessToken, getConfirmedTransactionsForRange, getAllConfirmedForReview } from '../../../lib/supabase';
+import { getConfirmedTransactionsForRange, getAllConfirmedForReview } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { findAnomalies, summariseAnomalies, type Anomaly } from '../../../lib/anomaly';
 import { findPersonal } from '../../../lib/personal';
 
@@ -29,9 +30,7 @@ function taxYearStartISO(d: Date): string {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (await userBurst('anomalies', user.id)) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });

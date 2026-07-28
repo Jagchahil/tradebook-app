@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 import { authorizeUrl, isHmrcConfigured, signState } from '../../../../lib/hmrc';
 
 // Start the HMRC "connect your account" flow. The app calls this with the user's
@@ -11,9 +11,7 @@ export async function GET(req: NextRequest) {
   if (!isHmrcConfigured()) {
     return NextResponse.json({ error: 'hmrc_not_configured' }, { status: 503 });
   }
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const url = authorizeUrl(signState(user.id));

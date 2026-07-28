@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  verifyAccessToken,
   createBookShare,
   listBookShares,
   revokeBookShare,
   getConfirmedTransactionsForUser,
 } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { shareToken, clampGrantDays, expiryFor, categoriesIn, normaliseScope } from '../../../lib/bookshare';
 import { rateLimitedShared } from '../../../lib/ratelimit';
 import { siteBase } from '../../../lib/packtoken';
@@ -31,9 +31,7 @@ import { siteBase } from '../../../lib/packtoken';
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const [shares, rows] = await Promise.all([
@@ -45,9 +43,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   // Minting a link hands out a view of someone's books, so it is rate limited

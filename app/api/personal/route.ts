@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  verifyAccessToken,
   getAllConfirmedForReview,
   setTransactionPersonal,
   setManyPersonal,
   getTransactionVendor,
   learnVendor,
 } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { findPersonal, impactOf } from '../../../lib/personal';
 import { learn } from '../../../lib/memory';
 import { rateLimitedShared } from '../../../lib/ratelimit';
@@ -27,9 +27,7 @@ import { rateLimitedShared } from '../../../lib/ratelimit';
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const rows = await getAllConfirmedForReview(user.id);
@@ -44,9 +42,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   if (await rateLimitedShared(`personal:${user.id}`, 120, 60 * 60 * 1000)) {

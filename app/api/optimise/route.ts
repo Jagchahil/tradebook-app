@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
-import { verifyAccessToken, getOptimiserInput, getAutonomyLevel } from '../../../lib/supabase';
+import { getOptimiserInput, getAutonomyLevel } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { findOptimisations, applyDial, totalEstimatedSaving, taxPosition } from '../../../lib/taxoptimiser';
 
 // Ways to save. The app calls this with the user's own token and gets back every
@@ -10,9 +11,7 @@ import { findOptimisations, applyDial, totalEstimatedSaving, taxPosition } from 
 //   GET -> { level, totalSaving, optimisations: [...] }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (await userBurst('optimise', user.id)) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });

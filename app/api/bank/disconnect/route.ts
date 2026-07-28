@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hasBankFeedConfig } from '../../../../lib/bankfeed';
-import { verifyAccessToken, revokeBankConnections } from '../../../../lib/supabase';
+import { revokeBankConnections } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 
 // Disconnect the user's bank feed. Destroys our copy of the tokens so no
 // further reads are possible from Lekhio's side; the consent at the bank runs
@@ -10,9 +11,7 @@ import { verifyAccessToken, revokeBankConnections } from '../../../../lib/supaba
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   if (!hasBankFeedConfig()) {

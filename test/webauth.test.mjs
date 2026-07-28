@@ -46,6 +46,11 @@ function walk(dir, out = []) {
 }
 
 const read = (p) => readFileSync(p, 'utf8');
+
+// Comments stripped, for the scans that ask what the CODE does. A comment saying "⚠️ NOT user.email"
+// must not be read as a use of user.email. test/watemplates.test.mjs and test/domain.test.mjs both
+// carry the same helper for the same reason, and both learned it the same way.
+const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 const rel = (p) => path.relative(repo, p);
 
 console.log('\n1. THE CUSTOMER WEB APP HAS NOWHERE TO PUT AN ID');
@@ -125,6 +130,70 @@ ok('🔴 THE COOKIE RESOLVES TO A ROW, AND THE USER COMES FROM THE ROW', webauth
 // becomes the only door that matters.
 ok('🔴 A BAD BEARER TOKEN IS REFUSED, NOT RETRIED AS A COOKIE', /Bearer '\)\)[\s\S]{0,300}return user \?/.test(webauth));
 
+// ⚠️ AND THE GATE HAS TO ACTUALLY BE THE GATE. It was not, until 28 July 2026.
+//
+// lib/webauth.ts was written to be the one place that answers "whose books are these", and then
+// NOTHING CALLED IT. Every one of the 36 customer API routes verified a Bearer token itself, so the
+// web session cookie could reach exactly none of them and the web app was two server rendered pages
+// with no API behind it. A gate nobody walks through is a comment.
+const apiRoutes = walk(path.join(repo, 'app/api')).filter((f) => path.basename(f) === 'route.ts');
+ok('the api tree was actually walked (not vacuous)', apiRoutes.length > 50);
+
+// The ONLY routes allowed to verify a Bearer themselves, each for a written reason.
+//
+//   api/team/...            Jag's internal console. Signs in with browserSupabase and sends a
+//                           Bearer. Not a customer surface, and it must never start accepting the
+//                           customer cookie.
+//   api/auth/verify         The door itself. It MINTS the cookie, so it cannot require one.
+//   api/connectors/.../start  Lives outside api/team but IS a team route: it checks readTeamMember
+//                           and refuses anybody who is not the owner.
+const BEARER_ALLOWED = [
+  'app/api/team/',
+  'app/api/auth/verify/route.ts',
+  'app/api/connectors/[platform]/start/route.ts',
+];
+const strayBearer = apiRoutes
+  .filter((f) => read(f).includes('verifyAccessToken'))
+  .map(rel)
+  .filter((r) => !BEARER_ALLOWED.some((a) => r.startsWith(a) || r === a));
+ok(
+  `🔴 NO CUSTOMER ROUTE VERIFIES A BEARER ITSELF${strayBearer.length ? `\n     ${strayBearer.join('\n     ')}` : ''}`,
+  strayBearer.length === 0,
+);
+
+// The other half: the customer routes must actually be going through the gate, or the check above
+// would pass just as happily on a route with no authentication at all.
+const throughTheGate = apiRoutes.filter((f) => read(f).includes('sessionUser('));
+ok(`the customer routes go through sessionUser (${throughTheGate.length} of them)`, throughTheGate.length >= 30);
+
+// 🔴 THE COST OF OPENING THESE ROUTES TO A COOKIE, AND IT IS NOT OPTIONAL.
+//
+// A Bearer only route is immune to cross site request forgery BY ACCIDENT: no browser attaches an
+// Authorization header to a request another site caused. A cookie IS attached, on the browser's own
+// judgement, so the moment sessionUser accepts one, every state changing route needs an origin
+// check. It lives inside sessionUser rather than in 36 routes, because a rule every route author
+// must remember is a rule that holds until somebody is in a hurry.
+ok('🔴 THE COOKIE PATH CHECKS THE ORIGIN', webauth.includes('originAllowed'));
+ok(
+  '🔴 IT CHECKS IT ON ANYTHING THAT CHANGES SOMETHING, and skips GET and HEAD',
+  /method !== 'GET' && method !== 'HEAD'[\s\S]{0,220}originAllowed/.test(webauth),
+);
+ok(
+  'the origin check sits on the cookie path, AFTER the Bearer path has returned',
+  webauth.indexOf("via: 'bearer'") < webauth.indexOf('originAllowed('),
+);
+
+// The email is the one thing the two doors do not agree on: GoTrue hands it over with the identity,
+// a session row does not carry it. A route that reads user.email and gets null from the cookie door
+// cannot tell "he has no email" from "this door did not carry it", and for a GDPR delete those are
+// very different facts.
+ok('there is one lazy identity lookup for the doors that need more than an id', webauth.includes('identityForUser'));
+for (const r of ['app/api/account/delete/route.ts', 'app/api/account/export/route.ts', 'app/api/billing/portal/route.ts']) {
+  const src = read(path.join(repo, r));
+  ok(`${r}: resolves the identity rather than trusting the door`, src.includes('identityForUser'));
+  ok(`🔴 ${r}: NEVER passes a raw session email`, !/\b(user|verified)\.email\b/.test(stripComments(src)));
+}
+
 console.log('\n5. THE SESSION TABLE IS NOT THE CUSTOMER\'S TO READ');
 const sql = read(path.join(repo, 'supabase/APPLY_2026-07-27_web_login.sql'));
 ok('web_sessions has row level security on', /alter table public\.web_sessions enable row level security/.test(sql));
@@ -140,6 +209,61 @@ ok('the week comes from lib/weeklyupdate.ts', money.includes('weeklyInput') && m
 ok('the banner comes from lib/announcements.ts', money.includes('selectAnnouncements'));
 ok('🔴 THE PAGE DOES NOT RUN THE TAX ENGINE ITSELF', !money.includes('soleTraderTax') && !money.includes('from \'../../lib/taxengine\''));
 ok('🔴 THE APPLIED LINE COMES FROM THE MODULE THAT CAN REFUSE IT', money.includes('appliedLineFor'));
+
+// 🔴 AND NOBODY WRITES THE EIGHTEENTH MONEY FORMATTER.
+//
+// The 28 July sweep found SEVENTEEN in lib/, nine of which could print "£-33", and replaced them
+// with lib/money.ts. app/app/page.tsx was written the same day and STILL declared its own
+// `const money = (n) => ...` with the sign inside the pound. It happened to be safe only because
+// nothing on that screen goes negative today, which is a formatter that is correct by luck.
+//
+// So the rule is checked where the rule actually gets broken: on the screens.
+const appPages = walk(path.join(repo, 'app/app'));
+//
+// ⚠️ MATCHED ON THE DEFECT, NOT ON THE NAME. The first draft of this looked for an identifier
+// containing "money", and flagged `export default async function MoneyPage()`, which is the page
+// itself. A guard that fires on the thing it is protecting is a guard somebody deletes.
+//
+// So it looks for what actually goes wrong: a pound sign being BUILT next to a number, anywhere on
+// a screen. That is the whole shape of the bug, whatever the variable ends up being called, and it
+// stays true for the next screen somebody adds in a hurry.
+const buildsAPound = /`£\$\{|['"]£['"]\s*\+|\+\s*['"]£['"]/;
+const ownFormatter = appPages.filter((f) => buildsAPound.test(stripComments(read(f))));
+ok(
+  '🔴 NO SCREEN BUILDS A POUND ITSELF, IT ASKS lib/money.ts: ' + (ownFormatter.map(rel).join(', ') || 'none'),
+  ownFormatter.length === 0,
+);
+const printsMoney = appPages.filter((f) => /£/.test(stripComments(read(f))) || /gbp0|gbp2|gbpAbs/.test(read(f)));
+for (const f of printsMoney) {
+  ok(`${rel(f)}: writes pounds through lib/money.ts`, read(f).includes("from '../../../lib/money'") || read(f).includes("from '../../lib/money'"));
+}
+
+console.log('\n7. THE PILE IS A SURFACE, NOT A SECOND PILE');
+//
+// The grouping IS the feature: fourteen trips to a merchant is one question, not fourteen. All of
+// that reasoning, the careful-first ordering, and the rule about whether the fast path is even on
+// offer live in lib/reviewpile.ts, and /api/pile and the phone app already render it. A web page
+// that regrouped the rows itself would be a second pile, disagreeing with his phone about how many
+// questions he has left.
+const pile = read(path.join(repo, 'app/app/pile/page.tsx'));
+ok('the groups come from lib/reviewpile.ts', pile.includes('buildPile') && pile.includes('summarisePile'));
+ok('🔴 THE FAST PATH RULE IS ASKED FOR, NOT REIMPLEMENTED', pile.includes('canBulkConfirm'));
+ok('the vendor key comes from lib/memory.ts', pile.includes('normaliseVendor'));
+ok('🔴 THE CATEGORY LIST HAS ONE HOME', pile.includes('CATEGORIES') && !/const CATEGORIES\s*=/.test(pile));
+// A decision changes his books, so it is a form post. A GET that files fourteen payments is a GET
+// any other site can make him send with an image tag.
+ok('every decision is a POST, never a link', !/href="\/api\/pile/.test(pile) && (pile.match(/method="post"/g) || []).length >= 2);
+
+const pileRoute = read(path.join(repo, 'app/api/pile/route.ts'));
+ok('the route accepts the web form as well as the app JSON', pileRoute.includes('application/x-www-form-urlencoded'));
+// One handler, two encodings. A second route for the web would be a second implementation of
+// "file these and remember it", and the one that drifts is the one he used.
+ok('🔴 THERE IS STILL ONLY ONE confirmPile CALL', (pileRoute.match(/await confirmPile\(/g) || []).length === 1);
+ok('🔴 THERE IS STILL ONLY ONE setManyPersonal CALL', (pileRoute.match(/await setManyPersonal\(/g) || []).length === 1);
+// 303, so a refresh or a back button cannot file the same rows twice.
+ok('the form answer is a 303, not a 302', /NextResponse\.redirect\([^)]*,\s*303\)/.test(pileRoute));
+// Reporting 14 filed when 11 were filed is how a man ends up with three he believes are in his books.
+ok('🔴 A PARTIAL APPLY IS TOLD APART FROM A FULL ONE', pileRoute.includes("'partial'") && pile.includes("case 'partial'"));
 
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

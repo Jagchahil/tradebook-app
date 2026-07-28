@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
-import { verifyAccessToken, readTeamMember } from '../../../../../lib/supabase';
+import { readTeamMember } from '../../../../../lib/supabase';
+// ⚠️ DELIBERATELY NOT sessionUser. This route lives outside /api/team but it IS a team route: it
+// checks readTeamMember and refuses anybody who is not the owner. The customer web cookie must
+// never be a credential that reaches it, so it keeps the Bearer door the rest of the console uses.
+import { verifyAccessToken } from '../../../../../lib/supabase';
 import { isTeam } from '../../../../../lib/team';
 import {
   CONNECTORS_ENABLED, connectorConfigured, isConnector, authorizeUrl, signState, pkceVerifier, pkceChallenge,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
-import { verifyAccessToken, readAnnouncementSources, dismissAnnouncement, undismissAnnouncement } from '../../../lib/supabase';
+import { readAnnouncementSources, dismissAnnouncement, undismissAnnouncement } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { selectAnnouncements, appliedLineFor } from '../../../lib/announcements';
 
 export const runtime = 'nodejs';
@@ -25,9 +26,7 @@ export const runtime = 'nodejs';
 // NOTHING PERSONAL GOES OUT OF HERE. An announcement is a fact about the law, identical for every
 // reader. The only per-user thing in the whole request is which cards he has already cleared.
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (await userBurst('announcements', user.id)) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });
@@ -71,9 +70,7 @@ export async function GET(req: NextRequest) {
 // be taken straight back. Compare the rules in CLAUDE.md: money, tax filing and anything sent to
 // another human being always ask. This is none of those.
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (await userBurst('announcements-dismiss', user.id)) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });

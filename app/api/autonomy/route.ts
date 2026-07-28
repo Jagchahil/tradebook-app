@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, getAutonomyLevel, setAutonomyLevel } from '../../../lib/supabase';
+import { getAutonomyLevel, setAutonomyLevel } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 
 // The autonomy dial setting. The app reads and writes the user's level here with
 // their own Supabase token. The value only governs reversible admin work; money
@@ -8,9 +9,7 @@ import { verifyAccessToken, getAutonomyLevel, setAutonomyLevel } from '../../../
 //   POST { level: 'suggest' | 'draft' | 'auto' } -> { level } (validated server side)
 
 async function userFrom(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  return token ? verifyAccessToken(token) : null;
+  return sessionUser(req);
 }
 
 export async function GET(req: NextRequest) {

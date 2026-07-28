@@ -1285,6 +1285,47 @@ export async function verifyAccessToken(token: string): Promise<VerifiedUser | n
   }
 }
 
+// THE IDENTITY, FOR THE COOKIE DOOR. Deliberately its own function and NOT part of the session read.
+//
+// verifyAccessToken gets the email for free, because GoTrue returns it with the identity. A session
+// cookie does not: it resolves to a row in public.web_sessions holding a user id, and public.users
+// has no email column, because the email lives on auth.users where the identity is.
+//
+// ⚠️ SO WHY NOT JUST ADD IT TO readWebSession AND HAVE DONE.
+//
+// Because readWebSession runs on EVERY authenticated request from the web, and the budget for a man
+// on a bad signal is one second for the whole page. Three routes in this codebase need his email:
+// exporting his data, deleting his account, and finding his Stripe customer. Everything else needs
+// only the user id. Paying for a second round trip on every ledger read to serve three routes is the
+// wrong trade, so the lookup is lazy and the caller asks for it.
+//
+// Service role, admin API. Returns null rather than throwing: a route that cannot get the email must
+// decide for itself whether that is fatal, and for a GDPR delete it is.
+export interface AuthIdentity {
+  email: string | null;
+  phone: string | null;
+}
+
+// Both fields in ONE call, because the admin response carries both and the billing portal needs
+// both: it resolves a Stripe customer by email, and falls back to the phone for a phone-only
+// account. Two functions would have meant two round trips to answer one question.
+export async function readAuthUserIdentity(userId: string): Promise<AuthIdentity> {
+  const none: AuthIdentity = { email: null, phone: null };
+  if (!userId) return none;
+  try {
+    const { url, key } = config();
+    const res = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) return none;
+    const u = (await res.json().catch(() => null)) as { email?: string | null; phone?: string | null } | null;
+    if (!u) return none;
+    return { email: u.email ?? null, phone: u.phone ? String(u.phone) : null };
+  } catch {
+    return none;
+  }
+}
+
 // --- The web session (the customer web app) --------------------------------
 //
 // The phone app carries a Supabase session in the device keystore. A browser cannot safely do

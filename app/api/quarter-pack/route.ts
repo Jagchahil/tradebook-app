@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, getConfirmedTransactionsForRange, getBusinessName, refreshFactsFromDb, preFilingAssurance } from '../../../lib/supabase';
+import { getConfirmedTransactionsForRange, getBusinessName, refreshFactsFromDb, preFilingAssurance } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import { buildQuarterPack, quarterBounds, quarterForDate, renderQuarterPackHtml } from '../../../lib/quarterpack';
 import { packUrl, verifyPackToken } from '../../../lib/packtoken';
 
@@ -41,9 +42,7 @@ export async function GET(req: NextRequest) {
     startYear = claim.year;
     quarter = claim.quarter;
   } else {
-    const auth = req.headers.get('authorization') || '';
-    const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    const user = bearer ? await verifyAccessToken(bearer) : null;
+    const user = await sessionUser(req);
     if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     userId = user.id;
 

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
 import {
-  verifyAccessToken, readCircumstances, saveCircumstance, forgetCircumstance,
+  readCircumstances, saveCircumstance, forgetCircumstance,
 } from '../../../lib/supabase';
+import { sessionUser } from '../../../lib/webauth';
 import {
   CIRCUMSTANCES, unanswered, notOurs, sensitive, hasSpecialConsent, CONSENT_KEY, CONSENT_ASK,
 } from '../../../lib/circumstances';
@@ -15,9 +16,7 @@ export const runtime = 'nodejs';
 // reason: there was nowhere in this product for a man to tell us he was married.
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (await userBurst('circumstances', user.id)) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });
@@ -77,9 +76,7 @@ export async function GET(req: NextRequest) {
 // That is a filing cabinet with a note on the front saying we have stopped looking.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 export async function DELETE(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (await userBurst('circumstances', user.id)) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });
@@ -109,9 +106,7 @@ export async function DELETE(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (await userBurst('circumstances', user.id)) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });

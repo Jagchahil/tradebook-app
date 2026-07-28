@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hasBankFeedConfig } from '../../../../lib/bankfeed';
-import { verifyAccessToken, listBankConnectionsForUser } from '../../../../lib/supabase';
+import { listBankConnectionsForUser } from '../../../../lib/supabase';
+import { sessionUser } from '../../../../lib/webauth';
 
 // The app's single probe for the bank card. Three states:
 //   503                  feature not switched on (card shows the coming soon teaser)
@@ -10,9 +11,7 @@ import { verifyAccessToken, listBankConnectionsForUser } from '../../../../lib/s
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  const user = token ? await verifyAccessToken(token) : null;
+  const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   if (!hasBankFeedConfig()) {

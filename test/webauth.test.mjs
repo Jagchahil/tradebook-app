@@ -258,8 +258,39 @@ const pileRoute = read(path.join(repo, 'app/api/pile/route.ts'));
 ok('the route accepts the web form as well as the app JSON', pileRoute.includes('application/x-www-form-urlencoded'));
 // One handler, two encodings. A second route for the web would be a second implementation of
 // "file these and remember it", and the one that drifts is the one he used.
-ok('🔴 THERE IS STILL ONLY ONE confirmPile CALL', (pileRoute.match(/await confirmPile\(/g) || []).length === 1);
-ok('🔴 THERE IS STILL ONLY ONE setManyPersonal CALL', (pileRoute.match(/await setManyPersonal\(/g) || []).length === 1);
+//
+// ⚠️ THIS ASSERTION USED TO COUNT CALL SITES, AND IT CAUGHT ME, CORRECTLY, THEN TURNED OUT TO BE
+// MEASURING THE WRONG THING.
+//
+// Adding the one tap "confirm everything we are sure about" branch made it two calls to
+// confirmPile, and the count failed. But the invariant was never "one call site", it was "there is
+// only one implementation of filing, and it lives in lib". A loop that calls the same function is
+// not a second implementation. A route that wrote its own insert would be.
+//
+// So it now tests the thing it always meant: nothing in this route files anything itself.
+ok(
+  '🔴 THE ROUTE NEVER FILES ANYTHING ITSELF, IT ONLY EVER CALLS lib',
+  !/\bfetch\s*\(/.test(pileRoute) && !/\binsert\b|\bupsert\b|rest\/v1/.test(pileRoute),
+);
+ok('every filing goes through confirmPile', pileRoute.includes('confirmPile('));
+ok('every not-business decision goes through setManyPersonal', pileRoute.includes('setManyPersonal('));
+
+// 🔴 AND THE ONE TAP BRANCH IS THE DANGEROUS ONE, so it gets its own assertions.
+//
+// It files many rows at once. If the page could hand it a list of ids, a crafted post would file
+// anything at all, including the careful groups the own name check exists to protect. The intent
+// comes from the client and nothing else does: the server re-reads the pile and asks
+// bulkConfirmPlan what it was confident about.
+// Anchored on the BRANCH, not the first mention of the word: 'confirm_known' also appears in the
+// type and in the form parsing above it, and slicing from there swept the ordinary id reading into
+// the range and failed for the wrong reason.
+const bulk = pileRoute.slice(pileRoute.indexOf("if (body.verdict === 'confirm_known')"));
+ok('the bulk branch rebuilds the pile server side', /pileEntries\(user\.id\)[\s\S]{0,400}buildPile\(/.test(bulk));
+ok('🔴 IT ASKS lib WHICH GROUPS IT WAS CONFIDENT ABOUT', bulk.includes('bulkConfirmPlan('));
+ok(
+  '🔴 AND IT NEVER READS IDS FROM THE REQUEST',
+  !/body\.ids|f\.get\(.ids.\)/.test(bulk.slice(0, bulk.indexOf('const ids ='))),
+);
 // 303, so a refresh or a back button cannot file the same rows twice.
 ok('the form answer is a 303, not a 302', /NextResponse\.redirect\([^)]*,\s*303\)/.test(pileRoute));
 // Reporting 14 filed when 11 were filed is how a man ends up with three he believes are in his books.

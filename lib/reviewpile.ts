@@ -153,6 +153,63 @@ export function canBulkConfirm(group: PileGroup): boolean {
   return true;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE THREE PILES. Added 28 July 2026, after Jag sat with 44 real rows and did not finish them.
+//
+// One flat list asks the same question of every group, so the ones we are sure about cost him
+// exactly as much attention as the ones we have never seen. On his feed that meant twenty cards
+// each rendering a twenty four option dropdown, including for Transport for London.
+//
+// Three piles, because there are only ever three situations and they deserve different questions:
+//
+//   known    We recognise the merchant and have a category. The question is "is that right",
+//            which is a yes, and a yes to twenty of them should be ONE tap.
+//   unknown  We have never seen it. The useful first question is NOT which of twenty four
+//            categories, it is "is this business at all", which clears most of a personal-heavy
+//            feed without categorising anything.
+//   careful  It smells: his own name, a benefit, a refund, a bet. Never bulk, always the reason.
+//
+// PURE, and here rather than on a page, because the phone app has to draw the same three piles or
+// the two surfaces will disagree about how much work he has left.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export interface PilePartition {
+  known: PileGroup[];
+  unknown: PileGroup[];
+  careful: PileGroup[];
+  income: PileGroup[];
+}
+
+export function partitionPile(groups: PileGroup[]): PilePartition {
+  const out: PilePartition = { known: [], unknown: [], careful: [], income: [] };
+  for (const g of groups) {
+    if (g.kind === 'careful') out.careful.push(g);
+    else if (g.kind === 'income') out.income.push(g);
+    else if (canBulkConfirm(g)) out.known.push(g);
+    else out.unknown.push(g);
+  }
+  return out;
+}
+
+// ⚠️ THE SERVER RECOMPUTES THIS. THE CLIENT NEVER SENDS A LIST OF IDS TO CONFIRM.
+//
+// "Confirm all the ones you are sure about" is the most dangerous button in the product: one tap
+// files many rows. If the page posted the ids, a crafted post could file anything, including the
+// careful ones the whole design exists to protect. So the page posts nothing but the intent, and
+// the server works out what it was confident about from the same functions that drew the screen.
+//
+// Returns each group's id list with the category it will be filed under, so a caller can apply them
+// and report honestly how many actually landed.
+export function bulkConfirmPlan(groups: PileGroup[]): Array<{ vendor: string; key: string; category: string; ids: string[] }> {
+  return partitionPile(groups).known.map((g) => ({
+    vendor: g.vendor,
+    key: g.key,
+    // canBulkConfirm already guarantees a suggestion exists, so this is never the empty string.
+    category: g.suggested as string,
+    ids: g.ids,
+  }));
+}
+
 // What the deck actually costs him, so we can tell him the truth before he starts.
 export interface PileSummary {
   entries: number;

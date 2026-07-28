@@ -3,12 +3,12 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import { pileEntries, readOwnNames } from '../../../lib/supabase';
-import { buildPile, summarisePile, canBulkConfirm } from '../../../lib/reviewpile';
+import { buildPile, summarisePile, partitionPile } from '../../../lib/reviewpile';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES } from '../../../lib/categories';
 import { gbp0 } from '../../../lib/money';
-import { A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_TINT } from '../../../lib/tokens';
+import { A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_TINT, SURFACE } from '../../../lib/tokens';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -80,10 +80,12 @@ export default async function PilePage({
   const groups = buildPile(rows, normaliseVendor, ownNames);
   const summary = summarisePile(groups);
 
-  // Money in is never bundled with the spending, and confirm_pile refuses it outright, so there is
-  // no decision to offer here. It is counted honestly in one line rather than listed as rows he
-  // cannot act on, which would fail doc 103's empty test on every visit.
-  const decidable = groups.filter((g) => g.kind !== 'income');
+  // THREE PILES, from lib/reviewpile.ts. Money in is never bundled with the spending and
+  // confirm_pile refuses it outright, so it is counted in one honest line rather than listed as rows
+  // he cannot act on, which would fail doc 103's empty test on every visit.
+  const { known, unknown, careful, income } = partitionPile(groups);
+  const decidable = known.length + unknown.length + careful.length;
+  const knownRows = known.reduce((n, g) => n + g.count, 0);
 
   return (
     <main style={S.wrap}>
@@ -96,7 +98,7 @@ export default async function PilePage({
 
       {note && <p style={S.note}>{note}</p>}
 
-      {decidable.length === 0 ? (
+      {decidable === 0 ? (
         <section style={S.card}>
           <h1 style={S.h1}>Nothing is waiting on you.</h1>
           <p style={S.sub}>
@@ -105,96 +107,138 @@ export default async function PilePage({
         </section>
       ) : (
         <>
+          {/* ⚠️ THE TRUTH ABOUT WHAT THIS COSTS HIM, BEFORE HE STARTS, AND THE WIN NAMED FIRST.
+              He went to the same merchant many times: that is one question, not many. And the ones
+              we already recognise are not a question at all, they are a yes. Saying so up front is
+              the difference between a screen he works through and a screen he closes. */}
           <section style={S.card}>
-            {/* THE TRUTH ABOUT WHAT THIS COSTS HIM, BEFORE HE STARTS. He went to the same merchant
-                fourteen times: that is one question, not fourteen, and saying so is the difference
-                between a screen he opens and a screen he closes. */}
-            {/* ⚠️ THE COUNT IS OF WHAT IS ON THIS PAGE, NOT OF EVERY GROUP.
-                Caught on Jag's real data: summarisePile() counts every group including money in,
-                so the heading promised 36 questions above a page showing 29 cards. Seven of them
-                were income, which this screen deliberately does not ask about. A number that does
-                not match what is underneath it is the fastest way to stop being believed, and it is
-                worse here than anywhere because the whole point of the grouping is the claim that
-                there are fewer questions than there are rows. */}
             <h1 style={S.h1}>
-              {summary.entries} to check, and {decidable.length === 1 ? 'one question' : `only ${decidable.length} questions`}.
+              {summary.entries} to check, and {decidable === 1 ? 'one question' : `only ${decidable} questions`}.
             </h1>
             <p style={S.sub}>
               We have grouped them by who you paid. Answer once for a shop and we will file every
               future payment there the same way, without asking again.
             </p>
-            {summary.income > 0 && (
+            {income.length > 0 && (
               <p style={S.aside}>
-                {summary.income === 1 ? 'One of them is' : `${summary.income} of them are`} money in
+                {income.length === 1 ? 'One of them is' : `${income.length} of them are`} money in
                 rather than money out. Those are kept separate and are not waiting on you here.
               </p>
             )}
           </section>
 
-          {decidable.map((g) => {
-            const ids = g.ids.join(',');
-            const careful = g.kind === 'careful';
-            return (
-              <section key={g.key} style={careful ? { ...S.card, ...S.careful } : S.card}>
-                <div style={S.rowTop}>
-                  <span style={S.vendor}>{g.vendor}</span>
-                  <span style={S.amount}>{gbp0(g.total)}</span>
-                </div>
-                <p style={S.meta}>
-                  {g.count === 1 ? 'One payment' : `${g.count} payments`}
-                  {g.suggested ? `, and we think this is ${g.suggested}` : ''}.
-                </p>
+          {/* ── 1. THE ONES WE KNOW ──────────────────────────────────────────────────────────
+              No dropdown. A category he can read, and ONE button for the lot. Rendering a twenty
+              four option select next to a merchant we already recognise is asking a question we
+              have already answered, and doing it twenty times is what made this screen feel like
+              work. He only needs the dropdown when he DISAGREES, which is what the row link is. */}
+          {known.length > 0 && (
+            <section style={S.card}>
+              <h2 style={S.h2}>We recognise {known.length === 1 ? 'this one' : `these ${known.length}`}</h2>
+              <p style={S.sub}>
+                {knownRows === 1 ? 'One payment' : `${knownRows} payments`}, and we are confident
+                about {known.length === 1 ? 'it' : 'them'}. Have a read, then file the lot in one go.
+              </p>
+              <ul style={S.lines}>
+                {known.map((g) => (
+                  <li key={g.key} style={S.line}>
+                    <div style={S.rowTop}>
+                      <span style={S.vendor}>{g.vendor}</span>
+                      <span style={S.amount}>{gbp0(g.total)}</span>
+                    </div>
+                    <p style={S.meta}>
+                      {g.count === 1 ? 'One payment' : `${g.count} payments`}, filed as{' '}
+                      <b style={S.cat}>{g.suggested}</b>.
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              {/* THE CLIENT SENDS NO IDS. The server rebuilds the pile and works out for itself
+                  which groups it was confident about. See the comment in app/api/pile/route.ts:
+                  this is the one tap that files many rows, so nothing about it trusts the browser. */}
+              <form action="/api/pile" method="post" style={S.form}>
+                <input type="hidden" name="verdict" value="confirm_known" />
+                <button type="submit" style={S.primary}>
+                  Yes, file {known.length === 1 ? 'it' : `all ${knownRows}`}
+                </button>
+              </form>
+              <p style={S.hint}>
+                Anything you disagree with, sort it below after. Nothing here is final.
+              </p>
+            </section>
+          )}
 
-                {/* HIS WORDS, NOT OURS. lib/personal.ts writes the sentence, so a man can argue with
-                    the reason rather than be silently refused. */}
-                {careful && <p style={S.reason}>{looksPersonal(g.vendor, null, ownNames)?.why ?? g.reason}</p>}
+          {/* ── 2. THE ONES THAT NEED HIM ────────────────────────────────────────────────────
+              Few, and they are the ones that cost him if he gets them wrong, so they sit above the
+              long tail where he will actually see them. Never bulk, always the reason in his words. */}
+          {careful.map((g) => (
+            <section key={g.key} style={{ ...S.card, ...S.careful }}>
+              <div style={S.rowTop}>
+                <span style={S.vendor}>{g.vendor}</span>
+                <span style={S.amount}>{gbp0(g.total)}</span>
+              </div>
+              <p style={S.meta}>{g.count === 1 ? 'One payment' : `${g.count} payments`}.</p>
+              <p style={S.reason}>{looksPersonal(g.vendor, null, ownNames)?.why ?? g.reason}</p>
+              <p style={S.aside}>
+                We will not file {g.count === 1 ? 'this' : 'these'} for you in one go, because getting
+                it wrong costs you. If it really is business, confirm it on its own.
+              </p>
+              <form action="/api/pile" method="post" style={S.formTight}>
+                <input type="hidden" name="ids" value={g.ids.join(',')} />
+                <input type="hidden" name="vendor" value={g.vendor} />
+                <input type="hidden" name="verdict" value="personal" />
+                <button type="submit" style={S.secondary}>Not business money</button>
+              </form>
+            </section>
+          ))}
 
-                {/* ⚠️ TWO DIFFERENT ACTS, AND THE FIRST DRAFT OF THIS PAGE CONFLATED THEM.
-                    canBulkConfirm() answers "may he simply AGREE to our guess", and it is false when
-                    we have no guess to offer. I first read that as "no fast path, so no path", which
-                    left every group we could not guess at unanswerable on the web: he could mark it
-                    personal or nothing at all. Choosing a category himself is not the fast path, it
-                    is him doing the work, and confirm_pile has always allowed it.
-                    The only group with no business path here is 'careful', because the SQL refuses
-                    a flagged row whatever the page sends, and a button that silently files nothing
-                    is worse than no button. */}
-                {!careful ? (
-                  <form action="/api/pile" method="post" style={S.form}>
-                    <input type="hidden" name="ids" value={ids} />
-                    <input type="hidden" name="vendor" value={g.vendor} />
-                    <input type="hidden" name="verdict" value="business" />
-                    <label htmlFor={`cat-${g.key}`} style={S.label}>
-                      {canBulkConfirm(g) ? 'File as' : 'What was this?'}
-                    </label>
-                    <select id={`cat-${g.key}`} name="category" defaultValue={g.suggested ?? ''} style={S.select} required>
-                      {!canBulkConfirm(g) && <option value="">Choose one</option>}
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                    <button type="submit" style={S.primary}>
-                      {canBulkConfirm(g)
-                        ? `Yes, file ${g.count === 1 ? 'it' : `all ${g.count}`}`
-                        : `File ${g.count === 1 ? 'it' : `all ${g.count}`}`}
-                    </button>
-                  </form>
-                ) : (
-                  <p style={S.aside}>
-                    We will not file these for you in one go, because getting one of them wrong costs
-                    you. If they really are business, confirm them one at a time.
-                  </p>
-                )}
+          {/* ── 3. THE ONES WE HAVE NEVER SEEN ───────────────────────────────────────────────
+              ⚠️ THE EASY QUESTION FIRST. "Is this business at all" is a far easier thing to answer
+              than "which of twenty four categories", and on a feed with a lot of personal spending
+              in it, answering it clears most of the pile without categorising anything. So Not
+              business money is the FIRST thing on the card, and the category is underneath for the
+              ones he keeps. */}
+          {unknown.length > 0 && (
+            <section style={S.card}>
+              <h2 style={S.h2}>We have not seen {unknown.length === 1 ? 'this one' : 'these'} before</h2>
+              <p style={S.sub}>
+                Quickest way through: knock out anything that was not business first, then say what
+                the rest were.
+              </p>
+            </section>
+          )}
+          {unknown.map((g) => (
+            <section key={g.key} style={S.card}>
+              <div style={S.rowTop}>
+                <span style={S.vendor}>{g.vendor}</span>
+                <span style={S.amount}>{gbp0(g.total)}</span>
+              </div>
+              <p style={S.meta}>{g.count === 1 ? 'One payment' : `${g.count} payments`}.</p>
 
-                <form action="/api/pile" method="post" style={S.formTight}>
-                  <input type="hidden" name="ids" value={ids} />
-                  <input type="hidden" name="vendor" value={g.vendor} />
-                  <input type="hidden" name="verdict" value="personal" />
-                  <input type="hidden" name="web" value="1" />
-                  <button type="submit" style={S.secondary}>Not business money</button>
-                </form>
-              </section>
-            );
-          })}
+              <form action="/api/pile" method="post" style={S.form}>
+                <input type="hidden" name="ids" value={g.ids.join(',')} />
+                <input type="hidden" name="vendor" value={g.vendor} />
+                <input type="hidden" name="verdict" value="personal" />
+                <button type="submit" style={S.primaryQuiet}>Not business money</button>
+              </form>
+
+              <form action="/api/pile" method="post" style={S.formTight}>
+                <input type="hidden" name="ids" value={g.ids.join(',')} />
+                <input type="hidden" name="vendor" value={g.vendor} />
+                <input type="hidden" name="verdict" value="business" />
+                <label htmlFor={`cat-${g.key}`} style={S.label}>Or file it as</label>
+                <select id={`cat-${g.key}`} name="category" defaultValue="" style={S.select} required>
+                  <option value="">Choose one</option>
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <button type="submit" style={S.secondary}>
+                  File {g.count === 1 ? 'it' : `all ${g.count}`}
+                </button>
+              </form>
+            </section>
+          ))}
         </>
       )}
     </main>
@@ -227,5 +271,10 @@ const S: Record<string, React.CSSProperties> = {
   label: { display: 'block', fontSize: 12.5, fontWeight: 700, color: MUTED, marginBottom: 6 },
   select: { width: '100%', boxSizing: 'border-box', padding: '12px', fontSize: 16, fontFamily: FONT, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, color: INK, background: '#fff' },
   primary: { width: '100%', marginTop: 10, padding: '14px 16px', fontSize: 15.5, fontWeight: 700, fontFamily: FONT, color: '#fff', background: RIVER, border: 'none', borderRadius: RADIUS.md, cursor: 'pointer' },
+  cat: { color: RIVER_DEEP },
+  lines: { listStyle: 'none', margin: '14px 0 0', padding: 0 },
+  line: { borderTop: `1px solid ${LINE}`, padding: '12px 0 0', marginTop: 12 },
+  hint: { fontSize: 12.5, lineHeight: 1.5, color: MUTED, textAlign: 'center', margin: '10px 0 0' },
+  primaryQuiet: { width: '100%', padding: '14px 16px', fontSize: 15.5, fontWeight: 700, fontFamily: FONT, color: INK, background: SURFACE, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, cursor: 'pointer' },
   secondary: { width: '100%', padding: '12px 16px', fontSize: 14.5, fontWeight: 700, fontFamily: FONT, color: MUTED, background: 'transparent', border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, cursor: 'pointer' },
 };

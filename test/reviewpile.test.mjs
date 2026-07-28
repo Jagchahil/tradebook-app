@@ -22,7 +22,7 @@ writeStage(
   pathStage.join(stageDir, 'reviewpile.ts'),
   readStage(pathStage.join(libStage, 'reviewpile.ts'), 'utf8').replace("from './personal'", "from './personal.ts'"),
 );
-const { buildPile: build, canBulkConfirm, summarisePile } = await import(pathToFileURL(pathStage.join(stageDir, 'reviewpile.ts')).href);
+const { buildPile: build, canBulkConfirm, summarisePile, partitionPile, bulkConfirmPlan } = await import(pathToFileURL(pathStage.join(stageDir, 'reviewpile.ts')).href);
 // The REAL normaliser, not a stand-in. If normaliseVendor ever changes how it collapses shop
 // names, these tests feel it, which is the whole reason it is injected rather than copied.
 import { normaliseVendor } from '../lib/memory.ts';
@@ -171,6 +171,44 @@ ok('the shop can still be filed in one tap', canBulkConfirm(shop) === true);
 // The old signature still behaves exactly as it did, so every existing caller is unaffected.
 const noNames = build(selfRows, (v) => v.toLowerCase().trim());
 ok('with no names passed, nothing changes', noNames.find((g) => g.vendor === 'Jag')?.kind === 'ask');
+
+// 🔴 THREE PILES. Added after Jag sat with 44 real rows on the live site and did not finish them.
+//
+// One flat list asks the same question of every group, so a merchant we recognise costs him exactly
+// as much attention as one we have never seen. On his feed that was twenty cards each rendering a
+// twenty four option dropdown, including for Transport for London.
+console.log('\nTHREE PILES, NOT ONE LIST');
+const triRows = [
+  // ⚠️ A CATEGORY ON THE ROW IS WHAT MAKES A GROUP "KNOWN". buildPile does not categorise: the
+  // keyword map in lib/categories.ts runs at import in lib/banksync.ts and the answer is stored on
+  // the row. My first fixture left it null and the group came back unknown, which was the fixture
+  // being wrong rather than the code, and it is worth writing down: an entry with no category is a
+  // merchant nobody has ever recognised, not a merchant we forgot to ask about.
+  { id: '1', vendor: 'Screwfix', amount: -40, category: 'materials', looks_personal: false },
+  { id: '2', vendor: 'Screwfix', amount: -12, category: 'materials', looks_personal: false },
+  { id: '3', vendor: 'Konoba-vinoteka', amount: -28, category: null, looks_personal: false },
+  { id: '4', vendor: 'Jag', amount: -496, category: null, looks_personal: false },
+  { id: '5', vendor: 'A Customer', amount: 900, category: null, looks_personal: false },
+];
+const triParts = partitionPile(build(triRows, (v) => v.toLowerCase().trim(), ['Jag']));
+ok('a merchant we know lands in known', triParts.known.length === 1 && triParts.known[0].vendor === 'Screwfix');
+ok('and it is grouped, so two rows are one question', triParts.known[0].count === 2);
+ok('a merchant we have never seen lands in unknown', triParts.unknown.some((g) => g.vendor === 'Konoba-vinoteka'));
+ok('🔴 HIS OWN ACCOUNT LANDS IN CAREFUL, NEVER IN KNOWN', triParts.careful.some((g) => g.vendor === 'Jag'));
+ok('money in is its own pile', triParts.income.length === 1);
+ok('every group lands in exactly one pile', triParts.known.length + triParts.unknown.length + triParts.careful.length + triParts.income.length === 4);
+
+// 🔴 THE ONE TAP PLAN. This is what the server files when he presses the button, and it is built
+// from the groups rather than from anything the browser sent.
+console.log('\nTHE ONE TAP PLAN NEVER REACHES PAST THE CONFIDENT ONES');
+const triPlan = bulkConfirmPlan(build(triRows, (v) => v.toLowerCase().trim(), ['Jag']));
+ok('the plan covers only what we were confident about', triPlan.length === 1 && triPlan[0].vendor === 'Screwfix');
+ok('🔴 IT NEVER INCLUDES HIS OWN ACCOUNT', !triPlan.some((p) => p.vendor === 'Jag'));
+ok('🔴 IT NEVER INCLUDES MONEY IN', !triPlan.some((p) => p.vendor === 'A Customer'));
+ok('it never includes a merchant we could not guess', !triPlan.some((p) => p.vendor === 'Konoba-vinoteka'));
+ok('every item carries a real category, never an empty one', triPlan.every((p) => typeof p.category === 'string' && p.category.length > 0));
+ok('and it carries every id in the group, so two rows file together', triPlan[0].ids.length === 2);
+ok('an empty pile plans nothing rather than throwing', bulkConfirmPlan([]).length === 0);
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

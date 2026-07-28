@@ -8,7 +8,7 @@ import {
   learnVendor,
 } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
-import { buildPile, summarisePile, canBulkConfirm } from '../../../lib/reviewpile';
+import { buildPile, summarisePile, canBulkConfirm, bulkConfirmPlan } from '../../../lib/reviewpile';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES } from '../../../lib/categories';
@@ -77,7 +77,8 @@ interface Decision {
   vendor: string;
   // 'business'  yes, file these, under `category`
   // 'personal'  no, this is not business money. Out of the books, and remembered.
-  verdict: 'business' | 'personal';
+  // 'confirm_known' files every group the SERVER decides it was confident about. It carries no ids.
+  verdict: 'business' | 'personal' | 'confirm_known';
   category?: string;
   // Remember the answer for next time, so this shop is never asked about again. Default true:
   // the whole point is that he tells us once. He can turn it off per decision.
@@ -116,7 +117,11 @@ export async function POST(req: NextRequest) {
     body = {
       ids: String(f.get('ids') ?? '').split(',').map((x) => x.trim()).filter(Boolean),
       vendor: String(f.get('vendor') ?? ''),
-      verdict: f.get('verdict') === 'personal' ? 'personal' : 'business',
+      verdict: f.get('verdict') === 'personal'
+        ? 'personal'
+        : f.get('verdict') === 'confirm_known'
+          ? ('confirm_known' as Decision['verdict'])
+          : 'business',
       category: String(f.get('category') ?? ''),
     };
   } else {
@@ -125,6 +130,41 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Bad request.' }, { status: 400 });
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // CONFIRM EVERYTHING WE ARE SURE ABOUT, IN ONE TAP.
+  //
+  // ⚠️ THE CLIENT SENDS NO IDS, AND THAT IS THE WHOLE SECURITY DESIGN OF THIS BRANCH.
+  //
+  // This is the most dangerous button in the product: one tap files many rows into a man's tax
+  // figures. If the page posted a list of ids, a crafted post could file anything at all, including
+  // the careful ones that the own name check and the benefit detector exist to protect.
+  //
+  // So the intent comes from the client and NOTHING else. The server re-reads his pile, rebuilds
+  // the groups with the same functions that drew the screen, and asks bulkConfirmPlan which of them
+  // it was confident about. confirm_pile then re-applies its own rules in SQL on top. Three layers,
+  // and not one of them trusts the browser.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  if (body.verdict === 'confirm_known') {
+    const [freshRows, ownNames] = await Promise.all([pileEntries(user.id), readOwnNames(user.id)]);
+    const plan = bulkConfirmPlan(buildPile(freshRows, normaliseVendor, ownNames));
+    let applied = 0;
+    let asked = 0;
+    for (const item of plan) {
+      asked += item.ids.length;
+      applied += await confirmPile(user.id, item.ids, item.category);
+      // Remembering is the point: he has now agreed our guess for this shop, so it becomes his
+      // answer and the next payment there is filed without asking. Shared with the crowd, because a
+      // shop's category is not private. Nothing personal is ever shared.
+      if (item.key) await learnVendor(user.id, item.key, item.category, null, true);
+    }
+    if (form) {
+      if (applied === 0) return backToPile(req, 'nothing', 0);
+      if (applied < asked) return backToPile(req, 'partial', applied);
+      return backToPile(req, 'filed', applied);
+    }
+    return NextResponse.json({ ok: true, applied, asked, skipped: asked - applied, groups: plan.length });
   }
 
   const ids = Array.isArray(body?.ids) ? body.ids.slice(0, 500) : [];

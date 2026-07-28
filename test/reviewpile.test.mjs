@@ -22,7 +22,7 @@ writeStage(
   pathStage.join(stageDir, 'reviewpile.ts'),
   readStage(pathStage.join(libStage, 'reviewpile.ts'), 'utf8').replace("from './personal'", "from './personal.ts'"),
 );
-const { buildPile: build, canBulkConfirm, summarisePile, partitionPile, bulkConfirmPlan } = await import(pathToFileURL(pathStage.join(stageDir, 'reviewpile.ts')).href);
+const { buildPile: build, canBulkConfirm, summarisePile, partitionPile, bulkConfirmPlan, readAccountUse, MERCHANT_SETTLES } = await import(pathToFileURL(pathStage.join(stageDir, 'reviewpile.ts')).href);
 // The REAL normaliser, not a stand-in. If normaliseVendor ever changes how it collapses shop
 // names, these tests feel it, which is the whole reason it is injected rather than copied.
 import { normaliseVendor } from '../lib/memory.ts';
@@ -209,6 +209,67 @@ ok('it never includes a merchant we could not guess', !triPlan.some((p) => p.ven
 ok('every item carries a real category, never an empty one', triPlan.every((p) => typeof p.category === 'string' && p.category.length > 0));
 ok('and it carries every id in the group, so two rows file together', triPlan[0].ids.length === 2);
 ok('an empty pile plans nothing rather than throwing', bulkConfirmPlan([]).length === 0);
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE ONE TAP PILE, AND WHAT IT ALMOST DID. Live on a real account, 28 July 2026.
+//
+// The confident section offered to file, in a single press: a holiday train, two holiday coffees as
+// "meals", and three months of overdraft fees as "bank charges". Six personal costs into a man's tax
+// figures, one tap, no second thought.
+//
+// The merchant did not lie. The ACCOUNT did, and the CATEGORY did. Both gates below came from that.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nA MERCHANT ONLY SETTLES SOME CATEGORIES');
+const grp = (vendor, category) => build(
+  [{ id: 'x', vendor, amount: -20, category, looks_personal: false }],
+  (v) => v.toLowerCase().trim(),
+)[0];
+
+ok('🔴 MEALS IS NEVER A ONE TAP', canBulkConfirm(grp('Coffee Cake', 'meals')) === false);
+ok('🔴 NOR IS TRAVEL, because Trainline cannot tell a site visit from a holiday', canBulkConfirm(grp('Trainline', 'travel')) === false);
+ok('🔴 NOR ARE BANK CHARGES, because an overdraft on a personal account is not a business cost', canBulkConfirm(grp('June overdraft fees', 'bank charges')) === false);
+ok('nor fuel, which is business miles or the family car', canBulkConfirm(grp('Shell', 'fuel')) === false);
+ok('a builders merchant still is, because nobody buys plasterboard for a holiday', canBulkConfirm(grp('Screwfix', 'materials')) === true);
+ok('so are tools', canBulkConfirm(grp('Toolstation', 'tools')) === true);
+ok('so is workwear', canBulkConfirm(grp('Arco', 'workwear')) === true);
+ok('the list errs towards asking: it is short', MERCHANT_SETTLES.length <= 8);
+ok('and every entry in it is a real category', MERCHANT_SETTLES.every((c) => typeof c === 'string' && c.length > 0));
+
+console.log('\nAND NOTHING IS PRESUMED ON AN ACCOUNT HE DOES NOT TRADE THROUGH');
+const trade = grp('Screwfix', 'materials');
+ok('on a business account, one tap stands', canBulkConfirm(trade, 'business') === true);
+ok('on a mixed account it stands too, which is the sole trader default', canBulkConfirm(trade, 'mixed') === true);
+ok('🔴 ON A PERSONAL ACCOUNT, NOTHING IS EVER ONE TAP', canBulkConfirm(trade, 'personal') === false);
+ok('and the plan is empty on a personal account', bulkConfirmPlan([trade], 'personal').length === 0);
+ok('so the whole known pile empties', partitionPile([trade], 'personal').known.length === 0);
+ok('and those groups are still answerable, one at a time', partitionPile([trade], 'personal').unknown.length === 1);
+
+// null means nobody was ever asked, which is every connection made before this existed. It must
+// read as the behaviour those connections already had, never as permission.
+ok('an unanswered account reads as mixed', readAccountUse(null) === 'mixed');
+ok('so does nonsense', readAccountUse('yes please') === 'mixed');
+ok('business is honoured', readAccountUse('business') === 'business');
+ok('personal is honoured', readAccountUse('personal') === 'personal');
+
+// 🔴 A ROW IMPORTED UNDER AN OLDER KEYWORD MAP.
+//
+// buildPile does not categorise: the map runs once at import and the answer is stored. So when the
+// map learns a merchant, every row already in the database keeps the older answer for ever. That is
+// not hypothetical: "Transport for London" was added to the travel rule on 28 July and every TfL row
+// already imported still carried nothing.
+console.log('\nA ROW IMPORTED UNDER AN OLDER MAP IS READ AGAINST THE CURRENT ONE');
+const stale = [{ id: 's', vendor: 'Transport for London', amount: -7, category: null, looks_personal: false }];
+const late = (t) => (/transport for london/i.test(t) ? 'travel' : 'other');
+ok('with no categoriser it stays unknown, exactly as before', build(stale, (v) => v.toLowerCase().trim())[0].suggested === null);
+ok('🔴 WITH THE CURRENT MAP IT IS RECOGNISED', build(stale, (v) => v.toLowerCase().trim(), [], late)[0].suggested === 'travel');
+ok('and nothing was written: the input row is untouched', stale[0].category === null);
+// A category he chose himself must always beat a keyword guess.
+const his = [{ id: 'h', vendor: 'Transport for London', amount: -7, category: 'subcontractor', looks_personal: false }];
+ok('🔴 HIS OWN ANSWER BEATS THE MAP', build(his, (v) => v.toLowerCase().trim(), [], late)[0].suggested === 'subcontractor');
+ok('a map answer of other is still no answer', build(
+  [{ id: 'o', vendor: 'Konoba-vinoteka', amount: -28, category: null, looks_personal: false }],
+  (v) => v.toLowerCase().trim(), [], late,
+)[0].suggested === null);
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

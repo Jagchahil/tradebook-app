@@ -3,6 +3,7 @@ import { rateLimitedShared } from '../../../lib/ratelimit';
 import {
   pileEntries,
   readOwnNames,
+  readAccountUse,
   confirmPile,
   setManyPersonal,
   learnVendor,
@@ -11,7 +12,7 @@ import { sessionUser } from '../../../lib/webauth';
 import { buildPile, summarisePile, canBulkConfirm, bulkConfirmPlan } from '../../../lib/reviewpile';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
-import { CATEGORIES } from '../../../lib/categories';
+import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
 
 // The pile: what a man faces the morning after he connects his bank.
 //
@@ -42,8 +43,12 @@ export async function GET(req: NextRequest) {
 
   // In parallel: the rows, and every name that means him. A payment to himself is drawings, and
   // drawings are never a business cost, so it must never reach the one tap path.
-  const [rows, ownNames] = await Promise.all([pileEntries(user.id), readOwnNames(user.id)]);
-  const groups = buildPile(rows, normaliseVendor, ownNames);
+  const [rows, ownNames, accountUse] = await Promise.all([
+    pileEntries(user.id), readOwnNames(user.id), readAccountUse(user.id),
+  ]);
+  // categoriseBankLine is passed in so a row imported under an older keyword map is read against
+  // the CURRENT one. Nothing is written: the stored category still only changes when he confirms.
+  const groups = buildPile(rows, normaliseVendor, ownNames, categoriseBankLine);
 
   return NextResponse.json({
     // THE APP DOES NOT KEEP ITS OWN CATEGORY LIST. It renders what it is given.
@@ -59,7 +64,7 @@ export async function GET(req: NextRequest) {
       // Whether the FAST path is even on offer for this group. The app must not have to
       // re-derive this rule, and the database enforces it again anyway (confirm_pile), because
       // a guard that only lives in the client is a suggestion.
-      fast: canBulkConfirm(g),
+      fast: canBulkConfirm(g, accountUse),
       // For the careful ones, say WHY, in his words. "This looks like a benefit" is a reason a
       // man can argue with. A silent refusal to let him proceed is not.
       //
@@ -147,8 +152,13 @@ export async function POST(req: NextRequest) {
   // and not one of them trusts the browser.
   // ═══════════════════════════════════════════════════════════════════════════════════════
   if (body.verdict === 'confirm_known') {
-    const [freshRows, ownNames] = await Promise.all([pileEntries(user.id), readOwnNames(user.id)]);
-    const plan = bulkConfirmPlan(buildPile(freshRows, normaliseVendor, ownNames));
+    const [freshRows, ownNames, accountUse] = await Promise.all([
+      pileEntries(user.id), readOwnNames(user.id), readAccountUse(user.id),
+    ]);
+    const plan = bulkConfirmPlan(
+      buildPile(freshRows, normaliseVendor, ownNames, categoriseBankLine),
+      accountUse,
+    );
     let applied = 0;
     let asked = 0;
     for (const item of plan) {

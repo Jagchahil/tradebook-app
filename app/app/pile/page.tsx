@@ -2,11 +2,11 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { pileEntries, readOwnNames } from '../../../lib/supabase';
+import { pileEntries, readOwnNames, readAccountUse } from '../../../lib/supabase';
 import { buildPile, summarisePile, partitionPile } from '../../../lib/reviewpile';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
-import { CATEGORIES } from '../../../lib/categories';
+import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
 import { gbp0 } from '../../../lib/money';
 import { A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_TINT, SURFACE } from '../../../lib/tokens';
 
@@ -76,14 +76,16 @@ export default async function PilePage({
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
   const note = message(one('done'), one('n'));
 
-  const [rows, ownNames] = await Promise.all([pileEntries(user.id), readOwnNames(user.id)]);
-  const groups = buildPile(rows, normaliseVendor, ownNames);
+  const [rows, ownNames, accountUse] = await Promise.all([
+    pileEntries(user.id), readOwnNames(user.id), readAccountUse(user.id),
+  ]);
+  const groups = buildPile(rows, normaliseVendor, ownNames, categoriseBankLine);
   const summary = summarisePile(groups);
 
   // THREE PILES, from lib/reviewpile.ts. Money in is never bundled with the spending and
   // confirm_pile refuses it outright, so it is counted in one honest line rather than listed as rows
   // he cannot act on, which would fail doc 103's empty test on every visit.
-  const { known, unknown, careful, income } = partitionPile(groups);
+  const { known, unknown, careful, income } = partitionPile(groups, accountUse);
   const decidable = known.length + unknown.length + careful.length;
   const knownRows = known.reduce((n, g) => n + g.count, 0);
 

@@ -1326,6 +1326,37 @@ export async function readAuthUserIdentity(userId: string): Promise<AuthIdentity
   }
 }
 
+// WHAT HE SAID HIS CONNECTED ACCOUNTS ARE FOR, as one answer for the whole pile.
+//
+// ⚠️ THE STRICTEST ANSWER WINS, AND THAT IS THE ONLY SAFE WAY TO COMBINE THEM.
+//
+// A man can connect more than one account, and the pile mixes them. If he has a business account and
+// a personal one, presuming business across the lot would file his personal life the moment a
+// merchant looked familiar. So: any account marked personal makes the whole pile personal, and only
+// when every account is marked business is the fast path allowed to presume anything.
+//
+// No connections, or none answered, reads as 'mixed', which is the behaviour every existing
+// connection already has.
+export async function readAccountUse(userId: string): Promise<'business' | 'personal' | 'mixed'> {
+  if (!userId) return 'mixed';
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/bank_connections?user_id=eq.${encodeURIComponent(userId)}&status=eq.active&select=account_use`,
+      { headers: headers() },
+    );
+    if (!res.ok) return 'mixed';
+    const rows = (await res.json().catch(() => null)) as Array<{ account_use?: string | null }> | null;
+    if (!Array.isArray(rows) || rows.length === 0) return 'mixed';
+    const uses = rows.map((r) => r.account_use ?? 'mixed');
+    if (uses.some((u) => u === 'personal')) return 'personal';
+    if (uses.every((u) => u === 'business')) return 'business';
+    return 'mixed';
+  } catch {
+    return 'mixed';
+  }
+}
+
 // EVERY NAME THAT MEANS HIM. Used to spot money moving between his own accounts.
 //
 // Three sources, because a bank line can carry any of them: the name he gave us, the name he trades
@@ -2969,18 +3000,29 @@ export interface BankConnection {
   token_expires_at: string | null;
   last_synced_date: string | null;
   history_from: string | null; // the earliest date the first sync may pull, chosen at connect
+  // What he told us the account is FOR, chosen at connect. Null means we never asked, which is
+  // every connection made before 28 July 2026. readAccountUse() in lib/reviewpile.ts reads null
+  // as 'mixed', so those keep behaving exactly as they did.
+  account_use: string | null;
 }
 
 export async function createBankConnection(
   userId: string,
   reference: string,
   historyFrom?: string | null,
+  // What he said the account is for. Null is allowed and means nobody asked, which is every
+  // connection made before 28 July 2026. See supabase/APPLY_2026-07-28_account_use.sql.
+  accountUse?: 'business' | 'personal' | 'mixed' | null,
 ): Promise<boolean> {
   const { url } = config();
   const res = await fetch(`${url}/rest/v1/bank_connections`, {
     method: 'POST',
     headers: headers({ Prefer: 'return=minimal' }),
-    body: JSON.stringify({ user_id: userId, reference, status: 'created', history_from: historyFrom ?? null }),
+    body: JSON.stringify({
+      user_id: userId, reference, status: 'created',
+      history_from: historyFrom ?? null,
+      account_use: accountUse ?? null,
+    }),
   });
   if (!res.ok) {
     // The PostgREST error body names the failing constraint or column and holds

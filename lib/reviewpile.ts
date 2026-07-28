@@ -32,6 +32,59 @@ import { matchesOwnName } from './personal';
 
 export type KeyOf = (vendor: string) => string;
 
+// What he told us this account is FOR, answered once when he connected it.
+//
+// 🔴 WHY THIS EXISTS. On 28 July 2026 the one tap confident pile went live and was pointed at a
+// real personal account. It offered to file, in a single press: a holiday train, two holiday
+// coffees as "meals", and three months of overdraft fees as "bank charges". Six personal costs into
+// a man's tax figures, one tap, no second thought.
+//
+// The merchant did not lie. The ACCOUNT did. Nothing in the product knew whether it was looking at
+// an account he trades through or one he lives out of, so it read every line as a business decision
+// waiting to be classified.
+//
+// 'mixed' is the default and the honest one for a sole trader, who legally has no separation and
+// often runs everything through one current account. null means we never asked, which is every
+// connection made before this existed, and it is treated as 'mixed' so nothing changes under them.
+export type AccountUse = 'business' | 'personal' | 'mixed';
+
+export function readAccountUse(value: unknown): AccountUse {
+  return value === 'business' || value === 'personal' ? value : 'mixed';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE CATEGORIES A MERCHANT CAN ACTUALLY SETTLE.
+//
+// The one tap path rests on one claim: that knowing WHO he paid is enough to know it was business.
+// For some categories that is true and obvious. Nobody buys plasterboard, a cement mixer or a bag
+// of ballast for a holiday, so a builders merchant settles the question by itself.
+//
+// For others the merchant tells you almost nothing, because the answer lives in the CIRCUMSTANCE:
+//
+//   meals          Subsistence is where HMRC is strictest and most of it is not allowable for a
+//                  sole trader. A coffee near home is not a business cost because it came from a
+//                  coffee shop. Suggesting it confidently invites OVER claiming, which is exactly
+//                  as wrong as the drawings bug and in the opposite direction.
+//   travel         A tradesman between sites is claiming. The same man commuting, or on holiday in
+//                  Montenegro, is not. Trainline cannot tell you which.
+//   fuel           Business miles or the family car. The pump does not know.
+//   bank charges   An overdraft fee on a personal current account is not a business cost.
+//   phone/software A phone bill and a streaming subscription arrive looking identical.
+//
+// ⚠️ THIS LIST IS DELIBERATELY SHORT, AND ERRS TOWARDS ASKING. A category wrongly left off costs
+// him one tap. A category wrongly left on costs him an over claim he did not make and cannot see.
+// Growing it is a tax judgement, not a UI one.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const MERCHANT_SETTLES: readonly string[] = [
+  'materials',
+  'tools',
+  'equipment',
+  'workwear',
+  'subcontractor',
+  'waste',
+  'stock',
+];
+
 export interface PileEntry {
   id: string;
   vendor: string | null;
@@ -70,7 +123,22 @@ export interface PileGroup {
 //
 // The 'careful' ones come FIRST regardless. They are the ones that will cost him if he gets
 // them wrong, and they are the ones he must not be able to rush past.
-export function buildPile(entries: PileEntry[], keyOf: KeyOf, ownNames: string[] = []): PileGroup[] {
+// ⚠️ THE CATEGORISER IS OPTIONAL AND IT MATTERS MORE THAN IT LOOKS.
+//
+// buildPile does NOT categorise: the keyword map runs once at import in lib/banksync.ts and the
+// answer is stored on the row. So when the map learns a merchant, every row already in the database
+// keeps the answer an OLDER map gave it, for ever.
+//
+// That is not hypothetical. "Transport for London" was added to the travel rule on 28 July 2026,
+// and every TfL row already imported still carried nothing, so the pile kept asking about a
+// merchant we had just claimed to know. Passing the CURRENT categoriser in fixes them all on the
+// next read, in memory, and writes nothing: the stored category still only changes when he confirms.
+export function buildPile(
+  entries: PileEntry[],
+  keyOf: KeyOf,
+  ownNames: string[] = [],
+  categorise?: (text: string) => string,
+): PileGroup[] {
   const map = new Map<string, PileGroup>();
 
   for (const e of entries) {
@@ -100,7 +168,7 @@ export function buildPile(entries: PileEntry[], keyOf: KeyOf, ownNames: string[]
       // A group only keeps a suggestion if EVERY row in it agrees. One row saying "materials"
       // and another saying "fuel" is not a group with a suggestion, it is a group with a
       // disagreement, and offering him one of the two as if it were settled is a small lie.
-      if (existing.suggested && normCat(e.category) !== existing.suggested) {
+      if (existing.suggested && suggestionFor(e, categorise) !== existing.suggested) {
         existing.suggested = null;
       }
       continue;
@@ -112,7 +180,7 @@ export function buildPile(entries: PileEntry[], keyOf: KeyOf, ownNames: string[]
       kind,
       count: 1,
       total: Math.abs(e.amount),
-      suggested: normCat(e.category),
+      suggested: suggestionFor(e, categorise),
       ids: [e.id],
     });
   }
@@ -126,6 +194,16 @@ export function buildPile(entries: PileEntry[], keyOf: KeyOf, ownNames: string[]
   });
 
   return groups;
+}
+
+// The category to show for one row: what was stored, or what the CURRENT map says when nothing
+// useful was stored. Never overwrites a real stored answer, so a category he chose himself always
+// wins over a keyword guess.
+function suggestionFor(e: PileEntry, categorise?: (text: string) => string): string | null {
+  const stored = normCat(e.category);
+  if (stored) return stored;
+  if (!categorise) return null;
+  return normCat(categorise(`${e.vendor ?? ''} ${e.description ?? ''}`.trim()));
 }
 
 // "other" is not a category, it is the absence of one. Printing it as though it were a guess we
@@ -147,10 +225,17 @@ function normCat(c: string | null): string | null {
 //
 // It fails towards asking. Always. Getting this wrong in the other direction is not a bad user
 // experience, it is a wrong tax return with his name on it.
-export function canBulkConfirm(group: PileGroup): boolean {
+export function canBulkConfirm(group: PileGroup, accountUse: AccountUse = 'mixed'): boolean {
   if (group.kind !== 'ask') return false;      // never income, never anything that smells
   if (!group.suggested) return false;          // we have no answer, so there is nothing to agree to
-  return true;
+
+  // 🔴 NOTHING IS EVER PRESUMED ON AN ACCOUNT HE TOLD US HE DOES NOT TRADE THROUGH.
+  // He can still file anything here one at a time. What he cannot do is file a screenful of his own
+  // life in one press because a merchant looked familiar.
+  if (accountUse === 'personal') return false;
+
+  // And only where the merchant genuinely settles it. See MERCHANT_SETTLES.
+  return MERCHANT_SETTLES.includes(group.suggested);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -180,12 +265,12 @@ export interface PilePartition {
   income: PileGroup[];
 }
 
-export function partitionPile(groups: PileGroup[]): PilePartition {
+export function partitionPile(groups: PileGroup[], accountUse: AccountUse = 'mixed'): PilePartition {
   const out: PilePartition = { known: [], unknown: [], careful: [], income: [] };
   for (const g of groups) {
     if (g.kind === 'careful') out.careful.push(g);
     else if (g.kind === 'income') out.income.push(g);
-    else if (canBulkConfirm(g)) out.known.push(g);
+    else if (canBulkConfirm(g, accountUse)) out.known.push(g);
     else out.unknown.push(g);
   }
   return out;
@@ -200,8 +285,11 @@ export function partitionPile(groups: PileGroup[]): PilePartition {
 //
 // Returns each group's id list with the category it will be filed under, so a caller can apply them
 // and report honestly how many actually landed.
-export function bulkConfirmPlan(groups: PileGroup[]): Array<{ vendor: string; key: string; category: string; ids: string[] }> {
-  return partitionPile(groups).known.map((g) => ({
+export function bulkConfirmPlan(
+  groups: PileGroup[],
+  accountUse: AccountUse = 'mixed',
+): Array<{ vendor: string; key: string; category: string; ids: string[] }> {
+  return partitionPile(groups, accountUse).known.map((g) => ({
     vendor: g.vendor,
     key: g.key,
     // canBulkConfirm already guarantees a suggestion exists, so this is never the empty string.

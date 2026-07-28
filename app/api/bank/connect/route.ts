@@ -21,14 +21,24 @@ export async function POST(req: NextRequest) {
 
   // How much history to import, chosen by the user. Default the minimum: this
   // tax year only. We never pull a person's whole banking history by default.
+  // 🔴 AND WHAT THE ACCOUNT IS FOR. Asked here because it is the only moment he is thinking about
+  // this specific account, and because the answer changes what every row from it means.
+  //
+  // Defaults to 'mixed', which is the honest answer for a sole trader who has no legal separation
+  // and often runs everything through one current account, and which asks about everything. A
+  // client that says nothing gets the cautious answer, never the permissive one.
   let history: BankHistory = 'this_year';
+  let accountUse: 'business' | 'personal' | 'mixed' = 'mixed';
   try {
-    const body = (await req.json()) as { history?: unknown };
+    const body = (await req.json()) as { history?: unknown; accountUse?: unknown };
     if (body?.history === 'this_year' || body?.history === 'two_years' || body?.history === 'all') {
       history = body.history;
     }
+    if (body?.accountUse === 'business' || body?.accountUse === 'personal' || body?.accountUse === 'mixed') {
+      accountUse = body.accountUse;
+    }
   } catch {
-    // no body, keep the default
+    // no body, keep the defaults
   }
 
   const state = signState(user.id);
@@ -37,7 +47,7 @@ export async function POST(req: NextRequest) {
   const link = buildAuthLink(state);
   if (!link) return NextResponse.json({ error: 'provider_unavailable' }, { status: 502 });
 
-  const stored = await createBankConnection(user.id, state, historyFromISO(history));
+  const stored = await createBankConnection(user.id, state, historyFromISO(history), accountUse);
   if (!stored) return NextResponse.json({ error: 'storage_failed' }, { status: 500 });
 
   return NextResponse.json({ link });

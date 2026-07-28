@@ -82,7 +82,7 @@ ok('every page sends a signed out visitor to /in: ' + (noRedirect.map(rel).join(
 console.log('\n2. THE AUTH ROUTES NEVER TRUST WHAT THE CLIENT SENT');
 const startRoute = read(path.join(repo, 'app/api/auth/start/route.ts'));
 const verifyRoute = read(path.join(repo, 'app/api/auth/verify/route.ts'));
-const outRoute = read(path.join(repo, 'app/api/auth/out/route.ts'));
+const outRoute = read(path.join(repo, 'app/api/auth/signout/route.ts'));
 
 ok('the send route checks the origin', startRoute.includes('originAllowed'));
 ok('the verify route checks the origin', verifyRoute.includes('originAllowed'));

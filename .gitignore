@@ -21,6 +21,18 @@ next-env.d.ts
 .env*
 !.env*.example
 
+# 🔴 THE HMRC SANDBOX SESSION. It looks like config and it is a credential file.
+#
+# scripts/hmrc-sandbox-demo.mjs writes the live sandbox session into it: a server token, an access
+# token, a refresh token, and the HMRC issued test user's own id, password, National Insurance
+# number and UTR. It was tracked from the beginning and went up with every push, because "sandbox"
+# reads as "not real" and a .json in the repo root reads as settings.
+#
+# They are test credentials, not production ones, and the repo is private. It is still a live
+# session for an HMRC service sitting in git history, and we are in the middle of an HMRC
+# production approval whose checklist asks how we handle exactly this.
+.hmrc-sandbox.json
+
 # Vercel
 .vercel
 

@@ -158,6 +158,53 @@ console.log('\n=== voice: no path that ships customer audio to a third party ===
   ok('no OpenAI audio endpoint or key read in app/ or lib/', offenders.length === 0);
 }
 
+// ---------------------------------------------------------------------------------------------
+// 5. 🔴 NO ROUTE MAY LIVE IN A FOLDER .gitignore SWALLOWS.
+//
+// Added 28 July 2026, after it happened. The sign out route was written as app/api/auth/out/, and
+// .gitignore carries `out/` for the Next.js static export folder. The pattern matched, `git add -A`
+// silently skipped the file, and commit 1e7160db went to production with a sign out button posting
+// at a route that was not in the repository.
+//
+// Every local check passed, because the file was on the disk that ran them. Only CI noticed, because
+// CI checks out from git rather than from the machine that wrote the code. That is the whole shape
+// of this bug: it is invisible everywhere except the one place that matters.
+//
+// So this reads the REAL .gitignore rather than a hardcoded list, takes every directory rule out of
+// it, and fails if any folder under app/ or lib/ is named the same. The next `build`, `dist`,
+// `coverage` or `out` route cannot disappear the same way, and if someone adds a new directory rule
+// to .gitignore, this test starts guarding that too without being edited.
+{
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const repo = path.resolve(here, '..');
+  const ignore = readFileSync(path.join(repo, '.gitignore'), 'utf8');
+  const dirRules = ignore
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#') && !l.startsWith('!'))
+    .filter((l) => l.endsWith('/'))
+    .map((l) => l.replace(/\/$/, '').replace(/^\//, ''))
+    .filter((l) => l && !l.includes('*'));
+
+  const offenders = [];
+  const walk = (dir) => {
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (dirRules.includes(entry.name)) {
+        offenders.push(`${path.relative(repo, path.join(dir, entry.name))}  (matches .gitignore rule "${entry.name}/")`);
+        continue;
+      }
+      walk(path.join(dir, entry.name));
+    }
+  };
+  ['../app', '../lib'].map((r) => path.resolve(here, r)).forEach(walk);
+  if (offenders.length) offenders.forEach((o) => console.log(`        ${o}`));
+  ok('the .gitignore directory rules were actually read', dirRules.length >= 3);
+  ok('🔴 NO FOLDER UNDER app/ OR lib/ IS NAMED AFTER A .gitignore DIRECTORY RULE', offenders.length === 0);
+}
+
 // The other two fixes from this pass are pinned in the suites that already own those modules,
 // because both files need staging to load under type stripping and duplicating that machinery
 // here would be a second place to maintain it:

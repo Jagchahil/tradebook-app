@@ -89,7 +89,7 @@ export default async function MoneyPage() {
         <span style={S.logo}>Lekhio</span>
         {/* Signing out is a state change, so it is a form and not a link. A GET that ends a session
             is a session any other site can end for him with an image tag. */}
-        <form action="/api/auth/out" method="post">
+        <form action="/api/auth/signout" method="post">
           <button type="submit" style={S.out}>Sign out</button>
         </form>
       </header>

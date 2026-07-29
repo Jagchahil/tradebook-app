@@ -12,10 +12,15 @@ import { findSic } from '../../lib/siccodes';
 // download buttons. One env var, no copy rewrite.
 // The line under the store buttons. Flips with the same flag, so we never tell
 // someone to "download the app" while pointing at a store that has not got it.
+//
+// 🔴 IT ALSO NO LONGER SENDS HIM TO WHATSAPP. It used to read "everything works on WhatsApp right
+// now", which was true when WhatsApp was the product and is a dead end now that the web app is.
+// Whichever way the flag falls, the answer to "what do I do next" is the thing he is already
+// looking at.
 function storeNote(): string {
   return appStoreLive() && APP_STORE_URL && PLAY_STORE_URL
-    ? 'Grab the app, or just carry on in WhatsApp. Both work, and they stay in sync.'
-    : 'The app lands in the stores soon. You do not need to wait, everything works on WhatsApp right now.';
+    ? 'Grab the app if you want it. Everything is on the web too, and the two stay in sync.'
+    : 'The app lands in the stores soon. You do not need it: everything works right here in your browser.';
 }
 
 function StoreButtons() {
@@ -65,6 +70,23 @@ function digitsOnly(v: string) {
   return v.replace(/\D/g, '');
 }
 
+// A failure code from the signup routes, turned into something a person can act on. Same approach
+// as app/in/page.tsx: never a stack trace, never "an error occurred", and never blame.
+function codeMessage(code: string | undefined): string {
+  switch (code) {
+    case 'code': return 'That code did not work. Check the email and try again.';
+    case 'email': return 'That email does not look right. Go back and check it.';
+    case 'toomany': return 'Too many tries. Give it a few minutes and try again.';
+    case 'capped': return 'We cannot send codes just this minute. Try again shortly.';
+    case 'send': return 'We could not send that just now. Try again in a minute.';
+    case 'account': return 'We could not finish setting your account up. Try again in a minute.';
+    case 'session': return 'We could not sign you in just now. Try again in a minute.';
+    case 'origin': return 'That request did not come from Lekhio, so we stopped it.';
+    case 'unavailable': return 'Signing up is not available right now. Try again shortly.';
+    default: return 'Something went wrong with that. Try again.';
+  }
+}
+
 export default function StartPage() {
   const [step, setStep] = useState(1);
   const [done, setDone] = useState(false);
@@ -93,6 +115,13 @@ export default function StartPage() {
   // The streams question: what sits alongside the trade. It shapes the tax
   // picture and primes the WhatsApp setup, so it earns a step of its own.
   const [streams, setStreams] = useState<string[]>([]);
+  // The code step. `done` now means "the questions are answered, prove the email", not "finished":
+  // the account does not exist until the code is typed, so this is the last thing between him and
+  // his own books rather than a thank you screen.
+  const [code, setCode] = useState('');
+  const [codeErr, setCodeErr] = useState('');
+  const [codeBusy, setCodeBusy] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
   const [hp, setHp] = useState(''); // honeypot, must stay empty for a real person
   const [t0] = useState(() => Date.now());
   const [offer] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('offer') ?? '' : ''));
@@ -163,11 +192,15 @@ export default function StartPage() {
   );
   const sicChoice = sicMatches[Math.min(sicPick, sicMatches.length - 1)] ?? null;
 
-  function submitSignup() {
-    // Fire and forget. The success screen shows regardless, so the experience
-    // never breaks if the backend is not switched on yet.
+  // 🔴 THIS IS NO LONGER FIRE AND FORGET, AND IT CANNOT BE.
+  //
+  // It used to post and move straight on, because the next screen was a thank you and nothing
+  // depended on the row landing. Now the next thing that happens is that he proves his email, and
+  // /api/signup/verify reconciles his answers by looking that signup row up. A post still in
+  // flight is a man who answered six questions and arrives in an empty account.
+  async function submitSignup(): Promise<void> {
     try {
-      fetch('/api/onboard', {
+      await fetch('/api/onboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -191,19 +224,74 @@ export default function StartPage() {
           // when the box above rendered). Never guessed silently server side.
           sicCode: sicChoice ? sicChoice.code : undefined,
         }),
-      }).catch(() => {});
+      });
     } catch {
-      // ignore
+      // A failed save must not trap him on the form. He still gets his code and his account; the
+      // worst case is that a few answers are asked again inside onboarding, which is a nuisance
+      // rather than a wall.
     }
   }
 
-  function next() {
+  // Ask for the code. Used both on finishing the questions and by "Send it again".
+  async function sendCode(isResend = false): Promise<boolean> {
+    if (isResend) setResendBusy(true);
+    try {
+      const res = await fetch('/api/signup/code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setCodeErr(codeMessage(data.error));
+        return false;
+      }
+      return true;
+    } catch {
+      setCodeErr('We could not send that just now. Try again in a minute.');
+      return false;
+    } finally {
+      // Deliberately not a countdown. He does not need a timer, he needs the button to stop
+      // looking like the thing to press twenty times while the first email is still in flight.
+      if (isResend) setTimeout(() => setResendBusy(false), 30_000);
+    }
+  }
+
+  // Prove it. This is the moment the account exists.
+  async function confirmCode(): Promise<void> {
+    setCodeBusy(true);
+    setCodeErr('');
+    try {
+      const res = await fetch('/api/signup/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), code }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; redirect?: string; error?: string };
+      if (res.ok && data.ok) {
+        // A full navigation, not a router push. The session arrives as an HttpOnly cookie on this
+        // very response, and /app is server rendered off it, so the next page must be fetched by
+        // the browser with that cookie attached.
+        window.location.href = data.redirect || '/app';
+        return;
+      }
+      setCodeErr(codeMessage(data.error));
+    } catch {
+      setCodeErr('We could not check that just now. Try again in a minute.');
+    }
+    setCodeBusy(false);
+  }
+
+  async function next() {
     if (step < TOTAL) {
       setStep(step + 1);
-    } else {
-      submitSignup();
-      setDone(true);
+      return;
     }
+    // Save the answers FIRST, then ask for the code, then show the screen. In that order, because
+    // the verify step reconciles against the row this writes.
+    await submitSignup();
+    await sendCode();
+    setDone(true);
   }
   function back() {
     if (step > 1) setStep(step - 1);
@@ -280,8 +368,11 @@ export default function StartPage() {
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
               <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>Your plan is locked in.</h1>
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 28px' }}>
-                Your card is saved and your 7 day free trial is running. You will not be charged until it ends, and you can cancel any time before then and pay nothing. Say hello on WhatsApp to log your first receipt.
+                Your card is saved and your 7 day free trial is running. You will not be charged until it ends, and you can cancel any time before then and pay nothing.
               </p>
+              {/* The way in, not a way to a store queue. Both Stripe return screens land a man
+                  who already has an account, so the only sensible button is his own books. */}
+              <a href="/app" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12, marginBottom: 22 }}>Open my Lekhio →</a>
               <div style={{ marginBottom: 24 }}>
                 <StoreButtons />
                 <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>{storeNote()}</p>
@@ -295,6 +386,9 @@ export default function StartPage() {
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 28px' }}>
                 No card added, and that is fine. Your 7 day free trial is active. You can add a card to keep Lekhio any time, from the app or the website.
               </p>
+              {/* The way in, not a way to a store queue. Both Stripe return screens land a man
+                  who already has an account, so the only sensible button is his own books. */}
+              <a href="/app" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12, marginBottom: 22 }}>Open my Lekhio →</a>
               <div style={{ marginBottom: 24 }}>
                 <StoreButtons />
                 <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>{storeNote()}</p>
@@ -302,71 +396,71 @@ export default function StartPage() {
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
           ) : done ? (
+            /* 🔴 THE END OF THE ROAD USED TO BE A FIELD.
+               It read: download the app, let the app set you up, say hello on WhatsApp. The store
+               buttons beside it were dimmed and said "soon", and there was no link to the web app
+               anywhere on the page. The product did not appear at the end of its own signup.
+
+               Now the last thing he does is prove his email, which is what MAKES the account, and
+               then he is in. No download, no WhatsApp, no waiting on Apple. */
             <div className="step-anim" style={{ textAlign: 'center', paddingTop: 24 }}>
-              <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: GREEN_TINT, color: GREEN, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
-              <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>You are all set{greetName ? `, ${greetName.split(' ')[0]}` : ''}.</h1>
-              <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 420, margin: '0 auto 18px' }}>
-                Your 7 day free trial has started. No card needed. Three steps and your back office runs itself:
+              <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: RIVER_TINT, color: RIVER, fontSize: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✉</div>
+              <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>Check your email.</h1>
+              <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 8px' }}>
+                We have sent a six digit code to <b style={{ color: INK }}>{email.trim()}</b>. Type it
+                in and your Lekhio is ready.
+              </p>
+              <p style={{ fontSize: 13, color: MUTED, margin: '0 auto 24px', maxWidth: 400 }}>
+                It can take a minute to arrive. Have a look in your junk folder if it does not.
               </p>
 
-              <div style={{ textAlign: 'left', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 18, maxWidth: 460, margin: '0 auto 18px' }}>
-                {[
-                  ['1', 'Download the app', 'Your books, your figures, your yes on every entry.'],
-                  ['2', 'It sets you up on first open', 'A quick, skippable walk-through: confirm your business, the bits about you, connect your bank if you want, and see what Lekhio has already saved you.'],
-                  ['3', 'Say hello on WhatsApp', 'Then just send a receipt or a voice note as things happen. That is the whole job, day to day.'],
-                ].map(([n, t, d]) => (
-                  <div key={n} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '8px 0' }}>
-                    <span style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: RIVER_TINT, color: RIVER, fontSize: 12.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{n}</span>
-                    <span style={{ flex: 1 }}>
-                      <span style={{ display: 'block', fontSize: 14.5, fontWeight: 800, color: INK }}>{t}</span>
-                      <span style={{ display: 'block', fontSize: 13, color: MUTED, lineHeight: 1.5, marginTop: 2 }}>{d}</span>
-                    </span>
-                  </div>
-                ))}
-                <a href={`https://wa.me/447593214044?text=${encodeURIComponent('Hi')}`} style={{ display: 'block', textAlign: 'center', backgroundColor: '#25D366', color: '#fff', fontSize: 15, fontWeight: 700, padding: '13px 0', borderRadius: 12, marginTop: 10 }}>💬 Say hello on WhatsApp</a>
-              </div>
-
-              {/* Optional: add a card so Lekhio carries on after the free trial. */}
-              <div style={{ textAlign: 'left', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 20, maxWidth: 460, margin: '0 auto 24px' }}>
-                <p style={{ fontSize: 15, fontWeight: 800, color: INK, margin: '0 0 4px' }}>Add a card to keep Lekhio</p>
-                <p style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.5, margin: '0 0 14px' }}>
-                  {'Save a card so Lekhio carries on after your trial. Still 7 days free, cancel any time before then and pay nothing.'}
-                </p>
-
-                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                  {(['monthly', 'annual'] as const).map((p) => {
-                    const active = plan === p;
-                    return (
-                      <button key={p} onClick={() => setPlan(p)} style={{ flex: 1, cursor: 'pointer', fontSize: 13.5, fontWeight: 700, color: active ? RIVER : INK, backgroundColor: active ? RIVER_TINT : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 12, padding: '11px 0' }}>
-                        {p === 'monthly' ? 'Monthly' : 'Annual'}
-                        {p === 'annual' ? <span style={{ display: 'block', fontSize: 11, fontWeight: 600, color: GREEN, marginTop: 2 }}>2 months free</span> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
-                  <span style={{ fontSize: 26, fontWeight: 800, color: INK }}>{priceNow}</span>
-                  <span style={{ fontSize: 12.5, color: MUTED }}>after your free trial</span>
-                </div>
-
-                <button className="btn" onClick={startCheckout} disabled={billingBusy} style={{ width: '100%', cursor: billingBusy ? 'wait' : 'pointer', backgroundColor: RIVER, color: '#fff', border: 'none', fontSize: 15.5, fontWeight: 700, padding: '14px 0', borderRadius: 12 }}>
-                  {billingBusy ? 'Opening secure checkout…' : 'Save my card, stay 7 days free →'}
+              <div style={{ maxWidth: 320, margin: '0 auto' }}>
+                <label htmlFor="signup-code" style={{ ...fieldLabel, textAlign: 'left' }}>Your code</label>
+                <input
+                  id="signup-code"
+                  className="field"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  placeholder="6 digit code"
+                  maxLength={8}
+                  value={code}
+                  onChange={(e) => { setCode(e.target.value.replace(/\D/g, '')); setCodeErr(''); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && code.length >= 4) void confirmCode(); }}
+                  style={{ ...fieldStyle, textAlign: 'center', fontSize: 24, letterSpacing: '6px', fontWeight: 700 }}
+                />
+                {codeErr ? (
+                  <p role="alert" style={{ fontSize: 13.5, color: '#C0392B', lineHeight: 1.5, margin: '10px 0 0', textAlign: 'left' }}>{codeErr}</p>
+                ) : null}
+                <button
+                  className="btn"
+                  onClick={() => void confirmCode()}
+                  disabled={codeBusy || code.length < 4}
+                  style={{ width: '100%', marginTop: 14, cursor: codeBusy ? 'wait' : code.length < 4 ? 'not-allowed' : 'pointer', backgroundColor: code.length < 4 ? '#C7D2E8' : RIVER, color: '#fff', border: 'none', fontSize: 16, fontWeight: 700, padding: '15px 0', borderRadius: 12 }}
+                >
+                  {codeBusy ? 'Just a moment…' : 'Open my Lekhio →'}
                 </button>
-                <p style={{ fontSize: 11.5, color: MUTED, textAlign: 'center', margin: '10px 0 0' }}>Secure payment by Stripe. We never see your card number.</p>
+                <button
+                  type="button"
+                  onClick={() => void sendCode(true)}
+                  disabled={resendBusy}
+                  style={{ marginTop: 14, background: 'none', border: 'none', color: resendBusy ? MUTED : RIVER, fontSize: 14, fontWeight: 600, cursor: resendBusy ? 'default' : 'pointer', padding: 8 }}
+                >
+                  {resendBusy ? 'Sent. Give it a moment.' : 'Send it again'}
+                </button>
               </div>
 
-              <div style={{ marginBottom: 18 }}>
+              {/* The stores stay honest. They are not a call to action and they are not a way in:
+                  everything is on the web from today, and the app is launch two. */}
+              <div style={{ marginTop: 28 }}>
                 <StoreButtons />
                 <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>{storeNote()}</p>
               </div>
-              <p style={{ fontSize: 13, color: MUTED, marginBottom: 16 }}>Prefer to decide later? Just download the app, your trial is already running.</p>
-              <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
           ) : (
             <div key={step} className="step-anim">
               {step === 1 && (
-                <Step title="Let's set up your account" sub="Your mobile is your account and links your WhatsApp, where the work happens. Your email keeps everything tied to one place.">
+                <Step title="Let's set up your account" sub="Your email is your account, and we will send you a code at the end to prove it. Your mobile is what links your WhatsApp later, once you want to send receipts by text.">
                   <label htmlFor="signup-phone" style={fieldLabel}>Mobile number</label>
                   <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '15px 14px', backgroundColor: RIVER_TINT, color: RIVER, fontWeight: 700, fontSize: 16, borderRight: `1.5px solid ${LINE}` }}>🇬🇧 +44</span>
@@ -374,7 +468,7 @@ export default function StartPage() {
                   </div>
                   <label htmlFor="signup-email" style={{ ...fieldLabel, marginTop: 18 }}>Email</label>
                   <input id="signup-email" className="field" inputMode="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={fieldStyle} />
-                  <p style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>Your receipts, records and account all live here. The day to day still happens on WhatsApp.</p>
+                  <p style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>We send your code here, and everything about your account lives here. Your number is only used to link WhatsApp when you are ready.</p>
                   <p style={{ fontSize: 12.5, color: MUTED, marginTop: 12 }}>We never share your details. We only ever message you in reply to you.</p>
                 </Step>
               )}
@@ -493,7 +587,7 @@ export default function StartPage() {
                       );
                     })}
                   </div>
-                  <p style={{ fontSize: 12.5, color: MUTED, marginTop: 14 }}>Tick any that apply, or none. The two minute WhatsApp setup picks these up properly with the exact figures.</p>
+                  <p style={{ fontSize: 12.5, color: MUTED, marginTop: 14 }}>Tick any that apply, or none. We ask for the exact figures once you are inside, where they can be saved against your account.</p>
                 </Step>
               )}
 
@@ -518,7 +612,7 @@ export default function StartPage() {
                     })}
                   </div>
                   <div style={{ marginTop: 22, backgroundColor: RIVER_TINT, borderRadius: 12, padding: 16 }}>
-                    <p style={{ fontSize: 13.5, color: RIVER_DEEP, lineHeight: 1.6, margin: 0 }}>That is everything. Next you will start your free trial. No card needed, and you can cancel any time.</p>
+                    <p style={{ fontSize: 13.5, color: RIVER_DEEP, lineHeight: 1.6, margin: 0 }}>That is everything. We will email you a code to finish setting up your account, and your free trial starts the moment you are in. No card needed.</p>
                   </div>
                 </Step>
               )}
@@ -534,7 +628,7 @@ export default function StartPage() {
             {step > 1 ? (
               <button onClick={back} style={{ cursor: 'pointer', background: 'none', border: 'none', fontSize: 15, fontWeight: 600, color: MUTED, padding: '12px 4px' }}>Back</button>
             ) : <span />}
-            <button className="btn" onClick={next} disabled={!canContinue} style={{ cursor: canContinue ? 'pointer' : 'not-allowed', backgroundColor: canContinue ? RIVER : '#C7D2E8', color: '#fff', border: 'none', fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12 }}>
+            <button className="btn" onClick={() => void next()} disabled={!canContinue} style={{ cursor: canContinue ? 'pointer' : 'not-allowed', backgroundColor: canContinue ? RIVER : '#C7D2E8', color: '#fff', border: 'none', fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12 }}>
               {step === TOTAL ? 'Start free trial' : 'Continue'}
             </button>
           </div>

@@ -11,6 +11,10 @@
 import { encryptSecret, decryptSecret } from './crypto';
 import { referralCode, sanitizeRefCode } from './referral';
 import { trialEndsAt } from './entitlement';
+import {
+  decideTrialGrant, normaliseEmail, normalisePhone,
+  type MatchKind, type PriorGrant,
+} from './trialidentity';
 import type { TrialRow } from './trialnudge';
 import { CUSTOMER_COLUMNS, normaliseSource } from './team';
 import type { TeamCustomer, TeamMember } from './team';
@@ -1137,10 +1141,26 @@ export interface ReconcileResult { reconciled: boolean; applied: string[]; promp
 // It carries the facts that map cleanly: the business structure, the name/address, VAT status, and a
 // PAYE job alongside the trade. The 'property' and 'loan' streams need details the web did not
 // collect (rent figures, the student loan plan), so those stay as in-app prompts rather than guesses.
-export async function reconcileSignupToUser(userId: string): Promise<ReconcileResult> {
+// 🔴 THE JOIN KEY IS THE THING HE PROVED, AND SINCE 29 JULY 2026 THAT IS NOT ALWAYS THE PHONE.
+//
+// This used to read users.phone_number and look the signup up by it, full stop. That was right
+// while every account was minted by proving a number. A web account is now minted by proving an
+// EMAIL and its phone_number column is deliberately empty, so the old lookup would find nothing
+// and every answer he gave at /start would be dropped on the floor without a word.
+//
+// So: join by the phone when there is one, which is every mobile account and leaves that path
+// byte for byte as it was, and by the email when there is not.
+//
+// ⚠️ THE EMAIL MUST COME FROM THE CALLER, AND IT MUST BE ONE GoTrue VERIFIED. public.users has no
+// email column, so there is nothing here to read. /api/signup/verify passes the address off the
+// verified identity, never off the form, because an email that could be asserted would let a man
+// claim somebody else's signup answers, and those answers include his address.
+export async function reconcileSignupToUser(
+  userId: string,
+  verifiedEmail?: string | null,
+): Promise<ReconcileResult> {
   const { url } = config();
 
-  // The phone is the join key, and it lives on the user, not in the request.
   const ures = await fetch(
     `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=phone_number&limit=1`,
     { headers: headers() },
@@ -1149,11 +1169,21 @@ export async function reconcileSignupToUser(userId: string): Promise<ReconcileRe
   const urows = (await ures.json().catch(() => null)) as Array<{ phone_number: string | null }> | null;
   const phone = Array.isArray(urows) && urows[0]?.phone_number ? urows[0].phone_number : '';
   const e164 = normalizeUkPhone(phone);
-  if (!e164) return { reconciled: false, applied: [] };
 
-  // The most recent signup for this phone that has not been reconciled yet.
+  const email = (verifiedEmail ?? '').trim().toLowerCase();
+  // createSignup stores the address already lowercased, so an exact match is right here. Nothing
+  // clever: a normalised match would reconcile a DIFFERENT man's signup onto this account whenever
+  // two addresses collapse to the same mailbox, which is precisely what normalisation is for.
+  const match = e164
+    ? `phone=eq.${encodeURIComponent(e164)}`
+    : email
+      ? `email=eq.${encodeURIComponent(email)}`
+      : '';
+  if (!match) return { reconciled: false, applied: [] };
+
+  // The most recent signup for this man that has not been reconciled yet.
   const res = await fetch(
-    `${url}/rest/v1/signups?phone=eq.${encodeURIComponent(e164)}&reconciled_at=is.null` +
+    `${url}/rest/v1/signups?${match}&reconciled_at=is.null` +
       `&select=trade_type,name,address,postcode,vat_registered,streams&order=created_at.desc&limit=1`,
     { headers: headers() },
   );
@@ -1205,9 +1235,10 @@ export async function reconcileSignupToUser(userId: string): Promise<ReconcileRe
     )) applied.push('other_job');
   }
 
-  // Mark reconciled, so a second app launch never re-applies any of the above.
+  // Mark reconciled, so a second sign in never re-applies any of the above. Same key we read on,
+  // or we would mark a row we did not use and leave the one we did unmarked for ever.
   await fetch(
-    `${url}/rest/v1/signups?phone=eq.${encodeURIComponent(e164)}&reconciled_at=is.null`,
+    `${url}/rest/v1/signups?${match}&reconciled_at=is.null`,
     {
       method: 'PATCH',
       headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
@@ -1946,6 +1977,193 @@ export async function grantTrialIfNone(phone: string): Promise<SubscriptionStatu
 
     const rows = (await res.json()) as SubscriptionStatus[];
     return rows[0] ?? (await getSubscriptionByPhone(phone));
+  } catch {
+    return null;
+  }
+}
+
+// ── The web trial: granted against an ACCOUNT, not a phone ───────────────────────────────────────
+//
+// 🔴 WHY THERE IS A SECOND GRANT FUNCTION AND grantTrialIfNone WAS NOT SIMPLY CHANGED.
+//
+// grantTrialIfNone(phone) is the MOBILE path, and on mobile the phone has been proved by an SMS
+// before the app ever calls it. It is correct there and it is left exactly as it was.
+//
+// The web mints an account on a proved EMAIL, and the number is typed. Handing that number to
+// grantTrialIfNone would key a man's billing to a string he could change by typing, and worse,
+// would write it into subscriptions.phone, which /api/cron/trial reads and SENDS A WHATSAPP TO.
+// One mistyped digit and a stranger is told somebody else's trial is ending.
+//
+// So the web grants against the account id, records every identifier we hold for the duplicate
+// check, and puts the typed number in signup_phone, which nothing sends to.
+
+export interface TrialGrantInput {
+  userId: string;
+  email: string;
+  // Typed at signup, proved by nobody. Evidence only. Never a send target.
+  signupPhone?: string | null;
+  personName?: string | null;
+  businessName?: string | null;
+}
+
+export interface TrialGrantResult {
+  sub: SubscriptionStatus | null;
+  granted: boolean;
+  refusedOn: MatchKind | null;
+  // Soft collisions for a human to look at. Never a reason to refuse. See lib/trialidentity.ts.
+  flags: MatchKind[];
+}
+
+// Every local grant that shares an identifier with this man. Five small indexed reads rather than
+// one clever `or=()`: a normalised email and a business name both contain characters PostgREST
+// treats as syntax inside or(), and a filter that silently fails to parse is a duplicate check
+// that quietly returns nothing and grants everybody a second trial.
+async function priorLocalGrants(input: TrialGrantInput): Promise<PriorGrant[]> {
+  const { url } = config();
+  const cols = 'user_id,email_norm,signup_phone,person_name,business_name';
+  const base = `${url}/rest/v1/subscriptions?stripe_subscription_id=is.null&select=${cols}&limit=20`;
+
+  const emailNorm = normaliseEmail(input.email);
+  const phone = normalisePhone(input.signupPhone);
+  const person = (input.personName ?? '').trim();
+  const business = (input.businessName ?? '').trim();
+
+  const wanted: string[] = [];
+  if (input.userId) wanted.push(`&user_id=eq.${encodeURIComponent(input.userId)}`);
+  if (emailNorm) wanted.push(`&email_norm=eq.${encodeURIComponent(emailNorm)}`);
+  if (phone) wanted.push(`&signup_phone=eq.${encodeURIComponent(phone)}`);
+  if (person) wanted.push(`&person_name=eq.${encodeURIComponent(person)}`);
+  if (business) wanted.push(`&business_name=eq.${encodeURIComponent(business)}`);
+
+  const pages = await Promise.all(
+    wanted.map(async (q) => {
+      try {
+        const res = await fetch(base + q, { headers: headers() });
+        if (!res.ok) return null;
+        return (await res.json()) as PriorGrant[];
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  // ⚠️ A READ THAT FAILED IS NOT A CLEAN SHEET. If any of these could not be answered we do not
+  // know whether he has had a trial, and refusing a man on our own database wobble is the mistake
+  // lib/entitlement.ts spends forty lines telling us not to make. So an unreadable check is
+  // treated as "no prior found", he gets his week, and the unique indexes in the database are what
+  // stop an actual double grant.
+  return pages.filter((p): p is PriorGrant[] => Array.isArray(p)).flat();
+}
+
+// What he told us at /start, read back off his own signup row so the trial identity is never
+// taken from the browser. The form that posts a code could post any name and any number beside it;
+// the signup row is what he actually filled in, minutes earlier, before he had an account.
+//
+// Deliberately NOT filtered on reconciled_at: this is read alongside reconcileSignupToUser, which
+// marks rows as it goes, and a filter here would make the answer depend on which ran first.
+export interface SignupIdentity {
+  phone: string | null;
+  personName: string | null;
+  businessName: string | null;
+}
+
+export async function latestSignupIdentity(email: string): Promise<SignupIdentity | null> {
+  const key = (email ?? '').trim().toLowerCase();
+  if (!key) return null;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/signups?email=eq.${encodeURIComponent(key)}` +
+        `&select=phone,person_name,name,trade_type&order=created_at.desc&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{
+      phone: string | null; person_name: string | null; name: string | null; trade_type: string | null;
+    }>;
+    const r = rows[0];
+    if (!r) return null;
+    // A sole trader's `name` IS his own name, not a business, so it must not be filed as one: two
+    // different sole traders called Dave Smith would otherwise collide on "business" as well as
+    // "name" and look far more like the same man than they are.
+    const isBusiness = r.trade_type === 'ltd' || r.trade_type === 'business';
+    return {
+      phone: r.phone ?? null,
+      personName: r.person_name ?? r.name ?? null,
+      businessName: isBusiness ? r.name ?? null : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function grantTrialWithIdentity(input: TrialGrantInput): Promise<TrialGrantResult> {
+  const none: TrialGrantResult = { sub: null, granted: false, refusedOn: null, flags: [] };
+  if (!input.userId) return none;
+
+  // Already has one on this account? Hand it back rather than deciding anything.
+  const existing = await getSubscriptionByUser(input.userId);
+  if (existing) return { sub: existing, granted: false, refusedOn: 'account', flags: [] };
+
+  const decision = decideTrialGrant(
+    {
+      userId: input.userId,
+      email: input.email,
+      signupPhone: input.signupPhone ?? null,
+      personName: input.personName ?? null,
+      businessName: input.businessName ?? null,
+    },
+    await priorLocalGrants(input),
+  );
+  if (!decision.grant) {
+    return { sub: null, granted: false, refusedOn: decision.refusedOn, flags: decision.flags };
+  }
+
+  const { url } = config();
+  try {
+    const res = await fetch(`${url}/rest/v1/subscriptions`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=representation' }),
+      body: JSON.stringify({
+        user_id: input.userId,
+        email: input.email,
+        email_norm: normaliseEmail(input.email),
+        // 🔴 signup_phone, NOT phone. phone is a send target: /api/cron/trial texts it.
+        signup_phone: normalisePhone(input.signupPhone),
+        person_name: (input.personName ?? '').trim() || null,
+        business_name: (input.businessName ?? '').trim() || null,
+        plan: null,
+        status: 'trialing',
+        amount_pence: 0,
+        current_period_end: trialEndsAt(),
+        cancel_at_period_end: false,
+      }),
+    });
+    // 409: a unique index refused a second grant, so another request won the race, or he really
+    // has had one. Either way read back what is there. The database is the rule, this is the hope.
+    if (res.status === 409) {
+      const back = await getSubscriptionByUser(input.userId);
+      return { sub: back, granted: false, refusedOn: 'account', flags: decision.flags };
+    }
+    if (!res.ok) return { ...none, flags: decision.flags };
+    const rows = (await res.json()) as SubscriptionStatus[];
+    return { sub: rows[0] ?? null, granted: true, refusedOn: null, flags: decision.flags };
+  } catch {
+    return { ...none, flags: decision.flags };
+  }
+}
+
+export async function getSubscriptionByUser(userId: string): Promise<SubscriptionStatus | null> {
+  if (!userId) return null;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(userId)}&select=status,plan,current_period_end,cancel_at_period_end&order=updated_at.desc&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as SubscriptionStatus[];
+    return rows[0] ?? null;
   } catch {
     return null;
   }

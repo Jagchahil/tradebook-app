@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPhoneForUser, grantTrialIfNone } from '../../../../lib/supabase';
+import { getPhoneForUser, grantTrialIfNone, getSubscriptionByUser } from '../../../../lib/supabase';
 import { sessionUser } from '../../../../lib/webauth';
 import { isEntitled } from '../../../../lib/entitlement';
 
@@ -21,6 +21,11 @@ import { isEntitled } from '../../../../lib/entitlement';
 export async function POST(req: NextRequest) {
   const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // A web signup already has a trial, granted against his account at /api/signup/verify. Hand it
+  // back rather than looking for a phone he has deliberately never proved.
+  const byAccount = await getSubscriptionByUser(user.id);
+  if (byAccount) return NextResponse.json({ ...byAccount, entitled: isEntitled(byAccount) });
 
   const phone = await getPhoneForUser(user.id);
   if (!phone) return NextResponse.json({ status: 'none', entitled: false });

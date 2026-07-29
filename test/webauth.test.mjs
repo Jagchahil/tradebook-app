@@ -144,14 +144,37 @@ ok('the api tree was actually walked (not vacuous)', apiRoutes.length > 50);
 //   api/team/...            Jag's internal console. Signs in with browserSupabase and sends a
 //                           Bearer. Not a customer surface, and it must never start accepting the
 //                           customer cookie.
-//   api/auth/verify         The door itself. It MINTS the cookie, so it cannot require one.
+//   api/auth/verify         The SIGN IN door. It MINTS the cookie, so it cannot require one.
+//   api/signup/verify       The SIGN UP door, added 29 July 2026. Same reason exactly: it proves an
+//                           emailed code, creates the account, and mints the very cookie every
+//                           other route demands. A door cannot ask to see the key it is about to cut.
 //   api/connectors/.../start  Lives outside api/team but IS a team route: it checks readTeamMember
 //                           and refuses anybody who is not the owner.
 const BEARER_ALLOWED = [
   'app/api/team/',
   'app/api/auth/verify/route.ts',
+  'app/api/signup/verify/route.ts',
   'app/api/connectors/[platform]/start/route.ts',
 ];
+
+// ⚠️ AND THE EXCUSE HAS TO BE TRUE.
+//
+// Two entries above are excused because they MINT a session. That is a claim in a comment, and a
+// comment is exactly what this file exists to stop us relying on: the next person who needs to
+// verify a Bearer directly can make the red test go green by adding one line to the list, and the
+// reason he writes need not be true.
+//
+// So the claim is checked. A route excused for being a door must actually set the session cookie.
+// If one ever stops doing that, it is not a door any more and it has no business here.
+const DOORS = ['app/api/auth/verify/route.ts', 'app/api/signup/verify/route.ts'];
+const notReallyDoors = DOORS.filter((d) => {
+  const src = read(path.join(repo, d));
+  return !(src.includes('SESSION_COOKIE') && src.includes('sessionCookieValue'));
+});
+ok(
+  `🔴 EVERY ROUTE EXCUSED AS A DOOR ACTUALLY MINTS A SESSION${notReallyDoors.length ? `\n     ${notReallyDoors.join('\n     ')}` : ''}`,
+  notReallyDoors.length === 0,
+);
 const strayBearer = apiRoutes
   .filter((f) => read(f).includes('verifyAccessToken'))
   .map(rel)

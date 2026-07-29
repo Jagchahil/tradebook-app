@@ -137,7 +137,11 @@ export default async function MoneyPage() {
         ) : (
           // NOT ENOUGH IS NOT ZERO. lib/ledger.ts refuses to draw a confident number off three
           // weeks of data, and this screen says why rather than showing a proud and silly £14.
-          <p style={S.note}>{l.note}</p>
+          //
+          // ⚠️ AND IT IS NOT SAID TWICE. headline() falls back to l.note when there is not enough
+          // to be confident, so rendering the note underneath printed the identical sentence twice,
+          // one above the other, on the first screen a new customer ever sees.
+          l.note && l.note !== headline(l) ? <p style={S.note}>{l.note}</p> : null
         )}
 
         {/* HIS OWN MONEY, HELD BY HMRC. Its own number, never added to what we saved him. This

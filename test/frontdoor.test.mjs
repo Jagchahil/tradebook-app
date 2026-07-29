@@ -106,6 +106,36 @@ ok('the homepage names no messaging channel at all', !/WhatsApp/.test(home));
 ok('step one is connecting the bank', /title: 'Connect your bank'/.test(site));
 
 // ---------------------------------------------------------------------------------------------
+// 🔴 AND THE SENTENCES THAT COME OUT OF lib/, WHICH THE CHECKS ABOVE CANNOT SEE.
+//
+// The first version of this file walked app/*.tsx only, and missed the emptiest screen in the
+// product: /app renders lib/ledger.ts's note, which read "Nothing confirmed yet. Send a receipt or
+// connect the bank." Sending a receipt means WhatsApp, which needs a proved number he does not
+// have. So the very first thing a new customer saw was an instruction he could not follow, and a
+// test that only reads .tsx files reported everything green.
+//
+// These are the lib modules whose strings are printed to a customer verbatim.
+// ---------------------------------------------------------------------------------------------
+//
+// ⚠️ COMMENTS ARE STRIPPED FIRST. lib/weeklyupdate.ts's header explains at length why the summary
+// became a pull rather than a push, and it must keep saying WhatsApp to make sense. What matters is
+// the STRINGS a customer is shown, not the reasoning above them.
+const CUSTOMER_LIBS = ['lib/ledger.ts', 'lib/weeklyupdate.ts'];
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const libSays = CUSTOMER_LIBS.filter((f) => /send a receipt|Send a receipt/i.test(codeOnly(read(f))));
+ok(
+  `🔴 no sentence printed from lib names an action a web customer cannot take${libSays.length ? `\n     ${libSays.join('\n     ')}` : ''}`,
+  libSays.length === 0,
+);
+ok('the empty ledger points at the one thing that works today',
+  /Connect your bank and this fills itself in/.test(read('lib/ledger.ts')));
+
+// ⚠️ AND THE SAME SENTENCE IS NEVER PRINTED TWICE. headline() falls back to the note when there is
+// not enough data to be confident, so /app rendering both put the identical line above itself.
+ok('the money screen does not print the headline and the note when they are the same',
+  read('app/app/page.tsx').includes("l.note !== headline(l)"));
+
+// ---------------------------------------------------------------------------------------------
 // WHAT STAYS, AND WHY REMOVING IT WOULD MAKE THINGS WORSE.
 //
 // The privacy policy, the terms and the security page describe a capability that genuinely exists

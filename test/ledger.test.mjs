@@ -122,8 +122,12 @@ ok('two weeks in, we do NOT proudly report that we saved him £14',
 ok('...we say WHY, in his words',
   early.note.includes('Too early to say'));
 
-ok('a man with nothing confirmed is told to send a receipt, not shown a zero',
-  ledger({ ...base, grossIncome: 0 }).note.includes('Send a receipt'));
+// 🔴 THE POINT IS THAT HE IS GIVEN SOMETHING TO DO, NOT SHOWN A ZERO. The action changed on
+// 29 July: this used to say "Send a receipt", which means WhatsApp, which needs a proved number a
+// web customer does not have. Naming an action he cannot take turns an empty screen into a dead
+// end, which is worse than the zero this assertion was written to prevent.
+ok('a man with nothing confirmed is given something he can actually do, not shown a zero',
+  ledger({ ...base, grossIncome: 0 }).note.includes('Connect your bank'));
 
 ok('...but his CIS is still shown, because that money is real and it is HIS',
   ledger({ ...base, grossIncome: 0, cisSuffered: 4_000 }).refundDue === 4_000);
@@ -164,9 +168,9 @@ ok('the headline is one line, his number, no adjectives',
 ok('...and when there is nothing to say, it says nothing rather than something',
   headline(early) === early.note);
 
-ok('a man who has saved nothing is told to log a cost, not congratulated',
+ok('a man who has saved nothing is told what to do next, not congratulated',
   headline(ledger({ ...base, expenses: 0, mileage: 0, homeOffice: 0, capitalAllowances: 0 }))
-    .includes('starts moving'));
+    .includes('starts counting'));
 
 // --- and the sanity floor -----------------------------------------------------------------------
 

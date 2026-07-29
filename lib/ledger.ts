@@ -151,7 +151,10 @@ export function ledger(input: LedgerInput): Ledger {
     return {
       enough: false,
       note: gross <= 0
-        ? 'Nothing confirmed yet. Send a receipt or connect the bank and this fills itself in.'
+        // ⚠️ THE ONE THING HE CAN ACTUALLY DO. This said "send a receipt or connect the bank", and
+        // sending a receipt means WhatsApp, which needs a proved number a web customer does not
+        // have yet. Naming an action he cannot take is how an empty screen becomes a dead end.
+        ? 'Nothing confirmed yet. Connect your bank and this fills itself in.'
         : `Too early to say. Give it ${ENOUGH_MONTHS} months of real figures and this will mean something.`,
       withoutLekhio: 0, withLekhio: 0, saved: 0, lines: [],
       refundDue: round(Math.max(0, input.cisSuffered)),
@@ -196,7 +199,7 @@ export function ledger(input: LedgerInput): Ledger {
 // The sentence for the top of the screen. One line, his numbers, no adjectives.
 export function headline(l: Ledger): string {
   if (!l.enough) return l.note ?? '';
-  if (l.saved <= 0) return 'Nothing saved yet. Log a cost and this starts moving.';
+  if (l.saved <= 0) return 'Nothing saved yet. Connect your bank and every cost starts counting.';
   return `Lekhio has kept £${l.saved.toLocaleString('en-GB')} out of the taxman's hands this year.`;
 }
 

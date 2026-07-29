@@ -69,8 +69,8 @@ ok('the trial is keyed to the account', /user_id: input\.userId/.test(grant));
 // 🔴 THE SAME RULE AT THE OTHER END. The users row is created with the number GoTrue proved,
 // which for an email signup is nothing at all, never with anything off the form.
 // ---------------------------------------------------------------------------------------------
-ok('the account is created from the VERIFIED identity, not the form',
-  /ensureUserRow\(user\.id, user\.phone \|\| ''\)/.test(verify));
+ok('🔴 the users row is created with an EMPTY phone, never one off the form',
+  /ensureUserRow\(userId, ''\)/.test(verify));
 ok('nothing in the verify route reads a phone out of the request body',
   !/body\.phone|body\?\.phone/.test(verify));
 ok('identity for the trial is read off the signup row, not the request',
@@ -84,11 +84,39 @@ ok('identity for the trial is read off the signup row, not the request',
 // address and be handed an account keyed to that stranger's number. /api/signup/code is SIGNING
 // UP, where creating the account is the entire job. If these two ever agree, one of them is wrong.
 // ---------------------------------------------------------------------------------------------
-ok('the signup door creates accounts', /create_user: true/.test(codeRoute));
-ok('the sign in door still refuses to create one from an email',
+// 🔴 NOTHING IS CREATED BEFORE THE CODE COMES BACK.
+//
+// This is the security claim the whole signup rests on, and it is a claim about ABSENCE, which is
+// exactly the kind that rots quietly. Until the right six digits arrive, the entire footprint of a
+// signup attempt is one row in signup_codes and one email in somebody else's inbox: no auth user,
+// no users row, no trial, no session.
+ok('🔴 the code door creates no auth user', !codeRoute.includes('createConfirmedAuthUser'));
+ok('🔴 the code door creates no users row', !codeRoute.includes('ensureUserRow'));
+ok('🔴 the code door grants no trial', !codeRoute.includes('grantTrial'));
+ok('🔴 the code door opens no session', !codeRoute.includes('createWebSession'));
+ok('the code door writes down the code before it emails it, never after',
+  codeRoute.indexOf('createSignupCode(') < codeRoute.indexOf('sendSignupCodeEmail('));
+
+// 🔴 THE ORDER INSIDE VERIFY. Each of these is a hole if it reverses.
+ok('🔴 the guess is COUNTED before it is compared, so a dropped request is not a free guess',
+  verify.indexOf('bumpSignupCodeAttempt(') < verify.indexOf('verifyStoredCode('));
+ok('🔴 the code is SPENT before an account is created, so one proof cannot mint two',
+  verify.indexOf('consumeSignupCode(') < verify.indexOf('createConfirmedAuthUser('));
+ok('🔴 the session is opened LAST, after the code is spent',
+  verify.indexOf('consumeSignupCode(') < verify.indexOf('createWebSession('));
+
+// The sign in door is a different door and must stay one.
+ok('the sign in door still refuses to create an account from an email',
   /email: id\.value, create_user: false/.test(authStart));
 ok('and it still refuses to send at all to an email with no account behind it',
   authStart.includes("if (id.channel === 'email' && !account.userId)"));
+
+// 🔴 THE CODE IS NEVER WRITTEN ANYWHERE BUT THE EMAIL.
+//
+// lib/signupcode.ts stores only an HMAC. This is the other half: the routes must not put the plain
+// code into a log line, an error body, or a response. A code in a log is a login in a log.
+ok('🔴 the code door never logs or returns the code', !/console\.(log|error)\([^)]*code[^)]*\)/.test(codeRoute));
+ok('🔴 the verify door never logs the code', !/console\.(log|error)\([^)]*\bcode\b/.test(verify));
 
 // ---------------------------------------------------------------------------------------------
 // Both new doors are state changing, so both check the origin. SameSite is a promise made by the

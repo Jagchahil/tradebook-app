@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { rateLimitedShared, clientIp } from '../../../../lib/ratelimit';
 import { targetHash } from '../../../../lib/logindoor';
 import {
-  verifyAccessToken, createWebSession, ensureUserRow, reconcileSignupToUser,
-  latestSignupIdentity, grantTrialWithIdentity,
+  createWebSession, ensureUserRow, reconcileSignupToUser, latestSignupIdentity,
+  grantTrialWithIdentity, readLatestSignupCode, bumpSignupCodeAttempt, consumeSignupCode,
+  findAuthUserIdForEmail, createConfirmedAuthUser, setSignupUserId,
 } from '../../../../lib/supabase';
 import {
   SESSION_COOKIE, SESSION_TTL_SECONDS, newSessionId, originAllowed,
@@ -11,6 +12,10 @@ import {
 } from '../../../../lib/websession';
 import { looksLikeEmail } from '../../../../lib/email';
 import { normaliseEmail, refusalNote } from '../../../../lib/trialidentity';
+import {
+  verifyStoredCode, codeMessage, isCodeShape, signupCodesConfigured,
+} from '../../../../lib/signupcode';
+import { sendWelcomeEmail } from '../../../../lib/email';
 
 export const runtime = 'nodejs';
 
@@ -35,26 +40,28 @@ export const runtime = 'nodejs';
 // ⚠️ NO PENDING COOKIE HERE, UNLIKE /api/auth/verify, AND THE DIFFERENCE IS DELIBERATE.
 //
 // That route reads the contact from a signed cookie because its identifier is a PHONE NUMBER, and
-// a phone number must never be written into a URL, a history entry or a Referer header. It also
-// had to stop a man exchanging a code sent to his own device for somebody else's account.
+// a phone number must never be written into a URL, a history entry or a Referer header.
 //
-// Neither applies here. GoTrue validates the address and the token AS A PAIR, so a posted address
-// that we never sent to simply fails, and every fact used after this point comes from the verified
-// identity GoTrue hands back rather than from the form. Adding a second cookie mechanism beside
-// the sign in one would be new surface in the most sensitive corner of the codebase, bought for
-// nothing.
+// Here the identifier is an email and the code is bound to it CRYPTOGRAPHICALLY: the stored value
+// is an HMAC over the address and the code together, so a code issued to one address can never
+// validate against another. Posting somebody else's address with a code you were sent does not
+// work, because the hash will not match. The cookie would be adding a second mechanism to enforce
+// something the hash already enforces, and new surface in this corner is not bought cheaply.
 //
-// FOUR THINGS HAPPEN, IN THIS ORDER, AND THE ORDER MATTERS:
+// FIVE THINGS HAPPEN, IN THIS ORDER, AND EVERY ONE OF THE ORDERINGS IS LOAD BEARING:
 //
-//   1. The code is proved. Nothing below runs otherwise.
-//   2. The users row is created, WITHOUT a phone.
-//   3. His /start answers are reconciled onto it, joined by the address he just proved.
-//   4. The trial is granted against the ACCOUNT, carrying every identifier we hold.
+//   1. The attempt is COUNTED, before anything is compared. An abandoned request is not a free guess.
+//   2. The code is checked. Spent, burnt and expired are all decided before the digits are compared,
+//      so no dead row can be revived by a lucky one.
+//   3. The code is SPENT, conditionally, in the database. Two requests carrying one valid code
+//      cannot both proceed.
+//   4. Only now does the account exist: the auth user, then the users row WITHOUT a phone.
+//   5. His answers, his trial and his session.
 //
-// Three and four are best effort. A man must never be left without an account because a profile
-// field would not save, and he must never be left without his books because a billing row would
-// not write. Only the session is allowed to fail him, because a cookie that means nothing is worse
-// than an honest error.
+// The reconcile and the trial are best effort. A man must never be left without an account because
+// a profile field would not save, nor without his books because a billing row would not write. Only
+// the session is allowed to fail him, because a cookie that means nothing is worse than an honest
+// error.
 
 const PER_TARGET_VERIFIES = 10;
 const PER_TARGET_WINDOW_SECONDS = 15 * 60;
@@ -89,49 +96,65 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'toomany' }, { status: 429 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  if (!url || !anon) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+  if (!signupCodesConfigured()) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+  if (!isCodeShape(code)) return NextResponse.json({ error: 'code' }, { status: 400 });
 
-  let accessToken = '';
-  try {
-    const res = await fetch(`${url}/auth/v1/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: anon },
-      body: JSON.stringify({ type: 'email', email, token: code }),
-    });
-    if (!res.ok) return NextResponse.json({ error: 'code' }, { status: 400 });
-    const json = (await res.json()) as { access_token?: string };
-    accessToken = json.access_token || '';
-  } catch {
-    return NextResponse.json({ error: 'send' }, { status: 502 });
+  const verifiedEmail = email;
+  const emailNorm = normaliseEmail(email) || email;
+
+  const row = await readLatestSignupCode(emailNorm);
+
+  // ⚠️ THE ATTEMPT IS COUNTED BEFORE THE COMPARISON, AND THAT ORDER IS THE GUARD.
+  //
+  // Counting afterwards looks tidier and is the hole: a request abandoned, timed out, or dropped
+  // between comparing and writing is a FREE GUESS, and free guesses are the whole attack. Counting
+  // first means the worst case is an honest man burning one of five on a bad connection, which
+  // costs him a tap on "Send it again".
+  if (row) await bumpSignupCodeAttempt(row.id);
+
+  const verdict = verifyStoredCode(row, emailNorm, code);
+  if (verdict !== 'ok') {
+    // The reason is specific on purpose. "Try again" is useless advice for a code that can no
+    // longer work however carefully he types it, and an expired code is not his mistake.
+    return NextResponse.json({ error: 'code', message: codeMessage(verdict) }, { status: 400 });
   }
-  if (!accessToken) return NextResponse.json({ error: 'code' }, { status: 400 });
 
-  // ⚠️ THE IDENTITY COMES FROM SUPABASE, NEVER FROM US. We hand the token straight back to GoTrue
-  // and let it say who this is, exactly as every authed route already does, then throw the token
-  // away. It never reaches the browser, so there is nothing on the page for a script to steal.
-  const user = await verifyAccessToken(accessToken);
-  if (!user) return NextResponse.json({ error: 'code' }, { status: 400 });
+  // 🔴 SPENDING IT IS THE DATABASE'S DECISION, NOT OURS.
+  //
+  // Two requests carrying the same valid code both pass the check above, because both read the row
+  // before either wrote to it. Only one of them gets a row back from consumeSignupCode, which
+  // filters on consumed_at being null. The loser is refused here rather than being handed a second
+  // session on one proof.
+  const spent = await consumeSignupCode(row!.id);
+  if (!spent) return NextResponse.json({ error: 'code', message: codeMessage('spent') }, { status: 400 });
 
-  // The address as GoTrue holds it, not as the form spelled it.
-  const verifiedEmail = (user.email || email).trim().toLowerCase();
+  // 🔴 THE AUTH USER IS CREATED ONLY NOW, ON THE FAR SIDE OF THE PROOF.
+  //
+  // An address that already has an account resolves to it and he simply ends up in his own books,
+  // which is the right outcome for a man who forgot he had signed up and gives nothing away to
+  // anybody who did not just read his inbox.
+  const existingId = await findAuthUserIdForEmail(verifiedEmail);
+  const userId = existingId ?? (await createConfirmedAuthUser(verifiedEmail));
+  if (!userId) return NextResponse.json({ error: 'account' }, { status: 502 });
 
-  // 🔴 EMPTY PHONE. See the header. user.phone is whatever GoTrue has, which for an email signup is
-  // nothing, and passing it through rather than the typed number is what keeps that true.
-  const rowOk = await ensureUserRow(user.id, user.phone || '');
+  // 🔴 EMPTY PHONE. See the header. Nothing here has proved a number, so nothing here writes one.
+  const rowOk = await ensureUserRow(userId, '');
   if (!rowOk) return NextResponse.json({ error: 'account' }, { status: 502 });
 
+  // The bridge from this address to this account, so the sign in door can find him tomorrow without
+  // going through a phone number he has deliberately never proved.
+  await setSignupUserId(verifiedEmail, userId);
+
   // His /start answers, carried onto the account so nothing is asked twice. Best effort on purpose.
-  await reconcileSignupToUser(user.id, verifiedEmail).catch(() => null);
+  await reconcileSignupToUser(userId, verifiedEmail).catch(() => null);
 
   // The trial. The identity is read off his own signup row rather than the request body, so a
   // crafted post cannot hand us a clean name and number to get past the duplicate check.
   let trialNote: string | null = null;
+  const ident = await latestSignupIdentity(verifiedEmail);
   try {
-    const ident = await latestSignupIdentity(verifiedEmail);
     const grant = await grantTrialWithIdentity({
-      userId: user.id,
+      userId,
       email: verifiedEmail,
       signupPhone: ident?.phone ?? null,
       personName: ident?.personName ?? null,
@@ -147,9 +170,13 @@ export async function POST(req: NextRequest) {
     // A billing row that would not write must never cost a man his account.
   }
 
+  // Welcome him, now that there is something to welcome him to. Only on a NEW account: a man
+  // signing back in after forgetting does not need telling he has joined.
+  if (!existingId) void sendWelcomeEmail(verifiedEmail, ident?.personName ?? null).catch(() => {});
+
   const sessionId = newSessionId();
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
-  const opened = await createWebSession(user.id, sessionId, expiresAt);
+  const opened = await createWebSession(userId, sessionId, expiresAt);
   if (!opened) return NextResponse.json({ error: 'session' }, { status: 502 });
 
   const cookie = sessionCookieValue(sessionId);

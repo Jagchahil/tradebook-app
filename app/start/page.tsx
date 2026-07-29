@@ -267,7 +267,7 @@ export default function StartPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), code }),
       });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; redirect?: string; error?: string };
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; redirect?: string; error?: string; message?: string };
       if (res.ok && data.ok) {
         // A full navigation, not a router push. The session arrives as an HttpOnly cookie on this
         // very response, and /app is server rendered off it, so the next page must be fetched by
@@ -275,7 +275,10 @@ export default function StartPage() {
         window.location.href = data.redirect || '/app';
         return;
       }
-      setCodeErr(codeMessage(data.error));
+      // The route sends a specific sentence for a code that expired, was used, or has been retired
+      // after too many tries. Prefer it: "that code did not work" is useless advice for a code that
+      // can no longer work however carefully he types it.
+      setCodeErr(data.message || codeMessage(data.error));
     } catch {
       setCodeErr('We could not check that just now. Try again in a minute.');
     }

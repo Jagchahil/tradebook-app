@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSignup } from '../../../lib/supabase';
 import { searchCompanies, getCompany, companiesHouseEnabled } from '../../../lib/companieshouse';
-import { sendWelcomeEmail } from '../../../lib/email';
 import { rateLimitedShared, clientIp } from '../../../lib/ratelimit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -195,10 +194,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not save. Please try again.' }, { status: 500 });
     }
 
-    // Fire a welcome email, best effort, only if they gave one. No-op until Resend is configured.
-    // Greet the PERSON. This used to pass `name`, which for a limited company is the company, so
-    // the welcome email opened "Hi Smith Electrical Ltd".
-    if (email) void sendWelcomeEmail(email, str(b.personName) ?? str(b.name)).catch(() => {});
+    // 🔴 THE WELCOME EMAIL DOES NOT FIRE HERE ANY MORE.
+    //
+    // This route saves the answers. It does not create an account: that happens at
+    // /api/signup/verify, on a proved code. Welcoming a man here meant welcoming him to something he
+    // had not joined, and every abandoned signup got a welcome to an account that did not exist.
+    // The welcome now fires from the far side of verification, where it is true.
 
     // Never log the personal details. Just confirm one signup saved.
     console.log('[onboard] Saved one signup');

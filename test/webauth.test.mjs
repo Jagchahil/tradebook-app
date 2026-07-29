@@ -145,15 +145,15 @@ ok('the api tree was actually walked (not vacuous)', apiRoutes.length > 50);
 //                           Bearer. Not a customer surface, and it must never start accepting the
 //                           customer cookie.
 //   api/auth/verify         The SIGN IN door. It MINTS the cookie, so it cannot require one.
-//   api/signup/verify       The SIGN UP door, added 29 July 2026. Same reason exactly: it proves an
-//                           emailed code, creates the account, and mints the very cookie every
-//                           other route demands. A door cannot ask to see the key it is about to cut.
 //   api/connectors/.../start  Lives outside api/team but IS a team route: it checks readTeamMember
 //                           and refuses anybody who is not the owner.
+//
+// api/signup/verify is deliberately NOT here. It mints a session, so it is a door, but it proves
+// its own emailed code against lib/signupcode.ts and never touches a Bearer token. It is on the
+// DOORS list below and nowhere else.
 const BEARER_ALLOWED = [
   'app/api/team/',
   'app/api/auth/verify/route.ts',
-  'app/api/signup/verify/route.ts',
   'app/api/connectors/[platform]/start/route.ts',
 ];
 

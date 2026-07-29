@@ -1982,6 +1982,180 @@ export async function grantTrialIfNone(phone: string): Promise<SubscriptionStatu
   }
 }
 
+// ── Signup codes: the six digits we send ourselves ──────────────────────────────────────────────
+//
+// The rules live in lib/signupcode.ts, which is pure. This is only the reading and writing.
+// See supabase/APPLY_2026-07-29_signup_codes.sql for why we send the code rather than GoTrue.
+
+export interface SignupCodeRow {
+  id: string;
+  code_hash: string;
+  attempts: number;
+  expires_at: string;
+  consumed_at: string | null;
+}
+
+export async function createSignupCode(
+  email: string, emailNorm: string, codeHash: string, expiresAtIso: string,
+): Promise<boolean> {
+  if (!email || !emailNorm || !codeHash) return false;
+  const { url } = config();
+  try {
+    const res = await fetch(`${url}/rest/v1/signup_codes`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ email, email_norm: emailNorm, code_hash: codeHash, expires_at: expiresAtIso }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// The most recent code for this address. Only ever one is live: asking for a new one does not
+// delete the old, it simply stops being the newest, and verifyStoredCode reads THIS one. So a man
+// who asks twice and types the first code is told it did not work, which is true.
+export async function readLatestSignupCode(emailNorm: string): Promise<SignupCodeRow | null> {
+  if (!emailNorm) return null;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/signup_codes?email_norm=eq.${encodeURIComponent(emailNorm)}` +
+        `&select=id,code_hash,attempts,expires_at,consumed_at&order=created_at.desc&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as SignupCodeRow[];
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ⚠️ COUNT THE ATTEMPT BEFORE COMPARING, NOT AFTER.
+//
+// The other order looks tidier and is the bug: a request that is abandoned, times out, or crashes
+// between the comparison and the write is a free guess, and free guesses are the entire attack.
+// Counting first means the worst case is that an honest man burns one attempt on a dropped
+// connection, which costs him a tap on "Send it again".
+export async function bumpSignupCodeAttempt(id: string): Promise<void> {
+  if (!id) return;
+  const { url } = config();
+  try {
+    await fetch(`${url}/rest/v1/rpc/increment_signup_attempt`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ p_id: id }),
+    });
+  } catch {
+    // Best effort. The cap is a guard, not the only one: the per address and per source rate limits
+    // in the route stand whatever happens here.
+  }
+}
+
+// 🔴 SPENDING A CODE IS CONDITIONAL ON IT BEING UNSPENT, AND THE DATABASE DECIDES.
+//
+// The PATCH filters on consumed_at being null and asks for the row back. Two requests racing with
+// the same valid code both pass verifyStoredCode, because both read the row before either wrote to
+// it; only one of them gets a row back from this. The loser is refused. Checking in TypeScript and
+// then writing would let both through.
+export async function consumeSignupCode(id: string): Promise<boolean> {
+  if (!id) return false;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/signup_codes?id=eq.${encodeURIComponent(id)}&consumed_at=is.null`,
+      {
+        method: 'PATCH',
+        headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ consumed_at: new Date().toISOString() }),
+      },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json().catch(() => null)) as unknown[] | null;
+    return Array.isArray(rows) && rows.length === 1;
+  } catch {
+    return false;
+  }
+}
+
+// The auth user id behind an address, from OUR OWN tables. No GoTrue lookup, because the admin API
+// has no reliable filter by email and paging every user to find one is a landmine at any real size.
+//
+// Two routes, newest first. signups.user_id is written at verify time and is the direct answer. The
+// legacy path, through the phone on the signup row, is how every account created before 29 July
+// 2026 resolves, and it stays because those men must still be able to sign in.
+export async function findAuthUserIdForEmail(email: string): Promise<string | null> {
+  const key = (email ?? '').trim().toLowerCase();
+  if (!key) return null;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/signups?email=eq.${encodeURIComponent(key)}&user_id=not.is.null` +
+        `&select=user_id&order=created_at.desc&limit=1`,
+      { headers: headers() },
+    );
+    if (res.ok) {
+      const rows = (await res.json()) as Array<{ user_id: string | null }>;
+      if (rows[0]?.user_id) return rows[0].user_id;
+    }
+  } catch {
+    // fall through to the legacy route
+  }
+  try {
+    const known = await findContactAccount('email', key);
+    return known?.userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// 🔴 THE AUTH USER IS CREATED HERE AND ONLY HERE, AND ONLY AFTER THE CODE WAS PROVED.
+//
+// email_confirm: true is a TRUE STATEMENT by the time this runs, which is the whole reason we did
+// not take the shortcut of turning Confirm email off at the project. That switch would have set the
+// same flag on every user whether or not a human ever opened the inbox, which is a lie planted in
+// the auth store for anything downstream to trust.
+export async function createConfirmedAuthUser(email: string): Promise<string | null> {
+  const key = (email ?? '').trim().toLowerCase();
+  if (!key) return null;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  if (!url || !service) return null;
+  try {
+    const res = await fetch(`${url}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: service, Authorization: `Bearer ${service}` },
+      body: JSON.stringify({ email: key, email_confirm: true }),
+    });
+    if (res.ok) {
+      const u = (await res.json()) as { id?: string };
+      return u?.id ?? null;
+    }
+    // Already registered. Never log the body: it echoes the address back.
+    console.error('[createConfirmedAuthUser] refused:', res.status);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// The bridge from an address to an account, written once the address is proved. See the migration.
+export async function setSignupUserId(email: string, userId: string): Promise<void> {
+  const key = (email ?? '').trim().toLowerCase();
+  if (!key || !userId) return;
+  const { url } = config();
+  try {
+    await fetch(`${url}/rest/v1/signups?email=eq.${encodeURIComponent(key)}&user_id=is.null`, {
+      method: 'PATCH',
+      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ user_id: userId }),
+    });
+  } catch {
+    // Best effort: he is already signed in by the time this runs, and the legacy lookup still works.
+  }
+}
+
 // ── The web trial: granted against an ACCOUNT, not a phone ───────────────────────────────────────
 //
 // 🔴 WHY THERE IS A SECOND GRANT FUNCTION AND grantTrialIfNone WAS NOT SIMPLY CHANGED.

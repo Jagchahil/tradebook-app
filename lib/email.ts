@@ -153,21 +153,49 @@ export async function sendInvoiceEmail(opts: InvoiceEmail): Promise<boolean> {
   return send({ from, to: opts.to, subject, html: shell(inner, { preheader: `Invoice ${opts.number} for ${total}` }), tag: 'invoice' });
 }
 
-// --- app welcome (fires from /api/onboard) --------------------------------
+// --- the signup code (fires from /api/signup/code) -------------------------
+//
+// 🔴 THE ONE EMAIL A MAN CANNOT DO WITHOUT. Nothing else in the product is blocked on an email
+// arriving; this one IS the account. So it says one thing, the code is the biggest thing on the
+// screen, and there is nothing to click. A link would be a second way in, and a second way in is a
+// second thing to phish.
+export async function sendSignupCodeEmail(to: string, code: string): Promise<boolean> {
+  const safe = String(code ?? '').replace(/\D/g, '').slice(0, 8);
+  if (!safe) return false;
+  const inner = `
+    ${h1('Your Lekhio code')}
+    <div style="font-size:38px;font-weight:800;letter-spacing:10px;color:${INK};background:#F4F7FB;border:1px solid #E3EAF3;border-radius:12px;padding:20px 0;text-align:center;margin:6px 0 18px">${safe}</div>
+    ${p('Type this into Lekhio to finish setting up your account. It lasts ten minutes and can only be used once.')}
+    ${pMuted('If you did not ask for this, you can ignore this email. Nothing has been created and nothing will happen.')}`;
+  return send({
+    to,
+    subject: `${safe} is your Lekhio code`,
+    // The code in the preview line, so he can often read it from the notification without opening
+    // anything. He is on a ladder.
+    html: shell(inner, { preheader: `${safe} is your code. It lasts ten minutes.` }),
+    tag: 'signup-code',
+  });
+}
+
+// --- welcome (fires from /api/signup/verify, once the account is REAL) -----
+//
+// ⚠️ THIS USED TO FIRE FROM /api/onboard, which is before he proves his email and therefore before
+// the account exists. A man who abandoned at the code screen was welcomed to something he had not
+// joined. It now fires once, from the far side of verification.
+//
+// 🔴 AND IT USED TO DESCRIBE THE OLD JOURNEY. It said his books "now live in WhatsApp" and that we
+// would text him to confirm his number. We are not going to text him, and the product is the web
+// app. Telling a new customer to wait for a message that is never coming is how the first day
+// teaches him we are not quite real.
 export async function sendWelcomeEmail(to: string, name?: string | null): Promise<boolean> {
-  const hi = name ? `Welcome to Lekhio, ${esc(name)}.` : 'Welcome to Lekhio.';
+  const hi = name ? `You are in, ${esc(name)}.` : 'You are in.';
   const inner = `
     ${h1(hi)}
-    ${p('Your books and tax now live in WhatsApp. Here is how to start — it takes about a minute.')}
-    <ol style="font-size:15px;line-height:1.9;color:${INK};padding-left:20px;margin:0 0 14px">
-      <li>We'll text you to confirm your number. Save it as Lekhio.</li>
-      <li>Snap a photo of any receipt and send it. Logged in seconds.</li>
-      <li>Try a few: "drove 24 miles", "worked 90 hours from home", or "got paid £400 by Dave".</li>
-    </ol>
-    ${p('Your first 7 days are free. Open the app any time to watch it all add up, ready for tax.')}
-    ${button(APP, 'Open Lekhio')}
-    ${pMuted('A real person is on the other end — just reply if you need anything.')}`;
-  return send({ to, subject: 'Welcome to Lekhio. Here is how to start.', html: shell(inner, { preheader: 'Your books and tax, now in WhatsApp.' }), tag: 'welcome' });
+    ${p('Your Lekhio is set up and your 7 day free trial has started. No card, and nothing to install.')}
+    ${p('Everything lives in your browser, on any phone or laptop. Sign in with this email address whenever you want to see where you stand.')}
+    ${button(`${APP}/app`, 'Open your Lekhio')}
+    ${pMuted('A real person is on the other end. Just reply if you need anything.')}`;
+  return send({ to, subject: 'You are in. Your Lekhio is ready.', html: shell(inner, { preheader: 'Your 7 day free trial has started.' }), tag: 'welcome' });
 }
 
 // --- waitlist welcome (fires from /api/waitlist) --------------------------

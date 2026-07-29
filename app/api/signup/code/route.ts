@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimitedShared, spendCapReached, clientIp } from '../../../../lib/ratelimit';
-import { logAuthSend } from '../../../../lib/supabase';
+import { logAuthSend, createSignupCode } from '../../../../lib/supabase';
 import { targetHash } from '../../../../lib/logindoor';
 import { originAllowed, webSessionsConfigured } from '../../../../lib/websession';
-import { looksLikeEmail } from '../../../../lib/email';
+import { looksLikeEmail, sendSignupCodeEmail } from '../../../../lib/email';
 import { normaliseEmail } from '../../../../lib/trialidentity';
+import { newCode, hashCode, expiresAt, signupCodesConfigured } from '../../../../lib/signupcode';
 
 export const runtime = 'nodejs';
 
@@ -35,9 +36,21 @@ export const runtime = 'nodejs';
 // and a send that failed at the provider all return exactly the same thing. A signup form that
 // tells you which addresses are already customers is a customer list with a search box on it.
 //
-// The code itself is sent by Supabase through our own Resend SMTP, using the Magic link or OTP
-// template. That template must contain {{ .Token }}: with only a link in it, a man is emailed
-// something he cannot use while the page in front of him waits for six digits.
+// 🔴 WE GENERATE AND SEND THE CODE OURSELVES, THROUGH RESEND.
+//
+// The first version leaned on GoTrue's own email. It does not work for signup: for a brand new
+// address GoTrue uses the "Confirm sign up" template, which is a LINK flow, and editing that
+// template did not take effect in production over nine minutes and four sends.
+//
+// The obvious unblock was to turn "Confirm email" off, which makes GoTrue send the OTP template.
+// That was considered and REFUSED: it sets mailer_autoconfirm for the whole project, applies to
+// every flow including email change, and marks every user's address as confirmed whether or not a
+// human ever opened that inbox. That is a false fact planted in the auth store for anything
+// downstream to trust, traded for one template.
+//
+// So the code is ours: generated from the CSPRNG, stored only as an HMAC bound to the address, and
+// checked by us. NOTHING IS CREATED HERE. No auth user, no users row, no trial, no session. The
+// entire footprint of a signup attempt until the code comes back is one row and one email.
 
 // Per address. Low, because a man needs one code and occasionally a second.
 const PER_TARGET_SENDS = 4;
@@ -95,26 +108,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'capped' }, { status: 429 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  if (!url || !anon) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+  // No signing secret means no hash we could trust, so there is nothing safe to issue.
+  if (!signupCodesConfigured()) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
 
-  let ok = false;
-  try {
-    const res = await fetch(`${url}/auth/v1/otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: anon },
-      // create_user IS the point of this endpoint, and it is the one line that separates it from
-      // /api/auth/start. An address that already has an account simply gets a sign in code and
-      // ends up in his own books, which is the right outcome and gives nothing away.
-      body: JSON.stringify({ email, create_user: true }),
-    });
-    ok = res.ok;
-  } catch {
-    ok = false;
+  const emailNorm = normaliseEmail(email) || email;
+  const code = newCode();
+
+  // The row goes down BEFORE the email goes out. The other order sends a man a code we have no
+  // record of, and he types six correct digits into a screen that tells him they are wrong.
+  const stored = await createSignupCode(email, emailNorm, hashCode(emailNorm, code), expiresAt());
+  if (!stored) {
+    await logAuthSend('email', hash, 'failed');
+    // Honest, because the alternative is a man staring at an inbox for a code that was never
+    // written down and is never coming.
+    return NextResponse.json({ error: 'send' }, { status: 503 });
   }
 
-  // Never the address itself. It is personal data and, from today, it is the account key.
+  const ok = await sendSignupCodeEmail(email, code);
+
+  // Never the address, and NEVER THE CODE. Not in a log, not in an error, not once.
   await logAuthSend('email', hash, ok ? 'sent' : 'failed');
   return onward();
 }

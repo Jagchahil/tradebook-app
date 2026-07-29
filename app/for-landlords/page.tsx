@@ -4,12 +4,12 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter, Ic } from '../_shared/site';
 
 export const metadata: Metadata = {
-  title: 'Lekhio for Landlords | Rent, Section 24 and April 2027, Sorted on WhatsApp',
+  title: 'Lekhio for Landlords | Rent, Section 24 and April 2027, Sorted',
   description:
-    'Bookkeeping and tax prep for UK landlords, on WhatsApp. Text the rent as it lands, see Section 24 properly, and know what the April 2027 property rates cost you a year early. For landlords with a day job, self employed landlords, and full time landlords.',
+    'Bookkeeping and tax prep for UK landlords. Log the rent as it lands, see Section 24 properly, and know what the April 2027 property rates cost you a year early. For landlords with a day job, self employed landlords, and full time landlords.',
   openGraph: {
     title: 'Lekhio for landlords: text the rent, tax sorted',
-    description: 'Rent capture on WhatsApp, Section 24 made visible, and April 2027 priced on your numbers a year early.',
+    description: 'Rent capture done for you, Section 24 made visible, and April 2027 priced on your numbers a year early.',
     type: 'website',
   },
 };

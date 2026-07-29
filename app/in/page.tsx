@@ -92,7 +92,7 @@ export default async function SignInPage({
             silently goes nowhere. Doc 103's honesty test applied to an error state. */}
         {!configured ? (
           <p style={S.note}>
-            Signing in is not switched on yet. Everything still works on WhatsApp in the meantime.
+            Signing in is not switched on just now. Try again shortly, and get in touch if it stays that way.
           </p>
         ) : step === 'code' ? (
           <form action="/api/auth/verify" method="post">

@@ -168,7 +168,7 @@ export default async function MoneyPage() {
           truth. It is a plain link because looking at a list changes nothing. */}
       <p style={S.foot}>
         Everything here is money you have confirmed. <a href="/app/pile" style={S.footLink}>Anything
-        waiting on you</a> is not counted yet. Send a receipt on WhatsApp any time and it lands here.
+        waiting on you</a> is not counted yet. Connect your bank and new spending lands here on its own.
       </p>
     </main>
   );

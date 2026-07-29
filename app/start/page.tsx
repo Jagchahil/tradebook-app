@@ -113,7 +113,7 @@ export default function StartPage() {
   const [address, setAddress] = useState('');
   const [vat, setVat] = useState<boolean | null>(false);
   // The streams question: what sits alongside the trade. It shapes the tax
-  // picture and primes the WhatsApp setup, so it earns a step of its own.
+  // picture and primes the questions onboarding asks next, so it earns a step of its own.
   const [streams, setStreams] = useState<string[]>([]);
   // The code step. `done` now means "the questions are answered, prove the email", not "finished":
   // the account does not exist until the code is typed, so this is the last thing between him and

@@ -11,14 +11,14 @@ import {
 export const metadata: Metadata = {
   title: 'Lekhio vs the other options. An honest comparison.',
   description:
-    'How Lekhio compares to other apps and doing it yourself. WhatsApp capture, voice notes, CIS, invoices and quarterly tax prep, side by side. We do not name competitors, and we show the gaps fairly.',
+    'How Lekhio compares to other apps and doing it yourself. Bank capture, voice notes, CIS, invoices and quarterly tax prep, side by side. We do not name competitors, and we show the gaps fairly.',
 };
 
 type Cell = boolean | 'soon' | 'limit' | 'extra' | 'higher' | 'maybe';
 interface Row { label: string; lekhio: Cell; apps: Cell; diy: Cell }
 const GROUPS: { cat: string; rows: Row[] }[] = [
   { cat: 'Capture and logging', rows: [
-    { label: 'Lives in WhatsApp, no new app to learn', lekhio: true, apps: false, diy: false },
+    { label: 'Works in your browser, nothing to install', lekhio: true, apps: false, diy: false },
     { label: 'Snap a receipt and it is fully logged', lekhio: true, apps: 'limit', diy: false },
     { label: 'Log an expense by voice note', lekhio: true, apps: false, diy: false },
     { label: 'Claim mileage, home, phone and CIS from a text', lekhio: true, apps: false, diy: false },
@@ -180,7 +180,7 @@ export default function ComparePage() {
         <div className="wrap">
           <div className="score reveal">
             <div className="scard lek"><div className="snum" data-to="11">11</div><div className="slabel">Lekhio</div><div className="ssub">today, and always growing ↗</div></div>
-            <div className="scard"><div className="snum" data-to="2">2</div><div className="slabel">Other apps</div><div className="ssub">and none in WhatsApp</div></div>
+            <div className="scard"><div className="snum" data-to="2">2</div><div className="slabel">Other apps</div><div className="ssub">and none of them talk to each other</div></div>
             <div className="scard"><div className="snum" data-to="2">2</div><div className="slabel">Doing it yourself</div><div className="ssub">and all the work is yours</div></div>
           </div>
           <p className="center mut" style={{ fontSize: 13, marginTop: 16 }}>Thirteen things people actually need. Lekhio leads on eleven today, and we ship more every month.</p>
@@ -192,7 +192,7 @@ export default function ComparePage() {
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 40 }}><h2 className="h2">Three things only Lekhio does.</h2><p className="lead">No app we have found does all three.</p></div>
           <div className="only reveal">
-            <div className="ocard"><span className="otag">ONLY LEKHIO</span><h3>Lives in WhatsApp</h3><p className="mut" style={{ fontSize: 14, margin: 0 }}>No new app to learn. Text it like you text a mate.</p><div className="demo"><div className="bub out">spent 42 on diesel</div><div className="bub in two">Logged, £42 fuel ✅</div></div></div>
+            <div className="ocard"><span className="otag">ONLY LEKHIO</span><h3>Nothing to install</h3><p className="mut" style={{ fontSize: 14, margin: 0 }}>It opens in your browser, on any phone. Tell it like you would tell a mate.</p><div className="demo"><div className="bub out">spent 42 on diesel</div><div className="bub in two">Logged, £42 fuel ✅</div></div></div>
             <div className="ocard"><span className="otag">ONLY LEKHIO</span><h3>Log by voice note</h3><p className="mut" style={{ fontSize: 14, margin: 0 }}>Hands full on the job? Just say it.</p><div className="demo"><div className="bub out" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 16 }}>🎙️</span><span className="wave"><i /><i /><i /><i /><i /></span></div><div className="bub in two">£40 fuel, logged ✅</div></div></div>
             <div className="ocard"><span className="otag">ONLY LEKHIO</span><h3>Claim by text</h3><p className="mut" style={{ fontSize: 14, margin: 0 }}>Say the thing, it is claimed at the HMRC rate.</p><div className="demo"><div className="bub out">drove 24 miles</div><div className="bub in two">£13.20 travel, logged ✅</div></div></div>
           </div>
@@ -217,10 +217,10 @@ export default function ComparePage() {
       <section>
         <div className="wrap"><div className="cred reveal">
           <h2>Built by the book. Better than the rest.</h2>
-          <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>The complete tax assistant that lives in WhatsApp, and it does the sums properly.</p>
+          <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>The complete tax assistant that opens in your browser, and it does the sums properly.</p>
           <div className="credrow">
             <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b>, 104 tests</span></div>
-            <div className="credchip"><span>Built for WhatsApp</span></div>
+            <div className="credchip"><span>Built for a phone on site</span></div>
             <div className="credchip"><span>HMRC recognition <b>in progress</b></span></div>
             <div className="credchip">🇬🇧 <span>A real UK company</span></div>
           </div>

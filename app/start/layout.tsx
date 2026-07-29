@@ -6,10 +6,10 @@ import type { ReactNode } from 'react';
 export const metadata: Metadata = {
   title: 'Get started with Lekhio. 7 days free, no card.',
   description:
-    'Set up Lekhio in two minutes. Tell us your number and your trade, and do your books and tax by WhatsApp. 7 days free, no card needed.',
+    'Set up Lekhio in two minutes. Tell us your trade, connect your bank, and your books and tax look after themselves. 7 days free, no card needed.',
   openGraph: {
     title: 'Get started with Lekhio',
-    description: 'Your books and tax, by WhatsApp. 7 days free, no card needed.',
+    description: 'Your books and tax, handled. 7 days free, no card needed.',
     type: 'website',
   },
 };

@@ -29,9 +29,9 @@ const durFor = (i: number) => COUNTS[i] * STAGGER + HOLD;
 
 const STAGES = [
   { n: 'Step 1 · the website', t: 'Sign up asks who you are', head: 'lekhio.app/start · step 4 of 6', live: false },
-  { n: 'Step 2 · the app', t: 'A 60 second tour', head: 'Lekhio app · first launch', live: false },
-  { n: 'Step 3 · WhatsApp', t: 'The two minute setup', head: '💬 Lekhio · WhatsApp', live: true },
-  { n: 'Step 4 · every day after', t: 'It runs itself', head: '💬 Lekhio · day to day', live: true },
+  { n: 'Step 2 · your Lekhio', t: 'A 60 second tour', head: 'Your Lekhio · first time in', live: false },
+  { n: 'Step 3 · your Lekhio', t: 'The questions that matter', head: 'Your Lekhio · setting up', live: true },
+  { n: 'Step 4 · every day after', t: 'It runs itself', head: 'Your Lekhio · day to day', live: true },
 ];
 
 const NOTES: [string, string][] = [
@@ -41,7 +41,7 @@ const NOTES: [string, string][] = [
   ],
   [
     'First launch opens a sixty second tour.',
-    'How capture works, the approval gate, your income streams, the two helpers. The last slide is a handover: one green button opens WhatsApp with the setup already typed.',
+    'How capture works, the approval gate, your income streams, the two helpers. The last slide hands straight over: one button and the questions that configure your figures begin.',
   ],
   [
     'Six questions that configure, not decorate.',
@@ -103,7 +103,7 @@ function Stage({ stage }: { stage: number }) {
             <span style={{ width: 6, height: 6, borderRadius: 3, background: LINE }} />
           </div>
         </Reveal>
-        <Reveal i={4}><div style={{ marginTop: 14, width: 250, background: '#25D366', color: '#fff', textAlign: 'center', borderRadius: 10, padding: 10, fontSize: 13, fontWeight: 700 }}>💬 Finish setup on WhatsApp</div></Reveal>
+        <Reveal i={4}><div style={{ marginTop: 14, width: 250, background: RIVER, color: '#fff', textAlign: 'center', borderRadius: 10, padding: 10, fontSize: 13, fontWeight: 700 }}>Set my figures up →</div></Reveal>
       </div>
     );
   }

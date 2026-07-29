@@ -54,7 +54,7 @@ export default function EarlyAccessPage() {
 
         <h1 style={styles.heading}>Get early access.</h1>
         <p style={styles.sub}>
-          Lekhio is coming to WhatsApp first. Drop your number and we&apos;ll text
+          Lekhio opens in your browser, with nothing to install. Drop your number and we&apos;ll text
           you the moment it&apos;s live. No app download. No forms. Just text it.
         </p>
 

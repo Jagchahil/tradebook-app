@@ -104,7 +104,7 @@ export default async function PilePage({
         <section style={S.card}>
           <h1 style={S.h1}>Nothing is waiting on you.</h1>
           <p style={S.sub}>
-            Everything we have is filed and counted. Send a receipt on WhatsApp whenever it happens.
+            Everything we have is filed and counted. Connect your bank and new spending arrives here on its own.
           </p>
         </section>
       ) : (

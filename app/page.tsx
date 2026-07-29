@@ -283,7 +283,7 @@ export default function HomePage() {
             <p className="lead">Connect it once. It works in the background from then on.</p>
           </div>
           <div className="steps reveal">
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--river),var(--river-deep))', boxShadow: '0 12px 26px rgba(27,89,166,.32)' }}>1</div><h3>Connect your bank</h3><p className="mut" style={{ fontSize: 15 }}>Every card payment is read and sorted automatically. Paid cash? Snap the receipt on WhatsApp. That is the whole job.</p></div>
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--river),var(--river-deep))', boxShadow: '0 12px 26px rgba(27,89,166,.32)' }}>1</div><h3>Connect your bank</h3><p className="mut" style={{ fontSize: 15 }}>Every card payment is read and sorted automatically. Nothing to type, nothing to file. That is the whole job.</p></div>
             <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--saffron),var(--saffron-deep))', boxShadow: '0 12px 26px rgba(224,163,62,.32)' }}>2</div><h3>It finds your money</h3><p className="mut" style={{ fontSize: 15 }}>It sorts every transaction, claims the reliefs you are owed, tracks your refund, and keeps your tax ready as you go.</p></div>
             <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--green),#0F5C2E)', boxShadow: '0 12px 26px rgba(21,128,61,.32)' }}>3</div><h3>You approve</h3><p className="mut" style={{ fontSize: 15 }}>Your figures sit there ready. You check them and send them. Nothing reaches HMRC without your yes.</p></div>
           </div>
@@ -350,7 +350,7 @@ export default function HomePage() {
             <div className="dtext">
               <div className="eyebrow" style={{ color: 'var(--river)' }}>Bank connected</div>
               <h3>Connect it once. It reads everything.</h3>
-              <p>Connect your bank and every card payment is read, sorted and logged for you, automatically. No typing, no chasing. Paid cash? Snap the receipt on WhatsApp and it does the rest.</p>
+              <p>Connect your bank and every card payment is read, sorted and logged for you, automatically. No typing, no chasing. Paid cash? Add it in a line and it does the rest.</p>
             </div>
             <div className="dvis">
               <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>THIS WEEK · SORTED FOR YOU</div>

@@ -49,7 +49,7 @@ const steps = [
 const faqs = [
   { q: 'Is it actually free?', a: 'Yes, for the basic path: profits, losses, and the essentials HMRC asks for. It costs us nothing to run because no AI is involved, so there is no reason to charge for it.' },
   { q: 'Do I have to be a paying Lekhio customer?', a: 'No. This basic path is built to stand on its own. If your situation is simple, this alone may be all you need.' },
-  { q: 'What if my situation is not simple, property income, a PAYE job alongside my trade, VAT?', a: 'The free basic path covers straightforward sole trader profit and loss only. Anything with more moving parts is exactly what the full Lekhio service, WhatsApp bookkeeping and tax prep all year, is built for.' },
+  { q: 'What if my situation is not simple, property income, a PAYE job alongside my trade, VAT?', a: 'The free basic path covers straightforward sole trader profit and loss only. Anything with more moving parts is exactly what the full Lekhio service, bookkeeping and tax prep all year, is built for.' },
   { q: 'Does Lekhio file my tax for me?', a: filingFaqAnswer() },
   { q: 'When can I actually use it?', a: 'It is not live yet. This page is here so you can join the list and hear the moment it opens, rather than us making a promise before it is ready.' },
 ];
@@ -147,13 +147,13 @@ export default function FreeMtdFilingPage() {
           <div>
             <h2 style={{ fontSize: 21, fontWeight: 700, margin: '0 0 10px' }}>Why it is free</h2>
             <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: 0 }}>
-              Every other part of Lekhio uses AI to read a photo of a receipt or answer a question on WhatsApp. This basic filing path does not. It is a fully deterministic engine working from numbers you type in, so it costs us nothing to run whether one person uses it or a million do. That is the whole reason we can keep it free rather than a promotion that ends.
+              Every other part of Lekhio uses AI to read a photo of a receipt or answer a question about your figures. This basic filing path does not. It is a fully deterministic engine working from numbers you type in, so it costs us nothing to run whether one person uses it or a million do. That is the whole reason we can keep it free rather than a promotion that ends.
             </p>
           </div>
           <div>
             <h2 style={{ fontSize: 21, fontWeight: 700, margin: '0 0 10px' }}>What it covers, honestly</h2>
             <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: 0 }}>
-              Straightforward sole trader profit and loss, nothing more, at least at first. Property income, a PAYE job alongside your trade, VAT, and the rest still need the fuller picture, which is what the full Lekhio service on WhatsApp is for. We would rather tell you the edge of it now than have you find out later.
+              Straightforward sole trader profit and loss, nothing more, at least at first. Property income, a PAYE job alongside your trade, VAT, and the rest still need the fuller picture, which is what the full Lekhio service is for. We would rather tell you the edge of it now than have you find out later.
             </p>
           </div>
         </div>

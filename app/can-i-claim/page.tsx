@@ -9,11 +9,11 @@ import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 export const metadata: Metadata = {
   title: 'Can I claim it? UK self employed expenses, answered straight | Lekhio',
   description:
-    'Can I expense my work boots? Is a van tax deductible? Lekhio answers the real allowable expense questions for UK sole traders, the grey areas included, all within the law. Ask it on WhatsApp.',
+    'Can I expense my work boots? Is a van tax deductible? Lekhio answers the real allowable expense questions for UK sole traders, the grey areas included, all within the law. Ask it in your browser.',
   openGraph: {
     title: 'Can I claim it? Just ask Lekhio.',
     description:
-      'The real rules on what UK sole traders can and cannot claim, the grey areas done properly, all legal. Ask it on WhatsApp.',
+      'The real rules on what UK sole traders can and cannot claim, the grey areas done properly, all legal. Ask it in your browser.',
     type: 'website',
   },
 };
@@ -172,7 +172,7 @@ export default function CanIClaimPage() {
         </div>
       </section>
 
-      {/* The one rule + WhatsApp demo */}
+      {/* The one rule, and a worked example of asking it */}
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: '34px 24px' }}>
         <div className="reveal oneRule">
           <div style={{ minWidth: 0 }}>
@@ -191,7 +191,7 @@ export default function CanIClaimPage() {
                 <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>Lekhio</div><div style={{ fontSize: 10.5, opacity: 0.85 }}>online</div></div>
               </div>
               <div style={{ background: '#ECE5DD', padding: '16px 13px', display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {/* Hardcoded light WhatsApp bubbles need hardcoded dark text: var(--tx)
+                {/* Hardcoded light chat bubbles need hardcoded dark text: var(--tx)
                     goes near white in dark mode and vanished on these surfaces. */}
                 {demo.map((m, i) => (
                   <div key={i} style={{ alignSelf: m.side === 'out' ? 'flex-end' : 'flex-start', background: m.side === 'out' ? '#DCF8C6' : '#fff', borderRadius: m.side === 'out' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '9px 12px', maxWidth: '86%', fontSize: 13, color: '#111111', boxShadow: m.side === 'in' ? '0 1px 2px rgba(0,0,0,.08)' : 'none', lineHeight: 1.5 }}>{m.text}</div>
@@ -274,7 +274,7 @@ export default function CanIClaimPage() {
         <div className="reveal" style={{ maxWidth: 720, margin: '0 auto', padding: '54px 24px', textAlign: 'center' }}>
           <h2 className="h2" style={{ color: '#fff', fontWeight: 700, margin: '0 0 14px' }}>Stop overpaying. Just ask.</h2>
           <p style={{ fontSize: 16.5, color: '#B6BDC8', lineHeight: 1.6, maxWidth: 540, margin: '0 auto 28px' }}>
-            Lekhio answers your claim questions on WhatsApp, logs every cost as you go, and keeps you ready for tax. You always approve before anything is sent to HMRC.
+            Lekhio answers your claim questions in plain English, logs every cost as you go, and keeps you ready for tax. You always approve before anything is sent to HMRC.
           </p>
           <Link href="/start" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Start free trial</Link>
           <p style={{ fontSize: 13, color: '#8A93A0', marginTop: 22, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>

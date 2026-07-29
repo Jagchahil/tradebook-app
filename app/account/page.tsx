@@ -110,7 +110,7 @@ export default function AccountPage() {
           <div>
             <h1 style={S.heroTitle}>Your account,<br />in one place.</h1>
             <p style={S.heroSub}>Cancel, switch your card, or download an invoice whenever you like. No phone calls, no forms, no waiting on hold.</p>
-            <div style={S.pill}><span style={S.dot} /> Works through WhatsApp</div>
+            <div style={S.pill}><span style={S.dot} /> Works in your browser</div>
           </div>
           <p style={S.brandTrust}>You approve everything. We are not HMRC.</p>
         </aside>

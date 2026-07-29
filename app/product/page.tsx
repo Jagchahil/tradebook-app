@@ -11,7 +11,7 @@ import {
 export const metadata: Metadata = {
   title: 'What Lekhio does. Snap it, say it, sorted.',
   description:
-    'Text Lekhio like you text a mate. It reads it, sorts it, and it lands in your app, tidy and ready. Receipts, voice notes, mileage, invoices, CIS and quarterly tax, all from WhatsApp. You approve before anything reaches HMRC.',
+    'Connect your bank and Lekhio reads it, sorts it, and keeps it tidy and ready. Receipts, mileage, invoices, CIS and quarterly tax, all in your browser. You approve before anything reaches HMRC.',
 };
 
 const PRODUCT_CSS = `
@@ -120,7 +120,7 @@ const PRODUCT_CSS = `
 
 const PRODUCT_JS = `
 (function(){  var FEAT=[
-   {t:'Snap a receipt',p:'Photograph it on WhatsApp. Lekhio pulls the total, the VAT and the category, and logs it in seconds.',demo:'<div class="db out d1"><div style="background:#cde7b4;border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:4px">🧾</div>Screwfix receipt</div><div class="db in d2">Logged. £42.60, materials ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">VAT £7.10 · Materials · 3 Jul</div>'},
+   {t:'Snap a receipt',p:'Photograph it and Lekhio pulls the total, the VAT and the category, and logs it in seconds.',demo:'<div class="db out d1"><div style="background:#cde7b4;border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:4px">🧾</div>Screwfix receipt</div><div class="db in d2">Logged. £42.60, materials ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">VAT £7.10 · Materials · 3 Jul</div>'},
    {t:'Say it out loud',p:'Hands full on the job? Leave a voice note. Lekhio hears it and logs it before you have put the phone down.',demo:'<div class="db out d1" style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">🎙️</span><span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div><div class="db out d2">"spent forty on diesel"</div><div class="db in d3">£40 fuel, logged ✅</div>'},
    {t:'Mileage in a text',p:'Text the trip. Lekhio works out the claim at the HMRC rate and logs it. No fiddly logbook.',demo:'<div class="db out d1">drove 24 miles to the job</div><div class="db in d2">£13.20 mileage claimed at the HMRC rate ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">55p a mile · logged to travel</div>'},
    {t:'Invoice from a text',p:'Type it in plain words. Lekhio builds a clean invoice and sends it, then tracks who has paid.',demo:'<div class="db out d1">invoice Dave £450 for the rewire</div><div class="db in d2">Invoice #0043 sent to Dave ✅</div><div class="db in d3">Dave paid. +£450 income 💷</div>'},
@@ -179,7 +179,7 @@ export default function ProductPage() {
           <div className="center reveal" style={{ marginBottom: 28 }}>
             <div className="eyebrow">Everything it does</div>
             <h2 className="h2">Your whole back office, in one place.</h2>
-            <p className="lead">Ten seconds a day on WhatsApp. Lekhio does the rest and keeps it tidy in your app.</p>
+            <p className="lead">Ten seconds a day. Lekhio does the rest and keeps it tidy, ready for tax.</p>
           </div>
           <div className="featgrid reveal">
             <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📸" color="var(--river)" size={26} /></div><h3>Snap a receipt</h3><p>Photo it, Lekhio reads the shop, total and VAT.</p></div>
@@ -205,11 +205,11 @@ export default function ProductPage() {
           <div className="center reveal" style={{ marginBottom: 40 }}>
             <div className="eyebrow">From a text to your books</div>
             <h2 className="h2">You text it. It lands in your app.</h2>
-            <p className="lead">One message on WhatsApp. Seconds later it is logged, sorted, and sat in your app.</p>
+            <p className="lead">One line. Seconds later it is logged, sorted, and sat in your books.</p>
           </div>
           <div className="journey reveal">
             <div>
-              <div className="jlabel">1 · You text on WhatsApp</div>
+              <div className="jlabel">1 · You tell Lekhio</div>
               <div className="wphone">
                 <div className="wahead"><span className="a">💬</span><div><b>Lekhio</b><small>online</small></div></div>
                 <div className="wchat">
@@ -253,7 +253,7 @@ export default function ProductPage() {
             <button type="button" className="ftab" data-f="5" role="tab" aria-selected="false">Ask</button>
           </div>
           <div className="fstage reveal">
-            <div className="ftext" id="ftext"><h3>Snap a receipt</h3><p>Photograph it on WhatsApp. Lekhio pulls the total, the VAT and the category, and logs it in seconds.</p></div>
+            <div className="ftext" id="ftext"><h3>Snap a receipt</h3><p>Photograph it and Lekhio pulls the total, the VAT and the category, and logs it in seconds.</p></div>
             <div className="fdemo" id="fdemo">
               <div className="db out d1"><div style={{ background: '#cde7b4', borderRadius: 8, padding: 12, textAlign: 'center', fontSize: 20, marginBottom: 4 }}>🧾</div>Screwfix receipt</div>
               <div className="db in d2">Logged. £42.60, materials ✅</div>
@@ -324,7 +324,7 @@ export default function ProductPage() {
               <div className="hic"><Ic e="🛡️" color="var(--saffron-deep)" size={26} /></div>
               <h3>Rakha</h3>
               <div className="htag">Speaks before you ask</div>
-              <p>Rakha watches your numbers all year: the VAT threshold creeping closer, a State Pension year about to slip, the January bill quietly building. When something needs you, Rakha tells you first, in the app and on WhatsApp. It suggests, never acts. You decide everything.</p>
+              <p>Rakha watches your numbers all year: the VAT threshold creeping closer, a State Pension year about to slip, the January bill quietly building. When something needs you, Rakha tells you first, on your dashboard and by email. It suggests, never acts. You decide everything.</p>
               <p className="hname">Rakha is Punjabi for guardian. Lekhio keeps your books. Rakha watches them.</p>
             </div>
           </div>
@@ -337,7 +337,7 @@ export default function ProductPage() {
           <div className="center reveal" style={{ marginBottom: 34 }}>
             <h2 className="h2">From first click to running itself.</h2>
             <p style={{ fontSize: 17, color: 'var(--tx-mut)', maxWidth: 620, margin: '12px auto 0', lineHeight: 1.6 }}>
-              Onboarding is one journey across three places. Watch it play out: the website asks who you are, the app shows you around in sixty seconds, and WhatsApp finishes the setup. Then it just runs.
+              Onboarding is one journey, and it happens in one place. Watch it play out: the website asks who you are, then you land in your Lekhio and it sets you up properly. Then it just runs.
             </p>
           </div>
           <div className="reveal">

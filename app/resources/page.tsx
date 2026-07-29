@@ -70,7 +70,7 @@ export default function ResourcesPage() {
           <span style={{ display: 'inline-block', backgroundColor: RIVER_TINT, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE, NO SIGNUP</span>
           <h1 className="h1r" style={{ fontWeight: 700, margin: '0 0 16px' }}>Free tools for the self employed.</h1>
           <p style={{ fontSize: 18.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>
-            Everything a UK sole trader needs to stay on top of the money and the tax, free to use, no account, no card. Built by the team behind Lekhio, the back office that lives in WhatsApp.
+            Everything a UK sole trader needs to stay on top of the money and the tax, free to use, no account, no card. Built by the team behind Lekhio, the back office that opens in your browser.
           </p>
         </div>
       </section>

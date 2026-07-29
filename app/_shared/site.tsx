@@ -284,7 +284,7 @@ export const MARKETING_CSS = `
 
 // ---------- content data ----------
 export const steps = [
-  { n: '1', title: 'Snap it, say it, or text it', body: 'Photograph a receipt on WhatsApp. Or leave a voice note. Or just type what you spent or got paid. That is the whole job.' },
+  { n: '1', title: 'Connect your bank', body: 'Every card payment is read, sorted and logged for you. Nothing to type and nothing to file, from the day you sign up.' },
   { n: '2', title: 'Lekhio sorts it', body: 'It reads the receipt, pulls out the total, sorts the category, and logs it. You get a reply to confirm. It even writes your invoices.' },
   { n: '3', title: 'Tax time is already done', body: 'Your income and expenses add up as you go. We prepare your quarterly summary. You approve it. Nothing is sent without you.' },
 ];
@@ -306,12 +306,12 @@ export const features = [
   { icon: '📸', title: 'Receipt capture', body: 'Photograph a receipt and it is logged in seconds. No typing, no app to open.', tint: RIVER_TINT, fg: RIVER },
   { icon: '🎙️', title: 'Voice notes', body: 'Hands full on the job. Say the expense out loud and carry on.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { icon: '🚗', title: 'Mileage in a text', body: 'Text "drove 24 miles to the job" and Lekhio logs the claim at the HMRC rate. No fiddly logbook.', tint: RIVER_TINT, fg: RIVER },
-  { icon: '🧾', title: 'Invoices from a text', body: 'Type "create invoice" on WhatsApp. Lekhio asks what it needs and sends a clean invoice for you.', tint: GREEN_TINT, fg: GREEN },
+  { icon: '🧾', title: 'Invoices in a minute', body: 'Say who it is for and what it is for. Lekhio asks what it needs and sends a clean invoice, with a pay button on it.', tint: GREEN_TINT, fg: GREEN },
   { icon: '👷', title: 'CIS done right', body: 'Subcontractor? Lekhio splits labour and materials, applies your CIS deduction, and tracks the refund building up. Other apps charge extra or get it wrong.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { icon: '✅', title: 'You approve everything', body: 'See every entry. Fix anything that looks off. Nothing counts toward your tax until you confirm it.', tint: RIVER_TINT, fg: RIVER },
   { icon: '📊', title: 'Tax prepared for you', body: 'Quarterly figures, ready. You check them, you send them. We never imply HMRC backs us.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
   { icon: '💡', title: 'Can I claim it?', body: 'Not sure if something counts? Text "can I claim my work boots?" and Lekhio answers straight, the grey areas included.', tint: RIVER_TINT, fg: RIVER },
-  { icon: '💬', title: 'Instant replies in the chat', body: 'Stuck on something? Message the same WhatsApp and get an instant reply. No hold music, no queue.', tint: GREEN_TINT, fg: GREEN },
+  { icon: '💬', title: 'Ask it anything', body: 'Stuck on something? Ask Lekhio and get a straight answer about your own figures. No hold music, no queue.', tint: GREEN_TINT, fg: GREEN },
 ];
 
 export const mtdMeans = [
@@ -321,7 +321,7 @@ export const mtdMeans = [
 ];
 
 export const compareRows = [
-  { label: 'Lives in WhatsApp, no new app to learn', lekhio: true, apps: false, diy: false },
+  { label: 'Works in your browser, nothing to install', lekhio: true, apps: false, diy: false },
   { label: 'Snap a receipt and it is fully logged, not just matched', lekhio: true, apps: 'limit', diy: false },
   { label: 'Log an expense by voice note', lekhio: true, apps: false, diy: false },
   { label: 'Claim mileage, home, phone and CIS from a text', lekhio: true, apps: false, diy: false },
@@ -367,12 +367,12 @@ export const comingSoon = [
 ];
 
 export const fixes = [
-  { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'Message the same WhatsApp and get a straight answer fast. No going in circles, no hold music.' },
+  { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'Ask Lekhio and get a straight answer fast, about your own figures. A real person is behind it when you need one.' },
   { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £12.99 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
   { stars: 1, who: 'A self employed driver, reviewing another app', gripe: 'The bank feed kept dropping. Half my month went missing and I had to relink it again and again.', fix: 'Lekhio never leans on a fragile feed. Snap it or text it and it is logged for good. Connecting your bank, when it lands, is a bonus, never a crutch.' },
   { stars: 2, who: 'A trades subcontractor, reviewing another app', gripe: 'I photographed a receipt and it would not even log it. It just tried to match it to something and gave up.', fix: 'Send a photo and Lekhio reads it and logs the lot, the amount, the VAT, the category, in seconds. No matching, no retyping.' },
   { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'They held my own money for weeks with a copy and paste excuse. Never again.', fix: 'Lekhio never holds your money or touches your account. We keep the records, that is all. Your cash is only ever yours.' },
-  { stars: 2, who: 'A freelancer, reviewing another app', gripe: 'It talks to me like I am an accountant. I am not. Half of it I do not understand.', fix: 'Plain English, and it lives in WhatsApp. If you can send a text, you can use Lekhio.' },
+  { stars: 2, who: 'A freelancer, reviewing another app', gripe: 'It talks to me like I am an accountant. I am not. Half of it I do not understand.', fix: 'Plain English, and it opens in your browser. If you can send a text, you can use Lekhio.' },
   { stars: 2, who: 'A self employed cleaner, reviewing another app', gripe: 'Once it auto sorted something wrong, fixing it was a proper faff. I gave up correcting it.', fix: 'Wrong category? Just say "that was fuel, not food" and it is fixed in one line. You are always in charge of every entry.' },
   { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'Cancelling was a nightmare. I felt completely locked in.', fix: 'Cancel any time, in one tap. Your records export whenever you want.' },
 ];
@@ -416,7 +416,7 @@ export const moneyFlow = [
 export const included = [
   'Unlimited receipt, voice, text, and mileage capture',
   'Automatic bookkeeping and categories',
-  'Invoices created and sent from WhatsApp',
+  'Invoices created, sent and paid online',
   'MTD ready quarterly summaries, you approve before anything is filed',
   'Instant replies in the same chat',
   'Records exported any time, and cancel in one tap',

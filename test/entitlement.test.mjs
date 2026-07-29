@@ -91,22 +91,29 @@ ok('undefined is not entitled', isEntitled(undefined, NOW) === false);
 ok('a row with a null status is not entitled', isEntitled({ status: null }, NOW) === false);
 
 // ---------------------------------------------------------------------------------------------
-// THE FORTNIGHT WE ADVERTISE IS THE FORTNIGHT WE GRANT.
-// The screen says 14 days. If this ever drifts, the product is lying to him again.
+// THE TRIAL WE ADVERTISE IS THE TRIAL WE GRANT.
+//
+// 🔴 SEVEN DAYS since 29 July 2026, and the boundaries below are written relative to TRIAL_DAYS
+// rather than to the literal 7. The point of this block is that the granted length and the
+// entitlement window agree with each other, and a test that hardcodes both sides of that
+// agreement can only ever prove that somebody edited two numbers at once.
+//
+// The one literal kept on purpose is TRIAL_DAYS itself, because changing the trial length is a
+// commercial decision and it should have to walk past a red test to happen.
 // ---------------------------------------------------------------------------------------------
-ok('the trial is 14 days, the number on the screen', TRIAL_DAYS === 14);
+ok('the trial is 7 days, the number on the screen', TRIAL_DAYS === 7);
 
 const end = new Date(trialEndsAt(NOW));
 const granted = Math.round((end.getTime() - NOW.getTime()) / (24 * 3600 * 1000));
-ok(`a trial granted now ends in exactly 14 days (got ${granted})`, granted === 14);
+ok(`a trial granted now ends in exactly ${TRIAL_DAYS} days (got ${granted})`, granted === TRIAL_DAYS);
 
 ok('a freshly granted trial is entitled today', isEntitled({ status: 'trialing', current_period_end: trialEndsAt(NOW) }, NOW) === true);
 
-ok('a freshly granted trial is NOT entitled on day 15',
-  isEntitled({ status: 'trialing', current_period_end: trialEndsAt(NOW) }, new Date(NOW.getTime() + 15 * 24 * 3600 * 1000)) === false);
+ok(`a freshly granted trial is NOT entitled the day after it ends (day ${TRIAL_DAYS + 1})`,
+  isEntitled({ status: 'trialing', current_period_end: trialEndsAt(NOW) }, new Date(NOW.getTime() + (TRIAL_DAYS + 1) * 24 * 3600 * 1000)) === false);
 
-ok('a freshly granted trial IS still entitled on day 13',
-  isEntitled({ status: 'trialing', current_period_end: trialEndsAt(NOW) }, new Date(NOW.getTime() + 13 * 24 * 3600 * 1000)) === true);
+ok(`a freshly granted trial IS still entitled the day before it ends (day ${TRIAL_DAYS - 1})`,
+  isEntitled({ status: 'trialing', current_period_end: trialEndsAt(NOW) }, new Date(NOW.getTime() + (TRIAL_DAYS - 1) * 24 * 3600 * 1000)) === true);
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

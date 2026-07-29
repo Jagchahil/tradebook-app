@@ -8,7 +8,7 @@ import {
 export const metadata: Metadata = {
   title: 'Lekhio. Your first employee. The one that saves you money.',
   description:
-    'Lekhio is the first employee your business hires, and the first that pays for itself. Connect your bank and it works in the background, finding every legal way to lower your tax and keeping you ready to file. Filing is the easy part. Saving you money is the job. You approve. 14 days free.',
+    'Lekhio is the first employee your business hires, and the first that pays for itself. Connect your bank and it works in the background, finding every legal way to lower your tax and keeping you ready to file. Filing is the easy part. Saving you money is the job. You approve. 7 days free.',
   openGraph: {
     title: 'Lekhio. Your first employee. The one that saves you money.',
     description: 'Not software you buy. The first employee your business hires. It finds the money, you approve, it keeps you ready to file.',
@@ -225,7 +225,7 @@ export default function HomePage() {
             </div>
             <div className="micro">
               <span className="avs"><span style={{ background: '#1B59A6' }} /><span style={{ background: '#E0A33E' }} /><span style={{ background: '#15803D' }} /><span style={{ background: '#134277' }} /></span>
-              <span><b style={{ color: 'var(--saffron)' }}>★★★★★</b> &nbsp;Built with UK sole traders. 14 days free, no card.</span>
+              <span><b style={{ color: 'var(--saffron)' }}>★★★★★</b> &nbsp;Built with UK sole traders. 7 days free, no card.</span>
             </div>
           </div>
           <div><HeroPhone /></div>
@@ -469,13 +469,13 @@ export default function HomePage() {
       {/* Pricing */}
       <section className="pricewrap">
         <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 42 }}><h2 className="h2">One price. Everything in.</h2><p className="lead">No receipt limits, no tiers, no surprises. Both plans start with 14 days free, no card needed.</p></div>
+          <div className="center reveal" style={{ marginBottom: 42 }}><h2 className="h2">One price. Everything in.</h2><p className="lead">No receipt limits, no tiers, no surprises. Both plans start with 7 days free, no card needed.</p></div>
           <div className="prices reveal">
             <div className="pcard">
               <div className="pname">Monthly</div>
               <div className="pamt">£12.99<span>/mo</span></div>
               <div className="pnote">Billed monthly. Cancel any time.</div>
-              <div className="pcta"><Link href="/start" className="btn primary">Start 14 days free</Link><div className="pmicro">No card needed</div></div>
+              <div className="pcta"><Link href="/start" className="btn primary">Start 7 days free</Link><div className="pmicro">No card needed</div></div>
             </div>
             <div className="pcard best">
               <span className="pbadge">2 months free</span>
@@ -483,7 +483,7 @@ export default function HomePage() {
               <div className="pamt">£129<span>/yr</span></div>
               <div className="pnote">Just £10.75 a month, billed once a year.</div>
               <span className="psave">You save £27 a year</span>
-              <div className="pcta"><Link href="/start" className="btn primary">Start 14 days free</Link><div className="pmicro">No card needed</div></div>
+              <div className="pcta"><Link href="/start" className="btn primary">Start 7 days free</Link><div className="pmicro">No card needed</div></div>
             </div>
           </div>
           <div className="incl-panel reveal">
@@ -505,7 +505,7 @@ export default function HomePage() {
         <div className="wrap">
           <div className="final reveal">
             <h2>Your first employee starts today.</h2>
-            <p>Connect your bank and it goes to work, finding your money and keeping you ready to file. 14 days free, no card needed.</p>
+            <p>Connect your bank and it goes to work, finding your money and keeping you ready to file. 7 days free, no card needed.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
           </div>
         </div>

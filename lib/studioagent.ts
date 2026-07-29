@@ -31,7 +31,7 @@ export interface DraftResult {
   storyboard: Storyboard;
 }
 
-const DOOR = 'Text it. It is in your Lekhio. Free for 14 days, no card.';
+const DOOR = 'Text it. It is in your Lekhio. Free for 7 days, no card.';
 
 // The one message, restated for the model every time so it never drifts.
 const SPINE =

@@ -17,7 +17,7 @@ import { isEntitled } from '../../../../lib/entitlement';
 // The trial is normally granted by POST /api/billing/trial, when the man taps the button. But if
 // that request failed, because he was in a lift or on site or on 3G, he would be left with no
 // subscription row and would be shown the paywall on his next launch, having done nothing wrong
-// and having been told he had a fortnight. So the read path grants it too. Two callers, one
+// and having been told he had a week. So the read path grants it too. Two callers, one
 // idempotent function, and a unique index in the database that makes a double grant impossible.
 //
 // A man is never locked out of his own books because one of our requests did not arrive.

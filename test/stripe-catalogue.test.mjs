@@ -59,9 +59,9 @@ ok('an unknown offer is treated as standard', S.cataloguePriceId('monthly', 'non
 ok('a null offer is treated as standard', S.cataloguePriceId('annual', null) === 'price_test_annual');
 
 console.log('\n=== trial still applies regardless of pricing path ===\n');
-ok('default trial is 14 days', S.TRIAL_DAYS === 14);
+ok('default trial is 7 days', S.TRIAL_DAYS === 7);
 ok('rep trial is 30 days', S.REP_TRIAL_DAYS === 30);
-ok('no rep code gives the 14 day trial', S.resolveTrialDays(null) === 14);
+ok('no rep code gives the standard trial', S.resolveTrialDays(null) === S.TRIAL_DAYS);
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

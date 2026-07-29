@@ -37,7 +37,7 @@
 //
 // A trial with a stripe_subscription_id is a man who has already handed over a card. He will roll
 // onto a paid plan by himself, and Stripe emails him about it. Telling him to "pick a plan" would
-// be confusing and slightly insulting. This only ever speaks to the local, no card, 14 day grants
+// be confusing and slightly insulting. This only ever speaks to the local, no card, 7 day grants
 // that grantTrialIfNone() hands out.
 
 export interface TrialRow {

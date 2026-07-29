@@ -227,7 +227,7 @@ export interface SeedAsset {
   storyboard: Storyboard;
 }
 
-const DOOR = 'Text it. It is in your Lekhio. Free for 14 days, no card.';
+const DOOR = 'Text it. It is in your Lekhio. Free for 7 days, no card.';
 
 export const SEED_ASSETS: SeedAsset[] = [
   {
@@ -275,7 +275,7 @@ export const SEED_ASSETS: SeedAsset[] = [
       { n: 2, visual: 'Gestures around the shop', caption: 'Every one comes off your tax', vo: 'Every one of those comes off your tax and half of you are not putting them down.', seconds: 5 },
       { n: 3, visual: 'Direct to camera', caption: 'You are not bad with money', vo: 'You are not bad with money. You are cutting hair eleven hours a day.', seconds: 4 },
       { n: 4, visual: 'Snaps a receipt on the counter', caption: 'Text the receipt. It sorts it.', vo: 'Submitting on time does nothing for that. Claiming the lot does. Text the receipt, it sorts it, you approve it.', seconds: 6 },
-      { n: 5, visual: 'Logo and door line', caption: 'Free for two weeks', vo: DOOR, seconds: 3 },
+      { n: 5, visual: 'Logo and door line', caption: 'Free for a week', vo: DOOR, seconds: 3 },
     ],
   },
   {

@@ -17,7 +17,7 @@ export const runtime = 'nodejs';
 // thing he has to read and dismiss before he reaches the one he came for.
 //
 //   Is it growing?          signups over time. REAL history: a created_at is written once.
-//   Is the trial working?   trial to paid. THE number. At £12.99 with a fortnight free, 20% is a
+//   Is the trial working?   trial to paid. THE number. At £12.99 with a week free, 20% is a
 //                           company and 5% is not, and nothing else you build fixes that.
 //   Who is leaving?         cancelled, and who has asked to.
 //   Which channel PAYS?     not who came. Who came AND STAYED. Cost per acquisition is vanity.

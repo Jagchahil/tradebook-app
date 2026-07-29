@@ -47,7 +47,20 @@ export interface Entitlement {
   current_period_end?: string | null;
 }
 
-export const TRIAL_DAYS = 14;
+// 🔴 SEVEN DAYS, NOT FOURTEEN. Jag's call, 28 July 2026, and THE ONLY DEFINITION OF IT.
+//
+// lib/stripe.ts used to carry a second copy of this number for the card trial, so the no card
+// grant and the Stripe trial were two 14s that nothing held together. It now imports this one.
+// A number that means one thing belongs in one place: the last time this codebase kept two
+// readers over one figure, the one that drifted was the one he believed.
+//
+// Seven changes what the product must do, not just what it says. A weekly summary that fires on a
+// Sunday may never fire at all inside seven days, so during a trial it fires relative to signup.
+// See lib/weeklyupdate.ts.
+//
+// ⚠️ The store listings and the website still say 14. They are corrected as part of launch two,
+// before the app goes live. Nobody has yet downloaded an app promising a fortnight.
+export const TRIAL_DAYS = 7;
 
 // The statuses that mean "he has paid, or is inside a window where he does not have to yet".
 // past_due is deliberate. See the note above.
@@ -72,7 +85,7 @@ export function isEntitled(sub: Entitlement | null | undefined, now: Date = new 
   return false;
 }
 
-// When a trial granted right now would end. Used at the single point of grant, so the fortnight is
+// When a trial granted right now would end. Used at the single point of grant, so the length is
 // defined once and cannot drift between the copy on the screen and the row in the database.
 export function trialEndsAt(now: Date = new Date()): string {
   const end = new Date(now.getTime());

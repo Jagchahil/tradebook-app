@@ -164,7 +164,7 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
       <li>Snap a photo of any receipt and send it. Logged in seconds.</li>
       <li>Try a few: "drove 24 miles", "worked 90 hours from home", or "got paid £400 by Dave".</li>
     </ol>
-    ${p('Your first 14 days are free. Open the app any time to watch it all add up, ready for tax.')}
+    ${p('Your first 7 days are free. Open the app any time to watch it all add up, ready for tax.')}
     ${button(APP, 'Open Lekhio')}
     ${pMuted('A real person is on the other end — just reply if you need anything.')}`;
   return send({ to, subject: 'Welcome to Lekhio. Here is how to start.', html: shell(inner, { preheader: 'Your books and tax, now in WhatsApp.' }), tag: 'welcome' });
@@ -177,7 +177,7 @@ export async function sendWaitlistWelcomeEmail(to: string, name?: string | null)
     ${h1(hi)}
     ${p('Thanks for putting your name down for Lekhio. You’ll be one of the first we let in.')}
     ${p('Lekhio is your first employee: it connects to your bank, sorts every payment in the background, and finds the tax you never need to pay. The shoebox and the January panic are done — it all happens in WhatsApp, and you approve everything.')}
-    ${p('<strong>What happens next:</strong> we’ll message you the moment your spot is ready. Your first 14 days are free, and there’s no card to enter to start.')}
+    ${p('<strong>What happens next:</strong> we’ll message you the moment your spot is ready. Your first 7 days are free, and there’s no card to enter to start.')}
     ${button(APP, 'See how it works')}
     ${pMuted('If you didn’t sign up, just reply and we’ll take you off.')}`;
   return send({ to, subject: 'You are on the Lekhio list.', html: shell(inner, { preheader: "We'll let you in soon — here's what's coming." }), tag: 'waitlist' });

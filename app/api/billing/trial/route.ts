@@ -13,7 +13,7 @@ import { isEntitled } from '../../../../lib/entitlement';
 // NO CARD. NO PRICE. NO STRIPE. Nothing here is a purchase, so App Store Review Guideline 3.1.3(f)
 // is untouched: "Free apps acting as a stand-alone companion to a paid web based tool ... do not
 // need to use in-app purchase, provided there is no purchasing inside the app, or calls to action
-// for purchase outside of the app." Giving a man a fortnight for nothing is not selling him
+// for purchase outside of the app." Giving a man a week for nothing is not selling him
 // anything, and no price or checkout appears anywhere in the binary.
 //
 // Idempotent, and once per phone for the life of that number. Tapping twice, reinstalling, or

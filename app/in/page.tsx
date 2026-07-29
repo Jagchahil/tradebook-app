@@ -136,7 +136,7 @@ export default async function SignInPage({
 
         <p style={S.foot}>
           New to Lekhio? <a href="/start" style={S.footLink}>Get set up</a>. It takes two minutes and
-          the first 14 days are free.
+          the first 7 days are free.
         </p>
         <p style={S.trust}>You approve everything. We are not HMRC.</p>
       </div>

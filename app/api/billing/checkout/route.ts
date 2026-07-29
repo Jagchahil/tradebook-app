@@ -4,7 +4,7 @@ import { normalizeUkPhone } from '../../../../lib/supabase';
 import { rateLimitedShared, clientIp } from '../../../../lib/ratelimit';
 
 // Start a real Lekhio subscription. The page posts the chosen plan and any founder
-// offer, we create a Stripe Checkout session with a 14 day free trial, and return
+// offer, we create a Stripe Checkout session with a 7 day free trial, and return
 // the hosted URL for the browser to redirect to. No card details ever touch us.
 
 function str(v: unknown, max = 200): string {

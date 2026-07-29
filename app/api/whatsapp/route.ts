@@ -1174,7 +1174,7 @@ async function handlePricing(from: string): Promise<void> {
   await sendText(
     from,
     [
-      'Lekhio is £12.99 a month or £129 a year, everything in, and your first 14 days are free.',
+      'Lekhio is £12.99 a month or £129 a year, everything in, and your first 7 days are free.',
       '',
       `That covers receipt capture, bookkeeping, invoicing, CIS, mileage, and your quarterly tax prep. Get started at ${APP_URL.replace('https://', '')}.`,
     ].join('\n'),

@@ -36,7 +36,7 @@ export const NURTURE_SEQUENCE: NurtureEmail[] = [
     bodyHtml: `
       <p style="font-size:20px;font-weight:800;letter-spacing:-0.3px;margin:0 0 14px;color:${INK}">Whenever you are ready.</p>
       <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">No pressure and no hard sell. But when the shoebox starts to nag, or a deadline creeps up on a Sunday night, Lekhio is here: your books and tax handled from WhatsApp, the reliefs found for you, and you approve everything before anything moves.</p>
-      <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">Your first 14 days are free, and there is no card to start.</p>
+      <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">Your first 7 days are free, and there is no card to start.</p>
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 8px"><tr><td style="background:${RIVER};border-radius:10px"><a href="${APP}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">See how it works</a></td></tr></table>
     `,
   },

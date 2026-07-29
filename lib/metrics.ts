@@ -121,7 +121,7 @@ export function daily(dates: Array<string | null | undefined>, days = 30, now: D
 // --- The funnel -------------------------------------------------------------------------------
 //
 // The one number that decides whether there is a business: of the men who START a trial, how many
-// PAY. At £12.99 with a fortnight free, 20% is a company and 5% is not, and nothing else you build
+// PAY. At £12.99 with a week free, 20% is a company and 5% is not, and nothing else you build
 // fixes that.
 
 export interface FunnelRow {

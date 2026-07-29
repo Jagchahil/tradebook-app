@@ -78,8 +78,8 @@ export async function createInvoiceCheckout(input: CheckoutInput): Promise<strin
 // filing is still being switched on; the plan is to raise it to £19.99 a month once
 // filing is live, at which point every existing subscriber keeps this price for life
 // automatically, because Stripe locks the amount at signup (inline price_data). A
-// 14 day free trial is attached by default, so no card is charged for the first two
-// weeks. A field sales rep can hand a customer a longer 30 day trial by giving them a
+// 7 day free trial is attached by default, so no card is charged for the first week.
+// A field sales rep can hand a customer a longer 30 day trial by giving them a
 // rep code (see REP_TRIAL_CODES and resolveTrialDays below).
 
 export type BillingPlan = 'monthly' | 'annual';
@@ -114,10 +114,22 @@ const PRICE_IDS: Record<BillingPlan, string | undefined> = {
   annual: process.env.STRIPE_PRICE_ANNUAL,
 };
 
-// The default self serve trial. Fourteen days: long enough to reach the aha
-// moments (a first week of entries, a receipt, the CIS refund building), short
-// enough to keep momentum and filter tyre kickers.
-export const TRIAL_DAYS = 14;
+// 🔴 SEVEN DAYS. THE SAME SEVEN AS lib/entitlement.ts, AND A TEST IS WHAT KEEPS THEM THE SAME.
+//
+// This number exists twice on purpose, and the duplication is not laziness, it is the price of a
+// constraint worth more than tidiness: lib/stripe.ts imports NOTHING local, which is the only
+// reason test/trial.test.mjs and test/stripe-catalogue.test.mjs can load it straight into node
+// and attack it. Importing the constant from entitlement.ts broke all three suites at once.
+//
+// So the guard is not an import, it is an assertion. test/trial.test.mjs loads both files and
+// fails the build if these two numbers ever disagree. That is the same shape as
+// test/watemplates.test.mjs, which enforces an invariant ACROSS files rather than hoping a
+// convention holds, and it is strictly stronger than an import: an import proves they are one
+// number, a test proves they MEAN the same thing and says so out loud when they stop.
+//
+// Two lengths for one trial would show up as a man being locked out days early by a rule he was
+// never shown, so this is worth a red test rather than a comment asking nicely.
+export const TRIAL_DAYS = 7;
 
 // The longer trial a field sales rep can grant in person. Reps hand out a code
 // from REP_TRIAL_CODES (a comma separated env list, case insensitive). Only a
@@ -134,7 +146,7 @@ export function isRepTrialCode(code?: string | null): boolean {
   return allowed.includes(c);
 }
 
-// How many trial days this checkout gets: 30 for a valid rep code, else 14.
+// How many trial days this checkout gets: 30 for a valid rep code, else the standard trial.
 export function resolveTrialDays(repCode?: string | null): number {
   return isRepTrialCode(repCode) ? REP_TRIAL_DAYS : TRIAL_DAYS;
 }
@@ -173,7 +185,7 @@ export interface SubscriptionCheckoutInput {
 }
 
 // Create a hosted Stripe Checkout session in subscription mode, with the trial
-// (14 days by default, 30 for a valid rep code) and the right recurring price.
+// (7 days by default, 30 for a valid rep code) and the right recurring price.
 // Returns the URL to send the user to, or null if Stripe is not configured or
 // the call fails.
 export async function createSubscriptionCheckout(input: SubscriptionCheckoutInput): Promise<string | null> {

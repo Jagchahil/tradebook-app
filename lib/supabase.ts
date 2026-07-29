@@ -2082,9 +2082,15 @@ export async function consumeSignupCode(id: string): Promise<boolean> {
 // The auth user id behind an address, from OUR OWN tables. No GoTrue lookup, because the admin API
 // has no reliable filter by email and paging every user to find one is a landmine at any real size.
 //
-// Two routes, newest first. signups.user_id is written at verify time and is the direct answer. The
-// legacy path, through the phone on the signup row, is how every account created before 29 July
-// 2026 resolves, and it stays because those men must still be able to sign in.
+// 🔴 ONE ROUTE ONLY, AND THE SECOND ONE WAS DELETED RATHER THAN KEPT FOR COMPATIBILITY.
+//
+// This used to fall back to findContactAccount, which resolved an address through the PHONE TYPED
+// ON THE SIGNUP ROW. Nobody proves that number, so the fallback handed back whichever account owned
+// a number an attacker had typed. See the note in findContactAccount: it was demonstrated end to
+// end on 29 July 2026.
+//
+// signups.user_id is the only acceptable link, because it is written in exactly one place, on the
+// far side of a code we emailed and he typed back.
 export async function findAuthUserIdForEmail(email: string): Promise<string | null> {
   const key = (email ?? '').trim().toLowerCase();
   if (!key) return null;
@@ -2100,14 +2106,12 @@ export async function findAuthUserIdForEmail(email: string): Promise<string | nu
       if (rows[0]?.user_id) return rows[0].user_id;
     }
   } catch {
-    // fall through to the legacy route
-  }
-  try {
-    const known = await findContactAccount('email', key);
-    return known?.userId ?? null;
-  } catch {
+    // A read that failed is not "no account". Returning null here means the signup route creates a
+    // fresh auth user, which GoTrue refuses if the address already has one, and he is told to try
+    // again. Annoying, and safe.
     return null;
   }
+  return null;
 }
 
 // 🔴 THE AUTH USER IS CREATED HERE AND ONLY HERE, AND ONLY AFTER THE CODE WAS PROVED.
@@ -6463,30 +6467,59 @@ export async function findContactAccount(channel: 'sms' | 'email', value: string
     return null;
   }
 
-  // EMAIL. public.users has no email column, so the address is matched against the signups row it
-  // was collected on, and the PHONE on that row is what finds the account. That is not a detour, it
-  // is the point: the phone is the account key because WhatsApp matches inbound messages by number,
-  // and an email must resolve to the same account rather than beside it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 EMAIL. THIS RESOLVED THROUGH THE PHONE ON THE SIGNUP ROW AND THAT WAS AN ACCOUNT TAKEOVER.
+  //
+  // It used to read: find the signups row for this address, take the PHONE typed on it, and return
+  // whichever account owns that number. The comment above it argued that the phone is the account
+  // key so an email must resolve to the same account rather than beside it. The reasoning is right
+  // and the implementation was a door.
+  //
+  // NOBODY PROVES THE PHONE ON A SIGNUPS ROW. It is a number somebody typed into a public form.
+  //
+  // So: type a stranger's mobile and your own email at /start, prove your own address, and this
+  // hands back the stranger's user id. The sign in door then binds your address to his auth user
+  // and opens a session on his books. Demonstrated end to end on 29 July 2026 against a test
+  // account: the signup did not merely open it, reconcileSignupToUser then wrote the attacker's
+  // name over the owner's.
+  //
+  // ⚠️ THE RULE THAT REPLACES IT: AN EMAIL MAY ONLY RESOLVE TO AN ACCOUNT THROUGH A LINK MADE
+  // AFTER THAT EMAIL WAS PROVED.
+  //
+  // signups.user_id is that link, and it is written in exactly one place: /api/signup/verify, on
+  // the far side of a code we emailed and he typed back. Nothing a stranger can type creates it.
+  //
+  // ⚠️ AND THE COST, WRITTEN DOWN RATHER THAN DISCOVERED. A customer who joined on the phone app
+  // has never proved an address to us, so his email will not open this door until he binds one. He
+  // signs in with his number, which is the door he has always used. That is a real inconvenience
+  // for some people and it is the correct trade: the alternative is a door that a typed digit
+  // walks through.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   const email = value.trim().toLowerCase();
   if (!email) return null;
 
   const sres = await fetch(
-    `${url}/rest/v1/signups?email=eq.${encodeURIComponent(email)}&select=phone&order=created_at.desc&limit=1`,
+    `${url}/rest/v1/signups?email=eq.${encodeURIComponent(email)}&user_id=not.is.null` +
+      `&select=user_id,phone&order=created_at.desc&limit=1`,
     { headers: headers() },
   );
   if (!sres.ok) throw new Error('contact_lookup_failed');
-  const srows = (await sres.json().catch(() => null)) as Array<{ phone: string | null }> | null;
-  const phone = Array.isArray(srows) && srows[0]?.phone ? normalizeUkPhone(srows[0].phone as string) : '';
-  if (!phone) return null;
+  const srows = (await sres.json().catch(() => null)) as Array<{ user_id: string | null; phone: string | null }> | null;
+  const row = Array.isArray(srows) ? srows[0] : null;
+  if (!row?.user_id) return null;
 
+  // ⚠️ THE PHONE COMES BACK FROM THE ACCOUNT, NEVER FROM THE SIGNUP ROW. The caller uses it for
+  // nothing but logging today, and the day it is used for anything else it must be a proved number
+  // rather than the typed one sitting next to it.
   const ures = await fetch(
-    `${url}/rest/v1/users?phone_number=eq.${encodeURIComponent(phone)}&select=id&limit=1`,
+    `${url}/rest/v1/users?id=eq.${encodeURIComponent(row.user_id)}&select=id,phone_number&limit=1`,
     { headers: headers() },
   );
   if (!ures.ok) throw new Error('contact_lookup_failed');
-  const urows = (await ures.json().catch(() => null)) as Array<{ id: string }> | null;
-  const userId = Array.isArray(urows) && urows[0] ? urows[0].id : null;
-  return { userId, phone };
+  const urows = (await ures.json().catch(() => null)) as Array<{ id: string; phone_number: string | null }> | null;
+  const u = Array.isArray(urows) ? urows[0] : null;
+  if (!u) return null;
+  return { userId: u.id, phone: u.phone_number ?? '' };
 }
 
 // 🔴 THE ONE THAT COULD ACTUALLY SPLIT A MAN'S BOOKS IN TWO.

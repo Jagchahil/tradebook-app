@@ -143,6 +143,44 @@ ok('the answers are saved before the code is asked for, not after',
   startPage.indexOf('await submitSignup();') < startPage.indexOf('await sendCode();'));
 
 // ---------------------------------------------------------------------------------------------
+// 🔴 THE ACCOUNT TAKEOVER. This is the most important block in this file.
+//
+// findContactAccount's email branch used to resolve an address by reading the signups row and then
+// the PHONE TYPED ON IT, returning whichever account owned that number. Nobody proves the number on
+// a signups row: it is a string somebody entered into a public form.
+//
+// So the attack was: type a stranger's mobile and your own email at /start, prove your own address,
+// and be handed the stranger's account. It was demonstrated end to end on 29 July 2026 against a
+// test account, and it did not stop at read access, because reconcileSignupToUser then wrote the
+// attacker's name over the owner's.
+//
+// THE RULE: an email may only resolve to an account through a link made AFTER that email was
+// proved. signups.user_id is that link and it is written in exactly one place.
+//
+// These assertions are the ones to be most suspicious of anybody "simplifying".
+// ---------------------------------------------------------------------------------------------
+const emailBranch = supabase.slice(
+  supabase.indexOf('🔴 EMAIL. THIS RESOLVED THROUGH THE PHONE'),
+  supabase.indexOf('export async function attachEmailToAuthUser'),
+);
+ok('the email branch of the contact lookup exists to be checked', emailBranch.length > 400);
+ok('🔴 an email only resolves through a link made after it was proved',
+  /signups\?email=eq[^`]*user_id=not\.is\.null/.test(emailBranch));
+ok('🔴 an email NEVER resolves by looking up an account from a typed phone',
+  !/users\?phone_number=eq\./.test(emailBranch));
+ok('the phone it hands back comes off the ACCOUNT, not off the signup row',
+  /users\?id=eq\.\$\{encodeURIComponent\(row\.user_id\)\}/.test(emailBranch));
+
+const finder = supabase.slice(
+  supabase.indexOf('export async function findAuthUserIdForEmail'),
+  supabase.indexOf('export async function createConfirmedAuthUser'),
+);
+ok('the signup lookup exists to be checked', finder.length > 200);
+ok('🔴 the signup lookup has no fallback that walks through a typed phone',
+  !finder.includes('findContactAccount('));
+ok('🔴 and it requires the proved link', /user_id=not\.is\.null/.test(finder));
+
+// ---------------------------------------------------------------------------------------------
 // Reconcile has to find the signup for an account with no phone, or every answer is dropped.
 // ---------------------------------------------------------------------------------------------
 const recon = supabase.slice(

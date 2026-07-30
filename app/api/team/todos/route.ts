@@ -13,8 +13,8 @@ function cap(s: string): string {
 
 interface SurfaceRow { key?: string; label?: string; status?: string; note?: string }
 
-// SECURITY GOES TO THE TOP, STRAIGHT AWAY. Any live worker reporting a warning — either a whole-worker
-// warn/alert, or (for Pehredaar) a single watched surface in warn/alert — becomes a hi-priority item at
+// SECURITY GOES TO THE TOP, STRAIGHT AWAY. Any live worker reporting a warning, either a whole-worker
+// warn/alert, or (for Pehredaar) a single watched surface in warn/alert, becomes a hi-priority item at
 // the very top of the CEO list, above everything else. These rows are SYNTHETIC (id prefixed
 // "security:"), never team_todos: they appear the instant a bot flags something and clear themselves the
 // moment the next sweep reads clean. A stale (resting) worker is not an alarm, so it is skipped.
@@ -37,7 +37,7 @@ async function openSecurityTodos(): Promise<TodoItemDTO[]> {
             id: `security:${b.workerKey}:${s.key ?? label}`,
             kind: 'needs',
             buddyKey: b.workerKey,
-            text: note ? `${label} needs a look — ${note}` : `${label} needs a look.`,
+            text: note ? `${label} needs a look, ${note}` : `${label} needs a look.`,
             from: `${cap(b.workerKey)} · security watch`,
             where: cap(b.workerKey),
             prio: 'hi',
@@ -49,7 +49,7 @@ async function openSecurityTodos(): Promise<TodoItemDTO[]> {
           id: `security:${b.workerKey}`,
           kind: 'needs',
           buddyKey: b.workerKey,
-          text: b.headline || `${cap(b.workerKey)} flagged something — open the desk.`,
+          text: b.headline || `${cap(b.workerKey)} flagged something, open the desk.`,
           from: `${cap(b.workerKey)} · security watch`,
           where: cap(b.workerKey),
           prio: 'hi',
@@ -71,13 +71,13 @@ async function openSecurityTodos(): Promise<TodoItemDTO[]> {
 // tickets live, right beside Munshi's prepared list, so a customer asking for a person never sits unseen
 // on a separate page. These rows are SYNTHETIC (id prefixed "support:"), not team_todos: Munshi's daily
 // replace never touches them, and they vanish the instant the ticket is answered or dismissed in the
-// Support desk. Ticking one here is a deliberate no-op — it is resolved by actually replying.
+// Support desk. Ticking one here is a deliberate no-op, it is resolved by actually replying.
 const SUPPORT_TEXT: Record<string, string> = {
-  human: 'A customer asked to speak to a human — reply in the Support desk.',
-  complaint: 'A customer raised a complaint — reply in the Support desk.',
-  billing: 'A customer has a billing question — reply in the Support desk.',
-  problem: 'A customer reported a problem — reply in the Support desk.',
-  other: 'A customer needs a hand on WhatsApp — reply in the Support desk.',
+  human: 'A customer asked to speak to a human, reply in the Support desk.',
+  complaint: 'A customer raised a complaint, reply in the Support desk.',
+  billing: 'A customer has a billing question, reply in the Support desk.',
+  problem: 'A customer reported a problem, reply in the Support desk.',
+  other: 'A customer needs a hand on WhatsApp, reply in the Support desk.',
 };
 
 async function openSupportTodos(): Promise<TodoItemDTO[]> {
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
     openSecurityTodos(),
   ]);
   if (todos === null) return NextResponse.json({ error: 'unreadable' }, { status: 503 });
-  // Done team_todos drop off the list entirely (the row stays in the DB, so it is reversible — reopen by
+  // Done team_todos drop off the list entirely (the row stays in the DB, so it is reversible, reopen by
   // ticking again). A completed task is not clutter Jag should keep scanning past.
   const open = todos.filter((t) => !t.done);
   // Order of urgency: a security warning first (straight to the top), then a customer waiting on a human,
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
   }
   if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-  // Support and security items are live pointers, not team_todos — a support item is resolved by
+  // Support and security items are live pointers, not team_todos, a support item is resolved by
   // answering in the Support desk, a security item by fixing the cause and re-running the sweep. Accept
   // the tap so the UI stays smooth, but change nothing; each clears itself on the next poll once handled.
   if (body.id.startsWith('support:') || body.id.startsWith('security:')) {

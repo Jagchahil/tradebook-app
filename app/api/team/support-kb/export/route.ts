@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 // the mini mirror job reads this and writes each entry as a readable .md note into the "Lekhio Support"
 // folder of Jag's Obsidian vault, so his brain always holds a current copy. Secret-gated the same way as
 // the Bridge and the KB ingest (constant-time compare of x-munshi-secret against MUNSHI_SECRET), so only
-// the mini can read it. No customer data — only our own playbook.
+// the mini can read it. No customer data, only our own playbook.
 function authorised(req: NextRequest): boolean {
   const secret = process.env.MUNSHI_SECRET;
   if (!secret) return false;

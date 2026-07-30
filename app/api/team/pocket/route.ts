@@ -6,7 +6,7 @@ import { readPocket } from '../../../../lib/pocket';
 export const runtime = 'nodejs';
 
 // KHOJI'S POCKET, read by the console. Same gate as the rest of /team: a row in team_members, checked
-// fresh on THIS request. Read-only — the pocket is written only by the mini, one way. No customer data.
+// fresh on THIS request. Read-only, the pocket is written only by the mini, one way. No customer data.
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization') || '';

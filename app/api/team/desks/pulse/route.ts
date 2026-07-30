@@ -15,14 +15,14 @@ import { upsertHeartbeat, type WorkerStatus } from '../../../../../lib/bridge';
 
 export const runtime = 'nodejs';
 
-// THE DESK PULSE. Three of the workforce — Khazanchi (finance), Saudagar (revenue) and Mistri (system)
-// — are not watchers of a live wire like Pehredaar; they are analysts of numbers we already hold. So
+// THE DESK PULSE. Three of the workforce, Khazanchi (finance), Saudagar (revenue) and Mistri (system)
+//, are not watchers of a live wire like Pehredaar; they are analysts of numbers we already hold. So
 // rather than a bot each on the mini, ONE small mini job hits this endpoint on a schedule, and the
 // server reads the current picture and beats a heartbeat for all three. That is what makes them "live":
 // a fresh, honest one-line read of the business, updated every pass.
 //
-// Secret-gated (x-munshi-secret vs MUNSHI_SECRET), same as the bridge. It returns ONLY aggregates — a
-// total MRR, counts, a health word — never a single customer's figures, exactly like the overview the
+// Secret-gated (x-munshi-secret vs MUNSHI_SECRET), same as the bridge. It returns ONLY aggregates, a
+// total MRR, counts, a health word, never a single customer's figures, exactly like the overview the
 // team already sees. If MUNSHI_SECRET is unset, refused.
 function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a);
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     readKnowledgeState(),
   ]);
   if (customers === null) {
-    // Could not read the business. Do NOT beat a confident green over nothing — say so and stop.
+    // Could not read the business. Do NOT beat a confident green over nothing, say so and stop.
     return NextResponse.json({ error: 'unreadable' }, { status: 503 });
   }
 
@@ -91,13 +91,13 @@ export async function GET(req: NextRequest) {
   const cronsOk = runs !== null && cAlarms.length === 0;
   const kStatus = brain === null ? 'unknown' : knowledgeStatus(knowledgeAlarms(brain));
   let mistriStatus: WorkerStatus = 'ok';
-  let mistriHead = 'All green — site up, scheduled jobs on time, tax engine agrees with GOV.UK.';
+  let mistriHead = 'All green, site up, scheduled jobs on time, tax engine agrees with GOV.UK.';
   if (kStatus !== 'ok' && kStatus !== 'unknown') {
     mistriStatus = 'alert';
     mistriHead = 'The tax engine disagrees with GOV.UK, or cannot be checked. Look before trusting a figure.';
   } else if (runs !== null && !cronsOk) {
     mistriStatus = 'warn';
-    mistriHead = `${cAlarms.length} scheduled job(s) behind — something that should be running is not.`;
+    mistriHead = `${cAlarms.length} scheduled job(s) behind, something that should be running is not.`;
   }
   const mistri = {
     status: mistriStatus,
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
 
   // --- Hoka · marketing -------------------------------------------------------------------------
   // The make loop, read off the studio backend the retired studio left behind. His headline is the state
-  // of the workshop: ideas banked, drafts waiting on Jag, and pieces live. Best-effort — if the studio is
+  // of the workshop: ideas banked, drafts waiting on Jag, and pieces live. Best-effort, if the studio is
   // unreadable he simply reports "warming up" rather than a false empty.
   const [ideas, assets] = await Promise.all([readStudioIdeas(), readStudioAssets()]);
   let hoka;
@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
     };
   }
 
-  // Beat them all. Best-effort — a failed beat just means a stale card until the next pass.
+  // Beat them all. Best-effort, a failed beat just means a stale card until the next pass.
   await Promise.all([
     upsertHeartbeat({ worker_key: 'khazanchi', status: khazanchi.status, headline: khazanchi.headline, detail: khazanchi.detail }),
     upsertHeartbeat({ worker_key: 'saudagar', status: saudagar.status, headline: saudagar.headline, detail: saudagar.detail }),

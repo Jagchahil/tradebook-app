@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 
 // THE WEBSITE SWEEP, run live. Every load compares the public site FAQ (the single source of the
 // marketing answers) against the playbook, and flags any FAQ topic the website covers that the desk does
-// not yet answer — so your answers never fall behind the site. Deliberately forgiving: a topic counts as
+// not yet answer, so your answers never fall behind the site. Deliberately forgiving: a topic counts as
 // covered if any playbook entry shares a real word with the question (so "tradesperson" is covered by an
 // entry about "trade"). Only genuinely uncovered topics show.
 const STOP = new Set(['does', 'this', 'that', 'have', 'what', 'your', 'mean', 'with', 'from', 'four', 'lekhio', 'financial', 'they']);
@@ -26,10 +26,10 @@ function coveredByPlaybook(question: string, entryBlobs: string[]): boolean {
   });
 }
 
-// THE PLAYBOOK. The console's Playbook node reads and edits every common-issue entry — the same rows that
+// THE PLAYBOOK. The console's Playbook node reads and edits every common-issue entry, the same rows that
 // ground the drafts and fill the pick-list. Team-gated, same as the rest of the console. support_kb is
 // the source of truth (a mini job mirrors it back into the Obsidian vault). GET lists; POST saves one
-// (edit with id, add without); DELETE removes one. No customer data — only our own playbook.
+// (edit with id, add without); DELETE removes one. No customer data, only our own playbook.
 async function gate(req: NextRequest): Promise<NextResponse | null> {
   const auth = req.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';

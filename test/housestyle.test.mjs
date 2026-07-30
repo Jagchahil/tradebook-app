@@ -40,5 +40,62 @@ ok('houseCopy passes null through', H.houseCopy(null) === null);
 ok('houseCopy passes empty through', H.houseCopy('') === null);
 ok('NO_DASH_RULE names the rule', typeof H.NO_DASH_RULE === 'string' && H.NO_DASH_RULE.includes('em dash'));
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE SANITISER ONLY EVER RAN ON THE MODEL'S OUTPUT.
+//
+// houseCopy() is wired into lib/claude.ts, announcements and the calendar, because an em dash from
+// a language model was the failure everybody expected. Hand written strings were assumed to already
+// follow the rule, and on 30 July twenty of them did not: a WhatsApp reply that read "Sorry, I could
+// not write up that voice note" with an em dash in it, the footer of every email we send, and five
+// lines of the newsletter.
+//
+// A rule the codebase cannot check is a rule nobody keeps, so it is checked here, at the source,
+// for the copy that reaches a person. Comments are exempt: they are held to the same rule by hand
+// but a dash in one has never reached a customer, and failing the build over a comment would teach
+// people to stop reading the failure.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== no forbidden dash in copy that reaches a customer ===\n');
+{
+  const { readdirSync, lstatSync } = await import('node:fs');
+  const repo = path.resolve(here, '..');
+  const SKIP = ['node_modules', '.git', '.next', '_to_delete', '_scale_review', path.join('app', 'team'), 'test'];
+  const walk = (dir, out = []) => {
+    for (const e of readdirSync(dir)) {
+      if (e.startsWith('.')) continue;
+      const full = path.join(dir, e);
+      const rel = path.relative(repo, full);
+      if (SKIP.some((s) => rel === s || rel.startsWith(s + path.sep))) continue;
+      const st = lstatSync(full);
+      if (st.isSymbolicLink()) continue;
+      if (st.isDirectory()) walk(full, out);
+      else if (/\.(ts|tsx)$/.test(e)) out.push(full);
+    }
+    return out;
+  };
+  // Quoted strings and plain JSX text. Deliberately not a whole file scan: the sanitiser in this
+  // very file has to contain the characters it removes.
+  const spans = (line) => {
+    const found = [];
+    const q = /'([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\]*(?:\\.[^`\\]*)*)`/g;
+    for (const m of line.matchAll(q)) found.push(m[1] ?? m[2] ?? m[3] ?? '');
+    for (const m of line.matchAll(/>([^<>{}]{4,})</g)) found.push(m[1]);
+    return found;
+  };
+  const offenders = [];
+  for (const file of walk(repo)) {
+    const rel = path.relative(repo, file);
+    if (rel === path.join('lib', 'housestyle.ts')) continue;
+    readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+      const s = line.trim();
+      if (s.startsWith('//') || s.startsWith('*')) return;
+      for (const str of spans(line)) {
+        if (/[\u2014\u2013]/.test(str)) { offenders.push(`${rel}:${i + 1}  ${str.trim().slice(0, 70)}`); break; }
+      }
+    });
+  }
+  offenders.slice(0, 12).forEach((o) => console.log(`        ${o}`));
+  ok('no em dash or en dash in any customer facing string', offenders.length === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

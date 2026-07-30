@@ -224,6 +224,10 @@ export default function Universe({ data }: { data: UniverseData }) {
         onPointerUp={onUp}
         onPointerLeave={() => { onUp(); setHover(null); }}
         style={{
+          // A cursor read from a ref during render. The rule is right that a ref is not reactive, and
+          // that is the point: the grab cursor should follow the pointer without re-rendering a canvas
+          // of a few hundred nodes on every mouse move.
+          // eslint-disable-next-line react-hooks/refs
           position: 'relative', borderRadius: 18, overflow: 'hidden', cursor: drag.current ? 'grabbing' : 'grab',
           background: 'radial-gradient(1500px 780px at 50% 46%, #101a34 0%, #080b16 60%, #04060c 100%)',
           border: '1px solid #141c30', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)', userSelect: 'none', touchAction: 'none',

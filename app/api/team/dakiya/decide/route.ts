@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   });
   if (!sent.ok) {
     return NextResponse.json(
-      { error: 'send failed — check RESEND_API_KEY is set and the from-address is on the verified domain.' },
+      { error: 'send failed, check RESEND_API_KEY is set and the from-address is on the verified domain.' },
       { status: 502 },
     );
   }

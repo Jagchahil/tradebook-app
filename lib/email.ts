@@ -77,7 +77,7 @@ function shell(inner: string, opts: { preheader?: string; unsubscribeLink?: stri
         ${inner}
       </td></tr>
       <tr><td style="padding:20px 6px 8px;font-size:12px;line-height:1.6;color:${MUTED}">
-        <p style="margin:0">Lekhio — your books and tax, handled in WhatsApp.</p>
+        <p style="margin:0">Lekhio. Your books and tax, handled in WhatsApp.</p>
         <p style="margin:6px 0 0">Lekhio is an independent UK company. It is not affiliated with HMRC, and nothing is ever filed to HMRC without your approval.</p>
         ${unsub}
       </td></tr>
@@ -224,11 +224,11 @@ export async function sendWaitlistWelcomeEmail(to: string, name?: string | null)
   const inner = `
     ${h1(hi)}
     ${p('Thanks for putting your name down for Lekhio. You’ll be one of the first we let in.')}
-    ${p('Lekhio is your first employee: it connects to your bank, sorts every payment in the background, and finds the tax you never need to pay. The shoebox and the January panic are done — it all happens in WhatsApp, and you approve everything.')}
+    ${p('Lekhio is your first employee: it connects to your bank, sorts every payment in the background, and finds the tax you never need to pay. The shoebox and the January panic are done, it all happens in WhatsApp, and you approve everything.')}
     ${p('<strong>What happens next:</strong> we’ll message you the moment your spot is ready. Your first 7 days are free, and there’s no card to enter to start.')}
     ${button(APP, 'See how it works')}
     ${pMuted('If you didn’t sign up, just reply and we’ll take you off.')}`;
-  return send({ to, subject: 'You are on the Lekhio list.', html: shell(inner, { preheader: "We'll let you in soon — here's what's coming." }), tag: 'waitlist' });
+  return send({ to, subject: 'You are on the Lekhio list.', html: shell(inner, { preheader: "We'll let you in soon, here's what's coming." }), tag: 'waitlist' });
 }
 
 // --- the trial, and the week (fires from /api/cron/trial and /api/cron/reminders) ---------
@@ -335,7 +335,7 @@ export async function sendLeadResultEmail(to: string, resultNote: string, unsubs
   const note = esc(resultNote).replace(/\r?\n/g, '<br>');
   const inner = `
     ${h1('Here is your result.')}
-    ${p('You asked us to send this over, so here it is — saved for whenever you need it.')}
+    ${p('You asked us to send this over, so here it is, saved for whenever you need it.')}
     <div style="background:#F4F7FB;border:1px solid #E3EAF3;border-radius:12px;padding:18px 20px;margin:4px 0 16px;font-size:16px;line-height:1.7;color:${INK}">${note}</div>
     ${p('These are estimates to give you the shape of it. The number that really moves is your expenses: every business cost you claim comes off your tax, and most people lose hundreds because a receipt goes missing. That is the whole job Lekhio does, from a text, all year.')}
     ${button(APP, 'Start free, no card')}`;
@@ -359,13 +359,13 @@ export async function sendPaymentConfirmedEmail(opts: PaymentEmail): Promise<boo
   const planLine = opts.plan ? ` for your ${esc(opts.plan)} plan` : '';
   const next = opts.nextDate ? p(`Your next payment is due <strong>${esc(opts.nextDate)}</strong>.`) : '';
   const inner = `
-    ${h1("You're all set — payment received.")}
-    ${p(`Thanks — we've received your payment of <strong>${amt}</strong>${planLine}.`)}
+    ${h1("You're all set, payment received.")}
+    ${p(`Thanks, we've received your payment of <strong>${amt}</strong>${planLine}.`)}
     ${p('Nothing changes on your side: Lekhio keeps sorting your books and finding your tax reliefs in the background, all year.')}
     ${next}
     ${button(APP, 'Open Lekhio')}
     ${pMuted('Any questions about your billing, just reply to this email.')}`;
-  return send({ to: opts.to, subject: 'Payment received — thanks from Lekhio', html: shell(inner, { preheader: `We've received your ${amt} payment.` }), tag: 'payment-ok' });
+  return send({ to: opts.to, subject: 'Payment received, thanks from Lekhio', html: shell(inner, { preheader: `We've received your ${amt} payment.` }), tag: 'payment-ok' });
 }
 
 // --- payment failed (Stripe invoice.payment_failed) -----------------------
@@ -379,7 +379,7 @@ export async function sendPaymentFailedEmail(opts: PaymentFailedEmail): Promise<
   const amt = money(opts.amountPence);
   const inner = `
     ${h1('A quick heads-up on your payment.')}
-    ${p(`We tried to take your Lekhio payment of <strong>${amt}</strong> and it didn’t go through — usually an expired card or a bank block, nothing to worry about.`)}
+    ${p(`We tried to take your Lekhio payment of <strong>${amt}</strong> and it didn’t go through, usually an expired card or a bank block, nothing to worry about.`)}
     ${p('Update your card and we’ll sort it automatically. Your account stays active in the meantime.')}
     ${button(opts.updateUrl, 'Update payment')}
     ${pMuted('If you think this is a mistake, or need a hand, just reply and we’ll help.')}`;

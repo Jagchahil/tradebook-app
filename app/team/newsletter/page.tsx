@@ -57,6 +57,9 @@ export default function NewsletterPage() {
 
   // Load the preview whenever the selected issue changes.
   useEffect(() => {
+    // Clearing a stale preview the instant the selection changes. Deriving it during render would mean
+    // showing the previous issue's HTML under the new issue's title for one frame.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!selected) { setPreviewHtml(null); return; }
     let alive = true;
     (async () => {

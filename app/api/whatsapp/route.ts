@@ -1062,7 +1062,7 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
   if (!(await isWorkerLive('voice'))) {
     await sendText(
       from,
-      'Voice notes are briefly unavailable — send a photo of the receipt or just type it, and I will log it now.',
+      'Voice notes are briefly unavailable. Send a photo of the receipt or just type it, and I will log it now.',
     );
     return;
   }
@@ -1091,7 +1091,7 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
     return;
   }
 
-  await sendText(from, 'Got your voice note — writing it up now, one sec.');
+  await sendText(from, 'Got your voice note. Writing it up now, one sec.');
 }
 
 // The deterministic money-entry parser now lives in lib/waintents.ts with unit
@@ -1228,7 +1228,7 @@ async function handleSupportRequest(from: string, text: string): Promise<void> {
 
   await sendText(
     from,
-    "Thanks — I've passed this straight to a real person on the Lekhio team, and they'll reply right here shortly. Feel free to add anything else in the meantime and I'll pass it on.",
+    "Thanks, I've passed this straight to a real person on the Lekhio team, and they'll reply right here shortly. Feel free to add anything else in the meantime and I'll pass it on.",
   );
 }
 

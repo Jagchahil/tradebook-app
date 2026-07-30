@@ -7,7 +7,7 @@ import { sendTextResult } from '../../../../../lib/whatsapp';
 export const runtime = 'nodejs';
 
 // WHATSAPP SUPPORT, decide side. Jag approves a reply (send) or clears the ticket (dismiss). On send we
-// re-check the 24-hour window from the ticket's own last_inbound_at at the moment of sending — if it has
+// re-check the 24-hour window from the ticket's own last_inbound_at at the moment of sending, if it has
 // closed since the console loaded, we refuse rather than silently failing at Meta, and tell Jag it now
 // needs a template. Nothing leaves without his tap. Team-gated, same as the rest of the console.
 export async function POST(req: NextRequest) {

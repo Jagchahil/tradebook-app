@@ -13,7 +13,7 @@ export const runtime = 'nodejs';
 // A MINI WORKER REPORTS HERE. Not the team login: this is a bot on the mini, so it carries the shared
 // secret in the x-munshi-secret header (constant-time compared to MUNSHI_SECRET, the same secret Munshi
 // already uses). It upserts the worker's heartbeat and appends any activity. No customer data crosses
-// this wire — a worker sends only its OWN status. If MUNSHI_SECRET is unset, every call is refused.
+// this wire, a worker sends only its OWN status. If MUNSHI_SECRET is unset, every call is refused.
 
 function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a);

@@ -167,7 +167,7 @@ function limitedCompanyPosition(input: PositionInput): Position {
     corporationTax: r2(corpTax),
     employerNI: r2(erNI),
     distributable,
-    note: 'The company is its own taxpayer. It files a Corporation Tax return (CT600) and pays corporation tax on its profit after salaries. What is left is what can be paid out as dividends — and each owner is then taxed personally on the salary and dividends they take.',
+    note: 'The company is its own taxpayer. It files a Corporation Tax return (CT600) and pays corporation tax on its profit after salaries. What is left is what can be paid out as dividends, and each owner is then taxed personally on the salary and dividends they take.',
   };
 
   const personalTax = r2(ownerPositions.reduce((s, op) => s + op.personal.totalTax, 0));

@@ -9,7 +9,7 @@ import { buildInPersonLead } from '../../../../lib/growth';
 
 export const runtime = 'nodejs';
 
-// SAUDAGAR'S DESK — the CRM read + the in-person capture write.
+// SAUDAGAR'S DESK, the CRM read + the in-person capture write.
 //   GET  the pipeline stage counts and the most recent door-to-door leads (CRM contact fields only).
 //   POST a lead a rep just took at the door: consent recorded, contact captured, enrolled in the flow.
 // Same gate as the rest of the console: a row in team_members, re-checked on THIS request. Never
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
   if (!wrote) return NextResponse.json({ error: 'Could not save that lead.' }, { status: 500 });
 
   // A face-to-face lead has been met, so they start at 'warming', not cold. And if they gave email
-  // consent at the door, confirm them straight into the nurture flow — the verbal consent recorded
+  // consent at the door, confirm them straight into the nurture flow, the verbal consent recorded
   // above is the double opt-in, so no confirmation email is sent.
   await setContactStage(built.capture.email, 'warming');
   let enrolled = false;

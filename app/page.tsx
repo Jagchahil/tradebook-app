@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import {
   INK, PAPER, FONT, SITE, faqs, reviews,
   SharedHead, SiteNav, SiteFooter, StickyCta, HeroPhone, Ic,
@@ -308,7 +309,7 @@ export default function HomePage() {
               <div className="chartbox">
                 <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 8 }}>PROFIT · LAST 6 MONTHS</div>
                 <div className="chartrow">
-                  {CBARS.map((b, i) => (<div key={i} className="cbar" style={{ background: b.c, opacity: b.o, ['--h']: `${b.h}px` } as any} />))}
+                  {CBARS.map((b, i) => (<div key={i} className="cbar" style={{ background: b.c, opacity: b.o, '--h': `${b.h}px` } as CSSProperties & Record<'--h', string>} />))}
                 </div>
               </div>
               <div className="cisbar"><div className="top"><span>CIS refund building up</span><span>£1,120</span></div><div className="track"><div className="fill" /></div></div>

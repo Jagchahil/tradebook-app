@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 // as the rest of the console: a team_members row, read fresh on this request. Open tickets are the work;
 // a short tail of decided ones gives context. Each open ticket also carries the matching entries from
 // Jag's Obsidian common-issues playbook, so the console can offer them as one-click pick-list replies.
-// No customer financial data — only the message that asked for help, the drafted reply, and the window.
+// No customer financial data, only the message that asked for help, the drafted reply, and the window.
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';

@@ -106,6 +106,9 @@ export default function Brain() {
     setD((await res.json()) as Payload);
   }
 
+  // Fetch on mount. The rule is warning about a second render, which is exactly what loading data
+  // costs when there is no data library in the stack. Nothing here is derivable during render.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, []);
 
   // ⚠️ THE COUNT WENT STALE, AND THE BUG WAS A RACE I BUILT MYSELF.
@@ -125,6 +128,17 @@ export default function Brain() {
   const [done, setDone] = useState<Array<{ item: Pending; decision: 'approve' | 'dismiss' }>>([]);
   const [undoing, setUndoing] = useState(false);
 
+  // ⚠️ AN EFFECT THAT COPIES THE PAYLOAD INTO STATE, ON PURPOSE, AND IT STAYS.
+  //
+  // react-hooks/set-state-in-effect flags this and I briefly "fixed" it by deriving the deck during
+  // render instead. That broke two assertions in test/review.test.mjs, and they were right to
+  // break: the deck being LOCAL state is the design. A decision pops it here and nothing re-reads
+  // the server, so no stale response can land late and contradict what he just approved. Deriving
+  // it from the payload quietly hands that authority back to the last fetch.
+  //
+  // So the lint error is accepted, here, deliberately. An internal screen paying one extra render
+  // is a smaller price than a man seeing a card he already decided on come back.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (d && deck === null) setDeck(d.pending); }, [d, deck]);
 
   async function post(id: string, decision: 'approve' | 'dismiss' | 'undo') {

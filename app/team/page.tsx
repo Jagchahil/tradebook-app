@@ -65,6 +65,9 @@ export default function TeamPage() {
     setReady(true);
   }
 
+  // Fetch on mount. The rule is warning about a second render, which is exactly what loading data
+  // costs when there is no data library in the stack. Nothing here is derivable during render.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, []);
 
   async function signIn(e: React.FormEvent) {

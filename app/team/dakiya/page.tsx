@@ -1,8 +1,8 @@
 'use client';
 
-// DAKIYA — the front desk. Three times a day he scans the Lekhio mailboxes, drafts a reply to every
+// DAKIYA, the front desk. Three times a day he scans the Lekhio mailboxes, drafts a reply to every
 // real enquiry, and lands them here. You read the customer's message, tweak the draft if you want, and
-// tap Approve to send it — branded, from the address it came in on. Or dismiss it. THE RULE: Dakiya
+// tap Approve to send it, branded, from the address it came in on. Or dismiss it. THE RULE: Dakiya
 // never sends anything on his own. Every reply waits for you. He reads and drafts; you decide.
 //
 // Data comes from /api/team/dakiya (pending + recently decided) and his heartbeat from the same Bridge
@@ -163,7 +163,7 @@ export default function DakiyaPage() {
               : 'Reading the wire…'}
         </p>
         <p style={{ ...T.tiny, marginTop: 12, marginBottom: 0, color: C.faint }}>
-          Dakiya reads and drafts. He never sends anything on his own — every reply below waits for your
+          Dakiya reads and drafts. He never sends anything on his own, every reply below waits for your
           approval, and goes out branded from the address it came in on.
         </p>
         <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -215,7 +215,7 @@ export default function DakiyaPage() {
 
                   {/* the draft, editable */}
                   <div style={{ marginTop: 12 }}>
-                    <div style={{ ...T.tiny, color: C.faint, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 }}>Dakiya's draft — edit before you send</div>
+                    <div style={{ ...T.tiny, color: C.faint, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 }}>Dakiya&apos;s draft, edit before you send</div>
                     <input
                       value={e.subject}
                       onChange={(ev) => setEdit(d.id, { subject: ev.target.value })}

@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     status: 'ok',
     headline: stored > 0
       ? `${stored} repl${stored === 1 ? 'y' : 'ies'} drafted and waiting for you.`
-      : 'Inbox swept — nothing new to reply to.',
+      : 'Inbox swept, nothing new to reply to.',
     detail: { swept, stored, at: new Date().toISOString() },
   });
   await appendActivity([

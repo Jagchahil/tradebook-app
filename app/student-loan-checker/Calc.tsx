@@ -79,7 +79,7 @@ export default function Calc() {
           <div style={{ marginBottom: 18 }}>
             <button type="button" className="sl-chip" data-on={postgrad} onClick={() => setPostgrad(!postgrad)} aria-pressed={postgrad}>
               <span style={{ fontSize: 14, fontWeight: 700, color: INK }}>{postgrad ? '✓ ' : ''}Postgraduate loan too</span>
-              <span style={{ display: 'block', fontSize: 12, color: MUTED, marginTop: 2 }}>A master's or doctoral loan repays on top of a plan loan, 6% above £21,000</span>
+              <span style={{ display: 'block', fontSize: 12, color: MUTED, marginTop: 2 }}>A master&apos;s or doctoral loan repays on top of a plan loan, 6% above £21,000</span>
             </button>
           </div>
 

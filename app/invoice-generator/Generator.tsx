@@ -179,6 +179,10 @@ export default function Generator() {
   const [due, setDue] = useState('');
   // Seed dates on the client after mount so the server-rendered HTML and the client
   // agree (new Date() on the server vs browser can differ across the day boundary).
+  // ⚠️ SEEDED AFTER MOUNT ON PURPOSE, AND THE COMMENT ABOVE SAYS WHY. Rendering today's date on the
+  // server and again in the browser disagrees across the day boundary and hydration blows up. The
+  // second render this costs is the price of the page being correct at five past midnight.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setDate(todayISO()); setDue(plusDays(14)); }, []);
   const [vat, setVat] = useState(PRESETS[0].vat);
   const [vatRate, setVatRate] = useState('20');

@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   for (const s of stale) {
     void sendText(
       s.fromPhone,
-      'Sorry — I could not write up that voice note in time. Send it again, or a photo of the receipt, and I will get it.',
+      'Sorry, I could not write up that voice note in time. Send it again, or a photo of the receipt, and I will get it.',
     );
   }
 

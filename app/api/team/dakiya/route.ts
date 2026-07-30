@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 // DAKIYA, read side. The console polls this to show the drafts waiting for approval. Same gate as the
 // rest of the console: a team_members row, read fresh on THIS request. Returns pending drafts plus a
-// short tail of recently decided ones. No customer financial data — only the enquiry text and the
+// short tail of recently decided ones. No customer financial data, only the enquiry text and the
 // drafted reply.
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization') || '';

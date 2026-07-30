@@ -10,7 +10,7 @@ export const maxDuration = 60;
 
 // THE NEWSLETTER DESK. Same team gate as the rest of the console. GET lists the issues, the confirmed
 // audience size and whether sending is armed; GET with ?id=X also returns the rendered preview HTML.
-// POST sends an issue — but ONLY to a signed-in team member, ONLY when NEWSLETTER_SEND_ENABLED is
+// POST sends an issue, but ONLY to a signed-in team member, ONLY when NEWSLETTER_SEND_ENABLED is
 // 'true', and ONLY with an explicit { confirm: true } in the body. Three locks, so nothing broadcasts by
 // accident. Every send carries a one-click unsubscribe (added by sendMarketingEmail). Bounded per run so
 // a single serverless invocation stays inside Resend's daily allowance.

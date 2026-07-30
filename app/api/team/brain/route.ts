@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
     : 1;
 
   // RECENT LEARNINGS, in plain words. The constellation shows the SHAPE of the brain; this shows the
-  // CONTENT — the actual things Khoji distilled and a human kept, newest first, with the source it rests
+  // CONTENT, the actual things Khoji distilled and a human kept, newest first, with the source it rests
   // on. Dismissed items are noise a human already cleared, so they are not "learnings"; only what was
   // kept (reviewed) or is a live verbatim anchor counts. This is the "so this is actually working" view.
   const recentLearnings = [...brain.items]

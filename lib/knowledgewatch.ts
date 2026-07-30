@@ -148,7 +148,7 @@ export function knowledgeAlarms(s: KnowledgeState, now: Date = new Date()): Know
         reason: 'not_learning',
         detail:
           `no new knowledge for ${Math.round(feedHours)}h (ceiling ${MAX_QUIET_HOURS_CAPTURE}h) ` +
-          `AND the brain is not running — the capture watcher has stopped, not just gone quiet`,
+          `AND the brain is not running, the capture watcher has stopped, not just gone quiet`,
       });
     }
   }

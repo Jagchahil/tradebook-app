@@ -89,6 +89,8 @@ export default function SystemPage() {
     const res = await fetch(`/api/connectors/${platform}/start`, { headers: { Authorization: `Bearer ${tok}` } });
     if (!res.ok) return;
     const j = (await res.json()) as { url?: string };
+    // Navigating away, not mutating a captured value. The rule cannot tell the difference.
+    // eslint-disable-next-line react-hooks/immutability
     if (j.url) window.location.href = j.url;
   }
 

@@ -93,10 +93,11 @@ export function AnnouncementsBanner({
     setActive(Math.max(0, Math.min(items.length - 1, Math.round(el.scrollLeft / w))));
   }, [items.length]);
 
-  useEffect(() => {
-    // A dismissal can shorten the rail out from under the current position.
-    if (active > items.length - 1) setActive(Math.max(0, items.length - 1));
-  }, [items.length, active]);
+  // A dismissal can shorten the rail out from under the current position. This used to be an
+  // effect that noticed afterwards and set state to correct itself, which renders the out of range
+  // value once before fixing it. Clamping as we read it means the out of range value never reaches
+  // the screen at all, and there is no second render to pay for.
+  const shown = Math.max(0, Math.min(active, items.length - 1));
 
   // ⚠️ NOTHING TO SAY MEANS NOTHING ON THE SCREEN. Doc 103's empty test: a row that reads "no
   // changes to report" most weeks teaches him to stop looking, and then he misses the week it
@@ -169,13 +170,13 @@ export function AnnouncementsBanner({
               key={a.key}
               type="button"
               role="tab"
-              aria-selected={i === active}
+              aria-selected={i === shown}
               aria-label={`Update ${i + 1}`}
               onClick={() => {
                 const el = railRef.current;
                 if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
               }}
-              style={{ ...S.dot, ...(i === active ? S.dotOn : null) }}
+              style={{ ...S.dot, ...(i === shown ? S.dotOn : null) }}
             />
           ))}
         </div>

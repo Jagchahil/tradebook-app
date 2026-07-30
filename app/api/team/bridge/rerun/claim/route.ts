@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 // THE MINI CLAIMS A PENDING RE-RUN HERE. A bot on the mini calls this at the top of each run, carrying
 // the shared secret (x-munshi-secret, constant-time compared to MUNSHI_SECRET). It returns { pending:
 // true } exactly once per queued request and clears it, so the bot knows to sweep off-schedule. No
-// customer data — only "was a re-check asked for". If MUNSHI_SECRET is unset, every call is refused.
+// customer data, only "was a re-check asked for". If MUNSHI_SECRET is unset, every call is refused.
 function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a);
   const bb = Buffer.from(b);

@@ -6,7 +6,7 @@ import { hasClaudeConfig, improveSupportAnswer } from '../../../../../lib/claude
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-// "Run it through" — sharpen a playbook answer with Claude. Team-gated. Takes the question and the
+// "Run it through", sharpen a playbook answer with Claude. Team-gated. Takes the question and the
 // founder's rough answer, returns a customer-ready version he can accept or keep editing. It never saves
 // anything itself; the console decides whether to keep the result.
 export async function POST(req: NextRequest) {
@@ -24,6 +24,6 @@ export async function POST(req: NextRequest) {
   if (!draft) return NextResponse.json({ error: 'nothing to improve' }, { status: 400 });
 
   const improved = await improveSupportAnswer(b.question || '', draft);
-  if (!improved) return NextResponse.json({ error: 'could not improve that — try again' }, { status: 502 });
+  if (!improved) return NextResponse.json({ error: 'could not improve that, try again' }, { status: 502 });
   return NextResponse.json({ improved });
 }

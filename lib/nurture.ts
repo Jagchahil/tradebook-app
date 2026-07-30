@@ -24,7 +24,7 @@ export const NURTURE_SEQUENCE: NurtureEmail[] = [
     subject: 'The tax number most people get wrong',
     bodyHtml: `
       <p style="font-size:20px;font-weight:800;letter-spacing:-0.3px;margin:0 0 14px;color:${INK}">The number most people get wrong.</p>
-      <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">When you worked out your tax the other day, the figure that moved it most was your expenses. Every pound of genuine business cost comes off your taxable profit — and most sole traders lose hundreds every year simply because a receipt goes missing, or they never knew a cost counted.</p>
+      <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">When you worked out your tax the other day, the figure that moved it most was your expenses. Every pound of genuine business cost comes off your taxable profit, and most sole traders lose hundreds every year simply because a receipt goes missing, or they never knew a cost counted.</p>
       <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">Mileage. Use of home. Tools, materials, phone, a share of the van. It adds up faster than people think, and it is all money you keep instead of handing to HMRC.</p>
       <p style="font-size:15px;line-height:1.65;color:${INK};margin:0 0 14px">That is the whole job Lekhio does: snap a receipt or send a quick text, and it captures every cost across the year, so nothing is missed by January.</p>
     `,

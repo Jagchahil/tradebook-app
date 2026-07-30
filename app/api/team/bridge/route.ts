@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 // THE BRIDGE, read side. The console polls this to watch the workforce live. Same gate as the rest of
 // the console: a team_members row, read fresh on THIS request (not a cached role, not the JWT). Returns
-// each worker's heartbeat plus the recent activity feed. No customer data — workers report only their
+// each worker's heartbeat plus the recent activity feed. No customer data, workers report only their
 // own status.
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization') || '';
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   const [heartbeats, activity] = await Promise.all([readHeartbeats(), readActivity(40)]);
   if (heartbeats === null) {
-    // Could not read. Not "the team is idle" — we will not draw a dead cockpit and let it read as calm.
+    // Could not read. Not "the team is idle", we will not draw a dead cockpit and let it read as calm.
     return NextResponse.json({ error: 'unreadable' }, { status: 503 });
   }
   return NextResponse.json({ heartbeats, activity: activity ?? [] });

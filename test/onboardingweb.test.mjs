@@ -43,7 +43,7 @@ const {
   STEPS, FIRST_STEP, LAST_STEP, isStep, toStep, nextStep, prevStep, isDone, stepIndex,
   walkedSteps, stepNumber, stepCount, progressPct, stepTitle, HOW_LONG,
 } = O;
-const { CIRCUMSTANCES, household, notHousehold, unanswered } = C;
+const { CIRCUMSTANCES, household, notHousehold, unanswered, progressIn } = C;
 
 const onbSrc = read('lib/onboarding.ts');
 const pageSrc = read('app/app/setup/page.tsx');
@@ -138,6 +138,43 @@ ok(`🔴 no question is on both screens${overlap.length ? `\n     ${overlap.join
 const missed = askable.filter((k) => !hKeys.includes(k) && !nKeys.includes(k));
 ok(`🔴 no askable question falls between the two screens${missed.length ? `\n     ${missed.join(', ')}` : ''}`,
   missed.length === 0);
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE COUNT HE IS SHOWN. Found live on 30 July, and it is run here rather than grepped for.
+//
+// The household screen told a brand new customer "1 of 4 answered" before he had answered anything,
+// because a question held back by an unmet premise was being counted as done. Then, once he answered
+// his first, it still said "1 of 4", so it was right by coincidence, which is the harder failure to
+// spot and the reason this is a fixture test and not a regex.
+// ---------------------------------------------------------------------------------------------
+const hGroup = household();
+const fresh = progressIn(hGroup, []);
+ok(`🔴 a man who has answered nothing is told he has answered nothing (got ${fresh.answered} of ${fresh.askable})`,
+  fresh.answered === 0);
+ok('and the denominator is only what is askable of him today, not the module total',
+  fresh.askable === unanswered([]).filter((c) => hGroup.some((g) => g.key === c.key)).length
+  && fresh.askable < hGroup.length);
+
+// Answering the premise reveals the follow-up, so BOTH numbers move. This is the honest shape: he
+// has answered one, and answering it earned him one more question worth asking.
+const afterMarried = progressIn(hGroup, [{ key: 'married', answer: 'yes' }]);
+ok(`🔴 answering one counts as one (got ${afterMarried.answered} of ${afterMarried.askable})`,
+  afterMarried.answered === 1);
+ok('🔴 and the denominator GROWS when an answer unlocks a follow-up',
+  afterMarried.askable === fresh.askable + 1);
+
+// Saying no to the premise must not unlock it, or a single man is asked what his wife earns.
+const afterSingle = progressIn(hGroup, [{ key: 'married', answer: 'no' }]);
+ok('a no on the premise counts, and unlocks nothing',
+  afterSingle.answered === 1 && afterSingle.askable === fresh.askable);
+
+// Answered questions from another group never leak into this one's count.
+const other = progressIn(hGroup, [{ key: 'vat_registered', answer: 'yes' }]);
+ok('an answer from the other screen does not count on this one',
+  other.answered === 0 && other.askable === fresh.askable);
+
+ok('🔴 the page does not work the count out for itself',
+  /progressIn\(group, rows\)/.test(pageSrc) && !/!open\.has\(c\.key\)\)\.length/.test(pageSrc));
 
 // The two Jag named on 28 July, and the reason this step exists at all: there was nowhere in this
 // product for a man to say he was married, and nowhere to say who claims the Child Benefit.

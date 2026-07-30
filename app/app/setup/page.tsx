@@ -6,7 +6,9 @@ import {
   readOnboardingProgress, getBusinessProfile, readCircumstances, listBankConnectionsForUser,
 } from '../../../lib/supabase';
 import { hasBankFeedConfig } from '../../../lib/bankfeed';
-import { unanswered, household, notHousehold, type Circumstance } from '../../../lib/circumstances';
+import {
+  unanswered, household, notHousehold, progressIn, type Circumstance,
+} from '../../../lib/circumstances';
 import {
   isStep, isDone, toStep, prevStep, stepNumber, stepCount, progressPct, stepTitle,
   HOW_LONG, HOW_LONG_WHY, type Step,
@@ -318,14 +320,13 @@ async function QuestionsStep({ userId, step }: { userId: string; step: 'househol
   const group: Circumstance[] = step === 'household' ? household() : notHousehold();
   const list = group.filter((c) => open.has(c.key));
 
-  // ⚠️ THE DENOMINATOR IS THIS MAN'S, NOT THE MODULE'S TOTAL.
+  // ⚠️ THE COUNT IS NOT WORKED OUT HERE, AND THE FIRST VERSION OF THIS PAGE WORKED IT OUT HERE.
   //
-  // Some questions only exist once another is answered: a single man is never asked what his wife
-  // earns. Counting against the full list gives him a bar he can never fill, so he answers every
-  // question we have for him and is told he is on 3 of 4. Answered plus still to ask is the only
-  // denominator that is true for HIM, and it grows as he goes.
-  const answeredHere = group.filter((c) => !open.has(c.key)).length;
-  const askable = answeredHere + list.length;
+  // It counted "in the group but not in the queue" as answered, which folds in every question whose
+  // premise is not yet established, and told a brand new customer he had answered one of four before
+  // he had touched anything. lib/circumstances.ts owns what a question is and when it is askable, so
+  // it owns this too, and a test can run it against fixtures rather than read this file.
+  const { answered: answeredHere, askable } = progressIn(group, rows);
 
   return (
     <section style={S.card}>

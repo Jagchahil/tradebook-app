@@ -470,6 +470,46 @@ export function notHousehold(): Circumstance[] {
   return askingOrder().filter((c) => !c.household && !c.specialCategory);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 HOW FAR THROUGH A GROUP HE IS, AND THE DENOMINATOR IS HIS, NOT THE MODULE'S.
+//
+// Found by walking the live site on 30 July, not by a test. The household screen greeted a brand new
+// customer with "1 of 4 answered" before he had answered anything, and then still said "1 of 4"
+// after he answered his first, so it was wrong, and then right by accident, which is worse: a number
+// that agrees with the truth by coincidence is measuring something else.
+//
+// ⚠️ THE MISTAKE WAS COUNTING "NOT IN THE QUEUE" AS "ANSWERED", AND THOSE ARE DIFFERENT THINGS.
+//
+// unanswered() holds a question back until its premise is established: a single man is never asked
+// what his wife earns. So partner_low_earner is absent from the queue of a man who has not said he is
+// married, and absence was being read as done.
+//
+// The denominator grows instead. Answered plus still to ask is the only count that is true for THIS
+// man, and saying "married, yes" turns 0 of 3 into 1 of 4, which is honest in both directions: he has
+// answered one, and answering it revealed one more that is worth asking him.
+//
+// It lives here rather than in the page because a count derived at a call site is a rule that has to
+// be got right again at the next call site, and because a function here is one a test can RUN
+// against fixtures rather than grep for. See test/onboardingweb.test.mjs.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export interface AskProgress {
+  // Questions in this group he has actually given us an answer to.
+  answered: number;
+  // Those, plus the ones still worth asking him. Never the module's total.
+  askable: number;
+}
+
+export function progressIn(
+  group: Circumstance[],
+  answered: Array<{ key: string; answer: string }>,
+): AskProgress {
+  const given = new Set(answered.map((a) => a.key));
+  const inGroup = new Set(group.map((c) => c.key));
+  const done = group.filter((c) => given.has(c.key)).length;
+  const toAsk = unanswered(answered).filter((c) => inGroup.has(c.key)).length;
+  return { answered: done, askable: done + toAsk };
+}
+
 // Has he given EXPLICIT consent to be asked at all? Nothing in sensitive() may be shown, asked,
 // stored, or acted on until this is true.
 export function hasSpecialConsent(answered: Array<{ key: string; answer: string }>): boolean {

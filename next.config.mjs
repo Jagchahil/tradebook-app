@@ -19,8 +19,30 @@
 //   Cloudflare Turnstile bot check can load. Server side only today, but pre
 //   allow listing it means switching on the client widget will not break.
 // - The lock down directives (frame-ancestors none, object-src none, base-uri
-//   self, form-action self) close clickjacking, plugin, base tag and form
-//   hijack vectors.
+//   self) close clickjacking, plugin and base tag vectors.
+//
+// 🔴 form-action IS NOT 'self' ALONE, AND THE REASON IS A BUG THAT SHIPPED ON 30 JULY.
+//
+// It WAS 'self', and that silently broke both bank connect and paying us on the web, on the day the
+// setup wizard started using plain form posts. Chrome enforces form-action across the REDIRECT CHAIN
+// of a form submission, not merely the form's own action. So a form that posts to our own
+// /api/bank/connect and is answered with a 303 to TrueLayer is refused at the redirect, the
+// navigation is dropped, and the page simply sits there. No error, no console message the user would
+// ever see, nothing in the network tab that reads like a failure. The button just does nothing.
+//
+// ⚠️ IT DID NOT BITE BEFORE BECAUSE NOTHING USED A FORM. The phone app posts JSON and follows the
+// link itself, and /start posts JSON and sets window.location, which is a SCRIPT navigation and is
+// not covered by form-action at all. The web app ships no client script on purpose, so it is the
+// only surface that submits a real form, and it was the only one this could reach.
+//
+// So the two origins we deliberately hand a customer to are named, and nothing else is. This is the
+// standard shape for a site using hosted checkout and hosted bank auth: the protection form-action
+// buys is against an injected form exfiltrating to an attacker's server, and two named payment
+// origins do not weaken that.
+//
+// ⚠️ ANYTHING ADDED HERE MUST BE A DESTINATION WE REDIRECT A FORM TO, AND test/csp.test.mjs FAILS
+// THE BUILD if a route 303s a form somewhere this list does not name. Do not widen it by hand
+// without a route to point at.
 //
 // Test in a Vercel preview after any change here. If a page ever fails to load
 // a resource, the browser console names the blocked URL and the directive.
@@ -30,7 +52,10 @@ const csp = [
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
-  "form-action 'self'",
+  // 'self' for every ordinary form. Then the two hosted journeys we send a customer out to:
+  // TrueLayer's bank picker (both the live and sandbox hosts, because BANK_SANDBOX flips which one
+  // lib/bankfeed.ts builds) and Stripe's hosted checkout.
+  "form-action 'self' https://auth.truelayer.com https://auth.truelayer-sandbox.com https://checkout.stripe.com",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",

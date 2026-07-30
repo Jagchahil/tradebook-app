@@ -132,7 +132,7 @@ export default function FreeMtdFilingPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
             {steps.map((s) => (
               <div key={s.n} style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: 20 }}>
-                <span style={{ display: 'inline-flex', width: 28, height: 28, borderRadius: 14, background: RIVER, color: '#fff', fontSize: 13, fontWeight: 800, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>{s.n}</span>
+                <span style={{ display: 'inline-flex', width: 28, height: 28, borderRadius: 14, background: RIVER, color: 'var(--on-river)', fontSize: 13, fontWeight: 800, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>{s.n}</span>
                 <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px' }}>{s.title}</h3>
                 <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.55, margin: 0 }}>{s.body}</p>
               </div>

@@ -259,7 +259,7 @@ function StepMock({ k }: { k: string }) {
         <div style={{ padding: '12px 16px', minHeight: 168 }}>
           {items.map((t, i) => (
             <div key={t} className="wtA" style={{ animationDelay: `${0.1 + i * 0.12}s`, display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}>
-              <span className="wtP" style={{ animationDelay: `${0.2 + i * 0.12}s`, width: 22, height: 22, borderRadius: 11, background: GREEN, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>✓</span>
+              <span className="wtP" style={{ animationDelay: `${0.2 + i * 0.12}s`, width: 22, height: 22, borderRadius: 11, background: GREEN, color: 'var(--on-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>✓</span>
               <span style={{ fontSize: 13.5 }}>{t}</span>
             </div>
           ))}
@@ -278,7 +278,7 @@ function StepMock({ k }: { k: string }) {
           </div>
           <div style={{ fontSize: 12, color: MUTED, margin: '12px 0 4px' }}>Password</div>
           <div style={{ height: 34, borderRadius: 8, border: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: 13, letterSpacing: 2 }}>••••••••</div>
-          <div className="wtPress" style={{ marginTop: 14, background: RIVER, color: '#fff', borderRadius: 8, padding: '10px', textAlign: 'center', fontSize: 13.5, fontWeight: 700 }}>Sign in</div>
+          <div className="wtPress" style={{ marginTop: 14, background: RIVER, color: 'var(--on-river)', borderRadius: 8, padding: '10px', textAlign: 'center', fontSize: 13.5, fontWeight: 700 }}>Sign in</div>
           <div className="wtP" style={{ animationDelay: '1.55s', marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, color: GREEN, fontSize: 12.5, fontWeight: 600 }}><span>✓</span> Tax year 2025 to 2026</div>
         </div>
       </div>
@@ -315,7 +315,7 @@ function StepMock({ k }: { k: string }) {
               <span style={{ color: MUTED }}>{r[0]}</span><span style={{ fontWeight: 600 }}>{r[1]}</span>
             </div>
           ))}
-          <div className="wtP" style={{ animationDelay: '1s', marginTop: 12, background: RIVER, color: '#fff', borderRadius: 10, padding: '11px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="wtP" style={{ animationDelay: '1s', marginTop: 12, background: RIVER, color: 'var(--on-river)', borderRadius: 10, padding: '11px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 13 }}>Your bill</span><span style={{ fontSize: 18, fontWeight: 800 }}>£4,311</span>
           </div>
         </div>
@@ -327,9 +327,9 @@ function StepMock({ k }: { k: string }) {
       <div className="wt-screen">
         <div className="wt-screenbar">Submit your return</div>
         <div style={{ padding: '20px 16px', textAlign: 'center', minHeight: 168 }}>
-          <div className="wtPress" style={{ background: RIVER, color: '#fff', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700 }}>Submit return</div>
+          <div className="wtPress" style={{ background: RIVER, color: 'var(--on-river)', borderRadius: 10, padding: '13px', fontSize: 14, fontWeight: 700 }}>Submit return</div>
           <div className="wtP" style={{ animationDelay: '1.55s', marginTop: 16 }}>
-            <div style={{ width: 54, height: 54, borderRadius: 27, background: GREEN, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 900, margin: '0 auto' }}>✓</div>
+            <div style={{ width: 54, height: 54, borderRadius: 27, background: GREEN, color: 'var(--on-green)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 900, margin: '0 auto' }}>✓</div>
             <div style={{ marginTop: 10, fontSize: 14, fontWeight: 700 }}>Submission received</div>
             <div style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>Reference IRMARK 9F2A7C</div>
           </div>
@@ -343,7 +343,7 @@ function StepMock({ k }: { k: string }) {
       <div className="wt-screenbar">Pay by 31 January</div>
       <div style={{ padding: '16px 16px', display: 'flex', gap: 14, alignItems: 'center', minHeight: 168 }}>
         <div className="wtP" style={{ animationDelay: '.2s', width: 84, flexShrink: 0, border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', textAlign: 'center' }}>
-          <div style={{ background: RIVER, color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px' }}>JAN</div>
+          <div style={{ background: RIVER, color: 'var(--on-river)', fontSize: 11, fontWeight: 700, padding: '4px' }}>JAN</div>
           <div style={{ fontSize: 30, fontWeight: 800, padding: '8px 0', color: RIVER_DEEP }}>31</div>
         </div>
         <div style={{ flex: 1 }}>
@@ -426,7 +426,7 @@ export default function FileYourTaxReturnPage() {
           The honest bit: the 15 minutes is the form. The hard part was always the year of receipts behind it. That is the part Lekhio does for you, so the form really is 15 minutes.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a href="#steps" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12, textDecoration: 'none' }}>Start the walkthrough</a>
+          <a href="#steps" style={{ backgroundColor: RIVER, color: 'var(--on-river)', fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12, textDecoration: 'none' }}>Start the walkthrough</a>
           <Link href="/start" style={{ background: 'var(--panel)', color: RIVER, border: `1.5px solid ${RIVER}`, fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12, textDecoration: 'none' }}>Get the reminders</Link>
         </div>
       </section>
@@ -610,7 +610,7 @@ export default function FileYourTaxReturnPage() {
           <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.65, maxWidth: 520, margin: '0 auto 22px' }}>
             Keep your records with Lekhio through the year. Snap a receipt, leave a voice note, or just type it. When the deadline comes, your numbers are already added up and ready, and we remind you well before it. Your first 7 days are free.
           </p>
-          <Link href="/start" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12, textDecoration: 'none' }}>Start free for 7 days</Link>
+          <Link href="/start" style={{ display: 'inline-block', backgroundColor: RIVER, color: 'var(--on-river)', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12, textDecoration: 'none' }}>Start free for 7 days</Link>
         </div>
       </section>
 

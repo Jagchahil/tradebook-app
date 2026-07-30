@@ -166,7 +166,7 @@ export default function CanIClaimPage() {
             Half of paying less tax is just knowing what you are allowed to claim. Text Lekhio the thing, and get a straight answer in seconds. The real rules, the grey areas included, all fully within the law.
           </p>
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-            <Link href="/start" className="btn" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Start free trial</Link>
+            <Link href="/start" className="btn" style={{ backgroundColor: RIVER, color: 'var(--on-river)', fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>Start free trial</Link>
             <a href="#list" className="btn" style={{ backgroundColor: 'transparent', color: INK, border: `1px solid ${INK}`, fontSize: 16, fontWeight: 600, padding: '15px 30px', borderRadius: 12 }}>See the list</a>
           </div>
         </div>
@@ -249,7 +249,7 @@ export default function CanIClaimPage() {
           <div className="reveal tips-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             {TAX_TIPS.map((t, i) => (
               <div key={t.title} style={{ display: 'flex', gap: 14, background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 14, padding: '18px 20px' }}>
-                <span style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 14, background: RIVER, color: '#fff', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+                <span style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 14, background: RIVER, color: 'var(--on-river)', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
                 <div>
                   <h3 style={{ fontSize: 15.5, fontWeight: 700, margin: '0 0 4px' }}>{t.title}</h3>
                   <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.55, margin: 0 }}>{t.body}</p>
@@ -276,7 +276,7 @@ export default function CanIClaimPage() {
           <p style={{ fontSize: 16.5, color: '#B6BDC8', lineHeight: 1.6, maxWidth: 540, margin: '0 auto 28px' }}>
             Lekhio answers your claim questions in plain English, logs every cost as you go, and keeps you ready for tax. You always approve before anything is sent to HMRC.
           </p>
-          <Link href="/start" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Start free trial</Link>
+          <Link href="/start" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: 'var(--on-river)', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Start free trial</Link>
           <p style={{ fontSize: 13, color: '#8A93A0', marginTop: 22, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>
             General information, not tax advice for your exact situation. Lekhio is an independent UK company, not HMRC, and not endorsed by HMRC. Always check your own position with HMRC or an accountant if you are unsure.
           </p>

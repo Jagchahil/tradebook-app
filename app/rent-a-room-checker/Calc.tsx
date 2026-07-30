@@ -113,7 +113,7 @@ export default function Calc() {
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
           Over the limit, HMRC lets you pick the smaller taxable amount every single year, but you have to know the choice exists. Lekhio watches your lodger income alongside everything else you earn, makes the election arithmetic automatic, and Rakha nudges you when the answer flips.
         </p>
-        <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: '#fff', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Let Lekhio make the call →</Link>
+        <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: 'var(--on-river)', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Let Lekhio make the call →</Link>
       </div>
 
       {hasInput ? (

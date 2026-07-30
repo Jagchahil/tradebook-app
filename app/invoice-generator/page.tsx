@@ -54,7 +54,7 @@ export default function InvoiceGeneratorPage() {
             <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 8px' }}>Want it to chase the payment too?</h2>
             <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, margin: 0 }}>This generator is free forever. Lekhio goes further: it builds the invoice from a text, sends it, logs the income when it is paid, and keeps you ready for tax.</p>
           </div>
-          <Link href="/start" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12 }}>Start free trial</Link>
+          <Link href="/start" style={{ display: 'inline-block', backgroundColor: RIVER, color: 'var(--on-river)', fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12 }}>Start free trial</Link>
         </div>
         <div style={{ marginTop: 16, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
           <Link href="/" style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>← Back to home</Link>

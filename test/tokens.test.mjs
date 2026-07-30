@@ -185,11 +185,27 @@ console.log('\n=== no accent fill carries white text ===\n');
 // and the "Approve and send to HMRC" button stayed at 2.37:1 on the deployed site after a build
 // that looked like it had fixed it. A rule cannot be trusted to be in one place, so this greps for
 // the SHAPE of the mistake across every file rather than for the file it was found in.
+// ⚠️ AND IT IS NOT ONLY CSS RULES. Most of these were inline styles, and they only bite on a page
+// that themes: on an app page RIVER is the raw #1B59A6 and white on it reads at 6.94:1, which is
+// correct. Same identifier, different value, different verdict, so the check has to know which
+// module the page imported its colours from.
+const themes = (src) => /const\s+(RIVER|GREEN|SAFFRON)\s*=\s*'var\(--/.test(src)
+  || [...src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]*_shared\/site['"]/gs)]
+    .some((m) => /\b(RIVER|RIVER_DEEP|GREEN|SAFFRON)\b/.test(m[1]));
+const INLINE_WHITE = [
+  /(?:background|backgroundColor):\s*(?:RIVER|GREEN|SAFFRON)\b[^}]{0,120}?color:\s*'#(?:fff|ffffff)'/,
+  /color:\s*'#(?:fff|ffffff)'[^}]{0,120}?(?:background|backgroundColor):\s*(?:RIVER|GREEN|SAFFRON)\b/,
+];
 const accentWhite = [];
 for (const file of walk(root)) {
   const rel = path.relative(root, file);
-  readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+  const src = readFileSync(file, 'utf8');
+  const isThemed = themes(src);
+  src.split('\n').forEach((line, i) => {
     if (line.trimStart().startsWith('//')) return;
+    if (isThemed && INLINE_WHITE.some((re) => re.test(line))) {
+      accentWhite.push(`${rel}:${i + 1} inline accent fill with white text, on a page that themes`);
+    }
     if (/background(-color)?:var\(--(river|green|saffron|red)\);color:#(fff|ffffff)\b/i.test(line)) {
       accentWhite.push(`${rel}:${i + 1} accent fill with white text`);
     }

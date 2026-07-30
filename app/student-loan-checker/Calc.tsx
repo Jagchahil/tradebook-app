@@ -155,7 +155,7 @@ export default function Calc() {
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
           Most tax apps forget student loans exist, then January arrives. Lekhio tracks your income all year and keeps one honest set aside figure: tax, National Insurance and student loan together, so the bill is never a surprise.
         </p>
-        <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: '#fff', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Always know your number →</Link>
+        <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: 'var(--on-river)', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Always know your number →</Link>
       </div>
 
       {hasInput ? (

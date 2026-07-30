@@ -294,7 +294,7 @@ export default function Generator() {
             <label htmlFor="inv-notes" style={labelStyle}>Notes and payment terms</label>
             <textarea id="inv-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
 
-            <button onClick={() => window.print()} style={{ marginTop: 20, width: '100%', background: RIVER, color: '#fff', border: 'none', borderRadius: 12, padding: '15px 0', fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Download or print {docWord.toLowerCase()}</button>
+            <button onClick={() => window.print()} style={{ marginTop: 20, width: '100%', background: RIVER, color: 'var(--on-river)', border: 'none', borderRadius: 12, padding: '15px 0', fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Download or print {docWord.toLowerCase()}</button>
             <p style={{ fontSize: 12, color: MUTED, textAlign: 'center', marginTop: 10 }}>Free, no signup. Choose &ldquo;Save as PDF&rdquo; in the print window.</p>
           </div>
         </div>

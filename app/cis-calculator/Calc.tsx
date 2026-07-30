@@ -101,7 +101,7 @@ export default function Calc() {
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
           CIS takes {Math.round(FACTS.cisRegisteredRate * 100)}% off your labour before you are paid, as if all of it were profit. But you get a £{FACTS.personalAllowance.toLocaleString('en-GB')} tax free personal allowance, and every tool, every drop of fuel and every bit of material lowers your real profit. So the tax actually due is usually a good bit less than the CIS already taken. The gap is your refund. The trick is logging every expense, all year. Miss them and you hand HMRC money that is yours.
         </p>
-        <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: '#fff', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Let Lekhio track every expense for you →</Link>
+        <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: 'var(--on-river)', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Let Lekhio track every expense for you →</Link>
       </div>
 
       {/* Consent engine: only shown once they have a result, so the email is

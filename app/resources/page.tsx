@@ -139,7 +139,7 @@ export default function ResourcesPage() {
           <p style={{ fontSize: 16.5, color: '#B6BDC8', lineHeight: 1.6, maxWidth: 540, margin: '0 auto 28px' }}>
             One chat that logs your receipts, claims your reliefs, sends your invoices, and keeps you ready for tax. You always approve before anything reaches HMRC.
           </p>
-          <Link href="/start" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Start free trial</Link>
+          <Link href="/start" style={{ display: 'inline-block', backgroundColor: RIVER, color: 'var(--on-river)', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12 }}>Start free trial</Link>
           <div style={{ marginTop: 20 }}>
             <Link href="/" style={{ color: '#CFE0F2', fontSize: 14, fontWeight: 500 }}>← Back to home</Link>
           </div>

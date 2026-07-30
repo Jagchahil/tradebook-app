@@ -93,7 +93,7 @@ export default function Calc() {
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
           The dividend rates rose two points in April 2026 and the maths moved for everyone. Landlords have their own version of this question: companies deduct mortgage interest in full and skip the new 2027 property rates. Lekhio runs your real numbers all year and Rakha tells you when the answer flips for you, not for the average person in a blog post.
         </p>
-        <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: '#fff', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Get the answer on your numbers →</Link>
+        <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: 'var(--on-river)', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Get the answer on your numbers →</Link>
       </div>
 
       {hasInput ? (

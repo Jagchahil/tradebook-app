@@ -113,7 +113,7 @@ export default function Calc() {
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
           It funds your State Pension, and the rules changed completely in 2024: Class 2 became voluntary, so low profit years can quietly stop counting towards your pension without anyone telling you. Lekhio watches your profits all year and tells you when a £190 decision protects a pension year, before the deadline passes, not after.
         </p>
-        <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: '#fff', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Let Lekhio watch it for you →</Link>
+        <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: 'var(--on-river)', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Let Lekhio watch it for you →</Link>
       </div>
 
       {hasInput ? (

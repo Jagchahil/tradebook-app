@@ -86,7 +86,7 @@ function Stage({ stage }: { stage: number }) {
         <Reveal i={2}><div style={{ border: `1.5px solid ${RIVER}`, background: RIVER_TINT, borderRadius: 10, padding: 10 }}><div style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>💼 A PAYE job ✓</div><div style={{ fontSize: 11, color: RIVER_DEEP }}>Sets the rate your profit is taxed at</div></div></Reveal>
         <Reveal i={3}><div style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: 10 }}><div style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>🏠 Rental property</div><div style={{ fontSize: 11, color: MUTED }}>Own rules, new rates April 2027</div></div></Reveal>
         <Reveal i={4}><div style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: 10 }}><div style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>🎓 A student loan</div><div style={{ fontSize: 11, color: MUTED }}>Lands in one lump each January</div></div></Reveal>
-        <Reveal i={5}><div style={{ marginTop: 'auto', background: RIVER, color: '#fff', textAlign: 'center', borderRadius: 10, padding: 10, fontSize: 13, fontWeight: 700 }}>Continue</div></Reveal>
+        <Reveal i={5}><div style={{ marginTop: 'auto', background: RIVER, color: 'var(--on-river)', textAlign: 'center', borderRadius: 10, padding: 10, fontSize: 13, fontWeight: 700 }}>Continue</div></Reveal>
       </>
     );
   }
@@ -103,7 +103,7 @@ function Stage({ stage }: { stage: number }) {
             <span style={{ width: 6, height: 6, borderRadius: 3, background: LINE }} />
           </div>
         </Reveal>
-        <Reveal i={4}><div style={{ marginTop: 14, width: 250, background: RIVER, color: '#fff', textAlign: 'center', borderRadius: 10, padding: 10, fontSize: 13, fontWeight: 700 }}>Set my figures up →</div></Reveal>
+        <Reveal i={4}><div style={{ marginTop: 14, width: 250, background: RIVER, color: 'var(--on-river)', textAlign: 'center', borderRadius: 10, padding: 10, fontSize: 13, fontWeight: 700 }}>Set my figures up →</div></Reveal>
       </div>
     );
   }

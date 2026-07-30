@@ -93,7 +93,7 @@ export default function TaxCalculatorPage() {
             </p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Link href="/start" style={{ display: 'inline-block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12 }}>Start free trial</Link>
+            <Link href="/start" style={{ display: 'inline-block', textAlign: 'center', backgroundColor: RIVER, color: 'var(--on-river)', fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12 }}>Start free trial</Link>
             <Link href="/can-i-claim" style={{ display: 'inline-block', textAlign: 'center', color: RIVER_DEEP, border: `1px solid ${LINE}`, fontSize: 15, fontWeight: 600, padding: '13px 26px', borderRadius: 12 }}>What can I claim?</Link>
           </div>
         </div>

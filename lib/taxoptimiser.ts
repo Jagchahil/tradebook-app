@@ -177,6 +177,60 @@ export function taxPosition(
   };
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHAT IS IN THE SET ASIDE FIGURE, IN WORDS, BECAUSE THE NUMBER ON ITS OWN LOOKS WRONG.
+//
+// Found on the deployed Overview on 30 July 2026. The screen said "Put by for tax £26,579", and
+// directly underneath it "Profit £12,307". Both were correct and together they were unreadable: the
+// £26,579 is his WHOLE personal tax across a salary, dividends, savings and a projected full year of
+// trade, and the £12,307 is his business profit so far. Nothing on the screen said so, and a man
+// who cannot reconcile two of our numbers stops believing both of them.
+//
+// lib/ledger.ts's header is the standard this fails: he should be able to check our working. So the
+// figure names its own ingredients, and it names them HERE rather than in a React file, for the same
+// reason lib/announcements.ts holds its own wording: what we are willing to claim about a man's tax
+// is not a presentation decision.
+//
+// ⚠️ IT ONLY EVER LISTS A STREAM HE ACTUALLY HAS. For a pure sole trader the answer is one word,
+// because listing "your wages" at zero is a line he has to read and reject on the one screen he came
+// to for a number.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+export function setAsideBasis(input: OptimiserInput): string[] {
+  const parts: string[] = ['your business'];
+  if (Math.max(0, input.employmentIncome) > 0) parts.push('your wages');
+  if (Math.max(0, (input.ytdPropertyIncome ?? 0) - (input.ytdPropertyExpenses ?? 0)) > 0) parts.push('your rent');
+  if (Math.max(0, input.dividendIncome ?? 0) > 0) parts.push('your dividends');
+  if (Math.max(0, input.savingsIncome ?? 0) > 0) parts.push('your savings interest');
+  return parts;
+}
+
+// "your business, your wages and your dividends". An Oxford comma is not house style and a list of
+// one must not come back with an "and" hanging off it.
+export function inPlainList(parts: string[]): string {
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+// The sentence under the big number. Null when there is nothing worth explaining, which is a pure
+// sole trader with no job and no dividends: for him the figure is simply his business's tax and
+// saying so adds a line without adding a fact.
+export function setAsideBasisLine(input: OptimiserInput, position: { studentLoan: number; employmentTax: number }): string | null {
+  const parts = setAsideBasis(input);
+  if (parts.length < 2 && position.studentLoan <= 0 && position.employmentTax <= 0) return null;
+  // ⚠️ "and your savings interest and your student loan" is two ANDs in one sentence, which is how
+  // the first version read on a real account. The loan is not another income stream, it is another
+  // thing the January bill collects, so it joins with "plus" rather than pretending to be one.
+  let line = `It covers ${inPlainList(parts)}`;
+  line += position.studentLoan > 0 ? ', plus your student loan.' : '.';
+  // ⚠️ AND IT SAYS WHAT HAS ALREADY BEEN PAID, or a man with a job reads this as a bill on top of
+  // the tax his payslip has been taking all year.
+  if (position.employmentTax > 0) {
+    line += ' The tax your wages have already paid through your payslip is taken off.';
+  }
+  return line;
+}
+
 // The common allowable costs a tradesperson usually has. Missing two or more of
 // these while trading is a strong signal of unclaimed, tax-reducing spend.
 const COMMON_COSTS = ['fuel', 'phone', 'insurance', 'tools'];

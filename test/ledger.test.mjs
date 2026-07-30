@@ -28,8 +28,11 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'ledger-'));
-const fix = (s) => s.replace("from './taxengine'", "from './taxengine.ts'");
-for (const f of ['taxengine', 'ledger']) {
+// Every extensionless relative import gets an extension, not just taxengine: ledger.ts now leans on
+// personalincome.ts, which is the same whole-person engine taxPosition uses. See the baseline note
+// in lib/ledger.ts: taxing the trade alone gave a man with a job his personal allowance twice.
+const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
+for (const f of ['taxengine', 'nistudentloan', 'ltdengine', 'personalincome', 'ledger']) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
 const L = await import(pathToFileURL(path.join(stage, 'ledger.ts')).href);
@@ -319,6 +322,111 @@ ok('...routed BEFORE the generic question handler, so a model never gets the cha
 ok('the intent catches the real ways he would ask it',
   ['what have you saved me', 'how much have you saved me this year', 'saved me anything', 'is it worth it']
     .every((q) => intents.includes('isSavingsQuestion')));
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n🔴 A MAN WITH A JOB WAS BEING GIVEN HIS PERSONAL ALLOWANCE TWICE.');
+//
+// Found on 30 July 2026 by loading the deployed Overview on a real account. On one screen, in the
+// largest type we draw: "Put by for tax £26,579". Eight lines below it: "With Lekhio £0".
+//
+// The £26,579 was right. The £0 came from this file taxing his TRADE ON ITS OWN. soleTraderTax
+// hands the trade a full personal allowance, so £12,307 of profit sitting on top of a £30,000
+// salary that had already used that allowance up came out as no tax at all. HMRC does not do that.
+//
+// The impossible zero was the visible half. The invisible half was that "without Lekhio" was
+// understated the same way, so the SAVING itself was wrong.
+{
+  const withJob = {
+    monthsElapsed: 12, grossIncome: 15900, expenses: 3421, mileage: 172,
+    homeOffice: 0, capitalAllowances: 0, pension: 0, cisSuffered: 240,
+    otherIncome: { employment: 30000 },
+  };
+  const l = ledger(withJob);
+
+  ok('🔴 HIS TRADE PROFIT IS NOT TAX FREE JUST BECAUSE IT IS UNDER THE ALLOWANCE', l.withLekhio > 0);
+  ok('...and the baseline is not either', l.withoutLekhio > 0);
+  ok('...and he is still shown a saving', l.saved > 0);
+
+  // ⚠️ AND IT IS NOT SIMPLY THE DEDUCTIONS TIMES THE MARGINAL RATE, which is what I assumed when I
+  // wrote this test and got it wrong by fifteen pounds. Worth spelling out, because the reason is
+  // real tax law rather than an arithmetic slip.
+  //
+  // His profit sits in the basic band on top of the salary, so every pound of deduction saves 20p of
+  // income tax: £3,593 x 20% = £719. But Class 4 has its OWN threshold, and the deductions take his
+  // profit from £15,900 down to £12,307, which is below it. So only the slice from £15,900 down to
+  // the threshold saves any Class 4 at all, and the rest of the deduction saves none.
+  //
+  // The bracket below is deliberately not a typed in figure: it says the answer must be more than
+  // income tax alone and less than the full combined rate, which is exactly the shape that fact
+  // produces, and it stays true when Khoji moves a rate.
+  const deducted = 3421 + 172;
+  const basicOnly = deducted * 0.20;
+  const basicPlusClass4 = deducted * (soleTraderTax(50000).total - soleTraderTax(49000).total) / 1000;
+  ok('the saving is more than income tax alone', l.saved > basicOnly);
+  ok('...and less than the full combined rate, because Class 4 has its own threshold',
+    l.saved < basicPlusClass4);
+
+  // 🔴 AND THE OLD ANSWER IS PROVABLY WORSE, not merely different. Taxing the trade alone gave
+  // £866 of saving against a real figure nearer £934.
+  const alone = ledger({ ...withJob, otherIncome: undefined });
+  ok('🔴 THE OLD TRADE ONLY READING UNDERSTATED WHAT WE SAVED HIM', alone.saved < l.saved);
+  ok('...and printed a zero that could not be true', alone.withLekhio === 0 && l.withLekhio > 0);
+}
+
+// ⚠️ AND NOTHING MOVES FOR A PURE SOLE TRADER. This is the property that made the fix safe to make:
+// with no other income the whole-person engine IS the sole-trader engine, so every figure any
+// existing customer has ever seen is identical to the penny.
+{
+  const base = {
+    monthsElapsed: 12, grossIncome: 42000, expenses: 8000, mileage: 1200,
+    homeOffice: 312, capitalAllowances: 0, pension: 0, cisSuffered: 0,
+  };
+  const bare = ledger(base);
+  const zeroed = ledger({ ...base, otherIncome: { employment: 0, savings: 0, dividends: 0, otherNonSavings: 0 } });
+
+  ok('🔴 A SOLE TRADER WITH NO OTHER INCOME IS UNCHANGED, WITHOUT',
+    bare.withoutLekhio === Math.round(soleTraderTax(42000).total));
+  ok('🔴 ...AND WITH', bare.withLekhio === Math.round(soleTraderTax(42000 - 9512).total));
+  ok('passing explicit zeros changes nothing either',
+    zeroed.withoutLekhio === bare.withoutLekhio && zeroed.withLekhio === bare.withLekhio && zeroed.saved === bare.saved);
+}
+
+// Wages and rent push his trade up a band, so the same deductions are worth more to him.
+{
+  const shape = {
+    monthsElapsed: 12, grossIncome: 30000, expenses: 5000, mileage: 0,
+    homeOffice: 0, capitalAllowances: 0, pension: 0, cisSuffered: 0,
+  };
+  const plain = ledger(shape);
+  const salaried = ledger({ ...shape, otherIncome: { employment: 50000 } });
+  const landlord = ledger({ ...shape, otherIncome: { otherNonSavings: 40000 } });
+  ok('the same profit costs more tax when wages put it in a higher band', salaried.withoutLekhio > plain.withoutLekhio);
+  ok('...so the deductions are worth more to him, not less', salaried.saved > plain.saved);
+  ok('rent counts the same way, because it is non savings income too', landlord.saved > plain.saved);
+  ok('every figure is still a real number', [plain, salaried, landlord].every((l) =>
+    Number.isFinite(l.saved) && Number.isFinite(l.withLekhio) && Number.isFinite(l.withoutLekhio) && l.saved >= 0));
+}
+
+// 🔴 DIVIDENDS AND SAVINGS ARE DELIBERATELY NOT IN THE STACK, and this pins it so nobody adds them
+// back as an improvement. They sit ON TOP of non savings income, so his trade does not get taxed
+// differently because of them: THEY get taxed differently because of it. Crediting us with that
+// swing means quoting a saving that depends on where his dividends land at the end of a year we are
+// four months into, which is rule 1 of this file's header, in its own words.
+//
+// On the real account this was found on, including them turned £919 into £1,816. The bigger figure
+// was the one we would have printed in bold.
+{
+  const shape = {
+    monthsElapsed: 12, grossIncome: 15900, expenses: 3593, mileage: 0,
+    homeOffice: 0, capitalAllowances: 0, pension: 0, cisSuffered: 0,
+  };
+  const withSalary = ledger({ ...shape, otherIncome: { employment: 30000 } });
+  const alsoDividends = ledger({ ...shape, otherIncome: { employment: 30000, dividends: 12500, savings: 1500 } });
+  ok('🔴 DIVIDENDS DO NOT INFLATE WHAT WE CLAIM TO HAVE SAVED HIM',
+    alsoDividends.saved === withSalary.saved);
+  ok('...and neither does savings interest', alsoDividends.withoutLekhio === withSalary.withoutLekhio);
+}
+
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

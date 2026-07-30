@@ -12,7 +12,7 @@ import { waLinksConfigured } from '../../lib/walink';
 import { gateForUser } from '../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../lib/gate';
 import { ledgerFor, headline } from '../../lib/ledger';
-import { taxPosition } from '../../lib/taxoptimiser';
+import { taxPosition, setAsideBasisLine } from '../../lib/taxoptimiser';
 import { weeklyInput, weeklyLine } from '../../lib/weeklyupdate';
 import { weekOf } from '../../lib/weekchart';
 import { buildPile, partitionPile } from '../../lib/reviewpile';
@@ -163,6 +163,7 @@ export default async function OverviewPage() {
   // new customer ever sees is doc 103's empty test failing on day one: it teaches him this screen
   // has nothing on it. The ledger's own headline already tells an empty account what to do.
   const showTax = moneyIn > 0;
+  const basis = setAsideBasisLine(optimiser, tax);
 
   return (
     <main style={S.wrap}>
@@ -209,18 +210,23 @@ export default async function OverviewPage() {
           <div style={S.hero}>{gbp0(tax.setAside)}</div>
           <p style={S.heroNote}>
             {tax.projected
-              ? 'What your figures are heading for across the full tax year'
-              : 'What the year so far has built up. Too early to call the whole year yet'}
-            {tax.studentLoan > 0 ? ', including your student loan' : ''}. It moves as you earn, and
-            it is due by 31 January.
+              ? 'What your figures are heading for across the full tax year.'
+              : 'What the year so far has built up. Too early to call the whole year yet.'}
+            {' '}It moves as you earn, and it is due by 31 January.
           </p>
+          {/* ⚠️ WHAT IS IN THE NUMBER, WHENEVER IT IS MORE THAN THE BUSINESS.
+              On the live site this card read £26,579 with "Profit £12,307" directly underneath it.
+              Both figures were right and together they were unreadable, because this one is his
+              whole personal tax and that one is his business. lib/taxoptimiser.ts writes the
+              sentence, so what we are willing to claim about a man's tax stays in one place. */}
+          {basis ? <p style={S.heroBasis}>{basis}</p> : null}
         </section>
       ) : null}
 
       {/* ── 2. WHERE THAT NUMBER CAME FROM ─────────────────────────────────────────────────────
           Three figures, no cleverness. The sum he would do on the back of an envelope, done. */}
       <section style={S.card} className="lek-card">
-        <h2 style={S.h2}>Your year so far</h2>
+        <h2 style={S.h2}>Your business this year</h2>
         <div className="lek-grid">
           <div style={S.tile}>
             <div style={S.tileLabel}>In</div>
@@ -292,6 +298,11 @@ export default async function OverviewPage() {
 
         {l.enough ? (
           <>
+            {/* ⚠️ THE SCOPE, SAID OUT LOUD. These two are the tax his TRADE adds to his bill, and
+                on a man with a job the second one can legitimately be small while he still owes
+                thousands overall. Unlabelled, beside the set aside figure above, that reads as a
+                contradiction rather than as two answers to two questions. */}
+            <p style={S.scope}>Tax your business adds to your bill, before and after what you claimed.</p>
             <div style={S.two}>
               <div>
                 <div style={S.tileLabel}>Without Lekhio</div>
@@ -409,6 +420,8 @@ const S: Record<string, React.CSSProperties> = {
   eyebrow: { fontSize: 12.5, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: RIVER_DEEP, margin: '0 0 6px' },
   hero: { fontSize: 44, lineHeight: 1.05, fontWeight: 800, letterSpacing: '-1.6px', color: RIVER_DEEP },
   heroNote: { fontSize: 14, lineHeight: 1.55, color: INK, margin: '10px 0 0' },
+  heroBasis: { fontSize: 13, lineHeight: 1.55, color: RIVER_DEEP, margin: '8px 0 0' },
+  scope: { fontSize: 13, lineHeight: 1.5, color: MUTED, margin: '0 0 14px' },
 
   h2: { fontSize: 15, fontWeight: 800, letterSpacing: '-0.2px', margin: '0 0 12px' },
   headline: { fontSize: 19, lineHeight: 1.35, fontWeight: 800, letterSpacing: '-0.4px', margin: '0 0 16px' },

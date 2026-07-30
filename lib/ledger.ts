@@ -59,7 +59,8 @@
 //
 // If anyone ever proposes pricing on this figure, the answer is no, and the reason is a statute.
 
-import { FACTS, soleTraderTax, asPence } from './taxengine';
+import { FACTS, asPence } from './taxengine';
+import { combinedIncomeTax } from './personalincome';
 
 // Below this, a "saved" figure is noise dressed as a fact. Three months is when the projection in
 // lib/taxoptimiser.ts is allowed to speak, and the same honesty applies here.
@@ -77,6 +78,18 @@ export interface LedgerInput {
   pension: number;           // contributions actually made
   // CIS suffered. HIS OWN MONEY, held by HMRC. A repayment, never a saving. See rule 3.
   cisSuffered: number;
+
+  // 🔴 EVERYTHING ELSE HE EARNS, because it decides what rate his TRADE is taxed at.
+  //
+  // Absent means a pure sole trader, and a pure sole trader's figures are unchanged to the penny.
+  // See the baseline note below: this field exists because leaving it out gave a man with a PAYE
+  // job his personal allowance twice and printed "With Lekhio £0" over a real tax bill.
+  otherIncome?: {
+    employment?: number;       // a PAYE job or a pension
+    otherNonSavings?: number;  // property profit
+    savings?: number;          // bank interest, not ISAs
+    dividends?: number;
+  };
 }
 
 export interface LedgerLine {
@@ -137,8 +150,67 @@ export function ledger(input: LedgerInput): Ledger {
   //
   // Tax on the GROSS, claiming nothing. Not a guess about his behaviour. A defined counterfactual,
   // and for a CIS subbie it is what actually happens to him.
-  const withoutLekhio = round(soleTraderTax(gross).total);
-  const withLekhio = round(soleTraderTax(Math.max(0, gross - totalDeducted)).total);
+  //
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 30 JULY 2026: AND IT WAS GIVING A MAN WITH A JOB HIS PERSONAL ALLOWANCE TWICE.
+  //
+  // Found by loading the deployed Overview on a real account. On screen, in the largest type we
+  // draw, it said "Put by for tax £26,579", and eight lines below it, "With Lekhio £0".
+  //
+  // Both came out of this codebase. The £26,579 is right. The £0 was this function calling
+  // soleTraderTax on the TRADE ALONE for a man who also has a £30,000 salary. soleTraderTax hands
+  // the trade a full personal allowance, so £12,307 of profit sitting on top of wages that have
+  // already used that allowance up came out as nothing at all. HMRC does not do that. His trade
+  // profit is taxed at the MARGIN, on top of everything else he earns.
+  //
+  // The cost was not only the impossible zero. "Without Lekhio" was understated the same way, so
+  // the saving itself was wrong: £866 where the truth was nearer £934, and the gap grows into
+  // hundreds for a man whose trade profit straddles the higher rate threshold.
+  //
+  // ⚠️ SO THE TRADE IS TAXED AT THE MARGIN, AND THE MARGIN IS WHERE THE REST OF HIS INCOME LEFT IT.
+  //
+  // Both figures are now "what his TRADE adds to his tax bill": his whole tax with the trade in it,
+  // less his whole tax with the trade taken out. That is the honest answer to "what did this cost
+  // me", and it is the only one that survives him having a job.
+  //
+  // ⚠️ NOTHING MOVES FOR A PURE SOLE TRADER, BY CONSTRUCTION. With no other income the second term
+  // is zero and combinedIncomeTax of a trade alone IS soleTraderTax, which lib/taxoptimiser.ts's
+  // own tests already pin. Every existing figure is identical to the penny.
+  //
+  // ⚠️ AND IT USES THE SAME ENGINE taxPosition USES, deliberately. Two readers over one man's tax
+  // is what produced the contradiction in the first place.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // ⚠️ EMPLOYMENT AND PROPERTY GO IN. DIVIDENDS AND SAVINGS DELIBERATELY DO NOT.
+  //
+  // This is the line I got wrong first and it is worth the paragraph, because the difference on a
+  // real account was £866 against £1,816 and the bigger one was ours to brag about.
+  //
+  // Wages and rent are NON SAVINGS income. They sit UNDERNEATH his trade in the stacking order, so
+  // they use up his personal allowance and his basic band before his profit gets there. Leaving
+  // them out is what handed him a second personal allowance. They belong here.
+  //
+  // Dividends and savings interest sit ON TOP. Trade profit does not get taxed differently because
+  // of them, but they get taxed differently because of IT: adding profit underneath pushes his
+  // dividends up a band. So including them would credit us with a saving that comes from where his
+  // dividends happen to land at the end of the year, on a figure this file computes from four
+  // months of realised trade. That is rule 1 of this file's header, in the exact words: never a
+  // projection, never a conditional, never a "could".
+  //
+  // ⚠️ AND THE DIRECTION MATTERS MORE THAN THE PRECISION. Leaving them out UNDERSTATES what we
+  // saved him. Understating is the direction a man forgives; a headline saving that shrinks when
+  // his accountant checks it is the one he never forgives, and it is the one this file's header
+  // calls a marketing number.
+  const other = input.otherIncome;
+  const wholeTaxWith = (tradeProfit: number) => combinedIncomeTax({
+    selfEmployment: Math.max(0, tradeProfit),
+    employment: Math.max(0, other?.employment ?? 0),
+    otherNonSavings: Math.max(0, other?.otherNonSavings ?? 0),
+  }).totalTax;
+
+  // His tax with no trade at all. Everything above this line is what the trade costs him.
+  const withoutTrade = wholeTaxWith(0);
+  const withoutLekhio = round(wholeTaxWith(gross) - withoutTrade);
+  const withLekhio = round(wholeTaxWith(Math.max(0, gross - totalDeducted)) - withoutTrade);
   const saved = Math.max(0, withoutLekhio - withLekhio);
 
   // ⚠️ NOT ENOUGH IS NOT ZERO.
@@ -223,6 +295,16 @@ export interface LedgerSource {
   ytdCisSuffered: number;
   ytdMileage?: number;
   ytdHomeOffice?: number;
+
+  // 🔴 THE REST OF HIS INCOME. All optional, all zero by default, so a caller that does not pass
+  // them behaves exactly as it did before this existed. OptimiserInput already carries every one of
+  // these, which is how this bug survived: the values were sitting in the object being passed in
+  // and nothing read them.
+  employmentIncome?: number;
+  savingsIncome?: number;
+  dividendIncome?: number;
+  ytdPropertyIncome?: number;
+  ytdPropertyExpenses?: number;
 }
 
 export function ledgerFor(input: LedgerSource): Ledger {
@@ -270,5 +352,15 @@ export function ledgerFor(input: LedgerSource): Ledger {
 
     // HIS OWN MONEY, HELD BY HMRC. Its own number on the screen, never added to "saved".
     cisSuffered: input.ytdCisSuffered,
+
+    // 🔴 WHAT RATE HIS TRADE IS ACTUALLY TAXED AT. See the baseline note in ledger() above: without
+    // this a man with a job was handed a second personal allowance and told his trade cost him
+    // nothing. Property is netted here the same way the optimiser nets it.
+    otherIncome: {
+      employment: Math.max(0, input.employmentIncome ?? 0),
+      otherNonSavings: Math.max(0, (input.ytdPropertyIncome ?? 0) - (input.ytdPropertyExpenses ?? 0)),
+      savings: Math.max(0, input.savingsIncome ?? 0),
+      dividends: Math.max(0, input.dividendIncome ?? 0),
+    },
   });
 }

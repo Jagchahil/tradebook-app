@@ -34,6 +34,11 @@ const SRC = readFileSync(path.join(lib, 'elections.ts'), 'utf8');
 const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
+// ledger.ts leans on the whole-person engine now, so its dependencies come along. See the baseline
+// note in lib/ledger.ts: taxing a man's trade on its own handed him a second personal allowance.
+for (const dep of ['nistudentloan', 'ltdengine', 'personalincome']) {
+  writeFileSync(path.join(stage, dep + '.ts'), fix(readFileSync(path.join(lib, dep + '.ts'), 'utf8')));
+}
 // lib/money.ts is staged too: the one money formatter every conversational surface now uses.
 writeFileSync(path.join(stage, 'money.ts'), readFileSync(path.join(lib, 'money.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'elections.ts'), fix(SRC));

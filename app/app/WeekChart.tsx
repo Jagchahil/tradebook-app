@@ -56,6 +56,9 @@ export function WeekChart({ week }: { week: Week }) {
   // line above the chart does, because a description that says "a bar chart" describes nothing.
   const label = `Your last seven days. ${gbp0(week.income)} in and ${gbp0(week.expenses)} out.`;
 
+  const anyIn = week.days.some((d) => d.income > 0);
+  const anyOut = week.days.some((d) => d.expenses > 0);
+
   return (
     <figure style={S.fig}>
       <style>{CSS}</style>
@@ -108,10 +111,14 @@ export function WeekChart({ week }: { week: Week }) {
         {week.days.map((d) => <span key={d.iso}>{d.initial}</span>)}
       </div>
 
-      {/* Which colour is which. A chart nobody can read is a decoration. */}
+      {/* Which colour is which. A chart nobody can read is a decoration.
+          ⚠️ AND ONLY FOR A COLOUR THAT IS ACTUALLY ON THE CHART. Seen on the deployed site: a week
+          with nothing coming in still offered a green key for "In", pointing at a colour that
+          appeared nowhere. Doc 103's empty test in miniature, and the smallest version of the thing
+          that makes a man stop reading a screen. */}
       <figcaption style={S.key}>
-        <span style={S.keyItem}><i style={{ ...S.swatch, background: GREEN }} /> In</span>
-        <span style={S.keyItem}><i style={{ ...S.swatch, background: RIVER }} /> Out</span>
+        {anyIn ? <span style={S.keyItem}><i style={{ ...S.swatch, background: GREEN }} /> In</span> : null}
+        {anyOut ? <span style={S.keyItem}><i style={{ ...S.swatch, background: RIVER }} /> Out</span> : null}
       </figcaption>
     </figure>
   );

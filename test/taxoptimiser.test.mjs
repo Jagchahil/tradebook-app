@@ -243,5 +243,53 @@ console.log('\n=== 🔴 THE SET ASIDE FIGURE, AND THE STUDENT LOAN IT USED TO FO
     [a, b, employed, empty].every((p) => Number.isFinite(p.setAside) && p.setAside >= 0));
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 🔴 WHAT IS IN THE SET ASIDE FIGURE, IN WORDS ===\n');
+//
+// Found on the deployed Overview on 30 July 2026. The screen said "Put by for tax £26,579", and
+// directly underneath it "Profit £12,307". Both figures were correct and together they were
+// unreadable: the first is his whole personal tax across a salary, dividends, savings and a
+// projected full year of trade, and the second is his business profit so far. Nothing said so.
+//
+// lib/ledger.ts's standard is that he should be able to check our working, and two of our numbers
+// he cannot reconcile is how he stops believing either of them.
+{
+  const sole = { ...base, ytdTradeIncome: 30000, ytdTradeExpenses: 5000 };
+  ok('a pure sole trader is just his business', JSON.stringify(O.setAsideBasis(sole)) === JSON.stringify(['your business']));
+  // ⚠️ AND HE IS TOLD NOTHING EXTRA. Listing "your wages" at zero is a line he has to read and
+  // reject on the one screen he came to for a number.
+  ok('🔴 SO HE IS GIVEN NO EXTRA LINE TO READ',
+    O.setAsideBasisLine(sole, O.taxPosition(sole)) === null);
+
+  const withJob = { ...sole, employmentIncome: 30000, dividendIncome: 12500, savingsIncome: 1500 };
+  const parts = O.setAsideBasis(withJob);
+  ok('a man with wages, dividends and savings has all three named',
+    parts.includes('your wages') && parts.includes('your dividends') && parts.includes('your savings interest'));
+  ok('...and his business is named first, because it is the one we are his employee for',
+    parts[0] === 'your business');
+
+  const line = O.setAsideBasisLine(withJob, O.taxPosition(withJob));
+  ok('🔴 THE NUMBER NOW SAYS WHAT IS IN IT', /your business, your wages, your dividends and your savings interest/.test(line));
+  // ⚠️ AND WHAT HAS ALREADY BEEN PAID. Without this a man with a job reads the figure as a bill on
+  // top of the tax his payslip has been taking off him all year.
+  ok('🔴 AND THAT HIS PAYSLIP HAS ALREADY PAID SOME OF IT', /payslip/.test(line));
+
+  const loan = { ...withJob, studentPlans: ['plan2'] };
+  ok('a student loan is named too', /student loan/.test(O.setAsideBasisLine(loan, O.taxPosition(loan))));
+
+  // The list reads like a person wrote it, at every length.
+  ok('a list of one has no "and" hanging off it', O.inPlainList(['your business']) === 'your business');
+  ok('a list of two joins with "and"', O.inPlainList(['a', 'b']) === 'a and b');
+  ok('a list of three uses commas then "and"', O.inPlainList(['a', 'b', 'c']) === 'a, b and c');
+  ok('an empty list is empty, never "and"', O.inPlainList([]) === '');
+
+  // A property landlord is named as one, and a man with a loss on his rent is not.
+  ok('rent is named when it makes money',
+    O.setAsideBasis({ ...sole, ytdPropertyIncome: 9000, ytdPropertyExpenses: 2000 }).includes('your rent'));
+  ok('...and not when it does not',
+    !O.setAsideBasis({ ...sole, ytdPropertyIncome: 2000, ytdPropertyExpenses: 9000 }).includes('your rent'));
+}
+
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

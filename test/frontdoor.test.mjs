@@ -130,18 +130,41 @@ ok('the wa.me host is written in exactly one place, and it is not a page',
 // configured AND he has no number bound yet, so it is never on screen for a man who cannot act on
 // it and never on screen for a man who already has.
 const CONNECT_PAGE = 'app/app/connect/page.tsx';
+// ⚠️ AND THE NAV, WHICH NAMES WHATSAPP AS A PLACE RATHER THAN AS AN INSTRUCTION.
+//
+// app/app/AppNav.tsx carries a "WhatsApp" item pointing at the connect page. That is the opposite
+// of the bug this file was written about: the old screens told a man to send a receipt on WhatsApp
+// when he had no number bound and nowhere to bind it. A link that takes him TO the place he binds
+// it is the fix, not a repeat.
+//
+// It is exempted from the word check and held to a stricter one instead, below: the nav may name
+// WhatsApp, and it may not tell him to do anything with it.
+const APP_NAV = 'app/app/AppNav.tsx';
 const inApp = pages.filter((f) => rel(f).startsWith('app/app/'));
 ok('the logged in app has screens to check', inApp.length >= 3);
 ok('the connect page is one of them', inApp.map(rel).includes(CONNECT_PAGE));
 const appInstructs = inApp
-  .filter((f) => rel(f) !== CONNECT_PAGE && rel(f) !== 'app/app/page.tsx')
+  .filter((f) => rel(f) !== CONNECT_PAGE && rel(f) !== 'app/app/page.tsx' && rel(f) !== APP_NAV)
   .filter((f) => /WhatsApp/.test(read(rel(f)).replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')))
   .map(rel);
 ok(
   `🔴 no screen inside /app instructs a WhatsApp action${appInstructs.length ? `\n     ${appInstructs.join('\n     ')}` : ''}`,
   appInstructs.length === 0,
 );
-// 🔴 AND THE MONEY SCREEN'S ONE MENTION IS GATED. Without this the exemption above would let any
+
+
+// The nav's exemption, paid for. It may name WhatsApp; it may not instruct.
+{
+  const whole = read(APP_NAV).replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  // Everything above the style object, which is the only part that renders words at a customer.
+  // Checking the whole file matches "text" inside textDecoration, and a guard that cries wolf on a
+  // CSS property is a guard the next person switches off.
+  const nav = whole.slice(0, whole.indexOf('const S:') === -1 ? whole.length : whole.indexOf('const S:'));
+  ok('the nav names WhatsApp only as a link to the connect page',
+    /href: '\/app\/connect', label: 'WhatsApp'/.test(nav));
+  ok('the nav does not tell him to do anything on WhatsApp',
+    !/\b(send|snap|photo|message|receipt)\b/i.test(nav));
+}// 🔴 AND THE MONEY SCREEN'S ONE MENTION IS GATED. Without this the exemption above would let any
 // amount of ungated WhatsApp copy back onto the first screen a new customer sees.
 const money = read('app/app/page.tsx');
 ok('🔴 the money screen offers WhatsApp only behind the gate',

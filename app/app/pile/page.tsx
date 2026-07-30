@@ -11,6 +11,7 @@ import { gbp0 } from '../../../lib/money';
 import { gateForUser } from '../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../lib/gate';
 import { A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_TINT, SURFACE } from '../../../lib/tokens';
+import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -102,10 +103,7 @@ export default async function PilePage({
     <main style={S.wrap}>
       <style>{CSS}</style>
 
-      <header style={S.head}>
-        <a href="/app" style={S.logo}>Lekhio</a>
-        <a href="/app" style={S.back}>Your money</a>
-      </header>
+      <AppNav current="/app/pile" />
 
       {note && <p style={S.note}>{note}</p>}
 

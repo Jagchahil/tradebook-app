@@ -11,6 +11,7 @@ import { qrPath } from '../../../lib/qr';
 import {
   A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SURFACE, WHATSAPP,
 } from '../../../lib/tokens';
+import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -77,9 +78,7 @@ export default async function ConnectPage({
     <main style={S.wrap}>
       <style>{CSS}</style>
 
-      <header style={S.head}>
-        <a href="/app" style={S.back}>Back to your money</a>
-      </header>
+      <AppNav current="/app/connect" />
 
       <h1 style={S.h1}>Lekhio on WhatsApp</h1>
 

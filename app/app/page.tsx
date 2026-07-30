@@ -20,6 +20,7 @@ import {
   A11Y_CSS, FONT, GREEN, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_DEEP,
   SAFFRON_TINT, WHATSAPP,
 } from '../../lib/tokens';
+import { AppNav } from './AppNav';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -129,14 +130,7 @@ export default async function MoneyPage() {
     <main style={S.wrap}>
       <style>{CSS}</style>
 
-      <header style={S.head}>
-        <span style={S.logo}>Lekhio</span>
-        {/* Signing out is a state change, so it is a form and not a link. A GET that ends a session
-            is a session any other site can end for him with an image tag. */}
-        <form action="/api/auth/signout" method="post">
-          <button type="submit" style={S.out}>Sign out</button>
-        </form>
-      </header>
+      <AppNav current="/app" />
 
       {/* Item 1 finally has a customer surface. Khoji reads the law nightly and a human approves
           what matters, and until this line existed no customer ever saw it happen. */}

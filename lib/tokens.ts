@@ -147,6 +147,30 @@ export const SHADOW = {
   raised: '0 12px 40px rgba(17,17,17,0.12)',
 } as const;
 
+// ---------- movement ----------
+//
+// ⚠️ EVERY DURATION AND CURVE THE APP IS ALLOWED TO USE, AND THERE ARE FIVE OF THEM.
+//
+// A dashboard with animation is either calm or it is a fairground, and the difference is whether
+// the timings were chosen once or invented per component. These are the only ones. The curve is a
+// gentle ease out: things arrive quickly and settle, which reads as the interface responding to
+// him rather than performing at him.
+//
+// Nothing here needs switching off for reduced motion. A11Y_CSS already collapses every duration
+// on the page to nothing when the OS asks, so a man who cannot take movement gets the same layout
+// with none of it, from one rule, rather than from every component remembering.
+export const MOTION = {
+  // A press, a hover, a colour change. Fast enough to feel like cause and effect.
+  quick: '140ms',
+  // A panel opening, a row expanding. Long enough to be followed by the eye.
+  panel: '220ms',
+  // Something arriving on the page for the first time.
+  enter: '320ms',
+  ease: 'cubic-bezier(0.22, 0.61, 0.36, 1)',
+  // For a thing that grows from nothing, like a bar on a chart.
+  grow: 'cubic-bezier(0.16, 1, 0.3, 1)',
+} as const;
+
 // ---------- the stylesheet ----------
 
 export const THEME_SWAP_CLASS = 'theme-swap';

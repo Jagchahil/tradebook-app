@@ -317,9 +317,12 @@ async function QuestionsStep({ userId, step }: { userId: string; step: 'househol
   const intro = step === 'household'
     ? {
       title: 'You and your household.',
-      // Says why the four cheapest questions we own come before the ones worth more. He knows every
-      // answer without looking anything up.
-      blurb: 'Four questions, and you know every answer off the top of your head. They are worth real money and no bookkeeping app has ever asked them.',
+      // ⚠️ NO COUNT IN THIS SENTENCE, AND THE FIRST VERSION HAD ONE. It said "Four questions"
+      // while the counter below said "0 of 3", because the child benefit follow up only becomes
+      // askable once its premise is established. The counter is computed by lib/circumstances.ts
+      // and tells the truth; a number written into prose is a second copy of it, and the second
+      // copy lied on the live site on 30 July.
+      blurb: 'You know every answer off the top of your head. They are worth real money and no bookkeeping app has ever asked them.',
     }
     : {
       title: 'What you can claim.',

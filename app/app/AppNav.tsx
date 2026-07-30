@@ -19,9 +19,14 @@ import {
 //
 // ⚠️ AND NO CLIENT JAVASCRIPT, INCLUDING THE DROPDOWNS. They are <details> elements, which open
 // and close in the browser with no script at all. A menu that waits for hydration is a menu that
-// is dead for the first second on a bad signal, and a bad signal is a building site. The cost is
-// that two open menus do not close each other, which is a fair trade for a menu that works before
-// the JavaScript has even been asked for.
+// is dead for the first second on a bad signal, and a bad signal is a building site.
+//
+// 🔴 THE DROPDOWNS SHARE A name, AND THE FIRST VERSION DID NOT. Two <details> with no name
+// are independent, so opening You while Money was open left both menus drawn at once, each showing
+// through the other's panel. Found by pressing them on the live site on 30 July. A shared name
+// makes the browser itself close one when the other opens, still with no script. Browsers too old
+// to know the attribute keep the old both open behaviour, which is untidy but works, so nobody is
+// worse off than they were.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 export interface NavItem { href: string; label: string; hint?: string }
@@ -105,7 +110,7 @@ export function AppNav({ current }: { current: string }) {
             );
           }
           return (
-            <details key={sec.href} className="lek-drop">
+            <details key={sec.href} className="lek-drop" name="lek-nav">
               <summary className={`lek-tab${here ? ' on' : ''}`} aria-current={here ? 'page' : undefined}>
                 {sec.label}
                 <span className="lek-caret" aria-hidden="true" />

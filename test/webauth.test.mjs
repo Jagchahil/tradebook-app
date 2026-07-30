@@ -366,5 +366,63 @@ ok('the page partitions by what the account is for', /partitionPile\(groups, acc
 ok('the api gates the one tap by it too', /canBulkConfirm\(g, accountUse\)/.test(pileRoute));
 ok('🔴 AND THE BULK PLAN IS GATED BY IT', /bulkConfirmPlan\(\s*[\s\S]{0,160}accountUse,/.test(pileRoute));
 
+console.log('\n8. THE MONEY LOG IS A SURFACE, AND ITS TOTALS AGREE WITH THE OVERVIEW');
+//
+// This is the page that makes the ledger's claim checkable. lib/ledger.ts's header says "£12.99
+// saves you £2,000" is a specification and not a slogan: if we cannot show him the £2,000 we have
+// not earned the £12.99. Every pound of it comes from rows, and until 30 July the web app had
+// nowhere to look at a row.
+//
+// So the risk is a page that adds his money up its own way. A total here that disagreed with the
+// Overview would be the fourth time this codebase put two readers over one number.
+const log = read(path.join(repo, 'app/app/money/page.tsx'));
+const personalRoute = read(path.join(repo, 'app/api/personal/route.ts'));
+
+ok('the month is grouped and added up in lib/moneylog.ts', log.includes('logFor'));
+// 🔴 THE MONTH IS ASKED FOR BY DATE, NOT FILTERED OUT OF EVERYTHING.
+//
+// The first draft read getAllConfirmedForReview, which has no date filter and a limit of two
+// thousand rows, and sliced a month out in memory. On a busy account that limit is reached and the
+// oldest rows fall off the end, so a man stepping back to April is shown an EMPTY MONTH with
+// nothing to tell him why. A silent truncation that reads as "you did no work in April".
+ok('🔴 THE MONTH IS FETCHED BY DATE, NOT SLICED OUT OF A CAPPED LIST',
+  log.includes('transactionsInMonth') && !log.includes('getAllConfirmedForReview'));
+ok('a failed read is told apart from a quiet month', /rows !== null/.test(log));
+ok('🔴 THE PAGE DOES NOT ADD HIS MONEY UP ITSELF',
+  !/\breduce\(/.test(stripComments(log)) && !/income\s*\+=|expenses\s*\+=/.test(stripComments(log)));
+ok('what is waiting is counted by lib/reviewpile.ts, like everywhere else',
+  log.includes('buildPile') && log.includes('partitionPile'));
+ok('pounds are written by lib/money.ts', log.includes("from '../../../lib/money'"));
+ok('🔴 AND NO SCREEN BUILDS A POUND ITSELF', !buildsAPound.test(stripComments(log)));
+ok('the month key off the query string is validated before it is used', log.includes('isMonthKey'));
+
+// 🔴 A CORRECTION IS A POST, NEVER A LINK. A GET that strikes a line out of a man's tax figures is
+// a change any other site can make for him with an image tag, and a crawler can make by accident.
+ok('🔴 A CORRECTION IS A FORM POST, NEVER A LINK',
+  /<form action="\/api\/personal" method="post"/.test(log));
+ok('the route answers the web form as well as the app JSON', personalRoute.includes('formData'));
+// ⚠️ THE OBVIOUS REGEX HERE IS WRONG, and it cost me a red run. [^)]* stops at the first bracket,
+// which in `redirect(new URL(...), 303)` is the one closing the URL, so the assertion can never see
+// the status code. Matched across the whole call instead.
+ok('the form answer is a 303, not a 302',
+  /NextResponse\.redirect\([\s\S]{0,160}?,\s*303\)/.test(personalRoute)
+  && !/NextResponse\.redirect\([\s\S]{0,160}?,\s*302\)/.test(personalRoute));
+
+// 🔴 'false' IS A TRUTHY STRING. A form posts strings, so reading the flag the lazy way would make
+// "Put it back" mark the line personal all over again: a button that does the opposite of its own
+// label, on his tax figures.
+ok("🔴 THE FORM'S 'false' IS READ AS FALSE, NOT AS A TRUTHY STRING",
+  /!==\s*'false'/.test(personalRoute));
+
+// 🔴 MONEY IN IS NOT OFFERED THE BUTTON. Striking out a payment INTO his account removes income
+// from his own tax figures in one press, and understating income is the one direction of error this
+// product must never make easy. lib/personal.ts and confirm_pile both already refuse it.
+ok('🔴 ONLY MONEY OUT CAN BE STRUCK OUT FROM THIS SCREEN',
+  /e\.amount < 0 \? \(\s*<form action="\/api\/personal"/.test(log));
+
+// He lands back on the month he was looking at. Returning him to today after he corrects a line in
+// March loses his place, on the page whose whole job is finding one payment.
+ok('the month travels with the correction', /name="m"/.test(log) && personalRoute.includes("f.get('m')"));
+
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

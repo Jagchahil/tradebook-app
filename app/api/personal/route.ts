@@ -41,22 +41,59 @@ export async function GET(req: NextRequest) {
   });
 }
 
+// ⚠️ IT ANSWERS A FORM AS WELL AS A FETCH, because /app/money posts one.
+//
+// The phone app sends JSON and reads JSON back. The web app ships no client JavaScript, so a
+// correction on the money log is an ordinary <form method="post"> and it needs a redirect back to
+// the page rather than a JSON body the browser would render as a screen of text. Same gate, same
+// validation, same write, same lesson taught to the brain: only the reply differs, decided by the
+// content type the caller sent. That is the shape /api/billing/checkout already uses.
+//
+// The redirect is a 303, so the back button cannot re-post the correction and flip it again.
 export async function POST(req: NextRequest) {
-  const user = await sessionUser(req);
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const isForm = (req.headers.get('content-type') || '').includes('application/x-www-form-urlencoded');
+  const backTo = (done: string, month: string) => {
+    // ⚠️ BACK TO THE MONTH HE WAS LOOKING AT. Returning him to the current month after he corrects
+    // a line in March loses his place, and finding one payment is the whole job of that page.
+    const m = /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? `&m=${month}` : '';
+    return NextResponse.redirect(new URL(`/app/money?done=${done}${m}`, req.url), 303);
+  };
 
-  if (await rateLimitedShared(`personal:${user.id}`, 120, 60 * 60 * 1000)) {
-    return NextResponse.json({ error: 'too_many_requests' }, { status: 429 });
+  const user = await sessionUser(req);
+  // A form caller with no session is a man whose session expired while the page sat open. Send him
+  // to the door, not to a JSON error he cannot read.
+  if (!user) {
+    return isForm
+      ? NextResponse.redirect(new URL('/in?next=/app/money', req.url), 303)
+      : NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
   let body: { id?: string; personal?: boolean; ids?: string[] } = {};
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+  let month = '';
+  if (isForm) {
+    const f = await req.formData().catch(() => null);
+    if (!f) return backTo('failed', '');
+    month = String(f.get('m') ?? '');
+    body = {
+      id: String(f.get('id') ?? ''),
+      // ⚠️ A FORM POSTS STRINGS, AND 'false' IS A TRUTHY ONE. Reading this as a boolean the lazy
+      // way would make "put it back" mark the line personal all over again, which is a button that
+      // does the opposite of its own label on a man's tax figures.
+      personal: String(f.get('personal') ?? 'true') !== 'false',
+    };
+  } else {
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+    }
   }
 
-  // "Yes, all of those are personal."
+  if (await rateLimitedShared(`personal:${user.id}`, 120, 60 * 60 * 1000)) {
+    return isForm ? backTo('failed', month) : NextResponse.json({ error: 'too_many_requests' }, { status: 429 });
+  }
+
+  // "Yes, all of those are personal." JSON only: the web offers one row at a time.
   if (Array.isArray(body.ids)) {
     const ids = body.ids.filter((i) => typeof i === 'string').slice(0, 200);
     const marked = await setManyPersonal(user.id, ids);
@@ -67,18 +104,24 @@ export async function POST(req: NextRequest) {
   }
 
   // One row, either way. Reversible: a user who taps it by mistake taps it back.
-  if (typeof body.id === 'string') {
+  if (typeof body.id === 'string' && body.id) {
     const personal = body.personal !== false;
     const ok = await setTransactionPersonal(user.id, body.id, personal);
-    if (!ok) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    // A FAILED WRITE MUST NOT LOOK LIKE A SUCCESSFUL ONE. The page reloads with the line exactly as
+    // it was, and says so, rather than letting him believe he corrected something he did not.
+    if (!ok) return isForm ? backTo('failed', month) : NextResponse.json({ error: 'not_found' }, { status: 404 });
 
     // TEACH THE BRAIN. This is the whole idea: they should only ever have to tell
     // us once. Next time this vendor arrives from the bank it lands already out of
     // the tax figures, with no AI call and no second question.
     void teach(user.id, body.id, personal);
 
-    return NextResponse.json({ ok: true });
+    return isForm
+      ? backTo(personal ? 'personal' : 'business', month)
+      : NextResponse.json({ ok: true });
   }
+
+  if (isForm) return backTo('failed', month);
 
   return NextResponse.json({ error: 'bad_request' }, { status: 400 });
 }

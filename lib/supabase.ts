@@ -32,6 +32,7 @@ import { advanceStage, normaliseWhatsapp, isContactStage, isCheckoutStage, isEve
 import { sicByCode } from './siccodes';
 import { useOfHomeToDate } from './elections';
 import { weekTotals, FETCH_DAYS, type WeekRow } from './weekchart';
+import { isMonthKey, monthStart, monthEnd } from './moneylog';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -4985,6 +4986,68 @@ export async function setManyPersonal(userId: string, ids: string[]): Promise<nu
 
 // Everything confirmed, INCLUDING personal, so the detector can look at the whole
 // picture and the app can show a personal entry greyed out rather than hiding it.
+// ONE MONTH OF HIS BOOK, AND THE DATE HE STARTED.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ WHY THESE EXIST WHEN getAllConfirmedForReview IS RIGHT THERE.
+//
+// That function has no date filter and a limit of two thousand rows. /app/money's first draft used
+// it and filtered a month out in memory, and on a busy account that is a SILENT TRUNCATION: the
+// oldest rows fall off the end of the limit, and a man stepping back to April is shown an empty
+// month with nothing at all to tell him why. "You did no work in April" is a worse answer than a
+// slow page, and it was also the slow page, two thousand rows over a bad signal to draw thirty.
+//
+// So the month is asked for by date, and the earliest date is asked for on its own so the back
+// arrow knows where his books actually start. Doc 103's third test: an arrow into a month before he
+// ever traded is a button whose only function is to show him nothing.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+//
+// ⚠️ NULL MEANS WE COULD NOT READ IT, not that the month was quiet. A page that prints an empty
+// month over a database timeout is telling him something false about his own money.
+export async function transactionsInMonth(
+  userId: string,
+  month: string,
+): Promise<Record<string, unknown>[] | null> {
+  if (!isMonthKey(month)) return null;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
+        + '&confirmed=eq.true'
+        + `&transaction_date=gte.${monthStart(month)}`
+        + `&transaction_date=lt.${monthEnd(month)}`
+        + '&select=id,amount,vendor,category,transaction_date,description,is_personal'
+        + '&order=transaction_date.desc&limit=2000',
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as Record<string, unknown>[];
+  } catch {
+    return null;
+  }
+}
+
+// The first day his books have anything on. Used only to decide whether the back arrow leads
+// anywhere, so a failed read returns null and the arrow simply stays available: letting him step
+// into an empty month is a far smaller fault than refusing to let him reach a real one.
+export async function earliestTransactionDate(userId: string): Promise<string | null> {
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
+        + '&confirmed=eq.true&transaction_date=not.is.null'
+        + '&select=transaction_date&order=transaction_date.asc&limit=1',
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ transaction_date?: string | null }>;
+    const first = rows[0]?.transaction_date;
+    return typeof first === 'string' ? first.slice(0, 10) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAllConfirmedForReview(userId: string): Promise<Record<string, unknown>[]> {
   const { url } = config();
   const res = await fetch(

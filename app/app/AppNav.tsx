@@ -46,9 +46,10 @@ export interface NavSection { href: string; label: string; items: NavItem[] }
 export const SECTIONS: ReadonlyArray<NavSection> = [
   { href: '/app', label: 'Overview', items: [] },
   {
-    href: '/app/pile',
+    href: '/app/money',
     label: 'Money',
     items: [
+      { href: '/app/money', label: 'Everything logged', hint: 'Every payment, a month at a time' },
       { href: '/app/pile', label: 'Waiting on you', hint: 'Anything we could not call ourselves' },
     ],
   },

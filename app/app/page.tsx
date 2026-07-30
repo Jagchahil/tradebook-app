@@ -4,10 +4,11 @@ import { userFromSessionCookie } from '../../lib/webauth';
 import { SESSION_COOKIE } from '../../lib/websession';
 import {
   getOptimiserInput, weeklyTotals, weeklyUpdateFactsFor, readAnnouncementSources,
-  readOnboardingProgress,
+  readOnboardingProgress, readProvedPhone,
 } from '../../lib/supabase';
 import { toStep, isDone, stepTitle, stepNumber, stepCount } from '../../lib/onboarding';
-import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL } from '../../lib/features';
+import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL, WHATSAPP_NUMBER } from '../../lib/features';
+import { waLinksConfigured } from '../../lib/walink';
 import { ledgerFor, headline } from '../../lib/ledger';
 import { weeklyInput, weeklyFigures, weeklyLine } from '../../lib/weeklyupdate';
 import { selectAnnouncements, appliedLineFor, tagFor } from '../../lib/announcements';
@@ -15,7 +16,7 @@ import { AnnouncementsBanner, type BannerItem } from '../_shared/AnnouncementsBa
 import { gbp0, gbpAbs0 } from '../../lib/money';
 import {
   A11Y_CSS, FONT, GREEN, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_DEEP,
-  SAFFRON_TINT,
+  SAFFRON_TINT, WHATSAPP,
 } from '../../lib/tokens';
 
 export const runtime = 'nodejs';
@@ -60,12 +61,13 @@ export default async function MoneyPage() {
 
   // Everything at once. Three round trips in parallel rather than three in a row, because the
   // budget for this page is one bad-signal second, not three.
-  const [optimiser, totals, factsMap, sources, progress] = await Promise.all([
+  const [optimiser, totals, factsMap, sources, progress, proved] = await Promise.all([
     getOptimiserInput(user.id),
     weeklyTotals(user.id),
     weeklyUpdateFactsFor([user.id]).catch(() => null),
     readAnnouncementSources(user.id).catch(() => null),
     readOnboardingProgress(user.id).catch(() => null),
+    readProvedPhone(user.id).catch(() => null),
   ]);
 
   // ⚠️ THE RESUME LINE, AND DOC 103'S EMPTY TEST DECIDES WHEN IT IS ON SCREEN.
@@ -79,6 +81,18 @@ export default async function MoneyPage() {
   // worse than saying nothing, because the line he cannot dismiss is the one he learns to ignore.
   const setup = progress && !progress.completedAt ? toStep(progress.step) : null;
   const resumeAt = setup && !isDone(setup) ? setup : null;
+
+  // ⚠️ THE WHATSAPP ROW, AND DOC 103'S EMPTY TEST DECIDES WHEN IT IS ON SCREEN, exactly as it does
+  // for the resume line above.
+  //
+  // It is drawn while his phone is NOT connected and disappears the moment it is. A permanent row
+  // saying "connected" is a row he reads and rejects every time he opens the one screen he came to
+  // for a number, and doc 103's standing question is what we took out to make room for it.
+  //
+  // A failed read draws nothing, because telling a man who connected last week that he has not is
+  // worse than saying nothing at all.
+  const offerWhatsApp = proved !== null && !proved.phone
+    && waLinksConfigured() && WHATSAPP_NUMBER.length >= 8;
 
   const l = ledgerFor(optimiser);
   const week = weeklyInput(totals, factsMap?.get(user.id), new Date());
@@ -197,6 +211,24 @@ export default async function MoneyPage() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          🔴 THE ONE PLACE THAT OFFERS WHATSAPP, AND IT IS BEHIND THE FRONT DOOR TOO.
+          test/frontdoor.test.mjs used to forbid the word WhatsApp anywhere under app/app, because
+          inbound resolves a message BY PHONE NUMBER and a web customer's number is deliberately
+          unproved: every mention was an instruction he could not follow. Binding is what makes it
+          followable, so the rule narrows rather than disappearing. This row and /app/connect are
+          the only two places allowed to say it, and only while he genuinely can act on it.
+          ═══════════════════════════════════════════════════════════════════════════════════════ */}
+      {offerWhatsApp ? (
+        <a href="/app/connect" style={S.connect}>
+          <span style={S.connectTop}>Add WhatsApp</span>
+          <span style={S.connectBody}>
+            Photograph a receipt, say what you spent, or ask what you owe, from the chat app you
+            already have open. Connecting your phone takes about a minute.
+          </span>
+        </a>
+      ) : null}
+
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
           🔴 THE ONLY PLACE IN THE PRODUCT THAT OFFERS THE APP, AND IT IS BEHIND THE FRONT DOOR.
           Jag's call, 30 July: nobody downloads the app before he is in the web app. Everyone goes
           through the same door, in the same order, and the phone is something he adds afterwards
@@ -267,4 +299,7 @@ const S: Record<string, React.CSSProperties> = {
   resumeTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
   resumeBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
   footLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },
+  connect: { display: 'block', textDecoration: 'none', background: '#fff', border: `1px solid ${LINE}`, borderLeft: `3px solid ${WHATSAPP}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
+  connectTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: GREEN, marginBottom: 5 },
+  connectBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
 };

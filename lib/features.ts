@@ -49,6 +49,23 @@ export function bankFeedLive(): boolean {
 export const APP_STORE_URL = process.env.NEXT_PUBLIC_APP_STORE_URL ?? '';
 export const PLAY_STORE_URL = process.env.NEXT_PUBLIC_PLAY_STORE_URL ?? '';
 
+// ⚠️ THE NUMBER A CUSTOMER MESSAGES TO CONNECT HIS PHONE. Digits only, international, no plus and
+// no spaces, for example 447700900123.
+//
+// NOT NEXT_PUBLIC, unlike everything above it, and that is deliberate rather than an oversight. The
+// only thing that reads this is /app/connect, which is server rendered, so the value never needs to
+// reach a bundle. It is not a secret, it is printed on the page, but a value with no reason to be
+// in the JavaScript a customer downloads should not be in it.
+//
+// 🔴 WHATSAPP_PHONE_NUMBER_ID IS NOT THIS. That is Meta's internal id for the sending number and it
+// is not dialable, not messageable, and produces a wa.me link that opens WhatsApp on a blank screen
+// with no error anywhere. They are easy to confuse because we already have one of them in the
+// environment and it looks like a long number.
+//
+// Empty means the feature draws nothing at all. lib/walink.ts's waMeLink returns null rather than a
+// half built link, and /app/connect explains rather than showing a dead button.
+export const WHATSAPP_NUMBER = (process.env.WHATSAPP_NUMBER ?? '').replace(/[^0-9]/g, '');
+
 // --- copy that changes with the flags ---------------------------------------
 // Kept here, next to the flags, so the "before" and "after" wording live side by
 // side and cannot drift apart.

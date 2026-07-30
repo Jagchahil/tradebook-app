@@ -1557,7 +1557,19 @@ export async function ensureUserRow(userId: string, phoneE164: string): Promise<
   if (!userId) return false;
   const body: Record<string, unknown> = { id: userId };
   const e164 = normalizeUkPhone(phoneE164);
-  if (e164) body.phone_number = e164;
+  // 🔴 THE NUMBER AND THE PROOF GO IN TOGETHER OR NOT AT ALL.
+  //
+  // The only caller that passes a number here is the phone OTP door, and the number it passes has
+  // just been proved by Twilio. That was the whole rule while phone_number was the only evidence
+  // there was. From the 29 July migration the evidence is a column of its own, and its header says
+  // that anything finding a phone_number with no phone_verified_at beside it is looking at a bug.
+  //
+  // It read as harmless because nothing consulted the new column yet. lib/walink.ts is what starts
+  // consulting it, and a proved number carrying no proof would have read as unproved.
+  if (e164) {
+    body.phone_number = e164;
+    body.phone_verified_at = new Date().toISOString();
+  }
   const res = await fetch(`${url}/rest/v1/users?on_conflict=id`, {
     method: 'POST',
     headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
@@ -3974,6 +3986,159 @@ export async function completeOnboarding(userId: string): Promise<boolean> {
     body: JSON.stringify({ user_id: userId, step: 'done', completed_at: now, updated_at: now }),
   });
   return res.ok;
+}
+
+// ── Binding a WhatsApp number: the other half of the 29 July migration ──────────────────────────
+//
+// The rules live in lib/walink.ts, which is pure. This is only the reading and writing.
+// supabase/APPLY_2026-07-29_onboarding_and_walink.sql section 2 is the argument for the shape.
+
+export interface WaLinkRow {
+  id: string;
+  user_id: string;
+  expires_at: string;
+  consumed_at: string | null;
+}
+
+// One row per real attempt. The CODE IS NEVER STORED, only its keyed digest, so nothing here can be
+// read back into a working credential even by us. That is also why the code has to ride to the
+// browser in a signed cookie rather than being re-read on the next page load: there is nothing to
+// re-read, by design.
+export async function createWaLink(
+  userId: string, codeHash: string, expiresAtIso: string,
+): Promise<boolean> {
+  if (!userId || !codeHash) return false;
+  const { url } = config();
+  try {
+    const res = await fetch(`${url}/rest/v1/wa_links`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ user_id: userId, code_hash: codeHash, expires_at: expiresAtIso }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ⚠️ UNCONSUMED ONLY, AND THAT IS THE INDEX RATHER THAN A PREFERENCE.
+//
+// wa_links_hash_idx is a PARTIAL index, `where consumed_at is null`. A lookup by hash alone cannot
+// use it and would sequentially scan the table on every inbound WhatsApp message carrying anything
+// code shaped, which is a hot path an attacker chooses the volume of.
+//
+// So a spent code simply does not match, and the webhook reports it the same way it reports a code
+// that never existed. That costs one shade of accuracy in a sentence and buys an indexed read on
+// the one query a stranger can make us run at will. The genuinely useful case, a man who sends his
+// code twice, is answered properly anyway: the second message comes from a number we have by then
+// bound, so he is told he is already connected rather than told nothing was found.
+export async function readLiveWaLink(codeHash: string): Promise<WaLinkRow | null> {
+  if (!codeHash) return null;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/wa_links?code_hash=eq.${encodeURIComponent(codeHash)}&consumed_at=is.null` +
+        `&select=id,user_id,expires_at,consumed_at&order=created_at.desc&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as WaLinkRow[] | null;
+    return Array.isArray(rows) ? rows[0] ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
+// 🔴 SPENDING A CODE IS CONDITIONAL ON IT BEING UNSPENT, AND THE DATABASE DECIDES. Same shape as
+// consumeSignupCode, and here it is doing more work than it is there.
+//
+// Two messages carrying one code can arrive together, from two different phones. Both reads see an
+// unconsumed row, both pass verifyStoredLink, and if the check were made in TypeScript both would
+// bind: the second write would silently move the account to the second number. The PATCH filters on
+// consumed_at being null and asks for the row back, so exactly one of them gets it.
+//
+// The number that won is written here too, because a support question about which phone got bound
+// deserves an answer that is not an inference.
+export async function consumeWaLink(id: string, boundPhone: string): Promise<boolean> {
+  if (!id) return false;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/wa_links?id=eq.${encodeURIComponent(id)}&consumed_at=is.null`,
+      {
+        method: 'PATCH',
+        headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ consumed_at: new Date().toISOString(), bound_phone: boundPhone }),
+      },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json().catch(() => null)) as unknown[] | null;
+    return Array.isArray(rows) && rows.length === 1;
+  } catch {
+    return false;
+  }
+}
+
+// 🔴 THE NUMBER AND THE PROOF ARE WRITTEN IN ONE STATEMENT, AND THE MIGRATION SAYS WHY.
+//
+// "users.phone_number MAY ONLY EVER BE WRITTEN BY A PATH THAT HAS JUST PROVED THAT NUMBER, and that
+// path sets phone_verified_at in the same write. Anything that finds a phone_number with no
+// phone_verified_at beside it is looking at a bug."
+//
+// Two writes would leave a window where the column that three crons SEND to is populated and the
+// fact that anybody proved it is not yet recorded. One statement, or neither.
+//
+// A refusal here is usually the unique index doing its job: the number belongs to another account.
+// The caller treats that as a refusal to bind, never as something to retry.
+export async function bindProvedPhone(userId: string, e164: string): Promise<boolean> {
+  if (!userId) return false;
+  const phone = normalizeUkPhone(e164);
+  if (!phone) return false;
+  const { url } = config();
+  try {
+    const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ phone_number: phone, phone_verified_at: new Date().toISOString() }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// What the connect page needs to know about him, in one round trip: whether a number is bound, and
+// what to call him in the WhatsApp welcome.
+//
+// ⚠️ THE WHOLE NUMBER COMES BACK AND THE PAGE PRINTS ONLY THE LAST FOUR. Trimming it here would put
+// the formatting rule in the data layer, where the next caller would have to invent its own.
+export interface ProvedPhone {
+  phone: string | null;
+  verifiedAt: string | null;
+  name: string | null;
+}
+
+export async function readProvedPhone(userId: string): Promise<ProvedPhone | null> {
+  if (!userId) return null;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=phone_number,phone_verified_at,name&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{
+      phone_number: string | null; phone_verified_at: string | null; name: string | null;
+    }> | null;
+    if (!Array.isArray(rows) || !rows[0]) return { phone: null, verifiedAt: null, name: null };
+    return {
+      phone: rows[0].phone_number ?? null,
+      verifiedAt: rows[0].phone_verified_at ?? null,
+      name: rows[0].name ?? null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // 🔴 THE LAW FRESHNESS FOR THE CONSTELLATION. Reads khoji_law (written nightly by khoji/lawwatch.mjs)

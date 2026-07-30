@@ -112,6 +112,7 @@ WHATSAPP_TOKEN=              # Meta Cloud API access token
 WHATSAPP_PHONE_NUMBER_ID=    # From Meta developer console
 WHATSAPP_VERIFY_TOKEN=       # Self-defined, for webhook verification
 WHATSAPP_APP_SECRET=         # Meta app secret, used to verify the x-hub-signature-256 header
+WHATSAPP_NUMBER=             # The number a customer messages to connect his phone. DIGITS ONLY, international, no plus, e.g. 447700900123. NOT the phone number id above, which is not messageable. Unset means /app/connect draws nothing.
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=

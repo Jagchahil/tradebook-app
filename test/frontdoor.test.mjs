@@ -47,6 +47,11 @@ function walk(dir) {
   return out;
 }
 const rel = (f) => path.relative(root, f);
+// The same walk, named for the second sweep below so the intent of each call site reads clearly.
+const walkAll = walk;
+// ⚠️ DEFINED HERE RATHER THAN BESIDE ITS FIRST USE, because three separate sweeps now need it and
+// the two added on 30 July run before the one it was originally written for.
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 
 let pass = 0;
 let fail = 0;
@@ -62,17 +67,47 @@ const pages = walk(path.join(root, 'app'))
 ok('the app tree was actually walked (not vacuous)', pages.length > 30);
 
 // ---------------------------------------------------------------------------------------------
-// 🔴 NOTHING CUSTOMER FACING LINKS OUT TO WHATSAPP.
+// 🔴 EXACTLY ONE CUSTOMER PAGE LINKS OUT TO WHATSAPP, AND IT IS THE ONE THAT BINDS HIS NUMBER.
 //
-// A wa.me link is the strongest possible statement that WhatsApp is the next step, and it is the
-// exact thing the 28 July walk ended on. Until binding exists and he has done it, a link there is
-// a door to a room he cannot enter.
+// ⚠️ THIS ASSERTION USED TO READ "no customer page links out to WhatsApp", AND IT WAS RIGHT WHEN IT
+// WAS WRITTEN. Its reasoning, kept because it is still the reasoning:
+//
+//   A wa.me link is the strongest possible statement that WhatsApp is the next step, and it is the
+//   exact thing the 28 July walk ended on. Inbound WhatsApp resolves a message to an account BY
+//   PHONE NUMBER, and a web signup's number is deliberately unproved, so until he binds it every
+//   such link is a door to a room he cannot enter.
+//
+// Binding is what changed on 30 July, and it changed by the only route that makes the link honest:
+// he proves the number by sending us a code from it. So the rule narrows rather than lifting. The
+// link may exist in exactly one file, /app/connect, which is the page whose entire job is that
+// binding, and which draws nothing at all when the feature is not configured.
+//
+// 🔴 IF THIS LIST EVER GROWS, THE OLD BUG IS BACK. A wa.me link on the homepage, in the signup, or
+// on a Stripe return screen is once again an instruction a man cannot follow.
 // ---------------------------------------------------------------------------------------------
-const waLinks = pages.filter((f) => /wa\.me/.test(read(rel(f)))).map(rel);
+//
+// ⚠️ COMMENTS ARE STRIPPED FIRST. The connect page's own header explains at length why the link
+// travels the direction it does, and it has to say wa.me to make sense. What matters is the link a
+// customer can press, not the reasoning above it.
+const waLinks = pages.filter((f) => /wa\.me/.test(codeOnly(read(rel(f))))).map(rel);
 ok(
-  `🔴 no customer page links out to WhatsApp${waLinks.length ? `\n     ${waLinks.join('\n     ')}` : ''}`,
+  `🔴 no page writes a wa.me link itself${waLinks.length ? `\n     ${waLinks.join('\n     ')}` : ''}`,
   waLinks.length === 0,
 );
+// The link is BUILT by lib/walink.ts and the page never writes the host itself, so the sweep above
+// finds nothing even on the page that legitimately links out. That is the right answer and it is
+// also a trap: a future page could link out by calling waMeLink too and this would stay green.
+// So the builder is pinned to the one file allowed to call it.
+const waMeCallers = walkAll(path.join(root, 'app'))
+  .filter((f) => !rel(f).startsWith('app/team/'))
+  .filter((f) => /waMeLink/.test(read(rel(f))))
+  .map(rel);
+ok(
+  `🔴 only the connect page builds a WhatsApp link${waMeCallers.length ? `\n     ${waMeCallers.join('\n     ')}` : ''}`,
+  waMeCallers.length === 1 && waMeCallers[0] === 'app/app/connect/page.tsx',
+);
+ok('the wa.me host is written in exactly one place, and it is not a page',
+  /wa\.me/.test(read('lib/walink.ts')));
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 THE LOGGED IN APP NEVER TELLS HIM TO DO SOMETHING HE CANNOT DO.
@@ -82,15 +117,78 @@ ok(
 // actually opens, so they are held to the strictest version of the rule: no mention at all until
 // the capability is real for him.
 // ---------------------------------------------------------------------------------------------
+//
+// ⚠️ NARROWED ON 30 JULY, FOR THE SAME REASON AS THE RULE ABOVE, AND NO FURTHER.
+//
+// /app and /app/pile both used to end with "Send a receipt on WhatsApp any time and it lands here."
+// He had no bound number, so it did not land anywhere. Those two screens are still held to the
+// strictest version of the rule, because they are the two a paying customer actually opens and
+// neither of them is where connecting happens.
+//
+// The exceptions are the connect page, whose whole subject is WhatsApp, and ONE row on the money
+// screen that offers it. That row is gated on `offerWhatsApp`, which is false unless the feature is
+// configured AND he has no number bound yet, so it is never on screen for a man who cannot act on
+// it and never on screen for a man who already has.
+const CONNECT_PAGE = 'app/app/connect/page.tsx';
 const inApp = pages.filter((f) => rel(f).startsWith('app/app/'));
-ok('the logged in app has screens to check', inApp.length >= 2);
+ok('the logged in app has screens to check', inApp.length >= 3);
+ok('the connect page is one of them', inApp.map(rel).includes(CONNECT_PAGE));
 const appInstructs = inApp
+  .filter((f) => rel(f) !== CONNECT_PAGE && rel(f) !== 'app/app/page.tsx')
   .filter((f) => /WhatsApp/.test(read(rel(f)).replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')))
   .map(rel);
 ok(
   `🔴 no screen inside /app instructs a WhatsApp action${appInstructs.length ? `\n     ${appInstructs.join('\n     ')}` : ''}`,
   appInstructs.length === 0,
 );
+// 🔴 AND THE MONEY SCREEN'S ONE MENTION IS GATED. Without this the exemption above would let any
+// amount of ungated WhatsApp copy back onto the first screen a new customer sees.
+const money = read('app/app/page.tsx');
+ok('🔴 the money screen offers WhatsApp only behind the gate',
+  /const offerWhatsApp = proved !== null && !proved\.phone/.test(money)
+  && /waLinksConfigured\(\) && WHATSAPP_NUMBER\.length >= 8/.test(money)
+  && /\{offerWhatsApp \? \(/.test(money));
+//
+// 🔴 AND EVERY WORD OF IT IS INSIDE THAT GATE. Cutting the gated block out of the file must leave
+// no customer facing mention behind anywhere else on the money screen, which is the assertion that
+// stops the exemption above turning into a licence.
+//
+// ⚠️ THE IDENTIFIER IS NOT A MENTION. `offerWhatsApp` contains the word and appears twice, in the
+// decision and in the gate. The first draft of this counted raw occurrences, expected one, and
+// found three, which is a test failing for the wrong reason and is how a real assertion gets
+// weakened into uselessness by whoever fixes it in a hurry.
+const gateStart = money.indexOf('{offerWhatsApp ? (');
+const gateEnd = money.indexOf(') : null}', gateStart);
+ok('the gated block was actually found, so the check below is not vacuous',
+  gateStart > 0 && gateEnd > gateStart);
+const outsideGate = codeOnly(money.slice(0, gateStart) + money.slice(gateEnd))
+  .replace(/offerWhatsApp/g, '');
+ok('🔴 the money screen says WhatsApp inside that gate and nowhere else',
+  !/WhatsApp/.test(outsideGate));
+
+// 🔴 AND THE CONNECT PAGE ITSELF DRAWS NOTHING WHEN THE FEATURE IS NOT CONFIGURED. Doc 103's third
+// test: a button whose only function is to say the feature does not exist yet is an advert for our
+// roadmap. Reaching this page on a build with no number set must explain, not offer.
+const connect = read(CONNECT_PAGE);
+ok('the connect page is gated on both the secret and a real number',
+  /waLinksConfigured\(\) && WHATSAPP_NUMBER\.length >= 8/.test(connect));
+ok('🔴 the connect page never claims a proactive template sends the welcome',
+  !/sendTemplate|TEMPLATES_APPROVED/.test(connect));
+// AND IT SHIPS NO CLIENT SCRIPT, like every other screen in the web app. He is on a cheap Android
+// on a bad signal and the square is the whole reason he is here, so it has to be in the HTML that
+// arrives rather than something a bundle draws once it turns up.
+//
+// 🔴 dangerouslySetInnerHTML IS IN THIS LIST DELIBERATELY. The first version of this page injected
+// the SVG as a string. It was safe, because nothing a customer types reaches the encoder, but "safe
+// because of what today's only caller happens to pass" expires the moment somebody adds a second
+// caller. lib/qr.ts now hands back a viewBox and a path and the page renders real JSX, so this is
+// provable by grep rather than by argument.
+ok('🔴 the connect page is server rendered and carries no script of any kind',
+  !/'use client'/.test(connect)
+  && /export const runtime = 'nodejs'/.test(connect)
+  && !/onClick|onChange|onSubmit|<script|useState|dangerouslySetInnerHTML/.test(connect));
+ok('every action on it is a form post or a plain link',
+  (connect.match(/method="post"/g) ?? []).length >= 2);
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 STEP ONE IS CONNECTING THE BANK.
@@ -121,7 +219,6 @@ ok('step one is connecting the bank', /title: 'Connect your bank'/.test(site));
 // became a pull rather than a push, and it must keep saying WhatsApp to make sense. What matters is
 // the STRINGS a customer is shown, not the reasoning above them.
 const CUSTOMER_LIBS = ['lib/ledger.ts', 'lib/weeklyupdate.ts'];
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 const libSays = CUSTOMER_LIBS.filter((f) => /send a receipt|Send a receipt/i.test(codeOnly(read(f))));
 ok(
   `🔴 no sentence printed from lib names an action a web customer cannot take${libSays.length ? `\n     ${libSays.join('\n     ')}` : ''}`,

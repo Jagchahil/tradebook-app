@@ -63,7 +63,8 @@ export type MessageType =
   // deletes. It reads better too: these are the alerts, and alerts are what WhatsApp is still for.
   | 'alert_threshold'
   | 'alert_deadline'
-  | 'alert_opportunity';
+  | 'alert_opportunity'
+  | 'connect_result';
 
 export interface Route {
   type: MessageType;
@@ -115,6 +116,24 @@ export const ROUTES: Route[] = [
     channels: ['whatsapp_reply', 'push', 'email'],
     template: null,
     why: 'We could not read the photo, so nothing was saved and he must send it again. Silence here loses him money rather than merely worrying him, so it answers in the channel he used. Rare by nature.',
+  },
+  {
+    // ⚠️ THE ONE ROW IN THIS TABLE WITH NOWHERE ELSE TO GO, AND IT IS WORTH SAYING WHY, BECAUSE
+    // EVERY OTHER ROW HERE EXISTS TO MOVE A MESSAGE OFF THE METERED CHANNEL.
+    //
+    // This is the answer to a code he sent us from his own WhatsApp to prove the phone is his. It
+    // happens BEFORE anything is bound, which is the whole point of it, so at the moment it sends:
+    // there is no bound number to push to, there is no thread because the thread belongs to an
+    // account this message is what attaches him to, and an email would answer a man on the wrong
+    // device entirely. He is standing there holding the phone, watching the chat he just sent from.
+    //
+    // The cost is real and it is small. Once per customer for ever, not once per receipt, which is
+    // the opposite end of the scale from capture_ack. If it ever starts firing more than about once
+    // per customer, something is wrong with binding rather than with this row.
+    type: 'connect_result',
+    channels: ['whatsapp_reply'],
+    template: null,
+    why: 'The reply to a WhatsApp binding code. It is sent before he has a bound number, a thread or an app, so WhatsApp is not the cheapest channel here, it is the only one that exists yet. Once per customer, and it is a reply inside his own window so it needs no template.',
   },
   {
     type: 'conversation_answer',

@@ -35,9 +35,21 @@ import {
 } from '../../../lib/banknudge';
 import { CIRCUMSTANCES, unanswered, buttonId, parseButtonId } from '../../../lib/circumstances';
 import {
+  findLinkCodeIn, hashLinkCode, verifyStoredLink, bindingVerdict, linkMessage, welcomeAfterBinding,
+  waLinksConfigured, isUkMobile, type LinkVerdict,
+} from '../../../lib/walink';
+// 🔴 THE TABLE'S FIRST REAL CALLER. Until item 4 it described where every message should go and
+// governed nothing, which is a document with a type annotation on it. handleConnectCode asks it.
+import { channelsFor } from '../../../lib/routing';
+import {
   readCircumstances,
   saveCircumstance,
   findUserIdByPhone,
+  normalizeUkPhone,
+  readLiveWaLink,
+  consumeWaLink,
+  bindProvedPhone,
+  readProvedPhone,
   writeAllowanceElection,
   weeklyTotals,
   weeklyUpdateFactsFor,
@@ -364,9 +376,18 @@ async function processMessage(message: IncomingMessage): Promise<void> {
       await handleButtonReply(from, message.interactive.button_reply.id);
     } else if (message.type === 'text' && message.text?.body) {
       const text = message.text.body;
-      // "invoice this" turns the last logged sale into a draft invoice. Checked
-      // before the multi step invoice flow, which also begins with the word invoice.
-      if (isInvoiceThis(text)) {
+      // 🔴 CONNECTING A PHONE IS CHECKED BEFORE EVERY OTHER READING OF THE TEXT, AND IT HAS TO BE.
+      //
+      // Everything below this line assumes we already know whose message this is, because it
+      // resolves the sender by number. A man connecting for the first time is by definition a
+      // number we do not know, so his message would fall all the way through to replyNotLinked and
+      // be told to go and sign up, which he has already done. Worse, a bound customer reconnecting
+      // a new handset would have his code read by the transaction parser.
+      //
+      // It consumes the message when it finds a code, so nothing after it ever sees one.
+      if (await handleConnectCode(from, text)) {
+        // handled
+      } else if (isInvoiceThis(text)) {
         await handleInvoiceThis(from, text);
       } else {
       // Invoice flow takes priority. If it consumes the message, do not also log it.
@@ -704,6 +725,114 @@ async function handleButtonReply(from: string, buttonId: string): Promise<void> 
   if (await handleCircumstanceButton(from, buttonId)) return;
   // An unknown button id (future flows): fall back to the help list.
   await handleHelp(from);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 CONNECTING A PHONE. THE ONE HANDLER IN THIS FILE THAT RUNS FOR A NUMBER WE DO NOT KNOW.
+//
+// Everything else here resolves the sender to an account by number first. This is the handler that
+// creates that relationship, so it is the only one that starts from nothing, and it is checked
+// before every other reading of the message text for that reason. A first time connector would
+// otherwise fall all the way through to replyNotLinked and be told to go and sign up, which he has
+// already done, and a customer reconnecting a new handset would have his code read by the
+// transaction parser.
+//
+// The proof travels HIS way. Meta has already authenticated the account this message came from, so
+// receiving the code and the number in one payload proves he controls the WhatsApp account the
+// receipts will arrive from. That is a better fact than an SMS gives us, and it needs no Twilio.
+// lib/walink.ts holds the rules and the full argument.
+//
+// ⚠️ ONE SEND, AT THE BOTTOM, AND IT ASKS lib/routing.ts WHETHER TO SEND AT ALL.
+//
+// The first draft answered from six places. That is six inline sendText call sites, which is the
+// thing test/routing.test.mjs ratchets DOWN, and it is also six places that would each have to be
+// found on the day this message moves channel. From 1 October every outbound WhatsApp message is
+// billed individually, so where this goes is a cost decision, and a cost decision belongs in the
+// table with its reasoning beside it rather than scattered through a handler.
+//
+// This is the table's FIRST real caller. Until now it described the product without governing it.
+//
+// Returns true when it has answered the message, so the dispatcher stops. A message with no code in
+// it is not ours and returns false untouched.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+async function handleConnectCode(from: string, body: string): Promise<boolean> {
+  // No secret, no binding, and no reply either: without WEB_SESSION_SECRET no code was ever issued,
+  // so anything code shaped arriving here is not one of ours and the ordinary handlers should have
+  // it. Fail closed and silent.
+  if (!waLinksConfigured()) return false;
+
+  const code = findLinkCodeIn(body);
+  if (!code) return false;
+  const hash = hashLinkCode(code);
+  if (!hash) return false;
+
+  const { verdict, name } = await connectOutcome(from, hash);
+
+  // 🔴 THE CHANNEL IS THE TABLE'S DECISION, NOT THIS HANDLER'S. connect_result routes to
+  // whatsapp_reply and nothing else, because at this instant nothing else can reach him: there is
+  // no bound number to push to and no thread until this message succeeds. hasWhatsApp is true by
+  // construction here, since he is the one who messaged us.
+  //
+  // An empty list is SAID rather than assumed. A message nobody received that looks like a message
+  // that was sent is the house disease, and this is a handler whose whole job is a handshake.
+  const channels = channelsFor('connect_result', { hasPush: false, hasEmail: false, hasWhatsApp: true });
+  if (!channels.includes('whatsapp_reply')) {
+    console.warn('[whatsapp] connect_result has no channel, so nothing was answered');
+    return true;
+  }
+
+  await sendText(from, verdict === 'ok' ? welcomeAfterBinding(name) : linkMessage(verdict));
+  return true;
+}
+
+// Everything that has to touch the database to decide what happened. Split out so the handler above
+// is a decision and a single send, and so this can be read on its own: every branch of it is a
+// refusal except the last one.
+async function connectOutcome(
+  from: string, hash: string,
+): Promise<{ verdict: LinkVerdict; name: string | null }> {
+  const no = (verdict: LinkVerdict) => ({ verdict, name: null });
+
+  const phone = normalizeUkPhone(from);
+  if (!isUkMobile(phone)) return no('notuk');
+
+  // Who this number belongs to TODAY, read before anything is written. This is what turns a second
+  // scan of the same square into "you are already connected" rather than "we cannot find that
+  // code", and it is what refuses a number that belongs to somebody else.
+  const [owner, row] = await Promise.all([findUserIdByPhone(from), readLiveWaLink(hash)]);
+
+  const codeVerdict = verifyStoredLink(row);
+  if (codeVerdict !== 'ok' || !row) {
+    // ⚠️ A MAN WHO IS ALREADY CONNECTED IS TOLD SO, whatever was wrong with the code he sent. He
+    // scanned twice, or the reply did not arrive, and telling him we cannot find his code would
+    // send him back to the website to fix something that is not broken.
+    return no(owner ? 'already' : codeVerdict);
+  }
+
+  const verdict = bindingVerdict('ok', owner, row.user_id);
+  if (verdict !== 'ok') return no(verdict);
+
+  // 🔴 SPEND THE CODE FIRST, THEN BIND. The database decides the winner.
+  //
+  // Two messages carrying one code can arrive together from two different phones. Both reads saw an
+  // unconsumed row and both got this far. consumeWaLink filters on consumed_at being null and asks
+  // for the row back, so exactly one of them proceeds and the other is told the code is spent.
+  //
+  // Binding first and consuming second would let the second write move the account onto the second
+  // number, silently, while the man who actually scanned was looking at a screen that said it had
+  // worked.
+  if (!(await consumeWaLink(row.id, phone))) return no('spent');
+
+  if (!(await bindProvedPhone(row.user_id, phone))) {
+    // The code is gone and he is not connected, which is the one outcome here that is entirely our
+    // fault. Say so plainly and send him for a fresh one rather than leaving him waiting.
+    return no('failed');
+  }
+
+  // His name for the greeting, read AFTER the bind rather than before, so a slow or failed read
+  // costs him a first name and never the connection itself.
+  const proved = await readProvedPhone(row.user_id).catch(() => null);
+  return { verdict: 'ok', name: proved?.name ?? null };
 }
 
 async function replyNotLinked(from: string): Promise<void> {

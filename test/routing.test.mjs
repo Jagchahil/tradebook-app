@@ -180,6 +180,13 @@ console.log('\n6. THE BILLABLE LIST IS PINNED');
 
 const EXPECTED_BILLABLE = [
   'capture_unreadable',
+  // 🔴 ADDED 30 JULY WITH ITEM 4, AND IT IS THE ONE PAID ROUTE THAT WAS NOT A CHOICE.
+  //
+  // Every other line here is a message we decided was worth paying for. This one is the reply to a
+  // WhatsApp binding code, sent at the single moment in a customer's life when WhatsApp is the only
+  // channel that exists for him: nothing is bound yet, so there is no push target and no thread.
+  // Once per customer for ever, which is the opposite end of the volume scale from capture_ack.
+  'connect_result',
   'nudge',
   'reminder_due',
   'trial_ending',
@@ -203,13 +210,36 @@ ok('push is never priced', R.costKind('push') === null);
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n7. THE INLINE sendText COUNT MAY FALL BUT NEVER RISE');
 //
-// A ratchet, and deliberately not a ban. There are 152 inline sendText call sites today across
-// app/ and lib/, most of them in the WhatsApp webhook, and moving all of them at once would be a
-// change too large to verify honestly in one go. So the count is recorded here: it may go down
-// as call sites move onto the table, and a new one fails the build.
+// A ratchet, and deliberately not a ban. There were 152 inline sendText call sites when this was
+// written, across app/ and lib/, most of them in the WhatsApp webhook, and moving all of them at
+// once would be a change too large to verify honestly in one go. So the count is recorded here: it
+// may go down as call sites move onto the table, and a new one fails the build.
 //
 // When you move a batch, lower this number in the same commit. That edit is the point: it makes
 // the direction of travel a thing somebody has to type.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ 152 BECAME 153 ON 30 JULY, WHICH IS THE DIRECTION THIS TEST EXISTS TO REFUSE, SO HERE IS THE
+// WHOLE ARGUMENT RATHER THAN A SHRUG.
+//
+// Item 4 added handleConnectCode, the reply to a WhatsApp binding code. It caught the ratchet
+// immediately, at 158, because the first draft answered from six places.
+//
+// Five of those six were removed by making the handler decide a verdict and send once. The sixth
+// cannot be removed by any amount of tidying: it is a genuinely new outbound message, and there is
+// no send in this codebase that does not eventually call sendText.
+//
+// What makes raising it the right answer rather than the easy one is what came with it. This send
+// is the FIRST caller channelsFor has ever had. Before item 4 the table described where every
+// message in the product should go and governed nothing at all, which is a document with a type
+// annotation on it. handleConnectCode asks the table and refuses to send when the answer is empty.
+//
+// So the rule this number now encodes, and the bar for touching it again:
+//
+//   IT MAY FALL FREELY. It may rise ONLY for a new message type that has a row in ROUTES, whose
+//   send ASKS channelsFor rather than deciding for itself, and by no more than one call site per
+//   message type. Anything else is the old habit wearing a justification.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', '_to_delete']);
 function walk(dir, out = []) {
@@ -232,7 +262,7 @@ function stripComments(s) {
   return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
-const CALL_SITE_CEILING = 152;
+const CALL_SITE_CEILING = 153;
 let callSites = 0;
 for (const f of [...walk(path.join(repo, 'app')), ...walk(lib)]) {
   if (f === path.join(lib, 'whatsapp.ts')) continue; // where sendText is defined, not called

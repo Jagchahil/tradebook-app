@@ -7,6 +7,7 @@ import {
   readOnboardingProgress,
 } from '../../lib/supabase';
 import { toStep, isDone, stepTitle, stepNumber, stepCount } from '../../lib/onboarding';
+import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL } from '../../lib/features';
 import { ledgerFor, headline } from '../../lib/ledger';
 import { weeklyInput, weeklyFigures, weeklyLine } from '../../lib/weeklyupdate';
 import { selectAnnouncements, appliedLineFor, tagFor } from '../../lib/announcements';
@@ -195,6 +196,31 @@ export default async function MoneyPage() {
         <p style={S.line2}>{weeklyLine(week)}</p>
       </section>
 
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          🔴 THE ONLY PLACE IN THE PRODUCT THAT OFFERS THE APP, AND IT IS BEHIND THE FRONT DOOR.
+          Jag's call, 30 July: nobody downloads the app before he is in the web app. Everyone goes
+          through the same door, in the same order, and the phone is something he adds afterwards
+          rather than a second way in that skips setting up.
+          They were on /start, on the code screen and on both Stripe return screens, which is the
+          worst possible placement under that rule: offered to a man in the middle of signing up, as
+          an alternative to finishing.
+          ⚠️ AND ONLY WHEN THE STORES REALLY HAVE IT. A dimmed "soon" chip is doc 103's third test
+          exactly: a button whose only function is to say the feature does not exist yet is an advert
+          for our roadmap. So until NEXT_PUBLIC_APP_STORE_LIVE is true this renders nothing at all,
+          anywhere, and nobody is told to wait for something.
+          ═══════════════════════════════════════════════════════════════════════════════════════ */}
+      {appStoreLive() && APP_STORE_URL && PLAY_STORE_URL ? (
+        <section style={S.stores}>
+          <p style={S.storeNote}>
+            Lekhio is on your phone too. Same books, same figures, and the two stay in step.
+          </p>
+          <div style={S.storeRow}>
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" style={S.badge}>App Store</a>
+            <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" style={S.badge}>Google Play</a>
+          </div>
+        </section>
+      ) : null}
+
       {/* THE WAY THROUGH TO THE PILE. Everything on the screen above is money he has CONFIRMED, so
           if anything is waiting on him this line is the only reason the figures are not the whole
           truth. It is a plain link because looking at a list changes nothing. */}
@@ -233,6 +259,10 @@ const S: Record<string, React.CSSProperties> = {
   week: { fontSize: 17, fontWeight: 700, margin: '0 0 8px' },
   line2: { fontSize: 14.5, lineHeight: 1.55, color: MUTED, margin: 0 },
   foot: { fontSize: 13, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
+  stores: { textAlign: 'center', marginTop: 18 },
+  storeNote: { fontSize: 13, color: MUTED, margin: '0 0 10px' },
+  storeRow: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' },
+  badge: { display: 'inline-block', background: INK, color: '#fff', fontSize: 13.5, fontWeight: 600, padding: '10px 16px', borderRadius: RADIUS.md, textDecoration: 'none' },
   resume: { display: 'block', textDecoration: 'none', background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
   resumeTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
   resumeBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },

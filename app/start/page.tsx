@@ -3,44 +3,8 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
-import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL } from '../../lib/features';
 import { findSic } from '../../lib/siccodes';
 import { HOW_LONG } from '../../lib/onboarding';
-
-// The app store buttons. Until the app is ACTUALLY in both stores these are dead,
-// dimmed "soon" chips, never links to nowhere. The day it lands, flip
-// NEXT_PUBLIC_APP_STORE_LIVE=true (and set the two URLs) and they become real
-// download buttons. One env var, no copy rewrite.
-// The line under the store buttons. Flips with the same flag, so we never tell
-// someone to "download the app" while pointing at a store that has not got it.
-//
-// 🔴 IT ALSO NO LONGER SENDS HIM TO WHATSAPP. It used to read "everything works on WhatsApp right
-// now", which was true when WhatsApp was the product and is a dead end now that the web app is.
-// Whichever way the flag falls, the answer to "what do I do next" is the thing he is already
-// looking at.
-function storeNote(): string {
-  return appStoreLive() && APP_STORE_URL && PLAY_STORE_URL
-    ? 'Grab the app if you want it. Everything is on the web too, and the two stay in sync.'
-    : 'The app lands in the stores soon. You do not need it: everything works right here in your browser.';
-}
-
-function StoreButtons() {
-  const live = appStoreLive() && APP_STORE_URL && PLAY_STORE_URL;
-  if (!live) {
-    return (
-      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', opacity: 0.5 }}>
-        <span style={badgeStore}>  App Store · soon</span>
-        <span style={badgeStore}>▶  Google Play · soon</span>
-      </div>
-    );
-  }
-  return (
-    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-      <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" style={badgeStore}>  Download on the App Store</a>
-      <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" style={badgeStore}>▶  Get it on Google Play</a>
-    </div>
-  );
-}
 
 const INK = '#111111';
 const RIVER = '#1B59A6';
@@ -385,10 +349,6 @@ export default function StartPage() {
               {/* The way in, not a way to a store queue. Both Stripe return screens land a man
                   who already has an account, so the only sensible button is his own books. */}
               <a href="/app" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12, marginBottom: 22 }}>Open my Lekhio →</a>
-              <div style={{ marginBottom: 24 }}>
-                <StoreButtons />
-                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>{storeNote()}</p>
-              </div>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
           ) : billingResult === 'cancelled' ? (
@@ -396,15 +356,11 @@ export default function StartPage() {
               <div style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: RIVER_TINT, color: RIVER, fontSize: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', animation: 'pop .5s ease' }}>✓</div>
               <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>Your trial is still running.</h1>
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 28px' }}>
-                No card added, and that is fine. Your 7 day free trial is active. You can add a card to keep Lekhio any time, from the app or the website.
+                No card added, and that is fine. Your 7 day free trial is active. You can add a card to keep Lekhio any time, from your account.
               </p>
               {/* The way in, not a way to a store queue. Both Stripe return screens land a man
                   who already has an account, so the only sensible button is his own books. */}
               <a href="/app" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12, marginBottom: 22 }}>Open my Lekhio →</a>
-              <div style={{ marginBottom: 24 }}>
-                <StoreButtons />
-                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>{storeNote()}</p>
-              </div>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
           ) : done ? (
@@ -462,12 +418,6 @@ export default function StartPage() {
                 </button>
               </div>
 
-              {/* The stores stay honest. They are not a call to action and they are not a way in:
-                  everything is on the web from today, and the app is launch two. */}
-              <div style={{ marginTop: 28 }}>
-                <StoreButtons />
-                <p style={{ fontSize: 12.5, color: MUTED, marginTop: 10, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>{storeNote()}</p>
-              </div>
             </div>
           ) : (
             <div key={step} className="step-anim">
@@ -666,7 +616,4 @@ const fieldStyle: React.CSSProperties = {
 };
 const fieldLabel: React.CSSProperties = {
   display: 'block', fontSize: 12.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8,
-};
-const badgeStore: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, backgroundColor: INK, color: '#fff', fontSize: 14, fontWeight: 600, padding: '12px 18px', borderRadius: 12,
 };

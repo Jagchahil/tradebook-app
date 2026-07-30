@@ -136,6 +136,38 @@ ok('the money screen does not print the headline and the note when they are the 
   read('app/app/page.tsx').includes("l.note !== headline(l)"));
 
 // ---------------------------------------------------------------------------------------------
+// 🔴 NOBODY IS OFFERED THE APP UNTIL HE IS INSIDE THE WEB APP.
+//
+// Jag's call, 30 July: everyone goes through the same door in the same order, and the phone is
+// something a customer adds AFTER he is in, never a second way in that skips setting up.
+//
+// The store buttons were on /start's code screen and on both Stripe return screens, which under that
+// rule is the worst placement there is: offered to a man in the middle of signing up, as an
+// alternative to finishing the thing we just told him takes ten to fifteen minutes. Two of those
+// three screens belong to a man who has not proved his email yet.
+//
+// So exactly one file may name a store, and it is the money screen behind the session.
+// ---------------------------------------------------------------------------------------------
+const STORE = /APP_STORE_URL|PLAY_STORE_URL|appStoreLive|App Store|Google Play/;
+const storePages = pages
+  .filter((f) => STORE.test(codeOnly(read(rel(f)))))
+  .map(rel);
+ok(
+  `🔴 only the web app's own screen offers the app${storePages.length ? `\n     ${storePages.join('\n     ')}` : ''}`,
+  storePages.length === 1 && storePages[0] === 'app/app/page.tsx',
+);
+ok('🔴 and /start offers it nowhere at all, on any of its three end screens',
+  !STORE.test(codeOnly(read('app/start/page.tsx'))));
+
+// ⚠️ AND IT RENDERS NOTHING UNTIL THE STORES REALLY HAVE IT. A dimmed "soon" chip is doc 103's third
+// test exactly: a button whose only function is to say the feature does not exist yet is an advert
+// for our roadmap. The old markup had one on every screen it appeared on.
+ok('🔴 nothing anywhere advertises a store that has not got the app yet',
+  !pages.some((f) => /App Store · soon|Google Play · soon/.test(read(rel(f)))));
+ok('the app offer is gated on the flag AND on both links really existing',
+  /appStoreLive\(\) && APP_STORE_URL && PLAY_STORE_URL/.test(read('app/app/page.tsx')));
+
+// ---------------------------------------------------------------------------------------------
 // WHAT STAYS, AND WHY REMOVING IT WOULD MAKE THINGS WORSE.
 //
 // The privacy policy, the terms and the security page describe a capability that genuinely exists

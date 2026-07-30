@@ -182,7 +182,13 @@ export async function POST(req: NextRequest) {
   const cookie = sessionCookieValue(sessionId);
   if (!cookie) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
 
-  const res = NextResponse.json({ ok: true, redirect: '/app', trialNote });
+  // 🔴 STRAIGHT INTO SETUP, NOT ONTO AN EMPTY DASHBOARD.
+  //
+  // This used to send him to /app, which on his first day is a screen with nothing on it: no
+  // confirmed money, no bank, no figures. He proved his email and was shown a blank. Setting up is
+  // the thing that puts numbers on that screen, so it is what happens next, and /app carries a line
+  // back to it until it is finished so he is never trapped in a wizard.
+  const res = NextResponse.json({ ok: true, redirect: '/app/setup', trialNote });
   res.cookies.set(SESSION_COOKIE, cookie, sessionCookieAttributes());
   return res;
 }

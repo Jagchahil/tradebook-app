@@ -84,9 +84,26 @@ ok('the `asked` column holds the SENTENCE, and the schema says so in terms',
 ok('WhatsApp logs c.ask, taken from the SERVER, never a string off the button',
   /saveCircumstance\(userId, key, answer, c\.ask, 'whatsapp'\)/.test(waSrc));
 
+// ⚠️ THIS ASSERTION USED TO PIN THE CHANNEL LITERAL TO 'app', AND THAT WAS NOT WHAT IT MEASURES.
+//
+// On 29 July the web onboarding started posting to this same route, and a web answer logged as 'app'
+// is a record claiming a man answered in an app he has never installed. So the route now decides the
+// channel from the encoding it was called with, and this guard went red on a change that made the log
+// MORE true. Do not weaken a guard to fit new code; fix what it measures. What it measures is that
+// the SENTENCE comes from the server, so that is what is pinned, and the channel is pinned separately
+// to the honest set.
 ok('the app API logs c.ask too, never the body the client posted',
-  /saveCircumstance\(user\.id, key, answer, c\.ask, 'app'\)/.test(apiSrc)
+  /saveCircumstance\(user\.id, key, answer, c\.ask,/.test(apiSrc)
   && !/body\.asked|body\.ask\b/.test(apiSrc));
+
+// 🔴 AND THE CHANNEL IS NEVER TAKEN FROM THE REQUEST. It is where he really answered, decided here
+// from how the request arrived, because the log is the exhibit and an exhibit that records the
+// surface the client claimed proves nothing about the surface he used.
+const channels = [...apiSrc.matchAll(/saveCircumstance\([^)]*?,\s*(?:'([a-z]+)'|([^,)]*\?[^)]*))\)/g)];
+ok('the channel is a server decision, out of a closed set',
+  /isForm \? 'web' : 'app'/.test(apiSrc)
+  && !/channel/.test(apiSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, ''))
+  && channels.length >= 2);
 
 ok('the question we SEND is exactly the question we LOG, with nothing bolted on',
   // sendButtons is called with `next.ask` bare. The moment somebody appends a "worth £252!" line to

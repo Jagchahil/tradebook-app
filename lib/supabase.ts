@@ -3857,6 +3857,87 @@ export async function setPartnershipShare(userId: string, share: number): Promis
   return res.ok;
 }
 
+// --- where he got to setting up ------------------------------------------------------------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THREE FUNCTIONS, AND BETWEEN THEM THEY CAN WRITE EXACTLY ONE COLUMN OF HIS ANSWERS: NONE.
+//
+// public.onboarding_progress records WHICH STEP HE IS ON and nothing else. Every answer he gives
+// during setup is written to its real home as he gives it, by the route that owns that fact, so
+// there is nothing here to hold. The migration header
+// (supabase/APPLY_2026-07-29_onboarding_and_walink.sql) is the full argument, and the short version
+// is that a jsonb blob of his answers would be a second copy of the truth, and the copy that drifts
+// is the one he believes.
+//
+// ⚠️ IF A FUTURE STEP HAS NO REAL HOME TO WRITE TO, THAT STEP NEEDS ONE. It is not a reason to add
+// a column here. test/onboardingweb.test.mjs fails the build if these functions ever learn to write
+// anything but the step.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export interface OnboardingProgress {
+  step: string;
+  completedAt: string | null;
+}
+
+// ⚠️ NULL MEANS WE COULD NOT READ, NOT "HE HAS NOT STARTED", and the two must never be confused.
+// A read failure treated as a fresh start walks a man who is eleven questions in back to the welcome
+// screen, which is the single most expensive thing this feature could do to him. Callers show him a
+// resumable screen and no false progress; they do not reset him.
+//
+// A MISSING ROW, though, genuinely is "he has not started", and is reported as such: the default
+// step with no completion.
+export async function readOnboardingProgress(userId: string): Promise<OnboardingProgress | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/onboarding_progress?user_id=eq.${encodeURIComponent(userId)}&select=step,completed_at&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json().catch(() => null)) as Array<{
+    step: string | null; completed_at: string | null;
+  }> | null;
+  if (!Array.isArray(rows)) return null;
+  if (rows.length === 0) return { step: 'welcome', completedAt: null };
+  return { step: rows[0].step || 'welcome', completedAt: rows[0].completed_at ?? null };
+}
+
+// Move his recorded position. Upsert on the primary key, because the first Continue he presses is
+// also the first time the row exists, and two of those arriving together must not become an error he
+// sees instead of the next question.
+//
+// The step string is validated by lib/onboarding.ts BEFORE it reaches here. This function does not
+// second guess it: a second validator is a second list of steps, and the two would drift.
+export async function setOnboardingStep(userId: string, step: string): Promise<boolean> {
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/onboarding_progress?on_conflict=user_id`, {
+    method: 'POST',
+    headers: {
+      ...headers(),
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify({ user_id: userId, step, updated_at: new Date().toISOString() }),
+  });
+  return res.ok;
+}
+
+// He finished. Stamped once and never cleared: completed_at is the fact that he has been through
+// this, and reopening setup from Settings later must not un-happen it.
+export async function completeOnboarding(userId: string): Promise<boolean> {
+  const { url } = config();
+  const now = new Date().toISOString();
+  const res = await fetch(`${url}/rest/v1/onboarding_progress?on_conflict=user_id`, {
+    method: 'POST',
+    headers: {
+      ...headers(),
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify({ user_id: userId, step: 'done', completed_at: now, updated_at: now }),
+  });
+  return res.ok;
+}
+
 // 🔴 THE LAW FRESHNESS FOR THE CONSTELLATION. Reads khoji_law (written nightly by khoji/lawwatch.mjs)
 // and turns it into a per-field pulse the brain map can colour with. A field with NO row here is left
 // out of the map, so the console draws it DIM (unmeasured), which is the honest state until lawwatch

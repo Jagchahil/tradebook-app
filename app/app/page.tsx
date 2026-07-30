@@ -4,13 +4,18 @@ import { userFromSessionCookie } from '../../lib/webauth';
 import { SESSION_COOKIE } from '../../lib/websession';
 import {
   getOptimiserInput, weeklyTotals, weeklyUpdateFactsFor, readAnnouncementSources,
+  readOnboardingProgress,
 } from '../../lib/supabase';
+import { toStep, isDone, stepTitle, stepNumber, stepCount } from '../../lib/onboarding';
 import { ledgerFor, headline } from '../../lib/ledger';
 import { weeklyInput, weeklyFigures, weeklyLine } from '../../lib/weeklyupdate';
 import { selectAnnouncements, appliedLineFor, tagFor } from '../../lib/announcements';
 import { AnnouncementsBanner, type BannerItem } from '../_shared/AnnouncementsBanner';
 import { gbp0, gbpAbs0 } from '../../lib/money';
-import { A11Y_CSS, FONT, GREEN, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP } from '../../lib/tokens';
+import {
+  A11Y_CSS, FONT, GREEN, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_DEEP,
+  SAFFRON_TINT,
+} from '../../lib/tokens';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,12 +59,25 @@ export default async function MoneyPage() {
 
   // Everything at once. Three round trips in parallel rather than three in a row, because the
   // budget for this page is one bad-signal second, not three.
-  const [optimiser, totals, factsMap, sources] = await Promise.all([
+  const [optimiser, totals, factsMap, sources, progress] = await Promise.all([
     getOptimiserInput(user.id),
     weeklyTotals(user.id),
     weeklyUpdateFactsFor([user.id]).catch(() => null),
     readAnnouncementSources(user.id).catch(() => null),
+    readOnboardingProgress(user.id).catch(() => null),
   ]);
+
+  // ⚠️ THE RESUME LINE, AND DOC 103'S EMPTY TEST DECIDES WHEN IT IS ON SCREEN.
+  //
+  // A row that says "nothing to do" most of the time teaches him to stop looking, and then he misses
+  // the week it matters. So this is drawn while his setup is genuinely unfinished and NEVER once it
+  // is done. He is never redirected into it either: this is his money screen, and a wizard that will
+  // not let him past it is a wizard that owns his books.
+  //
+  // A failed read draws nothing. Telling a man who finished setting up last week that he has not is
+  // worse than saying nothing, because the line he cannot dismiss is the one he learns to ignore.
+  const setup = progress && !progress.completedAt ? toStep(progress.step) : null;
+  const resumeAt = setup && !isDone(setup) ? setup : null;
 
   const l = ledgerFor(optimiser);
   const week = weeklyInput(totals, factsMap?.get(user.id), new Date());
@@ -103,6 +121,16 @@ export default async function MoneyPage() {
       {/* Item 1 finally has a customer surface. Khoji reads the law nightly and a human approves
           what matters, and until this line existed no customer ever saw it happen. */}
       <AnnouncementsBanner items={items} />
+
+      {resumeAt ? (
+        <a href={`/app/setup?step=${resumeAt}`} style={S.resume}>
+          <span style={S.resumeTop}>Finish setting up &middot; step {stepNumber(resumeAt)} of {stepCount()}</span>
+          <span style={S.resumeBody}>
+            You stopped at {stepTitle(resumeAt).toLowerCase()}. Everything you answered is saved, and
+            the rest is where the money we can find you comes from.
+          </span>
+        </a>
+      ) : null}
 
       <section style={S.card}>
         <h1 style={S.h1}>{headline(l)}</h1>
@@ -205,5 +233,8 @@ const S: Record<string, React.CSSProperties> = {
   week: { fontSize: 17, fontWeight: 700, margin: '0 0 8px' },
   line2: { fontSize: 14.5, lineHeight: 1.55, color: MUTED, margin: 0 },
   foot: { fontSize: 13, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
+  resume: { display: 'block', textDecoration: 'none', background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
+  resumeTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
+  resumeBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
   footLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },
 };

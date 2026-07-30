@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
 import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL } from '../../lib/features';
 import { findSic } from '../../lib/siccodes';
+import { HOW_LONG } from '../../lib/onboarding';
 
 // The app store buttons. Until the app is ACTUALLY in both stores these are dead,
 // dimmed "soon" chips, never links to nowhere. The day it lands, flip
@@ -338,7 +339,15 @@ export default function StartPage() {
         <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: '20px 22px 0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: RIVER, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step {step} of {TOTAL}</span>
-            <span style={{ fontSize: 12.5, color: MUTED }}>About a minute</span>
+            {/* 🔴 THIS SAID "About a minute", AND IT WAS TRUE OF THESE SIX QUESTIONS AND FALSE ABOUT
+                WHAT HE IS STARTING. Six questions really do take a minute; what follows them is ten
+                to fifteen, because we cannot tailor a man's tax until we know everything about him.
+                A page that promises a minute and then asks for fifteen has not saved him fourteen
+                minutes, it has taught him we shade the truth about his money on the very first
+                screen. Jag's call, 28 July: say it up front, because depth is the feature.
+                The string comes from lib/onboarding so this page and the setup screens cannot
+                disagree about it. */}
+            <span style={{ fontSize: 12.5, color: MUTED }}>{HOW_LONG} in total</span>
           </div>
           <div style={{ height: 7, borderRadius: 4, backgroundColor: SURFACE, overflow: 'hidden' }}>
             <div className="barfill" style={{ height: 7, borderRadius: 4, width: `${Math.max(pct, 8)}%`, background: `linear-gradient(90deg, ${RIVER}, ${SAFFRON})` }} />
@@ -411,7 +420,7 @@ export default function StartPage() {
               <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-1px', margin: '0 0 12px' }}>Check your email.</h1>
               <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.6, maxWidth: 430, margin: '0 auto 8px' }}>
                 We have sent a six digit code to <b style={{ color: INK }}>{email.trim()}</b>. Type it
-                in and your Lekhio is ready.
+                in and we will start setting your Lekhio up.
               </p>
               <p style={{ fontSize: 13, color: MUTED, margin: '0 auto 24px', maxWidth: 400 }}>
                 It can take a minute to arrive. Have a look in your junk folder if it does not.
@@ -615,7 +624,7 @@ export default function StartPage() {
                     })}
                   </div>
                   <div style={{ marginTop: 22, backgroundColor: RIVER_TINT, borderRadius: 12, padding: 16 }}>
-                    <p style={{ fontSize: 13.5, color: RIVER_DEEP, lineHeight: 1.6, margin: 0 }}>That is everything. We will email you a code to finish setting up your account, and your free trial starts the moment you are in. No card needed.</p>
+                    <p style={{ fontSize: 13.5, color: RIVER_DEEP, lineHeight: 1.6, margin: 0 }}>That is the quick part done. We will email you a code, and then there are {HOW_LONG} of questions about you, which is where the money is. You can stop part way through and pick up where you left off. Your free trial starts the moment you are in, and no card is needed.</p>
                   </div>
                 </Step>
               )}

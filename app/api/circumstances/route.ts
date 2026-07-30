@@ -4,6 +4,7 @@ import {
   readCircumstances, saveCircumstance, forgetCircumstance,
 } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
+import { isStep, type Step } from '../../../lib/onboarding';
 import {
   CIRCUMSTANCES, unanswered, notOurs, sensitive, hasSpecialConsent, CONSENT_KEY, CONSENT_ASK,
 } from '../../../lib/circumstances';
@@ -105,6 +106,28 @@ export async function DELETE(req: NextRequest) {
   return NextResponse.json({ ok: true, forgotten: keys });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE WEB ONBOARDING ANSWERS A QUESTION WITH A PLAIN FORM POST, AND LANDS BACK ON THE SAME SCREEN.
+//
+// /app/setup ships no client script, because he is on a cheap Android on a bad signal and a page
+// that cannot act until JavaScript arrives is a page that cannot act. So each Yes and each No is a
+// one field form, posted here, answered with a 303 back to the step he was on.
+//
+// ⚠️ TWO ENCODINGS, ONE WRITE. Everything below the parse is identical for the form and for the
+// phone app's JSON, because a second route for the web would be a second implementation of "log the
+// exact sentence he read", and the one that drifts is the one that has to stand up under Finance Act
+// 2026 Sch 22.
+//
+// 🔴 THE REDIRECT TARGET IS A STEP NAME, NEVER A URL.
+//
+// A `back=/anywhere` field would be an open redirect sitting on an authenticated POST: a crafted
+// form could answer a question on his behalf and land him on somebody else's page. So the field
+// carries a step, lib/onboarding decides whether it is one, and this file builds the path itself.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+function backToSetup(req: NextRequest, step: Step) {
+  return NextResponse.redirect(new URL(`/app/setup?step=${step}`, req.url), 303);
+}
+
 export async function POST(req: NextRequest) {
   const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -112,11 +135,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });
   }
 
+  const isForm = (req.headers.get('content-type') || '').includes('application/x-www-form-urlencoded');
   let body: { key?: unknown; answer?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'bad_json' }, { status: 400 });
+  // Where to send him afterwards, when this came from a form. Null for the phone app, which gets
+  // JSON and decides its own navigation.
+  let back: Step | null = null;
+  if (isForm) {
+    const f = await req.formData().catch(() => null);
+    if (!f) return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+    body = { key: String(f.get('key') ?? ''), answer: String(f.get('answer') ?? '') };
+    const step = String(f.get('step') ?? '');
+    back = isStep(step) ? step : null;
+  } else {
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'bad_json' }, { status: 400 });
+    }
   }
 
   const key = typeof body.key === 'string' ? body.key : '';
@@ -133,6 +168,7 @@ export async function POST(req: NextRequest) {
   if (key === CONSENT_KEY) {
     const ok = await saveCircumstance(user.id, CONSENT_KEY, answer, CONSENT_ASK, 'app');
     if (!ok) return NextResponse.json({ error: 'write_failed' }, { status: 502 });
+    if (back) return backToSetup(req, back);
     return NextResponse.json({ ok: true, key, answer, claimant: 'him' });
   }
 
@@ -169,11 +205,20 @@ export async function POST(req: NextRequest) {
   //
   // Finance Act 2026 Sch 22: the log of what we asked and what he answered is the only thing that
   // proves we did not intend a loss of tax revenue.
-  const ok = await saveCircumstance(user.id, key, answer, c.ask, 'app');
+  // ⚠️ THE CHANNEL IS THE ONE HE REALLY USED. reconcileSignupToUser already logs 'web' for the
+  // answers he gave on lekhio.app before he had an account, and a record that says 'app' for a man
+  // who has never installed one is a record that cannot be relied on the day it matters.
+  const ok = await saveCircumstance(user.id, key, answer, c.ask, isForm ? 'web' : 'app');
 
   // A FAILED WRITE MUST NOT LOOK LIKE A SUCCESSFUL ONE. If we tell him "got it" and store nothing,
   // he believes we know he is married, we quietly do not, and he loses the money while thanking us.
   if (!ok) return NextResponse.json({ error: 'write_failed' }, { status: 502 });
+
+  // ⚠️ THE 303 IS SENT ONLY AFTER THE WRITE SUCCEEDED. Redirecting first and writing after would
+  // put him back on a screen with the question gone and nothing in the database, which is the exact
+  // shape of the failure the comment above this write exists to prevent: he believes we know he is
+  // married, we do not, and he loses the money while thanking us.
+  if (back) return backToSetup(req, back);
 
   return NextResponse.json({ ok: true, key, answer, claimant: c.claimant });
 }

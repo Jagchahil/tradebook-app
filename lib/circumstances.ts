@@ -111,6 +111,29 @@ export interface Circumstance {
   // because Article 17 is not optional and a tax app is not a medical record.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   specialCategory?: true;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE HOUSEHOLD FOUR. A GROUPING, NEVER A RE-ORDERING.
+  //
+  // Marriage, his wife's earnings, the kids, and whoever minds them. Four questions about the same
+  // household, and every one of them is claimed by somebody who is not our customer, which is why
+  // `claimant` on all four is his partner or both of them.
+  //
+  // ⚠️ IT IS HERE RATHER THAN IN THE ONBOARDING PAGE, AND THAT IS THE POINT.
+  //
+  // A surface holding its own list of "which of these are the household ones" is a second copy of a
+  // fact about a question, sitting a directory away from the question. specialCategory already
+  // proved the shape: put what a question IS next to the question, and let callers select. A page
+  // with the keys hardcoded is a page that quietly stops matching the list the day one is added.
+  //
+  // ⚠️ AND IT CHANGES NO ORDER. askingOrder() still sorts by what a question is worth, inside this
+  // group and outside it. worthOrder is a tax judgement and this is a screen, and a screen does not
+  // get to decide that marriage is worth more than a terminal loss. See lib/onboarding.ts for why
+  // the household screen nonetheless comes FIRST: it is not that they are worth more, it is that
+  // they are the four a man can answer without looking anything up, and a man who leaves after four
+  // questions must not be one who was never asked whether he is married.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  household?: true;
 }
 
 // The consent itself is stored as a circumstance, which is exactly right: Article 7(1) says we must
@@ -187,6 +210,7 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // return and we corrupt HMRC's own calculation. Our whole job here is to TELL HIM and get out
     // of the way. HMRC does not want a certificate either: it wants two NI numbers.
     key: 'married',
+    household: true,
     ask: 'Are you married or in a civil partnership?',
     why: 'If you are, one of you may be able to hand the other part of their tax free allowance. It is worth £252 a year and it backdates four years.',
     worthOrder: 'real',
@@ -215,6 +239,7 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // married..." card to a single man for ever, which doc 103 calls the empty test and which teaches
     // him to stop reading the page.
     key: 'partner_low_earner',
+    household: true,
     ask: 'Does your husband or wife earn less than £12,570 a year?',
     why: 'That is the personal allowance. Whichever of you is under it can hand the other £1,260 of it, and it is worth £252 a year to the one who receives it.',
     worthOrder: 'real',
@@ -241,6 +266,7 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // you never pay the charge. AND BACKDATING IS ONLY THREE MONTHS, so every month of delay is a
     // month of state pension gone for ever.
     key: 'children',
+    household: true,
     ask: 'Do you have kids under 12? And does anyone in the house claim Child Benefit?',
     why: 'If you opted out because of the high income charge, the parent at home may have stopped building up their state pension without knowing. You can claim it and take zero pounds: you keep the pension credit and never pay the charge. It only backdates three months, so every month counts.',
     worthOrder: 'large',
@@ -253,6 +279,7 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // A grandad who has minded the kids on a Friday since 2015 can pick up A DECADE of qualifying
     // years. Backdatable to 2011. Needs TWO signatures. HMRC does not advertise it.
     key: 'grandparent_childcare',
+    household: true,
     ask: 'Does a grandparent, or an aunt or uncle, look after your kids while you work?',
     why: 'They can claim National Insurance credits for it, backdated all the way to 2011. It can be a decade of state pension. Hardly anybody knows it exists.',
     worthOrder: 'large',
@@ -426,6 +453,21 @@ export function unanswered(answered: Array<{ key: string; answer: string }>): Ci
 // and it is not ordinary. It is the one question in this product that the law says we may not ask.
 export function sensitive(): Circumstance[] {
   return CIRCUMSTANCES.filter((c) => c.specialCategory);
+}
+
+// THE HOUSEHOLD FOUR, AND EVERYTHING THAT IS NOT ONE OF THEM.
+//
+// Two selectors rather than one, because the caller that shows the household screen and the caller
+// that shows the rest must partition the SAME list. One selector plus a negation written at the call
+// site is how a question ends up asked twice, or asked never, and both of those are the cheapest way
+// to teach a man we are not listening. test/onboardingweb.test.mjs asserts the two are disjoint and
+// that together they account for every askable question.
+export function household(): Circumstance[] {
+  return askingOrder().filter((c) => c.household && !c.specialCategory);
+}
+
+export function notHousehold(): Circumstance[] {
+  return askingOrder().filter((c) => !c.household && !c.specialCategory);
 }
 
 // Has he given EXPLICIT consent to be asked at all? Nothing in sensitive() may be shown, asked,

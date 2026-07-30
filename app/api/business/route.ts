@@ -6,6 +6,7 @@ import {
   setPartnershipShare,
 } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
+import { isStep, type Step } from '../../../lib/onboarding';
 
 // The business structure: sole trader, limited company, or partnership.
 //
@@ -50,11 +51,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });
   }
 
+  // TWO ENCODINGS, ONE WRITE. /app/setup ships no client script, so its business step is a plain
+  // form post. The phone wizard posts JSON. Both land on setBusinessType below, because the tax
+  // engine branches on this answer and two paths into it is two chances to get a man's structure
+  // wrong.
+  //
+  // 🔴 THE REDIRECT CARRIES A STEP NAME AND NEVER A URL, so an authenticated POST cannot be turned
+  // into an open redirect. lib/onboarding decides what is a step; this file builds the path.
+  const isForm = (req.headers.get('content-type') || '').includes('application/x-www-form-urlencoded');
   let body: { business_type?: unknown; partnership_share?: unknown } = {};
-  try {
-    body = await req.json();
-  } catch {
-    // fall through to validation, which rejects an empty body
+  let back: Step | null = null;
+  if (isForm) {
+    const f = await req.formData().catch(() => null);
+    if (!f) return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+    const share = Number(String(f.get('partnership_share') ?? '').trim());
+    body = {
+      business_type: String(f.get('business_type') ?? ''),
+      // An empty or unreadable share is ABSENT, not zero. A zero share would tax a partner on
+      // nothing at all, and setPartnershipShare's own guard would reject it anyway; sending
+      // undefined keeps whatever he told us before rather than quietly replacing it.
+      partnership_share: Number.isFinite(share) && share > 0 ? share : undefined,
+    };
+    const step = String(f.get('step') ?? '');
+    back = isStep(step) ? step : null;
+  } else {
+    try {
+      body = await req.json();
+    } catch {
+      // fall through to validation, which rejects an empty body
+    }
   }
 
   const requested = typeof body.business_type === 'string' ? (body.business_type as BizType) : null;
@@ -72,6 +97,13 @@ export async function POST(req: NextRequest) {
     if (share > 0 && share <= 100) {
       await setPartnershipShare(user.id, share);
     }
+  }
+
+  // Only once the structure is actually stored. A redirect sent before the write would put him on
+  // the next screen believing we had him down as a partner while the engine still had him as a sole
+  // trader, and that disagreement ends up in his return rather than on his screen.
+  if (back) {
+    return NextResponse.redirect(new URL(`/app/setup?step=${back}`, req.url), 303);
   }
 
   const profile = await getBusinessProfile(user.id);

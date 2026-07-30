@@ -123,8 +123,12 @@ ok('🔴 and posts no answer but yes and no',
     .map((m) => m[1].replace(/["']/g, ''))
     .every((v) => v === 'a' || v === 'yes' || v === 'no'));
 // The queue is what makes leaving safe: an unanswered question is still unanswered, so it comes back.
+// ⚠️ THE MONEY QUEUE, WHICH IS NOT EVERY QUESTION. It refuses the special category one as a matter
+// of law and the compliance ones as a matter of what the queue is FOR. Both refusals are asserted
+// in their own sections; this one only checks that nothing else was quietly dropped.
 ok('an unanswered question stays in the queue',
-  unanswered([]).length === CIRCUMSTANCES.filter((c) => !c.specialCategory && !c.dependsOn).length);
+  unanswered([]).length
+    === CIRCUMSTANCES.filter((c) => !c.specialCategory && !c.mtd && !c.dependsOn).length);
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 4. THE TWO SCREENS PARTITION ONE LIST. No overlap, no gap.
@@ -132,11 +136,14 @@ ok('an unanswered question stays in the queue',
 const hKeys = household().map((c) => c.key);
 const nKeys = notHousehold().map((c) => c.key);
 const askable = CIRCUMSTANCES.filter((c) => !c.specialCategory).map((c) => c.key);
+// The two MONEY screens partition the money questions. The compliance ones are a third group with
+// its own screen and are checked in their own section, so they are not expected here.
+const moneyAskable = CIRCUMSTANCES.filter((c) => !c.specialCategory && !c.mtd).map((c) => c.key);
 ok('both groups have questions in them', hKeys.length > 0 && nKeys.length > 0);
 const overlap = hKeys.filter((k) => nKeys.includes(k));
 ok(`🔴 no question is on both screens${overlap.length ? `\n     ${overlap.join(', ')}` : ''}`, overlap.length === 0);
-const missed = askable.filter((k) => !hKeys.includes(k) && !nKeys.includes(k));
-ok(`🔴 no askable question falls between the two screens${missed.length ? `\n     ${missed.join(', ')}` : ''}`,
+const missed = moneyAskable.filter((k) => !hKeys.includes(k) && !nKeys.includes(k));
+ok(`🔴 no money question falls between the two money screens${missed.length ? `\n     ${missed.join(', ')}` : ''}`,
   missed.length === 0);
 
 // ---------------------------------------------------------------------------------------------

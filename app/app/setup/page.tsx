@@ -7,7 +7,7 @@ import {
 } from '../../../lib/supabase';
 import { hasBankFeedConfig } from '../../../lib/bankfeed';
 import {
-  unanswered, household, notHousehold, progressIn, type Circumstance,
+  unanswered, unansweredMtd, household, notHousehold, mtdQuestions, progressIn, type Circumstance,
 } from '../../../lib/circumstances';
 import {
   isStep, isDone, toStep, prevStep, stepNumber, stepCount, progressPct, stepTitle,
@@ -140,6 +140,7 @@ export default async function SetupPage({
       {step === 'business' ? <BusinessStep userId={user.id} /> : null}
       {step === 'household' ? <QuestionsStep userId={user.id} step="household" /> : null}
       {step === 'about' ? <QuestionsStep userId={user.id} step="about" /> : null}
+      {step === 'mtd' ? <MtdStep userId={user.id} /> : null}
       {step === 'bank' ? <BankStep userId={user.id} note={bankNote(one('bank'))} /> : null}
 
       <footer style={S.foot}>
@@ -393,6 +394,103 @@ async function QuestionsStep({ userId, step }: { userId: string; step: 'househol
       {list.length > 0 ? (
         <p style={S.hint}>
           Not sure about one? Leave it. Continue at the bottom moves you on and it stays on your list.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// WHERE HE STANDS WITH HMRC. The only screen in setup that offers him nothing, and earns its place
+// anyway because of what the answers change on our side.
+//
+// 🔴 IT ASKS ONE QUESTION OF MOST PEOPLE. Making Tax Digital applies over £50,000 of gross trade and
+// rent, so the other three hang off that gate and lib/circumstances.ts will not release them until
+// he says yes. A man under the line answers once and moves on, and is never asked whether he has
+// signed up for something that does not apply to him.
+//
+// 🔴 AND IT DOES NOT ASK HIM WHAT HE SUBMITTED IN AUGUST, WHICH IS THE OBVIOUS QUESTION AND THE
+// WRONG ONE. A quarterly update is cumulative: the one due 7 November covers 6 April to 5 October
+// and REPLACES the one sent in August. So his earlier figures are not an input to anything, and
+// asking him to dig them out would be asking him to look up a number we are about to overwrite.
+// What we need instead is his money back to 6 April, which is what the bank step collects.
+// ---------------------------------------------------------------------------------------------
+async function MtdStep({ userId }: { userId: string }) {
+  const rows = await readCircumstances(userId);
+
+  if (rows === null) {
+    return (
+      <section style={S.card}>
+        <h1 style={S.h1}>Where you stand with HMRC.</h1>
+        <p style={S.warn}>{UNREADABLE}</p>
+      </section>
+    );
+  }
+
+  const list = unansweredMtd(rows);
+  const { answered: answeredHere, askable } = progressIn(mtdQuestions(), rows);
+  const answers = new Map(rows.map((r) => [r.key, r.answer]));
+  const mandated = answers.get('mtd_mandated');
+
+  return (
+    <section style={S.card}>
+      <h1 style={S.h1}>Where you stand with HMRC.</h1>
+      <p style={S.body}>
+        Making Tax Digital changes what HMRC wants during the year rather than only at the end of it.
+        These answers do not change a penny of your tax. They change what we do for you, so it is
+        worth thirty seconds.
+      </p>
+
+      {askable > 0 ? <p style={S.count}>{answeredHere} of {askable} answered</p> : null}
+
+      {list.length === 0 ? (
+        <p style={S.done}>
+          {mandated === 'no'
+            // Doc 103's empty test. He has told us he is under the line, so there is nothing further
+            // to ask and we say so rather than leaving a blank card implying we want more.
+            ? 'Nothing else to ask. Making Tax Digital does not apply to you at that level, and if your takings grow past it we will tell you before HMRC does.'
+            : 'That is everything. We know where you stand.'}
+        </p>
+      ) : (
+        <div style={S.stack}>
+          {list.map((q) => (
+            <div key={q.key} style={S.q}>
+              <p style={S.ask}>{q.ask}</p>
+              <p style={S.why}>{q.why}</p>
+              <div style={S.answers}>
+                {(['yes', 'no'] as const).map((a) => (
+                  <form key={a} action="/api/circumstances" method="post" style={S.aForm}>
+                    <input type="hidden" name="key" value={q.key} />
+                    <input type="hidden" name="answer" value={a} />
+                    <input type="hidden" name="step" value="mtd" />
+                    <button type="submit" style={a === 'yes' ? S.yes : S.no}>
+                      {a === 'yes' ? 'Yes' : 'No'}
+                    </button>
+                  </form>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ⚠️ WHERE HE FINDS THE ANSWERS. Every one of these is a fact about him that lives somewhere
+          he can reach, and saying where is the difference between a question and a homework task. */}
+      {list.length > 0 ? (
+        <p style={S.hint}>
+          Not sure? Your HMRC online account says whether you are signed up and who is authorised to
+          act for you, and your accountant will know the rest. None of it has to be exact today.
+        </p>
+      ) : null}
+
+      {/* 🔴 THE REASSURANCE, AND IT IS A FACT RATHER THAN A KINDNESS. Late submission penalties for
+          quarterly updates were waived for the whole of 2026/27 at Budget 2025, resuming 6 April
+          2027. A man who joins in August and thinks he has missed something needs telling. */}
+      {mandated === 'yes' ? (
+        <p style={S.reassure}>
+          <b>If you think you have missed one, you have not lost anything.</b> There are no late
+          filing penalties on quarterly updates for this tax year, and every update covers the whole
+          year from 6 April anyway, so the next one puts you straight.
         </p>
       ) : null}
     </section>

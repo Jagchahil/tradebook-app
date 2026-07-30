@@ -152,10 +152,18 @@ ok('the grandparent credit reaches back to 2011, which can be a decade of state 
 const DEPENDENT = CIRCUMSTANCES.filter((c) => c.dependsOn);
 const ans = (o) => Object.entries(o).map(([key, answer]) => ({ key, answer }));
 
-// Two kinds of question are held out of the queue, for two completely different reasons:
+// THREE kinds of question are held out of the queue, for three completely different reasons, and
+// the third arrived on 30 July:
 //   a FOLLOW-UP waits for its premise (we do not ask a single man what his wife earns);
-//   a HEALTH question never enters the queue at all, on any channel (Article 9, see test/specialcategory).
-const HELD_BACK = CIRCUMSTANCES.filter((c) => c.dependsOn || c.specialCategory);
+//   a HEALTH question never enters the queue at all, on any channel (Article 9, see test/specialcategory);
+//   a COMPLIANCE question is not a relief. This queue is the MONEY queue: it is sorted by what a
+//     question is worth and it feeds the WhatsApp chain, the app's list and the reliefs screen.
+//     "Have you signed up for Making Tax Digital" is worth nothing and would sit between a man's
+//     pension and his van. It travels through mtdQuestions() instead, onto its own screen.
+//
+// ⚠️ THIS LIST IS THE POINT OF THE ASSERTION, so extending it is not weakening the guard as long as
+// each addition names its reason. A question held back for no reason is a question never asked.
+const HELD_BACK = CIRCUMSTANCES.filter((c) => c.dependsOn || c.specialCategory || c.mtd);
 
 ok('a man who has told us nothing is asked everything EXCEPT the follow-ups and the health question',
   unanswered([]).length === CIRCUMSTANCES.length - HELD_BACK.length);

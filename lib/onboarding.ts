@@ -40,7 +40,16 @@
 // dates. So the two he is most likely to answer, and the two we most need, come first.
 //
 // The money ordering inside each step is still entirely lib/circumstances.ts's. Nothing here re-sorts.
-export const STEPS = ['welcome', 'business', 'household', 'about', 'bank', 'done'] as const;
+// ⚠️ `mtd` SITS AFTER THE MONEY AND BEFORE THE BANK, AND BOTH HALVES OF THAT ARE ON PURPOSE.
+//
+// After the money, because it is the one screen that offers him nothing. Marriage is worth £252 and
+// a terminal loss is worth four figures; "have you signed up for Making Tax Digital" is worth
+// nothing to him at all, it changes what WE do. Put it in front of the reliefs and the man who
+// leaves after four questions leaves having answered the four that were worth the least.
+//
+// Before the bank, because the bank step hands him to somebody else's website and is the likeliest
+// place in the whole journey to lose him. Anything we still want to know has to be asked first.
+export const STEPS = ['welcome', 'business', 'household', 'about', 'mtd', 'bank', 'done'] as const;
 
 export type Step = (typeof STEPS)[number];
 
@@ -131,6 +140,7 @@ const TITLES: Record<Step, string> = {
   business: 'How you trade',
   household: 'You and your household',
   about: 'What you can claim',
+  mtd: 'Where you stand with HMRC',
   bank: 'Your bank',
   done: 'Finished',
 };

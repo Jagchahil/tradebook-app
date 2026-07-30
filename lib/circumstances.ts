@@ -134,6 +134,21 @@ export interface Circumstance {
   // questions must not be one who was never asked whether he is married.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   household?: true;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 NOT A RELIEF. A COMPLIANCE FACT, AND IT MUST NEVER ENTER THE MONEY QUEUE.
+  //
+  // "Have you signed up for Making Tax Digital" is worth no money to anybody. It changes what WE do
+  // for him, not what he can claim. askingOrder() sorts by worthOrder, so an entry with a worthOrder
+  // it does not deserve would push a real relief down the list, and unanswered() feeds the WhatsApp
+  // chain and the app's own list, neither of which should ever ask a man about his filing status
+  // between a question about his van and a question about his pension.
+  //
+  // So these are refused by unanswered() the same way a special category question is, and travel
+  // only through mtdQuestions(). They keep a worthOrder because the field is required, and it is
+  // 'small' precisely so that if one ever leaks into the money queue it leaks to the bottom.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  mtd?: true;
 }
 
 // The consent itself is stored as a circumstance, which is exactly right: Article 7(1) says we must
@@ -365,6 +380,79 @@ export const CIRCUMSTANCES: Circumstance[] = [
     evidence: 'Nothing, if it is under the limit and you claim no expenses against it.',
     source: 'GOV.UK, tax-free allowances on property and trading income. Rent a Room: HS223.',
   },
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // MAKING TAX DIGITAL. Where he stands with HMRC, which is not the same as what he can claim.
+  //
+  // 🔴 THE GATE IS FIRST AND THE OTHER THREE HANG OFF IT. A barber turning over £28,000 is not in
+  // MTD in 2026/27, and asking him whether he has signed up for it is doc 103's empty test in its
+  // purest form: a question with no sensible answer, which teaches him our questions are not worth
+  // reading. dependsOn already does exactly this job for the marriage follow up, so it does it here.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  {
+    // ⚠️ THE £50,000 IS WRITTEN OUT, AND THAT IS DELIBERATE EVEN THOUGH lib/taxengine.ts HOLDS IT.
+    //
+    // Normally a figure in two places is the bug this codebase keeps producing. This is the one case
+    // where it is not: `ask` is stored VERBATIM as the exhibit (Finance Act 2026 Sch 22), so the row
+    // must carry the sentence he actually read, threshold and all, for ever. Nothing computes from
+    // this string; the engine reads FACTS.mtdThreshold2026 as it always did.
+    //
+    // ⚠️ AND WHEN THE THRESHOLD DROPS TO £30,000 IN 2027, ADD A NEW KEY. Do NOT edit this sentence:
+    // that would rewrite what we asked a man in 2026, which is the one thing the log exists to
+    // prevent. test/onboardingweb.test.mjs fails the build if this literal and the engine's constant
+    // ever disagree, so Khoji finding a change becomes a decision rather than a silent drift.
+    mtd: true,
+    key: 'mtd_mandated',
+    ask: 'Do you expect to take more than £50,000 this year, before any expenses, from self employment and rent put together?',
+    why: 'That is the line where Making Tax Digital applies to you, and it changes what HMRC wants from you during the year rather than just at the end of it.',
+    worthOrder: 'small',
+    claimant: 'him',
+    backYears: 0,
+    evidence: 'Nothing. It is your gross income, before expenses, from your trade and any rent added together.',
+    source: 'GOV.UK, Making Tax Digital for Income Tax. Qualifying income over £50,000 from 6 April 2026, over £30,000 from April 2027, over £20,000 from April 2028.',
+  },
+  {
+    mtd: true,
+    key: 'mtd_signed_up',
+    ask: 'Have you signed up for Making Tax Digital with HMRC yet?',
+    why: 'Being required to use it and being signed up for it are two different jobs, and plenty of people have done the first without the second. If you have not, we will show you where.',
+    worthOrder: 'small',
+    claimant: 'him',
+    backYears: 0,
+    evidence: 'Nothing. Your HMRC online account tells you, and so will your accountant if you have one.',
+    source: 'GOV.UK, sign up for Making Tax Digital for Income Tax. Signing up is a separate act from being within scope.',
+    dependsOn: { key: 'mtd_mandated', answer: 'yes' },
+  },
+  {
+    // 🔴 THE ONE THAT ACTUALLY CHANGES WHAT WE DO. Two parties sending quarterly updates for one man
+    // is not a tidiness problem, it is two sets of figures arriving at HMRC for the same business.
+    // If somebody else is already doing it, we prepare and they send, and we say so plainly.
+    mtd: true,
+    key: 'mtd_agent',
+    ask: 'Is an accountant or a tax agent already sending your quarterly updates for you?',
+    why: 'If somebody else is already sending them, two sets of figures going to HMRC helps nobody. We would get your books straight and leave the sending to them.',
+    worthOrder: 'small',
+    claimant: 'him',
+    backYears: 0,
+    evidence: 'Nothing. Your accountant knows, and your HMRC account lists who is authorised to act for you.',
+    source: 'GOV.UK, tax agents and advisers. An authorised agent can send quarterly updates on a client\'s behalf.',
+    dependsOn: { key: 'mtd_mandated', answer: 'yes' },
+  },
+  {
+    // ⚠️ ASKED FOR REASSURANCE, NEVER FOR HIS FIGURES. A quarterly update is cumulative: the one due
+    // 7 November covers 6 April to 5 October and REPLACES the one sent in August. So his earlier
+    // submission is not an input to anything we do, and asking him to dig out those figures would be
+    // asking him to look up a number we are about to overwrite. See lib/hmrc.ts.
+    mtd: true,
+    key: 'mtd_already_filed',
+    ask: 'Have you already sent a quarterly update to HMRC this tax year?',
+    why: 'It does not change your figures: every update covers the whole year from 6 April and replaces the one before it. We ask so we know where you are, and so nobody worries about a deadline that has already gone.',
+    worthOrder: 'small',
+    claimant: 'him',
+    backYears: 0,
+    evidence: 'Nothing. There are no late submission penalties for quarterly updates in 2026/27 either way.',
+    source: 'GOV.UK, use Making Tax Digital for Income Tax: updates are cumulative. Budget 2025: late submission penalties for quarterly updates waived for 2026/27, resuming 6 April 2027.',
+    dependsOn: { key: 'mtd_mandated', answer: 'yes' },
+  },
   {
     key: 'home_working',
     ask: 'Do you do your quotes, invoices and paperwork at home?',
@@ -405,6 +493,33 @@ export function notOurs(): Circumstance[] {
 // wife earns under the personal allowance and you have not asked him a question, you have read him a
 // list. He will notice, and the price of him noticing is that he stops answering the ones that are
 // worth thousands.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE CORE. "Which of these is it fair to ask him today", applied to whichever list you hand it.
+//
+// ⚠️ IT IS ONE FUNCTION BECAUSE THERE IS ONE RULE. unanswered() asks it about the money questions,
+// the MTD path asks it about the compliance ones, and progressIn() asks it about whichever group is
+// on screen. Three copies of "has he answered it, and does its premise hold" is three chances for a
+// man to be asked something twice, and the copy that drifts is the one he is looking at.
+//
+// The special category REFUSAL does not live here, it lives in unanswered(), because it is a refusal
+// rather than a rule: a caller must not be able to get a health question out of this file by passing
+// the right list. sensitive() is the only door, and it is gated.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+function openIn(
+  list: Circumstance[],
+  answered: Array<{ key: string; answer: string }>,
+): Circumstance[] {
+  const given = new Map(answered.map((a) => [a.key, a.answer]));
+  return list.filter((c) => {
+    if (c.specialCategory) return false;
+    if (given.has(c.key)) return false;
+    if (!c.dependsOn) return true;
+    // The premise must be ANSWERED and answered the right way. An unanswered premise holds the
+    // follow up back, it does not release it.
+    return given.get(c.dependsOn.key) === c.dependsOn.answer;
+  });
+}
+
 export function unanswered(answered: Array<{ key: string; answer: string }>): Circumstance[] {
   const given = new Map(answered.map((a) => [a.key, a.answer]));
 
@@ -416,6 +531,15 @@ export function unanswered(answered: Array<{ key: string; answer: string }>): Ci
     // that will one day be enforced in two. Health data does not get to depend on a new route
     // remembering. See sensitive() for the gated path it is allowed to travel instead.
     if (c.specialCategory) return false;
+
+    // 🔴 AND THE COMPLIANCE QUESTIONS ARE REFUSED HERE TOO, FOR A DIFFERENT REASON.
+    //
+    // Not because they are dangerous, because they are not reliefs. This queue is the money queue:
+    // it feeds the WhatsApp chain, the app's list and the setup wizard's relief screen, all of which
+    // are sorted by what a question is worth. "Have you signed up for Making Tax Digital" is worth
+    // nothing and belongs beside the bank step, not between the pension and the van. mtdQuestions()
+    // is its door.
+    if (c.mtd) return false;
 
     if (given.has(c.key)) return false;
     if (!c.dependsOn) return true;
@@ -463,11 +587,30 @@ export function sensitive(): Circumstance[] {
 // to teach a man we are not listening. test/onboardingweb.test.mjs asserts the two are disjoint and
 // that together they account for every askable question.
 export function household(): Circumstance[] {
-  return askingOrder().filter((c) => c.household && !c.specialCategory);
+  return askingOrder().filter((c) => c.household && !c.specialCategory && !c.mtd);
 }
 
+// ⚠️ AND IT EXCLUDES THE COMPLIANCE ONES TOO, WHICH IS EASY TO MISS.
+//
+// This is the reliefs screen. Without the `!c.mtd` clause every MTD question would land on it, in
+// worthOrder position, between "do you give to charity" and "do you do your paperwork at home". The
+// test asserts the three groups partition the list rather than merely not overlapping, so a fourth
+// group added later cannot quietly fall through into this one.
 export function notHousehold(): Circumstance[] {
-  return askingOrder().filter((c) => !c.household && !c.specialCategory);
+  return askingOrder().filter((c) => !c.household && !c.specialCategory && !c.mtd);
+}
+
+// WHERE HE STANDS WITH HMRC. Its own door, its own screen, never in the money queue.
+//
+// The gate (`mtd_mandated`) comes first because the other three depend on it, and openIn() will not
+// release them until he has said yes. A man under the threshold answers one question and is done.
+export function mtdQuestions(): Circumstance[] {
+  return CIRCUMSTANCES.filter((c) => c.mtd && !c.specialCategory);
+}
+
+// The MTD questions it is fair to ask him today. Same rule as the money queue, different list.
+export function unansweredMtd(answered: Array<{ key: string; answer: string }>): Circumstance[] {
+  return openIn(mtdQuestions(), answered);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -504,9 +647,11 @@ export function progressIn(
   answered: Array<{ key: string; answer: string }>,
 ): AskProgress {
   const given = new Set(answered.map((a) => a.key));
-  const inGroup = new Set(group.map((c) => c.key));
   const done = group.filter((c) => given.has(c.key)).length;
-  const toAsk = unanswered(answered).filter((c) => inGroup.has(c.key)).length;
+  // ⚠️ openIn RATHER THAN unanswered, AND THE DIFFERENCE IS NOT COSMETIC. unanswered() refuses the
+  // compliance questions on purpose, so counting through it would tell a man on the MTD screen that
+  // he has 0 of 0 to answer while three questions sit in front of him.
+  const toAsk = openIn(group, answered).length;
   return { answered: done, askable: done + toAsk };
 }
 

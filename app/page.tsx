@@ -7,6 +7,7 @@ import {
 } from './_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/' },
   title: 'Lekhio. Your first employee. The one that saves you money.',
   description:
     'Lekhio is the first employee your business hires, and the first that pays for itself. Connect your bank and it works in the background, finding every legal way to lower your tax and keeping you ready to file. Filing is the easy part. Saving you money is the job. You approve. 7 days free.',

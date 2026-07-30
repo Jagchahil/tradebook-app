@@ -8,6 +8,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { TRIAL_DAYS } from '../../lib/entitlement';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/register-your-business' },
   title: 'Register Your Business: Free Step by Step Guide | Lekhio',
   description:
     'Setting up as a sole trader or a limited company? Our free, step by step guide gives you the exact process, the forms like the CWF1, the SIC codes and the GOV.UK links to register yourself. The guide is free. Start with Lekhio and get 7 days free.',

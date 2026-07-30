@@ -5,6 +5,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/tax-calculator' },
   title: 'Free Self Employed Tax Calculator 2026/27 | Lekhio',
   description:
     'Work out your income tax, National Insurance, take home pay and how much to set aside, in seconds. Free, no signup. See how much claiming your expenses saves you. Built for UK sole traders.',

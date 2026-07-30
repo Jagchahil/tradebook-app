@@ -121,6 +121,13 @@ export default async function SignInPage({
             />
             <button type="submit" style={S.btn}>Sign in</button>
             <a href="/in" style={S.link}>Use a different email or number</a>
+            {/* ⚠️ WE NEVER SAY "NO ACCOUNT WITH THAT ADDRESS", AND WE ARE NOT GOING TO. Telling a
+                stranger which addresses are registered hands him a list of our customers, so this
+                screen looks identical whether the code went out or there was nobody to send it to.
+                The cost of that is a man who mistyped his email waiting for something that is never
+                coming, which feels like a broken product rather than a typo. So we say the true
+                thing that helps him without saying the one that helps an attacker. */}
+            <p style={S.hint}>Nothing after a minute? Check the address you typed.</p>
           </form>
         ) : (
           /* ONE FIELD, TWO DOORS. Not two forms of login, one form of login with two ways for the

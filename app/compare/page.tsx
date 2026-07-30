@@ -9,6 +9,7 @@ import {
 } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/compare' },
   title: 'Lekhio vs the other options. An honest comparison.',
   description:
     'How Lekhio compares to other apps and doing it yourself. Bank capture, voice notes, CIS, invoices and quarterly tax prep, side by side. We do not name competitors, and we show the gaps fairly.',

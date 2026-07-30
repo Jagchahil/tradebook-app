@@ -4,6 +4,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/landlord-tax-calculator' },
   title: 'Landlord Tax Calculator 2026/27 and the April 2027 Rise | Lekhio',
   description:
     'Free landlord tax calculator. See the tax on your rental income for 2026/27 AND what the new 22%, 42% and 47% property rates from April 2027 will cost you. Section 24 relief included. Works for landlords with a job, self employed landlords and full time landlords. No signup.',

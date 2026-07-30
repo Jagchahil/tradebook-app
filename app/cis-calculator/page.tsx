@@ -4,6 +4,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/cis-calculator' },
   title: 'CIS Tax Refund Calculator 2026/27 | Are You Owed Money? | Lekhio',
   description:
     'Free CIS tax refund estimator for UK construction subcontractors. See if HMRC owes you a refund on the CIS deducted from your pay, using 2026/27 rates. No signup.',

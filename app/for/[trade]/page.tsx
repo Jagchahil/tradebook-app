@@ -17,7 +17,12 @@ export async function generateMetadata({ params }: { params: Promise<{ trade: st
   if (!t) return { title: 'Lekhio' };
   const title = `Bookkeeping and Tax for ${t.plural.charAt(0).toUpperCase() + t.plural.slice(1)} | Lekhio`;
   const description = `Lekhio is the back office for UK ${t.plural}. Snap receipts, log mileage and jobs, claim every cost, and stay MTD ready. ${t.cis ? 'CIS handled. ' : ''}7 days free, no card.`;
-  return { title, description, openGraph: { title, description, type: 'website' } };
+  // In the sitemap, so it must say which URL it is. Without this every ?utm= variant of a trade
+  // page competes with the page itself, and there are as many of these as there are trades.
+  return {
+    alternates: { canonical: `/for/${t.slug}` },
+    title, description, openGraph: { title, description, type: 'website' },
+  };
 }
 
 const INK = '#111111';

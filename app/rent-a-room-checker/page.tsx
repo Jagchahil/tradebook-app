@@ -4,6 +4,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/rent-a-room-checker' },
   title: 'Rent a Room Checker: the £7,500 Lodger Allowance | Lekhio',
   description:
     'Free Rent a Room checker. Taking in a lodger? See whether your rent is tax free under the £7,500 Rent a Room scheme, and whether opting in beats deducting your actual expenses. No signup.',

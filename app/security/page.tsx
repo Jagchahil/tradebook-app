@@ -7,6 +7,7 @@ import {
 } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/security' },
   title: 'Security and Your Data | Lekhio',
   description:
     'How Lekhio keeps your money and tax data safe, and exactly how the AI is and is not used. Plain English. Your data is yours, encrypted, never sold, and you approve everything before it reaches HMRC.',

@@ -17,6 +17,7 @@ import { filingFaqAnswer } from '../../lib/features';
 // ready. Everything else is honest "this is coming, here is what it will be."
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/free-mtd-filing' },
   title: 'Free Making Tax Digital Filing, Built and In Testing | Lekhio',
   description:
     'For straightforward UK sole trader returns, just profits, losses and the essentials, Lekhio will prepare and file your Making Tax Digital return for free. No AI in this path, so it costs us nothing to run. Join the list.',

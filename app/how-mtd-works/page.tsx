@@ -8,6 +8,7 @@ import {
 } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/how-mtd-works' },
   title: 'How Making Tax Digital works, in plain English.',
   description:
     'Making Tax Digital, explained simply. Drag your income to see if and when it affects you. Keep digital records, send four short updates, and approve everything before it reaches HMRC. Lekhio keeps you ready.',

@@ -4,6 +4,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/ni-checker' },
   title: 'National Insurance Checker 2026/27 | Class 1, 2 and 4 | Lekhio',
   description:
     'Free National Insurance checker for the self employed and anyone with a side business. See your Class 1, Class 2 and Class 4 NI for 2026/27, and whether your State Pension year is safe. No signup.',

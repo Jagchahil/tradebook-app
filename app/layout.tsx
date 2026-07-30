@@ -1,4 +1,23 @@
 import type { ReactNode } from 'react';
+import type { Metadata } from 'next';
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 metadataBase, SET ONCE, SO EVERY PAGE CAN DECLARE ITS CANONICAL URL.
+//
+// On 30 July a sweep of the live site found twenty four of twenty five pages with no canonical
+// link at all. Only /file-your-tax-return had one, and it had to declare its own metadataBase to
+// do it, because there was nothing here to inherit.
+//
+// Without a canonical, lekhio.app/pricing, www.lekhio.app/pricing and every ?utm= and ?fbclid=
+// variant are four different pages to a search engine, splitting the ranking of each between
+// them. The whole free tools strategy is pages earning their way up search results, so this is
+// not housekeeping, it is the strategy quietly leaking.
+//
+// Set here rather than page by page: one base, and each page names its own path.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app'),
+};
 
 // Root layout for the live marketing site (the root app/ tree). Previously there
 // was no root layout here, so Next.js generated a bare default whose <html> tag

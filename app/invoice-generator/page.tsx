@@ -5,6 +5,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/invoice-generator' },
   title: 'Free Invoice & Quote Generator for Tradespeople | Lekhio',
   description:
     'Make a clean, professional invoice or quote in two minutes. Free, no signup. Load a ready made template for your trade, fill it in, and save as PDF. Built for UK sole traders.',

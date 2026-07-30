@@ -5,6 +5,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter, Ic } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/resources' },
   title: 'Free Tools & Guides for the UK Self Employed | Lekhio',
   description:
     'Free tax tools and plain English guides for UK sole traders and tradespeople. A tax calculator, an invoice and quote generator, an expense checker, a file your own return guide, and the key tax dates. No signup.',

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/privacy' },
   title: 'Privacy Policy. Lekhio.',
   description: 'How Lekhio collects, uses, and protects your data under UK GDPR.',
 };

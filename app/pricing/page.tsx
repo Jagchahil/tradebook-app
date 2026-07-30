@@ -8,6 +8,7 @@ import {
 } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/pricing' },
   title: 'Pricing. One flat price, everything in.',
   description:
     'Lekhio is £12.99 a month, or £129 a year with about two months free. No receipt limits, no tiers, no surprises. It replaces a whole shelf of subscriptions. 7 days free, no card needed.',

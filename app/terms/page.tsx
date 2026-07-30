@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/terms' },
   title: 'Terms of Service. Lekhio.',
   description: 'The terms for using Lekhio, including your free trial and billing.',
 };

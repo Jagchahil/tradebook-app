@@ -7,6 +7,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/can-i-claim' },
   title: 'Can I claim it? UK self employed expenses, answered straight | Lekhio',
   description:
     'Can I expense my work boots? Is a van tax deductible? Lekhio answers the real allowable expense questions for UK sole traders, the grey areas included, all within the law. Ask it in your browser.',

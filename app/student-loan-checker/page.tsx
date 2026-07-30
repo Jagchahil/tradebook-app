@@ -4,6 +4,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/student-loan-checker' },
   title: 'Student Loan Repayment Checker 2026/27 | Plans 1, 2, 4, 5 and Postgrad | Lekhio',
   description:
     'Free student loan repayment checker for 2026/27. See what you repay on Plan 1, 2, 4, 5 or a postgraduate loan, and the Self Assessment lump the self employed get billed in January. No signup.',

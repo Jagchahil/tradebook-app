@@ -9,6 +9,7 @@ import {
 } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/product' },
   title: 'What Lekhio does. Snap it, say it, sorted.',
   description:
     'Connect your bank and Lekhio reads it, sorts it, and keeps it tidy and ready. Receipts, mileage, invoices, CIS and quarterly tax, all in your browser. You approve before anything reaches HMRC.',

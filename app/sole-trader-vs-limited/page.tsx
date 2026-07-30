@@ -4,6 +4,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/sole-trader-vs-limited' },
   title: 'Sole Trader vs Limited Company Calculator 2026/27 | Lekhio',
   description:
     'Free sole trader vs limited company calculator for 2026/27. Real corporation tax with marginal relief, the new dividend rates, employer NI and the director salary points. See which leaves you more, and by how much. No signup.',

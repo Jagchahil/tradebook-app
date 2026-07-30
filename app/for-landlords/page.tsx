@@ -4,6 +4,7 @@ import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter, Ic } from '../_shared/site';
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/for-landlords' },
   title: 'Lekhio for Landlords | Rent, Section 24 and April 2027, Sorted',
   description:
     'Bookkeeping and tax prep for UK landlords. Log the rent as it lands, see Section 24 properly, and know what the April 2027 property rates cost you a year early. For landlords with a day job, self employed landlords, and full time landlords.',

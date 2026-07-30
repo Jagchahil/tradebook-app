@@ -7,9 +7,20 @@ import {
   cronStarted,
   cronFinished,
   addWaSend,
+  emailForUser,
+  getOptimiserInput,
+  weeklyTotals,
+  weeklyUpdateFactsFor,
 } from '../../../../lib/supabase';
 import { sendTemplate } from '../../../../lib/whatsapp';
-import { decideTrialNudge, templateFor, paramsFor, type TrialRow } from '../../../../lib/trialnudge';
+import {
+  decideTrialNudge, templateFor, paramsFor, trialWeekMessage, trialEndedMessage, type TrialRow,
+} from '../../../../lib/trialnudge';
+import { channelsFor } from '../../../../lib/routing';
+import { templateSendable } from '../../../../lib/watemplates';
+import { sendTrialWeekEmail, sendTrialEndedEmail, hasEmailConfig } from '../../../../lib/email';
+import { weeklyInput, weeklyFigures } from '../../../../lib/weeklyupdate';
+import { ledgerFor } from '../../../../lib/ledger';
 
 export const runtime = 'nodejs';
 
@@ -17,10 +28,23 @@ export const runtime = 'nodejs';
 // default, which is far shorter, so a long run was killed rather than finishing.
 export const maxDuration = 60;
 
-// Tell a man his free trial is ending, on WhatsApp, before he finds out by being locked out.
+// Tell a man his free trial is ending, before he finds out by being locked out.
 //
-// Day 11: three days left. Day 14: it has ended, and nothing has been deleted. Two messages, ever.
-// The policy lives in lib/trialnudge.ts and is pinned by tests. This route only carries it out.
+// Day six of seven: his week, and one sentence saying it ends tomorrow. Day eight: it has ended and
+// nothing has been deleted. Two messages, ever. The policy and the words both live in
+// lib/trialnudge.ts and are pinned by tests. This route only carries them out.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 30 JULY: IT WAS WHATSAPP ONLY, AND ON 10 AUGUST THAT MEANT NOBODY.
+//
+// Every send in here was sendTemplate to row.phone, and decideTrialNudge opened by returning null
+// when there was no phone. A web customer has no proved number until he binds one and launch one is
+// the web, so the entire trial ladder reached zero people while reporting a clean run every morning.
+//
+// The channel is now lib/routing.ts's decision, asked per man at the moment of sending, and email
+// is a real channel rather than a row in a table nobody read. What he is DUE is still
+// decideTrialNudge's decision and nothing here second guesses it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 //
 // WHY THIS IS NOT AN APP STORE PROBLEM. The app itself contains no price and no link to pay, which
 // is guideline 3.1.3(f) and the reason we keep 82% instead of 70%. But 3.1.3 also says, in Apple's
@@ -49,7 +73,16 @@ export const maxDuration = 60;
 //
 // And a hop counter, which the digest cron does not have: a cursor that somehow failed to advance
 // would otherwise chain forever, and a cron that retries in a tight loop is a bill.
-const SENDS_ENABLED = () => process.env.TRIAL_TEMPLATES_APPROVED === 'true';
+// ⚠️ THIS GATE NOW GUARDS THE WHATSAPP HALF ONLY, AND THAT IS THE POINT OF SPLITTING IT.
+//
+// It exists because a template Meta has not approved fails silently rather than loudly, so nothing
+// may reach one until somebody has confirmed it. That reasoning applies to TEMPLATES. It was
+// applied to the whole route, so an unset flag meant a man heard nothing by any means, and the flag
+// is unset today.
+//
+// Email needs no approval from anybody. lib/routing.ts drops whatsapp_template from the channel
+// list when templateSendable says no, and the email channel stands on its own.
+const TEMPLATES_ON = () => process.env.TRIAL_TEMPLATES_APPROVED === 'true';
 
 const PAGE_SIZE = 200;
 const BUDGET_MS = 40_000; // leaves room inside maxDuration to finish and hand off cleanly
@@ -66,6 +99,42 @@ function authorised(req: NextRequest): boolean {
     return crypto.timingSafeEqual(Buffer.from(header), Buffer.from(expected));
   } catch {
     return false;
+  }
+}
+
+// HIS WEEK, FROM THE SAME FUNCTIONS /app RENDERS AND THE WHATSAPP REPLY ANSWERS WITH.
+//
+// 🔴 ONE ENGINE, NEVER A SECOND. weeklyFigures() and ledgerFor() are the same calls the money screen
+// makes. A cron that did its own arithmetic would be a fourth reader of one number, and
+// /api/ledger's header lists the three times this codebase has already been caught that way. The
+// day this message and his dashboard disagree by a pound is the day he stops believing either.
+//
+// Read for the handful of men on day six each morning, never for everybody.
+//
+// Fails towards the honest empty: if any read fails we say we have nothing to show him rather than
+// inventing a confident zero, which is the same rule the 30 July reveal settled on.
+async function weekFor(userId: string) {
+  const empty = { income: 0, expenses: 0, profit: 0, saved: null as number | null, hasAnything: false };
+  if (!userId) return empty;
+  try {
+    const [optimiser, totals, factsMap] = await Promise.all([
+      getOptimiserInput(userId),
+      weeklyTotals(userId),
+      weeklyUpdateFactsFor([userId]).catch(() => null),
+    ]);
+    const figures = weeklyFigures(weeklyInput(totals, factsMap?.get(userId), new Date()));
+    const ledger = ledgerFor(optimiser);
+    return {
+      income: figures.income,
+      expenses: figures.expenses,
+      profit: figures.profit,
+      // ⚠️ NULL WHEN THE LEDGER REFUSES TO BE CONFIDENT, never a zero dressed up as an answer.
+      // lib/ledger.ts will not draw a figure off three weeks of data, and `enough` is how it says so.
+      saved: ledger.enough ? ledger.saved : null,
+      hasAnything: figures.income !== 0 || figures.expenses !== 0,
+    };
+  } catch {
+    return empty;
   }
 }
 
@@ -99,22 +168,18 @@ export async function GET(req: NextRequest) {
   // The WHOLE row travels with the job, not just the phone. paramsFor reads current_period_end to
   // put the actual end date in the "three days left" message, so a job carrying anything less than
   // the real row would send every man a confidently wrong date.
-  const plan: Array<{ phone: string; nudge: 'warn' | 'ended'; row: TrialRow }> = [];
+  const plan: Array<{ id: string; nudge: 'warn' | 'ended'; row: TrialRow & { id: string } }> = [];
   for (const row of page.rows) {
     const nudge = decideTrialNudge(row, now);
-    if (!nudge || !row.phone) continue;
-    if (!SENDS_ENABLED()) {
-      // Dark. Count what we WOULD have sent, and do not mark the row, so that switching the flag on
-      // tomorrow still catches everyone. A dry run that quietly marks people as told is a dry run
-      // that loses them.
-      skipped++;
-      continue;
-    }
-    plan.push({ phone: row.phone, nudge, row });
+    // ⚠️ NO PHONE CHECK HERE ANY MORE. It used to sit on this line and it was a channel question
+    // deciding a policy outcome: no number meant no message by any route, for ever.
+    if (!nudge) continue;
+    plan.push({ id: row.id, nudge, row });
   }
 
   let warned = 0;
   let ended = 0;
+  let unreachable = 0;
   let cursorIdx = 0;
 
   async function lane(): Promise<void> {
@@ -127,16 +192,53 @@ export async function GET(req: NextRequest) {
       if (Date.now() - started > BUDGET_MS) return;
       const job = plan[i];
       try {
+        const userId = job.row.user_id ?? '';
+        const email = userId ? await emailForUser(userId) : null;
+
+        // 🔴 THE TABLE DECIDES, PER MAN, AT THE MOMENT OF SENDING. A channel we cannot reach him on
+        // simply drops out, and lib/routing.ts drops whatsapp_template on its own when the template
+        // is not sendable. Nothing here substitutes one channel for another.
+        const channels = channelsFor(
+          job.nudge === 'warn' ? 'trial_ending' : 'trial_ended',
+          {
+            hasPush: false,
+            hasEmail: Boolean(email) && hasEmailConfig(),
+            hasWhatsApp: Boolean(job.row.phone) && TEMPLATES_ON(),
+          },
+        );
+
+        // ⚠️ AN EMPTY LIST IS SAID OUT LOUD AND THE ROW IS LEFT ALONE.
+        //
+        // A man we cannot reach today may be reachable tomorrow: he binds a phone, or an address
+        // gets attached. Marking him told would spend the one message he was ever going to get on a
+        // send that never happened, which is the silent failure this whole route is shaped around.
+        if (channels.length === 0) {
+          unreachable++;
+          continue;
+        }
+
         // Mark BEFORE sending. A crash between the two costs him one message. The other order
         // costs him the same message every morning until he blocks us. See markTrialNudged.
-        const claimed = await markTrialNudged(job.phone, job.nudge);
+        const claimed = await markTrialNudged(job.id, job.nudge);
         if (!claimed) continue; // somebody else already has this one
-        await sendTemplate(job.phone, templateFor(job.nudge), 'en_GB', paramsFor(job.nudge, job.row));
-        await addWaSend(1);
+
+        if (channels.includes('whatsapp_template') && job.row.phone && templateSendable(templateFor(job.nudge))) {
+          await sendTemplate(job.row.phone, templateFor(job.nudge), 'en_GB', paramsFor(job.nudge, job.row));
+          await addWaSend(1);
+        }
+
+        if (channels.includes('email') && email) {
+          if (job.nudge === 'warn') {
+            await sendTrialWeekEmail(email, trialWeekMessage(await weekFor(userId)));
+          } else {
+            await sendTrialEndedEmail(email, trialEndedMessage());
+          }
+        }
+
         if (job.nudge === 'warn') warned++;
         else ended++;
       } catch {
-        // One number failing is not the page failing.
+        // One man failing is not the page failing.
         skipped++;
       }
     }
@@ -177,13 +279,18 @@ export async function GET(req: NextRequest) {
   }
 
   // Never the phone numbers, never the names. A cron log is not a place to put a customer list.
+  // ⚠️ `unreachable` IS REPORTED BESIDE THE SENDS AND IS MEANT TO BE READ WITH THEM. A run that
+  // warned nobody and could not reach forty people is not a quiet week, it is a broken channel, and
+  // the only difference between those two readings is this number being on the page.
   return NextResponse.json({
     ok: true,
-    sends_enabled: SENDS_ENABLED(),
+    templates_enabled: TEMPLATES_ON(),
+    email_configured: hasEmailConfig(),
     hop,
     warned,
     ended,
-    would_have_sent: skipped,
+    unreachable,
+    failed: skipped,
     more: page.more,
   });
 }

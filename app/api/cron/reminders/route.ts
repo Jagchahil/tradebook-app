@@ -19,6 +19,11 @@ import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
 import { T_NUDGE, T_REMINDER, templateSendable } from '../../../../lib/watemplates';
 import { hasBankFeedConfig } from '../../../../lib/bankfeed';
+import {
+  listWeeklyTargetsPage, emailsForUsers, trialingUserIds,
+} from '../../../../lib/supabase';
+import { channelsFor } from '../../../../lib/routing';
+import { sendWeeklyReadyEmail, hasEmailConfig } from '../../../../lib/email';
 import { syncPageResumable } from '../../../../lib/banksync';
 
 // The reminder engine. Hit on a schedule (Vercel Cron, Supabase pg_cron, or any
@@ -125,18 +130,22 @@ async function triggerContinuation(job: string, afterId: string | null, hop: num
 }
 
 // The nudge and weekly fan out, one budget's worth, then hand over the cursor.
-async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: number): Promise<void> {
+// ⚠️ THE NUDGE ONLY. It used to serve the weekly notification too, with a `usesWhatsApp` flag
+// branching almost every line, and that shared shape is what made the weekly notification phone
+// gated: one target query, written for a job that needs a number, feeding a job that does not.
+// See weeklyFanOut below.
+async function fanOut(startAfter: string | null, hop: number): Promise<void> {
+  const job = 'nudge' as const;
   const started = Date.now();
   let sent = 0;
   // ⚠️ ONLY THE NUDGE SPENDS MONEY NOW. The weekly job sends a push notification, which is free,
   // so the WhatsApp kill switch, the daily cap and the send budget below all apply to the nudge and
   // not to it. Gating a free send on a cost brake would mean a man stops hearing that his numbers
   // are ready because we are watching a bill he is not on.
-  const usesWhatsApp = job === 'nudge';
 
   // Emergency brake: if proactive sends are switched off, do nothing. This is the
   // cost kill switch (scale audit); inbound service replies are unaffected.
-  if (usesWhatsApp && !waSendsEnabled()) {
+  if (!waSendsEnabled()) {
     console.log(`[cron] job=${job} proactive WhatsApp sends disabled (WHATSAPP_SENDS_ENABLED=false), skipping`);
     return;
   }
@@ -144,7 +153,7 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
   // A nudge cannot go out until Meta has approved the template. This is the gate the reminder
   // engine never had, and its absence is exactly why four bad template names sat here unnoticed:
   // there was nothing that had to be switched on, so there was nothing anybody had to check.
-  if (usesWhatsApp && !templateSendable(T_NUDGE)) {
+  if (!templateSendable(T_NUDGE)) {
     console.log(`[cron] job=${job} skipped: ${T_NUDGE} is not approved in Meta yet (set REMINDER_TEMPLATES_APPROVED=true once it is)`);
     return;
   }
@@ -197,7 +206,7 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
     const prefs = await getNudgePrefsForUsers(targets.map((t) => t.user_id));
     const wanted = targets.filter((t) => {
       const p = prefs.get(t.user_id);
-      return job === 'nudge' ? (p ? p.daily_nudges : true) : (p ? p.weekly_summary : true);
+      return p ? p.daily_nudges : true;
     });
 
     // No figures are read here any more. The Sunday notification says the numbers are ready and
@@ -213,43 +222,21 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
     // spending.
     //
     // `wanted` is exactly who we are about to text, so this is not an estimate.
-    if (usesWhatsApp && wanted.length > 0) {
+    if (wanted.length > 0) {
       const reserved = await addWaSend(wanted.length);
       if (reserved != null) runningTotal = reserved;
     }
 
     let pageSent = 0;
-    let pageNoToken = 0;
-    if (job === 'nudge') {
-      await mapLimit(wanted, 20, async (t) => {
-        await sendTemplate(t.phone, T_NUDGE, 'en_GB', []);
-        sent++;
-        pageSent++;
-      });
-    } else {
-      // THE SUNDAY NOTIFICATION. Free, and it says one thing: your numbers are in.
-      //
-      // ⚠️ A USER WITH NO PUSH TOKEN GETS NOTHING, AND THAT IS COUNTED OUT LOUD.
-      //
-      // The token arrives when the app registers for notifications, so today most rows have none.
-      // The dangerous version of this loop is the one that skips them silently and reports a
-      // cheerful `sent` figure: the job would look healthy while reaching nobody, which is the
-      // exact shape of every silent failure in this codebase's history. So the skip is counted and
-      // logged beside the sends, and the two numbers are meant to be read together.
-      await mapLimit(wanted, 20, async (t) => {
-        if (!isExpoPushToken(t.expo_push_token)) { pageNoToken++; return; }
-        await sendExpoPush(t.expo_push_token, WEEKLY_PUSH_TITLE, WEEKLY_PUSH_BODY);
-        sent++;
-        pageSent++;
-      });
-    }
-    if (pageNoToken > 0) {
-      console.log(`[cron] job=${job} ${pageNoToken} of ${wanted.length} on this page have no push token, they were not notified`);
-    }
+    await mapLimit(wanted, 20, async (t) => {
+      await sendTemplate(t.phone, T_NUDGE, 'en_GB', []);
+      sent++;
+      pageSent++;
+    });
     // Already counted, above, before the sends went out. If a send FAILED we have over-reserved
     // by one, which costs us nothing but a slightly early stop. That is the safe direction and it
     // is not worth a compensating write to correct.
-    if (usesWhatsApp && pageSent !== wanted.length) {
+    if (pageSent !== wanted.length) {
       console.error(`[cron] job=${job} sent ${pageSent} of ${wanted.length} reserved`);
     }
     if (!last) break; // final page done
@@ -269,6 +256,101 @@ async function fanOut(job: 'nudge' | 'weekly', startAfter: string | null, hop: n
     }
   }
   console.log(`[cron] job=${job} hop=${hop} sent=${sent} complete`);
+  await cronFinished(job, true, hop);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SUNDAY NOTIFICATION, AND ON 10 AUGUST THE OLD ONE WOULD HAVE REACHED NOBODY.
+//
+// It shared fanOut() with the nudge, so it inherited the nudge's target query, and that query
+// filters `phone_number=not.is.null`. Then it sent an Expo push, which needs the mobile app. So a
+// web customer failed BOTH gates: not in the list, and no app to receive it if he had been.
+//
+// Launch one is the web and the app is not released. The job would have run every Sunday at 23:00,
+// called cronFinished(ok), and delivered zero messages. That is the house disease in its purest
+// form: something that does nothing and looks completely fine.
+//
+// What changed, and none of it is new policy:
+//   . it walks EVERY user, not only the ones with a number, via listWeeklyTargetsPage
+//   . lib/routing.ts decides the channels, and `weekly_ready` has said ['push','email'] since
+//     28 July. The email half simply did not exist. Now it does.
+//   . a man mid trial is left out entirely, because he gets ONE message on day six that carries his
+//     week, and a Sunday notification landing beside it is the second message Jag said he must not
+//     get. On a seven day trial it can easily be the one that arrives on day one with nothing in it.
+//
+// ⚠️ IT COSTS NOTHING. Push and email are both free, so there is no send budget, no daily cap, no
+// WhatsApp kill switch and no template gate in here. All of those exist in fanOut() to protect a
+// bill this job is not on, and gating a free send on a cost brake would mean a man stops hearing
+// that his numbers are ready because we are watching money he does not spend.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+async function weeklyFanOut(startAfter: string | null, hop: number): Promise<void> {
+  const job = 'weekly' as const;
+  const started = Date.now();
+  let sent = 0;
+  let noChannel = 0;
+  let inTrial = 0;
+
+  if (startAfter === null) await cronStarted(job);
+
+  let cursor = startAfter;
+  for (;;) {
+    const { targets, last } = await listWeeklyTargetsPage(cursor, PAGE_SIZE);
+    if (targets.length === 0) break;
+
+    const ids = targets.map((t) => t.user_id);
+    // Three reads per page rather than three per man, the same shape getNudgePrefsForUsers already
+    // uses. A per user query inside a page loop is a page of round trips per page of customers.
+    const [prefs, emails, trialing] = await Promise.all([
+      getNudgePrefsForUsers(ids),
+      emailsForUsers(ids),
+      trialingUserIds(ids),
+    ]);
+
+    const wanted = targets.filter((t) => {
+      if (trialing.has(t.user_id)) { inTrial++; return false; }
+      const p = prefs.get(t.user_id);
+      return p ? p.weekly_summary : true;
+    });
+
+    await mapLimit(wanted, 20, async (t) => {
+      const email = emails.get(t.user_id) ?? null;
+      const channels = channelsFor('weekly_ready', {
+        hasPush: isExpoPushToken(t.expo_push_token),
+        hasEmail: Boolean(email) && hasEmailConfig(),
+        hasWhatsApp: false,
+      });
+
+      // ⚠️ REACHED NOBODY IS COUNTED, NOT SHRUGGED OFF. The old version logged a push token miss and
+      // that instinct was right; what it could not see was that most of the base was never in the
+      // list to begin with. These two numbers are meant to be read next to `sent`.
+      if (channels.length === 0) { noChannel++; return; }
+
+      if (channels.includes('push') && isExpoPushToken(t.expo_push_token)) {
+        await sendExpoPush(t.expo_push_token as string, WEEKLY_PUSH_TITLE, WEEKLY_PUSH_BODY);
+      }
+      // BOTH, not one or the other. lib/routing.ts's own header is explicit that the channels in a
+      // row are attempted rather than fallen back through: a man with the app gets the push AND the
+      // email, because Jag's 28 July decision was that everybody gets the email.
+      if (channels.includes('email') && email) {
+        await sendWeeklyReadyEmail(email);
+      }
+      sent++;
+    });
+
+    if (!last) break;
+    cursor = last;
+    if (Date.now() - started > SEND_BUDGET_MS) {
+      if (hop + 1 > MAX_HOPS) {
+        console.error(`[cron] job=${job} hop cap reached at hop=${hop}, stopping with cursor set`);
+        await cronFinished(job, false, hop, `hop cap reached at hop ${hop}, users after the cursor were not reached`);
+        return;
+      }
+      console.log(`[cron] job=${job} hop=${hop} sent=${sent} continuing after=${cursor}`);
+      await triggerContinuation(job, cursor, hop + 1);
+      return;
+    }
+  }
+  console.log(`[cron] job=${job} hop=${hop} sent=${sent} in_trial=${inTrial} no_channel=${noChannel} complete`);
   await cronFinished(job, true, hop);
 }
 
@@ -405,7 +487,8 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
       console.log(`[cron] job=due hop=${hop} sent=${sent} complete`);
       await cronFinished('due', true, hop);
     } else if (job === 'nudge' || job === 'weekly') {
-      await fanOut(job, afterId, hop);
+      if (job === 'weekly') await weeklyFanOut(afterId, hop);
+      else await fanOut(afterId, hop);
     } else if (job === 'cleanup') {
       const { pruned } = await pruneOldRows();
       console.log(`[cron] job=cleanup pruned=${pruned}`);

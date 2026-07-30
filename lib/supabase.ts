@@ -1880,7 +1880,9 @@ export async function writeSnapshot(s: Snapshot): Promise<boolean> {
 // id is what makes the walk finite: every page asks for id greater than the last one seen, so no
 // row is ever visited twice and the id space runs out.
 export interface TrialPage {
-  rows: TrialRow[];
+  // ⚠️ CARRYING THE ROW ID IS LOAD BEARING, not incidental. markTrialNudged claims by it, because
+  // claiming by phone cannot work for a web customer who has not got one.
+  rows: Array<TrialRow & { id: string }>;
   lastId: string | null;
   more: boolean;
 }
@@ -1896,7 +1898,10 @@ export async function trialsNeedingNudgePage(
       `${url}/rest/v1/subscriptions` +
         `?status=eq.trialing&stripe_subscription_id=is.null` +
         `&or=(trial_warn_sent_at.is.null,trial_end_sent_at.is.null)` +
-        `&select=id,phone,status,current_period_end,stripe_subscription_id,trial_warn_sent_at,trial_end_sent_at` +
+        // 🔴 user_id JOINED THE SELECT ON 30 JULY. Without it this page carries a phone and nothing
+        // else, so a trialing web customer, who has no phone until he binds one, could not be
+        // reached by any route at all. It is what emailForUser resolves an address from.
+        `&select=id,user_id,phone,status,current_period_end,stripe_subscription_id,trial_warn_sent_at,trial_end_sent_at` +
         `&order=id.asc&limit=${limit}${cursor}`,
       { headers: headers() },
     );
@@ -1924,12 +1929,28 @@ export async function trialsNeedingNudgePage(
 //
 // So we mark first. The cost of the opposite failure, marking and then failing to send, is that he
 // misses one message. That is the cheaper mistake, and it is the one we choose.
-export async function markTrialNudged(phone: string, which: 'warn' | 'ended'): Promise<boolean> {
+// 🔴 CLAIMED BY THE SUBSCRIPTION ROW ID, NOT BY THE PHONE NUMBER. Changed 30 July, and it is a
+// correctness fix in three separate ways rather than a tidy up.
+//
+//   . A WEB CUSTOMER HAS NO PHONE. Keying the claim on one meant that the moment the trial cron
+//     learned to email him, it still could not mark him as told, so he would have been emailed
+//     again every morning until his trial ended. The message that exists to be sent once becomes
+//     the thing he blocks us for.
+//   . A PHONE CAN MATCH MORE THAN ONE ROW. `phone=eq.` is not a unique filter, so a number that
+//     appears on two subscription rows had both stamped by one claim, and the second trial silently
+//     lost its warning.
+//   . THE PAGE ALREADY CARRIES THE ID. trialsNeedingNudgePage selects it and hands it straight to
+//     the caller, so keying on the primary key costs nothing and could have been done all along.
+//
+// Still a claim rather than an update: the `is.null` guard means two crons racing produce exactly
+// one winner, and the loser gets an empty array back and sends nothing.
+export async function markTrialNudged(subscriptionId: string, which: 'warn' | 'ended'): Promise<boolean> {
+  if (!subscriptionId) return false;
   try {
     const { url } = config();
     const col = which === 'warn' ? 'trial_warn_sent_at' : 'trial_end_sent_at';
     const res = await fetch(
-      `${url}/rest/v1/subscriptions?phone=eq.${encodeURIComponent(phone)}&${col}=is.null`,
+      `${url}/rest/v1/subscriptions?id=eq.${encodeURIComponent(subscriptionId)}&${col}=is.null`,
       {
         method: 'PATCH',
         headers: headers({ Prefer: 'return=representation' }),
@@ -1937,9 +1958,6 @@ export async function markTrialNudged(phone: string, which: 'warn' | 'ended'): P
       },
     );
     if (!res.ok) return false;
-    // The `is.null` guard makes this a claim, not just an update: if two crons somehow ran at once,
-    // exactly one of them changes a row and gets it back. The other gets an empty array and sends
-    // nothing.
     const rows = (await res.json()) as unknown[];
     return rows.length > 0;
   } catch {
@@ -2689,6 +2707,115 @@ export interface NudgeTarget {
   phone: string;
   daily_nudges: boolean;
   weekly_summary: boolean;
+}
+
+// ── Reaching a customer who has no phone ────────────────────────────────────────────────────────
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHY THESE EXIST, AND IT IS THE SAME BUG IN THREE PLACES.
+//
+// Every proactive path in this product was built when a customer arrived on WhatsApp, so every one
+// of them starts from a phone number. listNudgeTargetsPage filters `phone_number=not.is.null`, the
+// trial cron sends a template to `row.phone`, and the Sunday job sends an Expo push.
+//
+// Launch one is the WEB. A web customer has no proved number until he binds one, and no app, so on
+// 10 August all three of those reach nobody. The Sunday job would have run every week, logged a
+// cheerful finish, and delivered zero messages.
+//
+// lib/routing.ts has said `weekly_ready` goes to ['push','email'] and both trial rows go to
+// ['whatsapp_template','email'] since 28 July. The email half was never built, so the table has
+// been describing a product we do not have. These readers are what make it true.
+//
+// ⚠️ THE ADDRESS COMES FROM signups.user_id AND NOWHERE ELSE. That link is written only after the
+// address has been proved (the 29 July takeover fix), so an email reached this way is one we know
+// belongs to him. Reading signups.email by phone, which is what the old sign in door did, is the
+// exact hole that was closed.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// One page of EVERY user, for the weekly notification. Deliberately NOT listNudgeTargetsPage.
+//
+// That function keeps its `phone_number=not.is.null` filter, because it feeds the WhatsApp nudge
+// and a nudge with no number to send to is not a nudge. Reusing it here is what made the weekly
+// notification phone gated in the first place: one query serving two jobs with different reach.
+export async function listWeeklyTargetsPage(
+  afterId: string | null,
+  limit = 500,
+): Promise<{ targets: Array<{ user_id: string; expo_push_token: string | null }>; last: string | null }> {
+  const { url } = config();
+  const cursor = afterId ? `&id=gt.${encodeURIComponent(afterId)}` : '';
+  const res = await fetch(
+    `${url}/rest/v1/users?select=id,expo_push_token&order=id.asc&limit=${limit}${cursor}`,
+    { headers: headers() },
+  );
+  if (!res.ok) return { targets: [], last: null };
+  const batch = (await res.json()) as Array<{ id: string; expo_push_token: string | null }>;
+  if (!Array.isArray(batch)) return { targets: [], last: null };
+  return {
+    targets: batch.map((u) => ({ user_id: u.id, expo_push_token: u.expo_push_token ?? null })),
+    last: batch.length ? batch[batch.length - 1].id : null,
+  };
+}
+
+// The proved address for each of these accounts, in one round trip rather than one per man. Same
+// shape as getNudgePrefsForUsers, for the same reason: a per user query inside a page loop is a
+// page of round trips per page of customers.
+//
+// Newest signup wins where a man has more than one row, because that is the address he most
+// recently proved.
+export async function emailsForUsers(userIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (userIds.length === 0) return out;
+  const { url } = config();
+  const list = userIds.map((id) => `"${id}"`).join(',');
+  const res = await fetch(
+    `${url}/rest/v1/signups?user_id=in.(${encodeURIComponent(list)})` +
+      `&email=not.is.null&select=user_id,email,created_at&order=created_at.asc`,
+    { headers: headers() },
+  );
+  if (!res.ok) return out;
+  const rows = (await res.json().catch(() => null)) as Array<{ user_id: string; email: string }> | null;
+  if (!Array.isArray(rows)) return out;
+  // Ascending, so a later row overwrites an earlier one and the newest address is what remains.
+  for (const r of rows) if (r.user_id && r.email) out.set(r.user_id, r.email);
+  return out;
+}
+
+// One address for one account. The trial cron works a handful of rows a day, so the batch version
+// above would be ceremony.
+export async function emailForUser(userId: string): Promise<string | null> {
+  if (!userId) return null;
+  const map = await emailsForUsers([userId]);
+  return map.get(userId) ?? null;
+}
+
+// 🔴 WHO IS MID TRIAL, so the Sunday walk can leave them alone.
+//
+// Jag's call, 30 July: during a trial he hears from us exactly once, on day six, and that one
+// message carries his week. A Sunday notification landing in the middle of that is the second
+// message he was promised he would not get, and on a seven day trial it can easily be the one that
+// arrives on day one with nothing in it.
+//
+// Only OUR trials, never a Stripe one, which is the same line decideTrialNudge draws: a man with a
+// card on file is on a path Stripe is telling him about.
+export async function trialingUserIds(userIds: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (userIds.length === 0) return out;
+  const { url } = config();
+  const list = userIds.map((id) => `"${id}"`).join(',');
+  const res = await fetch(
+    `${url}/rest/v1/subscriptions?user_id=in.(${encodeURIComponent(list)})` +
+      `&status=eq.trialing&select=user_id`,
+    { headers: headers() },
+  );
+  // ⚠️ FAILS TOWARDS SILENCE. If we cannot tell who is mid trial we return an empty set, which
+  // means nobody is excluded and a man in a trial might get one extra notification. The other
+  // direction would be excluding everybody and sending nothing at all, and a job that goes quiet
+  // because a query failed is this codebase's whole disease.
+  if (!res.ok) return out;
+  const rows = (await res.json().catch(() => null)) as Array<{ user_id: string | null }> | null;
+  if (!Array.isArray(rows)) return out;
+  for (const r of rows) if (r.user_id) out.add(r.user_id);
+  return out;
 }
 
 // One page of nudge targets, keyset ordered by user id, for the resumable cron

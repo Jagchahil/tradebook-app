@@ -18,6 +18,15 @@ import crypto from 'crypto';
 //   ?slot=am   0 7  * * *   due, trial, and (Mon/Wed/Fri) nudge     , the morning messages
 //   ?slot=pm   0 23 * * *   metrics, digest, and (Sunday) weekly    , the end-of-day work
 //
+// ⚠️ THE WEEKLY JOB IS SUNDAY ONLY AND THAT IS STILL RIGHT, but it is no longer the only way a man
+// gets his week. From 30 July a customer MID TRIAL is excluded from the Sunday walk entirely and
+// gets his week inside the day six trial message instead, sent by the `trial` job above, relative
+// to when HE signed up rather than to a calendar Sunday.
+//
+// The reason is the seven day trial: a Saturday signup used to see the Sunday notification on day
+// one with nothing in it, and the next Sunday fell on day eight, after he had gone. So he got one
+// empty message and then nothing at all, which is the worst of both.
+//
 // 🔴 EACH KICK IS INDEPENDENT, AND THE DISPATCHER GATES ON NOTHING. metrics is the reason: the daily
 // revenue snapshot cannot be backfilled and must run even on a day WhatsApp is down, so it is never
 // placed behind a messaging config or another job's health. Every kicked endpoint still writes its

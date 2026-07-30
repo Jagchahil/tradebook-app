@@ -231,6 +231,91 @@ export async function sendWaitlistWelcomeEmail(to: string, name?: string | null)
   return send({ to, subject: 'You are on the Lekhio list.', html: shell(inner, { preheader: "We'll let you in soon — here's what's coming." }), tag: 'waitlist' });
 }
 
+// --- the trial, and the week (fires from /api/cron/trial and /api/cron/reminders) ---------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THESE ARE WHAT MAKE lib/routing.ts TRUE.
+//
+// That table has said since 28 July that `weekly_ready` goes to ['push','email'] and that both
+// trial rows go to ['whatsapp_template','email']. The email half did not exist. So the table
+// described a product we did not have, and every one of those messages was reaching a phone or an
+// app that a web customer does not have. Launch one is the web.
+//
+// ⚠️ THE WORDS ARE NOT WRITTEN HERE. They come from lib/trialnudge.ts, which is pure and tested,
+// so the email, the WhatsApp reply and anything added later cannot say three different things.
+// This file is a renderer: it turns a subject and a body into the branded shell.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// A plain message in the house shell. Blank lines in `body` are paragraph breaks and single
+// newlines are line breaks, which is exactly how the modules that compose these bodies write them.
+//
+// Everything is escaped. None of today's callers pass anything a customer typed, but a figure that
+// starts arriving from his own vendor names one day must not be the moment somebody remembers.
+function messageEmail(body: string): string {
+  return body
+    .split('\n\n')
+    .map((para) => para.trim())
+    .filter(Boolean)
+    .map((para) => p(para.split('\n').map(esc).join('<br>')))
+    .join('\n');
+}
+
+// DAY SIX OF SEVEN. His week, and one sentence about ours. lib/trialnudge.ts holds the reasoning
+// for why this is ONE message rather than two, and why the trial line is last.
+export async function sendTrialWeekEmail(
+  to: string,
+  msg: { subject: string; body: string },
+): Promise<boolean> {
+  const inner = `
+    ${h1(esc(msg.subject))}
+    ${messageEmail(msg.body)}
+    ${button(`${APP}/app`, 'See your week')}
+    ${pMuted('A real person is on the other end. Just reply if you need anything.')}`;
+  return send({
+    to,
+    subject: msg.subject,
+    html: shell(inner, { preheader: 'Your first week, and what happens tomorrow.' }),
+    tag: 'trial-week',
+  });
+}
+
+// THE DAY AFTER. His books are safe, and the card is the way back.
+export async function sendTrialEndedEmail(
+  to: string,
+  msg: { subject: string; body: string },
+): Promise<boolean> {
+  const inner = `
+    ${h1(esc(msg.subject))}
+    ${messageEmail(msg.body)}
+    ${button(`${APP}/app`, 'Carry on with Lekhio')}
+    ${pMuted('Nothing has been deleted, and it will not be. Reply here any time.')}`;
+  return send({
+    to,
+    subject: msg.subject,
+    html: shell(inner, { preheader: 'Your books are safe. Here is how to carry on.' }),
+    tag: 'trial-ended',
+  });
+}
+
+// THE SUNDAY NOTIFICATION, for a man who is not mid trial.
+//
+// ⚠️ IT CARRIES NO FIGURES, ON PURPOSE, and that is the 27 July decision holding. The summary is a
+// PULL: computed when he opens it, for the few who do, rather than for everybody every week whether
+// they look or not. This says the numbers are in and gets out of the way.
+export async function sendWeeklyReadyEmail(to: string): Promise<boolean> {
+  const inner = `
+    ${h1('Your week is ready')}
+    ${p('Your figures for the week are in. What you made, what you spent, and what Lekhio has found you.')}
+    ${button(`${APP}/app`, 'See your week')}
+    ${pMuted('You can turn these off in Settings whenever you like.')}`;
+  return send({
+    to,
+    subject: 'Your week is ready',
+    html: shell(inner, { preheader: 'What you made, what you spent, and what we found you.' }),
+    tag: 'weekly-ready',
+  });
+}
+
 // --- consent engine: double opt-in confirm --------------------------------
 export async function sendLeadConfirmEmail(to: string, confirmLink: string, unsubscribeLink: string): Promise<boolean> {
   const inner = `

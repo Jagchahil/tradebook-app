@@ -208,6 +208,77 @@ ok('email is never priced', R.costKind('email') === null);
 ok('push is never priced', R.costKind('push') === null);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n8. THE TABLE HAS CALLERS, AND THE REACH IT DESCRIBES IS REAL');
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS SECTION EXISTS BECAUSE THE TABLE WAS DECORATIVE FOR TWO DAYS AND NOBODY COULD TELL.
+//
+// From 28 July it said `weekly_ready` goes to ['push','email'] and both trial rows go to
+// ['whatsapp_template','email']. Not one line of code asked it anything, and the email half of all
+// three did not exist. So the table described a product we did not have, and every one of those
+// messages went to a phone or an app that a web customer has not got. Launch one is the web, so on
+// 10 August the Sunday notification and the entire trial ladder would have reached ZERO people
+// while logging clean runs every time.
+//
+// Sections 1 to 6 all passed throughout. They check that the table is well formed, which it was.
+// Nothing checked that anything READ it. That is the gap this closes.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+const src = (rel) => readFileSync(path.join(repo, rel), 'utf8');
+const TRIAL_ROUTE = 'app/api/cron/trial/route.ts';
+const WEEKLY_ROUTE = 'app/api/cron/reminders/route.ts';
+const WA_ROUTE = 'app/api/whatsapp/route.ts';
+
+ok('🔴 the trial cron asks the table which channels to use',
+  /channelsFor\(/.test(src(TRIAL_ROUTE)) && /'trial_ending'/.test(src(TRIAL_ROUTE)) && /'trial_ended'/.test(src(TRIAL_ROUTE)));
+ok('🔴 the weekly job asks the table which channels to use',
+  /channelsFor\('weekly_ready'/.test(src(WEEKLY_ROUTE)));
+ok('🔴 the WhatsApp binding reply asks the table too',
+  /channelsFor\('connect_result'/.test(src(WA_ROUTE)));
+
+// 🔴 THE EMAIL HALF IS REAL. A row saying 'email' with no sender behind it is the exact thing this
+// section was written about, so every route whose row names email must actually call an email sender.
+ok('🔴 the trial cron really sends email', /sendTrialWeekEmail|sendTrialEndedEmail/.test(src(TRIAL_ROUTE)));
+ok('🔴 the weekly job really sends email', /sendWeeklyReadyEmail/.test(src(WEEKLY_ROUTE)));
+
+// 🔴 AND THE WEEKLY WALK IS NOT PHONE GATED ANY MORE.
+//
+// listNudgeTargetsPage filters `phone_number=not.is.null`, correctly, because it feeds the WhatsApp
+// nudge. The weekly notification shared it, so a web customer was not even a candidate. The two
+// jobs now have their own pagers and this asserts they stay that way.
+const supabaseSrc = src('lib/supabase.ts');
+const weeklyPager = supabaseSrc.slice(
+  supabaseSrc.indexOf('export async function listWeeklyTargetsPage'),
+  supabaseSrc.indexOf('export async function emailsForUsers'),
+);
+ok('the weekly pager was actually found, so the check below is not vacuous', weeklyPager.length > 200);
+ok('🔴 the weekly pager does not filter on a phone number', !/phone_number=not\.is\.null/.test(weeklyPager));
+ok('the nudge pager still does, because a nudge with no number to send to is not a nudge',
+  /phone_number=not\.is\.null/.test(supabaseSrc.slice(
+    supabaseSrc.indexOf('export async function listNudgeTargetsPage'),
+    supabaseSrc.indexOf('export async function listNudgeTargetsPage') + 1500,
+  )));
+ok('the weekly job uses the unfiltered pager', /listWeeklyTargetsPage/.test(src(WEEKLY_ROUTE)));
+
+// 🔴 A MAN MID TRIAL HEARS FROM US ONCE. Jag, 30 July: he gets nothing until the day before it
+// ends, and that one message carries his week. A Sunday notification beside it is the second
+// message he was promised he would not get.
+ok('🔴 the Sunday walk leaves a man mid trial alone', /trialingUserIds/.test(src(WEEKLY_ROUTE)));
+
+// 🔴 THE TRIAL GATE STOPS THE TEMPLATE, NOT THE MESSAGE. TRIAL_TEMPLATES_APPROVED used to wrap the
+// whole cron, so an unset flag (it is unset today) meant silence by every route including email.
+const trialSrc = src(TRIAL_ROUTE);
+ok('🔴 the template gate no longer decides whether he hears anything at all',
+  /hasWhatsApp: Boolean\(job\.row\.phone\) && TEMPLATES_ON\(\)/.test(trialSrc));
+ok('and the email send is not behind that gate',
+  !/TEMPLATES_ON\(\)[\s\S]{0,200}sendTrialWeekEmail/.test(trialSrc));
+
+// Reaching nobody is COUNTED. The difference between a quiet week and a broken channel is whether
+// that number is on the page.
+ok('the trial cron reports who it could not reach', /unreachable/.test(trialSrc));
+ok('the weekly job reports who it could not reach', /no_channel|noChannel/.test(src(WEEKLY_ROUTE)));
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n7. THE INLINE sendText COUNT MAY FALL BUT NEVER RISE');
 //
 // A ratchet, and deliberately not a ban. There were 152 inline sendText call sites when this was

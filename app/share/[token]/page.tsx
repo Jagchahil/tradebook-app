@@ -236,7 +236,7 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
                     textAlign: 'right',
                     fontWeight: 700,
                     whiteSpace: 'nowrap',
-                    color: t.amount > 0 ? 'var(--green, #157F3B)' : INK,
+                    color: t.amount > 0 ? 'var(--green, #15803D)' : INK,
                   }}
                 >
                   {t.amount > 0 ? '+' : ''}

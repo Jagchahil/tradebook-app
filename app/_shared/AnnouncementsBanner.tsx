@@ -25,7 +25,7 @@ const RIVER_TINT = '#EDF3FA';
 const INK = '#111111';
 const MUTED = '#5B6470';
 const LINE = '#E7E3D9';
-const GREEN = '#0F7B4F';
+const GREEN = '#15803D';  // the brand green, not a third one
 const GREEN_TINT = '#EAF5EF';
 
 export interface BannerItem {

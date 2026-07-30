@@ -262,7 +262,7 @@ export default function Wizard() {
                     <span style={{ width: 10, height: 10, borderRadius: 5, background: '#F25F58' }} />
                     <span style={{ width: 10, height: 10, borderRadius: 5, background: '#FBBE3C' }} />
                     <span style={{ width: 10, height: 10, borderRadius: 5, background: '#58CB42' }} />
-                    <span style={{ marginLeft: 8, fontSize: 11, color: '#6B7280', background: '#fff', borderRadius: 6, padding: '3px 10px', fontVariantNumeric: 'tabular-nums' }}>{steps[step].preview!.site === 'Companies House' ? 'find-and-update.company-information.service.gov.uk' : 'gov.uk'}</span>
+                    <span style={{ marginLeft: 8, fontSize: 11, color: '#5B6470', background: '#fff', borderRadius: 6, padding: '3px 10px', fontVariantNumeric: 'tabular-nums' }}>{steps[step].preview!.site === 'Companies House' ? 'find-and-update.company-information.service.gov.uk' : 'gov.uk'}</span>
                   </div>
                   <div style={{ background: '#0b0c0c', color: '#fff', padding: '10px 16px', fontSize: 14, fontWeight: 700 }}>{steps[step].preview!.site}</div>
                   <div style={{ background: '#fff', padding: '18px 16px' }}>

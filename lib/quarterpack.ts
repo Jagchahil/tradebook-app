@@ -391,7 +391,7 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
   // A safety banner if the underlying data may have been capped, so a truncated
   // summary is never presented to an accountant as complete.
   const truncatedBanner = pack.truncated
-    ? `<div style="background:#FDECEC;border:1px solid #F5B5B5;border-radius:10px;padding:12px 14px;margin:0 0 18px;font-size:13px;color:#8A1F1F">This summary may be incomplete: you have an unusually large number of entries and not all could be included. Please contact us before relying on these figures.</div>`
+    ? `<div style="background:#FBEAE8;border:1px solid #F5B5B5;border-radius:10px;padding:12px 14px;margin:0 0 18px;font-size:13px;color:#8A1F1F">This summary may be incomplete: you have an unusually large number of entries and not all could be included. Please contact us before relying on these figures.</div>`
     : '';
 
   return `<!doctype html>

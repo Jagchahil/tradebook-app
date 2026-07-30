@@ -29,7 +29,7 @@ const INK = '#111111';
 const MUTED = '#5B6470';
 const PAPER = '#FBFAF7';
 const LINE = '#E7E3D9';
-const WHATSAPP = '#1FA855';
+const WHATSAPP = '#25D366';  // WhatsApp's own green. This file had a second, slightly different one.
 
 // Turn UK input (07..., 447..., +44 7...) into E.164, the account key.
 function toE164(raw: string): string {

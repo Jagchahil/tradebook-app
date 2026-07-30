@@ -81,8 +81,8 @@ const MTD_JS = `
     var k=+slider.value;var iv=document.getElementById('incomeVal');if(iv)iv.textContent=money(k);
     var r=document.getElementById('result');if(!r)return;var title,date,note,bg,col;
     if(k>=50){title='MTD applies to you now';date='FROM APRIL 2026';note='You send HMRC four short updates a year. Lekhio prepares every one, ready for your approval.';bg='var(--river-tint)';col='var(--river)';}
-    else if(k>=30){title='MTD applies from April 2027';date='THE £30,000 THRESHOLD';note='You have time. Start now and your records are already ready when it kicks in.';bg='var(--saffron-tint)';col='var(--saffron-deep)';}
-    else if(k>=20){title='MTD applies from April 2028';date='THE £20,000 THRESHOLD';note='Plenty of time. Lekhio keeps you ready either way, with zero effort.';bg='var(--saffron-tint)';col='var(--saffron-deep)';}
+    else if(k>=30){title='MTD applies from April 2027';date='THE £30,000 THRESHOLD';note='You have time. Start now and your records are already ready when it kicks in.';bg='var(--saffron-tint)';col='var(--on-saffron-tint)';}
+    else if(k>=20){title='MTD applies from April 2028';date='THE £20,000 THRESHOLD';note='Plenty of time. Lekhio keeps you ready either way, with zero effort.';bg='var(--saffron-tint)';col='var(--on-saffron-tint)';}
     else{title='Not required yet';date='UNDER £20,000';note='No MTD duty for now. Tidy books still save you money and stress, so Lekhio keeps you sorted.';bg='var(--green-tint)';col='var(--green)';}
     r.style.background=bg;
     r.innerHTML='<div class="rtitle" style="color:'+col+'">'+title+'</div><div class="rdate" style="color:'+col+'">'+date+'</div><div class="rnote">'+note+'</div>';

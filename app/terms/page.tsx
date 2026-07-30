@@ -27,14 +27,14 @@ const heading: React.CSSProperties = {
 const para: React.CSSProperties = {
   fontSize: 16,
   lineHeight: 1.7,
-  color: '#374151',
+  color: '#5B6470',
   margin: '0 0 14px',
 };
 
 const li: React.CSSProperties = {
   fontSize: 16,
   lineHeight: 1.7,
-  color: '#374151',
+  color: '#5B6470',
   marginBottom: 8,
 };
 

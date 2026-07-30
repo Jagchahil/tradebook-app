@@ -20,7 +20,7 @@ const APP = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
 // --- brand palette --------------------------------------------------------
 const INK = '#111111';
 const RIVER = '#1B59A6';
-const GOLD = '#C6871A';
+const GOLD = '#C9842A';  // SAFFRON_DEEP. This was two ticks off it.
 const MUTED = '#5B6470';
 const CREAM = '#FBFAF7';
 const LINE = '#ECE9E2';

@@ -134,7 +134,33 @@ async function triggerContinuation(job: string, afterId: string | null, hop: num
 // branching almost every line, and that shared shape is what made the weekly notification phone
 // gated: one target query, written for a job that needs a number, feeding a job that does not.
 // See weeklyFanOut below.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A JOB THAT IS SWITCHED OFF ON PURPOSE MUST SAY SO, NOT GO QUIET.
+//
+// This cost us a 503 and an UptimeRobot page on 30 July, with nothing whatsoever wrong. The nudge
+// has two deliberate off switches, the WhatsApp kill switch and the Meta template gate, and both
+// used to `console.log` and return BEFORE the watchdog row was written. So a job we had chosen not
+// to run was indistinguishable, to /api/health, from a job that had died. Eighty hours later the
+// site went red and the whole product looked down.
+//
+// It is the house disease again: a check that cannot tell "no" from "nothing". The walk is over the
+// moment we decide not to do it, so we record that it started, finished, and why it sent nothing.
+// The watchdog keeps watching and the row carries the reason. Health stays green because the
+// silence was ours.
+//
+// ⚠️ This is NOT the same as loosening the alarm. If the cron genuinely stops firing, no row is
+// written by anybody and /api/health still goes red exactly as before.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+async function skippedOnPurpose(job: string, startAfter: string | null, why: string): Promise<void> {
+  console.log(`[cron] job=${job} skipped: ${why}`);
+  // Only on the first hop. A later page of a walk we already recorded must not restate the start.
+  if (startAfter !== null) return;
+  await cronStarted(job);
+  await cronFinished(job, true, 0, `skipped on purpose: ${why}`);
+}
+
 async function fanOut(startAfter: string | null, hop: number): Promise<void> {
+
   const job = 'nudge' as const;
   const started = Date.now();
   let sent = 0;
@@ -146,7 +172,7 @@ async function fanOut(startAfter: string | null, hop: number): Promise<void> {
   // Emergency brake: if proactive sends are switched off, do nothing. This is the
   // cost kill switch (scale audit); inbound service replies are unaffected.
   if (!waSendsEnabled()) {
-    console.log(`[cron] job=${job} proactive WhatsApp sends disabled (WHATSAPP_SENDS_ENABLED=false), skipping`);
+    await skippedOnPurpose(job, startAfter, 'proactive WhatsApp sends are switched off (WHATSAPP_SENDS_ENABLED=false)');
     return;
   }
 
@@ -154,7 +180,7 @@ async function fanOut(startAfter: string | null, hop: number): Promise<void> {
   // engine never had, and its absence is exactly why four bad template names sat here unnoticed:
   // there was nothing that had to be switched on, so there was nothing anybody had to check.
   if (!templateSendable(T_NUDGE)) {
-    console.log(`[cron] job=${job} skipped: ${T_NUDGE} is not approved in Meta yet (set REMINDER_TEMPLATES_APPROVED=true once it is)`);
+    await skippedOnPurpose(job, startAfter, `${T_NUDGE} is not approved in Meta yet (set REMINDER_TEMPLATES_APPROVED=true once it is)`);
     return;
   }
   // The day's send ceiling, DERIVED from the live paying base and the margin

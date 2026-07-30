@@ -8,11 +8,16 @@ import ClientScript from './ClientScript';
 import { filingFaqAnswer, filingMark, bankMark, hmrcFilingLive, bankFeedLive } from '../../lib/features';
 import type { CSSProperties } from 'react';
 import { TRADES } from '../../lib/trades';
-import { A11Y_CSS } from '../../lib/tokens';
+import { A11Y_CSS, THEME_CSS, THEME_SWAP_JS } from '../../lib/tokens';
 
-// Colours are CSS variables so the whole site themes light and dark from one
-// place. The raw palette lives in THEME_VARS below. Components keep using these
-// same constant names, so nothing downstream has to change.
+// Colours are CSS variables so the whole site themes light and dark from one place. The raw
+// palette is lib/tokens.ts and arrives here as THEME_CSS, injected by SharedHead. Components keep
+// using these same constant names, so nothing downstream has to change.
+//
+// ⚠️ lib/tokens.ts exports SOME OF THESE NAMES TOO, with raw hex values instead of var() calls.
+// That is deliberate: app pages paint inline styles and stay light, marketing pages theme. Import
+// colours from THIS file on any page that renders <SharedHead />, and from lib/tokens.ts on any
+// page that does not. A var() on a page with no theme block resolves to nothing.
 export const INK = 'var(--tx)';
 export const RIVER = 'var(--river)';
 export const RIVER_DEEP = 'var(--river-deep)';
@@ -29,6 +34,13 @@ export const SURFACE = 'var(--surface)';
 export const LINE = 'var(--bd)';
 export const MUTED = 'var(--tx-mut)';
 export const WHATSAPP = '#25D366';
+// The ink that belongs ON each accent. Never plain white: the dark theme lifts every accent so it
+// can be seen against a near black page, and white on those lifted colours drops to 2.4:1. See the
+// long note in lib/tokens.ts. Use these anywhere an accent is a BACKGROUND.
+export const ON_RIVER = 'var(--on-river)';
+export const ON_GREEN = 'var(--on-green)';
+export const ON_SAFFRON = 'var(--on-saffron)';
+export const ON_WHATSAPP = 'var(--on-whatsapp)';
 // A white card surface that becomes a dark panel in dark mode.
 export const PANEL = 'var(--panel)';
 // A deep contrast band (footer, feature-dark sections) in both themes.
@@ -128,7 +140,7 @@ export const MARKETING_CSS = `
 .mkt .dot{width:8px;height:8px;border-radius:999px;background:#22C55E;animation:hpulse 2s infinite}
 @keyframes hpulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
 .mkt .btn{display:inline-block;text-align:center;font-weight:700;font-size:16px;padding:15px 30px;border-radius:13px;cursor:pointer;border:0;font-family:inherit;transition:transform .18s,box-shadow .25s}
-.mkt .btn.primary{background:var(--river);color:#fff;box-shadow:0 10px 26px rgba(27,89,166,.32)}
+.mkt .btn.primary{background:var(--river);color:var(--on-river);box-shadow:0 10px 26px rgba(27,89,166,.32)}
 .mkt .btn.primary:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(27,89,166,.4)}
 .mkt .btn.ghost{background:transparent;color:var(--tx);border:1px solid var(--tx)}
 .mkt .btn.ghost:hover{transform:translateY(-2px);background:var(--panel-2)}
@@ -201,9 +213,9 @@ export const MARKETING_CSS = `
 .wf{display:flex;align-items:flex-end;gap:3px;height:30px;padding:2px 0}.wf i{width:4px;border-radius:2px;background:var(--river)}
 .splitrow{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
 .splitrow:last-child{border:0;font-weight:800}
-.approvebtn{margin-top:4px;background:var(--green);color:#fff;border-radius:12px;padding:11px;font-weight:800;text-align:center;font-size:14px}
+.approvebtn{margin-top:4px;background:var(--green);color:var(--on-green);border-radius:12px;padding:11px;font-weight:800;text-align:center;font-size:14px}
 .diconrow{display:flex;align-items:center;gap:12px}
-.dicon{width:44px;height:44px;border-radius:999px;background:var(--river);color:#fff;font-size:20px;display:grid;place-items:center}
+.dicon{width:44px;height:44px;border-radius:999px;background:var(--river);color:var(--on-river);font-size:20px;display:grid;place-items:center}
 .rev-marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
 .rev-track{display:flex;gap:18px;width:max-content;animation:hslide 44s linear infinite}
 .rev-marquee:hover .rev-track{animation-play-state:paused}
@@ -604,7 +616,7 @@ export function AppTax() {
         <span style={{ fontSize: 12, fontWeight: 700, color: INK }}>Estimated profit</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: RIVER }}>£1,270.00</span>
       </div>
-      <div style={{ marginTop: 14, background: RIVER, color: '#fff', borderRadius: 12, padding: '12px 0', textAlign: 'center', fontSize: 13, fontWeight: 700 }}>Prepare my summary</div>
+      <div style={{ marginTop: 14, background: RIVER, color: ON_RIVER, borderRadius: 12, padding: '12px 0', textAlign: 'center', fontSize: 13, fontWeight: 700 }}>Prepare my summary</div>
     </div>
   );
 }
@@ -618,7 +630,7 @@ export function AppInv() {
     <div className="appscreen">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 18, fontWeight: 800, color: INK }}>Invoices</div>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: RIVER, padding: '7px 13px', borderRadius: 10 }}>+ New</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: ON_RIVER, background: RIVER, padding: '7px 13px', borderRadius: 10 }}>+ New</span>
       </div>
       <div style={{ marginTop: 14, background: PANEL, border: `1px solid ${LINE}`, borderRadius: 14, padding: '15px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>Outstanding</span>
@@ -678,21 +690,7 @@ export function HeroPhone() {
 }
 
 // ---------- shared chrome ----------
-const SHARED_CSS = `
-:root{
-  --river:#1B59A6;--river-deep:#134277;--river-tint:#E9F1FA;
-  --saffron:#E0A33E;--saffron-deep:#C9842A;--saffron-tint:#FBEFD8;
-  --green:#15803D;--green-tint:#E7F5EC;--red:#C0392B;--red-tint:#FDECEC;
-  --bg:#FBFAF7;--panel:#FFFFFF;--surface:#F2F0EA;--bd:#E7E3D9;--band:#141821;
-  --tx:#111111;--tx-mut:#5B6470;
-}
-[data-theme="dark"]{
-  --river:#4C8FDB;--river-deep:#6AA6E6;--river-tint:#16263C;
-  --saffron:#E9B45A;--saffron-deep:#F0C173;--saffron-tint:#2A2113;
-  --green:#43BE72;--green-tint:#12281B;--red:#E67667;--red-tint:#2A1614;
-  --bg:#0E1116;--panel:#161A21;--surface:#1E242E;--bd:#2A313C;--band:#080A0E;
-  --tx:#F3F5F8;--tx-mut:#9AA6B5;
-}
+const SHARED_CSS = `${THEME_CSS}
 html,body{background:var(--bg)}
 body{transition:background-color .35s ease,color .35s ease}
 *{box-sizing:border-box} body{margin:0}
@@ -732,7 +730,7 @@ a{text-decoration:none}
 .icontile{transition:transform .2s ease}
 .card:hover .icontile{transform:scale(1.08) rotate(-3deg)}
 .chip{transition:transform .15s ease, background-color .15s ease, color .15s ease}
-.chip:hover{transform:translateY(-2px);background-color:${RIVER};color:#fff;border-color:${RIVER}}
+.chip:hover{transform:translateY(-2px);background-color:${RIVER};color:var(--on-river);border-color:${RIVER}}
 .riverflow{stroke-dasharray:1600;stroke-dashoffset:1600;animation:flow 1.4s ease forwards .15s}
 .gradtext{background:linear-gradient(90deg,${RIVER},#2E7BBF,${SAFFRON},${RIVER});background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:sheen 5s linear infinite}
 .hero-h1-size{font-size:64px;line-height:1.05}
@@ -827,20 +825,33 @@ details.faq[open] .faq-body{max-height:360px;opacity:1;margin-top:12px}
 // Idempotent reveal + countup. Safe to run even if a global layout script also runs.
 const REVEAL_JS = `
 (function(){
-  // Theme: follow the device's light/dark setting automatically, and keep in
-  // step if the user changes it while the page is open. No manual toggle.
+  // Theme: his own choice if he has made one, otherwise whatever his device says, and it keeps
+  // in step if he changes the device setting while the page is open.
+  //
+  // 🔴 EVERY CHANGE GOES THROUGH swapTheme. Setting data-theme directly leaves half the page on
+  // the old palette, because Chrome will not re-resolve a property that is mid transition when
+  // only the custom property behind it changed. The full story is in lib/tokens.ts.
+  var swapTheme = ${THEME_SWAP_JS};
+  var saved = null;
+  try{ saved = localStorage.getItem('lekhio-theme'); }catch(e){}
   try{
     var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme:dark)') : null;
-    document.documentElement.setAttribute('data-theme', (mq && mq.matches) ? 'dark' : 'light');
-    if(mq && mq.addEventListener){ mq.addEventListener('change', function(e){ document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light'); }); }
+    swapTheme(saved || ((mq && mq.matches) ? 'dark' : 'light'));
+    // ⚠️ His explicit choice outranks the device. Without this check, a phone that flips to dark
+    // at sunset would undo the light mode he deliberately picked ten minutes earlier.
+    if(mq && mq.addEventListener){ mq.addEventListener('change', function(e){
+      var chosen = null; try{ chosen = localStorage.getItem('lekhio-theme'); }catch(err){}
+      if(!chosen) swapTheme(e.matches ? 'dark' : 'light');
+    }); }
   }catch(e){}
   var setIcon = function(){ var b=document.getElementById('lekhio-theme'); if(b) b.textContent = document.documentElement.getAttribute('data-theme')==='dark' ? '☀️' : '🌙'; };
   var wireToggle = function(){
     var b=document.getElementById('lekhio-theme');
     if(b && !b.__wired){ b.__wired=true; b.addEventListener('click', function(){
-      var d = document.documentElement.getAttribute('data-theme')==='dark';
-      var n = d ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', n);
+      var n = document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
+      swapTheme(n);
+      // Remembered, and now actually read back on the next page load. It used to be written here
+      // and never read anywhere, so his choice was lost the moment he clicked a link.
       try{ localStorage.setItem('lekhio-theme', n); }catch(e){}
       setIcon();
     }); }
@@ -910,7 +921,7 @@ export function SiteNav() {
           {NAV_LINKS.map(([href, label]) => (
             <Link key={href} href={href} className="navtop">{label}</Link>
           ))}
-          <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
+          <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
         </div>
         {/* suppressHydrationWarning: the head script sets this button's icon from the
             OS theme before React hydrates, so dark mode visitors would otherwise get a
@@ -933,7 +944,7 @@ export function SiteNav() {
         <Link href="/rent-a-room-checker">Rent a Room checker</Link>
         <Link href="/sole-trader-vs-limited">Sole trader vs limited</Link>
         <Link href="/security">Security and trust</Link>
-        <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
+        <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: ON_RIVER, fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
       </div>
     </nav>
   );
@@ -943,7 +954,7 @@ export function StickyCta() {
   return (
     <div className="stickycta">
       <span style={{ fontSize: 14, fontWeight: 700, color: INK }}>7 days free. No card.</span>
-      <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 700, padding: '11px 20px', borderRadius: 10 }}>Start free</Link>
+      <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 700, padding: '11px 20px', borderRadius: 10 }}>Start free</Link>
     </div>
   );
 }

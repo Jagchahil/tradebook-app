@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 }
 
 function page(title: string, body: string, ok: boolean): string {
-  const accent = ok ? '#15803D' : '#B42318';
+  const accent = ok ? '#15803D' : '#C0392B';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} | Lekhio</title></head>
   <body style="margin:0;background:#FBFAF7;font-family:Inter,-apple-system,'Segoe UI',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
     <div style="max-width:440px;text-align:center;background:#fff;border:1px solid #ECECEC;border-radius:16px;padding:40px 28px">

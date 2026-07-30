@@ -18,7 +18,7 @@ const INK = '#111111';
 const MUTED = '#5B6470';
 const LINE = '#D4E4F4';
 const GREEN = '#15803D';
-const RED = '#B42318';
+const RED = '#C0392B';  // the brand red, not a second one
 
 const CONSENT_TEXT =
   'Yes, email me my result plus occasional tax deadline reminders and money saving tips from Lekhio. I can unsubscribe at any time.';

@@ -748,14 +748,14 @@ a{text-decoration:none}
 .timeline{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:10px}
 .tl-line{position:absolute;top:18px;left:10%;right:10%;height:3px;background:linear-gradient(90deg,${RIVER},${SAFFRON});border-radius:2px;transform:scaleX(0);transform-origin:left;animation:grow .8s ease forwards .15s}
 .tl-step{text-align:center;position:relative}
-.tl-dot{width:38px;height:38px;border-radius:19px;background:#fff;border:3px solid ${RIVER};color:${RIVER};font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;position:relative;z-index:1;opacity:0;animation:popIn .5s ease forwards}
+.tl-dot{width:38px;height:38px;border-radius:19px;background:#fff;border:3px solid ${RIVER};color:var(--on-white-river);font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;position:relative;z-index:1;opacity:0;animation:popIn .5s ease forwards}
 .marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
 .marquee-track{display:flex;gap:20px;width:max-content;animation:marquee 48s linear infinite}
 .marquee:hover .marquee-track{animation-play-state:paused}
 .rev-card{width:340px;flex:0 0 auto}
 .appdemo-grid{display:grid;grid-template-columns:.95fr 1.05fr;gap:48px;align-items:center}
-.appphone{width:340px;max-width:100%;margin:0 auto;background:#fff;border-radius:40px;border:1px solid ${LINE};box-shadow:0 30px 70px rgba(17,17,17,.18);overflow:hidden}
-.appstatus{height:30px;display:flex;align-items:center;justify-content:center;background:#fff}
+.appphone{width:340px;max-width:100%;margin:0 auto;background:var(--panel);border-radius:40px;border:1px solid ${LINE};box-shadow:0 30px 70px rgba(17,17,17,.18);overflow:hidden}
+.appstatus{height:30px;display:flex;align-items:center;justify-content:center;background:var(--panel)}
 .appstatus i{width:96px;height:6px;border-radius:3px;background:${LINE};display:block}
 .appview{position:relative;height:438px;overflow:hidden;background:${PAPER}}
 .apptrack{display:flex;width:400%;height:100%;animation:appslide 7s cubic-bezier(.65,0,.35,1) infinite}

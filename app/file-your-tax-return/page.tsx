@@ -145,10 +145,10 @@ const stepperCss =
   `.wtF{animation:wtFill .7s ease forwards}` +
   `.wtPress{animation:wtPress 1.5s ease .25s forwards}` +
   `.wt-caret{display:inline-block;width:2px;height:14px;background:${RIVER};vertical-align:middle;animation:wtBlink .8s step-end infinite}` +
-  `.wt-screen{background:#fff;border:1px solid ${LINE};border-radius:16px;overflow:hidden;box-shadow:0 14px 36px rgba(17,17,17,.08)}` +
+  `.wt-screen{background:var(--panel);border:1px solid ${LINE};border-radius:16px;overflow:hidden;box-shadow:0 14px 36px rgba(17,17,17,.08)}` +
   `.wt-screenbar{background:${INK};color:#fff;font-size:11.5px;font-weight:600;letter-spacing:.3px;padding:9px 14px}` +
   `.wt-tabs{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:24px}` +
-  `.wt-tab{cursor:pointer;width:40px;height:40px;border-radius:999px;border:1.5px solid ${LINE};background:#fff;color:${INK};font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s}` +
+  `.wt-tab{cursor:pointer;width:40px;height:40px;border-radius:999px;border:1.5px solid ${LINE};background:var(--panel);color:${INK};font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s}` +
   `.wt-tab:hover{border-color:${RIVER}}` +
   `.wt-stage{min-height:312px}` +
   `.wt-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:center}` +
@@ -382,15 +382,15 @@ export default function FileYourTaxReturnPage() {
           .trade-panel{display:none;animation:riseIn .25s ease}
           ${tradeCss}
           ${stepperCss}
-          details{border:1px solid ${LINE};border-radius:14px;background:#fff;margin-bottom:12px;overflow:hidden}
+          details{border:1px solid ${LINE};border-radius:14px;background:var(--panel);margin-bottom:12px;overflow:hidden}
           details[open]{box-shadow:0 10px 30px rgba(17,17,17,.06)}
           summary{list-style:none;cursor:pointer;padding:18px 20px;font-weight:600;font-size:16.5px;display:flex;align-items:center;justify-content:space-between;gap:14px}
           summary::-webkit-details-marker{display:none}
           summary::after{content:'+';font-size:22px;color:${RIVER};font-weight:400;line-height:1}
           details[open] summary::after{content:'-'}
-          .step-card{display:flex;gap:18px;padding:22px;background:#fff;border:1px solid ${LINE};border-radius:16px;margin-bottom:14px}
-          .branch-tab{display:inline-block;cursor:pointer;border:1.5px solid ${LINE};background:#fff;color:${INK};font-weight:600;font-size:15px;padding:12px 20px;border-radius:999px}
-          .chip{display:inline-block;cursor:pointer;border:1.5px solid ${LINE};background:#fff;color:${INK};font-weight:600;font-size:14px;padding:9px 15px;border-radius:999px;transition:all .15s}
+          .step-card{display:flex;gap:18px;padding:22px;background:var(--panel);border:1px solid ${LINE};border-radius:16px;margin-bottom:14px}
+          .branch-tab{display:inline-block;cursor:pointer;border:1.5px solid ${LINE};background:var(--panel);color:${INK};font-weight:600;font-size:15px;padding:12px 20px;border-radius:999px}
+          .chip{display:inline-block;cursor:pointer;border:1.5px solid ${LINE};background:var(--panel);color:${INK};font-weight:600;font-size:14px;padding:9px 15px;border-radius:999px;transition:all .15s}
           .chip:hover{border-color:${RIVER}}
           @media (max-width:640px){ .hide-sm{display:none} .step-card{flex-direction:column;gap:10px} }
           `,

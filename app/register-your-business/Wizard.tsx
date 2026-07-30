@@ -256,7 +256,24 @@ export default function Wizard() {
 
             {steps[step].preview ? (
               <div className="wz-anim" style={{ marginTop: 18 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>What you will see</div>
+                {/* ═══════════════════════════════════════════════════════════════════════════
+                    🔴 THIS IS A DRAWING OF SOMEBODY ELSE'S WEBSITE AND IT HAS TO SAY SO.
+                    Below is a facsimile of a GOV.UK page: their black header, their green button,
+                    their address in the bar. It earns its place, because a man who knows what the
+                    real page looks like does not get taken in by a copycat filing service, and
+                    those are the outfits that charge him ninety pounds to press submit.
+
+                    But GOV.UK's brand guidelines are written for government teams on official
+                    government channels, and we are neither. The risk is not that we are sued over
+                    a green rectangle. It is that a tradesman glances at this and concludes Lekhio
+                    is part of the government. Google has already rejected our Play listing once
+                    for looking like a government entity, and the HMRC production checklist asks
+                    about exactly this.
+
+                    So the fidelity stays, because desaturating it would defeat the purpose, and
+                    the ambiguity goes. The line below is not decoration and must not be removed.
+                    ═══════════════════════════════════════════════════════════════════════════ */}
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>What you will see on the government website</div>
                 <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, boxShadow: '0 8px 24px rgba(17,17,17,.06)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#E8E8E8', padding: '8px 12px' }}>
                     <span style={{ width: 10, height: 10, borderRadius: 5, background: '#F25F58' }} />
@@ -270,6 +287,11 @@ export default function Wizard() {
                     <span style={{ display: 'inline-block', background: '#00703c', color: '#fff', fontSize: 13.5, fontWeight: 700, padding: '9px 16px', borderRadius: 3 }}>{steps[step].preview!.cta} ›</span>
                   </div>
                 </div>
+                <p style={{ fontSize: 12, lineHeight: 1.5, color: MUTED, margin: '8px 2px 0' }}>
+                  A picture of {steps[step].preview!.site}, so you know the real page when you land
+                  on it. Lekhio is an independent UK company. We are not the government and we are
+                  not endorsed by them.
+                </p>
               </div>
             ) : null}
 

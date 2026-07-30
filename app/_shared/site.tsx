@@ -941,6 +941,11 @@ export function SiteNav() {
       </div>
 
       <div className="nav-panel">
+        {/* ⚠️ FIRST, NOT LAST. It was at the bottom of this panel for about twenty minutes and on a
+            phone that put it fifteenth, under "Rent a Room checker". A stranger is happy to read
+            down a list of what we do. A man who already pays us is here for one thing and should
+            not have to scroll past fourteen adverts to find the door to his own books. */}
+        <Link href="/in" style={{ fontWeight: 700 }}>Sign in</Link>
         {NAV_LINKS.map(([href, label]) => (
           <Link key={href} href={href}>{label}</Link>
         ))}
@@ -954,7 +959,6 @@ export function SiteNav() {
         <Link href="/rent-a-room-checker">Rent a Room checker</Link>
         <Link href="/sole-trader-vs-limited">Sole trader vs limited</Link>
         <Link href="/security">Security and trust</Link>
-        <Link href="/in">Sign in</Link>
         <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: ON_RIVER, fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
       </div>
     </nav>

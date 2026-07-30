@@ -298,6 +298,16 @@ console.log('\n=== a customer can get back in ===\n');
   ok('the nav says "Sign in" in words a customer would look for', /Sign in/.test(nav));
   ok('the mobile menu links to it too, not just the desktop nav',
     (nav.match(/href="\/in"/g) || []).length >= 2);
+  // ⚠️ PRESENT IS NOT THE SAME AS FINDABLE. The first version of this put it last in the mobile
+  // panel, which on a phone is fifteenth, under "Rent a Room checker". A stranger will read down a
+  // list of what we do. A customer is here for one thing. It comes before the marketing links.
+  {
+    const panel = nav.slice(nav.indexOf('className="nav-panel"'));
+    const signIn = panel.indexOf('href="/in"');
+    const marketing = panel.indexOf('NAV_LINKS.map');
+    ok('sign in comes before the marketing links in the mobile menu',
+      signIn > -1 && marketing > -1 && signIn < marketing);
+  }
   ok('the footer links to it as well', footer.includes("'/in'"));
 
   // ⚠️ THE STAFF DOOR MUST NEVER BE THE ONLY DOOR. It stays, plainly labelled, because it is where

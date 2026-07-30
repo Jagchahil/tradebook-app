@@ -5,7 +5,7 @@
 //   create test user -> find business id -> connect (OAuth) -> obligations ->
 //   build a cumulative summary -> approve -> submit -> validate fraud headers.
 //
-// It reuses the REAL production code in lib/hmrc.ts (buildPeriodicUpdate, the
+// It reuses the REAL production code in lib/hmrc.ts (buildCumulativeUpdate, the
 // fraud-prevention header builder, and the approval-gated submit), so what you
 // demonstrate is the same code path that would run live. Only the sandbox-only
 // helpers (create test user, list businesses, header validator) are added here.
@@ -131,15 +131,17 @@ function demoFraudContext(userId) {
 // --- sample transactions for the cumulative summary ------------------------
 // Year to date (accounting period start to latest quarter end). Positive is
 // income, negative is expense, matching lib/hmrc.ts SimpleTxn.
+// Dated, because buildCumulativeUpdate windows on the date rather than trusting the caller.
+// All inside Q1 so the demo's default period works untouched.
 const SAMPLE_TXNS = [
-  { amount: 5200, category: 'income' },
-  { amount: 3100, category: 'income' },
-  { amount: -640, category: 'materials' },
-  { amount: -220, category: 'tools' },
-  { amount: -900, category: 'subcontractor' },
-  { amount: -410, category: 'fuel' },
-  { amount: -95, category: 'phone' },
-  { amount: -180, category: 'accountancy' },
+  { amount: 5200, category: 'income', date: '2026-04-14' },
+  { amount: 3100, category: 'income', date: '2026-06-02' },
+  { amount: -640, category: 'materials', date: '2026-04-16' },
+  { amount: -220, category: 'tools', date: '2026-04-29' },
+  { amount: -900, category: 'subcontractor', date: '2026-05-08' },
+  { amount: -410, category: 'fuel', date: '2026-05-21' },
+  { amount: -95, category: 'phone', date: '2026-06-10' },
+  { amount: -180, category: 'accountancy', date: '2026-06-24' },
 ];
 
 // ===========================================================================
@@ -266,10 +268,11 @@ async function submit(approve) {
   if (!st.accessToken || !st.nino || !st.businessId) { console.error('Run create-user, authorize, businesses first.'); process.exit(1); }
   const taxYear = process.env.HMRC_DEMO_TAX_YEAR || '2026-27';
   const consolidated = process.env.HMRC_DEMO_CONSOLIDATED === 'true';
-  const start = process.env.HMRC_DEMO_PERIOD_START || '2026-04-06';
+  // ⚠️ NO PERIOD START ANY MORE. It is derived from the tax year, because a cumulative window always
+  // opens on 6 April and letting an env var move it is exactly how a discrete quarter gets submitted.
   const end = process.env.HMRC_DEMO_PERIOD_END || '2026-07-05';
 
-  const payload = HMRC.buildPeriodicUpdate(SAMPLE_TXNS, start, end, { consolidated });
+  const payload = HMRC.buildCumulativeUpdate({ taxYear, periodEndDate: end, txns: SAMPLE_TXNS, consolidated });
   console.log('Cumulative (year to date) payload to submit:\n', JSON.stringify(payload, null, 2));
 
   if (!approve) {
@@ -411,7 +414,7 @@ async function fullTest() {
   const b = loadState().businessId;
   await run('BusinessDetails.retrieve', async () => { if (b) await HMRC.retrieveBusinessDetails(n, b, t, f); });
   await run('Obligations.retrieveIandE', async () => { await HMRC.retrieveObligations(n, t, f); });
-  await run('SelfEmployment.submitCumulative', async () => { if (!b) throw new Error('no businessId'); const payload = HMRC.buildPeriodicUpdate([{ amount: 5000, category: 'income' }, { amount: -1000, category: 'materials' }], `${ty.slice(0,4)}-04-06`, `${ty.slice(0,4)}-07-05`); await HMRC.submitQuarterlyUpdate({ nino:n, businessId:b, taxYear:ty, payload, approved:true, fraud:f }); });
+  await run('SelfEmployment.submitCumulative', async () => { if (!b) throw new Error('no businessId'); const payload = HMRC.buildCumulativeUpdate({ taxYear: ty, periodEndDate: `${ty.slice(0,4)}-07-05`, txns: [{ amount: 5000, category: 'income', date: `${ty.slice(0,4)}-04-10` }, { amount: -1000, category: 'materials', date: `${ty.slice(0,4)}-04-12` }] }); await HMRC.submitQuarterlyUpdate({ nino:n, businessId:b, taxYear:ty, payload, approved:true, fraud:f }); });
   await run('Calculation.trigger', async () => { const tr = await HMRC.triggerCalculation(n, ty, 'intent-to-finalise', t, f); if (tr.calculationId) saveState({ calculationId: tr.calculationId }); });
   await run('Calculation.list', async () => { await HMRC.listCalculations(n, ty, t, f); });
   await run('Calculation.retrieve', async () => { const cid = loadState().calculationId; if (cid) await HMRC.retrieveCalculation(n, ty, cid, t, f); });

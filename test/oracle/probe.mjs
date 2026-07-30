@@ -78,15 +78,16 @@ function money(n) { return `£${Math.round(Number(n) || 0).toLocaleString('en-GB
 async function tax(s, label) {
   console.log(`\n[probe] ${label}: turnover ${money(s.turnover)}, expenses ${money(s.expenses)}`);
 
-  // buildPeriodicUpdate turns our own transactions into HMRC's payload shape. Already tested.
-  const payload = H.buildPeriodicUpdate(
-    [
-      { amount: s.turnover, category: 'income' },
-      { amount: -s.expenses, category: 'materials' },
+  // buildCumulativeUpdate turns our own transactions into HMRC's payload shape. Already tested.
+  const payload = H.buildCumulativeUpdate({
+    taxYear: TAX_YEAR,
+    // The final cumulative period: the whole tax year.
+    periodEndDate: `${Number(TAX_YEAR.slice(0, 4)) + 1}-04-05`,
+    txns: [
+      { amount: s.turnover, category: 'income', date: `${Number(TAX_YEAR.slice(0, 4))}-04-06` },
+      { amount: -s.expenses, category: 'materials', date: `${Number(TAX_YEAR.slice(0, 4))}-04-06` },
     ],
-    `${Number(TAX_YEAR.slice(0, 4))}-04-06`,
-    `${Number(TAX_YEAR.slice(0, 4)) + 1}-04-05`,
-  );
+  });
 
   // ⚠️ approved: true, AND IT IS AN HONEST TRUE.
   //

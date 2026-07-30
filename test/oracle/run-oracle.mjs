@@ -85,14 +85,15 @@ const SCENARIOS = [
 const money = (n) => `£${Math.round(Number(n) || 0).toLocaleString('en-GB')}`;
 
 async function hmrcTax(s) {
-  const payload = H.buildPeriodicUpdate(
-    [
-      { amount: s.turnover, category: 'income' },
-      { amount: -s.expenses, category: 'materials' },
+  const payload = H.buildCumulativeUpdate({
+    taxYear: TAX_YEAR,
+    // The final cumulative period: the whole tax year.
+    periodEndDate: `${Number(TAX_YEAR.slice(0, 4)) + 1}-04-05`,
+    txns: [
+      { amount: s.turnover, category: 'income', date: `${Number(TAX_YEAR.slice(0, 4))}-04-06` },
+      { amount: -s.expenses, category: 'materials', date: `${Number(TAX_YEAR.slice(0, 4))}-04-06` },
     ],
-    `${Number(TAX_YEAR.slice(0, 4))}-04-06`,
-    `${Number(TAX_YEAR.slice(0, 4)) + 1}-04-05`,
-  );
+  });
 
   // approved: true, and it is an honest true. submitQuarterlyUpdate THROWS unless it is explicitly
   // set: no code path may ever send a real man's figures to HMRC without him saying yes. Here it is a

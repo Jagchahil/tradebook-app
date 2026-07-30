@@ -44,15 +44,26 @@ const tools = [
   { href: '/register-your-business', icon: '🏁', title: 'Register your business', body: 'Sole trader, limited, VAT, PAYE and CIS, explained simply with the real 2026 costs and deadlines.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Guide' },
 ];
 
+// 🔴 THESE LABELS SAID "covering August to October", AND THAT WAS WRONG TWICE OVER.
+//
+// An MTD quarterly update is CUMULATIVE. GOV.UK, to the taxpayer: "Each time you send a quarterly
+// update it will cover from the start of the tax year to the end of the update period, not just the
+// previous three months." So the update due 7 November covers 6 April to 5 October, and it replaces
+// the one sent in August rather than continuing from it.
+//
+// The old labels described discrete three month blocks, which is what quarterly updates were before
+// 2025-26 and what most people still assume. A man reading "covering August to October" quite
+// reasonably concludes he needs his August to October figures and nothing else, and the single
+// commonest way to file a wrong update is to leave the earlier months out.
 const dates = [
   { date: '6 April 2026', label: 'New tax year begins. Making Tax Digital for Income Tax starts for anyone over £50,000.' },
-  { date: '7 August 2026', label: 'First MTD quarterly update due, covering April to July.' },
+  { date: '7 August 2026', label: 'First MTD quarterly update due, covering 6 April to 5 July.' },
   { date: '5 October 2026', label: 'Register for Self Assessment if you became self employed in the 2025/26 year.' },
-  { date: '7 November 2026', label: 'Second MTD quarterly update due, covering August to October.' },
+  { date: '7 November 2026', label: 'Second MTD quarterly update due, covering 6 April to 5 October. Each update restates the year so far and replaces the one before it.' },
   { date: '31 January 2027', label: 'Self Assessment for 2025/26 due. Balancing payment and first payment on account due.' },
-  { date: '7 February 2027', label: 'Third MTD quarterly update due, covering November to January.' },
+  { date: '7 February 2027', label: 'Third MTD quarterly update due, covering 6 April to 5 January.' },
   { date: '5 April 2027', label: 'The 2026/27 tax year ends.' },
-  { date: '7 May 2027', label: 'Fourth MTD quarterly update due, covering February to April.' },
+  { date: '7 May 2027', label: 'Fourth MTD quarterly update due, covering the whole of 2026/27.' },
   { date: '31 July 2027', label: 'Second payment on account due.' },
 ];
 

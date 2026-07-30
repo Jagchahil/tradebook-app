@@ -59,7 +59,15 @@ export interface QuarterPack {
   taxYear: string;
   period: QuarterBounds;
   generatedAt: string; // ISO
-  // The quarter itself: this is the content of an MTD quarterly update.
+  // ⚠️ THE QUARTER ON ITS OWN, FOR A HUMAN READING THE PACK, AND NOT WHAT HMRC RECEIVES.
+  //
+  // This comment used to read "this is the content of an MTD quarterly update", and that was wrong
+  // from 2025-26 onward and dangerous from November onward. An MTD update is CUMULATIVE: 6 April to
+  // the quarter end, every time. See `submission` below, and the header of buildCumulativeUpdate in
+  // lib/hmrc.ts for what wiring this field to a submission would have done to a man's figures.
+  //
+  // It stays because it is genuinely useful: "what did I actually do these three months" is a
+  // question a trader asks and the cumulative figure cannot answer.
   trade: StreamSummary;
   property: StreamSummary;
   cisSuffered: number;
@@ -67,6 +75,26 @@ export interface QuarterPack {
   hasProperty: boolean;
   truncated: boolean; // the source data may be incomplete (row limit hit)
   finalCheck?: string; // pre-filing assurance line, set by the route after a live-facts refresh
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT HMRC ACTUALLY RECEIVES. Named so that the right figure is the one nearest to hand.
+  //
+  // Identical arithmetic to `ytd` below, over the identical window, and it exists anyway. `ytd` is
+  // named for the running tax picture and reads like context; a person wiring up a submission
+  // reaches for the block called `trade`, because that is what a quarterly update sounded like for
+  // as long as quarterly updates were discrete. So the cumulative figures get a name that says what
+  // they are for, and carry the window with them rather than leaving it to be reconstructed.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  submission: {
+    // 6 April, always. A cumulative period never starts anywhere else.
+    periodStartDate: string;
+    // The quarter end. 5 Oct for the update due 7 November.
+    periodEndDate: string;
+    trade: StreamSummary;
+    property: StreamSummary;
+    cisSuffered: number;
+    // How many confirmed entries stand behind it, across the WHOLE window, not the quarter.
+    txCount: number;
+  };
   // Year to date, up to and including this quarter, for the running tax picture.
   ytd: {
     trade: StreamSummary;
@@ -219,10 +247,10 @@ function mtdYearFor(startYear: number): 2026 | 2027 | 2028 {
   return startYear >= 2028 ? 2028 : startYear >= 2027 ? 2027 : 2026;
 }
 
-// Build the pack. Quarter figures cover the selected quarter only (the MTD
-// update content). Year to date figures cover the tax year opening (6 April of
-// startYear) up to and including the quarter end, and drive the running tax
-// estimate.
+// Build the pack. Quarter figures cover the selected quarter only, for a human reading it. The
+// SUBMISSION figures, and the year to date figures that drive the running tax estimate, both cover
+// the tax year opening (6 April of startYear) up to and including the quarter end, because that is
+// the window an MTD quarterly update actually reports.
 export function buildQuarterPack(input: BuildInput): QuarterPack {
   const { transactions, startYear, quarter } = input;
   const period = quarterBounds(startYear, quarter);
@@ -275,6 +303,14 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
     property,
     cisSuffered: cisTotal(quarterTx),
     txCount: quarterTx.length,
+    submission: {
+      periodStartDate: taxYearStart,
+      periodEndDate: period.end,
+      trade: ytdTrade,
+      property: ytdProperty,
+      cisSuffered: cisTotal(ytdTx),
+      txCount: ytdTx.length,
+    },
     hasProperty: ytdProperty.income > 0 || ytdProperty.expenses > 0,
     truncated: Boolean(input.truncated),
     finalCheck: input.finalCheck,
@@ -423,7 +459,20 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
 
       ${propertyBlock}
 
-      <h2>Year to date, and the running tax picture</h2>
+      <h2>What your quarterly update reports</h2>
+      <p class="muted" style="font-size:13px;margin:0 0 10px">
+        A Making Tax Digital update covers <strong>${esc(prettyDay(pack.submission.periodStartDate))} to ${esc(prettyDay(pack.submission.periodEndDate))}</strong>,
+        the whole tax year so far, not just these three months. Each update restates the year and replaces the one before it,
+        so the figures below are the ones that go on the update, and the quarter above is there so you can see what these
+        three months did on their own.
+      </p>
+      <table>
+        <tr><td style="padding:6px 0">Trade income, year so far</td><td style="padding:6px 0;text-align:right">${gbp(pack.submission.trade.income)}</td></tr>
+        <tr><td style="padding:6px 0">Trade expenses, year so far</td><td style="padding:6px 0;text-align:right">${gbp(pack.submission.trade.expenses)}</td></tr>
+        <tr style="border-top:1px solid ${BORDER}"><td style="padding:8px 0;font-weight:700">Trade profit, year so far</td><td style="padding:8px 0;text-align:right;font-weight:700">${gbp(pack.submission.trade.net)}</td></tr>
+      </table>
+
+      <h2>The running tax picture</h2>
       <table>
         <tr><td style="padding:6px 0">Trade profit so far this year</td><td style="padding:6px 0;text-align:right">${gbp(pack.ytd.trade.net)}</td></tr>
         ${showProperty ? `<tr><td style="padding:6px 0">Property profit so far this year</td><td style="padding:6px 0;text-align:right">${gbp(pack.ytd.property.net)}</td></tr>` : ''}

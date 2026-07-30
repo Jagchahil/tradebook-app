@@ -15,21 +15,23 @@ const ok = (name, cond) => {
   else { fail += 1; console.log(`  FAIL  ${name}`); }
 };
 
+// ⚠️ EVERY ROW CARRIES A DATE NOW, AND THAT IS NOT DECORATION. buildCumulativeUpdate does its own
+// windowing, so a dateless row cannot reach the totals. See the header in lib/hmrc.ts.
 const txns = [
-  { amount: 5000, category: 'income' },     // turnover
-  { amount: 1200, category: 'income' },     // turnover
-  { amount: -400, category: 'materials' },  // costOfGoods
-  { amount: -150, category: 'tools' },      // costOfGoods
-  { amount: -800, category: 'subcontractor' }, // paymentsToSubcontractors
-  { amount: -300, category: 'fuel' },       // carVanTravelExpenses
-  { amount: -120, category: 'phone' },      // adminCosts
-  { amount: -200, category: 'accountancy' },// professionalFees
-  { amount: -90, category: 'meals' },       // otherExpenses
+  { amount: 5000, category: 'income', date: '2026-04-20' },     // turnover
+  { amount: 1200, category: 'income', date: '2026-06-11' },     // turnover
+  { amount: -400, category: 'materials', date: '2026-04-22' },  // costOfGoods
+  { amount: -150, category: 'tools', date: '2026-05-02' },      // costOfGoods
+  { amount: -800, category: 'subcontractor', date: '2026-05-19' }, // paymentsToSubcontractors
+  { amount: -300, category: 'fuel', date: '2026-06-01' },       // carVanTravelExpenses
+  { amount: -120, category: 'phone', date: '2026-06-14' },      // adminCosts
+  { amount: -200, category: 'accountancy', date: '2026-06-30' },// professionalFees
+  { amount: -90, category: 'meals', date: '2026-07-04' },       // otherExpenses
 ];
 
 console.log('\n=== HMRC MTD foundation tests ===\n');
 
-const full = H.buildPeriodicUpdate(txns, '2026-04-06', '2026-07-05');
+const full = H.buildCumulativeUpdate({ taxYear: '2026-27', periodEndDate: '2026-07-05', txns });
 ok('turnover sums income', full.periodIncome.turnover === 6200);
 ok('costOfGoods merges materials + tools (550)', full.periodExpenses.costOfGoods === 550);
 ok('paymentsToSubcontractors (800)', full.periodExpenses.paymentsToSubcontractors === 800);
@@ -39,7 +41,7 @@ ok('professionalFees from accountancy (200)', full.periodExpenses.professionalFe
 ok('otherExpenses from meals (90)', full.periodExpenses.otherExpenses === 90);
 ok('period dates carried through', full.periodDates.periodStartDate === '2026-04-06' && full.periodDates.periodEndDate === '2026-07-05');
 
-const consolidated = H.buildPeriodicUpdate(txns, '2026-04-06', '2026-07-05', { consolidated: true });
+const consolidated = H.buildCumulativeUpdate({ taxYear: '2026-27', periodEndDate: '2026-07-05', txns, consolidated: true });
 const totalExpenses = 400 + 150 + 800 + 300 + 120 + 200 + 90; // 2060
 ok('consolidated expenses total (2060)', consolidated.periodExpenses.consolidatedExpenses === totalExpenses);
 ok('consolidated has no category breakdown', Object.keys(consolidated.periodExpenses).length === 1);

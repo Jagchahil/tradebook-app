@@ -311,14 +311,76 @@ export function missingFraudHeaders(ctx: FraudContext): string[] {
 // shape. Traders under the £90,000 turnover line may send a single consolidated
 // expenses figure; everyone else sends the category breakdown.
 //
-// CUMULATIVE model (2025-26 onward): feed this the transactions for the WHOLE
-// year to date (accounting-period start up to the end of the latest quarter),
-// not just the current quarter, and set periodEndDate to the latest quarter end.
-// The output is the running year-to-date summary the cumulative endpoint expects.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 CUMULATIVE, AND THIS FUNCTION NOW REFUSES TO BE HANDED A DISCRETE QUARTER.
+//
+// From 2025-26 HMRC replaced the old discrete quarterly "period" endpoint with a single
+// CUMULATIVE summary per year. GOV.UK, to the taxpayer, in terms: "Each time you send a quarterly
+// update it will cover from the start of the tax year to the end of the update period, not just the
+// previous three months." So the 7 November update is 6 April to 5 October, not July to October,
+// and it SUPERSEDES the one sent in August rather than sitting alongside it.
+//
+// ⚠️ UNTIL 30 JULY 2026 THAT WAS A COMMENT AND NOTHING ELSE.
+//
+// The old signature took `(txns, periodStartDate, periodEndDate)` and totalled whatever it was
+// handed, over whatever window it was told to declare. lib/quarterpack.ts computes DISCRETE quarters
+// (Q2 starts 6 July) and its own comment called that figure "the content of an MTD quarterly
+// update". Wire those two together for November and a man's submission reports July to October and
+// silently omits April to July: his income understated to HMRC, which is precisely the conduct
+// Finance Act 2026 Sch 22 makes sanctionable.
+//
+// 🔴 AND EVERY TEST WAS GREEN, BECAUSE EVERY TEST USED Q1.
+//
+// All five call sites hardcoded 6 April to 5 July, the one quarter of four where cumulative and
+// discrete are the same window. The bug was not merely untested, it was untestable by the fixtures
+// that existed. test/cumulative.test.mjs exercises Q2, where the two differ, and fails the build if
+// this ever narrows again.
+//
+// SO THE WINDOW IS NO LONGER THE CALLER'S TO GET WRONG:
+//   . the start is DERIVED from the tax year, so no caller can declare a July start
+//   . the end must be one of that year's four quarter ends, so no caller can invent a window
+//   . every transaction carries a date and this filters them itself, so the rows it totals are the
+//     rows the declared window covers
+//
+// ⚠️ ONE SHARP EDGE REMAINS AND IT IS NAMED ON PURPOSE. Nothing here can tell the difference between
+// "April to July was quiet" and "April to July was never handed to me". Pass EVERY confirmed
+// transaction for the tax year, never one quarter's worth. lib/quarterpack.ts's `submission` block
+// exists so the right rows are the ones lying nearest to hand.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 
 export interface SimpleTxn {
   amount: number; // positive income, negative expense
   category?: string | null;
+  // ⚠️ REQUIRED, and it is required so that this module can do its own windowing rather than trust
+  // that somebody upstream did. ISO yyyy-mm-dd.
+  date: string;
+}
+
+// A window that cannot be a cumulative MTD period. Thrown rather than returned, because a wrong
+// payload that looks fine is the failure this whole block exists to prevent, and a caller that
+// cannot build a valid window has a bug rather than a bad day.
+export class CumulativeWindowError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CumulativeWindowError';
+  }
+}
+
+// The tax year opening, from the '2026-27' label HMRC itself uses. Under basis period reform every
+// unincorporated business is taxed on the tax year basis, so the accounting period start IS 6 April.
+// A business with a genuinely different accounting date is not something to guess at: it would need
+// its own window, and until we support one this refuses rather than apportions silently.
+export function taxYearStartDate(taxYear: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(taxYear).trim());
+  if (!m) throw new CumulativeWindowError(`Not an HMRC tax year label: ${taxYear}`);
+  return `${m[1]}-04-06`;
+}
+
+// The four cumulative period ends for a tax year, in order. Every one of them starts at 6 April;
+// only the end moves. That is the whole shape of the cumulative model in one function.
+export function cumulativePeriodEnds(taxYear: string): string[] {
+  const start = Number(taxYearStartDate(taxYear).slice(0, 4));
+  return [`${start}-07-05`, `${start}-10-05`, `${start + 1}-01-05`, `${start + 1}-04-05`];
 }
 
 // Lekhio category -> MTD self-employment expense field.
@@ -362,17 +424,45 @@ export interface PeriodicUpdate {
   periodExpenses: Record<string, number>;
 }
 
-export function buildPeriodicUpdate(
-  txns: SimpleTxn[],
-  periodStartDate: string,
-  periodEndDate: string,
-  opts: { consolidated?: boolean } = {},
-): PeriodicUpdate {
+export interface CumulativeUpdateArgs {
+  // The HMRC tax year label, e.g. '2026-27'. The window START is derived from this and is never
+  // taken from the caller, which is the point.
+  taxYear: string;
+  // The end of the latest quarter, e.g. '2026-10-05' for the update due 7 November.
+  periodEndDate: string;
+  // EVERY confirmed transaction for the tax year. This filters; do not pre-filter to a quarter.
+  txns: SimpleTxn[];
+  // Traders under the turnover line may send one consolidated expenses figure.
+  consolidated?: boolean;
+}
+
+export function buildCumulativeUpdate(args: CumulativeUpdateArgs): PeriodicUpdate {
+  const periodStartDate = taxYearStartDate(args.taxYear);
+  const periodEndDate = String(args.periodEndDate || '').trim();
+
+  // 🔴 THE END MUST BE A REAL QUARTER END FOR THIS YEAR. An arbitrary date here is how a discrete
+  // window sneaks back in wearing a cumulative name, and HMRC would accept the payload: the endpoint
+  // takes what it is given and recalculates from the most recent submission.
+  if (!cumulativePeriodEnds(args.taxYear).includes(periodEndDate)) {
+    throw new CumulativeWindowError(
+      `${periodEndDate} is not a quarterly period end for ${args.taxYear}. `
+      + `A cumulative update runs from ${periodStartDate} to one of ${cumulativePeriodEnds(args.taxYear).join(', ')}.`,
+    );
+  }
+
   let turnover = 0;
   const expenseTotals: Record<string, number> = {};
   let consolidatedTotal = 0;
 
-  for (const t of txns) {
+  // ⚠️ IT DOES ITS OWN WINDOWING. A row outside the declared period cannot reach the totals even if
+  // a caller hands it over, so the figures and the dates on the payload can never describe two
+  // different periods.
+  const inWindow = args.txns.filter((t) => {
+    const d = String(t?.date || '');
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= periodStartDate && d <= periodEndDate;
+  });
+
+  for (const t of inWindow) {
     const amt = Number(t.amount) || 0;
     if (amt >= 0) {
       turnover += amt;
@@ -384,7 +474,7 @@ export function buildPeriodicUpdate(
     expenseTotals[field] = round2((expenseTotals[field] || 0) + expense);
   }
 
-  const periodExpenses = opts.consolidated
+  const periodExpenses = args.consolidated
     ? { consolidatedExpenses: round2(consolidatedTotal) }
     : expenseTotals;
 

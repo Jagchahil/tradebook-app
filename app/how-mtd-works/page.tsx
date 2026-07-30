@@ -143,7 +143,7 @@ export default function HowMtdWorksPage() {
           <div className="center reveal" style={{ marginBottom: 40 }}><h2 className="h2">Three simple things.</h2><p className="lead">Lekhio does the first two. You stay in charge of the third.</p></div>
           <div className="g3 reveal">
             <div className="mcard"><div className="ci" style={{ background: 'var(--river-tint)', color: 'var(--river)' }}><Ic e="🗂️" color="var(--river)" size={24} /></div><h3>Keep digital records</h3><p>HMRC wants income and costs kept digitally. Lekhio logs every receipt and payment as you go.</p></div>
-            <div className="mcard"><div className="ci" style={{ background: 'var(--saffron-tint)', color: 'var(--saffron-deep)' }}><Ic e="📨" color="var(--saffron-deep)" size={24} /></div><h3>Send four short updates</h3><p>Four quick summaries across the year instead of one big return. Lekhio prepares each one.</p></div>
+            <div className="mcard"><div className="ci" style={{ background: 'var(--saffron-tint)', color: 'var(--saffron-deep)' }}><Ic e="📨" color="var(--saffron-deep)" size={24} /></div><h3>Send four short updates</h3><p>Four times a year you send HMRC your figures for the year so far. Each one restates the year and replaces the last, so nothing has to be perfect first time. Lekhio prepares each one.</p></div>
             <div className="mcard"><div className="ci" style={{ background: 'var(--green-tint)', color: 'var(--green)' }}><Ic e="🤝" color="var(--green)" size={24} /></div><h3>You stay in control</h3><p>Nothing goes to HMRC until you say yes. Lekhio keeps you ready. The final say is always yours.</p></div>
           </div>
         </div>
@@ -155,21 +155,21 @@ export default function HowMtdWorksPage() {
           <div className="reveal" style={{ marginBottom: 8 }}><div className="eyebrow">The change, in one tap</div><h2 className="h2">The old way, and the new way.</h2></div>
           <div className="seg reveal" id="seg" style={{ marginTop: 24 }}><button className="on" data-p="old">The old way</button><button data-p="new">The new way</button></div>
           <div className="onpanel on" id="p-old" data-panel="old"><div className="bigcard old"><div className="be">📦</div><h3>One big return, once a year</h3><p>A shoebox of receipts, a lost weekend, and the January panic. One deadline where everything has to be right at once, with no time left to plan.</p><span className="pantag">📅 January: panic</span></div></div>
-          <div className="onpanel" id="p-new" data-panel="new"><div className="bigcard new"><div className="be">✅</div><h3>Four short check-ins</h3><p>Four quick summaries across the year, each one prepared for you. You check it, you send it. No panic, no shoebox, no scramble.</p><span className="pantag">😌 Sorted, all year</span></div></div>
+          <div className="onpanel" id="p-new" data-panel="new"><div className="bigcard new"><div className="be">✅</div><h3>Four short check-ins</h3><p>Four times a year, each one covering the year so far and each one prepared for you. You check it, you send it. No panic, no shoebox, no scramble.</p><span className="pantag">😌 Sorted, all year</span></div></div>
         </div>
       </section>
 
       {/* Timeline */}
       <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">Your year, in four easy updates.</h2><p className="lead">Each one is a quick summary Lekhio prepares. You check it over a brew and send it.</p></div>
+          <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">Your year, in four easy updates.</h2><p className="lead">Each one covers from 6 April up to the date shown, so every update restates the year so far and replaces the one before it. Lekhio prepares it, you check it over a brew and send it.</p></div>
           <div className="reveal">
             <div className="tlbar"><i /></div>
             <div className="tl">
-              <div className="tlnode"><div className="tldot">1</div><b>Update 1</b><small>Summer</small></div>
-              <div className="tlnode"><div className="tldot">2</div><b>Update 2</b><small>Autumn</small></div>
-              <div className="tlnode"><div className="tldot">3</div><b>Update 3</b><small>Winter</small></div>
-              <div className="tlnode"><div className="tldot">4</div><b>Update 4</b><small>Spring</small></div>
+              <div className="tlnode"><div className="tldot">1</div><b>Update 1</b><small>To 5 Jul</small></div>
+              <div className="tlnode"><div className="tldot">2</div><b>Update 2</b><small>To 5 Oct</small></div>
+              <div className="tlnode"><div className="tldot">3</div><b>Update 3</b><small>To 5 Jan</small></div>
+              <div className="tlnode"><div className="tldot">4</div><b>Update 4</b><small>To 5 Apr</small></div>
             </div>
           </div>
         </div>

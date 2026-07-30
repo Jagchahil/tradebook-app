@@ -65,6 +65,9 @@ export function subscriptionRowFrom(sub: Record<string, unknown>): SubscriptionR
 
   const row: SubscriptionRecord = {
     stripe_subscription_id: id,
+    // Read off the SUBSCRIPTION's metadata, which createSubscriptionCheckout sets, so it survives
+    // every later renewal, plan change and cancellation event and not just the first one.
+    user_id: metadata.user_id || null,
     status: (sub.status as string | undefined) ?? null,
     plan: metadata.plan || (interval === 'year' ? 'annual' : interval === 'month' ? 'monthly' : null),
     offer: metadata.offer || null,

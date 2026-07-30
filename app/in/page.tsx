@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../lib/webauth';
 import { SESSION_COOKIE, webSessionsConfigured } from '../../lib/websession';
+import { HOW_LONG } from '../../lib/onboarding';
 import { A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP } from '../../lib/tokens';
 
 export const metadata: Metadata = {
@@ -81,7 +82,17 @@ export default async function SignInPage({
         <h1 style={S.h1}>{step === 'code' ? 'Enter your code' : 'Sign in'}</h1>
         <p style={S.sub}>
           {step === 'code'
-            ? 'We have sent you a six digit code. It lasts a few minutes.'
+            // ⚠️ NO LENGTH IN THIS SENTENCE, AND THAT IS THE FIX RATHER THAN A DIFFERENT NUMBER.
+            //
+            // This said "six digit" and the code that arrives is EIGHT digits. The sign in code is
+            // minted by GoTrue, and its length is a Supabase project setting we do not own and can
+            // be changed from a dashboard without a deploy. Copy asserting a length is therefore a
+            // second copy of a fact belonging to somebody else, and the day it drifts a man counts
+            // his six digits, finds two spare, and concludes he has the wrong email.
+            //
+            // ⚠️ THE SIGNUP CODE IS DIFFERENT AND ITS COPY STAYS. lib/signupcode.ts mints that one
+            // and it really is six digits, guaranteed by a test, so app/start may say so.
+            ? 'We have sent you a code. It lasts a few minutes.'
             : 'Your email address or your mobile number, whichever you gave us. We will send you a code.'}
         </p>
 
@@ -104,7 +115,7 @@ export default async function SignInPage({
               inputMode="numeric"
               autoComplete="one-time-code"
               autoFocus
-              placeholder="6 digit code"
+              placeholder="Your code"
               maxLength={8}
               required
             />
@@ -135,7 +146,11 @@ export default async function SignInPage({
         )}
 
         <p style={S.foot}>
-          New to Lekhio? <a href="/start" style={S.footLink}>Get set up</a>. It takes two minutes and
+          {/* 🔴 THIS PROMISED TWO MINUTES. Signing up is six questions and about a minute of them, but
+              setting up properly is ten to fifteen, and from 30 July the code lands him in that
+              rather than on a dashboard. Promising two minutes to a man about to spend fifteen is
+              the same shading of the truth /start was corrected for on the same day. */}
+          New to Lekhio? <a href="/start" style={S.footLink}>Get set up</a>. It takes {HOW_LONG} and
           the first 7 days are free.
         </p>
         <p style={S.trust}>You approve everything. We are not HMRC.</p>

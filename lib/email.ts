@@ -8,6 +8,11 @@
 //   EMAIL_FROM       e.g. "Lekhio <hello@lekhio.app>" (the domain must be verified in Resend). Defaults
 //                    to invoices@lekhio.app.
 
+// Both of these are read rather than retyped. TRIAL_DAYS lives in lib/entitlement.ts and HOW_LONG in
+// lib/onboarding.ts, and both modules are pure with no imports of their own, so this costs nothing.
+import { TRIAL_DAYS } from './entitlement';
+import { HOW_LONG } from './onboarding';
+
 const KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.EMAIL_FROM || 'Lekhio <invoices@lekhio.app>';
 const APP = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
@@ -187,15 +192,30 @@ export async function sendSignupCodeEmail(to: string, code: string): Promise<boo
 // would text him to confirm his number. We are not going to text him, and the product is the web
 // app. Telling a new customer to wait for a message that is never coming is how the first day
 // teaches him we are not quite real.
+// ⚠️ AND IT SAID HIS LEKHIO WAS SET UP, WHICH STOPPED BEING TRUE ON 30 JULY.
+//
+// This fires from /api/signup/verify, and until 30 July verification WAS the last step: he proved
+// his email and landed on his dashboard. Now proving the email is the START of setting up, and the
+// ten to fifteen minutes that matter come after it. So an email saying it is set up, with a button
+// to a dashboard that has nothing on it, congratulated him for something he had not done and pointed
+// him at the emptiest screen in the product.
+//
+// It now says where he actually is and sends him back to finish. If he HAS finished, /app/setup
+// redirects to /app, so the button is right either way and needs no branch here.
+//
+// The trial length and the promise both come from their owners rather than being typed again. This
+// file had "7 day" as a literal in two places, which is exactly how the store listings ended up
+// still advertising fourteen.
 export async function sendWelcomeEmail(to: string, name?: string | null): Promise<boolean> {
   const hi = name ? `You are in, ${esc(name)}.` : 'You are in.';
   const inner = `
     ${h1(hi)}
-    ${p('Your Lekhio is set up and your 7 day free trial has started. No card, and nothing to install.')}
+    ${p(`Your account is open and your ${TRIAL_DAYS} day free trial has started. No card, and nothing to install.`)}
+    ${p(`The next bit is where the money is: ${HOW_LONG} of questions about you, not about your paperwork. Most of what you can claim has nothing to do with receipts, and nobody ever asks. Stop whenever you like and pick up where you left off.`)}
+    ${button(`${APP}/app/setup`, 'Finish setting up')}
     ${p('Everything lives in your browser, on any phone or laptop. Sign in with this email address whenever you want to see where you stand.')}
-    ${button(`${APP}/app`, 'Open your Lekhio')}
     ${pMuted('A real person is on the other end. Just reply if you need anything.')}`;
-  return send({ to, subject: 'You are in. Your Lekhio is ready.', html: shell(inner, { preheader: 'Your 7 day free trial has started.' }), tag: 'welcome' });
+  return send({ to, subject: 'You are in. Let us finish setting you up.', html: shell(inner, { preheader: `Your ${TRIAL_DAYS} day free trial has started.` }), tag: 'welcome' });
 }
 
 // --- waitlist welcome (fires from /api/waitlist) --------------------------

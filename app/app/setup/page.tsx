@@ -4,17 +4,23 @@ import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import {
   readOnboardingProgress, getBusinessProfile, readCircumstances, listBankConnectionsForUser,
+  getOptimiserInput, hasCardOnFile,
 } from '../../../lib/supabase';
+import { ledgerFor } from '../../../lib/ledger';
+import { gbp0 } from '../../../lib/money';
+import { hasStripeConfig } from '../../../lib/stripe';
+import { TRIAL_DAYS } from '../../../lib/entitlement';
 import { hasBankFeedConfig } from '../../../lib/bankfeed';
 import {
-  unanswered, unansweredMtd, household, notHousehold, mtdQuestions, progressIn, type Circumstance,
+  unanswered, unansweredMtd, household, notHousehold, mtdQuestions, progressIn, askingOrder,
+  type Circumstance,
 } from '../../../lib/circumstances';
 import {
   isStep, isDone, toStep, prevStep, stepNumber, stepCount, progressPct, stepTitle,
   HOW_LONG, HOW_LONG_WHY, type Step,
 } from '../../../lib/onboarding';
 import {
-  A11Y_CSS, FONT, GREEN_TINT, INK, LINE, MUTED, PAPER, RADIUS, RED, RIVER, RIVER_DEEP,
+  A11Y_CSS, FONT, GREEN, GREEN_TINT, INK, LINE, MUTED, PAPER, RADIUS, RED, RIVER, RIVER_DEEP,
   RIVER_TINT, SAFFRON_DEEP, SURFACE,
 } from '../../../lib/tokens';
 
@@ -59,6 +65,19 @@ export const dynamic = 'force-dynamic';
 // dressed up as an empty result: "you have nothing to claim" and "we could not check" are different
 // things to tell a man, and confusing them is how he stops answering.
 const UNREADABLE = 'We could not read your answers just this minute. Nothing is lost. Give it a moment and reload, or carry on and come back to this.';
+
+// A card that did not start is not a problem he has to solve. His trial is running either way, which
+// is the first thing these say, because the fear on a payment screen is always about the money.
+function cardNote(code: string | undefined): string | null {
+  switch (code) {
+    case 'cancelled':
+      return 'No card added, and that is fine. Your free trial is running and nothing has changed.';
+    case 'failed':
+      return 'We could not open the payment page just then. Nothing was charged and your trial is running. Try again in a minute, or add a card later from your account.';
+    default:
+      return null;
+  }
+}
 
 function bankNote(code: string | undefined): string | null {
   switch (code) {
@@ -142,6 +161,7 @@ export default async function SetupPage({
       {step === 'about' ? <QuestionsStep userId={user.id} step="about" /> : null}
       {step === 'mtd' ? <MtdStep userId={user.id} /> : null}
       {step === 'bank' ? <BankStep userId={user.id} note={bankNote(one('bank'))} /> : null}
+      {step === 'reveal' ? <RevealStep userId={user.id} note={cardNote(one('card'))} /> : null}
 
       <footer style={S.foot}>
         {/* THE ONLY THING THAT MOVES HIM. It posts which step he has FINISHED, never where to go:
@@ -150,7 +170,7 @@ export default async function SetupPage({
         <form action="/api/onboarding" method="post" style={S.nextForm}>
           <input type="hidden" name="from" value={step} />
           <button type="submit" style={S.next}>
-            {step === 'bank' ? 'Finish and take me in' : step === 'welcome' ? 'Start' : 'Continue'}
+            {step === 'reveal' ? 'Take me to my Lekhio' : step === 'welcome' ? 'Start' : 'Continue'}
           </button>
         </form>
         {back ? <a href={`/app/setup?step=${back}`} style={S.backLink}>Back</a> : null}
@@ -585,6 +605,192 @@ async function BankStep({ userId, note }: { userId: string; note: string | null 
   );
 }
 
+// ---------------------------------------------------------------------------------------------
+// THE REVEAL, AND THE CARD ON THE SAME SCREEN.
+//
+// 🔴 THE HARDEST SCREEN IN THE PRODUCT TO GET RIGHT, BECAUSE IT CAN BE EMPTY.
+//
+// "Here is what we saved you: £0" was named on 28 July as the worst screen we could ship, and it is
+// the LIKELIEST one on day one: a man who skipped the bank has no transactions, so lib/ledger.ts
+// refuses to draw a confident number and is right to. A reveal that shrugs at that point wastes the
+// fifteen minutes he just gave us and asks him for a card in the same breath.
+//
+// So there are THREE things this screen can honestly say, and it says whichever is true:
+//
+//   1. THE MONEY, when the ledger is confident. His own figures, the same ledgerFor() the dashboard
+//      and the quarter pack read, so this screen can never disagree with the one he opens tomorrow.
+//   2. WHAT HIS ANSWERS OPENED, when there are no figures yet but he told us things. This is not a
+//      consolation prize: a man who said he was employed before going self employed has just opened
+//      a loss carry back reaching three years, and no other product asked him.
+//   3. THAT WE HAVE NOTHING TO LOOK AT, when both are empty. Said plainly, with the one thing that
+//      fixes it. Never dressed up.
+//
+// ⚠️ AND CASE 2 NEVER SHOWS A NUMBER. lib/circumstances.ts's fourth rule: worthOrder is an order of
+// magnitude for SORTING the questions, it is not a promise and it may never enter a total. Adding up
+// "up to £252" and "up to £3,000" would produce a figure we cannot stand behind, on the screen we
+// are asking him for money on. The reliefs are named, and what they are worth is described in his
+// own words by `why`, and nothing is summed.
+// ---------------------------------------------------------------------------------------------
+async function RevealStep({ userId, note }: { userId: string; note: string | null }) {
+  const [optimiser, rows, carded] = await Promise.all([
+    getOptimiserInput(userId).catch(() => null),
+    readCircumstances(userId),
+    hasCardOnFile(userId),
+  ]);
+
+  const l = optimiser ? ledgerFor(optimiser) : null;
+  const foundMoney = Boolean(l && l.enough && l.saved > 0);
+
+  // What he told us was TRUE of him. Only 'yes' answers: a no is an answer we are glad to have and
+  // is not a relief. Ordered by lib/circumstances.ts, so the biggest is first here too.
+  const said = new Set((rows ?? []).filter((r) => r.answer === 'yes').map((r) => r.key));
+  const opened = askingOrder().filter((c) => said.has(c.key) && !c.specialCategory && !c.mtd);
+
+  return (
+    <>
+      <section style={S.card}>
+        {note ? <p style={S.warn}>{note}</p> : null}
+
+        {foundMoney && l ? (
+          <>
+            <h1 style={S.h1}>Here is what we have found you.</h1>
+            <div style={S.bigWrap}>
+              <div style={S.big2}>{gbp0(l.saved)}</div>
+              <div style={S.bigNote}>kept out of the taxman&apos;s hands so far this year.</div>
+            </div>
+            <div style={S.two}>
+              <div>
+                <div style={S.small}>Without Lekhio</div>
+                <div style={S.fig}>{gbp0(l.withoutLekhio)}</div>
+              </div>
+              <div>
+                <div style={S.small}>With Lekhio</div>
+                <div style={{ ...S.fig, color: GREEN }}>{gbp0(l.withLekhio)}</div>
+              </div>
+            </div>
+            {/* Every line carries its own plain English basis, because the ledger's whole job is that
+                he can check our working rather than take a number on trust. */}
+            <ul style={S.lines}>
+              {l.lines.map((line) => (
+                <li key={line.key} style={S.line}>
+                  <div style={S.lineTop}>
+                    <span style={S.lineLabel}>{line.label}</span>
+                    <span style={S.lineSaved}>{gbp0(line.saved)} saved</span>
+                  </div>
+                  <div style={S.basis}>{gbp0(line.deducted)} off your profit. {line.basis}</div>
+                </li>
+              ))}
+            </ul>
+            {/* HIS OWN MONEY, HELD BY HMRC. Its own line, never added to what we saved him. This
+                product has already once quoted a man a CIS refund that did not exist. */}
+            {l.refundDue > 0 ? (
+              <p style={S.refund}>
+                <b>{gbp0(l.refundDue)}</b> of CIS has been taken off your pay this year. That is your
+                money, and it comes back when your return is filed.
+              </p>
+            ) : null}
+          </>
+        ) : opened.length > 0 ? (
+          <>
+            <h1 style={S.h1}>Here is what you have just opened up.</h1>
+            <p style={S.body}>
+              {/* ⚠️ THE HONEST FRAME. Not "we saved you nothing", and not a number we cannot stand
+                  behind. What changed in the last fifteen minutes is that these are now on the table,
+                  and that is a true and specific thing to tell him. */}
+              We have not got your figures yet, so there is no total to show you. What we do have is{' '}
+              {opened.length === 1 ? 'this, which you just told us' : `these ${opened.length}, which you just told us`}
+              {' '}and which no bookkeeping app has ever asked you about.
+            </p>
+            <ul style={S.lines}>
+              {opened.map((c) => (
+                <li key={c.key} style={S.line}>
+                  <div style={S.lineLabel}>{c.why}</div>
+                  <div style={S.basis}>
+                    {c.backYears > 0
+                      ? `This one reaches back ${c.backYears} ${c.backYears === 1 ? 'year' : 'years'}. `
+                      : ''}
+                    {c.claimant === 'him'
+                      ? 'We handle this one.'
+                      : c.claimant === 'his council'
+                        ? 'This one is claimed from your council, and we will show you exactly what to ask for.'
+                        : c.claimant === 'his partner'
+                          ? 'Your husband or wife has to claim this one, and we will show them how.'
+                          : c.claimant === 'both of them'
+                            ? 'This one needs two of you, and we will show you both what to do.'
+                            : 'Your company claims this one.'}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p style={S.hint}>
+              No figures on this page, on purpose. We will not put a number on your money until we are
+              reading your actual books, and then it appears on your dashboard on its own.
+            </p>
+          </>
+        ) : (
+          <>
+            {/* 🔴 THE TRUE EMPTY CASE, AND IT DOES NOT PRETEND. No figures and nothing told to us.
+                A cheerful screen here would be the product's first lie, on the last screen of setup. */}
+            <h1 style={S.h1}>We have nothing to look at yet.</h1>
+            <p style={S.body}>
+              {l?.note ?? 'There is nothing in your books yet, so there is nothing we can honestly tell you about your tax.'}
+            </p>
+            <p style={S.body}>
+              Connect your bank and this page fills itself in: your spending logs itself, and what you
+              are owed appears without you sending us anything. It is the one thing that changes
+              everything here, and it takes two minutes.
+            </p>
+            <a href="/app/setup?step=bank" style={S.backAlt}>Go back and connect it</a>
+          </>
+        )}
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          THE CARD, HERE, WHILE HE IS LOOKING AT THE SCREEN ABOVE.
+          ═══════════════════════════════════════════════════════════════════════════════════════ */}
+      {carded ? (
+        <section style={S.card}>
+          <h2 style={S.h2}>Your card is already on file.</h2>
+          <p style={S.body}>Nothing to do. Your free trial runs its course and you can change or cancel it any time from your account.</p>
+        </section>
+      ) : hasStripeConfig() ? (
+        <section style={S.card}>
+          <h2 style={S.h2}>Keep it going.</h2>
+          <p style={S.body}>
+            Your {TRIAL_DAYS} days are free and <b>you are not charged today</b>. Adding a card now
+            just means it does not stop on you. Cancel before the {TRIAL_DAYS} days are up and you pay
+            nothing at all.
+          </p>
+          <div style={S.stack}>
+            {/* One form per plan, so choosing IS the action. A radio group plus a Continue button is
+                one more press between him and a decision he has already made. */}
+            {([
+              ['monthly', '£12.99 a month', 'Cancel any time.'],
+              ['annual', '£129 a year', 'Two months cheaper than paying monthly.'],
+            ] as const).map(([plan, price, note2]) => (
+              <form key={plan} action="/api/billing/checkout" method="post" style={S.optForm}>
+                <input type="hidden" name="plan" value={plan} />
+                {/* A STEP NAME, never a URL. The route builds the return path itself. */}
+                <input type="hidden" name="step" value="reveal" />
+                <button type="submit" style={S.opt}>
+                  <span style={S.optLabel}>{price}</span>
+                  <span style={S.optNote}>{note2} Free for {TRIAL_DAYS} days first.</span>
+                </button>
+              </form>
+            ))}
+          </div>
+          <p style={S.hint}>
+            {/* ⚠️ THE WAY PAST IT, SAID PLAINLY. The card is asked for, never demanded: his books are
+                his, and a wizard that will not let him into them until he pays is a wall. */}
+            Not now? Use the button below and carry on. Your trial is running either way, and you can
+            add a card from your account whenever you like.
+          </p>
+        </section>
+      ) : null}
+    </>
+  );
+}
+
 const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK, padding: '18px 16px 40px', maxWidth: 640, margin: '0 auto' },
   head: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
@@ -638,6 +844,20 @@ const S: Record<string, React.CSSProperties> = {
   radioNote: { display: 'block', fontSize: 13.5, lineHeight: 1.5, color: MUTED, marginTop: 2 },
   connect: { width: '100%', background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.md, padding: '15px 0', fontSize: 16, fontWeight: 800, fontFamily: FONT, cursor: 'pointer' },
 
+  bigWrap: { margin: '4px 0 18px' },
+  big2: { fontSize: 44, fontWeight: 800, letterSpacing: '-1.5px', color: GREEN, lineHeight: 1.05 },
+  bigNote: { fontSize: 15, color: MUTED, marginTop: 4 },
+  two: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 8 },
+  fig: { fontSize: 24, fontWeight: 800, letterSpacing: '-0.6px' },
+  lines: { listStyle: 'none', margin: '6px 0 0', padding: 0 },
+  line: { borderTop: `1px solid ${LINE}`, padding: '12px 0 0', marginTop: 12 },
+  lineTop: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' },
+  lineLabel: { fontSize: 15, fontWeight: 700, lineHeight: 1.45 },
+  lineSaved: { fontSize: 15, fontWeight: 800, color: GREEN, whiteSpace: 'nowrap' },
+  basis: { fontSize: 13.5, lineHeight: 1.5, color: MUTED, margin: '4px 0 0' },
+  refund: { fontSize: 14, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: 14, margin: '18px 0 0' },
+  h2: { fontSize: 18, fontWeight: 800, letterSpacing: '-0.3px', margin: '0 0 10px' },
+  backAlt: { display: 'inline-block', marginTop: 4, color: RIVER, fontSize: 15, fontWeight: 700, textDecoration: 'none' },
   foot: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 6 },
   nextForm: { width: '100%', margin: 0 },
   next: { width: '100%', background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.lg, padding: '17px 0', fontSize: 17, fontWeight: 800, fontFamily: FONT, cursor: 'pointer' },

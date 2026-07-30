@@ -56,6 +56,10 @@ const circRouteSrc = read('app/api/circumstances/route.ts');
 const bizRouteSrc = read('app/api/business/route.ts');
 const bankConnectSrc = read('app/api/bank/connect/route.ts');
 const bankCallbackSrc = read('app/api/bank/callback/route.ts');
+const checkoutSrc = read('app/api/billing/checkout/route.ts');
+const stripeSrc = read('lib/stripe.ts');
+const webhookSrc = read('app/api/stripe/webhook/route.ts');
+const rowFromSrc = read('lib/stripewebhook.ts');
 const migrationSrc = read('supabase/APPLY_2026-07-29_onboarding_and_walink.sql');
 
 let pass = 0;
@@ -285,6 +289,74 @@ ok('🔴 a failed connection still offers the way back into setup',
   (bankCallbackSrc.match(/surface,\n/g) ?? []).length >= 3);
 ok('the web return needs no script to follow it',
   /back === 'app'/.test(bankCallbackSrc) && /<script>/.test(bankCallbackSrc));
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE REVEAL. The screen that can be empty, and the card that sits on it.
+// ---------------------------------------------------------------------------------------------
+ok('the reveal is the last step he walks, after the bank', 
+  stepIndex('reveal') > stepIndex('bank') && nextStep('reveal') === 'done');
+ok('the setup page has a screen for it', /step === 'reveal' \? <RevealStep/.test(pageSrc));
+
+// 🔴 IT READS THE SAME LEDGER THE DASHBOARD DOES. Two readers over one number is the mistake this
+// codebase has been caught by three times, and here it would be the screen he is asked to pay on
+// disagreeing with the screen he opens tomorrow.
+ok('🔴 the reveal reads ledgerFor, the same function /app and the quarter pack read',
+  /ledgerFor\(/.test(pageSrc) && /ledgerFor\(/.test(appSrc));
+ok('🔴 and it computes no money of its own',
+  !/soleTraderTax|incomeTax\s*[+*]|\.reduce\(\(n, [a-z]\) => n \+/.test(codeOnly(pageSrc)));
+
+// 🔴 THE EMPTY REVEAL HAS THREE HONEST ANSWERS AND NOT ONE OF THEM IS A ZERO.
+ok('🔴 the reveal never prints a saving of zero as an achievement',
+  !/£0 saved|saved you £0|You have saved £0/.test(pageSrc));
+ok('the fallback names what his answers opened', /just opened up/.test(pageSrc));
+ok('and the true empty case says so plainly rather than dressing it up',
+  /We have nothing to look at yet/.test(pageSrc) && /Connect your bank and this page fills itself in/.test(pageSrc));
+
+// ⚠️ AND THE FALLBACK NEVER SUMS THE RELIEFS. lib/circumstances.ts rule 4: worthOrder is an order of
+// magnitude for SORTING and may never enter a total. A number we cannot stand behind, on the screen
+// we ask for money on, is the worst place in the product to invent one.
+// Comments stripped: the block above this in the page cites rule 4 by name in order to explain why
+// it is obeyed, and a check that cannot tell the reasoning from the code would teach the next person
+// to delete the reasoning.
+ok('🔴 the reveal never totals what a relief might be worth',
+  !/worthOrder/.test(codeOnly(pageSrc)) && !/opened\.reduce|\.reduce\([^)]*worth/.test(codeOnly(pageSrc)));
+ok('and it says out loud that there is no figure, on purpose',
+  /No figures on this page, on purpose/.test(pageSrc));
+
+// The card is an ask, never a wall.
+ok('🔴 the card can be walked past', /Not now\? Use the button below and carry on/.test(pageSrc));
+ok('🔴 and setup is never gated on it: nothing checks a card before letting him finish',
+  !/hasCardOnFile[\s\S]{0,200}redirect/.test(pageSrc));
+ok('a man who already paid is thanked, not asked again', /Your card is already on file/.test(pageSrc));
+ok('the card says plainly that today is free',
+  /you are not charged today/.test(pageSrc));
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE SUBSCRIPTION MUST BIND TO THE ACCOUNT, OR A PAYING CUSTOMER IS NEVER FOUND.
+//
+// upsertSubscription keys on stripe_subscription_id. A web customer's no card trial row carries a
+// user_id and NO stripe id, so adding a card inserts a SECOND row. Without a user_id on it,
+// getSubscriptionByUser returns the old trial for ever: he pays, is still cut off on day eight, and
+// every screen agrees he was not entitled.
+// ---------------------------------------------------------------------------------------------
+ok('🔴 checkout carries the account id to Stripe', /userId: user\?\.id/.test(checkoutSrc));
+ok('🔴 on the session AND the subscription, so renewals keep it',
+  /subscription_data\[metadata\]\[user_id\]/.test(stripeSrc) && /metadata\[user_id\]/.test(stripeSrc));
+ok('🔴 the webhook reads it back on the checkout path', /metadata\.user_id/.test(webhookSrc));
+ok('🔴 and on every later subscription event', /user_id: metadata\.user_id/.test(rowFromSrc));
+
+// 🔴 AND THE ACCOUNT ID IS NEVER TAKEN FROM THE REQUEST BODY. This route is unauthenticated by
+// design for the pre signup funnel, so a body that could name a user id would let anyone attach a
+// card, or a cancelled one, to somebody else's books.
+ok('🔴 the account comes from the session, never the body',
+  /const user = await sessionUser\(req\)/.test(checkoutSrc)
+  && !/body\.user_id|body\.userId/.test(checkoutSrc));
+ok('and his proved email beats the one he typed',
+  /identity\?\.email \|\| str\(body\.email/.test(checkoutSrc));
+ok('🔴 the checkout return is a step name, never a URL',
+  /isStep\(from\)/.test(checkoutSrc) && !/body\.successUrl|body\.returnTo/.test(checkoutSrc));
+ok('a form caller never sees JSON from the billing route',
+  /card=failed/.test(checkoutSrc) && /card=unavailable/.test(checkoutSrc));
 
 // ---------------------------------------------------------------------------------------------
 // AND IT SHIPS NO CLIENT SCRIPT, like every other screen in the web app.

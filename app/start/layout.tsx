@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 export const metadata: Metadata = {
   title: 'Get started with Lekhio. 7 days free, no card.',
   description:
-    'Set up Lekhio in two minutes. Tell us your trade, connect your bank, and your books and tax look after themselves. 7 days free, no card needed.',
+    'Set Lekhio up properly in 10 to 15 minutes. Tell us your trade, answer the questions nobody else asks, connect your bank, and your books and tax look after themselves. 7 days free, no card needed.',
   openGraph: {
     title: 'Get started with Lekhio',
     description: 'Your books and tax, handled. 7 days free, no card needed.',

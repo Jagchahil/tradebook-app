@@ -106,7 +106,11 @@ export async function POST(req: NextRequest) {
         const customer = (typeof obj.customer === 'string' ? obj.customer : undefined) ?? undefined;
         const details = (obj.customer_details ?? {}) as Record<string, unknown>;
         const email = (details.email as string | undefined) || (obj.customer_email as string | undefined) || null;
-        const phone = metadata.phone || null; // the account key, from the session metadata
+        const phone = metadata.phone || null; // the OLD account key, from the session metadata
+        // 🔴 AND THE ACCOUNT ITSELF, WHICH IS THE ONLY KEY A WEB CUSTOMER HAS.
+        // His users.phone_number is deliberately empty until a number is proved, so binding by phone
+        // alone would leave every web sale attached to nothing.
+        const userId = metadata.user_id || null;
 
         if (subId) {
           const sub = await getStripeSubscription(subId);
@@ -115,11 +119,13 @@ export async function POST(req: NextRequest) {
             if (email) row.email = email;
             if (customer) row.stripe_customer_id = customer;
             if (phone && !row.phone) row.phone = phone;
+            if (userId && !row.user_id) row.user_id = userId;
             await upsertSubscription(row);
           } else {
             // Fall back to what the session already gave us, so we never lose a sale.
             await upsertSubscription({
               stripe_subscription_id: subId,
+              user_id: userId,
               email,
               phone,
               stripe_customer_id: customer ?? null,

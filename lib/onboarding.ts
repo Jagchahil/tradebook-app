@@ -49,7 +49,16 @@
 //
 // Before the bank, because the bank step hands him to somebody else's website and is the likeliest
 // place in the whole journey to lose him. Anything we still want to know has to be asked first.
-export const STEPS = ['welcome', 'business', 'household', 'about', 'mtd', 'bank', 'done'] as const;
+// ⚠️ `reveal` IS LAST, AND THE CARD IS ON IT RATHER THAN ON A STEP OF ITS OWN.
+//
+// Jag's call, 28 July: the card is asked for WHILE HE IS LOOKING AT WHAT WE JUST FOUND HIM. Not on a
+// page before he has seen anything, and not by email on day six when he has forgotten us. Two paths
+// existed before this and the no card path never converted, because there is no automatic charge
+// without a card on file.
+//
+// It is after the bank because the bank is what puts real money on this screen. A man who connects
+// first sees his own figures; a man who skips sees what his answers opened, which is still his.
+export const STEPS = ['welcome', 'business', 'household', 'about', 'mtd', 'bank', 'reveal', 'done'] as const;
 
 export type Step = (typeof STEPS)[number];
 
@@ -142,6 +151,7 @@ const TITLES: Record<Step, string> = {
   about: 'What you can claim',
   mtd: 'Where you stand with HMRC',
   bank: 'Your bank',
+  reveal: 'What we found',
   done: 'Finished',
 };
 

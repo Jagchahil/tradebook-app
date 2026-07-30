@@ -139,6 +139,7 @@ import type { TradeInfo } from '../../../lib/taxguide';
 import { rateLimitedShared } from '../../../lib/ratelimit';
 import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
+import { TRIAL_DAYS } from '../../../lib/entitlement';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
 
@@ -711,7 +712,14 @@ async function replyNotLinked(from: string): Promise<void> {
     [
       'Hi, I am Lekhio. I do your books and tax, right here on WhatsApp. Snap a receipt, log your mileage, ask about your money, all by text.',
       '',
-      `I do not have an account for this number yet. Get set up in two minutes at ${APP_URL.replace('https://', '')}, first month free, then text me again.`,
+      // 🔴 THIS SAID "first month free", AND THE TRIAL HAS BEEN SEVEN DAYS SINCE 29 JULY.
+      //
+      // Not a rounding error, a different offer: a man told he has a month and cut off on day eight
+      // has been misled about money by the product that exists to be straight with him about money.
+      // It also said "two minutes", which was the signup promise corrected on 30 July. Both figures
+      // now come from the modules that own them, so neither can drift on its own again.
+      `I do not have an account for this number yet. Get set up at ${APP_URL.replace('https://', '')}, `
+      + `${TRIAL_DAYS} days free and no card needed, then text me again.`,
     ].join('\n'),
   );
 }
@@ -2367,7 +2375,7 @@ function isTaxTips(body: string): boolean {
 async function signupTail(from: string): Promise<string> {
   const linked = await findUserIdByPhone(from);
   if (linked) return '';
-  return `\n\nWant me to track all this for you? Get set up in two minutes at ${APP_URL.replace('https://', '')}, first month free.`;
+  return `\n\nWant me to track all this for you? Get set up at ${APP_URL.replace('https://', '')}, ${TRIAL_DAYS} days free.`;
 }
 
 async function handleExpenseCheck(from: string, body: string): Promise<void> {
@@ -2376,7 +2384,7 @@ async function handleExpenseCheck(from: string, body: string): Promise<void> {
   const linked = await findUserIdByPhone(from);
   const tail = linked
     ? ''
-    : `\n\nWant me to track all this for you? Get set up in two minutes at ${APP_URL.replace('https://', '')}, first month free.`;
+    : `\n\nWant me to track all this for you? Get set up at ${APP_URL.replace('https://', '')}, ${TRIAL_DAYS} days free.`;
 
   const hit = checkExpense(body);
   if (!hit) {

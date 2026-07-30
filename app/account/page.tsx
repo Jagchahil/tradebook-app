@@ -150,7 +150,8 @@ export default function AccountPage() {
                 style={S.input}
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                placeholder="6 digit code"
+                // The length belongs to GoTrue's project settings, not to us. See app/in/page.tsx.
+                placeholder="Your code"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') verifyAndOpen(); }}

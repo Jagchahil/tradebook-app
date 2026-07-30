@@ -2,6 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import Wizard from './Wizard';
 import { A11Y_CSS } from '../../lib/tokens';
+// 🔴 THIS PAGE SAID "14 DAYS FREE" IN A CHIP AND "your first 7 days are free" IN THE PARAGRAPH
+// TWO LINES BELOW IT, LIVE, ON A PUBLIC PAGE. Found by the sweep in test/trial.test.mjs on 30 July,
+// not by anyone reading it. Both now come from the one place that knows.
+import { TRIAL_DAYS } from '../../lib/entitlement';
 
 export const metadata: Metadata = {
   title: 'Register Your Business: Free Step by Step Guide | Lekhio',
@@ -35,10 +39,10 @@ export default function RegisterPage() {
       </nav>
 
       <section style={{ maxWidth: 760, margin: '0 auto', padding: '28px 24px 4px' }}>
-        <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE GUIDE · 14 DAYS FREE ON LEKHIO</span>
+        <span style={{ display: 'inline-block', backgroundColor: GREEN_TINT, color: GREEN, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 18 }}>FREE GUIDE · {TRIAL_DAYS} DAYS FREE ON LEKHIO</span>
         <h1 className="h1b" style={{ fontWeight: 700, margin: '0 0 16px' }}>Set up your business, start to finish.</h1>
         <p style={{ fontSize: 18.5, color: MUTED, lineHeight: 1.6, margin: 0 }}>
-          Tell us what you are setting up. We give you the exact steps, the forms and the codes to register yourself on GOV.UK, plus where to sort a bank, an email and insurance, in plain English. The guide is free. Start with Lekhio and your first 7 days are free, then £12.99 a month or £129 a year.
+          Tell us what you are setting up. We give you the exact steps, the forms and the codes to register yourself on GOV.UK, plus where to sort a bank, an email and insurance, in plain English. The guide is free. Start with Lekhio and your first {TRIAL_DAYS} days are free, then £12.99 a month or £129 a year.
         </p>
       </section>
 

@@ -180,6 +180,11 @@ export interface SubscriptionCheckoutInput {
   email?: string | null;
   phone?: string | null;
   repCode?: string | null; // a field rep's code, unlocks the 30 day trial
+  // 🔴 THE ACCOUNT THIS CARD BELONGS TO. Set whenever the buyer is signed in, which from 30 July is
+  // every customer who reaches the card at the end of setting up. The phone below is the OLD account
+  // key and stays for the pre signup funnel; a web account has no proved phone, so without this the
+  // webhook has nothing to bind the subscription to. See SubscriptionRecord.user_id.
+  userId?: string | null;
   successUrl: string;
   cancelUrl: string;
 }
@@ -223,6 +228,13 @@ export async function createSubscriptionCheckout(input: SubscriptionCheckoutInpu
   if (input.phone) {
     form.set('subscription_data[metadata][phone]', input.phone);
     form.set('metadata[phone]', input.phone);
+  }
+  // On BOTH, for the same reason the phone is on both: checkout.session.completed reads the session,
+  // and every later customer.subscription.* event reads only the subscription. A card that binds on
+  // day one and comes loose at the first renewal is worse than one that never bound.
+  if (input.userId) {
+    form.set('subscription_data[metadata][user_id]', input.userId);
+    form.set('metadata[user_id]', input.userId);
   }
   // And on the session, so checkout.session.completed can tell this from an invoice.
   form.set('metadata[kind]', 'subscription');

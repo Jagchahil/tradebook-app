@@ -1573,6 +1573,14 @@ export async function ensureUserRow(userId: string, phoneE164: string): Promise<
 // --- Subscriptions (Stripe billing) ---------------------------------------
 
 export interface SubscriptionRecord {
+  // 🔴 THE ACCOUNT, AND WITHOUT IT A PAYING WEB CUSTOMER IS NEVER FOUND.
+  //
+  // upsertSubscription keys on stripe_subscription_id. A web customer's no card trial row was
+  // written by grantTrialWithIdentity with a user_id and NO stripe id, so when he adds a card Stripe
+  // mints a brand new subscription and this inserts a SECOND row. If that row carries no user_id,
+  // getSubscriptionByUser keeps returning the old trial for ever: he pays, and is still cut off on
+  // day eight, and every screen agrees he was not entitled. Carried from the session metadata.
+  user_id?: string | null;
   email?: string | null;
   phone?: string | null;
   stripe_customer_id?: string | null;
@@ -1596,6 +1604,7 @@ export async function upsertSubscription(rec: SubscriptionRecord): Promise<void>
     stripe_subscription_id: rec.stripe_subscription_id,
     updated_at: new Date().toISOString(),
   };
+  if (rec.user_id != null) body.user_id = rec.user_id;
   if (rec.email != null) body.email = rec.email;
   if (rec.phone != null) body.phone = rec.phone;
   if (rec.stripe_customer_id != null) body.stripe_customer_id = rec.stripe_customer_id;
@@ -2344,6 +2353,35 @@ export async function getSubscriptionByUser(userId: string): Promise<Subscriptio
     return rows[0] ?? null;
   } catch {
     return null;
+  }
+}
+
+// IS THERE A CARD ON FILE FOR THIS ACCOUNT?
+//
+// ⚠️ NOT THE SAME QUESTION AS "is he entitled", AND THE DIFFERENCE IS THE WHOLE POINT OF ASKING.
+//
+// Every new customer is `trialing` whether or not he ever saw a payment page: grantTrialWithIdentity
+// writes that row for the no card trial we promise him. So status cannot tell the two apart. The
+// only honest signal is a Stripe subscription id, which exists only if he actually went through
+// checkout. Used to decide whether the end of setting up asks him for a card or thanks him for it.
+//
+// Returns false when we cannot read, which asks a man who already paid for a card he has given. That
+// is the mistake worth making: the other way round silently drops the ask for everybody the day the
+// read breaks, and nobody would notice until the revenue did not arrive.
+export async function hasCardOnFile(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(userId)}`
+      + '&stripe_subscription_id=not.is.null&select=stripe_subscription_id&limit=1',
+      { headers: headers() },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json().catch(() => null)) as unknown[] | null;
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
   }
 }
 

@@ -312,6 +312,13 @@ ok('the fallback names what his answers opened', /just opened up/.test(pageSrc))
 ok('and the true empty case says so plainly rather than dressing it up',
   /We have nothing to look at yet/.test(pageSrc) && /Connect your bank and this page fills itself in/.test(pageSrc));
 
+// 🔴 AND IT DOES NOT SAY IT TWICE. lib/ledger.ts's note carries its own "connect your bank" because
+// it is written for the dashboard, where nothing else tells him what to do. Printing it above a
+// paragraph that says the same thing is the bug fixed on /app on 29 July, reappearing on a new
+// screen, which is exactly what a guard tied to one file cannot catch. Found by walking it.
+ok('🔴 the empty reveal never tells him to connect his bank twice',
+  /connect your bank\/i\.test\(l\.note\)/.test(pageSrc));
+
 // ⚠️ AND THE FALLBACK NEVER SUMS THE RELIEFS. lib/circumstances.ts rule 4: worthOrder is an order of
 // magnitude for SORTING and may never enter a total. A number we cannot stand behind, on the screen
 // we ask for money on, is the worst place in the product to invent one.
@@ -345,6 +352,21 @@ ok('🔴 and setup is never gated on it: nothing checks a card before letting hi
 ok('a man who already paid is thanked, not asked again', /Your card is already on file/.test(pageSrc));
 ok('the card says plainly that today is free',
   /you are not charged today/.test(pageSrc));
+
+// 🔴 AND THE ASK MATCHES WHAT THE SCREEN ABOVE IT SAID. Asking for money in the sentence after
+// admitting we found nothing reads as cheek, and it lands on the man who skipped the bank, who is
+// the least invested customer we have. Jag's call, 30 July: bank first, card quieter, never removed.
+ok('🔴 the card softens itself when the reveal found nothing', /The card can wait/.test(pageSrc));
+// ⚠️ THE POINT IS THAT SOFTENING THE WORDS DID NOT REMOVE THE BUTTONS. The plan forms come from a
+// map, so the literal appears once whatever the branch does; what matters is that `nothingFound`
+// guards ONLY the heading and the paragraph, and gates nothing he could act on. The no card path has
+// never converted, so a quieter ask must still be an ask.
+ok('and it is still reachable in the same visit, because the no card path never converts',
+  (pageSrc.match(/action="\/api\/billing\/checkout"/g) ?? []).length === 1
+  && (pageSrc.match(/\{nothingFound \?/g) ?? []).length === 1);
+ok('🔴 both halves of the screen read ONE expression for whether we found anything',
+  /const nothingFound = !foundMoney && opened\.length === 0;/.test(pageSrc)
+  && /\{nothingFound \?/.test(pageSrc));
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 THE SUBSCRIPTION MUST BIND TO THE ACCOUNT, OR A PAYING CUSTOMER IS NEVER FOUND.

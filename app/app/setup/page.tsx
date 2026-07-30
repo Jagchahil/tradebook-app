@@ -645,6 +645,9 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
   // is not a relief. Ordered by lib/circumstances.ts, so the biggest is first here too.
   const said = new Set((rows ?? []).filter((r) => r.answer === 'yes').map((r) => r.key));
   const opened = askingOrder().filter((c) => said.has(c.key) && !c.specialCategory && !c.mtd);
+  // ⚠️ ONE EXPRESSION, READ BY BOTH HALVES OF THE SCREEN. The reveal branches on it and so does the
+  // card, so the card can never be cheerful about a saving the screen above it did not show.
+  const nothingFound = !foundMoney && opened.length === 0;
 
   return (
     <>
@@ -751,13 +754,23 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
             {/* 🔴 THE TRUE EMPTY CASE, AND IT DOES NOT PRETEND. No figures and nothing told to us.
                 A cheerful screen here would be the product's first lie, on the last screen of setup. */}
             <h1 style={S.h1}>We have nothing to look at yet.</h1>
-            <p style={S.body}>
-              {l?.note ?? 'There is nothing in your books yet, so there is nothing we can honestly tell you about your tax.'}
-            </p>
+            {/* 🔴 THE LEDGER'S NOTE AND OUR OWN SENTENCE BOTH TOLD HIM TO CONNECT HIS BANK, ONE
+                DIRECTLY ABOVE THE OTHER. Caught by walking it, and it is the SAME shape as the bug
+                fixed on /app on 29 July: headline() falls back to l.note, so printing the note under
+                it produced the identical sentence twice on the first screen a new customer ever saw.
+                That one has a guard in test/frontdoor.test.mjs. This is the same mistake in a new
+                place, which is what a guard tied to one file cannot prevent.
+
+                lib/ledger.ts's note is written for the dashboard, where nothing else is telling him
+                what to do, so it carries the instruction itself. Here the paragraph below already
+                does. So the note is printed only when it says something this screen does not, which
+                it does whenever there IS data and merely not enough of it: "three weeks is not enough
+                to be confident" is worth reading and is not a repeat. */}
+            {l?.note && !/connect your bank/i.test(l.note) ? <p style={S.body}>{l.note}</p> : null}
             <p style={S.body}>
               Connect your bank and this page fills itself in: your spending logs itself, and what you
               are owed appears without you sending us anything. It is the one thing that changes
-              everything here, and it takes two minutes.
+              everything here.
             </p>
             <a href="/app/setup?step=bank" style={S.backAlt}>Go back and connect it</a>
           </>
@@ -774,12 +787,35 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
         </section>
       ) : hasStripeConfig() ? (
         <section style={S.card}>
-          <h2 style={S.h2}>Keep it going.</h2>
-          <p style={S.body}>
-            Your {TRIAL_DAYS} days are free and <b>you are not charged today</b>. Adding a card now
-            just means it does not stop on you. Cancel before the {TRIAL_DAYS} days are up and you pay
-            nothing at all.
-          </p>
+          {/* ═══════════════════════════════════════════════════════════════════════════════════
+              🔴 THE ASK MATCHES WHAT THE SCREEN ABOVE IT JUST SAID.
+              Jag's 28 July reasoning was that the card is asked for WHILE HE IS LOOKING AT WHAT WE
+              FOUND HIM. When we found nothing, that reasoning does not hold: asking a man for money
+              in the sentence after admitting we have nothing to show him reads as cheek, and it is
+              aimed at exactly the man who skipped the bank and is least invested so far.
+              So the card stays on the screen, because he can still add one in this visit and the no
+              card path has never converted, but on an empty reveal it stops being the headline and
+              says so plainly. Jag's call, 30 July: bank first, card quieter, never removed.
+              ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {nothingFound ? (
+            <>
+              <h2 style={S.h2}>The card can wait.</h2>
+              <p style={S.body}>
+                There is nothing for you to pay for yet, and we would rather you connected your bank
+                first and saw what we do with it. Your {TRIAL_DAYS} days are running from today either
+                way. If you would sooner get it out of the way now, it is here.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 style={S.h2}>Keep it going.</h2>
+              <p style={S.body}>
+                Your {TRIAL_DAYS} days are free and <b>you are not charged today</b>. Adding a card now
+                just means it does not stop on you. Cancel before the {TRIAL_DAYS} days are up and you
+                pay nothing at all.
+              </p>
+            </>
+          )}
           <div style={S.stack}>
             {/* One form per plan, so choosing IS the action. A radio group plus a Continue button is
                 one more press between him and a decision he has already made. */}

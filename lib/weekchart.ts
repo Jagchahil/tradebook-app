@@ -14,12 +14,25 @@
 // that cannot mislead him.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 //
-// ⚠️ AND THE DAYS ARE LONDON DAYS, NOT UTC DAYS.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND IT BUCKETS ON THE DAY HE SPENT THE MONEY, NOT THE DAY WE LEARNED ABOUT IT.
 //
-// A payment at half past midnight on a Thursday in July is 23:30 UTC on the Wednesday, because
-// Britain is an hour ahead in summer. Bucketing on the UTC date would draw a man's Thursday takings
-// on Wednesday's bar for seven months of the year, and he would be looking at a picture of his own
-// week that he knows is wrong. Every date in this file is the date it was in London.
+// Found on the deployed site, by correcting one row and watching the wrong number move. The week
+// said "£1,197 out". Marking a payment dated 11 MAY as not business took the week down to £701,
+// because weeklyTotals had always filtered on `created_at`: the day the row arrived in our table.
+//
+// As a sentence that was merely ambiguous. As a bar chart it is a lie with a shape: a bank feed
+// backfilling ninety days would draw three months of a man's spending as one enormous bar on the
+// afternoon he connected it, on a card headed "Your week".
+//
+// So the window and the buckets are both `transaction_date`, which is what every other money figure
+// in this product already uses, and a plain calendar date with no time on it. A row without one is
+// excluded, exactly as getOptimiserInput already excludes it from his year.
+//
+// ⚠️ THE LONDON CODE BELOW STAYS, and it is not left over. Working out WHICH seven days the window
+// covers still means asking what today's date is, and at half past midnight in July that is
+// tomorrow in UTC. Getting that wrong shifts the whole chart by a day.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 //
 // PURE. No fetch, no clock of its own: `now` is passed in, so a test can stand on any day of the
 // year and on both sides of the clock change.
@@ -34,12 +47,12 @@
 // means by the word and the only window a bar chart can honestly draw.
 export const WEEK_DAYS = 7;
 
-// A confirmed, non personal transaction, as the reader hands it over. `at` is the ISO timestamp the
-// row was created; `amount` is positive for money in and negative for money out, which is the
-// convention the transactions table has always used.
+// A confirmed, non personal transaction, as the reader hands it over. `date` is transaction_date,
+// the day the money moved, as a plain YYYY-MM-DD. `amount` is positive for money in and negative
+// for money out, which is the convention the transactions table has always used.
 export interface WeekRow {
   amount: number;
-  at: string;
+  date: string;
 }
 
 export interface WeekBar {
@@ -64,6 +77,7 @@ export interface Week {
 }
 
 const LONDON = 'Europe/London';
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
 
 // The date in London, as YYYY-MM-DD. Built from parts rather than from a locale that happens to
 // print in the right order, because "which day was this" is not a formatting question.
@@ -107,13 +121,12 @@ export function weekWindow(now: Date): string[] {
   return out;
 }
 
-// ⚠️ THE READER FETCHES WIDER THAN THIS WINDOW, AND THAT IS DELIBERATE.
-//
-// Asking Postgres for "since local midnight six days ago" means computing a London midnight in UTC,
-// which means knowing the offset on that date, which means writing daylight saving arithmetic into
-// a database query. So the query asks for a whole extra day and this function throws away what does
-// not belong. Cheap, and exact by construction rather than by cleverness.
-export const FETCH_DAYS = WEEK_DAYS + 1;
+// The first day of the window, for the query. A plain date, so the query is a plain date
+// comparison and there is no daylight saving arithmetic anywhere near a database.
+export function windowStart(now: Date): string {
+  const win = weekWindow(now);
+  return win.length ? win[0] : '';
+}
 
 export function weekOf(rows: WeekRow[], now: Date): Week {
   const window = weekWindow(now);
@@ -121,7 +134,9 @@ export function weekOf(rows: WeekRow[], now: Date): Week {
   for (const iso of window) byDay.set(iso, { income: 0, expenses: 0 });
 
   for (const r of rows) {
-    const day = londonDay(r.at);
+    // A plain date, taken as it is. No timezone reading: transaction_date carries no time, so
+    // interpreting it in one would be inventing a fact about when he spent his money.
+    const day = typeof r.date === 'string' && ISO_DATE.test(r.date) ? r.date.slice(0, 10) : null;
     if (!day) continue;
     const bucket = byDay.get(day);
     if (!bucket) continue;                       // outside the seven days, from the wider fetch

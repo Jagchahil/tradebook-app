@@ -7,9 +7,11 @@
 //      would drift, and lib/money.ts and lib/ledger.ts both open with what happens then: the one
 //      that drifts is the one he believes. Proven here by adding the bars up independently and
 //      insisting the answer matches.
-//   2. THE DAYS ARE LONDON DAYS. A payment at half past midnight on a Thursday in July is 23:30 UTC
-//      on the Wednesday. Bucketing on the UTC date draws his Thursday takings on Wednesday's bar
-//      for seven months of the year. Proven on both sides of the clock change.
+//   2. IT BUCKETS ON THE DAY THE MONEY MOVED, NOT THE DAY WE HEARD ABOUT IT. transaction_date, not
+//      created_at. A bank feed backfilling ninety days would otherwise draw three months of a man's
+//      spending as one enormous bar on the afternoon he connected it, under the heading "your week".
+//      And WHICH seven days the window covers is still a London question: at half past midnight in
+//      July, today in UTC is already tomorrow.
 //   3. THE WINDOW IS SEVEN WHOLE DAYS, and it survives the two Sundays a year that are 23 and 25
 //      hours long. Stepping back by 24 hours across the last Sunday in October lands on the same
 //      date twice, which would draw a man six days and call it a week.
@@ -94,7 +96,7 @@ ok('an empty string is null too', W.londonDay('') === null);
   // 🔴 THE WHOLE POINT, END TO END. A tradesman paid at half past midnight on the Thursday. On a
   // UTC bucket his money lands on Wednesday's bar and he is looking at a picture of his own week
   // that he knows is wrong.
-  const week = W.weekOf([{ amount: 500, at: '2026-07-29T23:30:00Z' }], SUMMER);
+  const week = W.weekOf([{ amount: 500, date: '2026-07-30' }], SUMMER);
   const thursday = week.days.find((d) => d.iso === '2026-07-30');
   const wednesday = week.days.find((d) => d.iso === '2026-07-29');
   ok('🔴 A HALF PAST MIDNIGHT PAYMENT IS ON THE RIGHT DAY', thursday.income === 500);
@@ -106,10 +108,10 @@ console.log('\n3. THE TOTALS ARE SUMMED FROM THE BARS');
 
 {
   const rows = [
-    { amount: 1200, at: '2026-07-30T09:00:00Z' },
-    { amount: -400, at: '2026-07-30T10:00:00Z' },
-    { amount: 300, at: '2026-07-28T11:00:00Z' },
-    { amount: -50.5, at: '2026-07-25T11:00:00Z' },
+    { amount: 1200, date: '2026-07-30' },
+    { amount: -400, date: '2026-07-30' },
+    { amount: 300, date: '2026-07-28' },
+    { amount: -50.5, date: '2026-07-25' },
   ];
   const week = W.weekOf(rows, SUMMER);
   const barsIn = week.days.reduce((n, d) => n + d.income, 0);
@@ -128,7 +130,7 @@ console.log('\n3. THE TOTALS ARE SUMMED FROM THE BARS');
 {
   // A negative amount is money out. Nothing in this file may ever report a negative income or a
   // negative expense: the sign is the direction, and the figures are magnitudes.
-  const week = W.weekOf([{ amount: -99, at: '2026-07-30T09:00:00Z' }], SUMMER);
+  const week = W.weekOf([{ amount: -99, date: '2026-07-30' }], SUMMER);
   ok('money out is a positive expense, never a negative income',
     week.expenses === 99 && week.income === 0);
   ok('no day ever carries a negative figure',
@@ -138,39 +140,50 @@ console.log('\n3. THE TOTALS ARE SUMMED FROM THE BARS');
 {
   // Zero is money in, not money out. A £0 row is vanishingly rare and it must not silently become
   // spending.
-  const week = W.weekOf([{ amount: 0, at: '2026-07-30T09:00:00Z' }], SUMMER);
+  const week = W.weekOf([{ amount: 0, date: '2026-07-30' }], SUMMER);
   ok('a zero row does not become an expense', week.expenses === 0 && week.income === 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
-console.log('\n4. THE WIDER FETCH IS TRIMMED HERE, NOT IN THE QUERY');
+console.log('\n4. THE WINDOW IS A PLAIN DATE, AND ANYTHING OUTSIDE IT IS DISCARDED');
 
-ok('the reader is asked for one day more than the week', W.FETCH_DAYS === W.WEEK_DAYS + 1);
+// 🔴 THE QUERY ASKS ON transaction_date, THE DAY THE MONEY MOVED, NOT created_at, THE DAY WE HEARD
+// ABOUT IT. Found on the deployed site by correcting one row and watching the wrong number move:
+// marking a payment dated 11 MAY as not business took "your week" down by the same amount, because
+// the row had arrived in our table that week. A bank feed backfilling ninety days would have drawn
+// three months of spending as one enormous bar on the afternoon he connected it.
+ok('the window starts on the oldest day of the seven', W.windowStart(SUMMER) === '2026-07-24');
+ok('...and it is a plain date a database can compare', /^\d{4}-\d{2}-\d{2}$/.test(W.windowStart(SUMMER)));
+ok('it moves with the clock it is given', W.windowStart(WINTER) === '2026-01-09');
 
 {
   const week = W.weekOf([
-    { amount: 999, at: '2026-07-23T09:00:00Z' },   // the extra day the query fetched
-    { amount: 111, at: '2026-07-24T09:00:00Z' },   // the oldest day that counts
+    { amount: 999, date: '2026-07-23' },   // one day older than the window
+    { amount: 111, date: '2026-07-24' },   // the oldest day that counts
   ], SUMMER);
   ok('a row from outside the seven days is discarded', week.income === 111);
   ok('...and the oldest day inside it is kept', week.days[0].income === 111);
 }
 
 ok('a row from last month never reaches a figure',
-  W.weekOf([{ amount: 5000, at: '2026-06-01T09:00:00Z' }], SUMMER).income === 0);
+  W.weekOf([{ amount: 5000, date: '2026-06-01' }], SUMMER).income === 0);
 ok('a row from the future never reaches a figure',
-  W.weekOf([{ amount: 5000, at: '2026-09-01T09:00:00Z' }], SUMMER).income === 0);
+  W.weekOf([{ amount: 5000, date: '2026-09-01' }], SUMMER).income === 0);
+// 🔴 THE ONE OFF THE LIVE SITE. A payment made on 11 May is not part of this week, whatever day it
+// happened to land in our table.
+ok('🔴 A PAYMENT MADE IN MAY IS NOT IN JULY&apos;S WEEK',
+  W.weekOf([{ amount: -496, date: '2026-05-11' }], SUMMER).expenses === 0);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n5. RUBBISH IN DOES NOT BECOME A FIGURE');
 
 {
   const week = W.weekOf([
-    { amount: 100, at: '2026-07-30T09:00:00Z' },
-    { amount: Number.NaN, at: '2026-07-30T09:00:00Z' },
-    { amount: Number.POSITIVE_INFINITY, at: '2026-07-30T09:00:00Z' },
-    { amount: 50, at: 'not a date' },
-    { amount: 50, at: '' },
+    { amount: 100, date: '2026-07-30' },
+    { amount: Number.NaN, date: '2026-07-30' },
+    { amount: Number.POSITIVE_INFINITY, date: '2026-07-30' },
+    { amount: 50, date: 'not a date' },
+    { amount: 50, date: '' },
   ], SUMMER);
   ok('a NaN amount is skipped, not added', week.income === 100);
   ok('an infinite amount is skipped too', Number.isFinite(week.income));

@@ -31,7 +31,7 @@ import { refreshFacts, resolveOverrides, isOverridableKey, isInBounds, type Fact
 import { advanceStage, normaliseWhatsapp, isContactStage, isCheckoutStage, isEventKind, type ContactStage, type CheckoutStage, type EventKind } from './crm';
 import { sicByCode } from './siccodes';
 import { useOfHomeToDate } from './elections';
-import { weekTotals, FETCH_DAYS, type WeekRow } from './weekchart';
+import { weekTotals, windowStart, type WeekRow } from './weekchart';
 import { isMonthKey, monthStart, monthEnd } from './moneylog';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -3149,24 +3149,30 @@ export async function weeklyUpdateFactsFor(userIds: string[]): Promise<Map<strin
 // "£0 in, £0 out" over a database timeout, which is a lie with his own money in it.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 //
-// It asks for one day more than the week needs. lib/weekchart.ts explains why: the window is seven
-// whole London days, and working out when local midnight was in UTC means writing daylight saving
-// arithmetic into a database query. Fetching wider and discarding in a pure function is exact by
-// construction instead of by cleverness.
+// 🔴 IT ASKS ON transaction_date, THE DAY THE MONEY MOVED, NOT created_at, THE DAY WE HEARD ABOUT IT.
+//
+// Found on the deployed site by correcting one row and watching the wrong number move: marking a
+// payment dated 11 MAY as not business took "your week" down by the same amount. As a sentence that
+// was ambiguous; as a bar chart it means a bank feed backfilling ninety days draws three months of
+// spending as one enormous bar on the afternoon he connected it.
+//
+// It is also simpler: transaction_date is a plain calendar date, so the window is a plain date
+// comparison with no daylight saving arithmetic anywhere near a query.
 export async function weekRows(userId: string): Promise<WeekRow[] | null> {
   const { url } = config();
-  const since = new Date(Date.now() - FETCH_DAYS * 24 * 3600 * 1000).toISOString();
+  const from = windowStart(new Date());
+  if (!from) return null;
   try {
     const res = await fetch(
       `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
         + '&confirmed=eq.true&is_personal=eq.false'
-        + `&created_at=gte.${encodeURIComponent(since)}`
-        + '&select=amount,created_at&order=created_at.asc&limit=5000',
+        + `&transaction_date=gte.${from}`
+        + '&select=amount,transaction_date&order=transaction_date.asc&limit=5000',
       { headers: headers() },
     );
     if (!res.ok) return null;
-    const rows = (await res.json()) as Array<{ amount: number; created_at: string }>;
-    return rows.map((r) => ({ amount: Number(r.amount) || 0, at: r.created_at }));
+    const rows = (await res.json()) as Array<{ amount: number; transaction_date: string }>;
+    return rows.map((r) => ({ amount: Number(r.amount) || 0, date: r.transaction_date }));
   } catch {
     return null;
   }

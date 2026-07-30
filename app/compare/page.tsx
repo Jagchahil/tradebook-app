@@ -56,7 +56,7 @@ const COMPARE_CSS = `
 .score{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:720px;margin:0 auto}
 @media(max-width:640px){.score{grid-template-columns:1fr}}
 .scard{border-radius:20px;padding:26px;text-align:center;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow)}
-.scard.lek{background:linear-gradient(150deg,var(--river),var(--river-deep));color:#fff;border:0}
+.scard.lek{background:linear-gradient(150deg,var(--river-panel),var(--river-panel-deep));color:#fff;border:0}
 .scard .snum{font-size:52px;font-weight:900;letter-spacing:-.03em;line-height:1}
 .scard .slabel{font-size:14px;font-weight:800;margin-top:4px}
 .scard .ssub{font-size:12.5px;opacity:.85;margin-top:4px}
@@ -105,7 +105,7 @@ table.cmp{width:100%;border-collapse:collapse;font-size:14.5px;min-width:640px}
 .mk.soon{width:auto;height:auto;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:800;background:var(--saffron-tint);color:var(--saffron-deep)}
 .lbl{font-size:12px;font-weight:600;color:var(--tx-mut)}
 tr.hide{display:none}
-.cred{background:linear-gradient(135deg,var(--river-deep),var(--river));border-radius:24px;padding:44px 32px;color:#fff;text-align:center}
+.cred{background:linear-gradient(135deg,var(--river-panel-deep),var(--river-panel));border-radius:24px;padding:44px 32px;color:#fff;text-align:center}
 .cred h2{color:#fff;font-size:clamp(24px,3.6vw,36px)}
 .credrow{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:24px}
 .credchip{background:rgba(255,255,255,.14);border-radius:14px;padding:14px 18px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:9px}

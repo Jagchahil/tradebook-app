@@ -49,10 +49,10 @@ const PRICING_CSS = `
 .stotal{display:flex;justify-content:space-between;align-items:center;padding:16px 0 6px}
 .stotal .stl{font-size:15px;font-weight:800}
 .stotal .stc{font-size:20px;font-weight:900;color:var(--red);text-decoration:line-through;opacity:.7}
-.replace{margin-top:14px;background:linear-gradient(135deg,var(--river),var(--river-deep));border-radius:16px;padding:20px;text-align:center;color:#fff}
+.replace{margin-top:14px;background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:16px;padding:20px;text-align:center;color:#fff}
 .replace .rt{font-size:14px;opacity:.9}
 .replace .rp{font-size:34px;font-weight:900;letter-spacing:-.03em;margin-top:2px}
-.cred{background:linear-gradient(135deg,var(--river-deep),var(--river));border-radius:24px;padding:44px 32px;color:#fff;text-align:center}
+.cred{background:linear-gradient(135deg,var(--river-panel-deep),var(--river-panel));border-radius:24px;padding:44px 32px;color:#fff;text-align:center}
 .cred h2{color:#fff;font-size:clamp(24px,3.6vw,36px)}
 .credrow{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:24px}
 .credchip{background:rgba(255,255,255,.14);border-radius:14px;padding:14px 18px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:9px}

@@ -90,7 +90,7 @@ const PRODUCT_CSS = `
 .ttabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .ttab{padding:9px 15px;font-family:inherit;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:13px;cursor:pointer;transition:.2s;color:var(--tx)}
 .ttab.on{background:var(--river);color:var(--on-river);border-color:var(--river)}
-.bignum{background:linear-gradient(135deg,var(--river),var(--river-deep));border-radius:16px;padding:16px;color:#fff}
+.bignum{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:16px;padding:16px;color:#fff}
 .bignum .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;opacity:.85}
 .bignum .v{font-size:30px;font-weight:900;letter-spacing:-.03em}
 .trow{display:flex;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--line);font-size:13px}

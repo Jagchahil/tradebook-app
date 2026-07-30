@@ -86,7 +86,7 @@ const HOME_CSS = `
 .ba{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
 @media(max-width:760px){.ba{grid-template-columns:1fr}}
 .ba .old{background:var(--band);color:#fff;border-radius:20px;padding:30px}
-.ba .new{background:linear-gradient(150deg,var(--river),var(--river-deep));color:#fff;border-radius:20px;padding:30px}
+.ba .new{background:linear-gradient(150deg,var(--river-panel),var(--river-panel-deep));color:#fff;border-radius:20px;padding:30px}
 .ba h3{font-size:21px;margin:0 0 16px}
 .ba li{list-style:none;display:flex;gap:11px;align-items:flex-start;padding:8px 0;font-size:15px}
 .ba .m{flex:0 0 22px;height:22px;border-radius:999px;display:grid;place-items:center;font-size:12px;font-weight:900;margin-top:1px}
@@ -103,7 +103,7 @@ const HOME_CSS = `
 .numgrid{display:grid;grid-template-columns:.9fr 1.1fr;gap:48px;align-items:center}
 @media(max-width:900px){.numgrid{grid-template-columns:1fr;gap:32px}}
 .appmock{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:20px;box-shadow:var(--shadow);max-width:360px;margin:0 auto;width:100%}
-.setaside{background:linear-gradient(135deg,var(--river),var(--river-deep));border-radius:18px;padding:18px;color:#fff}
+.setaside{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:18px;padding:18px;color:#fff}
 .setaside .l{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.85}
 .setaside .big{font-size:38px;font-weight:900;letter-spacing:-.03em;margin-top:2px}
 .setaside .s{font-size:12px;opacity:.85}
@@ -174,7 +174,7 @@ const HOME_CSS = `
 .incl-grid li{list-style:none;display:flex;gap:12px;align-items:center;font-size:14.5px;font-weight:600}
 .incl-grid .t{flex:0 0 24px;height:24px;border-radius:999px;background:var(--green-tint);color:var(--green);display:grid;place-items:center;font-weight:900;font-size:12px}
 
-.final{background:linear-gradient(135deg,var(--river),var(--river-deep));border-radius:26px;padding:56px 32px;text-align:center;color:#fff}
+.final{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:26px;padding:56px 32px;text-align:center;color:#fff}
 .final h2{font-size:clamp(28px,4.4vw,44px);color:#fff;margin:0}
 .final p{color:rgba(255,255,255,.86);font-size:18px;margin:14px auto 26px;max-width:460px}
 `;

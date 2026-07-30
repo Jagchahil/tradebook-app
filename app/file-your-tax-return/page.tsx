@@ -131,7 +131,7 @@ const stepperCss =
     .map(
       (s) =>
         `#wt${s.n}:checked~.wt-stage .wtp-${s.n}{display:block}` +
-        `#wt${s.n}:checked~.wt-tabs label[for="wt${s.n}"]{background:${RIVER};color:#fff;border-color:${RIVER}}` +
+        `#wt${s.n}:checked~.wt-tabs label[for="wt${s.n}"]{background:${RIVER};color:var(--on-river);border-color:${RIVER}}` +
         `#wt${s.n}:focus-visible~.wt-tabs label[for="wt${s.n}"]{outline:2px solid ${RIVER};outline-offset:2px}`,
     )
     .join('') +
@@ -146,7 +146,7 @@ const stepperCss =
   `.wtPress{animation:wtPress 1.5s ease .25s forwards}` +
   `.wt-caret{display:inline-block;width:2px;height:14px;background:${RIVER};vertical-align:middle;animation:wtBlink .8s step-end infinite}` +
   `.wt-screen{background:var(--panel);border:1px solid ${LINE};border-radius:16px;overflow:hidden;box-shadow:0 14px 36px rgba(17,17,17,.08)}` +
-  `.wt-screenbar{background:${INK};color:#fff;font-size:11.5px;font-weight:600;letter-spacing:.3px;padding:9px 14px}` +
+  `.wt-screenbar{background:var(--band);color:#fff;font-size:11.5px;font-weight:600;letter-spacing:.3px;padding:9px 14px}` +
   `.wt-tabs{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:24px}` +
   `.wt-tab{cursor:pointer;width:40px;height:40px;border-radius:999px;border:1.5px solid ${LINE};background:var(--panel);color:${INK};font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s}` +
   `.wt-tab:hover{border-color:${RIVER}}` +
@@ -220,7 +220,7 @@ const tradeCss = trades
   .map(
     (t) =>
       `#trade-${t.id}:checked ~ .trade-panels .tp-${t.id}{display:block}` +
-      `#trade-${t.id}:checked ~ .trade-chips label[for="trade-${t.id}"]{background:${RIVER};color:#fff;border-color:${RIVER}}` +
+      `#trade-${t.id}:checked ~ .trade-chips label[for="trade-${t.id}"]{background:${RIVER};color:var(--on-river);border-color:${RIVER}}` +
       `#trade-${t.id}:focus-visible ~ .trade-chips label[for="trade-${t.id}"]{outline:2px solid ${RIVER};outline-offset:2px}`,
   )
   .join('\n');
@@ -376,7 +376,7 @@ export default function FileYourTaxReturnPage() {
           #route-under:checked ~ .branch-panel.panel-under{display:block}
           #route-over:checked ~ .branch-panel.panel-over{display:block}
           #route-under:checked ~ .branch-tabs label[for="route-under"],
-          #route-over:checked ~ .branch-tabs label[for="route-over"]{background:${RIVER};color:#fff;border-color:${RIVER}}
+          #route-over:checked ~ .branch-tabs label[for="route-over"]{background:${RIVER};color:var(--on-river);border-color:${RIVER}}
           #route-under:focus-visible ~ .branch-tabs label[for="route-under"],
           #route-over:focus-visible ~ .branch-tabs label[for="route-over"]{outline:2px solid ${RIVER};outline-offset:2px}
           .trade-panel{display:none;animation:riseIn .25s ease}

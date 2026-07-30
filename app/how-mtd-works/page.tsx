@@ -42,7 +42,7 @@ const MTD_CSS = `
 @keyframes mfade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .bigcard{border-radius:22px;padding:34px;text-align:center}
 .bigcard.old{background:var(--band);color:#fff}
-.bigcard.new{background:linear-gradient(150deg,var(--river),var(--river-deep));color:#fff}
+.bigcard.new{background:linear-gradient(150deg,var(--river-panel),var(--river-panel-deep));color:#fff}
 .bigcard .be{font-size:44px;margin-bottom:12px}
 .bigcard h3{font-size:24px;margin:0 0 10px}
 .bigcard p{font-size:15.5px;opacity:.9;max-width:440px;margin:0 auto}
@@ -52,7 +52,7 @@ const MTD_CSS = `
 .tl{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;max-width:820px;margin:0 auto}
 @media(max-width:760px){.tl{grid-template-columns:1fr 1fr}}
 .tlnode{text-align:center}
-.tldot{width:56px;height:56px;border-radius:999px;margin:0 auto 14px;display:grid;place-items:center;font-weight:900;font-size:20px;color:#fff;background:linear-gradient(135deg,var(--river),var(--river-deep));box-shadow:0 12px 26px rgba(27,89,166,.3);transform:scale(0);animation:tlpop .5s cubic-bezier(.2,1.6,.4,1) both}
+.tldot{width:56px;height:56px;border-radius:999px;margin:0 auto 14px;display:grid;place-items:center;font-weight:900;font-size:20px;color:#fff;background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));box-shadow:0 12px 26px rgba(27,89,166,.3);transform:scale(0);animation:tlpop .5s cubic-bezier(.2,1.6,.4,1) both}
 .tlnode:nth-child(1) .tldot{animation-delay:.05s}
 .tlnode:nth-child(2) .tldot{animation-delay:.17s}
 .tlnode:nth-child(3) .tldot{animation-delay:.29s}
@@ -67,7 +67,7 @@ const MTD_CSS = `
 .fbox{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;text-align:center;box-shadow:var(--shadow)}
 .fbox .fe{font-size:30px;margin-bottom:8px}.fbox b{font-size:15px;display:block;margin-bottom:4px}.fbox small{font-size:13px;color:var(--tx-mut)}
 .farrow{font-size:24px;color:var(--saffron);font-weight:900;text-align:center}
-.cred{background:linear-gradient(135deg,var(--river-deep),var(--river));border-radius:24px;padding:44px 32px;color:#fff;text-align:center}
+.cred{background:linear-gradient(135deg,var(--river-panel-deep),var(--river-panel));border-radius:24px;padding:44px 32px;color:#fff;text-align:center}
 .cred h2{color:#fff;font-size:clamp(24px,3.6vw,36px)}
 .credrow{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:24px}
 .credchip{background:rgba(255,255,255,.14);border-radius:14px;padding:14px 18px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:9px}

@@ -89,6 +89,14 @@ export const ON_WHATSAPP = '#08301A';
 // saffron tint reads at 2.7:1, and how-mtd-works was painting the MTD threshold card in exactly
 // that pair: the line telling a sole trader which April he is caught by. These are the inks for
 // text on a tinted panel. The accents themselves stay as they are, because they are also fills.
+// ⚠️ AND A BIG BLUE PANEL IS A SURFACE, NOT AN ACCENT MARK. The hero cards, the closing call to
+// action and the timeline dots are filled with a river gradient and carry white text. Themed, that
+// gradient lifts to #4C8FDB in dark and the white on it drops to 2.6:1 on a whole panel of copy.
+// A deep blue panel reads perfectly well on a dark page, exactly as --band does, so these keep the
+// light values in both themes on purpose. They are surfaces that happen to be blue.
+export const RIVER_PANEL = RIVER;
+export const RIVER_PANEL_DEEP = RIVER_DEEP;
+
 // ⚠️ AND THE INVERSE MISTAKE, ON A BUTTON THAT IS WHITE IN BOTH THEMES. var(--river) lifts to
 // #4C8FDB in dark so it can be seen against a near black page, which is right everywhere except on
 // a fill that stayed white. There it reads at 3.36:1. A white surface does not darken when the page
@@ -157,6 +165,7 @@ export const THEME_CSS = `
   --green:${GREEN};--green-tint:${GREEN_TINT};--on-green:${ON_GREEN};--on-green-tint:${ON_GREEN_TINT};
   --red:${RED};--red-tint:${RED_TINT};--on-red:${ON_RED};
   --whatsapp:${WHATSAPP};--on-whatsapp:${ON_WHATSAPP};--on-white-river:${RIVER};
+  --river-panel:${RIVER_PANEL};--river-panel-deep:${RIVER_PANEL_DEEP};
   --bg:${PAPER};--panel:${PANEL};--surface:${SURFACE};--bd:${LINE};--band:${BAND};
   --tx:${INK};--tx-mut:${MUTED};
 }
@@ -165,6 +174,7 @@ export const THEME_CSS = `
   --saffron:${DARK_SAFFRON};--saffron-deep:${DARK_SAFFRON_DEEP};--saffron-tint:${DARK_SAFFRON_TINT};--on-saffron:${DARK_ON_SAFFRON};--on-saffron-tint:${DARK_SAFFRON};
   --green:${DARK_GREEN};--green-tint:${DARK_GREEN_TINT};--on-green:${DARK_ON_GREEN};--on-green-tint:${DARK_GREEN};
   --red:${DARK_RED};--red-tint:${DARK_RED_TINT};--on-red:${DARK_ON_RED};
+  --river-panel:${RIVER_PANEL};--river-panel-deep:${RIVER_PANEL_DEEP};
   --bg:${DARK_PAPER};--panel:${DARK_PANEL};--surface:${DARK_SURFACE};--bd:${DARK_LINE};--band:${DARK_BAND};
   --tx:${DARK_INK};--tx-mut:${DARK_MUTED};
 }
@@ -213,6 +223,7 @@ export const PALETTE: Readonly<Record<string, string>> = {
   DARK_SAFFRON_TINT, DARK_GREEN, DARK_GREEN_TINT, DARK_RED, DARK_RED_TINT, DARK_PAPER,
   DARK_PANEL, DARK_SURFACE, DARK_LINE, DARK_MUTED, DARK_BAND,
   ON_RIVER, ON_GREEN, ON_RED, ON_SAFFRON, ON_WHATSAPP, ON_SAFFRON_TINT, ON_GREEN_TINT,
+  RIVER_PANEL, RIVER_PANEL_DEEP,
   DARK_ON_RIVER, DARK_ON_GREEN, DARK_ON_RED, DARK_ON_SAFFRON,
 };
 
@@ -243,6 +254,8 @@ export const ON_PAIRS: ReadonlyArray<{ theme: 'light' | 'dark'; name: string; bg
   { theme: 'dark', name: 'paper-muted', bg: DARK_PAPER, ink: DARK_MUTED },
   { theme: 'dark', name: 'surface-muted', bg: DARK_SURFACE, ink: DARK_MUTED },
   { theme: 'dark', name: 'panel-ink', bg: DARK_PANEL, ink: DARK_INK },
+  { theme: 'dark', name: 'river-panel', bg: RIVER_PANEL, ink: ON_RIVER },
+  { theme: 'dark', name: 'river-panel-deep', bg: RIVER_PANEL_DEEP, ink: ON_RIVER },
   { theme: 'dark', name: 'river-tint', bg: DARK_RIVER_TINT, ink: DARK_RIVER },
   { theme: 'dark', name: 'green-tint', bg: DARK_GREEN_TINT, ink: DARK_GREEN },
   { theme: 'dark', name: 'red-tint', bg: DARK_RED_TINT, ink: DARK_RED },

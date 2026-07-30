@@ -206,8 +206,28 @@ for (const file of walk(root)) {
     if (isThemed && INLINE_WHITE.some((re) => re.test(line))) {
       accentWhite.push(`${rel}:${i + 1} inline accent fill with white text, on a page that themes`);
     }
+    // Three syntaxes, because the same fault was written all three ways and the first two versions
+    // of this guard each missed one: var(--river) in a plain rule, ${RIVER} interpolated into a
+    // template, and a river gradient. All of them lift in dark mode; white does not.
     if (/background(-color)?:var\(--(river|green|saffron|red)\);color:#(fff|ffffff)\b/i.test(line)) {
       accentWhite.push(`${rel}:${i + 1} accent fill with white text`);
+    }
+    if (/background(-color)?:\$\{(RIVER|RIVER_DEEP|GREEN|SAFFRON|INK)\};color:#(fff|ffffff)\b/.test(line) && isThemed) {
+      accentWhite.push(`${rel}:${i + 1} interpolated accent fill with white text`);
+    }
+    // ⚠️ THE BRAND MARK IS EXEMPT, AND IT IS THE ONLY THING THAT IS. The L chip is a river to
+    // saffron gradient carrying a white letter, which is 2.2:1 at the saffron end and would fail
+    // this check. WCAG 1.4.3 exempts logotypes from contrast minimums, precisely because a brand
+    // mark is a picture of a name rather than something anybody has to read. Repainting the logo
+    // to satisfy a rule written not to apply to it would be the wrong way round.
+    //
+    // Keyed on the river to saffron pair, which nothing else uses. Every readable surface is river
+    // to river-deep, so this exemption cannot quietly swallow one.
+    const isBrandMark = /linear-gradient\([^)]*var\(--river\)[^)]*var\(--saffron\)/.test(line);
+    if (!isBrandMark
+      && /linear-gradient\([^)]*var\(--river(-deep)?\)/.test(line)
+      && /color:\s*'?#(fff|ffffff)/i.test(line)) {
+      accentWhite.push(`${rel}:${i + 1} river gradient with white text, use --river-panel`);
     }
     // And the inverse: a fill that stays white in both themes must not take a themed accent as its
     // text, because the accent lifts in dark mode and the fill does not.

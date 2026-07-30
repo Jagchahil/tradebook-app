@@ -130,6 +130,39 @@ export function kindOf(source: AnnouncementSource, applied: boolean): Announceme
   return applied ? 'law_changed' : 'worth_knowing';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND ON 30 JULY, OFF A LIVE SCREEN AGAIN: "WORTH KNOWING" DOES NOT REACH A CUSTOMER AT ALL.
+//
+// The 28 July fix above stopped us calling a webinar announcement a change in the law. It did not
+// stop us SHOWING him the webinar announcement. On the deployed site a barber's own money screen
+// was carrying three cards: the VAT grouping rules, the Capital Goods Scheme, and an archived page
+// about the taxation of wine. Every one of them was correctly approved, correctly cited, correctly
+// in date, and correctly tagged. Every one of them was also nothing to do with him.
+//
+// The difference between the two kinds is not tone, it is PROOF. `law_changed` means a fact
+// override exists, meaning a constant inside the engine really moved because of this, meaning his
+// own figures changed while he slept. That is the sentence nobody else in this market can write.
+// `worth_knowing` means we could not prove any of that: it is a page Khoji read.
+//
+// Doc 103's second test decides it. A row he has to read and reject before he reaches what he came
+// for is a cost, and a row that is irrelevant most of the time teaches him to stop looking, and
+// then he misses the week it mattered. So the banner carries what moved HIS money and what a human
+// deliberately wrote, and nothing else.
+//
+// ⚠️ NOTHING IS LOST FROM KHOJI. Every finding still lands, is still reviewed on the Brain desk,
+// and still moves the engine when it should. What changes is that being read by Khoji is no longer
+// on its own a reason to put a card on a man's money screen.
+//
+// ⚠️ AND THIS IS THE PLACE IT IS DECIDED, not a filter in a React file. The header of this module
+// and of app/api/announcements/route.ts both say it: the moment a second place decides what a
+// customer may be told, the approve button on the Brain desk stops meaning anything.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const CUSTOMER_FACING_KINDS: ReadonlyArray<AnnouncementKind> = ['law_changed', 'product'];
+
+export function isCustomerFacing(kind: AnnouncementKind): boolean {
+  return CUSTOMER_FACING_KINDS.includes(kind);
+}
+
 // The words themselves, here rather than in a component, for the same reason the gate is here:
 // there is one place that decides what a customer is told about tax law.
 export const KIND_LABEL: Record<AnnouncementKind, string> = {
@@ -286,7 +319,15 @@ export function selectAnnouncements(input: AnnouncementsInput): Announcement[] {
   // Last line of defence, and it should never fire. If any of the above ever produced a dash, drop
   // the item rather than ship it: lib/housestyle.ts is the business wide lock and a banner is the
   // most read copy we have.
-  return out.filter((a) => !hasForbiddenDash(a.title) && !hasForbiddenDash(a.body)).slice(0, MAX_ITEMS);
+  //
+  // And the kind filter, applied here rather than at the top, so `applied` has already been decided
+  // from the override table by the time anything is judged on it. See CUSTOMER_FACING_KINDS above:
+  // what reached a barber's money screen without it was the Capital Goods Scheme and a page about
+  // wine duty.
+  return out
+    .filter((a) => isCustomerFacing(a.kind))
+    .filter((a) => !hasForbiddenDash(a.title) && !hasForbiddenDash(a.body))
+    .slice(0, MAX_ITEMS);
 }
 
 // The one reassurance sentence, and the only place it is allowed to be written. It is separate from

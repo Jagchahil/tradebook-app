@@ -3,8 +3,8 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../lib/webauth';
 import { SESSION_COOKIE } from '../../lib/websession';
 import {
-  getOptimiserInput, weeklyTotals, weeklyUpdateFactsFor, readAnnouncementSources,
-  readOnboardingProgress, readProvedPhone,
+  getOptimiserInput, weekRows, weeklyUpdateFactsFor, readAnnouncementSources,
+  readOnboardingProgress, readProvedPhone, pileEntries, readOwnNames, readAccountUse,
 } from '../../lib/supabase';
 import { toStep, isDone, stepTitle, stepNumber, stepCount } from '../../lib/onboarding';
 import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL, WHATSAPP_NUMBER } from '../../lib/features';
@@ -12,20 +12,26 @@ import { waLinksConfigured } from '../../lib/walink';
 import { gateForUser } from '../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../lib/gate';
 import { ledgerFor, headline } from '../../lib/ledger';
-import { weeklyInput, weeklyFigures, weeklyLine } from '../../lib/weeklyupdate';
-import { selectAnnouncements, appliedLineFor, tagFor } from '../../lib/announcements';
-import { AnnouncementsBanner, type BannerItem } from '../_shared/AnnouncementsBanner';
+import { taxPosition } from '../../lib/taxoptimiser';
+import { weeklyInput, weeklyLine } from '../../lib/weeklyupdate';
+import { weekOf } from '../../lib/weekchart';
+import { buildPile, partitionPile } from '../../lib/reviewpile';
+import { normaliseVendor } from '../../lib/memory';
+import { categoriseBankLine } from '../../lib/categories';
+import { selectAnnouncements } from '../../lib/announcements';
 import { gbp0, gbpAbs0 } from '../../lib/money';
 import {
-  A11Y_CSS, FONT, GREEN, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_DEEP,
-  SAFFRON_TINT, WHATSAPP,
+  A11Y_CSS, FONT, GREEN, INK, LINE, MOTION, MUTED, PANEL, PAPER, RADIUS, RIVER, RIVER_DEEP,
+  RIVER_TINT, SAFFRON_DEEP, SAFFRON_TINT, SHADOW, SURFACE, WHATSAPP,
 } from '../../lib/tokens';
 import { AppNav } from './AppNav';
+import { Announcements } from './Announcements';
+import { WeekChart } from './WeekChart';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// THE MONEY VIEW. The screen a man opens when he wants to know what he owes.
+// THE OVERVIEW. The screen a man opens when he wants to know what he owes.
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // ⚠️ SERVER RENDERED, AND THAT IS THE WHOLE POINT OF THE WEB APP.
@@ -33,40 +39,59 @@ export const dynamic = 'force-dynamic';
 // He is on a cheap Android on a bad signal, standing in somebody's kitchen with one hand on a
 // ladder. Every kilobyte of JavaScript is a second he spends looking at a white screen wondering
 // whether we have taken his money and broken. So his figures are already IN the HTML when it
-// arrives. There is no loading spinner on this page because there is nothing to load.
+// arrives. There is no loading spinner on this page because there is nothing to load, and as of
+// 30 July there is no client component on it either: the announcements banner was the last one.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 //
 // ⚠️ NOT ONE FIGURE ON THIS SCREEN IS COMPUTED HERE.
 //
-// The ledger comes from ledgerFor(), the week from weeklyInput() and weeklyLine(), the banner from
-// selectAnnouncements(). All three are the SAME functions /api/ledger, /api/weekly and
-// /api/announcements call, which are the same ones the phone app and the WhatsApp reply read. That
-// is not tidiness. /api/ledger's own header lists three separate times this codebase was caught
-// with two readers over one number, and the lesson it draws is that the one which drifts is the one
-// he believes. A server rendered page that did its own arithmetic would be the fourth, and the
-// first where the disagreement was between his screen and his quarter pack.
+// The ledger comes from ledgerFor(), the tax from taxPosition(), the week from weekOf() and
+// weeklyLine(), what is waiting from buildPile(), the banner from selectAnnouncements(). Every one
+// of them is the SAME function the API routes call, which are the same ones the phone app and the
+// WhatsApp reply read. That is not tidiness. /api/ledger's own header lists three separate times
+// this codebase was caught with two readers over one number, and the lesson it draws is that the
+// one which drifts is the one he believes.
 //
 // ⚠️ AND THE USER ID COMES FROM THE SESSION ROW, NEVER FROM THE URL.
 //
 // There is no id in the path and no id in the query, so there is nothing to change. See
 // lib/webauth.ts and test/webauth.test.mjs, which fails the build if any page under app/app starts
 // reading one.
-
+//
 // ⚠️ NO LOCAL MONEY FORMATTER HERE. This page had one, written the same day lib/money.ts was
 // created to replace the seventeen the 28 July sweep found. It would print "£-33" for a negative,
-// which is the exact bug that sweep existed to remove, and it survived only because nothing on
-// this screen happens to go negative today. A formatter that is correct by luck is the eighteenth.
+// which is the exact bug that sweep existed to remove.
+//
+// THE ORDER OF THIS SCREEN, AND WHY IT IS THIS ORDER.
+//
+// Doc 103: he is up a ladder with one hand on the rail, he is not exploring. So the question he
+// came with is answered first and everything else earns its place under it.
+//
+//   1. Anything stopping him using the product   the read only banner, unfinished setup
+//   2. What to put by for tax                    the question. One number.
+//   3. In, out, profit                           where that number came from
+//   4. What is waiting on him                    the only reason 2 and 3 are not the whole truth
+//   5. His week                                  the habit, in words and as a picture
+//   6. What Lekhio saved him                     the proof he is getting his money's worth
+//
+// The standing question, whenever anything is added: what did we take out to make room for it?
+// The "Worth knowing" carousel came out. On the live site it was offering a barber the VAT grouping
+// rules, the Capital Goods Scheme and an archived page about wine duty.
 
-export default async function MoneyPage() {
+export default async function OverviewPage() {
   const jar = await cookies();
   const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
   if (!user) redirect('/in');
 
-  // Everything at once. Three round trips in parallel rather than three in a row, because the
-  // budget for this page is one bad-signal second, not three.
-  const [optimiser, totals, factsMap, sources, progress, proved, gate] = await Promise.all([
+  const now = new Date();
+
+  // Everything at once. Round trips in parallel rather than in a row, because the budget for this
+  // page is one bad-signal second, not eight.
+  const [
+    optimiser, rows, factsMap, sources, progress, proved, gate, pileRows, ownNames, accountUse,
+  ] = await Promise.all([
     getOptimiserInput(user.id),
-    weeklyTotals(user.id),
+    weekRows(user.id),
     weeklyUpdateFactsFor([user.id]).catch(() => null),
     readAnnouncementSources(user.id).catch(() => null),
     readOnboardingProgress(user.id).catch(() => null),
@@ -74,6 +99,9 @@ export default async function MoneyPage() {
     // ⚠️ IN THE SAME ROUND TRIP AS EVERYTHING ELSE. This runs on the screen a man opens to find out
     // what he owes, on a bad signal, so it may not add a serial wait to it.
     gateForUser(user.id),
+    pileEntries(user.id).catch(() => []),
+    readOwnNames(user.id).catch(() => [] as string[]),
+    readAccountUse(user.id).catch(() => 'mixed' as const),
   ]);
 
   // ⚠️ THE RESUME LINE, AND DOC 103'S EMPTY TEST DECIDES WHEN IT IS ON SCREEN.
@@ -89,42 +117,52 @@ export default async function MoneyPage() {
   const resumeAt = setup && !isDone(setup) ? setup : null;
 
   // ⚠️ THE WHATSAPP ROW, AND DOC 103'S EMPTY TEST DECIDES WHEN IT IS ON SCREEN, exactly as it does
-  // for the resume line above.
-  //
-  // It is drawn while his phone is NOT connected and disappears the moment it is. A permanent row
-  // saying "connected" is a row he reads and rejects every time he opens the one screen he came to
-  // for a number, and doc 103's standing question is what we took out to make room for it.
-  //
-  // A failed read draws nothing, because telling a man who connected last week that he has not is
-  // worse than saying nothing at all.
+  // for the resume line above. It is drawn while his phone is NOT connected and disappears the
+  // moment it is. A permanent row saying "connected" is a row he reads and rejects every time he
+  // opens the one screen he came to for a number.
   const offerWhatsApp = proved !== null && !proved.phone
     && waLinksConfigured() && WHATSAPP_NUMBER.length >= 8;
 
   const l = ledgerFor(optimiser);
-  const week = weeklyInput(totals, factsMap?.get(user.id), new Date());
-  const figures = weeklyFigures(week);
+  const tax = taxPosition(optimiser);
 
-  const items: BannerItem[] = sources
+  // HIS BUSINESS MONEY THIS TAX YEAR, trade and property together, because a landlord looking at
+  // "£0 in" would be looking at a screen that does not know about his rent. The ledger card lower
+  // down is trade only and says so: it answers a different question.
+  const moneyIn = Math.max(0, optimiser.ytdTradeIncome) + Math.max(0, optimiser.ytdPropertyIncome ?? 0);
+  const moneyOut = Math.max(0, optimiser.ytdTradeExpenses) + Math.max(0, optimiser.ytdPropertyExpenses ?? 0);
+  const profit = moneyIn - moneyOut;
+
+  // ⚠️ A READ THAT FAILED IS NOT A QUIET WEEK, AND THIS SCREEN IS ALLOWED TO KNOW THE DIFFERENCE.
+  // weekRows returns null when Supabase could not answer. Printing "£0 in, £0 out" over a timeout
+  // is a lie with his own money in it.
+  const weekRead = rows !== null;
+  const week = weekOf(rows ?? [], now);
+  const weekProfit = week.income - week.expenses;
+  const weekSaid = weeklyInput({ income: week.income, expenses: week.expenses }, factsMap?.get(user.id), now);
+
+  // WHAT IS WAITING, from the same three functions /app/pile and /api/pile use. Money in is never
+  // in this count: confirm_pile refuses it outright, so counting it would promise him a decision he
+  // is not offered.
+  const { known, unknown, careful } = partitionPile(
+    buildPile(pileRows, normaliseVendor, ownNames, categoriseBankLine),
+    accountUse,
+  );
+  const waiting = known.length + unknown.length + careful.length;
+
+  const items = sources
     ? selectAnnouncements({
         knowledge: sources.knowledge,
         manual: sources.manual,
         appliedItemIds: sources.appliedItemIds,
         dismissedKeys: sources.dismissedKeys,
-      }).map((a) => ({
-        key: a.key,
-        source: a.source,
-        tag: tagFor(a),
-        kind: a.kind,
-        title: a.title,
-        body: a.body,
-        sourceUrl: a.sourceUrl,
-        effectiveDate: a.effectiveDate,
-        // From the module, which refuses to produce this for an item it cannot prove. There is
-        // nothing here for a caller to forget.
-        appliedLine: appliedLineFor(a),
-        at: a.at,
-      }))
+      })
     : [];
+
+  // The tax card is drawn once there is money to tax. A proud "£0 to put by" on the first screen a
+  // new customer ever sees is doc 103's empty test failing on day one: it teaches him this screen
+  // has nothing on it. The ledger's own headline already tells an empty account what to do.
+  const showTax = moneyIn > 0;
 
   return (
     <main style={S.wrap}>
@@ -132,50 +170,135 @@ export default async function MoneyPage() {
 
       <AppNav current="/app" />
 
-      {/* Item 1 finally has a customer surface. Khoji reads the law nightly and a human approves
-          what matters, and until this line existed no customer ever saw it happen. */}
       {/* ═══════════════════════════════════════════════════════════════════════════════════════
           🔴 THE TRIAL HAS ENDED, AND HE CAN STILL SEE EVERY FIGURE ON THIS PAGE.
           lib/gate.ts's header is the argument: his records are his, the work is what he was buying,
           and a product that hides finished work behind a card form is taking back something he has
           already paid for. Under UK GDPR it is also a right of access problem we would have built
-          on purpose.
-          So this is a banner, not a wall. Nothing below it is removed.
+          on purpose. So this is a banner, not a wall. Nothing below it is removed.
           ═══════════════════════════════════════════════════════════════════════════════════════ */}
       {gate === 'readonly' ? (
-        <section style={S.locked}>
-          <span style={S.lockedTop}>{READONLY_TITLE}</span>
-          <span style={S.lockedBody}>{READONLY_LINE}</span>
+        <section style={S.notice}>
+          <span style={S.noticeTop}>{READONLY_TITLE}</span>
+          <span style={S.noticeBody}>{READONLY_LINE}</span>
           <form action="/api/billing/checkout" method="post" style={{ marginTop: 12 }}>
-            <button type="submit" style={S.lockedBtn}>Add a card</button>
+            <button type="submit" style={S.primaryBtn}>Add a card</button>
           </form>
         </section>
       ) : null}
 
-      <AnnouncementsBanner items={items} />
+      <Announcements items={items} />
 
       {resumeAt ? (
-        <a href={`/app/setup?step=${resumeAt}`} style={S.resume}>
-          <span style={S.resumeTop}>Finish setting up &middot; step {stepNumber(resumeAt)} of {stepCount()}</span>
-          <span style={S.resumeBody}>
+        <a href={`/app/setup?step=${resumeAt}`} style={S.resume} className="lek-hit">
+          <span style={S.noticeTop}>Finish setting up &middot; step {stepNumber(resumeAt)} of {stepCount()}</span>
+          <span style={S.noticeBody}>
             You stopped at {stepTitle(resumeAt).toLowerCase()}. Everything you answered is saved, and
             the rest is where the money we can find you comes from.
           </span>
         </a>
       ) : null}
 
-      <section style={S.card}>
-        <h1 style={S.h1}>{headline(l)}</h1>
+      {/* ── 1. WHAT TO PUT BY ──────────────────────────────────────────────────────────────────
+          The question he came with, answered in one number before anything else on the screen.
+          taxPosition() is his WHOLE tax across every stream we know about, minus what PAYE has
+          already taken, plus the student loan that Self Assessment collects in January. */}
+      {showTax ? (
+        <section style={{ ...S.card, ...S.taxCard }} className="lek-card">
+          <h1 style={S.eyebrow}>Put by for tax</h1>
+          <div style={S.hero}>{gbp0(tax.setAside)}</div>
+          <p style={S.heroNote}>
+            {tax.projected
+              ? 'What your figures are heading for across the full tax year'
+              : 'What the year so far has built up. Too early to call the whole year yet'}
+            {tax.studentLoan > 0 ? ', including your student loan' : ''}. It moves as you earn, and
+            it is due by 31 January.
+          </p>
+        </section>
+      ) : null}
+
+      {/* ── 2. WHERE THAT NUMBER CAME FROM ─────────────────────────────────────────────────────
+          Three figures, no cleverness. The sum he would do on the back of an envelope, done. */}
+      <section style={S.card} className="lek-card">
+        <h2 style={S.h2}>Your year so far</h2>
+        <div className="lek-grid">
+          <div style={S.tile}>
+            <div style={S.tileLabel}>In</div>
+            <div style={{ ...S.tileValue, color: GREEN }}>{gbp0(moneyIn)}</div>
+          </div>
+          <div style={S.tile}>
+            <div style={S.tileLabel}>Out</div>
+            <div style={{ ...S.tileValue, color: RIVER }}>{gbp0(moneyOut)}</div>
+          </div>
+          <div style={S.tile}>
+            <div style={S.tileLabel}>Profit</div>
+            <div style={S.tileValue}>{gbp0(profit)}</div>
+          </div>
+        </div>
+        <p style={S.quiet}>Since 6 April, on everything you have confirmed.</p>
+      </section>
+
+      {/* ── 3. WHAT IS WAITING ─────────────────────────────────────────────────────────────────
+          Doc 103's empty test again: this is the ONLY reason the figures above are not the whole
+          truth, so it is loud when it matters and absent when it does not. A permanent "nothing
+          waiting" row is a row he learns to stop reading. */}
+      {waiting > 0 ? (
+        <a href="/app/pile" style={S.waiting} className="lek-hit">
+          <span style={S.waitingCount}>{waiting}</span>
+          <span>
+            <span style={S.waitingTop}>
+              {waiting === 1 ? 'One thing is waiting on you' : `${waiting} things are waiting on you`}
+            </span>
+            <span style={S.waitingBody}>
+              Until you answer, none of it counts towards the figures above. Most are one question
+              covering several payments.
+            </span>
+          </span>
+        </a>
+      ) : null}
+
+      {/* ── 4. HIS WEEK ────────────────────────────────────────────────────────────────────────
+          The same sentence WhatsApp sends, from the same function, and the same seven days drawn
+          from the same rows. See lib/weekchart.ts: the picture and the words cannot disagree,
+          because the words are summed from the picture. */}
+      <section style={S.card} className="lek-card">
+        <h2 style={S.h2}>Your week</h2>
+        {weekRead ? (
+          <>
+            <p style={S.week}>
+              {gbp0(week.income)} in, {gbp0(week.expenses)} out.{' '}
+              {weekProfit >= 0
+                ? `That leaves ${gbp0(weekProfit)}.`
+                : `That is ${gbpAbs0(weekProfit)} more out than in.`}
+            </p>
+            <p style={S.quiet}>{weeklyLine(weekSaid)}</p>
+            {/* A chart of seven empty days says nothing the sentence has not already said better. */}
+            {week.anyMoney ? <WeekChart week={week} /> : null}
+          </>
+        ) : (
+          <p style={S.quiet}>
+            We could not read your week just now. Nothing is lost, your figures are safe, and this
+            fills itself in on the next load.
+          </p>
+        )}
+      </section>
+
+      {/* ── 5. THE PROOF ───────────────────────────────────────────────────────────────────────
+          "£12.99 saves you £2,000" is a specification, not a slogan. If we cannot show him the
+          £2,000 we have not earned the £12.99. lib/ledger.ts holds the argument. */}
+      <section style={S.card} className="lek-card">
+        <h2 style={S.h2}>What Lekhio has saved you</h2>
+        <p style={S.headline}>{headline(l)}</p>
 
         {l.enough ? (
           <>
             <div style={S.two}>
               <div>
-                <div style={S.small}>Without Lekhio</div>
+                <div style={S.tileLabel}>Without Lekhio</div>
                 <div style={S.big}>{gbp0(l.withoutLekhio)}</div>
               </div>
               <div>
-                <div style={S.small}>With Lekhio</div>
+                <div style={S.tileLabel}>With Lekhio</div>
                 <div style={{ ...S.big, color: GREEN }}>{gbp0(l.withLekhio)}</div>
               </div>
             </div>
@@ -199,9 +322,8 @@ export default async function MoneyPage() {
           // weeks of data, and this screen says why rather than showing a proud and silly £14.
           //
           // ⚠️ AND IT IS NOT SAID TWICE. headline() falls back to l.note when there is not enough
-          // to be confident, so rendering the note underneath printed the identical sentence twice,
-          // one above the other, on the first screen a new customer ever sees.
-          l.note && l.note !== headline(l) ? <p style={S.note}>{l.note}</p> : null
+          // to be confident, so rendering the note underneath printed the identical sentence twice.
+          l.note && l.note !== headline(l) ? <p style={S.quiet}>{l.note}</p> : null
         )}
 
         {/* HIS OWN MONEY, HELD BY HMRC. Its own number, never added to what we saved him. This
@@ -214,19 +336,6 @@ export default async function MoneyPage() {
         )}
       </section>
 
-      <section style={S.card}>
-        <h2 style={S.h2}>Your week</h2>
-        <p style={S.week}>
-          {gbp0(figures.income)} in, {gbp0(figures.expenses)} out.{' '}
-          {figures.profit >= 0
-            ? `That leaves ${gbp0(figures.profit)}.`
-            : `That is ${gbpAbs0(figures.profit)} more out than in.`}
-        </p>
-        {/* THE SAME SENTENCE WHATSAPP SENDS, from the same function. If he asks for his weekly
-            summary by text and then opens this page, the two must not disagree by a word. */}
-        <p style={S.line2}>{weeklyLine(week)}</p>
-      </section>
-
       {/* ═══════════════════════════════════════════════════════════════════════════════════════
           🔴 THE ONE PLACE THAT OFFERS WHATSAPP, AND IT IS BEHIND THE FRONT DOOR TOO.
           test/frontdoor.test.mjs used to forbid the word WhatsApp anywhere under app/app, because
@@ -236,9 +345,9 @@ export default async function MoneyPage() {
           the only two places allowed to say it, and only while he genuinely can act on it.
           ═══════════════════════════════════════════════════════════════════════════════════════ */}
       {offerWhatsApp ? (
-        <a href="/app/connect" style={S.connect}>
+        <a href="/app/connect" style={S.connect} className="lek-hit">
           <span style={S.connectTop}>Add WhatsApp</span>
-          <span style={S.connectBody}>
+          <span style={S.noticeBody}>
             Photograph a receipt, say what you spent, or ask what you owe, from the chat app you
             already have open. Connecting your phone takes about a minute.
           </span>
@@ -250,17 +359,13 @@ export default async function MoneyPage() {
           Jag's call, 30 July: nobody downloads the app before he is in the web app. Everyone goes
           through the same door, in the same order, and the phone is something he adds afterwards
           rather than a second way in that skips setting up.
-          They were on /start, on the code screen and on both Stripe return screens, which is the
-          worst possible placement under that rule: offered to a man in the middle of signing up, as
-          an alternative to finishing.
           ⚠️ AND ONLY WHEN THE STORES REALLY HAVE IT. A dimmed "soon" chip is doc 103's third test
           exactly: a button whose only function is to say the feature does not exist yet is an advert
-          for our roadmap. So until NEXT_PUBLIC_APP_STORE_LIVE is true this renders nothing at all,
-          anywhere, and nobody is told to wait for something.
+          for our roadmap. So until NEXT_PUBLIC_APP_STORE_LIVE is true this renders nothing at all.
           ═══════════════════════════════════════════════════════════════════════════════════════ */}
       {appStoreLive() && APP_STORE_URL && PLAY_STORE_URL ? (
         <section style={S.stores}>
-          <p style={S.storeNote}>
+          <p style={S.quiet}>
             Lekhio is on your phone too. Same books, same figures, and the two stay in step.
           </p>
           <div style={S.storeRow}>
@@ -270,12 +375,13 @@ export default async function MoneyPage() {
         </section>
       ) : null}
 
-      {/* THE WAY THROUGH TO THE PILE. Everything on the screen above is money he has CONFIRMED, so
-          if anything is waiting on him this line is the only reason the figures are not the whole
-          truth. It is a plain link because looking at a list changes nothing. */}
+      {/* The footer changes with the screen above it. Saying "anything waiting on you is not
+          counted" underneath a card that has just said it in bigger letters is the same sentence
+          twice, and a screen that repeats itself is a screen he skims. */}
       <p style={S.foot}>
-        Everything here is money you have confirmed. <a href="/app/pile" style={S.footLink}>Anything
-        waiting on you</a> is not counted yet. Connect your bank and new spending lands here on its own.
+        {waiting > 0
+          ? 'Everything above is money you have confirmed. New spending lands in your bank feed on its own.'
+          : 'Everything here is money you have confirmed. Connect your bank and new spending lands here on its own, ready for you to check.'}
       </p>
     </main>
   );
@@ -283,44 +389,65 @@ export default async function MoneyPage() {
 
 const CSS = [
   A11Y_CSS,
-  `.lek-app{max-width:640px;margin:0 auto}`,
+  // The screen arrives rather than appearing. One timing from MOTION, chosen once, used here.
+  `@keyframes lek-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`,
+  `.lek-card{animation:lek-in ${MOTION.enter} ${MOTION.ease} both}`,
+  `.lek-hit{transition:transform ${MOTION.quick} ${MOTION.ease},box-shadow ${MOTION.quick} ${MOTION.ease}}`,
+  `.lek-hit:hover{transform:translateY(-1px);box-shadow:${SHADOW.card}}`,
+  // Three across wherever there is room, stacked on a small phone rather than three squeezed
+  // columns each with a wrapped pound sign in it.
+  `.lek-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}`,
+  `@media(max-width:420px){.lek-grid{grid-template-columns:1fr}}`,
 ].join('');
 
 const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK, padding: '18px 16px 40px', maxWidth: 640, margin: '0 auto' },
-  head: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
-  logo: { fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px', color: RIVER_DEEP },
-  out: { background: 'transparent', border: 'none', color: MUTED, fontSize: 13.5, fontWeight: 600, fontFamily: FONT, cursor: 'pointer', padding: 6 },
-  card: { background: '#fff', border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '20px 18px', marginBottom: 14 },
-  h1: { fontSize: 21, lineHeight: 1.3, fontWeight: 800, letterSpacing: '-0.5px', margin: '0 0 18px' },
-  h2: { fontSize: 15, fontWeight: 800, letterSpacing: '-0.2px', margin: '0 0 10px' },
+
+  card: { background: PANEL, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '20px 18px', marginBottom: 14 },
+  taxCard: { borderColor: `${RIVER}33`, background: RIVER_TINT },
+
+  eyebrow: { fontSize: 12.5, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: RIVER_DEEP, margin: '0 0 6px' },
+  hero: { fontSize: 44, lineHeight: 1.05, fontWeight: 800, letterSpacing: '-1.6px', color: RIVER_DEEP },
+  heroNote: { fontSize: 14, lineHeight: 1.55, color: INK, margin: '10px 0 0' },
+
+  h2: { fontSize: 15, fontWeight: 800, letterSpacing: '-0.2px', margin: '0 0 12px' },
+  headline: { fontSize: 19, lineHeight: 1.35, fontWeight: 800, letterSpacing: '-0.4px', margin: '0 0 16px' },
+
+  tile: { background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px' },
+  tileLabel: { fontSize: 12, fontWeight: 700, color: MUTED, marginBottom: 4 },
+  tileValue: { fontSize: 22, fontWeight: 800, letterSpacing: '-0.7px' },
+
   two: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 },
-  small: { fontSize: 12, fontWeight: 700, color: MUTED, marginBottom: 4 },
   big: { fontSize: 26, fontWeight: 800, letterSpacing: '-0.8px' },
+
   lines: { listStyle: 'none', margin: 0, padding: 0 },
   line: { borderTop: `1px solid ${LINE}`, padding: '12px 0 0', marginTop: 12 },
   lineTop: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' },
   lineLabel: { fontSize: 15, fontWeight: 700 },
   lineSaved: { fontSize: 15, fontWeight: 800, color: GREEN, whiteSpace: 'nowrap' },
   basis: { fontSize: 13.5, lineHeight: 1.5, color: MUTED, margin: '4px 0 0' },
-  note: { fontSize: 15, lineHeight: 1.55, color: MUTED, margin: 0 },
-  refund: { fontSize: 14, lineHeight: 1.55, color: INK, background: '#F2F0EA', borderRadius: RADIUS.md, padding: 14, margin: '18px 0 0' },
-  week: { fontSize: 17, fontWeight: 700, margin: '0 0 8px' },
-  line2: { fontSize: 14.5, lineHeight: 1.55, color: MUTED, margin: 0 },
-  foot: { fontSize: 13, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
-  stores: { textAlign: 'center', marginTop: 18 },
-  storeNote: { fontSize: 13, color: MUTED, margin: '0 0 10px' },
-  storeRow: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' },
-  badge: { display: 'inline-block', background: INK, color: '#fff', fontSize: 13.5, fontWeight: 600, padding: '10px 16px', borderRadius: RADIUS.md, textDecoration: 'none' },
+
+  quiet: { fontSize: 13.5, lineHeight: 1.55, color: MUTED, margin: '10px 0 0' },
+  week: { fontSize: 17, fontWeight: 700, margin: 0 },
+  refund: { fontSize: 14, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: 14, margin: '18px 0 0' },
+
+  waiting: { display: 'flex', gap: 14, alignItems: 'center', textDecoration: 'none', background: PANEL, border: `1px solid ${LINE}`, borderLeft: `3px solid ${SAFFRON_DEEP}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
+  waitingCount: { flex: '0 0 auto', minWidth: 40, height: 40, borderRadius: RADIUS.pill, background: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 17, fontWeight: 800, display: 'grid', placeItems: 'center', padding: '0 10px' },
+  waitingTop: { display: 'block', fontSize: 15, fontWeight: 800, color: INK, marginBottom: 3 },
+  waitingBody: { display: 'block', fontSize: 13.5, lineHeight: 1.5, color: MUTED },
+
+  notice: { display: 'block', background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
+  noticeTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
+  noticeBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
   resume: { display: 'block', textDecoration: 'none', background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
-  resumeTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
-  resumeBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
-  footLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },
-  locked: { display: 'block', background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
-  lockedTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
-  lockedBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
-  lockedBtn: { background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: 15, fontWeight: 800, padding: '11px 18px', cursor: 'pointer' },
-  connect: { display: 'block', textDecoration: 'none', background: '#fff', border: `1px solid ${LINE}`, borderLeft: `3px solid ${WHATSAPP}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
+  primaryBtn: { background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: 15, fontWeight: 800, padding: '11px 18px', cursor: 'pointer' },
+
+  connect: { display: 'block', textDecoration: 'none', background: PANEL, border: `1px solid ${LINE}`, borderLeft: `3px solid ${WHATSAPP}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
   connectTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: GREEN, marginBottom: 5 },
-  connectBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
+
+  stores: { textAlign: 'center', marginTop: 18 },
+  storeRow: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginTop: 10 },
+  badge: { display: 'inline-block', background: INK, color: '#fff', fontSize: 13.5, fontWeight: 600, padding: '10px 16px', borderRadius: RADIUS.md, textDecoration: 'none' },
+
+  foot: { fontSize: 13, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
 };

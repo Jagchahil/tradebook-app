@@ -101,7 +101,13 @@ export function marginalRate(projectedTotalIncome: number): number {
 // only income is a trade it equals soleTraderTax, so nothing an existing user sees moves.
 export function taxPosition(
   input: OptimiserInput,
-): PersonalIncomeResult & { projected: boolean; employmentTax: number; selfAssessmentTax: number } {
+): PersonalIncomeResult & {
+  projected: boolean;
+  employmentTax: number;
+  selfAssessmentTax: number;
+  studentLoan: number;
+  setAside: number;
+} {
   const tradeNet = Math.max(0, input.ytdTradeIncome - input.ytdTradeExpenses);
   const canProject = input.monthsElapsed >= 3;
   const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
@@ -133,7 +139,42 @@ export function taxPosition(
   const employmentTax = employment > 0 ? combinedIncomeTax({ employment }).incomeTax.total : 0;
   const selfAssessmentTax = Math.max(0, round(result.totalTax - employmentTax));
 
-  return { ...result, projected: canProject, employmentTax: round(employmentTax), selfAssessmentTax };
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE STUDENT LOAN, WHICH THIS FUNCTION USED TO LEAVE OUT OF A NUMBER CALLED "WHAT SELF
+  // ASSESSMENT COLLECTS".
+  //
+  // Self Assessment collects it. A self employed man's repayment is not taken as he goes, it lands
+  // in one lump with the January bill, and /student-loan-checker says on the live site that most tax
+  // apps forget student loans exist and then January arrives. selfAssessmentTax above forgot it too.
+  //
+  // ⚠️ selfAssessmentTax IS LEFT EXACTLY AS IT WAS, and the loan is added as its own field beside
+  // it. /api/optimise already publishes this object and the phone app already renders it, so
+  // quietly moving a figure a customer may be looking at is not a change to make inside a dashboard
+  // build. setAside is the honest total and the new surfaces read that.
+  //
+  // studentLoanForSA is the same function lib/agent.ts uses for the January rehearsal, so the
+  // dashboard and the WhatsApp reply are working from one piece of arithmetic. It nets off whatever
+  // payroll has already taken on the salary, which is why the salary goes in rather than being
+  // ignored.
+  //
+  // The trade profit is the projected one, matching every other figure here, and property is left
+  // out on purpose: whether rental profit counts towards a repayment depends on the unearned income
+  // rules, and there is no sourced constant in this codebase for them. An understatement we can
+  // explain beats a confident figure we cannot.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  const plans = input.studentPlans ?? [];
+  const studentLoan = plans.length > 0 ? round(studentLoanForSA(projTradeNet, employment, plans)) : 0;
+
+  return {
+    ...result,
+    projected: canProject,
+    employmentTax: round(employmentTax),
+    selfAssessmentTax,
+    studentLoan,
+    // ONE HONEST NUMBER. Doc 103: the screen a man opens to find out what he owes gets one figure,
+    // not a stack he has to add up himself.
+    setAside: selfAssessmentTax + studentLoan,
+  };
 }
 
 // The common allowable costs a tradesperson usually has. Missing two or more of

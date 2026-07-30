@@ -231,7 +231,33 @@ ok('the ledger comes from lib/ledger.ts', money.includes('ledgerFor'));
 ok('the week comes from lib/weeklyupdate.ts', money.includes('weeklyInput') && money.includes('weeklyLine'));
 ok('the banner comes from lib/announcements.ts', money.includes('selectAnnouncements'));
 ok('🔴 THE PAGE DOES NOT RUN THE TAX ENGINE ITSELF', !money.includes('soleTraderTax') && !money.includes('from \'../../lib/taxengine\''));
-ok('🔴 THE APPLIED LINE COMES FROM THE MODULE THAT CAN REFUSE IT', money.includes('appliedLineFor'));
+// The tax to put by is his whole position, from the same function /api/optimise publishes, never a
+// figure this page adds up for itself. Same for the chart and for what is waiting on him.
+ok('the tax to put by comes from lib/taxoptimiser.ts', money.includes('taxPosition'));
+ok('the week chart comes from lib/weekchart.ts', money.includes('weekOf'));
+ok('what is waiting comes from lib/reviewpile.ts', money.includes('buildPile') && money.includes('partitionPile'));
+
+// 🔴 THE APPLIED LINE COMES FROM THE MODULE THAT CAN REFUSE IT.
+//
+// It moved out of page.tsx on 30 July, when the client announcements banner was replaced by a
+// server rendered one, so this checks the file that actually renders it rather than the file it
+// used to live in. The rule is unchanged: lib/announcements.ts refuses to produce that sentence for
+// an item it cannot prove, so no surface may write the sentence itself.
+const banner = read(path.join(repo, 'app/app/Announcements.tsx'));
+ok('🔴 THE APPLIED LINE COMES FROM THE MODULE THAT CAN REFUSE IT', banner.includes('appliedLineFor'));
+ok('...and no surface types that sentence out for itself',
+  !/already reflect this/.test(stripComments(banner)) && !/already reflect this/.test(stripComments(money)));
+ok('the tag words come from the module too', banner.includes('tagFor'));
+
+// 🔴 AND EVERY SCREEN IN THE WEB APP SHIPS NO CLIENT JAVASCRIPT.
+//
+// The whole argument for the web app is that his figures are already in the HTML when it arrives,
+// because he is on a cheap Android on a bad signal with one hand on a ladder. Until 30 July the
+// announcements banner was marked 'use client', so the one screen the app is built around was
+// shipping React to the browser in order to draw two lines of text.
+for (const f of walk(path.join(repo, 'app/app'))) {
+  ok(`${rel(f)}: is server rendered`, !/^'use client'/m.test(read(f)));
+}
 
 // 🔴 AND NOBODY WRITES THE EIGHTEENTH MONEY FORMATTER.
 //

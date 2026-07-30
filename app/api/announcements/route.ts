@@ -69,27 +69,54 @@ export async function GET(req: NextRequest) {
 // as small and as personal as a decision gets, so it takes one tap and no confirmation, and it can
 // be taken straight back. Compare the rules in CLAUDE.md: money, tax filing and anything sent to
 // another human being always ask. This is none of those.
+// ⚠️ IT ANSWERS A FORM AS WELL AS A FETCH, and the web Overview posts a form.
+//
+// The phone app sends JSON and reads JSON back. The web app ships no client JavaScript at all, so
+// its clear button is an ordinary <form method="post"> and it needs a redirect back to the page
+// rather than a JSON body the browser would render as a page of text. Same route, same gate, same
+// validation, same write: only the reply differs, decided by the content type the caller sent. That
+// is the shape /api/billing/checkout already uses.
+//
+// The redirect is a 303 so the back button cannot re-post the dismissal.
 export async function POST(req: NextRequest) {
+  const isForm = (req.headers.get('content-type') || '').includes('application/x-www-form-urlencoded');
+  const back = (query: string) => NextResponse.redirect(new URL(`/app${query}`, req.url), 303);
+  const fail = (error: string, status: number) => (
+    isForm ? back('?notice=notcleared') : NextResponse.json({ error }, { status })
+  );
+
   const user = await sessionUser(req);
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  if (await userBurst('announcements-dismiss', user.id)) {
-    return NextResponse.json({ error: 'slow down' }, { status: 429 });
+  // A form caller with no session is a man whose session expired while the page sat open. Send him
+  // to the door, not to a JSON error he cannot read.
+  if (!user) {
+    return isForm
+      ? NextResponse.redirect(new URL('/in?next=/app', req.url), 303)
+      : NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
+  if (await userBurst('announcements-dismiss', user.id)) return fail('slow down', 429);
 
-  let body: { key?: unknown; action?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'bad_json' }, { status: 400 });
+  let key = '';
+  let action: 'dismiss' | 'undo' = 'dismiss';
+  if (isForm) {
+    const f = await req.formData().catch(() => null);
+    if (!f) return back('?notice=notcleared');
+    key = String(f.get('key') ?? '').trim();
+    action = f.get('action') === 'undo' ? 'undo' : 'dismiss';
+  } else {
+    let body: { key?: unknown; action?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'bad_json' }, { status: 400 });
+    }
+    key = typeof body.key === 'string' ? body.key.trim() : '';
+    action = body.action === 'undo' ? 'undo' : 'dismiss';
   }
-
-  const key = typeof body.key === 'string' ? body.key.trim() : '';
-  const action = body.action === 'undo' ? 'undo' : 'dismiss';
 
   // The key shape is fixed by khojiKey()/manualKey(). Validating it here keeps arbitrary strings out
   // of a table whose whole value is that one row means one card.
   if (!key || key.length > 200 || !/^(khoji|lekhio):[A-Za-z0-9._-]{1,120}$/.test(key)) {
-    return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+    return fail('bad_request', 400);
   }
 
   const done = action === 'undo'
@@ -98,8 +125,11 @@ export async function POST(req: NextRequest) {
 
   // A FAILED WRITE MUST NOT LOOK LIKE A SUCCESSFUL ONE. The banner puts the card back on a non-ok
   // rather than leaving him believing he cleared something he did not, and watching it return
-  // tomorrow with no explanation.
-  if (!done) return NextResponse.json({ error: 'write_failed' }, { status: 502 });
+  // tomorrow with no explanation. The form caller gets the same honesty: the page reloads with the
+  // card still on it, because the write that would have removed it did not happen.
+  if (!done) return fail('write_failed', 502);
+
+  if (isForm) return back('');
 
   return NextResponse.json({ ok: true, key, action });
 }

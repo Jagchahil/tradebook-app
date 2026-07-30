@@ -31,6 +31,7 @@ import { refreshFacts, resolveOverrides, isOverridableKey, isInBounds, type Fact
 import { advanceStage, normaliseWhatsapp, isContactStage, isCheckoutStage, isEventKind, type ContactStage, type CheckoutStage, type EventKind } from './crm';
 import { sicByCode } from './siccodes';
 import { useOfHomeToDate } from './elections';
+import { weekTotals, FETCH_DAYS, type WeekRow } from './weekchart';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -3127,20 +3128,64 @@ export async function weeklyUpdateFactsFor(userIds: string[]): Promise<Map<strin
   }
 }
 
-export async function weeklyTotals(userId: string): Promise<{ income: number; expenses: number }> {
+// HIS WEEK, AS ROWS. One query, read two ways.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ THE SENTENCE AND THE CHART COME FROM HERE, TOGETHER, AND THAT IS THE WHOLE REASON THIS
+// FUNCTION EXISTS.
+//
+// The Overview says "£1,200 in, £400 out" in words and draws the same seven days as bars beside it.
+// Fetching those separately would be two readers over one number, which this file has already been
+// caught doing three times in a single day (the signups count, the knowledge count, the review
+// queue). So there is one query, and lib/weekchart.ts buckets it. The totals are summed from the
+// same buckets the bars are drawn from.
+//
+// ⚠️ NULL MEANS WE COULD NOT READ IT, AND IT IS NOT THE SAME AS A QUIET WEEK.
+//
+// weeklyTotals below still answers zero on a failed read, because the Sunday job and the WhatsApp
+// reply have always behaved that way and this is not the change that should move them. A screen can
+// do better: the Overview tells him plainly that we could not read his week rather than printing
+// "£0 in, £0 out" over a database timeout, which is a lie with his own money in it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+//
+// It asks for one day more than the week needs. lib/weekchart.ts explains why: the window is seven
+// whole London days, and working out when local midnight was in UTC means writing daylight saving
+// arithmetic into a database query. Fetching wider and discarding in a pure function is exact by
+// construction instead of by cleverness.
+export async function weekRows(userId: string): Promise<WeekRow[] | null> {
   const { url } = config();
-  const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const res = await fetch(`${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&confirmed=eq.true&is_personal=eq.false&created_at=gte.${encodeURIComponent(since)}&select=amount`, { headers: headers() });
-  if (!res.ok) return { income: 0, expenses: 0 };
-  const rows = (await res.json()) as Array<{ amount: number }>;
-  let income = 0;
-  let expenses = 0;
-  for (const r of rows) {
-    const a = Number(r.amount) || 0;
-    if (a >= 0) income += a;
-    else expenses += Math.abs(a);
+  const since = new Date(Date.now() - FETCH_DAYS * 24 * 3600 * 1000).toISOString();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
+        + '&confirmed=eq.true&is_personal=eq.false'
+        + `&created_at=gte.${encodeURIComponent(since)}`
+        + '&select=amount,created_at&order=created_at.asc&limit=5000',
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ amount: number; created_at: string }>;
+    return rows.map((r) => ({ amount: Number(r.amount) || 0, at: r.created_at }));
+  } catch {
+    return null;
   }
-  return { income, expenses };
+}
+
+// ⚠️ THIS NOW MEANS TODAY AND THE SIX DAYS BEFORE IT, WHERE IT USED TO MEAN THE LAST 168 HOURS.
+//
+// The old window started at whatever time of day the question happened to be asked, so the oldest
+// day in it was always a part day. That was invisible while the answer was one sentence and becomes
+// visible the moment it is drawn as bars: a Thursday holding Thursday evening only, the same width
+// as a whole day beside it. Seven whole days is what a person means by the word, and it is the only
+// window the chart can draw honestly.
+//
+// The figure it returns moves slightly as a result, on the weekly summary and on the WhatsApp reply.
+// It moves in the direction of being a week.
+export async function weeklyTotals(userId: string): Promise<{ income: number; expenses: number }> {
+  const rows = await weekRows(userId);
+  // A failed read stays a quiet zero here, exactly as it always has. Changing that would change
+  // what the Sunday job does on a bad night, which is a decision of its own and not this one.
+  return weekTotals(rows ?? [], new Date());
 }
 
 export async function insertTransaction(record: NewTransaction): Promise<void> {

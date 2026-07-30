@@ -181,5 +181,67 @@ const near = (a, b) => Math.abs(a - b) <= 0.01;
   ok('early in the year the whole tax is flagged as a projection', early.projected === false);
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 🔴 THE SET ASIDE FIGURE, AND THE STUDENT LOAN IT USED TO FORGET ===\n');
+//
+// A self employed man's student loan repayment is not taken as he goes. It lands in one lump with
+// the January bill, which means Self Assessment collects it, which means a number called "what Self
+// Assessment collects" that leaves it out understates what he has to find. Understating the January
+// bill is the direction that hurts, because he has already spent the difference.
+//
+// /student-loan-checker says on the live site that most tax apps forget student loans exist and then
+// January arrives. This one did too, on the figure the dashboard now prints in the largest type on
+// the screen.
+//
+// ⚠️ selfAssessmentTax IS DELIBERATELY UNCHANGED. /api/optimise already publishes this object and
+// the phone app already renders it, so the loan arrives as its own field and setAside is the honest
+// total. Nothing a customer is looking at today moved.
+{
+  const noLoan = { ...base, ytdTradeIncome: 45000, ytdTradeExpenses: 5000 };
+  const withLoan = { ...noLoan, studentPlans: ['plan2'] };
+
+  const a = O.taxPosition(noLoan);
+  const b = O.taxPosition(withLoan);
+
+  ok('a man with no student loan has no loan in his set aside', a.studentLoan === 0);
+  ok('...and for him the set aside IS the Self Assessment figure', a.setAside === a.selfAssessmentTax);
+
+  ok('🔴 A MAN WITH A PLAN 2 LOAN HAS IT IN HIS SET ASIDE', b.studentLoan > 0);
+  ok('...by a real amount, not a rounding', b.studentLoan > 100);
+  ok('...and the set aside is the two added up', b.setAside === b.selfAssessmentTax + b.studentLoan);
+  ok('🔴 SO HE IS TOLD TO PUT MORE BY THAN A MAN WITHOUT ONE', b.setAside > a.setAside);
+
+  // ⚠️ AND THE FIELD THE PHONE APP ALREADY READS DID NOT MOVE. If this ever fails, somebody has
+  // changed a figure a customer is looking at today without deciding to.
+  ok('🔴 selfAssessmentTax IS UNCHANGED BY THE LOAN', a.selfAssessmentTax === b.selfAssessmentTax);
+
+  // ⚠️ THE SALARY GOES IN, AND IT MAKES THE SELF ASSESSMENT SHARE BIGGER, NOT SMALLER.
+  //
+  // This is worth spelling out because the obvious guess is the wrong way round. A student loan is
+  // a percentage of income ABOVE a threshold. A man with a £30,000 salary has already spent nearly
+  // all of that threshold on his wages, so almost every pound of his trade profit is repayable, and
+  // payroll has only collected on the small slice of the salary that was over the line. The netting
+  // in studentLoanForSA is what stops that slice being asked for twice; it is not a discount.
+  //
+  // A man with the same profit and no job still has his whole threshold to use up against it, so he
+  // repays less.
+  const employed = O.taxPosition({ ...withLoan, employmentIncome: 30000 });
+  ok('the salary is not ignored when working out the loan', employed.studentLoan !== b.studentLoan);
+  ok('🔴 A SALARY USES UP THE THRESHOLD, SO MORE OF THE PROFIT IS REPAYABLE',
+    employed.studentLoan > b.studentLoan);
+  ok('...and payroll\'s own share is still netted off, never asked for twice',
+    employed.studentLoan < O.taxPosition({
+      ...withLoan, ytdTradeIncome: 75000, ytdTradeExpenses: 5000,
+    }).studentLoan);
+
+  // Nothing to tax, nothing to put by. A brand new account must never be told to find money.
+  const empty = O.taxPosition({ ...base, studentPlans: ['plan2'] });
+  ok('an empty account is asked for nothing', empty.setAside === 0 && empty.studentLoan === 0);
+
+  // Whatever the shape, the answer is a number a screen can print.
+  ok('the set aside is always a real, non negative figure',
+    [a, b, employed, empty].every((p) => Number.isFinite(p.setAside) && p.setAside >= 0));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

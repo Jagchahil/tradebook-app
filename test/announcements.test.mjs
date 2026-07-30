@@ -75,8 +75,14 @@ const mRow = (over = {}) => ({
   ...over,
 });
 
+// ⚠️ THE DEFAULT FIXTURE IS A PROVED CHANGE, and that changed on 30 July.
+//
+// A Khoji finding now only reaches a customer when a fact override proves a constant in the engine
+// really moved. So "does the gate accept this row" and "does this row reach a screen" became two
+// different questions, and this helper asks the second one. Anything testing the FIRST calls
+// refuseKnowledge directly, and anything testing the unproved case passes appliedItemIds: [].
 const select = (over = {}) =>
-  A.selectAnnouncements({ knowledge: [], manual: [], now: NOW, ...over });
+  A.selectAnnouncements({ knowledge: [], manual: [], appliedItemIds: ['k1'], now: NOW, ...over });
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n1. THE GATE: only an approved row reaches a customer');
@@ -159,7 +165,11 @@ ok('nothing in the output ends in an ellipsis', (() => {
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n5. "your figures already reflect this" needs PROOF, not intent');
 
-ok('engine_impact alone does NOT mark an item applied', select({ knowledge: [kRow({ engine_impact: true })] })[0].applied === false);
+// engine_impact records what somebody INTENDED, not what actually moved. Since 30 July the
+// consequence is stronger than a missing sentence: without a real override the item is not a proved
+// change, so it does not reach a customer at all.
+ok('engine_impact alone does NOT mark an item applied',
+  A.selectAnnouncements({ knowledge: [kRow({ engine_impact: true })], manual: [], appliedItemIds: [], now: NOW }).length === 0);
 ok('an item in appliedItemIds IS applied', select({ knowledge: [kRow()], appliedItemIds: ['k1'] })[0].applied === true);
 ok('appliedLineFor refuses an unapplied item', A.appliedLineFor({ applied: false }) === null);
 ok('appliedLineFor gives the one line for an applied item', A.appliedLineFor({ applied: true }) === A.APPLIED_LINE);
@@ -178,7 +188,11 @@ ok('keys from the two sources can never collide', A.khojiKey('x') !== A.manualKe
 ok('a dismissed khoji item disappears', select({ knowledge: [kRow()], dismissedKeys: ['khoji:k1'] }).length === 0);
 ok('a dismissed manual item disappears', select({ manual: [mRow()], dismissedKeys: ['lekhio:m1'] }).length === 0);
 ok('dismissing one leaves the other', (() => {
-  const shown = select({ knowledge: [kRow(), kRow({ id: 'k2' })], dismissedKeys: ['khoji:k1'] });
+  const shown = select({
+    knowledge: [kRow(), kRow({ id: 'k2' })],
+    appliedItemIds: ['k1', 'k2'],
+    dismissedKeys: ['khoji:k1'],
+  });
   return shown.length === 1 && shown[0].key === 'khoji:k2';
 })());
 ok('an edited announcement stays dismissed (the key is the id, not the text)', (() => {
@@ -191,7 +205,7 @@ console.log('\n7. THE SHAPE OF THE BANNER: a few things, in a defensible order')
 
 ok('the banner never holds more than the cap', (() => {
   const many = Array.from({ length: 12 }, (_, i) => kRow({ id: `k${i}`, created_at: daysAgo(i + 1) }));
-  return select({ knowledge: many }).length === A.MAX_ITEMS;
+  return select({ knowledge: many, appliedItemIds: many.map((r) => r.id) }).length === A.MAX_ITEMS;
 })());
 ok('the cap is a small number', A.MAX_ITEMS <= 5);
 ok('what moved his figures comes first', (() => {
@@ -201,20 +215,26 @@ ok('what moved his figures comes first', (() => {
   });
   return shown[0].key === 'khoji:old';
 })());
-ok('a human note outranks an ordinary khoji card', (() => {
+// ⚠️ THIS USED TO READ "a human note outranks an ORDINARY khoji card", and since 30 July there is
+// no such thing on a customer's screen: an unproved Khoji card does not render at all. What is left
+// of the ordering rule is that a change which really moved his figures comes before a note we chose
+// to write, which is the right way round.
+ok('what moved his figures outranks a human note', (() => {
   const shown = select({ knowledge: [kRow({ created_at: daysAgo(1) })], manual: [mRow({ published_at: daysAgo(5) })] });
-  return shown[0].source === 'lekhio';
+  return shown[0].source === 'khoji' && shown[1].source === 'lekhio';
 })());
 ok('otherwise, newest first', (() => {
   const shown = select({
     knowledge: [kRow({ id: 'a', created_at: daysAgo(9) }), kRow({ id: 'b', created_at: daysAgo(1) })],
+    appliedItemIds: ['a', 'b'],
   });
   return shown[0].key === 'khoji:b' && shown[1].key === 'khoji:a';
 })());
 ok('the order is stable for identical timestamps', (() => {
   const rows = [kRow({ id: 'b' }), kRow({ id: 'a' })];
-  const one = select({ knowledge: rows }).map((a) => a.key).join(',');
-  const two = select({ knowledge: [...rows].reverse() }).map((a) => a.key).join(',');
+  const ids = ['a', 'b'];
+  const one = select({ knowledge: rows, appliedItemIds: ids }).map((a) => a.key).join(',');
+  const two = select({ knowledge: [...rows].reverse(), appliedItemIds: ids }).map((a) => a.key).join(',');
   return one === two;
 })());
 ok('a human wording supersedes the automatic card for the same finding', (() => {
@@ -342,13 +362,67 @@ console.log('\n🔴 WHAT WE ARE WILLING TO CALL A THING. Added 28 July 2026, off
     source_url: 'https://www.gov.uk/guidance/mtd-videos', effective_date: null,
     created_at: new Date().toISOString(), engine_impact: true,
   };
-  const unproven = A.selectAnnouncements({ knowledge: [row], manual: [] })[0];
-  ok('🔴 THE EXACT ITEM THAT SHIPPED WRONG IS NOW "Worth knowing"', A.tagFor(unproven) === 'Worth knowing');
-  ok('...and engine_impact alone does NOT promote it, because that flag is an intention', unproven.kind === 'worth_knowing');
+  const unprovenKind = A.kindOf('khoji', false);
+  ok('🔴 THE EXACT ITEM THAT SHIPPED WRONG IS NOW "Worth knowing"',
+    A.KIND_LABEL[unprovenKind] === 'Worth knowing');
+  ok('...and engine_impact alone does NOT promote it, because that flag is an intention',
+    unprovenKind === 'worth_knowing');
 
   const proven = A.selectAnnouncements({ knowledge: [row], manual: [], appliedItemIds: ['k-webinar'] })[0];
   ok('...while a real override does promote it', A.tagFor(proven) === 'The law changed');
-  ok('...and only then does the reassurance sentence appear', !!A.appliedLineFor(proven) && !A.appliedLineFor(unproven));
+  ok('...and only then does the reassurance sentence appear',
+    !!A.appliedLineFor(proven) && !A.appliedLineFor({ applied: false }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n🔴 AND ON 30 JULY: "Worth knowing" DOES NOT REACH A CUSTOMER AT ALL.');
+//
+// The 28 July fix stopped us CALLING a webinar announcement a change in the law. It did not stop us
+// SHOWING it. On the deployed site a barber's own money screen was carrying the VAT grouping rules,
+// the Capital Goods Scheme, and an archived page about the taxation of wine. All three correctly
+// approved, correctly cited, correctly in date, correctly tagged, and nothing to do with him.
+{
+  const webinar = {
+    id: 'k-webinar', status: 'reviewed', title: 'HMRC videos and webinars for Making Tax Digital',
+    summary: 'HMRC has published videos to help sole traders understand MTD.',
+    source_url: 'https://www.gov.uk/guidance/mtd-videos', effective_date: null,
+    created_at: daysAgo(1), engine_impact: true,
+  };
+  const wine = {
+    id: 'k-wine', status: 'reviewed', title: 'The taxation of wine',
+    summary: 'An archived page about alcohol duty on wine.',
+    source_url: 'https://www.gov.uk/guidance/wine-duty', effective_date: null,
+    created_at: daysAgo(3), engine_impact: false,
+  };
+
+  ok('the kinds a customer may see are named in the module',
+    JSON.stringify([...A.CUSTOMER_FACING_KINDS].sort()) === JSON.stringify(['law_changed', 'product']));
+  ok('worth_knowing is not one of them', A.isCustomerFacing('worth_knowing') === false);
+  ok('a proved change is', A.isCustomerFacing('law_changed') === true);
+  ok('a human written note is', A.isCustomerFacing('product') === true);
+
+  // 🔴 THE THREE OFF THE LIVE SCREEN. The gate accepts every one of them and none of them renders.
+  const shown = A.selectAnnouncements({
+    knowledge: [webinar, wine], manual: [], appliedItemIds: [], now: NOW,
+  });
+  ok('the wine page passes the gate, which is why tagging alone never fixed this',
+    A.refuseKnowledge(wine, NOW) === null);
+  ok('🔴 AND NEITHER OF THEM REACHES A CUSTOMER', shown.length === 0);
+
+  // The mirror, so the rule above is not just switching the feature off. A proved change still
+  // arrives, and so does a human's own note, which is the whole point of the banner.
+  const withProof = A.selectAnnouncements({
+    knowledge: [webinar, wine], manual: [mRow()], appliedItemIds: ['k-webinar'], now: NOW,
+  });
+  ok('a proved change still arrives', withProof.some((a) => a.kind === 'law_changed'));
+  ok('a human written note still arrives', withProof.some((a) => a.kind === 'product'));
+  ok('and the unproved one beside it still does not', !withProof.some((a) => a.kind === 'worth_knowing'));
+
+  // NOTHING IS LOST FROM KHOJI ITSELF. The finding still lands, is still reviewed, and still moves
+  // the engine. What changed is that being read by Khoji is no longer on its own a reason to put a
+  // card on a man's money screen.
+  ok('the finding is still a valid announcement, it is just not shown',
+    A.kindOf('khoji', false) === 'worth_knowing' && A.refuseKnowledge(webinar, NOW) === null);
 }
 
 console.log(`\n${pass} passed, ${fail} failed.`);

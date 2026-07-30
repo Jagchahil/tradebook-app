@@ -276,5 +276,36 @@ ok('the privacy policy still describes what happens to WhatsApp messages',
   /WhatsApp/.test(read('app/privacy/page.tsx')));
 ok('the terms still describe how records arrive', /WhatsApp/.test(read('app/terms/page.tsx')));
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND A FRONT DOOR HAS TO OPEN FROM THE OUTSIDE TOO.
+//
+// This file was written about a stranger who could not find his way IN. On 30 July it turned out a
+// CUSTOMER could not find his way BACK in. The nav had five marketing links and a Sign up button,
+// and of the sixty links on the home page the only one matching "sign in" was "Team sign in",
+// which is the staff door and would have turned him away.
+//
+// /in worked perfectly the whole time. Nothing pointed at it. That is the same disease as a job
+// that runs and never reports, and as a health check that cannot tell no from nothing: the thing
+// exists, and the product behaves exactly as though it does not.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== a customer can get back in ===\n');
+{
+  const chrome = readFileSync(path.join(root, 'app/_shared/site.tsx'), 'utf8');
+  const nav = chrome.slice(chrome.indexOf('export function SiteNav'), chrome.indexOf('export function StickyCta'));
+  const footer = chrome.slice(chrome.indexOf('export function SiteFooter'));
+
+  ok('the nav links to the sign in page', nav.includes('href="/in"'));
+  ok('the nav says "Sign in" in words a customer would look for', /Sign in/.test(nav));
+  ok('the mobile menu links to it too, not just the desktop nav',
+    (nav.match(/href="\/in"/g) || []).length >= 2);
+  ok('the footer links to it as well', footer.includes("'/in'"));
+
+  // ⚠️ THE STAFF DOOR MUST NEVER BE THE ONLY DOOR. It stays, plainly labelled, because it is where
+  // the team signs in. What it may not be again is the single thing on the page that looks like a
+  // way back into your own books.
+  const teamOnly = footer.includes("'/team'") && !footer.includes("'/in'");
+  ok('"Team sign in" is not the only sign in on the page', !teamOnly);
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

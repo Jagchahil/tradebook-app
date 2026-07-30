@@ -921,6 +921,16 @@ export function SiteNav() {
           {NAV_LINKS.map(([href, label]) => (
             <Link key={href} href={href} className="navtop">{label}</Link>
           ))}
+          {/* ═══════════════════════════════════════════════════════════════════════════════
+              🔴 THE WAY BACK IN. IT WAS NOT HERE, AND THAT IS AS BAD AS THE SITE BEING DOWN.
+              Until 30 July the front door had five marketing links and a Sign up button, and the
+              only sign in anywhere on the page was "Team sign in" in the footer, which is the
+              staff door. A paying customer coming back to check what he owes had nothing to press
+              and one link that would reject him.
+              A text link, not a second button: signing up is still the one thing we ask a stranger
+              to do, and a man who already has an account does not need persuading, only a door.
+              ═══════════════════════════════════════════════════════════════════════════════ */}
+          <Link href="/in" className="navtop">Sign in</Link>
           <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
         </div>
         {/* suppressHydrationWarning: the head script sets this button's icon from the
@@ -944,6 +954,7 @@ export function SiteNav() {
         <Link href="/rent-a-room-checker">Rent a Room checker</Link>
         <Link href="/sole-trader-vs-limited">Sole trader vs limited</Link>
         <Link href="/security">Security and trust</Link>
+        <Link href="/in">Sign in</Link>
         <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: ON_RIVER, fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
       </div>
     </nav>
@@ -987,7 +998,7 @@ export function SiteFooter() {
             team_members, and it answers identically whether or not the address exists, so a
             stranger cannot even use it to learn who works here. robots.ts disallows it too.
           */}
-          {col('Company', [['/security', 'Security and trust'], ['/register-your-business', 'Register your business'], ['/privacy', 'Privacy'], ['/terms', 'Terms'], ['/team', 'Team sign in']])}
+          {col('Company', [['/in', 'Sign in'], ['/security', 'Security and trust'], ['/register-your-business', 'Register your business'], ['/privacy', 'Privacy'], ['/terms', 'Terms'], ['/team', 'Team sign in']])}
         </div>
         <div style={{ borderTop: '1px solid #2C2C2C', paddingTop: 24, display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: 13, color: '#8A93A0', maxWidth: 640, lineHeight: 1.6 }}>

@@ -41,6 +41,8 @@ import {
 // 🔴 THE TABLE'S FIRST REAL CALLER. Until item 4 it described where every message should go and
 // governed nothing, which is a document with a type annotation on it. handleConnectCode asks it.
 import { channelsFor } from '../../../lib/routing';
+import { gateForUser } from '../../../lib/gateserver';
+import { READONLY_LINE } from '../../../lib/gate';
 import {
   readCircumstances,
   saveCircumstance,
@@ -369,8 +371,11 @@ async function processMessage(message: IncomingMessage): Promise<void> {
     if (await messageCapExceeded(from)) return;
 
     if (message.type === 'image' && message.image?.id) {
+      // Capture is the work. Nothing is stored and no AI is spent, and he is told why in one line.
+      if (await workIsPaused(from)) { await sayWorkPaused(from); return; }
       await handleReceiptImage(from, messageId, message.image.id);
     } else if (message.type === 'audio' && message.audio?.id) {
+      if (await workIsPaused(from)) { await sayWorkPaused(from); return; }
       await handleVoiceNote(from, messageId, message.audio.id);
     } else if (message.type === 'interactive' && message.interactive?.button_reply?.id) {
       await handleButtonReply(from, message.interactive.button_reply.id);
@@ -387,6 +392,11 @@ async function processMessage(message: IncomingMessage): Promise<void> {
       // It consumes the message when it finds a code, so nothing after it ever sees one.
       if (await handleConnectCode(from, text)) {
         // handled
+      } else if (!alwaysAnswered(text) && (await workIsPaused(from))) {
+        // 🔴 EVERYTHING ELSE IS WORK. Logging a spend, answering a question, totting up his week:
+        // all of it is us doing something for him, and all of it stops together rather than in a
+        // pattern he has to learn by trial and error.
+        await sayWorkPaused(from);
       } else if (isInvoiceThis(text)) {
         await handleInvoiceThis(from, text);
       } else {
@@ -833,6 +843,61 @@ async function connectOutcome(
   // costs him a first name and never the connection itself.
   const proved = await readProvedPhone(row.user_id).catch(() => null);
   return { verdict: 'ok', name: proved?.name ?? null };
+}
+
+// The one place this is said, and it asks the table rather than deciding for itself. Three copies of
+// `sendText(from, READONLY_LINE)` is three places to find on the day this moves channel, and it is
+// the thing test/routing.test.mjs ratchets down.
+async function sayWorkPaused(from: string): Promise<void> {
+  const channels = channelsFor('work_paused', { hasPush: false, hasEmail: false, hasWhatsApp: true });
+  if (!channels.includes('whatsapp_reply')) {
+    console.warn('[whatsapp] work_paused has no channel, so nothing was said');
+    return;
+  }
+  await sendText(from, READONLY_LINE);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WORK STOPS ON WHATSAPP TOO, OR THE PAYWALL IS A WEB PAYWALL AND NOTHING MORE.
+//
+// Every gate in this product is on a web route, and WhatsApp is where the work actually arrives: a
+// photograph of a receipt is the single most valuable thing we do and it never touches a browser.
+// A man whose trial ended could have carried on photographing receipts for ever, and the web lock
+// would have looked like it was working the whole time.
+//
+// ⚠️ IT IS TWO READS, SO IT ONLY RUNS WHEN THE MESSAGE IS ABOUT TO COST US SOMETHING. The always
+// allowed list below is checked first, and an unknown number never reaches here at all: it falls
+// through to the handlers that tell him to sign up.
+//
+// Fails OPEN, like everything else that touches this decision. lib/entitlement.ts: locking a man
+// out of his own records is worse than letting him have another fortnight free.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+async function workIsPaused(from: string): Promise<boolean> {
+  try {
+    const userId = await findUserIdByPhone(from);
+    // Not one of ours. The ordinary handlers will tell him where to sign up, which is the right
+    // answer and a better one than a message about a subscription he has never had.
+    if (!userId) return false;
+    return (await gateForUser(userId)) === 'readonly';
+  } catch {
+    return false;
+  }
+}
+
+// ⚠️ WHAT STILL WORKS WHEN THE WORK HAS STOPPED, AND EVERY ONE OF THESE IS DELIBERATE.
+//
+// Stopping messages, asking a human for help, and finding out what we are and what we cost. A
+// product that answers "STOP" with "add a card first" is not running a paywall, it is refusing to
+// let go of somebody, and for STOP specifically that is unlawful rather than merely grubby.
+function alwaysAnswered(text: string): boolean {
+  return Boolean(
+    matchStopStart(text)
+    || isSupportRequest(text)
+    || isHelp(text)
+    || isIdentity(text)
+    || isPricing(text)
+    || isThanks(text),
+  );
 }
 
 async function replyNotLinked(from: string): Promise<void> {

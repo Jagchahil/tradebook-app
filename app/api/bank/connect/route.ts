@@ -3,6 +3,7 @@ import { hasBankFeedConfig, buildAuthLink, historyFromISO, type BankHistory } fr
 import { createBankConnection } from '../../../../lib/supabase';
 import { sessionUser } from '../../../../lib/webauth';
 import { signState } from '../../../../lib/hmrc';
+import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
 
 // Start a bank connection. The app posts with the user's Supabase token; we
 // hand back TrueLayer's hosted auth link (their dialog includes the bank
@@ -14,6 +15,13 @@ export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. lib/gate.ts row: this route is 'entitled'.
+  //
+  // His records stay readable everywhere; what a lapsed subscription buys is that we do nothing NEW
+  // for him. gateForUser never returns readonly because something broke, so this can only fire on a
+  // real answer about a real subscription.
+  if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app/setup?step=bank');
 
   if (!hasBankFeedConfig()) {
     return NextResponse.json({ error: 'not_enabled', message: 'Bank feeds are not switched on yet.' }, { status: 503 });

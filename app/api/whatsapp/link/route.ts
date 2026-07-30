@@ -6,6 +6,7 @@ import {
   LINK_TTL_SECONDS,
 } from '../../../../lib/walink';
 import { sessionCookieAttributes } from '../../../../lib/websession';
+import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
 
 export const runtime = 'nodejs';
 
@@ -31,6 +32,13 @@ export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   const user = await sessionUser(req);
   if (!user) return NextResponse.redirect(new URL('/in', req.url), 303);
+
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. lib/gate.ts row: this route is 'entitled'.
+  //
+  // His records stay readable everywhere; what a lapsed subscription buys is that we do nothing NEW
+  // for him. gateForUser never returns readonly because something broke, so this can only fire on a
+  // real answer about a real subscription.
+  if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app/connect');
 
   // ⚠️ A FORM CALLER NEVER SEES JSON. Same rule as /api/bank/connect: a man in the middle of setting
   // up his phone must not be shown an error object. Every failure below is a redirect back to the

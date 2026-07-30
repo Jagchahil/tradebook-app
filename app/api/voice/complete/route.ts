@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
 import { getVoiceJob, finishVoiceJob } from '../../../../lib/voicejobs';
 import { finishVoiceEntry } from '../../../../lib/voiceflow';
+import { gateForUser } from '../../../../lib/gateserver';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -29,6 +30,20 @@ export async function POST(req: NextRequest) {
 
   const job = await getVoiceJob(id);
   if (!job) return NextResponse.json({ error: 'not found' }, { status: 404 });
+
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING, AND HERE THE GATE IS ON THE JOB'S OWNER.
+  //
+  // Every other gated route reads a session. This one is called by the Mac mini with MUNSHI_SECRET,
+  // so the man is not on the other end of the request: he is on the voice_jobs row. Gating the
+  // CALLER would be gating our own worker.
+  //
+  // The job is marked done either way, because leaving it open would have the mini retry a note it
+  // is never allowed to finish, for ever. He simply gets no transaction out of it, which is exactly
+  // what "we stop doing the work" means.
+  if ((await gateForUser(job.user_id)) === 'readonly') {
+    await finishVoiceJob(id, 'done');
+    return NextResponse.json({ ok: true, skipped: 'not_entitled' });
+  }
   // Already finished (a retry, or the sweep rescued and someone else did it) — accept quietly, no double
   // entry and no second message to the customer.
   if (job.status === 'done' || job.status === 'error') return NextResponse.json({ ok: true, already: true });

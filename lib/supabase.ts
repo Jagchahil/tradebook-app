@@ -2370,6 +2370,72 @@ export async function grantTrialWithIdentity(input: TrialGrantInput): Promise<Tr
   }
 }
 
+// ── What the gate needs to know, in one read ────────────────────────────────────────────────────
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 getSubscriptionByUser RETURNS null FOR TWO COMPLETELY DIFFERENT THINGS, and the paywall is the
+// first caller for which that matters enough to break something.
+//
+// It returns null when the query FAILED and null when the man simply HAS NO ROW. As a status
+// reporter that was harmless. As the input to a lock it is not: treating a failed read as "not
+// entitled" would put every customer we have into read only during one bad minute at Supabase, at
+// exactly the moment we are least able to notice it happening.
+//
+// So this reader answers with a KIND, and lib/gate.ts opens the door on 'unreadable' while judging
+// only 'none'. The old function is untouched, because its callers want what it already does.
+//
+// The account age comes back in the same call because gate.ts needs it for the no row case: a man
+// in his first week with no subscription row is far more likely to be our failed write than a
+// repeat identity, and nobody is in his first week twice.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export interface GateInputs {
+  read: import('./gate').SubscriptionRead;
+  accountAgeDays: number | null;
+}
+
+export async function readGateInputs(userId: string): Promise<GateInputs> {
+  if (!userId) return { read: { kind: 'unreadable' }, accountAgeDays: null };
+  const { url } = config();
+
+  // Two round trips in parallel rather than two in a row. This runs on every gated action, so it is
+  // on the hot path for a man pressing Confirm on a bad signal.
+  const [subRes, userRes] = await Promise.all([
+    fetch(
+      `${url}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(userId)}` +
+        `&select=status,current_period_end&order=updated_at.desc&limit=1`,
+      { headers: headers() },
+    ).catch(() => null),
+    fetch(
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=created_at&limit=1`,
+      { headers: headers() },
+    ).catch(() => null),
+  ]);
+
+  let read: import('./gate').SubscriptionRead = { kind: 'unreadable' };
+  if (subRes && subRes.ok) {
+    const rows = (await subRes.json().catch(() => null)) as Array<{
+      status: string | null; current_period_end: string | null;
+    }> | null;
+    // ⚠️ AN UNPARSEABLE BODY IS UNREADABLE, NOT EMPTY. A 200 carrying rubbish is still us failing to
+    // see, and the whole point of this type is that we never guess in that direction.
+    if (Array.isArray(rows)) {
+      read = rows.length === 0
+        ? { kind: 'none' }
+        : { kind: 'read', status: rows[0].status, current_period_end: rows[0].current_period_end };
+    }
+  }
+
+  let accountAgeDays: number | null = null;
+  if (userRes && userRes.ok) {
+    const urows = (await userRes.json().catch(() => null)) as Array<{ created_at: string | null }> | null;
+    const created = Array.isArray(urows) && urows[0]?.created_at ? Date.parse(urows[0].created_at) : NaN;
+    if (Number.isFinite(created)) accountAgeDays = (Date.now() - created) / 86_400_000;
+  }
+
+  return { read, accountAgeDays };
+}
+
 export async function getSubscriptionByUser(userId: string): Promise<SubscriptionStatus | null> {
   if (!userId) return null;
   const { url } = config();

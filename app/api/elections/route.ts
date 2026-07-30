@@ -9,6 +9,7 @@ import {
   bandForHours, bandOptions, bandLabel, isHoursBand,
   useOfHomeToDate, useOfHomeFullYear, electionConfirmation,
 } from '../../../lib/elections';
+import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 
 export const runtime = 'nodejs';
 
@@ -87,6 +88,13 @@ export async function POST(req: NextRequest) {
   if (await userBurst('elections', user.id)) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });
   }
+
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. lib/gate.ts row: this route is 'entitled'.
+  //
+  // His records stay readable everywhere; what a lapsed subscription buys is that we do nothing NEW
+  // for him. gateForUser never returns readonly because something broke, so this can only fire on a
+  // real answer about a real subscription.
+  if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app');
 
   let body: { hoursBand?: unknown; hoursPerMonth?: unknown };
   try {

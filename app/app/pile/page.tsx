@@ -8,6 +8,8 @@ import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
 import { gbp0 } from '../../../lib/money';
+import { gateForUser } from '../../../lib/gateserver';
+import { READONLY_TITLE, READONLY_LINE } from '../../../lib/gate';
 import { A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_TINT, SURFACE } from '../../../lib/tokens';
 
 export const runtime = 'nodejs';
@@ -76,9 +78,16 @@ export default async function PilePage({
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
   const note = message(one('done'), one('n'));
 
-  const [rows, ownNames, accountUse] = await Promise.all([
-    pileEntries(user.id), readOwnNames(user.id), readAccountUse(user.id),
+  const [rows, ownNames, accountUse, gate] = await Promise.all([
+    pileEntries(user.id), readOwnNames(user.id), readAccountUse(user.id), gateForUser(user.id),
   ]);
+  // 🔴 THE PILE IS STILL DRAWN IN FULL WHEN THE TRIAL HAS ENDED. What stops is answering it.
+  //
+  // These are HIS bank lines and HIS receipts. lib/gate.ts's header is the argument, and this is the
+  // screen it was written about: hiding the list would be hiding his own records to make a point
+  // about £12.99. /api/pile refuses the POST regardless, so hiding it would only mean he could not
+  // see what he was being refused, which is the worse of the two.
+  const locked = gate === 'readonly';
   const groups = buildPile(rows, normaliseVendor, ownNames, categoriseBankLine);
   const summary = summarisePile(groups);
 
@@ -99,6 +108,16 @@ export default async function PilePage({
       </header>
 
       {note && <p style={S.note}>{note}</p>}
+
+      {locked ? (
+        <section style={S.locked}>
+          <span style={S.lockedTop}>{READONLY_TITLE}</span>
+          <span style={S.lockedBody}>{READONLY_LINE}</span>
+          <form action="/api/billing/checkout" method="post" style={{ marginTop: 12 }}>
+            <button type="submit" style={S.lockedBtn}>Add a card</button>
+          </form>
+        </section>
+      ) : null}
 
       {decidable === 0 ? (
         <section style={S.card}>
@@ -158,7 +177,7 @@ export default async function PilePage({
               {/* THE CLIENT SENDS NO IDS. The server rebuilds the pile and works out for itself
                   which groups it was confident about. See the comment in app/api/pile/route.ts:
                   this is the one tap that files many rows, so nothing about it trusts the browser. */}
-              <form action="/api/pile" method="post" style={S.form}>
+              <form action="/api/pile" method="post" hidden={locked} style={S.form}>
                 <input type="hidden" name="verdict" value="confirm_known" />
                 <button type="submit" style={S.primary}>
                   Yes, file {known.length === 1 ? 'it' : `all ${knownRows}`}
@@ -185,7 +204,7 @@ export default async function PilePage({
                 We will not file {g.count === 1 ? 'this' : 'these'} for you in one go, because getting
                 it wrong costs you. If it really is business, confirm it on its own.
               </p>
-              <form action="/api/pile" method="post" style={S.formTight}>
+              <form action="/api/pile" method="post" hidden={locked} style={S.formTight}>
                 <input type="hidden" name="ids" value={g.ids.join(',')} />
                 <input type="hidden" name="vendor" value={g.vendor} />
                 <input type="hidden" name="verdict" value="personal" />
@@ -232,14 +251,14 @@ export default async function PilePage({
                 {g.suggested ? `, and this looks like ${g.suggested}. Only you know if it was work.` : '.'}
               </p>
 
-              <form action="/api/pile" method="post" style={S.form}>
+              <form action="/api/pile" method="post" hidden={locked} style={S.form}>
                 <input type="hidden" name="ids" value={g.ids.join(',')} />
                 <input type="hidden" name="vendor" value={g.vendor} />
                 <input type="hidden" name="verdict" value="personal" />
                 <button type="submit" style={S.primaryQuiet}>Not business money</button>
               </form>
 
-              <form action="/api/pile" method="post" style={S.formTight}>
+              <form action="/api/pile" method="post" hidden={locked} style={S.formTight}>
                 <input type="hidden" name="ids" value={g.ids.join(',')} />
                 <input type="hidden" name="vendor" value={g.vendor} />
                 <input type="hidden" name="verdict" value="business" />
@@ -280,6 +299,10 @@ const S: Record<string, React.CSSProperties> = {
   sub: { fontSize: 14.5, lineHeight: 1.55, color: MUTED, margin: 0 },
   aside: { fontSize: 13.5, lineHeight: 1.55, color: MUTED, margin: '12px 0 0' },
   note: { background: '#fff', border: `1px solid ${LINE}`, borderRadius: RADIUS.md, padding: 14, fontSize: 14.5, lineHeight: 1.5, margin: '0 0 14px' },
+  locked: { display: 'block', background: SAFFRON_TINT, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
+  lockedTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: INK, marginBottom: 5 },
+  lockedBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
+  lockedBtn: { background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: 15, fontWeight: 800, padding: '11px 18px', cursor: 'pointer' },
   rowTop: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' },
   vendor: { fontSize: 16.5, fontWeight: 800, letterSpacing: '-0.2px' },
   amount: { fontSize: 16.5, fontWeight: 800, whiteSpace: 'nowrap' },

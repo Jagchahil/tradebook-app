@@ -11,6 +11,7 @@ import {
 import { sessionUser } from '../../../../lib/webauth';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
 import { computeSignalsForStructure, type AgentInput } from '../../../../lib/agent';
+import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
 
 export const runtime = 'nodejs';
 
@@ -28,6 +29,13 @@ export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
   const verified = await sessionUser(req);
   if (!verified) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. lib/gate.ts row: this route is 'entitled'.
+  //
+  // His records stay readable everywhere; what a lapsed subscription buys is that we do nothing NEW
+  // for him. gateForUser never returns readonly because something broke, so this can only fire on a
+  // real answer about a real subscription.
+  if ((await gateForUser(verified.id)) === 'readonly') return refuseUnentitled(req, '/app');
   const userId = verified.id;
   await refreshFactsFromDb();
 

@@ -64,7 +64,8 @@ export type MessageType =
   | 'alert_threshold'
   | 'alert_deadline'
   | 'alert_opportunity'
-  | 'connect_result';
+  | 'connect_result'
+  | 'work_paused';
 
 export interface Route {
   type: MessageType;
@@ -134,6 +135,22 @@ export const ROUTES: Route[] = [
     channels: ['whatsapp_reply'],
     template: null,
     why: 'The reply to a WhatsApp binding code. It is sent before he has a bound number, a thread or an app, so WhatsApp is not the cheapest channel here, it is the only one that exists yet. Once per customer, and it is a reply inside his own window so it needs no template.',
+  },
+  {
+    // ⚠️ TELLING HIM THE WORK HAS STOPPED IS ITSELF A PAID MESSAGE, WHICH IS WORTH SAYING OUT LOUD.
+    //
+    // From 1 October every outbound WhatsApp message is billed, so we pay about 2.2p to tell a man
+    // who is no longer paying us that we are no longer working for him. That is still right:
+    // silence in the channel he just used reads as broken, and a customer who thinks we are broken
+    // does not come back to pay.
+    //
+    // It is bounded rather than open ended: processMessage's durable daily cap per phone stops a
+    // man who keeps texting from costing us a message every time, and the always answered list means
+    // he can still reach a human without spending anything extra.
+    type: 'work_paused',
+    channels: ['whatsapp_reply'],
+    template: null,
+    why: 'His trial has ended and he has just sent us work. He messaged us, so the window is open and this is a free form reply. Silence would read as the product being broken rather than as him not paying.',
   },
   {
     type: 'conversation_answer',

@@ -187,6 +187,11 @@ const EXPECTED_BILLABLE = [
   // channel that exists for him: nothing is bound yet, so there is no push target and no thread.
   // Once per customer for ever, which is the opposite end of the volume scale from capture_ack.
   'connect_result',
+  // ⚠️ ADDED 30 JULY WITH THE PAYWALL, and it is the odd one: we pay to tell a man who has stopped
+  // paying us that we have stopped working. Silence in the channel he just used reads as the product
+  // being broken, and a customer who thinks we are broken does not come back to pay. Bounded by the
+  // durable per phone daily cap in processMessage.
+  'work_paused',
   'nudge',
   'reminder_due',
   'trial_ending',
@@ -310,6 +315,11 @@ console.log('\n7. THE INLINE sendText COUNT MAY FALL BUT NEVER RISE');
 //   IT MAY FALL FREELY. It may rise ONLY for a new message type that has a row in ROUTES, whose
 //   send ASKS channelsFor rather than deciding for itself, and by no more than one call site per
 //   message type. Anything else is the old habit wearing a justification.
+//
+// ⚠️ 153 BECAME 154 ON 30 JULY, and the rule above is exactly what forced the shape of it. The
+// paywall's WhatsApp side was written with three sends, one each for a photo, a voice note and a
+// text. The ratchet refused it at 156. Collapsing them into sayWorkPaused(), which asks the table,
+// left one. The rule worked as intended: it did not stop the feature, it stopped the sprawl.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', '_to_delete']);
@@ -333,7 +343,7 @@ function stripComments(s) {
   return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
-const CALL_SITE_CEILING = 153;
+const CALL_SITE_CEILING = 154;
 let callSites = 0;
 for (const f of [...walk(path.join(repo, 'app')), ...walk(lib)]) {
   if (f === path.join(lib, 'whatsapp.ts')) continue; // where sendText is defined, not called

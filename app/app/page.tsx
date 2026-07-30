@@ -9,6 +9,8 @@ import {
 import { toStep, isDone, stepTitle, stepNumber, stepCount } from '../../lib/onboarding';
 import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL, WHATSAPP_NUMBER } from '../../lib/features';
 import { waLinksConfigured } from '../../lib/walink';
+import { gateForUser } from '../../lib/gateserver';
+import { READONLY_TITLE, READONLY_LINE } from '../../lib/gate';
 import { ledgerFor, headline } from '../../lib/ledger';
 import { weeklyInput, weeklyFigures, weeklyLine } from '../../lib/weeklyupdate';
 import { selectAnnouncements, appliedLineFor, tagFor } from '../../lib/announcements';
@@ -61,13 +63,16 @@ export default async function MoneyPage() {
 
   // Everything at once. Three round trips in parallel rather than three in a row, because the
   // budget for this page is one bad-signal second, not three.
-  const [optimiser, totals, factsMap, sources, progress, proved] = await Promise.all([
+  const [optimiser, totals, factsMap, sources, progress, proved, gate] = await Promise.all([
     getOptimiserInput(user.id),
     weeklyTotals(user.id),
     weeklyUpdateFactsFor([user.id]).catch(() => null),
     readAnnouncementSources(user.id).catch(() => null),
     readOnboardingProgress(user.id).catch(() => null),
     readProvedPhone(user.id).catch(() => null),
+    // ⚠️ IN THE SAME ROUND TRIP AS EVERYTHING ELSE. This runs on the screen a man opens to find out
+    // what he owes, on a bad signal, so it may not add a serial wait to it.
+    gateForUser(user.id),
   ]);
 
   // ⚠️ THE RESUME LINE, AND DOC 103'S EMPTY TEST DECIDES WHEN IT IS ON SCREEN.
@@ -135,6 +140,24 @@ export default async function MoneyPage() {
 
       {/* Item 1 finally has a customer surface. Khoji reads the law nightly and a human approves
           what matters, and until this line existed no customer ever saw it happen. */}
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          🔴 THE TRIAL HAS ENDED, AND HE CAN STILL SEE EVERY FIGURE ON THIS PAGE.
+          lib/gate.ts's header is the argument: his records are his, the work is what he was buying,
+          and a product that hides finished work behind a card form is taking back something he has
+          already paid for. Under UK GDPR it is also a right of access problem we would have built
+          on purpose.
+          So this is a banner, not a wall. Nothing below it is removed.
+          ═══════════════════════════════════════════════════════════════════════════════════════ */}
+      {gate === 'readonly' ? (
+        <section style={S.locked}>
+          <span style={S.lockedTop}>{READONLY_TITLE}</span>
+          <span style={S.lockedBody}>{READONLY_LINE}</span>
+          <form action="/api/billing/checkout" method="post" style={{ marginTop: 12 }}>
+            <button type="submit" style={S.lockedBtn}>Add a card</button>
+          </form>
+        </section>
+      ) : null}
+
       <AnnouncementsBanner items={items} />
 
       {resumeAt ? (
@@ -299,6 +322,10 @@ const S: Record<string, React.CSSProperties> = {
   resumeTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
   resumeBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
   footLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },
+  locked: { display: 'block', background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
+  lockedTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
+  lockedBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
+  lockedBtn: { background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: 15, fontWeight: 800, padding: '11px 18px', cursor: 'pointer' },
   connect: { display: 'block', textDecoration: 'none', background: '#fff', border: `1px solid ${LINE}`, borderLeft: `3px solid ${WHATSAPP}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
   connectTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: GREEN, marginBottom: 5 },
   connectBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },

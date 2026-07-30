@@ -13,6 +13,7 @@ import { buildPile, summarisePile, canBulkConfirm, bulkConfirmPlan } from '../..
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
+import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 
 // The pile: what a man faces the morning after he connects his bank.
 //
@@ -106,6 +107,13 @@ export async function POST(req: NextRequest) {
   if (await rateLimitedShared(`pile:${user.id}`, 300, 60 * 60 * 1000)) {
     return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
   }
+
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. lib/gate.ts row: this route is 'entitled'.
+  //
+  // His records stay readable everywhere; what a lapsed subscription buys is that we do nothing NEW
+  // for him. gateForUser never returns readonly because something broke, so this can only fire on a
+  // real answer about a real subscription.
+  if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app/pile');
 
   // ⚠️ TWO ENCODINGS, ONE DECISION. The phone app posts JSON. The web page posts a plain HTML form,
   // because it ships no client script: a man on a bad signal must be able to answer a question

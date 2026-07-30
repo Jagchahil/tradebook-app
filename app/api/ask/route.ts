@@ -7,6 +7,7 @@ import { byPhase, daysUntil } from '../../../lib/brain';
 import { rateLimitedShared } from '../../../lib/ratelimit';
 import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
+import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 
 // The in-app accountant endpoint. The app posts a question with the user's
 // Supabase access token. We verify the user, meter usage so costs stay bounded
@@ -37,6 +38,13 @@ export async function POST(req: NextRequest) {
   if (!verified) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
+
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. lib/gate.ts row: this route is 'entitled'.
+  //
+  // His records stay readable everywhere; what a lapsed subscription buys is that we do nothing NEW
+  // for him. gateForUser never returns readonly because something broke, so this can only fire on a
+  // real answer about a real subscription.
+  if ((await gateForUser(verified.id)) === 'readonly') return refuseUnentitled(req, '/app');
   const userId = verified.id;
 
   // Burst guard: at most a handful of questions in a short window.

@@ -8,6 +8,7 @@ import {
 import { sessionUser } from '../../../lib/webauth';
 import { learn, normaliseVendor } from '../../../lib/memory';
 import { rateLimitedShared } from '../../../lib/ratelimit';
+import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 
 // What Lekhio has learned.
 //
@@ -34,6 +35,13 @@ export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. lib/gate.ts row: this route is 'entitled'.
+  //
+  // His records stay readable everywhere; what a lapsed subscription buys is that we do nothing NEW
+  // for him. gateForUser never returns readonly because something broke, so this can only fire on a
+  // real answer about a real subscription.
+  if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app');
 
   const rules = await getUserRules(user.id);
   // Most used first: the ones actually saving them time.

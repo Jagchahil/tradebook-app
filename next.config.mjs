@@ -40,9 +40,10 @@
 // buys is against an injected form exfiltrating to an attacker's server, and two named payment
 // origins do not weaken that.
 //
-// ⚠️ ANYTHING ADDED HERE MUST BE A DESTINATION WE REDIRECT A FORM TO, AND test/csp.test.mjs FAILS
-// THE BUILD if a route 303s a form somewhere this list does not name. Do not widen it by hand
-// without a route to point at.
+// ⚠️ AND IT IS CHECKED AT EVERY HOP, WHICH IS WHY THESE ARE DOMAINS RATHER THAN HOSTS. See the
+// directive itself below. Anything added here must be a destination we redirect a form to, and
+// test/csp.test.mjs fails the build if a route 303s a form somewhere this list does not cover. Do
+// not widen it by hand without a route to point at.
 //
 // Test in a Vercel preview after any change here. If a page ever fails to load
 // a resource, the browser console names the blocked URL and the directive.
@@ -52,10 +53,18 @@ const csp = [
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
-  // 'self' for every ordinary form. Then the two hosted journeys we send a customer out to:
-  // TrueLayer's bank picker (both the live and sandbox hosts, because BANK_SANDBOX flips which one
-  // lib/bankfeed.ts builds) and Stripe's hosted checkout.
-  "form-action 'self' https://auth.truelayer.com https://auth.truelayer-sandbox.com https://checkout.stripe.com",
+  // 'self' for every ordinary form, then the two hosted journeys we deliberately send a customer out
+  // to. ⚠️ WHOLE DOMAINS, NOT SINGLE HOSTS, AND THAT IS THE SECOND VERSION OF THIS LINE.
+  //
+  // The first named auth.truelayer.com exactly, which is the host lib/bankfeed.ts builds, and it was
+  // STILL broken: auth.truelayer.com answers with another redirect, on to login.truelayer.com, and
+  // form-action is checked at every hop. So we allowed hop one and it died silently at hop two, with
+  // the same symptom as before and no way to tell the two apart from the outside.
+  //
+  // Naming hosts means guessing a third party's internal redirect chain and being re-broken, without
+  // a deploy on our side, the day they add a hop. Naming their DOMAIN does not: it is still just
+  // TrueLayer and still just Stripe, and it cannot be widened by anybody but them.
+  "form-action 'self' https://*.truelayer.com https://*.truelayer-sandbox.com https://*.stripe.com",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",

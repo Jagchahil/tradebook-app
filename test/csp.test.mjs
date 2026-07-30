@@ -55,21 +55,43 @@ ok('there is a form-action directive at all', formAction.startsWith("'self'"));
 const bankfeed = read('lib/bankfeed.ts');
 const authHosts = [...bankfeed.matchAll(/'(https:\/\/auth\.truelayer[a-z-]*\.com)'/g)].map((m) => m[1]);
 ok(`lib/bankfeed.ts names its auth hosts (${authHosts.join(', ')})`, authHosts.length === 2);
-for (const host of authHosts) {
-  ok(`🔴 form-action allows ${host}, which /api/bank/connect 303s a form to`, formAction.includes(host));
+
+// 🔴 COVER, NOT AN EXACT MATCH, AND THE FIRST VERSION OF THIS CHECKED THE EXACT HOST AND PASSED ON A
+// POLICY THAT WAS STILL BROKEN.
+//
+// auth.truelayer.com answers our 303 with ANOTHER redirect, on to login.truelayer.com, and
+// form-action is enforced at every hop. Naming the one host we build satisfies a test and still
+// leaves a customer stuck, silently, because the failure is a navigation that simply does not
+// happen. So the question is not "is our host listed" but "is every host this journey can pass
+// through listed", and the only answer that survives a third party changing its own chain is the
+// whole domain.
+function covers(origin) {
+  const host = new URL(origin).host;
+  const domain = host.split('.').slice(-2).join('.');
+  return formAction.includes(`https://*.${domain}`) || formAction.includes(origin);
 }
+for (const host of authHosts) {
+  ok(`🔴 form-action covers ${host} AND anything it redirects on to`, covers(host));
+}
+ok('🔴 the TrueLayer entry is a domain, so a new hop of theirs cannot re-break us',
+  /https:\/\/\*\.truelayer\.com/.test(formAction));
 
 // Stripe's hosted checkout. lib/stripe.ts returns whatever URL Stripe hands back, so the host cannot
 // be read out of our source; it is checkout.stripe.com for a hosted session and has been since the
 // integration was written. Named here so the pairing is still written down in one place.
-ok('🔴 form-action allows Stripe hosted checkout, which /api/billing/checkout 303s a form to',
-  formAction.includes('https://checkout.stripe.com'));
+ok('🔴 form-action covers Stripe hosted checkout, which /api/billing/checkout 303s a form to',
+  covers('https://checkout.stripe.com') && /https:\/\/\*\.stripe\.com/.test(formAction));
 
 // ---------------------------------------------------------------------------------------------
 // AND NOTHING BEYOND THOSE. A widened directive is a smaller wall, so it may only be widened by
 // something with a route behind it.
 // ---------------------------------------------------------------------------------------------
-const ALLOWED = new Set(["'self'", ...authHosts, 'https://checkout.stripe.com']);
+const ALLOWED = new Set([
+  "'self'",
+  'https://*.truelayer.com',
+  'https://*.truelayer-sandbox.com',
+  'https://*.stripe.com',
+]);
 const stray = formAction.split(/\s+/).filter((t) => t && !ALLOWED.has(t));
 ok(`🔴 form-action names nothing without a route behind it${stray.length ? `\n     ${stray.join(', ')}` : ''}`,
   stray.length === 0);

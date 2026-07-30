@@ -177,7 +177,7 @@ export const GATED_ROUTES: GatedRoute[] = [
   //
   // Gate it the day it learns who is asking, which is the day the phone app is rebuilt.
   { route: 'app/api/draft-invoice', rule: 'always', why: 'Drafting an invoice IS work, but this route has no session to gate on: the phone app posts with no token. The spend is already bounded by a per IP cap and a global daily ceiling that fails closed, so this is a paywall leak rather than a wallet risk. Recorded rather than pretended away.' },
-  { route: 'app/api/elections', rule: 'entitled', why: 'Claiming use of home. Us finding him money is the product.' },
+  { route: 'app/api/elections', rule: 'entitled', why: 'Claiming use of home. Us finding him money is the product. ⚠️ The POST is gated and the DELETE deliberately is not: he may always UNDO a claim on his own record, and refusing that would leave an election standing that he has asked us to drop.' },
   { route: 'app/api/reconcile', rule: 'entitled', why: 'Matching his records up. Work.' },
   { route: 'app/api/learn', rule: 'entitled', why: 'Teaching the categoriser a vendor rule, which then does work for him for ever.' },
   { route: 'app/api/voice/complete', rule: 'entitled', why: 'A transcribed voice note becoming a logged transaction. Capture is work.' },

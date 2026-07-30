@@ -163,12 +163,41 @@ ok('and it really does have no session read in it',
 // A row saying 'entitled' with no gateForUser in the route is a paywall that is switched off for
 // that feature, silently, for everybody, for ever.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-const unenforced = gatedRoutes().filter(
-  (r) => !/gateForUser/.test(readFileSync(path.join(repo, `${r}/route.ts`), 'utf8')),
+// ⚠️ AND IT CHECKS WHICH HANDLER, NOT JUST WHICH FILE. The first version of this grepped the whole
+// route and was happy. In app/api/learn the guard had landed in the GET, which reads back the vendor
+// rules a man already taught us and must NEVER be gated, while the POST that does the actual
+// learning was left wide open. The file contained gateForUser, so the test passed, and the paywall
+// was off for that feature and on for the wrong one.
+//
+// It was found by walking the live site: /api/learn answered 400 where every other gated route
+// answered 402. Same lesson as always here. A green suite is not evidence.
+function handlers(src) {
+  const found = [...src.matchAll(/export async function (GET|POST|PATCH|PUT|DELETE)\b/g)];
+  return found.map((h, i) => ({
+    method: h[1],
+    body: src.slice(h.index, i + 1 < found.length ? found[i + 1].index : src.length),
+  }));
+}
+
+const MUTATORS = new Set(['POST', 'PATCH', 'PUT']);
+const unenforced = [];
+const wronglyGated = [];
+for (const r of gatedRoutes()) {
+  const src = readFileSync(path.join(repo, `${r}/route.ts`), 'utf8');
+  for (const h of handlers(src)) {
+    const guarded = /gateForUser/.test(h.body);
+    if (MUTATORS.has(h.method) && !guarded) unenforced.push(`${r} ${h.method}`);
+    // 🔴 A GUARDED GET IS THE learn BUG. Reading his own records is never the work.
+    if (h.method === 'GET' && guarded) wronglyGated.push(`${r} GET`);
+  }
+}
+ok(
+  `🔴 every mutating handler on a gated route calls gateForUser${unenforced.length ? `\n     ${unenforced.join('\n     ')}` : ''}`,
+  unenforced.length === 0,
 );
 ok(
-  `🔴 every gated route actually calls gateForUser${unenforced.length ? `\n     ${unenforced.join('\n     ')}` : ''}`,
-  unenforced.length === 0,
+  `🔴 and no GET is gated, because reading his own records is never the work${wronglyGated.length ? `\n     ${wronglyGated.join('\n     ')}` : ''}`,
+  wronglyGated.length === 0,
 );
 
 // And it refuses in a language the caller understands. A form post that got JSON back would show a

@@ -36,13 +36,6 @@ export async function GET(req: NextRequest) {
   const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. lib/gate.ts row: this route is 'entitled'.
-  //
-  // His records stay readable everywhere; what a lapsed subscription buys is that we do nothing NEW
-  // for him. gateForUser never returns readonly because something broke, so this can only fire on a
-  // real answer about a real subscription.
-  if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app');
-
   const rules = await getUserRules(user.id);
   // Most used first: the ones actually saving them time.
   rules.sort((a, b) => b.hits - a.hits);
@@ -52,6 +45,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. lib/gate.ts row: this route is 'entitled'.
+  //
+  // ⚠️ IT BELONGS IN POST, NOT GET, AND IT WAS BRIEFLY IN THE WRONG ONE. Teaching the categoriser a
+  // vendor rule is work that then runs for him for ever; READING the rules he already taught it is
+  // his own record and must never be gated. The two were the wrong way round for one deploy, and a
+  // live walk found it because /api/learn answered 400 where every other gated route answered 402.
+  if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app');
 
   if (await rateLimitedShared(`learn:${user.id}`, 300, 60 * 60 * 1000)) {
     return NextResponse.json({ error: 'too_many_requests' }, { status: 429 });

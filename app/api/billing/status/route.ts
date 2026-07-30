@@ -3,7 +3,7 @@ import {
   getPhoneForUser, getSubscriptionByPhone, grantTrialIfNone, getSubscriptionByUser,
 } from '../../../../lib/supabase';
 import { sessionUser } from '../../../../lib/webauth';
-import { isEntitled } from '../../../../lib/entitlement';
+import { gateForUser } from '../../../../lib/gateserver';
 
 // The one question the app asks about money: may this man open his books?
 //
@@ -36,14 +36,25 @@ export async function GET(req: NextRequest) {
   // The phone read stays for the mobile path, where the number IS proved and where the trial was
   // granted against it, and the backstop grant stays with it: that only fires for a man who has a
   // proved number, which is exactly the population grantTrialIfNone was written for.
+  // 🔴 `entitled` COMES FROM THE GATE, NOT FROM isEntitled ON A READ THAT MAY HAVE FAILED.
+  //
+  // The mobile app gates on this exact field: app/(tabs)/_layout.tsx redirects to /paywall unless
+  // it is true. Every path below answers false when a read comes back empty, and a FAILED read is
+  // indistinguishable from an empty one through getSubscriptionByUser. So one bad minute at
+  // Supabase showed a paywall to every mobile customer at once, on their own books.
+  //
+  // gateForUser reads both keys, tells an unreadable subscription apart from a missing one, and
+  // opens the door on the first. The display fields still come from the row, so the shape the app
+  // reads is unchanged.
+  const gate = await gateForUser(user.id);
   const byAccount = await getSubscriptionByUser(user.id);
-  if (byAccount) return NextResponse.json({ ...byAccount, entitled: isEntitled(byAccount) });
+  if (byAccount) return NextResponse.json({ ...byAccount, entitled: gate === 'open' });
 
   const phone = await getPhoneForUser(user.id);
-  if (!phone) return NextResponse.json({ status: 'none', entitled: false });
+  if (!phone) return NextResponse.json({ status: 'none', entitled: gate === 'open' });
 
   const sub = (await getSubscriptionByPhone(phone)) ?? (await grantTrialIfNone(phone));
 
-  if (!sub || !sub.status) return NextResponse.json({ status: 'none', entitled: false });
-  return NextResponse.json({ ...sub, entitled: isEntitled(sub) });
+  if (!sub || !sub.status) return NextResponse.json({ status: 'none', entitled: gate === 'open' });
+  return NextResponse.json({ ...sub, entitled: gate === 'open' });
 }

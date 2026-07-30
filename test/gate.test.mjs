@@ -223,6 +223,56 @@ ok('a nonsense age is open too', noRowGrace(Number.NaN, TRIAL_DAYS) === 'open');
 ok('the grace window follows the trial length, it is not a second 7',
   noRowGrace(10, 14) === 'open' && noRowGrace(15, 14) === 'readonly');
 
+// ── 3b. THE READ THAT FEEDS ALL OF THIS ───────────────────────────────────────────────────────
+//
+// 🔴 THIS SECTION EXISTS BECAUSE THE PAYWALL SHIPPED WITH A BUG AND WAS FOUND AN HOUR LATER.
+//
+// subscriptions.user_id only arrived on 29 July. Every row created before it is keyed to a PHONE,
+// and on 30 July three of the four rows in production had no user_id, including a paying active
+// one. readGateInputs read by account only, so a legacy customer came back 'none', and 'none' on an
+// account older than the trial means READ ONLY.
+//
+// The paywall would have locked out a man who was paying us, on his first visit to the web app, and
+// the only signal would have been him leaving. /api/billing/status has done the two key read since
+// web accounts landed; the lock had to learn the same thing.
+const supabaseSrc = readFileSync(path.join(repo, 'lib/supabase.ts'), 'utf8');
+const gateReader = supabaseSrc.slice(
+  supabaseSrc.indexOf('export async function readGateInputs'),
+  supabaseSrc.indexOf('export async function getSubscriptionByUser'),
+);
+ok('the gate reader was found, so these checks are not vacuous', gateReader.length > 500);
+ok('🔴 it falls back to the phone keyed subscription, or a legacy paying customer is locked out',
+  /getPhoneForUser/.test(gateReader) && /subscriptions\?phone=eq\./.test(gateReader));
+// ⚠️ AND ONLY ON 'none'. Retrying after a failed read would turn "we could not see" into a second
+// chance to answer wrongly, which is the whole thing the kinds exist to prevent.
+ok('🔴 the phone fallback runs only when the account read came back EMPTY, never when it failed',
+  /if \(read\.kind === 'none'\) \{[\s\S]{0,200}getPhoneForUser/.test(gateReader));
+ok('a failed phone read is unreadable, not empty',
+  (gateReader.match(/kind: 'unreadable'/g) || []).length >= 3);
+
+// ── 3c. ONE ANSWER TO "IS HE ENTITLED", NOT THREE ─────────────────────────────────────────────
+//
+// 🔴 THE MOBILE PAYWALL READS /api/billing/status. app/(tabs)/_layout.tsx redirects to /paywall
+// unless `entitled` is true, and every path in that route used to answer false when a read came
+// back empty. A failed read is indistinguishable from an empty one through getSubscriptionByUser,
+// so one bad minute at Supabase showed a paywall to every mobile customer at once, on their own
+// books. That is the same failure the web gate was built to avoid, on the surface that already had
+// a paywall.
+//
+// Both billing endpoints now report the gate, which reads two keys and fails open.
+for (const r of ['app/api/billing/status', 'app/api/billing/trial']) {
+  const src = readFileSync(path.join(repo, `${r}/route.ts`), 'utf8');
+  ok(`🔴 ${r} reports entitlement from the gate, which fails open`,
+    /gateForUser/.test(src) && /entitled: gate === 'open'/.test(src));
+  ok(`${r} no longer answers entitled: false on an empty read`,
+    !/entitled: false/.test(src));
+  // ⚠️ COMMENTS STRIPPED FIRST. The route's own header names isEntitled in order to explain why it
+  // is NOT used, and a guard that forbids a file from explaining itself is a guard somebody deletes.
+  // The same trap caught the fourteen day sweep in test/trialnudge.test.mjs an hour earlier.
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  ok(`${r} does not compute a second opinion with isEntitled`, !/isEntitled/.test(code));
+}
+
 // ── 4. WHAT HE IS TOLD ────────────────────────────────────────────────────────────────────────
 ok('there is a title and a line', READONLY_TITLE.length > 5 && READONLY_LINE.length > 30);
 // 🔴 His books are not gone, and saying otherwise would be a lie about a man's tax records.

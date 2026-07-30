@@ -163,10 +163,20 @@ export const GATED_ROUTES: GatedRoute[] = [
   // protection is a per IP rate limit and a durable daily cap. There is no user to read a
   // subscription for, so there is nothing here to gate on.
   //
-  // ⚠️ THAT IS ITS OWN PROBLEM AND IT IS BIGGER THAN THE PAYWALL: an unauthenticated route that
-  // spends AI budget can be called by anybody. Recorded here rather than quietly marked 'entitled',
-  // which would have read as covered while doing nothing. Gate it the day it learns who is asking.
-  { route: 'app/api/draft-invoice', rule: 'always', why: 'Drafting an invoice IS work, but this route has no session to gate on: the phone app posts with no token and only an IP rate limit protects it. Recorded as a gap rather than pretended away.' },
+  // ⚠️ AND THE WALLET IS NOT AT RISK, WHICH IS A CORRECTION TO AN EARLIER READING OF THIS FILE.
+  //
+  // It was first written up here as an open AI drain. It is not. There is an in memory burst limit,
+  // a durable per IP daily cap, and a DURABLE GLOBAL DAILY CEILING that fails closed, whose own
+  // comment says it exists precisely because X-Forwarded-For can be spoofed. Somebody thought about
+  // this properly.
+  //
+  // What is actually true is smaller and worth stating accurately, because a comment that cries
+  // wolf sends the next reader chasing a problem that is not there: a lapsed customer can still
+  // draft invoices, and a stranger can spend the day's global allowance and deny it to real ones.
+  // A paywall leak and a feature level denial of service, not a wallet.
+  //
+  // Gate it the day it learns who is asking, which is the day the phone app is rebuilt.
+  { route: 'app/api/draft-invoice', rule: 'always', why: 'Drafting an invoice IS work, but this route has no session to gate on: the phone app posts with no token. The spend is already bounded by a per IP cap and a global daily ceiling that fails closed, so this is a paywall leak rather than a wallet risk. Recorded rather than pretended away.' },
   { route: 'app/api/elections', rule: 'entitled', why: 'Claiming use of home. Us finding him money is the product.' },
   { route: 'app/api/reconcile', rule: 'entitled', why: 'Matching his records up. Work.' },
   { route: 'app/api/learn', rule: 'entitled', why: 'Teaching the categoriser a vendor rule, which then does work for him for ever.' },

@@ -2426,6 +2426,46 @@ export async function readGateInputs(userId: string): Promise<GateInputs> {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THEN BY PHONE, BECAUSE MOST SUBSCRIPTION ROWS DO NOT CARRY A user_id.
+  //
+  // This is the bug that nearly shipped. subscriptions.user_id only arrived on 29 July, so every
+  // row created before it is keyed to a PHONE. On 30 July three of the four rows in production had
+  // no user_id at all, including a paying, active one.
+  //
+  // Reading by account alone therefore answered 'none' for a legacy customer, and 'none' on an
+  // account older than the trial means READ ONLY. The paywall would have locked out a man who was
+  // paying us, on his first visit to the web app, and the only signal would have been him leaving.
+  //
+  // /api/billing/status has carried this same two key read since the web accounts landed, and its
+  // header explains the same thing. This is that reasoning applied where it decides a lock rather
+  // than a label.
+  //
+  // ⚠️ ONLY ON 'none'. A failed read must never be retried into a different answer: if the first
+  // query could not see, we say so and lib/gate.ts opens the door.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (read.kind === 'none') {
+    const phone = await getPhoneForUser(userId).catch(() => null);
+    if (phone) {
+      const byPhone = await fetch(
+        `${url}/rest/v1/subscriptions?phone=eq.${encodeURIComponent(phone)}` +
+          `&select=status,current_period_end&order=updated_at.desc&limit=1`,
+        { headers: headers() },
+      ).catch(() => null);
+      if (!byPhone || !byPhone.ok) {
+        read = { kind: 'unreadable' };
+      } else {
+        const prows = (await byPhone.json().catch(() => null)) as Array<{
+          status: string | null; current_period_end: string | null;
+        }> | null;
+        if (!Array.isArray(prows)) read = { kind: 'unreadable' };
+        else if (prows.length > 0) {
+          read = { kind: 'read', status: prows[0].status, current_period_end: prows[0].current_period_end };
+        }
+      }
+    }
+  }
+
   let accountAgeDays: number | null = null;
   if (userRes && userRes.ok) {
     const urows = (await userRes.json().catch(() => null)) as Array<{ created_at: string | null }> | null;

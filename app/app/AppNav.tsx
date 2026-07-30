@@ -80,8 +80,14 @@ export function AppNav({ current }: { current: string }) {
         </form>
       </div>
 
-      {/* Scrolls sideways rather than wrapping. Five fit on a phone; a nav that reflows into two
-          ragged rows looks broken in a way a nav that scrolls does not. */}
+      {/* 🔴 THIS ROW MUST NOT SCROLL, AND THE FIRST VERSION DID.
+          It was written as overflow-x:auto with overflow-y:visible, on the reasoning that five tabs
+          might not fit a phone and scrolling beats wrapping. CSS does not allow that pair: set one
+          axis to auto and the other is forced to auto with it. So the scroll box clipped the menus
+          hanging out of it, and on the deployed site the carets flipped open onto nothing at all.
+          Found by pressing it, not by reading it.
+          Wrapping instead. Five short words fit one line on anything wider than a small phone, and
+          two tidy rows on a small one is a great deal better than a menu that never appears. */}
       <div className="lek-nav">
         {SECTIONS.map((sec) => {
           const here = sec.href === current || sec.items.some((i) => i.href === current);
@@ -122,7 +128,7 @@ export function AppNav({ current }: { current: string }) {
 // One style block rather than inline styles, because a dropdown needs :hover, [open] and a
 // keyframe, and none of those exist in a React style object.
 const CSS = `
-.lek-nav{display:flex;gap:2px;max-width:960px;margin:10px auto 0;padding:0;overflow-x:auto;overflow-y:visible}
+.lek-nav{display:flex;flex-wrap:wrap;gap:2px;max-width:960px;margin:10px auto 0;padding:0;overflow:visible}
 .lek-tab{display:flex;align-items:center;gap:6px;flex:0 0 auto;font-size:14.5px;font-weight:700;color:${MUTED};text-decoration:none;padding:10px 14px;border-radius:${RADIUS.sm}px ${RADIUS.sm}px 0 0;white-space:nowrap;border-bottom:3px solid transparent;cursor:pointer;list-style:none;transition:color ${MOTION.quick} ${MOTION.ease},background-color ${MOTION.quick} ${MOTION.ease}}
 .lek-tab::-webkit-details-marker{display:none}
 .lek-tab:hover{color:${INK};background:${SURFACE}}
@@ -140,8 +146,9 @@ const CSS = `
 /* The menu is absolutely positioned, so on a narrow screen it would be cut off by the sideways
    scroll of the row it lives in. Below this width it becomes an ordinary block that pushes the
    page down, which is the behaviour a phone wants anyway. */
+/* On a phone the menu stops floating and becomes an ordinary block that pushes the page down,
+   which is what a thumb wants and what removes any chance of it being clipped off screen. */
 @media(max-width:640px){
-  .lek-nav{flex-wrap:wrap;overflow:visible}
   .lek-menu{position:static;min-width:0;box-shadow:none;margin:4px 0 8px}
 }
 `;

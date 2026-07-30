@@ -77,5 +77,14 @@ ok('the dropdowns are <details>, so they work with no script', nav.includes('<de
 ok('it uses the shared motion tokens rather than inventing timings', nav.includes('MOTION.'));
 ok('no raw hex is painted in the shell', !/#[0-9a-f]{3,6}\b/i.test(nav));
 
+// 🔴 THE ONE THAT SHIPPED BROKEN. The row held overflow-x:auto with overflow-y:visible, which CSS
+// silently turns into auto on both axes, so the scroll box clipped the dropdowns hanging out of it
+// and the carets opened onto nothing. A menu inside a scrolling row cannot be seen, so the row is
+// not allowed to scroll.
+const row = (nav.match(/\.lek-nav\{[^}]*\}/) || [''])[0];
+ok('the nav row does not scroll, because a scroll box clips the menus inside it',
+  !/overflow-x\s*:\s*(auto|scroll)/.test(row) && !/overflow\s*:\s*(auto|scroll)/.test(row));
+ok('the nav row wraps instead', /flex-wrap\s*:\s*wrap/.test(row));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

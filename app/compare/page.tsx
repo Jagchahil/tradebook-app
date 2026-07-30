@@ -99,7 +99,7 @@ table.cmp{width:100%;border-collapse:collapse;font-size:14.5px;min-width:640px}
 .mk-wrap{display:inline-block;animation:tickpop .4s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes tickpop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
 .mk{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:999px;font-size:14px;font-weight:900}
-.mk.yes{background:var(--green);color:#fff}
+.mk.yes{background:var(--green);color:var(--on-green)}
 .mk.no{background:var(--panel-2);color:#B8B2A6}
 [data-theme="dark"] .mk.no{background:#242b35;color:#5b6470}
 .mk.soon{width:auto;height:auto;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:800;background:var(--saffron-tint);color:var(--saffron-deep)}

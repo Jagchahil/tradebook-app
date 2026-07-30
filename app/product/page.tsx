@@ -65,7 +65,7 @@ const PRODUCT_CSS = `
 .ftabs{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:28px}
 .ftab{display:flex;align-items:center;gap:8px;font-family:inherit;padding:11px 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;cursor:pointer;transition:.2s;color:var(--tx)}
 .ftab:hover{border-color:var(--river);transform:translateY(-2px)}
-.ftab.on{background:var(--river);color:#fff;border-color:var(--river);box-shadow:0 8px 20px rgba(27,89,166,.3)}
+.ftab.on{background:var(--river);color:var(--on-river);border-color:var(--river);box-shadow:0 8px 20px rgba(27,89,166,.3)}
 .fstage{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center;max-width:900px;margin:0 auto;min-height:280px}
 @media(max-width:820px){.fstage{grid-template-columns:1fr;gap:24px}}
 .ftext h3{font-size:26px;margin:0 0 10px}
@@ -89,7 +89,7 @@ const PRODUCT_CSS = `
 .tslide{min-width:100%;height:100%;padding:20px 16px;overflow:hidden}
 .ttabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .ttab{padding:9px 15px;font-family:inherit;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:13px;cursor:pointer;transition:.2s;color:var(--tx)}
-.ttab.on{background:var(--river);color:#fff;border-color:var(--river)}
+.ttab.on{background:var(--river);color:var(--on-river);border-color:var(--river)}
 .bignum{background:linear-gradient(135deg,var(--river),var(--river-deep));border-radius:16px;padding:16px;color:#fff}
 .bignum .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;opacity:.85}
 .bignum .v{font-size:30px;font-weight:900;letter-spacing:-.03em}

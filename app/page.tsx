@@ -136,9 +136,9 @@ const HOME_CSS = `
 .wf i{width:4px;border-radius:2px;background:var(--river)}
 .splitrow{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
 .splitrow:last-child{border:0;font-weight:800}
-.approvebtn{margin-top:4px;background:var(--green);color:#fff;border-radius:12px;padding:11px;font-weight:800;text-align:center;font-size:14px}
+.approvebtn{margin-top:4px;background:var(--green);color:var(--on-green);border-radius:12px;padding:11px;font-weight:800;text-align:center;font-size:14px}
 .diconrow{display:flex;align-items:center;gap:12px}
-.dicon{width:44px;height:44px;border-radius:999px;background:var(--river);color:#fff;font-size:20px;display:grid;place-items:center}
+.dicon{width:44px;height:44px;border-radius:999px;background:var(--river);color:var(--on-river);font-size:20px;display:grid;place-items:center}
 
 .rev-marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
 .rev-track{display:flex;gap:18px;width:max-content;animation:hslide 44s linear infinite}

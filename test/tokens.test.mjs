@@ -179,5 +179,24 @@ for (const [hex, what] of Object.entries(GONE)) {
   ok(`${hex} is gone (${what})`, !unnamed.has(hex.toUpperCase()));
 }
 
+console.log('\n=== no accent fill carries white text ===\n');
+// 🔴 THE ONE THAT CAUGHT THE DUPLICATE. Fixing .approvebtn in the shared marketing CSS left the
+// home page's own copy of the same rule untouched, because app/page.tsx duplicates it wholesale,
+// and the "Approve and send to HMRC" button stayed at 2.37:1 on the deployed site after a build
+// that looked like it had fixed it. A rule cannot be trusted to be in one place, so this greps for
+// the SHAPE of the mistake across every file rather than for the file it was found in.
+const accentWhite = [];
+for (const file of walk(root)) {
+  const rel = path.relative(root, file);
+  readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+    if (line.trimStart().startsWith('//')) return;
+    if (/background(-color)?:var\(--(river|green|saffron|red)\);color:#(fff|ffffff)\b/i.test(line)) {
+      accentWhite.push(`${rel}:${i + 1}`);
+    }
+  });
+}
+if (accentWhite.length) accentWhite.forEach((w) => console.log(`        ${w}`));
+ok('no CSS rule fills with an accent and writes white on it', accentWhite.length === 0);
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

@@ -697,14 +697,25 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
               {/* ⚠️ THE HONEST FRAME. Not "we saved you nothing", and not a number we cannot stand
                   behind. What changed in the last fifteen minutes is that these are now on the table,
                   and that is a true and specific thing to tell him. */}
-              We have not got your figures yet, so there is no total to show you. What we do have is{' '}
-              {opened.length === 1 ? 'this, which you just told us' : `these ${opened.length}, which you just told us`}
-              {' '}and which no bookkeeping app has ever asked you about.
+              We have not got your figures yet, so there is no total to show you. What you have done is
+              answer {opened.length === 1 ? 'a question' : `${opened.length} questions`} about yourself,
+              and {opened.length === 1 ? 'that yes is' : 'every yes is'} money most people never claim
+              because nobody ever asks them.
             </p>
             <ul style={S.lines}>
               {opened.map((c) => (
                 <li key={c.key} style={S.line}>
-                  <div style={S.lineLabel}>{c.why}</div>
+                  {/* 🔴 THE QUESTION GOES ON THE SCREEN, AND THE FIRST VERSION LEFT IT OFF.
+                      Walking it live showed why. `why` is written as the SECOND half of a pair: it
+                      answers the `ask` sitting above it on the question screen. Printed alone it
+                      dangles. A man read "If you are, one of you may be able to hand the other part of
+                      their tax free allowance" with nothing anywhere telling him what "you are"
+                      referred to, on the screen that is meant to be his reward for fifteen minutes.
+
+                      It is `c.ask` verbatim, the same sentence stored as the exhibit, so the words on
+                      this screen are the words he actually answered. */}
+                  <div style={S.lineLabel}>{c.ask}</div>
+                  <div style={S.openedWhy}>{c.why}</div>
                   <div style={S.basis}>
                     {c.backYears > 0
                       ? `This one reaches back ${c.backYears} ${c.backYears === 1 ? 'year' : 'years'}. `
@@ -723,8 +734,16 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
               ))}
             </ul>
             <p style={S.hint}>
-              No figures on this page, on purpose. We will not put a number on your money until we are
-              reading your actual books, and then it appears on your dashboard on its own.
+              {/* ⚠️ THIS SAID "No figures on this page, on purpose", AND THERE ARE FIGURES ON THIS
+                  PAGE. Several `why` sentences carry a sourced amount, like the £252 on Marriage
+                  Allowance, and they should: that is what the relief is worth in general and
+                  lib/circumstances.ts stands behind it. What we will not do is ADD THEM UP, because a
+                  total is a claim about HIS money and we are not reading his books yet. Saying "no
+                  figures" while showing figures is a small lie on the screen where we ask for a card,
+                  which is the worst place in the product to be caught being loose. */}
+              We have not put a total on this, on purpose. Those amounts are what each one is worth in
+              general. What <b>yours</b> comes to appears on your dashboard once we are reading your
+              actual books, and not a moment before.
             </p>
           </>
         ) : (
@@ -853,6 +872,7 @@ const S: Record<string, React.CSSProperties> = {
   line: { borderTop: `1px solid ${LINE}`, padding: '12px 0 0', marginTop: 12 },
   lineTop: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' },
   lineLabel: { fontSize: 15, fontWeight: 700, lineHeight: 1.45 },
+  openedWhy: { fontSize: 14, lineHeight: 1.55, color: MUTED, margin: '5px 0 0' },
   lineSaved: { fontSize: 15, fontWeight: 800, color: GREEN, whiteSpace: 'nowrap' },
   basis: { fontSize: 13.5, lineHeight: 1.5, color: MUTED, margin: '4px 0 0' },
   refund: { fontSize: 14, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: 14, margin: '18px 0 0' },

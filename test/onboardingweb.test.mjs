@@ -320,8 +320,23 @@ ok('and the true empty case says so plainly rather than dressing it up',
 // to delete the reasoning.
 ok('🔴 the reveal never totals what a relief might be worth',
   !/worthOrder/.test(codeOnly(pageSrc)) && !/opened\.reduce|\.reduce\([^)]*worth/.test(codeOnly(pageSrc)));
-ok('and it says out loud that there is no figure, on purpose',
-  /No figures on this page, on purpose/.test(pageSrc));
+// ⚠️ CHECKED AGAINST THE STRIPPED SOURCE, AND THE FIRST VERSION OF THIS ASSERTION WAS NOT.
+//
+// It matched "No figures on this page, on purpose", which is the copy that was REMOVED on 30 July
+// for being false (several `why` sentences carry a sourced amount). The comment explaining the
+// removal quotes the old sentence, so the assertion went on passing against a string no customer
+// could see any more. A guard that reads its own explanation is a guard that proves nothing.
+ok('🔴 the reveal does not claim there are no figures while showing figures',
+  !/No figures on this page, on purpose/.test(codeOnly(pageSrc)));
+ok('it says instead that there is no TOTAL, which is the true claim',
+  /We have not put a total on this, on purpose/.test(codeOnly(pageSrc)));
+
+// 🔴 AND THE QUESTION IS ON THE SCREEN BESIDE THE ANSWER. `why` is written as the second half of a
+// pair and dangles without its `ask`: "If you are, one of you may be able to hand the other part of
+// their tax free allowance" reads as a fragment when the question is not there. Found by walking it.
+ok('🔴 the reveal shows the question he answered, not just the answer',
+  /<div style=\{S\.lineLabel\}>\{c\.ask\}<\/div>/.test(pageSrc)
+  && /<div style=\{S\.openedWhy\}>\{c\.why\}<\/div>/.test(pageSrc));
 
 // The card is an ask, never a wall.
 ok('🔴 the card can be walked past', /Not now\? Use the button below and carry on/.test(pageSrc));

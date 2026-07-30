@@ -89,6 +89,12 @@ export const ON_WHATSAPP = '#08301A';
 // saffron tint reads at 2.7:1, and how-mtd-works was painting the MTD threshold card in exactly
 // that pair: the line telling a sole trader which April he is caught by. These are the inks for
 // text on a tinted panel. The accents themselves stay as they are, because they are also fills.
+// ⚠️ AND THE INVERSE MISTAKE, ON A BUTTON THAT IS WHITE IN BOTH THEMES. var(--river) lifts to
+// #4C8FDB in dark so it can be seen against a near black page, which is right everywhere except on
+// a fill that stayed white. There it reads at 3.36:1. A white surface does not darken when the page
+// does, so it keeps the light accent whatever the theme is doing around it: --on-white-river is
+// RIVER in both blocks, deliberately, and is not a copy and paste slip.
+
 export const ON_SAFFRON_TINT = '#7D5410';
 export const ON_GREEN_TINT = '#136B34';
 
@@ -150,7 +156,7 @@ export const THEME_CSS = `
   --saffron:${SAFFRON};--saffron-deep:${SAFFRON_DEEP};--saffron-tint:${SAFFRON_TINT};--on-saffron:${ON_SAFFRON};--on-saffron-tint:${ON_SAFFRON_TINT};
   --green:${GREEN};--green-tint:${GREEN_TINT};--on-green:${ON_GREEN};--on-green-tint:${ON_GREEN_TINT};
   --red:${RED};--red-tint:${RED_TINT};--on-red:${ON_RED};
-  --whatsapp:${WHATSAPP};--on-whatsapp:${ON_WHATSAPP};
+  --whatsapp:${WHATSAPP};--on-whatsapp:${ON_WHATSAPP};--on-white-river:${RIVER};
   --bg:${PAPER};--panel:${PANEL};--surface:${SURFACE};--bd:${LINE};--band:${BAND};
   --tx:${INK};--tx-mut:${MUTED};
 }

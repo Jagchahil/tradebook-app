@@ -38,7 +38,7 @@ const HOME_CSS = `
 .home .btn.primary:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(27,89,166,.4)}
 .home .btn.ghost{background:transparent;color:var(--tx);border:1px solid var(--tx)}
 .home .btn.ghost:hover{transform:translateY(-2px);background:var(--panel-2)}
-.home .btn.white{background:#fff;color:var(--river)}
+.home .btn.white{background:#fff;color:var(--on-white-river)}
 
 .mtdtop{background:var(--band);color:#fff}
 .mtdtop a{display:flex;align-items:center;justify-content:center;gap:11px;flex-wrap:wrap;padding:10px 16px;font-size:13px;font-weight:500;color:rgba(255,255,255,.85)}

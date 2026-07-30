@@ -191,12 +191,17 @@ for (const file of walk(root)) {
   readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
     if (line.trimStart().startsWith('//')) return;
     if (/background(-color)?:var\(--(river|green|saffron|red)\);color:#(fff|ffffff)\b/i.test(line)) {
-      accentWhite.push(`${rel}:${i + 1}`);
+      accentWhite.push(`${rel}:${i + 1} accent fill with white text`);
+    }
+    // And the inverse: a fill that stays white in both themes must not take a themed accent as its
+    // text, because the accent lifts in dark mode and the fill does not.
+    if (/background(-color)?:#(fff|ffffff);color:var\(--(river|green|saffron|red)\)/i.test(line)) {
+      accentWhite.push(`${rel}:${i + 1} white fill with a themed accent as text`);
     }
   });
 }
 if (accentWhite.length) accentWhite.forEach((w) => console.log(`        ${w}`));
-ok('no CSS rule fills with an accent and writes white on it', accentWhite.length === 0);
+ok('no CSS rule pairs an accent and white the wrong way round', accentWhite.length === 0);
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

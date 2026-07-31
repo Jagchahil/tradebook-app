@@ -15,6 +15,10 @@ const eslintConfig = defineConfig([
     // Orphaned file handles from the Cowork FUSE mount. Not source, and they are stale copies of
     // real pages, so linting them reports faults that were fixed in the file that actually ships.
     "**/.fuse_hidden*",
+    // The holding pen for code on its way out. It is already excluded by tsconfig and .vercelignore;
+    // eslint was the only one of the three that still read it, so a deletion in progress failed the
+    // lint over faults in files that are being deleted. The three lists now agree.
+    "_to_delete/**",
   ]),
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════

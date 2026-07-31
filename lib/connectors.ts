@@ -1,6 +1,6 @@
 // THE AD AND POST CONNECTORS, the single wrapper for Meta, TikTok, Google, LinkedIn and X.
 // Every OAuth handshake, every webhook check, and every token exchange for these platforms goes
-// through this one file, the same posture as lib/claude.ts, lib/whatsapp.ts and lib/higgsfield.ts.
+// through this one file, the same posture as lib/claude.ts and lib/whatsapp.ts.
 //
 // It ships DARK. CONNECTORS_ENABLED is off by default, so exchangeCode refuses and the start route
 // will not redirect. Nothing here posts a thing or spends a penny: it is the plumbing that lets Jag

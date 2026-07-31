@@ -2,38 +2,39 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   verifyAccessToken,
   readTeamMember,
-  insertStudioIdea,
-  voteStudioIdea,
   insertStudioAsset,
   readStudioAsset,
-  readStudioIdea,
-  markIdeaPromoted,
   setStudioAssetState,
   readStudioAssets,
   setStudioAssetScheduled,
+  setStudioAssetMedia,
   insertStudioApproval,
   insertStudioMetric,
-  countStudioAssets,
 } from '../../../../../lib/supabase';
 import { isTeam } from '../../../../../lib/team';
-import { draftStoryboard } from '../../../../../lib/claude';
-import type { DraftInput } from '../../../../../lib/studioagent';
 import {
-  SEED_ASSETS, defaultPlatforms, isLegalAdvance, isPublishGate,
+  defaultPlatforms, isLegalAdvance, isPublishGate,
   type Format, type Promise3, type AssetState, type Platform, type Storyboard,
 } from '../../../../../lib/studio';
 import { nextFreeSlot } from '../../../../../lib/calendar';
 
 export const runtime = 'nodejs';
 
-// EVERY WRITE THE STUDIO MAKES GOES THROUGH HERE, and every one is gated. One route, one switch, so
+// EVERY WRITE HOKA'S DESK MAKES GOES THROUGH HERE, and every one is gated. One route, one switch, so
 // there is one place that answers "who is allowed to do this". Reading is open to any team member.
-// The two things that matter, approving and seeding, are OWNER only, checked against the team_members
-// row on this request. The client cannot vote itself into the owner chair.
+// The thing that matters, approving, is OWNER only, checked against the team_members row on this
+// request. The client cannot vote itself into the owner chair.
+//
+// 🔴 31 JUL 2026: THE IDEAS BANK AND THE AI DRAFTING ARE GONE. Marketing is made by hand.
+// The actions that used to live here and no longer do:
+//   add_idea, vote_idea  the founder led ideas bank, now nothing
+//   draft                Claude turning an idea into a storyboard (lib/studioagent.ts, deleted)
+//   seed                 the bible storyboards planted into an empty room (SEED_ASSETS, deleted)
+// Nothing in this file writes a word of copy. A piece exists because a person wrote it, and the only
+// machine left is the one that moves it forward and books it a slot.
 interface Body {
   action?: string;
   id?: string;
-  idea_id?: string | null;
   title?: string;
   trade?: string | null;
   format?: string;
@@ -43,6 +44,7 @@ interface Body {
   scene?: string | null;
   caption?: string | null;
   source_tag?: string | null;
+  file_url?: string | null;
   storyboard?: Storyboard;
   to?: string;
   kind?: string;
@@ -89,36 +91,13 @@ export async function POST(req: NextRequest) {
   }
   const action = body.action || '';
 
-  // --- add an idea to the backlog. Any team member. -------------------------------------------
-  if (action === 'add_idea') {
-    const title = (body.title || '').trim();
-    if (!title) return NextResponse.json({ error: 'title required' }, { status: 400 });
-    const idea = await insertStudioIdea({
-      title,
-      trade: (body.trade || '').trim() || null,
-      format: asFormat(body.format),
-      promise: asPromise(body.promise),
-      note: (body.note || '').trim() || null,
-      author: me,
-    });
-    if (!idea) return NextResponse.json({ error: 'insert failed' }, { status: 503 });
-    return NextResponse.json({ idea });
-  }
-
-  // --- vote an idea up. Any team member. ------------------------------------------------------
-  if (action === 'vote_idea') {
-    if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
-    const ok = await voteStudioIdea(body.id);
-    return NextResponse.json({ ok });
-  }
-
-  // --- create an asset from an idea (or from scratch). Any team member. Starts in scripting. ---
+  // --- write a piece down. Any team member. Starts in scripting, which is a person, writing. -----
   if (action === 'create_asset') {
     const title = (body.title || '').trim();
     if (!title) return NextResponse.json({ error: 'title required' }, { status: 400 });
     const format = asFormat(body.format);
     const asset = await insertStudioAsset({
-      idea_id: body.idea_id || null,
+      idea_id: null,
       title,
       trade: (body.trade || '').trim() || null,
       format,
@@ -133,44 +112,6 @@ export async function POST(req: NextRequest) {
       created_by: me,
     });
     if (!asset) return NextResponse.json({ error: 'insert failed' }, { status: 503 });
-    return NextResponse.json({ asset });
-  }
-
-  // --- draft a storyboard from an idea with Claude. Any team member. Lands in awaiting_approval. -
-  if (action === 'draft') {
-    let input: DraftInput;
-    let ideaId: string | null = null;
-    if (body.id) {
-      const idea = await readStudioIdea(body.id);
-      if (!idea) return NextResponse.json({ error: 'not found' }, { status: 404 });
-      ideaId = idea.id;
-      input = { title: idea.title, trade: idea.trade, format: idea.format, promise: idea.promise };
-    } else {
-      const title = (body.title || '').trim();
-      if (!title) return NextResponse.json({ error: 'title or id required' }, { status: 400 });
-      input = { title, trade: (body.trade || '').trim() || null, format: asFormat(body.format), promise: asPromise(body.promise) };
-    }
-
-    const draft = await draftStoryboard(input);
-    if (!draft) return NextResponse.json({ error: 'draft failed' }, { status: 503 });
-
-    const asset = await insertStudioAsset({
-      idea_id: ideaId,
-      title: input.title,
-      trade: input.trade,
-      format: input.format,
-      promise: input.promise,
-      script: draft.script,
-      scene: draft.scene || null,
-      caption: draft.caption,
-      platforms: defaultPlatforms(input.format),
-      source_tag: draft.source_tag,
-      storyboard: draft.storyboard,
-      state: 'awaiting_approval',
-      created_by: me,
-    });
-    if (!asset) return NextResponse.json({ error: 'insert failed' }, { status: 503 });
-    if (ideaId) await markIdeaPromoted(ideaId);
     return NextResponse.json({ asset });
   }
 
@@ -190,6 +131,26 @@ export async function POST(req: NextRequest) {
     const updated = await setStudioAssetState(body.id, asset.state, to);
     if (!updated) return NextResponse.json({ error: 'already moved' }, { status: 409 });
     return NextResponse.json({ asset: updated });
+  }
+
+  // --- paste in the finished file. Any team member. Something he made, by hand. ----------------
+  //
+  // This replaced the render queue on 31 Jul. It refuses anything that is not real https, and the
+  // `file_url=is.null` guard in setStudioAssetMedia means a second paste cannot overwrite the first
+  // by accident. Having the file is not posting it: the state does not move here.
+  if (action === 'set_media') {
+    if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+    const raw = (body.file_url || '').trim();
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      return NextResponse.json({ error: 'that is not a link' }, { status: 400 });
+    }
+    if (url.protocol !== 'https:') return NextResponse.json({ error: 'the link has to be https' }, { status: 400 });
+    const asset = await setStudioAssetMedia(body.id, url.toString());
+    if (!asset) return NextResponse.json({ error: 'nothing changed. It may already have a file.' }, { status: 409 });
+    return NextResponse.json({ asset });
   }
 
   // --- the gate. Record a decision. OWNER only. A publish approve also advances the card. ------
@@ -214,7 +175,7 @@ export async function POST(req: NextRequest) {
     if (!approval) return NextResponse.json({ error: 'insert failed' }, { status: 503 });
 
     // A publish approval is also the thing that moves the card out of the gate. A rejection or a
-    // request for changes records the decision and leaves the card where it is, for a redraft.
+    // request for changes records the decision and leaves the card where it is, for a rewrite.
     let updated = asset;
     if (kind === 'publish' && decision === 'approve' && asset.state === 'awaiting_approval') {
       // Book it onto the go live calendar as we approve it. Read what is already scheduled so the new
@@ -230,7 +191,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ approval, asset: updated });
   }
 
-  // --- type in the numbers a live post did. Any team member. Manual until a connector exists. --
+  // --- type in the numbers a live post did. Any team member. Manual, and staying manual. -------
   if (action === 'add_metric') {
     if (!body.id) return NextResponse.json({ error: 'id required' }, { status: 400 });
     const platform = (body.platform || '') as Platform;
@@ -248,50 +209,6 @@ export async function POST(req: NextRequest) {
     });
     if (!metric) return NextResponse.json({ error: 'insert failed' }, { status: 503 });
     return NextResponse.json({ metric });
-  }
-
-  // --- seed the bible content, once. OWNER only. Refuses if anything already exists. -----------
-  if (action === 'seed') {
-    if (!isOwner) return NextResponse.json({ error: 'owner only' }, { status: 403 });
-    const count = await countStudioAssets();
-    if (count === null) return NextResponse.json({ error: 'unreadable' }, { status: 503 });
-    if (count > 0) return NextResponse.json({ seeded: 0, skipped: true });
-
-    let seeded = 0;
-    for (const s of SEED_ASSETS) {
-      const script = s.storyboard.map((f) => f.vo).filter(Boolean).join('\n') || null;
-      const asset = await insertStudioAsset({
-        idea_id: null,
-        title: s.title,
-        trade: s.trade,
-        format: s.format,
-        promise: s.promise,
-        script,
-        scene: s.scene,
-        caption: s.caption,
-        platforms: defaultPlatforms(s.format),
-        source_tag: s.source_tag,
-        storyboard: s.storyboard,
-        state: 'awaiting_approval',
-        created_by: me,
-      });
-      if (asset) seeded++;
-    }
-
-    // A small backlog so the Ideas tab shows the swap per trade idea from doc 111.
-    const backlog = ['roofer', 'decorator', 'groundworker', 'tiler', 'plasterer'];
-    for (const trade of backlog) {
-      await insertStudioIdea({
-        title: `The ${trade}: filing is the easy bit`,
-        trade,
-        format: 'video',
-        promise: 'money',
-        note: 'Swap the bible template onto this trade.',
-        author: me,
-      });
-    }
-
-    return NextResponse.json({ seeded });
   }
 
   return NextResponse.json({ error: 'unknown action' }, { status: 400 });

@@ -209,7 +209,6 @@ export const GATED_ROUTES: GatedRoute[] = [
   { route: 'app/api/company/owners', rule: 'always', why: 'Who owns his company. Structure, not work.' },
   { route: 'app/api/companies-house', rule: 'always', why: 'A lookup on the public register. Rate limited on its own key, and not something he buys from us.' },
   { route: 'app/api/voice/pending', rule: 'always', why: 'Whether a voice note is still being written up. Status, not work. The work itself is voice/complete, which is gated.' },
-  { route: 'app/api/agent/pending-generation', rule: 'always', why: 'Whether Rakha is still thinking. Status, not work.' },
   { route: 'app/api/health', rule: 'always', why: 'Ours. No customer, no session, no subscription.' },
   { route: 'app/api/lead/confirm', rule: 'always', why: 'Double opt in confirmation from an email link. A stranger, not a customer.' },
 
@@ -236,9 +235,6 @@ export const GATED_ROUTES: GatedRoute[] = [
   { route: 'app/api/stripe/webhook', rule: 'always', why: 'Stripe calls this. Gating it on payment would be a loop.' },
   { route: 'app/api/webhooks/meta', rule: 'always', why: 'Meta marketing webhook. No customer session exists.' },
   { route: 'app/api/webhooks/tiktok', rule: 'always', why: 'TikTok webhook. No customer session exists.' },
-  { route: 'app/api/agent/attach-media', rule: 'always', why: 'A render coming back into the marketing studio, posted by our own script with AGENT_SECRET. Ours, not his. It was briefly marked entitled by somebody who read the name and assumed Rakha.' },
-  { route: 'app/api/agent/studio-brief', rule: 'always', why: 'The marketing studio, ours not his. Gated by the team console, not by a customer subscription.' },
-  { route: 'app/api/agent/studio-run', rule: 'always', why: 'The marketing studio, ours not his.' },
 
   // ── The web input layer, 30 July 2026. Capture from the dashboard itself. ─────────────────
   { route: 'app/api/money/manual', rule: 'entitled', why: 'A typed cash entry becoming a logged transaction. Capture is work, the same judgement as voice/complete, and it stops when he stops paying.' },

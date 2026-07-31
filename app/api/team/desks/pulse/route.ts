@@ -4,7 +4,6 @@ import {
   readTeamCustomers,
   listCronRuns,
   readKnowledgeState,
-  readStudioIdeas,
   readStudioAssets,
 } from '../../../../../lib/supabase';
 import { overview } from '../../../../../lib/team';
@@ -106,22 +105,24 @@ export async function GET(req: NextRequest) {
   };
 
   // --- Hoka · marketing -------------------------------------------------------------------------
-  // The make loop, read off the studio backend the retired studio left behind. His headline is the state
-  // of the workshop: ideas banked, drafts waiting on Jag, and pieces live. Best-effort, if the studio is
-  // unreadable he simply reports "warming up" rather than a false empty.
-  const [ideas, assets] = await Promise.all([readStudioIdeas(), readStudioAssets()]);
+  // The make loop, read off the content tables the retired studio left behind. His headline is the state
+  // of the workshop: pieces being written, waiting on Jag, booked in, and live. Every one of them was
+  // written by a person: the ideas bank and the AI drafting were removed on 31 Jul 2026. Best-effort,
+  // if the tables are unreadable he reports "warming up" rather than a false empty.
+  const assets = await readStudioAssets();
   let hoka;
-  if (ideas === null || assets === null) {
-    hoka = { status: 'ok' as WorkerStatus, headline: 'Studio warming up.', detail: {} };
+  if (assets === null) {
+    hoka = { status: 'ok' as WorkerStatus, headline: 'Marketing desk warming up.', detail: {} };
   } else {
-    const openIdeas = ideas.filter((i) => i.status === 'open').length;
+    const writing = assets.filter((a) => a.state === 'scripting').length;
     const awaiting = assets.filter((a) => a.state === 'awaiting_approval').length;
+    const scheduled = assets.filter((a) => a.state === 'scheduled').length;
     const live = assets.filter((a) => a.state === 'live' || a.state === 'measured').length;
     hoka = {
       status: (awaiting > 0 ? 'warn' : 'ok') as WorkerStatus,
       headline:
-        `${openIdeas} idea${openIdeas === 1 ? '' : 's'} banked · ${awaiting} awaiting your approval · ${live} live.`,
-      detail: { openIdeas, awaiting, live },
+        `${writing} being written · ${awaiting} awaiting your approval · ${scheduled} booked in · ${live} live.`,
+      detail: { writing, awaiting, scheduled, live },
     };
   }
 

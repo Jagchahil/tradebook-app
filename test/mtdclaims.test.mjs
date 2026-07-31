@@ -58,14 +58,16 @@ const rel = (p) => path.relative(repo, p);
 const flat = (s) => s.replace(/\s+/g, ' ');
 const sources = files.map((f) => [rel(f), flat(strip(readFileSync(f, 'utf8')))]);
 
-// 🔴 ONE DECLARED EXCEPTION, AND IT HAS TO BE DECLARED BY HAND.
+// 🔴 EXCEPTIONS HAVE TO BE DECLARED BY HAND, AND RIGHT NOW THERE ARE NONE.
 //
-// lib/studioagent.ts is the file that FORBIDS these phrases to the copy generator. It necessarily
-// quotes them, in a string rather than a comment, so stripping comments does not remove them. It is
-// allowlisted here rather than by loosening a pattern, because loosening the pattern would let the
-// real thing through everywhere. Anything else that quotes a forbidden phrase has to come here and
-// say why, which is the friction working.
-const QUOTES_THE_RULES = new Set(['lib/studioagent.ts']);
+// There used to be exactly one: lib/studioagent.ts, the file that FORBADE these phrases to the AI
+// copy generator and therefore had to quote them, in a string rather than a comment, so stripping
+// comments did not remove them. That file was deleted on 31 Jul 2026 along with the whole AI drafting
+// path, so the allowlist is empty and every forbidden phrase is now forbidden everywhere.
+//
+// Anything that wants to quote one has to come here and say why. That friction is the point: loosening
+// the pattern instead would let the real thing through in every file at once.
+const QUOTES_THE_RULES = new Set([]);
 
 ok(`there is customer facing source to check (${sources.length} files)`, sources.length > 50);
 
@@ -130,7 +132,10 @@ console.log('\n3. THE MTD PAGE IS HONEST ABOUT WHERE IT HAS GOT TO');
 // Flattened for the same reason: this copy is JSX and wraps mid sentence.
 const mtd = flat(readFileSync(path.join(repo, 'app/free-mtd-filing/page.tsx'), 'utf8'));
 ok('it no longer just says coming soon', !/COMING SOON/i.test(strip(mtd)));
-ok('the exception list is not a way to smuggle a claim in', QUOTES_THE_RULES.size === 1);
+// The allowlist is pinned at EMPTY. It held one entry until 31 Jul 2026 (lib/studioagent.ts, the AI
+// copy generator, deleted that day). Pinning the size is the whole point of it: adding a file to the
+// allowlist has to fail the build first, so it is argued for out loud rather than slipped in.
+ok('the exception list is not a way to smuggle a claim in', QUOTES_THE_RULES.size === 0);
 
 // 🔴 THE GUARD MUST STILL BITE. A sentence-level negation check could be written so loosely that it
 // passes everything, and a compliance test that cannot fail is worse than none because it reads as

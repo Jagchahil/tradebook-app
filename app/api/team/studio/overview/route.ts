@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   verifyAccessToken,
   readTeamMember,
-  readStudioIdeas,
   readStudioAssets,
   readStudioMetrics,
   attributionByTag,
@@ -13,8 +12,9 @@ import { platformCaptions } from '../../../../../lib/calendar';
 
 export const runtime = 'nodejs';
 
-// Everything the Studio needs in one fetch: the idea backlog, every asset (the board reads state off
-// these), and the scoreboard for what is live. Same gate as the rest of the console: a row in
+// Everything Hoka's desk needs in one fetch: every asset (the board reads state off these), the go
+// live calendar, and the scoreboard for what is live. The idea backlog was removed on 31 Jul 2026
+// along with the AI drafting, so there is nothing to read but work a person actually wrote. Same gate as the rest of the console: a row in
 // team_members, read fresh on THIS request. No customer data is returned. The only money number is
 // aggregate attribution by a post's own tag.
 export async function GET(req: NextRequest) {
@@ -26,15 +26,14 @@ export async function GET(req: NextRequest) {
   const member = await readTeamMember(user.email);
   if (!isTeam(member)) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
 
-  const [ideas, assets, metrics, attr] = await Promise.all([
-    readStudioIdeas(),
+  const [assets, metrics, attr] = await Promise.all([
     readStudioAssets(),
     readStudioMetrics(),
     attributionByTag(),
   ]);
 
-  if (assets === null || ideas === null) {
-    // We could not read. We will not draw an empty studio and let someone believe it is empty.
+  if (assets === null) {
+    // We could not read. We will not draw an empty desk and let someone believe it is empty.
     return NextResponse.json({ error: 'unreadable' }, { status: 503 });
   }
 
@@ -70,7 +69,6 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     me: { email: member!.email, name: member!.name, role: member!.role },
-    ideas,
     assets,
     scoreboard,
     calendar,

@@ -208,7 +208,7 @@ console.log('\n=== voice: no path that ships customer audio to a third party ===
 // The other two fixes from this pass are pinned in the suites that already own those modules,
 // because both files need staging to load under type stripping and duplicating that machinery
 // here would be a second place to maintain it:
-//   . the render URL host allowlist  -> test/higgsfield.test.mjs
+//   . the render URL host allowlist  -> deleted 31 Jul 2026 with the AI render queue
 //   . constant time secret comparison -> test/connectors.test.mjs
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);

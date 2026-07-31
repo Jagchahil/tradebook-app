@@ -25,7 +25,7 @@ import type { OptimiserInput } from './taxoptimiser';
 import { qaDedupeKey, qaPrunePaths } from './qaretention';
 import type { KnowledgeState } from './knowledgewatch';
 import type {
-  Idea, Asset, Approval, Metric, AssetState, Format, Promise3, Platform, Storyboard,
+  Asset, Approval, Metric, AssetState, Format, Promise3, Platform, Storyboard,
 } from './studio';
 import { refreshFacts, resolveOverrides, isOverridableKey, isInBounds, type FactOverride } from './facts';
 import { advanceStage, normaliseWhatsapp, isContactStage, isCheckoutStage, isEventKind, type ContactStage, type CheckoutStage, type EventKind } from './crm';
@@ -6480,62 +6480,6 @@ export async function forgetCircumstance(userId: string, key: string): Promise<b
 // post's own tag, never who they are and never a figure about their money.
 // ================================================================================================
 
-export async function readStudioIdeas(): Promise<Idea[] | null> {
-  try {
-    const { url } = config();
-    const res = await fetch(
-      `${url}/rest/v1/content_ideas?select=*&order=votes.desc,created_at.desc&limit=500`,
-      { headers: headers() },
-    );
-    if (!res.ok) return null;
-    return (await res.json()) as Idea[];
-  } catch { return null; }
-}
-
-export async function insertStudioIdea(input: {
-  title: string; trade: string | null; format: Format; promise: Promise3; note: string | null; author: string | null;
-}): Promise<Idea | null> {
-  try {
-    const { url } = config();
-    const res = await fetch(`${url}/rest/v1/content_ideas`, {
-      method: 'POST',
-      headers: headers({ Prefer: 'return=representation' }),
-      body: JSON.stringify({
-        title: input.title, trade: input.trade, format: input.format,
-        promise: input.promise, note: input.note, author: input.author,
-      }),
-    });
-    if (!res.ok) return null;
-    const rows = (await res.json()) as Idea[];
-    return rows[0] ?? null;
-  } catch { return null; }
-}
-
-// A vote is read then write. If two votes race, one increment can be lost, and that is completely
-// fine: a backlog vote is a nudge, not an accounting entry. We do not add a database function and a
-// migration to make a popularity counter perfect.
-export async function voteStudioIdea(id: string): Promise<boolean> {
-  try {
-    const { url } = config();
-    const cur = await fetch(
-      `${url}/rest/v1/content_ideas?id=eq.${encodeURIComponent(id)}&select=votes`,
-      { headers: headers() },
-    );
-    if (!cur.ok) return false;
-    const rows = (await cur.json()) as Array<{ votes: number }>;
-    if (!rows[0]) return false;
-    const res = await fetch(
-      `${url}/rest/v1/content_ideas?id=eq.${encodeURIComponent(id)}`,
-      {
-        method: 'PATCH',
-        headers: headers({ Prefer: 'return=minimal' }),
-        body: JSON.stringify({ votes: rows[0].votes + 1 }),
-      },
-    );
-    return res.ok;
-  } catch { return false; }
-}
-
 export async function countStudioAssets(): Promise<number | null> {
   try {
     const { url } = config();
@@ -6733,115 +6677,13 @@ export async function attributionByTag(): Promise<Record<string, { trials: numbe
   } catch { return null; }
 }
 
-// --- Studio agent: idea lookup, promotion, and the heartbeat -----------------------------------
+// --- the finished file --------------------------------------------------------------------------
 
-export async function readStudioIdea(id: string): Promise<Idea | null> {
-  try {
-    const { url } = config();
-    const res = await fetch(
-      `${url}/rest/v1/content_ideas?id=eq.${encodeURIComponent(id)}&select=*`,
-      { headers: headers() },
-    );
-    if (!res.ok) return null;
-    const rows = (await res.json()) as Idea[];
-    return rows[0] ?? null;
-  } catch { return null; }
-}
-
-// Mark an idea promoted once an asset has been drafted from it, so it is not drafted again. Best
-// effort: a failure here does not undo the asset that was already made.
-export async function markIdeaPromoted(id: string): Promise<boolean> {
-  try {
-    const { url } = config();
-    const res = await fetch(
-      `${url}/rest/v1/content_ideas?id=eq.${encodeURIComponent(id)}`,
-      {
-        method: 'PATCH',
-        headers: headers({ Prefer: 'return=minimal' }),
-        body: JSON.stringify({ status: 'promoted' }),
-      },
-    );
-    return res.ok;
-  } catch { return false; }
-}
-
-export interface StudioAgentRun {
-  ran_at: string;
-  drafted: number;
-  considered: number;
-  ok: boolean;
-}
-
-// THE HEARTBEAT WRITE. Called on EVERY agent run, success or failure. A run that drafted nothing
-// still writes a row: the bot looked, and that is the fact the console needs to know it is alive.
-export async function insertStudioAgentRun(input: {
-  drafted: number; considered: number; ok: boolean; note: string | null; duration_ms: number | null;
-}): Promise<boolean> {
-  try {
-    const { url } = config();
-    const res = await fetch(`${url}/rest/v1/studio_agent_runs`, {
-      method: 'POST',
-      headers: headers({ Prefer: 'return=minimal' }),
-      body: JSON.stringify(input),
-    });
-    return res.ok;
-  } catch { return false; }
-}
-
-// The newest heartbeat, for a console light later. Null means the table is empty, which for a bot
-// that has never run is the honest answer, not a green light.
-export async function readLatestStudioAgentRun(): Promise<StudioAgentRun | null> {
-  try {
-    const { url } = config();
-    const res = await fetch(
-      `${url}/rest/v1/studio_agent_runs?select=ran_at,drafted,considered,ok&order=ran_at.desc&limit=1`,
-      { headers: headers() },
-    );
-    if (!res.ok) return null;
-    const rows = (await res.json()) as StudioAgentRun[];
-    return rows[0] ?? null;
-  } catch { return null; }
-}
-
-// --- Studio generation: approved storyboards that still need a video made -----------------------
-
-// Assets that Jag has APPROVED (state scheduled) but that have no finished file yet. This is the
-// generation agent's work queue. It never sees anything unapproved, so it can only ever put effort
-// into things Jag already said yes to.
-export async function readAssetsPendingGeneration(): Promise<Asset[] | null> {
-  try {
-    const { url } = config();
-    const res = await fetch(
-      `${url}/rest/v1/content_assets?state=eq.scheduled&file_url=is.null&select=*&order=updated_at.asc&limit=50`,
-      { headers: headers() },
-    );
-    if (!res.ok) return null;
-    return (await res.json()) as Asset[];
-  } catch { return null; }
-}
-
-// How many videos were generated (a file attached) since the given ISO time. The generation queue
-// uses this to hold the day inside the standing spend cap, so total renders in a day cannot exceed
-// STUDIO_GEN_MAX_PER_DAY however many times the worker runs. Null means the count could not be read,
-// and the caller treats that as "assume the day is spent" and hands out nothing, failing safe.
-export async function countStudioAssetsGeneratedSince(iso: string): Promise<number | null> {
-  try {
-    const { url } = config();
-    const res = await fetch(
-      `${url}/rest/v1/content_assets?file_url=not.is.null&updated_at=gte.${encodeURIComponent(iso)}&select=id`,
-      { method: 'HEAD', headers: headers({ Prefer: 'count=exact', Range: '0-0' }) },
-    );
-    if (!res.ok) return null;
-    const range = res.headers.get('content-range') || '';
-    const n = parseInt((range.split('/')[1] || ''), 10);
-    return Number.isFinite(n) ? n : null;
-  } catch { return null; }
-}
-
-// Attach a generated file to an approved asset. The `file_url=is.null` guard makes this a claim: if
-// two agent runs overlap, the first one to write wins and the second changes nothing, so a piece is
-// never generated twice or its file overwritten. Approval is NOT touched here: generating a video
-// does not post it, and posting still needs a human.
+// Attach the finished file to an approved piece. Since 31 Jul 2026 this is a URL Jag pastes in by
+// hand, of something he made himself: there is no render queue and no generator behind it any more.
+// The `file_url=is.null` guard makes the write a claim, so a second paste cannot quietly overwrite
+// the first. Approval is NOT touched here: having the file does not post it, and posting is still a
+// separate act by a human.
 export async function setStudioAssetMedia(id: string, fileUrl: string): Promise<Asset | null> {
   try {
     const { url } = config();

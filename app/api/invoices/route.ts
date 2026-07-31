@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sessionUser } from '../../../lib/webauth';
-import { createInvoice } from '../../../lib/supabase';
-import { rateLimitedShared } from '../../../lib/ratelimit';
+import { createInvoice, markInvoiceSentByOwner, markInvoicePaidByOwner } from '../../../lib/supabase';
+import { rateLimitedShared, userBurst } from '../../../lib/ratelimit';
 import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 import { invoiceRef } from '../../app/invoiceref';
 
-// AN INVOICE, MADE FROM THE WEB. The form door for the same path WhatsApp already walks.
+// AN INVOICE, MADE FROM THE WEB, AND KEPT STRAIGHT BY ITS OWNER.
 //
-//   POST { customer, contact?, item[], amount[] }  ->  one draft invoice, then the share step
+//   POST { customer, contact?, item[], amount[] }   ->  one draft invoice, then the share step
+//   POST { action: 'sent' | 'paid', id, ref? }      ->  his own row's status, said by him
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // ⚠️ THIS ROUTE WRITES NOTHING ITSELF. createInvoice in lib/supabase.ts is the one path every
 // invoice in the product arrives through (the WhatsApp guided flow, "invoice this"), and this
 // route is another CALLER of it, not another copy: the numbering, the fourteen day due date and
 // the draft status are all its decisions, made once, for every surface.
+//
+// ⚠️ THE TWO MARK ACTIONS ARE STATEMENTS OF FACT ABOUT HIS OWN BUSINESS (31 July 2026). He sent
+// the invoice from his own phone; his customer paid him. Until now the only path to 'paid' was
+// the Stripe webhook, so a bank transfer or an envelope of cash left an invoice we would chase
+// for ever. One press each, through markInvoiceSentByOwner and markInvoicePaidByOwner in lib,
+// where the tenancy lives: the session names the owner, the id rides in the FORM BODY never the
+// URL, and every query filters on user AND row, so another man's uuid matches nothing and is
+// told so. Marking paid books the income through the same shape as the Stripe path, once.
+//
+// ⚠️ AND THE MARKS ARE NEVER GATED, the elections DELETE shape: keeping his own record straight
+// is not the work, it is his record. Only creating an invoice is the work, so the gate sits on
+// the create branch alone, checked after the body is read because the action decides the rule.
 //
 // ⚠️ THE FORM IS THE WHOLE PARSE. The WhatsApp flow needs draftInvoice (AI) because a man in a
 // chat types "bathroom rewire 450, materials 80" as one breath. A form already has the amounts
@@ -34,6 +47,8 @@ export const runtime = 'nodejs';
 // Six lines is a real job's invoice. More is a spreadsheet, and the phone flow agrees.
 const MAX_LINES = 6;
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest) {
   const isForm = (req.headers.get('content-type') || '').includes('application/x-www-form-urlencoded');
   const back = (q: string) => NextResponse.redirect(new URL(`/app/invoices/new?${q}`, req.url), 303);
@@ -45,15 +60,9 @@ export async function POST(req: NextRequest) {
       : NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  // The work stops when he stops paying. lib/gate.ts row: 'entitled'. Raising a new invoice is
-  // us doing something new for him, the same judgement as a typed cash entry.
-  if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app/invoices/new');
-
-  // A man invoicing a week of jobs, not a loop minting rows.
-  if (await rateLimitedShared(`invoices:${user.id}`, 20, 60 * 60 * 1000)) {
-    return isForm ? back('problem=slow') : NextResponse.json({ error: 'too_many_requests' }, { status: 429 });
-  }
-
+  let action = '';
+  let markId = '';
+  let markRef = '';
   let customer = '';
   let contact = '';
   let items: string[] = [];
@@ -61,6 +70,9 @@ export async function POST(req: NextRequest) {
   if (isForm) {
     const f = await req.formData().catch(() => null);
     if (!f) return back('problem=bad');
+    action = String(f.get('action') ?? '');
+    markId = String(f.get('id') ?? '');
+    markRef = String(f.get('ref') ?? '');
     customer = String(f.get('customer') ?? '');
     contact = String(f.get('contact') ?? '');
     items = f.getAll('item').map(String);
@@ -80,6 +92,42 @@ export async function POST(req: NextRequest) {
       items.push(typeof r.description === 'string' ? r.description : '');
       amounts.push(typeof r.amount === 'string' || typeof r.amount === 'number' ? String(r.amount) : '');
     }
+  }
+
+  // ── His own row's status, said by him. Form posts from /app/invoice, never gated. ──────────
+  if (action === 'sent' || action === 'paid') {
+    // The way back is the detail page he pressed the button on, via the sealed reference he
+    // already held. The reference is not trusted here: the detail page re-verifies it on
+    // landing, and a stale or borrowed one lands on his own list, the invoiceref rule. The
+    // destination is always a path of ours resolved against req.url, the same origin shape
+    // test/csp.test.mjs walks every form route for.
+    const backTo = (q: string) => {
+      const to = markRef
+        ? `/app/invoice?ref=${encodeURIComponent(markRef)}&${q}`
+        : `/app/invoices?${q}`;
+      return NextResponse.redirect(new URL(to, req.url), 303);
+    };
+    // A man pressing a button, not a loop flipping rows.
+    if (await userBurst('invoicemark', user.id, 30)) return backTo('problem=slow');
+    // The id rides in the form body, shape checked before it goes near a query. Ownership is
+    // the lib accessor's: both filters, his row or nothing.
+    if (!UUID.test(markId)) return backTo('problem=save');
+    const done = action === 'sent'
+      ? await markInvoiceSentByOwner(user.id, markId)
+      : await markInvoicePaidByOwner(user.id, markId);
+    return done ? backTo(`did=${action}`) : backTo('problem=save');
+  }
+
+  // ── Making one: the work, gated and rate limited. ──────────────────────────────────────────
+  // The work stops when he stops paying. lib/gate.ts row: 'entitled'. Raising a new invoice is
+  // us doing something new for him, the same judgement as a typed cash entry. The gate sits
+  // after the body read because the action decides the rule, and visibly not nested under any
+  // earlier early return.
+  if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app/invoices/new');
+
+  // A man invoicing a week of jobs, not a loop minting rows.
+  if (await rateLimitedShared(`invoices:${user.id}`, 20, 60 * 60 * 1000)) {
+    return isForm ? back('problem=slow') : NextResponse.json({ error: 'too_many_requests' }, { status: 429 });
   }
 
   customer = customer.trim().slice(0, 120);

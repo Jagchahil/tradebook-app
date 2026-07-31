@@ -34,10 +34,14 @@ export const dynamic = 'force-dynamic';
 // its owner inside the ciphertext, and it cannot be forged without the key. The public page
 // hands the same rows to anyone holding the raw id, which is what these ids are for.
 //
-// ⚠️ NOTHING ON THIS PAGE SENDS ANYTHING, AND NOTHING ON IT MUTATES ANYTHING. There is no form
-// here at all. The share step and the chaser both end in HIS apps: a WhatsApp share sheet, an
-// email compose window, a block of text he can copy. A message to another human being always
-// asks, and here the asking is the entire feature.
+// ⚠️ NOTHING ON THIS PAGE SENDS ANYTHING, AND THE ONLY THING IT MUTATES IS HIS OWN RECORD
+// (31 July 2026). The share step and the chaser still end in HIS apps: a WhatsApp share sheet,
+// an email compose window, a block of text he can copy. A message to another human being always
+// asks, and here the asking is the entire feature. The two forms that now exist post plain
+// statements of fact to /api/invoices, id in the body never the URL: he sent this invoice, his
+// customer paid it. Until they existed the only road to 'paid' was the Stripe webhook, so a
+// bank transfer or cash left an invoice the list would call late for ever. Marking paid books
+// the income the same way a card payment does, and the page says so before the press.
 //
 // ⚠️ THE CHASER APPEARS ONLY WHEN THE INVOICE IS LATE. Doc 103's empty test: a "chase this"
 // button on an invoice that is not yet due is a nudge to harass a customer who owes nothing
@@ -66,6 +70,18 @@ export default async function InvoiceDetailPage({
 
   const made = one('made') === '1';
   const tone: ChaserTone = isChaserTone(one('tone')) ? (one('tone') as ChaserTone) : 'polite';
+
+  // What a mark press came back saying. The row below already shows the new status, so these
+  // are one line each, not a ceremony.
+  const said = one('did') === 'sent'
+    ? 'Noted as sent.'
+    : one('did') === 'paid'
+      ? 'Marked paid. The money is in your income figures.'
+      : one('problem') === 'save'
+        ? 'That did not save. Nothing has changed, so try it again.'
+        : one('problem') === 'slow'
+          ? 'That was a lot at once. Give it a minute and try again.'
+          : null;
 
   const inv = await getPublicInvoice(row);
 
@@ -134,6 +150,8 @@ export default async function InvoiceDetailPage({
             </p>
           ) : null}
 
+          {said ? <p style={S.said}>{said}</p> : null}
+
           <section className="lek-card">
             <h1 className="lek-title">{inv.customer_name || 'Customer'}</h1>
             <p className="lek-figure" style={state === 'paid' ? S.figurePaid : undefined}>
@@ -197,6 +215,39 @@ export default async function InvoiceDetailPage({
             </section>
           )}
 
+          {state !== 'paid' ? (
+            <section className="lek-card">
+              {/* His record, kept straight by him. Two plain form posts, ids in the body, the
+                  session naming the owner on the other side. Nothing here reaches his customer,
+                  and the page says so before either press. The weight of "paid" is said too:
+                  it books the income, so the sentence sits on the button that does it. */}
+              <h2 className="lek-h2">What has happened with it</h2>
+              <p style={S.sub}>
+                These update your records only. Nothing goes to your customer.
+              </p>
+              <div style={S.shareRow}>
+                {inv.status === 'draft' ? (
+                  <form action="/api/invoices" method="post">
+                    <input type="hidden" name="action" value="sent" />
+                    <input type="hidden" name="id" value={row} />
+                    <input type="hidden" name="ref" value={one('ref') ?? ''} />
+                    <button type="submit" className="lek-mark">I have sent it</button>
+                  </form>
+                ) : null}
+                <form action="/api/invoices" method="post">
+                  <input type="hidden" name="action" value="paid" />
+                  <input type="hidden" name="id" value={row} />
+                  <input type="hidden" name="ref" value={one('ref') ?? ''} />
+                  <button type="submit" className="lek-mark">I have been paid</button>
+                </form>
+              </div>
+              <p style={S.quiet}>
+                Paid means the money arrived. It goes into your income figures the moment you say
+                so, the same as a card payment.
+              </p>
+            </section>
+          ) : null}
+
           {late > 0 ? (
             <section className="lek-card">
               <h2 className="lek-h2">Chase it</h2>
@@ -252,6 +303,10 @@ const CSS = [
   `.lek-wa{display:inline-block;padding:12px 18px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${ON_WHATSAPP};background:${WHATSAPP};border-radius:${RADIUS.md}px;text-decoration:none}`,
   `.lek-ghostlink{display:inline-block;padding:12px 18px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${MUTED};background:${PANEL};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;text-decoration:none;transition:color ${MOTION.quick} ${MOTION.ease}}`,
   `.lek-ghostlink:hover{color:${INK}}`,
+  // The mark buttons: quiet, bordered, deliberately not the WhatsApp green or the primary river.
+  // They change a record, they do not send anything, and the styling says which family they are in.
+  `.lek-mark{padding:12px 18px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${INK};background:${PANEL};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;cursor:pointer;transition:background-color ${MOTION.quick} ${MOTION.ease}}`,
+  `.lek-mark:hover{background:${SURFACE}}`,
   `.lek-tone{display:inline-block;padding:7px 14px;font-size:${TYPE.note}px;font-weight:700;font-family:${FONT};color:${MUTED};background:${SURFACE};border-radius:${RADIUS.pill}px;text-decoration:none;transition:color ${MOTION.quick} ${MOTION.ease}}`,
   `.lek-tone:hover{color:${INK}}`,
   `.lek-tone.on{color:${RIVER_DEEP};background:${RIVER_TINT}}`,

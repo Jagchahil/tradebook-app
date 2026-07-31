@@ -71,6 +71,7 @@ export const SECTIONS: ReadonlyArray<NavSection> = [
       { href: '/app/tax/what-if', label: 'What if', hint: 'Try a change to your profit, on your real figures' },
       { href: '/app/tax/ways-to-save', label: 'Ways to save', hint: 'Every lever we can find you, with the working' },
       { href: '/app/tax/can-i-claim', label: 'Can I claim it', hint: 'The expense rules, with HMRC sources' },
+      { href: '/app/pay-yourself', label: 'Pay yourself', hint: 'The most tax efficient way to take your money out' },
     ],
   },
   {
@@ -90,6 +91,7 @@ export const SECTIONS: ReadonlyArray<NavSection> = [
     href: '/app/you',
     label: 'You',
     items: [
+      { href: '/app/thread', label: 'Ask Lekhio', hint: 'Your questions and the answers, kept' },
       { href: '/app/you', label: 'About you', hint: 'Who we think you are, and how to reach you' },
       { href: '/app/you/circumstances', label: 'Circumstances', hint: 'What you have told us, and what is still worth answering' },
       { href: '/app/connect', label: 'WhatsApp', hint: 'The number your receipts arrive from' },

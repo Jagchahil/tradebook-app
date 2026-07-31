@@ -31,6 +31,7 @@ import { refreshFacts, resolveOverrides, isOverridableKey, isInBounds, type Fact
 import { advanceStage, normaliseWhatsapp, isContactStage, isCheckoutStage, isEventKind, type ContactStage, type CheckoutStage, type EventKind } from './crm';
 import { sicByCode } from './siccodes';
 import { useOfHomeToDate } from './elections';
+import { fromLegacyKind, toLegacyKind, isGoalKind, type LegacyGoalKind } from './goals';
 import { weekTotals, windowStart, type WeekRow } from './weekchart';
 import { isMonthKey, monthStart, monthEnd } from './moneylog';
 
@@ -4694,67 +4695,13 @@ export async function logAgentDelivery(userId: string, signalKey: string): Promi
 }
 
 // --- Goals (doc 82 section 5b) ------------------------------------------------
-
-export interface ActiveGoal {
-  id: string;
-  kind: 'purchase' | 'income' | 'savings';
-  title: string;
-  amount: number;
-  target_date: string | null;
-}
-
-export async function getActiveGoals(userId: string): Promise<ActiveGoal[]> {
-  const { url } = config();
-  const query = `${url}/rest/v1/user_goals?user_id=eq.${encodeURIComponent(userId)}&status=eq.active&select=id,kind,title,amount,target_date&order=created_at.desc&limit=10`;
-  const res = await fetch(query, { headers: headers() });
-  if (!res.ok) return [];
-  const rows = (await res.json().catch(() => [])) as Array<{
-    id: string;
-    kind: string;
-    title: string;
-    amount: number | string;
-    target_date: string | null;
-  }>;
-  return rows
-    .filter((r) => r.kind === 'purchase' || r.kind === 'income' || r.kind === 'savings')
-    .map((r) => ({
-      id: r.id,
-      kind: r.kind as ActiveGoal['kind'],
-      title: r.title,
-      amount: Number(r.amount) || 0,
-      target_date: r.target_date,
-    }));
-}
-
-// Create a goal from WhatsApp ("my goal is a van for 24k"). The title is the
-// user's own words.
-export async function insertUserGoal(
-  userId: string,
-  goal: { kind: 'purchase' | 'income' | 'savings'; title: string; amount: number },
-): Promise<boolean> {
-  const { url } = config();
-  const res = await fetch(`${url}/rest/v1/user_goals`, {
-    method: 'POST',
-    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ user_id: userId, ...goal }),
-  });
-  return res.ok;
-}
-
-// "goal done": marks the newest active goal done. From WhatsApp there is no
-// picker, so newest-first is the least surprising rule; the app can manage
-// individual goals precisely.
-export async function completeLatestGoal(userId: string): Promise<string | null> {
-  const goals = await getActiveGoals(userId);
-  if (goals.length === 0) return null;
-  const { url } = config();
-  const res = await fetch(`${url}/rest/v1/user_goals?id=eq.${encodeURIComponent(goals[0].id)}`, {
-    method: 'PATCH',
-    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({ status: 'done', updated_at: new Date().toISOString() }),
-  });
-  return res.ok ? goals[0].title : null;
-}
+//
+// ⚠️ MOVED, NOT GONE. getActiveGoals, insertUserGoal and completeLatestGoal used to live here and
+// used to speak to public.user_goals. The founder decided on 31 July 2026 that there is ONE goals
+// store, public.goals, so the three now live beside the wave three goals accessors at the bottom
+// of this file and are thin translations over them. user_goals is read only legacy until launch
+// two; nothing in this file writes it any more. See the section THE JOBS DIARY AND GOALS below,
+// and supabase/APPLY_2026-07-31_goals_consolidation.sql for the row migration.
 
 // --- Properties, service role side (doc 82 s4) --------------------------------
 export interface UserProperty {
@@ -7717,3 +7664,472 @@ export async function deleteGoal(userId: string, goalId: string): Promise<boolea
     return false;
   }
 }
+
+// --- THE LEGACY GOAL DOORS, REPOINTED AT THE ONE STORE -----------------------------------------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 ONE GOALS STORE, DECIDED BY THE FOUNDER, 31 JULY 2026. These three functions are the doors
+// doc 82 built for WhatsApp and Rakha (set a goal in chat, list them, "goal done") and for two
+// weeks they wrote public.user_goals while the web wrote public.goals: two tables that both meant
+// "what he is saving for", which is the house disease with a savings account. The diary_goals
+// migration file said out loud that the founder would decide the reconciliation, and he has:
+// public.goals wins, so every door here now walks through the wave three accessors above
+// (listGoals, addGoal, setGoalStatus) and user_goals is read only legacy until launch two. The
+// unreleased phone app may keep reading it; nothing on the server writes it any more, and
+// test/goalstore.test.mjs fails the build if a writer ever comes back.
+//
+// ⚠️ THE CALLERS DID NOT MOVE. The WhatsApp webhook, the optimiser, Rakha's walk and the on
+// demand reassess all still speak doc 82's tongue (kinds purchase, income, savings; pounds), so
+// each door translates at the threshold with the two honest mappings in lib/goals.ts, written
+// once and pinned there. Pounds become pence on the way in and pence become pounds on the way
+// out, always by one hundred, never rounded twice.
+//
+// ⚠️ A GOAL WITHOUT A FIGURE IS NOT RETURNED HERE. Every doc 82 reader divides by the amount or
+// compares against it, because the legacy table required one. The goals table honestly allows a
+// goal with no figure, and handing such a row to goalAnswer would print a progress bar against
+// £NaN. So the web page shows every goal, and these doors show the ones their readers can do
+// arithmetic on.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export interface ActiveGoal {
+  id: string;
+  kind: LegacyGoalKind;
+  title: string;
+  amount: number;
+  target_date: string | null;
+}
+
+// Open goals in doc 82's shape: newest first, capped at ten, exactly the order and cap the
+// user_goals read always had, so no caller's behaviour moves. A failed read stays [] here, the
+// old contract: every consumer treats "no goals" as a quiet day, never as a fact to announce.
+export async function getActiveGoals(userId: string): Promise<ActiveGoal[]> {
+  const rows = await listGoals(userId);
+  if (rows === null) return [];
+  return rows
+    .filter((r) => r.status === 'open' && isGoalKind(r.kind) && Number.isFinite(Number(r.amount_pence)) && Number(r.amount_pence) > 0)
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, 10)
+    .map((r) => ({
+      id: r.id,
+      kind: toLegacyKind(r.kind as Parameters<typeof toLegacyKind>[0]),
+      title: r.label,
+      amount: Number(r.amount_pence) / 100,
+      target_date: r.target_date,
+    }));
+}
+
+// Create a goal from WhatsApp ("my goal is a van for 24k"). The title is the user's own words
+// and lands in label untouched; the kind crosses fromLegacyKind, so a chat "purchase" is stored
+// as the honest 'other', never guessed into 'van'. WhatsApp asks no target date, so none is set.
+export async function insertUserGoal(
+  userId: string,
+  goal: { kind: LegacyGoalKind; title: string; amount: number },
+): Promise<boolean> {
+  if (!Number.isFinite(goal.amount) || goal.amount <= 0) return false;
+  return addGoal(userId, {
+    kind: fromLegacyKind(goal.kind),
+    label: goal.title,
+    amountPence: Math.round(goal.amount * 100),
+    targetDate: null,
+  });
+}
+
+// "goal done": marks the newest open goal done, the least surprising rule when chat has no
+// picker. Newest OPEN goal across the one store, so a goal he set on the web closes the same way
+// a goal he texted does; the app manages individual goals precisely. Returns the label for the
+// celebration line, or null when there is nothing open or the write failed.
+export async function completeLatestGoal(userId: string): Promise<string | null> {
+  const rows = await listGoals(userId);
+  if (rows === null) return null;
+  const open = rows
+    .filter((r) => r.status === 'open')
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  if (open.length === 0) return null;
+  const done = await setGoalStatus(userId, open[0].id, 'done');
+  return done ? open[0].label : null;
+}
+
+// --- RECEIPT IMAGES, KEPT AS EVIDENCE ----------------------------------------------------------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// The photograph a man sends of a receipt used to be read by the model and thrown away, which
+// meant the one piece of evidence HMRC would actually want to see survived only as our reading
+// of it. These helpers put the image in the PRIVATE receipts bucket (created in
+// supabase/APPLY_2026-07-31_goals_consolidation.sql) and hand back the path that goes into the
+// transaction row's raw_input_url, the column docs/03 reserved for exactly this.
+//
+// 🔴 THE BUCKET IS PRIVATE AND THE PATH IS NOT A LINK. No public URL exists or is ever built
+// here: raw_input_url holds `receipts/<user id>/<file>`, which only the service role can turn
+// into bytes. A public bucket of receipts would be a directory of every customer's spending,
+// which doc 97 forbade in writing.
+//
+// ⚠️ STORAGE IS EVIDENCE, NEVER A DEPENDENCY. Every caller must treat a null from
+// storeReceiptImage as "no image kept" and carry on to the figures: a lost image must never
+// lose the numbers, because the numbers are what his tax is prepared from.
+//
+// ⚠️ PATH BUILDING IS PURE AND SEPARATE so test/receiptstore.test.mjs can attack it without a
+// network: the user id is the folder (scoping every object to its owner), the extension comes
+// off the allowlisted media type or the upload is refused, and the nonce keeps two receipts
+// photographed the same day from colliding.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export const RECEIPTS_BUCKET = 'receipts';
+
+// The extension for an allowlisted image type, or null. Unknown types are refused, never
+// guessed: an extension invented from a mystery media type would be a lie in a filename.
+export function receiptFileExtension(mediaType: string): string | null {
+  const t = (mediaType || '').toLowerCase().split(';')[0].trim();
+  if (t === 'image/jpeg' || t === 'image/jpg') return 'jpg';
+  if (t === 'image/png') return 'png';
+  if (t === 'image/webp') return 'webp';
+  if (t === 'image/gif') return 'gif';
+  return null;
+}
+
+// `receipts/<user id>/<day>-<nonce>.<ext>`, or null when any piece fails its shape. The user id
+// folder is the tenancy: every object names its owner in its path, so a per user wipe or export
+// is one prefix. The day is for a human reading the bucket, the nonce is for uniqueness.
+export function receiptStoragePath(
+  userId: string,
+  mediaType: string,
+  dayISO: string,
+  nonce: string,
+): string | null {
+  if (!UUID.test(userId)) return null;
+  const ext = receiptFileExtension(mediaType);
+  if (!ext) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayISO)) return null;
+  const clean = (nonce || '').replace(/[^a-z0-9-]/gi, '').slice(0, 36);
+  if (!clean) return null;
+  return `${RECEIPTS_BUCKET}/${userId}/${dayISO}-${clean}.${ext}`;
+}
+
+// Upload the bytes, return the raw_input_url path, or null on ANY failure. Null and never a
+// throw, so no capture route can lose a man's figures over our storage having a bad minute.
+export async function storeReceiptImage(
+  userId: string,
+  bytes: Uint8Array<ArrayBuffer>,
+  mediaType: string,
+): Promise<string | null> {
+  const storagePath = receiptStoragePath(
+    userId,
+    mediaType,
+    new Date().toISOString().slice(0, 10),
+    globalThis.crypto.randomUUID(),
+  );
+  if (!storagePath) return null;
+  // The same ceiling the web route enforces, repeated here so no future caller can push a video
+  // sized blob into the bucket by skipping the route's check.
+  if (!bytes || bytes.byteLength === 0 || bytes.byteLength > 4 * 1024 * 1024) return null;
+  try {
+    const { url, key } = config();
+    const res = await fetch(`${url}/storage/v1/object/${storagePath}`, {
+      method: 'POST',
+      // Not headers(): the body is the image, so the content type must be the image's own.
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': mediaType },
+      body: bytes,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    return storagePath;
+  } catch {
+    return null;
+  }
+}
+
+// --- INVOICES, READ AND KEPT STRAIGHT BY THEIR OWNER -------------------------------------------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// /app/invoices used to read through exportUserData, the UK GDPR export, because no scoped list
+// existed: it over fetched every table a man has and could not tell a failed invoices query from
+// an empty one. readInvoices is the one small function that page header asked for, with the
+// diary's honesty contract: null on a failed read, [] only when the table really is empty,
+// because "no invoices yet" and "we could not look" are different sentences about a man's money.
+//
+// The two mark functions record HIS statements about HIS invoice: that he sent it, that it was
+// paid. Same tenancy shape as the diary and goals accessors above: user filter AND row filter in
+// every query, representation asked for so zero matches reads as the false it is, and the row id
+// only ever arrives from a session scoped call site with the id in the form body.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export interface InvoiceListDbRow {
+  id: string;
+  number: string;
+  customer_name: string | null;
+  total: number | string;
+  status: string;
+  issued_date: string | null;
+  due_date: string | null;
+  created_at: string;
+}
+
+const INVOICE_LIST_COLS = 'id,number,customer_name,total,status,issued_date,due_date,created_at';
+
+// Every invoice this user has, newest first (the index invoices_user_created_idx carries it).
+// Null on failure, never [], the whole reason this function exists.
+export async function readInvoices(userId: string): Promise<InvoiceListDbRow[] | null> {
+  if (!userId) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}`
+      + `&select=${INVOICE_LIST_COLS}&order=created_at.desc&limit=500`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as InvoiceListDbRow[];
+  } catch {
+    return null;
+  }
+}
+
+// He sent the invoice himself, from his own phone, and is telling us so. A statement of fact
+// about his own business: no message leaves here and nothing reaches his customer. Idempotent in
+// the direction of truth: saying "sent" about an invoice already sent, or already paid, is not
+// false and returns true without touching anything, because paid outranks sent and must never be
+// walked back by a stale form.
+export async function markInvoiceSentByOwner(userId: string, invoiceId: string): Promise<boolean> {
+  if (!userId || !UUID.test(invoiceId)) return false;
+  try {
+    const { url } = config();
+    // HIS row or nothing: both filters, so a stranger's uuid reads as absent, not as forbidden.
+    const read = await fetch(
+      `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}`
+      + `&id=eq.${encodeURIComponent(invoiceId)}&select=status&limit=1`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!read.ok) return false;
+    const rows = (await read.json()) as Array<{ status: string }>;
+    if (rows.length === 0) return false;
+    if (rows[0].status !== 'draft') return true; // already sent, or paid, which outranks sent
+    const res = await fetch(
+      `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}`
+      + `&id=eq.${encodeURIComponent(invoiceId)}&status=eq.draft`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ status: 'sent' }),
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!res.ok) return false;
+    const updated = (await res.json()) as unknown[];
+    return updated.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// The customer paid him, he is telling us so, and the books must agree: the same flip and the
+// same one time income booking the Stripe webhook path (markInvoicePaidServer) performs, so a
+// bank transfer and a card payment leave identical records. His press IS the approval: asking
+// him to confirm his own statement in Things to check would be making him say one fact twice.
+//
+// 🔴 THE INCOME IS BOOKED AT MOST ONCE. The flip filters on status=neq.paid and asks for the
+// rows back, exactly the atomic gate the Stripe path uses, so this racing a webhook (or a double
+// press) can only book the income on whichever write actually flipped the row.
+export async function markInvoicePaidByOwner(userId: string, invoiceId: string): Promise<boolean> {
+  if (!userId || !UUID.test(invoiceId)) return false;
+  try {
+    const { url } = config();
+    const read = await fetch(
+      `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}`
+      + `&id=eq.${encodeURIComponent(invoiceId)}&select=number,customer_name,total,status&limit=1`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!read.ok) return false;
+    const rows = (await read.json()) as Array<{
+      number: string;
+      customer_name: string;
+      total: number | string;
+      status: string;
+    }>;
+    if (rows.length === 0) return false;
+    const inv = rows[0];
+    if (inv.status === 'paid') return true; // his statement is already the record
+
+    const up = await fetch(
+      `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}`
+      + `&id=eq.${encodeURIComponent(invoiceId)}&status=neq.paid`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ status: 'paid', paid_at: new Date().toISOString() }),
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!up.ok) return false;
+    const updated = (await up.json()) as unknown[];
+    if (updated.length === 0) return true; // another delivery flipped it and booked the income
+
+    await insertTransaction({
+      user_id: userId,
+      vendor: inv.customer_name,
+      amount: Math.abs(Number(inv.total) || 0),
+      category: 'income',
+      transaction_date: new Date().toISOString().slice(0, 10),
+      source_type: 'invoice',
+      description: `Invoice ${inv.number}`,
+      // Confirmed because HE said it, in one press, about his own money. The gate exists for
+      // machine readings; a man's own statement is the approval itself.
+      confirmed: true,
+    }).catch((e) => console.error('[markInvoicePaidByOwner] income insert failed:', e instanceof Error ? e.message : e));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// --- The Lekhio thread (31 July 2026, APPLY_2026-07-31_thread.sql) ----------------------------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// APPEND ONLY ADDITIONS for /app/thread and /api/thread: reads and writes of the one standing
+// conversation between a user and Lekhio. The ANSWERING machinery is not here and must never
+// be: the thread answers with the same intents and the same guarded AI path as WhatsApp, and
+// this block only stores and fetches the words.
+//
+// ⚠️ TENANCY IS ENFORCED IN EVERY QUERY, TWICE OVER. The service role bypasses RLS, so every
+// read and write here filters on user_id from the session, per this file's rule. And a write
+// into a conversation id verifies the conversation is THIS user's Lekhio thread before a row
+// is inserted, the conversationOwnedBy shape, so a crafted or borrowed id can never attach a
+// message to another man's thread even if a future caller forgets where the id came from.
+// (Today's caller never takes an id from the client at all; this is the belt under that brace.)
+//
+// ⚠️ THE BLOCK IS SELF CONTAINED ON PURPOSE: config(), headers() and fetch, nothing else, so
+// test/thread.test.mjs can stage it with a recording fetch and ATTACK the tenancy scoping at
+// runtime. Keep it that way, and keep the end marker below it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export interface LekhioThreadMessage {
+  id: string;
+  role: 'user' | 'lekhio';
+  content: string;
+  created_at: string;
+}
+
+// The turns of this user's Lekhio thread, oldest first so the newest sits at the bottom of the
+// page. Distinguishes the three honest answers a page needs: null (the read failed, say so),
+// [] (no thread yet, or an empty one, draw the empty state), rows (draw them).
+export async function lekhioThreadMessages(userId: string, limit = 200): Promise<LekhioThreadMessage[] | null> {
+  if (!userId) return null;
+  try {
+    const { url } = config();
+    const conv = await fetch(
+      `${url}/rest/v1/conversations?user_id=eq.${encodeURIComponent(userId)}&kind=eq.lekhio&select=id&limit=1`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!conv.ok) return null;
+    const found = (await conv.json().catch(() => null)) as Array<{ id?: string }> | null;
+    if (!Array.isArray(found)) return null;
+    if (found.length === 0 || !found[0]?.id) return [];
+    const conversationId = String(found[0].id);
+
+    // Newest first with the limit, then reversed, so a long thread keeps its most recent turns
+    // rather than its oldest. Filtered by user_id AS WELL AS conversation_id: the id came from
+    // the scoped read above, and the second filter makes a poisoned id harmless anyway.
+    const res = await fetch(
+      `${url}/rest/v1/messages?user_id=eq.${encodeURIComponent(userId)}&conversation_id=eq.${encodeURIComponent(conversationId)}&select=id,role,content,created_at&order=created_at.desc&limit=${limit}`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as LekhioThreadMessage[] | null;
+    if (!Array.isArray(rows)) return null;
+    return rows.reverse();
+  } catch {
+    return null;
+  }
+}
+
+// The id of this user's one Lekhio thread, scoped by user_id. Not exported: callers go through
+// lekhioThreadMessages or getOrCreateLekhioThread, so nobody holds a bare id they did not earn.
+async function readLekhioThreadId(userId: string): Promise<string | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/conversations?user_id=eq.${encodeURIComponent(userId)}&kind=eq.lekhio&select=id&limit=1`,
+    { headers: headers(), signal: AbortSignal.timeout(6000) },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json().catch(() => null)) as Array<{ id?: string }> | null;
+  return Array.isArray(rows) && rows[0]?.id ? String(rows[0].id) : null;
+}
+
+// Find the thread or start it. One per user, and the partial unique index in the database is
+// the referee: if two requests race, the loser's insert is refused and the re-read returns the
+// winner's row, so both end up talking into the same thread.
+export async function getOrCreateLekhioThread(userId: string): Promise<string | null> {
+  if (!userId) return null;
+  try {
+    const existing = await readLekhioThreadId(userId);
+    if (existing) return existing;
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/conversations`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=representation' }),
+      body: JSON.stringify({ user_id: userId, kind: 'lekhio', title: 'Lekhio' }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (res.ok) {
+      const rows = (await res.json().catch(() => null)) as Array<{ id?: string }> | null;
+      return Array.isArray(rows) && rows[0]?.id ? String(rows[0].id) : null;
+    }
+    // Lost the race to ourselves, or any other refusal: one honest re-read, then give up.
+    return await readLekhioThreadId(userId);
+  } catch {
+    return null;
+  }
+}
+
+// Store one turn. Returns false rather than throwing, so the route can tell the user plainly
+// that nothing was saved instead of pretending.
+export async function saveLekhioThreadMessage(
+  userId: string,
+  conversationId: string,
+  role: 'user' | 'lekhio',
+  content: string,
+): Promise<boolean> {
+  const text = (content || '').trim();
+  if (!userId || !conversationId || !text) return false;
+  try {
+    const { url } = config();
+
+    // 🔴 OWNERSHIP FIRST. The insert below carries a conversation id, and an id is a claim, not
+    // a fact. This read asks the database whether the claim is true FOR THIS USER, and nothing
+    // is written when it is not. A crafted id, a replayed id, another man's id: all of them die
+    // here with zero rows touched.
+    const own = await fetch(
+      `${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&user_id=eq.${encodeURIComponent(userId)}&kind=eq.lekhio&select=id&limit=1`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!own.ok) return false;
+    const owned = (await own.json().catch(() => null)) as unknown[] | null;
+    if (!Array.isArray(owned) || owned.length === 0) return false;
+
+    const res = await fetch(`${url}/rest/v1/messages`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        user_id: userId,
+        conversation_id: conversationId,
+        role,
+        content: text.slice(0, 8000),
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return false;
+
+    // Bump the thread's own clock, best effort and still scoped by user_id.
+    await fetch(
+      `${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&user_id=eq.${encodeURIComponent(userId)}`,
+      {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({ last_message_at: new Date().toISOString() }),
+        signal: AbortSignal.timeout(6000),
+      },
+    ).catch(() => {});
+    return true;
+  } catch {
+    return false;
+  }
+}
+// --- end of the Lekhio thread block -----------------------------------------------------------

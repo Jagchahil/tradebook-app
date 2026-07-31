@@ -288,6 +288,23 @@ console.log('\n7. THE ONE MONEY FORMATTER');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n7b. THE COST DESK PENCE FORMATTER (team facing, but the same rules apply)');
+
+{
+  const MC = await load('messagecost');
+  let rendered = 0;
+  for (const n of [
+    ...AMOUNTS, ...AMOUNTS.map((a) => -a),
+    2.2, 2.2 * 3, 2.2 * 104, 44.00000000000001, 0.52, 166 * 0.52,
+    Number.NaN, Number.POSITIVE_INFINITY, -0,
+  ]) {
+    clean('messagecost.pencePretty', MC.pencePretty(n));
+    rendered += 1;
+  }
+  ok(`rendered ${rendered} cost desk pence labels`, rendered > 30);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n8. THE VERDICT');
 
 if (offenders.length) {

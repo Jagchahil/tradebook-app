@@ -110,6 +110,41 @@ export function capitalNote(goals: ReadonlyArray<Goal>): string | null {
   return `${subject} can come off your profit through capital allowances, and buying before the tax year ends brings that relief into this year's bill rather than next.`;
 }
 
+// ── The one goals store, and the honest bridge from the old one ──────────────────────────────
+//
+// ⚠️ THE FOUNDER DECIDED (31 July 2026): ONE GOALS STORE, public.goals, THIS MODULE'S SHAPE.
+// user_goals was Rakha's store from doc 82 (kinds purchase, income, savings; pounds; written by
+// the WhatsApp paths). Two tables that both mean "what he is saving for" is a second copy of a
+// truth, the house disease, so the WhatsApp paths now write goals through the same accessors the
+// web uses, and these two functions are the whole translation, written once, tested directly.
+//
+// 🔴 THE MAPPING IS HONEST, NEVER CLEVER. A legacy 'purchase' goal called "van" is NOT mapped to
+// kind 'van': the man never chose from our kinds, and guessing a capital item from a label would
+// hand the tax planner a fact nobody stated. So purchase and savings both land in 'other', and
+// only 'income' survives as itself. The price is real and accepted: a WhatsApp "van for 24k"
+// stops earning the capital sentence until he says so in a kind we can trust. Wrong quietly is
+// worse than modest honestly.
+
+// The kinds the legacy user_goals table and the WhatsApp parser speak.
+export type LegacyGoalKind = 'purchase' | 'income' | 'savings';
+
+// Legacy kind in, goals table kind out. The same mapping, in the same words, as the row
+// migration in supabase/APPLY_2026-07-31_goals_consolidation.sql; if one changes the other must.
+export function fromLegacyKind(kind: LegacyGoalKind): GoalKind {
+  return kind === 'income' ? 'income' : 'other';
+}
+
+// Goals table kind in, legacy kind out, for the readers that still speak doc 82's tongue (the
+// optimiser's purchaseGoal, Rakha's purchase filters, the WhatsApp goals answer). 'van' and
+// 'tools' ARE planned purchases of capital items, so calling them 'purchase' states a fact and
+// keeps the AIA reasoning honest. 'pension' and 'other' are money being put aside for something
+// that is not a capital purchase, so they read as 'savings', the kind no tax rule fires on.
+export function toLegacyKind(kind: GoalKind): LegacyGoalKind {
+  if (kind === 'van' || kind === 'tools') return 'purchase';
+  if (kind === 'income') return 'income';
+  return 'savings';
+}
+
 // ── Words and parsing for the surfaces ───────────────────────────────────────────────────────
 
 // The kind as a row reads it. The label is his own words; this is only the quiet word beside it.

@@ -248,7 +248,7 @@ ok(
   libSays.length === 0,
 );
 ok('the empty ledger points at the one thing that works today',
-  /Connect your bank and this fills itself in/.test(read('lib/ledger.ts')));
+  /Add your first entry or upload a bank statement, and this fills itself in/.test(read('lib/ledger.ts')));
 
 // ⚠️ AND THE SAME SENTENCE IS NEVER PRINTED TWICE. headline() falls back to the note when there is
 // not enough data to be confident, so /app rendering both put the identical line above itself.

@@ -130,7 +130,7 @@ ok('...we say WHY, in his words',
 // web customer does not have. Naming an action he cannot take turns an empty screen into a dead
 // end, which is worse than the zero this assertion was written to prevent.
 ok('a man with nothing confirmed is given something he can actually do, not shown a zero',
-  ledger({ ...base, grossIncome: 0 }).note.includes('Connect your bank'));
+  ledger({ ...base, grossIncome: 0 }).note.includes('Add your first entry'));
 
 ok('...but his CIS is still shown, because that money is real and it is HIS',
   ledger({ ...base, grossIncome: 0, cisSuffered: 4_000 }).refundDue === 4_000);

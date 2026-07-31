@@ -10,10 +10,11 @@
 // on a rail. "issued 2026-07-02, due 2026-07-16" is a table cell he has to do arithmetic on,
 // and he opened this page precisely so he would not have to.
 //
-// ⚠️ THE ROWS ARRIVE UNTYPED. The only per-user invoice read lib/supabase.ts offers today is the
-// account export, which returns invoices as unknown[]. So every row passes a shape check here
-// and a row that fails it is dropped rather than rendered wrong: a list missing a broken row is
-// a smaller lie than a £NaN on a screen about money he is owed.
+// ⚠️ EVERY ROW STILL PASSES THE SHAPE CHECK. The list now arrives through readInvoices in
+// lib/supabase.ts (scoped, typed loosely at the wire), but a database column is still only a
+// claim until it is checked, so every row passes normaliseInvoiceRow and a row that fails it is
+// dropped rather than rendered wrong: a list missing a broken row is a smaller lie than a £NaN
+// on a screen about money he is owed.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 import { gbp0 } from '../../../lib/money';

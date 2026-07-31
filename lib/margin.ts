@@ -21,8 +21,31 @@
 //
 //   variable = revenue x (1 - marginTarget) - fixedCogs
 //
-// Deliberately dependency free (no imports at all), so the whole economics model
-// is unit testable in isolation. Everything that spends money reads from here.
+// Deliberately free of IO. Its ONE import is lib/aicost.ts's price book, which is
+// itself pure, so the whole economics model stays unit testable in isolation.
+// Everything that spends money reads from here.
+//
+// ⚠️ 31 JULY 2026: THE FLAT 0.5p PER AI CALL ASSUMPTION IS GONE. Every cap this
+// file derives used to divide the AI budget by a hand picked 0.5p, while
+// lib/aicost.ts sat next door knowing the real per model prices, and NOTHING that
+// gates a send ever consulted it. An Anthropic price change would have moved our
+// bill and not our caps. costPerAiCallPence() now derives from the aicost.ts
+// price book and the call profile below (blended 0.52p at today's prices, so the
+// derived AI caps tightened by about 4 percent). AI_COST_PER_CALL_PENCE still
+// forces a figure by hand, exactly as before. Deliberate, tested in
+// test/margin.test.mjs.
+//
+// Same day, the WhatsApp side of the gating maths became regime aware: the daily
+// proactive ceiling derives from the CONVERSATION price before 1 October 2026 and
+// from the PER MESSAGE price after it, so the cap re-derives itself on the day
+// with nobody editing anything. Before the change it returns exactly what it
+// always did, and a test pins that.
+//
+// The per customer month (UsageMonth, marginForUsage) is read by lib/messagecost.ts
+// and shown BY NAME on /team, so a heavy user is visible months before a Meta
+// invoice says it in aggregate.
+
+import { PRICE_PENCE_PER_MTOK, estimateCostPence, type AiModel } from './aicost';
 
 // --- the model --------------------------------------------------------------
 
@@ -32,17 +55,21 @@ export const REVENUE_PENCE_PER_USER_MONTH = 1075;
 // Costs that do not vary with how much someone uses the product.
 export const FIXED_COGS_PENCE_PER_USER_MONTH = 49;
 
-// The gross margin we refuse to go below. The floor is 80; we run at 82 so there
-// is headroom for a price rise by Meta or Anthropic before the floor bites.
+// The gross margin we refuse to go below. THE FLOOR IS THE PROMISE; the 82 target
+// is the headroom we run with so a price rise by Meta or Anthropic does not bite
+// the floor on day one. The floor is exported so the console can read a customer's
+// month against the actual promise, not against the comfortable target.
+export const MARGIN_FLOOR_PCT = 80;
 const DEFAULT_MARGIN_TARGET_PCT = 82;
 
 // How the variable budget splits. AI gets the larger share on purpose: parsing
 // receipts is what customers pay for; a nudge is a retention nicety.
 const DEFAULT_WA_SHARE_OF_VARIABLE = 0.40;
 
-// Unit costs, rounded UP so an estimate is never rosier than the bill.
+// Unit costs, rounded UP so an estimate is never rosier than the bill. The AI
+// call cost is no longer a flat constant here: see blendedAiCallCostPence below,
+// which reads the real per model prices from lib/aicost.ts.
 const DEFAULT_COST_PER_SEND_PENCE = 3;   // Meta utility CONVERSATION, UK, pre 1 Oct 2026
-const DEFAULT_COST_PER_AI_CALL_PENCE = 0.5; // Haiku vision parse carries the bulk
 
 // Per MESSAGE, from 1 October 2026. Inferred from industry sources, not from Meta. Set this to the
 // real figure once Meta publishes per-market rates, promised for 1 September 2026.
@@ -82,8 +109,58 @@ export function waShareOfVariable(): number {
 export function costPerSendPence(): number {
   return envNum('WA_COST_PER_SEND_PENCE', DEFAULT_COST_PER_SEND_PENCE, 0.01, 100);
 }
+
+// --- what one AI call really costs -------------------------------------------
+//
+// The token profile of a typical call, per model. Sourced from lib/claude.ts: the
+// Haiku parses cap output at 300 to 500 tokens and carry a receipt photo (about
+// 1,600 image tokens) or a short text; the Sonnet accountant answers carry the
+// system prompt, the facts and the retrieved knowledge in, and reason before
+// answering (max_tokens 4000 there is a ceiling for reasoning bursts, observed
+// spend runs well under half of it). Rounded UP so the estimate is never rosier
+// than the bill. Re-check against the [ai] logUsage lines when the prompts grow.
+export const AI_CALL_TOKENS: Record<AiModel, { input: number; output: number }> = {
+  'claude-haiku-4-5-20251001': { input: 2200, output: 300 },
+  'claude-sonnet-5': { input: 5000, output: 1500 },
+};
+
+// How the call mix splits. Haiku carries the bulk because receipt and voice
+// capture ARE the product; the open ended Sonnet answer is the exception, roughly
+// one call in twelve. Overridable so the blend can be re-weighted from the
+// console if the observed mix drifts.
+const DEFAULT_SONNET_SHARE_OF_CALLS = 0.08;
+export function sonnetShareOfCalls(): number {
+  return envNum('AI_SONNET_SHARE_OF_CALLS', DEFAULT_SONNET_SHARE_OF_CALLS, 0, 1);
+}
+
+// The real cost of one call on one model, read off the lib/aicost.ts price book.
+// The book can be injected so a test can prove the caps move when Anthropic's
+// prices do, which is the entire point of the wiring.
+export function perCallCostPence(
+  model: AiModel,
+  prices: Record<AiModel, { input: number; output: number }> = PRICE_PENCE_PER_MTOK,
+): number {
+  const t = AI_CALL_TOKENS[model];
+  return estimateCostPence(model, t.input, t.output, prices);
+}
+
+// The mix weighted cost of a typical call, rounded UP to the next hundredth of a
+// penny. At today's book: 0.3p Haiku, 3p Sonnet, blended 0.52p.
+export function blendedAiCallCostPence(
+  prices: Record<AiModel, { input: number; output: number }> = PRICE_PENCE_PER_MTOK,
+): number {
+  const share = sonnetShareOfCalls();
+  const blended =
+    perCallCostPence('claude-haiku-4-5-20251001', prices) * (1 - share) +
+    perCallCostPence('claude-sonnet-5', prices) * share;
+  return Math.ceil(blended * 100) / 100;
+}
+
+// What the gating maths divides the AI budget by. A hand set
+// AI_COST_PER_CALL_PENCE still wins (unchanged behaviour); when it is unset the
+// figure comes from the real price book above rather than the old flat 0.5p.
 export function costPerAiCallPence(): number {
-  return envNum('AI_COST_PER_CALL_PENCE', DEFAULT_COST_PER_AI_CALL_PENCE, 0.01, 100);
+  return envNum('AI_COST_PER_CALL_PENCE', blendedAiCallCostPence(), 0.01, 100);
 }
 
 // The whole variable allowance (WhatsApp + AI) that still clears the floor. Never
@@ -152,10 +229,16 @@ export function waSpendAtFullBudgetPence(): number {
 }
 
 // The day's global send ceiling, derived from the paying base, unless overridden.
-export function globalDailyCapFor(activeSubscribers: number): number {
+//
+// REGIME AWARE since 31 July 2026: the ceiling divides the WhatsApp budget by
+// whichever unit Meta is actually billing in (waUnitCostPence). Before 1 October
+// that is the conversation price and this returns exactly what it always did,
+// pinned by test. On the day, it re-derives itself from the per message price
+// with nobody editing anything.
+export function globalDailyCapFor(activeSubscribers: number, now: Date = new Date()): number {
   const override = Number(process.env.WA_SEND_GLOBAL_DAILY ?? '');
   if (Number.isFinite(override) && override > 0) return Math.floor(override);
-  return dailyCapFor(activeSubscribers, sendsPerUserPerMonth());
+  return dailyCapFor(activeSubscribers, waUnitsPerUserPerMonth(now));
 }
 
 // The emergency brake. Only the exact string "false" disables, so a typo never
@@ -224,6 +307,18 @@ export function perMessagePricing(now: Date = new Date()): boolean {
   if (forced === 'true') return true;
   if (forced === 'false') return false;
   return now.toISOString().slice(0, 10) >= PER_MESSAGE_PRICING_FROM;
+}
+
+// THE PER MESSAGE COST LINE, wired into the gating maths. The billable unit we buy with the
+// WhatsApp budget: a 24 hour conversation before 1 October, a single message after it. The daily
+// proactive ceiling (globalDailyCapFor) divides by this, so the cap always reflects what Meta will
+// actually invoice per unit.
+export function waUnitCostPence(now: Date = new Date()): number {
+  return perMessagePricing(now) ? costPerMessagePence() : costPerSendPence();
+}
+export function waUnitsPerUserPerMonth(now: Date = new Date()): number {
+  const cost = waUnitCostPence(now);
+  return cost <= 0 ? 0 : Math.floor(waBudgetPence() / cost);
 }
 
 // What one outbound WhatsApp message actually costs us right now. Before the change a service reply

@@ -771,9 +771,9 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
                 to be confident" is worth reading and is not a repeat. */}
             {l?.note && !/connect your bank/i.test(l.note) ? <p style={S.body}>{l.note}</p> : null}
             <p style={S.body}>
-              Connect your bank and this page fills itself in: your spending logs itself, and what you
-              are owed appears without you sending us anything. It is the one thing that changes
-              everything here.
+              Get your figures in and this page fills itself in: upload a bank statement, add an
+              entry by hand, or send a receipt. Connect your bank and it happens on its own without
+              you sending us anything.
             </p>
             <a href="/app/setup?step=bank" style={S.backAlt}>Go back and connect it</a>
           </>

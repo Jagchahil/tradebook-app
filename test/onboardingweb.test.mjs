@@ -310,7 +310,7 @@ ok('🔴 the reveal never prints a saving of zero as an achievement',
   !/£0 saved|saved you £0|You have saved £0/.test(pageSrc));
 ok('the fallback names what his answers opened', /just opened up/.test(pageSrc));
 ok('and the true empty case says so plainly rather than dressing it up',
-  /We have nothing to look at yet/.test(pageSrc) && /Connect your bank and this page fills itself in/.test(pageSrc));
+  /We have nothing to look at yet/.test(pageSrc) && /upload a bank statement, add an/.test(pageSrc));
 
 // 🔴 AND IT DOES NOT SAY IT TWICE. lib/ledger.ts's note carries its own "connect your bank" because
 // it is written for the dashboard, where nothing else tells him what to do. Printing it above a

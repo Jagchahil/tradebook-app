@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { exportUserData } from '../../../lib/supabase';
+import { readInvoices } from '../../../lib/supabase';
 import { gbp2 } from '../../../lib/money';
 import { invoiceRef } from '../invoiceref';
 import {
@@ -24,19 +24,14 @@ export const dynamic = 'force-dynamic';
 // on time, then paid, because paid is history and late is a job. The judging and the ordering
 // live in ./words.ts, pure and tested, so this file is a surface.
 //
-// ⚠️ THE READ IS THE ACCOUNT EXPORT, AND THAT IS A RECORDED COMPROMISE, NOT A CHOICE. lib holds
-// no "list this user's invoices" read today: createInvoice writes, getPublicInvoice reads one
-// row for the public page, listOverdueInvoices reads five for the WhatsApp chaser, and the only
-// per user list of the whole table is inside exportUserData, the UK GDPR export. This wave may
-// not touch lib/, and a page-side query would break CLAUDE.md's rule that every Supabase read
-// lives in lib/supabase.ts. So the export is called and only its invoices are used. It over
-// fetches, honestly and knowingly: the day lib/ is open again, a scoped readInvoices() is one
-// small function and one changed line here.
-//
-// ⚠️ AND THE EXPORT CANNOT TELL A FAILED READ FROM AN EMPTY TABLE, so this page uses the one
-// tell it does have: an export whose users row is missing for a man who plainly has a session
-// is a read that failed, and it gets the "load it again" card, never a false "no invoices yet".
-// A failed invoices query alone still looks empty. Recorded rather than pretended away.
+// ⚠️ THE READ IS readInvoices, AND THE RECORDED COMPROMISE IS PAID OFF (31 July 2026). This
+// page used to read through exportUserData, the UK GDPR export, because lib held no scoped
+// list: it over fetched every table a man has, and it could not tell a failed invoices query
+// from an empty one, so a database bad minute rendered as "no invoices yet". readInvoices in
+// lib/supabase.ts is the one small function that compromise asked for: his rows only, newest
+// first, and null on a failed read, NEVER []. Null gets the "load it again" card; [] gets the
+// honest empty state; the two are different sentences about a man's money and this page can
+// finally tell them apart.
 //
 // ⚠️ EVERY ROW LINKS BY SEALED REFERENCE, app/app/invoiceref.ts, minted for THIS session. No id
 // in any app URL, exactly as /app/money does it. No secret means no link and the row stays
@@ -58,10 +53,11 @@ export default async function InvoicesPage({
   // land him on the invoice itself.
   const said = one('done') === 'made' ? 'Made and saved. It is in the list below.' : null;
 
-  const data = await exportUserData(user.id, null).catch(() => null);
-  const read = data !== null && data.user !== null;
+  // Null is a failed read and [] is an empty table: see the header, the whole point of the read.
+  const raw = await readInvoices(user.id);
+  const read = raw !== null;
   const rows = read
-    ? (data.invoices ?? []).map(normaliseInvoiceRow).filter((r): r is NonNullable<typeof r> => r !== null)
+    ? raw.map(normaliseInvoiceRow).filter((r): r is NonNullable<typeof r> => r !== null)
     : [];
 
   const todayISO = new Date().toISOString().slice(0, 10);

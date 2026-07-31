@@ -8,10 +8,21 @@
 // of the shared model, so nothing can quietly fork the economics again.
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+// margin.ts imports the price book from lib/aicost.ts (the gate consults the real per model
+// prices), so this loads it the staged way test/numbers.test.mjs does: copy lib/ aside and give
+// every relative import its .ts extension for node's type stripping.
 const here = path.dirname(fileURLToPath(import.meta.url));
-const G = await import(`${pathToFileURL(path.resolve(here, '../lib/margin.ts')).href}`);
+const lib = path.resolve(here, '../lib');
+const stage = mkdtempSync(path.join(tmpdir(), 'wabudget-'));
+const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
+for (const f of readdirSync(lib)) {
+  if (f.endsWith('.ts')) writeFileSync(path.join(stage, f), fix(readFileSync(path.join(lib, f), 'utf8')));
+}
+const G = await import(`${pathToFileURL(path.join(stage, 'margin.ts')).href}`);
 
 let pass = 0;
 let fail = 0;

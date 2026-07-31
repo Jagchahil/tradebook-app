@@ -246,7 +246,7 @@ export const GATED_ROUTES: GatedRoute[] = [
   { route: 'app/api/money/import', rule: 'entitled', why: 'A whole bank statement read into his books, deterministically and with no AI. It is the bank feed by another door while the feed has no provider, and continuous bookkeeping is the clearest work in the product, so it stops when he stops paying. His existing rows stay readable everywhere.' },
 
   // ── The invoices surface on the web, 30 July 2026. ────────────────────────────────────────
-  { route: 'app/api/invoices', rule: 'entitled', why: 'Raising a new invoice through the same createInvoice path WhatsApp uses. Work, and unlike draft-invoice this door HAS a session to gate on, so it is gated. He sends the link himself; we never contact his customer.' },
+  { route: 'app/api/invoices', rule: 'entitled', why: 'Raising a new invoice through the same createInvoice path WhatsApp uses. Work, and unlike draft-invoice this door HAS a session to gate on, so it is gated. He sends the link himself; we never contact his customer. ⚠️ Only creation is gated inside the route. Marking his own invoice sent or paid is him keeping his record straight, always allowed, the elections DELETE shape.' },
   { route: 'app/api/share-books', rule: 'always', why: 'His figures going OUT to a broker, a landlord or an accountant, through the same lib machinery as app/api/share, and the same judgement: his records are his. Revoking a share is a withdrawal of consent and could never be gated anyway.' },
 
   // ── The You surface, 31 July 2026. His identity and his switches. ─────────────────────────
@@ -259,6 +259,14 @@ export const GATED_ROUTES: GatedRoute[] = [
   { route: 'app/api/you/email/start', rule: 'always', why: 'Sending himself a code to prove a new email. His contact point, and the address his sign in codes arrive at, so gating it can gate him out of his own account.' },
   { route: 'app/api/you/email/verify', rule: 'always', why: 'Typing the code back and binding the proved address. The other half of the same door. Binding never creates an account and never moves a contact, so there is no work here to stop.' },
   { route: 'app/api/you/settings', rule: 'always', why: 'The reminder and weekly summary switches. Turning messages OFF is an opt out and may never sit behind a paywall (PECR), and turning them on costs us nothing.' },
+
+  // ── The Lekhio thread, 31 July 2026. The conversation, on our own turf. ───────────────────
+  //
+  // ⚠️ ONE ROW, AND THE SPLIT IS THE POINT. Reading the thread is /app/thread, a page, not a
+  // route in this table: a locked account keeps every word, because his questions and the
+  // answers he already paid for are his records. Posting is this route, and posting is the
+  // work: the deterministic intents cost queries and the open questions spend real AI money.
+  { route: 'app/api/thread', rule: 'entitled', why: 'Posting to the Lekhio thread. Answering is the work and the AI path spends money, the same judgement as /api/ask. Reading the thread stays free on the page: his own words are his records.' },
 ];
 
 export function ruleFor(route: string): Rule | null {

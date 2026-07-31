@@ -7,10 +7,21 @@
 // Run: node test/margin.test.mjs
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+// margin.ts now imports the price book from aicost.ts (that is the point: the gate consults the
+// real per model prices), so the suite stages lib/ and rewrites relative imports to .ts, the same
+// trick test/numbers.test.mjs uses.
 const here = path.dirname(fileURLToPath(import.meta.url));
-const load = (f) => import(`${pathToFileURL(path.resolve(here, `../lib/${f}`)).href}`);
+const lib = path.resolve(here, '../lib');
+const stage = mkdtempSync(path.join(tmpdir(), 'margin-'));
+const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
+for (const f of readdirSync(lib)) {
+  if (f.endsWith('.ts')) writeFileSync(path.join(stage, f), fix(readFileSync(path.join(lib, f), 'utf8')));
+}
+const load = (f) => import(`${pathToFileURL(path.join(stage, f)).href}`);
 const G = await load('margin.ts');   // the economics
 const A = await load('aicost.ts');   // the spend decision
 
@@ -30,6 +41,8 @@ const CLEAN = {
   WA_COST_PER_SEND_PENCE: undefined, AI_COST_PER_CALL_PENCE: undefined,
   WA_SEND_GLOBAL_DAILY: undefined, AI_GLOBAL_DAILY: undefined, AI_GLOBAL_MONTHLY: undefined,
   AI_USER_DAILY: undefined, AI_KILL_SWITCH: undefined, WHATSAPP_SENDS_ENABLED: undefined,
+  AI_SONNET_SHARE_OF_CALLS: undefined, WA_PER_MESSAGE_PRICING: undefined,
+  WA_COST_PER_MESSAGE_PENCE: undefined,
 };
 
 console.log('\n=== THE FLOOR: WhatsApp + AI TOGETHER must clear 80% ===\n');
@@ -37,7 +50,8 @@ withEnv(CLEAN, () => {
   const wa = G.waSpendAtFullBudgetPence();
   const ai = G.aiSpendAtFullBudgetPence();
   const margin = G.projectedMarginPct(wa, ai);
-  ok(`BOTH budgets spent in full still clears 80% (actual ${margin.toFixed(1)}%)`, margin >= 80);
+  ok('the floor itself is exported, and it is 80', G.MARGIN_FLOOR_PCT === 80);
+  ok(`BOTH budgets spent in full still clears 80% (actual ${margin.toFixed(1)}%)`, margin >= G.MARGIN_FLOOR_PCT);
   ok(`clears the 82% target with headroom (actual ${margin.toFixed(1)}%)`, margin >= 81.5);
   ok('neither budget is zero (the product actually works)', wa > 0 && ai > 0);
   ok('AI gets the larger share (receipts are what people pay for)', ai > wa);
@@ -119,6 +133,65 @@ withEnv(CLEAN, () => {
   // we would be silently throttling our own product.
   ok(`the nudge (3x/week) + weekly summary fits the send budget (${sends}/mo)`, sends >= 18);
   ok(`a user can parse a real day's receipts (${calls}/mo, ~${(calls / 30).toFixed(1)}/day)`, calls / 30 >= 5);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n🔴 THE PRICE BOOK IS WIRED INTO THE GATE (31 July 2026). The flat 0.5p is gone.');
+//
+// The defect this section pins shut: every cap divided the AI budget by a hand picked 0.5p while
+// lib/aicost.ts knew the real per model prices and nothing that gates a send ever consulted it.
+withEnv(CLEAN, () => {
+  ok('one Haiku call costs 0.3p at today\'s book', G.perCallCostPence('claude-haiku-4-5-20251001') === 0.3);
+  ok('one Sonnet call costs 3p at today\'s book', G.perCallCostPence('claude-sonnet-5') === 3);
+  ok('the blend is 0.52p (Haiku carries the bulk of the calls)', G.blendedAiCallCostPence() === 0.52);
+  ok('🔴 THE GATE CONSULTS THE BOOK: unset, the per call cost IS the blended real cost',
+     G.costPerAiCallPence() === G.blendedAiCallCostPence());
+  ok('...and it is no longer the old flat 0.5p', G.costPerAiCallPence() !== 0.5);
+
+  // The property the defect denied: an Anthropic price change now moves our caps, not just our bill.
+  const doubled = {
+    'claude-haiku-4-5-20251001': { input: 160, output: 800 },
+    'claude-sonnet-5': { input: 480, output: 2400 },
+  };
+  ok('🔴 DOUBLE THE PRICE BOOK AND THE PER CALL COST ROUGHLY DOUBLES WITH IT',
+     G.blendedAiCallCostPence(doubled) > 1.9 * G.blendedAiCallCostPence());
+  ok('...so fewer calls fit the same budget, which is the gate moving',
+     Math.floor(G.aiBudgetPence() / G.blendedAiCallCostPence(doubled)) < G.callsPerUserPerMonth());
+  ok('the floor still holds at the real blended cost',
+     G.projectedMarginPct(G.waSpendAtFullBudgetPence(), G.aiSpendAtFullBudgetPence()) >= 80);
+});
+
+// The old behaviour, pinned exactly where it must not change.
+ok('pinned: a hand set AI_COST_PER_CALL_PENCE still wins over the book',
+   withEnv({ ...CLEAN, AI_COST_PER_CALL_PENCE: '0.5' }, () => G.costPerAiCallPence() === 0.5));
+ok('pinned: at the old flat 0.5p the old cap comes back exactly (173 calls/user/month)',
+   withEnv({ ...CLEAN, AI_COST_PER_CALL_PENCE: '0.5' }, () => G.callsPerUserPerMonth() === 173));
+ok('new: at the real blended cost the cap is 166, tighter because the truth is dearer',
+   withEnv(CLEAN, () => G.callsPerUserPerMonth() === 166));
+ok('the Sonnet share is a dial: more Sonnet, dearer call',
+   withEnv({ ...CLEAN, AI_SONNET_SHARE_OF_CALLS: '0.5' }, () => G.blendedAiCallCostPence()) >
+   withEnv(CLEAN, () => G.blendedAiCallCostPence()));
+ok('at zero Sonnet share a call costs exactly what a Haiku call costs',
+   withEnv({ ...CLEAN, AI_SONNET_SHARE_OF_CALLS: '0' }, () =>
+     G.blendedAiCallCostPence() === G.perCallCostPence('claude-haiku-4-5-20251001')));
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n=== the proactive ceiling knows which unit Meta bills in ===\n');
+withEnv(CLEAN, () => {
+  const BEFORE = new Date('2026-09-30T12:00:00Z');
+  const AFTER = new Date('2026-10-01T12:00:00Z');
+  ok('pinned: before 1 October the unit is the 3p conversation and the cap is what it always was',
+     G.globalDailyCapFor(100000, BEFORE) === G.dailyCapFor(100000, G.sendsPerUserPerMonth()));
+  ok('the unit price switches on the day',
+     G.waUnitCostPence(BEFORE) === 3 && G.waUnitCostPence(AFTER) === G.costPerMessagePence());
+  ok('🔴 ON THE DAY THE CAP RE-DERIVES FROM THE PER MESSAGE PRICE, and nobody edits anything',
+     G.globalDailyCapFor(100000, AFTER) === G.dailyCapFor(100000, G.waUnitsPerUserPerMonth(AFTER)));
+  ok('a cheaper unit buys more units inside the same budget (2.2p < 3p)',
+     G.waUnitsPerUserPerMonth(AFTER) > G.sendsPerUserPerMonth());
+  ok('either way the spend cannot exceed the WhatsApp budget',
+     G.waUnitsPerUserPerMonth(AFTER) * G.waUnitCostPence(AFTER) <= G.waBudgetPence());
+  ok('the hard override still beats the regime',
+     withEnv({ ...CLEAN, WA_SEND_GLOBAL_DAILY: '88' }, () => G.globalDailyCapFor(100000, AFTER) === 88));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────

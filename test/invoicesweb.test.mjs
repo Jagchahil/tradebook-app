@@ -260,7 +260,9 @@ const WA = await stageWaintents();
 ok('the list resolves the session and sends a stranger to the door',
   pageList.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(pageList));
 ok('🔴 the read is scoped to the session user and only the session user',
-  /exportUserData\(user\.id, null\)/.test(pageList));
+  /readInvoices\(user\.id\)/.test(pageList));
+ok('🔴 and the GDPR export is out of the page: the recorded compromise is paid off',
+  !/exportUserData/.test(codeOnly(pageList)));
 ok('🔴 every row link carries a sealed reference minted for THIS session',
   /invoiceRef\(user\.id, inv\.id, 'invoice'\)/.test(pageList)
   && /href=\{`\/app\/invoice\?ref=\$\{encodeURIComponent\(ref\)\}`\}/.test(pageList));
@@ -268,8 +270,9 @@ ok('🔴 no row id is ever written into a URL on the list',
   !/href=\{`[^`]*\$\{inv\.id\}/.test(codeOnly(pageList)));
 ok('with no secret the row stays plain text rather than becoming a dead link',
   /\{ref \? \(/.test(pageList));
-ok('a failed read is told apart from an empty book',
-  /data\.user !== null/.test(pageList) && /Nothing is lost/.test(pageList));
+ok('a failed read is told apart from an empty book: null is the tell, never a heuristic',
+  /raw !== null/.test(pageList) && /Nothing is lost/.test(pageList)
+  && /could not read your invoices/.test(pageList));
 ok('🔴 the empty state is one honest line and the way to make one',
   /You have not made an invoice yet\./.test(pageList) && /href="\/app\/invoices\/new"/.test(pageList));
 ok('ages come from the words module, never a raw date on screen',
@@ -288,8 +291,27 @@ ok('🔴 the reference is verified, owner checked AND purpose checked, before an
   && /if \(!claim \|\| !invoiceRefUsable\(claim, user\.id, 'invoice'\)\) redirect\('\/app\/invoices'\)/.test(pageDetail));
 ok('the row is read through getPublicInvoice, the one one-invoice read in lib',
   /getPublicInvoice\(row\)/.test(pageDetail) && !/\bfetch\s*\(|rest\/v1/.test(codeOnly(pageDetail)));
-ok('🔴 NOTHING ON THE DETAIL PAGE POSTS, SENDS OR MUTATES: no form exists at all',
-  !/<form/.test(pageDetail));
+// The detail page grew its two record forms on 31 July 2026 (mark sent, mark paid), so the old
+// "no form exists at all" pin became "the only forms are the two record statements". Everything
+// they must NOT do (send anything, carry an id in a URL, invent a figure) is pinned below.
+ok('🔴 THE ONLY FORMS ON THE DETAIL PAGE ARE THE TWO RECORD STATEMENTS, posting to /api/invoices',
+  (pageDetail.match(/<form/g) || []).length === 2
+  && (pageDetail.match(/<form action="\/api\/invoices" method="post">/g) || []).length === 2);
+ok('🔴 the mark actions carry the id in the FORM BODY, never a URL',
+  (pageDetail.match(/name="id" value=\{row\}/g) || []).length === 2
+  && !/href=[^\n]*\$\{row\}[^\n]*(sent|paid)/.test(codeOnly(pageDetail)));
+ok('the two actions are exactly sent and paid',
+  /name="action" value="sent"/.test(pageDetail) && /name="action" value="paid"/.test(pageDetail));
+ok('🔴 the sent button appears only on a draft, the paid button never on a paid invoice',
+  /\{inv\.status === 'draft' \? \(/.test(pageDetail) && /\{state !== 'paid' \? \(\s*<section/.test(pageDetail));
+ok('the weight of paid is said BEFORE the press: it books the income',
+  /goes into your income figures the moment you say/.test(pageDetail));
+ok('and the marks say plainly that nothing reaches his customer',
+  /These update your records only\. Nothing goes to your customer\./.test(pageDetail));
+ok('a mark press is answered in one line, not a ceremony',
+  /Noted as sent\./.test(pageDetail) && /Marked paid\. The money is in your income figures\./.test(pageDetail));
+ok('and a failed mark is admitted, never swallowed',
+  /That did not save\. Nothing has changed/.test(pageDetail));
 ok('🔴 the share step hands HIM the link: WhatsApp share sheet and a mail compose, never a send by us',
   /wa\.me\/\?text=/.test(pageDetail) && /mailto:/.test(pageDetail)
   && !/sendText|sendInvoiceEmail|sendEmail/.test(pageDetail));
@@ -344,6 +366,131 @@ ok('a failed write is refused out loud, not reported as success', /problem=unava
 ok('the work is rate limited per account', /rateLimitedShared\(`invoices:\$\{user\.id\}`/.test(routeInvoices));
 ok('🔴 app/api/invoices has a gate decision and it is entitled', G.ruleFor('app/api/invoices') === 'entitled');
 ok('and the route actually consults the gate', /gateForUser/.test(routeInvoices) && /refuseUnentitled/.test(routeInvoices));
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 6b. MARKING SENT AND PAID (31 July 2026). His statement, his row, one press, never a send.
+// ---------------------------------------------------------------------------------------------
+ok('🔴 the mark actions go through the lib accessors, ownership on the server side',
+  /markInvoiceSentByOwner\(user\.id, markId\)/.test(routeInvoices)
+  && /markInvoicePaidByOwner\(user\.id, markId\)/.test(routeInvoices));
+ok('🔴 the id rides in the form body and is shape checked before any query',
+  /f\.get\('id'\)/.test(routeInvoices) && /UUID\.test\(markId\)/.test(routeInvoices));
+ok('the marks are rate limited on the shared durable counter',
+  /userBurst\('invoicemark', user\.id/.test(routeInvoices));
+ok('🔴 the marks are never gated, the elections DELETE shape: no gate inside the mark branch',
+  !/gateForUser/.test(routeInvoices.slice(
+    routeInvoices.indexOf("action === 'sent'"),
+    routeInvoices.indexOf('Making one'),
+  )));
+ok('...and the gate row says so out loud',
+  /elections DELETE shape/.test(G.GATED_ROUTES.find((r) => r.route === 'app/api/invoices').why));
+ok('creation is still the gated work, checked after the body read because the action decides the rule',
+  codeOnly(routeInvoices).indexOf("action === 'sent'") < codeOnly(routeInvoices).indexOf('await gateForUser'));
+ok('a mark press bounces back to the detail page through the reference he already held, or his list',
+  /\/app\/invoice\?ref=\$\{encodeURIComponent\(markRef\)\}/.test(routeInvoices)
+  && /'\/app\/invoices\?\$\{q\}'|`\/app\/invoices\?\$\{q\}`/.test(routeInvoices));
+ok('🔴 a failed mark is admitted, never reported as done', /problem=save/.test(routeInvoices));
+
+// The accessors themselves, attacked at runtime with another man's session. Staged the way
+// test/diarygoals.test.mjs stages the same tail of lib/supabase.ts: stub config and headers, a
+// fake PostgREST that honours filters exactly (a PATCH matching nothing succeeds with an empty
+// representation), and a stub insertTransaction that records what would have been booked.
+{
+  const supa = read('lib/supabase.ts');
+  const stage = mkdtempSync(path.join(tmpdir(), 'invoicemark-'));
+  const tail = supa.slice(supa.indexOf('export interface DiaryJobDbRow'));
+  writeFileSync(path.join(stage, 'accessors.ts'), [
+    `const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;`,
+    `function config(): { url: string; key: string } { return { url: 'https://db.test', key: 'k' }; }`,
+    `function headers(extra: Record<string, string> = {}): Record<string, string> {`,
+    `  return { apikey: 'k', Authorization: 'Bearer k', 'Content-Type': 'application/json', ...extra };`,
+    `}`,
+    `export const bookedIncome: unknown[] = [];`,
+    `async function insertTransaction(t: unknown): Promise<void> { bookedIncome.push(t); }`,
+    tail,
+  ].join('\n'));
+  const S = await import(pathToFileURL(path.join(stage, 'accessors.ts')).href);
+
+  const INVOICE = '7a8b9c0d-2222-4222-8222-333333333333';
+  const invoiceRow = {
+    id: INVOICE, number: 'INV-0007', customer_name: 'Mrs Khan', total: 450,
+    status: 'draft', issued_date: '2026-07-01', due_date: '2026-07-15', created_at: '2026-07-01T00:00:00Z',
+  };
+
+  const calls = [];
+  let mode = 'ok'; // 'ok' | 'down' | 'patch_races'
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = new URL(String(url));
+    calls.push({ url: String(url), method: init.method ?? 'GET', headers: init.headers ?? {}, body: init.body });
+    if (mode === 'down') return new Response('bad minute', { status: 500 });
+    const userOk = u.searchParams.get('user_id') === `eq.${OWNER}`;
+    const idFilter = u.searchParams.get('id');
+    const idOk = idFilter === null || idFilter === `eq.${invoiceRow.id}`;
+    const statusFilter = u.searchParams.get('status');
+    const statusOk = statusFilter === null
+      || (statusFilter === 'eq.draft' && invoiceRow.status === 'draft')
+      || (statusFilter === 'neq.paid' && invoiceRow.status !== 'paid');
+    if ((init.method ?? 'GET') === 'PATCH') {
+      if (mode === 'patch_races' || !(userOk && idOk && statusOk)) return new Response('[]', { status: 200 });
+      Object.assign(invoiceRow, JSON.parse(init.body));
+      return new Response(JSON.stringify([invoiceRow]), { status: 200 });
+    }
+    return new Response(JSON.stringify(userOk && idOk && statusOk ? [invoiceRow] : []), { status: 200 });
+  };
+
+  try {
+    ok('🔴 A STRANGER MARKING ANOTHER MAN\'S INVOICE SENT IS REFUSED, and his row never moves',
+      (await S.markInvoiceSentByOwner(INTRUDER, INVOICE)) === false && invoiceRow.status === 'draft');
+    ok('🔴 a stranger marking it paid is refused the same way, and NO income is booked',
+      (await S.markInvoicePaidByOwner(INTRUDER, INVOICE)) === false && S.bookedIncome.length === 0);
+    ok('and every query the stranger caused carried BOTH filters, user and row',
+      calls.every((c) => c.url.includes('user_id=eq.') && (!c.url.includes('id=eq.') || c.url.includes(`id=eq.${INVOICE}`))));
+    ok('a malformed id is refused before any query is made', await (async () => {
+      const before = calls.length;
+      return (await S.markInvoiceSentByOwner(OWNER, 'not-a-uuid')) === false && calls.length === before;
+    })());
+
+    ok('the owner marks his own draft sent, and paid never regresses: the flip filters on draft',
+      (await S.markInvoiceSentByOwner(OWNER, INVOICE)) === true && invoiceRow.status === 'sent');
+    ok('saying sent twice is not false and changes nothing',
+      (await S.markInvoiceSentByOwner(OWNER, INVOICE)) === true && invoiceRow.status === 'sent');
+
+    mode = 'patch_races';
+    ok('🔴 losing the race to a Stripe delivery books NOTHING: the atomic gate holds',
+      (await S.markInvoicePaidByOwner(OWNER, INVOICE)) === true && S.bookedIncome.length === 0);
+    mode = 'ok';
+
+    ok('the owner marks it paid: the row flips and the income is booked once, confirmed, his',
+      (await S.markInvoicePaidByOwner(OWNER, INVOICE)) === true
+      && invoiceRow.status === 'paid' && S.bookedIncome.length === 1);
+    {
+      const t = S.bookedIncome[0];
+      ok('🔴 the booked income is the Stripe path\'s shape: positive, category income, the invoice named',
+        t.user_id === OWNER && t.amount === 450 && t.category === 'income'
+        && t.source_type === 'invoice' && t.description === 'Invoice INV-0007' && t.confirmed === true);
+    }
+    ok('marking a paid invoice paid again is his statement already held: true, and booked NOTHING new',
+      (await S.markInvoicePaidByOwner(OWNER, INVOICE)) === true && S.bookedIncome.length === 1);
+
+    mode = 'down';
+    ok('a bad database minute is false, never a quiet success',
+      (await S.markInvoiceSentByOwner(OWNER, INVOICE)) === false
+      && (await S.markInvoicePaidByOwner(OWNER, INVOICE)) === false);
+    mode = 'ok';
+
+    // readInvoices: the whole reason it exists is the null against the [].
+    ok('🔴 readInvoices is scoped to the one user and reads newest first',
+      Array.isArray(await S.readInvoices(OWNER))
+      && calls.at(-1).url.includes(`user_id=eq.${OWNER}`) && calls.at(-1).url.includes('order=created_at.desc'));
+    ok('an empty book is [], the honest empty state', (await S.readInvoices(INTRUDER)).length === 0);
+    mode = 'down';
+    ok('🔴 a failed read is null, NEVER an empty list he did not empty', (await S.readInvoices(OWNER)) === null);
+    mode = 'ok';
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 7. PROOF OF INCOME. lib/incomeproof's figures, printable, honest about what it is not.

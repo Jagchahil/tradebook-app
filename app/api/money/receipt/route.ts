@@ -4,7 +4,7 @@ import { parseReceipt, hasClaudeConfig } from '../../../../lib/claude';
 import { clampReceiptDate } from '../../../../lib/waintents';
 import {
   insertTransaction, recentUnconfirmedForMatch, mergeIntoTransaction, bumpAiUsage,
-  countActiveSubscribers,
+  countActiveSubscribers, storeReceiptImage,
 } from '../../../../lib/supabase';
 import { findDuplicate } from '../../../../lib/dedupe';
 import { normaliseVendor } from '../../../../lib/memory';
@@ -38,10 +38,14 @@ import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
 // (facts, not readings), and says so. A maybe is left alone: merging two genuinely different
 // purchases would quietly delete one of his costs and raise his tax bill.
 //
-// ⚠️ THE IMAGE ITSELF IS READ AND DISCARDED, exactly as the WhatsApp path reads and discards
-// its download. Keeping it would need a storage write that lib/supabase.ts does not offer, and
-// inventing one inline is forbidden by CLAUDE.md rule 2. When receipt evidence storage lands in
-// lib/, both capture routes should gain it together or they will drift.
+// ⚠️ THE IMAGE IS KEPT, STORED FIRST AND PARSED SECOND (31 July 2026). storeReceiptImage in
+// lib/supabase.ts puts the photograph in the private receipts bucket under the user's own id
+// and the path lands in the row's raw_input_url, so the evidence HMRC would actually ask to
+// see survives alongside our reading of it. Storage is evidence, NEVER a dependency: a null
+// from the upload is carried on past, the parse still runs and the row still lands, because a
+// lost image must never lose the figures. The WhatsApp capture still reads and discards its
+// download; it is the remaining caller the helper was shaped for, and wiring it means
+// respecting the webhook's five second budget, a decision that path's owner makes.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 export const runtime = 'nodejs';
@@ -121,7 +125,16 @@ export async function POST(req: NextRequest) {
     return isForm ? back('problem=budget') : NextResponse.json({ error: 'budget' }, { status: 429 });
   }
 
-  const base64 = Buffer.from(await part.arrayBuffer()).toString('base64');
+  const bytes = new Uint8Array(await part.arrayBuffer());
+
+  // STORE FIRST, PARSE SECOND. The image goes to the private receipts bucket before the model
+  // ever sees it, so a parse crash cannot cost him the evidence too. A null here means storage
+  // had a bad minute: the figures continue regardless, because a lost image must never lose the
+  // figures. The one cost of this order is an unread photograph leaving an unreferenced object
+  // behind, which is pennies of storage against a man's proof of spend.
+  const storedPath = await storeReceiptImage(user.id, bytes, mediaType);
+
+  const base64 = Buffer.from(bytes).toString('base64');
   const parsed = await parseReceipt(base64, mediaType);
   // parseReceipt answers amount 0 when it could not read the total. moneylog's own header says a
   // £0 beside a real merchant is not a gap, it is a wrong figure a man acts on, so an unreadable
@@ -148,6 +161,9 @@ export async function POST(req: NextRequest) {
       await mergeIntoTransaction(user.id, String(hit.match.id), {
         vendor: parsed.merchant_name,
         category: parsed.category,
+        // The bank line keeps the figures; the receipt gives it the shop name, the category,
+        // and now the photograph. Only passed when storage actually kept one.
+        ...(storedPath ? { raw_input_url: storedPath } : {}),
       });
       return isForm ? back('done=merged') : NextResponse.json({ ok: true, merged: true });
     }
@@ -166,6 +182,9 @@ export async function POST(req: NextRequest) {
       source_type: 'web_image',
       // Captured, read, and WAITING. Never confirmed here: see the header.
       confirmed: false,
+      // The photograph's path in the private bucket, or null when storage failed. The figures
+      // above are already in hand either way: see the header, a lost image never loses them.
+      raw_input_url: storedPath,
     });
   } catch {
     return isForm ? back('problem=unavailable') : NextResponse.json({ error: 'unavailable' }, { status: 503 });

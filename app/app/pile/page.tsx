@@ -129,7 +129,7 @@ export default async function PilePage({
         <section className="lek-card">
           <h1 className="lek-title">Nothing is waiting on you.</h1>
           <p style={S.sub}>
-            Everything we have is filed and counted. Connect your bank and new spending arrives here on its own.
+            Everything we have is filed and counted. New spending lands here from a statement upload, a receipt, or your bank feed.
           </p>
         </section>
       ) : (

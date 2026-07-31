@@ -35,8 +35,15 @@ export const PRICE_PENCE_PER_MTOK: Record<AiModel, { input: number; output: numb
 };
 
 // A rough pence cost for one call, for logging and for the monthly projection.
-export function estimateCostPence(model: AiModel, inputTokens: number, outputTokens: number): number {
-  const p = PRICE_PENCE_PER_MTOK[model];
+// The price book can be injected so lib/margin.ts (and a test) can ask "what
+// happens to the caps if Anthropic doubles the price" without editing this file.
+export function estimateCostPence(
+  model: AiModel,
+  inputTokens: number,
+  outputTokens: number,
+  prices: Record<AiModel, { input: number; output: number }> = PRICE_PENCE_PER_MTOK,
+): number {
+  const p = prices[model];
   if (!p) return 0;
   const pence = (Math.max(0, inputTokens) * p.input + Math.max(0, outputTokens) * p.output) / 1_000_000;
   return Math.round(pence * 100) / 100;

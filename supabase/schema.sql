@@ -966,6 +966,11 @@ notify pgrst, 'reload schema';
 -- Goals: what Rakha plans around (doc 82 section 5b). The user's own words
 -- plus a number. vendor_note is the USER'S stated vendor, held and repeated
 -- back, never sourced by us (the FCA line).
+--
+-- 🔴 READ ONLY LEGACY SINCE 31 JULY 2026. The founder consolidated goals into
+-- public.goals (see APPLY_2026-07-31_goals_consolidation.sql): rows migrated,
+-- every server write path repointed. Only unreleased phone app builds still
+-- read this table. Do not write it; dropping it is launch two's decision.
 -- ---------------------------------------------------------------------------
 create table if not exists public.user_goals (
   id uuid primary key default gen_random_uuid(),
@@ -1203,4 +1208,26 @@ $$;
 revoke execute on function public.log_qa_candidate(text, text, text, jsonb, boolean, boolean, boolean) from anon, authenticated, public;
 grant execute on function public.log_qa_candidate(text, text, text, jsonb, boolean, boolean, boolean) to service_role;
 
+notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- The Lekhio thread (31 July 2026, APPLY_2026-07-31_thread.sql). The in house
+-- conversation surface at /app/thread rides the SAME conversations and messages
+-- tables as Puchio chat memory above, rather than growing a second pair that
+-- mean "a conversation". Three additions make that honest: a kind on the
+-- conversation so the one standing Lekhio thread is distinguishable from
+-- Puchio's per question chats, a partial unique index so "one thread per user"
+-- is a database fact, and 'lekhio' in the messages role check so Lekhio's
+-- replies are filed under their own name instead of borrowing Puchio's.
+-- RLS is unchanged: the _own policies already scope by auth.uid() = user_id.
+-- ---------------------------------------------------------------------------
+alter table public.conversations add column if not exists kind text not null default 'puchio';
+alter table public.conversations drop constraint if exists conversations_kind_check;
+alter table public.conversations add constraint conversations_kind_check
+  check (kind in ('puchio', 'lekhio'));
+create unique index if not exists conversations_one_lekhio_thread
+  on public.conversations (user_id) where kind = 'lekhio';
+alter table public.messages drop constraint if exists messages_role_check;
+alter table public.messages add constraint messages_role_check
+  check (role in ('user', 'puchio', 'lekhio'));
 notify pgrst, 'reload schema';

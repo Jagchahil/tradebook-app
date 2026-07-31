@@ -5,10 +5,10 @@ import { SESSION_COOKIE } from '../../../lib/websession';
 import { getConfirmedTransactionsForRange, getBusinessName } from '../../../lib/supabase';
 import { buildIncomeProof } from '../../../lib/incomeproof';
 import { gbp2 } from '../../../lib/money';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RADIUS, RIVER,
-  RIVER_DEEP, RIVER_TINT, SPACE, SURFACE, TYPE,
-} from '../../../lib/tokens';
+  INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, SURFACE,
+} from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';

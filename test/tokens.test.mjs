@@ -93,6 +93,30 @@ const inCss = [...new Set((T.THEME_CSS.match(/#[0-9A-Fa-f]{6}/g) || []).map((h) 
 const named = new Set(Object.values(T.PALETTE).map((h) => h.toUpperCase()));
 ok('every hex in THEME_CSS is a named colour', inCss.every((h) => named.has(h)));
 
+// ── The app's theme sheet: the same two palettes, hung off the DEVICE, with zero script. ──
+//
+// The app ships no client JavaScript, so it cannot run the toggle's swap. APP_THEME_CSS is how it
+// still gets dark: prefers-color-scheme decides, the browser does the switching, and the values
+// are the same two lists THEME_CSS uses, built from the same constants so they cannot drift.
+ok('APP_THEME_CSS exists and declares a light root', T.APP_THEME_CSS.includes(':root{'));
+ok('🔴 THE APP FOLLOWS THE DEVICE, NOT THE TOGGLE', T.APP_THEME_CSS.includes('@media(prefers-color-scheme:dark)')
+  && !T.APP_THEME_CSS.includes('data-theme'));
+ok('APP_THEME_CSS carries the light river', T.APP_THEME_CSS.includes(T.RIVER));
+ok('APP_THEME_CSS carries the dark river', T.APP_THEME_CSS.includes(T.DARK_RIVER));
+ok('APP_THEME_CSS carries an on-river ink for each theme',
+  T.APP_THEME_CSS.includes(`--on-river:${T.ON_RIVER}`) && T.APP_THEME_CSS.includes(`--on-river:${T.DARK_ON_RIVER}`));
+ok('the browser furniture follows the same query', T.APP_THEME_CSS.includes('color-scheme:light dark'));
+const inAppCss = [...new Set((T.APP_THEME_CSS.match(/#[0-9A-Fa-f]{6}/g) || []).map((h) => h.toUpperCase()))];
+ok('every hex in APP_THEME_CSS is a named colour', inAppCss.every((h) => named.has(h)));
+ok('the two sheets carry identical dark values, not two lists maintained by hand',
+  inAppCss.sort().join() === inCss.sort().join());
+// And the shell sheet itself paints only with the variables: a hex in APP_CSS outside the theme
+// block would be a colour the dark theme cannot reach.
+ok('🔴 APP_CSS PAINTS WITH THE VARIABLES, NOT HEXES',
+  !/#[0-9A-Fa-f]{6}/.test(T.APP_CSS.replace(T.APP_THEME_CSS, '')));
+ok('APP_CSS clears the desk rail from the shared constant, plus one rhythm step of air',
+  typeof T.SIDEBAR === 'number' && T.APP_CSS.includes(`margin-left:max(${T.SIDEBAR + T.SPACE.lg}px`));
+
 console.log('\n=== the theme swap stays wired ===\n');
 const site = readFileSync(path.join(root, 'app/_shared/site.tsx'), 'utf8');
 ok('THEME_SWAP_JS turns transitions off for the swap', T.THEME_SWAP_JS.includes(T.THEME_SWAP_CLASS));
@@ -189,8 +213,10 @@ console.log('\n=== no accent fill carries white text ===\n');
 // that themes: on an app page RIVER is the raw #1B59A6 and white on it reads at 6.94:1, which is
 // correct. Same identifier, different value, different verdict, so the check has to know which
 // module the page imported its colours from.
+// lib/apptheme.ts made every app page a themed page (its RIVER is var(--river) exactly as the
+// marketing pages' is), so importing an accent from there counts the same as from _shared/site.
 const themes = (src) => /const\s+(RIVER|GREEN|SAFFRON)\s*=\s*'var\(--/.test(src)
-  || [...src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]*_shared\/site['"]/gs)]
+  || [...src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]*(_shared\/site|lib\/apptheme)['"]/gs)]
     .some((m) => /\b(RIVER|RIVER_DEEP|GREEN|SAFFRON)\b/.test(m[1]));
 const INLINE_WHITE = [
   /(?:background|backgroundColor):\s*(?:RIVER|GREEN|SAFFRON)\b[^}]{0,120}?color:\s*'#(?:fff|ffffff)'/,

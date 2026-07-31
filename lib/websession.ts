@@ -28,6 +28,11 @@
 // again, because a credential that renews itself for ever is not a session, it is a password
 // nobody chose.
 //
+// Ninety days is for HIS browser. From 31 July the sign in page asks, with an unticked
+// "Remember my browser" box, and an unticked sign in gets a browser session cookie and a twelve
+// hour row that never slides. The row records which kind it is. See
+// SESSION_TTL_UNREMEMBERED_SECONDS and slideExpiry below for the two halves of that argument.
+//
 // ⚠️ AND WHY THERE IS A ROW IN A TABLE BEHIND IT.
 //
 // A signed cookie on its own cannot be taken back. For ninety days, a copied cookie is a copy of
@@ -63,6 +68,18 @@ export const SESSION_COOKIE = 'lek_s';
 // Ninety days, refreshed as he uses it. See the header: the alternative is a Twilio charge and a
 // hunt for a text message every time he wants to look at his own money.
 export const SESSION_TTL_SECONDS = 90 * 24 * 60 * 60;
+
+// ⚠️ AND THE SESSION HE GETS WHEN HE DOES NOT TICK "REMEMBER MY BROWSER". Twelve hours, not days.
+//
+// The ninety day argument above assumes the browser is his. On a merchant's counter PC or a
+// mate's laptop it is not, and the tick box on /in (unticked by default) is how he says so. Then
+// the cookie is issued with no Max-Age at all, so the browser drops it when it closes, and this
+// short expiry is written on the row as well, because "dies on close" is a browser promise we do
+// not control: Chrome's "continue where you left off" resurrects session cookies across restarts,
+// and a copied cookie never closes anything. Twelve hours outlasts any working day at a borrowed
+// screen and is gone before the machine's next shift, and lib/webauth.ts never slides it (see
+// slideExpiry), so an unticked session cannot creep towards the ninety days he declined.
+export const SESSION_TTL_UNREMEMBERED_SECONDS = 12 * 60 * 60;
 
 // The hard ceiling on one session's whole life, however much it slides. A year.
 export const SESSION_MAX_LIFE_SECONDS = 365 * 24 * 60 * 60;
@@ -104,10 +121,16 @@ export function isSessionId(value: unknown): value is string {
 }
 
 // Build the cookie value for a session id. Returns an empty string with no secret, so every
-// caller fails closed rather than issuing an unsigned credential.
-export function sessionCookieValue(sessionId: string, now: Date = new Date()): string {
+// caller fails closed rather than issuing an unsigned credential. The ttl is a parameter because
+// the two kinds of session (remembered and not) carry different expiries, and the cookie's own
+// exp must agree with the row it points at or one of the two is lying.
+export function sessionCookieValue(
+  sessionId: string,
+  now: Date = new Date(),
+  ttlSeconds: number = SESSION_TTL_SECONDS,
+): string {
   if (!webSessionsConfigured() || !isSessionId(sessionId)) return '';
-  const exp = Math.floor(now.getTime() / 1000) + SESSION_TTL_SECONDS;
+  const exp = Math.floor(now.getTime() / 1000) + ttlSeconds;
   const payload = b64url(Buffer.from(JSON.stringify({ s: sessionId, exp }), 'utf8'));
   return payload + '.' + sign(payload);
 }
@@ -163,7 +186,9 @@ export interface CookieAttributes {
   secure: boolean;
   sameSite: 'lax';
   path: '/';
-  maxAge: number;
+  // Absent on purpose for an unremembered session: a cookie with no Max-Age is a browser session
+  // cookie and dies when the browser closes. See browserSessionCookieAttributes.
+  maxAge?: number;
 }
 
 export function sessionCookieAttributes(maxAgeSeconds: number = SESSION_TTL_SECONDS): CookieAttributes {
@@ -174,6 +199,32 @@ export function sessionCookieAttributes(maxAgeSeconds: number = SESSION_TTL_SECO
     path: '/',
     maxAge: Math.max(0, Math.floor(maxAgeSeconds)),
   };
+}
+
+// The unremembered shape: identical protections, NO Max-Age. Omitting the attribute is the whole
+// point and not an oversight: with it the cookie persists to its expiry however many times the
+// browser closes, without it the browser forgets the cookie on close. A maxAge of zero would not
+// do, that is how a cookie is DELETED, and every caller clearing one does exactly that via
+// sessionCookieAttributes(0).
+export function browserSessionCookieAttributes(): CookieAttributes {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+  };
+}
+
+// ⚠️ WHAT A TOUCH MAY SLIDE THE EXPIRY TO, AND FOR AN UNREMEMBERED SESSION THE ANSWER IS NOTHING.
+//
+// The ninety day window slides because he ticked the box that said this browser is his. A session
+// he asked us NOT to remember must never inch its way to ninety days through use, or the tick box
+// is a decoration: heavy use is exactly the situation on a shared machine. Null means "do not
+// touch this row's expiry at all", and lib/webauth.ts obeys it. The decision lives here, pure,
+// so test/websession.test.mjs can hold it down directly rather than trusting a caller's if.
+export function slideExpiry(remembered: boolean, now: Date = new Date()): Date | null {
+  if (!remembered) return null;
+  return new Date(now.getTime() + SESSION_TTL_SECONDS * 1000);
 }
 
 // Whether a session that was last touched at this time is due another touch. Keeps the sliding

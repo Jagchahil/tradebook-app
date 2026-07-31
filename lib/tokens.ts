@@ -198,6 +198,12 @@ export const SPACE = { hair: 4, xs: 8, sm: 12, md: 16, lg: 24, xl: 32, xxl: 48 }
 // phone column with air around it, which is calmer than a layout that reflows at every size.
 export const BREAK = { stack: 420, desk: 1020 } as const;
 
+// The dashboard rail. From BREAK.desk up the app nav is a fixed left column of this width and the
+// content column clears it (see APP_CSS and app/app/AppNav.tsx); below desk it does not exist and
+// the phone's top bar draws instead. One number, named here, because the nav and the sheet that
+// makes room for it must never disagree about it.
+export const SIDEBAR = 260;
+
 // ---------- movement ----------
 //
 // ⚠️ EVERY DURATION AND CURVE THE APP IS ALLOWED TO USE, AND THERE ARE FIVE OF THEM.
@@ -230,11 +236,11 @@ export const THEME_SWAP_CLASS = 'theme-swap';
 const THEME_SWAP_CSS = `html.${THEME_SWAP_CLASS},html.${THEME_SWAP_CLASS} *,`
   + `html.${THEME_SWAP_CLASS} *::before,html.${THEME_SWAP_CLASS} *::after{transition:none !important}`;
 
-// Marketing pages colour themselves from these variables rather than the constants above, so one
-// attribute on <html> reskins the whole site. App pages use the constants directly and stay
-// light. Both come from the same values, which is the point.
-export const THEME_CSS = `
-:root{
+// The two value lists, written once and worn twice. THEME_CSS hangs them off the toggle's
+// attribute for the marketing site; APP_THEME_CSS hangs the same lists off the device setting for
+// the app. One copy of each list, or the two surfaces drift exactly the way the two hand typed
+// palettes did.
+const LIGHT_VARS = `
   --river:${RIVER};--river-deep:${RIVER_DEEP};--river-tint:${RIVER_TINT};--on-river:${ON_RIVER};
   --saffron:${SAFFRON};--saffron-deep:${SAFFRON_DEEP};--saffron-tint:${SAFFRON_TINT};--on-saffron:${ON_SAFFRON};--on-saffron-tint:${ON_SAFFRON_TINT};
   --green:${GREEN};--green-tint:${GREEN_TINT};--on-green:${ON_GREEN};--on-green-tint:${ON_GREEN_TINT};
@@ -243,8 +249,8 @@ export const THEME_CSS = `
   --river-panel:${RIVER_PANEL};--river-panel-deep:${RIVER_PANEL_DEEP};
   --bg:${PAPER};--panel:${PANEL};--surface:${SURFACE};--bd:${LINE};--band:${BAND};
   --tx:${INK};--tx-mut:${MUTED};
-}
-[data-theme="dark"]{
+`;
+const DARK_VARS = `
   --river:${DARK_RIVER};--river-deep:${DARK_RIVER_DEEP};--river-tint:${DARK_RIVER_TINT};--on-river:${DARK_ON_RIVER};
   --saffron:${DARK_SAFFRON};--saffron-deep:${DARK_SAFFRON_DEEP};--saffron-tint:${DARK_SAFFRON_TINT};--on-saffron:${DARK_ON_SAFFRON};--on-saffron-tint:${DARK_SAFFRON};
   --green:${DARK_GREEN};--green-tint:${DARK_GREEN_TINT};--on-green:${DARK_ON_GREEN};--on-green-tint:${DARK_GREEN};
@@ -252,8 +258,36 @@ export const THEME_CSS = `
   --river-panel:${RIVER_PANEL};--river-panel-deep:${RIVER_PANEL_DEEP};
   --bg:${DARK_PAPER};--panel:${DARK_PANEL};--surface:${DARK_SURFACE};--bd:${DARK_LINE};--band:${DARK_BAND};
   --tx:${DARK_INK};--tx-mut:${DARK_MUTED};
-}
+`;
+
+// Marketing pages colour themselves from these variables rather than the constants above, so one
+// attribute on <html> reskins the whole site. Both themes come from the same values, which is the
+// point.
+export const THEME_CSS = `
+:root{${LIGHT_VARS}}
+[data-theme="dark"]{${DARK_VARS}}
 ${THEME_SWAP_CSS}
+`;
+
+// THE APP'S THEME, AND IT FOLLOWS THE DEVICE, NOT A TOGGLE.
+//
+// The same two value lists as THEME_CSS, hung off prefers-color-scheme instead of the toggle's
+// attribute. The app ships zero client JavaScript, so it cannot run the swap script and it cannot
+// read the choice the site's toggle stores in localStorage. Jag's call, 31 July 2026: the app
+// matches the system setting the way the site does by default, with no toggle of its own, which
+// replaced the 30 July "the app stays light" compromise recorded above APP_CSS. A man who forced
+// the marketing site light keeps a device dark app, and that is accepted: the app never sees his
+// stored choice, and pretending to honour a preference it cannot read would be worse.
+//
+// color-scheme is declared so the browser's own furniture, form controls and scrollbars, follows
+// the same media query the palette does, still with no script. The body rule rides with the
+// palette because the app pages paint their canvas on <main>: the browser's default 8 pixel body
+// margin was invisible when both sides of it were near white, and in dark it is a white frame
+// around every screen.
+export const APP_THEME_CSS = `
+:root{color-scheme:light dark;${LIGHT_VARS}}
+@media(prefers-color-scheme:dark){:root{${DARK_VARS}}}
+body{margin:0;background:var(--bg)}
 `;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -303,31 +337,35 @@ export const A11Y_CSS = [
 // the card padding, the tile figures and the headings take one step up the type scale. Cards sit
 // side by side only where they are true siblings, and each page declares that pairing itself.
 // The width in between gets the phone column with air around it, on purpose: a tablet held in a
-// kitchen is a big phone, not a small desk.
+// kitchen is a big phone, not a small desk. From desk up the nav is a fixed rail of SIDEBAR
+// pixels on the left (app/app/AppNav.tsx), so the column centres itself in what remains rather
+// than in the viewport, or the rail would sit on top of the first card.
 //
-// ⚠️ THE APP STAYS LIGHT, AND NOT BECAUSE THE DARK PALETTE ABOVE CANNOT COVER IT. It could, and
-// every dark pair is already guarded. But switching theme takes the swap script, and the app
-// ships no client JavaScript at all, so that a man's figures are in the HTML before any script
-// could run. test/webauth.test.mjs holds every screen to that. Following the device with a media
-// query instead would trample the choice the site's toggle stores in localStorage, where no
-// server can read it, and two surfaces disagreeing about a choice he made once is worse than an
-// app that is reliably light. The day the app is allowed a script, it takes THEME_CSS and the
-// swap whole, and this sheet moves to the var() names. Until then: constants, light, deliberate.
+// ⚠️ THE APP USED TO STAY LIGHT, AND FROM 31 JULY IT FOLLOWS THE DEVICE INSTEAD. The 30 July
+// compromise pinned the app to the light constants because switching theme took the swap script
+// and the app ships no client JavaScript at all, so that a man's figures are in the HTML before
+// any script could run. test/webauth.test.mjs still holds every screen to that. What changed is
+// the mechanism, not the rule: APP_THEME_CSS above carries both palettes under a
+// prefers-color-scheme media query, so the browser does the switching and the app still ships not
+// one byte of script. This sheet therefore paints with the var() names, and the app pages take
+// their colours from lib/apptheme.ts, which maps the same names to the same variables. The site's
+// toggle and its localStorage choice belong to the marketing pages alone.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 export const APP_CSS = `
+${APP_THEME_CSS}
 @keyframes lek-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .lek-wrap{box-sizing:border-box;max-width:672px;margin:0 auto;padding:${SPACE.md}px ${SPACE.md}px ${SPACE.xxl}px}
-.lek-card{background:${PANEL};border:1px solid ${LINE};border-radius:${RADIUS.lg}px;padding:${SPACE.md}px;margin-bottom:${SPACE.sm}px;animation:lek-in ${MOTION.enter} ${MOTION.ease} both}
+.lek-card{background:var(--panel);border:1px solid var(--bd);border-radius:${RADIUS.lg}px;padding:${SPACE.md}px;margin-bottom:${SPACE.sm}px;animation:lek-in ${MOTION.enter} ${MOTION.ease} both}
 .lek-hit{transition:transform ${MOTION.quick} ${MOTION.ease},box-shadow ${MOTION.quick} ${MOTION.ease}}
 .lek-hit:hover{transform:translateY(-1px);box-shadow:${SHADOW.card}}
 .lek-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:${SPACE.sm}px}
-.lek-tile{background:${SURFACE};border-radius:${RADIUS.md}px;padding:${SPACE.sm}px ${SPACE.md}px}
-.lek-tile-label{font-size:${TYPE.label}px;font-weight:700;color:${MUTED};margin-bottom:${SPACE.hair}px}
+.lek-tile{background:var(--surface);border-radius:${RADIUS.md}px;padding:${SPACE.sm}px ${SPACE.md}px}
+.lek-tile-label{font-size:${TYPE.label}px;font-weight:700;color:var(--tx-mut);margin-bottom:${SPACE.hair}px}
 .lek-tile-value{font-size:${TYPE.stat}px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
 .lek-h2{font-size:${TYPE.body}px;font-weight:800;letter-spacing:-0.01em;margin:0 0 ${SPACE.sm}px}
 @media(max-width:${BREAK.stack}px){.lek-grid{grid-template-columns:1fr}}
 @media(min-width:${BREAK.desk}px){
-  .lek-wrap{max-width:992px;padding:${SPACE.xl}px ${SPACE.md}px ${SPACE.xxl * 2}px}
+  .lek-wrap{max-width:992px;padding:${SPACE.xl}px ${SPACE.md}px ${SPACE.xxl * 2}px;margin-left:max(${SIDEBAR + SPACE.lg}px,calc((100vw + ${SIDEBAR}px - 992px)/2));margin-right:auto}
   .lek-card{padding:${SPACE.xl}px;margin-bottom:${SPACE.lg}px}
   .lek-grid{gap:${SPACE.md}px}
   .lek-tile{padding:${SPACE.lg}px}
@@ -384,6 +422,54 @@ export const ON_PAIRS: ReadonlyArray<{ theme: 'light' | 'dark'; name: string; bg
   { theme: 'dark', name: 'green-tint', bg: DARK_GREEN_TINT, ink: DARK_GREEN },
   { theme: 'dark', name: 'red-tint', bg: DARK_RED_TINT, ink: DARK_RED },
   { theme: 'dark', name: 'saffron-tint', bg: DARK_SAFFRON_TINT, ink: DARK_SAFFRON },
+  // ── The app's own pairings, both themes, added when the app started following the device. ──
+  //
+  // The app paints accents as TEXT on its three surfaces (a green money figure in a tile, a river
+  // "Out", a red overdue) and inks on its tints, so every one of those pairs is held to the same
+  // 4.5 the buttons are. The audit that added these also caught two light pairs the app was
+  // already shipping under the minimum: brand green on a surface tile at 4.40, and saffron deep
+  // on its own tint at 2.70, the exact pair the ON_SAFFRON_TINT comment above warns about. The
+  // pages now use ON_GREEN_TINT and ON_SAFFRON_TINT for those inks, and these rows keep it true.
+  { theme: 'light', name: 'panel-ink', bg: PANEL, ink: INK },
+  { theme: 'light', name: 'panel-muted', bg: PANEL, ink: MUTED },
+  { theme: 'light', name: 'panel-river', bg: PANEL, ink: RIVER },
+  { theme: 'light', name: 'panel-river-deep', bg: PANEL, ink: RIVER_DEEP },
+  { theme: 'light', name: 'panel-green', bg: PANEL, ink: GREEN },
+  { theme: 'light', name: 'panel-red', bg: PANEL, ink: RED },
+  { theme: 'light', name: 'paper-river', bg: PAPER, ink: RIVER },
+  { theme: 'light', name: 'paper-river-deep', bg: PAPER, ink: RIVER_DEEP },
+  { theme: 'light', name: 'paper-red', bg: PAPER, ink: RED },
+  { theme: 'light', name: 'surface-ink', bg: SURFACE, ink: INK },
+  { theme: 'light', name: 'surface-river', bg: SURFACE, ink: RIVER },
+  { theme: 'light', name: 'surface-river-deep', bg: SURFACE, ink: RIVER_DEEP },
+  { theme: 'light', name: 'surface-green', bg: SURFACE, ink: ON_GREEN_TINT },
+  { theme: 'light', name: 'surface-red', bg: SURFACE, ink: RED },
+  { theme: 'light', name: 'river-tint-ink', bg: RIVER_TINT, ink: INK },
+  { theme: 'light', name: 'river-tint-muted', bg: RIVER_TINT, ink: MUTED },
+  { theme: 'light', name: 'saffron-tint-ink', bg: SAFFRON_TINT, ink: INK },
+  { theme: 'light', name: 'saffron-tint-muted', bg: SAFFRON_TINT, ink: MUTED },
+  { theme: 'light', name: 'green-tint-ink', bg: GREEN_TINT, ink: INK },
+  { theme: 'light', name: 'red-tint-ink', bg: RED_TINT, ink: INK },
+  { theme: 'dark', name: 'panel-muted', bg: DARK_PANEL, ink: DARK_MUTED },
+  { theme: 'dark', name: 'panel-river', bg: DARK_PANEL, ink: DARK_RIVER },
+  { theme: 'dark', name: 'panel-river-deep', bg: DARK_PANEL, ink: DARK_RIVER_DEEP },
+  { theme: 'dark', name: 'panel-green', bg: DARK_PANEL, ink: DARK_GREEN },
+  { theme: 'dark', name: 'panel-red', bg: DARK_PANEL, ink: DARK_RED },
+  { theme: 'dark', name: 'paper-river', bg: DARK_PAPER, ink: DARK_RIVER },
+  { theme: 'dark', name: 'paper-river-deep', bg: DARK_PAPER, ink: DARK_RIVER_DEEP },
+  { theme: 'dark', name: 'paper-red', bg: DARK_PAPER, ink: DARK_RED },
+  { theme: 'dark', name: 'surface-ink', bg: DARK_SURFACE, ink: DARK_INK },
+  { theme: 'dark', name: 'surface-river', bg: DARK_SURFACE, ink: DARK_RIVER },
+  { theme: 'dark', name: 'surface-river-deep', bg: DARK_SURFACE, ink: DARK_RIVER_DEEP },
+  { theme: 'dark', name: 'surface-green', bg: DARK_SURFACE, ink: DARK_GREEN },
+  { theme: 'dark', name: 'surface-red', bg: DARK_SURFACE, ink: DARK_RED },
+  { theme: 'dark', name: 'river-tint-ink', bg: DARK_RIVER_TINT, ink: DARK_INK },
+  { theme: 'dark', name: 'river-tint-muted', bg: DARK_RIVER_TINT, ink: DARK_MUTED },
+  { theme: 'dark', name: 'river-tint-deep', bg: DARK_RIVER_TINT, ink: DARK_RIVER_DEEP },
+  { theme: 'dark', name: 'saffron-tint-ink', bg: DARK_SAFFRON_TINT, ink: DARK_INK },
+  { theme: 'dark', name: 'saffron-tint-muted', bg: DARK_SAFFRON_TINT, ink: DARK_MUTED },
+  { theme: 'dark', name: 'green-tint-ink', bg: DARK_GREEN_TINT, ink: DARK_INK },
+  { theme: 'dark', name: 'red-tint-ink', bg: DARK_RED_TINT, ink: DARK_INK },
 ];
 
 // Contrast per WCAG 2.1. Here rather than in the test because the app may want to ask the same

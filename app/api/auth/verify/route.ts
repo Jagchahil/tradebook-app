@@ -8,8 +8,9 @@ import {
   verifyAccessToken, createWebSession, ensureUserRow, reconcileSignupToUser,
 } from '../../../../lib/supabase';
 import {
-  PENDING_COOKIE, SESSION_COOKIE, SESSION_TTL_SECONDS, newSessionId, originAllowed,
-  sessionCookieAttributes, sessionCookieValue, verifyPendingCookie, webSessionsConfigured,
+  PENDING_COOKIE, SESSION_COOKIE, SESSION_TTL_SECONDS, SESSION_TTL_UNREMEMBERED_SECONDS,
+  browserSessionCookieAttributes, newSessionId, originAllowed, sessionCookieAttributes,
+  sessionCookieValue, verifyPendingCookie, webSessionsConfigured,
 } from '../../../../lib/websession';
 
 export const runtime = 'nodejs';
@@ -103,16 +104,29 @@ export async function POST(req: NextRequest) {
   // must never be locked out of his own books because a profile field would not save.
   await reconcileSignupToUser(user.id).catch(() => null);
 
+  // ⚠️ THE "REMEMBER MY BROWSER" BOX, AND THE ABSENT VALUE IS THE SAFE ONE. An unticked checkbox
+  // simply does not post its field, so anything other than the tick reads as not remembered,
+  // including a crafted post that omits it. Unremembered means three things that must agree: a
+  // short expiry on the row, the same short expiry inside the signed cookie, and cookie
+  // attributes with no Max-Age so the browser drops it on close. The row records the choice,
+  // because the row is what lib/webauth.ts consults when deciding whether a session may slide.
+  const remembered = form.get('remember') === 'on';
+  const ttlSeconds = remembered ? SESSION_TTL_SECONDS : SESSION_TTL_UNREMEMBERED_SECONDS;
+
   const sessionId = newSessionId();
-  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
-  const opened = await createWebSession(user.id, sessionId, expiresAt);
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+  const opened = await createWebSession(user.id, sessionId, expiresAt, remembered);
   if (!opened) return back(req, 'session');
 
-  const cookie = sessionCookieValue(sessionId);
+  const cookie = sessionCookieValue(sessionId, new Date(), ttlSeconds);
   if (!cookie) return back(req, 'unavailable');
 
   const res = NextResponse.redirect(new URL('/app', req.url), 303);
-  res.cookies.set(SESSION_COOKIE, cookie, sessionCookieAttributes());
+  res.cookies.set(
+    SESSION_COOKIE,
+    cookie,
+    remembered ? sessionCookieAttributes() : browserSessionCookieAttributes(),
+  );
   // The pending contact is spent. Clear it rather than leaving a signed contact in his browser.
   res.cookies.set(PENDING_COOKIE, '', sessionCookieAttributes(0));
   return res;

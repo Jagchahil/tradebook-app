@@ -7,10 +7,10 @@ import {
   household, notHousehold, mtdQuestions, unanswered, unansweredMtd, progressIn,
   type Circumstance, type BusinessStructure,
 } from '../../../../lib/circumstances';
+import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, FONT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RADIUS, RED, RED_TINT,
-  RIVER, RIVER_DEEP, RIVER_TINT, SPACE, TYPE,
-} from '../../../../lib/tokens';
+  INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP, RIVER_TINT, edge,
+} from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';
@@ -233,7 +233,7 @@ export default async function CircumstancesPage() {
 const CSS = [
   A11Y_CSS,
   APP_CSS,
-  `.lek-head{background:${RIVER_TINT};border-color:${RIVER}33}`,
+  `.lek-head{background:${RIVER_TINT};border-color:${LINE};border-color:${edge(RIVER, 20)}}`,
   `.lek-eyebrow{font-size:${TYPE.label}px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:${RIVER_DEEP};margin:0 0 ${SPACE.xs}px}`,
 ].join('');
 
@@ -244,7 +244,7 @@ const S: Record<string, React.CSSProperties> = {
   blurb: { fontSize: TYPE.note, lineHeight: 1.6, color: MUTED, margin: `0 0 ${SPACE.sm}px`, maxWidth: '62ch' },
   count: { fontSize: TYPE.label, fontWeight: 700, color: MUTED, margin: `0 0 ${SPACE.sm}px` },
   quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: 0 },
-  warn: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: RED_TINT, border: `1px solid ${RED}33`, borderRadius: RADIUS.md, padding: SPACE.sm, margin: 0 },
+  warn: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: RED_TINT, border: `1px solid ${LINE}`, borderColor: edge(RED, 20), borderRadius: RADIUS.md, padding: SPACE.sm, margin: 0 },
 
   stack: { display: 'flex', flexDirection: 'column', gap: SPACE.xs },
 

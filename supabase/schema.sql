@@ -1231,3 +1231,18 @@ alter table public.messages drop constraint if exists messages_role_check;
 alter table public.messages add constraint messages_role_check
   check (role in ('user', 'puchio', 'lekhio'));
 notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- The chat list (31 July 2026, APPLY_2026-07-31_chats.sql). /app/thread grew
+-- from the one standing thread into a DM style list the same day: every
+-- conversation a row, old chats to look back on, and a "Start a new chat"
+-- button that creates a fresh Lekhio conversation. The one-thread index above
+-- existed to referee getOrCreateLekhioThread's creation race; in the many
+-- chats model the worst a race can produce is one extra empty chat, while
+-- keeping the index refuses the surface's own first feature with a 409. So it
+-- is dropped, after its creation above, and a fresh database ends up exactly
+-- where a migrated one does. The kind column, its check and the widened role
+-- check all stand: they are what makes the list's rows mean what they say.
+-- ---------------------------------------------------------------------------
+drop index if exists public.conversations_one_lekhio_thread;
+notify pgrst, 'reload schema';

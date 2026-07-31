@@ -4,10 +4,11 @@ import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { readNudgePrefs } from '../../../../lib/supabase';
 import { settingsNotice } from '../identity';
+import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, FONT, GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RADIUS, RED,
-  RED_TINT, RIVER, RIVER_DEEP, SPACE, SURFACE, TYPE,
-} from '../../../../lib/tokens';
+  GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP, SURFACE,
+  edge,
+} from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';
@@ -136,7 +137,7 @@ const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
 
   blurb: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: `0 0 ${SPACE.md}px`, maxWidth: '62ch' },
-  warn: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: RED_TINT, border: `1px solid ${RED}33`, borderRadius: RADIUS.md, padding: SPACE.sm, margin: `0 0 ${SPACE.sm}px` },
+  warn: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: RED_TINT, border: `1px solid ${LINE}`, borderColor: edge(RED, 20), borderRadius: RADIUS.md, padding: SPACE.sm, margin: `0 0 ${SPACE.sm}px` },
   good: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: GREEN_TINT, borderRadius: RADIUS.md, padding: SPACE.sm, margin: `0 0 ${SPACE.sm}px` },
 
   stack: { display: 'flex', flexDirection: 'column', gap: SPACE.xs },

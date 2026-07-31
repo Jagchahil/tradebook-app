@@ -4,7 +4,8 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../lib/webauth';
 import { SESSION_COOKIE, webSessionsConfigured } from '../../lib/websession';
 import { HOW_LONG } from '../../lib/onboarding';
-import { A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP } from '../../lib/tokens';
+import { A11Y_CSS, APP_THEME_CSS, FONT, RADIUS } from '../../lib/tokens';
+import { INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RIVER, RIVER_DEEP, SURFACE } from '../../lib/apptheme';
 
 export const metadata: Metadata = {
   title: 'Sign in to Lekhio',
@@ -119,6 +120,22 @@ export default async function SignInPage({
               maxLength={8}
               required
             />
+            {/* ⚠️ UNTICKED BY DEFAULT, AND THAT IS THE SECURITY DECISION ON THIS SCREEN.
+                Ticked, the session is the ordinary ninety day sliding one (lib/websession.ts has
+                the cost argument). Unticked, the cookie dies when the browser closes and the row
+                behind it expires within hours either way, because a builders' merchant's counter
+                PC is exactly where someone signs in once, and the man in a hurry never reads a
+                checkbox. The safe shape has to be the one he gets by ignoring it. */}
+            <label style={S.remember}>
+              <input type="checkbox" name="remember" style={S.rememberBox} />
+              <span>
+                Remember my browser
+                <span style={S.rememberNote}>
+                  (If this is not your own device, leave this unticked and you will be signed out
+                  when you close it. Keep your data safe.)
+                </span>
+              </span>
+            </label>
             <button type="submit" style={S.btn}>Sign in</button>
             <a href="/in" style={S.link}>Use a different email or number</a>
             {/* ⚠️ WE NEVER SAY "NO ACCOUNT WITH THAT ADDRESS", AND WE ARE NOT GOING TO. Telling a
@@ -167,8 +184,11 @@ export default async function SignInPage({
 }
 
 const CSS = [
+  // The theme variables first, because every colour below is one of them. This page follows the
+  // device the same way the app does, with not one byte of script. See APP_THEME_CSS in tokens.
+  APP_THEME_CSS,
   A11Y_CSS,
-  `.lek-in{width:100%;max-width:420px;background:#fff;border:1px solid ${LINE};border-radius:${RADIUS.lg}px;padding:32px 28px}`,
+  `.lek-in{width:100%;max-width:420px;background:${PANEL};border:1px solid ${LINE};border-radius:${RADIUS.lg}px;padding:32px 28px}`,
   `@media(max-width:460px){.lek-in{border:none;border-radius:0;padding:26px 20px;background:transparent}}`,
 ].join('');
 
@@ -180,11 +200,14 @@ const S: Record<string, React.CSSProperties> = {
   h1: { fontSize: 26, fontWeight: 800, letterSpacing: '-0.6px', margin: '0 0 8px' },
   sub: { fontSize: 15, lineHeight: 1.55, color: MUTED, margin: '0 0 22px' },
   label: { display: 'block', fontSize: 12.5, fontWeight: 700, color: MUTED, marginBottom: 8 },
-  input: { width: '100%', boxSizing: 'border-box', padding: '14px', fontSize: 16, fontFamily: FONT, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, color: INK, background: '#fff' },
-  btn: { width: '100%', marginTop: 16, padding: '15px 16px', fontSize: 15.5, fontWeight: 700, fontFamily: FONT, color: '#fff', background: RIVER, border: 'none', borderRadius: RADIUS.md, cursor: 'pointer' },
+  input: { width: '100%', boxSizing: 'border-box', padding: '14px', fontSize: 16, fontFamily: FONT, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, color: INK, background: PANEL },
+  btn: { width: '100%', marginTop: 16, padding: '15px 16px', fontSize: 15.5, fontWeight: 700, fontFamily: FONT, color: ON_RIVER, background: RIVER, border: 'none', borderRadius: RADIUS.md, cursor: 'pointer' },
   link: { display: 'block', textAlign: 'center', marginTop: 14, fontSize: 14, fontWeight: 600, color: MUTED, textDecoration: 'none' },
-  err: { color: '#C0392B', fontSize: 14.5, lineHeight: 1.5, margin: '0 0 16px' },
-  note: { background: '#F2F0EA', borderRadius: RADIUS.md, padding: 14, fontSize: 14.5, lineHeight: 1.5, margin: '0 0 16px' },
+  remember: { display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 16, fontSize: 14.5, fontWeight: 600, cursor: 'pointer' },
+  rememberBox: { width: 18, height: 18, marginTop: 1, flex: '0 0 auto', cursor: 'pointer' },
+  rememberNote: { display: 'block', fontSize: 13, lineHeight: 1.5, fontWeight: 400, color: MUTED, marginTop: 3 },
+  err: { color: RED, fontSize: 14.5, lineHeight: 1.5, margin: '0 0 16px' },
+  note: { background: SURFACE, borderRadius: RADIUS.md, padding: 14, fontSize: 14.5, lineHeight: 1.5, margin: '0 0 16px' },
   foot: { fontSize: 14, lineHeight: 1.55, color: MUTED, margin: '24px 0 0' },
   footLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },
   hint: { fontSize: 13, color: MUTED, textAlign: 'center', margin: '12px 0 0' },

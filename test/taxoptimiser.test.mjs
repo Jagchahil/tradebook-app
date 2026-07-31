@@ -16,8 +16,12 @@ const fix = (s) => s
   .replace("from './autonomy'", "from './autonomy.ts'")
   .replace("from './ltdengine'", "from './ltdengine.ts'")
   .replace("from './personalincome'", "from './personalincome.ts'")
-  .replace("from './nistudentloan'", "from './nistudentloan.ts'");
+  .replace("from './nistudentloan'", "from './nistudentloan.ts'")
+  .replace("from './propertyengine'", "from './propertyengine.ts'");
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
+// The optimiser now asks the property engine how the £1,000 allowance stands against actual
+// costs (one engine, never a second copy of the comparison), so it stages alongside.
+writeFileSync(path.join(stage, 'propertyengine.ts'), fix(readFileSync(path.join(lib, 'propertyengine.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'autonomy.ts'), readFileSync(path.join(lib, 'autonomy.ts'), 'utf8'));
 // The optimiser now surfaces the WHOLE-PERSON tax (taxPosition), so its engine comes along too.
 writeFileSync(path.join(stage, 'personalincome.ts'), fix(readFileSync(path.join(lib, 'personalincome.ts'), 'utf8')));

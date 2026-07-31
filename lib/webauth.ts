@@ -21,7 +21,7 @@ import {
   type AuthIdentity,
 } from './supabase';
 import {
-  SESSION_COOKIE, SESSION_TTL_SECONDS, verifySessionCookie, needsTouch, pastMaxLife, originAllowed,
+  SESSION_COOKIE, verifySessionCookie, needsTouch, pastMaxLife, originAllowed, slideExpiry,
 } from './websession';
 
 export interface WebUser {
@@ -78,8 +78,14 @@ export async function userFromSessionCookie(value: string | null): Promise<WebUs
 
   // Slide it forward, at most once a day. Deliberately not awaited: a man reading his ledger must
   // not wait on a housekeeping write, and if it fails the session still works until it expires.
-  if (needsTouch(row.lastSeenAt)) {
-    void touchWebSession(row.id, new Date(Date.now() + SESSION_TTL_SECONDS * 1000));
+  //
+  // ⚠️ ONLY A REMEMBERED SESSION SLIDES. slideExpiry returns null for a session opened with the
+  // "Remember my browser" box unticked, and null means the expiry on the row is never moved: an
+  // unticked session runs out its few hours however hard it is used, which is the whole promise
+  // the unticked box makes on a machine that is not his.
+  const slid = slideExpiry(row.remembered);
+  if (slid && needsTouch(row.lastSeenAt)) {
+    void touchWebSession(row.id, slid);
   }
 
   return { id: row.userId, via: 'cookie', sessionId: row.id, email: null, phone: null };

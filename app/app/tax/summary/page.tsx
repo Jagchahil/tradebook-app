@@ -6,10 +6,10 @@ import { getConfirmedTransactionsForRange } from '../../../../lib/supabase';
 import { buildQuarterPack, quarterBounds, quarterForDate } from '../../../../lib/quarterpack';
 import { gbp0 } from '../../lib/money';
 import { updateDue, UPDATE_ORDINAL } from '../due';
+import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, FONT, GREEN, INK, LINE, MUTED, PAPER, RADIUS, RIVER, SAFFRON_DEEP,
-  SAFFRON_TINT, SPACE, SURFACE, TYPE,
-} from '../../../../lib/tokens';
+  GREEN, INK, LINE, MUTED, ON_GREEN_TINT, PAPER, RIVER, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge,
+} from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';
@@ -83,7 +83,7 @@ export default async function TaxSummaryPage() {
             <div className="lek-grid">
               <div className="lek-tile">
                 <div className="lek-tile-label">In</div>
-                <div className="lek-tile-value" style={{ color: GREEN }}>{gbp0(sub.trade.income)}</div>
+                <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp0(sub.trade.income)}</div>
               </div>
               <div className="lek-tile">
                 <div className="lek-tile-label">Out</div>
@@ -179,7 +179,7 @@ const CSS = [A11Y_CSS, APP_CSS].join('');
 const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
 
-  warn: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '13px 15px', margin: '0 0 14px' },
+  warn: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SAFFRON_TINT, border: `1px solid ${LINE}`, borderColor: edge(SAFFRON_DEEP, 27), borderRadius: RADIUS.lg, padding: '13px 15px', margin: '0 0 14px' },
 
   window: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: `0 0 ${SPACE.md}px`, maxWidth: '62ch' },
   body: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: 0, maxWidth: '62ch' },

@@ -8,9 +8,13 @@ import {
   verifyWaLinkCookie, waMeLink, connectMessage, waLinksConfigured, WALINK_COOKIE, LINK_TTL_SECONDS,
 } from '../../../lib/walink';
 import { qrPath } from '../../../lib/qr';
+// The two raw light tokens are for the QR square alone. A code a camera has to read stays dark
+// on light whatever the page around it is doing, so it deliberately does not theme, and SVG fill
+// attributes cannot resolve a var() anyway.
+import { A11Y_CSS, APP_CSS, FONT, RADIUS, INK as QR_INK, PANEL as QR_PAPER } from '../../../lib/tokens';
 import {
-  A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SURFACE, WHATSAPP,
-} from '../../../lib/tokens';
+  INK, LINE, MUTED, ON_WHATSAPP, PANEL, PAPER, RIVER, RIVER_DEEP, SURFACE, WHATSAPP,
+} from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';
@@ -74,8 +78,11 @@ export default async function ConnectPage({
   // render and a future second use of the square cannot quietly double the work.
   const square = link ? qrPath(link) : null;
 
+  // lek-wrap, so the desk composition clears the fixed nav rail like every other screen. The page
+  // used to size its own column, and a column that centres itself in the viewport sits under the
+  // rail on a laptop.
   return (
-    <main style={S.wrap}>
+    <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
 
       <AppNav current="/app/connect" />
@@ -143,8 +150,8 @@ export default async function ConnectPage({
                 aria-label="Scan to connect your phone to Lekhio on WhatsApp"
                 shapeRendering="crispEdges"
               >
-                <rect width={square.span} height={square.span} fill="#fff" />
-                <path fill={INK} d={square.path} />
+                <rect width={square.span} height={square.span} fill={QR_PAPER} />
+                <path fill={QR_INK} d={square.path} />
               </svg>
             </div>
 
@@ -207,21 +214,21 @@ function formatNumber(digits: string): string {
   return `+${d}`;
 }
 
-const CSS = [A11Y_CSS].join('');
+const CSS = [A11Y_CSS, APP_CSS].join('');
 
 const S: Record<string, React.CSSProperties> = {
-  wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK, padding: '18px 16px 40px', maxWidth: 640, margin: '0 auto' },
+  wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
   head: { marginBottom: 14 },
   back: { fontSize: 13.5, fontWeight: 700, color: MUTED, textDecoration: 'none' },
   h1: { fontSize: 24, lineHeight: 1.25, fontWeight: 800, letterSpacing: '-0.6px', margin: '0 0 16px' },
   h2: { fontSize: 15, fontWeight: 800, letterSpacing: '-0.2px', margin: '0 0 10px' },
-  card: { background: '#fff', border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '20px 18px', marginBottom: 14 },
+  card: { background: PANEL, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '20px 18px', marginBottom: 14 },
   lead: { fontSize: 17, lineHeight: 1.5, fontWeight: 700, margin: '0 0 10px' },
   body: { fontSize: 14.5, lineHeight: 1.6, color: MUTED, margin: '0 0 14px' },
   small: { fontSize: 13, lineHeight: 1.55, color: MUTED, margin: '14px 0 0' },
   qr: { display: 'flex', justifyContent: 'center', padding: '6px 0 16px' },
-  primary: { display: 'block', width: '100%', background: WHATSAPP, color: '#08301A', border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: 16, fontWeight: 800, padding: '15px 18px', cursor: 'pointer' },
-  primaryLink: { display: 'block', textAlign: 'center', background: WHATSAPP, color: '#08301A', borderRadius: RADIUS.md, fontSize: 16, fontWeight: 800, padding: '15px 18px', textDecoration: 'none' },
+  primary: { display: 'block', width: '100%', background: WHATSAPP, color: ON_WHATSAPP, border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: 16, fontWeight: 800, padding: '15px 18px', cursor: 'pointer' },
+  primaryLink: { display: 'block', textAlign: 'center', background: WHATSAPP, color: ON_WHATSAPP, borderRadius: RADIUS.md, fontSize: 16, fontWeight: 800, padding: '15px 18px', textDecoration: 'none' },
   secondary: { background: 'transparent', border: `1px solid ${LINE}`, borderRadius: RADIUS.md, color: RIVER_DEEP, fontFamily: FONT, fontSize: 14.5, fontWeight: 700, padding: '11px 16px', cursor: 'pointer' },
   formRow: { marginTop: 4 },
   code: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 15, fontWeight: 700, background: SURFACE, borderRadius: RADIUS.md, padding: '13px 14px', margin: 0, wordBreak: 'break-all' },

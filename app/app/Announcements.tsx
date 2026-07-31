@@ -1,4 +1,5 @@
-import { GREEN, GREEN_TINT, INK, LINE, MOTION, MUTED, RADIUS, RIVER, RIVER_TINT } from '../../lib/tokens';
+import { MOTION, RADIUS } from '../../lib/tokens';
+import { GREEN, GREEN_TINT, INK, LINE, MUTED, ON_GREEN_TINT, PANEL, RIVER, RIVER_TINT } from '../../lib/apptheme';
 import type { Announcement } from '../../lib/announcements';
 import { appliedLineFor, tagFor } from '../../lib/announcements';
 
@@ -101,7 +102,7 @@ export function Announcements({ items }: { items: Announcement[] }) {
 }
 
 const CSS = `
-.lek-ann{background:#fff;border:1px solid ${LINE};border-radius:${RADIUS.lg}px;padding:16px 18px;margin-bottom:12px;animation:lek-ann-in ${MOTION.enter} ${MOTION.ease} both}
+.lek-ann{background:${PANEL};border:1px solid ${LINE};border-radius:${RADIUS.lg}px;padding:16px 18px;margin-bottom:12px;animation:lek-ann-in ${MOTION.enter} ${MOTION.ease} both}
 @keyframes lek-ann-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .lek-ann-x{border:none;background:transparent;color:${MUTED};cursor:pointer;font-size:12.5px;font-weight:700;padding:5px 8px;border-radius:${RADIUS.sm}px;font-family:inherit;transition:background-color ${MOTION.quick} ${MOTION.ease},color ${MOTION.quick} ${MOTION.ease}}
 .lek-ann-x:hover{background:${LINE};color:${INK}}
@@ -116,7 +117,8 @@ const S: Record<string, React.CSSProperties> = {
   },
   tagProduct: {
     fontSize: 10.5, fontWeight: 800, letterSpacing: 0.7, textTransform: 'uppercase',
-    color: GREEN, background: GREEN_TINT, padding: '4px 9px', borderRadius: RADIUS.pill,
+    // ON_GREEN_TINT, not GREEN: brand green on its own tint reads at 4.46, under the ratchet.
+    color: ON_GREEN_TINT, background: GREEN_TINT, padding: '4px 9px', borderRadius: RADIUS.pill,
   },
   title: { fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.25px', lineHeight: 1.35, margin: 0, color: INK },
   body: { fontSize: 14, lineHeight: 1.5, color: MUTED, margin: '7px 0 0' },

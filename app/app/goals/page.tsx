@@ -6,10 +6,10 @@ import { listGoals } from '../../../lib/supabase';
 import { normaliseGoalRow, splitGoals, capitalNote, targetPhrase } from '../../../lib/goals';
 import { gbp0 } from '../../../lib/money';
 import { READONLY_TITLE, READONLY_LINE } from '../../../lib/gate';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, INK, LINE, MOTION, MUTED, ON_RIVER, PANEL, PAPER, RADIUS,
-  RIVER, RIVER_DEEP, RIVER_TINT, SPACE, SURFACE, TYPE,
-} from '../../../lib/tokens';
+  INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, SURFACE,
+} from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';

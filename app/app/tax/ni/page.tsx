@@ -6,9 +6,8 @@ import { getOptimiserInput } from '../../../../lib/supabase';
 import { niPosition, NI_FACTS } from '../../../../lib/nistudentloan';
 import { FACTS, asPercent } from '../../../../lib/taxengine';
 import { gbp0, gbp2 } from '../../lib/money';
-import {
-  A11Y_CSS, APP_CSS, FONT, GREEN_TINT, INK, MUTED, ON_GREEN_TINT, PAPER, RADIUS, SPACE, TYPE,
-} from '../../../../lib/tokens';
+import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
+import { GREEN_TINT, INK, MUTED, ON_GREEN_TINT, PAPER } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';

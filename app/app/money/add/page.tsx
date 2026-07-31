@@ -2,14 +2,17 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
+import { accountHasRental } from '../../../../lib/supabase';
 import { CATEGORIES } from '../../../../lib/categories';
 import { isMonthKey } from '../../../../lib/moneylog';
 import { gateForUser } from '../../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../../lib/gate';
 import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, INK, LINE, MOTION, MUTED, ON_RIVER, PANEL, PAPER, RADIUS,
-  RIVER, RIVER_DEEP, SPACE, SURFACE, TYPE,
+  A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE,
 } from '../../../../lib/tokens';
+import {
+  INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RIVER, RIVER_DEEP, SURFACE,
+} from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';
@@ -52,6 +55,8 @@ function notice(done: string | undefined, problem: string | undefined): string |
       return 'Logged. It is in your figures.';
     case 'in':
       return 'Logged as money in. It is in your income figures.';
+    case 'rent':
+      return 'Logged as rent. It is in your property stream, kept separate from your trade.';
   }
   switch (problem) {
     case 'bad':
@@ -83,7 +88,10 @@ export default async function AddEntryPage({
   // Validated with the same function /app/money validates its own query string with.
   const landedMonth = isMonthKey(one('m')) ? (one('m') as string) : null;
 
-  const gate = await gateForUser(user.id);
+  // Whether the rent choice is drawn at all. lib/supabase.ts owns the question: he said he has
+  // rental property (at signup or in setup), or he has already logged confirmed rent. For everyone
+  // else the form stays exactly two choices, doc 103's empty test.
+  const [gate, rental] = await Promise.all([gateForUser(user.id), accountHasRental(user.id)]);
   const locked = gate === 'readonly';
 
   // Today and the oldest day the server will accept. The WINDOW is owned by clampReceiptDate in
@@ -146,6 +154,24 @@ export default async function AddEntryPage({
                   <span style={S.radioHint}>You got paid.</span>
                 </span>
               </label>
+              {/* THE RENT DOOR. Drawn only for an account with a rental stream, because for anyone
+                  else it is a choice with no sensible answer. Rent must be distinguishable from
+                  trade income AT ENTRY: HMRC taxes the two streams differently (no National
+                  Insurance on rent, Section 24 on the mortgage interest), and a rent receipt filed
+                  as trade income overstates his Class 4 bill. Nothing existing is ever reclassified
+                  by this: the choice only shapes the row he is creating right now. */}
+              {rental ? (
+                <label style={S.radioRow}>
+                  <input type="radio" name="direction" value="rent" style={S.radio} />
+                  <span>
+                    <span style={S.radioTop}>Rent in, from a property</span>
+                    <span style={S.radioHint}>
+                      Money in from your rental property. Kept in its own stream and taxed its own
+                      way, never mixed with your trade.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
             </fieldset>
 
             <label htmlFor="amount" style={S.label}>How much, in pounds</label>

@@ -19,10 +19,11 @@ import {
   isStep, isDone, toStep, prevStep, stepNumber, stepCount, progressPct, stepTitle,
   HOW_LONG, HOW_LONG_WHY, type Step,
 } from '../../../lib/onboarding';
+import { A11Y_CSS, APP_THEME_CSS, FONT, RADIUS } from '../../../lib/tokens';
 import {
-  A11Y_CSS, FONT, GREEN, GREEN_TINT, INK, LINE, MUTED, PAPER, RADIUS, RED, RIVER, RIVER_DEEP,
-  RIVER_TINT, SAFFRON_DEEP, SURFACE,
-} from '../../../lib/tokens';
+  GREEN, GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP,
+  RIVER_TINT, SAFFRON_DEEP, SURFACE, edge,
+} from '../../../lib/apptheme';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -128,7 +129,7 @@ export default async function SetupPage({
 
   return (
     <main style={S.wrap}>
-      <style>{A11Y_CSS}</style>
+      <style>{[APP_THEME_CSS, A11Y_CSS].join('')}</style>
 
       <header style={S.head}>
         <span style={S.logo}>Lekhio</span>
@@ -881,11 +882,11 @@ const S: Record<string, React.CSSProperties> = {
   barTrack: { height: 6, borderRadius: 3, background: SURFACE, overflow: 'hidden', marginBottom: 18 },
   barFill: { height: 6, borderRadius: 3, background: SAFFRON_DEEP },
 
-  card: { background: '#fff', border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '20px 18px', marginBottom: 14 },
+  card: { background: PANEL, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '20px 18px', marginBottom: 14 },
   h1: { fontSize: 22, lineHeight: 1.28, fontWeight: 800, letterSpacing: '-0.5px', margin: '0 0 12px' },
   body: { fontSize: 15.5, lineHeight: 1.6, color: MUTED, margin: '0 0 14px' },
   reassure: { fontSize: 14.5, lineHeight: 1.6, color: INK, background: GREEN_TINT, borderRadius: RADIUS.md, padding: 14, margin: '4px 0 0' },
-  warn: { fontSize: 14.5, lineHeight: 1.6, color: INK, background: '#FBEAE8', border: `1px solid ${RED}33`, borderRadius: RADIUS.md, padding: 14, margin: '0 0 14px' },
+  warn: { fontSize: 14.5, lineHeight: 1.6, color: INK, background: RED_TINT, border: `1px solid ${LINE}`, borderColor: edge(RED, 20), borderRadius: RADIUS.md, padding: 14, margin: '0 0 14px' },
   done: { fontSize: 15, lineHeight: 1.6, color: INK, background: GREEN_TINT, borderRadius: RADIUS.md, padding: 14, margin: 0 },
   hint: { fontSize: 13, lineHeight: 1.55, color: MUTED, margin: '14px 0 0' },
   count: { fontSize: 12.5, fontWeight: 700, color: MUTED, margin: '0 0 12px' },
@@ -893,7 +894,7 @@ const S: Record<string, React.CSSProperties> = {
   stack: { display: 'flex', flexDirection: 'column', gap: 10 },
 
   optForm: { margin: 0 },
-  opt: { display: 'block', width: '100%', textAlign: 'left', background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, padding: '14px 14px', cursor: 'pointer', fontFamily: FONT, color: INK },
+  opt: { display: 'block', width: '100%', textAlign: 'left', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, padding: '14px 14px', cursor: 'pointer', fontFamily: FONT, color: INK },
   optOn: { borderColor: RIVER, background: RIVER_TINT },
   optLabel: { display: 'block', fontSize: 16, fontWeight: 700 },
   optNote: { display: 'block', fontSize: 13.5, lineHeight: 1.5, color: MUTED, marginTop: 3 },
@@ -901,18 +902,18 @@ const S: Record<string, React.CSSProperties> = {
   shareForm: { marginTop: 16, background: SURFACE, borderRadius: RADIUS.md, padding: 14 },
   label: { display: 'block', fontSize: 12.5, fontWeight: 700, color: MUTED, marginBottom: 8 },
   shareRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  shareInput: { width: 90, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: 16, fontFamily: FONT, color: INK },
+  shareInput: { width: 90, background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: 16, fontFamily: FONT, color: INK },
   pct: { fontSize: 16, fontWeight: 700, color: MUTED },
-  shareSave: { marginLeft: 'auto', background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.sm, padding: '11px 18px', fontSize: 14.5, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
+  shareSave: { marginLeft: 'auto', background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.sm, padding: '11px 18px', fontSize: 14.5, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
 
-  q: { border: `1px solid ${LINE}`, borderRadius: RADIUS.md, padding: 15, background: '#fff' },
+  q: { border: `1px solid ${LINE}`, borderRadius: RADIUS.md, padding: 15, background: PANEL },
   ask: { fontSize: 16, lineHeight: 1.45, fontWeight: 700, margin: '0 0 7px' },
   why: { fontSize: 14, lineHeight: 1.55, color: MUTED, margin: 0 },
   whose: { fontSize: 13, lineHeight: 1.5, color: RIVER_DEEP, background: RIVER_TINT, borderRadius: RADIUS.sm, padding: '9px 11px', margin: '10px 0 0' },
   answers: { display: 'flex', gap: 10, marginTop: 13 },
   aForm: { flex: 1, margin: 0 },
-  yes: { width: '100%', background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.sm, padding: '13px 0', fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
-  no: { width: '100%', background: '#fff', color: MUTED, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '13px 0', fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
+  yes: { width: '100%', background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.sm, padding: '13px 0', fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
+  no: { width: '100%', background: PANEL, color: MUTED, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '13px 0', fontSize: 15, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
 
   fieldset: { border: `1px solid ${LINE}`, borderRadius: RADIUS.md, padding: '12px 14px 14px', margin: '0 0 16px' },
   legend: { fontSize: 12.5, fontWeight: 700, color: MUTED, padding: '0 6px' },
@@ -920,7 +921,7 @@ const S: Record<string, React.CSSProperties> = {
   radio: { marginTop: 3, width: 18, height: 18, accentColor: RIVER, flexShrink: 0 },
   radioLabel: { display: 'block', fontSize: 15.5, fontWeight: 700 },
   radioNote: { display: 'block', fontSize: 13.5, lineHeight: 1.5, color: MUTED, marginTop: 2 },
-  connect: { width: '100%', background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.md, padding: '15px 0', fontSize: 16, fontWeight: 800, fontFamily: FONT, cursor: 'pointer' },
+  connect: { width: '100%', background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.md, padding: '15px 0', fontSize: 16, fontWeight: 800, fontFamily: FONT, cursor: 'pointer' },
 
   bigWrap: { margin: '4px 0 18px' },
   big2: { fontSize: 44, fontWeight: 800, letterSpacing: '-1.5px', color: GREEN, lineHeight: 1.05 },
@@ -939,6 +940,6 @@ const S: Record<string, React.CSSProperties> = {
   backAlt: { display: 'inline-block', marginTop: 4, color: RIVER, fontSize: 15, fontWeight: 700, textDecoration: 'none' },
   foot: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 6 },
   nextForm: { width: '100%', margin: 0 },
-  next: { width: '100%', background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.lg, padding: '17px 0', fontSize: 17, fontWeight: 800, fontFamily: FONT, cursor: 'pointer' },
+  next: { width: '100%', background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.lg, padding: '17px 0', fontSize: 17, fontWeight: 800, fontFamily: FONT, cursor: 'pointer' },
   backLink: { color: MUTED, fontSize: 13.5, fontWeight: 600, textDecoration: 'none' },
 };

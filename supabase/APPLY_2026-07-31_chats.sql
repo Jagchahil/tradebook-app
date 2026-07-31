@@ -1,0 +1,41 @@
+-- APPLY 2026-07-31 (second of the day): the chat list. Run this whole file in the Supabase SQL
+-- editor. It is idempotent.
+--
+-- ═══════════════════════════════════════════════════════════════════════════════════════════
+-- WHY ONE INDEX IS DROPPED, AND WHY DROPPED RATHER THAN SCOPED.
+--
+-- This morning's APPLY_2026-07-31_thread.sql created conversations_one_lekhio_thread, a partial
+-- unique index making "one Lekhio thread per user" a database fact. It existed for one job: to
+-- referee the race inside getOrCreateLekhioThread, so two simultaneous first posts could not
+-- mint two standing threads.
+--
+-- The same afternoon /app/thread became a DM style chat list: every conversation a row, old
+-- chats to look back on, and a "Start a new chat" button that creates a fresh Lekhio
+-- conversation. One thread per user is no longer the product; it is the opposite of the
+-- product, and the button's insert dies on this index with a 409 for every account that
+-- already has its standing thread.
+--
+-- Dropped rather than scoped, because there is no honest scope left. The index guarded a
+-- uniqueness the surface no longer wants, and the failure it prevented has become harmless:
+-- in the many chats model the worst a race between two "Start a new chat" presses can produce
+-- is one extra empty chat, which the list simply shows and the man simply ignores or uses.
+-- A scoped index (say, unique on a magic title) would be a rule nobody asked for enforced on
+-- a string anybody can type.
+--
+-- Until this file runs, the code stays honest rather than clever: createLekhioChat reports the
+-- 409 as blocked, /api/thread/new sends the man back to the list, and the list says plainly
+-- that a second chat cannot be started yet. Nothing reuses a chat he did not choose.
+--
+-- EVERYTHING ELSE FROM THIS MORNING STANDS. The kind column, its check, and the widened
+-- messages role check ('user', 'puchio', 'lekhio') are untouched: they are what makes the
+-- list's rows mean what they say.
+--
+-- RLS POSTURE: UNCHANGED, ON PURPOSE. conversations_own and messages_own already scope every
+-- verb by auth.uid() = user_id, and agent_signals (read on the same surface) keeps its
+-- select-and-update-own policies. The web server reads with the service role and scopes every
+-- query by user_id itself, per the lib/supabase.ts rule.
+-- ═══════════════════════════════════════════════════════════════════════════════════════════
+
+drop index if exists public.conversations_one_lekhio_thread;
+
+notify pgrst, 'reload schema';

@@ -6,10 +6,8 @@ import { transactionsInMonth } from '../../../lib/supabase';
 import { logFor, monthTitle, dayLabel } from '../../../lib/moneylog';
 import { gbp0 } from '../../../lib/money';
 import { verifyEntryRef, refBelongsTo } from '../entryref';
-import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, GREEN, INK, LINE, MOTION, MUTED, PAPER, RADIUS, RIVER, SPACE,
-  SURFACE, TYPE,
-} from '../../../lib/tokens';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
+import { GREEN, INK, LINE, MUTED, PAPER, RIVER, SURFACE } from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';

@@ -6,10 +6,8 @@ import { getOptimiserInput } from '../../../../lib/supabase';
 import { findOptimisations } from '../../../../lib/taxoptimiser';
 import { TAX_YEAR } from '../../../../lib/taxengine';
 import { gbp0 } from '../../lib/money';
-import {
-  A11Y_CSS, APP_CSS, FONT, GREEN_TINT, INK, MUTED, ON_GREEN_TINT, PAPER, RADIUS, SPACE, SURFACE,
-  TYPE,
-} from '../../../../lib/tokens';
+import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
+import { GREEN_TINT, INK, MUTED, ON_GREEN_TINT, PAPER, SURFACE } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';

@@ -7,9 +7,8 @@ import { taxPosition } from '../../../../lib/taxoptimiser';
 import { STUDENT_PLANS, type StudentPlan } from '../../../../lib/nistudentloan';
 import { asPercent } from '../../../../lib/taxengine';
 import { gbp0 } from '../../lib/money';
-import {
-  A11Y_CSS, APP_CSS, FONT, INK, MUTED, PAPER, RIVER_DEEP, SPACE, TYPE,
-} from '../../../../lib/tokens';
+import { A11Y_CSS, APP_CSS, FONT, SPACE, TYPE } from '../../../../lib/tokens';
+import { INK, MUTED, PAPER, RIVER_DEEP } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';

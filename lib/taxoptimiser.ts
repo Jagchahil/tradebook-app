@@ -12,6 +12,12 @@
 // for the user's yes. Timing and tax-treatment guidance only. You decide.
 
 import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly, marriageAllowance } from './taxengine';
+// The property engine, doc 82 section 4. There is ONE place that knows how the £1,000 property
+// allowance stands against actual costs, and it is lib/propertyengine.ts (verified against the
+// HMRC technical note of 26 November 2025, see its header). The lever below asks it and repeats
+// its answer; it never reworks the comparison, for the same reason no component holds a tax
+// constant: two copies of a rule drift, and the copy that drifts is the one he is looking at.
+import { propertyProfit, PROPERTY_FACTS, type PropertyTaxYear } from './propertyengine';
 import { compare } from './ltdengine';
 import { combinedIncomeTax, type PersonalIncomeResult } from './personalincome';
 import { decideAction, type AutonomyLevel } from './autonomy';
@@ -385,6 +391,62 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
       title: 'Property costs you may not be claiming',
       detail: `You have rental income but very little logged against it. Mortgage interest (a 20% tax credit), repairs, agent fees, insurance and ground rent all reduce your property tax. Log them and Lekhio applies the £1,000 property allowance or your actual costs, whichever leaves you better off.`,
       estSaving: 0,
+      action: 'log_entry',
+    });
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 8b. THE £1,000 PROPERTY ALLOWANCE AGAINST HIS ACTUAL COSTS, SAID OUT LOUD.
+  //
+  // Found by walking a landlord persona on the live site, 31 July 2026. The signup reveal told her
+  // the rental allowance "reaches back 4 years, we handle this one", and then Ways to save said
+  // "Nothing to suggest". Both sentences were individually defensible and together they were a
+  // broken promise: the one screen whose job is to show the working never mentioned the one relief
+  // she was promised.
+  //
+  // ⚠️ THE COMPARISON IS THE ENGINE'S, NOT OURS. propertyProfit() in lib/propertyengine.ts already
+  // decides allowance against actuals and writes the reason in plain English, and this lever
+  // repeats that sentence verbatim, then adds where the figures came from, because every figure
+  // carries its basis. When he has confirmed rent, the engine speaks about HIS numbers. When we
+  // only hold the flag (he ticked rental property at signup, or said yes to the rental question),
+  // there are no numbers to speak about and the card says exactly that instead of estimating.
+  //
+  // ⚠️ estSaving IS 0 IN EVERY BRANCH, ON PURPOSE. The allowance is applied by the engine when the
+  // figures are computed, not unlocked by him doing something, so a pounds figure here would be
+  // counted twice the day anything sums these. info: true, a thing worth knowing, never a promise.
+  //
+  // ⚠️ AND 'no' SUPPRESSES THE FLAG BRANCH, THE SAME RULE AS MARRIAGE BELOW: only an explicit yes
+  // opens the card, silence stays silent. Confirmed rent beats the flag either way, because money
+  // he has logged is a fact whatever he answered.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // Which schedule applies. startYear 2027 onward is the post Budget property schedule; the
+  // allowance itself is £1,000 in both years, but the year label must never be guessed.
+  const propYear: PropertyTaxYear = input.startYear >= 2027 ? '2027-28' : '2026-27';
+  const propAllowanceStr = PROPERTY_FACTS[propYear].propertyAllowance.toLocaleString('en-GB');
+  const rentalSaidYes = (input.circumstances ?? {}).rental === 'yes';
+  if (propIncome > 0) {
+    const split = propertyProfit(propIncome, propExpenses, propYear);
+    out.push({
+      key: 'property_allowance',
+      title: `The £${propAllowanceStr} property allowance, or your actual costs`,
+      detail:
+        `${split.note} Worked out on the £${round(propIncome).toLocaleString('en-GB')} of rent and `
+        + `£${round(propExpenses).toLocaleString('en-GB')} of property costs you have confirmed this year.`,
+      estSaving: 0,
+      info: true,
+      action: 'confirm_prompt',
+    });
+  } else if (rentalSaidYes) {
+    out.push({
+      key: 'property_allowance',
+      title: `The £${propAllowanceStr} property allowance, or your actual costs`,
+      detail:
+        `You told us you have rental property. Rent is kept in its own stream, taxed its own way, `
+        + `and once your rent and property costs are in, Lekhio takes the £${propAllowanceStr} property `
+        + `allowance or your actual costs, whichever leaves you better off. No property figures are `
+        + `logged yet, so there is no number to show you.`,
+      estSaving: 0,
+      info: true,
       action: 'log_entry',
     });
   }

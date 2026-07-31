@@ -81,7 +81,12 @@ export async function POST(req: NextRequest) {
     category = typeof body.category === 'string' ? body.category : '';
   }
 
-  if (direction !== 'in' && direction !== 'out') {
+  // 'rent' is money in for a property. It exists so a landlord's rent can be DISTINGUISHED from
+  // trade income at the door: the two are taxed as separate streams (no National Insurance on
+  // rent, Section 24 on the mortgage interest), and lib/propertyengine.ts can only keep them
+  // separate if the row says which it is. It is accepted whether or not the form happened to draw
+  // the choice, because a man typing his own rent is stating a fact about his own money.
+  if (direction !== 'in' && direction !== 'out' && direction !== 'rent') {
     return isForm ? back('problem=bad') : NextResponse.json({ error: 'bad_request' }, { status: 400 });
   }
 
@@ -109,9 +114,10 @@ export async function POST(req: NextRequest) {
 
   // Money in is income, decided here. Money out takes a real category from the one list in
   // lib/categories.ts, and an empty or unknown choice is 'other', which is the honest word for
-  // "he did not say", never a guess.
+  // "he did not say", never a guess. Rent in is 'rent', the same literal the WhatsApp rent
+  // capture writes, so every property income row in the product looks the same to its readers.
   const trimmed = category.trim().toLowerCase();
-  const filedAs = direction === 'in' ? 'income' : (isCategory(trimmed) ? trimmed : 'other');
+  const filedAs = direction === 'in' ? 'income' : direction === 'rent' ? 'rent' : (isCategory(trimmed) ? trimmed : 'other');
 
   try {
     await insertTransaction({
@@ -125,6 +131,9 @@ export async function POST(req: NextRequest) {
       // His own typing, approved by his own press. See the header for why this is the one
       // capture that does not wait.
       confirmed: true,
+      // The stream. ONLY the rent choice marks a row 'property'; plain money in stays trade
+      // income exactly as it always was, and nothing here ever rewrites an existing row.
+      income_type: direction === 'rent' ? 'property' : undefined,
     });
   } catch {
     // A failed write must not look like a successful one. Nothing landed, and the page says so.

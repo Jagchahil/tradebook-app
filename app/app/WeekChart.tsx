@@ -1,4 +1,5 @@
-import { GREEN, LINE, MOTION, MUTED, RIVER } from '../../lib/tokens';
+import { MOTION } from '../../lib/tokens';
+import { GREEN, LINE, MUTED, RIVER } from '../../lib/apptheme';
 import { gbp0 } from '../../lib/money';
 import { barHeight, type Week } from '../../lib/weekchart';
 
@@ -88,16 +89,20 @@ export function WeekChart({ week }: { week: Week }) {
           const delay = `${i * 45}ms`;
           return (
             <g key={d.iso}>
+              {/* ⚠️ fill LIVES IN style, NOT IN THE ATTRIBUTE. The colours are now CSS custom
+                  properties so the chart follows the device theme, and var() only resolves in CSS,
+                  never in an SVG presentation attribute. A fill attribute of var(--green) paints
+                  black. */}
               {inH > 0 && (
                 <rect
-                  className="lek-bar" style={{ animationDelay: delay }}
-                  x={x} y={H - inH} width={BAR} height={inH} fill={GREEN}
+                  className="lek-bar" style={{ animationDelay: delay, fill: GREEN }}
+                  x={x} y={H - inH} width={BAR} height={inH}
                 />
               )}
               {outH > 0 && (
                 <rect
-                  className="lek-bar" style={{ animationDelay: delay }}
-                  x={x + BAR + GAP} y={H - outH} width={BAR} height={outH} fill={RIVER}
+                  className="lek-bar" style={{ animationDelay: delay, fill: RIVER }}
+                  x={x + BAR + GAP} y={H - outH} width={BAR} height={outH}
                 />
               )}
             </g>

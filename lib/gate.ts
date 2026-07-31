@@ -266,7 +266,8 @@ export const GATED_ROUTES: GatedRoute[] = [
   // route in this table: a locked account keeps every word, because his questions and the
   // answers he already paid for are his records. Posting is this route, and posting is the
   // work: the deterministic intents cost queries and the open questions spend real AI money.
-  { route: 'app/api/thread', rule: 'entitled', why: 'Posting to the Lekhio thread. Answering is the work and the AI path spends money, the same judgement as /api/ask. Reading the thread stays free on the page: his own words are his records.' },
+  { route: 'app/api/thread', rule: 'entitled', why: 'Posting to a Lekhio chat. Answering is the work and the AI path spends money, the same judgement as /api/ask. Reading every chat stays free on the pages: his own words are his records.' },
+  { route: 'app/api/thread/new', rule: 'entitled', why: 'Starting a new chat, which exists only to post into, and posting is the work. His old chats and everything Rakha flagged stay readable on the pages whatever he pays.' },
 ];
 
 export function ruleFor(route: string): Rule | null {

@@ -146,7 +146,7 @@ const stage = mkdtempSync(path.join(tmpdir(), 'payweb-'));
 const fixLib = (s) => s.replace(/from '\.\/([a-z]+)'/g, "from './$1.ts'");
 for (const f of [
   'taxengine', 'nistudentloan', 'autonomy', 'ltdengine', 'personalincome', 'partnership',
-  'position', 'taxoptimiser', 'payyourself',
+  'position', 'propertyengine', 'taxoptimiser', 'payyourself',
 ]) {
   writeFileSync(path.join(stage, `${f}.ts`), fixLib(read(`lib/${f}.ts`)));
 }

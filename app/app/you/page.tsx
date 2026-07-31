@@ -6,10 +6,11 @@ import { readIdentityCard, getBusinessProfile, readCircumstances, readSignupComp
 import { registrationLine } from '../../../lib/companieshouse';
 import { household, notHousehold, mtdQuestions, progressIn } from '../../../lib/circumstances';
 import { maskEmail, bindNotice, BOUND_LINE } from './identity';
+import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, FONT, GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RADIUS,
-  RED, RED_TINT, RIVER, RIVER_DEEP, SPACE, SURFACE, TYPE,
-} from '../../../lib/tokens';
+  GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP, SURFACE,
+  edge,
+} from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';
@@ -287,7 +288,7 @@ const S: Record<string, React.CSSProperties> = {
   name: { fontSize: TYPE.stat, fontWeight: 800, letterSpacing: '-0.02em', margin: `0 0 ${SPACE.xs}px` },
   fact: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: `0 0 ${SPACE.xs}px`, maxWidth: '62ch' },
   quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: `${SPACE.xs}px 0 0`, maxWidth: '62ch' },
-  warn: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: RED_TINT, border: `1px solid ${RED}33`, borderRadius: RADIUS.md, padding: SPACE.sm, margin: `0 0 ${SPACE.sm}px` },
+  warn: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: RED_TINT, border: `1px solid ${LINE}`, borderColor: edge(RED, 20), borderRadius: RADIUS.md, padding: SPACE.sm, margin: `0 0 ${SPACE.sm}px` },
   good: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: GREEN_TINT, borderRadius: RADIUS.md, padding: SPACE.sm, margin: `${SPACE.xs}px 0 0` },
 
   inlineLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },

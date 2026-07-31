@@ -99,6 +99,56 @@ ok('🔴 VERIFY READS THE CONTACT FROM THE SIGNED COOKIE', verifyRoute.includes(
 ok('🔴 VERIFY NEVER READS A PHONE OR EMAIL OUT OF THE FORM', !/form\.get\(\s*['"](phone|email|contact)['"]/.test(verifyRoute));
 ok('the identity comes from Supabase, not from us', verifyRoute.includes('verifyAccessToken'));
 
+// ── REMEMBER MY BROWSER, THREADED HONESTLY THROUGH THE ONE DOOR THAT ASKS ──
+//
+// The box on /in is the user's statement about whose machine this is, and the only honest
+// implementation is one where the row, the signed cookie and the cookie attributes all say the
+// same thing. An unticked checkbox posts nothing, so absence must read as "do not remember",
+// including for a crafted post that omits the field on purpose.
+ok('verify reads the box from the form', verifyRoute.includes("form.get('remember')"));
+ok('and only the ticked value counts, absence is the safe reading',
+  /form\.get\('remember'\) === 'on'/.test(verifyRoute));
+ok('🔴 THE ROW RECORDS WHICH KIND OF SESSION IT IS',
+  /createWebSession\([^)]*,\s*remembered\)/.test(verifyRoute));
+ok('🔴 AN UNTICKED SIGN IN GETS THE SHORT SERVER SIDE EXPIRY',
+  verifyRoute.includes('SESSION_TTL_UNREMEMBERED_SECONDS'));
+ok('🔴 AND A COOKIE WITH NO Max-Age, WHICH DIES WITH THE BROWSER',
+  /remembered \? sessionCookieAttributes\(\) : browserSessionCookieAttributes\(\)/.test(verifyRoute));
+// ⚠️ NOT [^)]* HERE: new Date() closes a bracket mid call, the exact trap this suite already
+// documented once at the 303 assertion below. Matched across the whole call instead.
+ok('the exp inside the signed cookie rides the same ttl as the row',
+  /sessionCookieValue\(sessionId,[\s\S]{0,60}?ttlSeconds\)/.test(verifyRoute));
+
+// The other half of the promise: use must not stretch an unticked session towards the ninety
+// days he declined. The gate consults the row and slideExpiry refuses, and the refusal itself is
+// held down as pure logic in test/websession.test.mjs.
+const webauthSrc = read(path.join(repo, 'lib/webauth.ts'));
+ok('🔴 THE GATE ONLY EVER SLIDES A REMEMBERED SESSION',
+  /slideExpiry\(row\.remembered\)/.test(webauthSrc) && /if \(slid && needsTouch/.test(webauthSrc));
+ok('and no other slide path survives in the gate',
+  !/SESSION_TTL_SECONDS/.test(stripComments(webauthSrc)));
+ok('the session read carries the flag out of the row',
+  /select=id,user_id,created_at,last_seen_at,expires_at,remembered/.test(read(path.join(repo, 'lib/supabase.ts'))));
+
+// The box itself, on /in: present, honestly worded, and unticked by default. A default of ticked
+// would make the safe shape the one nobody in a hurry ever gets.
+const inPage = read(path.join(repo, 'app/in/page.tsx'));
+ok('the box posts as remember', /name="remember"/.test(inPage));
+ok('🔴 THE BOX IS UNTICKED BY DEFAULT', !/defaultChecked/.test(inPage));
+ok('it says what it is', inPage.includes('Remember my browser'));
+ok('and says what unticked means, plainly', inPage.includes('leave this unticked')
+  && inPage.includes('signed out') && inPage.includes('Keep your data safe'));
+
+// The signup door mints a session too, and the parameter has no default, so it must answer the
+// question out loud rather than inheriting an answer nobody chose.
+ok('the signup door answers the remembered question explicitly',
+  /createWebSession\([^)]*,\s*true\)/.test(read(path.join(repo, 'app/api/signup/verify/route.ts'))));
+
+// And the column the row records it in is applied, before the code that selects it by name.
+ok('the remembered column has a migration',
+  /add column if not exists remembered boolean not null default true/.test(
+    read(path.join(repo, 'supabase/APPLY_2026-07-31_remember_browser.sql'))));
+
 console.log('\n3. THE ABUSE CONTROLS ARE ON THE ONE ROUTE THAT COSTS MONEY');
 ok('🔴 IT REFUSES A CONTACT THAT IS NOT ALREADY OURS', startRoute.includes('findContactAccount'));
 ok('🔴 THE DAILY CAP FAILS CLOSED (spendCapReached, not rateLimitedShared)', startRoute.includes('spendCapReached'));

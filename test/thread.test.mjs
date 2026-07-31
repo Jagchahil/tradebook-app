@@ -1,25 +1,35 @@
-// THE LEKHIO THREAD. The conversation surface at /app/thread and its POST at /api/thread.
+// THE LEKHIO CHATS. The chat view at /app/thread/chat and its POST at /api/thread.
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // WHAT THIS SUITE DEFENDS, IN THE ORDER THE FAILURES WOULD HURT:
 //
-//   1. 🔴 ONE BRAIN. The thread must answer with the WhatsApp machinery BY NAME: the same
+//   1. 🔴 ONE BRAIN. The chat must answer with the WhatsApp machinery BY NAME: the same
 //      matchers, the same engines, the same guarded AI path, the same derived caps and the
 //      same shared spend rings. A route that grew its own tax constant or its own model call
 //      would be a second engine, and two engines over one number is the house disease.
 //
-//   2. 🔴 TENANCY. The thread helpers are staged with a recording fetch and ATTACKED at
+//   2. 🔴 TENANCY. The storage helpers are staged with a recording fetch and ATTACKED at
 //      runtime: a crafted conversation id belonging to another man must die at the ownership
 //      read with zero rows written, and every query must carry user_id from the session.
 //
 //   3. 🔴 HONESTY WHEN IT CANNOT ANSWER. Caps exhausted, kill switch, AI not configured:
-//      the stored reply is the plain truthful line, never silence and never a fake.
+//      the stored reply is the plain truthful line, never silence and never a fake. And
+//      honesty when the database still enforces v1's one thread: a refused new chat is
+//      reported blocked, never silently swapped for an old one.
 //
 //   4. 🔴 ARTICLE 9. Nothing from the circumstances chain can reach this surface, the model
 //      context is the same one WhatsApp sends, and no message content is ever logged.
 //
-//   5. The read only paywall: a locked account reads his whole thread, the composer hides
-//      behind the same banner other pages use, and the gate row says posting is 'entitled'.
+//   5. The read only paywall: a locked account reads every chat, the composer hides behind
+//      the same banner other pages use, and the gate rows say posting is 'entitled'.
+//
+// ⚠️ RE-PINNED 31 JULY 2026, SAME DAY AS V1. /app/thread became the chat LIST and the words
+// moved one tap deeper to /app/thread/chat behind a sealed reference (app/app/chatref.ts).
+// The v1 page pins moved here onto the chat view; the v1 "one thread per user is a database
+// fact" pin became its opposite on purpose (the widening APPLY drops that index); and the v1
+// "exactly one form field" pin became "exactly two: the words and the sealed reference".
+// The list page, the reference module and the Rakha view are pinned by
+// test/chatsurface.test.mjs.
 //
 // Source pins plus logic tests, in the style of test/moneyweb.test.mjs.
 // Run: node test/thread.test.mjs
@@ -47,14 +57,15 @@ const stripComments = (s) => s
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '');
 
-const pageSrc = read('app/app/thread/page.tsx');
+const chatSrc = read('app/app/thread/chat/page.tsx');
 const routeSrc = read('app/api/thread/route.ts');
 const waSrc = read('app/api/whatsapp/route.ts');
 const dbSrc = read('lib/supabase.ts');
 const applySrc = read('supabase/APPLY_2026-07-31_thread.sql');
+const applyChatsSrc = read('supabase/APPLY_2026-07-31_chats.sql');
 const schemaSrc = read('supabase/schema.sql');
 
-const pageCode = stripComments(pageSrc);
+const chatCode = stripComments(chatSrc);
 const routeCode = stripComments(routeSrc);
 
 const gate = await import(pathToFileURL(path.join(root, 'lib/gate.ts')).href);
@@ -62,14 +73,14 @@ const nudge = await import(pathToFileURL(path.join(root, 'lib/banknudge.ts')).hr
 const intents = await import(pathToFileURL(path.join(root, 'lib/waintents.ts')).href);
 const claims = await import(pathToFileURL(path.join(root, 'lib/claimrules.data.ts')).href);
 
-console.log('\nthread: the conversation surface, one brain, his rows only');
+console.log('\nthread: the chat surface, one brain, his rows only');
 
 // ---------------------------------------------------------------------------------------------
-// 1. THE STORAGE. The existing conversations and messages tables carry it, via an APPLY file.
+// 1. THE STORAGE. The existing conversations and messages tables carry it, via APPLY files.
 // ---------------------------------------------------------------------------------------------
 console.log('\n=== the storage rides the existing tables, honestly ===\n');
 
-ok('the APPLY file invents NO new table: the existing pair carries the thread',
+ok('the v1 APPLY file invents NO new table: the existing pair carries the chats',
   !/create\s+table/i.test(applySrc));
 ok('messages.role is widened to lekhio and KEEPS user and puchio',
   /check \(role in \('user', 'puchio', 'lekhio'\)\)/.test(applySrc));
@@ -77,52 +88,76 @@ ok('conversations gains a kind, defaulting every existing row to puchio',
   /add column if not exists kind text not null default 'puchio'/.test(applySrc));
 ok('the kind is checked to the two products and nothing else',
   /check \(kind in \('puchio', 'lekhio'\)\)/.test(applySrc));
-ok('🔴 one Lekhio thread per user is a DATABASE fact, not a code hope',
-  /create unique index if not exists conversations_one_lekhio_thread\s*\n?\s*on public\.conversations \(user_id\) where kind = 'lekhio'/.test(applySrc));
-ok('schema.sql carries the same three changes for a fresh database',
-  /conversations_one_lekhio_thread/.test(schemaSrc)
-  && /check \(role in \('user', 'puchio', 'lekhio'\)\)/.test(schemaSrc)
+
+// 🔴 THE WIDENING, RE-PINNED HONESTLY. v1 made "one Lekhio thread per user" a database fact
+// (the partial unique index) as the creation race's referee. The chat list makes many chats
+// the product, so the second APPLY of the day DROPS that index, with the reasoning in its
+// header, and until it runs the code reports the refusal rather than papering over it (the
+// createLekhioChat attack below, and the honest line pinned in test/chatsurface.test.mjs).
+ok('the v1 APPLY created the one-thread index, kept as history',
+  /create unique index if not exists conversations_one_lekhio_thread/.test(applySrc));
+ok('🔴 the chats APPLY drops that index, and says why in its header',
+  /drop index if exists public\.conversations_one_lekhio_thread/.test(applyChatsSrc)
+  && /WHY ONE INDEX IS DROPPED/.test(applyChatsSrc));
+ok('the chats APPLY changes nothing else: no table, no policy, no column, no constraint',
+  !/create\s+table|create policy|drop policy|alter table|add column/i.test(applyChatsSrc));
+ok('schema.sql carries the kind and role changes for a fresh database',
+  /check \(role in \('user', 'puchio', 'lekhio'\)\)/.test(schemaSrc)
   && /kind text not null default 'puchio'/.test(schemaSrc));
-ok('RLS posture is untouched: the APPLY file writes no policy',
-  !/create policy|drop policy/i.test(applySrc));
+ok('🔴 schema.sql drops the index AFTER creating it, so a fresh database lands where a migrated one does',
+  schemaSrc.indexOf('drop index if exists public.conversations_one_lekhio_thread')
+    > schemaSrc.indexOf('create unique index if not exists conversations_one_lekhio_thread'));
+ok('RLS posture is untouched: neither APPLY file writes a policy',
+  !/create policy|drop policy/i.test(applySrc) && !/create policy|drop policy/i.test(applyChatsSrc));
 
 // ---------------------------------------------------------------------------------------------
-// 2. THE PAGE. Server rendered, session first, readable when locked, composer gated.
+// 2. THE CHAT VIEW. Server rendered, session first, reffed, readable when locked, composer gated.
 // ---------------------------------------------------------------------------------------------
-console.log('\n=== the page ===\n');
+console.log('\n=== the chat view ===\n');
 
 ok('no client JavaScript: not a client component, no handlers, no hooks, no script tag',
-  !/^'use client'/m.test(pageSrc)
-  && !/onClick|onChange|onSubmit|useState|useEffect|<script/.test(pageCode));
+  !/^'use client'/m.test(chatSrc)
+  && !/onClick|onChange|onSubmit|useState|useEffect|<script/.test(chatCode));
 ok('session first: the cookie names the man, or he goes to /in',
-  /userFromSessionCookie/.test(pageCode) && /redirect\('\/in'\)/.test(pageCode));
-ok('the thread is read through lib/supabase.ts, never an inline query',
-  /lekhioThreadMessages\(user\.id\)/.test(pageCode) && !/rest\/v1/.test(pageCode));
+  /userFromSessionCookie/.test(chatCode) && /redirect\('\/in'\)/.test(chatCode));
+ok('🔴 the sealed reference is verified AND checked against the session before anything is read',
+  chatCode.indexOf('verifyChatRef(ref)') > -1
+  && chatCode.indexOf('chatRefBelongsTo(claim') > -1
+  // The CALLS are ordered, not the imports: the belongs-to check runs before any row is read.
+  && chatCode.indexOf('chatRefBelongsTo(claim') < chatCode.indexOf('chatMessagesForUser(user.id'));
+ok('a missing, stale, tampered or borrowed reference lands on the chat list',
+  /redirect\('\/app\/thread'\)/.test(chatCode));
+ok('the chat is read through lib/supabase.ts, never an inline query',
+  /chatMessagesForUser\(user\.id, claim\.id\)/.test(chatCode)
+  && /chatForUser\(user\.id, claim\.id\)/.test(chatCode)
+  && !/rest\/v1/.test(chatCode));
 ok('🔴 the read only banner is the same one other pages draw',
-  /READONLY_TITLE/.test(pageCode) && /READONLY_LINE/.test(pageCode)
-  && /\/api\/billing\/checkout/.test(pageCode));
-ok('🔴 a locked account still READS the thread: the messages render outside the locked branch',
-  /locked \? null : \(/.test(pageCode) === true
-  && pageCode.indexOf('messages.map') !== -1);
-ok('🔴 the composer hides behind the lock, and only the composer',
-  /\{locked \? null : \(\s*<section[^>]*>\s*<form action="\/api\/thread"/.test(pageCode));
-ok('a failed read is said plainly, never drawn as an empty thread',
-  /could not read your thread just now/.test(pageSrc));
+  /READONLY_TITLE/.test(chatCode) && /READONLY_LINE/.test(chatCode)
+  && /\/api\/billing\/checkout/.test(chatCode));
+ok('🔴 a locked account still READS the chat: the messages render outside the locked branch',
+  /locked \? null :/.test(chatCode) && chatCode.indexOf('messages.map') !== -1);
+ok('🔴 the composer hides behind the lock, and only draws on a Lekhio chat',
+  /\{locked \? null : kind === 'lekhio' \? \(/.test(chatCode)
+  && /<form action="\/api\/thread"/.test(chatCode));
+ok('a kept Puchio chat says plainly where new questions go, instead of a dead composer',
+  chatSrc.includes('A kept chat, here to look back on'));
+ok('a failed read is said plainly, never drawn as an empty chat',
+  /could not read this chat just now/.test(chatSrc));
 ok('the empty state speaks like an employee, in his words',
-  pageSrc.includes('what have I made this month') && pageSrc.includes('can I claim my boots'));
-ok('newest at the bottom: turns, then the #end anchor, then the one form',
-  pageCode.indexOf('messages.map') < pageCode.indexOf('id="end"')
-  && pageCode.indexOf('id="end"') < pageCode.indexOf('action="/api/thread"'));
-ok('🔴 no id in any URL and none in the form: one thread, found by the session',
-  !/conversationId/.test(pageCode) && !/name="id"/.test(pageCode)
-  && (pageCode.match(/name="/g) || []).length === 1 && /name="q"/.test(pageCode));
+  chatSrc.includes('what have I made this month') && chatSrc.includes('can I claim my boots'));
+ok('newest at the bottom: turns, then the #end anchor, then the one composer',
+  chatCode.indexOf('messages.map') < chatCode.indexOf('id="end"')
+  && chatCode.indexOf('id="end"') < chatCode.indexOf('action="/api/thread"'));
+ok('🔴 no raw id in any URL or field: the composer carries the words and the sealed reference, nothing else',
+  (chatCode.match(/name="/g) || []).length === 2
+  && /name="q"/.test(chatCode) && /name="c" value=\{ref/.test(chatCode)
+  && !/[?&]c=\$\{claim\.id/.test(chatCode) && !/[?&]c=\$\{conv/.test(chatCode));
 ok('the shared app shell and tokens, no raw hex painted',
-  /APP_CSS/.test(pageSrc) && /A11Y_CSS/.test(pageSrc) && !/#[0-9a-fA-F]{6}\b/.test(pageCode));
-ok('the nav is rendered (current is /app until AppNav grows the thread row)',
-  /<AppNav current="\/app" \/>/.test(pageSrc));
+  /APP_CSS/.test(chatSrc) && /A11Y_CSS/.test(chatSrc) && !/#[0-9a-fA-F]{6}\b/.test(chatCode));
+ok('the nav knows the thread row now', /<AppNav current="\/app\/thread" \/>/.test(chatSrc));
 
 // ---------------------------------------------------------------------------------------------
-// 3. THE ROUTE. Session, burst, gate, then the WhatsApp machinery by name.
+// 3. THE ROUTE. Session, reference, burst, gate, then the WhatsApp machinery by name.
 // ---------------------------------------------------------------------------------------------
 console.log('\n=== the route answers the way WhatsApp answers ===\n');
 
@@ -210,20 +245,20 @@ for (const reason of ['kill_switch', 'global_daily_cap', 'global_monthly_cap', '
 ok('the user\'s own cap is never blamed on the product being busy',
   !/busy/i.test(nudge.busyMessage('user_daily_cap', { available: false, connected: false })));
 ok('a failed store is admitted to the page, never swallowed',
-  /problem=unavailable/.test(routeCode) && /case 'unavailable':/.test(pageCode));
+  /problem=unavailable/.test(routeCode) && /case 'unavailable':/.test(chatCode));
 
 // ---------------------------------------------------------------------------------------------
 // 5. ARTICLE 9 AND THE LOG. The WhatsApp line, held on this surface.
 // ---------------------------------------------------------------------------------------------
 console.log('\n=== article 9 and the log ===\n');
 
-ok('🔴 nothing from the circumstances chain can reach the thread, in either file',
+ok('🔴 nothing from the circumstances chain can reach the chat, in either file',
   !/circumstances|CIRCUMSTANCES|sensitive\(|'blind'|"blind"/.test(routeCode)
-  && !/circumstances|CIRCUMSTANCES|sensitive\(|'blind'|"blind"/.test(pageCode));
+  && !/circumstances|CIRCUMSTANCES|sensitive\(|'blind'|"blind"/.test(chatCode));
 ok('🔴 message content is NEVER logged: no console call in the route at all',
   !/console\./.test(routeCode));
-ok('...and none in the page either',
-  !/console\./.test(pageCode));
+ok('...and none in the chat view either',
+  !/console\./.test(chatCode));
 ok('the queue that feeds every channel still refuses special category (the WhatsApp pin, re-held here)',
   (await import(pathToFileURL(path.join(root, 'lib/circumstances.ts')).href))
     .unanswered([]).every((c) => !c.specialCategory));
@@ -253,7 +288,7 @@ const START = '// --- The Lekhio thread (31 July 2026';
 const END = '// --- end of the Lekhio thread block';
 const si = dbSrc.indexOf(START);
 const ei = dbSrc.indexOf(END);
-ok('the thread block exists in lib/supabase.ts, append only, with its end marker', si > -1 && ei > si);
+ok('the thread block exists in lib/supabase.ts, self contained, with its end marker', si > -1 && ei > si);
 
 const block = dbSrc.slice(si, ei);
 ok('the block is self contained: config, headers and fetch, nothing else from the big file',
@@ -279,43 +314,95 @@ globalThis.fetch = async (url, init = {}) => {
 };
 const reset = (s) => { calls.length = 0; script = s; };
 
-// Reading: every query carries the session's user id.
-reset([
-  { json: [{ id: 'conv-1' }] },
-  { json: [
-    { id: 'm2', role: 'lekhio', content: 'answer', created_at: '2026-07-31T10:01:00Z' },
-    { id: 'm1', role: 'user', content: 'question', created_at: '2026-07-31T10:00:00Z' },
-  ] },
-]);
-const msgs = await T.lekhioThreadMessages('alice');
-ok('🔴 the conversation lookup is scoped by user_id and kind',
-  calls[0].url.includes('user_id=eq.alice') && calls[0].url.includes('kind=eq.lekhio'));
+const CONV = '5e6f7a8b-1111-4111-8111-222222222222';
+const SIG = '7a8b9c0d-3333-4333-8333-444444444444';
+
+// The list: one round trip, every filter carrying the session's user id, twice over.
+reset([{ json: [{
+  id: CONV, kind: 'lekhio', title: 'Lekhio',
+  last_message_at: '2026-07-31T10:01:00Z', created_at: '2026-07-31T09:00:00Z',
+  messages: [{ role: 'lekhio', content: 'the last answer' }],
+}] }]);
+const list = await T.listChatsForUser('alice');
+ok('🔴 the chat list is scoped by user_id on the conversations AND on the embedded last line',
+  calls[0].url.includes('user_id=eq.alice') && calls[0].url.includes('messages.user_id=eq.alice'));
+ok('one round trip carries the rows and their last lines, newest activity first',
+  calls.length === 1 && calls[0].url.includes('order=last_message_at.desc')
+  && Array.isArray(list) && list.length === 1 && list[0].last?.content === 'the last answer');
+reset([{ status: 500 }]);
+ok('a failed list read is null, so the page can say so, never an empty list',
+  (await T.listChatsForUser('alice')) === null);
+reset([{ json: [] }]);
+const noneYet = await T.listChatsForUser('alice');
+ok('no chats yet is [], the honest empty state', Array.isArray(noneYet) && noneYet.length === 0);
+
+// One chat's turns: every query carries the session's user id.
+reset([{ json: [
+  { id: 'm2', role: 'lekhio', content: 'answer', created_at: '2026-07-31T10:01:00Z' },
+  { id: 'm1', role: 'user', content: 'question', created_at: '2026-07-31T10:00:00Z' },
+] }]);
+const msgs = await T.chatMessagesForUser('alice', CONV);
 ok('🔴 the message read is scoped by user_id AS WELL AS conversation_id',
-  calls[1].url.includes('user_id=eq.alice') && calls[1].url.includes('conversation_id=eq.conv-1'));
+  calls[0].url.includes('user_id=eq.alice') && calls[0].url.includes(`conversation_id=eq.${CONV}`));
 ok('turns come back oldest first, so the newest sits at the bottom of the page',
   Array.isArray(msgs) && msgs.length === 2 && msgs[0].id === 'm1' && msgs[1].id === 'm2');
-
 reset([{ status: 500 }]);
-ok('a failed read is null, so the page can say so, never an empty thread',
-  (await T.lekhioThreadMessages('alice')) === null);
+ok('a failed read is null, so the page can say so, never an empty chat',
+  (await T.chatMessagesForUser('alice', CONV)) === null);
+reset([]);
+ok('🔴 an id that is not a uuid never reaches a query at all',
+  (await T.chatMessagesForUser('alice', 'x) or user_id=neq.nobody')) === null && calls.length === 0);
 
+// The chat head, same scoping.
+reset([{ json: [{ id: CONV, kind: 'lekhio', title: 'Lekhio' }] }]);
+await T.chatForUser('alice', CONV);
+ok('the chat head read is scoped by user_id as well as id',
+  calls[0].url.includes('user_id=eq.alice') && calls[0].url.includes(`id=eq.${CONV}`));
 reset([{ json: [] }]);
-const none = await T.lekhioThreadMessages('alice');
-ok('no thread yet is [], the honest empty state', Array.isArray(none) && none.length === 0);
+const notHis = await T.chatForUser('mallory', CONV);
+ok('🔴 another man\'s chat id comes back as nobody\'s: [], and the view goes to the list',
+  Array.isArray(notHis) && notHis.length === 0 && calls[0].url.includes('user_id=eq.mallory'));
 
-// Creating: the row is minted for the session's user, kind lekhio.
-reset([{ json: [] }, { status: 201, json: [{ id: 'new-1' }] }]);
-const made = await T.getOrCreateLekhioThread('alice');
-ok('a missing thread is created for THIS user with kind lekhio',
-  made === 'new-1'
-  && calls[1].method === 'POST'
-  && JSON.parse(calls[1].body).user_id === 'alice'
-  && JSON.parse(calls[1].body).kind === 'lekhio');
-reset([{ json: [] }, { status: 409 }, { json: [{ id: 'winner' }] }]);
-ok('losing the unique index race re-reads the winner instead of failing the post',
-  (await T.getOrCreateLekhioThread('alice')) === 'winner');
+// Starting a new chat: minted for THIS user, and HONEST when the database still says one.
+reset([{ status: 201, json: [{ id: 'new-1' }] }]);
+const made = await T.createLekhioChat('alice');
+ok('a new chat is minted for THIS user with kind lekhio',
+  made.ok === true && made.id === 'new-1'
+  && calls[0].method === 'POST'
+  && JSON.parse(calls[0].body).user_id === 'alice'
+  && JSON.parse(calls[0].body).kind === 'lekhio');
+reset([{ status: 409 }]);
+const refused = await T.createLekhioChat('alice');
+ok('🔴 the unrun migration (409 off the v1 one-thread index) is reported as blocked, honestly',
+  refused.ok === false && refused.blocked === true);
+ok('...and NOTHING was reused: one insert attempt, zero reads of other chats',
+  calls.length === 1 && calls[0].method === 'POST');
+reset([{ status: 500 }]);
+const broke = await T.createLekhioChat('alice');
+ok('any other failure is a plain no, never mislabelled as the migration',
+  broke.ok === false && broke.blocked === false);
 
-// 🔴 THE ATTACK. Mallory holds a conversation id that is really the victim's thread.
+// Rakha's rows: scoped, and READ ONLY by construction.
+reset([{ json: [{ id: SIG, signal_key: 'pension_relief', payload: { title: 'A pension move', body: 'the stored why' }, created_at: '2026-07-30T02:00:00Z' }] }]);
+const flags = await T.rakhaFlagsForUser('alice');
+ok('🔴 rakha flags are scoped by user_id, newest first, not dismissed',
+  calls[0].url.includes('user_id=eq.alice') && calls[0].url.includes('dismissed_at=is.null')
+  && calls[0].url.includes('order=created_at.desc'));
+ok('what renders is the stored payload: the title and the why in Rakha\'s own words',
+  Array.isArray(flags) && flags[0].title === 'A pension move' && flags[0].body === 'the stored why');
+ok('🔴 the rakha read is READ ONLY: a GET and nothing else',
+  calls.every((c) => c.method === 'GET'));
+reset([{ json: [] }]);
+const flag = await T.rakhaFlagForUser('mallory', SIG);
+ok('🔴 one flag is scoped by user_id as well as id, so another man\'s reference shows nothing',
+  Array.isArray(flag) && flag.length === 0
+  && calls[0].url.includes('user_id=eq.mallory') && calls[0].url.includes(`id=eq.${SIG}`)
+  && calls[0].method === 'GET');
+reset([]);
+ok('a non uuid signal id never reaches a query',
+  (await T.rakhaFlagForUser('alice', 'DROP TABLE agent_signals')) === null && calls.length === 0);
+
+// 🔴 THE ATTACK. Mallory holds a conversation id that is really the victim's chat.
 reset([{ json: [] }]);
 const attacked = await T.saveLekhioThreadMessage('mallory', 'conv-of-victim', 'user', 'hello');
 ok('🔴 the write is REFUSED: the ownership read found nothing for this user',
@@ -339,11 +426,20 @@ reset([]);
 ok('an empty message writes nothing at all',
   (await T.saveLekhioThreadMessage('alice', 'conv-1', 'user', '   ')) === false && calls.length === 0);
 
-// The route never lets a browser choose the thread: the ONLY form field read is q.
-ok('🔴 the route reads exactly one form field, q, so there is no id to tamper with',
-  (routeCode.match(/f\.get\(/g) || []).length === 1 && /f\.get\('q'\)/.test(routeCode));
-ok('...and the thread id comes from the session scoped lookup',
-  /getOrCreateLekhioThread\(user\.id\)/.test(routeCode));
+// The route never lets a browser choose a chat by id: the ONLY form fields read are the words
+// and the sealed reference, and the id the save uses is the VERIFIED claim's.
+ok('🔴 the route reads exactly two form fields, q and the sealed reference c',
+  (routeCode.match(/f\.get\(/g) || []).length === 2
+  && /f\.get\('q'\)/.test(routeCode) && /f\.get\('c'\)/.test(routeCode));
+ok('🔴 the reference is verified, kind checked, and checked against the session before any work',
+  /verifyChatRef\(ref\)/.test(routeCode)
+  && /claim\.kind !== 'chat'/.test(routeCode)
+  && /chatRefBelongsTo\(claim, user\.id\)/.test(routeCode)
+  // The CALLS are ordered, not the imports: the refusal comes before the counter and the write.
+  && routeCode.indexOf('chatRefBelongsTo(claim') < routeCode.indexOf('await userBurst')
+  && routeCode.indexOf('chatRefBelongsTo(claim') < routeCode.indexOf('saveLekhioThreadMessage(user.id'));
+ok('...and the thread id is the verified claim\'s, never a raw form value',
+  /const threadId = claim\.id/.test(routeCode));
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exit(fail === 0 ? 0 : 1);

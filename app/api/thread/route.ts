@@ -20,16 +20,16 @@ import {
   getOptimiserInput,
   transactionSummaryForUser,
   getRelevantKnowledge,
-  getOrCreateLekhioThread,
   saveLekhioThreadMessage,
 } from '../../../lib/supabase';
+import { verifyChatRef, chatRefBelongsTo } from '../../app/chatref';
 
 export const runtime = 'nodejs';
 // The AI path can take a few seconds; give the answer time to land before the 303.
 export const maxDuration = 60;
 
-// THE THREAD'S POST. One plain form field from /app/thread, one stored question, one stored
-// answer, and a 303 back to the page.
+// THE CHAT'S POST. One question from a chat view, one stored question, one stored answer, and
+// a 303 back into the same chat.
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // 🔴 THIS ROUTE ANSWERS THE WAY WHATSAPP ANSWERS, WITH THE SAME MACHINERY, OR NOT AT ALL.
@@ -44,15 +44,22 @@ export const maxDuration = 60;
 // a second brain is a second engine, and this codebase has been caught by two readers over one
 // number too many times to grow one on purpose.
 //
+// ⚠️ WHICH CHAT is named by the SEALED REFERENCE the composer posts back (app/app/chatref.ts),
+// never by a raw id: the claim is verified, checked against the session with chatRefBelongsTo,
+// and must be the 'chat' kind, so a read only Rakha reference can never become a place to
+// write. saveLekhioThreadMessage then proves ownership and kind against the database again
+// before one row is written. A stale or borrowed reference lands on the chat list, the same
+// answer the chat view gives it.
+//
 // ⚠️ AN ANSWER IS ALWAYS STORED. If the caps are exhausted, the kill switch is on, or the AI
 // is not configured, the stored reply is the plain honest line (busyMessage, the same words
-// WhatsApp sends), never silence and never a fake. A question sitting in a thread with no
+// WhatsApp sends), never silence and never a fake. A question sitting in a chat with no
 // answer under it reads as the product being broken, and a made up answer would be worse.
 //
 // ⚠️ NEVER LOG MESSAGE CONTENT. Same rule as the webhook: his words go to Supabase and to the
 // model, and nowhere else. There is deliberately no console call in this file.
 //
-// ⚠️ ARTICLE 9 HOLDS HERE EXACTLY AS ON WHATSAPP. The thread never asks a circumstances
+// ⚠️ ARTICLE 9 HOLDS HERE EXACTLY AS ON WHATSAPP. The chat never asks a circumstances
 // question (the chain lives elsewhere and unanswered() refuses special category on every
 // channel), and what reaches the model is the same context WhatsApp sends: his transaction
 // summary and the approved GOV.UK knowledge. Nothing from lib/circumstances.ts is imported
@@ -60,37 +67,48 @@ export const maxDuration = 60;
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 export async function POST(req: NextRequest) {
-  const back = (q: string) => NextResponse.redirect(new URL(`/app/thread${q}`, req.url), 303);
+  const list = (q: string) => NextResponse.redirect(new URL(`/app/thread${q}`, req.url), 303);
 
   // Session first, always. The account is the cookie's, never the form's.
   const user = await sessionUser(req);
   if (!user) return NextResponse.redirect(new URL('/in?next=/app/thread', req.url), 303);
 
+  const f = await req.formData().catch(() => null);
+  if (!f) return list('?problem=bad');
+
+  // The chat this question belongs in, out of the sealed reference and nowhere else. Anything
+  // missing, stale, tampered, borrowed or of the wrong kind lands on the list, where his real
+  // chats are.
+  const ref = String(f.get('c') ?? '');
+  const claim = verifyChatRef(ref);
+  if (!claim || claim.kind !== 'chat' || !chatRefBelongsTo(claim, user.id)) return list('');
+
+  const back = (q: string) =>
+    NextResponse.redirect(new URL(`/app/thread/chat?c=${encodeURIComponent(ref)}${q}`, req.url), 303);
+
+  const q = String(f.get('q') ?? '').trim().slice(0, 1000);
+  if (!q) return back('&problem=empty');
+
   // The durable shared burst limit, keyed on the user, the same atomic counter discipline as
   // /api/goals and /api/ask. Six posts a minute is chatty; more is a script, and a script must
-  // not be able to drain the AI budget one question at a time.
-  if (await userBurst('thread', user.id, 6)) return back('?problem=slow');
+  // not be able to drain the AI budget one question at a time. After the reference check, so
+  // the refusal can land back in the chat he was in rather than dumping him on the list.
+  if (await userBurst('thread', user.id, 6)) return back('&problem=slow');
 
-  const f = await req.formData().catch(() => null);
-  if (!f) return back('?problem=bad');
-  const q = String(f.get('q') ?? '').trim().slice(0, 1000);
-  if (!q) return back('?problem=empty');
-
-  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. Reading the thread is free on the page; posting new
-  // work is 'entitled' (lib/gate.ts row for this route). The form caller lands back on the page,
-  // which draws the read only banner and hides the composer.
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. Reading every chat is free on the pages; posting
+  // new work is 'entitled' (lib/gate.ts row for this route). The form caller lands back on the
+  // list, which draws the read only banner, and the chat view hides its composer the same way.
   if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app/thread');
 
   // Answer on the latest approved facts, exactly as the webhook does before it answers.
   await refreshFactsFromDb();
 
-  // His one thread. The id comes from the session scoped lookup and NEVER from the form: there
-  // is no conversation id in any URL or any field, so there is nothing to tamper with.
-  const threadId = await getOrCreateLekhioThread(user.id);
-  if (!threadId) return back('?problem=unavailable');
+  // The claim's id was minted for this session and shape checked twice; the save below still
+  // proves against the database that the chat is HIS and is a Lekhio chat before any write.
+  const threadId = claim.id;
 
   const stored = await saveLekhioThreadMessage(user.id, threadId, 'user', q);
-  if (!stored) return back('?problem=unavailable');
+  if (!stored) return back('&problem=unavailable');
 
   const reply = await composeReply(user.id, q);
   await saveLekhioThreadMessage(user.id, threadId, 'lekhio', reply);

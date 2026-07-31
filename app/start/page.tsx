@@ -26,6 +26,12 @@ type TradeType = 'sole' | 'business' | 'ltd' | null;
 const trades = [
   'Electrician', 'Plumber', 'Builder', 'Plasterer', 'Roofer', 'Joiner',
   'Decorator', 'Gardener', 'Cleaner', 'Driver', 'Hairdresser', 'Barber',
+  // Landlord earned its chip on 31 July 2026, after a landlord persona walked this page and had
+  // nowhere to land but "Something else". The product already keeps a property stream with its own
+  // engine (lib/propertyengine.ts), so the front door saying nothing about it was the door lying
+  // about the house. Picking it also carries the rental property flag with the signup, see
+  // submitSignup: a man whose trade IS the letting should not have to also tick "alongside".
+  'Landlord',
   'Photographer', 'Tutor', 'Carer', 'Cafe', 'Market trader', 'Freelancer', 'Something else',
 ];
 
@@ -180,7 +186,10 @@ export default function StartPage() {
           postcode: postcode.trim(),
           address: address.trim(),
           vat,
-          streams,
+          // A landlord's rental property is not "alongside the work", it IS the work, so step 4's
+          // property tick cannot be the only way the flag travels. Picking the Landlord chip
+          // carries it too, deduplicated, and nothing is ever removed from what he ticked himself.
+          streams: trade === 'Landlord' && !streams.includes('property') ? [...streams, 'property'] : streams,
           website: hp,
           ts: Date.now() - t0,
           offer,

@@ -8,10 +8,10 @@ import { invoiceRef } from '../invoiceref';
 import {
   normaliseInvoiceRow, sortInvoices, invoiceState, statusWords, owedLine,
 } from './words';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, GREEN, INK, LINE, MUTED, ON_RIVER, PAPER, RADIUS, RED, RIVER,
-  SPACE, SURFACE, TYPE,
-} from '../../../lib/tokens';
+  GREEN, INK, LINE, MUTED, ON_RIVER, PAPER, RED, RIVER, SURFACE,
+} from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';

@@ -6,10 +6,11 @@ import {
   EXPENSE_RULES, VERDICT_LABEL, type ExpenseRule, type Verdict,
 } from '../../../../lib/claimrules.data';
 import { RULE_SOURCES } from '../../../../lib/rulesources';
+import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, FONT, GREEN_TINT, INK, LINE, MUTED, ON_GREEN_TINT, ON_SAFFRON_TINT, PAPER,
-  RADIUS, RED, RED_TINT, SAFFRON_TINT, SPACE, TYPE,
-} from '../../../../lib/tokens';
+  GREEN_TINT, INK, LINE, MUTED, ON_GREEN_TINT, ON_SAFFRON_TINT, PAPER, RED, RED_TINT,
+  SAFFRON_TINT,
+} from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';

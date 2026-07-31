@@ -10,10 +10,11 @@ import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
 import { gbp0 } from '../../../lib/money';
 import { gateForUser } from '../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../lib/gate';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, INK, LINE, MOTION, MUTED, ON_RIVER, PANEL, PAPER, RADIUS, RIVER,
-  RIVER_DEEP, SAFFRON_DEEP, SAFFRON_TINT, SPACE, SURFACE, TYPE,
-} from '../../../lib/tokens';
+  INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RIVER, RIVER_DEEP, SAFFRON_DEEP, SAFFRON_TINT,
+  SURFACE, edge,
+} from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';
@@ -298,7 +299,7 @@ const CSS = [
   APP_CSS,
   `select:focus,button:focus{outline:3px solid ${RIVER};outline-offset:2px}`,
   `.lek-title{font-size:${TYPE.lead}px;line-height:1.3;font-weight:800;letter-spacing:-0.02em;margin:0 0 ${SPACE.xs}px}`,
-  `.lek-careful{background:${SAFFRON_TINT};border-color:${SAFFRON_DEEP}44}`,
+  `.lek-careful{background:${SAFFRON_TINT};border-color:${LINE};border-color:${edge(SAFFRON_DEEP, 27)}}`,
   `.lek-primary{width:100%;margin-top:${SPACE.xs}px;padding:14px ${SPACE.md}px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${ON_RIVER};background:${RIVER};border:none;border-radius:${RADIUS.md}px;cursor:pointer;transition:background-color ${MOTION.quick} ${MOTION.ease}}`,
   `.lek-primary:hover{background:${RIVER_DEEP}}`,
   `.lek-quiet{width:100%;padding:14px ${SPACE.md}px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${INK};background:${SURFACE};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;cursor:pointer;transition:background-color ${MOTION.quick} ${MOTION.ease}}`,

@@ -5,9 +5,10 @@ import { SESSION_COOKIE } from '../../../lib/websession';
 import { getOptimiserInput, getBusinessProfile } from '../../../lib/supabase';
 import { payModel, type BusinessType, type PayPlan } from './plan';
 import { gbp0 } from '../../../lib/money';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, INK, MUTED, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, SPACE, TYPE,
-} from '../../../lib/tokens';
+  INK, LINE, MUTED, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, edge,
+} from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';
@@ -353,7 +354,7 @@ function CompanyShape({ profit, plan }: { profit: number; plan: PayPlan }) {
 const CSS = [
   A11Y_CSS,
   APP_CSS,
-  `.lek-position{background:${RIVER_TINT};border-color:${RIVER}33}`,
+  `.lek-position{background:${RIVER_TINT};border-color:${LINE};border-color:${edge(RIVER, 20)}}`,
   `.lek-eyebrow{font-size:${TYPE.label}px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:${RIVER_DEEP};margin:0 0 ${SPACE.xs}px}`,
   `.lek-hero{font-size:${TYPE.hero}px;line-height:1.02;font-weight:800;letter-spacing:-0.035em;color:${RIVER_DEEP};font-variant-numeric:tabular-nums}`,
   `.lek-heronote{font-size:${TYPE.note}px;line-height:1.55;color:${INK};margin:${SPACE.sm}px 0 0;max-width:56ch}`,

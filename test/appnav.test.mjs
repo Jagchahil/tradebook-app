@@ -86,5 +86,45 @@ ok('the nav row does not scroll, because a scroll box clips the menus inside it'
   !/overflow-x\s*:\s*(auto|scroll)/.test(row) && !/overflow\s*:\s*(auto|scroll)/.test(row));
 ok('the nav row wraps instead', /flex-wrap\s*:\s*wrap/.test(row));
 
+console.log('\n=== the desk rail: one component, css decides, always open ===\n');
+//
+// From BREAK.desk up the nav is a fixed left rail with every section's items visible, and in the
+// hand the <details> clickers are untouched. The rail is a SECOND rendering of the same SECTIONS
+// constant, because CSS cannot reveal a closed <details> (the panel sits in a browser slot author
+// styles do not reach) and the open attribute cannot be forced on all five while they share a
+// name. So the invariants are: same source of truth, no clicking on the desk, one of the two
+// compositions always display:none, and the widths agreed through the shared constants.
+ok('the rail exists', nav.includes('className="lek-side"'));
+ok('🔴 THE BREAKPOINT COMES FROM BREAK.desk, NOT A NUMBER TYPED HERE',
+  nav.includes('@media(min-width:${BREAK.desk}px)'));
+ok('🔴 THE RAIL WIDTH COMES FROM THE SHARED SIDEBAR CONSTANT', nav.includes('width:${SIDEBAR}px'));
+ok('the rail is fixed to the left edge',
+  /\.lek-side\{display:block;position:fixed;top:0;left:0;bottom:0/.test(nav));
+// ⚠️ NOT [^}]* HERE: the source being read interpolates ${SIDEBAR}, whose own closing brace ends
+// a [^}]* match before the declaration being looked for. Bounded any-character instead.
+ok('the rail scrolls its own overflow, so the last group is always reachable',
+  /\.lek-side\{[\s\S]{0,220}?overflow-y:auto/.test(nav));
+ok('the rail is hidden in the hand', nav.includes('.lek-side{display:none}'));
+ok('and the phone bar is hidden on the desk', nav.includes('.lek-bar{display:none}'));
+
+// The rail and the dropdowns must render the same nav, so both are generated from SECTIONS and
+// neither retypes a label or an href. Exactly two walks: the phone one and the desk one.
+ok('both compositions are generated from SECTIONS', (nav.match(/SECTIONS\.map/g) || []).length === 2);
+
+// No clicking on the desk: everything after the rail begins is plain anchors, no <details>.
+const railFrom = nav.indexOf('className="lek-side"');
+ok('the rail is after the phone markup and holds no details at all',
+  railFrom > 0 && !nav.slice(railFrom).includes('<details'));
+// The current page is marked in both compositions, for the underline and for a screen reader.
+ok('the rail marks the current page', (nav.match(/aria-current/g) || []).length >= 3);
+// Signing out stays a form in both compositions, for the reason the phone bar comment gives.
+ok('the rail can sign out, and it is still a form',
+  (nav.match(/action="\/api\/auth\/signout" method="post"/g) || []).length === 2);
+
+// The other half of the rail lives in APP_CSS: the content column has to move over to meet it, or
+// the rail sits on top of the first card of every screen.
+const tokens = readFileSync(path.join(root, 'lib/tokens.ts'), 'utf8');
+ok('🔴 APP_CSS CLEARS THE RAIL, FROM THE SAME CONSTANT', tokens.includes('margin-left:max(${SIDEBAR'));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

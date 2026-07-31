@@ -1198,7 +1198,9 @@ export async function readSignupCompany(userId: string): Promise<SignupCompany |
 
 // `prompts` are the streams we could NOT fully apply because the web only captured a flag, not the
 // detail: 'property' needs rent figures, 'loan' needs the plan. The app nudges the user to add those
-// in their own screens, so even these do not feel like starting from scratch.
+// in their own screens, so even these do not feel like starting from scratch. Since 31 July 2026
+// the 'property' FLAG itself is applied (the rental circumstance, step 5 below); the figures are
+// still the app's to ask for, so 'property' stays in prompts as well.
 export interface ReconcileResult { reconciled: boolean; applied: string[]; prompts?: string[] }
 
 // 🔴 SEAMLESS ONBOARDING. Pull what the user already told us on the web /start signup into their
@@ -1305,6 +1307,18 @@ export async function reconcileSignupToUser(
       userId, 'other_job', 'yes',
       'You told us at signup that you also have a job on the payroll alongside your self-employed work.', 'web',
     )) applied.push('other_job');
+  }
+
+  // 5. Rental property -> the rental circumstance. The FLAG is his own tick on the web form, so it
+  // travels, exactly as the job tick does: dropping it was how a landlady who told us about her
+  // rent at signup arrived in an app that had never heard of it. The FIGURES (rents, costs, the
+  // mortgage interest) were never captured on the web, so 'property' also stays in `prompts` below
+  // and the app still asks for the numbers rather than guessing them.
+  if (streams.includes('property')) {
+    if (await saveCircumstance(
+      userId, 'rental', 'yes',
+      'You told us at signup that you have rental property.', 'web',
+    )) applied.push('rental');
   }
 
   // Mark reconciled, so a second sign in never re-applies any of the above. Same key we read on,
@@ -1531,18 +1545,29 @@ export interface WebSessionRow {
   createdAt: string;
   lastSeenAt: string;
   expiresAt: string;
+  // Whether he ticked "Remember my browser" when this session was opened. False means the cookie
+  // was issued to die with the browser and the row expires within hours; lib/webauth.ts refuses
+  // to slide it. Recorded on the row, not inferred from the cookie, because the row is the truth
+  // a cookie cannot argue with.
+  remembered: boolean;
 }
 
 // Open a session for a user whose phone we have just proved with a one time code. Returns the
 // session id to put in the cookie, or null if the write failed, so the caller can say "could not
-// sign you in" rather than handing out a cookie that means nothing.
-export async function createWebSession(userId: string, sessionId: string, expiresAt: Date): Promise<boolean> {
+// sign you in" rather than handing out a cookie that means nothing. The caller says whether he
+// asked to be remembered; there is no default, so every door that mints a session has to answer.
+export async function createWebSession(
+  userId: string,
+  sessionId: string,
+  expiresAt: Date,
+  remembered: boolean,
+): Promise<boolean> {
   const { url } = config();
   if (!userId || !sessionId) return false;
   const res = await fetch(`${url}/rest/v1/web_sessions`, {
     method: 'POST',
     headers: headers({ Prefer: 'return=minimal' }),
-    body: JSON.stringify({ id: sessionId, user_id: userId, expires_at: expiresAt.toISOString() }),
+    body: JSON.stringify({ id: sessionId, user_id: userId, expires_at: expiresAt.toISOString(), remembered }),
   });
   if (!res.ok) {
     // Never log the id. It is a live credential.
@@ -1567,12 +1592,13 @@ export async function readWebSession(sessionId: string): Promise<WebSessionRow |
   if (!sessionId) return null;
   const res = await fetch(
     `${url}/rest/v1/web_sessions?id=eq.${encodeURIComponent(sessionId)}` +
-      `&revoked_at=is.null&select=id,user_id,created_at,last_seen_at,expires_at&limit=1`,
+      `&revoked_at=is.null&select=id,user_id,created_at,last_seen_at,expires_at,remembered&limit=1`,
     { headers: headers() },
   );
   if (!res.ok) return null;
   const rows = (await res.json().catch(() => null)) as Array<{
     id: string; user_id: string; created_at: string; last_seen_at: string; expires_at: string;
+    remembered: boolean | null;
   }> | null;
   const row = Array.isArray(rows) ? rows[0] : null;
   if (!row) return null;
@@ -1584,6 +1610,9 @@ export async function readWebSession(sessionId: string): Promise<WebSessionRow |
     createdAt: row.created_at,
     lastSeenAt: row.last_seen_at,
     expiresAt: row.expires_at,
+    // Only an explicit false is an unremembered session. Rows from before the column existed read
+    // as remembered, which is the promise they were opened under.
+    remembered: row.remembered !== false,
   };
 }
 
@@ -4818,6 +4847,32 @@ export async function propertyYtdTotals(
   return { rents, expenses, finance };
 }
 
+// Does this account have a rental stream at all? The question the money-in form asks before it
+// offers "rent from a property" as a choice: doc 103's empty test says an option that applies to
+// nobody teaches everybody to stop reading, so the choice is drawn only for a man who has told us
+// about rental property, on any surface, or has already logged rent.
+//
+// ⚠️ TWO SOURCES, IN THIS ORDER, AND BOTH ARE HIS OWN STATEMENTS. The rental circumstance is his
+// tick at signup (reconciled above) or his yes to the setup question, stored with the wording he
+// saw. A confirmed property transaction is rent he logged himself. A failed read answers false,
+// which only hides an offer; it can never file anything, so the safe direction is the quiet one.
+export async function accountHasRental(userId: string): Promise<boolean> {
+  const answers = await readCircumstances(userId);
+  if ((answers ?? []).some((a) => a.key === 'rental' && a.answer === 'yes')) return true;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&income_type=eq.property&confirmed=eq.true&select=id&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json().catch(() => [])) as Array<{ id: string }>;
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 // --- Overdue invoices for the chaser (doc 82 s5e item 3) ----------------------
 // Sent, unpaid, and past the reference date: the due date when one was set,
 // otherwise 14 days from issue. Capped at five, oldest first, so the agent
@@ -8049,59 +8104,138 @@ export async function markInvoicePaidByOwner(userId: string, invoiceId: string):
   }
 }
 
-// --- The Lekhio thread (31 July 2026, APPLY_2026-07-31_thread.sql) ----------------------------
+// --- The Lekhio thread (31 July 2026, APPLY_2026-07-31_thread.sql; widened to the chat list
+// the same day, APPLY_2026-07-31_chats.sql) ---------------------------------------------------
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-// APPEND ONLY ADDITIONS for /app/thread and /api/thread: reads and writes of the one standing
-// conversation between a user and Lekhio. The ANSWERING machinery is not here and must never
-// be: the thread answers with the same intents and the same guarded AI path as WhatsApp, and
-// this block only stores and fetches the words.
+// The storage for /app/thread and /api/thread. The surface grew from one standing thread into
+// a DM style chat list the same day it shipped: every conversation a row, a button that starts
+// a fresh Lekhio chat, and Rakha's flags read alongside. The ANSWERING machinery is not here
+// and must never be: the thread answers with the same intents and the same guarded AI path as
+// WhatsApp, and this block only stores and fetches the words.
 //
 // ⚠️ TENANCY IS ENFORCED IN EVERY QUERY, TWICE OVER. The service role bypasses RLS, so every
 // read and write here filters on user_id from the session, per this file's rule. And a write
-// into a conversation id verifies the conversation is THIS user's Lekhio thread before a row
+// into a conversation id verifies the conversation is THIS user's Lekhio chat before a row
 // is inserted, the conversationOwnedBy shape, so a crafted or borrowed id can never attach a
-// message to another man's thread even if a future caller forgets where the id came from.
-// (Today's caller never takes an id from the client at all; this is the belt under that brace.)
+// message to another man's chat. The chat view's ids arrive inside a sealed reference
+// (app/app/chatref.ts) already checked against the session; this is the belt under that brace.
+//
+// ⚠️ THE RAKHA READS ARE READ ONLY BY CONSTRUCTION. rakhaFlagsForUser and rakhaFlagForUser
+// fetch and never write: no PATCH, no POST, no dismiss. The rows are the nightly walk's own
+// agent_signals, whose payload carries Rakha's rendered words (title and body, the why), so
+// what a man reads on the chat surface is what Rakha computed, never a re-derivation.
 //
 // ⚠️ THE BLOCK IS SELF CONTAINED ON PURPOSE: config(), headers() and fetch, nothing else, so
 // test/thread.test.mjs can stage it with a recording fetch and ATTACK the tenancy scoping at
 // runtime. Keep it that way, and keep the end marker below it.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-export interface LekhioThreadMessage {
+// The uuid shape gate this block applies before any id is spliced into a query path. The chat
+// list's one in-URL id (inside chatref's sealed claim) is checked at mint AND verify, so this
+// is the third fence, and it exists because a query built by splicing must never trust a string.
+const CHAT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface ChatListRow {
   id: string;
-  role: 'user' | 'lekhio';
+  kind: string; // 'lekhio' | 'puchio' as stored; a string so an unknown future kind still lists
+  title: string;
+  last_message_at: string;
+  created_at: string;
+  // The newest turn, for the DM row's one line preview. Null when the chat is empty.
+  last: { role: string; content: string } | null;
+}
+
+// Every conversation this user can go back and look at, newest activity first, each with its
+// latest line. ONE round trip: the last line rides along as an embedded, ordered, limited read
+// rather than a query per row. Null means the read failed and the page must say so; [] means
+// he genuinely has no chats yet.
+export async function listChatsForUser(userId: string, limit = 40): Promise<ChatListRow[] | null> {
+  if (!userId) return null;
+  try {
+    const { url } = config();
+    const uid = encodeURIComponent(userId);
+    // messages.user_id is filtered as well as conversations.user_id: the join already scopes
+    // the embed to his conversations, and the second filter makes that true twice.
+    const res = await fetch(
+      `${url}/rest/v1/conversations?user_id=eq.${uid}&select=id,kind,title,last_message_at,created_at,messages(role,content)` +
+        `&messages.user_id=eq.${uid}&messages.order=created_at.desc&messages.limit=1` +
+        `&order=last_message_at.desc&limit=${limit}`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{
+      id?: string; kind?: string; title?: string; last_message_at?: string; created_at?: string;
+      messages?: Array<{ role?: string; content?: string }>;
+    }> | null;
+    if (!Array.isArray(rows)) return null;
+    return rows
+      .filter((r) => typeof r.id === 'string')
+      .map((r) => ({
+        id: String(r.id),
+        kind: String(r.kind ?? ''),
+        title: String(r.title ?? ''),
+        last_message_at: String(r.last_message_at ?? ''),
+        created_at: String(r.created_at ?? ''),
+        last:
+          Array.isArray(r.messages) && r.messages[0]
+            ? { role: String(r.messages[0].role ?? ''), content: String(r.messages[0].content ?? '') }
+            : null,
+      }));
+  } catch {
+    return null;
+  }
+}
+
+// One chat's own row, so the view knows its kind and title before drawing anything. Scoped by
+// user_id as well as id. Null means the read failed; [] means no such chat is his, and the
+// view sends him back to the list exactly as it would for a stale reference.
+export async function chatForUser(
+  userId: string,
+  conversationId: string,
+): Promise<Array<{ id: string; kind: string; title: string }> | null> {
+  if (!userId || !CHAT_UUID.test(conversationId)) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/conversations?id=eq.${encodeURIComponent(conversationId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,kind,title&limit=1`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ id?: string; kind?: string; title?: string }> | null;
+    if (!Array.isArray(rows)) return null;
+    return rows.map((r) => ({ id: String(r.id ?? ''), kind: String(r.kind ?? ''), title: String(r.title ?? '') }));
+  } catch {
+    return null;
+  }
+}
+
+export interface ChatMessageRow {
+  id: string;
+  role: string; // 'user' | 'puchio' | 'lekhio' as stored
   content: string;
   created_at: string;
 }
 
-// The turns of this user's Lekhio thread, oldest first so the newest sits at the bottom of the
-// page. Distinguishes the three honest answers a page needs: null (the read failed, say so),
-// [] (no thread yet, or an empty one, draw the empty state), rows (draw them).
-export async function lekhioThreadMessages(userId: string, limit = 200): Promise<LekhioThreadMessage[] | null> {
-  if (!userId) return null;
+// The turns of ONE chat, any kind, oldest first so the newest sits at the bottom of the page.
+// Newest first with the limit, then reversed, so a long chat keeps its most recent turns
+// rather than its oldest. Filtered by user_id AS WELL AS conversation_id: the id came out of a
+// sealed reference already checked against the session, and the second filter makes a poisoned
+// id harmless anyway. Null means the read failed and the page must say so.
+export async function chatMessagesForUser(
+  userId: string,
+  conversationId: string,
+  limit = 200,
+): Promise<ChatMessageRow[] | null> {
+  if (!userId || !CHAT_UUID.test(conversationId)) return null;
   try {
     const { url } = config();
-    const conv = await fetch(
-      `${url}/rest/v1/conversations?user_id=eq.${encodeURIComponent(userId)}&kind=eq.lekhio&select=id&limit=1`,
-      { headers: headers(), signal: AbortSignal.timeout(6000) },
-    );
-    if (!conv.ok) return null;
-    const found = (await conv.json().catch(() => null)) as Array<{ id?: string }> | null;
-    if (!Array.isArray(found)) return null;
-    if (found.length === 0 || !found[0]?.id) return [];
-    const conversationId = String(found[0].id);
-
-    // Newest first with the limit, then reversed, so a long thread keeps its most recent turns
-    // rather than its oldest. Filtered by user_id AS WELL AS conversation_id: the id came from
-    // the scoped read above, and the second filter makes a poisoned id harmless anyway.
     const res = await fetch(
       `${url}/rest/v1/messages?user_id=eq.${encodeURIComponent(userId)}&conversation_id=eq.${encodeURIComponent(conversationId)}&select=id,role,content,created_at&order=created_at.desc&limit=${limit}`,
       { headers: headers(), signal: AbortSignal.timeout(6000) },
     );
     if (!res.ok) return null;
-    const rows = (await res.json().catch(() => null)) as LekhioThreadMessage[] | null;
+    const rows = (await res.json().catch(() => null)) as ChatMessageRow[] | null;
     if (!Array.isArray(rows)) return null;
     return rows.reverse();
   } catch {
@@ -8109,40 +8243,97 @@ export async function lekhioThreadMessages(userId: string, limit = 200): Promise
   }
 }
 
-// The id of this user's one Lekhio thread, scoped by user_id. Not exported: callers go through
-// lekhioThreadMessages or getOrCreateLekhioThread, so nobody holds a bare id they did not earn.
-async function readLekhioThreadId(userId: string): Promise<string | null> {
-  const { url } = config();
-  const res = await fetch(
-    `${url}/rest/v1/conversations?user_id=eq.${encodeURIComponent(userId)}&kind=eq.lekhio&select=id&limit=1`,
-    { headers: headers(), signal: AbortSignal.timeout(6000) },
-  );
-  if (!res.ok) return null;
-  const rows = (await res.json().catch(() => null)) as Array<{ id?: string }> | null;
-  return Array.isArray(rows) && rows[0]?.id ? String(rows[0].id) : null;
-}
+// What starting a new chat came back with. 'blocked' is its own answer because it is its own
+// truth: the database still enforces one Lekhio thread per user (the v1 partial unique index,
+// dropped by APPLY_2026-07-31_chats.sql), and the page owes the man that sentence rather than
+// a generic try-again.
+export type NewChatResult = { ok: true; id: string } | { ok: false; blocked: boolean };
 
-// Find the thread or start it. One per user, and the partial unique index in the database is
-// the referee: if two requests race, the loser's insert is refused and the re-read returns the
-// winner's row, so both end up talking into the same thread.
-export async function getOrCreateLekhioThread(userId: string): Promise<string | null> {
-  if (!userId) return null;
+// Start a NEW Lekhio chat for this user.
+//
+// 🔴 HONEST WHEN THE MIGRATION HAS NOT RUN. Until APPLY_2026-07-31_chats.sql drops the
+// one-thread index, this insert is refused (409) for any account that already has its standing
+// thread. The refusal comes back as blocked and the page says so plainly. It NEVER quietly
+// reuses an existing chat: a man who pressed "Start a new chat" and was handed his old one
+// would be talking into a chat he did not choose.
+export async function createLekhioChat(userId: string): Promise<NewChatResult> {
+  if (!userId) return { ok: false, blocked: false };
   try {
-    const existing = await readLekhioThreadId(userId);
-    if (existing) return existing;
     const { url } = config();
     const res = await fetch(`${url}/rest/v1/conversations`, {
       method: 'POST',
       headers: headers({ Prefer: 'return=representation' }),
-      body: JSON.stringify({ user_id: userId, kind: 'lekhio', title: 'Lekhio' }),
+      body: JSON.stringify({ user_id: userId, kind: 'lekhio', title: 'New chat' }),
       signal: AbortSignal.timeout(6000),
     });
-    if (res.ok) {
-      const rows = (await res.json().catch(() => null)) as Array<{ id?: string }> | null;
-      return Array.isArray(rows) && rows[0]?.id ? String(rows[0].id) : null;
-    }
-    // Lost the race to ourselves, or any other refusal: one honest re-read, then give up.
-    return await readLekhioThreadId(userId);
+    if (res.status === 409) return { ok: false, blocked: true };
+    if (!res.ok) return { ok: false, blocked: false };
+    const rows = (await res.json().catch(() => null)) as Array<{ id?: string }> | null;
+    return Array.isArray(rows) && rows[0]?.id
+      ? { ok: true, id: String(rows[0].id) }
+      : { ok: false, blocked: false };
+  } catch {
+    return { ok: false, blocked: false };
+  }
+}
+
+export interface RakhaFlagRow {
+  id: string;
+  signal_key: string;
+  title: string;
+  body: string; // Rakha's stored why, the payload the nightly walk rendered
+  created_at: string;
+}
+
+function rakhaRow(r: { id?: string; signal_key?: string; payload?: unknown; created_at?: string }): RakhaFlagRow | null {
+  if (!r || typeof r.id !== 'string') return null;
+  const p = (r.payload ?? {}) as { title?: unknown; body?: unknown };
+  const title = typeof p.title === 'string' ? p.title : '';
+  if (!title) return null; // a row without its rendered words has nothing honest to show
+  return {
+    id: r.id,
+    signal_key: String(r.signal_key ?? ''),
+    title,
+    body: typeof p.body === 'string' ? p.body : '',
+    created_at: String(r.created_at ?? ''),
+  };
+}
+
+// What Rakha has flagged for this account, newest first, not dismissed. READ ONLY: this
+// surface shows the suggestion and its stored why and changes nothing. Null means the read
+// failed and the list says so quietly; [] means Rakha has nothing flagged.
+export async function rakhaFlagsForUser(userId: string, limit = 20): Promise<RakhaFlagRow[] | null> {
+  if (!userId) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/agent_signals?user_id=eq.${encodeURIComponent(userId)}&dismissed_at=is.null&select=id,signal_key,payload,created_at&order=created_at.desc&limit=${limit}`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ id?: string; signal_key?: string; payload?: unknown; created_at?: string }> | null;
+    if (!Array.isArray(rows)) return null;
+    return rows.map(rakhaRow).filter((r): r is RakhaFlagRow => r !== null);
+  } catch {
+    return null;
+  }
+}
+
+// One flagged row, scoped by user_id as well as id, for the read only Rakha view. Null means
+// the read failed; [] means nothing of his answers to that id, and the view goes back to the
+// list the same way a stale reference does.
+export async function rakhaFlagForUser(userId: string, signalId: string): Promise<RakhaFlagRow[] | null> {
+  if (!userId || !CHAT_UUID.test(signalId)) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/agent_signals?id=eq.${encodeURIComponent(signalId)}&user_id=eq.${encodeURIComponent(userId)}&select=id,signal_key,payload,created_at&limit=1`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ id?: string; signal_key?: string; payload?: unknown; created_at?: string }> | null;
+    if (!Array.isArray(rows)) return null;
+    return rows.map(rakhaRow).filter((r): r is RakhaFlagRow => r !== null);
   } catch {
     return null;
   }

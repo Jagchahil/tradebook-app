@@ -22,10 +22,11 @@ import { normaliseVendor } from '../../lib/memory';
 import { categoriseBankLine } from '../../lib/categories';
 import { selectAnnouncements } from '../../lib/announcements';
 import { gbp0, gbpAbs0 } from '../../lib/money';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, GREEN, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RADIUS, RIVER,
-  RIVER_DEEP, RIVER_TINT, SAFFRON_DEEP, SAFFRON_TINT, SPACE, SURFACE, TYPE, WHATSAPP,
-} from '../../lib/tokens';
+  GREEN, INK, LINE, MUTED, ON_GREEN_TINT, ON_RIVER, ON_SAFFRON_TINT, PANEL, PAPER, RIVER,
+  RIVER_DEEP, RIVER_TINT, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, WHATSAPP, edge,
+} from '../../lib/apptheme';
 import { AppNav } from './AppNav';
 import { Announcements } from './Announcements';
 import { WeekChart } from './WeekChart';
@@ -253,7 +254,9 @@ export default async function OverviewPage() {
         <div className="lek-grid">
           <div className="lek-tile">
             <div className="lek-tile-label">In</div>
-            <div className="lek-tile-value" style={{ color: GREEN }}>{gbp0(moneyIn)}</div>
+            {/* ON_GREEN_TINT, not GREEN: brand green on a surface tile reads at 4.40, just under
+                the ratchet. The deeper green ink is what the guard holds against both surfaces. */}
+            <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp0(moneyIn)}</div>
           </div>
           <div className="lek-tile">
             <div className="lek-tile-label">Out</div>
@@ -440,7 +443,7 @@ export default async function OverviewPage() {
 const CSS = [
   A11Y_CSS,
   APP_CSS,
-  `.lek-tax{background:${RIVER_TINT};border-color:${RIVER}33}`,
+  `.lek-tax{background:${RIVER_TINT};border-color:${LINE};border-color:${edge(RIVER, 20)}}`,
   `.lek-eyebrow{font-size:${TYPE.label}px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:${RIVER_DEEP};margin:0 0 ${SPACE.xs}px}`,
   // The one number he came for. Tabular figures, because a money column that wobbles as its
   // digits change is a money column he learns to distrust.
@@ -484,14 +487,16 @@ const S: Record<string, React.CSSProperties> = {
   refund: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: 14, margin: '18px 0 0' },
 
   waiting: { display: 'flex', gap: 14, alignItems: 'center', textDecoration: 'none', background: PANEL, border: `1px solid ${LINE}`, borderLeft: `3px solid ${SAFFRON_DEEP}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
-  waitingCount: { flex: '0 0 auto', minWidth: 40, height: 40, borderRadius: RADIUS.pill, background: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: TYPE.strong, fontWeight: 800, display: 'grid', placeItems: 'center', padding: '0 10px', fontVariantNumeric: 'tabular-nums' },
+  // ON_SAFFRON_TINT, not SAFFRON_DEEP: the tokens header warns about exactly this pair, 2.70 on
+  // its own tint, and this screen was painting it anyway. Same fix on the notice eyebrow below.
+  waitingCount: { flex: '0 0 auto', minWidth: 40, height: 40, borderRadius: RADIUS.pill, background: SAFFRON_TINT, color: ON_SAFFRON_TINT, fontSize: TYPE.strong, fontWeight: 800, display: 'grid', placeItems: 'center', padding: '0 10px', fontVariantNumeric: 'tabular-nums' },
   waitingTop: { display: 'block', fontSize: TYPE.body, fontWeight: 800, color: INK, marginBottom: 3 },
   waitingBody: { display: 'block', fontSize: TYPE.note, lineHeight: 1.5, color: MUTED },
 
-  notice: { display: 'block', background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
-  noticeTop: { display: 'block', fontSize: TYPE.label, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
+  notice: { display: 'block', background: SAFFRON_TINT, border: `1px solid ${LINE}`, borderColor: edge(SAFFRON_DEEP, 27), borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
+  noticeTop: { display: 'block', fontSize: TYPE.label, fontWeight: 800, letterSpacing: '0.3px', color: ON_SAFFRON_TINT, marginBottom: 5 },
   noticeBody: { display: 'block', fontSize: TYPE.body, lineHeight: 1.55, color: INK },
-  resume: { display: 'block', textDecoration: 'none', background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
+  resume: { display: 'block', textDecoration: 'none', background: SAFFRON_TINT, border: `1px solid ${LINE}`, borderColor: edge(SAFFRON_DEEP, 27), borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
   primaryBtn: { background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: TYPE.body, fontWeight: 800, padding: '11px 18px', cursor: 'pointer' },
 
   connect: { display: 'block', textDecoration: 'none', background: PANEL, border: `1px solid ${LINE}`, borderLeft: `3px solid ${WHATSAPP}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },

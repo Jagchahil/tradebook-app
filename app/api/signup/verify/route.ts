@@ -176,7 +176,11 @@ export async function POST(req: NextRequest) {
 
   const sessionId = newSessionId();
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);
-  const opened = await createWebSession(userId, sessionId, expiresAt);
+  // Remembered, deliberately. The signup door has no "Remember my browser" box: he is minutes
+  // from a ten step setup on this very browser, and a session that dies mid setup costs him a
+  // second emailed code for no protection he asked for. A man signing up at a shared machine can
+  // sign out when he is done, and his NEXT sign in, at /in, is where the box lives.
+  const opened = await createWebSession(userId, sessionId, expiresAt, true);
   if (!opened) return NextResponse.json({ error: 'session' }, { status: 502 });
 
   const cookie = sessionCookieValue(sessionId);

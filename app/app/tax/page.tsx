@@ -8,10 +8,10 @@ import { shareCaption } from '../../../lib/position';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { buildQuarterPack, quarterBounds, quarterForDate } from '../../../lib/quarterpack';
 import { gbp0 } from '../../../lib/money';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, INK, LINE, MUTED, PANEL, PAPER, RADIUS, RIVER, RIVER_DEEP,
-  RIVER_TINT, SPACE, SURFACE, TYPE,
-} from '../../../lib/tokens';
+  INK, LINE, MUTED, PANEL, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, SURFACE, edge,
+} from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';
@@ -83,6 +83,20 @@ export default async function TaxHubPage() {
   // and the year label is startYear + 1 so the engine prints the correct January.
   const poa = paymentsOnAccount(tax.selfAssessmentTax, startYear + 1);
 
+  // THE RENTAL STREAM, NAMED. Step 4 of signup promises that each stream is taxed its own way and
+  // kept separate the way HMRC keeps them; until 31 July 2026 this screen never said the word rent
+  // to a landlord, which made that promise unverifiable on the one page it matters. One sentence,
+  // drawn only when the account has the rental flag or confirmed rent (doc 103's empty test), and
+  // it changes no figure: the property maths already lives in taxPosition via the same optimiser
+  // input. "No National Insurance" is lib/propertyengine.ts's own verified fact, not this page's.
+  const hasRentMoney = (optimiser.ytdPropertyIncome ?? 0) > 0;
+  const rentalFlag = optimiser.circumstances?.rental === 'yes';
+  const rentLine = hasRentMoney
+    ? 'Your rent is taxed as its own stream, separate from your trade and with no National Insurance on it, and it is counted in the figure above. The property allowance working shows under Ways to save.'
+    : rentalFlag
+      ? 'You told us you have rental property. Rent is taxed as its own stream, separate from your trade, and once it is logged it is counted here and under Ways to save.'
+      : null;
+
   return (
     <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
@@ -106,6 +120,8 @@ export default async function TaxHubPage() {
           {/* Whose money it is worked out on. For a partner the figure runs on his share of the
               firm's books, and this is where that is said. */}
           {shareCap ? <p style={S.heroBasis}>{shareCap}</p> : null}
+          {/* The rental stream, for a landlord only. See rentLine above for why it exists. */}
+          {rentLine ? <p style={S.heroBasis}>{rentLine}</p> : null}
         </section>
       ) : (
         <section className="lek-card">
@@ -115,6 +131,10 @@ export default async function TaxHubPage() {
             Connect your bank and your tax position builds itself from what you confirm. Every
             screen under Tax fills in from the same figures.
           </p>
+          {/* A landlord with the flag but no figures yet still deserves the promise kept: the
+              stream is real, named, and waiting for his numbers. Only the flag line can appear
+              here, because any confirmed rent makes the position card above draw instead. */}
+          {rentLine ? <p style={S.quiet}>{rentLine}</p> : null}
         </section>
       )}
 
@@ -207,7 +227,7 @@ export default async function TaxHubPage() {
 const CSS = [
   A11Y_CSS,
   APP_CSS,
-  `.lek-position{background:${RIVER_TINT};border-color:${RIVER}33}`,
+  `.lek-position{background:${RIVER_TINT};border-color:${LINE};border-color:${edge(RIVER, 20)}}`,
   `.lek-eyebrow{font-size:${TYPE.label}px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:${RIVER_DEEP};margin:0 0 ${SPACE.xs}px}`,
   // The one number he came for. Tabular figures, exactly as the Overview draws its own.
   `.lek-hero{font-size:${TYPE.hero}px;line-height:1.02;font-weight:800;letter-spacing:-0.035em;color:${RIVER_DEEP};font-variant-numeric:tabular-nums}`,

@@ -10,10 +10,11 @@ import {
   type InvoiceListRow, invoiceState, statusWords, daysLate, daysSinceIssued, lateWords,
   chaserDraft, isChaserTone, CHASER_TONES, type ChaserTone,
 } from '../invoices/words';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, GREEN, INK, LINE, MOTION, MUTED, ON_WHATSAPP, PANEL, PAPER,
-  RADIUS, RED, RIVER, RIVER_DEEP, RIVER_TINT, SPACE, SURFACE, TYPE, WHATSAPP,
-} from '../../../lib/tokens';
+  GREEN, INK, LINE, MUTED, ON_WHATSAPP, PANEL, PAPER, RED, RIVER, RIVER_DEEP, RIVER_TINT, SURFACE,
+  WHATSAPP,
+} from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';

@@ -15,10 +15,10 @@ import {
 } from '../../../lib/moneylog';
 import { gbp0 } from '../../../lib/money';
 import { entryRef } from '../entryref';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, BREAK, FONT, GREEN, INK, LINE, MOTION, MUTED, PANEL, PAPER, RADIUS, RIVER,
-  SPACE, SURFACE, TYPE,
-} from '../../../lib/tokens';
+  GREEN, INK, LINE, MUTED, ON_GREEN_TINT, PANEL, PAPER, RIVER, SURFACE,
+} from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';
@@ -147,7 +147,7 @@ export default async function MoneyPage({
         <div className="lek-grid">
           <div className="lek-tile">
             <div className="lek-tile-label">In</div>
-            <div className="lek-tile-value" style={{ color: GREEN }}>{gbp0(log.income)}</div>
+            <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp0(log.income)}</div>
           </div>
           <div className="lek-tile">
             <div className="lek-tile-label">Out</div>

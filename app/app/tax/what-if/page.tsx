@@ -6,10 +6,10 @@ import { getOptimiserInput, getBusinessProfile } from '../../../../lib/supabase'
 import { computePosition, type BusinessType, type OwnerInput } from '../../../../lib/position';
 import { studentLoanForSA, type StudentPlan } from '../../../../lib/nistudentloan';
 import { gbp0, gbpAbs0 } from '../../lib/money';
+import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
-  A11Y_CSS, APP_CSS, FONT, GREEN, INK, LINE, MUTED, ON_RIVER, PAPER, RADIUS, RIVER, RIVER_DEEP,
-  SPACE, SURFACE, TYPE,
-} from '../../../../lib/tokens';
+  GREEN, INK, LINE, MUTED, ON_GREEN_TINT, ON_RIVER, PAPER, RIVER, RIVER_DEEP, SURFACE,
+} from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';
@@ -170,7 +170,7 @@ export default async function WhatIfPage({
             </div>
             <div className="lek-tile">
               <div className="lek-tile-label">Difference</div>
-              <div className="lek-tile-value" style={{ color: wholeDiff > 0 ? RIVER_DEEP : GREEN }}>
+              <div className="lek-tile-value" style={{ color: wholeDiff > 0 ? RIVER_DEEP : ON_GREEN_TINT }}>
                 {gbp0(wholeDiff)}
               </div>
             </div>

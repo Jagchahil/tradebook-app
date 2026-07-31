@@ -157,5 +157,35 @@ ok('a missing created date counts as past it', W.pastMaxLife(null) === true);
 ok('the ceiling is longer than the sliding window', W.SESSION_MAX_LIFE_SECONDS > W.SESSION_TTL_SECONDS);
 ok('the touch interval is shorter than the window', W.SESSION_TOUCH_AFTER_SECONDS < W.SESSION_TTL_SECONDS);
 
+console.log('\n10. REMEMBER MY BROWSER: TWO COOKIE SHAPES, AND THE UNTICKED ONE IS ON A SHORT LEASH');
+// The box on /in is unticked by default. Unticked means three things at once: a short server side
+// expiry on the row, the same short expiry inside the signed cookie, and cookie attributes with no
+// Max-Age so the browser drops it on close. This section holds the pure halves of that; the
+// threading through /api/auth/verify is held by test/webauth.test.mjs.
+ok('the unremembered ttl is hours, not days', W.SESSION_TTL_UNREMEMBERED_SECONDS >= 60 * 60
+  && W.SESSION_TTL_UNREMEMBERED_SECONDS <= 24 * 60 * 60);
+ok('and two orders of magnitude under the remembered window',
+  W.SESSION_TTL_UNREMEMBERED_SECONDS * 100 <= W.SESSION_TTL_SECONDS);
+const short = W.sessionCookieValue(sid, new Date(), W.SESSION_TTL_UNREMEMBERED_SECONDS);
+ok('an unremembered cookie verifies while it lives', W.verifySessionCookie(short)?.sessionId === sid);
+const afterHours = new Date(Date.now() + (W.SESSION_TTL_UNREMEMBERED_SECONDS + 60) * 1000);
+ok('🔴 AND IS DEAD AFTER ITS HOURS, NOT AFTER NINETY DAYS', W.verifySessionCookie(short, afterHours) === null);
+ok('while a remembered cookie is still alive at that same moment', W.verifySessionCookie(cookie, afterHours) !== null);
+
+const bAttrs = W.browserSessionCookieAttributes();
+ok('🔴 THE UNREMEMBERED ATTRIBUTES CARRY NO Max-Age AT ALL, the browser session shape', !('maxAge' in bAttrs));
+ok('..and keep httpOnly', bAttrs.httpOnly === true);
+ok('..and keep sameSite lax', bAttrs.sameSite === 'lax');
+ok('..and keep the whole site path', bAttrs.path === '/');
+ok('the remembered shape still carries the full ttl', W.sessionCookieAttributes().maxAge === W.SESSION_TTL_SECONDS);
+
+// The sliding window is a privilege of the ticked box. slideExpiry is the one place that decides,
+// so an unticked session cannot inch to ninety days through heavy use on a machine that is not his.
+const at = new Date(1750000000000);
+ok('a remembered session slides to now plus the window',
+  W.slideExpiry(true, at)?.getTime() === at.getTime() + W.SESSION_TTL_SECONDS * 1000);
+ok('🔴 AN UNTICKED SESSION CANNOT SLIDE AT ALL', W.slideExpiry(false, at) === null);
+ok('..whatever the clock says', W.slideExpiry(false) === null);
+
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

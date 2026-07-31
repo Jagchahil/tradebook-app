@@ -1,0 +1,139 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { sessionUser } from '../../../../lib/webauth';
+import { insertTransaction } from '../../../../lib/supabase';
+import { isCategory } from '../../../../lib/categories';
+import { clampReceiptDate } from '../../../../lib/waintents';
+import { rateLimitedShared } from '../../../../lib/ratelimit';
+import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
+
+// A TYPED ENTRY BECOMING A LOGGED TRANSACTION. The web door for money no feed ever saw.
+//
+//   POST { direction, amount, vendor, date, category? }  ->  one row in his books
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ IT LANDS CONFIRMED, AND THAT IS THE ONE DELIBERATE DIFFERENCE FROM EVERY CAPTURE ROUTE.
+//
+// A receipt photo and a voice note land confirmed: false, because both are a MACHINE'S READING
+// of his money and a reading always waits for his yes. There is no reading here. Every field is
+// his own typing and the submit is his own hand, so asking him to approve his own statement on
+// the next screen would be a question with one sensible answer, which doc 103 forbids. The form
+// post IS the approval, exactly as a pile confirm is.
+//
+// ⚠️ MONEY IN IS ALWAYS 'income' WHATEVER THE FORM SAYS. The category list describes what money
+// OUT can be. Letting a payment in arrive labelled 'materials' would put income on an expense
+// line of a real return, so the server decides this one and the form is not consulted. The same
+// judgement markInvoicePaidServer already makes when an invoice is paid.
+//
+// ⚠️ AND NOTHING HERE WRITES A ROW ITSELF. insertTransaction in lib/supabase.ts is the one path
+// every confirmed transaction in the product arrives through (WhatsApp, voice, invoices), and
+// this route is another caller of it, not another copy of it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export const runtime = 'nodejs';
+
+export async function POST(req: NextRequest) {
+  const isForm = (req.headers.get('content-type') || '').includes('application/x-www-form-urlencoded');
+  const back = (q: string) => NextResponse.redirect(new URL(`/app/money/add?${q}`, req.url), 303);
+
+  const user = await sessionUser(req);
+  // A form caller with no session is a man whose session expired while the page sat open. Send
+  // him to the door, not to a JSON error he cannot read.
+  if (!user) {
+    return isForm
+      ? NextResponse.redirect(new URL('/in?next=/app/money/add', req.url), 303)
+      : NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  // 🔴 THE WORK STOPS WHEN HE STOPS PAYING. lib/gate.ts row: this route is 'entitled'. His
+  // records stay readable everywhere; a lapsed subscription means we do nothing NEW for him,
+  // and a new row in his books is the definition of new.
+  if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app/money/add');
+
+  // Generous for a man typing in a week of cash jobs, lethal to a loop.
+  if (await rateLimitedShared(`manual:${user.id}`, 60, 60 * 60 * 1000)) {
+    return isForm ? back('problem=slow') : NextResponse.json({ error: 'too_many_requests' }, { status: 429 });
+  }
+
+  let direction = '';
+  let amountRaw = '';
+  let vendor = '';
+  let date = '';
+  let category = '';
+  if (isForm) {
+    const f = await req.formData().catch(() => null);
+    if (!f) return back('problem=bad');
+    direction = String(f.get('direction') ?? '');
+    amountRaw = String(f.get('amount') ?? '');
+    vendor = String(f.get('vendor') ?? '');
+    date = String(f.get('date') ?? '');
+    category = String(f.get('category') ?? '');
+  } else {
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await req.json()) as Record<string, unknown>;
+    } catch {
+      return NextResponse.json({ error: 'bad_request' }, { status: 400 });
+    }
+    direction = typeof body.direction === 'string' ? body.direction : '';
+    amountRaw = typeof body.amount === 'string' || typeof body.amount === 'number' ? String(body.amount) : '';
+    vendor = typeof body.vendor === 'string' ? body.vendor : '';
+    date = typeof body.date === 'string' ? body.date : '';
+    category = typeof body.category === 'string' ? body.category : '';
+  }
+
+  if (direction !== 'in' && direction !== 'out') {
+    return isForm ? back('problem=bad') : NextResponse.json({ error: 'bad_request' }, { status: 400 });
+  }
+
+  // Pounds as a person types them: commas and spaces stripped, then it is a number or it is not.
+  // Two decimal places because that is what money has, and a hard ceiling because a fat finger
+  // on a phone keyboard writes 1200000 more easily than anyone earns it.
+  const magnitude = Math.round(Number(amountRaw.replace(/[,\s]/g, '')) * 100) / 100;
+  if (!Number.isFinite(magnitude) || magnitude <= 0 || magnitude > 1_000_000) {
+    return isForm ? back('problem=bad') : NextResponse.json({ error: 'bad_amount' }, { status: 400 });
+  }
+
+  vendor = vendor.trim().slice(0, 120);
+  if (!vendor) {
+    return isForm ? back('problem=bad') : NextResponse.json({ error: 'bad_vendor' }, { status: 400 });
+  }
+
+  // ⚠️ THE DATE WINDOW IS OWNED BY clampReceiptDate IN lib/waintents.ts, NOT REDECLARED HERE.
+  // The clamp maps anything outside "last two years up to today" to today. A vision misread
+  // deserves that silent rescue; a date a man CHOSE does not, because quietly moving his cash
+  // job to today would file it in the wrong quarter without telling him. So the same rule is
+  // asked a different question: if clamping would change his date, his date is refused, plainly.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || clampReceiptDate(date) !== date) {
+    return isForm ? back('problem=date') : NextResponse.json({ error: 'bad_date' }, { status: 400 });
+  }
+
+  // Money in is income, decided here. Money out takes a real category from the one list in
+  // lib/categories.ts, and an empty or unknown choice is 'other', which is the honest word for
+  // "he did not say", never a guess.
+  const trimmed = category.trim().toLowerCase();
+  const filedAs = direction === 'in' ? 'income' : (isCategory(trimmed) ? trimmed : 'other');
+
+  try {
+    await insertTransaction({
+      user_id: user.id,
+      vendor,
+      // The sign convention every reader in the product shares: negative out, positive in.
+      amount: direction === 'out' ? -magnitude : magnitude,
+      category: filedAs,
+      transaction_date: date,
+      source_type: 'web_manual',
+      // His own typing, approved by his own press. See the header for why this is the one
+      // capture that does not wait.
+      confirmed: true,
+    });
+  } catch {
+    // A failed write must not look like a successful one. Nothing landed, and the page says so.
+    return isForm ? back('problem=unavailable') : NextResponse.json({ error: 'unavailable' }, { status: 503 });
+  }
+
+  // Back to the add screen rather than the month, because a man logging cash jobs usually has a
+  // pocketful. The confirmation carries the month so one press shows him the row where it lives.
+  return isForm
+    ? back(`done=${direction}&m=${date.slice(0, 7)}`)
+    : NextResponse.json({ ok: true, direction, month: date.slice(0, 7) });
+}

@@ -237,6 +237,15 @@ export const GATED_ROUTES: GatedRoute[] = [
   { route: 'app/api/agent/attach-media', rule: 'always', why: 'A render coming back into the marketing studio, posted by our own script with AGENT_SECRET. Ours, not his. It was briefly marked entitled by somebody who read the name and assumed Rakha.' },
   { route: 'app/api/agent/studio-brief', rule: 'always', why: 'The marketing studio, ours not his. Gated by the team console, not by a customer subscription.' },
   { route: 'app/api/agent/studio-run', rule: 'always', why: 'The marketing studio, ours not his.' },
+
+  // ── The web input layer, 30 July 2026. Capture from the dashboard itself. ─────────────────
+  { route: 'app/api/money/manual', rule: 'entitled', why: 'A typed cash entry becoming a logged transaction. Capture is work, the same judgement as voice/complete, and it stops when he stops paying.' },
+  { route: 'app/api/money/receipt', rule: 'entitled', why: 'A receipt photograph read by a paid model and written into his books. The same work the WhatsApp capture does, with the same per call cost to us.' },
+  { route: 'app/api/money/import', rule: 'entitled', why: 'A whole bank statement read into his books, deterministically and with no AI. It is the bank feed by another door while the feed has no provider, and continuous bookkeeping is the clearest work in the product, so it stops when he stops paying. His existing rows stay readable everywhere.' },
+
+  // ── The invoices surface on the web, 30 July 2026. ────────────────────────────────────────
+  { route: 'app/api/invoices', rule: 'entitled', why: 'Raising a new invoice through the same createInvoice path WhatsApp uses. Work, and unlike draft-invoice this door HAS a session to gate on, so it is gated. He sends the link himself; we never contact his customer.' },
+  { route: 'app/api/share-books', rule: 'always', why: 'His figures going OUT to a broker, a landlord or an accountant, through the same lib machinery as app/api/share, and the same judgement: his records are his. Revoking a share is a withdrawal of consent and could never be gated anyway.' },
 ];
 
 export function ruleFor(route: string): Rule | null {

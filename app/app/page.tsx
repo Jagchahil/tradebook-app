@@ -21,8 +21,8 @@ import { categoriseBankLine } from '../../lib/categories';
 import { selectAnnouncements } from '../../lib/announcements';
 import { gbp0, gbpAbs0 } from '../../lib/money';
 import {
-  A11Y_CSS, FONT, GREEN, INK, LINE, MOTION, MUTED, PANEL, PAPER, RADIUS, RIVER, RIVER_DEEP,
-  RIVER_TINT, SAFFRON_DEEP, SAFFRON_TINT, SHADOW, SURFACE, WHATSAPP,
+  A11Y_CSS, APP_CSS, BREAK, FONT, GREEN, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RADIUS, RIVER,
+  RIVER_DEEP, RIVER_TINT, SAFFRON_DEEP, SAFFRON_TINT, SPACE, SURFACE, TYPE, WHATSAPP,
 } from '../../lib/tokens';
 import { AppNav } from './AppNav';
 import { Announcements } from './Announcements';
@@ -166,7 +166,7 @@ export default async function OverviewPage() {
   const basis = setAsideBasisLine(optimiser, tax);
 
   return (
-    <main style={S.wrap}>
+    <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
 
       <AppNav current="/app" />
@@ -205,10 +205,10 @@ export default async function OverviewPage() {
           taxPosition() is his WHOLE tax across every stream we know about, minus what PAYE has
           already taken, plus the student loan that Self Assessment collects in January. */}
       {showTax ? (
-        <section style={{ ...S.card, ...S.taxCard }} className="lek-card">
-          <h1 style={S.eyebrow}>Put by for tax</h1>
-          <div style={S.hero}>{gbp0(tax.setAside)}</div>
-          <p style={S.heroNote}>
+        <section className="lek-card lek-tax">
+          <h1 className="lek-eyebrow">Put by for tax</h1>
+          <div className="lek-hero">{gbp0(tax.setAside)}</div>
+          <p className="lek-heronote">
             {tax.projected
               ? 'What your figures are heading for across the full tax year.'
               : 'What the year so far has built up. Too early to call the whole year yet.'}
@@ -225,20 +225,20 @@ export default async function OverviewPage() {
 
       {/* ── 2. WHERE THAT NUMBER CAME FROM ─────────────────────────────────────────────────────
           Three figures, no cleverness. The sum he would do on the back of an envelope, done. */}
-      <section style={S.card} className="lek-card">
-        <h2 style={S.h2}>Your business this year</h2>
+      <section className="lek-card">
+        <h2 className="lek-h2">Your business this year</h2>
         <div className="lek-grid">
-          <div style={S.tile}>
-            <div style={S.tileLabel}>In</div>
-            <div style={{ ...S.tileValue, color: GREEN }}>{gbp0(moneyIn)}</div>
+          <div className="lek-tile">
+            <div className="lek-tile-label">In</div>
+            <div className="lek-tile-value" style={{ color: GREEN }}>{gbp0(moneyIn)}</div>
           </div>
-          <div style={S.tile}>
-            <div style={S.tileLabel}>Out</div>
-            <div style={{ ...S.tileValue, color: RIVER }}>{gbp0(moneyOut)}</div>
+          <div className="lek-tile">
+            <div className="lek-tile-label">Out</div>
+            <div className="lek-tile-value" style={{ color: RIVER }}>{gbp0(moneyOut)}</div>
           </div>
-          <div style={S.tile}>
-            <div style={S.tileLabel}>Profit</div>
-            <div style={S.tileValue}>{gbp0(profit)}</div>
+          <div className="lek-tile">
+            <div className="lek-tile-label">Profit</div>
+            <div className="lek-tile-value">{gbp0(profit)}</div>
           </div>
         </div>
         <p style={S.quiet}>Since 6 April, on everything you have confirmed.</p>
@@ -263,15 +263,22 @@ export default async function OverviewPage() {
         </a>
       ) : null}
 
+      {/* ── 4 AND 5, PAIRED ON A DESK ──────────────────────────────────────────────────────────
+          His week and what Lekhio saved him are the two cards that reflect rather than answer, so
+          they are the one pairing on this screen that are true siblings. On a phone they stack in
+          the doc 103 order. On a desk they sit side by side, which also keeps the week chart at a
+          width where a bar still looks like a bar. align-items:start, because stretching the
+          shorter card to match the taller one fills it with space that says nothing. */}
+      <div className="lek-duo">
       {/* ── 4. HIS WEEK ────────────────────────────────────────────────────────────────────────
           The same sentence WhatsApp sends, from the same function, and the same seven days drawn
           from the same rows. See lib/weekchart.ts: the picture and the words cannot disagree,
           because the words are summed from the picture. */}
-      <section style={S.card} className="lek-card">
-        <h2 style={S.h2}>Your week</h2>
+      <section className="lek-card">
+        <h2 className="lek-h2">Your week</h2>
         {weekRead ? (
           <>
-            <p style={S.week}>
+            <p className="lek-week-line">
               {gbp0(week.income)} in, {gbp0(week.expenses)} out.{' '}
               {weekProfit >= 0
                 ? `That leaves ${gbp0(weekProfit)}.`
@@ -292,8 +299,8 @@ export default async function OverviewPage() {
       {/* ── 5. THE PROOF ───────────────────────────────────────────────────────────────────────
           "£12.99 saves you £2,000" is a specification, not a slogan. If we cannot show him the
           £2,000 we have not earned the £12.99. lib/ledger.ts holds the argument. */}
-      <section style={S.card} className="lek-card">
-        <h2 style={S.h2}>What Lekhio has saved you</h2>
+      <section className="lek-card">
+        <h2 className="lek-h2">What Lekhio has saved you</h2>
         <p style={S.headline}>{headline(l)}</p>
 
         {l.enough ? (
@@ -303,14 +310,14 @@ export default async function OverviewPage() {
                 thousands overall. Unlabelled, beside the set aside figure above, that reads as a
                 contradiction rather than as two answers to two questions. */}
             <p style={S.scope}>Tax your business adds to your bill, before and after what you claimed.</p>
-            <div style={S.two}>
+            <div className="lek-two">
               <div>
-                <div style={S.tileLabel}>Without Lekhio</div>
-                <div style={S.big}>{gbp0(l.withoutLekhio)}</div>
+                <div className="lek-tile-label">Without Lekhio</div>
+                <div className="lek-big">{gbp0(l.withoutLekhio)}</div>
               </div>
               <div>
-                <div style={S.tileLabel}>With Lekhio</div>
-                <div style={{ ...S.big, color: GREEN }}>{gbp0(l.withLekhio)}</div>
+                <div className="lek-tile-label">With Lekhio</div>
+                <div className="lek-big" style={{ color: GREEN }}>{gbp0(l.withLekhio)}</div>
               </div>
             </div>
 
@@ -346,6 +353,7 @@ export default async function OverviewPage() {
           </p>
         )}
       </section>
+      </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════════════════════
           🔴 THE ONE PLACE THAT OFFERS WHATSAPP, AND IT IS BEHIND THE FRONT DOOR TOO.
@@ -398,69 +406,72 @@ export default async function OverviewPage() {
   );
 }
 
+// The column, the card, the tile and the desk composition come whole from APP_CSS in
+// lib/tokens.ts, one sheet for all three money screens. What is declared here is only what this
+// screen alone owns: the tax card, and the one pairing of true siblings.
 const CSS = [
   A11Y_CSS,
-  // The screen arrives rather than appearing. One timing from MOTION, chosen once, used here.
-  `@keyframes lek-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`,
-  `.lek-card{animation:lek-in ${MOTION.enter} ${MOTION.ease} both}`,
-  `.lek-hit{transition:transform ${MOTION.quick} ${MOTION.ease},box-shadow ${MOTION.quick} ${MOTION.ease}}`,
-  `.lek-hit:hover{transform:translateY(-1px);box-shadow:${SHADOW.card}}`,
-  // Three across wherever there is room, stacked on a small phone rather than three squeezed
-  // columns each with a wrapped pound sign in it.
-  `.lek-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}`,
-  `@media(max-width:420px){.lek-grid{grid-template-columns:1fr}}`,
+  APP_CSS,
+  `.lek-tax{background:${RIVER_TINT};border-color:${RIVER}33}`,
+  `.lek-eyebrow{font-size:${TYPE.label}px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:${RIVER_DEEP};margin:0 0 ${SPACE.xs}px}`,
+  // The one number he came for. Tabular figures, because a money column that wobbles as its
+  // digits change is a money column he learns to distrust.
+  `.lek-hero{font-size:${TYPE.hero}px;line-height:1.02;font-weight:800;letter-spacing:-0.035em;color:${RIVER_DEEP};font-variant-numeric:tabular-nums}`,
+  // Capped in characters, not pixels. On a desk the card is wide and a sentence let run the full
+  // width of it stops being read as belonging to the number above.
+  `.lek-heronote{font-size:${TYPE.note}px;line-height:1.55;color:${INK};margin:${SPACE.sm}px 0 0;max-width:56ch}`,
+  `.lek-duo{display:grid;grid-template-columns:1fr;align-items:start}`,
+  `.lek-two{display:grid;grid-template-columns:1fr 1fr;gap:${SPACE.md}px;margin-bottom:${SPACE.md}px}`,
+  `.lek-big{font-size:${TYPE.stat}px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}`,
+  `.lek-week-line{font-size:${TYPE.strong}px;font-weight:700;margin:0}`,
+  // The desk composition. The tax figure takes the display step and the room around it grows with
+  // it: presence is the size AND the space, and only ever for this one number.
+  `@media(min-width:${BREAK.desk}px){
+    .lek-tax{padding:${SPACE.xxl}px}
+    .lek-hero{font-size:${TYPE.display}px}
+    .lek-heronote{font-size:${TYPE.body}px}
+    .lek-duo{grid-template-columns:1fr 1fr;gap:${SPACE.lg}px;margin-bottom:${SPACE.lg}px}
+    .lek-duo>.lek-card{margin-bottom:0}
+    .lek-big{font-size:${TYPE.title}px}
+    .lek-week-line{font-size:${TYPE.lead}px}
+  }`,
 ].join('');
 
 const S: Record<string, React.CSSProperties> = {
-  wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK, padding: '18px 16px 40px', maxWidth: 640, margin: '0 auto' },
+  wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
 
-  card: { background: PANEL, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '20px 18px', marginBottom: 14 },
-  taxCard: { borderColor: `${RIVER}33`, background: RIVER_TINT },
+  heroBasis: { fontSize: TYPE.note, lineHeight: 1.55, color: RIVER_DEEP, margin: '8px 0 0' },
+  scope: { fontSize: TYPE.note, lineHeight: 1.5, color: MUTED, margin: '0 0 14px' },
 
-  eyebrow: { fontSize: 12.5, fontWeight: 800, letterSpacing: '0.4px', textTransform: 'uppercase', color: RIVER_DEEP, margin: '0 0 6px' },
-  hero: { fontSize: 44, lineHeight: 1.05, fontWeight: 800, letterSpacing: '-1.6px', color: RIVER_DEEP },
-  heroNote: { fontSize: 14, lineHeight: 1.55, color: INK, margin: '10px 0 0' },
-  heroBasis: { fontSize: 13, lineHeight: 1.55, color: RIVER_DEEP, margin: '8px 0 0' },
-  scope: { fontSize: 13, lineHeight: 1.5, color: MUTED, margin: '0 0 14px' },
-
-  h2: { fontSize: 15, fontWeight: 800, letterSpacing: '-0.2px', margin: '0 0 12px' },
-  headline: { fontSize: 19, lineHeight: 1.35, fontWeight: 800, letterSpacing: '-0.4px', margin: '0 0 16px' },
-
-  tile: { background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px' },
-  tileLabel: { fontSize: 12, fontWeight: 700, color: MUTED, marginBottom: 4 },
-  tileValue: { fontSize: 22, fontWeight: 800, letterSpacing: '-0.7px' },
-
-  two: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 },
-  big: { fontSize: 26, fontWeight: 800, letterSpacing: '-0.8px' },
+  headline: { fontSize: TYPE.lead, lineHeight: 1.35, fontWeight: 800, letterSpacing: '-0.02em', margin: '0 0 16px' },
 
   lines: { listStyle: 'none', margin: 0, padding: 0 },
   line: { borderTop: `1px solid ${LINE}`, padding: '12px 0 0', marginTop: 12 },
   lineTop: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' },
-  lineLabel: { fontSize: 15, fontWeight: 700 },
-  lineSaved: { fontSize: 15, fontWeight: 800, color: GREEN, whiteSpace: 'nowrap' },
-  basis: { fontSize: 13.5, lineHeight: 1.5, color: MUTED, margin: '4px 0 0' },
+  lineLabel: { fontSize: TYPE.body, fontWeight: 700 },
+  lineSaved: { fontSize: TYPE.body, fontWeight: 800, color: GREEN, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
+  basis: { fontSize: TYPE.note, lineHeight: 1.5, color: MUTED, margin: '4px 0 0' },
 
-  quiet: { fontSize: 13.5, lineHeight: 1.55, color: MUTED, margin: '10px 0 0' },
-  week: { fontSize: 17, fontWeight: 700, margin: 0 },
-  refund: { fontSize: 14, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: 14, margin: '18px 0 0' },
+  quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '10px 0 0' },
+  refund: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: 14, margin: '18px 0 0' },
 
   waiting: { display: 'flex', gap: 14, alignItems: 'center', textDecoration: 'none', background: PANEL, border: `1px solid ${LINE}`, borderLeft: `3px solid ${SAFFRON_DEEP}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
-  waitingCount: { flex: '0 0 auto', minWidth: 40, height: 40, borderRadius: RADIUS.pill, background: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: 17, fontWeight: 800, display: 'grid', placeItems: 'center', padding: '0 10px' },
-  waitingTop: { display: 'block', fontSize: 15, fontWeight: 800, color: INK, marginBottom: 3 },
-  waitingBody: { display: 'block', fontSize: 13.5, lineHeight: 1.5, color: MUTED },
+  waitingCount: { flex: '0 0 auto', minWidth: 40, height: 40, borderRadius: RADIUS.pill, background: SAFFRON_TINT, color: SAFFRON_DEEP, fontSize: TYPE.strong, fontWeight: 800, display: 'grid', placeItems: 'center', padding: '0 10px', fontVariantNumeric: 'tabular-nums' },
+  waitingTop: { display: 'block', fontSize: TYPE.body, fontWeight: 800, color: INK, marginBottom: 3 },
+  waitingBody: { display: 'block', fontSize: TYPE.note, lineHeight: 1.5, color: MUTED },
 
   notice: { display: 'block', background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
-  noticeTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
-  noticeBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
+  noticeTop: { display: 'block', fontSize: TYPE.label, fontWeight: 800, letterSpacing: '0.3px', color: SAFFRON_DEEP, marginBottom: 5 },
+  noticeBody: { display: 'block', fontSize: TYPE.body, lineHeight: 1.55, color: INK },
   resume: { display: 'block', textDecoration: 'none', background: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}44`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
-  primaryBtn: { background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: 15, fontWeight: 800, padding: '11px 18px', cursor: 'pointer' },
+  primaryBtn: { background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: TYPE.body, fontWeight: 800, padding: '11px 18px', cursor: 'pointer' },
 
   connect: { display: 'block', textDecoration: 'none', background: PANEL, border: `1px solid ${LINE}`, borderLeft: `3px solid ${WHATSAPP}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
-  connectTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: GREEN, marginBottom: 5 },
+  connectTop: { display: 'block', fontSize: TYPE.label, fontWeight: 800, letterSpacing: '0.3px', color: GREEN, marginBottom: 5 },
 
   stores: { textAlign: 'center', marginTop: 18 },
   storeRow: { display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginTop: 10 },
-  badge: { display: 'inline-block', background: INK, color: '#fff', fontSize: 13.5, fontWeight: 600, padding: '10px 16px', borderRadius: RADIUS.md, textDecoration: 'none' },
+  badge: { display: 'inline-block', background: INK, color: PANEL, fontSize: TYPE.note, fontWeight: 600, padding: '10px 16px', borderRadius: RADIUS.md, textDecoration: 'none' },
 
-  foot: { fontSize: 13, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
+  foot: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
 };

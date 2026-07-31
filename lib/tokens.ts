@@ -147,6 +147,57 @@ export const SHADOW = {
   raised: '0 12px 40px rgba(17,17,17,0.12)',
 } as const;
 
+// ---------- type ----------
+//
+// ⚠️ EVERY SIZE THE APP SETS TYPE AT, AND THERE ARE NINE OF THEM.
+//
+// Hierarchy is the design. A screen that answers one question needs one big number, a small word
+// over it saying what the number is, and everything else visibly smaller, and that only holds
+// across screens built weeks apart if the sizes were chosen once. Before this scale the three
+// money screens set type at eighteen different sizes, many of them half a pixel apart, which is
+// the typographic version of the two greens: invisible in a diff and mush on a screen.
+//
+// The names are jobs, not measurements. display exists for exactly one thing: the figure a man
+// opened the page for, on a screen wide enough to give it room. If two numbers on one screen are
+// both set at display, one of them is lying about mattering.
+export const TYPE = {
+  // The one number he came for, on a desk. Nothing else on the screen gets this.
+  display: 72,
+  // The same number in a hand. A phone gives it presence with space, not with pixels it lacks.
+  hero: 44,
+  // A month title, a desk tile figure. The top of the ordinary range.
+  title: 30,
+  // A money figure in a tile on a phone, a screen's own heading on a desk.
+  stat: 24,
+  // A leading sentence: the pile's headline, the saved figure in words.
+  lead: 19,
+  // A vendor name, an amount on a row, an empty state. Strong, never loud.
+  strong: 17,
+  // Ordinary reading, a heading inside a card, a button.
+  body: 15,
+  // The quiet line under a figure. Muted in ink, and this is as small as muted goes.
+  note: 13.5,
+  // An uppercase eyebrow, a tile label, a chip. The floor. Nothing a customer must read goes under it.
+  label: 12,
+} as const;
+
+// ---------- space ----------
+//
+// The rhythm, chosen once. Between two of these there is no third: a gap that is nearly a step is
+// the spacing version of a near miss colour, and eyeballed thirteens and fifteens are how a calm
+// column turns into a noticeboard. If a layout seems to need a value that is not here, it almost
+// always needs the next step up and less on the screen.
+export const SPACE = { hair: 4, xs: 8, sm: 12, md: 16, lg: 24, xl: 32, xxl: 48 } as const;
+
+// ---------- the two compositions ----------
+//
+// The web app is one server rendered page worn two ways, and the difference is CSS alone. Under
+// stack, the money grid gives up its columns so three figures never squeeze into three slivers.
+// From desk up, the column widens to 960 and the type steps up, because a desk has room to be
+// generous and a phone does not. Two compositions, no third: every width in between gets the
+// phone column with air around it, which is calmer than a layout that reflows at every size.
+export const BREAK = { stack: 420, desk: 1020 } as const;
+
 // ---------- movement ----------
 //
 // ⚠️ EVERY DURATION AND CURVE THE APP IS ALLOWED TO USE, AND THERE ARE FIVE OF THEM.
@@ -235,6 +286,55 @@ export const A11Y_CSS = [
   `a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid ${RIVER};outline-offset:2px;border-radius:4px}`,
   '@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}}',
 ].join('');
+
+// ---------- the app shell ----------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 ONE COMPOSITION, THREE SCREENS, WRITTEN ONCE.
+//
+// /app, /app/money and /app/pile share this sheet the way the marketing pages share THEME_CSS.
+// test/sharedcss.test.mjs is the record of the alternative: the marketing site kept two copies of
+// one stylesheet, a contrast fix landed in one, and the deployed site stayed broken after a build
+// that looked green. The app column, the card, the money tile and the desk composition live here
+// so that a fix to one of them is a fix to all three screens, without a guard test having to make
+// the duplication safe after the fact.
+//
+// THE SHAPE. One centred column: 640 wide in the hand, 960 from BREAK.desk up, and from desk up
+// the card padding, the tile figures and the headings take one step up the type scale. Cards sit
+// side by side only where they are true siblings, and each page declares that pairing itself.
+// The width in between gets the phone column with air around it, on purpose: a tablet held in a
+// kitchen is a big phone, not a small desk.
+//
+// ⚠️ THE APP STAYS LIGHT, AND NOT BECAUSE THE DARK PALETTE ABOVE CANNOT COVER IT. It could, and
+// every dark pair is already guarded. But switching theme takes the swap script, and the app
+// ships no client JavaScript at all, so that a man's figures are in the HTML before any script
+// could run. test/webauth.test.mjs holds every screen to that. Following the device with a media
+// query instead would trample the choice the site's toggle stores in localStorage, where no
+// server can read it, and two surfaces disagreeing about a choice he made once is worse than an
+// app that is reliably light. The day the app is allowed a script, it takes THEME_CSS and the
+// swap whole, and this sheet moves to the var() names. Until then: constants, light, deliberate.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const APP_CSS = `
+@keyframes lek-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.lek-wrap{box-sizing:border-box;max-width:672px;margin:0 auto;padding:${SPACE.md}px ${SPACE.md}px ${SPACE.xxl}px}
+.lek-card{background:${PANEL};border:1px solid ${LINE};border-radius:${RADIUS.lg}px;padding:${SPACE.md}px;margin-bottom:${SPACE.sm}px;animation:lek-in ${MOTION.enter} ${MOTION.ease} both}
+.lek-hit{transition:transform ${MOTION.quick} ${MOTION.ease},box-shadow ${MOTION.quick} ${MOTION.ease}}
+.lek-hit:hover{transform:translateY(-1px);box-shadow:${SHADOW.card}}
+.lek-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:${SPACE.sm}px}
+.lek-tile{background:${SURFACE};border-radius:${RADIUS.md}px;padding:${SPACE.sm}px ${SPACE.md}px}
+.lek-tile-label{font-size:${TYPE.label}px;font-weight:700;color:${MUTED};margin-bottom:${SPACE.hair}px}
+.lek-tile-value{font-size:${TYPE.stat}px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.lek-h2{font-size:${TYPE.body}px;font-weight:800;letter-spacing:-0.01em;margin:0 0 ${SPACE.sm}px}
+@media(max-width:${BREAK.stack}px){.lek-grid{grid-template-columns:1fr}}
+@media(min-width:${BREAK.desk}px){
+  .lek-wrap{max-width:992px;padding:${SPACE.xl}px ${SPACE.md}px ${SPACE.xxl * 2}px}
+  .lek-card{padding:${SPACE.xl}px;margin-bottom:${SPACE.lg}px}
+  .lek-grid{gap:${SPACE.md}px}
+  .lek-tile{padding:${SPACE.lg}px}
+  .lek-tile-value{font-size:${TYPE.title}px}
+  .lek-h2{font-size:${TYPE.strong}px}
+}
+`;
 
 // ---------- what the guard test reads ----------
 //

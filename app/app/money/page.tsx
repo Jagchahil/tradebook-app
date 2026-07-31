@@ -12,8 +12,10 @@ import {
   isMonthKey, logFor, monthKeyOf, monthTitle, stepMonth, dayLabel,
 } from '../../../lib/moneylog';
 import { gbp0 } from '../../../lib/money';
+import { entryRef } from '../entryref';
 import {
-  A11Y_CSS, FONT, GREEN, INK, LINE, MOTION, MUTED, PANEL, PAPER, RADIUS, RIVER, SURFACE,
+  A11Y_CSS, APP_CSS, BREAK, FONT, GREEN, INK, LINE, MOTION, MUTED, PANEL, PAPER, RADIUS, RIVER,
+  SPACE, SURFACE, TYPE,
 } from '../../../lib/tokens';
 import { AppNav } from '../AppNav';
 
@@ -103,7 +105,7 @@ export default async function MoneyPage({
   const waiting = known.length + unknown.length + careful.length;
 
   return (
-    <main style={S.wrap}>
+    <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
 
       <AppNav current="/app/money" />
@@ -125,29 +127,29 @@ export default async function MoneyPage({
         </a>
       ) : null}
 
-      <section style={S.card} className="lek-card">
+      <section className="lek-card">
         <div style={S.monthRow}>
           {canGoBack ? (
             <a href={`/app/money?m=${prev}`} style={S.arrow} aria-label={`Go to ${monthTitle(prev)}`}>&larr;</a>
           ) : <span style={S.arrowOff} aria-hidden="true">&larr;</span>}
-          <h1 style={S.month}>{monthTitle(month)}</h1>
+          <h1 className="lek-month">{monthTitle(month)}</h1>
           {canGoForward ? (
             <a href={`/app/money?m=${next}`} style={S.arrow} aria-label={`Go to ${monthTitle(next)}`}>&rarr;</a>
           ) : <span style={S.arrowOff} aria-hidden="true">&rarr;</span>}
         </div>
 
         <div className="lek-grid">
-          <div style={S.tile}>
-            <div style={S.tileLabel}>In</div>
-            <div style={{ ...S.tileValue, color: GREEN }}>{gbp0(log.income)}</div>
+          <div className="lek-tile">
+            <div className="lek-tile-label">In</div>
+            <div className="lek-tile-value" style={{ color: GREEN }}>{gbp0(log.income)}</div>
           </div>
-          <div style={S.tile}>
-            <div style={S.tileLabel}>Out</div>
-            <div style={{ ...S.tileValue, color: RIVER }}>{gbp0(log.expenses)}</div>
+          <div className="lek-tile">
+            <div className="lek-tile-label">Out</div>
+            <div className="lek-tile-value" style={{ color: RIVER }}>{gbp0(log.expenses)}</div>
           </div>
-          <div style={S.tile}>
-            <div style={S.tileLabel}>Profit</div>
-            <div style={S.tileValue}>{gbp0(log.profit)}</div>
+          <div className="lek-tile">
+            <div className="lek-tile-label">Profit</div>
+            <div className="lek-tile-value">{gbp0(log.profit)}</div>
           </div>
         </div>
 
@@ -163,14 +165,14 @@ export default async function MoneyPage({
       </section>
 
       {!read ? (
-        <section style={S.card} className="lek-card">
+        <section className="lek-card">
           <p style={S.empty}>We could not read {monthTitle(month)} just now.</p>
           <p style={S.quiet}>
             Nothing is lost and nothing has changed. Load the page again in a minute.
           </p>
         </section>
       ) : log.entries.length === 0 ? (
-        <section style={S.card} className="lek-card">
+        <section className="lek-card">
           <p style={S.empty}>Nothing logged in {monthTitle(month)}.</p>
           {/* ⚠️ THIS NAMES ONE THING HE CAN ACTUALLY DO, AND ONLY ONE.
               The first draft ended "anything you send us in a chat arrives here too", and
@@ -181,12 +183,28 @@ export default async function MoneyPage({
           <p style={S.quiet}>Connect your bank and every payment lands here on its own.</p>
         </section>
       ) : (
-        <section style={S.card} className="lek-card">
+        <section className="lek-card">
           <ul style={S.list}>
-            {log.entries.map((e) => (
-              <li key={e.id} style={S.row}>
+            {log.entries.map((e) => {
+              // ⚠️ THE ROW'S ID NEVER REACHES THE URL. The link carries a sealed reference from
+              // app/app/entryref.ts instead, minted for THIS session and this month, so there is
+              // still nothing in any web app URL a customer could edit to reach another man's
+              // row. No reference (secret unset) means no link, and the row stays the plain text
+              // it always was rather than a dead button.
+              const ref = entryRef(user.id, e.id, month);
+              return (
+              <li key={e.id} className="lek-row">
                 <div style={S.rowMain}>
-                  <span style={e.personal ? S.labelOff : S.label}>{e.label}</span>
+                  {ref ? (
+                    <a
+                      href={`/app/entry?ref=${encodeURIComponent(ref)}`}
+                      style={e.personal ? S.labelOffLink : S.labelLink}
+                    >
+                      {e.label}
+                    </a>
+                  ) : (
+                    <span style={e.personal ? S.labelOff : S.label}>{e.label}</span>
+                  )}
                   {/* ⚠️ gbp0 AND NOTHING ELSE. The first draft of this line built the negative
                       itself, which is the eighteenth money formatter and exactly what the 28 July
                       sweep existed to stop. lib/money.ts puts the sign outside the pound, "-£42"
@@ -219,7 +237,8 @@ export default async function MoneyPage({
                   ) : null}
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </section>
       )}
@@ -232,51 +251,54 @@ export default async function MoneyPage({
   );
 }
 
+// The column, the card, the tile and the desk composition come whole from APP_CSS in
+// lib/tokens.ts, shared with the Overview and the pile. This block holds only what this screen
+// alone owns: the month title, the ledger rows, and the one button on a row.
 const CSS = [
   A11Y_CSS,
-  `@keyframes lek-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`,
-  `.lek-card{animation:lek-in ${MOTION.enter} ${MOTION.ease} both}`,
-  `.lek-hit{transition:transform ${MOTION.quick} ${MOTION.ease}}`,
-  `.lek-hit:hover{transform:translateY(-1px)}`,
-  `.lek-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}`,
-  `@media(max-width:420px){.lek-grid{grid-template-columns:1fr}}`,
-  `.lek-mark{border:1px solid ${LINE};background:${PANEL};color:${MUTED};font-family:inherit;font-size:12px;font-weight:700;padding:4px 10px;border-radius:${RADIUS.pill}px;cursor:pointer;transition:background-color ${MOTION.quick} ${MOTION.ease},color ${MOTION.quick} ${MOTION.ease}}`,
+  APP_CSS,
+  // The month is the one thing this screen is about, so it is the thing that takes the step up on
+  // a desk. The figures under it grow with the shared tile classes and nothing else grows at all.
+  `.lek-month{font-size:${TYPE.lead}px;font-weight:800;letter-spacing:-0.02em;margin:0}`,
+  `.lek-row{border-top:1px solid ${LINE};padding:13px 0 0;margin-top:13px}`,
+  `.lek-mark{border:1px solid ${LINE};background:${PANEL};color:${MUTED};font-family:inherit;font-size:${TYPE.label}px;font-weight:700;padding:4px 10px;border-radius:${RADIUS.pill}px;cursor:pointer;transition:background-color ${MOTION.quick} ${MOTION.ease},color ${MOTION.quick} ${MOTION.ease}}`,
   `.lek-mark:hover{background:${SURFACE};color:${INK}}`,
+  `@media(min-width:${BREAK.desk}px){
+    .lek-month{font-size:${TYPE.title}px}
+    .lek-row{padding:${SPACE.md}px 0 0;margin-top:${SPACE.md}px}
+  }`,
 ].join('');
 
 const S: Record<string, React.CSSProperties> = {
-  wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK, padding: '18px 16px 40px', maxWidth: 640, margin: '0 auto' },
-  card: { background: PANEL, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '20px 18px', marginBottom: 14 },
+  wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
 
-  said: { fontSize: 14, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px', margin: '0 0 14px' },
+  said: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px', margin: '0 0 14px' },
 
   monthRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 },
-  month: { fontSize: 19, fontWeight: 800, letterSpacing: '-0.4px', margin: 0 },
   arrow: { color: RIVER, fontSize: 20, fontWeight: 800, textDecoration: 'none', padding: '2px 10px', borderRadius: RADIUS.sm },
   arrowOff: { color: LINE, fontSize: 20, fontWeight: 800, padding: '2px 10px' },
 
-  tile: { background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px' },
-  tileLabel: { fontSize: 12, fontWeight: 700, color: MUTED, marginBottom: 4 },
-  tileValue: { fontSize: 22, fontWeight: 800, letterSpacing: '-0.7px' },
-
   list: { listStyle: 'none', margin: 0, padding: 0 },
-  row: { borderTop: `1px solid ${LINE}`, padding: '13px 0 0', marginTop: 13 },
   rowMain: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' },
-  label: { fontSize: 15, fontWeight: 700 },
-  labelOff: { fontSize: 15, fontWeight: 700, color: MUTED, textDecoration: 'line-through' },
-  amount: { fontSize: 15, fontWeight: 800, whiteSpace: 'nowrap' },
-  amountIn: { fontSize: 15, fontWeight: 800, color: GREEN, whiteSpace: 'nowrap' },
-  amountOff: { fontSize: 15, fontWeight: 800, color: MUTED, textDecoration: 'line-through', whiteSpace: 'nowrap' },
-  rowMeta: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 12.5, color: MUTED, marginTop: 6 },
+  label: { fontSize: TYPE.body, fontWeight: 700 },
+  labelOff: { fontSize: TYPE.body, fontWeight: 700, color: MUTED, textDecoration: 'line-through' },
+  // The label as a link to its own line. Ink, not river: a column of blue vendor names would
+  // shout over the figures, and the underline is enough to say "this opens".
+  labelLink: { fontSize: TYPE.body, fontWeight: 700, color: INK, textDecoration: 'underline', textDecorationColor: LINE, textUnderlineOffset: 3 },
+  labelOffLink: { fontSize: TYPE.body, fontWeight: 700, color: MUTED, textDecoration: 'underline line-through', textDecorationColor: LINE, textUnderlineOffset: 3 },
+  amount: { fontSize: TYPE.body, fontWeight: 800, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
+  amountIn: { fontSize: TYPE.body, fontWeight: 800, color: GREEN, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
+  amountOff: { fontSize: TYPE.body, fontWeight: 800, color: MUTED, textDecoration: 'line-through', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
+  rowMeta: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: TYPE.label, color: MUTED, marginTop: 6 },
   chip: { background: SURFACE, borderRadius: RADIUS.sm, padding: '2px 8px', fontWeight: 700 },
   inlineForm: { margin: 0, marginLeft: 'auto' },
 
   waiting: { display: 'flex', gap: 14, alignItems: 'center', textDecoration: 'none', background: PANEL, border: `1px solid ${LINE}`, borderLeft: `3px solid ${RIVER}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
-  waitingCount: { flex: '0 0 auto', minWidth: 40, height: 40, borderRadius: RADIUS.pill, background: SURFACE, color: RIVER, fontSize: 17, fontWeight: 800, display: 'grid', placeItems: 'center', padding: '0 10px' },
-  waitingTop: { display: 'block', fontSize: 15, fontWeight: 800, color: INK, marginBottom: 3 },
-  waitingBody: { display: 'block', fontSize: 13.5, lineHeight: 1.5, color: MUTED },
+  waitingCount: { flex: '0 0 auto', minWidth: 40, height: 40, borderRadius: RADIUS.pill, background: SURFACE, color: RIVER, fontSize: TYPE.strong, fontWeight: 800, display: 'grid', placeItems: 'center', padding: '0 10px', fontVariantNumeric: 'tabular-nums' },
+  waitingTop: { display: 'block', fontSize: TYPE.body, fontWeight: 800, color: INK, marginBottom: 3 },
+  waitingBody: { display: 'block', fontSize: TYPE.note, lineHeight: 1.5, color: MUTED },
 
-  empty: { fontSize: 17, fontWeight: 700, margin: 0 },
-  quiet: { fontSize: 13.5, lineHeight: 1.55, color: MUTED, margin: '10px 0 0' },
-  foot: { fontSize: 13, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
+  empty: { fontSize: TYPE.strong, fontWeight: 700, margin: 0 },
+  quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '10px 0 0' },
+  foot: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
 };

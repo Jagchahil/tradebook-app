@@ -3993,6 +3993,40 @@ export async function insertBankTransactions(userId: string, entries: BankEntryI
   return inserted;
 }
 
+// Which of these external ids does this account already hold? The statement import asks before
+// it writes, so the result screen can say "22 were already in your books" as a counted fact
+// rather than an inference, and a re uploaded statement writes nothing at all instead of
+// posting three hundred rows for the database to shrug at.
+//
+// Null on any failure, never an empty set: an empty set means "none of these exist", which
+// would make the caller re insert everything. That is safe (the on_conflict rule absorbs it)
+// but the caller deserves to know its counts are now derived rather than observed.
+export async function knownExternalIds(userId: string, ids: string[]): Promise<Set<string> | null> {
+  const clean = ids.filter(Boolean);
+  if (clean.length === 0) return new Set();
+  try {
+    const { url } = config();
+    const found = new Set<string>();
+    // Chunked: a year of statement lines in one in.() list would be a URL nobody should send.
+    const CHUNK = 100;
+    for (let i = 0; i < clean.length; i += CHUNK) {
+      const inList = clean.slice(i, i + CHUNK).map((v) => `"${v.replace(/"/g, '')}"`).join(',');
+      const res = await fetch(
+        `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+          `&external_id=in.(${encodeURIComponent(inList)})&select=external_id`,
+        { headers: headers() },
+      );
+      if (!res.ok) return null;
+      const rows = (await res.json().catch(() => null)) as Array<{ external_id: string }> | null;
+      if (!Array.isArray(rows)) return null;
+      for (const r of rows) if (r.external_id) found.add(r.external_id);
+    }
+    return found;
+  } catch {
+    return null;
+  }
+}
+
 // --- Invoices (read for the public invoice page, server side only) ---------
 
 export interface InvoiceLine {
@@ -5613,7 +5647,30 @@ export async function sweepRateHits(): Promise<void> {
 // The pile. See lib/reviewpile.ts and app/api/pile/route.ts.
 // ---------------------------------------------------------------------------
 
-// Everything still waiting on him. Bank rows, unconfirmed, not already excluded.
+// Everything still waiting on him. Unconfirmed, not already excluded, from every capture
+// channel that leaves a row waiting: the bank feed, a receipt photographed on the web, and the
+// three WhatsApp captures (a photo, a voice note, a typed line).
+//
+// ⚠️ THIS USED TO BE source_type=eq.bank_feed, AND THAT ONE FILTER MADE THE PRODUCT LIE TWICE.
+// Setup promises "anything you leave is waiting for you inside", and this page's own header
+// says a receipt landing on WhatsApp is answered by an email telling him to come here and
+// confirm it. Then the query showed him bank rows only, so the receipt he was emailed about
+// was invisible on the very screen the email sent him to, and the money page's "none of it is
+// counted below until you answer it" count was silently short of every capture he had made.
+//
+// EVERY CALLER WAS READ BEFORE WIDENING THIS, AND THE WIDENING IS DELIBERATE FOR ALL OF THEM:
+// /app/pile draws the deck, /api/pile serves the same deck to the phone app and takes the
+// decisions, and the Overview and money pages only COUNT what is waiting. All four are the one
+// review surface, and a review surface that cannot see a waiting receipt is wrong, not safe.
+// The decision path holds unchanged: confirm_pile re applies its guard in SQL with no source
+// filter at all (money out only, nothing flagged, his rows only), so a receipt row obeys
+// exactly the rules a bank row obeys.
+//
+// ⚠️ THE FOUR STRUCTURED WHATSAPP CLAIMS ARE DELIBERATELY NOT HERE. whatsapp_mileage,
+// whatsapp_cis, whatsapp_homeoffice and whatsapp_phoneshare land with engine owned categories
+// ('use of home', 'cis income') that the pile's picker does not offer, so the select on
+// /app/pile would silently default one of them to its first option and a man's flat rate
+// claim would be filed as materials with his own consent. They keep their own confirm flow.
 //
 // Capped at 1000. Ninety days of a busy tradesman is two to three hundred; a thousand is a
 // year of heavy use and well past the point where a review deck is the right tool anyway.
@@ -5628,7 +5685,8 @@ export async function pileEntries(userId: string): Promise<Array<{
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
-      `&confirmed=eq.false&is_personal=eq.false&source_type=eq.bank_feed` +
+      `&confirmed=eq.false&is_personal=eq.false` +
+      `&source_type=in.(bank_feed,web_image,whatsapp_image,whatsapp_voice,whatsapp_text)` +
       `&select=id,vendor,description,amount,category,looks_personal` +
       `&order=transaction_date.desc&limit=1000`,
     { headers: headers() },

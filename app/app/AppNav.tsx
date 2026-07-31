@@ -56,6 +56,30 @@ export const SECTIONS: ReadonlyArray<NavSection> = [
     items: [
       { href: '/app/money', label: 'Everything logged', hint: 'Every payment, a month at a time' },
       { href: '/app/pile', label: 'Waiting on you', hint: 'Anything we could not call ourselves' },
+      { href: '/app/money/add', label: 'Add an entry', hint: 'Cash in hand, typed straight in' },
+      { href: '/app/money/capture', label: 'Upload a till slip', hint: 'We read it, and nothing counts until you say so' },
+      { href: '/app/money/import', label: 'Upload a statement', hint: 'A CSV from your bank, read without connecting it' },
+    ],
+  },
+  {
+    href: '/app/tax',
+    label: 'Tax',
+    items: [
+      { href: '/app/tax', label: 'Where you stand', hint: 'The year, what January collects, and when' },
+      { href: '/app/tax/summary', label: 'Quarterly summary', hint: 'What an MTD update would report today' },
+      { href: '/app/tax/what-if', label: 'What if', hint: 'Try a change to your profit, on your real figures' },
+      { href: '/app/tax/ways-to-save', label: 'Ways to save', hint: 'Every lever we can find you, with the working' },
+      { href: '/app/tax/can-i-claim', label: 'Can I claim it', hint: 'The expense rules, with HMRC sources' },
+    ],
+  },
+  {
+    href: '/app/invoices',
+    label: 'Invoices',
+    items: [
+      { href: '/app/invoices', label: 'Every invoice', hint: 'Who owes you, and what is late' },
+      { href: '/app/invoices/new', label: 'Make an invoice', hint: 'Built here, sent by you' },
+      { href: '/app/proof-of-income', label: 'Proof of income', hint: 'The summary a landlord or lender asks for' },
+      { href: '/app/share-books', label: 'Share your books', hint: 'A read only link you can take back' },
     ],
   },
   {

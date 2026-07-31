@@ -10,7 +10,10 @@ import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
 import { gbp0 } from '../../../lib/money';
 import { gateForUser } from '../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../lib/gate';
-import { A11Y_CSS, FONT, INK, LINE, MUTED, PAPER, RADIUS, RIVER, RIVER_DEEP, SAFFRON_TINT, SURFACE } from '../../../lib/tokens';
+import {
+  A11Y_CSS, APP_CSS, BREAK, FONT, INK, LINE, MOTION, MUTED, ON_RIVER, PANEL, PAPER, RADIUS, RIVER,
+  RIVER_DEEP, SAFFRON_DEEP, SAFFRON_TINT, SPACE, SURFACE, TYPE,
+} from '../../../lib/tokens';
 import { AppNav } from '../AppNav';
 
 export const runtime = 'nodejs';
@@ -100,10 +103,15 @@ export default async function PilePage({
   const knownRows = known.reduce((n, g) => n + g.count, 0);
 
   return (
-    <main style={S.wrap}>
+    <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
 
       <AppNav current="/app/pile" />
+
+      {/* The queue is a run of questions, and a question is read down a narrow page. On a desk
+          the column around it widens with the other two screens but the queue itself holds a
+          reading width, centred, rather than stretching a decision across a whole monitor. */}
+      <div className="lek-queue">
 
       {note && <p style={S.note}>{note}</p>}
 
@@ -118,8 +126,8 @@ export default async function PilePage({
       ) : null}
 
       {decidable === 0 ? (
-        <section style={S.card}>
-          <h1 style={S.h1}>Nothing is waiting on you.</h1>
+        <section className="lek-card">
+          <h1 className="lek-title">Nothing is waiting on you.</h1>
           <p style={S.sub}>
             Everything we have is filed and counted. Connect your bank and new spending arrives here on its own.
           </p>
@@ -130,8 +138,8 @@ export default async function PilePage({
               He went to the same merchant many times: that is one question, not many. And the ones
               we already recognise are not a question at all, they are a yes. Saying so up front is
               the difference between a screen he works through and a screen he closes. */}
-          <section style={S.card}>
-            <h1 style={S.h1}>
+          <section className="lek-card">
+            <h1 className="lek-title">
               {summary.entries} to check, and {decidable === 1 ? 'one question' : `only ${decidable} questions`}.
             </h1>
             <p style={S.sub}>
@@ -152,8 +160,8 @@ export default async function PilePage({
               have already answered, and doing it twenty times is what made this screen feel like
               work. He only needs the dropdown when he DISAGREES, which is what the row link is. */}
           {known.length > 0 && (
-            <section style={S.card}>
-              <h2 style={S.h2}>We recognise {known.length === 1 ? 'this one' : `these ${known.length}`}</h2>
+            <section className="lek-card">
+              <h2 className="lek-h2">We recognise {known.length === 1 ? 'this one' : `these ${known.length}`}</h2>
               <p style={S.sub}>
                 {knownRows === 1 ? 'One payment' : `${knownRows} payments`}, and we are confident
                 about {known.length === 1 ? 'it' : 'them'}. Have a read, then file the lot in one go.
@@ -177,7 +185,7 @@ export default async function PilePage({
                   this is the one tap that files many rows, so nothing about it trusts the browser. */}
               <form action="/api/pile" method="post" hidden={locked} style={S.form}>
                 <input type="hidden" name="verdict" value="confirm_known" />
-                <button type="submit" style={S.primary}>
+                <button type="submit" className="lek-primary">
                   Yes, file {known.length === 1 ? 'it' : `all ${knownRows}`}
                 </button>
               </form>
@@ -191,7 +199,7 @@ export default async function PilePage({
               Few, and they are the ones that cost him if he gets them wrong, so they sit above the
               long tail where he will actually see them. Never bulk, always the reason in his words. */}
           {careful.map((g) => (
-            <section key={g.key} style={{ ...S.card, ...S.careful }}>
+            <section key={g.key} className="lek-card lek-careful">
               <div style={S.rowTop}>
                 <span style={S.vendor}>{g.vendor}</span>
                 <span style={S.amount}>{gbp0(g.total)}</span>
@@ -206,7 +214,7 @@ export default async function PilePage({
                 <input type="hidden" name="ids" value={g.ids.join(',')} />
                 <input type="hidden" name="vendor" value={g.vendor} />
                 <input type="hidden" name="verdict" value="personal" />
-                <button type="submit" style={S.secondary}>Not business money</button>
+                <button type="submit" className="lek-ghost">Not business money</button>
               </form>
             </section>
           ))}
@@ -224,8 +232,8 @@ export default async function PilePage({
               is claimable depends on the journey. Telling a man we have not seen Trainline before is
               simply untrue, and he can see that it is. */}
           {unknown.length > 0 && (
-            <section style={S.card}>
-              <h2 style={S.h2}>{unknown.length === 1 ? 'This one needs' : 'These need'} you</h2>
+            <section className="lek-card">
+              <h2 className="lek-h2">{unknown.length === 1 ? 'This one needs' : 'These need'} you</h2>
               <p style={S.sub}>
                 Quickest way through: knock out anything that was not business first, then say what
                 the rest were. Where we have a good idea we have filled it in for you.
@@ -233,7 +241,7 @@ export default async function PilePage({
             </section>
           )}
           {unknown.map((g) => (
-            <section key={g.key} style={S.card}>
+            <section key={g.key} className="lek-card">
               <div style={S.rowTop}>
                 <span style={S.vendor}>{g.vendor}</span>
                 <span style={S.amount}>{gbp0(g.total)}</span>
@@ -253,7 +261,7 @@ export default async function PilePage({
                 <input type="hidden" name="ids" value={g.ids.join(',')} />
                 <input type="hidden" name="vendor" value={g.vendor} />
                 <input type="hidden" name="verdict" value="personal" />
-                <button type="submit" style={S.primaryQuiet}>Not business money</button>
+                <button type="submit" className="lek-quiet">Not business money</button>
               </form>
 
               <form action="/api/pile" method="post" hidden={locked} style={S.formTight}>
@@ -263,13 +271,13 @@ export default async function PilePage({
                 <label htmlFor={`cat-${g.key}`} style={S.label}>
                   {g.suggested ? 'Or it was work, file it as' : 'Or file it as'}
                 </label>
-                <select id={`cat-${g.key}`} name="category" defaultValue={g.suggested ?? ''} style={S.select} required>
+                <select id={`cat-${g.key}`} name="category" defaultValue={g.suggested ?? ''} className="lek-select" required>
                   {!g.suggested && <option value="">Choose one</option>}
                   {CATEGORIES.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                <button type="submit" style={S.secondary}>
+                <button type="submit" className="lek-ghost">
                   File {g.count === 1 ? 'it' : `all ${g.count}`}
                 </button>
               </form>
@@ -277,44 +285,57 @@ export default async function PilePage({
           ))}
         </>
       )}
+      </div>
     </main>
   );
 }
 
+// The column, the card and the desk composition come whole from APP_CSS in lib/tokens.ts, shared
+// with the Overview and the money log. This block holds only what the queue alone owns: its
+// headline, the careful tint, and the three buttons a decision can be.
 const CSS = [
   A11Y_CSS,
+  APP_CSS,
   `select:focus,button:focus{outline:3px solid ${RIVER};outline-offset:2px}`,
+  `.lek-title{font-size:${TYPE.lead}px;line-height:1.3;font-weight:800;letter-spacing:-0.02em;margin:0 0 ${SPACE.xs}px}`,
+  `.lek-careful{background:${SAFFRON_TINT};border-color:${SAFFRON_DEEP}44}`,
+  `.lek-primary{width:100%;margin-top:${SPACE.xs}px;padding:14px ${SPACE.md}px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${ON_RIVER};background:${RIVER};border:none;border-radius:${RADIUS.md}px;cursor:pointer;transition:background-color ${MOTION.quick} ${MOTION.ease}}`,
+  `.lek-primary:hover{background:${RIVER_DEEP}}`,
+  `.lek-quiet{width:100%;padding:14px ${SPACE.md}px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${INK};background:${SURFACE};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;cursor:pointer;transition:background-color ${MOTION.quick} ${MOTION.ease}}`,
+  `.lek-ghost{width:100%;padding:12px ${SPACE.md}px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${MUTED};background:transparent;border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;cursor:pointer;transition:color ${MOTION.quick} ${MOTION.ease},border-color ${MOTION.quick} ${MOTION.ease}}`,
+  `.lek-ghost:hover{color:${INK}}`,
+  // 16px is pinned, not a stray off the type scale: under 16 iOS Safari zooms the whole page the
+  // moment the select is focused, and he never asked to be zoomed.
+  `.lek-select{width:100%;box-sizing:border-box;padding:${SPACE.sm}px;font-size:16px;font-family:${FONT};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;color:${INK};background:${PANEL}}`,
+  // On a desk a decision is a button sized to its words, not a bar the width of the monitor. A
+  // full width press target earns its keep under a thumb and loses it under a mouse.
+  `@media(min-width:${BREAK.desk}px){
+    .lek-queue{max-width:760px;margin:0 auto}
+    .lek-title{font-size:${TYPE.stat}px}
+    .lek-primary,.lek-quiet,.lek-ghost{width:auto;min-width:264px}
+    .lek-select{max-width:420px}
+  }`,
 ].join('');
 
 const S: Record<string, React.CSSProperties> = {
-  wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK, padding: '18px 16px 40px', maxWidth: 640, margin: '0 auto' },
-  head: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
-  logo: { fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px', color: RIVER_DEEP, textDecoration: 'none' },
-  back: { fontSize: 13.5, fontWeight: 600, color: MUTED, textDecoration: 'none' },
-  card: { background: '#fff', border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '18px', marginBottom: 12 },
-  careful: { background: SAFFRON_TINT, borderColor: '#E7D4AC' },
-  h1: { fontSize: 21, lineHeight: 1.3, fontWeight: 800, letterSpacing: '-0.5px', margin: '0 0 8px' },
-  sub: { fontSize: 14.5, lineHeight: 1.55, color: MUTED, margin: 0 },
-  aside: { fontSize: 13.5, lineHeight: 1.55, color: MUTED, margin: '12px 0 0' },
-  note: { background: '#fff', border: `1px solid ${LINE}`, borderRadius: RADIUS.md, padding: 14, fontSize: 14.5, lineHeight: 1.5, margin: '0 0 14px' },
+  wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
+  sub: { fontSize: TYPE.body, lineHeight: 1.55, color: MUTED, margin: 0 },
+  aside: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '12px 0 0' },
+  note: { background: PANEL, border: `1px solid ${LINE}`, borderRadius: RADIUS.md, padding: 14, fontSize: TYPE.body, lineHeight: 1.5, margin: '0 0 14px' },
   locked: { display: 'block', background: SAFFRON_TINT, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
-  lockedTop: { display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '0.3px', color: INK, marginBottom: 5 },
-  lockedBody: { display: 'block', fontSize: 14.5, lineHeight: 1.55, color: INK },
-  lockedBtn: { background: RIVER, color: '#fff', border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: 15, fontWeight: 800, padding: '11px 18px', cursor: 'pointer' },
+  lockedTop: { display: 'block', fontSize: TYPE.label, fontWeight: 800, letterSpacing: '0.3px', color: INK, marginBottom: 5 },
+  lockedBody: { display: 'block', fontSize: TYPE.body, lineHeight: 1.55, color: INK },
+  lockedBtn: { background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: TYPE.body, fontWeight: 800, padding: '11px 18px', cursor: 'pointer' },
   rowTop: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' },
-  vendor: { fontSize: 16.5, fontWeight: 800, letterSpacing: '-0.2px' },
-  amount: { fontSize: 16.5, fontWeight: 800, whiteSpace: 'nowrap' },
-  meta: { fontSize: 13.5, lineHeight: 1.55, color: MUTED, margin: '4px 0 0' },
-  reason: { fontSize: 13.5, lineHeight: 1.55, color: INK, margin: '10px 0 0', fontWeight: 600 },
+  vendor: { fontSize: TYPE.strong, fontWeight: 800, letterSpacing: '-0.01em' },
+  amount: { fontSize: TYPE.strong, fontWeight: 800, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
+  meta: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '4px 0 0' },
+  reason: { fontSize: TYPE.note, lineHeight: 1.55, color: INK, margin: '10px 0 0', fontWeight: 600 },
   form: { margin: '14px 0 0' },
   formTight: { margin: '10px 0 0' },
-  label: { display: 'block', fontSize: 12.5, fontWeight: 700, color: MUTED, marginBottom: 6 },
-  select: { width: '100%', boxSizing: 'border-box', padding: '12px', fontSize: 16, fontFamily: FONT, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, color: INK, background: '#fff' },
-  primary: { width: '100%', marginTop: 10, padding: '14px 16px', fontSize: 15.5, fontWeight: 700, fontFamily: FONT, color: '#fff', background: RIVER, border: 'none', borderRadius: RADIUS.md, cursor: 'pointer' },
+  label: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, marginBottom: 6 },
   cat: { color: RIVER_DEEP },
   lines: { listStyle: 'none', margin: '14px 0 0', padding: 0 },
   line: { borderTop: `1px solid ${LINE}`, padding: '12px 0 0', marginTop: 12 },
-  hint: { fontSize: 12.5, lineHeight: 1.5, color: MUTED, textAlign: 'center', margin: '10px 0 0' },
-  primaryQuiet: { width: '100%', padding: '14px 16px', fontSize: 15.5, fontWeight: 700, fontFamily: FONT, color: INK, background: SURFACE, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, cursor: 'pointer' },
-  secondary: { width: '100%', padding: '12px 16px', fontSize: 14.5, fontWeight: 700, fontFamily: FONT, color: MUTED, background: 'transparent', border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, cursor: 'pointer' },
+  hint: { fontSize: TYPE.label, lineHeight: 1.5, color: MUTED, textAlign: 'center', margin: '10px 0 0' },
 };

@@ -352,7 +352,22 @@ console.log('\n=== the bank feed is offered by one switch, honestly ===\n');
   for (const f of inApp) {
     const src = codeOnly(read(rel(f)))
       .replace(/\/connect your bank\/i/g, '');
-    for (const m of src.matchAll(/[Cc]onnect(ed)? (your|the) bank/g)) {
+    // ═══════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THE PATTERN USED TO BE "connect your bank" ONLY, AND THAT IS HOW ONE GOT THROUGH.
+    //
+    // The dashboard footer said "New spending lands in YOUR BANK FEED on its own", every time
+    // anything sat in his pile. It names a door that does not open and it matched nothing in the
+    // old pattern, because it never uses the word connect. A sweep that catches one phrasing
+    // catches the sentences somebody happened to write that way. Found on the live site on 31 July
+    // 2026, one commit after this sweep was supposed to have finished the job.
+    //
+    // ⚠️ AND THE POSSESSIVE IS THE POINT, which is why this is "your bank feed" and not "bank feed".
+    // "The bank feed is on its way" (the setup step's honest copy) and "none of this is in a bank
+    // feed" (why the circumstances questions exist) are both TRUE with the switch off, and gating
+    // them would be gating the sentences that explain the absence. What must be behind the switch
+    // is any sentence asserting he HAS one, and in English that is the possessive.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    for (const m of src.matchAll(/([Cc]onnect(ed)? (your|the) bank|your bank feed)/g)) {
       const before = src.slice(Math.max(0, m.index - 260), m.index);
       if (!before.includes('bankFeedOffered()')) {
         bankOffenders.push(`${rel(f)}: ...${src.slice(m.index, m.index + 40)}...`);

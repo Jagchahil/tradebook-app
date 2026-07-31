@@ -17,7 +17,7 @@ import { ledgerFor, headline } from '../../lib/ledger';
 import { taxPosition, setAsideBasisLine } from '../../lib/taxoptimiser';
 import { weeklyInput, weeklyLine } from '../../lib/weeklyupdate';
 import { weekOf } from '../../lib/weekchart';
-import { buildPile, partitionPile } from '../../lib/reviewpile';
+import { buildPile, partitionPile, waitingCount } from '../../lib/reviewpile';
 import { bankFeedOffered } from '../../lib/bankfeed';
 import { normaliseVendor } from '../../lib/memory';
 import { categoriseBankLine } from '../../lib/categories';
@@ -166,11 +166,18 @@ export default async function OverviewPage() {
   // WHAT IS WAITING, from the same three functions /app/pile and /api/pile use. Money in is never
   // in this count: confirm_pile refuses it outright, so counting it would promise him a decision he
   // is not offered.
-  const { known, unknown, careful } = partitionPile(
+  const { known, unknown, careful, income } = partitionPile(
     buildPile(pileRows, normaliseVendor, ownNames, categoriseBankLine),
     accountUse,
   );
-  const waiting = known.length + unknown.length + careful.length;
+  // 🔴 INCOME COUNTS HERE NOW, AND ITS ABSENCE WAS HALF OF A REAL BUG.
+  //
+  // The pile had no section for money in, so this count deliberately left it out, and the two
+  // agreed with each other while both being wrong. Walking a live statement import on 31 July 2026
+  // showed the shape of it: six rows landed, this said four were waiting, and the two payments in,
+  // £420 of a man's income, were counted nowhere and shown nowhere. The pile now asks about them one
+  // payer at a time, so they are genuinely waiting on him and this number says so.
+  const waiting = waitingCount({ known, unknown, careful, income });
 
   const items = sources
     ? selectAnnouncements({
@@ -432,8 +439,17 @@ export default async function OverviewPage() {
       <p style={S.foot}>
         {/* The bank sentence returns with bankFeedOffered(); until then the footer names only the
             three doors that actually work today. */}
+        {/* 🔴 THIS BRANCHED ON `waiting > 0` AND NOT ON THE SWITCH, so the most read screen in the
+            product told a man his spending lands in a bank feed that has no provider, every time
+            anything was in his pile. The comment above claimed the bank sentence returns with
+            bankFeedOffered(), and on this branch it did not. Found by walking the live site on
+            31 July 2026, after the sweep that was supposed to have caught it: test/frontdoor's
+            regex looked for "connect your bank" and this line says "bank feed", so the sweep has
+            been widened as well as the line fixed. */}
         {waiting > 0
-          ? 'Everything above is money you have confirmed. New spending lands in your bank feed on its own.'
+          ? bankFeedOffered()
+            ? 'Everything above is money you have confirmed. New spending lands in your bank feed on its own.'
+            : 'Everything above is money you have confirmed. Add an entry, upload a till slip, or import a bank statement, and it lands here ready for you to check.'
           : bankFeedOffered()
             ? 'Everything here is money you have confirmed. Connect your bank and new spending lands here on its own, ready for you to check.'
             : 'Everything here is money you have confirmed. Add an entry, upload a till slip, or import a bank statement, and it lands here ready for you to check.'}

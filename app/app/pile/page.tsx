@@ -2,8 +2,8 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { pileEntries, readOwnNames, readAccountUse, readCircumstances, getBusinessProfile } from '../../../lib/supabase';
-import { buildPile, summarisePile, partitionPile } from '../../../lib/reviewpile';
+import { pileEntries, readOwnNames, readAccountUse, readCircumstances, getBusinessProfile, accountHasRental } from '../../../lib/supabase';
+import { buildPile, summarisePile, partitionPile, waitingCount } from '../../../lib/reviewpile';
 import { household, notHousehold, mtdQuestions, progressIn, openQuestionsLead } from '../../../lib/circumstances';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
@@ -65,6 +65,16 @@ function message(code: string | undefined, n: string | undefined): string | null
     // 14 is how a man ends up with three transactions he believes are filed.
     case 'partial':
       return 'Some of those were left alone, because they look like they might not be business money. Have a look at them on their own.';
+    // 🔴 MONEY IN GETS ITS OWN WORDS, because "filed" says nothing about which side of his books it
+    // landed on, and the whole point of the income section is that a payment in is not a cost.
+    case 'incomefiled':
+      return Number.isFinite(count) && count > 0
+        ? `Filed ${dec(count)} as money in. It is in your income figures now.`
+        : 'Filed as money in.';
+    case 'rent':
+      return Number.isFinite(count) && count > 0
+        ? `Filed ${dec(count)} as rent. It is in your property stream, kept separate from your trade.`
+        : 'Filed as rent.';
     case 'nothing':
       return 'Nothing was changed. Try that again.';
     default:
@@ -85,13 +95,19 @@ export default async function PilePage({
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
   const note = message(one('done'), one('n'));
 
-  const [rows, ownNames, accountUse, gate, circRows, profile] = await Promise.all([
+  const [rows, ownNames, accountUse, gate, circRows, profile, rental] = await Promise.all([
     pileEntries(user.id), readOwnNames(user.id), readAccountUse(user.id), gateForUser(user.id),
     // The SAME source /app/you reads for "N still worth answering": his answers and his structure,
     // counted by lib/circumstances.ts, never worked out here. A failed read passes null and the
     // footnote below simply does not draw, which is the honest shape for a nicety.
     readCircumstances(user.id).catch(() => null),
     getBusinessProfile(user.id).catch(() => null),
+    // Whether the money in section offers the rent door at all. The SAME question /app/money/add
+    // asks, from the same function, so the two screens can never disagree about whether this man
+    // has a property stream. False on a failed read, which draws one button instead of two: a
+    // payment filed as plain income is right for almost everybody and is his to correct, while a
+    // rent door for a man with no rental is a question with one sensible answer.
+    accountHasRental(user.id).catch(() => false),
   ]);
   // 🔴 THE PILE IS STILL DRAWN IN FULL WHEN THE TRIAL HAS ENDED. What stops is answering it.
   //
@@ -103,12 +119,27 @@ export default async function PilePage({
   const groups = buildPile(rows, normaliseVendor, ownNames, categoriseBankLine);
   const summary = summarisePile(groups);
 
-  // THREE PILES, from lib/reviewpile.ts. Money in is never bundled with the spending and
-  // confirm_pile refuses it outright, so it is counted in one honest line rather than listed as rows
-  // he cannot act on, which would fail doc 103's empty test on every visit.
+  // FOUR PILES, from lib/reviewpile.ts.
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 MONEY IN USED TO BE COUNTED IN ONE SENTENCE AND RENDERED NOWHERE, AND THAT WAS A HOLE.
+  //
+  // The reasoning here was: confirm_pile refuses a credit outright, so listing rows he cannot act
+  // on would fail doc 103's empty test on every visit. That is right about the screen and wrong
+  // about the money. Walking a real statement import on 31 July 2026 showed what it cost: two
+  // payments totalling £420 read correctly, kept out of the expense queue correctly, described as
+  // "kept separate and not waiting on you here", and then waiting nowhere else either. /app/money
+  // lists only what he has confirmed. The dashboard counted four things, not six. There was no
+  // screen in the product that listed unconfirmed income at all.
+  //
+  // Understating income is the one direction of error this product must never make easy
+  // (app/app/money/add says so in those words), so the answer was never to hide it more tidily. It
+  // was to build the door: confirm_income, one payer at a time, in supabase/APPLY_2026-07-31.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
   const { known, unknown, careful, income } = partitionPile(groups, accountUse);
-  const decidable = known.length + unknown.length + careful.length;
+  const decidable = waitingCount({ known, unknown, careful, income });
   const knownRows = known.reduce((n, g) => n + g.count, 0);
+  const incomeRows = income.reduce((n, g) => n + g.count, 0);
 
   // What is still open ABOUT HIM, same count as /app/you: progressIn over every group, so the
   // empty state below cannot say "everything is filed and counted" while his questions wait.
@@ -183,8 +214,9 @@ export default async function PilePage({
             </p>
             {income.length > 0 && (
               <p style={S.aside}>
-                {income.length === 1 ? 'One of them is' : `${income.length} of them are`} money in
-                rather than money out. Those are kept separate and are not waiting on you here.
+                {incomeRows === 1 ? 'One of them is' : `${incomeRows} of them are`} money in rather
+                than money out. Those are kept separate from your spending and asked on their own,
+                at the bottom.
               </p>
             )}
           </section>
@@ -315,6 +347,78 @@ export default async function PilePage({
                 <button type="submit" className="lek-ghost">
                   File {g.count === 1 ? 'it' : `all ${g.count}`}
                 </button>
+              </form>
+            </section>
+          ))}
+
+          {/* ── 4. MONEY IN ──────────────────────────────────────────────────────────────────
+              🔴 ONE PAYER AT A TIME, AND NEVER IN THE BULK CONFIRM. confirm_pile refuses a credit
+              outright and always will: "Income is what HMRC cares about and it is always asked."
+              This section is the asking. It is at the BOTTOM rather than the top on purpose: it is
+              the smallest part of a real pile and the least ambiguous, so it does not deserve the
+              position that the questions which actually cost him money get. But it is on the page,
+              which until 31 July 2026 it was not, and a payment in that no screen lists is income
+              that never reaches his tax figures.
+
+              THE DEFAULT IS THAT IT IS HIS. Money in is his income unless he says otherwise, so the
+              confirming button is the plain one and "not business money" is the quiet one. That is
+              the opposite way round from the spending sections above, where the easy question is
+              "was this business at all", and it is deliberate: for a cost, the cheap mistake is
+              claiming something he should not. For a payment in, the expensive mistake is striking
+              out income, so the effort sits on that side. */}
+          {income.length > 0 && (
+            <section className="lek-card">
+              <h2 className="lek-h2">Money in</h2>
+              <p style={S.sub}>
+                {incomeRows === 1 ? 'One payment' : `${incomeRows} payments`} into your account.
+                {' '}Money in goes straight into your income figures and nothing takes it out again,
+                so we ask about {income.length === 1 ? 'it' : 'each of these'} on its own rather than
+                filing {income.length === 1 ? 'it' : 'them'} with everything else.
+              </p>
+            </section>
+          )}
+          {income.map((g) => (
+            <section key={g.key} className="lek-card">
+              <div style={S.rowTop}>
+                <span style={S.vendor}>{g.vendor}</span>
+                <span style={S.amount}>{gbp0(g.total)}</span>
+              </div>
+              <p style={S.meta}>
+                {g.count === 1 ? 'One payment' : `${g.count} payments`} in.
+              </p>
+
+              <form action="/api/pile" method="post" hidden={locked} style={S.form}>
+                <input type="hidden" name="ids" value={g.ids.join(',')} />
+                <input type="hidden" name="vendor" value={g.vendor} />
+                <input type="hidden" name="verdict" value="income" />
+                <input type="hidden" name="category" value="income" />
+                <button type="submit" className="lek-primary">
+                  Yes, {g.count === 1 ? 'this is' : 'these are'} money in
+                </button>
+              </form>
+
+              {/* THE RENT DOOR, drawn only for an account with a rental stream, exactly as
+                  /app/money/add draws it. HMRC taxes the two differently (no National Insurance on
+                  rent, Section 24 on the mortgage interest), so a rent payment filed as trade income
+                  overstates his Class 4 bill. For a man with no rental stream this would be a
+                  question with only one sensible answer, which doc 103 says never to ask. */}
+              {rental && (
+                <form action="/api/pile" method="post" hidden={locked} style={S.formTight}>
+                  <input type="hidden" name="ids" value={g.ids.join(',')} />
+                  <input type="hidden" name="vendor" value={g.vendor} />
+                  <input type="hidden" name="verdict" value="income" />
+                  <input type="hidden" name="category" value="rent" />
+                  <button type="submit" className="lek-ghost">
+                    {g.count === 1 ? 'It was rent' : 'They were rent'}
+                  </button>
+                </form>
+              )}
+
+              <form action="/api/pile" method="post" hidden={locked} style={S.formTight}>
+                <input type="hidden" name="ids" value={g.ids.join(',')} />
+                <input type="hidden" name="vendor" value={g.vendor} />
+                <input type="hidden" name="verdict" value="personal" />
+                <button type="submit" className="lek-quiet">Not business money</button>
               </form>
             </section>
           ))}

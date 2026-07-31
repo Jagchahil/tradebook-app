@@ -7,7 +7,7 @@ import {
   getBusinessProfile,
 } from '../../../lib/supabase';
 import { wholeFirmCaption } from '../../../lib/position';
-import { buildPile, partitionPile } from '../../../lib/reviewpile';
+import { buildPile, partitionPile, waitingCount } from '../../../lib/reviewpile';
 import { bankFeedOffered } from '../../../lib/bankfeed';
 import { normaliseVendor } from '../../../lib/memory';
 import { categoriseBankLine } from '../../../lib/categories';
@@ -103,13 +103,16 @@ export default async function MoneyPage({
   const canGoBack = since === null || prev >= since.slice(0, 7);
   const canGoForward = next <= monthKeyOf(now);
 
-  // The pile, counted with the same three functions the Overview and /app/pile use, so the three
-  // screens cannot disagree about how many questions he has left.
-  const { known, unknown, careful } = partitionPile(
+  // The pile, counted with the same functions the Overview and /app/pile use, so the three screens
+  // cannot disagree about how many questions he has left.
+  //
+  // ⚠️ AND THE COUNT ITSELF NOW COMES FROM THE MODULE TOO, WHICH IS THE HALF THAT WAS MISSING. All
+  // three screens worked out known + unknown + careful for themselves, agreed with each other, and
+  // were wrong together: money in was left out of every one of them. See waitingCount.
+  const waiting = waitingCount(partitionPile(
     buildPile(pileRows, normaliseVendor, ownNames, categoriseBankLine),
     accountUse,
-  );
-  const waiting = known.length + unknown.length + careful.length;
+  ));
 
   return (
     <main className="lek-wrap" style={S.wrap}>

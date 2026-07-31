@@ -276,6 +276,26 @@ export function partitionPile(groups: PileGroup[], accountUse: AccountUse = 'mix
   return out;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 HOW MANY QUESTIONS HE ACTUALLY HAS, IN ONE PLACE, BECAUSE THREE SCREENS ASK IT.
+//
+// The Overview, the money log and the pile itself all show a "waiting on you" number, and until
+// 31 July 2026 each worked it out for itself as known + unknown + careful. All three agreed, and
+// all three were wrong the same way: they left out MONEY IN, because the pile had no section for
+// it and nothing could be done about it anyway.
+//
+// Then a real statement import landed six rows, two of them payments in, and every screen in the
+// product said four. £420 of a man's income counted nowhere and shown nowhere. See the pile page
+// and supabase/APPLY_2026-07-31_confirm_income.sql for the whole of it.
+//
+// The lesson is the one this codebase keeps relearning: a count derived at a call site is a rule
+// that has to be got right again at the next call site, and the copy that drifts is the one he is
+// looking at. So it lives here, where a test can run it, and the three screens ask.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export function waitingCount(p: PilePartition): number {
+  return p.known.length + p.unknown.length + p.careful.length + p.income.length;
+}
+
 // ⚠️ THE SERVER RECOMPUTES THIS. THE CLIENT NEVER SENDS A LIST OF IDS TO CONFIRM.
 //
 // "Confirm all the ones you are sure about" is the most dangerous button in the product: one tap

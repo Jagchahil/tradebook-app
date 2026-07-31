@@ -6008,6 +6008,43 @@ export async function confirmPile(userId: string, ids: string[], category: strin
   }
 }
 
+// 🔴 THE OTHER HALF OF confirmPile: FILING MONEY IN. See supabase/APPLY_2026-07-31_confirm_income.sql
+// for why this did not exist until 31 July 2026 and what it cost.
+//
+// confirm_pile refuses a credit outright and always will: money in is what HMRC cares about and it
+// is never swept up in a one tap confirm across the whole pile. This is the deliberate, one payer
+// at a time door instead, and the database re-applies its own guards on top (money in only, never a
+// flagged row, and the category may only be 'income' or 'rent').
+//
+// `kind` is the two words the RPC accepts and nothing else can be passed: 'rent' also sets the
+// property stream, because HMRC taxes rent and trade differently and a rent payment filed as trade
+// income overstates his Class 4 bill.
+//
+// Returns how many rows actually landed, so the caller can say something honest rather than
+// reporting success for rows the guard refused. A missing function (the migration not yet run)
+// returns 0, and the screen says it could not file it rather than pretending it did.
+export async function confirmIncome(
+  userId: string,
+  ids: string[],
+  kind: 'income' | 'rent',
+): Promise<number> {
+  const clean = ids.filter((i) => UUID.test(i));
+  if (clean.length === 0) return 0;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/rpc/confirm_income`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_user: userId, p_ids: clean, p_category: kind }),
+    });
+    if (!res.ok) return 0;
+    const n = await res.json();
+    return typeof n === 'number' ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
 // --- Khoji, the knowledge brain (docs/105) -----------------------------------
 //
 // Read the state of the brain for /api/health. Three questions, and the third is the one that

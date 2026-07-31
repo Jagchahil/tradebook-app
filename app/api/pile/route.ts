@@ -5,6 +5,7 @@ import {
   readOwnNames,
   readAccountUse,
   confirmPile,
+  confirmIncome,
   setManyPersonal,
   learnVendor,
 } from '../../../lib/supabase';
@@ -84,7 +85,12 @@ interface Decision {
   // 'business'  yes, file these, under `category`
   // 'personal'  no, this is not business money. Out of the books, and remembered.
   // 'confirm_known' files every group the SERVER decides it was confident about. It carries no ids.
-  verdict: 'business' | 'personal' | 'confirm_known';
+  // 🔴 'income'  yes, this payment IN is mine, filed as income or as rent. Its own verdict because
+  //             confirm_pile refuses a credit outright and always will: money in is never swept up
+  //             in a one tap confirm across the whole pile. This is the one payer at a time door,
+  //             and the reason it exists at all is that until 31 July 2026 there was no door and
+  //             imported income was invisible everywhere. See the migration for what that cost.
+  verdict: 'business' | 'personal' | 'confirm_known' | 'income';
   category?: string;
   // Remember the answer for next time, so this shop is never asked about again. Default true:
   // the whole point is that he tells us once. He can turn it off per decision.
@@ -134,7 +140,9 @@ export async function POST(req: NextRequest) {
         ? 'personal'
         : f.get('verdict') === 'confirm_known'
           ? ('confirm_known' as Decision['verdict'])
-          : 'business',
+          : f.get('verdict') === 'income'
+            ? ('income' as Decision['verdict'])
+            : 'business',
       category: String(f.get('category') ?? ''),
     };
   } else {
@@ -191,6 +199,32 @@ export async function POST(req: NextRequest) {
   const vendor = (body.vendor ?? '').trim();
   const remember = body.remember !== false;
   const key = vendor ? normaliseVendor(vendor) : '';
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 MONEY IN. His income, filed as income or as rent, one payer at a time.
+  //
+  // The category NEVER comes from the browser here. The form sends 'income' or 'rent' and anything
+  // else is read as 'income', which is the safe reading: a payment in is income unless he has told
+  // us it is rent, and the worst case of guessing wrong that way is his Class 4 bill being slightly
+  // high, not income going missing. The database then re-applies the same allowlist on top, so a
+  // hand rolled post naming 'materials' files nothing at all.
+  //
+  // learnVendor is NOT called. A shop's category is a fact about the shop and worth remembering; a
+  // customer paying him is not a rule, and filing every future payment from that name as income
+  // without asking is exactly the automatic behaviour the control doctrine exists to refuse.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  if (body.verdict === 'income') {
+    const kind = (body.category ?? '').trim().toLowerCase() === 'rent' ? 'rent' : 'income';
+    const applied = await confirmIncome(user.id, ids, kind);
+    if (form) {
+      // A zero here is worth telling him about plainly rather than bouncing him back to a screen
+      // that looks unchanged: the likeliest cause is the migration not being run yet.
+      if (applied === 0) return backToPile(req, 'nothing', 0);
+      if (applied < ids.length) return backToPile(req, 'partial', applied);
+      return backToPile(req, kind === 'rent' ? 'rent' : 'incomefiled', applied);
+    }
+    return NextResponse.json({ ok: true, applied, asked: ids.length, skipped: ids.length - applied, kind });
+  }
 
   // NOT BUSINESS MONEY. His decision, and it is reversible: the row stays visible in his
   // transactions list, greyed out and struck through, and one tap puts it back.

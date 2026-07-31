@@ -137,12 +137,15 @@ async function processUser(user: {
     studentLoanPostgrad: user.student_loan_postgrad,
     employmentIncome: user.employment_income,
     goals: goals.map((g) => ({ id: g.id, kind: g.kind, title: g.title, amount: g.amount, targetDate: g.target_date })),
-    // Structure-aware Rakha (19 Jul): a limited company owner gets the money-moves brain, not the
-    // sole-trader signals that would read its profit as personal income. Sole traders/partnerships
-    // are unaffected (computeSignalsForStructure returns the existing engine for them).
+    // Structure-aware Rakha (19 Jul, partner share routed 30 Jul): a limited company owner gets the
+    // money-moves brain, not the sole-trader signals that would read its profit as personal income;
+    // a partner gets the engine on their share of the shared books (users.partnership_share, the
+    // same field the optimiser scales by). Sole traders are unaffected (computeSignalsForStructure
+    // returns the existing engine for them, byte for byte).
     businessType: profile?.businessType ?? 'sole_trader',
     dividendIncome: income?.dividendIncome ?? 0,
     savingsIncome: income?.savingsIncome ?? 0,
+    partnershipShare: profile?.partnershipShare ?? 100,
   };
   let signals = computeSignalsForStructure(input);
   if (signals.length === 0) return { inserted: 0, pinged: 0 };

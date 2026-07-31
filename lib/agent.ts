@@ -16,7 +16,7 @@ import { studentLoanForSA, STUDENT_PLANS, type StudentPlan } from './nistudentlo
 import { aprilDelta, PROPERTY_FACTS } from './propertyengine';
 import { chaseMessage } from './waintents';
 import { savingsMoves, type Move } from './rakhamoves';
-import type { BusinessType, OwnerInput } from './position';
+import { computePosition, type BusinessType, type OwnerInput } from './position';
 import { gbp0 } from './money';
 
 // --- Input ---------------------------------------------------------------------
@@ -70,6 +70,11 @@ export interface AgentInput {
   savingsIncome?: number;      // savings interest, for the whole-person stack
   married?: boolean;           // for the Marriage Allowance move
   spouseHasSpareAllowance?: boolean; // their spouse earns under the personal allowance
+  // A partner's percentage share of the partnership profit, 1 to 100, as captured at setup
+  // (users.partnership_share, the same field getOptimiserInput already scales by). Defaults to 100,
+  // the stored default, which treats the whole profit as theirs until they tell us otherwise.
+  // Ignored for every other structure, so a sole trader cannot be accidentally halved.
+  partnershipShare?: number;
 }
 
 export type SignalPriority = 'ping' | 'card';
@@ -868,19 +873,43 @@ export function applyPingCaps(signals: AgentSignal[], pingsSentLast7Days: number
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-// STRUCTURE-AWARE RAKHA (doc: structure-aware returns, 19 Jul).
+// STRUCTURE-AWARE RAKHA (doc: structure-aware returns, 19 Jul; partner share routed 30 Jul).
 //
-// computeSignals() above is, and stays, the SOLE-TRADER brain. It is deep, tested (187 assertions) and
-// correct for a sole trader, and a partner is taxed on their share exactly like a sole trader, so it is
-// right for them too. What it CANNOT be right about is a LIMITED COMPANY: there the profit belongs to
-// the company, corporation tax comes first, and the owner is taxed personally on the salary and
-// dividends they draw. Firing "you are heading into the 40% band" on the company's profit, or a
-// payments-on-account figure from soleTraderTax(), is simply the wrong number for a director.
+// computeSignals() above is, and stays, the SOLE-TRADER brain. It is deep, tested and correct for a
+// sole trader, and it must come out of this wrapper UNCHANGED TO THE PENNY for one: the wrapper
+// returns its output untouched for the default structure, and the tests pin that byte for byte.
 //
-// So rather than surgically rewrite the sole-trader engine (and risk the numbers it already gets
-// right), we wrap it: for a limited company we DROP the signals that assume profit == personal income,
-// and ADD the structure-correct money moves from lib/rakhamoves.ts (which compute across BOTH returns
-// via lib/position.ts). Sole traders and partnerships are returned unchanged.
+// What it cannot be right about on its own is anyone else, and for months it was applied to everyone.
+// The watchman was taxing a DIRECTOR as a sole trader: firing "you are heading into the 40% band" on
+// profit that belongs to the COMPANY, and quoting a payments on account figure from soleTraderTax()
+// to a man whose actual bills are a CT600 for the company and dividend tax on his own return. And it
+// was taxing a PARTNER on the WHOLE FIRM: the shared books hold the whole partnership's money, the
+// partner owes tax only on his slice (users.partnership_share, captured at setup, already scaled by
+// getOptimiserInput), and the walk never passed the share in, so a half share partner was warned
+// about thresholds his own income never goes near, and NOT warned about the ones it does (his Class 2
+// pension year can be at risk while the firm's profit looks safe).
+//
+// lib/position.ts is the spine that knows all three structures and the returns each implies. So
+// rather than surgically rewrite the sole-trader engine (and risk the numbers it already gets right),
+// we route around it by structure:
+//
+//   SOLE TRADER      the engine, untouched. The baseline every parity test protects.
+//   PARTNERSHIP      the engine run on the PARTNER'S SLICE of the books (his personal tax, his
+//                    Class 2, his payments on account, his CIS share), while the signals that watch
+//                    the FIRM (VAT registration is the partnership's own test, on its whole turnover)
+//                    keep the whole books. Signals the law does not give a partner at any share (the
+//                    trading allowance, MTD mandation on partnership income) are gated off entirely.
+//   LIMITED COMPANY  the engine minus every signal that reads company profit as personal income,
+//                    plus the structure-correct money moves from lib/rakhamoves.ts (which compute
+//                    across BOTH returns via lib/position.ts), and the Monday brief's tax line
+//                    swapped for the company's own Corporation Tax figure from the same spine.
+//
+// WHY GATING BEATS A WRONG NUMBER, HERE OF ALL PLACES. Rakha's entire value is being believed. A
+// signal that is sometimes absent is a quiet week; a signal that is confidently wrong teaches the
+// customer to ignore the one that matters, and a wrong TAX figure can move real money (a set aside
+// that is double what he owes, a refund promise he spends). Where we can compute the right figure
+// through the canonical engines we do; where we cannot yet, the signal does not fire for that
+// structure. No signal beats a wrong signal, every time.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 // The sole-trader signals that assume the trading profit IS the person's income. Wrong for a company,
@@ -890,7 +919,63 @@ const LTD_SUPPRESSED_SIGNALS = new Set<string>([
   'cis_refund_milestone', 'aia_timing', 'home_office_saving', 'trading_allowance_saving', 'expense_completeness',
   'mtd_mandation', 'mtd_combined_trap', 'january_rehearsal', 'year_end_countdown',
   'goal_threshold_combo', 'goal_purchase_timing', 'goal_within_reach', 'goal_progress',
+  // THE LANDLORD SET, GATED 30 JUL. Both of these gate on projected profit plus salary, which for a
+  // company reads the COMPANY'S profit as the landlord's personal income, and the April 2027 preview
+  // prices a Self Assessment property delta off the company's trade figures. A director who is
+  // privately a landlord deserves these computed on his salary plus dividends, which the sole-trader
+  // engine cannot produce; until the landlord set is rebuilt on the whole-person engine, it is gated.
+  's24_exposure', 'property_rates_2027',
 ]);
+
+// The sole-trader signals a PARTNER must not receive at ANY share, because the law is different in
+// kind, not merely in amount:
+//   . trading_allowance_saving: the £1,000 trading allowance cannot be set against a partner's share
+//     of partnership income (GOV.UK, Tax-free allowances on property and trading income: partnership
+//     income is excluded). The signal would promise a saving the law does not give him.
+//   . mtd_mandation / mtd_combined_trap: a partner's share of partnership profit is NOT Making Tax
+//     Digital qualifying income. Partnerships are not yet mandated and have no announced date, so
+//     "quarterly updates apply to you" is simply untrue for him today. His own property stream could
+//     still cross alone; a property-only test for partners is follow-up work, and until it exists the
+//     wrong warning stays off.
+const PARTNERSHIP_SUPPRESSED_SIGNALS = new Set<string>(['trading_allowance_saving', 'mtd_mandation', 'mtd_combined_trap']);
+
+// The signals that watch the FIRM rather than the partner, kept on the WHOLE books however small his
+// share is. VAT registration is tested on the PARTNERSHIP'S taxable turnover, because the partnership
+// itself is the registrable person; scaling that to his slice would hide a real registration duty.
+// The quiet-month check watches the shared books' logging habit, which is not a tax figure at all.
+const PARTNERSHIP_FIRM_SIGNALS = new Set<string>(['vat_approach', 'quiet_expenses']);
+
+// The partner's share as a 0 to 1 factor. Validated exactly as lib/supabase.ts getBusinessProfile
+// validates it: anything unset, non-finite or out of range means "the whole profit is his", which is
+// the stored default and the safe one (it is what the engine always assumed).
+function partnerShareOf(input: AgentInput): number {
+  const pct = input.partnershipShare;
+  return typeof pct === 'number' && Number.isFinite(pct) && pct > 0 && pct <= 100 ? pct / 100 : 1;
+}
+
+// The books through ONE PARTNER'S eyes: the money scaled to his share, everything else untouched.
+// This is the same treatment lib/supabase.ts getOptimiserInput gives the optimiser ("each partner
+// pays tax on their share", GOV.UK /set-up-business-partnership), applied to the walk's aggregates.
+// The week, the invoices, the goals and the counts stay whole: they are facts about the books and
+// about him, not tax figures. The property stream is scaled with the months because the month
+// buckets already contain it and the engine derives the trade slice by subtraction; for the rare
+// partner who also holds a WHOLLY personal let this understates the property side, which errs quiet
+// rather than loud and is noted as follow-up in the structure tests.
+function partnerView(input: AgentInput, share: number): AgentInput {
+  return {
+    ...input,
+    months: input.months.map((m) => ({ ...m, income: m.income * share, expenses: m.expenses * share, cis: m.cis * share })),
+    property: input.property
+      ? {
+          rents: input.property.rents * share,
+          expenses: input.property.expenses * share,
+          finance: input.property.finance * share,
+          rents12: input.property.rents12 * share,
+        }
+      : null,
+    equipmentSpendYtd: input.equipmentSpendYtd * share,
+  };
+}
 
 function slugName(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -911,19 +996,13 @@ function moveToSignal(m: Move, year: string): AgentSignal {
   };
 }
 
-// Build the structure-aware money moves for this user from what the walk already holds. Single-owner
-// today (the account holder); the co-owners arrive with the Companies House link (Layer 4).
-export function moneyMoveSignals(input: AgentInput): AgentSignal[] {
-  const structure: BusinessType = input.businessType ?? 'sole_trader';
-  const d = derive(input);
-  const canProject = d.monthsElapsed >= 3;
-  const projProfit = canProject ? projectAnnual(d.ytdProfit, d) : d.ytdProfit;
-  const year = taxYearLabel(input.today);
+// The account holder as a position.ts owner. One place, because the money moves and the Monday brief
+// correction below must describe the SAME person to the spine or the two would quietly disagree.
+function soloOwners(structure: BusinessType, input: AgentInput): OwnerInput[] {
   const salary = Math.max(0, input.employmentIncome);
   const dividends = Math.max(0, input.dividendIncome ?? 0);
   const savings = Math.max(0, input.savingsIncome ?? 0);
-
-  const owners: OwnerInput[] = [{
+  return [{
     name: 'You',
     // In a company the salary and dividends the owner DRAWS are the company's, and their PAYE job (if
     // any) is separate; for a sole trader / partner the salary is an outside job that stacks on top.
@@ -935,6 +1014,38 @@ export function moneyMoveSignals(input: AgentInput): AgentSignal[] {
       dividends: structure === 'limited_company' ? 0 : dividends,
     },
   }];
+}
+
+// THE MONDAY BRIEF'S TAX LINE, PUT ON THE COMPANY'S OWN RETURN. The brief itself is structure
+// neutral (money in, money out, kept), which is why a director keeps it. But its quiet-week
+// watchpoint used to read "The year so far is carrying about £X of tax" with X from
+// soleTraderTax() ON THE COMPANY'S PROFIT: a sole trader's income tax and Class 4 quoted to a man
+// whose company owes Corporation Tax. We rebuild the exact sentence the sole-trader engine wrote
+// and replace it with the CT600 figure from the spine. The seam is pinned by a test in
+// test/agentstructure.test.mjs, so if the engine's wording ever drifts the test goes red rather
+// than the sole-trader line quietly leaking back to directors.
+function ltdMondayBrief(sig: AgentSignal, input: AgentInput): AgentSignal {
+  const d = derive(input);
+  const soleLine = `The year so far is carrying about ${gbp(soleTraderTax(d.ytdProfit).total)} of tax. Your set aside number has it covered.`;
+  if (!sig.body.includes(soleLine)) return sig;
+  const pos = computePosition({
+    type: 'limited_company',
+    profit: Math.max(0, d.ytdProfit),
+    owners: soloOwners('limited_company', input),
+  });
+  const ctLine = `The company's year so far is carrying about ${gbp(pos.business.corporationTax)} of Corporation Tax. Setting it aside as you go keeps the CT600 boring.`;
+  return { ...sig, body: sig.body.replace(soleLine, ctLine) };
+}
+
+// Build the structure-aware money moves for this user from what the walk already holds. Single-owner
+// today (the account holder); the co-owners arrive with the Companies House link (Layer 4).
+export function moneyMoveSignals(input: AgentInput): AgentSignal[] {
+  const structure: BusinessType = input.businessType ?? 'sole_trader';
+  const d = derive(input);
+  const canProject = d.monthsElapsed >= 3;
+  const projProfit = canProject ? projectAnnual(d.ytdProfit, d) : d.ytdProfit;
+  const year = taxYearLabel(input.today);
+  const owners = soloOwners(structure, input);
 
   const purchase = input.goals.find((g) => g.kind === 'purchase');
   const moves = savingsMoves(
@@ -950,14 +1061,37 @@ export function moneyMoveSignals(input: AgentInput): AgentSignal[] {
   return moves.map((m) => moveToSignal(m, year));
 }
 
-// THE ENTRY POINT THE WALK CALLS. Routes by structure: sole traders and partnerships get the existing
-// engine unchanged; a limited company gets the same engine minus the signals that assume its profit is
-// personal income, plus the structure-correct money moves.
+// THE ENTRY POINT THE WALK CALLS. Routes by structure so every threshold, alert and figure is
+// computed under the customer's ACTUAL structure:
+//   . a sole trader gets the engine untouched, byte for byte;
+//   . a partner gets the engine on HIS SLICE of the books, the firm-level signals on the whole
+//     books, and the signals the law does not give a partner gated off;
+//   . a company gets the engine minus everything that reads its profit as personal income, plus the
+//     structure-correct money moves, with the Monday brief's tax line moved onto the CT600.
 export function computeSignalsForStructure(input: AgentInput): AgentSignal[] {
   const structure: BusinessType = input.businessType ?? 'sole_trader';
   const base = computeSignals(input);
+
+  if (structure === 'partnership') {
+    const kept = base.filter((s) => !PARTNERSHIP_SUPPRESSED_SIGNALS.has(s.signalKey));
+    const share = partnerShareOf(input);
+    // A full share means the whole profit really is his slice, so the whole-books run above is
+    // already his personal run; only the structure gates apply. This is also the stored default, so
+    // a partnership that has not told us its split yet errs on the side of warning too much, never
+    // of hiding a threshold he is genuinely heading for.
+    if (share >= 1) return kept;
+    // Two runs of the ONE engine, never a second copy of any maths: his personal tax on the scaled
+    // books, the firm's own tests on the whole books, merged by signal.
+    const personal = computeSignals(partnerView(input, share)).filter(
+      (s) => !PARTNERSHIP_SUPPRESSED_SIGNALS.has(s.signalKey) && !PARTNERSHIP_FIRM_SIGNALS.has(s.signalKey),
+    );
+    return [...personal, ...kept.filter((s) => PARTNERSHIP_FIRM_SIGNALS.has(s.signalKey))];
+  }
+
   if (structure !== 'limited_company') return base;
-  const kept = base.filter((s) => !LTD_SUPPRESSED_SIGNALS.has(s.signalKey));
+  const kept = base
+    .filter((s) => !LTD_SUPPRESSED_SIGNALS.has(s.signalKey))
+    .map((s) => (s.signalKey === 'monday_brief' ? ltdMondayBrief(s, input) : s));
   const moves = moneyMoveSignals(input);
   const moveKeys = new Set(moves.map((m) => m.signalKey));
   // Moves first (they carry the real savings), then the neutral operational signals (VAT, invoices,

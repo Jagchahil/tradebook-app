@@ -73,6 +73,9 @@ export async function POST(req: NextRequest) {
     businessType: profile?.businessType ?? 'sole_trader',
     dividendIncome: income?.dividendIncome ?? 0,
     savingsIncome: income?.savingsIncome ?? 0,
+    // A partner is taxed on their share of the shared books, never the whole firm's profit. The
+    // share was captured at setup; the walk and this on-demand path must agree on it.
+    partnershipShare: profile?.partnershipShare ?? 100,
   };
 
   const signals = computeSignalsForStructure(input);

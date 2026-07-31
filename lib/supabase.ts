@@ -1770,6 +1770,47 @@ export async function getStripeCustomerByPhone(phone: string): Promise<string | 
   return rows[0]?.stripe_customer_id ?? null;
 }
 
+// The ACCOUNT key. A web era subscription row is bound to a user id by the checkout metadata
+// (see SubscriptionRecord.user_id), so this is the first place to look for a web customer.
+//
+// ⚠️ FILTERED TO ROWS THAT ACTUALLY CARRY A CUSTOMER ID. The no card trial row written by
+// grantTrialWithIdentity has a user_id and no Stripe ids at all, and it can be the most recently
+// updated row on the account. Without the filter this would find that row, read null off it, and
+// tell a paying customer he has no billing to manage while his real row sits one below.
+export async function getStripeCustomerByUser(userId: string): Promise<string | null> {
+  const { url } = config();
+  if (!userId) return null;
+  const res = await fetch(
+    `${url}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(userId)}`
+    + '&stripe_customer_id=not.is.null&select=stripe_customer_id&order=updated_at.desc&limit=1',
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ stripe_customer_id?: string | null }>;
+  return rows[0]?.stripe_customer_id ?? null;
+}
+
+// THE ONE RESOLUTION ORDER: account first, then email, then phone. The same order every other
+// subscription read uses (see /api/billing/status), written once so the billing page and the
+// portal route cannot disagree about whether a man has a Stripe customer to manage.
+//
+// ⚠️ THE KEYS COME FROM THE SESSION AND identityForUser, NEVER FROM A REQUEST BODY. A caller that
+// let a request name any of these three would let anyone open another man's billing portal.
+export async function getStripeCustomerForAccount(
+  userId: string,
+  email: string | null,
+  phone: string | null,
+): Promise<string | null> {
+  const byUser = await getStripeCustomerByUser(userId);
+  if (byUser) return byUser;
+  if (email) {
+    const byEmail = await getStripeCustomerByEmail(email);
+    if (byEmail) return byEmail;
+  }
+  if (phone) return getStripeCustomerByPhone(phone);
+  return null;
+}
+
 // Resolve a phone (E.164 +44) to its latest subscription state, so entitlement can
 // be checked for a phone-only account that has no email. Service role only.
 export interface SubscriptionStatus {

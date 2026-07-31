@@ -264,7 +264,9 @@ export default async function YouPage({
             <span style={S.doorLabel}>Settings</span>
             <span style={S.rowBody}>The daily reminder and the weekly summary, on or off.</span>
           </a>
-          <a href="/account" style={S.door} className="lek-hit">
+          {/* Not /account, which needs an SMS code a web account cannot get. This door rides the
+              session he is already in. */}
+          <a href="/app/you/billing" style={S.door} className="lek-hit">
             <span style={S.doorLabel}>Billing</span>
             <span style={S.rowBody}>Your card, your invoices from us, and cancelling.</span>
           </a>

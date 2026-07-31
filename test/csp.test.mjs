@@ -82,6 +82,18 @@ ok('🔴 the TrueLayer entry is a domain, so a new hop of theirs cannot re-break
 ok('🔴 form-action covers Stripe hosted checkout, which /api/billing/checkout 303s a form to',
   covers('https://checkout.stripe.com') && /https:\/\/\*\.stripe\.com/.test(formAction));
 
+// Stripe's hosted billing portal, 31 July 2026. /app/you/billing posts a plain form to
+// /api/billing/portal, which answers 303 to the portal on billing.stripe.com, so this redirect is
+// exactly the shape that silently died on 30 July. The formData sweep below cannot see this route,
+// because it never opens the body at all (the safest body is one that is never read), so the
+// pairing is asserted by name here instead.
+const portalRoute = read('app/api/billing/portal/route.ts');
+ok('🔴 form-action covers Stripe hosted billing, which /api/billing/portal 303s a form to',
+  covers('https://billing.stripe.com')
+  && /NextResponse\.redirect\(url, 303\)/.test(portalRoute));
+ok('and the portal route really does answer form posts, so the pairing above is not vacuous',
+  /wantsJson/.test(portalRoute) && !/req\.formData\(\)/.test(portalRoute));
+
 // ---------------------------------------------------------------------------------------------
 // AND NOTHING BEYOND THOSE. A widened directive is a smaller wall, so it may only be widened by
 // something with a route behind it.

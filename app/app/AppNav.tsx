@@ -95,7 +95,11 @@ export const SECTIONS: ReadonlyArray<NavSection> = [
       { href: '/app/you', label: 'About you', hint: 'Who we think you are, and how to reach you' },
       { href: '/app/you/circumstances', label: 'Circumstances', hint: 'What you have told us, and what is still worth answering' },
       { href: '/app/connect', label: 'WhatsApp', hint: 'The number your receipts arrive from' },
-      { href: '/account', label: 'Billing', hint: 'Your card, invoices and cancelling' },
+      // 🔴 NOT /account. That is the OLD portal door and it demands a phone SMS code, which a web
+      // account does not have by design, so from this rail it was a door that never opened. It
+      // stays alive for the phone era customers who still use it; the rail sends a web customer
+      // through the page that rides the session he is already signed in with.
+      { href: '/app/you/billing', label: 'Billing', hint: 'Your card, invoices and cancelling' },
       { href: '/app/you/settings', label: 'Settings', hint: 'The daily reminder and the weekly summary' },
     ],
   },

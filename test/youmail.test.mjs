@@ -340,9 +340,14 @@ ok('a failed read draws no switches rather than a guess', pageSet.includes('pref
 
 // The nav's promise: the You section lists exactly the doors the brief names, and each one is a
 // real page (test/appnav.test.mjs holds the resolving half).
+//
+// ⚠️ BILLING MOVED ON 31 JULY: /account is the OLD portal page and it demands a phone SMS code a
+// web account cannot receive, so the rail now opens /app/you/billing, which rides the web
+// session. /account stays alive for phone era customers, but nothing in the rail points there,
+// and test/billingweb.test.mjs holds both halves of that.
 const nav = read('app/app/AppNav.tsx');
 const navBlock = nav.slice(nav.indexOf('export const SECTIONS'), nav.indexOf('export function AppNav'));
-for (const href of ['/app/you', '/app/you/circumstances', '/app/connect', '/account', '/app/you/settings']) {
+for (const href of ['/app/you', '/app/you/circumstances', '/app/connect', '/app/you/billing', '/app/you/settings']) {
   ok(`the nav knows ${href}`, navBlock.includes(`'${href}'`));
 }
 

@@ -4,6 +4,7 @@ import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { getConfirmedTransactionsForRange } from '../../../../lib/supabase';
 import { buildQuarterPack, quarterBounds, quarterForDate } from '../../../../lib/quarterpack';
+import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { gbp0 } from '../../lib/money';
 import { updateDue, UPDATE_ORDINAL } from '../due';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
@@ -123,9 +124,11 @@ export default async function TaxSummaryPage() {
         ) : (
           <>
             <p style={S.empty}>Nothing confirmed since 6 April yet.</p>
+            {/* The bank sentence returns with bankFeedOffered(). */}
             <p style={S.quiet}>
-              Connect your bank and confirm what lands, and this page keeps itself ready. There is
-              nothing else you need to do for it.
+              {bankFeedOffered()
+                ? 'Connect your bank and confirm what lands, and this page keeps itself ready. There is nothing else you need to do for it.'
+                : 'Put your money in, by hand or by statement, and confirm what lands. This page keeps itself ready. There is nothing else you need to do for it.'}
             </p>
           </>
         )}

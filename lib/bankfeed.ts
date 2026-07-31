@@ -47,6 +47,21 @@ const REDIRECT_URI =
   process.env.BANK_REDIRECT_URI ??
   `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app'}/api/bank/callback`;
 
+// Is the bank feed OFFERED to customers as something new to connect?
+//
+// This is a different question from hasBankFeedConfig() below, and the difference is the whole
+// point. TrueLayer declined production authorisation, so a configured feed can still only open
+// their testing mode dialog, which tells a customer in an orange banner not to enter his bank
+// credentials. Config says "can we talk to TrueLayer". This says "may we honestly offer that to
+// a customer". Only the exact string 'true' switches it on, read at call time so a redeploy is
+// not needed for tests, and the default is off, which is the honest state today.
+//
+// It gates ONLY the offering of new connections: the setup bank step, /api/bank/connect and
+// /api/bank/institutions. The sync engine and every existing connection are untouched by it.
+export function bankFeedOffered(): boolean {
+  return process.env.BANK_FEED_OFFERED === 'true';
+}
+
 // Has the "bank feed configured but no encryption key" alarm already fired in this process?
 let warnedNoTokenKey = false;
 

@@ -219,7 +219,11 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
       const n = pending.count;
       return `You have ${n} thing${n === 1 ? '' : 's'} waiting for your approval under Money, Waiting on you${detail}. Nothing counts towards your tax until you confirm it, so the tally is £0 for now. Approve them and ask me again.`;
     }
-    return `Nothing logged ${q.periodLabel === 'all time' ? 'yet' : q.periodLabel}. Send Lekhio a receipt or what you spent and the tally starts itself.`;
+    // ⚠️ CHANNEL AWARE, AND THE DIFFERENCE IS WHAT HE CAN ACTUALLY DO. The WhatsApp handler keeps
+    // its own wording ("Send me a receipt") because on that channel a receipt is the very thing he
+    // is holding. Here he is on the web, where the chat takes no receipts and his number may not
+    // be bound, so the sentence names the door that always works: the Money pages.
+    return `Nothing logged ${q.periodLabel === 'all time' ? 'yet' : q.periodLabel}. Add what you earn and spend from the Money pages and the tally starts itself.`;
   }
 
   const profit = totals.income - totals.expenses;

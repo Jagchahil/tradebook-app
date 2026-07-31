@@ -196,5 +196,42 @@ ok('a YES releases it, and it is the very next thing worth asking about',
 ok('every dependent question depends on a key that actually exists',
   DEPENDENT.every((c) => CIRCUMSTANCES.some((x) => x.key === c.dependsOn.key)));
 
+// --- 🔴 THE PILE'S FOOTNOTE. Two screens must not disagree about what is waiting on him. --------
+//
+// Found on 31 July: /app/pile's empty state said "Nothing is waiting on you. Everything we have is
+// filed and counted" on the screen of a man whose circumstances questions were still open, while
+// /app/you counted them as "still worth answering" three taps away. The sentence lives in this
+// module because the count it describes is this module's count, and the page appends the link to
+// /app/you/circumstances itself, which is why the lead ends before the word Circumstances.
+
+const { openQuestionsLead } = C;
+
+ok('nothing open: the pile draws nothing extra', openQuestionsLead(0) === null);
+ok('a broken count draws nothing rather than nonsense',
+  openQuestionsLead(-2) === null && openQuestionsLead(NaN) === null);
+const oneOpen = openQuestionsLead(1);
+ok('one open question is said in the singular',
+  oneOpen === 'Though one question about you is still open. It is money or standing we cannot get you until you answer, and it is waiting under ');
+const threeOpen = openQuestionsLead(3);
+ok('three open questions are said in the plural, with the count',
+  threeOpen === 'Though 3 questions about you are still open. Each one is money or standing we cannot get you until you answer, and they are waiting under ');
+ok('the lead ends mid flow so the page can finish it with the Circumstances link',
+  oneOpen.endsWith('waiting under ') && threeOpen.endsWith('waiting under '));
+
+// And the page wires it to the SAME count /app/you shows, drawn only under the empty state.
+{
+  const pileSrc = readFileSync(path.join(root, 'app/app/pile/page.tsx'), 'utf8');
+  ok('🔴 the pile reads the same count as /app/you: progressIn over every group',
+    /progressIn\(\[\.\.\.household\(\), \.\.\.notHousehold\(\), \.\.\.mtdQuestions\(\)\], circRows, profile\?\.businessType\)/.test(pileSrc));
+  ok('🔴 the footnote is the module sentence, never page arithmetic of its own',
+    /openQuestionsLead\(asked\.askable - asked\.answered\)/.test(pileSrc));
+  ok('it links to Circumstances, where the questions actually wait',
+    /\{openLead\}<a href="\/app\/you\/circumstances"/.test(pileSrc));
+  ok('a failed read of his answers draws nothing rather than a guess',
+    /circRows === null\s*\?\s*null/.test(pileSrc));
+  ok('and /app/you still counts with the same expression, so the two screens cannot drift',
+    /asked\.askable - asked\.answered/.test(readFileSync(path.join(root, 'app/app/you/page.tsx'), 'utf8')));
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { pileEntries, readOwnNames, readAccountUse } from '../../../lib/supabase';
+import { pileEntries, readOwnNames, readAccountUse, readCircumstances, getBusinessProfile } from '../../../lib/supabase';
 import { buildPile, summarisePile, partitionPile } from '../../../lib/reviewpile';
+import { household, notHousehold, mtdQuestions, progressIn, openQuestionsLead } from '../../../lib/circumstances';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
@@ -83,8 +84,13 @@ export default async function PilePage({
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
   const note = message(one('done'), one('n'));
 
-  const [rows, ownNames, accountUse, gate] = await Promise.all([
+  const [rows, ownNames, accountUse, gate, circRows, profile] = await Promise.all([
     pileEntries(user.id), readOwnNames(user.id), readAccountUse(user.id), gateForUser(user.id),
+    // The SAME source /app/you reads for "N still worth answering": his answers and his structure,
+    // counted by lib/circumstances.ts, never worked out here. A failed read passes null and the
+    // footnote below simply does not draw, which is the honest shape for a nicety.
+    readCircumstances(user.id).catch(() => null),
+    getBusinessProfile(user.id).catch(() => null),
   ]);
   // 🔴 THE PILE IS STILL DRAWN IN FULL WHEN THE TRIAL HAS ENDED. What stops is answering it.
   //
@@ -102,6 +108,13 @@ export default async function PilePage({
   const { known, unknown, careful, income } = partitionPile(groups, accountUse);
   const decidable = known.length + unknown.length + careful.length;
   const knownRows = known.reduce((n, g) => n + g.count, 0);
+
+  // What is still open ABOUT HIM, same count as /app/you: progressIn over every group, so the
+  // empty state below cannot say "everything is filed and counted" while his questions wait.
+  const asked = circRows === null
+    ? null
+    : progressIn([...household(), ...notHousehold(), ...mtdQuestions()], circRows, profile?.businessType);
+  const openLead = asked ? openQuestionsLead(asked.askable - asked.answered) : null;
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -132,6 +145,11 @@ export default async function PilePage({
           <p style={S.sub}>
             Everything we have is filed and counted. New spending lands here from a statement upload, a receipt, or your bank feed.
           </p>
+          {openLead ? (
+            <p style={S.aside}>
+              {openLead}<a href="/app/you/circumstances" style={S.crossLink}>Circumstances</a>.
+            </p>
+          ) : null}
         </section>
       ) : (
         <>
@@ -322,6 +340,7 @@ const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
   sub: { fontSize: TYPE.body, lineHeight: 1.55, color: MUTED, margin: 0 },
   aside: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '12px 0 0' },
+  crossLink: { color: RIVER_DEEP, fontWeight: 700 },
   note: { background: PANEL, border: `1px solid ${LINE}`, borderRadius: RADIUS.md, padding: 14, fontSize: TYPE.body, lineHeight: 1.5, margin: '0 0 14px' },
   locked: { display: 'block', background: SAFFRON_TINT, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
   lockedTop: { display: 'block', fontSize: TYPE.label, fontWeight: 800, letterSpacing: '0.3px', color: INK, marginBottom: 5 },

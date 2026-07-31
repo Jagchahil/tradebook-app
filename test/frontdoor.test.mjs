@@ -300,6 +300,94 @@ ok('the privacy policy still describes what happens to WhatsApp messages',
 ok('the terms still describe how records arrive', /WhatsApp/.test(read('app/terms/page.tsx')));
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE BANK FEED IS OFFERED BY ONE SWITCH, AND UNTIL IT IS ON, NOTHING NAMES IT.
+//
+// Found by walking the live product on 31 July: TrueLayer declined production authorisation, so
+// the Choose your bank button sent a brand new customer to a dialog with an orange "Testing mode
+// active, do not enter your bank credentials" banner, while the empty states on the Overview, the
+// money log, the tax hub, the quarterly summary and Pay yourself all told him to connect the bank
+// he could not connect. Same disease as the WhatsApp lines above: an instruction the account
+// cannot follow.
+//
+// bankFeedOffered() in lib/bankfeed.ts is the single switch for OFFERING new connections. It is
+// false unless BANK_FEED_OFFERED is exactly 'true', and it gates only the offering: the sync
+// engine and existing connections are untouched. Both wordings live in the ternaries, so the day
+// a provider lands the bank copy returns with one env var and no copy hunt.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== the bank feed is offered by one switch, honestly ===\n');
+{
+  ok('the switch exists, defaults off, and only the exact string true turns it on',
+    /export function bankFeedOffered\(\): boolean \{\s*return process\.env\.BANK_FEED_OFFERED === 'true';\s*\}/.test(read('lib/bankfeed.ts')));
+
+  // The door itself. While the switch is off no request may leave for TrueLayer, and a form
+  // caller goes politely back to the bank step rather than being shown an error object.
+  const connectRoute = read('app/api/bank/connect/route.ts');
+  ok('🔴 /api/bank/connect refuses before anything TrueLayer when the feed is not offered',
+    connectRoute.indexOf('if (!bankFeedOffered())') > -1
+    && connectRoute.indexOf('if (!bankFeedOffered())') < connectRoute.indexOf('buildAuthLink(state)'));
+  ok('and the form caller gets a 303 back to the bank step, never JSON',
+    /bankFeedOffered\(\)[\s\S]{0,500}\/app\/setup\?step=bank[\s\S]{0,120}303/.test(connectRoute));
+  ok('the institutions probe hands out no Choose your bank entry while the feed is not offered',
+    /!bankFeedOffered\(\) \|\| !hasBankFeedConfig\(\)/.test(read('app/api/bank/institutions/route.ts')));
+
+  const setup = read('app/app/setup/page.tsx');
+  ok('🔴 the setup bank step draws no button and no radios when the feed is not offered',
+    /const offered = bankFeedOffered\(\);/.test(setup)
+    && /\) : !offered \? \(/.test(setup)
+    && setup.indexOf(': !offered ? (') < setup.indexOf('action="/api/bank/connect"'));
+  ok('and its honest copy points at the statement importer instead',
+    setup.includes('a bank statement CSV does the same job'));
+
+  // 🔴 THE SWEEP. Every customer facing "connect the bank" under app/app is chosen by the switch.
+  // The setup step's heading is exempt by name: the step keeps its title, and when the feed is not
+  // offered there is no button under it. The reveal's regex literal, which stops the ledger's own
+  // bank line printing twice, is code rather than copy and is stripped the same way.
+  const HEADING = '<h1 style={S.h1}>Connect your bank.</h1>';
+  const bankOffenders = [];
+  for (const f of inApp) {
+    const src = codeOnly(read(rel(f)))
+      .replace(HEADING, '')
+      .replace(/\/connect your bank\/i/g, '');
+    for (const m of src.matchAll(/[Cc]onnect(ed)? (your|the) bank/g)) {
+      const before = src.slice(Math.max(0, m.index - 260), m.index);
+      if (!before.includes('bankFeedOffered()')) {
+        bankOffenders.push(`${rel(f)}: ...${src.slice(m.index, m.index + 40)}...`);
+      }
+    }
+  }
+  ok(`🔴 no sentence under app/app names connecting a bank outside the switch${bankOffenders.length ? `\n     ${bankOffenders.join('\n     ')}` : ''}`,
+    bankOffenders.length === 0);
+
+  // Both states of every rewritten empty state are pinned, so the bank wording can only return
+  // through the switch and the honest wording cannot quietly rot while the switch is off.
+  const BOTH_STATES = [
+    ['app/app/page.tsx',
+      'Connect your bank and new spending lands here on its own, ready for you to check.',
+      'Add an entry, upload a till slip, or import a bank statement, and it lands here ready for you to check.'],
+    ['app/app/money/page.tsx',
+      'Connect your bank and every payment lands here on its own.',
+      'Add an entry, upload a till slip, or import a statement, and every payment lands here.'],
+    ['app/app/tax/page.tsx',
+      'Connect your bank and your tax position builds itself from what you confirm.',
+      'Add what you earn and spend, by hand or by statement, and your tax position builds itself from what you confirm.'],
+    ['app/app/tax/summary/page.tsx',
+      'Connect your bank and confirm what lands, and this page keeps itself ready.',
+      'Put your money in, by hand or by statement, and confirm what lands. This page keeps itself ready.'],
+    ['app/app/pay-yourself/page.tsx',
+      'Connect your bank or log what you have earned, and it fills in by itself.',
+      'Log what you have earned, and it fills in by itself.'],
+    ['app/app/pay-yourself/page.tsx',
+      'connect the bank or log what the company has earned, and this page prices every rung,',
+      'log what the company has earned, and this page prices every rung,'],
+  ];
+  for (const [f, onCopy, offCopy] of BOTH_STATES) {
+    const src = read(f);
+    ok(`${f} carries both states of the switch: "${offCopy.slice(0, 30)}..."`,
+      src.includes(onCopy) && src.includes(offCopy));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 // 🔴 AND A FRONT DOOR HAS TO OPEN FROM THE OUTSIDE TOO.
 //
 // This file was written about a stranger who could not find his way IN. On 30 July it turned out a

@@ -94,9 +94,10 @@ export default async function NewInvoicePage({
       ) : (
         <section className="lek-card">
           <h1 className="lek-title">Make an invoice</h1>
+          {/* The pay wording returns with payouts. See hasInvoicePayoutRoute in lib/stripe.ts. */}
           <p style={S.sub}>
             It comes out numbered and dated, due fourteen days from today, with a link your
-            customer can see it and pay it from.
+            customer can open and see.
           </p>
 
           <form action="/api/invoices" method="post">

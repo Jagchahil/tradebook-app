@@ -225,6 +225,17 @@ ok('🔴 NO tax constant in the route: every figure comes from the engines',
 ok('the model context is the WhatsApp context: his summary and the approved knowledge',
   /answerMoneyQuestion\(q, summary, knowledge\)/.test(routeCode));
 
+// 🔴 THE EMPTY TALLY IS CHANNEL AWARE, AND BOTH WORDINGS ARE PINNED (31 July 2026). The thread
+// used to answer "Send Lekhio a receipt", which on the web is an instruction the account may not
+// be able to take: the chat takes no receipts and his number may not be bound. The figures stay
+// shared; only the sentence around them knows which channel it is on.
+ok('🔴 the web thread\'s empty tally points at the Money pages, which always work',
+  routeSrc.includes('Add what you earn and spend from the Money pages and the tally starts itself.'));
+ok('🔴 and it no longer tells a web customer to send a receipt',
+  !/Send Lekhio a receipt/.test(stripComments(routeSrc)));
+ok('🔴 the WhatsApp wording is untouched: on that channel the receipt is in his hand',
+  waSrc.includes('Send me a receipt or what you spent and I will start the tally.'));
+
 // ---------------------------------------------------------------------------------------------
 // 4. HONESTY WHEN IT CANNOT ANSWER. Never silence, never a fake.
 // ---------------------------------------------------------------------------------------------

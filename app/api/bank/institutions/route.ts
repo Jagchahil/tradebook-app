@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { hasBankFeedConfig } from '../../../../lib/bankfeed';
+import { bankFeedOffered, hasBankFeedConfig } from '../../../../lib/bankfeed';
 import { sessionUser } from '../../../../lib/webauth';
 
 // TrueLayer hosts the bank picker inside its own auth dialog, so the app does
@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
   const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  if (!hasBankFeedConfig()) {
+  // The OFFER switch counts here as well as the config: this endpoint is what puts a Choose your
+  // bank entry on a screen, and while bankFeedOffered() is off no surface may render one. The
+  // status endpoint is untouched, so an existing connection still shows and still disconnects.
+  if (!bankFeedOffered() || !hasBankFeedConfig()) {
     return NextResponse.json({ error: 'not_enabled', message: 'Bank feeds are not switched on yet.' }, { status: 503 });
   }
 

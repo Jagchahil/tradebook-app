@@ -117,9 +117,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             and the one line below is the honest amount of promise we can make. */}
         {!isPaid ? (
           <div style={{ padding: '0 32px 28px' }}>
+            {/* The invoice itself carries no payment details unless the tradesman wrote them into
+                his notes, so this line may not point at details that are not there. The pay
+                wording returns with payouts. See hasInvoicePayoutRoute in lib/stripe.ts. */}
             <p style={{ textAlign: 'center', fontSize: 13, color: MUTED, margin: 0 }}>
-              Card payment is coming. For now, please pay using the details on this invoice, or
-              however you have agreed with {invoice.business_name || 'the sender'}.
+              Card payment is coming. For now, please pay{' '}
+              {invoice.business_name || 'the sender'} the way the two of you have agreed.
             </p>
           </div>
         ) : null}

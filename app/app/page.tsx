@@ -18,6 +18,7 @@ import { taxPosition, setAsideBasisLine } from '../../lib/taxoptimiser';
 import { weeklyInput, weeklyLine } from '../../lib/weeklyupdate';
 import { weekOf } from '../../lib/weekchart';
 import { buildPile, partitionPile } from '../../lib/reviewpile';
+import { bankFeedOffered } from '../../lib/bankfeed';
 import { normaliseVendor } from '../../lib/memory';
 import { categoriseBankLine } from '../../lib/categories';
 import { selectAnnouncements } from '../../lib/announcements';
@@ -429,9 +430,13 @@ export default async function OverviewPage() {
           counted" underneath a card that has just said it in bigger letters is the same sentence
           twice, and a screen that repeats itself is a screen he skims. */}
       <p style={S.foot}>
+        {/* The bank sentence returns with bankFeedOffered(); until then the footer names only the
+            three doors that actually work today. */}
         {waiting > 0
           ? 'Everything above is money you have confirmed. New spending lands in your bank feed on its own.'
-          : 'Everything here is money you have confirmed. Connect your bank and new spending lands here on its own, ready for you to check.'}
+          : bankFeedOffered()
+            ? 'Everything here is money you have confirmed. Connect your bank and new spending lands here on its own, ready for you to check.'
+            : 'Everything here is money you have confirmed. Add an entry, upload a till slip, or import a bank statement, and it lands here ready for you to check.'}
       </p>
     </main>
   );

@@ -4,6 +4,7 @@ import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import { getOptimiserInput, getBusinessProfile } from '../../../lib/supabase';
 import { payModel, type BusinessType, type PayPlan } from './plan';
+import { bankFeedOffered } from '../../../lib/bankfeed';
 import { gbp0 } from '../../../lib/money';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, SPACE, TYPE } from '../../../lib/tokens';
 import {
@@ -100,10 +101,13 @@ export default async function PayYourselfPage() {
                   <p style={S.oweBasis}>{r.why}</p>
                 </div>
               ))}
+              {/* The bank half of the sentence returns with bankFeedOffered(). */}
               <p style={S.quiet}>
                 Your own figures appear here the moment the money you confirm builds a profit:
-                connect the bank or log what the company has earned, and this page prices every
-                rung, the dividends on top, and what the next thousand pounds would cost you.
+                {bankFeedOffered()
+                  ? ' connect the bank or log what the company has earned, and this page prices every rung,'
+                  : ' log what the company has earned, and this page prices every rung,'}
+                {' '}the dividends on top, and what the next thousand pounds would cost you.
               </p>
             </section>
           </>
@@ -111,10 +115,13 @@ export default async function PayYourselfPage() {
           <section className="lek-card">
             <h1 className="lek-h2">Paying yourself</h1>
             <p style={S.empty}>Nothing to work out yet.</p>
+            {/* The bank half of the sentence returns with bankFeedOffered(). */}
             <p style={S.quiet}>
               Once the money you have confirmed builds up a profit, this page shows the most tax
-              efficient way to take it out, worked out for how you trade. Connect your bank or log
-              what you have earned, and it fills in by itself.
+              efficient way to take it out, worked out for how you trade.
+              {bankFeedOffered()
+                ? ' Connect your bank or log what you have earned, and it fills in by itself.'
+                : ' Log what you have earned, and it fills in by itself.'}
             </p>
           </section>
         )

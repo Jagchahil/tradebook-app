@@ -8,6 +8,7 @@ import {
 } from '../../../lib/supabase';
 import { wholeFirmCaption } from '../../../lib/position';
 import { buildPile, partitionPile } from '../../../lib/reviewpile';
+import { bankFeedOffered } from '../../../lib/bankfeed';
 import { normaliseVendor } from '../../../lib/memory';
 import { categoriseBankLine } from '../../../lib/categories';
 import {
@@ -192,7 +193,12 @@ export default async function MoneyPage({
               resolved BY PHONE NUMBER and a web customer's number is deliberately unproved until he
               binds it, so on this screen that sentence is an instruction he may well be unable to
               follow. The Overview carries the offer to bind it, gated on whether he can. */}
-          <p style={S.quiet}>Connect your bank and every payment lands here on its own.</p>
+          {/* The bank sentence returns with bankFeedOffered(). */}
+          <p style={S.quiet}>
+            {bankFeedOffered()
+              ? 'Connect your bank and every payment lands here on its own.'
+              : 'Add an entry, upload a till slip, or import a statement, and every payment lands here.'}
+          </p>
         </section>
       ) : (
         <section className="lek-card">

@@ -5,6 +5,7 @@ import { SESSION_COOKIE } from '../../../lib/websession';
 import { getOptimiserInput, getConfirmedTransactionsForRange, getBusinessProfile } from '../../../lib/supabase';
 import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
 import { shareCaption } from '../../../lib/position';
+import { bankFeedOffered } from '../../../lib/bankfeed';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { buildQuarterPack, quarterBounds, quarterForDate } from '../../../lib/quarterpack';
 import { gbp0 } from '../../../lib/money';
@@ -127,9 +128,11 @@ export default async function TaxHubPage() {
         <section className="lek-card">
           <h1 className="lek-eyebrow">Where you stand</h1>
           <p style={S.empty}>Nothing to work out yet.</p>
+          {/* The bank sentence returns with bankFeedOffered(). */}
           <p style={S.quiet}>
-            Connect your bank and your tax position builds itself from what you confirm. Every
-            screen under Tax fills in from the same figures.
+            {bankFeedOffered()
+              ? 'Connect your bank and your tax position builds itself from what you confirm. Every screen under Tax fills in from the same figures.'
+              : 'Add what you earn and spend, by hand or by statement, and your tax position builds itself from what you confirm. Every screen under Tax fills in from the same figures.'}
           </p>
           {/* A landlord with the flag but no figures yet still deserves the promise kept: the
               stream is real, named, and waiting for his numbers. Only the flag line can appear

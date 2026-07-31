@@ -753,6 +753,26 @@ export function progressIn(
   return { answered: done, askable: done + toAsk };
 }
 
+// The pile's honest footnote about the questions still open, and it lives here because the count
+// it describes is this module's count (progressIn over every group), never a page's own arithmetic.
+//
+// WHY IT EXISTS. /app/pile's empty state says "Nothing is waiting on you. Everything we have is
+// filed and counted", and on 31 July that sentence sat on the screen of a man with open
+// circumstances questions, each one money or standing we cannot get him until he answers. Two
+// screens contradicting each other about what is waiting on him is the product lying to one of
+// them.
+//
+// Returns null when nothing is open, so the page renders nothing extra. The sentence deliberately
+// ends before the word Circumstances: the page finishes it with a link to /app/you/circumstances,
+// so what a customer reads ends "waiting under Circumstances."
+export function openQuestionsLead(openCount: number): string | null {
+  if (!Number.isFinite(openCount) || openCount <= 0) return null;
+  if (openCount === 1) {
+    return 'Though one question about you is still open. It is money or standing we cannot get you until you answer, and it is waiting under ';
+  }
+  return `Though ${openCount} questions about you are still open. Each one is money or standing we cannot get you until you answer, and they are waiting under `;
+}
+
 // Has he given EXPLICIT consent to be asked at all? Nothing in sensitive() may be shown, asked,
 // stored, or acted on until this is true.
 export function hasSpecialConsent(answered: Array<{ key: string; answer: string }>): boolean {

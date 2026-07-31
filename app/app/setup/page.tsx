@@ -10,7 +10,7 @@ import { ledgerFor } from '../../../lib/ledger';
 import { gbp0 } from '../../../lib/money';
 import { hasStripeConfig } from '../../../lib/stripe';
 import { TRIAL_DAYS } from '../../../lib/entitlement';
-import { hasBankFeedConfig } from '../../../lib/bankfeed';
+import { bankFeedOffered, hasBankFeedConfig } from '../../../lib/bankfeed';
 import {
   unanswered, unansweredMtd, household, notHousehold, mtdQuestions, progressIn, askingOrder,
   type Circumstance,
@@ -547,6 +547,10 @@ async function MtdStep({ userId }: { userId: string }) {
 // ---------------------------------------------------------------------------------------------
 async function BankStep({ userId, note }: { userId: string; note: string | null }) {
   const enabled = hasBankFeedConfig();
+  // The OFFER is its own switch, separate from the config. A configured feed can still only open
+  // TrueLayer's testing mode dialog until they grant production, and a brand new customer must
+  // never be sent there. Existing connections are untouched: linked stays linked below.
+  const offered = bankFeedOffered();
   const connections = enabled ? await listBankConnectionsForUser(userId) : [];
   const linked = connections.find((c) => c.status === 'linked') ?? null;
 
@@ -561,6 +565,13 @@ async function BankStep({ userId, note }: { userId: string; note: string | null 
           {linked.bank_name ? `${linked.bank_name} is connected.` : 'Your bank is connected.'} Money in
           and out arrives on its own from here, marked to review. Nothing counts toward your tax until
           you say so.
+        </p>
+      ) : !offered ? (
+        // Doc 103's honesty test again. No button, no radios, and no dressing it up: the feed is
+        // not something we can honestly offer yet, and the statement importer does the same job.
+        <p style={S.body}>
+          The bank feed is on its way. Until it lands, a bank statement CSV does the same job:
+          download one from your bank and give it to us at Upload a statement once you are inside.
         </p>
       ) : !enabled ? (
         // Doc 103's honesty test. A button whose only function is to say the feature does not exist
@@ -791,12 +802,19 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
                 it does whenever there IS data and merely not enough of it: "three weeks is not enough
                 to be confident" is worth reading and is not a repeat. */}
             {l?.note && !/connect your bank/i.test(l.note) ? <p style={S.body}>{l.note}</p> : null}
+            {/* The bank sentence and the way back to the bank step exist only while the feed is
+                genuinely on offer. When it is not, the first sentence already names everything he
+                can actually do, and a link back to a step with no button on it is a dead door. */}
             <p style={S.body}>
               Get your figures in and this page fills itself in: upload a bank statement, add an
-              entry by hand, or send a receipt. Connect your bank and it happens on its own without
-              you sending us anything.
+              entry by hand, or send a receipt.
+              {bankFeedOffered()
+                ? ' Connect your bank and it happens on its own without you sending us anything.'
+                : ''}
             </p>
-            <a href="/app/setup?step=bank" style={S.backAlt}>Go back and connect it</a>
+            {bankFeedOffered()
+              ? <a href="/app/setup?step=bank" style={S.backAlt}>Go back and connect it</a>
+              : null}
           </>
         )}
       </section>
@@ -825,8 +843,9 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
             <>
               <h2 style={S.h2}>The card can wait.</h2>
               <p style={S.body}>
-                There is nothing for you to pay for yet, and we would rather you connected your bank
-                first and saw what we do with it. Your {TRIAL_DAYS} days are running from today either
+                There is nothing for you to pay for yet, and we would rather you
+                {bankFeedOffered() ? ' connected your bank' : ' put your money in'} first and saw
+                what we do with it. Your {TRIAL_DAYS} days are running from today either
                 way. If you would sooner get it out of the way now, it is here.
               </p>
             </>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { hasBankFeedConfig, buildAuthLink, historyFromISO, type BankHistory } from '../../../../lib/bankfeed';
+import { bankFeedOffered, hasBankFeedConfig, buildAuthLink, historyFromISO, type BankHistory } from '../../../../lib/bankfeed';
 import { createBankConnection } from '../../../../lib/supabase';
 import { sessionUser } from '../../../../lib/webauth';
 import { signState } from '../../../../lib/hmrc';
@@ -23,15 +23,26 @@ export async function POST(req: NextRequest) {
   // real answer about a real subscription.
   if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app/setup?step=bank');
 
-  if (!hasBankFeedConfig()) {
-    return NextResponse.json({ error: 'not_enabled', message: 'Bank feeds are not switched on yet.' }, { status: 503 });
-  }
-
-  // ⚠️ AND A FORM CALLER NEVER SEES JSON. /app/setup only draws the button when the feature is on, so
+  // ⚠️ A FORM CALLER NEVER SEES JSON. /app/setup only draws the button when the feature is on, so
   // reaching the failures below means something changed under him mid setup, and a man in the middle
   // of setting up his books must not be shown an error object. He goes back to the step, which says
   // plainly that the bank is not available and offers Skip.
   const isForm = (req.headers.get('content-type') || '').includes('application/x-www-form-urlencoded');
+
+  // 🔴 THE OFFER SWITCH COMES BEFORE EVERYTHING TRUELAYER. bankFeedOffered() is the single switch
+  // for offering NEW connections, and while it is off no request may leave here for TrueLayer,
+  // whose dialog is in testing mode and tells a customer not to enter his bank credentials. The
+  // form caller goes politely back to the bank step, which explains and offers Continue. Existing
+  // connections and the sync engine are not this route's business and are untouched.
+  if (!bankFeedOffered()) {
+    return isForm
+      ? NextResponse.redirect(new URL('/app/setup?step=bank', req.url), 303)
+      : NextResponse.json({ error: 'not_enabled', message: 'Bank connections are not open yet.' }, { status: 503 });
+  }
+
+  if (!hasBankFeedConfig()) {
+    return NextResponse.json({ error: 'not_enabled', message: 'Bank feeds are not switched on yet.' }, { status: 503 });
+  }
   const bankProblem = (why: string) => NextResponse.redirect(
     new URL(`/app/setup?step=bank&bank=${why}`, req.url), 303,
   );

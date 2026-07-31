@@ -155,7 +155,7 @@ export default async function ProofOfIncomePage({
           </section>
 
           <p className="lek-noprint" style={S.printHint}>
-            To hand it over, print this page or save it as a PDF from your browser's print menu.
+            To hand it over, print this page or save it as a PDF from your browser&apos;s print menu.
             The nav and these notes stay off the paper. It is your document: you send it, we do
             not.
           </p>

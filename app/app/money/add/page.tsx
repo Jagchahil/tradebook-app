@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { accountHasRental } from '../../../../lib/supabase';
+import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { CATEGORIES } from '../../../../lib/categories';
 import { isMonthKey } from '../../../../lib/moneylog';
 import { gateForUser } from '../../../../lib/gateserver';
@@ -227,9 +228,11 @@ export default async function AddEntryPage({
         </section>
       )}
 
+      {/* The bank sentence returns with bankFeedOffered(). */}
       <p style={S.foot}>
-        Anything that went through your bank arrives on its own once your bank is connected. This
-        page is for the money that never did.
+        {bankFeedOffered()
+          ? 'Anything that went through your bank arrives on its own once your bank is connected. This page is for the money that never did.'
+          : 'Anything that went through your bank can come in from a statement upload. This page is for the money that never did.'}
       </p>
     </main>
   );

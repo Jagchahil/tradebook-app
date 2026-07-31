@@ -4,6 +4,7 @@ import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import { readProvedPhone } from '../../../lib/supabase';
 import { WHATSAPP_NUMBER } from '../../../lib/features';
+import { bankFeedOffered } from '../../../lib/bankfeed';
 import {
   verifyWaLinkCookie, waMeLink, connectMessage, waLinksConfigured, WALINK_COOKIE, LINK_TTL_SECONDS,
 } from '../../../lib/walink';
@@ -111,9 +112,12 @@ export default async function ConnectPage({
       ) : !configured ? (
         <section style={S.card}>
           <p style={S.lead}>WhatsApp is not switched on yet.</p>
+          {/* The bank sentence returns with bankFeedOffered(); until then the fallback points at
+              the Money pages, which take his figures today. */}
           <p style={S.body}>
-            Nothing is wrong with your account. Connect your bank instead and your spending lands in
-            your books on its own, with nothing for you to send us.
+            {bankFeedOffered()
+              ? 'Nothing is wrong with your account. Connect your bank instead and your spending lands in your books on its own, with nothing for you to send us.'
+              : 'Nothing is wrong with your account. Add what you earn and spend from the Money pages and it lands in your books all the same.'}
           </p>
           <a href="/app" style={S.primaryLink}>Back to your money</a>
         </section>

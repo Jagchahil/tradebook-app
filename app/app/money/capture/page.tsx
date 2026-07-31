@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { hasClaudeConfig } from '../../../../lib/claude';
+import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { gateForUser } from '../../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../../lib/gate';
 import {
@@ -53,7 +54,10 @@ function notice(done: string | undefined, problem: string | undefined): string |
     case 'off':
       return 'Receipt reading is not switched on yet. Hang tight, it is coming very soon.';
     case 'budget':
-      return 'I have done all the reading I can afford today. Try again tomorrow, or connect your bank and the payment arrives on its own.';
+      // The bank offer returns with bankFeedOffered(); until then the way out is one he can take.
+      return bankFeedOffered()
+        ? 'I have done all the reading I can afford today. Try again tomorrow, or connect your bank and the payment arrives on its own.'
+        : 'I have done all the reading I can afford today. Try again tomorrow, or add the entry by hand and it counts today.';
     case 'slow':
       return 'One at a time is plenty. Give it a minute and try the next one.';
     case 'bad':
@@ -104,9 +108,12 @@ export default async function CapturePage({
         <section className="lek-card">
           <h1 className="lek-title">A paper receipt</h1>
           <p style={S.lead}>Receipt reading is not switched on yet.</p>
+          {/* The bank sentence returns with bankFeedOffered(); until then the fallback names the
+              two doors that work without a photograph. */}
           <p style={S.sub}>
-            Nothing is wrong with your account. Connect your bank instead and your spending lands
-            in your books on its own, with nothing to photograph.
+            {bankFeedOffered()
+              ? 'Nothing is wrong with your account. Connect your bank instead and your spending lands in your books on its own, with nothing to photograph.'
+              : 'Nothing is wrong with your account. Add the entry by hand or import a bank statement instead, and it lands in your books all the same.'}
           </p>
           <a href="/app/money" style={S.backLink}>Back to your money</a>
         </section>

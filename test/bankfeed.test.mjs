@@ -73,6 +73,18 @@ console.log('\n=== bankfeed: auth link ===\n');
 ok('auth link dormant without keys', B.buildAuthLink('state') === null);
 ok('config check dormant', B.hasBankFeedConfig() === false);
 
+console.log('\n=== bankfeed: the offer switch ===\n');
+// bankFeedOffered() gates the OFFERING of new connections and nothing else: while TrueLayer will
+// only open its testing mode dialog, no surface may offer a customer a new connection, whatever
+// the config says. Read at call time, so one loaded module answers for every state here.
+ok('not offered by default, which is the honest state today', B.bankFeedOffered() === false);
+process.env.BANK_FEED_OFFERED = 'TRUE';
+ok('anything but the exact string true stays off', B.bankFeedOffered() === false);
+process.env.BANK_FEED_OFFERED = 'true';
+ok('the exact string true switches the offer on', B.bankFeedOffered() === true);
+delete process.env.BANK_FEED_OFFERED;
+ok('unset again means off again, no reload needed', B.bankFeedOffered() === false);
+
 console.log('\n=== bankfeed: categorisation stays aligned with WhatsApp ===\n');
 const W = await import(`${pathToFileURL(path.resolve(here, '../lib/waintents.ts')).href}`);
 // TWO DOORS, AND THEY MUST NOT DISAGREE ABOUT THE SAME WORDS.

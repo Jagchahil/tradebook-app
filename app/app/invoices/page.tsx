@@ -80,9 +80,10 @@ export default async function InvoicesPage({
       ) : sorted.length === 0 ? (
         <section className="lek-card">
           <p style={S.empty}>You have not made an invoice yet.</p>
+          {/* The pay wording returns with payouts. See hasInvoicePayoutRoute in lib/stripe.ts. */}
           <p style={S.quiet}>
             Make one here and it comes out numbered, dated and ready to send, with a link your
-            customer can pay from. You send it. We never contact your customer.
+            customer can open and see. You send it. We never contact your customer.
           </p>
           <a href="/app/invoices/new" className="lek-go">Make your first invoice</a>
         </section>

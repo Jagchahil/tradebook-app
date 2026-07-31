@@ -189,9 +189,10 @@ export default async function InvoiceDetailPage({
           ) : (
             <section className="lek-card">
               <h2 className="lek-h2">Send it</h2>
+              {/* The pay wording returns with payouts. See hasInvoicePayoutRoute in lib/stripe.ts. */}
               <p style={S.sub}>
-                This link is the invoice. Your customer opens it, sees it, and can pay it. It goes
-                from you, never from us.
+                This link is the invoice. Your customer opens it and sees it. It goes from you,
+                never from us.
               </p>
               {/* One tap selects the whole link, which is the closest thing to a copy button that
                   needs no script. The green anchor opens his own messaging app's share screen

@@ -138,9 +138,13 @@ ok('🔴 no pay button and no Stripe promise on the page',
   !/Pay .*now|hasStripeConfig|Stripe/.test(invoicePageCode));
 ok('the tradesman\'s notes still render: his own bank details reach his customer if he wrote them',
   /invoice\.notes/.test(invoicePageCode));
-ok('🔴 the one honest line: card payment is coming, pay as agreed for now',
+// ⚠️ AND THE HONEST LINE NAMES NO DETAILS. The invoice carries no payment details unless the
+// tradesman wrote them into his notes, so "pay using the details on this invoice" promised the
+// payer something that was not there. Fixed 31 July: pay the sender the way the two of them agreed.
+ok('🔴 the one honest line: card payment is coming, pay the way the two of you have agreed',
   invoicePage.includes('Card payment is coming.')
-  && /however you have agreed with/.test(invoicePage));
+  && /the way the two of you have agreed/.test(invoicePage)
+  && !/pay using the details on this invoice/.test(invoicePageCode));
 ok('the page still ships no client script',
   !/'use client'|onClick|onChange|useState|<script/.test(invoicePage));
 

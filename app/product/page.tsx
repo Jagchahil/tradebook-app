@@ -121,7 +121,7 @@ const PRODUCT_CSS = `
 
 const PRODUCT_JS = `
 (function(){  var FEAT=[
-   {t:'Snap a receipt',p:'Photograph it and Lekhio pulls the total, the VAT and the category, and logs it in seconds.',demo:'<div class="db out d1"><div style="background:#cde7b4;border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:4px">🧾</div>Screwfix receipt</div><div class="db in d2">Logged. £42.60, materials ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">VAT £7.10 · Materials · 3 Jul</div>'},
+   {t:'Snap a receipt',p:'Photograph it and Lekhio pulls the shop, the total and the date, and files it in seconds.',demo:'<div class="db out d1"><div style="background:#cde7b4;border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:4px">🧾</div>Screwfix receipt</div><div class="db in d2">Logged. £42.60, materials ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">Screwfix · Materials · 3 Jul</div>'},
    {t:'Say it out loud',p:'Hands full on the job? Leave a voice note. Lekhio hears it and logs it before you have put the phone down.',demo:'<div class="db out d1" style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">🎙️</span><span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div><div class="db out d2">"spent forty on diesel"</div><div class="db in d3">£40 fuel, logged ✅</div>'},
    {t:'Mileage in a text',p:'Text the trip. Lekhio works out the claim at the HMRC rate and logs it. No fiddly logbook.',demo:'<div class="db out d1">drove 24 miles to the job</div><div class="db in d2">£13.20 mileage claimed at the HMRC rate ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">55p a mile · logged to travel</div>'},
    {t:'Invoice from a text',p:'Type it in plain words. Lekhio builds a clean invoice and sends it, then tracks who has paid.',demo:'<div class="db out d1">invoice Dave £450 for the rewire</div><div class="db in d2">Invoice #0043 sent to Dave ✅</div><div class="db in d3">Dave paid. +£450 income 💷</div>'},
@@ -183,7 +183,7 @@ export default function ProductPage() {
             <p className="lead">Ten seconds a day. Lekhio does the rest and keeps it tidy, ready for tax.</p>
           </div>
           <div className="featgrid reveal">
-            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📸" color="var(--river)" size={26} /></div><h3>Snap a receipt</h3><p>Photo it, Lekhio reads the shop, total and VAT.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📸" color="var(--river)" size={26} /></div><h3>Snap a receipt</h3><p>Photo it, Lekhio reads the shop, the total and the date.</p></div>
             <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="🎙️" color="var(--saffron-deep)" size={26} /></div><h3>Say it or type it</h3><p>&quot;spent 40 on diesel&quot;, by voice note or text.</p></div>
             <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}><Ic e="🚐" color="var(--green)" size={26} /></div><h3>Mileage</h3><p>&quot;drove 24 miles&quot; and it claims it at the HMRC rate.</p></div>
             <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><h3>Invoices</h3><p>Built and sent from the chat, chased when late.</p></div>
@@ -254,11 +254,11 @@ export default function ProductPage() {
             <button type="button" className="ftab" data-f="5" role="tab" aria-selected="false">Ask</button>
           </div>
           <div className="fstage reveal">
-            <div className="ftext" id="ftext"><h3>Snap a receipt</h3><p>Photograph it and Lekhio pulls the total, the VAT and the category, and logs it in seconds.</p></div>
+            <div className="ftext" id="ftext"><h3>Snap a receipt</h3><p>Photograph it and Lekhio pulls the shop, the total and the date, and files it in seconds.</p></div>
             <div className="fdemo" id="fdemo">
               <div className="db out d1"><div style={{ background: '#cde7b4', borderRadius: 8, padding: 12, textAlign: 'center', fontSize: 20, marginBottom: 4 }}>🧾</div>Screwfix receipt</div>
               <div className="db in d2">Logged. £42.60, materials ✅</div>
-              <div className="db in d3" style={{ background: 'transparent', fontSize: 12, color: 'var(--tx-mut)' }}>VAT £7.10 · Materials · 3 Jul</div>
+              <div className="db in d3" style={{ background: 'transparent', fontSize: 12, color: 'var(--tx-mut)' }}>Screwfix · Materials · 3 Jul</div>
             </div>
           </div>
         </div>

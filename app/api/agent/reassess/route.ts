@@ -7,6 +7,7 @@ import {
   getStudentLoanSettings,
   insertAgentSignals,
   refreshFactsFromDb,
+  readCircumstances,
 } from '../../../../lib/supabase';
 import { sessionUser } from '../../../../lib/webauth';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
@@ -50,11 +51,12 @@ export async function POST(req: NextRequest) {
   if (agg.months.length === 0 && agg.unconfirmed === 0) return NextResponse.json({ ok: true, signals: [] });
 
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
-  const [goals, overdue, profile, income] = await Promise.all([
+  const [goals, overdue, profile, income, circs] = await Promise.all([
     getActiveGoals(userId),
     listOverdueInvoices(userId),
     getBusinessProfile(userId),
     getStudentLoanSettings(userId),
+    readCircumstances(userId),
   ]);
 
   const input: AgentInput = {
@@ -80,6 +82,12 @@ export async function POST(req: NextRequest) {
     // who he is or the same man gets a different set of cards depending on which one ran last.
     // See the note on the same line in app/api/cron/agent/route.ts for the sources.
     incomeShape: profile?.incomeShape ?? null,
+    // 🔴 AND WHETHER HE IS ALREADY VAT REGISTERED, read from the circumstances log, which is the
+    // one place that fact lives. Without it the VAT threshold signal fired on turnover alone and
+    // pushed a paid WhatsApp message telling a man who registered years ago that he has 30 days to
+    // register. An unreadable answer is FALSE, not true: silencing the warning for a man heading
+    // past the threshold is the expensive direction, and it has a date on it.
+    vatRegistered: (circs ?? []).some((c) => c.key === 'vat_registered' && c.answer === 'yes'),
   };
 
   const signals = computeSignalsForStructure(input);

@@ -36,6 +36,7 @@ import {
   getBusinessProfile,
   getStudentLoanSettings,
   refreshFactsFromDb,
+  readCircumstances,
 } from '../../../../lib/supabase';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
 import { T_AGENT_THRESHOLD, T_AGENT_DEADLINE, T_AGENT_OPPORTUNITY } from '../../../../lib/watemplates';
@@ -118,11 +119,12 @@ async function processUser(user: {
   // A user with no data produces no signals; skip the engine's edge cases early.
   if (agg.months.length === 0 && agg.unconfirmed === 0) return { inserted: 0, pinged: 0 };
 
-  const [goals, overdue, profile, income] = await Promise.all([
+  const [goals, overdue, profile, income, circs] = await Promise.all([
     getActiveGoals(user.id),
     listOverdueInvoices(user.id),
     getBusinessProfile(user.id),
     getStudentLoanSettings(user.id),
+    readCircumstances(user.id),
   ]);
   const input: AgentInput = {
     today: new Date(),
@@ -155,6 +157,12 @@ async function processUser(user: {
     // so there are no relevant profits and no Class 2 to buy the year with. His route is Class 3,
     // at several times the cost. Null is unknown, and unknown is sent everything, as before.
     incomeShape: profile?.incomeShape ?? null,
+    // 🔴 AND WHETHER HE IS ALREADY VAT REGISTERED, read from the circumstances log, which is the
+    // one place that fact lives. Without it the VAT threshold signal fired on turnover alone and
+    // pushed a paid WhatsApp message telling a man who registered years ago that he has 30 days to
+    // register. An unreadable answer is FALSE, not true: silencing the warning for a man heading
+    // past the threshold is the expensive direction, and it has a date on it.
+    vatRegistered: (circs ?? []).some((c) => c.key === 'vat_registered' && c.answer === 'yes'),
   };
   let signals = computeSignalsForStructure(input);
   if (signals.length === 0) return { inserted: 0, pinged: 0 };

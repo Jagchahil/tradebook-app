@@ -574,7 +574,12 @@ async function handleButtonReply(from: string, buttonId: string): Promise<void> 
   if (buttonId === 'wk_receipt') {
     await sendText(
       from,
-      'Easy one. Snap a photo of any receipt, crumpled is fine, and send it right here. I read the shop, the total and the VAT, and it lands in your app to approve. Go on, try one now.',
+      // 🔴 31 JULY 2026: THIS PROMISED THAT WE READ THE VAT OFF THE RECEIPT. WE DO NOT.
+      // lib/claude.ts's vision prompt does not contain the word, ParsedReceipt has no VAT field, and
+      // the transactions table has no column to put one in. The in app capture screen was already
+      // honest and says "the shop, the total and the date", so this now matches it. When receipt VAT
+      // is genuinely extracted, this sentence and the three on /product change together.
+      'Easy one. Snap a photo of any receipt, crumpled is fine, and send it right here. I read the shop, the total and the date, and it lands in your app to approve. Go on, try one now.',
     );
     return;
   }

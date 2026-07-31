@@ -103,6 +103,28 @@ export interface AgentInput {
   // a trade, so an absence of information is never evidence of letting.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   incomeShape?: IncomeShape | null;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 IS HE ALREADY VAT REGISTERED? WE WERE PUSHING "GO AND REGISTER" AT MEN WHO DID YEARS AGO.
+  //
+  // Found by auditing VAT on 31 July 2026. The vat_approach signal below computed its three tiers
+  // from TURNOVER ALONE, because this field did not exist. Above the threshold it fires at ping
+  // priority, which is a paid WhatsApp template, and it says "You have crossed the VAT threshold"
+  // and "You normally have 30 days from the end of the month you crossed in to register".
+  //
+  // That reaches every VAT registered customer over the threshold, which is everyone who had to
+  // register compulsorily, which is the core of this audience. It costs him nothing and it costs us
+  // his trust in every other number in the app.
+  //
+  // lib/weeklyupdate.ts had this right all along (`if (haveTurnover && !input.vatRegistered)`), so
+  // two paths disagreed and the wrong one was the one that spends money to send.
+  //
+  // ⚠️ FALSE IS THE SAFE DEFAULT HERE, AND IT IS THE ONE DEFAULT ON THIS INPUT THAT IS A VALUE
+  // RATHER THAN A NULL. Treating unknown as registered would silence the warning for a man heading
+  // straight past the threshold, and missing that has a date on it and costs him real money.
+  // lib/weeklyupdate.ts makes the same call in the same words, deliberately.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  vatRegistered?: boolean;
 }
 
 export type SignalPriority = 'ping' | 'card';
@@ -380,7 +402,10 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
   const vatTurnover = Math.max(0, d.rolling12Income - (input.property?.rents12 ?? 0));
   const vatPct = vatTurnover / vat;
   const vatTier = vatPct >= 1 ? 3 : vatPct >= 0.9 ? 2 : vatPct >= 0.8 ? 1 : 0;
-  if (vatTier > 0) {
+  // 🔴 AND NOT ONE WORD OF IT TO A MAN WHO IS ALREADY REGISTERED. Every tier of this signal tells
+  // him something about registering, and the top one tells him he has 30 days to do a thing he did
+  // years ago. See AgentInput.vatRegistered for what it was doing before this line existed.
+  if (vatTier > 0 && !input.vatRegistered) {
     out.push({
       signalKey: 'vat_approach',
       periodKey: `${year}#t${vatTier}`,

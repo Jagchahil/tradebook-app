@@ -13,7 +13,7 @@ import { TRIAL_DAYS } from '../../../lib/entitlement';
 import { bankFeedOffered, hasBankFeedConfig } from '../../../lib/bankfeed';
 import {
   unanswered, unansweredMtd, household, notHousehold, mtdQuestions, progressIn, askingOrder,
-  type Circumstance,
+  type Circumstance, type Persona,
 } from '../../../lib/circumstances';
 import {
   isStep, isDone, toStep, prevStep, stepNumber, stepCount, progressPct, stepTitle,
@@ -313,14 +313,25 @@ async function BusinessStep({ userId }: { userId: string }) {
 // lib/circumstances.ts's own order, and the list visibly shrinks as he goes.
 // ---------------------------------------------------------------------------------------------
 async function QuestionsStep({ userId, step }: { userId: string; step: 'household' | 'about' }) {
-  // The structure rides along because askability now depends on it: lib/circumstances.ts refuses
-  // to hand a director the questions that assert he is self employed. A failed profile read passes
-  // null, which the module treats as unknown and asks everything, the direction it argues for.
+  // 🔴 THE WHOLE PERSONA RIDES ALONG, NOT JUST THE STRUCTURE, AND WAVE NINE IS WHY.
+  //
+  // Askability branches on both axes in lib/circumstances.ts: how he trades, and whether he trades
+  // at all. The structure alone was not enough. A landlord signing up through the Landlord chip on
+  // /start is stored as a sole trader, because he files a personal return and he is not a company,
+  // so he passed this step's structure check and was asked, on this very screen on 31 July 2026,
+  // what he did before he went self employed, under a promise of a loss carried back against the
+  // wages from his old job. That is ITA 2007 s72, early TRADE losses relief. A property business
+  // loss can only be carried forward against the same letting business.
+  //
+  // Both facts travel together now, computed once here and handed to every gate below. A failed
+  // profile read passes null on both, which the module treats as unknown and asks everything, the
+  // direction it argues for: a question he can say no to costs him a moment, a question we never
+  // asked costs him four figures with no trace.
   const [rows, biz] = await Promise.all([
     readCircumstances(userId),
     getBusinessProfile(userId).catch(() => null),
   ]);
-  const structure = biz?.businessType ?? null;
+  const who: Persona = { structure: biz?.businessType ?? null, income: biz?.incomeShape ?? null };
 
   const intro = step === 'household'
     ? {
@@ -348,8 +359,8 @@ async function QuestionsStep({ userId, step }: { userId: string; step: 'househol
 
   // The partition comes from lib/circumstances.ts, both halves of it, and `unanswered` is the gate.
   // Nothing here knows which questions are household ones, which are special category, or which
-  // structures a question is for: it asks.
-  const open = new Set(unanswered(rows, structure).map((c) => c.key));
+  // structures and income shapes a question is for: it asks.
+  const open = new Set(unanswered(rows, who).map((c) => c.key));
   const group: Circumstance[] = step === 'household' ? household() : notHousehold();
   const list = group.filter((c) => open.has(c.key));
 
@@ -359,7 +370,7 @@ async function QuestionsStep({ userId, step }: { userId: string; step: 'househol
   // premise is not yet established, and told a brand new customer he had answered one of four before
   // he had touched anything. lib/circumstances.ts owns what a question is and when it is askable, so
   // it owns this too, and a test can run it against fixtures rather than read this file.
-  const { answered: answeredHere, askable } = progressIn(group, rows, structure);
+  const { answered: answeredHere, askable } = progressIn(group, rows, who);
 
   return (
     <section style={S.card}>
@@ -448,14 +459,17 @@ async function QuestionsStep({ userId, step }: { userId: string; step: 'househol
 // What we need instead is his money back to 6 April, which is what the bank step collects.
 // ---------------------------------------------------------------------------------------------
 async function MtdStep({ userId }: { userId: string }) {
-  // The structure decides whether these questions exist for him at all: lib/circumstances.ts
-  // refuses the MTD gate for a limited company, because Making Tax Digital for Income Tax is about
-  // self employment and rent on a personal return and a company's trade is neither.
+  // The persona decides whether these questions exist for him at all: lib/circumstances.ts refuses
+  // the MTD gate for a limited company, because Making Tax Digital for Income Tax is about self
+  // employment and rent on a personal return and a company's trade is neither. The income shape
+  // travels with it for the same reason it does on every other step since wave nine, even though
+  // the gate itself deliberately carries no `incomes` tag: MTD counts trade AND property, so a man
+  // letting for £52,000 with no trade at all is genuinely mandated and must still be asked.
   const [rows, biz] = await Promise.all([
     readCircumstances(userId),
     getBusinessProfile(userId).catch(() => null),
   ]);
-  const structure = biz?.businessType ?? null;
+  const who: Persona = { structure: biz?.businessType ?? null, income: biz?.incomeShape ?? null };
 
   if (rows === null) {
     return (
@@ -466,8 +480,8 @@ async function MtdStep({ userId }: { userId: string }) {
     );
   }
 
-  const list = unansweredMtd(rows, structure);
-  const { answered: answeredHere, askable } = progressIn(mtdQuestions(), rows, structure);
+  const list = unansweredMtd(rows, who);
+  const { answered: answeredHere, askable } = progressIn(mtdQuestions(), rows, who);
   const answers = new Map(rows.map((r) => [r.key, r.answer]));
   const mandated = answers.get('mtd_mandated');
 
@@ -484,7 +498,7 @@ async function MtdStep({ userId }: { userId: string }) {
 
       {list.length === 0 ? (
         <p style={S.done}>
-          {structure === 'limited_company'
+          {who.structure === 'limited_company'
             // A company is not IN Making Tax Digital for Income Tax: it covers self employment and
             // rent on a personal return, and the company's trade is the company's own, on its own
             // return. Saying so beats a blank card that implies we wanted something.

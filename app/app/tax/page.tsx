@@ -66,12 +66,37 @@ export default async function TaxHubPage() {
   // his share of the firm's books. The caption from lib/position.ts says so, partnership only.
   const shareCap = biz ? shareCaption(biz.businessType, biz.partnershipShare) : null;
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHOSE OBLIGATIONS THESE ARE. Audited 31 July 2026, on a screen a director pays for.
+  //
+  // He was told "Making Tax Digital applies to you", and that January asks for payments on account.
+  // Both are SELF ASSESSMENT mechanisms and neither is his. Making Tax Digital for Income Tax
+  // covers self employment and rent on a personal return, and a company's trade is neither: the
+  // company files its own return. That is the same reasoning /app/setup already gives on its MTD
+  // step, in the same words, because a product that argues two ways about one fact argues wrong
+  // once. Payments on account are TMA 1970 s59A, a Self Assessment mechanism, and they do not
+  // exist for Corporation Tax.
+  //
+  // ⚠️ ONLY AN EXPLICIT COMPANY LOSES ANYTHING HERE. getBusinessProfile defaults an unset column to
+  // sole trader and a failed read comes back null, so both fall through to exactly today's screen.
+  // Hiding a real obligation from a sole trader because a read timed out is by far the worse
+  // failure, and this branch is written so it cannot happen.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const isCompany = biz?.businessType === 'limited_company';
+
   // The MTD test, asked of the quarter pack rather than re-derived. The threshold, the gross
   // qualifying income and the by-year rule all live in lib/quarterpack.ts and lib/taxengine.ts.
+  //
+  // ⚠️ AND THE TEST BASE IS NOT A DIRECTOR'S. mtdApplies runs on gross trade plus gross property,
+  // and for a company account the trade half is the COMPANY's turnover, which is not his qualifying
+  // income at all. So the row is withheld rather than reworded: doc 103 would rather say nothing
+  // than hand him a row explaining what does not apply. Rent is not buried with it, because rent on
+  // a personal return does count towards the line: /app/tax/summary says so to a director in
+  // exactly those words, which is where a man who lets property will read it.
   const pack = buildQuarterPack({
     transactions: txns, startYear, quarter: index, truncated: txns.length >= 20000,
   });
-  const mtd = pack.ytd.mtdApplies;
+  const mtd = pack.ytd.mtdApplies && !isCompany;
 
   // ⚠️ THE EMPTY TEST. A proud £0 for a brand new account teaches him this screen says nothing.
   // The tax card is drawn once there is money behind it, and the empty state names the one thing
@@ -113,8 +138,19 @@ export default async function TaxHubPage() {
             {tax.projected
               ? 'What the year is heading for, on everything you have confirmed so far.'
               : 'What the year so far has built up. Too early to call the whole year yet.'}
-            {' '}Self Assessment collects it in one bill, due by {poa.firstDue}.
+            {/* The January sentence is a Self Assessment sentence, so it is not said to a director.
+                See the structure note above: his company is not in Self Assessment. */}
+            {isCompany ? null : <>{' '}Self Assessment collects it in one bill, due by {poa.firstDue}.</>}
           </p>
+          {/* And the absence is explained rather than left as a gap, because a man reading a large
+              figure with no date on it will invent one. The claim is the narrow one setup already
+              makes: the company files its own return, and his own position is a different question. */}
+          {isCompany ? (
+            <p style={S.heroBasis}>
+              Your company files its own return, and your own tax position is a separate question.
+              That is why there is no Self Assessment date on this figure.
+            </p>
+          ) : null}
           {/* What is inside the number, written by lib/taxoptimiser.ts so the claim about a man's
               tax stays in one place. Null for a pure sole trader, for whom it would add no fact. */}
           {basis ? <p style={S.heroBasis}>{basis}</p> : null}
@@ -144,8 +180,12 @@ export default async function TaxHubPage() {
       {/* ── WHAT JANUARY ACTUALLY ASKS FOR. The part that catches people. ──────────────────────
           Drawn only when payments on account really apply, doc 103's empty test: a permanent row
           saying "no payments on account" is a row he learns to skip, and then the year he crosses
-          the line he misses it. */}
-      {showPosition && poa.required ? (
+          the line he misses it.
+
+          ⚠️ AND NEVER FOR A DIRECTOR. Payments on account are TMA 1970 s59A, a Self Assessment
+          mechanism, and they have no counterpart in Corporation Tax. There is nothing true this
+          page could put here in their place, so it puts nothing. */}
+      {showPosition && !isCompany && poa.required ? (
         <section className="lek-card">
           <h2 className="lek-h2">January asks for more than the bill</h2>
           <p style={S.body}>
@@ -177,7 +217,13 @@ export default async function TaxHubPage() {
         <div style={S.doors}>
           <a href="/app/tax/summary" style={S.door} className="lek-hit">
             <span style={S.doorLabel}>Quarterly summary</span>
-            <span style={S.rowBody}>What an update would report today, and when the next one is due.</span>
+            {/* The door stays for a director, because the figures behind it are his own money added
+                up. What goes is the promise of an update he does not have to make. */}
+            <span style={S.rowBody}>
+              {isCompany
+                ? 'Your figures since 6 April, and the quarter on its own.'
+                : 'What an update would report today, and when the next one is due.'}
+            </span>
           </a>
           <a href="/app/tax/what-if" style={S.door} className="lek-hit">
             <span style={S.doorLabel}>What if</span>

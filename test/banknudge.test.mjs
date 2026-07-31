@@ -42,7 +42,19 @@ const userCap = N.busyMessage('user_daily_cap', OFFERABLE);
 ok('user cap does NOT claim we are busy (that was the bug)', !userCap.includes('I am a bit busy'));
 ok('user cap tells them nothing is lost', userCap.includes('Nothing is lost'));
 ok('user cap tells them when to retry', userCap.includes('tomorrow'));
-ok('user cap offers the bank when it is offerable', userCap.includes('Connect your bank'));
+// 🔴 31 JULY: THE BANK SENTENCE IS NOW BEHIND bankFeedOffered(), DEFAULT OFF, AND THIS ASSERTION
+// WAS HOLDING THE DEFECT IN PLACE. TrueLayer declined production authorisation on 30 July and
+// Finexer want £650 a month, so there is nothing to connect to, and this line pinned a sentence
+// that sent a man who had just been refused a receipt read at a door that does not open. It now
+// pins BOTH sides: off, the way out has to be one he can take today; on, the old sentence returns.
+ok('user cap names a way out he can take today', userCap.includes('Import a bank statement'));
+ok('user cap never sends him at a bank we cannot connect', !userCap.includes('Connect your bank'));
+process.env.BANK_FEED_OFFERED = 'true';
+ok(
+  'user cap offers the bank again the day the offer is switched back on',
+  N.busyMessage('user_daily_cap', OFFERABLE).includes('Connect your bank'),
+);
+delete process.env.BANK_FEED_OFFERED;
 
 const userCapConnected = N.busyMessage('user_daily_cap', CONNECTED);
 ok('already connected: no pointless pitch', !userCapConnected.includes('Connect your bank'));
@@ -73,7 +85,13 @@ const allCopy = [
 
 ok('no em dashes, en dashes or minus signs anywhere in the copy', !/[–—−]/.test(allCopy));
 ok('never claims we file or do their tax', !/we will file|we file your|do your tax/i.test(allCopy));
-ok('the offer names the benefit, not our cost', N.bankOfferLine().includes('automatically'));
+// 🔴 31 JULY: the offer is two sentences now, one per side of bankFeedOffered(). 'automatically'
+// was specific to the feed. What this assertion was actually protecting is that the line names HIS
+// benefit rather than our AI cost, and both sides have to keep doing that.
+ok('the offer names the benefit, not our cost', N.bankOfferLine().includes('no daily limit'));
+process.env.BANK_FEED_OFFERED = 'true';
+ok('and the bank version still names the benefit it always named', N.bankOfferLine().includes('automatically'));
+delete process.env.BANK_FEED_OFFERED;
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

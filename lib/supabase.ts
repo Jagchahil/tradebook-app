@@ -34,6 +34,7 @@ import { useOfHomeToDate } from './elections';
 import { fromLegacyKind, toLegacyKind, isGoalKind, type LegacyGoalKind } from './goals';
 import { weekTotals, windowStart, type WeekRow } from './weekchart';
 import { isMonthKey, monthStart, monthEnd } from './moneylog';
+import { incomeShapeOfSignup, toIncomeShape, type IncomeShape } from './persona';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1091,7 +1092,7 @@ export async function countContactsByStage(): Promise<Record<string, number> | n
 }
 
 // The most recent in-person (door to door) leads, for the field-capture panel. CRM contact fields
-// ONLY (who they are, when, how far) — never a customer's receipts, income, tax or phone. These are
+// ONLY (who they are, when, how far). Never a customer's receipts, income, tax or phone. These are
 // marketing contacts who gave consent to be contacted, which is a different thing from a customer's
 // private books; the financial allowlist in lib/team.ts still governs anything about a paying user.
 export interface RecentLead {
@@ -1344,13 +1345,13 @@ export async function reconcileSignupToUser(
   // The most recent signup for this man that has not been reconciled yet.
   const res = await fetch(
     `${url}/rest/v1/signups?${match}&reconciled_at=is.null` +
-      `&select=trade_type,name,address,postcode,vat_registered,streams&order=created_at.desc&limit=1`,
+      `&select=trade_type,trade,name,address,postcode,vat_registered,streams&order=created_at.desc&limit=1`,
     { headers: headers() },
   );
   if (!res.ok) return { reconciled: false, applied: [] };
   const rows = (await res.json().catch(() => null)) as Array<{
-    trade_type: string | null; name: string | null; address: string | null; postcode: string | null;
-    vat_registered: boolean | null; streams: string[] | null;
+    trade_type: string | null; trade: string | null; name: string | null; address: string | null;
+    postcode: string | null; vat_registered: boolean | null; streams: string[] | null;
   }> | null;
   if (!Array.isArray(rows) || rows.length === 0) return { reconciled: false, applied: [] };
   const s = rows[0];
@@ -1369,12 +1370,36 @@ export async function reconcileSignupToUser(
   }
   const addr = [s.address, s.postcode].filter(Boolean).join(', ');
   if (addr) patch.address = addr;
+
+  // 🔴 2b. WHAT HIS BUSINESS INCOME ACTUALLY IS, WHICH trade_type CANNOT SAY.
+  //
+  // trade_type is sole, business or ltd: HOW he trades. The trade WORD is the only thing on this
+  // row that says WHETHER he trades, because picking Landlord means the letting IS the work while
+  // ticking 'property' at step 4 only means there is rent alongside it, and app/start/page.tsx
+  // adds 'property' to the streams in both cases. lib/persona.ts holds that rule and its sources.
+  //
+  // Written into the same patch as the name and address, so it costs no extra request, and only
+  // when there is something to say: a null leaves him unknown, and unknown is asked everything.
+  const shape = incomeShapeOfSignup({ trade: s.trade, streams: s.streams });
+  if (shape) patch.income_shape = shape;
   if (Object.keys(patch).length > 0) {
-    const pr = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
-      method: 'PATCH',
-      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify(patch),
-    });
+    const writeProfile = (body: Record<string, unknown>) => fetch(
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`,
+      {
+        method: 'PATCH',
+        headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(body),
+      },
+    );
+    let pr = await writeProfile(patch);
+    // ⚠️ UNTIL supabase/APPLY_2026-07-31_income_shape.sql IS RUN, income_shape is not a column and
+    // PostgREST rejects the WHOLE patch. His name and his address are the reason this function
+    // exists, and losing them because a new column is not there yet would be a far worse bug than
+    // the one wave nine set out to fix. So the column is dropped and the rest is written.
+    if (!pr.ok && patch.income_shape !== undefined) {
+      const { income_shape: _dropped, ...withoutShape } = patch;
+      if (Object.keys(withoutShape).length > 0) pr = await writeProfile(withoutShape);
+    }
     if (pr.ok) applied.push('profile');
   }
 
@@ -1391,7 +1416,10 @@ export async function reconcileSignupToUser(
   if (streams.includes('job')) {
     if (await saveCircumstance(
       userId, 'other_job', 'yes',
-      'You told us at signup that you also have a job on the payroll alongside your self-employed work.', 'web',
+      // ⚠️ NOT "alongside your self-employed work". This sentence is the EXHIBIT: it is stored as
+      // the question he was asked, and a landlord has no self employed work, so the log would have
+      // recorded us asking him something that was false about him on its face.
+      'You told us at signup that you also have a job on the payroll.', 'web',
     )) applied.push('other_job');
   }
 
@@ -3673,6 +3701,25 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     // A failed read yields {} which means UNKNOWN everywhere downstream, never "no". A man does not
     // become single because Postgres timed out.
     circumstances: circMap,
+
+    // ═══════════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 WHO HE IS, SO THE OPTIMISER STOPS OFFERING RELIEFS HE CANNOT TAKE. Wave nine, 31 July.
+    //
+    // lib/taxoptimiser.ts had NO structure awareness at all: grep it for businessType and you got
+    // nothing. So it offered "Claim use of home" with a pounds figure to a limited company
+    // director, and the flat rate is a SIMPLIFIED EXPENSE under ITTOIA 2005 s94H, which BIM75010
+    // limits to individuals and to partnerships of individuals. A company cannot have it at any
+    // number of hours, and a property business claims a proportion of its actual costs instead
+    // (PIM2220).
+    //
+    // Both are read from the profile this function ALREADY fetched, so it costs no extra request,
+    // and both fall back to null, which every gate downstream treats as unknown, which behaves
+    // exactly as it did before. `biz` is the single reader, for the same reason the marriage note
+    // above gives: two readers over the same fact drift, and the one that drifts is the one he is
+    // looking at.
+    // ═══════════════════════════════════════════════════════════════════════════════════════════
+    businessType: biz?.businessType ?? null,
+    incomeShape: biz?.incomeShape ?? null,
   };
 }
 
@@ -4407,16 +4454,34 @@ export interface BusinessProfile {
   businessType: BusinessType;
   /** For a partnership only: the individual's percentage share of profit. 100 for everyone else. */
   partnershipShare: number;
+  /**
+   * 🔴 THE SECOND AXIS: what his business income actually IS, which businessType cannot answer.
+   *
+   * 'trade' means he carries on a trade, with or without rent alongside. 'property_only' means his
+   * business is letting and there is no trade at all. null means we do not know, and every gate
+   * that reads it asks him everything, which is the safe direction: asking a landlord a trade
+   * question is a nuisance he can say no to, while never asking a sparky about his old employed
+   * job because a read came back empty is four figures gone without a trace.
+   *
+   * See lib/persona.ts for the four trade provisions this exists to withhold and their sources,
+   * and supabase/APPLY_2026-07-31_income_shape.sql for the column.
+   */
+  incomeShape: IncomeShape | null;
 }
 
 export async function getBusinessProfile(userId: string): Promise<BusinessProfile | null> {
   const { url } = config();
-  const query = `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=business_type,partnership_share&limit=1`;
+  const query = `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=business_type,partnership_share,income_shape&limit=1`;
   const res = await fetch(query, { headers: headers() });
-  if (!res.ok) return null;
+  // ⚠️ UNTIL THE MIGRATION IS RUN, SELECTING income_shape IS A 400 AND THE WHOLE PROFILE IS NULL,
+  // which would read as an unknown STRUCTURE too and quietly hand a director sole trader questions
+  // again. So a failed read retries without the new column: the product degrades to exactly its
+  // pre wave nine behaviour rather than to something worse than either.
+  if (!res.ok) return getBusinessProfileLegacy(userId);
   const rows = (await res.json().catch(() => null)) as Array<{
     business_type: string | null;
     partnership_share: number | string | null;
+    income_shape?: string | null;
   }> | null;
   if (!Array.isArray(rows) || rows.length === 0) return null;
   const r = rows[0];
@@ -4428,6 +4493,32 @@ export async function getBusinessProfile(userId: string): Promise<BusinessProfil
   return {
     businessType: bt,
     partnershipShare: bt === 'partnership' && Number.isFinite(share) && share > 0 && share <= 100 ? share : 100,
+    incomeShape: toIncomeShape(r.income_shape),
+  };
+}
+
+// The pre wave nine read, kept only as the fallback above. It returns a null incomeShape, which is
+// "unknown", which asks everything.
+async function getBusinessProfileLegacy(userId: string): Promise<BusinessProfile | null> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=business_type,partnership_share&limit=1`,
+    { headers: headers() },
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json().catch(() => null)) as Array<{
+    business_type: string | null;
+    partnership_share: number | string | null;
+  }> | null;
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const r = rows[0];
+  const bt: BusinessType =
+    r.business_type === 'limited_company' || r.business_type === 'partnership' ? r.business_type : 'sole_trader';
+  const share = Number(r.partnership_share);
+  return {
+    businessType: bt,
+    partnershipShare: bt === 'partnership' && Number.isFinite(share) && share > 0 && share <= 100 ? share : 100,
+    incomeShape: null,
   };
 }
 
@@ -6480,6 +6571,12 @@ export async function forgetCircumstance(userId: string, key: string): Promise<b
 // post's own tag, never who they are and never a figure about their money.
 // ================================================================================================
 
+// 🔴 THE IDEAS BANK IS GONE. Removed 31 July 2026 with the Hoka cleanup, whose migration is
+// supabase/APPLY_2026-07-31_hoka_cleanup.sql. readStudioIdeas, insertStudioIdea and voteStudioIdea
+// lived here and reached public.content_ideas, which that migration wipes. The Idea type went with
+// them out of lib/studio.ts, so nothing here may name it. The founder LEADS the ideas and the bot
+// draws from them: a table of AI invented ideas was the thing being torn out.
+
 export async function countStudioAssets(): Promise<number | null> {
   try {
     const { url } = config();
@@ -6677,13 +6774,27 @@ export async function attributionByTag(): Promise<Record<string, { trials: numbe
   } catch { return null; }
 }
 
-// --- the finished file --------------------------------------------------------------------------
+// --- The studio, after the Hoka cleanup of 31 July 2026 ----------------------------------------
+//
+// 🔴 NINE FUNCTIONS STOOD HERE AND ARE GONE, WITH THE PRODUCT CODE THAT CALLED THEM (b7dac7ef).
+//
+//   readStudioIdeas, insertStudioIdea, voteStudioIdea, readStudioIdea, markIdeaPromoted
+//     the ideas bank. public.content_ideas is wiped by supabase/APPLY_2026-07-31_hoka_cleanup.sql,
+//     and the Idea type went out of lib/studio.ts with it. The founder LEADS the ideas and the bot
+//     draws from them: a table of AI invented ideas was the thing being torn out.
+//
+//   insertStudioAgentRun, readLatestStudioAgentRun, readAssetsPendingGeneration,
+//   countStudioAssetsGeneratedSince
+//     the AI drafting path and its heartbeat. There is no drafting agent to have a heartbeat.
+//
+// ⚠️ setStudioAssetMedia below STAYS. It has a live caller in app/api/team/studio/mutate/route.ts.
+// Do not tidy it away with the rest, and do not re-add Idea to lib/studio.ts to make anything here
+// compile again: that resurrects deleted product code.
 
-// Attach the finished file to an approved piece. Since 31 Jul 2026 this is a URL Jag pastes in by
-// hand, of something he made himself: there is no render queue and no generator behind it any more.
-// The `file_url=is.null` guard makes the write a claim, so a second paste cannot quietly overwrite
-// the first. Approval is NOT touched here: having the file does not post it, and posting is still a
-// separate act by a human.
+// Attach a generated file to an approved asset. The `file_url=is.null` guard makes this a claim: if
+// two agent runs overlap, the first one to write wins and the second changes nothing, so a piece is
+// never generated twice or its file overwritten. Approval is NOT touched here: generating a video
+// does not post it, and posting still needs a human.
 export async function setStudioAssetMedia(id: string, fileUrl: string): Promise<Asset | null> {
   try {
     const { url } = config();

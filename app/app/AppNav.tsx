@@ -67,7 +67,14 @@ export const SECTIONS: ReadonlyArray<NavSection> = [
     label: 'Tax',
     items: [
       { href: '/app/tax', label: 'Where you stand', hint: 'The year, what January collects, and when' },
-      { href: '/app/tax/summary', label: 'Quarterly summary', hint: 'What an MTD update would report today' },
+      // ⚠️ THE HINT NAMES THE PAGE, NOT A REGIME. It read "What an MTD update would report today"
+      // until 31 July 2026, on every screen, for every customer. A limited company makes no MTD
+      // update at all: Making Tax Digital for Income Tax covers self employment and rent on a
+      // personal return, and a company's trade is neither. SECTIONS is a static const by design,
+      // rendered twice and read as source text by five test suites, and this component is given no
+      // customer to look up, so the row cannot be withheld from a director without rebuilding the
+      // nav. Naming what the page actually shows is true for everybody and costs nobody a door.
+      { href: '/app/tax/summary', label: 'Quarterly summary', hint: 'Your figures since 6 April, and the quarter on its own' },
       { href: '/app/tax/what-if', label: 'What if', hint: 'Try a change to your profit, on your real figures' },
       { href: '/app/tax/ways-to-save', label: 'Ways to save', hint: 'Every lever we can find you, with the working' },
       { href: '/app/tax/can-i-claim', label: 'Can I claim it', hint: 'The expense rules, with HMRC sources' },

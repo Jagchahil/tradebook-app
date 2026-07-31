@@ -111,9 +111,17 @@ export default async function PilePage({
 
   // What is still open ABOUT HIM, same count as /app/you: progressIn over every group, so the
   // empty state below cannot say "everything is filed and counted" while his questions wait.
+  //
+  // ⚠️ THE WHOLE PERSONA, NOT JUST THE STRUCTURE, SINCE WAVE NINE. A question that does not exist
+  // for a landlord is not one still waiting on him, and counting it here would put a number on
+  // this screen that his own circumstances page disagrees with. Both facts come from the one
+  // profile read; null on either is unknown, which counts everything, the safe direction.
   const asked = circRows === null
     ? null
-    : progressIn([...household(), ...notHousehold(), ...mtdQuestions()], circRows, profile?.businessType);
+    : progressIn([...household(), ...notHousehold(), ...mtdQuestions()], circRows, {
+      structure: profile?.businessType ?? null,
+      income: profile?.incomeShape ?? null,
+    });
   const openLead = asked ? openQuestionsLead(asked.askable - asked.answered) : null;
 
   return (

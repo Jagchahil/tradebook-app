@@ -76,6 +76,10 @@ export async function POST(req: NextRequest) {
     // A partner is taxed on their share of the shared books, never the whole firm's profit. The
     // share was captured at setup; the walk and this on-demand path must agree on it.
     partnershipShare: profile?.partnershipShare ?? 100,
+    // Whether he trades at all, on the on demand path too. The walk and this route must agree on
+    // who he is or the same man gets a different set of cards depending on which one ran last.
+    // See the note on the same line in app/api/cron/agent/route.ts for the sources.
+    incomeShape: profile?.incomeShape ?? null,
   };
 
   const signals = computeSignalsForStructure(input);

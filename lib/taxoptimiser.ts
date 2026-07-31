@@ -75,6 +75,32 @@ export interface OptimiserInput {
   // exactly the behaviour it got before this field existed: the conditional wording, no promise, no
   // suppression. Silence from a caller must never be mistaken for an answer from a man.
   circumstances?: Record<string, string>;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HOW HE TRADES, AND WHETHER HE TRADES AT ALL. THIS FILE HAD NEITHER UNTIL 31 JULY 2026.
+  //
+  // Found by audit: grep this file for businessType or structure before that date and there was
+  // nothing. So rule 4 below offered "Claim use of home", with a real pounds figure against it, to
+  // a limited company director and to a landlord with no trade. Neither can claim a penny of it.
+  // The flat rate is a SIMPLIFIED EXPENSE under ITTOIA 2005 s94H, which is a deduction in computing
+  // the profits of a TRADE, and HMRC BIM75010 restricts it to individuals and to partnerships of
+  // individuals. lib/elections.ts holds the rule, the two sources and the refusal sentences.
+  //
+  // ⚠️ THE RULE IS RESTATED HERE RATHER THAN IMPORTED, AND THAT IS NOT A CHOICE. Three test suites
+  // stage this module into a temp directory with a fixed list of dependencies, because Node's type
+  // stripping cannot resolve an extensionless relative import. Importing lib/elections.ts here
+  // would break them on a module resolution error rather than on anything real. lib/circumstances.ts
+  // and lib/persona.ts re-declare the same two literal unions for the same reason, and the tests
+  // pin them against each other so they cannot drift apart in silence.
+  //
+  // BOTH OPTIONAL AND BOTH DEFAULTING TO UNDEFINED, which is UNKNOWN, which is refused nothing. A
+  // caller that does not set them behaves exactly as it did before they existed. That direction is
+  // deliberate and it is the same one lib/elections.ts takes: a director shown a lever he cannot
+  // pull is a wrong sentence he can ignore, and a sole trader silently denied the flat rate because
+  // a profile read failed is money off his return every month with nothing to show him why.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  businessType?: 'sole_trader' | 'partnership' | 'limited_company' | null;
+  incomeShape?: 'trade' | 'property_only' | null;
 }
 
 export interface Optimisation {
@@ -302,7 +328,15 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   }
 
   // 4. Use of home. A flat rate with no receipts, missed by almost everyone.
-  if (!input.homeOfficeClaimed && projTradeNet > 0 && mRate > 0) {
+  //
+  // 🔴 BUT NOT OFFERED TO A MAN WHO CANNOT TAKE IT. See the businessType and incomeShape notes on
+  // OptimiserInput: the flat rate is a simplified expense under ITTOIA 2005 s94H, so a limited
+  // company is outside it (BIM75010) and a property business is not a trade. Written as two
+  // inequalities rather than a membership test ON PURPOSE, so undefined and null both fall through
+  // to the old behaviour. Only a KNOWN company and a KNOWN landlord are ever refused.
+  const canClaimSimplifiedExpenses =
+    input.businessType !== 'limited_company' && input.incomeShape !== 'property_only';
+  if (!input.homeOfficeClaimed && canClaimSimplifiedExpenses && projTradeNet > 0 && mRate > 0) {
     const monthly = homeOfficeFlatRateMonthly(25); // the 25 to 50 hours a month band
     const saving = round(monthly * 12 * mRate);
     out.push({

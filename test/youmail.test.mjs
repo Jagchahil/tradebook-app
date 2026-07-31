@@ -328,8 +328,27 @@ ok('circumstances posts every answer to the one logging route', pageCirc.include
 ok('and lands back on itself with the token, never a posted path', pageCirc.includes('name="back" value="you"'));
 ok('the partitions come from lib/circumstances, not a local list', pageCirc.includes('household()') && pageCirc.includes('notHousehold()') && pageCirc.includes('mtdQuestions()'));
 ok('the counts come from progressIn, whose denominator is his', pageCirc.includes('progressIn('));
-ok('open questions come from the gates, unanswered and unansweredMtd, with the structure passed through', pageCirc.includes('unanswered(rows, structure)') && pageCirc.includes('unansweredMtd(rows, structure)'));
-ok('the structure comes from getBusinessProfile, the same source every other surface reads', pageCirc.includes('getBusinessProfile'));
+// 🔴 THIS PIN USED TO READ THE LITERAL `unanswered(rows, structure)`, AND WAVE NINE WIDENED WHAT
+// "who the man is" MEANS, so the pin widens with it rather than being deleted.
+//
+// The structure alone is exactly what let a landlord through: the Landlord chip on /start stores
+// him as a sole trader, because he files a personal return and he is not a company, so he passed
+// every structure check and was asked what he did before he went self employed, under a promise of
+// a loss carried back against his old wages. That is ITA 2007 s72, early TRADE losses relief, and a
+// property business loss only ever carries forward against the same letting business.
+//
+// The assertion's job is unchanged: a page must not quietly stop passing who the man is. So it
+// finds the persona the page builds, by whatever name, and holds both gates to receiving THAT.
+const persona = pageCirc.match(/const (\w+): Persona = \{([\s\S]*?)\}/);
+const askingAs = persona?.[1] ?? '';
+ok('🔴 the page builds ONE persona from the profile read, carrying how he trades AND whether he trades',
+  Boolean(persona) && /businessType/.test(persona[2]) && /incomeShape/.test(persona[2]));
+ok('open questions come from the gates, unanswered and unansweredMtd, with that whole persona passed through',
+  askingAs !== '' && pageCirc.includes(`unanswered(rows, ${askingAs})`)
+  && pageCirc.includes(`unansweredMtd(rows, ${askingAs})`));
+ok('and the counts take it too, so a denominator can never disagree with the queue beside it',
+  askingAs !== '' && pageCirc.includes(`progressIn(group, rows, ${askingAs})`));
+ok('who he is comes from getBusinessProfile, the same source every other surface reads', pageCirc.includes('getBusinessProfile'));
 ok('🔴 the Article 9 path is not drawn: no sensitive(), no consent ask', !codeOnly(pageCirc).includes('sensitive(') && !codeOnly(pageCirc).includes('CONSENT_ASK'));
 ok('a failed read is said plainly, never a blank slate', pageCirc.includes('rows === null'));
 

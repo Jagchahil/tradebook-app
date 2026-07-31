@@ -221,8 +221,12 @@ ok('the lead ends mid flow so the page can finish it with the Circumstances link
 // And the page wires it to the SAME count /app/you shows, drawn only under the empty state.
 {
   const pileSrc = readFileSync(path.join(root, 'app/app/pile/page.tsx'), 'utf8');
-  ok('🔴 the pile reads the same count as /app/you: progressIn over every group',
-    /progressIn\(\[\.\.\.household\(\), \.\.\.notHousehold\(\), \.\.\.mtdQuestions\(\)\], circRows, profile\?\.businessType\)/.test(pileSrc));
+  // ⚠️ WAVE NINE WIDENED THE LAST ARGUMENT from a bare structure to the whole persona, because
+  // structure says HOW a man trades and cannot say WHETHER he trades. The assertion follows the
+  // truth rather than the old punctuation: it still exists so a page cannot quietly stop telling
+  // the module who the man is, and it now demands BOTH axes.
+  ok('🔴 the pile reads the same count as /app/you: progressIn over every group, with the whole persona',
+    /progressIn\(\[\.\.\.household\(\), \.\.\.notHousehold\(\), \.\.\.mtdQuestions\(\)\], circRows, \{[\s\S]{0,200}?businessType[\s\S]{0,200}?incomeShape[\s\S]{0,40}?\}\)/.test(pileSrc));
   ok('🔴 the footnote is the module sentence, never page arithmetic of its own',
     /openQuestionsLead\(asked\.askable - asked\.answered\)/.test(pileSrc));
   ok('it links to Circumstances, where the questions actually wait',

@@ -4,7 +4,9 @@ import { userFromSessionCookie, identityForUser } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import { readIdentityCard, getBusinessProfile, readCircumstances, readSignupCompany, type SignupCompany } from '../../../lib/supabase';
 import { registrationLine } from '../../../lib/companieshouse';
-import { household, notHousehold, mtdQuestions, progressIn } from '../../../lib/circumstances';
+import {
+  household, notHousehold, mtdQuestions, progressIn, type IncomeShape,
+} from '../../../lib/circumstances';
 import { maskEmail, bindNotice, BOUND_LINE } from './identity';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
@@ -71,6 +73,23 @@ function tidyTrade(raw: string | null): string | null {
   return t[0].toUpperCase() + t.slice(1);
 }
 
+// What he does, in his own word for it, said so that it is true of a landlord as well.
+//
+// 🔴 THIS LINE READ "Landlord by trade." AND A LANDLORD CARRIES ON NO TRADE.
+//
+// Not a quibble about a word. It is the whole of wave nine: early trade losses (ITA 2007 s72),
+// voluntary Class 2 (NIM74250, a landlord's ordinary activities are not gainful employment for
+// self employed NICs) and the use of home flat rate (ITTOIA 2005 s94H) are all TRADE provisions,
+// and every one of them was being offered to a man whose business is letting, because the Landlord
+// chip on /start stores him as a sole trader. The page that tells him who we think he is was
+// stating the mistake back to his face.
+//
+// An unknown shape keeps the old sentence. This is prose rather than a gate, and the wording that
+// is true of every customer we have on record is the right default until he tells us otherwise.
+function tradeLine(trade: string, income: IncomeShape | null): string {
+  return income === 'property_only' ? `${trade}. Letting is the business.` : `${trade} by trade.`;
+}
+
 export default async function YouPage({
   searchParams,
 }: {
@@ -99,11 +118,25 @@ export default async function YouPage({
   // us about his tax is how the record and his memory drift apart.
   const vat = rows?.find((r) => r.key === 'vat_registered') ?? null;
 
+  // What his business income actually is, read once and used twice below: the count of what is
+  // still worth asking him, and the sentence about what he does. Null is unknown, which asks and
+  // says everything, and that is the direction lib/persona.ts argues for.
+  const income = profile?.incomeShape ?? null;
+  const trade = tidyTrade(card?.trade ?? null);
+
   // How far through the questions he is, counted by lib/circumstances.ts against HIS answers,
   // never worked out here. The denominator is his: it grows as his answers open follow ups.
+  //
+  // ⚠️ BOTH HALVES OF WHO HE IS GO IN, NOT JUST THE STRUCTURE. Since wave nine a question that
+  // does not exist for a landlord is not one still waiting on him, and a door promising "3 still
+  // worth answering" that counts questions he can never be asked is a door that lies twice: once
+  // here and again when he opens it and finds them gone.
   const asked = rows === null
     ? null
-    : progressIn([...household(), ...notHousehold(), ...mtdQuestions()], rows, profile?.businessType);
+    : progressIn([...household(), ...notHousehold(), ...mtdQuestions()], rows, {
+      structure: profile?.businessType ?? null,
+      income,
+    });
 
   const notice = bindNotice(one('e'));
   const bind = one('bind');
@@ -130,7 +163,7 @@ export default async function YouPage({
             {card.businessName && card.name ? (
               <p style={S.fact}>Trading as {card.businessName}.</p>
             ) : null}
-            {tidyTrade(card.trade) ? <p style={S.fact}>{tidyTrade(card.trade)} by trade.</p> : null}
+            {trade ? <p style={S.fact}>{tradeLine(trade, income)}</p> : null}
             {profile ? <p style={S.fact}>{structureLine(profile, company)}</p> : null}
             {vat ? (
               <p style={S.fact}>

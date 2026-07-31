@@ -146,6 +146,15 @@ async function processUser(user: {
     dividendIncome: income?.dividendIncome ?? 0,
     savingsIncome: income?.savingsIncome ?? 0,
     partnershipShare: profile?.partnershipShare ?? 100,
+    // 🔴 AND WHETHER HE TRADES AT ALL, which businessType cannot say. Wave nine, 31 July 2026.
+    //
+    // A landlord signing up through the Landlord chip is mapped to 'sole_trader', so he passed the
+    // structure branch above and was being pushed voluntary Class 2 at a few pounds a week. HMRC's
+    // NIM74250: a person whose activities in managing property are those generally associated with
+    // being a landlord does not meet the definition of gainful employment for self employed NICs,
+    // so there are no relevant profits and no Class 2 to buy the year with. His route is Class 3,
+    // at several times the cost. Null is unknown, and unknown is sent everything, as before.
+    incomeShape: profile?.incomeShape ?? null,
   };
   let signals = computeSignalsForStructure(input);
   if (signals.length === 0) return { inserted: 0, pinged: 0 };

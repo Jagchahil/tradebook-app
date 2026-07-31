@@ -174,6 +174,40 @@ const TRIAL_TAIL = [
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
 const CHATS_LINE = `Any questions about your figures, ask in your Lekhio chats: ${APP_URL}/app/thread`;
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 31 JULY: THE ONE MESSAGE OF THE WHOLE TRIAL SENT HIM AT A DOOR THAT DOES NOT OPEN.
+//
+// There is no bank provider. TrueLayer declined production authorisation on 30 July and Finexer
+// want £650 a month before a single connection, so bankFeedOffered() went into lib/bankfeed.ts,
+// default OFF, and every dead bank sentence in app/ went behind it. This one did not, because it is
+// copy in a lib rather than copy on a screen.
+//
+// And this is the worst place in the product to leave one. The empty week message exists for the
+// man who reached day six with nothing in his books, so this single sentence is the whole of what
+// we ask him to do, on the only day we speak to him, one day before he decides whether to pay us.
+// Sending him to a connect screen that cannot connect is how that day ends in a cancellation.
+//
+// So when the offer is off the sentence names a door that opens TODAY. The statement import is the
+// closest substitute for a feed, it fills an empty week in one go, and it reads what eleven UK
+// banks hand out (lib/statementimport.ts BANKS). The bank sentence returns unchanged when the flag
+// comes back on.
+//
+// ⚠️ RE-DECLARED, NOT IMPORTED. This module is staged into a temp directory by
+// test/trialnudge.test.mjs with a fixed dependency list, because Node's type stripping cannot
+// resolve an extensionless relative import, so importing lib/bankfeed.ts would break that suite on
+// a module resolution error rather than on anything real. It reads the SAME env var, at call time,
+// and only the exact string 'true' switches it on. test/wave9_nudges.test.mjs pins the two against
+// each other so they cannot drift apart in silence.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+function bankFeedOffered(): boolean {
+  return process.env.BANK_FEED_OFFERED === 'true';
+}
+
+const EMPTY_WEEK_DOOR = () =>
+  bankFeedOffered()
+    ? 'Connect your bank and everything you spend lands here on its own, with nothing for you to send us.'
+    : `Import a bank statement and a whole month lands in your books in one go. Lekhio reads the ones eleven UK banks hand out: ${APP_URL}/app/money/import`;
+
 export function trialWeekMessage(week: TrialWeek): { subject: string; body: string } {
   const lines: string[] = [];
 
@@ -183,7 +217,7 @@ export function trialWeekMessage(week: TrialWeek): { subject: string; body: stri
     // as if it were his week. So we say what is true and point at the one thing that fixes it.
     lines.push('Your first week is done and there is nothing in your books yet.');
     lines.push('');
-    lines.push('Connect your bank and everything you spend lands here on its own, with nothing for you to send us.');
+    lines.push(EMPTY_WEEK_DOOR());
   } else {
     lines.push(`${gbp(week.income)} in, ${gbp(week.expenses)} out. That leaves ${gbp(week.profit)}.`);
     // Omitted entirely when there is nothing to say, rather than printed as a confident zero.

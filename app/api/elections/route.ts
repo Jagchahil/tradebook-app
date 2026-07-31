@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
 import {
-  readAllowanceElection, writeAllowanceElection, clearAllowanceElection,
+  readAllowanceElection, writeAllowanceElection, clearAllowanceElection, getBusinessProfile,
 } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
 import { quarterForDate } from '../../../lib/quarterpack';
 import {
   bandForHours, bandOptions, bandLabel, isHoursBand,
   useOfHomeToDate, useOfHomeFullYear, electionConfirmation,
+  electionRefusal, type Electing,
 } from '../../../lib/elections';
 import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 
@@ -43,6 +44,19 @@ function monthsElapsed(startYear: number): number {
   return Math.max(0, Math.min(12, months));
 }
 
+// WHO IS ELECTING, read ONCE and in one place, for lib/elections.ts to answer about. This route
+// supplies the two facts and repeats the answer; it does not know the rule and must not learn it.
+//
+// 🔴 THE .catch(() => null) IS THE SAFETY RULE, NOT LAZINESS. A read that throws must never become
+// "he is a company". That would refuse a sole trader the flat rate because a database was slow, and
+// he would lose the deduction every month with nothing on any screen to tell him why. A failure is
+// UNKNOWN, and lib/elections.ts only ever refuses a KNOWN limited company or a KNOWN landlord. The
+// same shape every other surface uses, e.g. app/app/you/page.tsx.
+async function electingAs(userId: string): Promise<Electing> {
+  const biz = await getBusinessProfile(userId).catch(() => null);
+  return { structure: biz?.businessType ?? null, income: biz?.incomeShape ?? null };
+}
+
 export async function GET(req: NextRequest) {
   const user = await auth(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -60,16 +74,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'unreadable' }, { status: 503 });
   }
 
+  // WHETHER THIS ELECTION IS EVEN HIS. The rule and the sentence both live in lib/elections.ts.
+  const refusal = electionRefusal('use_of_home', await electingAs(user.id));
+
   return NextResponse.json({
     startYear,
     monthsElapsed: months,
     // The three real answers, with what each is worth, read from the engine at request time so a
     // Khoji approved rate change shows up here without a deploy.
-    options: bandOptions().map((o) => ({
+    //
+    // ⚠️ AND NOT OFFERED AT ALL WHEN IT IS NOT HIS. Three bands with a pound figure against each is
+    // the product telling him to claim it, and a refusal that still prints the price is not a
+    // refusal. A director and a landlord get an empty list and the sentence below.
+    options: refusal ? [] : bandOptions().map((o) => ({
       ...o,
       fullYear: useOfHomeFullYear(o.band),
       toDate: useOfHomeToDate(o.band, months),
     })),
+    // 🔴 AN ELECTION ALREADY ON HIS RECORD IS STILL SHOWN, REFUSED OR NOT. Rows written before this
+    // door existed are still in the table, and DELETE is how they come off. Hiding one would leave a
+    // claim standing that he can neither see nor ask us to drop.
+    refused: refusal ? { reason: refusal.reason, message: refusal.message } : null,
     elected: election
       ? {
           hoursBand: election.hoursBand,
@@ -95,6 +120,26 @@ export async function POST(req: NextRequest) {
   // for him. gateForUser never returns readonly because something broke, so this can only fire on a
   // real answer about a real subscription.
   if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app');
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE DOOR. Until 31 July 2026 this wrote the election for ANYBODY who asked, with no profile
+  // read at all, so a limited company director and a landlord with no trade could both claim a
+  // relief that does not exist for them, and the figure landed in their books. See lib/elections.ts
+  // for the sources: ITTOIA 2005 s94H and BIM75010 for the company, s94H being a TRADE deduction for
+  // the property business.
+  //
+  // It is checked BEFORE the body is read, because the answer is a fact about the man and not about
+  // his request. And it is asked of lib/elections.ts rather than answered here, so the WhatsApp path
+  // and any surface built later get the same answer from the same place rather than a second copy
+  // that drifts. An unknown structure or shape is never refused: see electingAs above.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const refusal = electionRefusal('use_of_home', await electingAs(user.id));
+  if (refusal) {
+    // ONE PLAIN SENTENCE, AND NO TAX ADVICE IN IT. It names the relief and says it is not his. It
+    // does NOT describe what a company or a property business could do instead, because we have not
+    // built either, and a man told about a door that does not open stops looking for one that does.
+    return NextResponse.json({ error: 'not_eligible', message: refusal.message }, { status: 400 });
+  }
 
   let body: { hoursBand?: unknown; hoursPerMonth?: unknown };
   try {
@@ -140,6 +185,10 @@ export async function POST(req: NextRequest) {
 }
 
 // TAKING IT BACK. One call, no confirmation, because it is his own draft figure and it is reversible.
+//
+// ⚠️ AND IT IS DELIBERATELY NOT REFUSED THE WAY POST IS. A director who elected before the door
+// above existed has a row in the table, and this is the only way it comes off. Refusing to remove a
+// claim on the grounds that he was never allowed to make it would leave it standing forever.
 export async function DELETE(req: NextRequest) {
   const user = await auth(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });

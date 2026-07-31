@@ -48,6 +48,126 @@ import { gbp0 } from './money';
 // caller cannot invent one and quietly get a zero back.
 export type ElectionKey = 'use_of_home';
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHO THIS ELECTION IS EVEN FOR. FOUND BY AUDIT ON 31 JULY 2026: EVERYBODY COULD TAKE IT.
+//
+// This file had no idea who was electing. A limited company director and a landlord with no trade
+// could both claim the flat rate, and lib/taxoptimiser.ts rule 4 actively told them to, with a
+// figure in pounds next to it. Neither of them is entitled to a penny of it.
+//
+//   A LIMITED COMPANY.   The flat rate is a SIMPLIFIED EXPENSE under ITTOIA 2005 s94H, and ITTOIA
+//                        taxes individuals. HMRC BIM75010: "Only partnerships comprising solely
+//                        individual partners can claim this simplified expenses." A company sits
+//                        outside the regime entirely, so this is not a smaller claim for a
+//                        director, it is no claim at all.
+//                        ⚠️ A company CAN deal with a director's use of his home by other means,
+//                        and those means are paperwork rather than a tick box. WE HAVE BUILT NONE
+//                        OF THEM, so nothing here describes one, and no refusal below hints that
+//                        one is coming. Offering a man a door we have not built is worse than the
+//                        refusal, because he stops looking for the real one.
+//
+//   A PROPERTY BUSINESS. s94H is a deduction in computing the profits of a TRADE, and letting is
+//                        not a trade. A property business works out its own proportion of its
+//                        actual costs instead (HMRC PIM2220). Same answer: the flat rate is not
+//                        available to him.
+//
+// ⚠️ AND THE HALF OF THE RULE THAT MATTERS MORE: UNKNOWN CLAIMS EVERYTHING.
+//
+// Only a KNOWN 'limited_company' and a KNOWN 'property_only' are ever refused. A caller that does
+// not know how a man trades, or whose profile read failed, passes nothing and gets exactly the
+// behaviour it had before any of this existed. The two failures are not the same size. Showing a
+// director a relief he cannot take is a wrong sentence he can ignore. Refusing a sole trader the
+// flat rate because a database read timed out is real money gone, every month, with no trace that
+// it ever happened. The same judgement lib/circumstances.ts made on the same two axes.
+//
+// A PARTNERSHIP IS ALLOWED, and BIM75010's word "solely" is why that is a judgement rather than an
+// oversight: a partnership with a company among its partners cannot use the flat rate either, and
+// we have never asked a man who his partners are. Refusing every partnership on a fact we have not
+// collected would take the relief off the many to catch the few. Unknown claims everything here too.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// Re-declared rather than imported, deliberately, exactly as lib/circumstances.ts and lib/persona.ts
+// re-declare them and for the same reason: this module must stay loadable bare, with nothing but
+// pure helpers behind it, and Node's type stripping cannot resolve an extensionless relative import.
+// The literals are the same strings lib/supabase.ts getBusinessProfile() hands back, and
+// test/wave9_useofhome.test.mjs pins them against it so they cannot drift apart in silence.
+export type BusinessStructure = 'sole_trader' | 'partnership' | 'limited_company';
+export type IncomeShape = 'trade' | 'property_only';
+
+// WHO IS ELECTING. Two facts, both optional, both nullable, and either one missing means unknown.
+// The shape mirrors lib/circumstances.ts Persona for the same reason it exists there: a caller that
+// knows one fact and not the other should not have to invent the one it does not know.
+export interface Electing {
+  structure?: BusinessStructure | null;
+  income?: IncomeShape | null;
+}
+
+export interface ElectionRefusal {
+  key: ElectionKey;
+  // Which axis refused him, so a caller can tell the two apart without matching on the sentence.
+  reason: 'structure' | 'income';
+  // One plain sentence, ready to hand to a man as it stands. It names the relief and says it is not
+  // his. It promises no alternative, because we have built none.
+  message: string;
+}
+
+// 🔴 THE RULE IS A PROPERTY OF THE ELECTION, NOT OF THE CALLER. That is the whole point of it being
+// here. A route, a WhatsApp handler and a suggestion engine asking the same question three times is
+// three chances for one of them to stop asking, and the one that stops is the one nobody is looking
+// at. A second election added later carries its own answer on this table and no call site changes.
+//
+// ⚠️ AND IT IS A LIST OF WHO IS REFUSED, NOT A LIST OF WHO IT IS FOR. That is not a style choice.
+// An allow list refuses everything it has not heard of, so the day a fourth structure exists, or a
+// column comes back with a spelling this file has never seen, an allow list would quietly take the
+// flat rate off a man who is entitled to it and nothing on any screen would say why. A refusal list
+// fails the other way: it lets through what it does not recognise, and the worst case is a wrong
+// sentence somebody can ignore. The two failures are not the same size, so the shape of the data
+// is chosen to make the cheap one the one that happens.
+const ELECTION_RULES: Record<ElectionKey, {
+  refusedStructures: BusinessStructure[];
+  refusedIncomes: IncomeShape[];
+  refusals: { structure: string; income: string };
+}> = {
+  use_of_home: {
+    refusedStructures: ['limited_company'],
+    refusedIncomes: ['property_only'],
+    refusals: {
+      structure:
+        "Use of home at HMRC's flat rate is a simplified expense for sole traders and partnerships of individuals, and a limited company cannot claim it.",
+      income:
+        "Use of home at HMRC's flat rate is a simplified expense for a trade, and a property business cannot claim it.",
+    },
+  },
+};
+
+// THE DOOR. Null means he may elect. An object means he may not, and carries the sentence he reads.
+//
+// Note the order of the two guards: structure is asked first, so a director who is also a landlord
+// is told the thing that is true of him whatever else changes. Either way the answer is no.
+export function electionRefusal(key: ElectionKey, who?: Electing | null): ElectionRefusal | null {
+  const rule = ELECTION_RULES[key];
+  // Types make this unreachable and it stays anyway: a junk key arriving from a JSON body would
+  // otherwise throw inside the lookup below, and a thrown door is a door nobody can walk through.
+  // Falling back to "no refusal" is the same safe direction as every other line in this function.
+  if (!rule) return null;
+  // A missing fact is unknown, and unknown is never refused. See the note above: this is the line
+  // that keeps a failed profile read from quietly stripping a sole trader of a relief he is owed.
+  const structure = who?.structure ?? null;
+  const income = who?.income ?? null;
+  if (structure && rule.refusedStructures.includes(structure)) {
+    return { key, reason: 'structure', message: rule.refusals.structure };
+  }
+  if (income && rule.refusedIncomes.includes(income)) {
+    return { key, reason: 'income', message: rule.refusals.income };
+  }
+  return null;
+}
+
+// The same question the other way round, for a caller that wants a yes or no and not a sentence.
+export function canElect(key: ElectionKey, who?: Electing | null): boolean {
+  return electionRefusal(key, who) === null;
+}
+
 // HMRC's simplified expenses bands, by hours worked at home per month. The BOUNDARIES are the
 // claim: 25 to 50, 51 to 100, 101 or more. The MONEY is not here, it comes from
 // homeOfficeFlatRateMonthly() in lib/taxengine.ts, which reads FACTS and is live overridable and

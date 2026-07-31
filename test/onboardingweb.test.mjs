@@ -185,13 +185,16 @@ ok('an answer from the other screen does not count on this one',
   other.answered === 0 && other.askable === fresh.askable);
 
 ok('🔴 the page does not work the count out for itself',
-  /progressIn\(group, rows, structure\)/.test(pageSrc) && !/!open\.has\(c\.key\)\)\.length/.test(pageSrc));
-// The structure rides with every ask, because askability now branches on it: a director must not
-// be shown "before you went self employed". The fixtures live in test/structurehonesty.test.mjs;
-// here we pin that the page passes what it read rather than deciding anything itself.
-ok('🔴 the questions steps pass the structure from getBusinessProfile into the module',
-  /unanswered\(rows, structure\)/.test(pageSrc) && /unansweredMtd\(rows, structure\)/.test(pageSrc)
-  && /progressIn\(mtdQuestions\(\), rows, structure\)/.test(pageSrc));
+  /progressIn\(group, rows, who\)/.test(pageSrc) && !/!open\.has\(c\.key\)\)\.length/.test(pageSrc));
+// The whole persona rides with every ask, because askability branches on TWO facts now: a director
+// must not be shown "before you went self employed", and neither must a landlord, whose property
+// losses can never be carried back at all (ITA 2007 s72 is trades only). The fixtures live in
+// test/structurehonesty.test.mjs and test/persona.test.mjs; here we pin that the page passes what
+// it read rather than deciding anything itself.
+ok('🔴 the questions steps pass the whole persona from getBusinessProfile into the module',
+  /unanswered\(rows, who\)/.test(pageSrc) && /unansweredMtd\(rows, who\)/.test(pageSrc)
+  && /progressIn\(mtdQuestions\(\), rows, who\)/.test(pageSrc)
+  && /const who: Persona = \{[\s\S]{0,160}?businessType[\s\S]{0,160}?incomeShape/.test(pageSrc));
 
 // The two Jag named on 28 July, and the reason this step exists at all: there was nowhere in this
 // product for a man to say he was married, and nowhere to say who claims the Child Benefit.

@@ -115,8 +115,14 @@ const { CIRCUMSTANCES, unanswered, unansweredMtd, progressIn, mtdQuestions, hous
 // The three questions the brief names, plus the three MTD follow ups: dependsOn only holds a
 // follow up back while its gate is UNANSWERED, so a yes recorded before a man incorporated would
 // release "have you signed up" at a company unless the follow ups carry the tag themselves.
+//
+// ⚠️ WAVE NINE ADDED home_working. The use of home flat rate is a SIMPLIFIED EXPENSE, and BIM75010
+// on ITTOIA 2005 s94H limits those to individuals and to partnerships of individuals: "Only
+// partnerships comprising solely individual partners can claim this simplified expenses." A
+// company is outside ITTOIA, so a director cannot use the £10, £18, £26 bands at any hours, and
+// "no receipts to keep at all" was promising him the wrong thing entirely.
 const SOLE_ONLY = [
-  'prior_employment', 'low_profit_year',
+  'prior_employment', 'low_profit_year', 'home_working',
   'mtd_mandated', 'mtd_signed_up', 'mtd_agent', 'mtd_already_filed',
 ];
 {
@@ -162,7 +168,11 @@ const SOLE_ONLY = [
   ok('a sole trader\'s MTD count still starts 0 of 1, the gate alone', soleMtd.askable === 1);
   const ltdAll = progressIn([...household(), ...notHousehold()], [], 'limited_company');
   const soleAll = progressIn([...household(), ...notHousehold()], [], 'sole_trader');
-  ok('🔴 the director\'s money denominator is exactly two questions lighter', ltdAll.askable === soleAll.askable - 2);
+  // Three, not two, since wave nine: the old job, the voluntary Class 2 tick box, and the use of
+  // home flat rate a company cannot have.
+  ok('🔴 the director\'s money denominator is exactly three questions lighter', ltdAll.askable === soleAll.askable - 3);
+  ok('🔴 AND THE DIRECTOR IS NEVER PROMISED THE FLAT RATE HE CANNOT CLAIM', !forLtd.includes('home_working'));
+  ok('a sole trader keeps it, because s94H is his', forSole.includes('home_working'));
   ok('an answer he gave as a sole trader still counts after incorporating: the record is his',
     progressIn(notHousehold(), [{ key: 'prior_employment', answer: 'yes' }], 'limited_company').answered === 1);
   ok('a structure filter never leaks a special category question',

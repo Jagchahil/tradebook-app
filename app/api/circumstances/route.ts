@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { userBurst } from '../../../lib/ratelimit';
 import {
-  readCircumstances, saveCircumstance, forgetCircumstance,
+  readCircumstances, saveCircumstance, forgetCircumstance, getBusinessProfile,
 } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
 import { isStep, type Step } from '../../../lib/onboarding';
@@ -23,7 +23,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'slow down' }, { status: 429 });
   }
 
-  const rows = await readCircumstances(user.id);
+  // 🔴 WHO WE ARE ASKING, AND UNTIL 31 JULY 2026 THIS ROUTE ASKED ON BEHALF OF NOBODY.
+  //
+  // toAsk below is the phone app's whole question list, and it was computed with no persona at
+  // all. So neither filter has ever run on this channel: not the structure one, which stops a
+  // director being asked "what were you doing before you went self employed", and not wave nine's
+  // income one, which stops a landlord being promised an early trade loss carried back against his
+  // old wages that ITA 2007 s72 cannot give a property business.
+  //
+  // A failed profile read passes null on both axes, which lib/circumstances.ts treats as unknown
+  // and asks everything. That is exactly today's behaviour, so a database blip can never be what
+  // costs a sole trader the most valuable question on the list.
+  const [rows, biz] = await Promise.all([
+    readCircumstances(user.id),
+    getBusinessProfile(user.id).catch(() => null),
+  ]);
 
   // ⚠️ NULL IS "WE COULD NOT READ", NOT "HE HAS ANSWERED NOTHING".
   //
@@ -41,8 +55,12 @@ export async function GET(req: NextRequest) {
     // office before asking what he did for a living last year is how you leave four figures on the
     // floor and feel thorough.
     // The ANSWERS go in, not just the keys: a question about his wife is not a question until he has
-    // told us he has one.
-    toAsk: unanswered(rows),
+    // told us he has one. And WHO HE IS goes in beside them, both halves of it, so this channel
+    // asks the same man the same questions the web does.
+    toAsk: unanswered(rows, {
+      structure: biz?.businessType ?? null,
+      income: biz?.incomeShape ?? null,
+    }),
     total: CIRCUMSTANCES.length,
     // The ones we can never claim for him: his wife has to, or his council does. We tell him and we
     // get out of the way. A feature that tries to claim what it has no standing to claim gets

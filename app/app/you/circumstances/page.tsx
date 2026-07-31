@@ -5,7 +5,7 @@ import { SESSION_COOKIE } from '../../../../lib/websession';
 import { readCircumstances, getBusinessProfile } from '../../../../lib/supabase';
 import {
   household, notHousehold, mtdQuestions, unanswered, unansweredMtd, progressIn,
-  type Circumstance, type BusinessStructure,
+  type Circumstance, type Persona,
 } from '../../../../lib/circumstances';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
@@ -101,20 +101,21 @@ function QuestionCard({ q, current }: { q: Circumstance; current: string | null 
 }
 
 function Group({
-  title, blurb, group, open, rows, structure,
+  title, blurb, group, open, rows, who,
 }: {
   title: string;
   blurb: string;
   group: Circumstance[];
   open: Set<string>;
   rows: Array<{ key: string; answer: string }>;
-  structure: BusinessStructure | null;
+  who: Persona;
 }) {
   const given = new Map(rows.map((r) => [r.key, r.answer]));
-  // The structure keeps the denominator honest: a question lib/circumstances.ts refuses for how he
-  // trades is not "waiting for him", so it never counts against him here. An answer he has already
-  // given stays drawn and changeable whatever his structure is now, because the record is his.
-  const { answered, askable } = progressIn(group, rows, structure);
+  // The persona keeps the denominator honest, both halves of it: a question lib/circumstances.ts
+  // refuses for how he trades, or for whether he trades at all, is not "waiting for him", so it
+  // never counts against him here. An answer he has already given stays drawn and changeable
+  // whatever we now know about him, because the record is his.
+  const { answered, askable } = progressIn(group, rows, who);
   const drawable = group.filter((c) => open.has(c.key) || given.has(c.key));
 
   return (
@@ -140,14 +141,20 @@ export default async function CircumstancesPage() {
   const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
   if (!user) redirect('/in');
 
-  // The structure comes with the answers: askability branches on it in lib/circumstances.ts, so a
-  // director is not shown "before you went self employed" as a question still waiting on him. A
-  // failed profile read passes null, which the module treats as unknown and asks everything.
+  // 🔴 WHO HE IS COMES WITH THE ANSWERS, AND IT IS BOTH FACTS, NOT JUST THE STRUCTURE.
+  //
+  // Askability branches on both axes in lib/circumstances.ts, so a director is not shown "before
+  // you went self employed" as a question still waiting on him, and neither is a landlord. Wave
+  // nine: the Landlord chip on /start stores him as a sole trader, because he files a personal
+  // return and is not a company, so the structure alone waved him through to a promise of an early
+  // trade loss carried back against old wages that ITA 2007 s72 cannot give a property business.
+  // Computed once here and handed to every gate and every count below. A failed profile read
+  // passes null on both, which the module treats as unknown and asks everything.
   const [rows, biz] = await Promise.all([
     readCircumstances(user.id),
     getBusinessProfile(user.id).catch(() => null),
   ]);
-  const structure = biz?.businessType ?? null;
+  const who: Persona = { structure: biz?.businessType ?? null, income: biz?.incomeShape ?? null };
 
   // 🔴 A FAILED READ IS NEVER A BLANK SLATE. Drawing every question as open would ask a man
   // things he answered last month, and he only needs to notice once to stop answering the ones
@@ -170,11 +177,11 @@ export default async function CircumstancesPage() {
 
   // The money queue and the compliance queue, asked of the module. unanswered() refuses the MTD
   // questions on purpose, so the MTD group has its own gate through unansweredMtd(). Both take the
-  // structure, so what is "open" for this man is decided in one place for every surface.
-  const open = new Set(unanswered(rows, structure).map((c) => c.key));
-  const openMtd = new Set(unansweredMtd(rows, structure).map((c) => c.key));
+  // whole persona, so what is "open" for this man is decided in one place for every surface.
+  const open = new Set(unanswered(rows, who).map((c) => c.key));
+  const openMtd = new Set(unansweredMtd(rows, who).map((c) => c.key));
 
-  const overall = progressIn([...household(), ...notHousehold(), ...mtdQuestions()], rows, structure);
+  const overall = progressIn([...household(), ...notHousehold(), ...mtdQuestions()], rows, who);
   const waiting = overall.askable - overall.answered;
 
   return (
@@ -201,7 +208,7 @@ export default async function CircumstancesPage() {
         group={household()}
         open={open}
         rows={rows}
-        structure={structure}
+        who={who}
       />
 
       <Group
@@ -210,7 +217,7 @@ export default async function CircumstancesPage() {
         group={notHousehold()}
         open={open}
         rows={rows}
-        structure={structure}
+        who={who}
       />
 
       <Group
@@ -219,7 +226,7 @@ export default async function CircumstancesPage() {
         group={mtdQuestions()}
         open={openMtd}
         rows={rows}
-        structure={structure}
+        who={who}
       />
 
       <p style={S.foot}>

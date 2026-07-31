@@ -46,6 +46,7 @@ import { READONLY_LINE } from '../../../lib/gate';
 import {
   readCircumstances,
   saveCircumstance,
+  getBusinessProfile,
   findUserIdByPhone,
   normalizeUkPhone,
   readLiveWaLink,
@@ -140,11 +141,13 @@ import {
   supportReason,
 } from '../../../lib/waintents';
 import { weeklySummaryText } from '../../../lib/weeklyupdate';
-import { bandForHours, bandOptions, electionConfirmation } from '../../../lib/elections';
+import {
+  bandForHours, bandOptions, electionConfirmation, electionRefusal, type Electing,
+} from '../../../lib/elections';
 import { quarterForDate } from '../../../lib/quarterpack';
 import { openTicket } from '../../../lib/support';
 import { matchKb } from '../../../lib/supportkb';
-import { soleTraderTax, FACTS } from '../../../lib/taxengine';
+import { soleTraderTax, homeOfficeFlatRateMonthly, FACTS } from '../../../lib/taxengine';
 import { taxPosition } from '../../../lib/taxoptimiser';
 import { aprilDelta } from '../../../lib/propertyengine';
 import { niPosition, studentLoanRepayment, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
@@ -1057,7 +1060,7 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
   }
 
   // The transcriber runs on the mini. If it is not beating right now (mini down, or restarting), do NOT
-  // promise "writing it up now" for a note nobody will pick up — tell the customer plainly and let them
+  // promise "writing it up now" for a note nobody will pick up. Tell the customer plainly and let them
   // send a photo or type it instead. Fails closed: no fresh heartbeat, no promise.
   if (!(await isWorkerLive('voice'))) {
     await sendText(
@@ -1191,7 +1194,7 @@ async function saveEntry(
 // --- Support escalation. The customer asked for a human, complained, or reported a problem. Lift them
 // out of the automated flow: acknowledge in-thread, and open a ticket for Jag to answer from the console
 // with a Claude-drafted reply. The reply goes back into THIS thread, free-form, inside Meta's 24-hour
-// window. Nothing is ever sent on its own — Jag approves every reply. Only linked customers open a
+// window. Nothing is ever sent on its own, because Jag approves every reply. Only linked customers open a
 // ticket; an unknown number is pointed to the team instead, so the desk never fills with strangers.
 async function handleSupportRequest(from: string, text: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
@@ -1207,7 +1210,7 @@ async function handleSupportRequest(from: string, text: string): Promise<void> {
 
   // Pre-draft a warm reply for Jag to edit, grounded in his own playbook (the common-issue notes he
   // keeps in Obsidian) when a known issue matches. Best effort: if AI is off or the call fails, the
-  // draft is empty and Jag writes from scratch — the customer's own message is right there in the console.
+  // draft is empty and Jag writes from scratch, and the customer's own message is right there in the console.
   let draft = '';
   try {
     if (hasClaudeConfig()) {
@@ -1383,6 +1386,35 @@ async function handlePricing(from: string): Promise<void> {
   );
 }
 
+// WHO IS ELECTING, read once, in one place, for lib/elections.ts to answer about. The same helper
+// app/api/elections/route.ts has, in the same shape, because the two doors lead to the same table.
+//
+// 🔴 THE .catch(() => null) IS THE SAFETY RULE, NOT LAZINESS. A read that throws must never become
+// "he is a company". That would refuse a sole trader the flat rate because a database was slow, and
+// he would lose the deduction every month with nothing on any screen to tell him why. A failure is
+// UNKNOWN, and lib/elections.ts only ever refuses a KNOWN limited company or a KNOWN landlord.
+async function electingAs(userId: string): Promise<Electing> {
+  const biz = await getBusinessProfile(userId).catch(() => null);
+  return { structure: biz?.businessType ?? null, income: biz?.incomeShape ?? null };
+}
+
+// THE DOOR ITSELF, ASKED AND ANSWERED ONCE FOR BOTH ROUTES ONTO THIS RELIEF. True means he has been
+// refused and told why, so the caller stops.
+//
+// ⚠️ ONE SEND FOR TWO HANDLERS, AND THAT IS THE POINT RATHER THAN A TIDY UP. The ratchet in
+// test/routing.test.mjs counts inline sendText call sites and may only rise for a genuinely new
+// message type that asks lib/routing.ts. This is one sentence with two doors in front of it, so it
+// gets one send, the same shape sayWorkPaused() took for the same reason.
+//
+// The sentence is lib/elections.ts's own, so a man reads the same words here as on the web, and it
+// names no alternative because we have built none for a company or a property business.
+async function refusedUseOfHome(from: string, userId: string): Promise<boolean> {
+  const refusal = electionRefusal('use_of_home', await electingAs(userId));
+  if (!refusal) return false;
+  await sendText(from, refusal.message);
+  return true;
+}
+
 // CLAIMING USE OF HOME, BY TEXT. The money nobody was getting.
 //
 // lib/taxoptimiser.ts rule 4 has been telling every customer to claim this since it was written, and
@@ -1407,6 +1439,28 @@ async function handleUseOfHomeElection(from: string, body: string): Promise<void
     await replyNotLinked(from);
     return;
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE SECOND DOOR ONTO THE SAME ELECTION, AND UNTIL NOW IT HAD NO LOCK ON IT.
+  //
+  // /api/elections got this check on 31 July 2026. This handler did not, and it writes the same row
+  // to the same table, so a limited company director or a landlord with no trade could text three
+  // words and take a relief that does not exist for him. The flat rate is a SIMPLIFIED EXPENSE
+  // under ITTOIA 2005 s94H, and HMRC BIM75010 says "Only partnerships comprising solely individual
+  // partners can claim this simplified expenses", so a company is outside the regime entirely. And
+  // s94H is a deduction in computing the profits of a TRADE, so a property business works out its
+  // own proportion of its actual costs instead (HMRC PIM2220).
+  //
+  // The rule is ASKED of lib/elections.ts rather than answered here, and the sentence he reads is
+  // the module's own, so this channel and the web say the same thing in the same words. A second
+  // copy of the rule at a call site is a copy that stops matching, and the one that stops is the
+  // one nobody is looking at.
+  //
+  // It is checked BEFORE we ask him for his hours, because the answer is a fact about the man and
+  // not about his message. Asking a director how many hours he works at home and refusing him
+  // afterwards would waste his time twice over.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (await refusedUseOfHome(from, userId)) return;
 
   // He said he wants it but not how much. Ask, with the three real options and what each is worth.
   if (asked.hoursPerMonth === null) {
@@ -1562,7 +1616,23 @@ async function handleNiQuestion(from: string): Promise<void> {
     await sendText(from, 'I could not fetch your figures just now. Try again in a minute.');
     return;
   }
-  const settings = await getStudentLoanSettings(userId);
+  // 🔴 THE PROFILE READ IS WHAT MAKES THE LANDLORD GATE IN niAnswer() RUN AT ALL.
+  //
+  // The gate went into lib/waintents.ts on 31 July and this call site passed nothing, so it was
+  // inert on the only channel that reaches it: a man whose whole business is letting was still
+  // being told a lean year could be protected with voluntary Class 2. HMRC NIM74250: "A person
+  // whose activities in managing the property are those generally associated with being a landlord
+  // would not meet the definition of gainful employment for self-employed NICs purposes." There are
+  // no relevant profits, no small profits threshold to fall under, and no Class 2 to buy the year
+  // with. His route is Class 3, at several times the price.
+  //
+  // Fetched alongside the settings rather than after them, so the answer is no slower than it was.
+  // A failed read is null, which is unknown, and niAnswer answers exactly as it always has: NIM74250
+  // itself says a guest house is a trade, so only a KNOWN landlord is ever told something different.
+  const [settings, biz] = await Promise.all([
+    getStudentLoanSettings(userId),
+    getBusinessProfile(userId).catch(() => null),
+  ]);
   const salary = settings?.employmentIncome ?? 0;
   const profit = Math.max(0, totals.income - totals.expenses);
   const pos = niPosition(salary, profit);
@@ -1576,6 +1646,7 @@ async function handleNiQuestion(from: string): Promise<void> {
       class2Annual: pos.class2Voluntary.annual,
       qualifies: pos.qualifiesViaEmployment || pos.qualifiesViaProfits,
       voluntarySuggested: pos.voluntaryClass2Suggested,
+      incomeShape: biz?.incomeShape ?? null,
     }),
   );
 }
@@ -1764,12 +1835,37 @@ async function startCircumstances(from: string, userId: string): Promise<void> {
 
 // Ask the single highest-value thing we do not know. Returns false when there is nothing left.
 async function askNextCircumstance(from: string, userId: string): Promise<boolean> {
-  const rows = await readCircumstances(userId);
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE PROFILE READ IS NEW, AND ITS ABSENCE WAS A REAL BUG THAT PREDATES WAVE NINE.
+  //
+  // This line used to be `unanswered(rows)`, with no second argument, on the one channel where the
+  // question arrives as a green button on a man's phone. So the structure filter that came out of
+  // the director walk on 30 July (b1742cbc) HAS NEVER RUN HERE: every limited company director in
+  // the chain has still been offered "what were you doing before you went self employed" and the
+  // voluntary Class 2 tick box, both of which assert he is self employed, which he is not. His
+  // company trades and he does not.
+  //
+  // Wave nine adds the second axis and it lands here too: a landlord in this chain would be sent
+  // the s72 early trade losses question, whose promise of a cheque against his old wages cannot
+  // reach a property business, whose losses only carry forward against the same letting business.
+  //
+  // A failed profile read passes null on both axes, which lib/circumstances.ts treats as unknown
+  // and asks everything, which is precisely today's behaviour. So the worst this read can do when
+  // it fails is leave the chain exactly as it has always been, and never take a question away from
+  // a sole trader because a query timed out.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const [rows, biz] = await Promise.all([
+    readCircumstances(userId),
+    getBusinessProfile(userId).catch(() => null),
+  ]);
   if (rows === null) return false;
 
   // The ANSWERS, not the keys. A follow-up is held back until its premise holds: we do not ask a
-  // single man what his wife earns.
-  const next = unanswered(rows)[0];
+  // single man what his wife earns. And WHO HE IS, so the chain asks him what applies to him.
+  const next = unanswered(rows, {
+    structure: biz?.businessType ?? null,
+    income: biz?.incomeShape ?? null,
+  })[0];
   if (!next) return false;
 
   // ⚠️ THE BODY IS EXACTLY `next.ask` AND NOTHING ELSE.
@@ -2243,8 +2339,28 @@ async function handleCIS(from: string, messageId: string, body: string): Promise
 }
 
 // --- Working from home, simplified flat rate ------------------------------
-// "worked 90 hours from home" logs the HMRC flat rate for the month.
-// 25 to 50 hours = £10, 51 to 100 = £18, 101+ = £26.
+// "worked 90 hours from home" logs the HMRC flat rate for that month.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE THIRD DOOR ONTO THE SAME RELIEF, AND IT IS THE OLDEST ONE.
+//
+// The bands and the money used to be written into this file: 25, 51 and 101 hours, at £10, £18 and
+// £26. Four copies of a number is how this codebase keeps producing the same bug, and it is exactly
+// what lib/elections.ts and the Khoji nightly diff against GOV.UK exist to prevent: if HMRC moves
+// the rate, the watch approves it into FACTS and every reader picks it up without a deploy, EXCEPT
+// a reader with the old number typed into it. So the boundaries now come from bandForHours() in
+// lib/elections.ts and the money from homeOfficeFlatRateMonthly() in lib/taxengine.ts, which is
+// where the election itself reads them.
+//
+// ⚠️ AND IT HAD NO IDEA WHO IT WAS TALKING TO. A director could text his hours and have a relief he
+// cannot have written straight into his books. Same rule as the election, asked of the same module.
+//
+// ⚠️ THIS HANDLER WRITES A TRANSACTION, NOT AN ELECTION, AND THAT IS A KNOWN DEFECT LEFT STANDING.
+// A man who elects AND texts his hours is deducted twice in lib/ledger.ts, which adds the elected
+// flat rate on top of the expenses that already contain these rows. Reported rather than redesigned
+// on 31 July 2026: the fix belongs in lib/supabase.ts and lib/ledger.ts, beside the mileage slice
+// that solves the identical problem (isMileageRow, getOptimiserInput).
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 const HOMEOFFICE_RE = /\b(home office|worked from home|working from home|work from home|use of home|wfh)\b/i;
 function isHomeOffice(body: string): boolean {
   if (/£/.test(body) || body.trim().endsWith('?')) return false;
@@ -2256,24 +2372,39 @@ async function handleHomeOffice(from: string, messageId: string, body: string): 
     await sendText(from, 'Open the app and add your number first, then I can log your home working.');
     return;
   }
+  // Refused before he is asked for anything, exactly as the election is: whether the flat rate is
+  // his at all is a fact about the man, not about his message. Same door, same sentence.
+  if (await refusedUseOfHome(from, userId)) return;
+
   const hm = body.match(/(\d{1,4})\s*(?:hours?|hrs?)\b/i);
   const hours = hm ? parseInt(hm[1], 10) : null;
   if (hours === null) {
     await sendText(from, 'How many hours did you work from home this month? For example "worked 90 hours from home".');
     return;
   }
-  let rate = 0;
-  if (hours >= 101) rate = 26;
-  else if (hours >= 51) rate = 18;
-  else if (hours >= 25) rate = 10;
-  else {
-    await sendText(from, 'The flat rate starts at 25 hours a month. Below that, claim a fair share of your actual home costs instead.');
+  const band = bandForHours(hours);
+  if (band === null) {
+    // UNDER THE THRESHOLD IS NOT AN ERROR, and this used to end "claim a fair share of your actual
+    // home costs instead". That is a door we have not built: lib/categories.ts refuses to create a
+    // home category ON PURPOSE, because a rule on rent or a household energy bill would sweep up a
+    // man's own house, so there is nowhere in this product for him to put such a claim. It also sat
+    // oddly beside the election's own "this replaces claiming a share of your actual home bills,
+    // you cannot have both". So it now says what the election says, which is true and complete.
+    await sendText(
+      from,
+      "HMRC's flat rate starts at 25 hours a month, so there is nothing to claim that way at those hours. If it goes up, just tell me and I will put it on.",
+    );
     return;
   }
+  // Read at call time, never captured, so a Khoji approved rate change or a live override is picked
+  // up without a deploy. No zero guard, deliberately: electionConfirmation() in lib/elections.ts
+  // prints this same rate unguarded, and a second reader being more suspicious than the module that
+  // owns the number is how two doors start disagreeing about what a man is owed.
+  const monthly = homeOfficeFlatRateMonthly(band);
   await insertTransaction({
     user_id: userId,
     vendor: 'Use of home',
-    amount: -rate,
+    amount: -monthly,
     category: 'use of home',
     transaction_date: entryDate(body),
     source_type: 'whatsapp_homeoffice',
@@ -2281,7 +2412,7 @@ async function handleHomeOffice(from: string, messageId: string, body: string): 
     confirmed: false,
     raw_whatsapp_message_id: messageId,
   });
-  await sendText(from, `Logged. ${hours} hours from home, that is the £${rate} HMRC flat rate for the month. One claim a month. Check it in the app and confirm.`);
+  await sendText(from, `Logged. ${hours} hours from home, that is the £${monthly} HMRC flat rate for the month. One claim a month. Check it in the app and confirm.`);
 }
 
 // --- Phone and broadband, business share ----------------------------------

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getConfirmedTransactionsForRange } from '../../../../lib/supabase';
+import { getBusinessProfile, getConfirmedTransactionsForRange } from '../../../../lib/supabase';
 import { buildQuarterPack, quarterBounds, quarterForDate } from '../../../../lib/quarterpack';
 import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { gbp0 } from '../../lib/money';
@@ -37,6 +37,37 @@ export const dynamic = 'force-dynamic';
 // HMRC's own test systems, and it waits on HMRC granting production access. Until that day this
 // screen is a rehearsal of the real thing, it says so, and when filing does arrive it will still
 // wait for his approval, because that is the product. test/mtdclaims.test.mjs polices the words.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND UNTIL 31 JULY 2026 IT ADDRESSED EVERY READER AS AN MTD FILER, INCLUDING A DIRECTOR.
+//
+// The whole page spoke to a man who makes quarterly updates: what one would report, which update
+// this is, when it is due, and a promise that he would approve the figures before anything went.
+// A limited company makes none of them. Making Tax Digital for Income Tax covers self employment
+// and rent on a personal return, and a company's trade is neither: the company files its own
+// return. That is the sentence /app/setup already gives on its MTD step, reused rather than
+// reinvented, because one fact argued two ways is argued wrong once.
+//
+// ⚠️ WHICH FIGURES SURVIVE FOR A DIRECTOR, AND WHY THEY ARE HIS.
+//
+//   In, Out, Profit        His own confirmed entries added up. Arithmetic over his book, with no
+//                          tax rule inside it, so it is true whatever return the money ends up on.
+//   The property block     Same arithmetic on the rent rows, kept apart from the trade rows the
+//                          way he entered them. The claim about how an UPDATE carries property is
+//                          not made to him, because he does not make one.
+//   The CIS line           Money a contractor really did deduct from real payments. A fact about
+//                          what left, not a claim about which return settles it.
+//   The three months       The same arithmetic over a narrower window, and it stops calling itself
+//                          "not what an update reports", which for him would be arguing with a
+//                          claim nobody made.
+//
+// What goes: the update framing, the calendar card with its due date, and the filing promise. A
+// due date belongs to a return he does not file, and doc 103 would rather this page said nothing
+// there than filled the hole with something invented. NOT ONE FIGURE MOVES either way.
+//
+// ⚠️ ONLY AN EXPLICIT COMPANY LOSES ANYTHING. getBusinessProfile defaults an unset column to sole
+// trader and a failed read is null, so both keep today's page exactly.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 
 export default async function TaxSummaryPage() {
   const jar = await cookies();
@@ -48,11 +79,17 @@ export default async function TaxSummaryPage() {
   const taxYearStart = quarterBounds(startYear, 1).start;
   const bounds = quarterBounds(startYear, index);
 
-  const txns = await getConfirmedTransactionsForRange(user.id, taxYearStart, bounds.end).catch(() => []);
+  const [txns, biz] = await Promise.all([
+    getConfirmedTransactionsForRange(user.id, taxYearStart, bounds.end).catch(() => []),
+    // Who he is, from the same source every other structure aware screen reads. Null is unknown,
+    // and unknown reads exactly as it did before wave nine.
+    getBusinessProfile(user.id).catch(() => null),
+  ]);
   const pack = buildQuarterPack({
     transactions: txns, startYear, quarter: index, truncated: txns.length >= 20000,
   });
 
+  const isCompany = biz?.businessType === 'limited_company';
   const sub = pack.submission;
   const due = updateDue(startYear, index);
   const ordinal = UPDATE_ORDINAL[index];
@@ -71,13 +108,27 @@ export default async function TaxSummaryPage() {
         </p>
       ) : null}
 
-      {/* ── WHAT AN UPDATE WOULD REPORT TODAY. The cumulative window, said out loud. ─────────── */}
+      {/* ── WHAT AN UPDATE WOULD REPORT TODAY. The cumulative window, said out loud. ───────────
+          For a director the same figures keep their place under an honest heading, because the
+          money is his book either way and it is only the update framing that was never his. */}
       <section className="lek-card">
-        <h1 className="lek-h2">What a quarterly update would report today</h1>
-        <p style={S.window}>
-          Tax year {pack.taxYear}, 6 April to today. An update always restates the whole year so
-          far and replaces the one before it, never just the latest three months.
-        </p>
+        <h1 className="lek-h2">
+          {isCompany ? 'Your money since 6 April' : 'What a quarterly update would report today'}
+        </h1>
+        {isCompany ? (
+          <p style={S.window}>
+            Making Tax Digital for Income Tax covers self employment and rent on a personal return,
+            and your company&apos;s trade is neither: the company files its own return. So this is
+            not an update, it is your own figures for {pack.taxYear} added up. That window is the
+            personal tax year rather than your company&apos;s accounting period, so read it as a
+            running total and not as a set of accounts.
+          </p>
+        ) : (
+          <p style={S.window}>
+            Tax year {pack.taxYear}, 6 April to today. An update always restates the whole year so
+            far and replaces the one before it, never just the latest three months.
+          </p>
+        )}
 
         {hasFigures ? (
           <>
@@ -107,8 +158,12 @@ export default async function TaxSummaryPage() {
                 <h2 className="lek-h2">Property, reported separately</h2>
                 <p style={S.quiet}>
                   {gbp0(sub.property.income)} of rent in, {gbp0(sub.property.expenses)} out, so{' '}
-                  {gbp0(sub.property.net)} of property profit so far. An update carries property as
-                  its own stream, never mixed into the trade.
+                  {gbp0(sub.property.net)} of property profit so far.{' '}
+                  {/* The figures are the same either way. Only the claim about what an update does
+                      with them belongs to a man who makes one. */}
+                  {isCompany
+                    ? 'Rent is kept as its own stream here, never mixed into the trade.'
+                    : 'An update carries property as its own stream, never mixed into the trade.'}
                 </p>
               </div>
             ) : null}
@@ -134,14 +189,19 @@ export default async function TaxSummaryPage() {
         )}
       </section>
 
-      {/* ── THE CALENDAR. Which update this is and when it is due. ───────────────────────────── */}
-      <section className="lek-card">
-        <h2 className="lek-h2">The {ordinal} update of {pack.taxYear}</h2>
-        <p style={S.body}>
-          It covers 6 April to {prettyEnd(bounds.end)} and is due by <b>{due}</b>. Your figures are
-          already kept in the shape an update reports, so the deadline is a date, not a job.
-        </p>
-      </section>
+      {/* ── THE CALENDAR. Which update this is and when it is due. ─────────────────────────────
+          Withheld from a director whole. A due date is the date of a return he does not file, and
+          there is nothing honest to put in its place without inventing a company deadline, so the
+          card simply is not there. */}
+      {isCompany ? null : (
+        <section className="lek-card">
+          <h2 className="lek-h2">The {ordinal} update of {pack.taxYear}</h2>
+          <p style={S.body}>
+            It covers 6 April to {prettyEnd(bounds.end)} and is due by <b>{due}</b>. Your figures are
+            already kept in the shape an update reports, so the deadline is a date, not a job.
+          </p>
+        </section>
+      )}
 
       {/* ── THE QUARTER ON ITS OWN. Context, smaller, under the figures that matter. ─────────── */}
       {hasFigures ? (
@@ -150,17 +210,28 @@ export default async function TaxSummaryPage() {
           <p style={S.quiet}>
             {pack.period.label}: {gbp0(pack.trade.income)} in, {gbp0(pack.trade.expenses)} out,{' '}
             {gbp0(pack.trade.net)} of trade profit. Useful for seeing what the quarter itself did.
-            It is not what an update reports.
+            {/* The disclaimer answers the heading above it. For a director there is no update claim
+                to correct, so the sentence would be arguing with nobody. */}
+            {isCompany ? null : <>{' '}It is not what an update reports.</>}
           </p>
         </section>
       ) : null}
 
-      {/* ── THE HONEST LINE ABOUT FILING. We prepare. He approves. The switch waits on HMRC. ── */}
-      <p style={S.foot}>
-        Nothing on this page has been sent anywhere. Lekhio cannot send an update to HMRC yet: the
-        filing pipeline is built and the switch waits on HMRC granting production access. When it
-        arrives, you will see the figures first and approve them before anything goes.
-      </p>
+      {/* ── THE HONEST LINE ABOUT FILING. We prepare. He approves. The switch waits on HMRC. ──
+          A director gets the first sentence and not the rest: the rest is a promise about an update
+          he will never make, and a promise aimed at the wrong man is how a product loses him. */}
+      {isCompany ? (
+        <p style={S.foot}>
+          Nothing on this page has been sent anywhere. These are your own figures, prepared from
+          what you have confirmed, for you to check and to hand to whoever prepares your returns.
+        </p>
+      ) : (
+        <p style={S.foot}>
+          Nothing on this page has been sent anywhere. Lekhio cannot send an update to HMRC yet: the
+          filing pipeline is built and the switch waits on HMRC granting production access. When it
+          arrives, you will see the figures first and approve them before anything goes.
+        </p>
+      )}
     </main>
   );
 }

@@ -225,8 +225,13 @@ ok('but the figures and the trial sentence both survive that',
 const empty = trialWeekMessage(week({ income: 0, expenses: 0, profit: 0, saved: null, hasAnything: false }));
 ok('🔴 an empty week says so plainly rather than printing zeros',
   empty.body.includes('nothing in your books yet') && !empty.body.includes('£0'));
-ok('and it points at the one thing that works with nothing typed',
-  /connect your bank/i.test(empty.body));
+// 🔴 31 JULY: THE BANK SENTENCE IS NOW BEHIND bankFeedOffered(), DEFAULT OFF, and this assertion
+// was pinning the one message of the whole trial week at a door that does not open. TrueLayer
+// declined production authorisation outright on 30 July and there is no other provider, so
+// "connect your bank" was an instruction a customer could not carry out. The statement importer
+// covers eleven UK banks and needs nobody's permission, so that is where the empty week points.
+ok('and it points at a door that actually opens today',
+  empty.body.includes('/app/money/import') && !/connect your bank/i.test(empty.body));
 ok('the empty version still says the trial ends tomorrow', empty.body.includes('ends tomorrow'));
 ok('the empty version carries the same chats door', empty.body.includes('/app/thread'));
 

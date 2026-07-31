@@ -172,12 +172,66 @@ export interface Circumstance {
   // money gone without a trace. So the filter only ever bites on a KNOWN structure.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   structures?: BusinessStructure[];
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THE SECOND AXIS: WHETHER HE TRADES AT ALL. STRUCTURE CANNOT ANSWER THAT.
+  //
+  // Found by walking /app/setup as a LANDLORD on 31 July 2026, the day after the director walk
+  // above. He was asked what he did before he went self employed, under this promise: "If you lose
+  // money in your first four years, we can carry that loss back against the wages from your old
+  // job. HMRC send you a cheque." That is ITA 2007 s72, early TRADE losses relief, and a UK
+  // property business loss can only ever be carried FORWARD against future profits of the same
+  // letting business. We were promising him a cheque that cannot exist.
+  //
+  // He got it because the Landlord chip on /start maps to 'sole_trader': he files a personal
+  // return and he is not a company, so `structures` above waves him through. Structure says HOW a
+  // man trades. It has nothing to say about whether he trades, and early trade losses, voluntary
+  // Class 2, simplified expenses, the trading allowance and the Annual Investment Allowance are
+  // every one of them trade provisions.
+  //
+  // Absent means EVERY shape, which is most questions: marriage, the kids, a pension, charity and
+  // VAT do not care whether his money is rent or work. Set it only where the relief genuinely does
+  // not exist for the shape, and put the source on the row. lib/persona.ts carries the four
+  // provisions and their citations in one paragraph, for the day somebody asks why.
+  //
+  // ⚠️ AN UNKNOWN SHAPE IS ASKED EVERYTHING, exactly as an unknown structure is, and the asymmetry
+  // is deliberate: 'property_only' is only ever set because the man told us letting is his whole
+  // business. It is never inferred from a quiet month in the money log, because a roofer who
+  // logged nothing in July is not a landlord, and NIM74250's own exception (a guest house is a
+  // trade) is the reminder that letting and trading are not opposites.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  incomes?: IncomeShape[];
 }
 
 // Declared here rather than imported from lib/position.ts, deliberately: this module has no imports
 // at all, which is what lets every test and the WhatsApp webhook load it bare. The three literals
 // are pinned against the rest of the codebase by test/structurehonesty.test.mjs.
 export type BusinessStructure = 'sole_trader' | 'partnership' | 'limited_company';
+
+// Re-declared rather than imported, same rule, same reason. lib/persona.ts is the module that
+// DECIDES which of the two a man is, from what he told us at signup; this module only consumes the
+// answer. test/persona.test.mjs pins the two literals against each other.
+export type IncomeShape = 'trade' | 'property_only';
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// WHO WE ARE ASKING. Two facts, and either may be missing.
+//
+// ⚠️ THE OLD SHAPE STILL WORKS ON PURPOSE. Every caller that already passes a bare
+// BusinessStructure keeps its exact behaviour, because widening a parameter that eight surfaces
+// and six test files pass is how a filter quietly stops running on the one surface nobody updated.
+// A string means "this structure, income unknown". An object says both.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export interface Persona {
+  structure?: BusinessStructure | null;
+  income?: IncomeShape | null;
+}
+
+export type AskingFor = BusinessStructure | Persona | null | undefined;
+
+function personaOf(who: AskingFor): Persona {
+  if (!who) return {};
+  return typeof who === 'string' ? { structure: who } : who;
+}
 
 // The consent itself is stored as a circumstance, which is exactly right: Article 7(1) says we must
 // be able to DEMONSTRATE that he consented, and the circumstances table already logs the verbatim
@@ -213,6 +267,15 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // company's (CTA 2010 Part 4) and never reaches the director's P60. And the question itself,
     // "before you went self employed", asserts a director is self employed, which he is not.
     structures: ['sole_trader', 'partnership'],
+    // 🔴 AND NOT FOR A LANDLORD. THE ONE THAT STARTED WAVE NINE.
+    //
+    // s72 is early TRADE losses relief. A UK property business loss carries FORWARD against future
+    // profits of the same letting business and nowhere else: GOV.UK, working out your rental
+    // income, "Normally you can only offset that loss against any profits that arise from the same
+    // rental business in future years", and when the business ends the carried forward losses are
+    // simply lost. There is no carry back and there is no cheque. A landlord walked this question
+    // live on 31 July 2026 and read a promise of money that cannot reach him.
+    incomes: ['trade'],
   },
   {
     // 7 YEARS. Not four. The van, the Gas Safe course, the first set of tools, all bought before he
@@ -225,6 +288,13 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 7,
     evidence: 'The receipts. It must be a genuine business cost.',
     source: 'ITTOIA 2005 s57; BIM46351. Capital goes through CAA 2001 s12.',
+    // 🔴 NOT FOR A LANDLORD AS IT IS WRITTEN. The question asks when he started TRADING and lists
+    // tools, a van, courses and insurance, none of which is a letting cost, and the capital half
+    // runs straight into CAA 2001 s35, which denies plant and machinery allowances on plant in a
+    // dwelling house. Pre letting expenditure is a real relief that reaches a property business
+    // through ITTOIA 2005 s272, so this is a QUESTION WE OWE HIM IN HIS OWN WORDS rather than a
+    // relief he does not have. Noted for Jag as a gap, not silently dropped.
+    incomes: ['trade'],
   },
   {
     // A plumber who registers for VAT with a fully kitted van can reclaim the VAT on every tool
@@ -255,6 +325,14 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 4,
     evidence: 'Your pension provider’s annual statement showing gross contributions.',
     source: 'GOV.UK, tax on your private pension. Relief is capped by your relevant earnings.',
+    // ⚠️ ASKED OF EVERYONE ON PURPOSE, BUT THE `why` IS NOT TRUE OF A PURE LANDLORD.
+    //
+    // Relief is limited to relevant UK earnings (FA 2004 s189), and rent is not relevant earnings,
+    // so a man whose only income is letting is capped at £3,600 gross and there is no higher rate
+    // slice to reclaim. The QUESTION is still worth asking him, because knowing he pays into a
+    // pension changes what else we say, and because he may have a job or a trade we do not know
+    // about. The PROMISE is what needs a landlord's own wording, and this schema has one `why` per
+    // question. Logged for Jag rather than half fixed.
   },
   {
     // ⚠️ WE CANNOT CLAIM THIS ONE. HIS WIFE HAS TO. See doc 108 §3.
@@ -318,6 +396,19 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // His qualifying years come through Class 1 on a payroll salary, which is precisely what the
     // lower earnings limit rung in lib/payyourself.ts exists to price for him.
     structures: ['sole_trader', 'partnership'],
+    // 🔴 AND NOT FOR A LANDLORD, FOR A DIFFERENT REASON: THERE IS NO CLASS 2 FOR HIM TO PAY.
+    //
+    // NIM74250: "A person whose activities in managing the property are those generally associated
+    // with being a landlord would not meet the definition of gainful employment for self-employed
+    // NICs purposes." No gainful employment means no relevant profits, no small profits threshold
+    // to fall under, and no voluntary Class 2 at a few pounds a week. His route to a qualifying
+    // year is Class 3, which costs several times as much, and telling a man a lean year is cheap
+    // to protect when it is not is worse than saying nothing.
+    //
+    // ⚠️ And the same manual page is why 'unknown asks everything' is right: a guest house or a
+    // hotel IS a trade for these purposes. Only a man who told us letting is his whole business is
+    // refused this question.
+    incomes: ['trade'],
   },
   {
     // The move nobody knows: claim Child Benefit, elect to receive ZERO. You keep the NI credit,
@@ -357,6 +448,11 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 6,
     evidence: 'The rateable value and your lease. You apply to the COUNCIL, not to HMRC.',
     source: 'GOV.UK, Small Business Rate Relief. Council by council: there is no national backdating rule.',
+    // NOT FOR A LANDLORD. This asks whether he OCCUPIES trade premises he pays rates on. A man
+    // whose business is letting is on the other side of that question, and asking it directly
+    // above the rental question, in the same words ("a bit of yard"), is how he ends up unsure
+    // which side of his own ledger we are asking about.
+    incomes: ['trade'],
   },
   {
     // 🔴 THE ONLY ARTICLE 9 QUESTION IN THIS FILE, AND FOR AN HOUR TODAY IT WAS IN THE WHATSAPP CHAIN.
@@ -392,6 +488,10 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 0,
     evidence: 'The V5C and the purchase or order date.',
     source: 'EIM23151. Payne v HMRC (Coca-Cola), Court of Appeal. Transitional relief to 5 April 2029.',
+    // NOT FOR A LANDLORD. "What do you drive for work" and the van or car reclassification are a
+    // trade question about a trade vehicle. A landlord's travel to his own properties is a
+    // different rule again, and it is not this one.
+    incomes: ['trade'],
   },
   {
     key: 'other_job',
@@ -414,14 +514,33 @@ export const CIRCUMSTANCES: Circumstance[] = [
     source: 'GOV.UK Gift Aid. ⚠️ The carry-back election (ITA 2007 s426) must be in the ORIGINAL return. HMRC will NOT accept it in an amendment. A one-shot door.',
   },
   {
+    // ═══════════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THIS QUESTION USED TO ASSUME THE ANSWER WAS SMALL, AND FOR A LANDLORD IT IS THE WHOLE JOB.
+    //
+    // It read: "Do you rent anything out? A room, a garage, a parking space, a bit of yard?" with
+    // "There is an allowance that can cover it entirely, and a much bigger one if a lodger lives in
+    // your house." Both sentences are true of a man letting a lock-up. Both are false of a landlord:
+    // the £1,000 property allowance cannot cover real rent, and Rent a Room needs a lodger in the
+    // taxpayer's OWN home, so it is not available on a let property at all (HS223).
+    //
+    // ⚠️ AND HE NEVER ANSWERS THIS ONE, WHICH IS WHY IT WAS INVISIBLE. A Landlord signup has the
+    // answer written for him by reconcileFromSignup, and then the reveal and the circumstances
+    // page echo this `why` back at him as though he had chosen it. A landlord read the Rent a Room
+    // line on the live site on 31 July 2026, on his own reveal screen, about his own business.
+    //
+    // So the wording now has to be true for BOTH men, because one question serves both. `ask`
+    // stops framing letting as a sideline; `why` says the small case and the real case in that
+    // order and promises neither to the wrong man. Editing these is safe: saveCircumstance stores
+    // the exact wording each customer was shown on his own row, so no exhibit is rewritten.
+    // ═══════════════════════════════════════════════════════════════════════════════════════════
     key: 'rental',
-    ask: 'Do you rent anything out? A room, a garage, a parking space, a bit of yard?',
-    why: 'There is an allowance that can cover it entirely, and a much bigger one if a lodger lives in your house.',
+    ask: 'Do you rent anything out? A room, a garage, a parking space, or a property?',
+    why: 'If it is small, an allowance can cover it entirely, and there is a bigger one for a lodger in your own home. If it is a property let properly, it is its own income with its own costs and its own rules, and we keep it as a stream of its own.',
     worthOrder: 'real',
     claimant: 'him',
     backYears: 4,
-    evidence: 'Nothing, if it is under the limit and you claim no expenses against it.',
-    source: 'GOV.UK, tax-free allowances on property and trading income. Rent a Room: HS223.',
+    evidence: 'Nothing, if it is under the allowance and you claim no costs against it. A property let properly needs its rents and its costs, and it goes on pages of its own.',
+    source: 'GOV.UK, tax-free allowances on property and trading income (£1,000 property allowance). Rent a Room: HS223, and it needs a lodger in your OWN home. A let property is reported on SA105.',
   },
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // MAKING TAX DIGITAL. Where he stands with HMRC, which is not the same as what he can claim.
@@ -438,6 +557,16 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // where it is not: `ask` is stored VERBATIM as the exhibit (Finance Act 2026 Sch 22), so the row
     // must carry the sentence he actually read, threshold and all, for ever. Nothing computes from
     // this string; the engine reads FACTS.mtdThreshold2026 as it always did.
+    //
+    // ⚠️ AND IT DELIBERATELY CARRIES NO `incomes` TAG, THOUGH IT READS ODDLY TO A LANDLORD.
+    //
+    // Making Tax Digital for Income Tax counts trade AND property income, so the gate is genuinely
+    // his question: a man letting for £52,000 with no trade at all is mandated. The sentence names
+    // self employment first, which reads strangely to a man who has none, and the honest fix would
+    // be a second key in his words. It is not taken here because the shape is unknown for every
+    // customer who signed up before lib/persona.ts existed, and an unknown shape is asked
+    // everything, so a second key would ask most of the book the same threshold twice. Copy
+    // problem, logged for Jag, not a filter.
     //
     // ⚠️ AND WHEN THE THRESHOLD DROPS TO £30,000 IN 2027, ADD A NEW KEY. Do NOT edit this sentence:
     // that would rewrite what we asked a man in 2026, which is the one thing the log exists to
@@ -527,7 +656,23 @@ export const CIRCUMSTANCES: Circumstance[] = [
     claimant: 'him',
     backYears: 4,
     evidence: 'The hours you work at home each month. That is the whole evidence.',
-    source: 'GOV.UK simplified expenses. ⚠️ NEVER advise exclusive business use of a room: it can cost him Private Residence Relief when he sells (HS283).',
+    source: 'ITTOIA 2005 s94H; BIM75010; GOV.UK simplified expenses. ⚠️ NEVER advise exclusive business use of a room: it can cost him Private Residence Relief when he sells (HS283).',
+    // 🔴 THE FLAT RATE IS A SIMPLIFIED EXPENSE, AND SIMPLIFIED EXPENSES ARE UNINCORPORATED ONLY.
+    //
+    // BIM75010 on ITTOIA 2005 s94H: "Only partnerships comprising solely individual partners can
+    // claim this simplified expenses." A company is outside ITTOIA altogether, so a director
+    // cannot use the £10, £18, £26 bands at any number of hours. His company can pay him for the
+    // use of his home, but that is a licence or a reimbursement with paperwork, not a tick box,
+    // and promising him "no receipts to keep at all" is promising the wrong thing entirely.
+    //
+    // ⚠️ THIS LEAVES A DIRECTOR WITH NO HOME QUESTION AT ALL, which is honest but is not finished.
+    // The company route is a real relief he is now never asked about. Noted for Jag rather than
+    // guessed at, because an entry here has to name what he can actually claim.
+    structures: ['sole_trader', 'partnership'],
+    // AND NOT FOR A LANDLORD: s94H is a deduction in calculating the profits of a TRADE. A property
+    // business claims a proportion of its actual costs instead (PIM2220), which is a different
+    // sentence with different evidence, and "no receipts to keep at all" is the opposite of true.
+    incomes: ['trade'],
   },
 ];
 
@@ -580,18 +725,33 @@ function forStructure(c: Circumstance, structure?: BusinessStructure | null): bo
   return c.structures.includes(structure);
 }
 
+// The same rule on the second axis, written the same way for the same reason: absent on the entry
+// means every shape, and an unknown shape from the caller asks everything. See the `incomes` field
+// for why refusing too little is the safe failure and refusing too much is the expensive one.
+function forIncome(c: Circumstance, income?: IncomeShape | null): boolean {
+  if (!c.incomes || !income) return true;
+  return c.incomes.includes(income);
+}
+
+// Both axes at once. Every gate in this file goes through here, so there is exactly one answer to
+// "is this question even for him", and adding a third axis later means changing one function.
+function fits(c: Circumstance, who: Persona): boolean {
+  return forStructure(c, who.structure) && forIncome(c, who.income);
+}
+
 function openIn(
   list: Circumstance[],
   answered: Array<{ key: string; answer: string }>,
-  structure?: BusinessStructure | null,
+  asking?: AskingFor,
 ): Circumstance[] {
+  const who = personaOf(asking);
   const given = new Map(answered.map((a) => [a.key, a.answer]));
   return list.filter((c) => {
     if (c.specialCategory) return false;
-    // ⚠️ A REFUSAL, NOT A HOLD. A question that is not for his structure is not waiting on a
-    // premise, it does not apply to him at all, so it never enters the queue and never counts
-    // against him in a progress denominator.
-    if (!forStructure(c, structure)) return false;
+    // ⚠️ A REFUSAL, NOT A HOLD. A question that is not for his structure, or not for the kind of
+    // income he actually has, is not waiting on a premise. It does not apply to him at all, so it
+    // never enters the queue and never counts against him in a progress denominator.
+    if (!fits(c, who)) return false;
     if (given.has(c.key)) return false;
     if (!c.dependsOn) return true;
     // The premise must be ANSWERED and answered the right way. An unanswered premise holds the
@@ -602,8 +762,9 @@ function openIn(
 
 export function unanswered(
   answered: Array<{ key: string; answer: string }>,
-  structure?: BusinessStructure | null,
+  asking?: AskingFor,
 ): Circumstance[] {
+  const who = personaOf(asking);
   const given = new Map(answered.map((a) => [a.key, a.answer]));
 
   return askingOrder().filter((c) => {
@@ -624,11 +785,13 @@ export function unanswered(
     // is its door.
     if (c.mtd) return false;
 
-    // 🔴 AND A QUESTION THAT IS NOT FOR HIS STRUCTURE IS REFUSED THE SAME WAY. A director asked
-    // "before you went self employed" is being read a list, and he only needs to notice once to
-    // stop answering the questions that are worth thousands. Unknown structure asks everything:
-    // see forStructure for why that is the safe direction.
-    if (!forStructure(c, structure)) return false;
+    // 🔴 AND A QUESTION THAT IS NOT FOR HIS STRUCTURE, OR NOT FOR THE KIND OF INCOME HE HAS, IS
+    // REFUSED THE SAME WAY. A director asked "before you went self employed" is being read a list,
+    // and he only needs to notice once to stop answering the questions that are worth thousands. A
+    // landlord asked the same question is worse than that: the answer would have promised him a
+    // carry back that property losses cannot have. Unknown asks everything, on both axes: see
+    // forStructure and forIncome for why that is the safe direction.
+    if (!fits(c, who)) return false;
 
     if (given.has(c.key)) return false;
     if (!c.dependsOn) return true;
@@ -702,9 +865,9 @@ export function mtdQuestions(): Circumstance[] {
 // and the three follow ups hang off it, so nothing here needs to know why.
 export function unansweredMtd(
   answered: Array<{ key: string; answer: string }>,
-  structure?: BusinessStructure | null,
+  asking?: AskingFor,
 ): Circumstance[] {
-  return openIn(mtdQuestions(), answered, structure);
+  return openIn(mtdQuestions(), answered, asking);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -739,17 +902,17 @@ export interface AskProgress {
 export function progressIn(
   group: Circumstance[],
   answered: Array<{ key: string; answer: string }>,
-  structure?: BusinessStructure | null,
+  asking?: AskingFor,
 ): AskProgress {
   const given = new Set(answered.map((a) => a.key));
-  // ⚠️ AN ANSWER HE GAVE IS COUNTED EVEN IF HIS STRUCTURE WOULD NOT BE ASKED TODAY. He may have
-  // answered as a sole trader and incorporated since; the record of what he told us does not
-  // evaporate because the question stopped applying, only the ASKING stops.
+  // ⚠️ AN ANSWER HE GAVE IS COUNTED EVEN IF HE WOULD NOT BE ASKED TODAY. He may have answered as a
+  // sole trader and incorporated since, or sold the van and kept the flats; the record of what he
+  // told us does not evaporate because the question stopped applying, only the ASKING stops.
   const done = group.filter((c) => given.has(c.key)).length;
   // ⚠️ openIn RATHER THAN unanswered, AND THE DIFFERENCE IS NOT COSMETIC. unanswered() refuses the
   // compliance questions on purpose, so counting through it would tell a man on the MTD screen that
   // he has 0 of 0 to answer while three questions sit in front of him.
-  const toAsk = openIn(group, answered, structure).length;
+  const toAsk = openIn(group, answered, asking).length;
   return { answered: done, askable: done + toAsk };
 }
 

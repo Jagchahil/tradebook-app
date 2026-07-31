@@ -36,6 +36,17 @@ export interface UserGoal {
   targetDate: string | null; // YYYY-MM-DD
 }
 
+// WHAT HIS BUSINESS INCOME ACTUALLY IS, re-declared here rather than imported from lib/persona.ts.
+//
+// ⚠️ THE IMPORT WOULD NOT BE FREE. test/agent.test.mjs and test/agentstructure.test.mjs both stage
+// this module into a temp directory with a FIXED list of dependencies, because Node's type stripping
+// cannot resolve an extensionless relative import, so a new import here breaks both suites on a
+// module resolution error rather than on anything real. lib/circumstances.ts, lib/persona.ts,
+// lib/elections.ts and lib/taxoptimiser.ts all re-declare the same literal union for the same
+// reason. The strings are the ones lib/supabase.ts getBusinessProfile() hands back, and
+// test/wave9_nudges.test.mjs pins them against lib/persona.ts so they cannot drift apart in silence.
+export type IncomeShape = 'trade' | 'property_only';
+
 export interface AgentInput {
   today: Date;
   // Confirmed monthly totals for the trailing 12 calendar months including the
@@ -75,6 +86,23 @@ export interface AgentInput {
   // the stored default, which treats the whole profit as theirs until they tell us otherwise.
   // Ignored for every other structure, so a sole trader cannot be accidentally halved.
   partnershipShare?: number;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE SECOND AXIS: WHETHER HE TRADES AT ALL, WHICH businessType CANNOT ANSWER.
+  //
+  // A man who signs up through the Landlord chip is stored as a sole trader, because he files a
+  // personal return and he is not a company, so he cleared every structure guard in this file and
+  // was handed the whole trade corpus. See PROPERTY_ONLY_SUPPRESSED_SIGNALS below for what that
+  // cost him, and lib/persona.ts for the trade provisions this axis exists to withhold with their
+  // sources.
+  //
+  // OPTIONAL AND DEFAULTING TO UNDEFINED, WHICH IS UNKNOWN, WHICH IS REFUSED NOTHING. A caller that
+  // never sets it gets exactly the output it got before this field existed, and only a KNOWN
+  // 'property_only' ever has a signal withheld. That direction is the same one lib/taxoptimiser.ts
+  // and lib/elections.ts take, and NIM74250 is why it is the right one: a guest house or a hotel IS
+  // a trade, so an absence of information is never evidence of letting.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  incomeShape?: IncomeShape | null;
 }
 
 export type SignalPriority = 'ping' | 'card';
@@ -927,6 +955,61 @@ const LTD_SUPPRESSED_SIGNALS = new Set<string>([
   's24_exposure', 'property_rates_2027',
 ]);
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE PROPERTY ONLY SET, GATED 31 JUL. The signals a man whose whole business is letting cannot use.
+//
+// 🔴 THE FIND. class2_pension_year's guard is a PROFIT test, and derive() sums every month bucket,
+// which CONTAINS THE RENT. So a landlord having a lean year was told his State Pension year was at
+// risk and that "about £X of voluntary Class 2 protects it". HMRC NIM74250: "A person whose
+// activities in managing the property are those generally associated with being a landlord would not
+// meet the definition of gainful employment for self-employed NICs purposes." He has no relevant
+// profits, so there is no small profits threshold for him to fall under and no voluntary Class 2 to
+// buy the year with at all. His route is Class 3, at several times the price. Quoting him the cheap
+// number is worse than saying nothing, because he acts on it and finds out in January.
+//
+// ⚠️ ONLY A KNOWN 'property_only' IS EVER REFUSED, and the same manual page is why: NIM74250 carries
+// the exception that a guest house or a hotel IS a trade. An unknown shape keeps every signal it has
+// today. A wrong sentence a landlord can ignore is cheaper than silently taking a four figure relief
+// off a sparky whose profile read came back empty, which is the same judgement lib/persona.ts,
+// lib/elections.ts and lib/taxoptimiser.ts already made.
+//
+// It is a REFUSAL LIST, not an allow list, for lib/elections.ts's reason: an allow list refuses
+// everything it has not heard of, so a signal added next month would go dark for landlords with
+// nothing on any screen to say why. This fails the other way, which is the cheap way.
+//
+// AND IT IS STRUCTURE INDEPENDENT, applied last over whatever the structure branch produced. A
+// landlord signs up as a sole trader (lib/persona.ts), but a property partnership and a property
+// company are both real, and none of the three carries on a trade.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const PROPERTY_ONLY_SUPPRESSED_SIGNALS = new Set<string>([
+  // NIM74250, above. Not gainful employment, so no relevant profits and no voluntary Class 2.
+  'class2_pension_year',
+  // ITTOIA 2005 s94H is a SIMPLIFIED EXPENSE, a deduction in computing the profits of a TRADE, and
+  // BIM75010 restricts the hours based flat rate to individuals and partnerships of individuals
+  // carrying one on. A property business deducts a proportion of its ACTUAL costs instead (PIM2220),
+  // which is a different claim, worked out a different way, and never the flat monthly figure this
+  // signal quotes. lib/taxoptimiser.ts already refuses the same man the same lever.
+  'home_office_saving',
+  // The £1,000 TRADING allowance is ITTOIA 2005 Part 6A and is set against trading income. Property
+  // income has its own separate £1,000 property allowance, with its own rules, which a man claiming
+  // actual expenses on a mortgaged let usually should not take. The two reliefs must never be
+  // conflated, and this signal's copy states that Lekhio "uses it automatically" on his return.
+  'trading_allowance_saving',
+  // Its missing list is trade shaped and its own copy says so out loud: "public liability or tool
+  // insurance", "mileage or fuel", "tools and equipment", under a title reading "Claims most trades
+  // have" and a body reading "most tradespeople do". Read the signal before trusting this row.
+  'expense_completeness',
+  // CAA 2001 s35 denies plant and machinery allowances for expenditure on plant in a DWELLING HOUSE,
+  // which is most of what a residential landlord buys. This signal tells him flatly that "the whole
+  // cost comes off THIS year's profit under the Annual Investment Allowance", and for the furniture,
+  // white goods and fittings his money actually goes on, it does not come off at all.
+  'aia_timing',
+  // The same s35 denial, aimed at a goal he typed in his own words, which is worse rather than
+  // better: nothing here can tell whether "new kitchen" is plant in a dwelling house, a capital
+  // improvement or a repair, and the signal prices an exact after tax cost as though it could.
+  'goal_purchase_timing',
+]);
+
 // The sole-trader signals a PARTNER must not receive at ANY share, because the law is different in
 // kind, not merely in amount:
 //   . trading_allowance_saving: the £1,000 trading allowance cannot be set against a partner's share
@@ -1068,7 +1151,26 @@ export function moneyMoveSignals(input: AgentInput): AgentSignal[] {
 //     books, and the signals the law does not give a partner gated off;
 //   . a company gets the engine minus everything that reads its profit as personal income, plus the
 //     structure-correct money moves, with the Monday brief's tax line moved onto the CT600.
+//
+// 🔴 AND THEN BY INCOME SHAPE, LAST. Structure answers HOW he trades and cannot answer WHETHER he
+// trades at all, so the shape gate runs OVER whatever the structure branch produced rather than
+// inside any one of them. computeSignals() stays shape blind, exactly as it stays structure blind:
+// every gate this file adds lives in the wrapper, so the sole-trader engine below is still the one
+// thing the parity tests can pin byte for byte.
 export function computeSignalsForStructure(input: AgentInput): AgentSignal[] {
+  return forIncomeShape(structureSignals(input), input);
+}
+
+// Drop the trade only signals when, and only when, he has told us letting is the whole business.
+//
+// ⚠️ WRITTEN AS AN INEQUALITY, NOT A MEMBERSHIP TEST, so undefined and null both fall straight
+// through untouched. Same shape and same reason as lib/taxoptimiser.ts canClaimSimplifiedExpenses.
+function forIncomeShape(signals: AgentSignal[], input: AgentInput): AgentSignal[] {
+  if (input.incomeShape !== 'property_only') return signals;
+  return signals.filter((s) => !PROPERTY_ONLY_SUPPRESSED_SIGNALS.has(s.signalKey));
+}
+
+function structureSignals(input: AgentInput): AgentSignal[] {
   const structure: BusinessType = input.businessType ?? 'sole_trader';
   const base = computeSignals(input);
 

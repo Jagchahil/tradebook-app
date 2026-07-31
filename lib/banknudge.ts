@@ -30,6 +30,31 @@
 //
 // This module is deliberately import free so it can be unit tested directly by the
 // node test runner, which cannot resolve extensionless relative imports.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 31 JULY: EVERY SENTENCE BELOW POINTED AT A DOOR THAT DOES NOT OPEN.
+//
+// There is no bank provider. TrueLayer declined production authorisation outright on 30 July, and
+// Finexer want £650 a month before a single connection, which we are not paying pre launch. So
+// bankFeedOffered() went into lib/bankfeed.ts, default OFF, and every dead bank sentence in app/
+// went behind it. These two did not, because they are copy in a lib rather than copy on a screen,
+// and a grep for JSX found neither of them.
+//
+// The cost of leaving them is precisely measured: they fire at the exact moment a man has been
+// refused something, which is the moment he is least able to shrug off being sent somewhere that
+// does not exist. So when the offer is off the sentence names a door that opens TODAY. Importing a
+// statement is the closest thing we have to a feed and it reads what eleven UK banks hand out
+// (lib/statementimport.ts BANKS). When the offer comes back on, the old sentence returns unchanged.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// ⚠️ RE-DECLARED, NOT IMPORTED, for the reason in the paragraph above this one: an import of
+// lib/bankfeed.ts would stop test/banknudge.test.mjs loading this file at all. It reads the SAME env
+// var lib/bankfeed.ts bankFeedOffered() reads, at call time so no redeploy is needed, and only the
+// exact string 'true' switches it on. test/wave9_nudges.test.mjs pins the two against each other so
+// they cannot drift apart in silence.
+function bankFeedOffered(): boolean {
+  return process.env.BANK_FEED_OFFERED === 'true';
+}
 
 // Why the AI budget refused. Mirrors SpendReason in lib/aicost.ts.
 export type AiBlockReason =
@@ -55,8 +80,13 @@ export function shouldOfferBank(bank: BankState): boolean {
 
 // The offer itself. One line, plain, no pressure, and it names the benefit in the
 // user's terms rather than ours.
+//
+// The bank sentence returns with bankFeedOffered(); until then the fallback names the door that
+// does the same job today, and the benefit is still put in his terms rather than ours.
 export function bankOfferLine(): string {
-  return 'Want to stop hitting this? Connect your bank in the Lekhio app. Every payment in and out gets logged for you automatically, with no daily limit and no photos to remember.';
+  return bankFeedOffered()
+    ? 'Want to stop hitting this? Connect your bank in the Lekhio app. Every payment in and out gets logged for you automatically, with no daily limit and no photos to remember.'
+    : 'Want to stop hitting this? Import a bank statement in the Lekhio app, under Money. A whole month of spending lands in one go, with no daily limit and nothing to photograph.';
 }
 
 // The message we send when the AI budget refuses a request.
@@ -94,5 +124,9 @@ export const NUDGE_AFTER_RECEIPTS = 5;
 export function receiptMilestoneNudge(receiptsToday: number, bank: BankState): string | null {
   if (!shouldOfferBank(bank)) return null;
   if (receiptsToday !== NUDGE_AFTER_RECEIPTS) return null;
-  return 'That is five receipts today. You do not have to keep doing this. Connect your bank in the Lekhio app and anything you pay by card or transfer is logged for you the moment it happens.';
+  // The bank sentence returns with bankFeedOffered(). The fallback keeps the point of the nudge,
+  // which is that he does not have to keep doing this by hand, and names the door that proves it.
+  return bankFeedOffered()
+    ? 'That is five receipts today. You do not have to keep doing this. Connect your bank in the Lekhio app and anything you pay by card or transfer is logged for you the moment it happens.'
+    : 'That is five receipts today. You do not have to keep doing this. Import a bank statement in the Lekhio app, under Money, and everything you paid by card or transfer lands in your books in one go.';
 }

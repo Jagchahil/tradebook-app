@@ -403,6 +403,15 @@ export function matchStudentLoanPlanSet(body: string): 'plan1' | 'plan2' | 'plan
   return (`plan${m[1]}`) as 'plan1' | 'plan2' | 'plan4' | 'plan5';
 }
 
+// WHAT HIS BUSINESS INCOME ACTUALLY IS, re-declared here rather than imported from lib/persona.ts.
+//
+// ⚠️ THIS MODULE HAS NO IMPORTS AND MUST KEEP NONE. test/waintents.test.mjs loads it bare, and
+// Node's type stripping cannot resolve an extensionless relative import. lib/circumstances.ts,
+// lib/persona.ts, lib/elections.ts and lib/taxoptimiser.ts all re-declare the same literal union for
+// the same reason, and test/wave9_nudges.test.mjs pins this copy against lib/persona.ts so the two
+// cannot drift apart in silence.
+export type IncomeShape = 'trade' | 'property_only';
+
 // Reply for an NI question, from the year to date profit and optional salary.
 export function niAnswer(input: {
   profit: number;
@@ -412,6 +421,9 @@ export function niAnswer(input: {
   class2Annual: number;
   qualifies: boolean;
   voluntarySuggested: boolean;
+  // Optional, and undefined means UNKNOWN, which answers exactly as this function always has. Only
+  // a KNOWN 'property_only' is ever told something different. See the Class 2 block below.
+  incomeShape?: IncomeShape | null;
 }): string {
   const lines: string[] = [];
   if (input.class4 > 0 || input.class1 > 0) {
@@ -422,7 +434,36 @@ export function niAnswer(input: {
   } else {
     lines.push('No National Insurance is due on your figures so far this tax year.');
   }
-  if (input.voluntarySuggested) {
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE VOLUNTARY CLASS 2 PROMISE A LANDLORD CANNOT USE. Gated 31 July.
+  //
+  // HMRC NIM74250: "A person whose activities in managing the property are those generally
+  // associated with being a landlord would not meet the definition of gainful employment for
+  // self-employed NICs purposes." A man whose only business is letting therefore has no relevant
+  // profits, no small profits threshold to fall under, and NO voluntary Class 2 to buy a qualifying
+  // year with. Telling him a lean year is cheap to protect is worse than saying nothing: he plans
+  // around a price that is not on offer, and finds out when he tries to pay it.
+  //
+  // The "covered" branch is gated for the SAME reason and it is the same defect wearing the other
+  // face. qualifies arrives as qualifiesViaEmployment OR qualifiesViaProfits (lib/nistudentloan.ts
+  // niPosition), and a landlord's rent profits are not a qualifying route, so a man with no job at
+  // all would be reassured his year was covered by the very income NIM74250 says does not count.
+  // With no salary the only route that could have set the flag is the profits one, which is why the
+  // salary test is the discriminator here. A landlord who also has a payslip keeps the true answer.
+  //
+  // ⚠️ AND ONLY A KNOWN 'property_only'. NIM74250 also says a guest house or a hotel IS a trade, so
+  // an unknown shape keeps the old answer exactly, which is the safe direction: a landlord can
+  // ignore a sentence that does not fit him, while a sparky silently never told about his pension
+  // year loses a qualifying year he cannot get back cheaply.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const lettingOnly = input.incomeShape === 'property_only';
+  if (lettingOnly && (input.voluntarySuggested || (input.qualifies && input.salary <= 0))) {
+    // No figure is quoted, on purpose. The Class 3 rate is not one this codebase holds, and a price
+    // invented here would be a fourth reader of a number no engine owns. GOV.UK, Voluntary National
+    // Insurance: Class 3 is the voluntary class for people not eligible for Class 2, and it has
+    // always been several times the Class 2 rate.
+    lines.push('One thing worth knowing: letting property is not treated as self employed work for National Insurance, so the rent does not build a State Pension year on its own and voluntary Class 2 is not open to you. The voluntary route for you is Class 3, at several times the price. Your National Insurance record on GOV.UK shows which years are short.');
+  } else if (input.voluntarySuggested) {
     lines.push(`One thing worth knowing: profits under the small profits threshold with no job covering you means this year may not count for your State Pension. Voluntary Class 2 protects it for about ${formatGbp(input.class2Annual)} for the whole year. Worth a look near year end.`);
   } else if (input.qualifies) {
     lines.push('Your State Pension year looks covered.');
@@ -707,7 +748,7 @@ export function isSavingsQuestion(body: string): boolean {
 // When a customer asks for a human, complains, or reports something broken, we lift them out of the
 // automated flow and open a support ticket for Jag to answer. DELIBERATELY SPECIFIC: a false positive
 // drags a paying customer onto the desk for nothing, so these require a real cry for help, not an
-// ordinary question or a logged entry. Bare "help" is NOT here — that is the help menu (isHelp), and
+// ordinary question or a logged entry. Bare "help" is NOT here. That is the help menu (isHelp), and
 // this is checked before it so an explicit escalation wins over the generic menu.
 const SUPPORT_HUMAN =
   /(speak|talk|chat|connect|put me through|through to)[^.?!]{0,25}(human|person|someone|agent|advisor|adviser|representative|\brep\b|real person)|(human|real person|a person)[^.?!]{0,25}(talk|speak|chat)/;

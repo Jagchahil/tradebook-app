@@ -63,6 +63,13 @@ export default async function NewInvoicePage({
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
   const said = notice(one('problem'));
 
+  // The diary's "Draft the invoice" press lands here with ?for=<name>: the customer name off his
+  // own diary row, read back server side by /api/diary, never trusted from a form. It is a name
+  // and not an id, so test/webauth.test.mjs's rule stands, and it only prefills a field he can
+  // retype. ⚠️ THE WORK AND THE PRICE ARE NEVER PREFILLED. The diary knows no figures, and an
+  // invented amount on an invoice is the one lie this product must never tell.
+  const prefillFor = (one('for') ?? '').replace(/[\x00-\x1f\x7f]/g, ' ').trim().slice(0, 120);
+
   const gate = await gateForUser(user.id);
   const locked = gate === 'readonly';
 
@@ -92,7 +99,7 @@ export default async function NewInvoicePage({
 
           <form action="/api/invoices" method="post">
             <label htmlFor="customer" style={S.label}>Who is it for</label>
-            <input id="customer" name="customer" type="text" maxLength={120} required className="lek-field" />
+            <input id="customer" name="customer" type="text" maxLength={120} required className="lek-field" defaultValue={prefillFor || undefined} />
 
             <label htmlFor="contact" style={S.label}>Their email or mobile, if you want it kept with the invoice</label>
             <input id="contact" name="contact" type="text" maxLength={160} className="lek-field" />

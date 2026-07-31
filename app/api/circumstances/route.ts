@@ -128,6 +128,14 @@ function backToSetup(req: NextRequest, step: Step) {
   return NextResponse.redirect(new URL(`/app/setup?step=${step}`, req.url), 303);
 }
 
+// The second surface that posts here, 31 July 2026: /app/you/circumstances, where answered
+// questions are changed and open ones finally get asked outside the wizard. Same rule as the step
+// field: the form names a SURFACE, this file builds the path itself, and nothing posted can carry
+// a URL. The token is compared to one literal, so there is still no open redirect to craft.
+function backToYou(req: NextRequest) {
+  return NextResponse.redirect(new URL('/app/you/circumstances', req.url), 303);
+}
+
 export async function POST(req: NextRequest) {
   const user = await sessionUser(req);
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -140,12 +148,16 @@ export async function POST(req: NextRequest) {
   // Where to send him afterwards, when this came from a form. Null for the phone app, which gets
   // JSON and decides its own navigation.
   let back: Step | null = null;
+  // Whether the form asked to land back on /app/you/circumstances. A token checked against one
+  // literal, never a path read from the request. See backToYou.
+  let backYou = false;
   if (isForm) {
     const f = await req.formData().catch(() => null);
     if (!f) return NextResponse.json({ error: 'bad_request' }, { status: 400 });
     body = { key: String(f.get('key') ?? ''), answer: String(f.get('answer') ?? '') };
     const step = String(f.get('step') ?? '');
     back = isStep(step) ? step : null;
+    backYou = String(f.get('back') ?? '') === 'you';
   } else {
     try {
       body = await req.json();
@@ -168,6 +180,7 @@ export async function POST(req: NextRequest) {
   if (key === CONSENT_KEY) {
     const ok = await saveCircumstance(user.id, CONSENT_KEY, answer, CONSENT_ASK, 'app');
     if (!ok) return NextResponse.json({ error: 'write_failed' }, { status: 502 });
+    if (backYou) return backToYou(req);
     if (back) return backToSetup(req, back);
     return NextResponse.json({ ok: true, key, answer, claimant: 'him' });
   }
@@ -218,6 +231,7 @@ export async function POST(req: NextRequest) {
   // put him back on a screen with the question gone and nothing in the database, which is the exact
   // shape of the failure the comment above this write exists to prevent: he believes we know he is
   // married, we do not, and he loses the money while thanking us.
+  if (backYou) return backToYou(req);
   if (back) return backToSetup(req, back);
 
   return NextResponse.json({ ok: true, key, answer, claimant: c.claimant });

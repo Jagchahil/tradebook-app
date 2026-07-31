@@ -7273,3 +7273,447 @@ export async function sweepAuthSends(): Promise<void> {
     // Housekeeping. Never worth failing a cron over.
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE YOU SURFACE, 31 July 2026. Who we think he is, and the email bind. APPENDED, per the
+// append only rule: nothing above this line was touched.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// What the You page prints about him, in one round trip. name, the trade, the business name and
+// the WhatsApp binding all live on his users row, and four separate readers would be four round
+// trips to draw one card. Null means WE COULD NOT READ, which the page must tell apart from a row
+// with empty fields: "we hold nothing about you" and "we could not check" are different sentences.
+export interface IdentityCard {
+  name: string | null;
+  businessName: string | null;
+  // users.trade_type holds the TRADE ('electrician', 'plumber'), despite the name. The signups
+  // table has a column of the same name holding the STRUCTURE, which is a trap this comment exists
+  // to mark. The structure lives in users.business_type and is read by getBusinessProfile.
+  trade: string | null;
+  phone: string | null;
+  phoneVerifiedAt: string | null;
+}
+
+export async function readIdentityCard(userId: string): Promise<IdentityCard | null> {
+  if (!userId) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}` +
+        `&select=name,business_name,trade_type,phone_number,phone_verified_at&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{
+      name: string | null; business_name: string | null; trade_type: string | null;
+      phone_number: string | null; phone_verified_at: string | null;
+    }> | null;
+    if (!Array.isArray(rows)) return null;
+    const r = rows[0];
+    if (!r) return { name: null, businessName: null, trade: null, phone: null, phoneVerifiedAt: null };
+    return {
+      name: r.name ?? null,
+      businessName: r.business_name ?? null,
+      trade: r.trade_type ?? null,
+      phone: r.phone_number ?? null,
+      phoneVerifiedAt: r.phone_verified_at ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// One user's reminder preferences, with the three states kept apart.
+//
+// ⚠️ 'none' AND null ARE DIFFERENT, AND THE SETTINGS ROUTE DEPENDS ON THE DIFFERENCE.
+//
+// getNudgePrefsForUsers answers with an empty map both when the row does not exist and when the
+// read failed, which is fine for a cron deciding who to text and WRONG for a settings write. The
+// write merges the field he changed over the fields he did not, so it has to read first, and a
+// failed read treated as "the defaults" would quietly turn a man's old opt out back ON, on our own
+// database wobble. Under PECR an opt out has to be honoured, so an unreadable answer here refuses
+// the save rather than guessing. 'none' means he has never touched the switches, which really does
+// mean the defaults.
+export async function readNudgePrefs(
+  userId: string,
+): Promise<{ daily_nudges: boolean; weekly_summary: boolean } | 'none' | null> {
+  if (!userId) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/reminder_prefs?user_id=eq.${encodeURIComponent(userId)}` +
+        `&select=daily_nudges,weekly_summary&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{
+      daily_nudges: boolean | null; weekly_summary: boolean | null;
+    }> | null;
+    if (!Array.isArray(rows)) return null;
+    if (rows.length === 0) return 'none';
+    return {
+      daily_nudges: rows[0].daily_nudges !== false,
+      weekly_summary: rows[0].weekly_summary !== false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── The email bind. The delicate one. Read the whole header before touching anything. ────────
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE 29 JULY TAKEOVER FIX IS THE LAW OF THIS SECTION.
+//
+// An email may only resolve to an account through a link made AFTER the address was proved, and
+// signups.user_id is that link. findContactAccount's own header tells the story of the door this
+// replaced: resolve an address through the PHONE TYPED ON A SIGNUP ROW and a stranger's typed
+// digit hands his books over. Demonstrated end to end on 29 July 2026.
+//
+// These two functions serve /api/you/email, where a SIGNED IN man with no proved address adds
+// one. The proof is a code we emailed and he typed back, so by the time bindProvedEmailToUser
+// runs, the address is proved and the session says whose account it joins. The rules:
+//
+//   . A CONTACT THAT IS ANOTHER ACCOUNT'S IS REFUSED, NEVER MOVED. provedEmailOwner answers who
+//     holds the proved link today, and 'another' is a refusal at every step. The link write below
+//     only ever touches rows whose user_id is NULL, so even a bug in the caller could not re-point
+//     a link that already exists.
+//   . BINDING NEVER CREATES AN ACCOUNT. No auth user is minted here and no users row is written.
+//     The GoTrue write is a PUT on the auth user the session already proved.
+//   . AN UNREADABLE ANSWER IS A REFUSAL. Fail closed, unlike the abuse limiters: guessing about
+//     ownership is how a takeover happens politely.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export type EmailOwner = 'another' | 'his' | 'nobody';
+
+// Who holds the proved link for this address today. 'another' refuses the bind, 'his' means the
+// link exists already and pointing GoTrue at it is all that is left, 'nobody' means the address
+// has never been proved into an account. Null means we could not read, WHICH IS NOT 'nobody': the
+// caller refuses and says try again, because a database wobble must never look like a clean sheet
+// on the one check that keeps another man's address out of this account.
+export async function provedEmailOwner(userId: string, email: string): Promise<EmailOwner | null> {
+  const addr = (email ?? '').trim().toLowerCase();
+  if (!userId || !addr) return null;
+  try {
+    const { url } = config();
+    // Only rows carrying a proved link. An unlinked signups row is a form somebody filled in, and
+    // it has no owner to defend or to leak.
+    const res = await fetch(
+      `${url}/rest/v1/signups?email=eq.${encodeURIComponent(addr)}&user_id=not.is.null` +
+        `&select=user_id&limit=10`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ user_id: string | null }> | null;
+    if (!Array.isArray(rows)) return null;
+    if (rows.some((r) => r.user_id && r.user_id !== userId)) return 'another';
+    return rows.length > 0 ? 'his' : 'nobody';
+  } catch {
+    return null;
+  }
+}
+
+export type EmailBindOutcome = 'bound' | 'taken' | 'failed';
+
+// Attach a PROVED address to the session's own auth user and signups row. Called only by
+// /api/you/email/verify, on the far side of the code.
+//
+// ⚠️ NOT attachEmailToAuthUser, AND THE DIFFERENCE IS THE HONEST SENTENCE. That function folds
+// every failure into false, which is right for its caller: the sign in door treats any failure
+// identically. Here 'taken' and 'failed' are different sentences to a man's face. GoTrue refuses
+// an address another auth user holds with a conflict status, and that refusal IS the second half
+// of the never moved rule: even if the signups read above missed something, the auth store will
+// not hold one address on two accounts.
+//
+// ⚠️ 'bound' IS ONLY SAID WHEN THE SIGNUPS LINK IS CONFIRMED. The email sign in door resolves an
+// address through signups.user_id (findContactAccount), so GoTrue holding the address without the
+// link would be a bind that looks done and a door that stays shut. A 'failed' here after the
+// GoTrue write is safe to retry: the PUT is idempotent for the same address on the same user.
+export async function bindProvedEmailToUser(userId: string, email: string): Promise<EmailBindOutcome> {
+  const addr = (email ?? '').trim().toLowerCase();
+  if (!userId || !addr) return 'failed';
+  let url = '';
+  let key = '';
+  try {
+    ({ url, key } = config());
+  } catch {
+    return 'failed';
+  }
+
+  // 1. The auth user the session proved, and no other. email_confirm is a true statement: the
+  //    code was typed back from this inbox minutes ago.
+  let res: Response;
+  try {
+    res = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ email: addr, email_confirm: true }),
+    });
+  } catch {
+    return 'failed';
+  }
+  if (!res.ok) {
+    // GoTrue answers a duplicate address with a conflict. 409 and 422 are both seen in the wild,
+    // so both read as taken. Anything else is our infrastructure, and he is told to try again.
+    return res.status === 409 || res.status === 422 ? 'taken' : 'failed';
+  }
+
+  // 2. The proved link, through the ONE function that already writes it. setSignupUserId patches
+  //    only rows whose user_id is null, which is the never moved rule enforced in the query
+  //    itself: a link that exists is a link this write cannot touch.
+  await setSignupUserId(addr, userId);
+
+  // 3. Confirm the link is really there, and lay one down if the address never had a signups row
+  //    at all, which is every phone app customer who signed up before the web form existed.
+  //    reconciled_at is set on the fresh row because it carries no answers to reconcile, and an
+  //    empty row left unreconciled would be picked up by reconcileSignupToUser and mark itself
+  //    against a future real signup.
+  try {
+    const check = await fetch(
+      `${url}/rest/v1/signups?email=eq.${encodeURIComponent(addr)}` +
+        `&user_id=eq.${encodeURIComponent(userId)}&select=id&limit=1`,
+      { headers: headers() },
+    );
+    if (check.ok) {
+      const rows = (await check.json().catch(() => null)) as unknown[] | null;
+      if (Array.isArray(rows) && rows.length > 0) return 'bound';
+    }
+    const ins = await fetch(`${url}/rest/v1/signups`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        phone: '', email: addr, user_id: userId, reconciled_at: new Date().toISOString(),
+      }),
+    });
+    return ins.ok ? 'bound' : 'failed';
+  } catch {
+    return 'failed';
+  }
+}
+
+// --- THE JOBS DIARY AND GOALS ---------------------------------------------------------------
+//
+// The tables behind /app/diary and /app/goals, per supabase/APPLY_2026-07-31_diary_goals.sql.
+// Both are service role only (RLS enabled, no policies), so tenancy is enforced the way every
+// read in this file enforces it: the user_id filter is in the query, and the id of a row action
+// never arrives from anywhere but a session scoped call site. Every mutating accessor here
+// carries BOTH filters, user and row, so another man's uuid pasted into a form body matches
+// nothing and changes nothing. test/diarygoals.test.mjs pins that shape.
+//
+// ⚠️ LIST READS RETURN null ON FAILURE AND [] ON EMPTY, and the difference is the page's whole
+// honesty. With the migration not yet run, the read fails, and the page must say "we could not
+// read your diary just now" rather than showing a man an empty diary he did not empty. The same
+// rule readAllowanceElection states at length: a failed read is never a fact about him.
+
+export interface DiaryJobDbRow {
+  id: string;
+  title: string;
+  starts_at: string;
+  ends_at: string;
+  customer_name: string | null;
+  status: string;
+  created_at: string;
+}
+
+const DIARY_COLS = 'id,title,starts_at,ends_at,customer_name,status,created_at';
+
+export async function listDiaryJobs(userId: string): Promise<DiaryJobDbRow[] | null> {
+  if (!userId) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/diary_jobs?user_id=eq.${encodeURIComponent(userId)}`
+      + `&select=${DIARY_COLS}&order=starts_at.asc&limit=500`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as DiaryJobDbRow[];
+  } catch {
+    return null;
+  }
+}
+
+// One of HIS rows, or null, whether missing or unreadable. Used by the draft action, where the
+// customer name for the invoice prefill must come from the row we hold, never from a form field
+// that could carry anything.
+export async function readDiaryJob(userId: string, jobId: string): Promise<DiaryJobDbRow | null> {
+  if (!userId || !UUID.test(jobId)) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/diary_jobs?user_id=eq.${encodeURIComponent(userId)}`
+      + `&id=eq.${encodeURIComponent(jobId)}&select=${DIARY_COLS}&limit=1`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as DiaryJobDbRow[];
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function addDiaryJob(
+  userId: string,
+  job: { title: string; startsAt: string; endsAt: string; customerName: string | null },
+): Promise<boolean> {
+  if (!userId || !job.title) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/diary_jobs`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        user_id: userId,
+        title: job.title,
+        starts_at: job.startsAt,
+        ends_at: job.endsAt,
+        customer_name: job.customerName,
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ⚠️ return=representation, NOT return=minimal, AND IT IS THE TENANCY ANSWER. A PATCH whose
+// filters match nothing still comes back 204 under return=minimal, so a stranger's uuid would
+// "succeed" while changing nothing, and the page would say Done over a job that is not his and
+// was not touched. Asking for the rows back makes zero matches a false, which the route turns
+// into an honest "we could not find that job".
+export async function setDiaryJobStatus(
+  userId: string,
+  jobId: string,
+  status: 'planned' | 'done' | 'invoiced',
+): Promise<boolean> {
+  if (!userId || !UUID.test(jobId)) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/diary_jobs?user_id=eq.${encodeURIComponent(userId)}&id=eq.${encodeURIComponent(jobId)}`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ status }),
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json()) as unknown[];
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// A real delete of his own row, both filters in the URL, and representation asked for so
+// deleting nothing reads as the false it is.
+export async function deleteDiaryJob(userId: string, jobId: string): Promise<boolean> {
+  if (!userId || !UUID.test(jobId)) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/diary_jobs?user_id=eq.${encodeURIComponent(userId)}&id=eq.${encodeURIComponent(jobId)}`,
+      { method: 'DELETE', headers: headers({ Prefer: 'return=representation' }), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json()) as unknown[];
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export interface GoalDbRow {
+  id: string;
+  kind: string;
+  label: string;
+  amount_pence: number | null;
+  target_date: string | null;
+  status: string;
+  created_at: string;
+}
+
+const GOAL_COLS = 'id,kind,label,amount_pence,target_date,status,created_at';
+
+export async function listGoals(userId: string): Promise<GoalDbRow[] | null> {
+  if (!userId) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/goals?user_id=eq.${encodeURIComponent(userId)}`
+      + `&select=${GOAL_COLS}&order=created_at.asc&limit=200`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as GoalDbRow[];
+  } catch {
+    return null;
+  }
+}
+
+export async function addGoal(
+  userId: string,
+  goal: { kind: string; label: string; amountPence: number | null; targetDate: string | null },
+): Promise<boolean> {
+  if (!userId || !goal.kind || !goal.label) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/goals`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        user_id: userId,
+        kind: goal.kind,
+        label: goal.label,
+        amount_pence: goal.amountPence,
+        target_date: goal.targetDate,
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Same two filter, representation asked for shape as setDiaryJobStatus, for the same tenancy
+// reason.
+export async function setGoalStatus(userId: string, goalId: string, status: 'open' | 'done'): Promise<boolean> {
+  if (!userId || !UUID.test(goalId)) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/goals?user_id=eq.${encodeURIComponent(userId)}&id=eq.${encodeURIComponent(goalId)}`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ status }),
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json()) as unknown[];
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteGoal(userId: string, goalId: string): Promise<boolean> {
+  if (!userId || !UUID.test(goalId)) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/goals?user_id=eq.${encodeURIComponent(userId)}&id=eq.${encodeURIComponent(goalId)}`,
+      { method: 'DELETE', headers: headers({ Prefer: 'return=representation' }), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json()) as unknown[];
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}

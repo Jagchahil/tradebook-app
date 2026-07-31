@@ -56,6 +56,7 @@ export const SECTIONS: ReadonlyArray<NavSection> = [
     items: [
       { href: '/app/money', label: 'Everything logged', hint: 'Every payment, a month at a time' },
       { href: '/app/pile', label: 'Waiting on you', hint: 'Anything we could not call ourselves' },
+      { href: '/app/goals', label: 'Goals', hint: 'What you are saving for, written down' },
       { href: '/app/money/add', label: 'Add an entry', hint: 'Cash in hand, typed straight in' },
       { href: '/app/money/capture', label: 'Upload a till slip', hint: 'We read it, and nothing counts until you say so' },
       { href: '/app/money/import', label: 'Upload a statement', hint: 'A CSV from your bank, read without connecting it' },
@@ -78,16 +79,22 @@ export const SECTIONS: ReadonlyArray<NavSection> = [
     items: [
       { href: '/app/invoices', label: 'Every invoice', hint: 'Who owes you, and what is late' },
       { href: '/app/invoices/new', label: 'Make an invoice', hint: 'Built here, sent by you' },
+      { href: '/app/diary', label: 'Jobs diary', hint: 'What is booked, and one press to invoice it' },
       { href: '/app/proof-of-income', label: 'Proof of income', hint: 'The summary a landlord or lender asks for' },
       { href: '/app/share-books', label: 'Share your books', hint: 'A read only link you can take back' },
     ],
   },
   {
-    href: '/account',
+    // The You surface proper, 31 July 2026. The section used to lean on /account because there was
+    // nowhere else to stand; now /app/you is the overview and the old doors keep their places.
+    href: '/app/you',
     label: 'You',
     items: [
+      { href: '/app/you', label: 'About you', hint: 'Who we think you are, and how to reach you' },
+      { href: '/app/you/circumstances', label: 'Circumstances', hint: 'What you have told us, and what is still worth answering' },
       { href: '/app/connect', label: 'WhatsApp', hint: 'The number your receipts arrive from' },
       { href: '/account', label: 'Billing', hint: 'Your card, invoices and cancelling' },
+      { href: '/app/you/settings', label: 'Settings', hint: 'The daily reminder and the weekly summary' },
     ],
   },
 ];

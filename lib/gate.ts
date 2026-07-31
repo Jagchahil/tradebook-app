@@ -178,6 +178,8 @@ export const GATED_ROUTES: GatedRoute[] = [
   // Gate it the day it learns who is asking, which is the day the phone app is rebuilt.
   { route: 'app/api/draft-invoice', rule: 'always', why: 'Drafting an invoice IS work, but this route has no session to gate on: the phone app posts with no token. The spend is already bounded by a per IP cap and a global daily ceiling that fails closed, so this is a paywall leak rather than a wallet risk. Recorded rather than pretended away.' },
   { route: 'app/api/elections', rule: 'entitled', why: 'Claiming use of home. Us finding him money is the product. ⚠️ The POST is gated and the DELETE deliberately is not: he may always UNDO a claim on his own record, and refusing that would leave an election standing that he has asked us to drop.' },
+  { route: 'app/api/diary', rule: 'entitled', why: 'The jobs diary. Adding a job and taking one to invoicing are the work: the reminder and the invoice nudge exist because the row does. ⚠️ Only those two actions are gated inside the route. Marking his own job done or removing his own row is him keeping his record straight, always allowed, the elections DELETE shape.' },
+  { route: 'app/api/goals', rule: 'entitled', why: 'His goals. Adding one is the work, because the tax planning that reasons about a van or tools goal exists to find him money. ⚠️ Marking his own goal done or removing it is not gated inside the route, the elections DELETE shape: his record is his whatever he pays.' },
   { route: 'app/api/reconcile', rule: 'entitled', why: 'Matching his records up. Work.' },
   { route: 'app/api/learn', rule: 'entitled', why: 'Teaching the categoriser a vendor rule, which then does work for him for ever.' },
   { route: 'app/api/voice/complete', rule: 'entitled', why: 'A transcribed voice note becoming a logged transaction. Capture is work.' },
@@ -246,6 +248,17 @@ export const GATED_ROUTES: GatedRoute[] = [
   // ── The invoices surface on the web, 30 July 2026. ────────────────────────────────────────
   { route: 'app/api/invoices', rule: 'entitled', why: 'Raising a new invoice through the same createInvoice path WhatsApp uses. Work, and unlike draft-invoice this door HAS a session to gate on, so it is gated. He sends the link himself; we never contact his customer.' },
   { route: 'app/api/share-books', rule: 'always', why: 'His figures going OUT to a broker, a landlord or an accountant, through the same lib machinery as app/api/share, and the same judgement: his records are his. Revoking a share is a withdrawal of consent and could never be gated anyway.' },
+
+  // ── The You surface, 31 July 2026. His identity and his switches. ─────────────────────────
+  //
+  // ⚠️ ALL THREE ARE 'always' AND NONE OF THEM IS A NEAR MISS. A locked out man must still
+  // control his own contact points: the email he adds here is the address his sign in codes go
+  // to, so gating it would gate the way back into his own account, which is the first rule of
+  // this whole table. And the reminder switches are opt outs. Making a man pay to stop being
+  // messaged is the unsubscribe mistake wearing a different hat.
+  { route: 'app/api/you/email/start', rule: 'always', why: 'Sending himself a code to prove a new email. His contact point, and the address his sign in codes arrive at, so gating it can gate him out of his own account.' },
+  { route: 'app/api/you/email/verify', rule: 'always', why: 'Typing the code back and binding the proved address. The other half of the same door. Binding never creates an account and never moves a contact, so there is no work here to stop.' },
+  { route: 'app/api/you/settings', rule: 'always', why: 'The reminder and weekly summary switches. Turning messages OFF is an opt out and may never sit behind a paywall (PECR), and turning them on costs us nothing.' },
 ];
 
 export function ruleFor(route: string): Rule | null {

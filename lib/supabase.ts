@@ -124,6 +124,92 @@ export async function addWaSend(n: number): Promise<number | null> {
   }
 }
 
+// --- Outbound WhatsApp send counter (wa_out) --------------------------------
+// One row per outbound send that Meta ACCEPTED, written from graphSend in
+// lib/whatsapp.ts, the one door every send already passes through. The row is
+// the customer key, the kind (freeform or template, because templates are the
+// paid ones) and a timestamp. NEVER the message content and NEVER a template
+// variable: this table is a counter, not a log.
+//
+// BEST EFFORT, BY DESIGN. The webhook must answer Meta inside 5 seconds, so a
+// failed, slow or impossible insert may never fail, block or delay a send.
+// Every path in here swallows, the fetch carries its own timeout, and the
+// caller does not await. Until the founder pastes
+// supabase/APPLY_2026-07-31_wa_out.sql by hand the table does not exist and
+// the insert simply fails into the same swallow: recording is skipped and the
+// send is untouched. test/waout.test.mjs pins that.
+export type WaOutKind = 'freeform' | 'template';
+
+export async function recordWaOut(
+  kind: WaOutKind,
+  phone: string | null,
+  userId: string | null = null,
+): Promise<void> {
+  try {
+    const { url } = config();
+    await fetch(`${url}/rest/v1/wa_out`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      signal: AbortSignal.timeout(3000),
+      body: JSON.stringify({ kind, phone, user_id: userId }),
+    }).catch(() => {});
+  } catch {
+    /* best effort */
+  }
+}
+
+// The month's observed outbound sends, counted per customer. The phone on a
+// wa_out row is a JOIN KEY here and never leaves this function: the result is
+// keyed by user id, with every phone that matches no user pooled under
+// 'unmatched', the same honest bucket lib/messagecost.ts uses for strangers.
+// Returns null when the table is missing or unreadable, and the margin view
+// then falls back to its model rather than drawing a confident zero.
+export interface WaOutMonth {
+  total: number;
+  byUser: Record<string, { freeform: number; template: number }>;
+}
+
+export async function readWaOutMonth(month?: string): Promise<WaOutMonth | null> {
+  const m = month ?? new Date().toISOString().slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(m)) return null;
+  const [y, mo] = m.split('-').map(Number);
+  const first = `${m}-01`;
+  const next = new Date(Date.UTC(y, mo, 1)).toISOString().slice(0, 10);
+  try {
+    const { url } = config();
+    const [outRes, usersRes] = await Promise.all([
+      fetch(
+        `${url}/rest/v1/wa_out?select=user_id,phone,kind` +
+          `&created_at=gte.${first}&created_at=lt.${next}&limit=10000`,
+        { headers: headers() },
+      ),
+      fetch(`${url}/rest/v1/users?select=id,phone_number&limit=2000`, { headers: headers() }),
+    ]);
+    if (!outRes.ok || !usersRes.ok) return null;
+    const sends = (await outRes.json()) as Array<{ user_id: string | null; phone: string | null; kind: string }>;
+    const users = (await usersRes.json()) as Array<{ id: string; phone_number: string | null }>;
+
+    const idByPhone = new Map<string, string>();
+    for (const u of users) {
+      if (u.phone_number) idByPhone.set(u.phone_number, u.id);
+    }
+
+    const byUser: WaOutMonth['byUser'] = {};
+    let total = 0;
+    for (const s of sends) {
+      const id = s.user_id ?? (s.phone ? idByPhone.get(s.phone) : undefined) ?? 'unmatched';
+      const agg = byUser[id] ?? { freeform: 0, template: 0 };
+      if (s.kind === 'template') agg.template += 1;
+      else agg.freeform += 1;
+      byUser[id] = agg;
+      total += 1;
+    }
+    return { total, byUser };
+  } catch {
+    return null;
+  }
+}
+
 // --- Khoji knowledge retrieval (the growing brain) ------------------------
 // Khoji (the Mac mini watcher) distils GOV.UK and HMRC updates into the
 // knowledge_items table. This reads back only the rows a human has REVIEWED and

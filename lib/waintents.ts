@@ -343,6 +343,29 @@ export function formatGbp(n: number): string {
   return `£${Math.abs(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// --- "What do I owe", the WhatsApp sentence around the tax hub's own figure ----
+//
+// 🔴 THE FIGURE IS PASSED IN, NEVER WORKED OUT HERE, AND IT IS THE TAX HUB'S OWN NUMBER.
+//
+// What arrives is taxPosition() on getOptimiserInput(): the same call /app/tax leads with, the
+// Overview makes and the web chats at /app/thread answer with. The webhook used to run a little
+// January of its own for this question (soleTraderTax on the asked about rows, the student loan
+// added, CIS taken off, with company and partnership variants), and every figure in it was real
+// while the total still disagreed with the Tax screen. A man who asks two of our surfaces what he
+// owes and hears two numbers stops believing both. One question, one figure, on every channel.
+//
+// The projection notes are the thread's own sentences word for word, so the channels cannot say
+// two different things about one number. Only the tail is WhatsApp's: the channel keeps its
+// replies short, and the standing redirect shape ("Full picture in the app under...") is the same
+// one studentLoanAnswer already uses. Deterministic, never an AI paraphrase: a paraphrased money
+// figure is a different money figure.
+export function oweAnswer(setAside: number, projected: boolean): string {
+  const note = projected
+    ? 'That is what the year is heading for, on everything you have confirmed so far.'
+    : 'That is what the year so far has built up, too early to call the whole year yet.';
+  return `Put by ${formatGbp(setAside)} for tax. ${note} Full picture in the app under Tax.`;
+}
+
 // --- National Insurance and student loan questions ---------------------------
 // Answered deterministically from the user's own rows plus the plan stored on
 // their account, no AI. These run BEFORE matchTotalsQuestion in the webhook,

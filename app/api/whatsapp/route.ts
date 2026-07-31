@@ -89,7 +89,6 @@ import {
   setEmploymentIncome,
   setBusinessType,
   setPartnershipShare,
-  getBusinessProfile,
   getOrCreateReferralCode,
   getRelevantKnowledge,
   getOptimiserInput,
@@ -113,6 +112,7 @@ import {
   isDeadlineQuestion,
   deadlineAnswer,
   matchTotalsQuestion,
+  oweAnswer,
   isWeeklySummaryRequest,
   matchUseOfHomeElection,
   useOfHomeHoursQuestion,
@@ -145,9 +145,9 @@ import { quarterForDate } from '../../../lib/quarterpack';
 import { openTicket } from '../../../lib/support';
 import { matchKb } from '../../../lib/supportkb';
 import { soleTraderTax, FACTS } from '../../../lib/taxengine';
-import { corporationTax } from '../../../lib/ltdengine';
+import { taxPosition } from '../../../lib/taxoptimiser';
 import { aprilDelta } from '../../../lib/propertyengine';
-import { niPosition, studentLoanRepayment, studentLoanForSA, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
+import { niPosition, studentLoanRepayment, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
 import type { TradeInfo } from '../../../lib/taxguide';
 import { rateLimitedShared } from '../../../lib/ratelimit';
@@ -1526,48 +1526,20 @@ async function handleTotals(from: string, body: string): Promise<void> {
     await sendText(from, `${q.periodLabel === 'all time' ? 'All time' : `For ${q.periodLabel}`}: ${formatGbp(totals.income)} in, ${formatGbp(totals.expenses)} out, so ${formatGbp(profit)} profit.`);
     return;
   }
-  // 🔴 THE ANSWER BRANCHES ON BUSINESS STRUCTURE. A sole trader, a partner and a company director on
-  // the same profit owe three different amounts, and giving all three the sole-trader number was the
-  // gap Jag caught. getBusinessProfile defaults to sole_trader, so an account that never set a
-  // structure is unchanged.
-  const profile = await getBusinessProfile(userId).catch(() => null);
-
-  // A LIMITED COMPANY is a different calculation entirely: the COMPANY pays corporation tax on its
-  // profit, and the director's personal tax depends on how they extract it. We give the company's
-  // liability plainly and point to the Pay Yourself engine for the extraction, rather than pretending
-  // it is a sole trader and quoting a wrong number.
-  if (profile?.businessType === 'limited_company') {
-    const ct = corporationTax(Math.max(0, profit));
-    await sendText(
-      from,
-      `As a limited company, on ${formatGbp(profit)} profit so far this tax year the corporation tax is about ${formatGbp(ct)}. That is the company's bill. What YOU pay depends on how you take the money out, salary and dividends, and there is a split that keeps the most. Reply "pay yourself" and I will show you the numbers. A rough guide from your logged entries, not a final figure.`,
-    );
-    return;
-  }
-
-  // A PARTNER is taxed on their SHARE of the profit, not the whole thing.
-  const share = profile?.businessType === 'partnership' ? profile.partnershipShare / 100 : 1;
-  const taxableProfit = Math.max(0, profit * share);
-  const shareNote = share < 1 ? ` (your ${Math.round(share * 100)}% share of the ${formatGbp(profit)} partnership profit)` : '';
-
-  // Tax estimate for the year to date. Includes to-review entries, says so, and
-  // credits CIS already deducted. A guide, not a bill. Once a student loan plan
-  // is stored, the loan folds in automatically so the number is the whole
-  // January picture, not a surprise minus one line.
-  const est = soleTraderTax(taxableProfit);
-  const slSettings = await getStudentLoanSettings(userId).catch(() => null);
-  const slPlans: StudentPlan[] = [];
-  if (slSettings?.plan) slPlans.push(slSettings.plan);
-  if (slSettings?.postgrad) slPlans.push('postgrad');
-  const slDue = slPlans.length > 0 ? studentLoanForSA(taxableProfit, slSettings?.employmentIncome ?? 0, slPlans) : 0;
-  const totalDue = est.total + slDue;
-  const afterCis = Math.max(0, totalDue - totals.cis);
-  const slLine = slDue > 0 ? ` including ${formatGbp(slDue)} of student loan` : '';
-  const cisLine = totals.cis > 0 ? ` You have already had ${formatGbp(totals.cis)} taken in CIS, so the bill after that is about ${formatGbp(afterCis)}.` : '';
-  await sendText(
-    from,
-    `On ${formatGbp(taxableProfit)} profit so far this tax year${shareNote}, the rough bill is ${formatGbp(totalDue)} (income tax plus National Insurance${slLine}).${cisLine} A rough guide from your logged entries, including ones you have not confirmed yet, not a final figure.`,
-  );
+  // 🔴 WHAT HE OWES IS THE TAX HUB'S OWN NUMBER, FETCHED BY NAME, NEVER RE-DERIVED.
+  //
+  // This branch used to run a little January of its own: soleTraderTax on the asked about rows,
+  // the student loan added, CIS taken off, with company and partnership variants. Every figure in
+  // it was real, and the total still disagreed with /app/tax and the web chats at /app/thread,
+  // which both lead with taxPosition() on getOptimiserInput(): the whole person figure across
+  // trade, salary, property, savings and dividends, projected to the year, partnership share
+  // already applied. A man who asks two of our surfaces what he owes and hears two numbers stops
+  // believing both. So this is the same call the Tax hub, the Overview and the thread make, and
+  // the sentence around the figure is lib/waintents' oweAnswer, deterministic and pinned by test.
+  // A figure off his own rows is exactly what WhatsApp is for, so it is answered here in full.
+  const optimiser = await getOptimiserInput(userId);
+  const tax = taxPosition(optimiser);
+  await sendText(from, oweAnswer(tax.setAside, tax.projected));
 }
 
 // The UK tax year starts 6 April. Same rule as matchTotalsQuestion.

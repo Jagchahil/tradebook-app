@@ -192,6 +192,19 @@ ok('what we found him comes second', full.body.includes('We have found £84 you 
 ok('the trial sentence is last', full.body.trim().endsWith('Nothing gets deleted and your figures stay where they are.'));
 ok('it says the trial ends tomorrow', full.body.includes('Your free trial ends tomorrow.'));
 
+// 🔴 THE QUESTIONS DOOR IS THE LEKHIO CHATS ON THE WEB (31 July 2026). The one link the day six
+// email carries points at /app/thread, the chats, built from NEXT_PUBLIC_APP_URL with the
+// lekhio.app fallback. Never a domain we do not own: test/domain.test.mjs stands guard over that
+// string repo wide, and this pins the target so the link cannot quietly point somewhere else.
+const CHATS_URL = `${process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app'}/app/thread`;
+ok('the email invites questions into the Lekhio chats', /ask in your Lekhio chats/i.test(full.body));
+ok('🔴 the link is the chats on the web, on our own domain', full.body.includes(CHATS_URL));
+ok('🔴 never the domain we do not own', !/lekhio\.com/.test(full.body));
+ok('the chats line sits before the trial sentence, which stays last',
+  full.body.indexOf('/app/thread') < full.body.indexOf('Your free trial ends tomorrow.'));
+ok('the source builds the link from NEXT_PUBLIC_APP_URL, never a bare string alone',
+  /NEXT_PUBLIC_APP_URL/.test(_rf(_path.join(_lib, 'trialnudge.ts'), 'utf8')));
+
 // 🔴 DOC 108: NEVER PRICE ON THE SAVING. "We found you £84, that is six months of Lekhio" is the
 // obvious next sentence and it is forbidden. This is the one place the temptation actually lives.
 ok('🔴 it never turns the saving into a pitch',
@@ -215,6 +228,7 @@ ok('🔴 an empty week says so plainly rather than printing zeros',
 ok('and it points at the one thing that works with nothing typed',
   /connect your bank/i.test(empty.body));
 ok('the empty version still says the trial ends tomorrow', empty.body.includes('ends tomorrow'));
+ok('the empty version carries the same chats door', empty.body.includes('/app/thread'));
 
 // A bad week is still his week, and the minus sign goes in front of the symbol.
 const bad = trialWeekMessage(week({ income: 200, expenses: 640, profit: -440, saved: null }));

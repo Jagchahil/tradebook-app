@@ -167,6 +167,13 @@ const TRIAL_TAIL = [
   'If you would rather not, you do not need to do anything. Nothing gets deleted and your figures stay where they are.',
 ].join(' ');
 
+// The door for questions is the Lekhio chats on the web, where the answers come off his own rows.
+// The link is built from NEXT_PUBLIC_APP_URL per the house rule in CLAUDE.md, never a written out
+// domain, and never lekhio.com, a domain we do not own. The env read keeps this module loadable by
+// a bare node test, where it simply falls back to the real site.
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
+const CHATS_LINE = `Any questions about your figures, ask in your Lekhio chats: ${APP_URL}/app/thread`;
+
 export function trialWeekMessage(week: TrialWeek): { subject: string; body: string } {
   const lines: string[] = [];
 
@@ -185,6 +192,8 @@ export function trialWeekMessage(week: TrialWeek): { subject: string; body: stri
     }
   }
 
+  lines.push('');
+  lines.push(CHATS_LINE);
   lines.push('');
   lines.push(TRIAL_TAIL);
   return { subject: TRIAL_WEEK_SUBJECT, body: lines.join('\n') };

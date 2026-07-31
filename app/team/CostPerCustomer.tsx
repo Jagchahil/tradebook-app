@@ -18,8 +18,11 @@ import { C, T, S as U } from './ui';
 //    the customer list (COST_ROW_FIELDS in lib/messagecost.ts, tested).
 //
 // 2. MODELLED AND OBSERVED ARE NOT BLURRED. AI calls and inbound messages are observed counters.
-//    Reply COSTS are modelled (one reply per inbound message, at a per message rate Meta has not
-//    yet published). The table says which is which, in words, on the screen.
+//    Since 31 July 2026 outbound sends are recorded per customer too (public.wa_out, written at
+//    the one door every send passes through), and when the month has rows the sends column and
+//    the margin are OBSERVED. Until the table exists or has rows, reply costs stay MODELLED (one
+//    reply per inbound message, at a per message rate Meta has not yet published). The table
+//    says which is which, in words, on the screen.
 
 interface Row {
   id: string;
@@ -27,6 +30,7 @@ interface Row {
   aiCalls: number;
   inboundMessages: number;
   serviceRepliesModelled: number;
+  sendsObserved: number | null;
   aiPence: number;
   messagePenceNow: number;
   messagePenceFromOct: number;
@@ -38,6 +42,7 @@ interface Row {
 interface Payload {
   month: string;
   rows: Row[];
+  observed: boolean;
   floorPct: number;
   targetPct: number;
   perMessagePence: number;
@@ -87,6 +92,7 @@ export default function CostPerCustomer() {
                   <th style={U.th}>AI calls</th>
                   <th style={U.th}>AI cost</th>
                   <th style={U.th}>Messages in</th>
+                  <th style={U.th}>{d.observed ? 'Sends out' : 'Sends out (modelled)'}</th>
                   <th style={U.th}>{d.regimeLive ? 'Reply cost' : 'Reply cost from 1 Oct'}</th>
                   <th style={U.th}>Margin</th>
                 </tr>
@@ -101,6 +107,7 @@ export default function CostPerCustomer() {
                       <td style={U.td}>{r.aiCalls}</td>
                       <td style={U.td}>{pencePretty(r.aiPence)}</td>
                       <td style={U.td}>{r.inboundMessages}</td>
+                      <td style={U.td}>{r.sendsObserved ?? r.serviceRepliesModelled}</td>
                       <td style={U.td}>{pencePretty(d.regimeLive ? r.messagePenceNow : r.messagePenceFromOct)}</td>
                       <td style={{ ...U.td, color: tone, fontWeight: 700 }}>{margin.toFixed(1)}%</td>
                     </tr>
@@ -109,12 +116,26 @@ export default function CostPerCustomer() {
               </tbody>
             </table>
             <div style={S.legend}>
-              AI calls and messages in are <b style={{ color: C.ink }}>observed</b> counters. Reply
-              costs are <b style={{ color: C.ink }}>modelled</b>: one reply per inbound message at{' '}
-              {pencePretty(d.perMessagePence)} each{d.perMessageInferred
-                ? ', a rate inferred from industry sources until Meta publishes UK figures by 1 September'
-                : ''}. Outbound sends are not yet logged per customer, so nothing here is an invoice
-              figure yet.{!d.regimeLive
+              AI calls and messages in are <b style={{ color: C.ink }}>observed</b> counters.{' '}
+              {d.observed ? (
+                <>
+                  Sends out and the costs built on them are <b style={{ color: C.ink }}>observed</b>{' '}
+                  too: every outbound send is counted per customer as it leaves, priced at{' '}
+                  {pencePretty(d.perMessagePence)} each
+                  {d.perMessageInferred
+                    ? ', a rate inferred from industry sources until Meta publishes UK figures by 1 September'
+                    : ''}.
+                </>
+              ) : (
+                <>
+                  Reply costs are <b style={{ color: C.ink }}>modelled</b>: one reply per inbound
+                  message at {pencePretty(d.perMessagePence)} each
+                  {d.perMessageInferred
+                    ? ', a rate inferred from industry sources until Meta publishes UK figures by 1 September'
+                    : ''}. The send counter has no rows for this month yet, so nothing here is an
+                  invoice figure.
+                </>
+              )}{!d.regimeLive
                 ? ' Today these replies are free. The margin column shows this same month as it will be billed from 1 October, which is the point of looking now.'
                 : ''}{' '}
               A red row is never a customer to cap. It is a conversation to route into the app.

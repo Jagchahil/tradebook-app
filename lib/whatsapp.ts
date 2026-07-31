@@ -8,6 +8,7 @@
 //   WHATSAPP_APP_SECRET       the Meta app secret, used to verify the signature
 
 import crypto from 'crypto';
+import { recordWaOut } from './supabase';
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
@@ -186,7 +187,21 @@ async function graphSend(label: string, payload: Record<string, unknown>): Promi
         body: JSON.stringify({ messaging_product: 'whatsapp', ...payload }),
       });
 
-      if (res.ok) return true;
+      if (res.ok) {
+        // THE SEND COUNTER. Every send Meta accepted becomes one wa_out row, so the margin view
+        // on /team can OBSERVE what we actually sent each customer instead of modelling one reply
+        // per inbound (see lib/messagecost.ts, which proposed exactly this hook). What is
+        // recorded: the kind (a template is the paid one, everything else is freeform) and the
+        // recipient's phone, the same key the ai_usage per customer counters use. NEVER the body
+        // and NEVER a template variable. Deliberately not awaited: recordWaOut swallows every
+        // failure and carries its own timeout, so a missing table or a slow insert cannot fail,
+        // block or delay the send it is counting.
+        void recordWaOut(
+          payload.type === 'template' ? 'template' : 'freeform',
+          typeof payload.to === 'string' ? payload.to : null,
+        );
+        return true;
+      }
 
       const transient = res.status === 429 || res.status >= 500;
       if (!transient || last) {

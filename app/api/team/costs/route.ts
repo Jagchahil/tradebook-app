@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAccessToken, readTeamMember } from '../../../../lib/supabase';
+import { verifyAccessToken, readTeamMember, readWaOutMonth } from '../../../../lib/supabase';
 import { isTeam } from '../../../../lib/team';
 import {
   readCustomerCostMonth,
@@ -8,7 +8,15 @@ import {
   MARGIN_FLOOR_PCT,
   PER_MESSAGE_PRICING_FROM,
 } from '../../../../lib/messagecost';
-import { costPerMessagePence, costPerAiCallPence, marginTargetPct } from '../../../../lib/margin';
+import {
+  costPerMessagePence,
+  costPerAiCallPence,
+  marginTargetPct,
+  preferObserved,
+  usageForMargin,
+  whatsappSpendPence,
+  marginForUsage,
+} from '../../../../lib/margin';
 
 export const runtime = 'nodejs';
 
@@ -37,9 +45,36 @@ export async function GET(req: NextRequest) {
   // the team to stop looking in the one month it matters.
   if (rows === null) return NextResponse.json({ error: 'unreadable' }, { status: 503 });
 
+  // OBSERVED AGAINST MODELLED (31 July 2026). Every send Meta accepts is now recorded in
+  // public.wa_out, so when the month has rows the margin here is a measurement: the counted
+  // freeform and template sends, priced by lib/margin.ts. When the table is empty or unreadable
+  // (the founder pastes the SQL by hand, so it may not exist yet) the rows keep their modelled
+  // figures, one reply per inbound, and say so. The count added to each row is OUR spend on him,
+  // the same privacy posture as every other figure that crosses this boundary.
+  const waOut = await readWaOutMonth(month);
+  const observed = preferObserved(waOut?.total ?? null);
+  const now = new Date();
+  const octDate = new Date(`${PER_MESSAGE_PRICING_FROM}T12:00:00Z`);
+  const shaped = rows.map((r) => {
+    if (!observed || !waOut) return { ...r, sendsObserved: null };
+    const counts = waOut.byUser[r.id] ?? { freeform: 0, template: 0 };
+    const { usage } = usageForMargin(counts, r.inboundMessages, r.aiCalls);
+    return {
+      ...r,
+      sendsObserved: counts.freeform + counts.template,
+      messagePenceNow: whatsappSpendPence(usage, now),
+      messagePenceFromOct: whatsappSpendPence(usage, octDate),
+      marginNowPct: marginForUsage(usage, now),
+      marginFromOctPct: marginForUsage(usage, octDate),
+    };
+  });
+  // Keep the promise of the surface, heaviest first, under whichever mode produced the figures.
+  if (observed) shaped.sort((a, b) => a.marginFromOctPct - b.marginFromOctPct || b.aiPence - a.aiPence);
+
   return NextResponse.json({
     month,
-    rows,
+    rows: shaped,
+    observed,
     floorPct: MARGIN_FLOOR_PCT,
     targetPct: marginTargetPct(),
     perMessagePence: costPerMessagePence(),

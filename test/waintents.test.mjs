@@ -150,6 +150,40 @@ ok('claim question is not totals', W.matchTotalsQuestion('how much can I claim f
 eq('gbp formatting', W.formatGbp(1250.5), '£1,250.50');
 
 
+console.log('\n=== waintents: what do I owe, one figure on every channel ===\n');
+const oweP = W.oweAnswer(2450.5, true);
+const oweE = W.oweAnswer(320, false);
+ok('the owe answer leads with the figure', oweP.startsWith('Put by £2,450.50 for tax.'));
+ok('a projection is called a projection', /heading for/.test(oweP) && /confirmed so far/.test(oweP));
+ok('an early year says it is too early to call', /too early to call the whole year yet/.test(oweE));
+ok('both stay short and end at the Tax screen', [oweP, oweE].every((s) => /Full picture in the app under Tax\.$/.test(s)));
+ok('no forbidden dashes in either', [oweP, oweE].every((s) => !/[–—]/.test(s)));
+
+// 🔴 BOTH CHANNELS DERIVE THE OWE FIGURE FROM THE SAME FUNCTION, BY NAME (31 July 2026).
+//
+// The WhatsApp webhook used to run a little January of its own for this question (soleTraderTax
+// plus the loan minus CIS, with company and partnership variants) after the thread had already
+// moved to the tax hub's own taxPosition() on getOptimiserInput(). Two channels, two numbers, one
+// question. These assertions read both routes' source and tie them together the same way
+// test/thread.test.mjs ties the thread to the tax hub, so the channels cannot drift apart again.
+{
+  const waSrc = readFileSync(path.resolve(here, '../app/api/whatsapp/route.ts'), 'utf8');
+  const threadSrc = readFileSync(path.resolve(here, '../app/api/thread/route.ts'), 'utf8');
+  ok('🔴 the WhatsApp owe answer is taxPosition on getOptimiserInput, the thread and tax hub call',
+    /taxPosition\(optimiser\)/.test(waSrc) && /taxPosition\(optimiser\)/.test(threadSrc)
+    && /getOptimiserInput\(userId\)/.test(waSrc) && /getOptimiserInput\(userId\)/.test(threadSrc));
+  ok('🔴 the figure WhatsApp speaks is setAside itself, through oweAnswer',
+    /oweAnswer\(tax\.setAside, tax\.projected\)/.test(waSrc));
+  ok('🔴 the little January is gone from the webhook: no second engine on this question',
+    !/studentLoanForSA/.test(waSrc) && !/corporationTax\(/.test(waSrc) && !/rough bill/.test(waSrc));
+  ok('the projection notes are the thread\'s own sentences word for word',
+    threadSrc.includes('That is what the year is heading for, on everything you have confirmed so far.')
+    && oweP.includes('That is what the year is heading for, on everything you have confirmed so far.')
+    && threadSrc.includes('too early to call the whole year yet')
+    && oweE.includes('too early to call the whole year yet'));
+}
+
+
 console.log('\n=== waintents: NI and student loan ===\n');
 ok('ni question full phrase', W.isNiQuestion('how much national insurance do I pay'));
 ok('ni question class 4', W.isNiQuestion('what is my class 4'));

@@ -262,5 +262,38 @@ console.log('\n🔴 THE 1 OCTOBER 2026 CHANGE. Modelled BEFORE it happens, which
   })());
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n🔴 OBSERVED BEATS MODELLED, AND THE FALLBACK IS CLEAN (31 July 2026)');
+//
+// Outbound sends are now counted per customer in public.wa_out. When the period has rows the
+// margin arithmetic uses the COUNTED sends; when the table is empty or unreadable (the founder
+// pastes the SQL by hand, so it may not exist yet) it falls back to the old model, one reply per
+// inbound message, and nothing changes shape.
+withEnv(CLEAN, () => {
+  const AFTER = new Date('2026-10-01T12:00:00Z');
+
+  const obs = G.usageForMargin({ freeform: 7, template: 2 }, 40, 10);
+  ok('with wa_out counts the mode is observed', obs.mode === 'observed');
+  ok('observed freeform sends become the service replies', obs.usage.serviceReplies === 7);
+  ok('observed template sends become the proactive sends (templates are the paid ones)', obs.usage.proactiveSends === 2);
+  ok('🔴 THE MODELLED 40 INBOUNDS ARE IGNORED WHEN REALITY IS ON FILE', obs.usage.serviceReplies !== 40);
+
+  const mod = G.usageForMargin(null, 40, 10);
+  ok('without counts the mode is modelled', mod.mode === 'modelled');
+  ok('the model is one reply per inbound, the floor of what we actually send', mod.usage.serviceReplies === 40);
+  ok('the model assumes no proactive sends', mod.usage.proactiveSends === 0);
+  ok('ai calls ride through either mode unchanged', obs.usage.aiCalls === 10 && mod.usage.aiCalls === 10);
+
+  ok('🔴 A QUIETER REALITY THAN THE MODEL SHOWS A BETTER MARGIN, which is why observing matters',
+     G.marginForUsage(obs.usage, AFTER) > G.marginForUsage(mod.usage, AFTER));
+
+  ok('any rows at all prefer observation', G.preferObserved(1) === true && G.preferObserved(500) === true);
+  ok('an empty table falls back to the model', G.preferObserved(0) === false);
+  ok('an unreadable table falls back to the model', G.preferObserved(null) === false && G.preferObserved(undefined) === false);
+  ok('negative garbage cannot mint sends',
+     G.usageForMargin({ freeform: -3, template: -1 }, -5, -2).usage.serviceReplies === 0 &&
+     G.usageForMargin({ freeform: -3, template: -1 }, -5, -2).usage.proactiveSends === 0);
+});
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

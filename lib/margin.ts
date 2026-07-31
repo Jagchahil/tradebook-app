@@ -353,6 +353,61 @@ export function marginForUsage(u: UsageMonth, now: Date = new Date()): number {
   return projectedMarginPct(whatsappSpendPence(u, now), Math.max(0, u.aiCalls) * costPerAiCallPence());
 }
 
+// --- observed against modelled outbound (31 July 2026) -----------------------
+//
+// Outbound sends used to be recorded NOWHERE per customer, so the per customer
+// margin could only MODEL one service reply per inbound message. Since 31 July
+// 2026 every send Meta accepts becomes a row in public.wa_out (written by
+// lib/whatsapp.ts through lib/supabase.ts, this file stays free of IO), and the
+// arithmetic below prefers what was observed over what the model guesses.
+//
+// WHICH MODE IS WHICH, stated plainly:
+//
+//   OBSERVED  wa_out rows existed for the period. serviceReplies is the counted
+//             freeform sends and proactiveSends is the counted template sends
+//             (templates are the paid ones). This is a measurement.
+//
+//   MODELLED  the table was empty or unreadable. The founder pastes SQL by
+//             hand, so until supabase/APPLY_2026-07-31_wa_out.sql is run the
+//             table does not exist and every read refuses. serviceReplies falls
+//             back to one reply per inbound message, the floor of what we
+//             actually send, and proactiveSends to zero. This is a guess, and
+//             the surface says so.
+export interface ObservedOutbound {
+  freeform: number;
+  template: number;
+}
+export type OutboundMode = 'observed' | 'modelled';
+
+// Whether a period's wa_out read should be preferred: any rows at all means the
+// counter is live and observation wins. null (unreadable or missing table) or
+// zero (counter not recording yet) means fall back to the model.
+export function preferObserved(readTotal: number | null | undefined): boolean {
+  return typeof readTotal === 'number' && readTotal > 0;
+}
+
+export function usageForMargin(
+  observed: ObservedOutbound | null,
+  inboundMessages: number,
+  aiCalls: number,
+): { usage: UsageMonth; mode: OutboundMode } {
+  const calls = Math.max(0, aiCalls);
+  if (observed) {
+    return {
+      usage: {
+        serviceReplies: Math.max(0, observed.freeform),
+        proactiveSends: Math.max(0, observed.template),
+        aiCalls: calls,
+      },
+      mode: 'observed',
+    };
+  }
+  return {
+    usage: { serviceReplies: Math.max(0, inboundMessages), proactiveSends: 0, aiCalls: calls },
+    mode: 'modelled',
+  };
+}
+
 // How many outbound messages a month a single customer can have before HE ALONE breaches the floor.
 // Not a cap to enforce, a number to look at: when it drops into the range a normal customer reaches,
 // the channel is the wrong shape and no amount of budgeting fixes it.

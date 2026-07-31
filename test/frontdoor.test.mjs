@@ -339,14 +339,18 @@ console.log('\n=== the bank feed is offered by one switch, honestly ===\n');
     setup.includes('a bank statement CSV does the same job'));
 
   // 🔴 THE SWEEP. Every customer facing "connect the bank" under app/app is chosen by the switch.
-  // The setup step's heading is exempt by name: the step keeps its title, and when the feed is not
-  // offered there is no button under it. The reveal's regex literal, which stops the ledger's own
-  // bank line printing twice, is code rather than copy and is stripped the same way.
-  const HEADING = '<h1 style={S.h1}>Connect your bank.</h1>';
+  //
+  // ⚠️ THE SETUP HEADING USED TO BE EXEMPT BY NAME, AND THAT EXEMPTION IS GONE. It read "Connect
+  // your bank." whatever the switch said, on the reasoning that the step keeps its title and there
+  // is no button under it. Walking the live site on 31 July settled it the other way: the heading is
+  // the first thing he reads, and an instruction he cannot follow is doc 103's honesty test failing
+  // whatever the paragraph underneath says. It is now chosen by the switch like everything else, so
+  // this sweep covers it with no special case. The reveal's regex literal, which stops the ledger's
+  // own bank line printing twice, is code rather than copy and is still stripped.
+  const HEADING = '';
   const bankOffenders = [];
   for (const f of inApp) {
     const src = codeOnly(read(rel(f)))
-      .replace(HEADING, '')
       .replace(/\/connect your bank\/i/g, '');
     for (const m of src.matchAll(/[Cc]onnect(ed)? (your|the) bank/g)) {
       const before = src.slice(Math.max(0, m.index - 260), m.index);

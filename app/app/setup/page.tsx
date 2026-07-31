@@ -570,7 +570,12 @@ async function BankStep({ userId, note }: { userId: string; note: string | null 
 
   return (
     <section style={S.card}>
-      <h1 style={S.h1}>Connect your bank.</h1>
+      {/* 🔴 THE HEADING WAS THE ONE PART OF THIS STEP THE 31 JULY SWEEP LEFT ALONE, AND IT IS THE
+          FIRST THING HE READS. The body below is honest when the feed is not offered, but a man
+          scanning the screen sees "Connect your bank." as an instruction and then finds nothing to
+          click. Doc 103's honesty test is about the whole card, not just the paragraph. An existing
+          connection keeps the old heading, because for him it is simply the name of the step. */}
+      <h1 style={S.h1}>{bankFeedOffered() || linked ? 'Connect your bank.' : 'Your bank statement.'}</h1>
 
       {note ? <p style={S.warn}>{note}</p> : null}
 

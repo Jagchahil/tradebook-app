@@ -9,6 +9,7 @@ import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
 import { gbp0 } from '../../../lib/money';
+import { bankFeedOffered } from '../../../lib/bankfeed';
 import { gateForUser } from '../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../lib/gate';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
@@ -150,8 +151,15 @@ export default async function PilePage({
       {decidable === 0 ? (
         <section className="lek-card">
           <h1 className="lek-title">Nothing is waiting on you.</h1>
+          {/* 🔴 THE SWEEP OF 31 JULY MISSED THIS ONE, AND WALKING THE LIVE SITE FOUND IT.
+              Wave seven put every dead bank sentence behind bankFeedOffered() and this line still
+              told a man his spending lands here from a bank feed that has no provider. It is the
+              empty state of the pile, so it is read by exactly the customer who has nothing yet and
+              is looking for the way in. The bank sentence returns with bankFeedOffered(). */}
           <p style={S.sub}>
-            Everything we have is filed and counted. New spending lands here from a statement upload, a receipt, or your bank feed.
+            {bankFeedOffered()
+              ? 'Everything we have is filed and counted. New spending lands here from a statement upload, a receipt, or your bank feed.'
+              : 'Everything we have is filed and counted. New spending lands here from a statement upload or a receipt.'}
           </p>
           {openLead ? (
             <p style={S.aside}>

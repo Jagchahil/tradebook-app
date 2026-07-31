@@ -328,7 +328,8 @@ ok('circumstances posts every answer to the one logging route', pageCirc.include
 ok('and lands back on itself with the token, never a posted path', pageCirc.includes('name="back" value="you"'));
 ok('the partitions come from lib/circumstances, not a local list', pageCirc.includes('household()') && pageCirc.includes('notHousehold()') && pageCirc.includes('mtdQuestions()'));
 ok('the counts come from progressIn, whose denominator is his', pageCirc.includes('progressIn('));
-ok('open questions come from the gates, unanswered and unansweredMtd', pageCirc.includes('unanswered(rows)') && pageCirc.includes('unansweredMtd(rows)'));
+ok('open questions come from the gates, unanswered and unansweredMtd, with the structure passed through', pageCirc.includes('unanswered(rows, structure)') && pageCirc.includes('unansweredMtd(rows, structure)'));
+ok('the structure comes from getBusinessProfile, the same source every other surface reads', pageCirc.includes('getBusinessProfile'));
 ok('🔴 the Article 9 path is not drawn: no sensitive(), no consent ask', !codeOnly(pageCirc).includes('sensitive(') && !codeOnly(pageCirc).includes('CONSENT_ASK'));
 ok('a failed read is said plainly, never a blank slate', pageCirc.includes('rows === null'));
 

@@ -206,11 +206,18 @@ export default async function DiaryPage({
                 </div>
               </div>
 
-              <label htmlFor="days" style={S.label}>How long</label>
-              {/* Whole days, a short list. A slot that needs finer grain than a day is a slot
-                  this diary is not pretending to manage: it is not a calendar, it is a list of
-                  jobs and the question each one earns when it ends. */}
-              <select id="days" name="days" className="lek-field" defaultValue="1">
+              <label htmlFor="length" style={S.label}>How long</label>
+              {/* Hours for the short visits, whole days for the rest, still a short list. The
+                  first version started at one day, which forced a lie into the diary: an hour's
+                  measuring up had to be booked as a day, so the slot sat underway until the next
+                  morning and the invoice question arrived a day late. Half a day is four hours,
+                  a morning or an afternoon, and lib/diary.ts holds that number. Finer grain than
+                  an hour is a calendar's job, and this is not a calendar, it is a list of jobs
+                  and the question each one earns when it ends. */}
+              <select id="length" name="length" className="lek-field" defaultValue="1">
+                <option value="1h">One hour</option>
+                <option value="2h">Two hours</option>
+                <option value="4h">Half a day</option>
                 <option value="1">One day</option>
                 <option value="2">Two days</option>
                 <option value="3">Three days</option>

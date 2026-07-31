@@ -3,7 +3,7 @@ import { sessionUser } from '../../../lib/webauth';
 import { userBurst } from '../../../lib/ratelimit';
 import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 import { addDiaryJob, readDiaryJob, setDiaryJobStatus, deleteDiaryJob } from '../../../lib/supabase';
-import { londonToUtcIso, parseDurationDays } from '../../../lib/diary';
+import { londonToUtcIso, parseDurationHours } from '../../../lib/diary';
 
 export const runtime = 'nodejs';
 
@@ -55,16 +55,19 @@ export async function POST(req: NextRequest) {
     const title = String(f.get('title') ?? '').trim().slice(0, 120);
     const day = String(f.get('date') ?? '');
     const clock = String(f.get('time') ?? '');
-    const days = parseDurationDays(String(f.get('days') ?? ''));
+    // How long, in hours. The field grew hour options on 31 July 2026 and was renamed length;
+    // a page rendered before that deploy still posts the old days field with a bare day count,
+    // which parseDurationHours reads for exactly that tab. lib/diary.ts owns both shapes.
+    const hours = parseDurationHours(String(f.get('length') ?? f.get('days') ?? ''));
     const customer = String(f.get('customer') ?? '').trim().slice(0, 120) || null;
-    if (!title || days === null) return back('problem=bad');
+    if (!title || hours === null) return back('problem=bad');
 
     // The day and time he typed are London wall clock time, resolved once, server side, into the
     // UTC instant they mean. A date that is not a real date is refused plainly rather than a
     // wrong slot being saved quietly. lib/diary.ts owns the rule and the test attacks it there.
     const startsAt = londonToUtcIso(day, clock);
     if (!startsAt) return back('problem=bad');
-    const endsAt = new Date(Date.parse(startsAt) + days * 86_400_000).toISOString();
+    const endsAt = new Date(Date.parse(startsAt) + hours * 3_600_000).toISOString();
 
     const done = await addDiaryJob(user.id, { title, startsAt, endsAt, customerName: customer });
     return done ? back('done=added') : back('problem=unavailable');

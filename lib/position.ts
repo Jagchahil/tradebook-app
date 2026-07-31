@@ -242,3 +242,39 @@ export function computePosition(input: PositionInput): Position {
   if (input.type === 'partnership') return partnershipPosition(normalised);
   return soleTraderPosition(normalised);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE TWO CAPTIONS THAT KEEP A PARTNER'S SCREENS FROM CONTRADICTING EACH OTHER.
+//
+// Found by reading the deployed Overview as a 50% partner. "Your business this year: In £500" sat
+// directly above "Your week: £1,000 in", and /app/money showed the £1,000 too. Both figures were
+// right. getOptimiserInput scales the shared books to HIS SHARE before any tax is worked out,
+// because that is the slice he is taxed on, while the week and the money log read the raw
+// transactions, because a shared account IS the whole firm's money. Two correct answers to two
+// different questions, and not one word on either screen saying which question was being answered.
+// A man who cannot reconcile two of our numbers stops believing both of them.
+//
+// ⚠️ NOTHING COUNTED CHANGES. These are LABELS. The share stays applied where tax is worked out
+// and stays unapplied where the account is shown, exactly as before. What changes is that every
+// surface now says which of the two it is showing.
+//
+// ⚠️ THE SENTENCES LIVE HERE, NOT IN THE PAGES, for the same reason setAsideBasisLine lives in
+// lib/taxoptimiser.ts: what we are willing to claim about a man's figures is not a presentation
+// decision, and a caption retyped in three React files is three chances for one of them to drift.
+// The share percentage itself comes from getBusinessProfile (users.partnership_share), the SAME
+// source /app/pay-yourself reads, so no two screens can disagree about what his share is.
+//
+// ⚠️ NULL FOR EVERY OTHER STRUCTURE, ON PURPOSE. A sole trader's figures are simply his, and a
+// caption explaining a share he does not have is a line he reads and rejects on the one screen he
+// came to for a number (doc 103's empty test).
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export function shareCaption(type: BusinessType, sharePercent: number): string | null {
+  if (type !== 'partnership') return null;
+  const pct = Math.round(Number.isFinite(sharePercent) ? sharePercent : 100);
+  return `These figures are your ${pct}% share of the firm's books, the slice you are taxed on.`;
+}
+
+export function wholeFirmCaption(type: BusinessType): string | null {
+  if (type !== 'partnership') return null;
+  return 'This is everything through the business, the whole firm\'s money, before your share is taken.';
+}

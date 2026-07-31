@@ -5,7 +5,9 @@ import { SESSION_COOKIE } from '../../lib/websession';
 import {
   getOptimiserInput, weekRows, weeklyUpdateFactsFor, readAnnouncementSources,
   readOnboardingProgress, readProvedPhone, pileEntries, readOwnNames, readAccountUse,
+  getBusinessProfile,
 } from '../../lib/supabase';
+import { shareCaption, wholeFirmCaption } from '../../lib/position';
 import { toStep, isDone, stepTitle, stepNumber, stepCount } from '../../lib/onboarding';
 import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL, WHATSAPP_NUMBER } from '../../lib/features';
 import { waLinksConfigured } from '../../lib/walink';
@@ -88,7 +90,7 @@ export default async function OverviewPage() {
   // Everything at once. Round trips in parallel rather than in a row, because the budget for this
   // page is one bad-signal second, not eight.
   const [
-    optimiser, rows, factsMap, sources, progress, proved, gate, pileRows, ownNames, accountUse,
+    optimiser, rows, factsMap, sources, progress, proved, gate, pileRows, ownNames, accountUse, biz,
   ] = await Promise.all([
     getOptimiserInput(user.id),
     weekRows(user.id),
@@ -102,6 +104,10 @@ export default async function OverviewPage() {
     pileEntries(user.id).catch(() => []),
     readOwnNames(user.id).catch(() => [] as string[]),
     readAccountUse(user.id).catch(() => 'mixed' as const),
+    // For the partnership captions below. Same source /app/pay-yourself reads the share from, so
+    // no two screens can disagree about what his share is. A failed read draws no caption, which
+    // is the safe direction: an unlabelled figure beats a wrong label.
+    getBusinessProfile(user.id).catch(() => null),
   ]);
 
   // ⚠️ THE RESUME LINE, AND DOC 103'S EMPTY TEST DECIDES WHEN IT IS ON SCREEN.
@@ -125,6 +131,20 @@ export default async function OverviewPage() {
 
   const l = ledgerFor(optimiser);
   const tax = taxPosition(optimiser);
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A PARTNER'S TWO KINDS OF FIGURE, LABELLED. NOTHING COUNTED CHANGES.
+  //
+  // getOptimiserInput scales the shared books to HIS SHARE before any tax is worked out, so the
+  // year grid and the tax card above the fold are share figures. weekRows reads the raw
+  // transactions, so the week card is the WHOLE FIRM. Both are right, and on a 50% partner's
+  // screen "In £500" sat directly above "£1,000 in" with not one word saying why. The captions
+  // come from lib/position.ts, one sentence each, and draw for a partnership only: a sole
+  // trader's figures are simply his, and a caption about a share he does not have fails doc
+  // 103's empty test.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const shareCap = biz ? shareCaption(biz.businessType, biz.partnershipShare) : null;
+  const firmCap = biz ? wholeFirmCaption(biz.businessType) : null;
 
   // HIS BUSINESS MONEY THIS TAX YEAR, trade and property together, because a landlord looking at
   // "£0 in" would be looking at a screen that does not know about his rent. The ledger card lower
@@ -220,6 +240,9 @@ export default async function OverviewPage() {
               whole personal tax and that one is his business. lib/taxoptimiser.ts writes the
               sentence, so what we are willing to claim about a man's tax stays in one place. */}
           {basis ? <p style={S.heroBasis}>{basis}</p> : null}
+          {/* Whose money the figure is worked out on. For a partner the set aside is on his slice,
+              and saying so here is what stops it contradicting the whole firm week below. */}
+          {shareCap ? <p style={S.heroBasis}>{shareCap}</p> : null}
         </section>
       ) : null}
 
@@ -241,7 +264,9 @@ export default async function OverviewPage() {
             <div className="lek-tile-value">{gbp0(profit)}</div>
           </div>
         </div>
-        <p style={S.quiet}>Since 6 April, on everything you have confirmed.</p>
+        <p style={S.quiet}>
+          Since 6 April, on everything you have confirmed.{shareCap ? ` ${shareCap}` : ''}
+        </p>
       </section>
 
       {/* ── 3. WHAT IS WAITING ─────────────────────────────────────────────────────────────────
@@ -285,6 +310,9 @@ export default async function OverviewPage() {
                 : `That is ${gbpAbs0(weekProfit)} more out than in.`}
             </p>
             <p style={S.quiet}>{weeklyLine(weekSaid)}</p>
+            {/* The week is drawn from the raw rows, so for a partnership it is the whole firm's
+                money, unlike the share figures above. Said out loud, or the two contradict. */}
+            {firmCap ? <p style={S.quiet}>{firmCap}</p> : null}
             {/* A chart of seven empty days says nothing the sentence has not already said better. */}
             {week.anyMoney ? <WeekChart week={week} /> : null}
           </>

@@ -4,7 +4,9 @@ import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import {
   transactionsInMonth, earliestTransactionDate, pileEntries, readOwnNames, readAccountUse,
+  getBusinessProfile,
 } from '../../../lib/supabase';
+import { wholeFirmCaption } from '../../../lib/position';
 import { buildPile, partitionPile } from '../../../lib/reviewpile';
 import { normaliseVendor } from '../../../lib/memory';
 import { categoriseBankLine } from '../../../lib/categories';
@@ -74,12 +76,16 @@ export default async function MoneyPage({
   // this month rather than an error page about his own money.
   const month = isMonthKey(asked) ? asked : monthKeyOf(now);
 
-  const [rows, since, pileRows, ownNames, accountUse] = await Promise.all([
+  const [rows, since, pileRows, ownNames, accountUse, biz] = await Promise.all([
     transactionsInMonth(user.id, month),
     earliestTransactionDate(user.id),
     pileEntries(user.id).catch(() => []),
     readOwnNames(user.id).catch(() => [] as string[]),
     readAccountUse(user.id).catch(() => 'mixed' as const),
+    // For the partnership caption: this log is the RAW rows, the whole firm's money, while the
+    // Overview's year figures are his share. lib/position.ts writes the one sentence saying so,
+    // and it draws for a partnership only. A failed read draws nothing, the safe direction.
+    getBusinessProfile(user.id).catch(() => null),
   ]);
 
   // ⚠️ A READ THAT FAILED IS NOT A QUIET MONTH. Printing an empty April over a database timeout
@@ -152,6 +158,12 @@ export default async function MoneyPage({
             <div className="lek-tile-value">{gbp0(log.profit)}</div>
           </div>
         </div>
+
+        {/* Whose money this log is. For a partner these are the shared account's raw rows, the
+            whole firm, while his tax figures run on his share, and unlabelled the two contradict. */}
+        {biz && wholeFirmCaption(biz.businessType) ? (
+          <p style={S.quiet}>{wholeFirmCaption(biz.businessType)}</p>
+        ) : null}
 
         {/* Said once, and only when there is something it applies to. A permanent footnote about
             personal money on a page with none is a line he reads and rejects every visit. */}

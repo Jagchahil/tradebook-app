@@ -1127,6 +1127,75 @@ function tradeTypeToBusinessType(t: string | null | undefined): BusinessType {
   return t === 'ltd' ? 'limited_company' : 'sole_trader';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// WHAT THE SIGNUP LOOKUP ACTUALLY FOUND ABOUT HIS COMPANY, so /app/you can say only what we know.
+//
+// The Companies House lookup runs once, server side, inside /api/onboard, and writes its OUTCOME to
+// the signups row (matched, no_match, not_ltd, unavailable) beside whatever it found. Nothing copies
+// those columns onto public.users, deliberately: the signup row IS the record of what the lookup
+// found at signup, and a copy is a second truth that drifts. So the page that wants to describe the
+// company reads the same row, joined by the same keys reconcileSignupToUser joins by: the phone when
+// one is proved, else the verified email off the auth identity, never anything the browser asserts.
+//
+// ⚠️ null MEANS "WE COULD NOT SAY", never "no company". A failed read here must make the page
+// LESS assertive (it falls back to "as you told us"), not more, which is the safe direction for a
+// sentence about a register we did not manage to check.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export interface SignupCompany {
+  companyNumber: string | null;
+  companyName: string | null;
+  lookup: 'matched' | 'no_match' | 'not_ltd' | 'unavailable' | null;
+}
+
+export async function readSignupCompany(userId: string): Promise<SignupCompany | null> {
+  if (!userId) return null;
+  try {
+    const { url } = config();
+    const ures = await fetch(
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=phone_number&limit=1`,
+      { headers: headers() },
+    );
+    if (!ures.ok) return null;
+    const urows = (await ures.json().catch(() => null)) as Array<{ phone_number: string | null }> | null;
+    const e164 = normalizeUkPhone(Array.isArray(urows) && urows[0]?.phone_number ? urows[0].phone_number : '');
+
+    // A web account is minted by proving an EMAIL and its phone column is deliberately empty, the
+    // same fork reconcileSignupToUser documents. The email comes from the auth identity, which
+    // GoTrue verified, so a man cannot point this read at another man's signup.
+    let match = e164 ? `phone=eq.${encodeURIComponent(e164)}` : '';
+    if (!match) {
+      const identity = await readAuthUserIdentity(userId);
+      const email = (identity.email ?? '').trim().toLowerCase();
+      if (!email) return null;
+      match = `email=eq.${encodeURIComponent(email)}`;
+    }
+
+    // The most recent signup, reconciled or not: reconciliation stamps the row, it does not move it.
+    const res = await fetch(
+      `${url}/rest/v1/signups?${match}` +
+        `&select=company_number,company_name,company_lookup&order=created_at.desc&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{
+      company_number: string | null; company_name: string | null; company_lookup: string | null;
+    }> | null;
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+    const r = rows[0];
+    const lookup = r.company_lookup === 'matched' || r.company_lookup === 'no_match'
+      || r.company_lookup === 'not_ltd' || r.company_lookup === 'unavailable'
+      ? r.company_lookup
+      : null;
+    return {
+      companyNumber: r.company_number ?? null,
+      companyName: r.company_name ?? null,
+      lookup,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // `prompts` are the streams we could NOT fully apply because the web only captured a flag, not the
 // detail: 'property' needs rent figures, 'loan' needs the plan. The app nudges the user to add those
 // in their own screens, so even these do not feel like starting from scratch.

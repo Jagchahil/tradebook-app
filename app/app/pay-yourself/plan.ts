@@ -16,7 +16,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 import { taxPosition, setAsideBasisLine, type OptimiserInput } from '../../../lib/taxoptimiser';
-import { payYourself, type PayPlan } from '../../../lib/payyourself';
+import { payYourself, salaryRungs, type PayPlan } from '../../../lib/payyourself';
 import { computePosition, type BusinessType } from '../../../lib/position';
 
 export type { BusinessType, PayPlan };
@@ -37,7 +37,21 @@ export interface MonthlyDraw {
 
 export type PayModel =
   // Nothing confirmed to pay himself from yet. An honest short state, never an invented figure.
-  | { kind: 'nothing_yet'; structure: BusinessType }
+  //
+  // ⚠️ EXCEPT THAT A DIRECTOR'S EMPTY STATE CARRIES THE SHAPE, AND THE SHAPE IS NOT A FIGURE.
+  //
+  // A brand new company has no confirmed profit, so there is nothing to price, and the old branch
+  // showed him a bare "nothing yet" on the one screen whose subject is the single best reason to
+  // run a company at all. The salary rungs are not projections: they are lines the tax rules draw,
+  // the same whatever he earns, priced from named constants in lib/ltdengine.ts and watched by
+  // Khoji. So `rungs` hands the page the engine's own rungs, each with its own reason, and NOTHING
+  // priced: no take home, no corporation tax, no wall, because every one of those needs a profit
+  // we do not hold and an invented one would be a guess dressed as advice. His figures appear the
+  // moment his money does, through the 'company' branch below, and not a moment before.
+  //
+  // Null for a sole trader and a partner, whose empty state has no shape to teach: drawings are
+  // drawings at any profit.
+  | { kind: 'nothing_yet'; structure: BusinessType; rungs: Array<{ salary: number; why: string }> | null }
   // A sole trader or a partner: drawings, not wages. The tax follows the profit.
   | {
       kind: 'drawings';
@@ -60,7 +74,15 @@ export type PayModel =
 
 export function payModel(structure: BusinessType, optimiser: OptimiserInput): PayModel {
   const tradeNet = Math.round(Math.max(0, optimiser.ytdTradeIncome - optimiser.ytdTradeExpenses));
-  if (tradeNet <= 0) return { kind: 'nothing_yet', structure };
+  if (tradeNet <= 0) {
+    return {
+      kind: 'nothing_yet',
+      structure,
+      // The engine's rungs, whole and unpriced. salaryRungs() is deterministic and profit free,
+      // so an empty year can carry it without a single invented figure. See the PayModel note.
+      rungs: structure === 'limited_company' ? salaryRungs() : null,
+    };
+  }
 
   // The director's answer is the engine's answer, untouched. Confirmed profit only: a pay shape on
   // a projected year would be a guess on a guess, the same judgement /app/tax/what-if wrote down.

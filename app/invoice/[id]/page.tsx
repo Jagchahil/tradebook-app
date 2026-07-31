@@ -1,9 +1,7 @@
 import { getPublicInvoice } from '../../../lib/supabase';
-import { hasStripeConfig } from '../../../lib/stripe';
 import { A11Y_CSS } from '../../../lib/tokens';
 
 const INK = '#111111';
-const INDIGO = '#1B59A6';
 const MUTED = '#5B6470';
 const BORDER = '#ECECEC';
 const OFF_WHITE = '#FBFAF7';
@@ -107,25 +105,22 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </div>
         ) : null}
 
-        {!isPaid && hasStripeConfig() ? (
+        {/* 🔴 NO PAY BUTTON, ON PURPOSE. READ THIS BEFORE PUTTING ONE BACK.
+            Until 31 July 2026 this block drew "Pay now" and sent the payer through /api/pay to a
+            Checkout session on OUR Stripe account, branded Lekhio Ltd. No user has any payout
+            route, so every pound paid there would have landed in Lekhio's own balance with no way
+            on earth to reach the tradesman who did the work. Money paid to the wrong account is
+            the worst class of bug this product can have: the customer believes he has paid, the
+            tradesman has not been paid, and we are holding a stranger's money. The rule lives in
+            hasInvoicePayoutRoute in lib/stripe.ts, which also refuses to mint the session; the
+            page stays the document, the tradesman's own payment details ride in the notes above,
+            and the one line below is the honest amount of promise we can make. */}
+        {!isPaid ? (
           <div style={{ padding: '0 32px 28px' }}>
-            <a
-              href={`/api/pay/${id}`}
-              style={{
-                display: 'block',
-                textAlign: 'center',
-                backgroundColor: INDIGO,
-                color: '#FFFFFF',
-                fontSize: 16,
-                fontWeight: 700,
-                padding: '16px',
-                borderRadius: 12,
-                textDecoration: 'none',
-              }}
-            >
-              Pay {gbp(invoice.total)} now
-            </a>
-            <p style={{ textAlign: 'center', fontSize: 12, color: MUTED, marginTop: 10 }}>Secure card payment by Stripe.</p>
+            <p style={{ textAlign: 'center', fontSize: 13, color: MUTED, margin: 0 }}>
+              Card payment is coming. For now, please pay using the details on this invoice, or
+              however you have agreed with {invoice.business_name || 'the sender'}.
+            </p>
           </div>
         ) : null}
 

@@ -134,11 +134,30 @@ ok('two days', D.durationPhrase('2026-08-04T07:00:00Z', '2026-08-06T07:00:00Z') 
 ok('seven days is "a week"', D.durationPhrase('2026-08-04T07:00:00Z', '2026-08-11T07:00:00Z') === 'a week');
 ok('fourteen days is "two weeks"', D.durationPhrase('2026-08-04T07:00:00Z', '2026-08-18T07:00:00Z') === 'two weeks');
 
+// The sub day slots (31 July 2026). Before these, a one hour measuring up visit could only be
+// booked as a day, so the diary described an hour of work as "one day", a lie on his own diary.
+ok('🔴 one hour is "one hour", never rounded up to a day',
+  D.durationPhrase('2026-08-04T07:00:00Z', '2026-08-04T08:00:00Z') === 'one hour');
+ok('two hours', D.durationPhrase('2026-08-04T07:00:00Z', '2026-08-04T09:00:00Z') === 'two hours');
+ok('three hours stays in hour words', D.durationPhrase('2026-08-04T07:00:00Z', '2026-08-04T10:00:00Z') === 'three hours');
+ok('four hours is "half a day", the morning or the afternoon',
+  D.durationPhrase('2026-08-04T07:00:00Z', '2026-08-04T11:00:00Z') === 'half a day');
+
 ok('a posted duration must be a whole day count between 1 and 30',
   D.parseDurationDays('3') === 3 && D.parseDurationDays('1') === 1 && D.parseDurationDays('30') === 30);
 ok('zero, fractions, overruns and rubbish are refused, never rounded',
   [D.parseDurationDays('0'), D.parseDurationDays('2.5'), D.parseDurationDays('31'), D.parseDurationDays('x'), D.parseDurationDays('')]
     .every((v) => v === null));
+
+// The length field the form posts now, read in hours, with the old day shape kept alive for a
+// tab opened before hours existed.
+ok('the hour slots parse: 1h, 2h and half a day as 4h',
+  D.parseDurationHours('1h') === 1 && D.parseDurationHours('2h') === 2 && D.parseDurationHours('4h') === 4);
+ok('a bare day count still parses, in hours, for yesterday\'s tab',
+  D.parseDurationHours('1') === 24 && D.parseDurationHours('5') === 120 && D.parseDurationHours('14') === 336);
+ok('🔴 zero hours, a 24h day in disguise, fractions and rubbish are refused, never rounded',
+  ['0h', '24h', '99h', '1.5h', 'h', '', 'x', '31', '2.5'].every((v) => D.parseDurationHours(v) === null)
+  && D.parseDurationHours(null) === null && D.parseDurationHours(2) === null);
 
 // ---------------------------------------------------------------------------------------------
 // 3. THE THREE SECTIONS, DECIDED ONCE ON FIXTURES.
@@ -415,6 +434,16 @@ ok('🔴 no route reads an id from a URL, the id travels in the form body',
   && /f\.get\('id'\)/.test(routeDiary) && /f\.get\('id'\)/.test(routeGoals));
 ok('and the id is shape checked before it goes near a query',
   /UUID\.test\(id\)/.test(routeDiary) && /UUID\.test\(id\)/.test(routeGoals));
+
+// The slot length (31 July 2026): hours as well as days, one parse, ends_at derived in hours.
+ok('🔴 the diary route reads the length through parseDurationHours and derives ends_at in hours',
+  /parseDurationHours\(/.test(routeDiary) && /hours \* 3_600_000/.test(routeDiary)
+  && !/parseDurationDays\(/.test(codeOnly(routeDiary)));
+ok('a stale tab still posting the old days field is read, not refused',
+  /f\.get\('length'\) \?\? f\.get\('days'\)/.test(routeDiary));
+ok('🔴 the form offers the hour slots by name: one hour, two hours, half a day',
+  /value="1h">One hour/.test(pageDiary) && /value="2h">Two hours/.test(pageDiary)
+  && /value="4h">Half a day/.test(pageDiary) && /value="1">One day/.test(pageDiary));
 
 // The gate falls on the work. Marking his own row done, or removing it, is never gated.
 {

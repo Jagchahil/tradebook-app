@@ -312,7 +312,14 @@ async function BusinessStep({ userId }: { userId: string }) {
 // lib/circumstances.ts's own order, and the list visibly shrinks as he goes.
 // ---------------------------------------------------------------------------------------------
 async function QuestionsStep({ userId, step }: { userId: string; step: 'household' | 'about' }) {
-  const rows = await readCircumstances(userId);
+  // The structure rides along because askability now depends on it: lib/circumstances.ts refuses
+  // to hand a director the questions that assert he is self employed. A failed profile read passes
+  // null, which the module treats as unknown and asks everything, the direction it argues for.
+  const [rows, biz] = await Promise.all([
+    readCircumstances(userId),
+    getBusinessProfile(userId).catch(() => null),
+  ]);
+  const structure = biz?.businessType ?? null;
 
   const intro = step === 'household'
     ? {
@@ -339,8 +346,9 @@ async function QuestionsStep({ userId, step }: { userId: string; step: 'househol
   }
 
   // The partition comes from lib/circumstances.ts, both halves of it, and `unanswered` is the gate.
-  // Nothing here knows which questions are household ones or which are special category: it asks.
-  const open = new Set(unanswered(rows).map((c) => c.key));
+  // Nothing here knows which questions are household ones, which are special category, or which
+  // structures a question is for: it asks.
+  const open = new Set(unanswered(rows, structure).map((c) => c.key));
   const group: Circumstance[] = step === 'household' ? household() : notHousehold();
   const list = group.filter((c) => open.has(c.key));
 
@@ -350,7 +358,7 @@ async function QuestionsStep({ userId, step }: { userId: string; step: 'househol
   // premise is not yet established, and told a brand new customer he had answered one of four before
   // he had touched anything. lib/circumstances.ts owns what a question is and when it is askable, so
   // it owns this too, and a test can run it against fixtures rather than read this file.
-  const { answered: answeredHere, askable } = progressIn(group, rows);
+  const { answered: answeredHere, askable } = progressIn(group, rows, structure);
 
   return (
     <section style={S.card}>
@@ -439,7 +447,14 @@ async function QuestionsStep({ userId, step }: { userId: string; step: 'househol
 // What we need instead is his money back to 6 April, which is what the bank step collects.
 // ---------------------------------------------------------------------------------------------
 async function MtdStep({ userId }: { userId: string }) {
-  const rows = await readCircumstances(userId);
+  // The structure decides whether these questions exist for him at all: lib/circumstances.ts
+  // refuses the MTD gate for a limited company, because Making Tax Digital for Income Tax is about
+  // self employment and rent on a personal return and a company's trade is neither.
+  const [rows, biz] = await Promise.all([
+    readCircumstances(userId),
+    getBusinessProfile(userId).catch(() => null),
+  ]);
+  const structure = biz?.businessType ?? null;
 
   if (rows === null) {
     return (
@@ -450,8 +465,8 @@ async function MtdStep({ userId }: { userId: string }) {
     );
   }
 
-  const list = unansweredMtd(rows);
-  const { answered: answeredHere, askable } = progressIn(mtdQuestions(), rows);
+  const list = unansweredMtd(rows, structure);
+  const { answered: answeredHere, askable } = progressIn(mtdQuestions(), rows, structure);
   const answers = new Map(rows.map((r) => [r.key, r.answer]));
   const mandated = answers.get('mtd_mandated');
 
@@ -468,11 +483,16 @@ async function MtdStep({ userId }: { userId: string }) {
 
       {list.length === 0 ? (
         <p style={S.done}>
-          {mandated === 'no'
-            // Doc 103's empty test. He has told us he is under the line, so there is nothing further
-            // to ask and we say so rather than leaving a blank card implying we want more.
-            ? 'Nothing else to ask. Making Tax Digital does not apply to you at that level, and if your takings grow past it we will tell you before HMRC does.'
-            : 'That is everything. We know where you stand.'}
+          {structure === 'limited_company'
+            // A company is not IN Making Tax Digital for Income Tax: it covers self employment and
+            // rent on a personal return, and the company's trade is the company's own, on its own
+            // return. Saying so beats a blank card that implies we wanted something.
+            ? 'Nothing to ask you here. Making Tax Digital for Income Tax covers self employment and rent on a personal return, and your company’s trade is neither: the company files its own return.'
+            : mandated === 'no'
+              // Doc 103's empty test. He has told us he is under the line, so there is nothing
+              // further to ask and we say so rather than leaving a blank card implying we want more.
+              ? 'Nothing else to ask. Making Tax Digital does not apply to you at that level, and if your takings grow past it we will tell you before HMRC does.'
+              : 'That is everything. We know where you stand.'}
         </p>
       ) : (
         <div style={S.stack}>

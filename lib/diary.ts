@@ -38,6 +38,11 @@ export interface DiaryJob {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES: readonly string[] = ['planned', 'done', 'invoiced'];
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+// Half a day is four working hours, a morning or an afternoon. It is a word on the form and in
+// durationPhrase, so the two must agree on the number, and this constant is where they agree.
+const HALF_DAY_HOURS = 4;
+const NUMBER_WORDS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 
 export function isDiaryStatus(x: unknown): x is DiaryStatus {
   return typeof x === 'string' && STATUSES.includes(x);
@@ -218,23 +223,51 @@ export function pastDayPhrase(iso: string, now: Date): string {
   return `on ${p.day} ${p.monthName}`;
 }
 
-// How long a job runs, in words: "one day", "two days", "a week". Derived from the two
-// timestamps, which are the single copy of the truth about the slot.
+// How long a job runs, in words: "one hour", "half a day", "one day", "a week". Derived from
+// the two timestamps, which are the single copy of the truth about the slot. Under a day the
+// words are hours, because until 31 July 2026 the form could only book whole days and this
+// phrase rounded everything up to "one day": an hour's measuring up visit was described as a
+// day of work, which is a small lie on the one screen that is supposed to be his own diary.
 export function durationPhrase(startsAt: string, endsAt: string): string {
-  const days = Math.max(1, Math.round((Date.parse(endsAt) - Date.parse(startsAt)) / DAY_MS));
+  const ms = Date.parse(endsAt) - Date.parse(startsAt);
+  const hours = Math.max(1, Math.round(ms / HOUR_MS));
+  if (hours < 24) {
+    if (hours === HALF_DAY_HOURS) return 'half a day';
+    if (hours === 1) return 'one hour';
+    return `${hours <= 10 ? NUMBER_WORDS[hours - 1] : String(hours)} hours`;
+  }
+  const days = Math.max(1, Math.round(ms / DAY_MS));
   if (days === 7) return 'a week';
   if (days === 14) return 'two weeks';
-  const words = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-  const word = days <= 10 ? words[days - 1] : String(days);
+  const word = days <= 10 ? NUMBER_WORDS[days - 1] : String(days);
   return days === 1 ? 'one day' : `${word} days`;
 }
 
-// The duration as the form posts it. An integer count of days between 1 and 30, or null. A
-// half typed or hostile value is refused, never rounded into a slot he did not book.
+// A whole day count between 1 and 30, or null. This was the only shape the form could post
+// before hours existed, and it is kept both as the day half of parseDurationHours and because a
+// diary page opened before that deploy still posts it. A half typed or hostile value is
+// refused, never rounded into a slot he did not book.
 export function parseDurationDays(raw: unknown): number | null {
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1 || n > 30) return null;
   return n;
+}
+
+// The duration as the form posts it, in HOURS. Two shapes and nothing else:
+//   "2h"   an hour count, 1 to 23: the sub day slots (one hour, two hours, half a day as 4h)
+//   "3"    a whole day count, 1 to 30, via parseDurationDays: the current day options, and the
+//          only shape a page rendered before hours existed can post, so a man with yesterday's
+//          tab open books the slot he chose rather than being refused for our deploy
+// Everything else is refused, never rounded into a slot he did not book.
+export function parseDurationHours(raw: unknown): number | null {
+  if (typeof raw !== 'string') return null;
+  const m = /^(\d{1,2})h$/.exec(raw);
+  if (m) {
+    const n = Number(m[1]);
+    return n >= 1 && n < 24 ? n : null;
+  }
+  const days = parseDurationDays(raw);
+  return days === null ? null : days * 24;
 }
 
 // ── The nudges, decided and handed back ──────────────────────────────────────────────────────

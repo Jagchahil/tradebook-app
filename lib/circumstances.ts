@@ -149,7 +149,35 @@ export interface Circumstance {
   // 'small' precisely so that if one ever leaks into the money queue it leaks to the bottom.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   mtd?: true;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHO A QUESTION IS EVEN FOR. The product branches by business structure; the questions must too.
+  //
+  // Found by walking /app/setup as a limited company: it asked "What were you doing before you went
+  // self employed", offered the voluntary Class 2 tick box, and asked about "£50,000 from self
+  // employment and rent". Every one of those asserts the man is self employed. A director is not:
+  // his company trades, he does not, and a question built on a premise that is false of him teaches
+  // him in one screen that we are running a list at him rather than listening (the exact failure
+  // dependsOn exists to prevent, one field up).
+  //
+  // Absent means EVERY structure, which is almost every question: VAT, pensions, marriage and the
+  // kids do not care how a man trades. Set it only where the relief or the regime genuinely does
+  // not exist for a structure, and write the reasoning on the entry, because the day HMRC asks why
+  // we never asked a director something, the answer must be on the row.
+  //
+  // ⚠️ AN UNKNOWN STRUCTURE IS ASKED EVERYTHING. Callers that do not know how a man trades (an old
+  // surface, a failed profile read) pass nothing and get the old behaviour whole. The wrong
+  // direction here is the silent one: asking a director an inapplicable question is a nuisance he
+  // can say no to, while never asking a sole trader about his old job because a read timed out is
+  // money gone without a trace. So the filter only ever bites on a KNOWN structure.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  structures?: BusinessStructure[];
 }
+
+// Declared here rather than imported from lib/position.ts, deliberately: this module has no imports
+// at all, which is what lets every test and the WhatsApp webhook load it bare. The three literals
+// are pinned against the rest of the codebase by test/structurehonesty.test.mjs.
+export type BusinessStructure = 'sole_trader' | 'partnership' | 'limited_company';
 
 // The consent itself is stored as a circumstance, which is exactly right: Article 7(1) says we must
 // be able to DEMONSTRATE that he consented, and the circumstances table already logs the verbatim
@@ -180,6 +208,11 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 3,
     evidence: 'Your P60s or P45s from the old job, plus the loss figure.',
     source: 'ITA 2007 s72 (early trade losses relief); HS227',
+    // 🔴 NOT FOR A COMPANY. Early trade losses relief belongs to an UNINCORPORATED trade: it is the
+    // person's own loss going back against the person's own old wages. A company's loss is the
+    // company's (CTA 2010 Part 4) and never reaches the director's P60. And the question itself,
+    // "before you went self employed", asserts a director is self employed, which he is not.
+    structures: ['sole_trader', 'partnership'],
   },
   {
     // 7 YEARS. Not four. The van, the Gas Safe course, the first set of tools, all bought before he
@@ -195,11 +228,16 @@ export const CIRCUMSTANCES: Circumstance[] = [
   },
   {
     // A plumber who registers for VAT with a fully kitted van can reclaim the VAT on every tool
-    // still on hand, from four years back, on his very first return. And the invoices he needs are
-    // THE ONES WE ARE ALREADY STORING FOR HIM.
+    // still on hand, from four years back, on his very first return. And the invoices he needs
+    // are exactly the ones Lekhio is built to store for him.
+    //
+    // ⚠️ The last line used to say "We have your receipts", which was read by every account,
+    // including brand new ones that had sent us nothing. A claim about what we hold has to be
+    // true for the man reading it, so the line now describes what logging a receipt does for
+    // him, which is true whether he has logged a thousand or none yet.
     key: 'vat_registered',
     ask: 'Are you VAT registered, and when did you register?',
-    why: 'When you registered you could have reclaimed the VAT on every tool and bit of kit you already owned, going back four years. Almost nobody does. We have your receipts.',
+    why: 'When you registered you could have reclaimed the VAT on every tool and bit of kit you already owned, going back four years. Almost nobody does. Every receipt you put in your Lekhio is kept ready for exactly this.',
     worthOrder: 'huge',
     claimant: 'him',
     backYears: 4,
@@ -275,6 +313,11 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 0,
     evidence: 'Nothing. It is a box on the return.',
     source: 'LITRG, National Insurance for the self-employed. Class 2 voluntary.',
+    // 🔴 NOT FOR A COMPANY. Voluntary Class 2 is a SELF EMPLOYED provision: the tick box sits on the
+    // self employment pages of the return, and a director has no such pages for the company's trade.
+    // His qualifying years come through Class 1 on a payroll salary, which is precisely what the
+    // lower earnings limit rung in lib/payyourself.ts exists to price for him.
+    structures: ['sole_trader', 'partnership'],
   },
   {
     // The move nobody knows: claim Child Benefit, elect to receive ZERO. You keep the NI credit,
@@ -409,6 +452,14 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 0,
     evidence: 'Nothing. It is your gross income, before expenses, from your trade and any rent added together.',
     source: 'GOV.UK, Making Tax Digital for Income Tax. Qualifying income over £50,000 from 6 April 2026, over £30,000 from April 2027, over £20,000 from April 2028.',
+    // 🔴 NOT FOR A COMPANY, AND THE THREE FOLLOW UPS STOP WITH IT because they all hang off this
+    // gate through dependsOn. Making Tax Digital for Income Tax is about self employment and rent
+    // on a PERSONAL return; a company's trade is neither, it files its own CT600. A director who
+    // also has rent of his own above the line is a real case, but this sentence cannot honestly
+    // capture him: `ask` is stored verbatim as the exhibit, and his trade income is not "self
+    // employment". If property only mandation is ever surfaced for directors it gets a NEW key with
+    // its own wording, never an edit to this one.
+    structures: ['sole_trader', 'partnership'],
   },
   {
     mtd: true,
@@ -420,6 +471,11 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 0,
     evidence: 'Nothing. Your HMRC online account tells you, and so will your accountant if you have one.',
     source: 'GOV.UK, sign up for Making Tax Digital for Income Tax. Signing up is a separate act from being within scope.',
+    // ⚠️ THE SAME STRUCTURES AS THE GATE, EXPLICITLY. dependsOn already holds this back while the
+    // gate is unanswered, but a yes recorded before a man incorporated would release it: the
+    // premise check reads his answers, not his structure. The question is as inapplicable to a
+    // company as the gate itself, so it carries the same tag rather than relying on the gate's.
+    structures: ['sole_trader', 'partnership'],
     dependsOn: { key: 'mtd_mandated', answer: 'yes' },
   },
   {
@@ -435,6 +491,11 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 0,
     evidence: 'Nothing. Your accountant knows, and your HMRC account lists who is authorised to act for you.',
     source: 'GOV.UK, tax agents and advisers. An authorised agent can send quarterly updates on a client\'s behalf.',
+    // ⚠️ THE SAME STRUCTURES AS THE GATE, EXPLICITLY. dependsOn already holds this back while the
+    // gate is unanswered, but a yes recorded before a man incorporated would release it: the
+    // premise check reads his answers, not his structure. The question is as inapplicable to a
+    // company as the gate itself, so it carries the same tag rather than relying on the gate's.
+    structures: ['sole_trader', 'partnership'],
     dependsOn: { key: 'mtd_mandated', answer: 'yes' },
   },
   {
@@ -451,6 +512,11 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 0,
     evidence: 'Nothing. There are no late submission penalties for quarterly updates in 2026/27 either way.',
     source: 'GOV.UK, use Making Tax Digital for Income Tax: updates are cumulative. Budget 2025: late submission penalties for quarterly updates waived for 2026/27, resuming 6 April 2027.',
+    // ⚠️ THE SAME STRUCTURES AS THE GATE, EXPLICITLY. dependsOn already holds this back while the
+    // gate is unanswered, but a yes recorded before a man incorporated would release it: the
+    // premise check reads his answers, not his structure. The question is as inapplicable to a
+    // company as the gate itself, so it carries the same tag rather than relying on the gate's.
+    structures: ['sole_trader', 'partnership'],
     dependsOn: { key: 'mtd_mandated', answer: 'yes' },
   },
   {
@@ -505,13 +571,27 @@ export function notOurs(): Circumstance[] {
 // rather than a rule: a caller must not be able to get a health question out of this file by passing
 // the right list. sensitive() is the only door, and it is gated.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+// Is this question even FOR a man of this structure? See the `structures` field above for the two
+// halves of the rule: absent on the entry means everyone, and an unknown structure from the caller
+// means ask everything, because a failed profile read must never silently cost a sole trader the
+// biggest relief on the list.
+function forStructure(c: Circumstance, structure?: BusinessStructure | null): boolean {
+  if (!c.structures || !structure) return true;
+  return c.structures.includes(structure);
+}
+
 function openIn(
   list: Circumstance[],
   answered: Array<{ key: string; answer: string }>,
+  structure?: BusinessStructure | null,
 ): Circumstance[] {
   const given = new Map(answered.map((a) => [a.key, a.answer]));
   return list.filter((c) => {
     if (c.specialCategory) return false;
+    // ⚠️ A REFUSAL, NOT A HOLD. A question that is not for his structure is not waiting on a
+    // premise, it does not apply to him at all, so it never enters the queue and never counts
+    // against him in a progress denominator.
+    if (!forStructure(c, structure)) return false;
     if (given.has(c.key)) return false;
     if (!c.dependsOn) return true;
     // The premise must be ANSWERED and answered the right way. An unanswered premise holds the
@@ -520,7 +600,10 @@ function openIn(
   });
 }
 
-export function unanswered(answered: Array<{ key: string; answer: string }>): Circumstance[] {
+export function unanswered(
+  answered: Array<{ key: string; answer: string }>,
+  structure?: BusinessStructure | null,
+): Circumstance[] {
   const given = new Map(answered.map((a) => [a.key, a.answer]));
 
   return askingOrder().filter((c) => {
@@ -540,6 +623,12 @@ export function unanswered(answered: Array<{ key: string; answer: string }>): Ci
     // nothing and belongs beside the bank step, not between the pension and the van. mtdQuestions()
     // is its door.
     if (c.mtd) return false;
+
+    // 🔴 AND A QUESTION THAT IS NOT FOR HIS STRUCTURE IS REFUSED THE SAME WAY. A director asked
+    // "before you went self employed" is being read a list, and he only needs to notice once to
+    // stop answering the questions that are worth thousands. Unknown structure asks everything:
+    // see forStructure for why that is the safe direction.
+    if (!forStructure(c, structure)) return false;
 
     if (given.has(c.key)) return false;
     if (!c.dependsOn) return true;
@@ -609,8 +698,13 @@ export function mtdQuestions(): Circumstance[] {
 }
 
 // The MTD questions it is fair to ask him today. Same rule as the money queue, different list.
-export function unansweredMtd(answered: Array<{ key: string; answer: string }>): Circumstance[] {
-  return openIn(mtdQuestions(), answered);
+// A limited company gets an empty list by construction: the gate question carries `structures`
+// and the three follow ups hang off it, so nothing here needs to know why.
+export function unansweredMtd(
+  answered: Array<{ key: string; answer: string }>,
+  structure?: BusinessStructure | null,
+): Circumstance[] {
+  return openIn(mtdQuestions(), answered, structure);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -645,13 +739,17 @@ export interface AskProgress {
 export function progressIn(
   group: Circumstance[],
   answered: Array<{ key: string; answer: string }>,
+  structure?: BusinessStructure | null,
 ): AskProgress {
   const given = new Set(answered.map((a) => a.key));
+  // ⚠️ AN ANSWER HE GAVE IS COUNTED EVEN IF HIS STRUCTURE WOULD NOT BE ASKED TODAY. He may have
+  // answered as a sole trader and incorporated since; the record of what he told us does not
+  // evaporate because the question stopped applying, only the ASKING stops.
   const done = group.filter((c) => given.has(c.key)).length;
   // ⚠️ openIn RATHER THAN unanswered, AND THE DIFFERENCE IS NOT COSMETIC. unanswered() refuses the
   // compliance questions on purpose, so counting through it would tell a man on the MTD screen that
   // he has 0 of 0 to answer while three questions sit in front of him.
-  const toAsk = openIn(group, answered).length;
+  const toAsk = openIn(group, answered, structure).length;
   return { answered: done, askable: done + toAsk };
 }
 

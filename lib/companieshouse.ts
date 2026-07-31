@@ -68,6 +68,43 @@ async function chGet(path: string): Promise<unknown | null> {
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHAT WE ARE WILLING TO SAY ABOUT A MAN'S COMPANY, AND IT DEPENDS ON WHAT THE LOOKUP FOUND.
+//
+// /app/you used to print "A limited company, registered at Companies House" for ANY ltd signup.
+// The lookup runs server side at signup and records its OUTCOME (signups.company_lookup, see
+// supabase/APPLY_2026-07-27_signup_person_and_company.sql), and that outcome is often no_match: he
+// typed a name the register does not hold. Asserting registration we never verified is the exact
+// move the /start copy was purged of on 27 July ("we will verify your company details", when we
+// verify nothing), now on the page whose title is literally "Who we think you are". He only has to
+// catch us once.
+//
+// So the sentence is earned by the record:
+//   matched      we hold the register's own number, so we show it. A number he can check beats an
+//                adjective he has to trust.
+//   no_match     said plainly, with the one thing he can do about it. Never dressed up.
+//   anything else (not_ltd on a changed structure, unavailable, or a signup from before the
+//                lookup existed) asserts NOTHING about the register: "as you told us" is the
+//                whole claim, because it is the whole evidence.
+//
+// It lives HERE rather than in the page for the same reason setAsideBasisLine lives in
+// lib/taxoptimiser.ts: a claim about a man is not a presentation decision, and a pure function is
+// one a test can run against all four outcomes.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export function registrationLine(
+  lookup: string | null | undefined,
+  companyNumber: string | null | undefined,
+): string {
+  const number = (companyNumber ?? '').trim();
+  if (lookup === 'matched' && number) {
+    return `A limited company, number ${number} on the Companies House register, and you are a director of it.`;
+  }
+  if (lookup === 'no_match') {
+    return 'A limited company, as you told us, but we could not find this name on the register, check the spelling in setup.';
+  }
+  return 'A limited company, as you told us, and you are a director of it.';
+}
+
 export function parseSearch(json: unknown): CompanyMatch[] {
   const items = (json as { items?: unknown })?.items;
   if (!Array.isArray(items)) return [];

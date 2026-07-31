@@ -23,7 +23,7 @@ Two layers protect the AI spend:
 | `POST /api/draft-invoice` | The app, and anyone (CORS open) | Yes, one Claude text call | **20 per IP per 5 minutes.** Input length validated. Returns only drafted text, no user data. |
 | `POST /api/onboard` | The public signup form | Tiny, one welcome email | **12 per IP per 10 minutes.** Phone and email validated. **Honeypot field** and **minimum fill time** drop bots. **Turnstile** ready, inert until configured. Never returns user data. |
 | `POST /api/waitlist` | The public waitlist form | No | **12 per IP per 10 minutes.** Validated. |
-| `GET /api/pay/[id]` | The customer paying an invoice | No, creates a Stripe checkout | Only acts on an existing invoice, refuses if already paid. Paying an invoice benefits us, so there is no abuse upside. |
+| `GET /api/pay/[id]` | The customer paying an invoice | No | **Gated off entirely while no invoice owner has a payout route** (see `hasInvoicePayoutRoute` in `lib/stripe.ts`): a checkout here would collect the payer's money into Lekhio's own Stripe balance with no way onward to the tradesman. Redirects straight back to the invoice. When a payout route exists it will again create a checkout, rate limited per IP, acting only on an existing unpaid invoice. |
 | `POST /api/stripe/webhook` | Only Stripe (signature verified) | No | Stripe signature required. |
 | `GET /api/cron/reminders` | The scheduler | Yes, template sends | Bearer `CRON_SECRET` required. |
 

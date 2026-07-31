@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie, identityForUser } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { readIdentityCard, getBusinessProfile, readCircumstances } from '../../../lib/supabase';
+import { readIdentityCard, getBusinessProfile, readCircumstances, readSignupCompany, type SignupCompany } from '../../../lib/supabase';
+import { registrationLine } from '../../../lib/companieshouse';
 import { household, notHousehold, mtdQuestions, progressIn } from '../../../lib/circumstances';
 import { maskEmail, bindNotice, BOUND_LINE } from './identity';
 import {
@@ -40,13 +41,22 @@ export const dynamic = 'force-dynamic';
 
 // How he trades, said in his words. The profile defaults an unset structure to sole trader, which
 // is the engine's safe guess, so the sentence says "we have it as" rather than "you told us".
-function structureLine(p: { businessType: string; partnershipShare: number } | null): string {
+//
+// 🔴 THE COMPANY SENTENCE IS EARNED, NOT ASSUMED. This used to say "registered at Companies House"
+// for ANY ltd account, when the signup lookup may have searched the register and found nothing.
+// lib/companieshouse.ts writes the sentence now, from what the lookup actually recorded: the
+// number when there was a match, a plain "we could not find this name" when there was not, and no
+// claim about the register at all when we never managed to look.
+function structureLine(
+  p: { businessType: string; partnershipShare: number } | null,
+  company: SignupCompany | null,
+): string {
   if (!p) return '';
   switch (p.businessType) {
     case 'partnership':
       return `A partnership. We work your tax out on your share of the profit, which we have as ${p.partnershipShare}%.`;
     case 'limited_company':
-      return 'A limited company, registered at Companies House, and you are a director of it.';
+      return registrationLine(company?.lookup ?? null, company?.companyNumber ?? null);
     default:
       return 'Just you. Self employed, taxed as a sole trader, whatever name you trade under.';
   }
@@ -72,11 +82,15 @@ export default async function YouPage({
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
 
-  const [card, profile, rows, identity] = await Promise.all([
+  const [card, profile, rows, identity, company] = await Promise.all([
     readIdentityCard(user.id),
     getBusinessProfile(user.id).catch(() => null),
     readCircumstances(user.id),
     identityForUser(user),
+    // What the signup lookup recorded about his company, read from the signups row itself so this
+    // page cannot assert a registration the lookup never found. Null on any failure, which makes
+    // the sentence LESS assertive, never more.
+    readSignupCompany(user.id).catch(() => null),
   ]);
 
   // The VAT answer, from the log and only the log. 'yes' and 'no' get their own sentences; a
@@ -88,7 +102,7 @@ export default async function YouPage({
   // never worked out here. The denominator is his: it grows as his answers open follow ups.
   const asked = rows === null
     ? null
-    : progressIn([...household(), ...notHousehold(), ...mtdQuestions()], rows);
+    : progressIn([...household(), ...notHousehold(), ...mtdQuestions()], rows, profile?.businessType);
 
   const notice = bindNotice(one('e'));
   const bind = one('bind');
@@ -116,7 +130,7 @@ export default async function YouPage({
               <p style={S.fact}>Trading as {card.businessName}.</p>
             ) : null}
             {tidyTrade(card.trade) ? <p style={S.fact}>{tidyTrade(card.trade)} by trade.</p> : null}
-            {profile ? <p style={S.fact}>{structureLine(profile)}</p> : null}
+            {profile ? <p style={S.fact}>{structureLine(profile, company)}</p> : null}
             {vat ? (
               <p style={S.fact}>
                 {vat.answer === 'yes'

@@ -24,6 +24,11 @@ let pass = 0;
 let fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; console.log(`  ok  ${name}`); } else { fail++; console.log(`  FAIL ${name}`); } };
 
+// Comments stripped before asking what a CUSTOMER reads: the old SIC sentence survives in a
+// comment explaining why it was wrong, and a check that cannot tell the argument from the copy
+// gets deleted, not fixed.
+const codeOnlyStart = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
 console.log('\nsignup SIC matching: information, never a filing');
 
 // ---------------------------------------------------------------------------------------------
@@ -94,8 +99,14 @@ ok('the suggestion only computes for a limited company, never a sole trader or "
 ok('the payload sends the code only when a suggestion actually rendered, never a bare guess',
   /sicCode: sicChoice \? sicChoice\.code : undefined/.test(startSrc));
 
-ok('the copy tells him plainly that HE confirms it, we are not filing it',
-  /You will confirm it yourself there/.test(startSrc));
+// ⚠️ REWORDED 31 JULY. The old sentence said "when you register your limited company" to a man
+// whose ltd option reads "I have a registered company": a lecture about registering a company he
+// already has. The claim that matters survives the rewording and is pinned here: we file nothing,
+// and the register's own entry is the record, not our match.
+ok('the copy tells him plainly that we are not filing it and the register is the record',
+  /We never file it anywhere/.test(startSrc) && /the one that counts/.test(startSrc));
+ok('🔴 and it no longer lectures a man who already has a company about registering one',
+  !/when you register your limited company/.test(codeOnlyStart(startSrc)));
 
 ok('there is a way to see another suggestion rather than us silently keeping the first guess',
   /Not quite right\? Try another/.test(startSrc) && /setSicPick/.test(startSrc));

@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { getOptimiserInput, getConfirmedTransactionsForRange } from '../../../lib/supabase';
+import { getOptimiserInput, getConfirmedTransactionsForRange, getBusinessProfile } from '../../../lib/supabase';
 import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
+import { shareCaption } from '../../../lib/position';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { buildQuarterPack, quarterBounds, quarterForDate } from '../../../lib/quarterpack';
 import { gbp0 } from '../../../lib/money';
@@ -49,14 +50,20 @@ export default async function TaxHubPage() {
   const taxYearStart = quarterBounds(startYear, 1).start;
   const quarterEnd = quarterBounds(startYear, index).end;
 
-  const [optimiser, txns] = await Promise.all([
+  const [optimiser, txns, biz] = await Promise.all([
     getOptimiserInput(user.id),
     // The same window /api/quarter-pack reads, so the MTD line below is the pack's own answer.
     getConfirmedTransactionsForRange(user.id, taxYearStart, quarterEnd).catch(() => []),
+    // For the partnership caption under the number. Same source /app/pay-yourself reads the share
+    // from. A failed read draws no caption, which is safer than a wrong one.
+    getBusinessProfile(user.id).catch(() => null),
   ]);
 
   const tax = taxPosition(optimiser);
   const basis = setAsideBasisLine(optimiser, tax);
+  // The set aside is worked out on getOptimiserInput's figures, which for a partner are already
+  // his share of the firm's books. The caption from lib/position.ts says so, partnership only.
+  const shareCap = biz ? shareCaption(biz.businessType, biz.partnershipShare) : null;
 
   // The MTD test, asked of the quarter pack rather than re-derived. The threshold, the gross
   // qualifying income and the by-year rule all live in lib/quarterpack.ts and lib/taxengine.ts.
@@ -96,6 +103,9 @@ export default async function TaxHubPage() {
           {/* What is inside the number, written by lib/taxoptimiser.ts so the claim about a man's
               tax stays in one place. Null for a pure sole trader, for whom it would add no fact. */}
           {basis ? <p style={S.heroBasis}>{basis}</p> : null}
+          {/* Whose money it is worked out on. For a partner the figure runs on his share of the
+              firm's books, and this is where that is said. */}
+          {shareCap ? <p style={S.heroBasis}>{shareCap}</p> : null}
         </section>
       ) : (
         <section className="lek-card">

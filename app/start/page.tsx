@@ -515,8 +515,13 @@ export default function StartPage() {
                     <div style={{ marginTop: 18, backgroundColor: RIVER_TINT, border: `1.5px solid ${RIVER}`, borderRadius: 14, padding: '14px 16px' }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: RIVER_DEEP, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Your likely SIC code</div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: INK, marginTop: 6 }}>{sicChoice.code} &middot; {sicChoice.label}</div>
+                      {/* 🔴 THIS SAID "when you register your limited company", TO A MAN WHO JUST
+                          PICKED "I have a registered company" ONE STEP UP. Lecturing him about
+                          registering a company he already has is the small tell that we are not
+                          listening. The honest frame: the register's own entry is the record, we
+                          file nothing, and this is just so his details here line up. */}
                       <p style={{ fontSize: 12.5, color: MUTED, marginTop: 6, lineHeight: 1.5 }}>
-                        Companies House will ask for this when you register your limited company. You will confirm it yourself there, we are just saving you the look up.
+                        Companies House keeps a code like this on your company&apos;s record. We never file it anywhere, it is matched from what you told us, and the register&apos;s own entry is the one that counts.
                       </p>
                       {sicMatches.length > 1 && (
                         <button type="button" onClick={() => setSicPick((p) => (p + 1) % sicMatches.length)} style={{ marginTop: 8, background: 'none', border: 'none', color: RIVER, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
@@ -564,7 +569,16 @@ export default function StartPage() {
               )}
 
               {step === 6 && (
-                <Step title="Are you VAT registered?" sub="Most sole traders are not. If you are not sure, choose No, you can change it any time.">
+                /* 🔴 STRUCTURE AWARE, because "Most sole traders are not" was being said to a man
+                   who told us two steps earlier that he runs a limited company. VAT registration
+                   belongs to the COMPANY for him, so the sentence names that instead of calling
+                   him a sole trader. The safe default and the way out stay identical. */
+                <Step
+                  title="Are you VAT registered?"
+                  sub={tradeType === 'ltd'
+                    ? 'This one is about the company: whether it is registered for VAT. If you are not sure, choose No, you can change it any time.'
+                    : 'Most sole traders are not. If you are not sure, choose No, you can change it any time.'}
+                >
                   <div style={{ display: 'flex', gap: 12 }}>
                     {([['no', 'No', false], ['yes', 'Yes', true]] as const).map(([k, label, val]) => {
                       const active = vat === val;

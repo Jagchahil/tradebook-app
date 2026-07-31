@@ -142,8 +142,7 @@ ok('the refusal is the shared one, back to the page that draws the banner',
 // The machinery, by name. Every one of these is the function the WhatsApp handler calls.
 const MACHINERY = [
   'matchTotalsQuestion', 'totalsForUser', 'pendingSummaryForUser', 'formatGbp',
-  'soleTraderTax', 'corporationTax', 'studentLoanForSA', 'getBusinessProfile',
-  'getStudentLoanSettings', 'isDeadlineQuestion', 'deadlineAnswer', 'checkExpense',
+  'isDeadlineQuestion', 'deadlineAnswer', 'checkExpense',
   'VERDICT_ICON', 'hasClaudeConfig', 'answerMoneyQuestion', 'transactionSummaryForUser',
   'getRelevantKnowledge', 'aiCapsFor', 'decideSpend', 'bumpAiUsage', 'countActiveSubscribers',
   'busyMessage', 'refreshFactsFromDb',
@@ -152,6 +151,25 @@ for (const name of MACHINERY) {
   // Present in the thread route AND in the WhatsApp route: the same function, not a lookalike.
   ok(`reuses ${name} by name`, routeCode.includes(name) && waSrc.includes(name));
 }
+
+// 🔴 WHAT HE OWES IS THE TAX HUB'S NUMBER (31 July 2026). The owe intent used to run its own
+// little January (soleTraderTax plus the loan minus CIS) and disagreed with /app/tax, which
+// leads with taxPosition() on getOptimiserInput(). One question, one figure: the pins below tie
+// the thread to the tax hub BY NAME, the same way MACHINERY ties it to WhatsApp.
+const taxHubCode = stripComments(read('app/app/tax/page.tsx'));
+ok('🔴 the owe answer is taxPosition on getOptimiserInput, the tax hub\'s own call, in both files',
+  /taxPosition\(optimiser\)/.test(routeCode) && /taxPosition\(optimiser\)/.test(taxHubCode)
+  && /getOptimiserInput\(/.test(routeCode) && /getOptimiserInput\(/.test(taxHubCode));
+ok('🔴 the figure spoken is setAside itself, the hub\'s hero number',
+  /formatGbp\(tax\.setAside\)/.test(routeCode) && /\{gbp0\(tax\.setAside\)\}/.test(taxHubCode));
+ok('what is inside the number is the shared sentence, lib/taxoptimiser\'s own words',
+  /setAsideBasisLine\(optimiser, tax\)/.test(routeCode) && /setAsideBasisLine\(optimiser, tax\)/.test(taxHubCode));
+ok('🔴 the little January is gone: no engine arithmetic of the owe branch\'s own',
+  !/soleTraderTax|corporationTax|studentLoanForSA|getStudentLoanSettings|getBusinessProfile/.test(routeCode));
+ok('and the answer says out loud whose figure it is',
+  routeSrc.includes('It is the same figure your Tax screen leads with'));
+ok('a projection is called a projection, the hub\'s own honesty',
+  /tax\.projected\s*\?/.test(routeCode) && /heading for/.test(routeSrc));
 ok('deterministic intents run BEFORE the AI path, the WhatsApp order',
   routeCode.indexOf('matchTotalsQuestion(q)') > -1
   && routeCode.indexOf('matchTotalsQuestion(q)') < routeCode.indexOf('hasClaudeConfig()')

@@ -10,17 +10,14 @@ import {
   matchTotalsQuestion, formatGbp, isDeadlineQuestion, deadlineAnswer, type TotalsQuestion,
 } from '../../../lib/waintents';
 import { checkExpense, VERDICT_ICON } from '../../../lib/taxrules';
-import { soleTraderTax } from '../../../lib/taxengine';
-import { corporationTax } from '../../../lib/ltdengine';
-import { studentLoanForSA, type StudentPlan } from '../../../lib/nistudentloan';
+import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
 import {
   bumpAiUsage,
   countActiveSubscribers,
   refreshFactsFromDb,
   totalsForUser,
   pendingSummaryForUser,
-  getBusinessProfile,
-  getStudentLoanSettings,
+  getOptimiserInput,
   transactionSummaryForUser,
   getRelevantKnowledge,
   getOrCreateLekhioThread,
@@ -38,8 +35,8 @@ export const maxDuration = 60;
 // 🔴 THIS ROUTE ANSWERS THE WAY WHATSAPP ANSWERS, WITH THE SAME MACHINERY, OR NOT AT ALL.
 //
 // The order is app/api/whatsapp/route.ts's order, and every function is the same function by
-// name: deterministic intents first (totals and what he owes via matchTotalsQuestion,
-// totalsForUser, soleTraderTax, corporationTax and studentLoanForSA; claims via checkExpense;
+// name: deterministic intents first (totals via matchTotalsQuestion and totalsForUser; what he
+// owes via taxPosition on getOptimiserInput, the tax hub's own figure; claims via checkExpense;
 // deadlines via deadlineAnswer), then the guarded AI path (answerMoneyQuestion on
 // transactionSummaryForUser plus the approved knowledge), behind the SAME derived caps and the
 // SAME durable spend rings (aiCapsFor on the live paying base, decideSpend, bumpAiUsage on the
@@ -219,28 +216,22 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
     return `${q.periodLabel === 'all time' ? 'All time' : `For ${q.periodLabel}`}: ${formatGbp(totals.income)} in, ${formatGbp(totals.expenses)} out, so ${formatGbp(profit)} profit.`;
   }
 
-  // The answer branches on business structure, exactly as WhatsApp's does: a sole trader, a
-  // partner and a company director on the same profit owe three different amounts.
-  const profile = await getBusinessProfile(userId).catch(() => null);
-
-  if (profile?.businessType === 'limited_company') {
-    const ct = corporationTax(Math.max(0, profit));
-    return `As a limited company, on ${formatGbp(profit)} profit so far this tax year the corporation tax is about ${formatGbp(ct)}. That is the company's bill. What YOU pay depends on how you take the money out, salary and dividends. A rough guide from your confirmed entries, not a final figure.`;
-  }
-
-  const share = profile?.businessType === 'partnership' ? profile.partnershipShare / 100 : 1;
-  const taxableProfit = Math.max(0, profit * share);
-  const shareNote = share < 1 ? ` (your ${Math.round(share * 100)}% share of the ${formatGbp(profit)} partnership profit)` : '';
-
-  const est = soleTraderTax(taxableProfit);
-  const slSettings = await getStudentLoanSettings(userId).catch(() => null);
-  const slPlans: StudentPlan[] = [];
-  if (slSettings?.plan) slPlans.push(slSettings.plan);
-  if (slSettings?.postgrad) slPlans.push('postgrad');
-  const slDue = slPlans.length > 0 ? studentLoanForSA(taxableProfit, slSettings?.employmentIncome ?? 0, slPlans) : 0;
-  const totalDue = est.total + slDue;
-  const afterCis = Math.max(0, totalDue - totals.cis);
-  const slLine = slDue > 0 ? ` including ${formatGbp(slDue)} of student loan` : '';
-  const cisLine = totals.cis > 0 ? ` You have already had ${formatGbp(totals.cis)} taken in CIS, so the bill after that is about ${formatGbp(afterCis)}.` : '';
-  return `On ${formatGbp(taxableProfit)} profit so far this tax year${shareNote}, the rough bill is ${formatGbp(totalDue)} (income tax plus National Insurance${slLine}).${cisLine} A rough guide from your confirmed entries, not a final figure.`;
+  // 🔴 WHAT HE OWES IS THE TAX HUB'S OWN NUMBER, FETCHED BY NAME, NEVER RE-DERIVED.
+  //
+  // This branch used to run a little January of its own: soleTraderTax on the asked-about
+  // period's rows, the student loan added, CIS taken off, with company and partnership
+  // variants. Every figure was real, and the total still disagreed with /app/tax, which leads
+  // with taxPosition() on getOptimiserInput(): the whole person figure across trade, salary,
+  // property, savings and dividends, projected to the year, partnership share already applied.
+  // A man who asked the thread what he owes and then opened Tax got two answers to one
+  // question, and a product that disagrees with itself about his tax loses both answers. So
+  // this is now the same call the Tax hub and the Overview make, and only the sentence around
+  // the figure lives here.
+  const optimiser = await getOptimiserInput(userId);
+  const tax = taxPosition(optimiser);
+  const basis = setAsideBasisLine(optimiser, tax);
+  const note = tax.projected
+    ? 'That is what the year is heading for, on everything you have confirmed so far.'
+    : 'That is what the year so far has built up, too early to call the whole year yet.';
+  return `Put by ${formatGbp(tax.setAside)} for tax. ${note}${basis ? ` ${basis}` : ''} It is the same figure your Tax screen leads with, and Self Assessment collects it in one bill.`;
 }

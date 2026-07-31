@@ -5,8 +5,9 @@
 //   STRIPE_SECRET_KEY      sk_live_... or sk_test_...
 //   STRIPE_WEBHOOK_SECRET  whsec_..., used to verify the webhook signature
 //
-// Everything here returns gracefully when no key is set, so the invoice page
-// simply does not show a Pay now button until Stripe is switched on.
+// Everything here returns gracefully when no key is set. Invoice card payment is
+// additionally gated on a payout route existing, which today it never does: see
+// hasInvoicePayoutRoute below before touching anything invoice shaped.
 
 import crypto from 'crypto';
 
@@ -17,6 +18,36 @@ const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 export function hasStripeConfig(): boolean {
   return Boolean(KEY);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE PAYOUT ROUTE, OR RATHER THE FACT THAT THERE IS NOT ONE. READ THIS BEFORE TOUCHING
+// INVOICE CARD PAYMENT.
+//
+// STRIPE_SECRET_KEY is OUR key. A Checkout session created with it collects the payer's money
+// into LEKHIO LTD'S OWN STRIPE BALANCE. That is correct for the one thing we sell, the Lekhio
+// subscription. It is catastrophically wrong for a tradesman's invoice: his customer's £450
+// would land in our account, branded Lekhio, and nothing anywhere in this codebase, no Stripe
+// Connect account, no transfer, no stored bank details for the tradesman, could ever move it on
+// to the man who did the work. Found on 31 July 2026: the live invoice page offered exactly
+// that button to every customer's customer.
+//
+// Money paid to the wrong account is the worst class of bug this product can have. It is not a
+// crash we can fix or a figure we can correct. It is us holding a stranger's money, a customer
+// who believes he has paid, and a tradesman who has not been paid, all at once, with the mess
+// landing in the one relationship the product exists to protect.
+//
+// So: until a user can hold a real payout route, this answers false for EVERY invoice, and no
+// invoice checkout session can be created. The public invoice page stays the document plus
+// whatever payment details the tradesman wrote on it, with one honest line that card payment
+// is coming. The day payout routes exist, this function must take the invoice's owner and look
+// his route up, createInvoiceCheckout must charge THROUGH that route (a destination charge to
+// his connected account, never a plain charge into ours), and test/invoicepay.test.mjs, which
+// currently proves no session leaves this file even with a live key configured, must be
+// rewritten to attack the lookup.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+export function hasInvoicePayoutRoute(): boolean {
+  return false;
 }
 
 export interface CheckoutInput {
@@ -31,6 +62,11 @@ export interface CheckoutInput {
 // Create a hosted Stripe Checkout session for one invoice. Returns the URL to
 // send the customer to, or null if Stripe is not configured or the call fails.
 export async function createInvoiceCheckout(input: CheckoutInput): Promise<string | null> {
+  // 🔴 NO PAYOUT ROUTE, NO SESSION, BEFORE ANYTHING ELSE IS EVEN READ. Without a route to the
+  // invoice's owner this session would collect his customer's money into OUR balance, which is
+  // the trap hasInvoicePayoutRoute's header spells out. The guard lives here, at the only place
+  // a session is minted, so no future call site can reopen it by forgetting a check.
+  if (!hasInvoicePayoutRoute()) return null;
   if (!KEY) return null;
 
   const amountPence = Math.round(Math.abs(input.total) * 100);

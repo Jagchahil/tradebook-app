@@ -244,5 +244,22 @@ const fx = (over = {}) => ({
     M.payModel('limited_company', fx({ ytdTradeIncome: 0 })).kind === 'nothing_yet');
 }
 
+// THE DIRECTOR WITH NOTHING CONFIRMED. The salary and dividend SHAPE is profit free and
+// deterministic, so the empty state carries the engine's own rungs with their reasons and NOT ONE
+// priced figure: pricing needs a profit we do not hold. test/structurehonesty.test.mjs holds the
+// page half; this pins the helper's contract beside the rest of its fixtures.
+{
+  const bare = fx({ ytdTradeIncome: 0, ytdTradeExpenses: 0 });
+  const m = M.payModel('limited_company', bare);
+  const rungs = P.salaryRungs();
+  ok('🔴 EMPTY DIRECTOR: THE RUNGS ARE salaryRungs\' OWN, by value and by reason',
+    Array.isArray(m.rungs) && m.rungs.length === rungs.length
+    && m.rungs.every((r, i) => r.salary === rungs[i].salary && r.why === rungs[i].why));
+  ok('empty director: nothing is priced, no plan and no take home anywhere on the model',
+    !('plan' in m) && m.rungs.every((r) => !('takeHome' in r)));
+  ok('an empty sole trader and an empty partner carry no company shape',
+    M.payModel('sole_trader', bare).rungs === null && M.payModel('partnership', bare).rungs === null);
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

@@ -185,7 +185,13 @@ ok('an answer from the other screen does not count on this one',
   other.answered === 0 && other.askable === fresh.askable);
 
 ok('🔴 the page does not work the count out for itself',
-  /progressIn\(group, rows\)/.test(pageSrc) && !/!open\.has\(c\.key\)\)\.length/.test(pageSrc));
+  /progressIn\(group, rows, structure\)/.test(pageSrc) && !/!open\.has\(c\.key\)\)\.length/.test(pageSrc));
+// The structure rides with every ask, because askability now branches on it: a director must not
+// be shown "before you went self employed". The fixtures live in test/structurehonesty.test.mjs;
+// here we pin that the page passes what it read rather than deciding anything itself.
+ok('🔴 the questions steps pass the structure from getBusinessProfile into the module',
+  /unanswered\(rows, structure\)/.test(pageSrc) && /unansweredMtd\(rows, structure\)/.test(pageSrc)
+  && /progressIn\(mtdQuestions\(\), rows, structure\)/.test(pageSrc));
 
 // The two Jag named on 28 July, and the reason this step exists at all: there was nowhere in this
 // product for a man to say he was married, and nowhere to say who claims the Child Benefit.

@@ -62,17 +62,61 @@ export default async function PayYourselfPage() {
 
       <AppNav current="/app/tax" />
 
-      {/* ── NOTHING CONFIRMED YET. An honest short state, naming the one thing that fills it. ── */}
+      {/* ── NOTHING CONFIRMED YET. An honest short state, naming the one thing that fills it. ──
+          A DIRECTOR'S EMPTY STATE IS THE EXCEPTION, AND IT IS STILL NOT A FIGURE. The efficient
+          shape of company pay does not depend on the profit, so a brand new director gets the
+          shape now, from the engine's own rungs via ./plan.ts, with nothing priced: pricing needs
+          a profit we do not hold, and an invented one would be a guess dressed as advice. */}
       {model.kind === 'nothing_yet' ? (
-        <section className="lek-card">
-          <h1 className="lek-h2">Paying yourself</h1>
-          <p style={S.empty}>Nothing to work out yet.</p>
-          <p style={S.quiet}>
-            Once the money you have confirmed builds up a profit, this page shows the most tax
-            efficient way to take it out, worked out for how you trade. Connect your bank or log
-            what you have earned, and it fills in by itself.
-          </p>
-        </section>
+        model.rungs ? (
+          <>
+            <section className="lek-card">
+              <h1 className="lek-h2">Paying yourself from the company</h1>
+              <p style={S.body}>
+                No confirmed money yet, so there are no figures here. The shape is still worth two
+                minutes, because it is the same at any profit: a small salary first, then dividends
+                out of what the company keeps after Corporation Tax.
+              </p>
+              <p style={S.quiet}>
+                The salary is a company cost, so it comes off the profit before Corporation Tax is
+                worked out. Dividends carry no National Insurance at all. That pairing is why
+                salary first and dividends second is the efficient shape, and it is the order
+                everything on this page will be priced in once your money arrives.
+              </p>
+            </section>
+            <section className="lek-card">
+              <h2 className="lek-h2">The three salaries worth knowing</h2>
+              <p style={S.quiet}>
+                Each is a line the tax rules draw, not a recommendation. Which one wins depends on
+                figures you do not have yet, and the catch worth knowing early is the State
+                Pension one.
+              </p>
+              {model.rungs.map((r) => (
+                <div key={r.salary} style={S.owe}>
+                  <div style={S.oweTop}>
+                    <span style={S.oweLabel}>{gbp0(r.salary)} salary</span>
+                  </div>
+                  <p style={S.oweBasis}>{r.why}</p>
+                </div>
+              ))}
+              <p style={S.quiet}>
+                Your own figures appear here the moment the money you confirm builds a profit:
+                connect the bank or log what the company has earned, and this page prices every
+                rung, the dividends on top, and what the next thousand pounds would cost you.
+              </p>
+            </section>
+          </>
+        ) : (
+          <section className="lek-card">
+            <h1 className="lek-h2">Paying yourself</h1>
+            <p style={S.empty}>Nothing to work out yet.</p>
+            <p style={S.quiet}>
+              Once the money you have confirmed builds up a profit, this page shows the most tax
+              efficient way to take it out, worked out for how you trade. Connect your bank or log
+              what you have earned, and it fills in by itself.
+            </p>
+          </section>
+        )
       ) : null}
 
       {/* ── A SOLE TRADER OR A PARTNER. Drawings, not wages, and the truth said plainly. ─────── */}

@@ -2,10 +2,10 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { readCircumstances } from '../../../../lib/supabase';
+import { readCircumstances, getBusinessProfile } from '../../../../lib/supabase';
 import {
   household, notHousehold, mtdQuestions, unanswered, unansweredMtd, progressIn,
-  type Circumstance,
+  type Circumstance, type BusinessStructure,
 } from '../../../../lib/circumstances';
 import {
   A11Y_CSS, APP_CSS, FONT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RADIUS, RED, RED_TINT,
@@ -101,16 +101,20 @@ function QuestionCard({ q, current }: { q: Circumstance; current: string | null 
 }
 
 function Group({
-  title, blurb, group, open, rows,
+  title, blurb, group, open, rows, structure,
 }: {
   title: string;
   blurb: string;
   group: Circumstance[];
   open: Set<string>;
   rows: Array<{ key: string; answer: string }>;
+  structure: BusinessStructure | null;
 }) {
   const given = new Map(rows.map((r) => [r.key, r.answer]));
-  const { answered, askable } = progressIn(group, rows);
+  // The structure keeps the denominator honest: a question lib/circumstances.ts refuses for how he
+  // trades is not "waiting for him", so it never counts against him here. An answer he has already
+  // given stays drawn and changeable whatever his structure is now, because the record is his.
+  const { answered, askable } = progressIn(group, rows, structure);
   const drawable = group.filter((c) => open.has(c.key) || given.has(c.key));
 
   return (
@@ -136,7 +140,14 @@ export default async function CircumstancesPage() {
   const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
   if (!user) redirect('/in');
 
-  const rows = await readCircumstances(user.id);
+  // The structure comes with the answers: askability branches on it in lib/circumstances.ts, so a
+  // director is not shown "before you went self employed" as a question still waiting on him. A
+  // failed profile read passes null, which the module treats as unknown and asks everything.
+  const [rows, biz] = await Promise.all([
+    readCircumstances(user.id),
+    getBusinessProfile(user.id).catch(() => null),
+  ]);
+  const structure = biz?.businessType ?? null;
 
   // 🔴 A FAILED READ IS NEVER A BLANK SLATE. Drawing every question as open would ask a man
   // things he answered last month, and he only needs to notice once to stop answering the ones
@@ -158,11 +169,12 @@ export default async function CircumstancesPage() {
   }
 
   // The money queue and the compliance queue, asked of the module. unanswered() refuses the MTD
-  // questions on purpose, so the MTD group has its own gate through unansweredMtd().
-  const open = new Set(unanswered(rows).map((c) => c.key));
-  const openMtd = new Set(unansweredMtd(rows).map((c) => c.key));
+  // questions on purpose, so the MTD group has its own gate through unansweredMtd(). Both take the
+  // structure, so what is "open" for this man is decided in one place for every surface.
+  const open = new Set(unanswered(rows, structure).map((c) => c.key));
+  const openMtd = new Set(unansweredMtd(rows, structure).map((c) => c.key));
 
-  const overall = progressIn([...household(), ...notHousehold(), ...mtdQuestions()], rows);
+  const overall = progressIn([...household(), ...notHousehold(), ...mtdQuestions()], rows, structure);
   const waiting = overall.askable - overall.answered;
 
   return (
@@ -189,6 +201,7 @@ export default async function CircumstancesPage() {
         group={household()}
         open={open}
         rows={rows}
+        structure={structure}
       />
 
       <Group
@@ -197,6 +210,7 @@ export default async function CircumstancesPage() {
         group={notHousehold()}
         open={open}
         rows={rows}
+        structure={structure}
       />
 
       <Group
@@ -205,6 +219,7 @@ export default async function CircumstancesPage() {
         group={mtdQuestions()}
         open={openMtd}
         rows={rows}
+        structure={structure}
       />
 
       <p style={S.foot}>

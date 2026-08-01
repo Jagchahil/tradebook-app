@@ -1,6 +1,7 @@
 import { getPublicInvoice } from '../../../lib/supabase';
 import { A11Y_CSS } from '../../../lib/tokens';
 import { REVERSE_CHARGE_WORDING, formatVrn, isVatRateKey, rateLabel } from '../../../lib/vat';
+import { gbp2 } from '../../../lib/money';
 
 // THE DOCUMENT. Not a screen: the thing his customer pays from and his customer's accountant
 // checks, opened with no session and no account, months after it was sent.
@@ -34,9 +35,19 @@ const GREEN = '#15803D';
 
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
-function gbp(n: number): string {
-  return `£${(Number.isFinite(n) ? n : 0).toFixed(2)}`;
-}
+// 🔴 NOT A LOCAL toFixed(2), AND THIS PAGE IS WHY lib/money.ts EXISTS.
+//
+// The 28 July sweep found seventeen money formatters and replaced them with one, and gbp2's own
+// comment names the invoice as its use: "Documents rather than conversation... A figure a man
+// hands to a lender or an accountant shows its pence." That sweep read lib/. This formatter is
+// in app/, so it was never swept, and it is on the ONE page in the product that leaves the
+// building.
+//
+// Found by walking a reverse charge invoice live on 1 August 2026: the trader's own screen said
+// £2,400.00 and the copy his customer opens said £2400.00. Neither is wrong. They are two readers
+// over one number, on the document a main contractor's accounts payable checks, and a four figure
+// invoice with no thousands separator reads as a typo rather than as a bill.
+const gbp = gbp2;
 
 function prettyDate(value: string | null): string {
   if (!value) return '';

@@ -16,6 +16,7 @@ import { HOW_LONG } from './onboarding';
 // rulebook (VATREVCON37100) and a second copy of it here would be a second thing to get wrong.
 // lib/vat.ts has no imports of its own, so this costs nothing.
 import { REVERSE_CHARGE_WORDING } from './vat';
+import { gbp2 } from './money';
 
 const KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.EMAIL_FROM || 'Lekhio <invoices@lekhio.app>';
@@ -135,8 +136,11 @@ async function send(opts: { from?: string; to: string; subject: string; html: st
   }
 }
 
-const money = (pence: number) => `£${((Number(pence) || 0) / 100).toFixed(2)}`;
-const poundsFromNumber = (n: number) => `£${(Number(n) || 0).toFixed(2)}`;
+// Both delegate to lib/money.ts for the reason written above gbp on app/invoice/[id]/page.tsx:
+// these print the subtotal, the VAT, the reverse charge VAT and the total on the invoice EMAIL,
+// which is the same document as the invoice PAGE and must not disagree with it about £2,400.00.
+const money = (pence: number) => gbp2((Number(pence) || 0) / 100);
+const poundsFromNumber = (n: number) => gbp2(Number(n) || 0);
 
 // --- invoice (to a trader's own customer) ---------------------------------
 //

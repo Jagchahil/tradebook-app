@@ -65,9 +65,10 @@ export default function PrivacyPage() {
 
         <h2 style={heading}>Who we are</h2>
         <p style={para}>
-          Lekhio provides bookkeeping and tax preparation tools for UK self employed tradespeople.
-          For data protection law, Lekhio is the data controller for the information described here.
-          You can reach us any time at info@lekhio.app.
+          Lekhio provides bookkeeping and tax preparation tools for people running a business or
+          letting property in the UK: sole traders, partnerships, limited company directors and
+          landlords. For data protection law, Lekhio is the data controller for the information
+          described here. You can reach us any time at info@lekhio.app.
         </p>
 
         <h2 style={heading}>What we collect</h2>
@@ -118,7 +119,7 @@ export default function PrivacyPage() {
         <p style={para}>
           Lekhio uses AI to read a photo of a receipt and to understand what you tell it. One
           provider does that work for us, under contract, on our instructions and nobody
-          else&apos;s &mdash; and your voice notes we transcribe ourselves:
+          else&apos;s. Your voice notes we transcribe ourselves:
         </p>
         <p style={para}>
           <strong>Anthropic</strong> reads receipt photos and messages, and works out what you are
@@ -153,10 +154,19 @@ export default function PrivacyPage() {
           it is erased, not hidden. Our lawful basis is your explicit consent, and nothing else.
         </p>
 
+        {/* ⚠️ CONDITIONAL, NOT PRESENT TENSE. This used to read "You can choose to connect a bank
+            account so your transactions arrive automatically", which described a live feature. The
+            bank feed has no provider today (lib/bankfeed.ts, bankFeedOffered() defaults off), so it
+            was telling a reader about a choice that was not in front of him. Written this way it is
+            accurate now, when nobody can connect one, and still accurate the day a provider lands
+            and somebody does. */}
         <h2 style={heading}>Connecting your bank (optional)</h2>
         <p style={para}>
-          You can choose to connect a bank account so your transactions arrive automatically
-          instead of you sending each one. This is optional. Lekhio works fully without it.
+          This section applies only if you connect a bank account to Lekhio, so that your
+          transactions arrive on their own instead of you sending each one. Connecting one is
+          always your choice and never required, and Lekhio works fully without it. If you have
+          not connected an account, nothing described below applies to you and we hold none of
+          this data about you.
         </p>
         <p style={para}>
           If you connect a bank, we use TrueLayer, a provider authorised and regulated by the

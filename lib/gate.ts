@@ -145,6 +145,13 @@ export const GATED_ROUTES: GatedRoute[] = [
   // would be holding his own tax position hostage to make a point about £12.99.
   { route: 'app/api/business', rule: 'always', why: 'How he trades. His own fact, and the engine is wrong without it.' },
   { route: 'app/api/circumstances', rule: 'always', why: 'Marriage, children, CIS and the rest. His own facts, and the log IS the defence under Finance Act 2026 Sch 22.' },
+  // ⚠️ NOT WORK, EVEN THOUGH IT LOOKS TECHNICAL. His VAT number, the date he registered and his
+  // scheme are three facts about him, in the same class as "am I married". We do nothing new for
+  // him by writing them down, and the figures they correct are already his. A lapsed man who
+  // cannot record that he registered for VAT is a lapsed man whose invoices we would keep drawing
+  // without VAT on them, which is worse for him than for us. And the DELETE is the elections
+  // shape: a fact he gave us and now wants gone is his to remove, whatever he pays.
+  { route: 'app/api/vat', rule: 'always', why: 'His VAT number, the date he registered and his scheme. Facts about himself, not work we do, and the registration date is the anchor for the Reg 111 reclaim we promised him. A man whose trial has lapsed must still be able to correct his own record, and the DELETE is the elections shape: what he gave us and now wants gone is his to remove.' },
   { route: 'app/api/personal', rule: 'always', why: 'Marking a line personal. Correcting his own record, and refusing it would leave a wrong figure standing.' },
   { route: 'app/api/onboarding', rule: 'always', why: 'Which setup step he is on. One short string about him.' },
   { route: 'app/api/announcements', rule: 'always', why: 'Dismissing a banner. His own screen.' },

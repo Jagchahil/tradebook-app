@@ -7,11 +7,22 @@
 // the user already keeps. No software rival offers this, and every self employed
 // person needs one eventually. Unit tested in test/incomeproof.test.mjs.
 
-import { soleTraderTax } from './taxengine';
+import { incomeTaxOnProfit, class4NIC } from './taxengine';
 
 export interface IncomeProofTxn {
   amount: number; // signed: positive income, negative expense
   transaction_date: string; // YYYY-MM-DD
+  // 🔴 WHICH STREAM THIS ROW IS, AND THE REASON A LANDLORD WAS SHOWN NATIONAL INSURANCE ON RENT.
+  //
+  // 'property' marks the property stream; anything else is trade. It was NOT on this interface, so
+  // every row was totted up as one profit and run through soleTraderTax, which adds Class 4. Class 4
+  // is a charge on the profits of a TRADE (SSCBA 1992 s15). Rent is not a trade, it does not carry
+  // it, and we were printing it on a document a man hands to a lender.
+  //
+  // The rows have always carried it: lib/supabase.ts selects income_type and both callers pass their
+  // rows straight through. This interface simply did not ask for it. Optional, and absent means
+  // trade, so every existing trade only summary is identical to the penny.
+  income_type?: string | null;
 }
 
 export interface IncomeProof {
@@ -21,7 +32,18 @@ export interface IncomeProof {
   income: number;
   expenses: number;
   profit: number;
+  /** The two streams behind `profit`, each floored at zero, because tax is charged on them apart. */
+  tradeProfit: number;
+  propertyProfit: number;
   estimatedTax: number;
+  /** The Class 4 inside estimatedTax. Zero for a pure landlord, which is the whole point. */
+  nationalInsurance: number;
+  /**
+   * What to call estimatedTax on a screen, so no surface has to work out whether there is any
+   * National Insurance in it and none of them can answer differently. app/app/proof-of-income
+   * renders its own copy of this row and should read this rather than keep its own wording.
+   */
+  estimatedTaxLabel: string;
   txCount: number;
   generatedAt: string; // ISO
 }
@@ -46,14 +68,54 @@ export function buildIncomeProof(
 ): IncomeProof {
   let income = 0;
   let expenses = 0;
+  let tradeIncome = 0;
+  let tradeExpenses = 0;
+  let propertyIncome = 0;
+  let propertyExpenses = 0;
   for (const t of txns) {
     const a = Number(t.amount) || 0;
-    if (a >= 0) income += a;
-    else expenses += -a;
+    const isProperty = String(t.income_type ?? '').toLowerCase() === 'property';
+    if (a >= 0) {
+      income += a;
+      if (isProperty) propertyIncome += a; else tradeIncome += a;
+    } else {
+      expenses += -a;
+      if (isProperty) propertyExpenses += -a; else tradeExpenses += -a;
+    }
   }
-  income = Math.round(income * 100) / 100;
-  expenses = Math.round(expenses * 100) / 100;
-  const profit = Math.max(0, Math.round((income - expenses) * 100) / 100);
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  income = round2(income);
+  expenses = round2(expenses);
+  // The headline the lender reads: everything in, everything out. Unchanged.
+  const profit = Math.max(0, round2(income - expenses));
+  // The two streams, each floored at zero, because the tax below is charged on them apart, and what
+  // a loss in one of them does to the other is a relief he CLAIMS rather than something a summary
+  // may assume for him. For a trade only summary tradeProfit IS profit, to the penny.
+  const tradeProfit = Math.max(0, round2(tradeIncome - tradeExpenses));
+  const propertyProfit = Math.max(0, round2(propertyIncome - propertyExpenses));
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 NATIONAL INSURANCE ON THE TRADE ONLY. THE LINE UNDER THIS USED TO SAY IT ON RENT.
+  //
+  // This was soleTraderTax(profit).total over every confirmed row. Class 4 is charged on the profits
+  // of a trade, profession or vocation; rental income is property income and carries none of it. So
+  // a landlord's proof of income, the document he hands a mortgage broker, showed him National
+  // Insurance he does not owe, over our name, on the one page whose entire job is to be believed by
+  // somebody who checks.
+  //
+  // ⚠️ INCOME TAX IS STILL WORKED OUT ON THE TWO TOGETHER, and that is not a detail. Both are non
+  // savings income and they share ONE personal allowance. Taxing them separately and adding the
+  // answers would hand him the allowance twice, which is the same bug lib/ledger.ts had to be
+  // rescued from in July, and it would understate the tax on the document. So: income tax on the
+  // pair, Class 4 on the trade alone.
+  //
+  // ⚠️ WHICH WAY THIS MOVES A FIGURE. A trade only summary is identical to the penny, because
+  // incomeTaxOnProfit(p) + class4NIC(p) IS soleTraderTax(p).total. A landlord's estimated tax falls,
+  // which is correct: he was being charged a tax that is not his. Nobody's income or profit moves.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  const nationalInsurance = round2(class4NIC(tradeProfit));
+  const estimatedTax = round2(incomeTaxOnProfit(tradeProfit + propertyProfit) + nationalInsurance);
+
   return {
     businessName: (businessName ?? '').trim() || 'Your business',
     taxYear: taxYearLabel(startYear),
@@ -61,7 +123,14 @@ export function buildIncomeProof(
     income,
     expenses,
     profit,
-    estimatedTax: soleTraderTax(profit).total,
+    tradeProfit,
+    propertyProfit,
+    estimatedTax,
+    nationalInsurance,
+    // The words follow the figure. A man with no National Insurance in his number is not told there
+    // is some, and nobody has to read the code to find out which he is.
+    estimatedTaxLabel:
+      nationalInsurance > 0 ? 'Estimated Income Tax and National Insurance' : 'Estimated Income Tax',
     txCount: txns.length,
     generatedAt: now.toISOString(),
   };
@@ -127,7 +196,7 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
       ${row('Gross income', gbp(p.income))}
       ${row('Allowable expenses', gbp(p.expenses), { muted: true })}
       ${row('Net profit', gbp(p.profit), { bold: true })}
-      ${row('Estimated Income Tax and National Insurance', gbp(p.estimatedTax), { muted: true })}
+      ${row(p.estimatedTaxLabel, gbp(p.estimatedTax), { muted: true })}
     </table>
     <div class="stamp">Prepared by Lekhio &middot; ${esc(generated)} &middot; ${p.txCount} entries</div>
   </div>

@@ -677,12 +677,214 @@ export async function clearSession(phone: string): Promise<void> {
   });
 }
 
+// ── VAT ────────────────────────────────────────────────────────────────────────────────────────
+// The working record of a customer's VAT position. The vat_registered CIRCUMSTANCE stays where it
+// is and keeps doing its job, which is being the logged question and answer, an exhibit under
+// Finance Act 2026 Sch 22. This is the operational fact the engine reads.
+//
+// ⚠️ A FAILED READ RETURNS NULL, NOT AN EMPTY PROFILE. "Could not read" and "he is not registered"
+// are different answers and only one of them is safe to act on. Callers that need a value fall back
+// to the circumstance, which is the older and less detailed truth but is at least true.
+
+export interface VatProfileRow {
+  registered: boolean;
+  vrn: string | null;
+  registeredOn: string | null;
+  deregisteredOn: string | null;
+  scheme: 'standard' | 'flat_rate' | 'cash' | 'annual';
+  flatRatePercent: number | null;
+  flatRateFirstYear: boolean;
+  cisSubcontractor: boolean;
+}
+
+export async function readVatProfile(userId: string): Promise<VatProfileRow | null> {
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/vat_profiles?user_id=eq.${encodeURIComponent(userId)}` +
+      '&select=registered,vrn,registered_on,deregistered_on,scheme,flat_rate_percent,flat_rate_first_year,cis_subcontractor&limit=1',
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    const r = Array.isArray(rows) ? rows[0] : null;
+    if (!r) {
+      // No row is a real answer: we have never been told anything, which is not the same as a
+      // failed read. An empty profile is the honest starting point.
+      return {
+        registered: false,
+        vrn: null,
+        registeredOn: null,
+        deregisteredOn: null,
+        scheme: 'standard',
+        flatRatePercent: null,
+        flatRateFirstYear: false,
+        cisSubcontractor: false,
+      };
+    }
+    const scheme = String(r.scheme ?? 'standard');
+    return {
+      registered: Boolean(r.registered),
+      vrn: r.vrn ? String(r.vrn) : null,
+      registeredOn: r.registered_on ? String(r.registered_on).slice(0, 10) : null,
+      deregisteredOn: r.deregistered_on ? String(r.deregistered_on).slice(0, 10) : null,
+      scheme: (scheme === 'flat_rate' || scheme === 'cash' || scheme === 'annual') ? scheme : 'standard',
+      flatRatePercent: r.flat_rate_percent == null ? null : Number(r.flat_rate_percent),
+      flatRateFirstYear: Boolean(r.flat_rate_first_year),
+      cisSubcontractor: Boolean(r.cis_subcontractor),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Save what he told us. Partial by design: the VAT screen asks one thing at a time, so a man who
+// gives us his number today and his scheme next week does not have his number wiped in between.
+export async function saveVatProfile(
+  userId: string,
+  patch: Partial<{
+    registered: boolean;
+    vrn: string | null;
+    registeredOn: string | null;
+    deregisteredOn: string | null;
+    scheme: string;
+    flatRatePercent: number | null;
+    flatRateFirstYear: boolean;
+    cisSubcontractor: boolean;
+  }>,
+): Promise<boolean> {
+  const { url } = config();
+  const body: Record<string, unknown> = { user_id: userId, updated_at: new Date().toISOString() };
+  if (patch.registered !== undefined) body.registered = patch.registered;
+  if (patch.vrn !== undefined) body.vrn = patch.vrn;
+  if (patch.registeredOn !== undefined) body.registered_on = patch.registeredOn;
+  if (patch.deregisteredOn !== undefined) body.deregistered_on = patch.deregisteredOn;
+  if (patch.scheme !== undefined) body.scheme = patch.scheme;
+  if (patch.flatRatePercent !== undefined) body.flat_rate_percent = patch.flatRatePercent;
+  if (patch.flatRateFirstYear !== undefined) body.flat_rate_first_year = patch.flatRateFirstYear;
+  if (patch.cisSubcontractor !== undefined) body.cis_subcontractor = patch.cisSubcontractor;
+
+  try {
+    const res = await fetch(`${url}/rest/v1/vat_profiles?on_conflict=user_id`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// The VAT he has CONFIRMED on what he bought, for a date range, split by whether the row carries a
+// receipt. The split is the control doctrine in arithmetic: nothing is refused for want of a
+// receipt, but every figure knows whether it has one.
+export async function getConfirmedInputVat(
+  userId: string,
+  fromISO: string,
+  toISO: string,
+): Promise<{ total: number; withProof: number } | null> {
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+      '&vat_confirmed=eq.true&confirmed=eq.true' +
+      `&transaction_date=gte.${fromISO}&transaction_date=lte.${toISO}` +
+      '&select=vat_amount,raw_input_url&limit=5000',
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ vat_amount?: unknown; raw_input_url?: unknown }>;
+    let total = 0;
+    let withProof = 0;
+    for (const r of Array.isArray(rows) ? rows : []) {
+      const v = Number(r.vat_amount) || 0;
+      if (v <= 0) continue;
+      total += v;
+      if (r.raw_input_url) withProof += v;
+    }
+    return { total: Math.round(total * 100) / 100, withProof: Math.round(withProof * 100) / 100 };
+  } catch {
+    return null;
+  }
+}
+
+// The VAT he has CHARGED, from his own invoices, for a date range. Reverse charge invoices carry no
+// output tax by construction: he charged nothing, so there is nothing here to declare.
+export async function getOutputVat(
+  userId: string,
+  fromISO: string,
+  toISO: string,
+): Promise<{ outputVat: number; grossTurnover: number; reverseChargeVat: number } | null> {
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}` +
+      `&issued_date=gte.${fromISO}&issued_date=lte.${toISO}` +
+      '&select=tax,total,reverse_charge_vat,status&limit=5000',
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    let outputVat = 0;
+    let grossTurnover = 0;
+    let reverseChargeVat = 0;
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (String(r.status ?? '') === 'draft') continue; // a draft is not a supply
+      outputVat += Number(r.tax) || 0;
+      grossTurnover += Number(r.total) || 0;
+      reverseChargeVat += Number(r.reverse_charge_vat) || 0;
+    }
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    return { outputVat: r2(outputVat), grossTurnover: r2(grossTurnover), reverseChargeVat: r2(reverseChargeVat) };
+  } catch {
+    return null;
+  }
+}
+
+// Record the VAT on one cost, and mark it confirmed. Never called by a parser: a vision read is a
+// guess, and a VAT figure that is wrong one time in seven is worse than no figure because he will
+// trust it. His own rows only.
+export async function confirmTransactionVat(
+  userId: string,
+  transactionId: string,
+  vatAmount: number,
+): Promise<boolean> {
+  const { url } = config();
+  const v = Math.round((Number(vatAmount) || 0) * 100) / 100;
+  if (v < 0) return false;
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/transactions?id=eq.${encodeURIComponent(transactionId)}&user_id=eq.${encodeURIComponent(userId)}`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=minimal' }),
+        body: JSON.stringify({ vat_amount: v, vat_confirmed: true }),
+      },
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // Create an invoice from the server (the WhatsApp flow). Returns the new id,
 // human number, and total, or null on failure.
+//
+// ⚠️ VAT IS PASSED IN, NEVER WORKED OUT HERE. lib/vat.ts priceInvoice does the arithmetic and the
+// caller does the deciding, because whether an invoice carries VAT at all is a question about the
+// job and the customer that this function cannot see. Omitting the VAT fields gives exactly the old
+// behaviour, which is what the WhatsApp "invoice this" path still wants until it can ask.
 export interface ServerInvoiceInput {
   customer_name: string;
   customer_contact?: string | null;
-  line_items: Array<{ description: string; amount: number }>;
+  line_items: Array<{ description: string; amount: number; rate?: string }>;
+  vat?: {
+    treatment: 'none' | 'charged' | 'reverse_charge';
+    tax: number;
+    total: number;
+    reverseChargeVat: number;
+  };
 }
 
 export async function createInvoice(
@@ -716,8 +918,16 @@ export async function createInvoice(
       customer_contact: input.customer_contact ?? null,
       line_items: input.line_items,
       subtotal,
-      tax: 0,
-      total: subtotal,
+      // 🔴 THIS USED TO BE A HARDCODED tax: 0 AND total: subtotal, WHICH WAS ACCIDENTALLY RIGHT.
+      // A VAT registered subcontractor billing a main contractor charges no VAT at all, and that
+      // is the commonest invoice this audience sends. So zero was correct for him and wrong for
+      // everyone else, for the wrong reason. Now the caller decides, using lib/vat.ts, and passes
+      // the answer down. No caller means no VAT, which is the old behaviour exactly.
+      tax: input.vat ? input.vat.tax : 0,
+      total: input.vat ? input.vat.total : subtotal,
+      vat_treatment: input.vat ? input.vat.treatment : null,
+      reverse_charge_vat: input.vat ? input.vat.reverseChargeVat : 0,
+      tax_point: today.toISOString().slice(0, 10),
       status: 'draft',
       issued_date: today.toISOString().slice(0, 10),
       due_date: due.toISOString().slice(0, 10),
@@ -730,7 +940,7 @@ export async function createInvoice(
   const created = (await res.json()) as Array<{ id: string }>;
   const row = Array.isArray(created) ? created[0] : (created as { id: string });
   if (!row?.id) return null;
-  return { id: row.id, number, total: subtotal };
+  return { id: row.id, number, total: input.vat ? input.vat.total : subtotal };
 }
 
 // The most recent income entry (positive amount), for turning a just logged sale
@@ -1832,7 +2042,25 @@ export async function upsertSubscription(rec: SubscriptionRecord): Promise<void>
     updated_at: new Date().toISOString(),
   };
   if (rec.user_id != null) body.user_id = rec.user_id;
-  if (rec.email != null) body.email = rec.email;
+  // 🔴 email_norm TRAVELS WITH email, ALWAYS, AND UNTIL 1 AUGUST 2026 IT DID NOT.
+  //
+  // SubscriptionRecord has no email_norm field, so this function has never been able to write one.
+  // That is not cosmetic: email_norm is the ONLY key priorLocalGrants can match a web customer on,
+  // because a web account has no phone. So any row this function touches ends up with an address
+  // in `email` and nothing in `email_norm`, which makes that trial INVISIBLE to the one trial per
+  // person rule for ever. The next plus alias of the same person sails through, and it did.
+  //
+  // Found on 1 August by reading the three real production rows. The 30 July row carries the exact
+  // fingerprint of this function and of nothing else: a plan set, amount_pence NULL (both grant
+  // functions write 0 explicitly), and an email with no email_norm beside it.
+  //
+  // ⚠️ NORMALISED THE SAME WAY OR IT IS WORSE THAN USELESS. normaliseEmail strips plus aliases, so
+  // it must be the same function decideTrialGrant compares with. Two normalisers is how you get a
+  // key that looks populated and matches nothing.
+  if (rec.email != null) {
+    body.email = rec.email;
+    body.email_norm = normaliseEmail(rec.email);
+  }
   if (rec.phone != null) body.phone = rec.phone;
   if (rec.stripe_customer_id != null) body.stripe_customer_id = rec.stripe_customer_id;
   if (rec.plan != null) body.plan = rec.plan;
@@ -2485,13 +2713,23 @@ export interface TrialGrantResult {
   refusedOn: MatchKind | null;
   // Soft collisions for a human to look at. Never a reason to refuse. See lib/trialidentity.ts.
   flags: MatchKind[];
+  // 🔴 HOW MANY OF THE PRIOR GRANT CHECKS COULD NOT BE ANSWERED. Zero on a healthy system.
+  //
+  // Deliberately NOT a MatchKind: that union says what MATCHED, and a check that never ran is the
+  // opposite of a match. Keeping it separate is what stops "we looked and found nothing" and "we
+  // could not look" ending up in the same array, which is the exact confusion that let a fourth
+  // plus alias signup through on 31 July. Above zero means the one trial per person rule is not
+  // running, however clean the grant looks.
+  checkDegraded: number;
 }
 
 // Every local grant that shares an identifier with this man. Five small indexed reads rather than
 // one clever `or=()`: a normalised email and a business name both contain characters PostgREST
 // treats as syntax inside or(), and a filter that silently fails to parse is a duplicate check
 // that quietly returns nothing and grants everybody a second trial.
-async function priorLocalGrants(input: TrialGrantInput): Promise<PriorGrant[]> {
+async function priorLocalGrants(
+  input: TrialGrantInput,
+): Promise<{ grants: PriorGrant[]; unreadable: number; attempted: number }> {
   const { url } = config();
   const cols = 'user_id,email_norm,signup_phone,person_name,business_name';
   const base = `${url}/rest/v1/subscriptions?stripe_subscription_id=is.null&select=${cols}&limit=20`;
@@ -2525,7 +2763,36 @@ async function priorLocalGrants(input: TrialGrantInput): Promise<PriorGrant[]> {
   // lib/entitlement.ts spends forty lines telling us not to make. So an unreadable check is
   // treated as "no prior found", he gets his week, and the unique indexes in the database are what
   // stop an actual double grant.
-  return pages.filter((p): p is PriorGrant[] => Array.isArray(p)).flat();
+  //
+  // 🔴 AND THAT IS WHERE THIS WENT WRONG, SO READ THE NEXT PARAGRAPH BEFORE SIMPLIFYING IT BACK.
+  //
+  // Failing open is right. Failing open SILENTLY is not, and on 31 July 2026 a fourth plus alias
+  // signup was granted a trial while decideTrialGrant was provably correct, because the fault was
+  // here: these five reads name columns (email_norm, signup_phone, person_name, business_name) that
+  // only exist if APPLY_2026-07-29_web_account_and_trial_identity.sql was applied. PostgREST answers
+  // a select naming a column that does not exist with a 400. So `if (!res.ok) return null` turned
+  // EVERY check into "no prior found", for ever, for everybody, with nothing logged and nothing to
+  // see. A permanently broken rule looked exactly like a clean sheet, and the sentence above
+  // ("the unique indexes in the database are what stop an actual double grant") was the cover
+  // story: those indexes come from the SAME migration, so if the columns are missing the indexes
+  // are missing too and NOTHING is stopping it.
+  //
+  // The fix is not to fail closed. It is to make the two states distinguishable. `unreadable`
+  // counts the checks that could not be answered, the caller carries it into the flags, and the
+  // one line below is the only alarm this needs: a grep for it says instantly whether the rule is
+  // running or has been quietly off since July. Run supabase/CHECK_trial_rule.sql to see why.
+  const ok = pages.filter((p): p is PriorGrant[] => Array.isArray(p));
+  const unreadable = pages.length - ok.length;
+  if (unreadable > 0) {
+    // No customer data in this line, by design: it is a health signal, not a record.
+    console.warn(
+      `[trial-identity] DEGRADED: ${unreadable} of ${pages.length} prior grant checks could not be read. ` +
+      'The one trial per person rule is NOT running. Check that ' +
+      'supabase/APPLY_2026-07-29_web_account_and_trial_identity.sql has been applied, ' +
+      'then run supabase/CHECK_trial_rule.sql.',
+    );
+  }
+  return { grants: ok.flat(), unreadable, attempted: pages.length };
 }
 
 // What he told us at /start, read back off his own signup row so the trial identity is never
@@ -2571,13 +2838,14 @@ export async function latestSignupIdentity(email: string): Promise<SignupIdentit
 }
 
 export async function grantTrialWithIdentity(input: TrialGrantInput): Promise<TrialGrantResult> {
-  const none: TrialGrantResult = { sub: null, granted: false, refusedOn: null, flags: [] };
+  const none: TrialGrantResult = { sub: null, granted: false, refusedOn: null, flags: [], checkDegraded: 0 };
   if (!input.userId) return none;
 
   // Already has one on this account? Hand it back rather than deciding anything.
   const existing = await getSubscriptionByUser(input.userId);
-  if (existing) return { sub: existing, granted: false, refusedOn: 'account', flags: [] };
+  if (existing) return { sub: existing, granted: false, refusedOn: 'account', flags: [], checkDegraded: 0 };
 
+  const prior = await priorLocalGrants(input);
   const decision = decideTrialGrant(
     {
       userId: input.userId,
@@ -2586,10 +2854,15 @@ export async function grantTrialWithIdentity(input: TrialGrantInput): Promise<Tr
       personName: input.personName ?? null,
       businessName: input.businessName ?? null,
     },
-    await priorLocalGrants(input),
+    prior.grants,
   );
+  // 🔴 A DEGRADED CHECK TRAVELS WITH THE DECISION RATHER THAN VANISHING INTO IT. He still gets his
+  // week, which is right, but the flag says the rule did not actually run, so /team can see the
+  // difference between "nobody has tried it twice" and "we stopped looking in July".
+  const flags = decision.flags;
+  const checkDegraded = prior.unreadable;
   if (!decision.grant) {
-    return { sub: null, granted: false, refusedOn: decision.refusedOn, flags: decision.flags };
+    return { sub: null, granted: false, refusedOn: decision.refusedOn, flags, checkDegraded };
   }
 
   const { url } = config();
@@ -2616,13 +2889,13 @@ export async function grantTrialWithIdentity(input: TrialGrantInput): Promise<Tr
     // has had one. Either way read back what is there. The database is the rule, this is the hope.
     if (res.status === 409) {
       const back = await getSubscriptionByUser(input.userId);
-      return { sub: back, granted: false, refusedOn: 'account', flags: decision.flags };
+      return { sub: back, granted: false, refusedOn: 'account', flags, checkDegraded };
     }
-    if (!res.ok) return { ...none, flags: decision.flags };
+    if (!res.ok) return { ...none, flags, checkDegraded };
     const rows = (await res.json()) as SubscriptionStatus[];
-    return { sub: rows[0] ?? null, granted: true, refusedOn: null, flags: decision.flags };
+    return { sub: rows[0] ?? null, granted: true, refusedOn: null, flags, checkDegraded };
   } catch {
-    return { ...none, flags: decision.flags };
+    return { ...none, flags, checkDegraded };
   }
 }
 
@@ -3572,6 +3845,29 @@ export function isMileageRow(r: { vendor?: unknown; category?: unknown }): boole
   return vendor === 'mileage' || category.includes('mile');
 }
 
+// 🔴 THE SAME BUG AS MILEAGE, IN THE OTHER DIRECTION, AND IT WAS COSTING A MAN MONEY TWICE.
+//
+// lib/ledger.ts:340 ADDS the use of home election on its own line, and its comment argues that
+// adding rather than slicing is correct because "use of home is an ELECTION, not a transaction ...
+// So it cannot be inside expenses". That premise was TRUE when it was written and FALSE by the time
+// anybody read it: app/api/whatsapp/route.ts handleHomeOffice inserts a real transaction with
+// vendor 'Use of home' and category 'use of home', which lands in ytdTradeExpenses like any other
+// cost. That file admits it in a comment and left the fix for somebody else.
+//
+// So a man who makes the election AND texts his hours is deducted twice. This is the slice that
+// stops it, and it is deliberately EXACT rather than a substring match: category.includes('home')
+// would sweep up any future household category, and lib/categories.ts refuses to create one on
+// purpose, because a rule on the word rent or on a household energy bill would claim tax relief on
+// a man's own house.
+//
+// Both spellings, because lib/hmrc.ts:401 already carries both for the MTD mapping and a row
+// written by either route has to be found by this one function.
+export function isHomeOfficeRow(r: { vendor?: unknown; category?: unknown }): boolean {
+  const vendor = String(r.vendor ?? '').trim().toLowerCase();
+  const category = String(r.category ?? '').trim().toLowerCase();
+  return vendor === 'use of home' || category === 'use of home' || category === 'use_of_home';
+}
+
 export async function getOptimiserInput(userId: string): Promise<OptimiserInput> {
   const now = new Date();
   const { startYear } = quarterForDate(now);
@@ -3594,6 +3890,9 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   // 🔴 THE MILEAGE, COUNTED SEPARATELY BUT NOT COUNTED TWICE. See the note on OptimiserInput.ytdMileage.
   // This is a SLICE of ytdTradeExpenses, never an addition to it.
   let ytdMileage = 0;
+  // The same shape as ytdMileage: a SLICE of ytdTradeExpenses, never an addition to it. See
+  // isHomeOfficeRow above for why it exists at all.
+  let ytdHomeOfficeLogged = 0;
   for (const r of rows) {
     const amt = Number(r.amount) || 0;
     if ((r.income_type ?? '').toLowerCase() === 'property') {
@@ -3606,6 +3905,9 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
       ytdTradeExpenses += -amt;
       if (r.category) cats.add(String(r.category).toLowerCase());
       if (isMileageRow(r)) ytdMileage += -amt;
+      // Counted here so lib/ledger.ts can take it back off. See isHomeOfficeRow above: without
+      // this, a man who elects and also texts his hours has the same deduction twice.
+      if (isHomeOfficeRow(r)) ytdHomeOfficeLogged += -amt;
     }
     const c = Number(r.cis_deduction);
     if (Number.isFinite(c) && c > 0) ytdCisSuffered += c;
@@ -3680,6 +3982,11 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     ytdHomeOffice: election ? useOfHomeToDate(election.hoursBand as 25 | 51 | 101, monthsElapsed) : 0,
     mileageClaimed: ytdMileage > 0,
     ytdMileage: Math.round(ytdMileage * 100) / 100,
+    // 🔴 THE OTHER HALF OF THE HOME WORKING FIX. ytdHomeOffice above is what he ELECTED. This is
+    // what he TEXTED, and it is already inside ytdTradeExpenses. lib/ledger.ts and
+    // lib/taxoptimiser.ts both slice it out before applying the election, so the deduction lands
+    // once whichever door he came through, and never twice if he came through both.
+    ytdHomeOfficeLogged: Math.round(ytdHomeOfficeLogged * 100) / 100,
     purchaseGoal: purchase ? { title: purchase.title, amount: purchase.amount } : null,
     ytdPropertyIncome: Math.round(ytdPropertyIncome * 100) / 100,
     ytdPropertyExpenses: Math.round(ytdPropertyExpenses * 100) / 100,
@@ -4305,6 +4612,10 @@ export async function knownExternalIds(userId: string, ids: string[]): Promise<S
 export interface InvoiceLine {
   description: string;
   amount: number;
+  // The VAT rate key for this line, from lib/vat.ts. Absent on every invoice raised before
+  // 1 August 2026, and absent is not 'standard': it means the invoice was written when the product
+  // had no VAT at all, and it has to keep printing exactly as it printed on the day he sent it.
+  rate?: string;
 }
 
 export interface PublicInvoice {
@@ -4312,13 +4623,28 @@ export interface PublicInvoice {
   customer_name: string;
   customer_contact: string | null;
   line_items: InvoiceLine[];
+  // Before VAT. Written since the table was created and, until now, selected by nothing.
+  subtotal: number;
+  // VAT actually charged. Zero under the reverse charge, and that is the point of it.
+  tax: number;
   total: number;
+  // 🔴 The VAT the CUSTOMER must account for. It goes on the document and is deliberately NOT in
+  // total. VATREVCON37100: it "should not be included in the amount shown as total VAT charged".
+  reverse_charge_vat: number;
+  // null on every invoice that predates VAT support. Render those exactly as they were sent.
+  vat_treatment: 'none' | 'charged' | 'reverse_charge' | null;
+  tax_point: string | null;
   status: string;
   notes: string | null;
   issued_date: string | null;
   due_date: string | null;
   business_name: string | null;
   business_contact: string | null;
+  // A VAT invoice must carry the supplier's address and VAT number. users.address has existed all
+  // along and no invoice surface has ever selected it, so every invoice we have ever produced was
+  // short of a field the law asks for. VAT Regulations 1995 reg 14.
+  business_address: string | null;
+  business_vrn: string | null;
 }
 
 // Fetch one invoice plus the trader's business details. Uses the service role,
@@ -4327,7 +4653,7 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
   const { url } = config();
 
   const invRes = await fetch(
-    `${url}/rest/v1/invoices?id=eq.${encodeURIComponent(id)}&select=number,customer_name,customer_contact,line_items,total,status,notes,issued_date,due_date,user_id&limit=1`,
+    `${url}/rest/v1/invoices?id=eq.${encodeURIComponent(id)}&select=number,customer_name,customer_contact,line_items,subtotal,tax,total,reverse_charge_vat,vat_treatment,tax_point,status,notes,issued_date,due_date,user_id&limit=1`,
     { headers: headers() },
   );
   if (!invRes.ok) return null;
@@ -4337,19 +4663,35 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
 
   let businessName: string | null = null;
   let businessContact: string | null = null;
+  let businessAddress: string | null = null;
+  let businessVrn: string | null = null;
   const userId = inv.user_id as string | undefined;
   if (userId) {
     const userRes = await fetch(
-      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=name,business_name,phone_number&limit=1`,
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=name,business_name,phone_number,address&limit=1`,
       { headers: headers() },
     );
     if (userRes.ok) {
-      const urows = (await userRes.json()) as Array<{ name?: string; business_name?: string; phone_number?: string }>;
+      const urows = (await userRes.json()) as Array<{ name?: string; business_name?: string; phone_number?: string; address?: string }>;
       if (urows.length > 0) {
         businessName = urows[0].business_name || urows[0].name || null;
-        // Do not expose the trader's personal mobile on a shareable public link.
+        // Do not expose the trader's personal mobile on a shareable public link. His ADDRESS is a
+        // different matter: a VAT invoice must carry it, and it is his business address, printed on
+        // every invoice a supplier in this country has ever sent.
         businessContact = null;
+        businessAddress = urows[0].address || null;
       }
+    }
+    // The number only, and only when he has one. A failed read leaves it null, so the invoice
+    // prints without it rather than printing a stale one.
+    const vatRes = await fetch(
+      `${url}/rest/v1/vat_profiles?user_id=eq.${encodeURIComponent(userId)}&select=vrn,registered&limit=1`,
+      { headers: headers() },
+    ).catch(() => null);
+    if (vatRes && vatRes.ok) {
+      const vrows = (await vatRes.json().catch(() => null)) as Array<{ vrn?: string; registered?: boolean }> | null;
+      const v = Array.isArray(vrows) ? vrows[0] : null;
+      if (v && v.registered && v.vrn) businessVrn = String(v.vrn);
     }
   }
 
@@ -4361,13 +4703,20 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
     // Keep the customer's own contact details off the public, shareable link.
     customer_contact: null,
     line_items: lineItems,
+    subtotal: Number(inv.subtotal) || 0,
+    tax: Number(inv.tax) || 0,
     total: Number(inv.total) || 0,
+    reverse_charge_vat: Number(inv.reverse_charge_vat) || 0,
+    vat_treatment: (inv.vat_treatment as PublicInvoice['vat_treatment']) ?? null,
+    tax_point: (inv.tax_point as string) ?? null,
     status: (inv.status as string) ?? 'draft',
     notes: (inv.notes as string) ?? null,
     issued_date: (inv.issued_date as string) ?? null,
     due_date: (inv.due_date as string) ?? null,
     business_name: businessName,
     business_contact: businessContact,
+    business_address: businessAddress,
+    business_vrn: businessVrn,
   };
 }
 
@@ -5970,13 +6319,20 @@ export async function pileEntries(userId: string): Promise<Array<{
   amount: number;
   category: string | null;
   looks_personal: boolean | null;
+  // ⚠️ NAMED HERE OR THE VAT CONFIRM STEP NEVER DRAWS. This select lists its columns one by one, so
+  // a column nobody names arrives undefined however well the screen is written. And the order
+  // matters: PostgREST REFUSES a select naming a column that does not exist, and this function
+  // answers a failed read with [], which would empty the pile for every customer. So
+  // supabase/APPLY_2026-08-01_vat.sql has to be run BEFORE this line ships.
+  vat_amount: number | null;
+  vat_confirmed: boolean | null;
 }>> {
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
       `&confirmed=eq.false&is_personal=eq.false` +
       `&source_type=in.(bank_feed,web_image,whatsapp_image,whatsapp_voice,whatsapp_text)` +
-      `&select=id,vendor,description,amount,category,looks_personal` +
+      `&select=id,vendor,description,amount,category,looks_personal,vat_amount,vat_confirmed` +
       `&order=transaction_date.desc&limit=1000`,
     { headers: headers() },
   );

@@ -4,6 +4,8 @@ import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { gateForUser } from '../../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../../lib/gate';
+import { readVatProfile } from '../../../../lib/supabase';
+import { rateLabel, reverseChargeApplies, type VatRateKey } from '../../../../lib/vat';
 import {
   A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE,
 } from '../../../../lib/tokens';
@@ -31,6 +33,14 @@ export const dynamic = 'force-dynamic';
 // ⚠️ NO AI IS SPENT HERE. The WhatsApp flow needs draftInvoice to read "rewire 450, materials
 // 80" out of one breath of chat. A form already has the amounts in boxes. Deterministic in,
 // deterministic out, and the route refuses a half typed line rather than guessing at it.
+//
+// ⚠️ AND MOST MEN NEVER SEE A WORD ABOUT VAT ON IT (1 August 2026). Doc 103's standing question,
+// asked before a single control went on: what did we take out to make room for it? Nothing, and
+// nothing had to be, because for a man who is not VAT registered this form is EXACTLY what it was
+// yesterday. No rate boxes, no questions about his customer, not a word. He cannot charge VAT and
+// the answer is decided rather than asked. Only a VAT registered man gets the rate picker, and
+// only a VAT registered CIS subcontractor gets the three reverse charge questions, because he is
+// the one man in this product whose commonest invoice carries no VAT at all and has to say so.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 function notice(problem: string | undefined): string | null {
@@ -47,10 +57,19 @@ function notice(problem: string | undefined): string | null {
       return 'That did not save. Nothing has changed, so try it again.';
     case 'bad':
       return 'Something in that did not read right. Nothing was saved, so have another go.';
+    case 'vat':
+      return 'We could not check your VAT position, so nothing was made. An invoice with the wrong VAT on it is worse than one you have to make twice. Try it again in a minute.';
+    case 'vatasked':
+      return 'That was missing the three answers about your customer, so nothing was made. They decide whether you charge VAT on this job at all, so the form below asks them again.';
     default:
       return null;
   }
 }
+
+// The four rates a man on this form can put on a line. 'outside the scope' is real and is not one
+// of them: it is a judgement about whether a supply is in the VAT system at all, and it belongs in
+// a conversation, not in a box on a job sheet.
+const RATES: readonly VatRateKey[] = ['standard', 'reduced', 'zero', 'exempt'];
 
 export default async function NewInvoicePage({
   searchParams,
@@ -75,6 +94,30 @@ export default async function NewInvoicePage({
   const gate = await gateForUser(user.id);
   const locked = gate === 'readonly';
 
+  // 🔴 NULL IS A FAILED READ, NOT "HE IS NOT REGISTERED". A form drawn on that guess would take a
+  // VAT registered man's work and post it with no rate on any line, and the route would be right
+  // to refuse it. So the form is not drawn at all and the page says why.
+  const vatProfile = locked ? null : await readVatProfile(user.id);
+  const vatUnknown = !locked && vatProfile === null;
+  const registered = Boolean(vatProfile?.registered);
+  // The one man whose commonest invoice carries no VAT and has to say so.
+  const asksReverseCharge = registered && Boolean(vatProfile?.cisSubcontractor);
+  // What the form put to him, sent with it. The route works out what it should have been and
+  // refuses the mismatch rather than making an invoice out of questions nobody answered.
+  const vatFormShape = registered ? (asksReverseCharge ? 'rc' : 'rates') : 'none';
+
+  // The outcome, in lib/vat.ts's own words rather than a second copy of the rule written here. A
+  // live verdict would need script and this page has none, so the rule is stated plainly instead,
+  // for the answers that actually turn it on.
+  const rcVerdict = reverseChargeApplies({
+    supplierRegistered: true,
+    withinCis: true,
+    customerVatRegistered: true,
+    customerCisRegistered: true,
+    customerIsEndUser: false,
+    rateKey: 'standard',
+  });
+
   return (
     <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
@@ -91,6 +134,15 @@ export default async function NewInvoicePage({
             <button type="submit" style={S.lockedBtn}>Add a card</button>
           </form>
         </section>
+      ) : vatUnknown ? (
+        <section className="lek-card">
+          <h1 className="lek-title">Make an invoice</h1>
+          <p style={S.sub}>
+            We could not check your VAT position just now, so the form is not here. Whether this
+            invoice carries VAT, and how much, depends on it, and a document your customer pays
+            from is the last place to guess. Give it a minute and open this page again.
+          </p>
+        </section>
       ) : (
         <section className="lek-card">
           <h1 className="lek-title">Make an invoice</h1>
@@ -101,6 +153,11 @@ export default async function NewInvoicePage({
           </p>
 
           <form action="/api/invoices" method="post">
+            {/* What this form actually asked him. Not a decision, a statement of fact about the
+                screen he filled in, so the route can refuse a form that predates his own VAT
+                details rather than reading its silence as three noes. */}
+            <input type="hidden" name="vatform" value={vatFormShape} />
+
             <label htmlFor="customer" style={S.label}>Who is it for</label>
             <input id="customer" name="customer" type="text" maxLength={120} required className="lek-field" defaultValue={prefillFor || undefined} />
 
@@ -116,7 +173,7 @@ export default async function NewInvoicePage({
                   line with only half its pair filled in, rather than quietly dropping the price
                   a man meant to charge. */}
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} style={S.lineRow}>
+                <div key={i} style={registered ? S.lineRowVat : S.lineRow}>
                   <input
                     name="item"
                     type="text"
@@ -124,7 +181,7 @@ export default async function NewInvoicePage({
                     required={i === 0}
                     aria-label={`Line ${i + 1}, the work`}
                     placeholder={i === 0 ? 'Bathroom rewire' : ''}
-                    className="lek-field lek-desc"
+                    className={registered ? 'lek-field lek-descvat' : 'lek-field lek-desc'}
                   />
                   <input
                     name="amount"
@@ -138,9 +195,85 @@ export default async function NewInvoicePage({
                     placeholder={i === 0 ? '450' : ''}
                     className="lek-field lek-amount"
                   />
+                  {/* A plain server rendered select, one per line, and nothing recalculates as he
+                      touches it. The figures are worked out once, by lib/vat.ts, on the far side
+                      of the press. The labels come from rateLabel so they cannot drift from the
+                      rates the arithmetic actually uses. */}
+                  {registered ? (
+                    <select
+                      name="rate"
+                      defaultValue="standard"
+                      aria-label={`Line ${i + 1}, the VAT rate`}
+                      className="lek-field lek-rate"
+                    >
+                      {RATES.map((key) => (
+                        <option key={key} value={key}>{rateLabel(key)}</option>
+                      ))}
+                    </select>
+                  ) : null}
                 </div>
               ))}
+              {registered ? (
+                <p style={S.fieldNote}>
+                  The VAT rate sits on each line. It is 20% unless you know that bit of work is
+                  something else.
+                </p>
+              ) : null}
             </fieldset>
+
+            {/* ⚠️ THREE QUESTIONS, AND ONLY FOR THE MAN THEY BELONG TO. This is the CIS domestic
+                reverse charge, VATA 1994 s55A, and it decides whether he charges VAT on this job
+                at all. Nothing we can see tells us: the end user answer in particular has to come
+                from the customer in writing. So it is asked, in the words he would use, and it is
+                asked of nobody else. */}
+            {asksReverseCharge ? (
+              <fieldset style={S.fieldset}>
+                <legend style={S.label}>About your customer</legend>
+                <p style={S.fieldNote}>
+                  On construction work for a contractor you often charge no VAT at all. He pays it
+                  to HMRC himself. These three answers decide it, and the man who gave you the job
+                  will know them.
+                </p>
+                <p style={S.fieldNote}>
+                  Yes, yes and no is the reverse charge. {rcVerdict.because} Any other set of
+                  answers and you charge VAT the normal way.
+                </p>
+
+                {[
+                  {
+                    name: 'customer_vat',
+                    q: 'Is your customer VAT registered?',
+                    why: 'A business with its own VAT number, one that puts VAT on the invoices it sends out. A householder is not.',
+                  },
+                  {
+                    name: 'customer_cis',
+                    q: 'Is he registered for CIS?',
+                    why: 'The Construction Industry Scheme. A main contractor who takes tax off the subcontractors he pays is registered for it.',
+                  },
+                  {
+                    name: 'end_user',
+                    q: 'Has he told you in writing that he is the end user?',
+                    why: 'The end user is having the work done for himself rather than selling it on as part of his own building job. It only counts if he has put it in writing.',
+                  },
+                ].map((ask) => (
+                  // Its own fieldset and legend, which is what a pair of radios is: a screen
+                  // reader then reads the question before it reads Yes and No, rather than two
+                  // loose words in the middle of a form about invoices.
+                  <fieldset key={ask.name} style={S.ask}>
+                    <legend style={S.askQ}>{ask.q}</legend>
+                    <span style={S.askWhy}>{ask.why}</span>
+                    <span style={S.askRow}>
+                      <label style={S.pick}>
+                        <input type="radio" name={ask.name} value="yes" required /> Yes
+                      </label>
+                      <label style={S.pick}>
+                        <input type="radio" name={ask.name} value="no" required /> No
+                      </label>
+                    </span>
+                  </fieldset>
+                ))}
+              </fieldset>
+            ) : null}
 
             {/* Said before the press. The button makes and saves; nothing leaves the building. */}
             <p style={S.weight}>
@@ -173,7 +306,11 @@ const CSS = [
   // page the moment a field is focused.
   `.lek-field{box-sizing:border-box;padding:${SPACE.sm}px;font-size:16px;font-family:${FONT};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;color:${INK};background:${PANEL};width:100%}`,
   `.lek-desc{flex:1 1 auto;min-width:0}`,
+  // With a rate on the row the work takes a line of its own, so the price and the rate sit side
+  // by side underneath it and nothing is squeezed to nothing on a phone held in one hand.
+  `.lek-descvat{flex:1 1 100%;min-width:0}`,
   `.lek-amount{flex:0 0 112px;width:112px}`,
+  `.lek-rate{flex:0 0 128px;width:128px;appearance:none;-webkit-appearance:none}`,
   `.lek-primary{width:100%;margin-top:${SPACE.sm}px;padding:14px ${SPACE.md}px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${ON_RIVER};background:${RIVER};border:none;border-radius:${RADIUS.md}px;cursor:pointer;transition:background-color ${MOTION.quick} ${MOTION.ease}}`,
   `.lek-primary:hover{background:${RIVER_DEEP}}`,
   `@media(min-width:${BREAK.desk}px){
@@ -198,6 +335,13 @@ const S: Record<string, React.CSSProperties> = {
   fieldNote: { fontSize: TYPE.note, lineHeight: 1.5, color: MUTED, margin: '6px 0 0' },
   fieldset: { border: 'none', margin: 0, padding: 0 },
   lineRow: { display: 'flex', gap: 8, marginBottom: 8 },
+  lineRowVat: { display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
+
+  ask: { border: 'none', margin: '14px 0 0', padding: 0 },
+  askQ: { display: 'block', fontSize: TYPE.body, fontWeight: 700, color: INK, padding: 0 },
+  askWhy: { display: 'block', fontSize: TYPE.note, lineHeight: 1.5, color: MUTED, margin: '4px 0 8px' },
+  askRow: { display: 'flex', gap: 10 },
+  pick: { display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: TYPE.body, fontWeight: 700, color: INK, background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, padding: '10px 16px', cursor: 'pointer' },
 
   weight: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '14px 0 0' },
   foot: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },

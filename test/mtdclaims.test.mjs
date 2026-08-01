@@ -149,7 +149,16 @@ ok('it says it has been tested against HMRC systems', /own test systems/i.test(m
 ok('it names the fraud prevention headers, which is the hard part', /fraud prevention headers/i.test(mtd));
 ok('it says what is missing is permission, not software', /permission/i.test(mtd) && /rather than a build/i.test(mtd));
 ok('it explains WHY we are taking the time, rather than apologising', /matters more than being first/i.test(mtd));
-ok('🔴 it points at the 7 November deadline', /7 November 2026/.test(mtd));
+// 🔴 THIS USED TO ASSERT THE PAGE NAMED 7 NOVEMBER 2026. It did, and on 31 July 2026 that was
+// four months early: the next quarterly update was 7 AUGUST, one week away, and the page was
+// telling a man to relax about it. The fix was to derive the date, so the assertion is now that
+// the page CANNOT name a single fixed deadline: it has to carry the list and choose.
+ok('🔴 the next quarterly deadline is derived, never a single hardcoded date',
+  /nextQuarterlyDeadline\s*\(/.test(mtd) && /QUARTERLY_DEADLINES/.test(mtd));
+ok('the deadline list covers all four quarters', /7 August|7 November|7 February|7 May/.test(mtd)
+  && (mtd.match(/said: '/g) || []).length >= 4);
+ok('the page is revalidated, so a derived date cannot freeze at deploy time',
+  /export const revalidate/.test(mtd));
 ok('it never claims we can file today', !/\byou can file (now|today)\b/i.test(strip(mtd)));
 
 // The one phrase we ARE allowed, and only once it is true. Today it is not, so it should not

@@ -315,7 +315,7 @@ ok('and lib/bankfeed.ts is still the module that defines it', readsTheFlag('bank
 delete process.env.BANK_FEED_OFFERED;
 ok('🔴 the offer is OFF by default, which is the honest state today', BF.bankFeedOffered() === false);
 
-const offOffer = N.bankOfferLine();
+const offOffer = N.bankOfferLine({ available: true, connected: false });
 const offBusy = N.busyMessage('user_daily_cap', OFFERABLE);
 const offMilestone = N.receiptMilestoneNudge(5, OFFERABLE);
 const offTrial = TN.trialWeekMessage(emptyWeek).body;
@@ -338,7 +338,7 @@ ok('the empty week still says plainly that there is nothing in his books yet',
 process.env.BANK_FEED_OFFERED = 'true';
 ok('the flag turns the offer on', BF.bankFeedOffered() === true);
 ok('the cap offer returns to the original wording, to the letter',
-  N.bankOfferLine() === 'Want to stop hitting this? Connect your bank in the Lekhio app. Every payment in and out gets logged for you automatically, with no daily limit and no photos to remember.');
+  N.bankOfferLine({ available: true, connected: false }) === 'Want to stop hitting this? Connect your bank in the Lekhio app. Every payment in and out gets logged for you automatically, with no daily limit and no photos to remember.');
 ok('the busy message offers the bank again', /Connect your bank/.test(N.busyMessage('user_daily_cap', OFFERABLE)));
 ok('the milestone nudge returns to the original wording, to the letter',
   N.receiptMilestoneNudge(5, OFFERABLE) === 'That is five receipts today. You do not have to keep doing this. Connect your bank in the Lekhio app and anything you pay by card or transfer is logged for you the moment it happens.');
@@ -349,7 +349,7 @@ ok('the trial week email returns to the original sentence, to the letter',
 for (const wrong of ['TRUE', '1', 'yes', 'true ', '']) {
   process.env.BANK_FEED_OFFERED = wrong;
   ok(`only the exact string 'true' switches the offer on (tried ${JSON.stringify(wrong)})`,
-    BF.bankFeedOffered() === false && !/connect your bank/i.test(N.bankOfferLine()) && !/connect your bank/i.test(TN.trialWeekMessage(emptyWeek).body));
+    BF.bankFeedOffered() === false && !/connect your bank/i.test(N.bankOfferLine({ available: true, connected: false })) && !/connect your bank/i.test(TN.trialWeekMessage(emptyWeek).body));
 }
 delete process.env.BANK_FEED_OFFERED;
 

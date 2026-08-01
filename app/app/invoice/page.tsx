@@ -5,6 +5,7 @@ import { SESSION_COOKIE } from '../../../lib/websession';
 import { getPublicInvoice } from '../../../lib/supabase';
 import { siteBase } from '../../../lib/packtoken';
 import { gbp2 } from '../../../lib/money';
+import { REVERSE_CHARGE_WORDING } from '../../../lib/vat';
 import { verifyInvoiceRef, invoiceRefUsable } from '../invoiceref';
 import {
   type InvoiceListRow, invoiceState, statusWords, daysLate, daysSinceIssued, lateWords,
@@ -48,6 +49,20 @@ export const dynamic = 'force-dynamic';
 // button on an invoice that is not yet due is a nudge to harass a customer who owes nothing
 // wrong. The drafts are deterministic templates from ./invoices/words.ts, in the same voice as
 // the WhatsApp chaser, and the firmness is HIS choice, made with three links and no script.
+//
+// ⚠️ AND THE VAT BLOCK IS SHOWN ONLY WHERE THERE IS VAT (1 August 2026).
+//
+// 🔴 vat_treatment === null MEANS THE INVOICE PREDATES VAT SUPPORT, and those render exactly as
+// they rendered on the day he sent them. An invoice a customer has already been sent is a
+// document, not a view: growing a "before VAT" line under it, months later, would show him a
+// paper his customer never received. 'none' is different and is not null. It is a real, recorded
+// answer, that he was not VAT registered when he raised it, and it draws no VAT either, because
+// a man who is not registered must never show VAT on an invoice at all.
+//
+// 🔴 UNDER THE REVERSE CHARGE THE VAT IS SHOWN AND IS NOT IN THE TOTAL. VATREVCON37100: the
+// figure the customer must account for "should not be included in the amount shown as total VAT
+// charged". So it sits in its own block, with the wording HMRC accepts, and the total above it is
+// untouched. That total is what he is owed, and it is what the chaser and his list say too.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 export default async function InvoiceDetailPage({
@@ -124,6 +139,10 @@ export default async function InvoiceDetailPage({
   // with no script. It is the reference he already holds, not a new grant of anything.
   const refParam = encodeURIComponent(one('ref') ?? '');
 
+  // Null is an invoice raised before the product knew what VAT was, and it prints as it printed.
+  // 'none' is a recorded answer that he was not registered, and it carries no VAT either.
+  const carriesVat = inv?.vat_treatment === 'charged' || inv?.vat_treatment === 'reverse_charge';
+
   return (
     <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
@@ -172,11 +191,35 @@ export default async function InvoiceDetailPage({
                   <span style={S.itemAmount}>{gbp2(Number(li.amount) || 0)}</span>
                 </li>
               ))}
+              {carriesVat ? (
+                <li style={S.itemRow}>
+                  <span style={S.itemDesc}>Before VAT</span>
+                  <span style={S.itemAmount}>{gbp2(inv.subtotal)}</span>
+                </li>
+              ) : null}
+              {inv.vat_treatment === 'charged' ? (
+                <li style={S.itemRow}>
+                  <span style={S.itemDesc}>VAT</span>
+                  <span style={S.itemAmount}>{gbp2(inv.tax)}</span>
+                </li>
+              ) : null}
               <li style={S.totalRow}>
                 <span style={S.totalLabel}>Total</span>
                 <span style={S.totalAmount}>{gbp2(inv.total)}</span>
               </li>
             </ul>
+
+            {inv.vat_treatment === 'reverse_charge' ? (
+              <div style={S.rc}>
+                <span style={S.rcTop}>VAT for your customer to account for</span>
+                <span style={S.rcFigure}>{gbp2(inv.reverse_charge_vat)}</span>
+                <span style={S.rcBody}>{REVERSE_CHARGE_WORDING}</span>
+                <span style={S.rcBody}>
+                  You charge none of it, so it is not part of the {gbp2(inv.total)} above and it is
+                  not money owed to you. He pays it to HMRC himself.
+                </span>
+              </div>
+            ) : null}
 
             {inv.notes ? <p style={S.quiet}>{inv.notes}</p> : null}
           </section>
@@ -340,6 +383,13 @@ const S: Record<string, React.CSSProperties> = {
   totalRow: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', borderTop: `1px solid ${LINE}`, padding: '10px 0 0' },
   totalLabel: { fontSize: TYPE.body, fontWeight: 800 },
   totalAmount: { fontSize: TYPE.body, fontWeight: 800, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
+
+  // Its own block, outside the run of figures, because it is the one number on the page that is
+  // not part of the total and not money owed to him.
+  rc: { display: 'block', background: SURFACE, border: `1px solid ${LINE}`, borderRadius: RADIUS.md, padding: '13px 15px', margin: '14px 0 0' },
+  rcTop: { display: 'block', fontSize: TYPE.label, fontWeight: 800, color: MUTED, letterSpacing: '0.3px' },
+  rcFigure: { display: 'block', fontSize: TYPE.strong, fontWeight: 800, color: INK, margin: '2px 0 8px', fontVariantNumeric: 'tabular-nums' },
+  rcBody: { display: 'block', fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, marginTop: 6 },
 
   sub: { fontSize: TYPE.body, lineHeight: 1.55, color: MUTED, margin: '0 0 10px' },
   // userSelect all: one tap selects the whole thing, the closest a page with no script comes to

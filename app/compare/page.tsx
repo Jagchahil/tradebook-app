@@ -7,6 +7,7 @@ import {
   SharedHead, SiteNav, SiteFooter, StickyCta,
   Ic,
 } from '../_shared/site';
+import { FACTS } from '../../lib/taxengine';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/compare' },
@@ -49,6 +50,26 @@ function Mk({ v }: { v: Cell }) {
   return <span className="lbl">{L[v]}</span>;
 }
 const isWin = (r: Row) => r.lekhio === true && r.apps !== true && r.diy !== true;
+
+// ⚠️ EVERY NUMBER IN THE COPY IS COUNTED FROM THE TABLE ABOVE, NEVER TYPED.
+//
+// The caption under the score used to read "Lekhio leads on eleven today". Eleven is the count of
+// rows Lekhio DOES, which is what the three score cards show. It is not the count of rows Lekhio
+// LEADS on, because leading means the other two columns do not do it, which is what isWin tests and
+// what the "Where Lekhio wins" filter shows. Those are nine. So a visitor who clicked the filter
+// and counted got a different answer from the sentence, on our own honest comparison page. Counting
+// both from the data means the sentence cannot drift from the table again when a row is added.
+const ALL_ROWS: Row[] = GROUPS.flatMap((g) => g.rows);
+const TOTAL_ROWS = ALL_ROWS.length;
+const LEKHIO_DOES = ALL_ROWS.filter((r) => r.lekhio === true).length;
+const APPS_DO = ALL_ROWS.filter((r) => r.apps === true).length;
+const DIY_DOES = ALL_ROWS.filter((r) => r.diy === true).length;
+const LEKHIO_LEADS = ALL_ROWS.filter(isWin).length;
+
+// The page says numbers as words, so the counted ones do too.
+const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen'];
+const say = (n: number) => WORDS[n] ?? String(n);
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const COMPARE_CSS = `
 .mkt .hero{padding:52px 0 14px}
@@ -164,7 +185,10 @@ export default function ComparePage() {
       <style dangerouslySetInnerHTML={{ __html: MARKETING_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: COMPARE_CSS }} />
 
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for the self employed earning over £50k. <span className="go">See if it affects you →</span></Link></div>
+      {/* The threshold is on GROSS qualifying income, trade plus rent added together before any
+          expenses, and it catches landlords as squarely as it catches the self employed. "Earning
+          over £50k" said neither, so a landlord read past it and a sole trader read it as profit. */}
+      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for sole traders and landlords with gross income over £{FACTS.mtdThreshold2026 / 1000}k. <span className="go">See if it affects you →</span></Link></div>
       <SiteNav />
 
       {/* Hero */}
@@ -180,11 +204,11 @@ export default function ComparePage() {
       <section style={{ paddingTop: 20 }}>
         <div className="wrap">
           <div className="score reveal">
-            <div className="scard lek"><div className="snum" data-to="11">11</div><div className="slabel">Lekhio</div><div className="ssub">today, and always growing ↗</div></div>
-            <div className="scard"><div className="snum" data-to="2">2</div><div className="slabel">Other apps</div><div className="ssub">and none of them talk to each other</div></div>
-            <div className="scard"><div className="snum" data-to="2">2</div><div className="slabel">Doing it yourself</div><div className="ssub">and all the work is yours</div></div>
+            <div className="scard lek"><div className="snum" data-to={LEKHIO_DOES}>{LEKHIO_DOES}</div><div className="slabel">Lekhio</div><div className="ssub">today, and always growing ↗</div></div>
+            <div className="scard"><div className="snum" data-to={APPS_DO}>{APPS_DO}</div><div className="slabel">Other apps</div><div className="ssub">and none of them talk to each other</div></div>
+            <div className="scard"><div className="snum" data-to={DIY_DOES}>{DIY_DOES}</div><div className="slabel">Doing it yourself</div><div className="ssub">and all the work is yours</div></div>
           </div>
-          <p className="center mut" style={{ fontSize: 13, marginTop: 16 }}>Thirteen things people actually need. Lekhio leads on eleven today, and we ship more every month.</p>
+          <p className="center mut" style={{ fontSize: 13, marginTop: 16 }}>{cap(say(TOTAL_ROWS))} things people actually need. Lekhio does {say(LEKHIO_DOES)} of them today, and on {say(LEKHIO_LEADS)} it is the only one of the three that does. We ship more every month.</p>
         </div>
       </section>
 
@@ -220,7 +244,7 @@ export default function ComparePage() {
           <h2>Built by the book. Better than the rest.</h2>
           <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>The complete tax assistant that opens in your browser, and it does the sums properly.</p>
           <div className="credrow">
-            <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b>, 104 tests</span></div>
+            <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b></span></div>
             <div className="credchip"><span>Built for a phone on site</span></div>
             <div className="credchip"><span>HMRC recognition <b>in progress</b></span></div>
             <div className="credchip">🇬🇧 <span>A real UK company</span></div>

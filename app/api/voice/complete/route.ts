@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     await finishVoiceJob(id, 'done');
     return NextResponse.json({ ok: true, skipped: 'not_entitled' });
   }
-  // Already finished (a retry, or the sweep rescued and someone else did it) — accept quietly, no double
+  // Already finished (a retry, or the sweep rescued and someone else did it). Accept quietly, no double
   // entry and no second message to the customer.
   if (job.status === 'done' || job.status === 'error') return NextResponse.json({ ok: true, already: true });
 

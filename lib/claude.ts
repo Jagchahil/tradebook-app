@@ -1,7 +1,15 @@
 // Anthropic client. Every Claude call goes through here.
 //
 // Phase 0 use: read a photo of a receipt and pull out the merchant, the total,
-// and a category. Receipts are always an expense.
+// a category, the date, and the VAT the paper prints. Receipts are always an
+// expense.
+//
+// 🔴 THE VAT IS A READING AND NEVER A CLAIM. Nothing in this file, and nothing
+// downstream of it, may mark a VAT figure as confirmed. A figure read off a
+// photograph that is wrong one time in seven is worse than no figure at all,
+// because he will trust it and put it in a reclaim. The only thing that sets
+// vat_confirmed is lib/supabase.ts confirmTransactionVat, and the only thing that
+// calls that is a form he filled in himself.
 //
 // Env var: ANTHROPIC_API_KEY
 
@@ -50,6 +58,18 @@ export interface ParsedReceipt {
   // webhook clamps it and stores it in transaction_date, so back-dated receipts
   // land in the right tax quarter.
   transaction_date: string | null;
+  // 🔴 THE VAT PRINTED ON THE PAPER, IN POUNDS, OR NULL BECAUSE IT WAS NOT PRINTED.
+  //
+  // NULL IS NOT ZERO. Null means the receipt did not say, which is the honest
+  // answer for a slip carrying only a VAT registration number and a total. Zero
+  // means it did say, and said none. supabase/APPLY_2026-08-01_vat.sql draws the
+  // same line in the column comment, for the same reason.
+  //
+  // ⚠️ THE MODEL IS TOLD NOT TO WORK IT OUT. A sixth of the total is a guess
+  // wearing a reading's clothes, and on a supplier who was not charging VAT it is
+  // not even close. So a receipt that does not print the VAT comes back null and
+  // he is never shown a figure nobody wrote down.
+  vat: number | null;
 }
 
 const ALLOWED_CATEGORIES = ['tools', 'fuel', 'meals', 'materials', 'other'];
@@ -62,11 +82,18 @@ const PROMPT = [
   '  "amount": number, the total paid in pounds, no currency symbol,',
   `  "category": one of ${ALLOWED_CATEGORIES.join(', ')},`,
   '  "transaction_type": "expense",',
-  '  "transaction_date": the date printed on the receipt as YYYY-MM-DD, or null if you cannot read one',
+  '  "transaction_date": the date printed on the receipt as YYYY-MM-DD, or null if you cannot read one,',
+  '  "vat": number, the VAT amount printed on the receipt in pounds, or null if none is printed',
   '}',
   'Pick the closest category. Use "materials" for building supplies, "tools" for',
   'tools and hardware, "fuel" for petrol or diesel, "meals" for food and drink,',
   'and "other" for anything else. If you cannot read the total, set amount to 0.',
+  'Most UK till receipts do print the VAT, usually on a line marked VAT, or in a small',
+  'table of rate codes at the bottom. Many print only a VAT registration number and a',
+  'total, and that is not a VAT amount.',
+  'If no VAT amount is printed, return null for vat. Never calculate it from the total.',
+  'A calculated figure is a guess dressed up as a reading, and if the shop was not',
+  'charging VAT it is simply wrong.',
 ].join('\n');
 
 function clean(raw: string): string {
@@ -146,12 +173,26 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
         : 'other';
 
     const rawDate = typeof parsed.transaction_date === 'string' ? parsed.transaction_date : null;
+    const total = Number.isFinite(amount) ? Math.abs(amount) : 0;
+
+    // 🔴 THE ORDER OF THESE TWO LINES IS WHAT KEEPS NULL AND ZERO APART. Number(null) is 0, so
+    // running the value straight through Number() would turn "the paper did not say" into "the
+    // paper said none", and a confident zero is the one shape of wrong he cannot spot.
+    const rawVat = parsed.vat === null || parsed.vat === undefined ? null : Number(parsed.vat);
+    // Clamped both ends. Never negative, and never larger than the money that changed hands: VAT
+    // above the total is a misread, not a reading, and the smaller of the two is the only figure
+    // that could possibly be true. Confirming it is still his, and it happens nowhere near here.
+    const vat = rawVat !== null && Number.isFinite(rawVat) && rawVat >= 0
+      ? Math.min(rawVat, total)
+      : null;
+
     return {
       merchant_name: (parsed.merchant_name || 'Unknown').toString().slice(0, 120),
-      amount: Number.isFinite(amount) ? Math.abs(amount) : 0,
+      amount: total,
       category,
       transaction_type: 'expense',
       transaction_date: rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null,
+      vat,
     };
   } catch {
     console.error('[claude] Could not parse JSON from model reply.');
@@ -455,7 +496,7 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
 
 // --- WhatsApp support draft. When a customer asks for a human or reports a problem in WhatsApp, we open
 // a ticket for Jag and pre-draft a warm reply for him to edit before sending. It NEVER invents account
-// details, figures, a refund, or a promise Lekhio cannot keep — it acknowledges, reassures, and signals
+// details, figures, a refund, or a promise Lekhio cannot keep. It acknowledges, reassures, and signals
 // a person is on it. Only a starting point; Jag edits and approves every reply.
 export async function draftSupportReply(
   customerMessage: string,
@@ -465,7 +506,7 @@ export async function draftSupportReply(
   if (!ready() || !KEY) return null;
   const who = customerName && customerName.trim() ? customerName.trim().split(/\s+/)[0] : '';
   // Ground the draft in Jag's own playbook when a known issue matches, so the reply reflects the real
-  // fix (authored in Obsidian), not generic reassurance. Empty when nothing matches — then it degrades
+  // fix (authored in Obsidian), not generic reassurance. Empty when nothing matches, and then it degrades
   // to the warm-acknowledgement behaviour it had before.
   const known = (kb || []).slice(0, 3).map((k) => `- ${k.title}: ${k.body}`).join('\n');
   const prompt = [
@@ -511,7 +552,7 @@ export async function draftSupportReply(
 
 // --- Sharpen a playbook answer. Jag writes or pastes a rough answer to a common question in the console
 // and taps "improve"; this returns a tighter, warm, customer-ready version he can accept or edit. It only
-// rewrites what he gave it — it never invents figures, promises, or facts that were not in his draft.
+// rewrites what he gave it. It never invents figures, promises, or facts that were not in his draft.
 export async function improveSupportAnswer(question: string, draft: string): Promise<string | null> {
   if (!ready() || !KEY) return null;
   const prompt = [

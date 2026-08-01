@@ -2,13 +2,14 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { pileEntries, readOwnNames, readAccountUse, readCircumstances, getBusinessProfile, accountHasRental } from '../../../lib/supabase';
+import { pileEntries, readOwnNames, readAccountUse, readCircumstances, getBusinessProfile, accountHasRental, readVatProfile } from '../../../lib/supabase';
 import { buildPile, summarisePile, partitionPile, waitingCount } from '../../../lib/reviewpile';
+import { inputVatNote } from '../../../lib/vat';
 import { household, notHousehold, mtdQuestions, progressIn, openQuestionsLead } from '../../../lib/circumstances';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
-import { gbp0 } from '../../../lib/money';
+import { gbp0, gbp2 } from '../../../lib/money';
 import { bankFeedOffered } from '../../../lib/bankfeed';
 import { gateForUser } from '../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../lib/gate';
@@ -75,11 +76,93 @@ function message(code: string | undefined, n: string | undefined): string | null
       return Number.isFinite(count) && count > 0
         ? `Filed ${dec(count)} as rent. It is in your property stream, kept separate from your trade.`
         : 'Filed as rent.';
+    // 🔴 VAT GETS ITS OWN WORDS, AND THEY SAY THE HALF THAT IS STILL MISSING. Confirming the VAT
+    // does not file the payment, and the reclaim needs both. Telling him it is "claimed" when the
+    // cost itself is still waiting would be the one sentence on this screen that is not true.
+    case 'vat':
+      return 'Saved. That is the VAT we will use, and it counts towards what you claim back once you have filed the payment itself.';
+    case 'vatbad':
+      return 'That VAT figure does not fit the payment. It cannot be more than the payment, and at the standard rate it cannot be more than a sixth of it.';
+    case 'novat':
+      return 'We have you down as not VAT registered, so there is nothing to reclaim here. If that is wrong, put it right under You.';
     case 'nothing':
       return 'Nothing was changed. Try that again.';
     default:
       return null;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE PILE ROW, PLUS THE TWO VAT COLUMNS supabase/APPLY_2026-08-01_vat.sql ADDED.
+//
+// 🔴 THEY ARE OPTIONAL HERE, AND THAT IS NOT DEFENSIVENESS, IT IS THE HONEST SHAPE.
+//
+// pileEntries names its columns one by one and does not yet name these two, so today they arrive
+// undefined and this whole section draws nothing at all. Nobody sees a wrong figure and nobody
+// sees a broken screen. Adding vat_amount and vat_confirmed to that select in lib/supabase.ts is
+// what switches it on, and it is the one line this file is not allowed to write for itself.
+//
+// ⚠️ A STRING IS ALLOWED FOR A REASON. PostgREST hands back a numeric column as a JSON number on
+// some builds and as a string on others, and a silent NaN in a VAT figure is worse than any
+// amount of belt and braces here.
+interface RowWithVat {
+  id: string;
+  vendor: string | null;
+  description?: string | null;
+  amount: number;
+  category: string | null;
+  vat_amount?: number | string | null;
+  vat_confirmed?: boolean | null;
+}
+
+interface VatQuestion {
+  id: string;
+  vendor: string;
+  gross: number;
+  read: number;
+  category: string | null;
+  text: string;
+}
+
+// Which rows carry a VAT reading he has not yet agreed to.
+//
+// ⚠️ A STORED ZERO IS NOT ASKED ABOUT. Zero means the receipt printed no VAT, and asking a man to
+// agree that nothing was nothing is a question with one sensible answer, which doc 103 says never
+// to ask. It also adds not a penny to anything he claims back.
+function vatToCheck(rows: RowWithVat[]): VatQuestion[] {
+  const out: VatQuestion[] = [];
+  for (const r of rows) {
+    if (r.vat_confirmed) continue;
+    if (!(r.amount < 0)) continue; // input tax is on what he BOUGHT. A credit has none.
+    const raw = r.vat_amount === null || r.vat_amount === undefined ? null : Number(r.vat_amount);
+    if (raw === null || !Number.isFinite(raw) || raw <= 0) continue;
+    const gross = Math.abs(r.amount);
+    out.push({
+      id: r.id,
+      vendor: (r.vendor ?? '').trim() || 'Unknown',
+      gross,
+      // Never offer him a figure larger than the payment. lib/claude.ts clamps it on the way in
+      // and /api/pile refuses it on the way out, and this is the third: a screen that can print
+      // an impossible number is a screen that will, on the one row where it matters.
+      read: Math.min(raw, gross),
+      category: r.category,
+      text: `${r.vendor ?? ''} ${r.description ?? ''}`.trim(),
+    });
+  }
+  return out;
+}
+
+// What HMRC says about the VAT on this KIND of cost, where there is anything to say.
+//
+// lib/vat.ts owns every word of it: entertaining a customer is blocked outright, a van comes back
+// and a car does not, insurance carries no VAT at all, and a subcontractor invoicing under the
+// reverse charge charged him none to reclaim. It returns null for most costs, which is the point.
+// Drawn for a VAT registered customer and for nobody else.
+function VatNote({ show, category, text }: { show: boolean; category: string | null; text: string }) {
+  if (!show) return null;
+  const note = inputVatNote(category, text);
+  if (!note) return null;
+  return <p style={S.vatNote}>{note.says}</p>;
 }
 
 export default async function PilePage({
@@ -95,7 +178,7 @@ export default async function PilePage({
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
   const note = message(one('done'), one('n'));
 
-  const [rows, ownNames, accountUse, gate, circRows, profile, rental] = await Promise.all([
+  const [rows, ownNames, accountUse, gate, circRows, profile, rental, vatProfile] = await Promise.all([
     pileEntries(user.id), readOwnNames(user.id), readAccountUse(user.id), gateForUser(user.id),
     // The SAME source /app/you reads for "N still worth answering": his answers and his structure,
     // counted by lib/circumstances.ts, never worked out here. A failed read passes null and the
@@ -108,6 +191,15 @@ export default async function PilePage({
     // payment filed as plain income is right for almost everybody and is his to correct, while a
     // rent door for a man with no rental is a question with one sensible answer.
     accountHasRental(user.id).catch(() => false),
+    // 🔴 THE ONE FACT EVERY VAT WORD ON THIS SCREEN HANGS OFF. Most of this audience is not VAT
+    // registered and never will be, and a VAT row on the screen a man opens to clear his pile is
+    // pure noise to him. It teaches him that some of this page is not for him, and then he stops
+    // reading the part that is. Doc 103's empty test, applied to a whole feature.
+    //
+    // ⚠️ null MEANS THE READ FAILED, which is not "he is registered", so it draws nothing. Losing
+    // a VAT question for one page load costs him a refresh. Drawing one for a man who has no
+    // input tax to reclaim costs him his trust in the screen.
+    readVatProfile(user.id).catch(() => null),
   ]);
   // 🔴 THE PILE IS STILL DRAWN IN FULL WHEN THE TRIAL HAS ENDED. What stops is answering it.
   //
@@ -140,6 +232,22 @@ export default async function PilePage({
   const decidable = waitingCount({ known, unknown, careful, income });
   const knownRows = known.reduce((n, g) => n + g.count, 0);
   const incomeRows = income.reduce((n, g) => n + g.count, 0);
+
+  const vatRegistered = vatProfile !== null && vatProfile.registered;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE VAT WE HAVE READ, AND HE HAS NOT AGREED.
+  //
+  // lib/claude.ts now pulls the VAT off a receipt photograph and /api/money/receipt writes it to
+  // vat_amount with vat_confirmed left false. That is a machine's reading of a crumpled bit of
+  // paper. A total read wrong shows up the moment he looks at his own money; a VAT figure read
+  // wrong one time in seven goes quietly into a reclaim he has to stand behind at an inspection.
+  // So it waits here, with the figure printed, until he has looked at it and said yes.
+  //
+  // ⚠️ AND IT IS ASKED BEFORE THE FILING QUESTIONS, not after, because a row that has been filed
+  // leaves the pile and takes its unanswered VAT question with it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const vatWaiting = vatRegistered ? vatToCheck(rows) : [];
 
   // What is still open ABOUT HIM, same count as /app/you: progressIn over every group, so the
   // empty state below cannot say "everything is filed and counted" while his questions wait.
@@ -221,6 +329,61 @@ export default async function PilePage({
             )}
           </section>
 
+          {/* ── 0. THE VAT WE READ AND HE HAS NOT AGREED ─────────────────────────────────────
+              🔴 ABOVE THE FILING QUESTIONS ON PURPOSE. A row he files leaves the pile, and its
+              unanswered VAT question leaves with it, so this cannot sit at the bottom the way
+              money in does. Drawn only for a VAT registered customer, and only for rows where a
+              receipt actually printed a figure, so for almost everybody it is not on the page. */}
+          {vatWaiting.length > 0 && (
+            <section className="lek-card">
+              <h2 className="lek-h2">
+                {vatWaiting.length === 1 ? 'One receipt showed VAT' : `${vatWaiting.length} receipts showed VAT`}
+              </h2>
+              <p style={S.sub}>
+                We read {vatWaiting.length === 1 ? 'it' : 'them'} off the photograph, and a
+                photograph is our reading rather than your word. So nothing here counts towards
+                what you claim back until you have looked at the figure and said it is right.
+                Change it if we have read it wrong.
+              </p>
+              <ul style={S.lines}>
+                {vatWaiting.map((v) => (
+                  <li key={v.id} style={S.line}>
+                    <div style={S.rowTop}>
+                      <span style={S.vendor}>{v.vendor}</span>
+                      <span style={S.amount}>{gbp0(v.gross)}</span>
+                    </div>
+                    <p style={S.meta}>
+                      We read the VAT on this one as <b style={S.cat}>{gbp2(v.read)}</b>.
+                    </p>
+                    <VatNote show category={v.category} text={v.text} />
+                    <form action="/api/pile" method="post" hidden={locked} style={S.formTight}>
+                      <input type="hidden" name="ids" value={v.id} />
+                      <input type="hidden" name="verdict" value="vat" />
+                      <label htmlFor={`vat-${v.id}`} style={S.label}>The VAT on this receipt</label>
+                      {/* A plain text box rather than a number one, so a man who types the pound
+                          sign he can see on the paper is not silently refused by his browser. The
+                          route strips it, checks the figure against his own row, and says so in
+                          words if it does not fit. */}
+                      <input
+                        id={`vat-${v.id}`}
+                        name="vat"
+                        type="text"
+                        inputMode="decimal"
+                        defaultValue={v.read.toFixed(2)}
+                        className="lek-field"
+                        required
+                      />
+                      <button type="submit" className="lek-ghost">Yes, that is the VAT</button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+              <p style={S.hint}>
+                This is only about the VAT. The payment itself is still a question of its own, below.
+              </p>
+            </section>
+          )}
+
           {/* ── 1. THE ONES WE KNOW ──────────────────────────────────────────────────────────
               No dropdown. A category he can read, and ONE button for the lot. Rendering a twenty
               four option select next to a merchant we already recognise is asking a question we
@@ -244,6 +407,13 @@ export default async function PilePage({
                       {g.count === 1 ? 'One payment' : `${g.count} payments`}, filed as{' '}
                       <b style={S.cat}>{g.suggested}</b>.
                     </p>
+                    {/* The reverse charge line lands HERE and nowhere else, because a
+                        subcontractor is a merchant we settle ourselves, so his invoices are in
+                        this list rather than in the questions below. It is the single most
+                        common VAT mistake in this trade: his invoice charged no VAT, so there
+                        is none to reclaim, and a man who assumes otherwise reclaims a fifth of
+                        every subcontractor payment he makes. */}
+                    <VatNote show={vatRegistered} category={g.suggested} text={g.vendor} />
                   </li>
                 ))}
               </ul>
@@ -323,6 +493,10 @@ export default async function PilePage({
                 {g.count === 1 ? 'One payment' : `${g.count} payments`}
                 {g.suggested ? `, and this looks like ${g.suggested}. Only you know if it was work.` : '.'}
               </p>
+              {/* Insurance carries no VAT to reclaim, a car is blocked and a van is not, fuel
+                  depends on private use. One sentence, from lib/vat.ts, on the groups where
+                  there is something true to say and silent on the rest. */}
+              <VatNote show={vatRegistered} category={g.suggested} text={g.vendor} />
 
               <form action="/api/pile" method="post" hidden={locked} style={S.form}>
                 <input type="hidden" name="ids" value={g.ids.join(',')} />
@@ -446,13 +620,16 @@ const CSS = [
   // 16px is pinned, not a stray off the type scale: under 16 iOS Safari zooms the whole page the
   // moment the select is focused, and he never asked to be zoomed.
   `.lek-select{width:100%;box-sizing:border-box;padding:${SPACE.sm}px;font-size:16px;font-family:${FONT};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;color:${INK};background:${PANEL}}`,
+  // The VAT box. Same 16px pin as the select above, and for the same iOS Safari reason.
+  `.lek-field{width:100%;box-sizing:border-box;padding:${SPACE.sm}px;font-size:16px;font-family:${FONT};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;color:${INK};background:${PANEL};font-variant-numeric:tabular-nums}`,
+  `input:focus{outline:3px solid ${RIVER};outline-offset:2px}`,
   // On a desk a decision is a button sized to its words, not a bar the width of the monitor. A
   // full width press target earns its keep under a thumb and loses it under a mouse.
   `@media(min-width:${BREAK.desk}px){
     .lek-queue{max-width:760px;margin:0 auto}
     .lek-title{font-size:${TYPE.stat}px}
     .lek-primary,.lek-quiet,.lek-ghost{width:auto;min-width:264px}
-    .lek-select{max-width:420px}
+    .lek-select,.lek-field{max-width:420px}
   }`,
 ].join('');
 
@@ -471,6 +648,9 @@ const S: Record<string, React.CSSProperties> = {
   amount: { fontSize: TYPE.strong, fontWeight: 800, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
   meta: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '4px 0 0' },
   reason: { fontSize: TYPE.note, lineHeight: 1.55, color: INK, margin: '10px 0 0', fontWeight: 600 },
+  // The input tax line. Quieter than a reason and louder than the meta, because it is a fact
+  // about the rules rather than a question or a refusal.
+  vatNote: { fontSize: TYPE.note, lineHeight: 1.55, color: INK, margin: '8px 0 0' },
   form: { margin: '14px 0 0' },
   formTight: { margin: '10px 0 0' },
   label: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, marginBottom: 6 },

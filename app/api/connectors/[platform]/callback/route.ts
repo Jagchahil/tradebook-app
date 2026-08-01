@@ -14,7 +14,12 @@ export const runtime = 'nodejs';
 export async function GET(req: NextRequest, { params }: { params: Promise<{ platform: string }> }) {
   const { platform } = await params;
   const base = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
-  const back = (q: string) => NextResponse.redirect(`${base}/team/system?${q}`);
+  // 🔴 31 JUL 2026: THIS USED TO LAND ON /team/system AND NOTHING THERE EVER READ THE FLAG.
+  // Seven distinct failure reasons were encoded into this query string and not one line of code
+  // anywhere rendered them, so a refused OAuth looked exactly like a successful one: you came back
+  // to a normal console and assumed it worked. The board moved to Hoka's desk, and Hoka now reads
+  // this and says plainly what happened.
+  const back = (q: string) => NextResponse.redirect(`${base}/team/hoka?${q}`);
 
   if (!isConnector(platform)) return back('connect_error=unknown_platform');
   if (!CONNECTORS_ENABLED()) return back('connect_error=disabled');

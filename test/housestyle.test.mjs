@@ -50,28 +50,62 @@ ok('NO_DASH_RULE names the rule', typeof H.NO_DASH_RULE === 'string' && H.NO_DAS
 // lines of the newsletter.
 //
 // A rule the codebase cannot check is a rule nobody keeps, so it is checked here, at the source,
-// for the copy that reaches a person. Comments are exempt: they are held to the same rule by hand
-// but a dash in one has never reached a customer, and failing the build over a comment would teach
-// people to stop reading the failure.
+// for the copy that reaches a person.
+//
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE EXEMPTION FOR COMMENTS, REOPENED ON 31 JULY 2026 AND KEPT, NARROWED.
+//
+// The old reasoning said comments are exempt because a dash in one has never reached a customer and
+// failing the build over a comment would teach people to stop reading the failure. Both halves of
+// that are still true. What it did not weigh is that CLAUDE.md does not offer the exemption: the no
+// dash rule "Applies to all copy: UI, WhatsApp messages, docs, comments". A blanket exemption
+// written into the checker is the checker disagreeing with the standing instruction in silence,
+// which is worse than either answer taken openly.
+//
+// So it was measured rather than argued. Closing it outright would have failed the build on 47
+// comment lines across 21 files, in a repo several agents were editing at that moment, and a red
+// build that everybody has to fix before they can ship anything is precisely the build people learn
+// to skim. That is not a handful.
+//
+// THE ANSWER IS THREE PARTS, and it is a ratchet rather than a truce:
+//
+//   1. THE BLOCKING CHECK STILL EXEMPTS COMMENTS, for the copy scan below. Its job is the sentence
+//      a customer reads, and it should go red for that and for nothing else.
+//   2. A NAMED LIST OF FILES IS HELD TO THE WHOLE RULE, comments included, and it BLOCKS. It starts
+//      with the three cleaned on 31 July. A file goes on the list the day it is cleaned and it can
+//      never regress. The list is the only part that can fail, and it can only fail on a file
+//      somebody has already finished, which is a failure with an obvious owner and an obvious fix.
+//   3. A SURVEY PRINTS EVERY REMAINING COMMENT OFFENDER, file and line, and NEVER FAILS. The debt
+//      is counted out loud on every run instead of being invisible, so the next person to clean one
+//      does not have to go looking for it, and nobody has to argue about how big it is.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const { readdirSync, lstatSync } = await import('node:fs');
+const repo = path.resolve(here, '..');
+const SKIP = ['node_modules', '.git', '.next', '_to_delete', '_scale_review', path.join('app', 'team'), 'test'];
+const walk = (dir, out = []) => {
+  for (const e of readdirSync(dir)) {
+    if (e.startsWith('.')) continue;
+    const full = path.join(dir, e);
+    const rel = path.relative(repo, full);
+    if (SKIP.some((s) => rel === s || rel.startsWith(s + path.sep))) continue;
+    const st = lstatSync(full);
+    if (st.isSymbolicLink()) continue;
+    if (st.isDirectory()) walk(full, out);
+    else if (/\.(ts|tsx)$/.test(e)) out.push(full);
+  }
+  return out;
+};
+const DASH = /[\u2014\u2013]/;
+const isComment = (line) => {
+  const s = line.trim();
+  return s.startsWith('//') || s.startsWith('*');
+};
+// lib/housestyle.ts is the sanitiser itself and has to contain the characters it removes.
+const SANITISER = path.join('lib', 'housestyle.ts');
+const files = walk(repo).map((f) => [path.relative(repo, f), readFileSync(f, 'utf8').split('\n')]);
+
 console.log('\n=== no forbidden dash in copy that reaches a customer ===\n');
 {
-  const { readdirSync, lstatSync } = await import('node:fs');
-  const repo = path.resolve(here, '..');
-  const SKIP = ['node_modules', '.git', '.next', '_to_delete', '_scale_review', path.join('app', 'team'), 'test'];
-  const walk = (dir, out = []) => {
-    for (const e of readdirSync(dir)) {
-      if (e.startsWith('.')) continue;
-      const full = path.join(dir, e);
-      const rel = path.relative(repo, full);
-      if (SKIP.some((s) => rel === s || rel.startsWith(s + path.sep))) continue;
-      const st = lstatSync(full);
-      if (st.isSymbolicLink()) continue;
-      if (st.isDirectory()) walk(full, out);
-      else if (/\.(ts|tsx)$/.test(e)) out.push(full);
-    }
-    return out;
-  };
   // Quoted strings and plain JSX text. Deliberately not a whole file scan: the sanitiser in this
   // very file has to contain the characters it removes.
   const spans = (line) => {
@@ -82,19 +116,72 @@ console.log('\n=== no forbidden dash in copy that reaches a customer ===\n');
     return found;
   };
   const offenders = [];
-  for (const file of walk(repo)) {
-    const rel = path.relative(repo, file);
-    if (rel === path.join('lib', 'housestyle.ts')) continue;
-    readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-      const s = line.trim();
-      if (s.startsWith('//') || s.startsWith('*')) return;
+  for (const [rel, lines] of files) {
+    if (rel === SANITISER) continue;
+    lines.forEach((line, i) => {
+      if (isComment(line)) return;
       for (const str of spans(line)) {
-        if (/[\u2014\u2013]/.test(str)) { offenders.push(`${rel}:${i + 1}  ${str.trim().slice(0, 70)}`); break; }
+        if (DASH.test(str)) { offenders.push(`${rel}:${i + 1}  ${str.trim().slice(0, 70)}`); break; }
       }
     });
   }
   offenders.slice(0, 12).forEach((o) => console.log(`        ${o}`));
   ok('no em dash or en dash in any customer facing string', offenders.length === 0);
+}
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// PART 2 OF THE ANSWER ABOVE. THE FILES HELD TO THE WHOLE RULE, COMMENTS AND ALL.
+//
+// Add a file here the day its comments are clean. It can then never regress, and a file that is not
+// on the list is not being let off, it is queued: the survey underneath prints exactly where it is.
+//
+// The three below were cleaned on 31 July 2026, named in the brief that reopened this question:
+// a Stripe receipt comment, and one in each half of the voice worker handshake.
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+console.log('\n=== files held to the whole rule, comments included ===\n');
+{
+  const COMMENTS_TOO = [
+    path.join('app', 'api', 'stripe', 'webhook', 'route.ts'),
+    path.join('app', 'api', 'voice', 'complete', 'route.ts'),
+    path.join('app', 'api', 'voice', 'pending', 'route.ts'),
+  ];
+  const known = new Map(files);
+  for (const rel of COMMENTS_TOO) {
+    const lines = known.get(rel);
+    // A missing file is a FAILURE, not a skip. A list that silently shrinks when somebody renames a
+    // route is a list that stops meaning anything, quietly, which is the whole failure mode here.
+    if (!lines) { ok(`${rel} is on the list and exists`, false); continue; }
+    const bad = lines
+      .map((line, i) => (DASH.test(line) ? `${rel}:${i + 1}  ${line.trim().slice(0, 70)}` : null))
+      .filter(Boolean);
+    bad.forEach((b) => console.log(`        ${b}`));
+    ok(`${rel}: no em dash or en dash anywhere, comments included`, bad.length === 0);
+  }
+}
+
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+// PART 3. THE SURVEY. IT COUNTS THE DEBT OUT LOUD AND IT NEVER FAILS.
+//
+// Not an assertion. No ok(), no exit code, on purpose: the moment this can go red it is the blanket
+// check that was already rejected two comments up. What it buys is that the number is on the screen
+// of every run, so "how many are left" is never a question anybody has to go and measure again.
+// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+console.log('\n=== survey: dashes still sitting in comments (not a failure) ===\n');
+{
+  const byFile = new Map();
+  for (const [rel, lines] of files) {
+    if (rel === SANITISER) continue;
+    lines.forEach((line, i) => {
+      if (!isComment(line) || !DASH.test(line)) return;
+      if (!byFile.has(rel)) byFile.set(rel, []);
+      byFile.get(rel).push(i + 1);
+    });
+  }
+  const total = [...byFile.values()].reduce((n, xs) => n + xs.length, 0);
+  [...byFile.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .forEach(([rel, ls]) => console.log(`        ${String(ls.length).padStart(3)}  ${rel}  (lines ${ls.slice(0, 6).join(', ')}${ls.length > 6 ? ', ...' : ''})`));
+  console.log(`\n        ${total} comment ${total === 1 ? 'line' : 'lines'} in ${byFile.size} ${byFile.size === 1 ? 'file' : 'files'}. Clean one, then add the file to COMMENTS_TOO above.`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);

@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
         await upsertSubscription(row);
       }
     } else if (event.type === 'invoice.payment_succeeded') {
-      // A real charge cleared — the first charge after the trial, or a renewal. Send the receipt.
+      // A real charge cleared. The first charge after the trial, or a renewal. Send the receipt.
       // Guarded on amount > 0 so £0 trial-start invoices never trigger a "payment received" email.
       // Sent AFTER the 200 so Stripe is never held waiting and never retries into a duplicate email
       // (event-id idempotency above already makes each event single-shot).

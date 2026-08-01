@@ -4,7 +4,7 @@
 //
 // A receipt photo costs us an AI call, about 0.5p (Claude Vision). A bank
 // transaction costs us NOTHING: it arrives through the feed and is categorised by
-// the rules based CATEGORY_MAP in lib/bankfeed.ts, with no model call at all. So a
+// the rules based vendor map in lib/categories.ts, with no model call at all. So a
 // user who connects their bank is both cheaper to serve AND better served, because
 // their money is logged whether or not they remember to photograph anything.
 //
@@ -78,13 +78,35 @@ export function shouldOfferBank(bank: BankState): boolean {
   return bank.available && !bank.connected;
 }
 
+// 🔴 A DIFFERENT QUESTION, AND CONFLATING THE TWO MADE THE FALLBACK UNREACHABLE.
+//
+// "Should we offer him a bank CONNECTION" needs the feed to work. "Should we tell him there is a
+// better way than photographing every till slip" does not, because the statement importer at
+// /app/money/import needs no provider, no consent flow and nothing from anybody.
+//
+// Both questions were being answered by shouldOfferBank, so with no provider `available` is false,
+// and the two places that name a way out went quiet at once. The daily cap reply became "that is
+// everything I can read for you today" WITH NO WAY OUT NAMED, and the five receipt nudge stopped
+// firing entirely. The fallback copy sitting right there in bankOfferLine, written precisely for
+// the no provider case, could never be reached by the channel it was written for.
+//
+// He is only past helping if he has ALREADY connected a bank, because then it is being done for
+// him and there is nothing better to point at.
+export function shouldOfferEasierRoute(bank: BankState): boolean {
+  return !bank.connected;
+}
+
 // The offer itself. One line, plain, no pressure, and it names the benefit in the
 // user's terms rather than ours.
 //
 // The bank sentence returns with bankFeedOffered(); until then the fallback names the door that
 // does the same job today, and the benefit is still put in his terms rather than ours.
-export function bankOfferLine(): string {
-  return bankFeedOffered()
+// ⚠️ IT TAKES THE STATE NOW, AND BOTH HALVES HAVE TO AGREE BEFORE IT NAMES THE BANK. bankFeedOffered()
+// is the marketing switch and bank.available is hasBankFeedConfig(), which is whether the server can
+// actually deliver one. Offering a connection on the strength of the switch alone is how a live
+// signup ended up at a provider's "do not enter your bank credentials" banner on 31 July.
+export function bankOfferLine(bank: BankState): string {
+  return bankFeedOffered() && bank.available
     ? 'Want to stop hitting this? Connect your bank in the Lekhio app. Every payment in and out gets logged for you automatically, with no daily limit and no photos to remember.'
     : 'Want to stop hitting this? Import a bank statement in the Lekhio app, under Money. A whole month of spending lands in one go, with no daily limit and nothing to photograph.';
 }
@@ -102,8 +124,8 @@ export function busyMessage(reason: AiBlockReason, bank: BankState): string {
 
   const capped = 'That is everything I can read for you today. Nothing is lost. Send it again tomorrow and I will log it.';
 
-  if (shouldOfferBank(bank)) {
-    return `${capped}\n\n${bankOfferLine()}`;
+  if (shouldOfferEasierRoute(bank)) {
+    return `${capped}\n\n${bankOfferLine(bank)}`;
   }
 
   if (bank.connected) {
@@ -122,11 +144,13 @@ export function busyMessage(reason: AiBlockReason, bank: BankState): string {
 export const NUDGE_AFTER_RECEIPTS = 5;
 
 export function receiptMilestoneNudge(receiptsToday: number, bank: BankState): string | null {
-  if (!shouldOfferBank(bank)) return null;
+  // shouldOfferEasierRoute, not shouldOfferBank. See the note on that function: this nudge exists
+  // to tell a man photographing his fifth receipt of the day that he does not have to, and that is
+  // true with or without a provider. Gating it on the feed silenced it in exactly the months the
+  // feed does not exist, which is now.
+  if (!shouldOfferEasierRoute(bank)) return null;
   if (receiptsToday !== NUDGE_AFTER_RECEIPTS) return null;
-  // The bank sentence returns with bankFeedOffered(). The fallback keeps the point of the nudge,
-  // which is that he does not have to keep doing this by hand, and names the door that proves it.
-  return bankFeedOffered()
+  return bankFeedOffered() && bank.available
     ? 'That is five receipts today. You do not have to keep doing this. Connect your bank in the Lekhio app and anything you pay by card or transfer is logged for you the moment it happens.'
     : 'That is five receipts today. You do not have to keep doing this. Import a bank statement in the Lekhio app, under Money, and everything you paid by card or transfer lands in your books in one go.';
 }

@@ -134,7 +134,13 @@ export default async function ProofOfIncomePage({
                 <dd style={S.tdBold}>{gbp2(proof.profit)}</dd>
               </div>
               <div style={S.trLast}>
-                <dt style={S.thMut}>Estimated Income Tax and National Insurance</dt>
+                {/* 🔴 THE LABEL COMES FROM THE ENGINE, BECAUSE IT IS NOT ALWAYS TRUE. This said
+                    "Estimated Income Tax and National Insurance" for everybody, on a document that
+                    goes to a mortgage broker. Rental profit attracts no Class 4 National Insurance,
+                    so for a landlord that line named a tax he does not pay, and the figure under it
+                    included it. lib/incomeproof.ts now splits trade from property and hands back
+                    the honest wording with the honest number. */}
+                <dt style={S.thMut}>{proof.estimatedTaxLabel}</dt>
                 <dd style={S.tdMut}>{gbp2(proof.estimatedTax)}</dd>
               </div>
             </dl>

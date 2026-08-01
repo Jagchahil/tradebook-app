@@ -27,7 +27,7 @@ ASK ANYTHING
 "How much have I spent this month?" "Can I claim my work boots?" "When is my tax due?" Ask in plain English on WhatsApp and get a straight answer from your own figures.
 
 WHAT IT COSTS
-£12.99 a month or £129 a year, everything in. Your first 30 days are free, no card needed.
+£12.99 a month or £129 a year, everything in. Your first 7 days are free, no card needed.
 
 THE SMALL PRINT, HONESTLY
 Lekhio is an independent UK company. We are not HMRC and HMRC does not endorse us. Lekhio prepares your figures; you approve them; you stay responsible for your tax. General guidance, not regulated tax advice. Figures use the England, Wales and Northern Ireland income tax bands.
@@ -47,7 +47,7 @@ self employed,tax,bookkeeping,CIS,sole trader,receipts,invoice,MTD,tradesman,mil
 
 ## Review notes (for the store reviewers)
 
-Demo account: provide a test phone number with OTP disabled or a review build flag before submission. The app requires a UK mobile for OTP sign in. Core capture happens in WhatsApp; the app is where entries are reviewed, confirmed and prepared for tax. No purchase is required to review: the 30 day trial needs no card.
+Demo account: provide a test phone number with OTP disabled or a review build flag before submission. The app requires a UK mobile for OTP sign in. Core capture happens in WhatsApp; the app is where entries are reviewed, confirmed and prepared for tax. No purchase is required to review: the 7 day trial needs no card. (`TRIAL_DAYS = 7` in lib/entitlement.ts is the only definition of it. The 30 day trial is the rep code trial, `REP_TRIAL_DAYS` in lib/stripe.ts, and is not what a store visitor gets.)
 
 ## Category and rating
 

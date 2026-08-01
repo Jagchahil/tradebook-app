@@ -55,6 +55,36 @@ const faqs = [
   { q: 'When can I actually use it?', a: 'It is not live yet. This page is here so you can join the list and hear the moment it opens, rather than us making a promise before it is ready.' },
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE DEADLINE WAS TYPED IN, AND BY 31 JULY 2026 IT WAS TELLING A MAN TO RELAX.
+//
+// This page pointed at 7 November as "the next quarterly update deadline". It stopped being the
+// next one on 8 May, and by the end of July the real answer was 7 August, a week away, while
+// /resources had it right all along. A date a human types is a date that goes quietly wrong, and
+// the man it goes wrong for is the one who trusted it.
+//
+// lib/waintents.ts computes the same four dates, but deadlineAnswer() hands back a whole WhatsApp
+// reply rather than a date, so there is nothing there a page can render. Hence the list, with the
+// words alongside each date so the copy reads the way the rest of the page does.
+//
+// ⚠️ THE LIST RUNS OUT AFTER 7 MAY 2027. Add the next tax year's four dates (7 August 2027,
+// 7 November 2027, 7 February 2028, 7 May 2028) before then, or the page pins itself to the last
+// entry and starts naming a date that has already gone.
+const QUARTERLY_DEADLINES = [
+  { at: Date.UTC(2026, 7, 7), said: '7 August 2026' },
+  { at: Date.UTC(2026, 10, 7), said: '7 November 2026' },
+  { at: Date.UTC(2027, 1, 7), said: '7 February 2027' },
+  { at: Date.UTC(2027, 4, 7), said: '7 May 2027' },
+];
+
+// The deadline day itself still counts as the next one, so this compares whole days rather than
+// instants. A man reading the page on the morning of 7 August is not late yet.
+function nextQuarterlyDeadline(now: Date = new Date()): string {
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const next = QUARTERLY_DEADLINES.find((d) => d.at >= today);
+  return (next ?? QUARTERLY_DEADLINES[QUARTERLY_DEADLINES.length - 1]).said;
+}
+
 const faqSchema = {
   '@context': 'https://schema.org',
   '@type': 'FAQPage',
@@ -64,6 +94,10 @@ const faqSchema = {
     acceptedAnswer: { '@type': 'Answer', text: f.a },
   })),
 };
+
+// The page still renders statically and is still cached, it is simply rebuilt at most once a day so
+// the deadline above cannot sit on whatever the date happened to be at the last deploy.
+export const revalidate = 86400;
 
 export default function FreeMtdFilingPage() {
   return (
@@ -119,7 +153,7 @@ export default function FreeMtdFilingPage() {
             you do now.
           </p>
           <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.65, margin: 0 }}>
-            The date worth having in your head is <strong style={{ color: INK }}>7 November 2026</strong>,
+            The date worth having in your head is <strong style={{ color: INK }}>{nextQuarterlyDeadline()}</strong>,
             the next quarterly update deadline. Getting your books straight before then is the thing
             that actually saves you a scramble, and that part works today.
           </p>

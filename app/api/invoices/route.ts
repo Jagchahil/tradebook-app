@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sessionUser } from '../../../lib/webauth';
-import { createInvoice, markInvoiceSentByOwner, markInvoicePaidByOwner } from '../../../lib/supabase';
+import {
+  createInvoice, markInvoiceSentByOwner, markInvoicePaidByOwner, readVatProfile,
+} from '../../../lib/supabase';
 import { rateLimitedShared, userBurst } from '../../../lib/ratelimit';
 import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
+import {
+  isVatRateKey, priceInvoice, treatmentFor, type ReverseChargeFacts, type VatRateKey,
+} from '../../../lib/vat';
 import { invoiceRef } from '../../app/invoiceref';
 
 // AN INVOICE, MADE FROM THE WEB, AND KEPT STRAIGHT BY ITS OWNER.
 //
-//   POST { customer, contact?, item[], amount[] }   ->  one draft invoice, then the share step
-//   POST { action: 'sent' | 'paid', id, ref? }      ->  his own row's status, said by him
+//   POST { customer, contact?, item[], amount[], rate[] }  ->  one draft invoice, then the share
+//   POST { action: 'sent' | 'paid', id, ref? }             ->  his own row's status, said by him
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // ⚠️ THIS ROUTE WRITES NOTHING ITSELF. createInvoice in lib/supabase.ts is the one path every
@@ -40,6 +45,23 @@ import { invoiceRef } from '../../app/invoiceref';
 //
 // ⚠️ THE REDIRECT CARRIES A SEALED REFERENCE, NEVER THE NEW ROW'S ID. app/app/invoiceref.ts, the
 // same rule as every app URL: nothing a customer can read or edit points at a row.
+//
+// ⚠️ AND THE VAT IS DECIDED HERE, FROM FACTS, NEVER COMPUTED HERE (1 August 2026). lib/vat.ts owns
+// every figure: treatmentFor reads his profile and the three facts about this job, priceInvoice
+// does the arithmetic, and createInvoice stores what it was handed. This route does one thing the
+// library cannot: it puts the questions only to the man they belong to, and refuses to guess.
+//
+//   he is not VAT registered   ->  treatment 'none'. No VAT anywhere. Charging VAT when he is not
+//                                  registered is an offence, so the answer is decided, not asked.
+//   registered, not CIS        ->  the rate he picked on each line, charged the ordinary way.
+//   registered AND a CIS       ->  the three reverse charge facts come off the form. On his
+//   subcontractor                  commonest invoice, a main contractor's job, he charges NOTHING
+//                                  and the customer accounts for the VAT. VATA 1994 s55A.
+//
+// 🔴 A NULL VAT PROFILE IS A FAILED READ, NOT "HE IS NOT REGISTERED". The two are different
+// answers and only one of them is safe to act on. Treating a bad database minute as "unregistered"
+// would quietly strip the VAT off a document his customer pays from and his accountant checks, and
+// he would find out at his next return. So the create is refused, out loud, and he tries again.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 export const runtime = 'nodejs';
@@ -48,6 +70,26 @@ export const runtime = 'nodejs';
 const MAX_LINES = 6;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The VAT questions the form says it put to him. The route works out what it SHOULD have asked
+// from his profile, so a form rendered before he registered, or a hand made post, cannot make an
+// invoice out of questions nobody answered.
+type VatFormShape = 'none' | 'rates' | 'rc';
+
+// Yes, no, or nothing. Silence is never read as no on the reverse charge: an unanswered question
+// there is the difference between a legal invoice and one that charges VAT he must not charge.
+function answer(v: unknown): 'yes' | 'no' | null {
+  if (v === true || v === 'yes') return 'yes';
+  if (v === false || v === 'no') return 'no';
+  return null;
+}
+
+// The highest rate on the invoice, lib/vat.ts's own ordering. A wholly zero rated supply, a new
+// build, is outside the reverse charge, so which rate is on top decides the question.
+const RATE_ORDER: readonly VatRateKey[] = ['standard', 'reduced', 'zero', 'exempt', 'outside'];
+function topRate(lines: Array<{ rate: VatRateKey }>): VatRateKey {
+  return RATE_ORDER.find((k) => lines.some((li) => li.rate === k)) ?? 'standard';
+}
 
 export async function POST(req: NextRequest) {
   const isForm = (req.headers.get('content-type') || '').includes('application/x-www-form-urlencoded');
@@ -67,6 +109,11 @@ export async function POST(req: NextRequest) {
   let contact = '';
   let items: string[] = [];
   let amounts: string[] = [];
+  let rates: string[] = [];
+  let vatForm = '';
+  let customerVat: 'yes' | 'no' | null = null;
+  let customerCis: 'yes' | 'no' | null = null;
+  let endUser: 'yes' | 'no' | null = null;
   if (isForm) {
     const f = await req.formData().catch(() => null);
     if (!f) return back('problem=bad');
@@ -77,6 +124,11 @@ export async function POST(req: NextRequest) {
     contact = String(f.get('contact') ?? '');
     items = f.getAll('item').map(String);
     amounts = f.getAll('amount').map(String);
+    rates = f.getAll('rate').map(String);
+    vatForm = String(f.get('vatform') ?? '');
+    customerVat = answer(f.get('customer_vat'));
+    customerCis = answer(f.get('customer_cis'));
+    endUser = answer(f.get('end_user'));
   } else {
     let body: Record<string, unknown> = {};
     try {
@@ -88,10 +140,15 @@ export async function POST(req: NextRequest) {
     contact = typeof body.contact === 'string' ? body.contact : '';
     const li = Array.isArray(body.line_items) ? body.line_items : [];
     for (const raw of li) {
-      const r = (raw ?? {}) as { description?: unknown; amount?: unknown };
+      const r = (raw ?? {}) as { description?: unknown; amount?: unknown; rate?: unknown };
       items.push(typeof r.description === 'string' ? r.description : '');
       amounts.push(typeof r.amount === 'string' || typeof r.amount === 'number' ? String(r.amount) : '');
+      rates.push(typeof r.rate === 'string' ? r.rate : '');
     }
+    vatForm = typeof body.vatform === 'string' ? body.vatform : '';
+    customerVat = answer(body.customer_vat);
+    customerCis = answer(body.customer_cis);
+    endUser = answer(body.end_user);
   }
 
   // ── His own row's status, said by him. Form posts from /app/invoice, never gated. ──────────
@@ -141,7 +198,7 @@ export async function POST(req: NextRequest) {
   // description but no readable amount would issue an invoice missing the £450 he meant to
   // charge, and he would only find out when the payment came up short. Fully empty rows are
   // just the spare boxes on the form, and they are ignored.
-  const lineItems: Array<{ description: string; amount: number }> = [];
+  const lineItems: Array<{ description: string; amount: number; rate: VatRateKey }> = [];
   for (let i = 0; i < Math.max(items.length, amounts.length); i += 1) {
     const description = (items[i] ?? '').trim().slice(0, 200);
     const amountRaw = (amounts[i] ?? '').trim();
@@ -151,7 +208,13 @@ export async function POST(req: NextRequest) {
     if (!description || !Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) {
       return isForm ? back('problem=line') : NextResponse.json({ error: 'bad_line' }, { status: 400 });
     }
-    lineItems.push({ description, amount });
+    // 🔴 THE RATE IS READ AT THIS ROW'S OWN INDEX, AND NEVER TRUSTED AS IT ARRIVES. lineItems
+    // skips the spare empty rows, so reading the rates afterwards would slide a 5% line onto the
+    // wrong work. Anything that is not one of lib/vat.ts's five keys becomes the standard rate,
+    // which is the highest: a bent value can only ever raise the VAT he charges, never hide it.
+    const rateRaw = (rates[i] ?? '').trim();
+    const rate: VatRateKey = isVatRateKey(rateRaw) ? rateRaw : 'standard';
+    lineItems.push({ description, amount, rate });
   }
   if (lineItems.length === 0) {
     return isForm ? back('problem=line') : NextResponse.json({ error: 'bad_line' }, { status: 400 });
@@ -160,11 +223,74 @@ export async function POST(req: NextRequest) {
     return isForm ? back('problem=lines') : NextResponse.json({ error: 'too_many_lines' }, { status: 400 });
   }
 
+  // ── The VAT on it. Decided from his profile and this job, priced by lib/vat.ts. ─────────────
+  //
+  // 🔴 NULL IS A FAILED READ. It is not "he is not registered", and acting on it as though it
+  // were would put a document in front of his customer with the VAT quietly missing. Nothing has
+  // been saved at this point, so the honest answer is to refuse and let him press it again.
+  const profile = await readVatProfile(user.id);
+  if (!profile) {
+    return isForm ? back('problem=vat') : NextResponse.json({ error: 'vat_unavailable' }, { status: 503 });
+  }
+
+  // The three reverse charge facts are only ever PUT to a VAT registered CIS subcontractor. For
+  // everybody else they are decided here, because for everybody else there is only one answer.
+  const asked: VatFormShape = profile.registered
+    ? (profile.cisSubcontractor ? 'rc' : 'rates')
+    : 'none';
+
+  let facts: Omit<ReverseChargeFacts, 'supplierRegistered'>;
+  if (asked === 'rc') {
+    // 🔴 THE FORM MUST HAVE ACTUALLY ASKED, AND HE MUST HAVE ACTUALLY ANSWERED. A form rendered
+    // before he told us he was a CIS subcontractor, or a post made by hand, carries no answers,
+    // and reading that silence as three noes would charge 20% on the one invoice in this product
+    // that must carry none. Refused, and the fresh form asks him properly.
+    if (vatForm !== 'rc' || !customerVat || !customerCis || !endUser) {
+      return isForm ? back('problem=vatasked') : NextResponse.json({ error: 'vat_answers_missing' }, { status: 400 });
+    }
+    facts = {
+      withinCis: true,
+      customerVatRegistered: customerVat === 'yes',
+      customerCisRegistered: customerCis === 'yes',
+      customerIsEndUser: endUser === 'yes',
+      rateKey: topRate(lineItems),
+    };
+  } else {
+    // ⚠️ AND THE OTHER TWO SHAPES NEED NO SUCH CHECK, WHICH IS WORTH SAYING OUT LOUD. If the form
+    // is older than his profile the worst it can do is arrive with no rates, and a missing rate
+    // becomes the standard one, which is the right default for a registered man and the highest
+    // rate there is. If he has DEREGISTERED since the form was drawn, treatment is 'none' below
+    // and lib/vat.ts strips every rate off every line, which is the only safe answer for a man
+    // who may not charge VAT at all. Neither can produce an invoice that understates it.
+    facts = {
+      withinCis: false,
+      customerVatRegistered: false,
+      customerCisRegistered: false,
+      customerIsEndUser: false,
+      rateKey: topRate(lineItems),
+    };
+  }
+
+  const { treatment } = treatmentFor(profile, facts);
+  const priced = priceInvoice(lineItems, treatment);
+
   // 🔴 THE OWNER IS THE SESSION AND ONLY THE SESSION. Nothing in the request names an account.
   const inv = await createInvoice(user.id, {
     customer_name: customer,
     customer_contact: customerContact,
-    line_items: lineItems,
+    // The priced lines, so the rate that was applied is stored beside the work it was applied to.
+    // A VAT invoice has to show the rate on each line: VAT Regulations 1995 reg 14.
+    line_items: priced.lines.map((li) => ({
+      description: li.description,
+      amount: li.amount,
+      rate: li.rate,
+    })),
+    vat: {
+      treatment: priced.treatment,
+      tax: priced.vat,
+      total: priced.total,
+      reverseChargeVat: priced.reverseChargeVat,
+    },
   });
   if (!inv) {
     // A failed write must not look like a made invoice. Nothing was saved, and the page says so.

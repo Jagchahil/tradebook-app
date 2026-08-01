@@ -63,6 +63,35 @@ type NewPiece = { title: string; trade: string; format: Format; promise: Promise
 
 const BLANK: NewPiece = { title: '', trade: '', format: 'video', promise: 'money', caption: '', source_tag: '' };
 
+// 🔴 WHAT THE CALLBACK IS TRYING TO TELL YOU.
+//
+// /api/connectors/[platform]/callback encodes a distinct reason for every way an OAuth can fail, and
+// until 31 Jul 2026 nothing read a single one of them. It redirected to a page that rendered nothing,
+// so a refusal was indistinguishable from a success: you came back to a normal looking console and
+// believed you were connected. A silent failure is worse than a loud one, because you stop looking.
+//
+// Each reason is turned into the thing to actually go and DO, not a code to google.
+const REASON: Record<string, string> = {
+  disabled: 'The connector layer is switched off. Set CONNECTORS_ENABLED to true on Vercel and redeploy.',
+  not_configured: 'That platform has no keys on Vercel yet.',
+  unknown_platform: 'That is not a platform we have a connector for.',
+  platform_mismatch: 'The answer came back for a different platform than the one that asked. Try again.',
+  bad_state: 'The round trip could not be verified. This is almost always CONNECTOR_STATE_SECRET (or AGENT_SECRET, its fallback) missing on Vercel: with no secret the start signs the state anyway and the callback then refuses every one of them.',
+  no_token: 'The platform accepted the login but handed back no token.',
+  exchange_failed: 'The platform refused to swap the code for a token.',
+  network: 'Could not reach the platform to swap the code for a token.',
+  store_failed: 'The token came back but could not be saved. Check the marketing_connectors table exists.',
+};
+
+function explain(code: string): string {
+  if (REASON[code]) return REASON[code];
+  const http = /^http_(\d{3})$/.exec(code);
+  if (http) {
+    return `The platform refused the token exchange with a ${http[1]}. That is nearly always the redirect URI or the client secret on Vercel not matching what the platform has on file.`;
+  }
+  return `The platform refused it: ${code}`;
+}
+
 export default function HokaPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -76,6 +105,7 @@ export default function HokaPage() {
   const [connEnabled, setConnEnabled] = useState(false);
   const [connOwner, setConnOwner] = useState(false);
   const [connLoaded, setConnLoaded] = useState(false);
+  const [flash, setFlash] = useState<{ ok: boolean; text: string } | null>(null);
 
   const token = useCallback(async () => {
     const { data: s } = await browserSupabase.auth.getSession();
@@ -107,6 +137,33 @@ export default function HokaPage() {
       setConnLoaded(true);
     }
   }, [token]);
+
+  // Read the callback's verdict off the URL once, say it, and take it back out of the address bar so
+  // a refresh does not re-announce a thing that happened ten minutes ago.
+  //
+  // ⚠️ THE DISABLE IS DELIBERATE AND HERE IS THE ARGUMENT, because a bare disable is how a rule
+  // stops meaning anything. The rule is right in general: setState in an effect body costs an extra
+  // render pass, and a chain of them is a real performance bug. This is the one case where it is
+  // the correct pattern rather than a lazy one.
+  //
+  // window.location does not exist on the server, so it cannot be read during render. Moving it
+  // into a lazy useState initialiser (`useState(() => ...)`) reads it on the client and returns
+  // null on the server, which is a HYDRATION MISMATCH: React renders one tree, finds another, and
+  // warns. Trading a warning nobody can fix for one extra render on first paint, on an internal
+  // page one person opens, is the wrong trade.
+  //
+  // It also cannot cascade. The dependency array is empty, so it runs exactly once on mount, and
+  // the state it sets is a dismissable banner nothing else reads.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const good = q.get('connected');
+    const bad = q.get('connect_error');
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (good) setFlash({ ok: true, text: `${CONNECTOR_LABEL[good] || good} is connected.` });
+    else if (bad) setFlash({ ok: false, text: explain(bad) });
+    /* eslint-enable react-hooks/set-state-in-effect */
+    if (good || bad) window.history.replaceState({}, '', window.location.pathname);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -176,6 +233,16 @@ export default function HokaPage() {
           You write it, you approve it, it goes out. Nothing on this page writes a word of copy and
           nothing posts without your yes.
         </p>
+        {flash ? (
+          <div style={{
+            marginTop: 14, padding: '13px 15px', borderRadius: 12, fontSize: 13.2, lineHeight: 1.55, fontWeight: 600,
+            background: flash.ok ? C.greenTint : C.redTint,
+            border: `1px solid ${flash.ok ? '#BEDFCE' : '#F0C8C2'}`,
+            color: flash.ok ? '#0B5C3B' : '#8C2A20',
+          }}>
+            {flash.text}
+          </div>
+        ) : null}
         <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {note ? <span style={{ ...T.small, color: C.green }}>{note}</span> : null}
           {err ? <span style={{ ...T.small, color: C.red }}>{err}</span> : null}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConfirmedTransactionsForRange, getBusinessName, refreshFactsFromDb, preFilingAssurance } from '../../../lib/supabase';
+import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile, refreshFactsFromDb, preFilingAssurance } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
 import { buildQuarterPack, quarterBounds, quarterForDate, renderQuarterPackHtml } from '../../../lib/quarterpack';
 import { packUrl, verifyPackToken } from '../../../lib/packtoken';
@@ -71,9 +71,19 @@ export async function GET(req: NextRequest) {
   // Pull the whole tax year up to this quarter end, so the pack can show the
   // quarter itself and the year to date running position from one fetch.
   const taxYearStart = quarterBounds(startYear, 1).start;
-  const [transactions, businessName] = await Promise.all([
+  const [transactions, businessName, biz] = await Promise.all([
     getConfirmedTransactionsForRange(userId, taxYearStart, bounds.end),
     getBusinessName(userId),
+    // 🔴 WHO HE IS, so the document stops telling a director that his company's turnover puts him
+    // over the Making Tax Digital for Income Tax threshold and that he owes Class 4 National
+    // Insurance on his company's profit. The rule itself lives in lib/quarterpack.ts, never here: a
+    // route that decided what a limited company means would be a second copy of it, and the copy
+    // that drifts is always the one nobody is looking at.
+    //
+    // ⚠️ A FAILED READ IS NOT AN ANSWER. It comes back null, the pack treats null as unknown, and
+    // unknown gets exactly the document it got before this line existed. Withholding a real
+    // obligation from a sole trader because a profile read timed out is the worse failure by far.
+    getBusinessProfile(userId).catch(() => null),
   ]);
 
   // If the fetch hit its 20000-row cap the summary may be short, so flag it and
@@ -83,7 +93,10 @@ export async function GET(req: NextRequest) {
   // approved figures, then compose the one-line assurance that says we just did (naming any overrides).
   await refreshFactsFromDb();
   const finalCheck = await preFilingAssurance();
-  const pack = buildQuarterPack({ transactions, startYear, quarter, businessName, truncated, finalCheck });
+  const pack = buildQuarterPack({
+    transactions, startYear, quarter, businessName, truncated, finalCheck,
+    structure: biz?.businessType ?? null,
+  });
 
   if (sp.get('format') === 'json') {
     return NextResponse.json(pack);

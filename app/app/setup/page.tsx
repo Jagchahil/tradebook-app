@@ -13,7 +13,7 @@ import { TRIAL_DAYS } from '../../../lib/entitlement';
 import { bankFeedOffered, hasBankFeedConfig } from '../../../lib/bankfeed';
 import {
   unanswered, unansweredMtd, household, notHousehold, mtdQuestions, progressIn, askingOrder,
-  type Circumstance, type Persona,
+  writtenInFromSignup, type Circumstance, type Persona,
 } from '../../../lib/circumstances';
 import {
   isStep, isDone, toStep, prevStep, stepNumber, stepCount, progressPct, stepTitle,
@@ -697,7 +697,29 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
 
   // What he told us was TRUE of him. Only 'yes' answers: a no is an answer we are glad to have and
   // is not a relief. Ordered by lib/circumstances.ts, so the biggest is first here too.
-  const said = new Set((rows ?? []).filter((r) => r.answer === 'yes').map((r) => r.key));
+  //
+  // 🔴 AND ONLY THE ONES HE ACTUALLY ANSWERED. THIS SCREEN IS A CONGRATULATION.
+  //
+  // The heading is "Here is what you have just opened up" and the sentence under it says "What you
+  // have done is answer N questions about yourself, and every yes is money most people never claim
+  // because nobody ever asks them". A Landlord signup ticks the property stream on /start, and the
+  // signup reconcile writes `rental: yes` on his behalf before he ever reaches this screen. So the
+  // one man on the product whose rent is his whole business was congratulated for answering a
+  // question he was never shown, and told that nobody ever asks him about it, in the same sentence
+  // where we ask him for a card. Every word of that is false and he is the only person who can see
+  // it. writtenInFromSignup() carries the test, and lib/circumstances.ts carries the reasoning,
+  // because the sentence it recognises is written in lib/supabase.ts and no surface should hold its
+  // own copy of it.
+  //
+  // ⚠️ AND THE EMPTY CASE IS THE RIGHT PLACE FOR HIM TO LAND. If that tick was all we had, this
+  // screen now says we have nothing to look at yet, which is true: he has answered nothing in the
+  // last fifteen minutes. This screen's own rule is that a cheerful frame over nothing is the
+  // product's first lie, and a congratulation for a tick on another page is exactly that.
+  const said = new Set(
+    (rows ?? [])
+      .filter((r) => r.answer === 'yes' && !writtenInFromSignup(r.asked))
+      .map((r) => r.key),
+  );
   const opened = askingOrder().filter((c) => said.has(c.key) && !c.specialCategory && !c.mtd);
   // ⚠️ ONE EXPRESSION, READ BY BOTH HALVES OF THE SCREEN. The reveal branches on it and so does the
   // card, so the card can never be cheerful about a saving the screen above it did not show.

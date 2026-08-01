@@ -221,12 +221,26 @@ interface Row {
 
 // Everything in someone's books that we think is not business money, and that they
 // have not already told us about. We only ever raise it. They decide.
-export function findPersonal(rows: Row[]): MaybePersonal[] {
+//
+// 🔴 ownNames WAS BEING DROPPED ON THE FLOOR, SO THE ONE CHECK THAT DOES NOT GUESS NEVER RAN.
+//
+// looksPersonal takes his own names as a third argument and puts them FIRST, because knowing who he
+// is beats inferring it from the shape of a word. This function called it with two arguments, so the
+// parameter fell back to its empty default and the 'self' check was dead everywhere it mattered:
+// /api/anomalies and /api/personal, the two places that ask him "is this really business money".
+// A transfer to his own account went on being counted as a business cost, which takes money off his
+// taxable profit that should not come off, and that is the direction he never notices because the
+// number moved in his favour.
+//
+// ⚠️ THE ARGUMENT IS OPTIONAL AND DEFAULTS TO NONE, so a caller that has not read his names behaves
+// exactly as it did before. Passing none can only ever raise FEWER rows, never more, so nothing a
+// caller does by omission can cost him a real cost he is entitled to claim.
+export function findPersonal(rows: Row[], ownNames: string[] = []): MaybePersonal[] {
   const out: MaybePersonal[] = [];
   for (const r of rows) {
     // Already marked personal by the user. Nothing to ask.
     if (r.is_personal === true) continue;
-    const hit = looksPersonal(r.vendor, r.description);
+    const hit = looksPersonal(r.vendor, r.description, ownNames);
     if (!hit) continue;
     out.push({
       id: String(r.id ?? ''),

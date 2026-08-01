@@ -28,6 +28,16 @@ console.log('\nBank connect nudge\n');
 ok('offers when the feed works and they have not connected', N.shouldOfferBank(OFFERABLE) === true);
 ok('does NOT offer when they already connected', N.shouldOfferBank(CONNECTED) === false);
 ok('does NOT offer when the feed is not configured', N.shouldOfferBank(OFF) === false);
+
+// 🔴 THE SECOND QUESTION, AND THE ONE THAT WAS GOING UNANSWERED. shouldOfferBank asks whether to
+// offer a bank CONNECTION, which needs a provider. shouldOfferEasierRoute asks whether there is
+// anything better than photographing every till slip, which is true with no provider at all,
+// because the statement importer needs nobody. Both were being answered by the first function, so
+// with `available` false the way out went unnamed on the one channel that reaches him in a van.
+ok('there is always an easier route to name unless he has already connected',
+  N.shouldOfferEasierRoute(OFF) === true && N.shouldOfferEasierRoute(OFFERABLE) === true);
+ok('and none once he has connected, because it is being done for him',
+  N.shouldOfferEasierRoute(CONNECTED) === false);
 ok('does NOT offer when feed is off even if somehow connected', N.shouldOfferBank({ available: false, connected: true }) === false);
 
 // --- busyMessage: OUR caps keep the honest "I am busy" ----------------------
@@ -70,12 +80,20 @@ ok('milestone does not fire on the 4th', N.receiptMilestoneNudge(4, OFFERABLE) =
 ok('milestone does not fire again on the 6th (cannot nag)', N.receiptMilestoneNudge(6, OFFERABLE) === null);
 ok('milestone does not fire on the 50th', N.receiptMilestoneNudge(50, OFFERABLE) === null);
 ok('milestone silent when already connected', N.receiptMilestoneNudge(5, CONNECTED) === null);
-ok('milestone silent when the feed is not configured', N.receiptMilestoneNudge(5, OFF) === null);
+// 🔴 THIS ASSERTION PINNED THE BUG. It read "milestone silent when the feed is not configured",
+// and it was right when the only thing the nudge could say was "connect your bank". Then the
+// fallback was written for exactly the no provider case, and this assertion went on holding the
+// nudge silent so the fallback could never fire. A test that pins a feature shut is the same
+// failure as test/walink.test.mjs pinning the welcome message at a door that had closed.
+ok('🔴 the milestone DOES fire with no provider, and names the statement import',
+  /import a bank statement/i.test(N.receiptMilestoneNudge(5, OFF) || ''));
+ok('and it never names a bank connection when there is no provider to deliver one',
+  !/connect your bank/i.test(N.receiptMilestoneNudge(5, OFF) || ''));
 ok('milestone never fires at zero', N.receiptMilestoneNudge(0, OFFERABLE) === null);
 
 // --- house style ------------------------------------------------------------
 const allCopy = [
-  N.bankOfferLine(),
+  N.bankOfferLine({ available: true, connected: false }),
   N.busyMessage('user_daily_cap', OFFERABLE),
   N.busyMessage('user_daily_cap', CONNECTED),
   N.busyMessage('user_daily_cap', OFF),
@@ -88,9 +106,9 @@ ok('never claims we file or do their tax', !/we will file|we file your|do your t
 // 🔴 31 JULY: the offer is two sentences now, one per side of bankFeedOffered(). 'automatically'
 // was specific to the feed. What this assertion was actually protecting is that the line names HIS
 // benefit rather than our AI cost, and both sides have to keep doing that.
-ok('the offer names the benefit, not our cost', N.bankOfferLine().includes('no daily limit'));
+ok('the offer names the benefit, not our cost', N.bankOfferLine({ available: true, connected: false }).includes('no daily limit'));
 process.env.BANK_FEED_OFFERED = 'true';
-ok('and the bank version still names the benefit it always named', N.bankOfferLine().includes('automatically'));
+ok('and the bank version still names the benefit it always named', N.bankOfferLine({ available: true, connected: false }).includes('automatically'));
 delete process.env.BANK_FEED_OFFERED;
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);

@@ -1,5 +1,30 @@
 import { getPublicInvoice } from '../../../lib/supabase';
 import { A11Y_CSS } from '../../../lib/tokens';
+import { REVERSE_CHARGE_WORDING, formatVrn, isVatRateKey, rateLabel } from '../../../lib/vat';
+
+// THE DOCUMENT. Not a screen: the thing his customer pays from and his customer's accountant
+// checks, opened with no session and no account, months after it was sent.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHAT A UK VAT INVOICE HAS TO CARRY. VAT Regulations 1995 reg 14: the supplier's name,
+// ADDRESS and VAT NUMBER, the invoice number, the tax point, the customer's name, a description
+// of the work, the VAT RATE ON EACH LINE, the total before VAT, the total VAT, and the total
+// including VAT. Until 1 August 2026 this page printed none of the ones in capitals, because
+// nothing selected them: users.address had existed all along and no invoice surface had ever
+// asked for it. So every invoice this product has ever produced was short of fields the law asks
+// for, on the one page where being short of them matters.
+//
+// 🔴 AND vat_treatment === null IS AN INVOICE THAT PREDATES VAT SUPPORT. It prints exactly as it
+// printed on the day he sent it: no rates, no VAT lines, no VAT number. A customer may have paid
+// it and filed it, and a document does not get to change afterwards. 'none' is a different thing
+// and is not null: it is the recorded answer that he was not VAT registered, and a man who is not
+// registered must never show VAT on an invoice at all.
+//
+// 🔴 UNDER THE REVERSE CHARGE THE VAT IS SHOWN AND IS NOT IN THE TOTAL. VATREVCON37100: the
+// figure the customer accounts for "should not be included in the amount shown as total VAT
+// charged". So the total charged is nil, the figure sits in its own block with the wording HMRC
+// accepts, and the amount the customer pays is the total above it. VATA 1994 s55A.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 
 const INK = '#111111';
 const MUTED = '#5B6470';
@@ -36,6 +61,18 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   }
 
   const isPaid = invoice.status === 'paid';
+  // Whether this document is a VAT invoice at all. Null is the old world, 'none' is a man who was
+  // not registered when he raised it, and neither shows a rate, a VAT line or a VAT number.
+  const carriesVat = invoice.vat_treatment === 'charged' || invoice.vat_treatment === 'reverse_charge';
+  const reverseCharge = invoice.vat_treatment === 'reverse_charge';
+  // His address goes on any invoice, VAT or not: it is who he is, and a customer paying a stranger
+  // is entitled to it. The VAT number is different. Printing it on an invoice that shows no VAT
+  // would make a claim about that document, and on a legacy one it would make a claim about a
+  // paper he sent before he had a number at all.
+  const vrn = carriesVat ? formatVrn(invoice.business_vrn) : null;
+  // The tax point is the date of supply, and it is the date the law names on a VAT invoice.
+  const dateLabel = carriesVat ? 'Tax point' : 'Issued';
+  const dateValue = (carriesVat ? invoice.tax_point : null) || invoice.issued_date;
 
   return (
     <main style={{ backgroundColor: OFF_WHITE, color: INK, fontFamily: FONT, minHeight: '100vh', padding: '32px 16px' }}>
@@ -70,6 +107,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <div style={{ minWidth: 180 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>From</div>
             <div style={{ fontSize: 15, fontWeight: 600 }}>{invoice.business_name || 'Lekhio user'}</div>
+            {invoice.business_address ? (
+              <div style={{ fontSize: 14, color: MUTED, marginTop: 2, whiteSpace: 'pre-line' }}>{invoice.business_address}</div>
+            ) : null}
+            {vrn ? <div style={{ fontSize: 14, color: MUTED, marginTop: 4 }}>VAT number {vrn}</div> : null}
             {invoice.business_contact ? <div style={{ fontSize: 14, color: MUTED, marginTop: 2 }}>{invoice.business_contact}</div> : null}
           </div>
           <div style={{ minWidth: 180 }}>
@@ -77,10 +118,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             <div style={{ fontSize: 15, fontWeight: 600 }}>{invoice.customer_name}</div>
             {invoice.customer_contact ? <div style={{ fontSize: 14, color: MUTED, marginTop: 2 }}>{invoice.customer_contact}</div> : null}
           </div>
-          {invoice.issued_date ? (
+          {dateValue ? (
             <div style={{ minWidth: 120 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Issued</div>
-              <div style={{ fontSize: 15 }}>{prettyDate(invoice.issued_date)}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>{dateLabel}</div>
+              <div style={{ fontSize: 15 }}>{prettyDate(dateValue)}</div>
             </div>
           ) : null}
         </div>
@@ -90,14 +131,52 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           {invoice.line_items.map((li, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: `1px solid ${BORDER}` }}>
               <span style={{ fontSize: 15, color: INK, marginRight: 16 }}>{li.description}</span>
-              <span style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap' }}>{gbp(li.amount)}</span>
+              <span style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+                {/* The rate on each line, which reg 14 asks for by name. Absent on a legacy row,
+                    and absent is not the standard rate: it means the invoice was written when the
+                    product had no VAT, so it prints without one. */}
+                {carriesVat && isVatRateKey(li.rate) ? (
+                  <span style={{ fontSize: 13, color: MUTED, whiteSpace: 'nowrap', minWidth: 56, textAlign: 'right' }}>{rateLabel(li.rate)}</span>
+                ) : null}
+                <span style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap' }}>{gbp(li.amount)}</span>
+              </span>
             </div>
           ))}
+          {carriesVat ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0 0' }}>
+                <span style={{ fontSize: 15, color: MUTED }}>Total before VAT</span>
+                <span style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap' }}>{gbp(invoice.subtotal)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 0' }}>
+                <span style={{ fontSize: 15, color: MUTED }}>{reverseCharge ? 'VAT charged' : 'VAT'}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap' }}>{gbp(invoice.tax)}</span>
+              </div>
+            </>
+          ) : null}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 0' }}>
             <span style={{ fontSize: 17, fontWeight: 700 }}>Total</span>
             <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px' }}>{gbp(invoice.total)}</span>
           </div>
         </div>
+
+        {/* 🔴 THE FIGURE THAT IS ON THE DOCUMENT AND NOT IN THE TOTAL. */}
+        {reverseCharge ? (
+          <div style={{ padding: '0 32px 24px' }}>
+            <div style={{ border: `1px solid ${BORDER}`, borderRadius: 12, padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: INK }}>VAT to be accounted for by the customer</span>
+                <span style={{ fontSize: 17, fontWeight: 800, whiteSpace: 'nowrap' }}>{gbp(invoice.reverse_charge_vat)}</span>
+              </div>
+              <p style={{ fontSize: 14, color: INK, lineHeight: 1.6, margin: '10px 0 0' }}>{REVERSE_CHARGE_WORDING}</p>
+              <p style={{ fontSize: 13, color: MUTED, lineHeight: 1.6, margin: '8px 0 0' }}>
+                This VAT is not included in the total above and is not payable to{' '}
+                {invoice.business_name || 'the sender'}. It is the domestic reverse charge for
+                building and construction services.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         {invoice.notes ? (
           <div style={{ padding: '0 32px 24px' }}>

@@ -295,8 +295,11 @@ export const MARKETING_CSS = `
 `;
 
 // ---------- content data ----------
+// 🔴 STEP ONE IS SOMETHING HE CAN DO ON DAY ONE, AND IT USED TO BE "Connect your bank".
+// The bank feed has no provider (TrueLayer declined production authorisation, see lib/bankfeed.ts),
+// so step one was an instruction nobody could follow. All three of these work from signup.
 export const steps = [
-  { n: '1', title: 'Connect your bank', body: 'Every card payment is read, sorted and logged for you. Nothing to type and nothing to file, from the day you sign up.' },
+  { n: '1', title: 'Snap it, say it, or import it', body: 'A photo of a receipt, a line of plain words, or a statement exported straight from your bank. Every route works from the day you sign up.' },
   { n: '2', title: 'Lekhio sorts it', body: 'It reads the receipt, pulls out the total, sorts the category, and logs it. You get a reply to confirm. It even writes your invoices.' },
   { n: '3', title: 'Tax time is already done', body: 'Your income and expenses add up as you go. We prepare your quarterly summary. You approve it. Nothing is sent without you.' },
 ];
@@ -382,7 +385,10 @@ export const fixes = [
   { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'Ask Lekhio and get a straight answer fast, about your own figures. A real person is behind it when you need one.' },
   { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £12.99 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
   { stars: 1, who: 'A self employed driver, reviewing another app', gripe: 'The bank feed kept dropping. Half my month went missing and I had to relink it again and again.', fix: 'Lekhio never leans on a fragile feed. Snap it or text it and it is logged for good. Connecting your bank, when it lands, is a bonus, never a crutch.' },
-  { stars: 2, who: 'A trades subcontractor, reviewing another app', gripe: 'I photographed a receipt and it would not even log it. It just tried to match it to something and gave up.', fix: 'Send a photo and Lekhio reads it and logs the lot, the amount, the VAT, the category, in seconds. No matching, no retyping.' },
+  // ⚠️ NOT "the VAT". We do not read VAT off a receipt: the vision prompt in lib/claude.ts asks for
+  // the merchant, the total, the category and the date, and the word VAT does not appear in it.
+  // This now says what the capture screen says, which is what actually comes back.
+  { stars: 2, who: 'A trades subcontractor, reviewing another app', gripe: 'I photographed a receipt and it would not even log it. It just tried to match it to something and gave up.', fix: 'Send a photo and Lekhio reads it and logs the lot: the shop, the total and the date, in seconds. No matching, no retyping.' },
   { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'They held my own money for weeks with a copy and paste excuse. Never again.', fix: 'Lekhio never holds your money or touches your account. We keep the records, that is all. Your cash is only ever yours.' },
   { stars: 2, who: 'A freelancer, reviewing another app', gripe: 'It talks to me like I am an accountant. I am not. Half of it I do not understand.', fix: 'Plain English, and it opens in your browser. If you can send a text, you can use Lekhio.' },
   { stars: 2, who: 'A self employed cleaner, reviewing another app', gripe: 'Once it auto sorted something wrong, fixing it was a proper faff. I gave up correcting it.', fix: 'Wrong category? Just say "that was fuel, not food" and it is fixed in one line. You are always in charge of every entry.' },
@@ -444,8 +450,13 @@ export const replaces = [
 ];
 
 export const faqs = [
-  { q: 'Do I have to be a tradesperson?', a: 'No. Lekhio is for anyone self employed in the UK. A barber, a driver, a tutor, a freelancer, a plumber. If you keep receipts or send invoices, it is for you.' },
-  { q: 'What is Making Tax Digital?', a: 'From April 2026, HMRC wants self employed people over a certain income to keep digital records and send a short update each quarter instead of one big return. Lekhio keeps those records as you work.' },
+  // ⚠️ THESE TWO ARE EMITTED AS FAQPage JSON-LD ON BOTH / AND /pricing, so they feed Google rich
+  // results. They also used to tell a limited company director two things that are not true of him:
+  // that Lekhio is only for the self employed (a director is not self employed, and /start sells to
+  // him by name), and that MTD for Income Tax is his rule (it is not: a company files corporation
+  // tax and company accounts). Both now branch.
+  { q: 'Do I have to be a tradesperson?', a: 'No. Lekhio is for anyone running their own business or letting property in the UK: sole traders, partnerships, limited company directors and landlords. A barber, a driver, a tutor, a freelancer, a plumber. If you keep receipts or send invoices, it is for you.' },
+  { q: 'What is Making Tax Digital?', a: 'From April 2026, sole traders and landlords with gross qualifying income over £50,000 keep digital records and send HMRC a short update each quarter instead of one big return. The threshold drops to £30,000 in April 2027 and £20,000 in April 2028. Making Tax Digital for Income Tax does not apply to a limited company: a company has corporation tax and company accounts instead. Lekhio keeps the records either way, as you work.' },
   { q: 'Does this mean paying tax four times a year?', a: 'No, that is a common myth. You send four short updates a year, but you still pay your tax on the normal dates.' },
   { q: 'Does Lekhio file my tax for me?', a: filingFaqAnswer() },
   { q: 'What if a receipt is read wrong?', a: 'You see every entry and can fix the amount, the shop, or the category in a tap. Nothing counts until you confirm it.' },
@@ -453,8 +464,12 @@ export const faqs = [
 ];
 
 // The looping hero conversation, pure CSS.
+// 🔴 THE FIRST LINE A VISITOR READS. It renders in HeroPhone on the homepage, so it is the very
+// first sentence of the product anybody sees, and it used to be "Your bank is connected. I sorted
+// 34 payments this week", a feed that has no provider. This is the statement importer, which is
+// real, proven, and reports exactly these counts back at /app/money/import.
 export const chatMessages: { side: 'out' | 'in'; text: string; image?: string }[] = [
-  { side: 'in', text: 'Your bank is connected. I sorted 34 payments this week ✅' },
+  { side: 'in', text: 'Statement read. 62 payments sorted, 3 for you to check ✅' },
   { side: 'out', text: 'how much have I saved this year?' },
   { side: 'in', text: "£1,390 in reliefs so far 💷" },
   { side: 'in', text: 'Use of home, mileage, a pension move. All legit, your call.' },

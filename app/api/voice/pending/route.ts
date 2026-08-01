@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   // First, reap any note that has gone stale (mini was down when it arrived, or died mid-transcription):
   // apologise to the customer so they are never left on a silent "writing it up now". This runs whenever
-  // the mini is polling, which — thanks to the webhook's liveness check — is exactly when there is anyone
+  // the mini is polling, which, thanks to the webhook's liveness check, is exactly when there is anyone
   // to say sorry to. Kept off the response path: the mini gets its job without waiting on the apologies.
   const stale = await reapStaleVoiceJobs();
   for (const s of stale) {

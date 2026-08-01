@@ -22,6 +22,14 @@
 //   5. A ROUTE THAT TRUSTS THE BROWSER. Both new routes take the account from the session and
 //      only the session, and both have a row in lib/gate.ts.
 //
+//   6. 🔴 THE WRONG VAT ON A DOCUMENT ANOTHER MAN PAYS FROM (1 August 2026). The commonest
+//      invoice this audience sends is a VAT registered subcontractor billing a main contractor,
+//      and on that one he charges NO VAT: the CIS domestic reverse charge, VATA 1994 s55A. So
+//      section 9 attacks the three ways this ships wrong. Adding 20% to that invoice. Showing
+//      VAT on the invoice of a man who is not registered, which is an offence. And growing a VAT
+//      block on an invoice raised before any of this existed, which rewrites a paper a customer
+//      has already been sent. The arithmetic runs against the real lib/vat.ts.
+//
 // Run: node test/invoicesweb.test.mjs
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
@@ -73,9 +81,37 @@ function stageWaintents() {
   return import(pathToFileURL(path.join(stage, 'waintents.ts')).href);
 }
 
+// lib/vat.ts is import free for the same stated reason, so the REAL VAT arithmetic is on the
+// bench too. Nothing in section 9 works out a figure of its own.
+function stageVat() {
+  const stage = mkdtempSync(path.join(tmpdir(), 'invoicevat-'));
+  writeFileSync(path.join(stage, 'vat.ts'), read('lib/vat.ts'));
+  return import(pathToFileURL(path.join(stage, 'vat.ts')).href);
+}
+
+// Remove a balanced `{cond ? ( ... ) : null}` block from a page, so what is left is what a man
+// who fails that condition actually gets. Used to prove that a customer who is not VAT registered
+// has no VAT on his form at all, rather than merely that the guard is written somewhere.
+function stripGuarded(src, opener) {
+  let out = src;
+  for (;;) {
+    const at = out.indexOf(opener);
+    if (at === -1) return out;
+    let depth = 0;
+    let end = out.length - 1;
+    for (let i = at; i < out.length; i += 1) {
+      if (out[i] === '{') depth += 1;
+      else if (out[i] === '}') { depth -= 1; if (depth === 0) { end = i; break; } }
+    }
+    out = out.slice(0, at) + out.slice(end + 1);
+  }
+}
+
 const pageList = read('app/app/invoices/page.tsx');
 const pageNew = read('app/app/invoices/new/page.tsx');
 const pageDetail = read('app/app/invoice/page.tsx');
+const pagePublic = read('app/invoice/[id]/page.tsx');
+const libEmail = read('lib/email.ts');
 const pageProof = read('app/app/proof-of-income/page.tsx');
 const pageShare = read('app/app/share-books/page.tsx');
 const routeInvoices = read('app/api/invoices/route.ts');
@@ -561,7 +597,221 @@ ok('🔴 app/api/share-books has a gate decision and it is always, his records b
   G.ruleFor('app/api/share-books') === 'always');
 
 // ---------------------------------------------------------------------------------------------
-// 9. THE NAV, AND THE HOUSE RULES ACROSS THE WHOLE SURFACE.
+// 🔴 9. VAT ON AN INVOICE. Charged, not charged, and the one that says so on its face.
+// ---------------------------------------------------------------------------------------------
+const V = await stageVat();
+
+// 9a. THE ARITHMETIC, THROUGH THE REAL MODULE. Nothing below computes a figure of its own, for
+// the same reason the surfaces do not: there is one place VAT is worked out and this is not it.
+{
+  const REGISTERED_CIS = {
+    registered: true, vrn: '123456789', registeredOn: '2024-04-06', scheme: 'standard',
+    flatRatePercent: null, flatRateFirstYear: false, cisSubcontractor: true, deregisteredOn: null,
+  };
+  const NOT_REGISTERED = { ...REGISTERED_CIS, registered: false, vrn: null, cisSubcontractor: false };
+  const lines = [{ description: 'Bathroom rewire', amount: 450, rate: 'standard' }];
+  // What the three questions on the form come back as when he is billing a main contractor.
+  const mainContractor = {
+    withinCis: true, customerVatRegistered: true, customerCisRegistered: true,
+    customerIsEndUser: false, rateKey: 'standard',
+  };
+
+  const rc = V.treatmentFor(REGISTERED_CIS, mainContractor);
+  ok('🔴 A VAT REGISTERED SUB BILLING A VAT AND CIS REGISTERED CONTRACTOR REVERSE CHARGES',
+    rc.treatment === 'reverse_charge');
+
+  const priced = V.priceInvoice(lines, rc.treatment);
+  ok('🔴 HE CHARGES NOTHING: the VAT on that invoice is zero', priced.vat === 0);
+  ok('🔴 THE TOTAL EQUALS THE SUBTOTAL, to the penny',
+    priced.total === priced.subtotal && priced.total === 450);
+  ok('🔴 AND THE CUSTOMER\'S VAT IS SHOWN, NOT ADDED. VATREVCON37100',
+    priced.reverseChargeVat === 90 && priced.total !== priced.subtotal + priced.reverseChargeVat);
+  ok('the invoice carries the wording HMRC accepts, and it names the reverse charge',
+    priced.wording === V.REVERSE_CHARGE_WORDING && /reverse charge/i.test(priced.wording)
+    && /55A/.test(priced.wording));
+
+  // The end user answer on its own is what turns it back into an ordinary VAT invoice, which is
+  // exactly why the form asks it rather than inferring it from anything.
+  const endUser = V.treatmentFor(REGISTERED_CIS, { ...mainContractor, customerIsEndUser: true });
+  const endUserPriced = V.priceInvoice(lines, endUser.treatment);
+  ok('🔴 one written word from the customer flips it: an end user is charged VAT the normal way',
+    endUser.treatment === 'charged' && endUserPriced.vat === 90 && endUserPriced.total === 540
+    && endUserPriced.reverseChargeVat === 0);
+
+  ok('a customer who is not VAT registered is charged the normal way',
+    V.treatmentFor(REGISTERED_CIS, { ...mainContractor, customerVatRegistered: false }).treatment === 'charged');
+  ok('a customer who is not CIS registered is charged the normal way',
+    V.treatmentFor(REGISTERED_CIS, { ...mainContractor, customerCisRegistered: false }).treatment === 'charged');
+  ok('zero rated work, a new build, stays outside the reverse charge',
+    V.treatmentFor(REGISTERED_CIS, { ...mainContractor, rateKey: 'zero' }).treatment === 'charged');
+
+  // 🔴 THE MAN WHO IS NOT REGISTERED. Charging VAT when you are not registered is an offence, so
+  // there is nothing to decide here and the form never asks him anything.
+  const plain = V.treatmentFor(NOT_REGISTERED, {
+    withinCis: false, customerVatRegistered: false, customerCisRegistered: false,
+    customerIsEndUser: false, rateKey: 'standard',
+  });
+  const plainPriced = V.priceInvoice(lines, plain.treatment);
+  ok('🔴 AN UNREGISTERED MAN\'S INVOICE HAS NO VAT ON IT AT ALL',
+    plain.treatment === 'none' && plainPriced.vat === 0 && plainPriced.reverseChargeVat === 0
+    && plainPriced.total === plainPriced.subtotal);
+  ok('🔴 and no rate is stored against his work that could be rendered as one later',
+    plainPriced.lines.every((li) => li.rate === 'outside'));
+}
+
+// 9b. THE ROUTE. It decides from facts, prices through lib/vat, and refuses to guess.
+ok('🔴 THE VAT PROFILE IS READ, THROUGH THE LIB, FOR THE SESSION USER',
+  /readVatProfile\(user\.id\)/.test(routeInvoices));
+ok('🔴 A FAILED PROFILE READ IS REFUSED, NEVER TREATED AS "HE IS NOT REGISTERED"',
+  /if \(!profile\) \{/.test(routeInvoices) && /problem=vat'\)/.test(routeInvoices)
+  && /vat_unavailable/.test(routeInvoices));
+ok('the treatment comes from treatmentFor and the figures from priceInvoice',
+  /treatmentFor\(profile, facts\)/.test(routeInvoices)
+  && /priceInvoice\(lineItems, treatment\)/.test(routeInvoices));
+ok('🔴 THE ROUTE WORKS OUT NO VAT OF ITS OWN: no rate, no gross up, anywhere in it',
+  !/\*\s*0\.2|\*\s*1\.2|\/\s*1\.2|\*\s*0\.05|20\s*\/\s*100/.test(codeOnly(routeInvoices)));
+ok('🔴 the rate is validated with isVatRateKey and read at its own row\'s index',
+  /const rateRaw = \(rates\[i\] \?\? ''\)\.trim\(\);/.test(routeInvoices)
+  && /isVatRateKey\(rateRaw\) \? rateRaw : 'standard'/.test(routeInvoices));
+ok('🔴 the three reverse charge answers are only ever asked of a registered CIS subcontractor',
+  /profile\.registered\s*\n?\s*\? \(profile\.cisSubcontractor \? 'rc' : 'rates'\)/.test(routeInvoices));
+ok('🔴 and silence is refused, never read as three noes',
+  /vatForm !== 'rc' \|\| !customerVat \|\| !customerCis \|\| !endUser/.test(routeInvoices)
+  && /problem=vatasked/.test(routeInvoices));
+ok('the priced figures are handed to createInvoice whole, none of them reworked',
+  /treatment: priced\.treatment/.test(routeInvoices) && /tax: priced\.vat/.test(routeInvoices)
+  && /total: priced\.total/.test(routeInvoices)
+  && /reverseChargeVat: priced\.reverseChargeVat/.test(routeInvoices));
+ok('and the rate is stored beside the work it was applied to, reg 14',
+  /line_items: priced\.lines\.map/.test(routeInvoices) && /rate: li\.rate/.test(routeInvoices));
+
+// 9c. THE FORM. A rate picker with no script, three questions for one man, and nothing for the rest.
+{
+  const form = pageNew.slice(
+    pageNew.indexOf('<form action="/api/invoices" method="post">'),
+    pageNew.indexOf('</form>', pageNew.indexOf('<form action="/api/invoices" method="post">')),
+  );
+  const unregistered = codeOnly(
+    stripGuarded(stripGuarded(form, '{registered ? ('), '{asksReverseCharge ? ('),
+  );
+  ok('🔴 THE FORM A MAN WHO IS NOT VAT REGISTERED FILLS IN SAYS NOTHING ABOUT VAT',
+    unregistered.length > 400 && !/VAT/.test(unregistered));
+  ok('🔴 no rate box and no questions about his customer reach him either',
+    !/name="rate"/.test(unregistered)
+    && !/customer_vat|customer_cis|end_user/.test(unregistered));
+}
+ok('🔴 the rate picker is a plain server rendered select, not a live widget',
+  /\{registered \? \(\s*<select/.test(pageNew)
+  && /name="rate"/.test(pageNew) && /defaultValue="standard"/.test(pageNew));
+ok('its labels come from lib/vat rateLabel, so they cannot drift from the arithmetic',
+  /rateLabel\(key\)/.test(pageNew) && !/'20%'|"20%"/.test(pageNew));
+ok('🔴 the three questions are drawn only for a VAT registered CIS subcontractor',
+  /const asksReverseCharge = registered && Boolean\(vatProfile\?\.cisSubcontractor\)/.test(pageNew)
+  && /\{asksReverseCharge \? \(/.test(pageNew));
+ok('they are the three the law turns on, in a man\'s own words',
+  /Is your customer VAT registered\?/.test(pageNew)
+  && /Is he registered for CIS\?/.test(pageNew)
+  && /Has he told you in writing that he is the end user\?/.test(pageNew));
+ok('each one takes yes or no and neither can be left unsaid',
+  (pageNew.match(/name: '(customer_vat|customer_cis|end_user)'/g) || []).length === 3
+  && (pageNew.match(/type="radio"/g) || []).length === 2
+  && /value="yes" required/.test(pageNew) && /value="no" required/.test(pageNew));
+ok('the outcome is explained in lib/vat\'s own words, not a second copy of the rule',
+  /reverseChargeApplies\(\{/.test(pageNew) && /\{rcVerdict\.because\}/.test(pageNew));
+ok('🔴 a failed VAT read draws NO FORM, rather than one that would make the wrong invoice',
+  /const vatUnknown = !locked && vatProfile === null/.test(pageNew)
+  && /\) : vatUnknown \? \(/.test(pageNew)
+  && /could not check your VAT position just now/.test(pageNew));
+ok('the form says which questions it asked, so a stale one cannot be read as answers',
+  /<input type="hidden" name="vatform" value=\{vatFormShape\} \/>/.test(pageNew));
+ok('and it is still two forms on the page, the invoice and the locked state\'s checkout',
+  (pageNew.match(/<form action="/g) || []).length === 2);
+
+// 9d. THE DETAIL VIEW. Totals when there is VAT, nothing when there is not, and the old ones
+// exactly as they were.
+ok('🔴 A LEGACY INVOICE (vat_treatment null) AND AN UNREGISTERED MAN\'S (none) DRAW NO VAT BLOCK',
+  /const carriesVat = inv\?\.vat_treatment === 'charged' \|\| inv\?\.vat_treatment === 'reverse_charge';/.test(pageDetail));
+ok('the before VAT line is behind that gate, and the VAT line behind charged',
+  /\{carriesVat \? \(\s*<li/.test(pageDetail)
+  && /\{inv\.vat_treatment === 'charged' \? \(/.test(pageDetail));
+ok('🔴 the reverse charge figure is its own block, outside the run of totals',
+  /\{inv\.vat_treatment === 'reverse_charge' \? \(/.test(pageDetail)
+  && /\{gbp2\(inv\.reverse_charge_vat\)\}/.test(pageDetail));
+ok('🔴 and the page says plainly that it is not in the total and not owed to him',
+  /not part of the \{gbp2\(inv\.total\)\} above and it is\s*\n?\s*not money owed to you/.test(pageDetail));
+ok('the wording is read from lib/vat, never retyped on a screen',
+  /\{REVERSE_CHARGE_WORDING\}/.test(pageDetail)
+  && !/Section 55A applies/.test(codeOnly(pageDetail)));
+ok('the detail page still ships no client script',
+  !/'use client'|onClick|onChange|useState|<script/.test(pageDetail));
+
+// 9e. THE PUBLIC DOCUMENT. The one an accountant checks, and the one that has to be complete.
+ok('🔴 THE SUPPLIER\'S ADDRESS IS PRINTED. VAT Regulations 1995 reg 14',
+  /\{invoice\.business_address\}/.test(pagePublic));
+ok('🔴 AND HIS VAT NUMBER, FORMATTED BY lib/vat, on an invoice that carries VAT',
+  /const vrn = carriesVat \? formatVrn\(invoice\.business_vrn\) : null/.test(pagePublic)
+  && /VAT number \{vrn\}/.test(pagePublic));
+ok('the tax point is named as the tax point on a VAT invoice, and Issued on anything else',
+  /const dateLabel = carriesVat \? 'Tax point' : 'Issued'/.test(pagePublic)
+  && /invoice\.tax_point/.test(pagePublic));
+ok('🔴 the VAT rate is shown on each line, and never invented for a legacy row',
+  /carriesVat && isVatRateKey\(li\.rate\) \?/.test(pagePublic) && /rateLabel\(li\.rate\)/.test(pagePublic));
+ok('the total before VAT, the total VAT and the total including it are all on the document',
+  /Total before VAT/.test(pagePublic) && /\{gbp\(invoice\.subtotal\)\}/.test(pagePublic)
+  && /\{gbp\(invoice\.tax\)\}/.test(pagePublic) && /\{gbp\(invoice\.total\)\}/.test(pagePublic));
+ok('🔴 THE REVERSE CHARGE WORDING IS ON THE PUBLIC INVOICE',
+  /\{REVERSE_CHARGE_WORDING\}/.test(pagePublic)
+  && /REVERSE_CHARGE_WORDING.*from '\.\.\/\.\.\/\.\.\/lib\/vat'|from '\.\.\/\.\.\/\.\.\/lib\/vat'/.test(pagePublic)
+  && !/Section 55A applies/.test(codeOnly(pagePublic)));
+ok('🔴 with the figure the customer accounts for, said not to be in the total',
+  /\{gbp\(invoice\.reverse_charge_vat\)\}/.test(pagePublic)
+  && /not included in the total above/.test(pagePublic));
+ok('🔴 A LEGACY INVOICE PRINTS AS IT PRINTED: every VAT part of the document is behind carriesVat',
+  /const carriesVat = invoice\.vat_treatment === 'charged' \|\| invoice\.vat_treatment === 'reverse_charge';/.test(pagePublic)
+  && /const reverseCharge = invoice\.vat_treatment === 'reverse_charge';/.test(pagePublic));
+ok('🔴 the document computes nothing: every figure comes off the row',
+  !/invoice\.subtotal\s*\+|invoice\.tax\s*\+|\*\s*0\.2|\*\s*1\.2/.test(codeOnly(pagePublic)));
+ok('the public page still ships no client script',
+  !/'use client'|onClick|onChange|useState|<script/.test(pagePublic));
+
+// 9f. THE EMAIL. It may not state a total the document disagrees with.
+ok('the VAT figures are OPTIONAL on InvoiceEmail, so the WhatsApp caller keeps compiling',
+  /vatTreatment\?: 'none' \| 'charged' \| 'reverse_charge' \| null;/.test(libEmail)
+  && /subtotal\?: number \| null;/.test(libEmail)
+  && /reverseChargeVat\?: number \| null;/.test(libEmail));
+ok('a charged invoice names the work and the VAT separately, so the totals agree',
+  /for the work and/.test(libEmail) && /poundsFromNumber\(opts\.vat \?\? 0\)/.test(libEmail));
+ok('🔴 under the reverse charge it says NO VAT HAS BEEN CHARGED and who accounts for it',
+  /No VAT has been charged on this invoice/.test(libEmail)
+  && /of VAT is yours to account/.test(libEmail) && /for to HMRC\./.test(libEmail)
+  && /It is not part of the \$\{total\}/.test(libEmail));
+ok('and the wording is imported from lib/vat rather than typed a second time',
+  /import \{ REVERSE_CHARGE_WORDING \} from '\.\/vat'/.test(libEmail)
+  && !/Section 55A applies/.test(codeOnly(libEmail)));
+ok('an invoice with no VAT sends exactly the email it always sent',
+  /let vatLine = '';/.test(libEmail) && /opts\.vatTreatment === 'charged'/.test(libEmail));
+
+// 9g. THE WORDS. A demand for payment names the figure on the document, to the penny.
+{
+  const ctx = { customer: 'Dave', number: 'INV-0012', total: 450, daysSinceIssued: 6, daysLate: 45, link: 'https://x/invoice/1' };
+  ok('a whole pound total is still whole pounds, so the two chasers stay one voice',
+    W.chaserDraft('polite', ctx).includes('for £450,')
+    && W.chaserDraft('polite', ctx) === WA.chaseMessage('Dave', 'INV-0012', 450, 6, 'https://x/invoice/1'));
+  ok('🔴 BUT £127 OF WORK PLUS VAT IS £152.40, AND THE CHASER SAYS £152.40',
+    ['polite', 'firm', 'final'].every((t) => W.chaserDraft(t, { ...ctx, total: 152.4 }).includes('£152.40')));
+  ok('🔴 never £152, which invites a payment 40p short and an invoice that stays late',
+    !/£152\b(?!\.)/.test(W.chaserDraft('firm', { ...ctx, total: 152.4 })));
+  ok('the summary line above the list stays in whole pounds: nobody pays against a summary',
+    W.owedLine([{ ...mk({}), total: 152.4 }], TODAY) === '£152 is owed to you, and all of it is late.');
+  ok('🔴 and it adds totals only, so reverse charge VAT can never become money owed to him',
+    !/reverse|reverseChargeVat|vat/i.test(read('app/app/invoices/words.ts').slice(
+      read('app/app/invoices/words.ts').indexOf('export function owedLine'),
+      read('app/app/invoices/words.ts').indexOf('---- the chaser drafts'),
+    )));
+}
+
+// ---------------------------------------------------------------------------------------------
+// 10. THE NAV, AND THE HOUSE RULES ACROSS THE WHOLE SURFACE.
 // ---------------------------------------------------------------------------------------------
 const sections = nav.slice(nav.indexOf('export const SECTIONS'), nav.indexOf('export function AppNav'));
 ok('the nav has an Invoices section with all four doors',
@@ -576,6 +826,7 @@ ok('the detail page still lights up Invoices in the nav', /<AppNav current="\/ap
 for (const [name, src] of [
   ['list', pageList], ['detail', pageDetail], ['new', pageNew], ['proof', pageProof],
   ['share page', pageShare], ['invoices route', routeInvoices], ['share route', routeShare],
+  ['public invoice', pagePublic], ['words', read('app/app/invoices/words.ts')],
 ]) {
   ok(`${name}: no em or en dash anywhere in it`, !/[—–]/.test(src));
   ok(`${name}: never writes the rival domain`, !/lekhio\.com/.test(src));

@@ -56,8 +56,19 @@ const REDIRECT_URI =
 // a customer". Only the exact string 'true' switches it on, read at call time so a redeploy is
 // not needed for tests, and the default is off, which is the honest state today.
 //
-// It gates ONLY the offering of new connections: the setup bank step, /api/bank/connect and
-// /api/bank/institutions. The sync engine and every existing connection are untouched by it.
+// It gates ONLY the offering of new connections. The sync engine and every existing connection are
+// untouched by it, and no message is ever silenced by it: a sentence swaps, a send never stops.
+//
+// ⚠️ AND IT IS READ IN MORE PLACES THAN THE THREE THIS USED TO LIST, so the blast radius lives here
+// rather than in whoever remembers it. The doors: the setup bank step, /api/bank/connect and
+// /api/bank/institutions. The screens: the empty states across /app, swept in full by
+// test/frontdoor.test.mjs. And the two channels that reach him when he is NOT looking at a screen,
+// which were the last to be covered: lib/banknudge.ts (the WhatsApp reply when his daily AI
+// allowance runs out, and the line after his fifth receipt) and lib/trialnudge.ts (the one email of
+// the whole trial). Neither of those two may import this module, because their suites load them
+// through Node's type stripping and it cannot resolve an extensionless relative import, so each
+// keeps its own read of BANK_FEED_OFFERED and test/wave9_nudges.test.mjs pins the three reads
+// against each other.
 export function bankFeedOffered(): boolean {
   return process.env.BANK_FEED_OFFERED === 'true';
 }

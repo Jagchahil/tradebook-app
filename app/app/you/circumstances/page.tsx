@@ -4,8 +4,8 @@ import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { readCircumstances, getBusinessProfile } from '../../../../lib/supabase';
 import {
-  household, notHousehold, mtdQuestions, unanswered, unansweredMtd, progressIn,
-  type Circumstance, type Persona,
+  household, notHousehold, mtdQuestions, unanswered, unansweredMtd, progressIn, appliesTo,
+  writtenInFromSignup, type Circumstance, type Persona,
 } from '../../../../lib/circumstances';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
@@ -60,21 +60,73 @@ function claimantLine(c: Circumstance): string | null {
 
 // What his stored answer reads as. Yes and no get plain words; anything longer came in over
 // WhatsApp in his own words and is shown as he gave it, never paraphrased.
-function saidLine(answer: string): string {
+//
+// 🔴 EXCEPT WHEN WE WROTE THE ANSWER IN FOR HIM, WHICH IS NOT THE SAME THING AND MUST NOT READ AS
+// IF IT WERE. A Landlord signup ticks the property stream on /start and the signup reconcile writes
+// `rental: yes` on his behalf. He never saw the rental question, so "You said yes" is us telling a
+// man he answered something he was never shown, on the page whose whole job is to be the record of
+// what he told us. lib/circumstances.ts owns the test for it, because the sentence it recognises is
+// written in lib/supabase.ts and neither surface should be holding its own copy.
+function saidLine(answer: string, asked: string | null): string {
+  if (writtenInFromSignup(asked)) {
+    return answer === 'no'
+      ? 'You told us this when you signed up on the website. You have not been asked it here.'
+      : 'You told us this when you signed up on the website, so we have put it down for you. You have not been asked it here.';
+  }
   if (answer === 'yes') return 'You said yes.';
   if (answer === 'no') return 'You said no.';
   if (answer === 'skip') return 'You left this one.';
   return `You told us: ${answer}`;
 }
 
-function QuestionCard({ q, current }: { q: Circumstance; current: string | null }) {
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE RESOLUTION. THE ROW STILL COUNTS. THE PROMISE DOES NOT GET SHOWN.
+//
+// A question can be a RECORD and a PROMISE at once, and on 31 July those two came apart. `incomes`
+// stopped us ASKING a landlord what he did before he went self employed, because the `why` under
+// that question offers an ITA 2007 s72 early trade loss carried back against his old wages and a
+// cheque from HMRC, and a property business loss carries forward against future profits of the same
+// letting business and nowhere else. But a man who ANSWERED it in June, before the filter existed,
+// is still drawn his answer here, with that promise sitting underneath it.
+//
+// The two halves pull opposite ways and both of them are right:
+//
+//   THE ROW IS A RECORD, AND A RECORD OF WHAT HE TOLD US DOES NOT EVAPORATE. progressIn() counts
+//   an answer he gave even when the question would not be asked today, and it says so on the line
+//   that does it. He answered. Deleting the row, or dropping it out of "3 answered", would be the
+//   product quietly editing his own history because our understanding of him improved. It would
+//   also take away his only way to correct it, and people do incorporate, and do sell the van.
+//
+//   THE `why` IS A PROMISE, AND A PROMISE THAT IS NOT TRUE OF HIM MAY NOT BE PUT IN FRONT OF HIM.
+//   It is not a footnote he can weigh. It is us naming money and telling him it is his.
+//
+// SO: THE ROW STAYS, DRAWN AND CHANGEABLE AND COUNTED. THE PROMISE IS WITHHELD AND SAID PLAINLY
+// INSTEAD. Nothing is added to the screen (doc 103): one sentence stands where another stood, and
+// he is left with the truth in the place he would have read the promise.
+//
+// ⚠️ THE REPLACEMENT NAMES NO AXIS. appliesTo() answers one question, "is this for him", and does
+// not say whether it was refused for how he trades or for whether he trades at all. Guessing which
+// on a surface would be a second copy of a rule that lives in the module, and it is the copy that
+// drifts. The sentence is true either way and it does not pretend to know more than we asked.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const NOT_HIS =
+  'This one does not apply to a business like yours. We are not going to tell you what it might have '
+  + 'been worth, because it would not be true of you. Your answer stays on your record, and you can '
+  + 'change it here whenever you like.';
+
+function QuestionCard({ q, current, asked, mine }: {
+  q: Circumstance;
+  current: string | null;
+  asked: string | null;
+  mine: boolean;
+}) {
   const whose = claimantLine(q);
   return (
     <div style={S.q}>
       <p style={S.ask}>{q.ask}</p>
-      <p style={S.why}>{q.why}</p>
-      {whose ? <p style={S.whose}>{whose}</p> : null}
-      {current !== null ? <p style={S.said}>{saidLine(current)}</p> : null}
+      {mine ? <p style={S.why}>{q.why}</p> : <p style={S.notHis}>{NOT_HIS}</p>}
+      {mine && whose ? <p style={S.whose}>{whose}</p> : null}
+      {current !== null ? <p style={S.said}>{saidLine(current, asked)}</p> : null}
       <div style={S.answers}>
         {(['yes', 'no'] as const).map((a) => {
           const on = current === a;
@@ -107,14 +159,19 @@ function Group({
   blurb: string;
   group: Circumstance[];
   open: Set<string>;
-  rows: Array<{ key: string; answer: string }>;
+  // `asked` is the verbatim exhibit saveCircumstance stored beside his answer. It is optional so
+  // that a caller holding only keys and answers still type checks, and progressIn() only ever
+  // reads the two it has always read.
+  rows: Array<{ key: string; answer: string; asked?: string | null }>;
   who: Persona;
 }) {
   const given = new Map(rows.map((r) => [r.key, r.answer]));
+  const exhibit = new Map(rows.map((r) => [r.key, r.asked ?? null]));
   // The persona keeps the denominator honest, both halves of it: a question lib/circumstances.ts
   // refuses for how he trades, or for whether he trades at all, is not "waiting for him", so it
   // never counts against him here. An answer he has already given stays drawn and changeable
-  // whatever we now know about him, because the record is his.
+  // whatever we now know about him, because the record is his. What it does NOT keep is the
+  // promise: see NOT_HIS above for the row that counts while its `why` is withheld.
   const { answered, askable } = progressIn(group, rows, who);
   const drawable = group.filter((c) => open.has(c.key) || given.has(c.key));
 
@@ -128,7 +185,13 @@ function Group({
       ) : (
         <div style={S.stack}>
           {drawable.map((q) => (
-            <QuestionCard key={q.key} q={q} current={given.get(q.key) ?? null} />
+            <QuestionCard
+              key={q.key}
+              q={q}
+              current={given.get(q.key) ?? null}
+              asked={exhibit.get(q.key) ?? null}
+              mine={appliesTo(q, who)}
+            />
           ))}
         </div>
       )}
@@ -258,6 +321,9 @@ const S: Record<string, React.CSSProperties> = {
   q: { border: `1px solid ${LINE}`, borderRadius: RADIUS.md, padding: 15, background: PANEL },
   ask: { fontSize: TYPE.strong, lineHeight: 1.45, fontWeight: 700, margin: '0 0 7px' },
   why: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: 0 },
+  // Deliberately the same weight and colour as `why`, not a warning. It is not an alarm, it is the
+  // plain sentence that stands where the promise would have been.
+  notHis: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: 0 },
   whose: { fontSize: TYPE.note, lineHeight: 1.5, color: RIVER_DEEP, background: RIVER_TINT, borderRadius: RADIUS.sm, padding: '9px 11px', margin: '10px 0 0' },
   said: { fontSize: TYPE.note, fontWeight: 700, color: INK, margin: '10px 0 0' },
   answers: { display: 'flex', gap: SPACE.xs, marginTop: 13 },

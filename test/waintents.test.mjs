@@ -450,5 +450,41 @@ ok('no goals answer invites one', /my goal is/.test(gb));
     return !/\b(10|18|26)\b/.test(fn.slice(0, fn.indexOf('\n}')));
   })());
 }
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 WHICH DOOR HIS WORDS ACTUALLY REACH. Moved 1 August 2026, on Jag's call.
+//
+// matchUseOfHomeElection was tested EIGHTEEN LINES AND NINE BRANCHES below isHomeOffice in the one
+// else-if chain in app/api/whatsapp/route.ts. HOMEOFFICE_RE carries every phrase in HOME_WORDS
+// except "home as office", so every phrase this suite asserts as an election was eaten by the
+// transaction door before the election matcher was ever called. That door writes a row into
+// expenses, which is the door that double counts against the election.
+//
+// So the matcher was right and unreachable, which is the worst combination: green tests, dead code,
+// and a man deducted twice. The assertions below are on the ORDER in the route, not on the
+// matchers, because the matchers were never the problem.
+// ---------------------------------------------------------------------------------------------
+const wroute = readFileSync(path.resolve(here, '../app/api/whatsapp/route.ts'), 'utf8');
+const iElection = wroute.indexOf('} else if (matchUseOfHomeElection(text)) {');
+const iTransaction = wroute.indexOf('} else if (isHomeOffice(text)) {');
+ok('both home working doors are still in the chain', iElection > 0 && iTransaction > 0);
+ok('🔴 the ELECTION door is tested before the transaction door', iElection < iTransaction);
+ok('the election branch appears exactly once, so the old dead one is gone',
+  (wroute.match(/\} else if \(matchUseOfHomeElection\(text\)\) \{/g) || []).length === 1);
+ok('and the transaction door is still reachable, for a question or a pound sign',
+  (wroute.match(/\} else if \(isHomeOffice\(text\)\) \{/g) || []).length === 1);
+
+// The phrases that now reach the election. Each was reaching the transaction door before the move.
+for (const phrase of ['claim use of home', 'claim use of home, 30 hours a month',
+  'use of home 25 hours each month', 'start claiming working from home', 'yes claim home office']) {
+  ok(`"${phrase}" is an election, and now actually gets there`, W.matchUseOfHomeElection(phrase) !== null);
+}
+
+// ---------------------------------------------------------------------------------------------
+// A DIRECTOR'S "WHAT DO I OWE" CARRIES THE SENTENCE THAT EXPLAINS THE SMALLER NUMBER.
+// ---------------------------------------------------------------------------------------------
+ok('🔴 the owe answer renders setAsideBasisLine, so WhatsApp cannot show a smaller figure bare',
+  /setAsideBasisLine/.test(wroute) && /oweAnswer\(tax\.setAside, tax\.projected\)/.test(wroute));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

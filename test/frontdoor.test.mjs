@@ -214,17 +214,40 @@ ok('every action on it is a form post or a plain link',
   (connect.match(/method="post"/g) ?? []).length >= 2);
 
 // ---------------------------------------------------------------------------------------------
-// 🔴 STEP ONE IS CONNECTING THE BANK.
+// 🔴 STEP ONE IS SOMETHING HE CAN DO ON THE DAY HE SIGNS UP.
 //
-// The shared "how it works" list and the homepage are where a stranger decides what this product
-// is. Bank connect is the one capture route that works on day one for a web signup: it needs no
-// proved number, no Twilio, and no message in either direction.
+// THIS ASSERTION USED TO SAY "step one is connecting the bank", AND IT WAS RIGHT WHEN IT WAS
+// WRITTEN. Bank connect needed no proved number, no Twilio and no message in either direction, so
+// it was the one capture route a web signup could reach on day one. Then TrueLayer declined
+// production authorisation (see lib/bankfeed.ts), bankFeedOffered() went to default off, and the
+// same sentence became an instruction nobody could follow, printed as step one of three on the
+// front door. The premise moved; the test did not.
+//
+// So the rule is now the one underneath the old rule, which was always the real one: STEP ONE
+// NAMES A DOOR THAT IS OPEN. A photo, a statement import and a line of plain words all work with
+// no provider and no proved number. The bank feed may be named elsewhere on the page as something
+// coming, and lib/features.ts governs that wording, but it may not be the first thing we ask of a
+// man who has just paid us.
+//
+// ⚠️ IF A PROVIDER LANDS, DO NOT SIMPLY REVERT THIS. Bank connect may become step one again only
+// when bankFeedOffered() is true in production, and the honest way to write that is to branch the
+// copy the way captureLine() in app/page.tsx already does, not to swap one hardcoded promise for
+// another.
 // ---------------------------------------------------------------------------------------------
 const site = read('app/_shared/site.tsx');
 const home = read('app/page.tsx');
 ok('the how it works list names no messaging channel as step one', !/WhatsApp/.test(site));
 ok('the homepage names no messaging channel at all', !/WhatsApp/.test(home));
-ok('step one is connecting the bank', /title: 'Connect your bank'/.test(site));
+
+// The steps array only, never the whole file: "Connect your bank" is legitimate inside the
+// comingSoon list, and matching the file as a whole is what let the old assertion pass vacuously
+// after steps[0] had already changed underneath it.
+const stepsBlock = (site.match(/export const steps = \[[\s\S]*?\n\];/) || [''])[0];
+ok('the steps list is where we think it is', stepsBlock.length > 100);
+ok('🔴 step one is NOT connecting the bank, because that door has no provider',
+  !/Connect your bank/i.test(stepsBlock));
+ok('step one names a door that is actually open on day one',
+  /photo|snap|import|statement|say/i.test(stepsBlock.split("{ n: '2'")[0]));
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 AND THE SENTENCES THAT COME OUT OF lib/, WHICH THE CHECKS ABOVE CANNOT SEE.
@@ -338,7 +361,7 @@ console.log('\n=== the bank feed is offered by one switch, honestly ===\n');
   ok('and its honest copy points at the statement importer instead',
     setup.includes('a bank statement CSV does the same job'));
 
-  // 🔴 THE SWEEP. Every customer facing "connect the bank" under app/app is chosen by the switch.
+  // 🔴 THE SWEEP. Every customer facing "connect the bank" is chosen by the switch.
   //
   // ⚠️ THE SETUP HEADING USED TO BE EXEMPT BY NAME, AND THAT EXEMPTION IS GONE. It read "Connect
   // your bank." whatever the switch said, on the reasoning that the step keeps its title and there
@@ -347,35 +370,77 @@ console.log('\n=== the bank feed is offered by one switch, honestly ===\n');
   // whatever the paragraph underneath says. It is now chosen by the switch like everything else, so
   // this sweep covers it with no special case. The reveal's regex literal, which stops the ledger's
   // own bank line printing twice, is code rather than copy and is still stripped.
-  const HEADING = '';
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THE TWO CHANNELS THAT REACH HIM WHEN HE IS NOT LOOKING AT A SCREEN.
+  //
+  // This sweep walked app/app and nothing else, so it only ever covered places a man has to open
+  // before we can tell him anything. The nudges are the opposite. lib/banknudge.ts writes the
+  // WhatsApp reply that lands the moment his day's AI allowance runs out, and the line that follows
+  // his fifth receipt. lib/trialnudge.ts writes the ONE email of the whole trial, on the day before
+  // he decides whether to pay us. A dead sentence in either is worse than the same sentence on a
+  // page he chose to open: he did not ask for it, it arrives while he is on site, and the busy
+  // message in particular lands at the exact moment he has just been refused something.
+  //
+  // Both were fixed on 31 July and neither was covered by anything that would notice them coming
+  // back, because a grep for JSX finds neither. They are in the sweep now.
+  //
+  // ⚠️ NEITHER FILE MAY IMPORT lib/bankfeed.ts. Their own suites load them through Node's type
+  // stripping, which cannot resolve an extensionless relative import, so each keeps its own read of
+  // BANK_FEED_OFFERED and test/wave9_nudges.test.mjs pins the three reads against each other. This
+  // sweep does not care which copy of the read a sentence sits behind, only that it sits behind one.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const BANK_COPY_LIBS = ['lib/banknudge.ts', 'lib/trialnudge.ts'];
+  const swept = [...inApp.map(rel), ...BANK_COPY_LIBS];
+
+  // ═══════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE PATTERN USED TO BE "connect your bank" ONLY, AND THAT IS HOW ONE GOT THROUGH.
+  //
+  // The dashboard footer said "New spending lands in YOUR BANK FEED on its own", every time
+  // anything sat in his pile. It names a door that does not open and it matched nothing in the
+  // old pattern, because it never uses the word connect. A sweep that catches one phrasing
+  // catches the sentences somebody happened to write that way. Found on the live site on 31 July
+  // 2026, one commit after this sweep was supposed to have finished the job.
+  //
+  // ⚠️ AND THE VERB IS NOT ALWAYS "connect", WHICH IS THE THIRD TOO NARROW PATTERN IN TWO DAYS.
+  // The old one demanded a space straight after "connect", so "connecting your bank" and "it
+  // connects to your bank" both walked past it. The endings are covered here rather than waited for.
+  //
+  // ⚠️ AND THE POSSESSIVE IS THE POINT, which is why this is "your bank feed" and not "bank feed".
+  // "The bank feed is on its way" (the setup step's honest copy) and "none of this is in a bank
+  // feed" (why the circumstances questions exist) are both TRUE with the switch off, and gating
+  // them would be gating the sentences that explain the absence. What must be behind the switch
+  // is any sentence asserting he HAS one, and in English that is the possessive.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const BANK_SENTENCE = /([Cc]onnect(ed|ing|s)? (to )?(your|the) bank|your bank feed)/g;
+
   const bankOffenders = [];
-  for (const f of inApp) {
-    const src = codeOnly(read(rel(f)))
+  const bankMentions = new Map();
+  for (const f of swept) {
+    const src = codeOnly(read(f))
       .replace(/\/connect your bank\/i/g, '');
-    // ═══════════════════════════════════════════════════════════════════════════════════
-    // 🔴 THE PATTERN USED TO BE "connect your bank" ONLY, AND THAT IS HOW ONE GOT THROUGH.
-    //
-    // The dashboard footer said "New spending lands in YOUR BANK FEED on its own", every time
-    // anything sat in his pile. It names a door that does not open and it matched nothing in the
-    // old pattern, because it never uses the word connect. A sweep that catches one phrasing
-    // catches the sentences somebody happened to write that way. Found on the live site on 31 July
-    // 2026, one commit after this sweep was supposed to have finished the job.
-    //
-    // ⚠️ AND THE POSSESSIVE IS THE POINT, which is why this is "your bank feed" and not "bank feed".
-    // "The bank feed is on its way" (the setup step's honest copy) and "none of this is in a bank
-    // feed" (why the circumstances questions exist) are both TRUE with the switch off, and gating
-    // them would be gating the sentences that explain the absence. What must be behind the switch
-    // is any sentence asserting he HAS one, and in English that is the possessive.
-    // ═══════════════════════════════════════════════════════════════════════════════════════
-    for (const m of src.matchAll(/([Cc]onnect(ed)? (your|the) bank|your bank feed)/g)) {
+    let seen = 0;
+    for (const m of src.matchAll(BANK_SENTENCE)) {
+      seen += 1;
       const before = src.slice(Math.max(0, m.index - 260), m.index);
       if (!before.includes('bankFeedOffered()')) {
-        bankOffenders.push(`${rel(f)}: ...${src.slice(m.index, m.index + 40)}...`);
+        bankOffenders.push(`${f}: ...${src.slice(m.index, m.index + 40)}...`);
       }
     }
+    bankMentions.set(f, seen);
   }
-  ok(`🔴 no sentence under app/app names connecting a bank outside the switch${bankOffenders.length ? `\n     ${bankOffenders.join('\n     ')}` : ''}`,
+  ok(`🔴 no sentence a customer is shown or sent names connecting a bank outside the switch${bankOffenders.length ? `\n     ${bankOffenders.join('\n     ')}` : ''}`,
     bankOffenders.length === 0);
+
+  // ⚠️ AND THE TWO LIBS ARE CHECKED FOR HAVING ANYTHING TO SWEEP. A file listed in BANK_COPY_LIBS
+  // whose bank sentence has been renamed, moved or reworded passes this sweep by being empty, which
+  // is exactly how a sweep stops working without anybody noticing. If a sentence has genuinely gone
+  // for good, take its file out of BANK_COPY_LIBS in the same commit and this says so out loud.
+  const emptyLibs = BANK_COPY_LIBS.filter((f) => (bankMentions.get(f) ?? 0) === 0);
+  ok(
+    `the two message channels really carry bank copy, so sweeping them is not vacuous${emptyLibs.length ? `\n     nothing to sweep in: ${emptyLibs.join(', ')}` : ''}`,
+    emptyLibs.length === 0,
+  );
 
   // Both states of every rewritten empty state are pinned, so the bank wording can only return
   // through the switch and the honest wording cannot quietly rot while the switch is off.

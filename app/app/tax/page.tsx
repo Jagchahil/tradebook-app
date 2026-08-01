@@ -2,7 +2,9 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { getOptimiserInput, getConfirmedTransactionsForRange, getBusinessProfile } from '../../../lib/supabase';
+import {
+  getOptimiserInput, getConfirmedTransactionsForRange, getBusinessProfile, readVatProfile,
+} from '../../../lib/supabase';
 import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
 import { shareCaption } from '../../../lib/position';
 import { bankFeedOffered } from '../../../lib/bankfeed';
@@ -51,13 +53,16 @@ export default async function TaxHubPage() {
   const taxYearStart = quarterBounds(startYear, 1).start;
   const quarterEnd = quarterBounds(startYear, index).end;
 
-  const [optimiser, txns, biz] = await Promise.all([
+  const [optimiser, txns, biz, vat] = await Promise.all([
     getOptimiserInput(user.id),
     // The same window /api/quarter-pack reads, so the MTD line below is the pack's own answer.
     getConfirmedTransactionsForRange(user.id, taxYearStart, quarterEnd).catch(() => []),
     // For the partnership caption under the number. Same source /app/pay-yourself reads the share
     // from. A failed read draws no caption, which is safer than a wrong one.
     getBusinessProfile(user.id).catch(() => null),
+    // Whether he is VAT registered at all, for the door below. Null is "we could not read it",
+    // never "he is not registered", so an unknown draws nothing.
+    readVatProfile(user.id).catch(() => null),
   ]);
 
   const tax = taxPosition(optimiser);
@@ -122,6 +127,26 @@ export default async function TaxHubPage() {
     : rentalFlag
       ? 'You told us you have rental property. Rent is taxed as its own stream, separate from your trade, and once it is logged it is counted here and under Ways to save.'
       : null;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // VAT. THE DOOR EXISTS ONLY FOR A MAN WHO IS REGISTERED.
+  //
+  // ⚠️ DOC 103'S STANDING QUESTION: what came out to make room for it? Nothing came out, and this
+  // one earns its row anyway, because for most of this audience it is not a row at all. Most UK
+  // trades are under the threshold and always will be, and a permanent VAT row telling them
+  // "nothing to check" is the empty test failing in the one place it costs money: a row he learns
+  // to skip is a row he skips the quarter it matters. For the man who IS registered, VAT is the
+  // only thing on this screen with a quarterly clock on it and it is often larger than his income
+  // tax bill, so it goes first among the doors rather than behind Tools. The once test sends a
+  // thing behind Tools when he touches it less than monthly; a VAT position is checked whenever he
+  // wonders what is going out this month.
+  //
+  // ⚠️ AND A FAILED READ DRAWS NOTHING. readVatProfile returns null when the read failed, never
+  // "not registered", so an unknown keeps exactly today's screen. The cost of that is one missing
+  // door for one page load. The cost of the other way round is a door to a screen that could only
+  // tell him we could not read his profile.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const vatRegistered = vat !== null && vat.registered;
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -215,6 +240,16 @@ export default async function TaxHubPage() {
       <section className="lek-card">
         <h2 className="lek-h2">Go deeper</h2>
         <div style={S.doors}>
+          {/* See the VAT note above the return for why this is drawn for a registered customer
+              only, and why it sits first when it is drawn at all. */}
+          {vatRegistered ? (
+            <a href="/app/tax/vat" style={S.door} className="lek-hit">
+              <span style={S.doorLabel}>VAT this quarter</span>
+              <span style={S.rowBody}>
+                What you have charged, what you can reclaim, and where that leaves you.
+              </span>
+            </a>
+          ) : null}
           <a href="/app/tax/summary" style={S.door} className="lek-hit">
             <span style={S.doorLabel}>Quarterly summary</span>
             {/* The door stays for a director, because the figures behind it are his own money added

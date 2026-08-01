@@ -174,8 +174,16 @@ ok('a long number is refused', !isUkMobile('+4477009001234'));
 ok('no plus is refused', !isUkMobile('447700900123'));
 ok('rubbish is refused', !isUkMobile('') && !isUkMobile(null) && !isUkMobile(undefined));
 ok('the welcome still reads properly when we do not', welcomeAfterBinding(null).startsWith('Right.'));
-ok('the welcome points at the bank, which is the one thing that needs nothing typed',
-  /connecting your bank/i.test(welcomeAfterBinding('Dave')));
+// 🔴 THIS ASSERTION PINNED A DEAD INSTRUCTION IN PLACE, WHICH IS THE ONE THING A TEST MUST NOT DO.
+// It read "the welcome points at the bank, which is the one thing that needs nothing typed", and
+// the idea was right: the welcome should name the route that asks least of him. The DOOR moved.
+// TrueLayer declined production authorisation, bankFeedOffered() went to default off, and this
+// assertion went on holding the sentence steady while the thing it named stopped existing.
+// So it now pins the PROPERTY rather than the door: the welcome names a route that works today.
+ok('🔴 the welcome does NOT tell him to connect a bank, because there is no provider',
+  !/connect(ing|s|ed)? (to )?(your|the) bank/i.test(welcomeAfterBinding('Dave')));
+ok('it points at the route that genuinely needs nothing typed',
+  /import(ing)? a bank statement/i.test(welcomeAfterBinding('Dave')));
 // 🔴 It is a reply inside the free window, so it must never claim to be, or reference, a template.
 ok('the welcome names no template', !/template/i.test(welcomeAfterBinding('Dave')));
 

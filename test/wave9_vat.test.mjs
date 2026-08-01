@@ -133,12 +133,34 @@ const keysOf = (input) => computeSignals(input).map((s) => s.signalKey);
 }
 
 // ---------------------------------------------------------------------------------------------
-// 🔴 3. WE DO NOT READ THE VAT OFF A RECEIPT, SO NOTHING MAY SAY WE DO.
+// 🔴 3. WE READ THE VAT OFF A RECEIPT NOW, AND NOTHING MAY TREAT THAT READING AS HIS WORD.
+//
+// ⚠️ THIS SECTION USED TO SAY THE OPPOSITE, AND FLIPPING IT WAS THE POINT.
+//
+// On 31 July 2026 four surfaces claimed we read the VAT off a receipt while the vision prompt did
+// not contain the word, ParsedReceipt had no field for it, and no table had a column. The cheapest
+// true thing to do was delete the four claims and PIN THE ABSENCE, which is what the old assertion
+// did: "THE GROUND TRUTH: the vision prompt does not ask for VAT".
+//
+// On 1 August the claim was made TRUE instead. So the invariant MOVES rather than going away,
+// because the absence was holding back something worse than a false claim: a figure a model read
+// off a crumpled photograph turning into a reclaim he never looked at, and a VAT figure that is
+// wrong one time in seven is worse than none because he will trust it. Read, and never trusted
+// until he says so. test/receiptvat.test.mjs holds the whole of that chain.
+//
+// The four dead claims below are still pinned dead, word for word, because they were wrong about
+// WHICH fields we read and they stay wrong: we read the shop, the total, the date and the VAT.
 // ---------------------------------------------------------------------------------------------
 {
   const claude = read('lib/claude.ts');
-  ok('🔴 THE GROUND TRUTH: the vision prompt does not ask for VAT, and ParsedReceipt has no field for it',
-    !/vat/i.test(claude.slice(claude.indexOf('ParsedReceipt'), claude.indexOf('ParsedReceipt') + 3000)));
+  const receipt = claude.slice(0, claude.indexOf('export interface ParsedEntry'));
+
+  ok('🔴 THE NEW GROUND TRUTH: the vision prompt asks for the VAT, and refuses to let the model calculate one',
+    /"vat": number, the VAT amount printed on the receipt/.test(receipt)
+    && /Never calculate it from the total/.test(receipt));
+  ok('🔴 AND THE READING IS NEVER A CLAIM: nothing in lib/claude.ts confirms a VAT figure',
+    /vat: number \| null;/.test(receipt)
+    && !/vat_confirmed/.test(receipt.replace(/\/\/[^\n]*/g, '')));
 
   const claims = [
     ['app/api/whatsapp/route.ts', 'the shop, the total and the VAT'],

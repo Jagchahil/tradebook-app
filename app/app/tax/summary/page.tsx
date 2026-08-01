@@ -9,7 +9,7 @@ import { gbp0 } from '../../lib/money';
 import { updateDue, UPDATE_ORDINAL } from '../due';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
-  GREEN, INK, LINE, MUTED, ON_GREEN_TINT, PAPER, RIVER, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge,
+  INK, LINE, MUTED, ON_GREEN_TINT, PAPER, RIVER, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge,
 } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 

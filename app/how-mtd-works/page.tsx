@@ -6,13 +6,32 @@ import {
   SharedHead, SiteNav, SiteFooter, StickyCta,
   Ic,
 } from '../_shared/site';
+import { FACTS } from '../../lib/taxengine';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/how-mtd-works' },
   title: 'How Making Tax Digital works, in plain English.',
   description:
-    'Making Tax Digital, explained simply. Drag your income to see if and when it affects you. Keep digital records, send four short updates, and approve everything before it reaches HMRC. Lekhio keeps you ready.',
+    'Making Tax Digital, explained simply. Drag your gross income, turnover and rent before expenses, to see if and when it affects you. Keep digital records, send four short updates, and approve everything before it reaches HMRC. Lekhio keeps you ready.',
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE CHECKER ASKED FOR "YOUR INCOME" AND THEN TESTED IT AS IF IT WERE THE RIGHT NUMBER.
+//
+// The MTD for Income Tax test is on QUALIFYING INCOME: gross turnover plus gross rent, added
+// together, before a single expense comes off. It is not profit. A sparky turning over £70,000 and
+// keeping £45,000 read "your income", dragged to 45, and was told it starts for him in April 2027.
+// He is in now, a year early, and we told him to relax. So the control names gross income, and says
+// what that means, before he touches it.
+//
+// The thresholds come from lib/taxengine.ts, and the comparison is `>` because that is what
+// mtdForIncomeTaxRequired does: qualifying income OVER £50,000, not £50,000 and up. Copying the
+// figures out by hand is how the site and the engine end up disagreeing after a Budget.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const T26 = FACTS.mtdThreshold2026; // first mandated from April 2026
+const T27 = FACTS.mtdThreshold2027; // April 2027
+const T28 = FACTS.mtdThreshold2028; // April 2028
+const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
 
 const MTD_CSS = `
 .mkt .hero{padding:52px 0 12px}
@@ -20,7 +39,10 @@ const MTD_CSS = `
 .mkt .final p{color:rgba(255,255,255,.8)}
 .checker{max-width:640px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:30px;box-shadow:var(--shadow)}
 .checker .ct{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--tx-mut);text-align:center}
+.checker .csub{font-size:13px;line-height:1.55;color:var(--tx-mut);text-align:center;max-width:430px;margin:8px auto 0}
 .incomeval{font-size:44px;font-weight:900;letter-spacing:-.03em;text-align:center;margin:6px 0 4px}
+.ltd{max-width:640px;margin:16px auto 0;background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:15px 18px;font-size:13.5px;line-height:1.62;color:var(--tx-mut)}
+.ltd b{color:var(--tx)}
 .slider{width:100%;-webkit-appearance:none;appearance:none;height:10px;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--saffron),var(--river));outline:none;margin:14px 0 8px}
 .slider::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:999px;background:#fff;border:3px solid var(--river);cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2)}
 .slider::-moz-range-thumb{width:30px;height:30px;border-radius:999px;background:#fff;border:3px solid var(--river);cursor:pointer}
@@ -81,10 +103,11 @@ const MTD_JS = `
     var slider=document.getElementById('slider');if(!slider)return;
     var k=+slider.value;var iv=document.getElementById('incomeVal');if(iv)iv.textContent=money(k);
     var r=document.getElementById('result');if(!r)return;var title,date,note,bg,col;
-    if(k>=50){title='MTD applies to you now';date='FROM APRIL 2026';note='You send HMRC four short updates a year. Lekhio prepares every one, ready for your approval.';bg='var(--river-tint)';col='var(--river)';}
-    else if(k>=30){title='MTD applies from April 2027';date='THE £30,000 THRESHOLD';note='You have time. Start now and your records are already ready when it kicks in.';bg='var(--saffron-tint)';col='var(--on-saffron-tint)';}
-    else if(k>=20){title='MTD applies from April 2028';date='THE £20,000 THRESHOLD';note='Plenty of time. Lekhio keeps you ready either way, with zero effort.';bg='var(--saffron-tint)';col='var(--on-saffron-tint)';}
-    else{title='Not required yet';date='UNDER £20,000';note='No MTD duty for now. Tidy books still save you money and stress, so Lekhio keeps you sorted.';bg='var(--green-tint)';col='var(--green)';}
+    var gross=k*1000;
+    if(gross>${T26}){title='MTD applies to you now';date='FROM APRIL 2026';note='You send HMRC four short updates a year. Lekhio prepares every one, ready for your approval.';bg='var(--river-tint)';col='var(--river)';}
+    else if(gross>${T27}){title='MTD applies from April 2027';date='THE ${gbp(T27)} THRESHOLD';note='You have time. Start now and your records are already ready when it kicks in.';bg='var(--saffron-tint)';col='var(--on-saffron-tint)';}
+    else if(gross>${T28}){title='MTD applies from April 2028';date='THE ${gbp(T28)} THRESHOLD';note='Plenty of time. Lekhio keeps you ready either way, with zero effort.';bg='var(--saffron-tint)';col='var(--on-saffron-tint)';}
+    else{title='Not required yet';date='${gbp(T28)} GROSS OR LESS';note='No MTD duty for now. Tidy books still save you money and stress, so Lekhio keeps you sorted.';bg='var(--green-tint)';col='var(--green)';}
     r.style.background=bg;
     r.innerHTML='<div class="rtitle" style="color:'+col+'">'+title+'</div><div class="rdate" style="color:'+col+'">'+date+'</div><div class="rnote">'+note+'</div>';
   }
@@ -108,7 +131,10 @@ export default function HowMtdWorksPage() {
       <style dangerouslySetInnerHTML={{ __html: MARKETING_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: MTD_CSS }} />
 
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for the self employed earning over £50k. <span className="go">See if it affects you →</span></Link></div>
+      {/* Not "the self employed earning over £50k". The test catches landlords too, which is the
+          whole point of our own /for-landlords page, and it runs on gross income rather than on
+          what a man earns, which everybody reads as profit. Both wrong words are fixed here. */}
+      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for sole traders and landlords with gross income over £{T26 / 1000}k. <span className="go">See if it affects you →</span></Link></div>
       <SiteNav />
 
       {/* Hero */}
@@ -124,17 +150,27 @@ export default function HowMtdWorksPage() {
       <section style={{ paddingTop: 20 }}>
         <div className="wrap">
           <div className="checker reveal">
-            <div className="ct">Does it affect you? Drag your income.</div>
+            <div className="ct">Does it affect you? Drag your gross income.</div>
+            <div className="csub">Your turnover and any rent added together, before a single expense comes off. That is not your profit, which is the number most people reach for.</div>
             <div className="incomeval" id="incomeVal">£60,000</div>
-            <input type="range" min="0" max="100" step="5" defaultValue="60" className="slider" id="slider" aria-label="Your income" />
-            <div className="ticks"><span>£0</span><span>£20k</span><span>£30k</span><span>£50k</span><span>£100k+</span></div>
+            <input type="range" min="0" max="100" step="5" defaultValue="60" className="slider" id="slider" aria-label="Your gross income for the year, turnover and rent added together before expenses" />
+            <div className="ticks"><span>£0</span><span>£{T28 / 1000}k</span><span>£{T27 / 1000}k</span><span>£{T26 / 1000}k</span><span>£100k+</span></div>
             <div className="result" id="result" style={{ background: 'var(--river-tint)' }}>
               <div className="rtitle" style={{ color: 'var(--river)' }}>MTD applies to you now</div>
               <div className="rdate" style={{ color: 'var(--river)' }}>FROM APRIL 2026</div>
               <div className="rnote">You send HMRC four short updates a year. Lekhio prepares every one, ready for your approval.</div>
             </div>
           </div>
-          <p className="center mut" style={{ fontSize: 12.5, marginTop: 14 }}>A guide based on the announced thresholds. Your books stay ready with Lekhio either way.</p>
+          {/* Doc 103, and the standing question. Nothing was taken out to make room for this, so it
+              has to earn a permanent place on its own: a director who reads the slider as his gets
+              a due date for a return his company does not file, and he only finds out he was misled
+              much later. One paragraph, no card, no section, and no company tax guide. The sentence
+              is the one /app/setup and /app/tax/summary already give him, reused rather than
+              reinvented, because one fact argued two ways is argued wrong once. */}
+          <p className="ltd reveal">
+            <b>Running a limited company?</b> Making Tax Digital for Income Tax covers self employment and rent on a personal return, and your company&apos;s trade is neither: the company files its own return. If you also have a sole trade or rent of your own, drag the slider for that income alone.
+          </p>
+          <p className="center mut" style={{ fontSize: 12.5, marginTop: 14 }}>A guide based on the announced thresholds, which are tested on gross qualifying income and never on profit. Your books stay ready with Lekhio either way.</p>
         </div>
       </section>
 
@@ -197,7 +233,7 @@ export default function HowMtdWorksPage() {
             <h2>Built by the book. Better than the rest.</h2>
             <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>While others leave you to it, Lekhio keeps you ready and does the sums properly.</p>
             <div className="credrow">
-              <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b>, 104 test cases</span></div>
+              <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b></span></div>
               <div className="credchip"><span>MTD-ready today</span></div>
               <div className="credchip"><span>HMRC recognition <b>in progress</b></span></div>
               <div className="credchip">🇬🇧 <span>A real UK company</span></div>

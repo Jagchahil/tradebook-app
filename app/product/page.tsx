@@ -11,8 +11,10 @@ import {
 export const metadata: Metadata = {
   alternates: { canonical: '/product' },
   title: 'What Lekhio does. Snap it, say it, sorted.',
+  // ⚠️ THE SEARCH RESULT HAS TO MATCH THE PAGE. This said "Connect your bank" while the card
+  // further down correctly badges that feature BUILT, SWITCHING ON SOON from bankBadge().
   description:
-    'Connect your bank and Lekhio reads it, sorts it, and keeps it tidy and ready. Receipts, mileage, invoices, CIS and quarterly tax, all in your browser. You approve before anything reaches HMRC.',
+    'Snap a receipt, say it out loud, or import your bank statement, and Lekhio reads it, sorts it, and keeps it tidy and ready. Receipts, mileage, invoices, CIS and quarterly tax, all in your browser. You approve before anything reaches HMRC.',
 };
 
 const PRODUCT_CSS = `
@@ -161,7 +163,7 @@ export default function ProductPage() {
       <style dangerouslySetInnerHTML={{ __html: MARKETING_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: PRODUCT_CSS }} />
 
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for the self employed earning over £50k. <span className="go">See if it affects you →</span></Link></div>
+      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for sole traders and landlords with gross qualifying income over £50,000. <span className="go">See if it affects you →</span></Link></div>
       <SiteNav />
 
       {/* Hero */}
@@ -194,7 +196,7 @@ export default function ProductPage() {
           </div>
           <div className="compliance reveal">
             <div className="ci">Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
-            <div className="ci"><b>104 tests</b> on the tax engine</div>
+            <div className="ci"><b>2026/27 rates</b>, every one a published figure</div>
             <div className="ci"><b>Nothing filed</b> without your yes</div>
           </div>
         </div>
@@ -282,7 +284,15 @@ export default function ProductPage() {
                     <div className="feedcard"><div className="fi" style={{ background: 'var(--saffron-tint)' }}><Ic e="🧾" color="var(--saffron-deep)" size={22} /></div><div className="fm"><b>Screwfix</b><small>Materials · 2m</small></div><div className="fa">-£42.60</div></div>
                     <div className="feedcard"><div className="fi"><Ic e="⛽" color="var(--river)" size={22} /></div><div className="fm"><b>BP</b><small>Fuel · 1h</small></div><div className="fa">-£62.00</div></div>
                     <div className="feedcard" style={{ borderColor: 'var(--green)' }}><div className="fi" style={{ background: 'var(--green-tint)' }}><Ic e="💷" color="var(--green)" size={22} /></div><div className="fm"><b>Dave paid you</b><small>CIS £80 held · 3h</small></div><div className="fa" style={{ color: 'var(--green)' }}>+£500</div></div>
-                    <div className="feedcard" style={{ background: 'var(--saffron-tint)', borderColor: 'var(--saffron)' }}><div className="fi" style={{ background: '#fff' }}><Ic e="🔥" color="var(--saffron-deep)" size={22} /></div><div className="fm"><b>7-day streak!</b><small>Keep it going</small></div></div>
+                    {/* 🔴 THIS WAS A "7-day streak! Keep it going" CARD, AND IT WAS THREE WRONGS AT
+                        ONCE. There is no streak anywhere in the code, so it advertised a feature we
+                        do not have. app/llms.txt/route.ts states publicly that there are no streaks,
+                        no badges and no gamification, so the site contradicted our own published
+                        answer. And docs/103's alignment test forbids rewarding him for the manual
+                        work the product exists to remove. What belongs on the feed instead is the
+                        review pile, which is real, is at /app/pile, and is the one thing on that
+                        screen actually waiting on him. */}
+                    <div className="feedcard" style={{ background: 'var(--river-tint)', borderColor: 'var(--river)' }}><div className="fi" style={{ background: '#fff' }}><Ic e="✅" color="var(--river)" size={22} /></div><div className="fm"><b>3 waiting on you</b><small>Grouped by shop. Answer once each.</small></div></div>
                   </div>
                   <div className="tslide">
                     <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Money</b><span style={{ fontSize: 12 }}>2026/27 ▾</span></div>

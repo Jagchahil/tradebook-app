@@ -434,13 +434,38 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
   const tradeGrossYtd = Math.max(0, d.ytdIncome - rentsYtd);
   const combinedTrap = rentsYtd > 0 && tradeGrossYtd < mtdThreshold && d.ytdIncome >= mtdThreshold;
   if (combinedTrap) {
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THE SAME SIGNAL REACHES TWO DIFFERENT MEN, AND IT USED TO SPEAK TO ONLY ONE OF THEM.
+    //
+    // The condition is "trade under the line, trade plus rent over it", and a PURE LANDLORD meets
+    // it with a trade of zero. He was then sent: "Your trade alone (£0) sits under the £50,000
+    // level, but with £52,000 of rent the combined £52,000 crosses it. Most landlords with a day
+    // trade miss this." He has no trade, no day trade, and no combination. Three sentences about a
+    // business he does not have, telling him about the one obligation that genuinely is his.
+    //
+    // 🔴 THE SIGNAL IS NOT SUPPRESSED FOR HIM AND MUST NEVER BE. Making Tax Digital for Income Tax
+    // counts qualifying income from self employment AND property, so a man letting for more than
+    // the threshold with no trade at all is mandated. Filtering him out to dodge the wording would
+    // take a real obligation off the only screen that was going to tell him about it.
+    //
+    // So the copy branches on whether he has a trade at all, and neither branch says anything the
+    // other man's figures would make false. The trade branch still names both streams and both
+    // figures, which is the whole point of the trap and what test/agent.test.mjs pins.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    const hasTrade = tradeGrossYtd > 0;
     out.push({
       signalKey: 'mtd_combined_trap',
       periodKey: year,
       priority: 'ping',
-      title: 'Your trade plus your rent crosses the MTD line together',
-      body: `Making Tax Digital counts trade and property income TOGETHER. Your trade alone (${gbp(tradeGrossYtd)}) sits under the ${gbp(mtdThreshold)} level, but with ${gbp(rentsYtd)} of rent the combined ${gbp(d.ytdIncome)} crosses it. Most landlords with a day trade miss this. No panic: your Lekhio records already fit the quarterly rhythm, both streams.`,
-      waText: `trade (${gbp(tradeGrossYtd)}) plus rent (${gbp(rentsYtd)}) crosses the ${gbp(mtdThreshold)} Making Tax Digital level combined, which most people miss`,
+      title: hasTrade
+        ? 'Your trade plus your rent crosses the MTD line together'
+        : 'Your rent crosses the Making Tax Digital line on its own',
+      body: hasTrade
+        ? `Making Tax Digital counts trade and property income TOGETHER. Your trade alone (${gbp(tradeGrossYtd)}) sits under the ${gbp(mtdThreshold)} level, but with ${gbp(rentsYtd)} of rent the combined ${gbp(d.ytdIncome)} crosses it. It is the adding up that people miss, because each stream on its own looks safe. No panic: your Lekhio records already fit the quarterly rhythm, both streams.`
+        : `Making Tax Digital counts property income, not just self employment. Your rent of ${gbp(rentsYtd)} is over the ${gbp(mtdThreshold)} level on its own, so it applies to you. Plenty of landlords take it for granted that it is a thing for the self employed. No panic: your Lekhio records already fit the quarterly rhythm.`,
+      waText: hasTrade
+        ? `trade (${gbp(tradeGrossYtd)}) plus rent (${gbp(rentsYtd)}) crosses the ${gbp(mtdThreshold)} Making Tax Digital level combined, which most people miss`
+        : `your rent (${gbp(rentsYtd)}) is over the ${gbp(mtdThreshold)} Making Tax Digital level on its own, and it counts property income just as it counts self employment`,
       numbers: { tradeGross: tradeGrossYtd, rents: rentsYtd, combined: d.ytdIncome, threshold: mtdThreshold },
     });
   }

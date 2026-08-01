@@ -2,7 +2,11 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie, identityForUser } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { readIdentityCard, getBusinessProfile, readCircumstances, readSignupCompany, type SignupCompany } from '../../../lib/supabase';
+import {
+  readIdentityCard, getBusinessProfile, readCircumstances, readSignupCompany, readVatProfile,
+  type SignupCompany, type VatProfileRow,
+} from '../../../lib/supabase';
+import { formatVrn } from '../../../lib/vat';
 import { registrationLine } from '../../../lib/companieshouse';
 import {
   household, notHousehold, mtdQuestions, progressIn, type IncomeShape,
@@ -30,9 +34,14 @@ export const dynamic = 'force-dynamic';
 //
 // ⚠️ EVERYTHING SHOWN IS READ FROM WHAT HE HAS ALREADY TOLD US. Nothing on this page computes,
 // guesses or enriches: the name and trade come off his users row, the structure from
-// getBusinessProfile, the VAT answer from the circumstances log, the contact points from the auth
-// store. A page about him that embellished would be a page he stops trusting, and he only has to
-// catch us once.
+// getBusinessProfile, the VAT from vat_profiles with the circumstances log behind it, the contact
+// points from the auth store. A page about him that embellished would be a page he stops trusting,
+// and he only has to catch us once.
+//
+// ⚠️ AND THE VAT PART IS ONE SENTENCE AND ONE DOOR, ON PURPOSE. It used to be all this page could
+// say, three sentences built from a stored 'yes'. Since 1 August 2026 /app/you/vat holds the
+// number, the date he registered and his scheme, so this says what we know and gets out of the
+// way. A hub that repeats a page is a hub he has to read twice.
 //
 // 🔴 THE EMAIL IS PRINTED MASKED, AND THE ADD FLOW LIVES HERE. A page read over a shoulder on a
 // site, cached, screenshotted for support: the full address adds nothing its owner does not
@@ -90,6 +99,60 @@ function tradeLine(trade: string, income: IncomeShape | null): string {
   return income === 'property_only' ? `${trade}. Letting is the business.` : `${trade} by trade.`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// HIS VAT, IN ONE SENTENCE, WITH THE DOOR TO THE REST OF IT.
+//
+// This page used to say all it could about VAT, which was three sentences built from a single
+// stored 'yes'. Since 1 August 2026 there is a screen that holds the number, the date he
+// registered and his scheme, so the hub says what we know and gets out of the way. A hub that
+// repeats a page is a hub a man has to read twice.
+//
+// ⚠️ THE PROFILE LEADS AND THE LOGGED ANSWER IS THE FALLBACK. vat_profiles is what the engine
+// reads and what /app/you/vat writes. The circumstance is the logged question and answer, and it
+// is all we have for a man who answered at signup or over WhatsApp. A failed profile read comes
+// back null, and null falls back to the log rather than asserting he is not registered.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const SCHEME_WORDS: Record<string, string> = {
+  standard: 'standard',
+  flat_rate: 'flat rate',
+  cash: 'cash accounting',
+  annual: 'annual accounting',
+};
+
+function sayDate(iso: string | null): string | null {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  // UTC named on purpose: a stored day is a day, not an instant, and read in a negative offset it
+  // would print as the day before.
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  });
+}
+
+function vatLine(vat: VatProfileRow | null, answer: string | null): string {
+  if (vat?.registered) {
+    const since = sayDate(vat.registeredOn);
+    const said = [since ? `VAT registered since ${since}` : 'VAT registered, as you told us'];
+    const number = formatVrn(vat.vrn);
+    if (number) said.push(number);
+    if (vat.scheme !== 'standard') said.push(`on the ${SCHEME_WORDS[vat.scheme] ?? vat.scheme} scheme`);
+    return `${said.join(', ')}.`;
+  }
+  if (answer === 'yes') return 'VAT registered, as you told us.';
+  if (answer === 'no') return 'Not VAT registered, as you told us.';
+  // A longer answer came in over WhatsApp in his own words and is shown as he gave it. Paraphrasing
+  // what a man told us about his tax is how the record and his memory drift apart.
+  if (answer) return `On VAT you told us: ${answer}.`;
+  return 'You have not told us about VAT yet, and the answer can reach back four years.';
+}
+
+// What the door says, which is where the nudging belongs: a registered man with no date on file is
+// missing the one fact the whole pre registration reclaim is measured from.
+function vatDoor(vat: VatProfileRow | null, answer: string | null): string {
+  if (vat?.registered && !vat.registeredOn) return 'Add the date you registered';
+  if (vat?.registered || answer === 'yes') return 'Your VAT details';
+  return 'VAT';
+}
+
 export default async function YouPage({
   searchParams,
 }: {
@@ -102,7 +165,7 @@ export default async function YouPage({
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
 
-  const [card, profile, rows, identity, company] = await Promise.all([
+  const [card, profile, rows, identity, company, vatProfile] = await Promise.all([
     readIdentityCard(user.id),
     getBusinessProfile(user.id).catch(() => null),
     readCircumstances(user.id),
@@ -111,12 +174,14 @@ export default async function YouPage({
     // page cannot assert a registration the lookup never found. Null on any failure, which makes
     // the sentence LESS assertive, never more.
     readSignupCompany(user.id).catch(() => null),
+    // His VAT position. Null is an unreadable read, never "not registered", so vatLine falls back
+    // to the logged answer rather than telling a registered man his invoices carry no VAT.
+    readVatProfile(user.id).catch(() => null),
   ]);
 
-  // The VAT answer, from the log and only the log. 'yes' and 'no' get their own sentences; a
-  // longer answer given over WhatsApp is shown as he gave it, because paraphrasing what a man told
-  // us about his tax is how the record and his memory drift apart.
-  const vat = rows?.find((r) => r.key === 'vat_registered') ?? null;
+  // The logged answer, which is what we have for a man who told us at signup or over WhatsApp and
+  // has never opened the VAT screen.
+  const vatAnswer = rows?.find((r) => r.key === 'vat_registered')?.answer ?? null;
 
   // What his business income actually is, read once and used twice below: the count of what is
   // still worth asking him, and the sentence about what he does. Null is unknown, which asks and
@@ -165,20 +230,10 @@ export default async function YouPage({
             ) : null}
             {trade ? <p style={S.fact}>{tradeLine(trade, income)}</p> : null}
             {profile ? <p style={S.fact}>{structureLine(profile, company)}</p> : null}
-            {vat ? (
-              <p style={S.fact}>
-                {vat.answer === 'yes'
-                  ? 'VAT registered, as you told us.'
-                  : vat.answer === 'no'
-                    ? 'Not VAT registered, as you told us.'
-                    : `On VAT you told us: ${vat.answer}.`}
-              </p>
-            ) : (
-              <p style={S.quiet}>
-                You have not told us about VAT yet. It is one question on the circumstances page,
-                and the answer can reach back four years.
-              </p>
-            )}
+            <p style={S.fact}>
+              {vatLine(vatProfile, vatAnswer)}{' '}
+              <a href="/app/you/vat" style={S.inlineLink}>{vatDoor(vatProfile, vatAnswer)}</a>
+            </p>
             <p style={S.quiet}>
               Wrong about any of this? How you trade is changed in{' '}
               <a href="/app/setup?step=business" style={S.inlineLink}>setup</a>, and the rest comes

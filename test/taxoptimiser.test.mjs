@@ -294,6 +294,188 @@ console.log('\n=== 🔴 WHAT IS IN THE SET ASIDE FIGURE, IN WORDS ===\n');
     !O.setAsideBasis({ ...sole, ytdPropertyIncome: 2000, ytdPropertyExpenses: 9000 }).includes('your rent'));
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 🔴 "IT COVERS YOUR BUSINESS", SAID TO A MAN WITH NO BUSINESS ===\n');
+//
+// 'your business' was seeded into the list UNCONDITIONALLY while every other stream had a guard. So
+// a customer whose whole business is letting read "It covers your business and your rent" about a
+// business he has not got, on four surfaces, directly under the one number he came for. The comment
+// above the function already stated the rule it was breaking: it only ever lists a stream he has.
+{
+  const landlord = {
+    ...base, ytdTradeIncome: 0, ytdTradeExpenses: 0,
+    ytdPropertyIncome: 24000, ytdPropertyExpenses: 6000,
+  };
+  ok('🔴 THE BUG: a property only customer is not told the figure covers a business',
+    JSON.stringify(O.setAsideBasis(landlord)) === JSON.stringify(['your rent']));
+  // ⚠️ AND A PURE LANDLORD IS GIVEN NO SENTENCE AT ALL, for the same reason a pure sole trader is
+  // not: a one item list explains nothing the number does not already say. The bug was never the
+  // silence, it was the word "business" appearing in the list the moment there was a second stream.
+  ok('...so on his own he gets no extra line to read, exactly as a pure sole trader does not',
+    O.setAsideBasisLine(landlord, O.taxPosition(landlord)) === null);
+  ok('...and once he has wages too, the sentence he reads names his rent and never a business',
+    (() => {
+      const line = O.setAsideBasisLine({ ...landlord, employmentIncome: 30000 }, O.taxPosition({ ...landlord, employmentIncome: 30000 }));
+      return /It covers your wages and your rent\./.test(line) && !/business/.test(line);
+    })());
+
+  // Nothing moves for anybody who does have a trade.
+  const trader = { ...base, ytdTradeIncome: 30000, ytdTradeExpenses: 5000 };
+  ok('a sole trader is still his business, first, exactly as before',
+    O.setAsideBasis(trader)[0] === 'your business');
+  ok('...and a trader with rent gets both, in that order',
+    JSON.stringify(O.setAsideBasis({ ...trader, ytdPropertyIncome: 9000 }))
+    === JSON.stringify(['your business', 'your rent']));
+  // A brand new account has nothing in the figure at all, so there is nothing to explain.
+  ok('an empty account is given no sentence rather than an empty one',
+    O.setAsideBasis(base).length === 0
+    && O.setAsideBasisLine(base, O.taxPosition(base)) === null);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 🔴 THE USE OF HOME ELECTION, WHICH THIS FILE DECLARED AND THEN NEVER READ ===\n');
+//
+// ytdHomeOffice sat on OptimiserInput with a comment explaining it, and taxPosition() did not read
+// it. So a man who elected use of home saw his ledger go down and the figure the app prints in its
+// largest type stand perfectly still. The other half of the same bug: what he TEXTS is a real
+// transaction inside ytdTradeExpenses, so a man who did both was deducted twice on his ledger.
+//
+// THE RULE, applied here and identically in lib/ledger.ts: take what he LOGGED out of expenses,
+// always; then the deduction is the ELECTION if he has one, and the logged rows if he has not.
+// test/ledger.test.mjs runs a grid through both modules and fails if they ever disagree.
+{
+  // £40,000 in, £8,000 out. In the "texted" shapes £312 of that £8,000 IS the use of home rows.
+  const shape = { ...base, ytdTradeIncome: 40000, ytdTradeExpenses: 8000 };
+  const none = O.taxPosition(shape);
+  const electedOnly = O.taxPosition({ ...shape, ytdHomeOffice: 312 });
+  const textedOnly = O.taxPosition({ ...shape, ytdHomeOfficeLogged: 312 });
+  const both = O.taxPosition({ ...shape, ytdHomeOffice: 312, ytdHomeOfficeLogged: 312 });
+
+  ok('🔴 THE ELECTION FINALLY MOVES THE SET ASIDE, WHICH IT NEVER DID', electedOnly.setAside < none.setAside);
+  ok('...by a real amount at his marginal rate, not a rounding',
+    Math.abs((none.setAside - electedOnly.setAside) - 312 * 0.26) < 2);
+  ok('...and it is the profit itself that moved, not some adjustment bolted on the end',
+    electedOnly.totalIncome === 40000 - 8000 - 312);
+  ok('what he TEXTED was already inside his expenses, so it changes nothing on its own',
+    textedOnly.setAside === none.setAside && textedOnly.totalIncome === none.totalIncome);
+  ok('🔴 AND A MAN WHO DID BOTH IS DEDUCTED ONCE, NOT TWICE', both.totalIncome === 40000 - 8000);
+  ok('...which is the same profit as a man who elected and never texted the same claim',
+    both.totalIncome === O.taxPosition({ ...shape, ytdTradeExpenses: 8000 - 312, ytdHomeOffice: 312 }).totalIncome
+    && both.setAside === O.taxPosition({ ...shape, ytdTradeExpenses: 8000 - 312, ytdHomeOffice: 312 }).setAside);
+  ok('...and the double counted profit, £312 lower, is the one we are no longer printing at him',
+    O.taxPosition({ ...shape, ytdHomeOffice: 312 }).totalIncome === both.totalIncome - 312);
+  ok('a man with neither is unchanged to the penny',
+    none.setAside === O.taxPosition({ ...shape, ytdHomeOffice: 0, ytdHomeOfficeLogged: 0 }).setAside);
+  ok('the same rule reaches the suggestions, so his levers are priced on the same profit',
+    JSON.stringify(O.findOptimisations({ ...shape, ytdHomeOffice: 312, ytdHomeOfficeLogged: 312 }))
+    === JSON.stringify(O.findOptimisations({ ...shape, ytdTradeExpenses: 8000 + 312 })));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 🔴 HIS RENT WAS MISSING FROM THE INCOME THAT DECIDES HIS RATE ===\n');
+//
+// projTotalIncome in findOptimisations added the trade, the salary, the savings and the dividends,
+// and left out property. Fourteen lines later the same function read input.ytdPropertyIncome to
+// decide whether to talk to him about property costs. taxPosition() has always counted the rent. So
+// two functions in one file described the same man differently, and the levers below marginalRate()
+// (pension, AIA timing, missed costs, use of home, both marriage cards) were priced at a rate his
+// rent had already pushed him past.
+{
+  const withRent = {
+    ...base, ytdTradeIncome: 30000, ytdTradeExpenses: 0,
+    ytdPropertyIncome: 40000, ytdPropertyExpenses: 5000,
+    purchaseGoal: { title: 'a van', amount: 10000 },
+    categoriesLogged: ['fuel', 'phone', 'insurance', 'tools'],
+  };
+  const withoutRent = { ...withRent, ytdPropertyIncome: 0, ytdPropertyExpenses: 0 };
+  const aia = (list) => find(list, 'aia_timing').estSaving;
+
+  ok('🔴 THE BUG: £35,000 of rental profit now counts towards the rate his next deduction saves',
+    aia(O.findOptimisations(withRent)) > aia(O.findOptimisations(withoutRent)));
+  ok('...and the rate is the higher rate one, because that is where his whole income actually is',
+    aia(O.findOptimisations(withRent)) === 10000 * 0.42
+    && aia(O.findOptimisations(withoutRent)) === 10000 * 0.26);
+  ok('...so the pension lever fires for a man whose rent is what put him in the 40% band',
+    !!find(O.findOptimisations(withRent), 'pension_higher_rate')
+    && !find(O.findOptimisations(withoutRent), 'pension_higher_rate'));
+  // ⚠️ NET, AND PROJECTED WITH THE SAME factor THE TRADE USES. Half a year in, both functions must
+  // double the rent exactly as they double the trade, or the two describe different men.
+  ok('🔴 AND IT IS THE NET RENT, PROJECTED THE SAME WAY THE TRADE IS, so the two functions agree',
+    (() => {
+      const half = { ...withRent, monthsElapsed: 6 };
+      const projected = O.taxPosition(half).totalIncome;
+      return projected === (30000 + 35000) * 2
+        && find(O.findOptimisations(half), 'aia_timing').estSaving === 10000 * O.marginalRate(projected);
+    })());
+  ok('a man with no property is unchanged, to the byte',
+    JSON.stringify(O.findOptimisations(withoutRent))
+    === JSON.stringify(O.findOptimisations({ ...withoutRent, ytdPropertyIncome: undefined, ytdPropertyExpenses: undefined })));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 🔴 A DIRECTOR WAS BEING CHARGED INCOME TAX AND CLASS 4 ON HIS COMPANY ===\n');
+//
+// taxPosition() read neither businessType nor incomeShape, though getOptimiserInput fills both in.
+// So a limited company's profit went in as `selfEmployment`, the one slot that carries Class 4
+// National Insurance, and the answer became the headline "put by for tax" figure in the largest type
+// on the screen. Wrong taxpayer, wrong tax, wrong rate, wrong date: a company's trading profit is
+// chargeable to Corporation Tax IN THE COMPANY, and what reaches him is salary and dividends, which
+// this engine already counts properly.
+//
+// ⚠️ THE SMALLER NUMBER IS THE DANGEROUS PART, so the engine is not allowed to go quiet about it.
+{
+  const shape = {
+    ...base, ytdTradeIncome: 90000, ytdTradeExpenses: 20000,
+    employmentIncome: 12570, dividendIncome: 20000,
+  };
+  const asSoleTrader = O.taxPosition(shape);
+  const asCompany = O.taxPosition({ ...shape, businessType: 'limited_company' });
+
+  ok('🔴 THE BUG: no Class 4 National Insurance on a company\'s profit, on his personal figure',
+    asSoleTrader.class4NIC > 0 && asCompany.class4NIC === 0);
+  ok('🔴 ...and no income tax on it either. It is not his income',
+    asCompany.totalIncome === 12570 + 20000 && asSoleTrader.totalIncome === 12570 + 20000 + 70000);
+  ok('...his set aside falls, because he was being asked for a tax that is not his',
+    asCompany.setAside < asSoleTrader.setAside);
+  ok('🔴 BUT WHAT HE STILL DOES OWE IS UNTOUCHED: the tax on what he takes out',
+    asCompany.incomeTax.dividends > 0 && asCompany.setAside > 0);
+
+  // THE HONESTY HALF. A smaller number with nothing beside it is how this fix could do harm.
+  ok('🔴 THE ENGINE SAYS WHAT IT LEFT OUT, IN POUNDS', asCompany.companyProfitExcluded === 70000);
+  ok('...and turns it into a sentence, so no surface can print the smaller number in silence',
+    /Corporation Tax/.test(O.setAsideBasisLine({ ...shape, businessType: 'limited_company' }, asCompany)));
+  ok('...even for a director with no salary and no dividends captured, whose list is empty',
+    (() => {
+      const bare = { ...base, ytdTradeIncome: 90000, ytdTradeExpenses: 20000, businessType: 'limited_company' };
+      const line = O.setAsideBasisLine(bare, O.taxPosition(bare));
+      return typeof line === 'string' && /company/i.test(line) && O.taxPosition(bare).setAside === 0;
+    })());
+  ok('...and it never says the figure covers a business whose profit it just took out',
+    !O.setAsideBasis({ ...shape, businessType: 'limited_company' }).includes('your business'));
+
+  // ⚠️ ONLY AN EXPLICIT COMPANY LOSES ANYTHING. Unknown is not an answer, here or anywhere.
+  ok('🔴 AN UNKNOWN STRUCTURE IS UNCHANGED, TO THE PENNY',
+    JSON.stringify(O.taxPosition({ ...shape, businessType: null }))
+    === JSON.stringify(asSoleTrader)
+    && JSON.stringify(O.taxPosition({ ...shape, businessType: undefined })) === JSON.stringify(asSoleTrader));
+  ok('a known sole trader and a partner are unchanged too',
+    JSON.stringify(O.taxPosition({ ...shape, businessType: 'sole_trader' })) === JSON.stringify(asSoleTrader)
+    && JSON.stringify(O.taxPosition({ ...shape, businessType: 'partnership' })) === JSON.stringify(asSoleTrader));
+  ok('a sole trader carries no company line at all, so nothing new appears on his screen',
+    asSoleTrader.companyProfitExcluded === 0
+    && !/Corporation Tax/.test(O.setAsideBasisLine(shape, asSoleTrader) ?? ''));
+
+  // A director's student loan cannot be charged on his company's profit either.
+  const loan = { ...shape, studentPlans: ['plan2'] };
+  ok('🔴 AND HIS STUDENT LOAN IS NOT CHARGED ON THE COMPANY\'S PROFIT',
+    O.taxPosition({ ...loan, businessType: 'limited_company' }).studentLoan
+    < O.taxPosition(loan).studentLoan);
+
+  // House style holds in the new sentence.
+  ok('the company sentence carries no em, en or minus dash',
+    !/[–—−]/.test(O.setAsideBasisLine({ ...shape, businessType: 'limited_company' }, asCompany)));
+}
+
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

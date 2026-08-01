@@ -88,6 +88,18 @@ export interface Circumstance {
   // ASKED AGAIN. The log would have been useless the day we needed it, which is the day HMRC asks.
   //
   // One question, one fact. If you need two facts, you need two questions, and the second one waits.
+  //
+  // 🔴 AND THE BAN WAS BROKEN A SECOND TIME, BY vat_registered, FOR TWO AND A HALF WEEKS.
+  //
+  // "Are you VAT registered, and when did you register?" asked for a date into an answer type that
+  // holds 'yes', 'no' or 'skip'. The date went nowhere, every time, for everybody, while the `why`
+  // underneath it promised him a four year reclaim that hangs entirely off that date. A man read
+  // the question, answered it, and reasonably believed he had told us.
+  //
+  // ⚠️ THE SECOND FACT DID NOT BECOME A SECOND CIRCUMSTANCE, BECAUSE IT IS NOT A YES OR A NO. A
+  // date, a VAT number and a scheme have nowhere to live in `Answer`. They are captured on
+  // /app/you/vat and stored in vat_profiles, where lib/vat.ts can compute the Reg 111 window from
+  // them. The question here keeps the one fact it can honestly hold.
   dependsOn?: { key: string; answer: Answer };
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -305,9 +317,21 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // including brand new ones that had sent us nothing. A claim about what we hold has to be
     // true for the man reading it, so the line now describes what logging a receipt does for
     // him, which is true whether he has logged a thousand or none yet.
+    //
+    // 🔴 AND ON 1 AUGUST 2026 THE COMPOUND QUESTION CAME OFF IT. See the ban above dependsOn.
+    //
+    // It read "Are you VAT registered, and when did you register?" and stored 'yes'. The date was
+    // asked for and discarded, which made the promise below a calculation with no input: Reg 111
+    // of the VAT Regulations 1995 gives goods still on hand four years back and services six
+    // months back, both measured from the day he registered and from nothing else.
+    //
+    // The date, the number and the scheme now go to /app/you/vat and into vat_profiles, so the
+    // `why` says what the reclaim really is and sends him to the one screen that can capture it.
+    // This row keeps its key and its place in the order: it is still the third biggest question we
+    // ask, and it is now one question about one fact.
     key: 'vat_registered',
-    ask: 'Are you VAT registered, and when did you register?',
-    why: 'When you registered you could have reclaimed the VAT on every tool and bit of kit you already owned, going back four years. Almost nobody does. Every receipt you put in your Lekhio is kept ready for exactly this.',
+    ask: 'Are you VAT registered?',
+    why: 'When you registered you could have reclaimed the VAT on the kit you already owned: goods you still had on the day, going back four years, and services going back six months. Almost nobody does. All of it hangs on the date you registered, so tell us that on your VAT page under You, and every receipt you put in your Lekhio is kept ready for exactly this.',
     worthOrder: 'huge',
     claimant: 'him',
     backYears: 4,
@@ -319,20 +343,38 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // vast numbers of people never do.
     key: 'pension',
     ask: 'Do you pay into a pension?',
-    why: 'The basic rate relief goes in automatically. The higher rate slice does NOT. You have to claim it, and most people never do.',
+    why: 'Relief on what you put in is worked out from what you earn by working, and rent is not earnings, so where your money comes from decides how much you can get. The basic rate goes in on its own. Any higher rate does not, and it has to be claimed, which most people never do.',
     worthOrder: 'large',
     claimant: 'him',
     backYears: 4,
     evidence: 'Your pension provider’s annual statement showing gross contributions.',
-    source: 'GOV.UK, tax on your private pension. Relief is capped by your relevant earnings.',
-    // ⚠️ ASKED OF EVERYONE ON PURPOSE, BUT THE `why` IS NOT TRUE OF A PURE LANDLORD.
+    source: 'GOV.UK, tax on your private pension. Relief is capped by your relevant UK earnings (FA 2004 s189), and rent is not relevant earnings, so a pure landlord is limited to £3,600 gross a year.',
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // ⚠️ ASKED OF EVERYONE ON PURPOSE, AND THE `why` USED NOT TO BE TRUE OF A PURE LANDLORD.
     //
-    // Relief is limited to relevant UK earnings (FA 2004 s189), and rent is not relevant earnings,
-    // so a man whose only income is letting is capped at £3,600 gross and there is no higher rate
-    // slice to reclaim. The QUESTION is still worth asking him, because knowing he pays into a
-    // pension changes what else we say, and because he may have a job or a trade we do not know
-    // about. The PROMISE is what needs a landlord's own wording, and this schema has one `why` per
-    // question. Logged for Jag rather than half fixed.
+    // It read: "The basic rate relief goes in automatically. The higher rate slice does NOT. You
+    // have to claim it, and most people never do." Relief is limited to relevant UK earnings
+    // (FA 2004 s189) and rent is not relevant earnings, so a man whose only business is letting is
+    // capped at £3,600 gross a year and has no higher rate slice to reclaim at all. We were
+    // telling him to go and claim something that does not exist for him.
+    //
+    // The QUESTION stays for everyone. Knowing he pays into a pension changes what else we say,
+    // and he may have a job or a trade we have not been told about.
+    //
+    // 🔴 AND THE FIX IS ONE REWORDED `why`, NOT A SECOND `why` FIELD. THE CHOICE, AND WHY.
+    //
+    // A `whyPropertyOnly` would have to be SELECTED by every surface that prints a `why`: the
+    // setup wizard, this page, the reveal, the phone app and the WhatsApp chain. That is the exact
+    // shape this codebase keeps getting hurt by, and the file says so twice already: a rule
+    // enforced at five call sites is a rule that will one day be enforced at four, and the surface
+    // that forgets is the one a man is looking at. The failure would also be silent and it would
+    // land on the man the second wording exists to protect.
+    //
+    // So the single sentence is written to be true of both men, which is the precedent set one
+    // entry down by `rental` on the same day and for the same reason: one question serves both, so
+    // one wording must. It costs a landlord nothing to read that rent is not earnings, and it is
+    // the very fact he needs. A trader with a flat needs it too.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
   },
   {
     // ⚠️ WE CANNOT CLAIM THIS ONE. HIS WIFE HAS TO. See doc 108 §3.
@@ -651,7 +693,15 @@ export const CIRCUMSTANCES: Circumstance[] = [
   {
     key: 'home_working',
     ask: 'Do you do your quotes, invoices and paperwork at home?',
-    why: 'You can claim a flat rate every month with no receipts to keep at all.',
+    // ⚠️ THE SECOND SENTENCE IS THE ONE THAT MAKES IT HONEST, AND IT WAS MISSING.
+    //
+    // lib/elections.ts's header rests on every description of the flat rate saying that it REPLACES
+    // claiming a share of his actual household bills, because a man who takes the flat rate and also
+    // puts his gas bill through has claimed the same thing twice, and HMRC allows one or the other.
+    // This sentence promised the flat rate and said nothing about the trade off, so it was one of
+    // the places that made that header a claim rather than a fact. lib/ledger.ts's use of home line
+    // was the other. Both now say it.
+    why: 'You can claim a flat rate every month with no receipts to keep at all. It goes in instead of a share of your actual home bills, never as well as.',
     worthOrder: 'small',
     claimant: 'him',
     backYears: 4,
@@ -737,6 +787,62 @@ function forIncome(c: Circumstance, income?: IncomeShape | null): boolean {
 // "is this question even for him", and adding a third axis later means changing one function.
 function fits(c: Circumstance, who: Persona): boolean {
   return forStructure(c, who.structure) && forIncome(c, who.income);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SAME QUESTION, ASKED BY A SURFACE ABOUT A ROW IT HAS ALREADY DRAWN.
+//
+// unanswered() and openIn() answer "what should we ask him next", and both drop a question the
+// second he answers it. That is right for a queue and useless for a PAGE, because a page draws the
+// ANSWERED ones too, with their `why` underneath, and a `why` is a promise.
+//
+// So a landlord who answered "what were you doing before you went self employed" in June, before
+// this module had any idea what a landlord was, still reads "we can carry that loss back against
+// the wages from your old job. HMRC send you a cheque" on his own circumstances page today. ITA
+// 2007 s72 is early TRADE losses relief. A property business loss carries forward against future
+// profits of the same letting business and nowhere else. There is no cheque. The filter added on
+// 31 July stopped us ASKING him. It never touched what he had already been asked.
+//
+// ⚠️ unanswered() CANNOT BE REUSED FOR THIS, and that is not a style preference. It also filters on
+// dependsOn, so a married man who has answered partner_low_earner is absent from it, and a page
+// that read absence as "does not apply to him" would withhold a promise that is perfectly true of
+// him. fits() is the only half a surface wants, so fits() gets a door of its own.
+//
+// ⚠️ AND IT ANSWERS "IS THIS QUESTION FOR HIM", NEVER "SHOULD THIS ROW BE DRAWN". What a surface
+// does with a false is the surface's judgement and it is written on the surface. See
+// app/app/you/circumstances/page.tsx for the one this product made: THE ROW STAYS, THE PROMISE GOES.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function appliesTo(c: Circumstance, asking?: AskingFor): boolean {
+  return fits(c, personaOf(asking));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AN ANSWER WE WROTE IN FOR HIM IS NOT AN ANSWER HE GAVE.
+//
+// A Landlord signup ticks the property stream on /start, and the signup reconcile in
+// lib/supabase.ts then writes `rental: yes` on his behalf. The exhibit it stores is not a question,
+// because it never was one. It is a statement of what he told us somewhere else:
+//
+//   "You told us at signup that you have rental property."
+//
+// He never saw the rental question. So a screen that reads that row back as "You said yes", or
+// counts it among the questions he has just answered and calls it money nobody ever asks him
+// about, is crediting him with an answer he did not give, about the one part of his business that
+// is not a sideline. The PAYE job tick is written in for him the same way in the same function.
+//
+// ⚠️ THE PREFIX IS RE-DECLARED HERE RATHER THAN IMPORTED, for the reason every literal in this
+// module is: it has no imports at all, which is what lets a test and the WhatsApp webhook load it
+// bare. test/persona.test.mjs pins this string against lib/supabase.ts so the two cannot drift
+// apart in silence.
+//
+// ⚠️ AND IT IS DELIBERATELY NOT "the stored exhibit does not match c.ask". The log keeps the exact
+// wording he read, for ever, and `ask` gets edited: `rental` itself was rewritten on 31 July.
+// Comparing the two would tell every man who answered before an edit that he never answered at all.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const TOLD_AT_SIGNUP = 'You told us at signup';
+
+export function writtenInFromSignup(asked: string | null | undefined): boolean {
+  return typeof asked === 'string' && asked.trimStart().startsWith(TOLD_AT_SIGNUP);
 }
 
 function openIn(

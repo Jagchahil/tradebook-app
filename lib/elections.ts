@@ -36,7 +36,29 @@
 // The one way double counting could still happen is a man who claims the flat rate AND logs a share
 // of his actual household bills as a business cost. HMRC allows one or the other, never both. We
 // cannot see inside "other", so we do the only honest thing available: the election is flat rate
-// only, and every place we describe it says plainly that it replaces claiming actual home bills.
+// only, and we tell him plainly that it replaces claiming a share of his actual home bills.
+//
+// ⚠️ THAT SENTENCE USED TO END "and every place we describe it says plainly that it replaces
+// claiming actual home bills", AND ON 31 JULY THAT WAS NOT TRUE. lib/ledger.ts's use of home line
+// read "The flat rate for doing your quotes and paperwork at home. No receipts needed." and stopped
+// there, which is the screen where a man reads what he is actually claiming, and the `why` on the
+// home_working question in lib/circumstances.ts promised the flat rate and said nothing either. A
+// header asserting a property of the whole codebase, checked by nobody, is how a comment turns into
+// a thing everyone believes. Both now say it, and the claim is now a list of named places:
+//
+//   electionConfirmation()      below, the moment he elects.
+//   lib/ledger.ts               the use of home line, wherever the ledger is drawn.
+//   lib/circumstances.ts        the `why` under "do you do your paperwork at home".
+//
+// 🔴 AND TWO PLACES STILL DO NOT SAY IT. Named rather than papered over, because the header being
+// slightly wrong is exactly what put us here:
+//
+//   lib/taxoptimiser.ts rule 4      "You can claim a flat £X a month with no receipts to keep."
+//   app/api/whatsapp/route.ts       handleHomeOffice's "Logged. N hours from home..." confirmation.
+//
+// Both were owned elsewhere on the day this was written and neither was changed on a guess. Logged
+// for Jag. test/persona.test.mjs asserts the three that do say it, so the list above cannot quietly
+// become two.
 //
 // PURE. No I/O, no clock of its own. Every rate comes from lib/taxengine.ts, which is watched
 // nightly by khoji/diff.mjs against GOV.UK. Not one number is written down in this file.

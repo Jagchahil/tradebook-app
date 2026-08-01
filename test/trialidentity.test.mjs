@@ -21,9 +21,14 @@
 // The other half is the one that must hold: the SAME MAILBOX is the same man however he spells
 // it, because that is the lazy abuse this exists to stop.
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import {
   normaliseEmail, normaliseName, normalisePhone, decideTrialGrant, refusalNote,
 } from '../lib/trialidentity.ts';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 let pass = 0;
 let fail = 0;
@@ -139,6 +144,41 @@ ok('no user id is refused rather than granted to nobody',
 ok('a refused man is pointed at signing in, not shown a door',
   refusalNote('email').toLowerCase().includes('sign in'));
 ok('every refusal reason has words', refusalNote(null).length > 20);
+
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE HOLE THE THREE REAL PRODUCTION ROWS SHOWED, 1 AUGUST 2026.
+//
+// decideTrialGrant below is correct and always was. It refuses on a plus stripped email, and its
+// own assertions prove it. But on 30 July a second trial was granted to the same person anyway,
+// and reading the actual rows said why: the earlier row had email_norm filled in, and the later
+// one had an email with email_norm NULL.
+//
+// email_norm is the ONLY key priorLocalGrants can match a web customer on, because a web account
+// has no phone until he binds one. A row with a null email_norm is invisible to the rule for ever,
+// and the next alias of the same person is granted without anything even looking.
+//
+// upsertSubscription was the writer. Its record type had no email_norm field at all, so it could
+// not have written one however carefully it was called. The fix is that email_norm now travels
+// with email in that function, normalised by the SAME function this file compares with, and these
+// assertions are what stop the pair being separated again.
+// ---------------------------------------------------------------------------------------------
+const supa = readFileSync(path.join(root, 'lib/supabase.ts'), 'utf8');
+const upsert = supa.slice(supa.indexOf('export async function upsertSubscription'),
+  supa.indexOf('export async function upsertSubscription') + 2600);
+
+ok('🔴 upsertSubscription writes email_norm, not just email',
+  /body\.email_norm\s*=\s*normaliseEmail\(/.test(upsert));
+ok('and it is the SAME normaliser decideTrialGrant compares with, not a second one',
+  /normaliseEmail\(rec\.email\)/.test(upsert));
+ok('the two are set together, so one can never be written without the other',
+  /body\.email = rec\.email;\s*\n\s*body\.email_norm/.test(upsert));
+
+// And the property that made it matter: a plus alias normalises to the same person.
+ok('the normaliser still strips a plus alias, which is the whole point of storing it',
+  normaliseEmail('jagchahil12+barber6@gmail.com') === normaliseEmail('jagchahil12+barber2@gmail.com'));
+ok('and it is not fooled by casing or padding',
+  normaliseEmail('  JagChahil12+X@Gmail.com ') === normaliseEmail('jagchahil12@gmail.com'));
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

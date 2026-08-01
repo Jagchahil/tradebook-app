@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { hasClaudeConfig } from '../../../../lib/claude';
+import { readVatProfile } from '../../../../lib/supabase';
 import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { gateForUser } from '../../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../../lib/gate';
@@ -82,8 +83,17 @@ export default async function CapturePage({
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
   const said = notice(one('done'), one('problem'));
 
-  const gate = await gateForUser(user.id);
+  // ⚠️ THE VAT SENTENCE IS DRAWN FOR A REGISTERED MAN AND FOR NOBODY ELSE. Most of this audience
+  // is not registered and never will be, and telling him we read a figure he has no use for is a
+  // line he has to read and discard before he reaches the button he came for. Doc 103's empty
+  // test. null from readVatProfile means the READ FAILED, which is not "he is registered", so it
+  // draws the plain sentence, which is true for everybody.
+  const [gate, vatProfile] = await Promise.all([
+    gateForUser(user.id),
+    readVatProfile(user.id).catch(() => null),
+  ]);
   const locked = gate === 'readonly';
+  const vatRegistered = vatProfile !== null && vatProfile.registered;
   // Doc 103's honesty test: a form whose only outcome is "not switched on yet" is an advert for
   // the roadmap, so an unconfigured build explains itself and draws no button at all.
   const configured = hasClaudeConfig();
@@ -120,13 +130,26 @@ export default async function CapturePage({
       ) : (
         <section className="lek-card">
           <h1 className="lek-title">A paper receipt</h1>
+          {/* ⚠️ THE LIST NAMES WHAT THE PARSER ACTUALLY RETURNS, AND NOTHING ELSE. Until 31 July
+              2026 four places said we read the VAT while the vision prompt did not contain the
+              word. We read it now, so it may be said, and only where it is true: the paper has to
+              print it, and he has to be registered for it to be worth anything to him. */}
           <p style={S.lead}>
-            Give me the receipt and I will read it: the shop, the total and the date.
+            {vatRegistered
+              ? 'Give me the receipt and I will read it: the shop, the total, the date, and the VAT where the receipt prints one.'
+              : 'Give me the receipt and I will read it: the shop, the total and the date.'}
           </p>
           <p style={S.sub}>
             It goes in as waiting for your yes, never straight into your figures. If your bank
             already sent me the same payment, the receipt is put with it rather than counted twice.
           </p>
+          {vatRegistered ? (
+            <p style={S.sub}>
+              The VAT is a reading off the paper, so it counts towards nothing you claim back until
+              you have looked at the figure and said it is right. That question waits for you under
+              Waiting on you.
+            </p>
+          ) : null}
 
           <form action="/api/money/receipt" method="post" encType="multipart/form-data">
             {/* image/* rather than a list, so the phone offers its camera and its gallery both.

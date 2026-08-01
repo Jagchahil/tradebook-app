@@ -1,7 +1,7 @@
 // Email sending, via Resend. Dormant until RESEND_API_KEY is set, so everything degrades gracefully
 // until email is switched on. EVERY customer-facing email flows through one branded shell() so the whole
 // system looks like one professional company. 1-to-1 front-desk replies (sendReplyEmail) stay plain on
-// purpose — a real person's reply should not look like a marketing blast.
+// purpose, because a real person's reply should not look like a marketing blast.
 //
 // Env vars:
 //   RESEND_API_KEY   from resend.com
@@ -12,6 +12,10 @@
 // lib/onboarding.ts, and both modules are pure with no imports of their own, so this costs nothing.
 import { TRIAL_DAYS } from './entitlement';
 import { HOW_LONG } from './onboarding';
+// The reverse charge wording, read rather than retyped. It exists to satisfy somebody else's
+// rulebook (VATREVCON37100) and a second copy of it here would be a second thing to get wrong.
+// lib/vat.ts has no imports of its own, so this costs nothing.
+import { REVERSE_CHARGE_WORDING } from './vat';
 
 const KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.EMAIL_FROM || 'Lekhio <invoices@lekhio.app>';
@@ -135,6 +139,21 @@ const money = (pence: number) => `£${((Number(pence) || 0) / 100).toFixed(2)}`;
 const poundsFromNumber = (n: number) => `£${(Number(n) || 0).toFixed(2)}`;
 
 // --- invoice (to a trader's own customer) ---------------------------------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS EMAIL MUST NOT STATE A TOTAL THE DOCUMENT DISAGREES WITH (1 August 2026).
+//
+// It used to say one figure and nothing else, which was true when every invoice was hardcoded to
+// no VAT. It is not true now. A covering note saying "for £450" over an invoice that reads £540
+// is how a customer pays the wrong amount and a tradesman spends a fortnight chasing 90 quid he
+// was never short of. And under the reverse charge the opposite trap is waiting: the document
+// shows a VAT figure the customer must account for, and a note that did not explain it reads like
+// VAT he forgot to add.
+//
+// ⚠️ THE VAT FIELDS ARE OPTIONAL, so the WhatsApp caller that has never passed them keeps
+// compiling and keeps sending exactly the email it sent yesterday. Absent means "this invoice
+// carries no VAT", which is what every invoice this path has ever made.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export interface InvoiceEmail {
   to: string;
   number: string;
@@ -142,15 +161,41 @@ export interface InvoiceEmail {
   link: string;
   businessName?: string | null;
   customerName?: string | null;
+  // From lib/vat.ts, through the invoice row. Null or absent is an invoice with no VAT on it.
+  vatTreatment?: 'none' | 'charged' | 'reverse_charge' | null;
+  subtotal?: number | null;
+  vat?: number | null;
+  // 🔴 The VAT the CUSTOMER accounts for. Never added to the total, on the document or here.
+  reverseChargeVat?: number | null;
 }
 
 export async function sendInvoiceEmail(opts: InvoiceEmail): Promise<boolean> {
   const subject = `Invoice ${opts.number}${opts.businessName ? ` from ${opts.businessName}` : ''}`;
   const total = poundsFromNumber(opts.total);
   const link = safeUrl(opts.link);
+  const senderName = opts.businessName ? esc(opts.businessName) : 'the sender';
+
+  // The one extra sentence, and only where there is something to say. An invoice with no VAT on
+  // it reads exactly as it always has.
+  let vatLine = '';
+  if (opts.vatTreatment === 'charged') {
+    vatLine = p(
+      `That is <strong>${poundsFromNumber(opts.subtotal ?? 0)}</strong> for the work and `
+      + `<strong>${poundsFromNumber(opts.vat ?? 0)}</strong> VAT.`,
+    );
+  } else if (opts.vatTreatment === 'reverse_charge') {
+    vatLine = p(
+      `No VAT has been charged on this invoice. The domestic reverse charge applies, so the `
+      + `<strong>${poundsFromNumber(opts.reverseChargeVat ?? 0)}</strong> of VAT is yours to account `
+      + `for to HMRC. It is not part of the ${total} and it is not payable to ${senderName}. `
+      + `${esc(REVERSE_CHARGE_WORDING)}`,
+    );
+  }
+
   const inner = `
     ${p(`Hi ${esc(opts.customerName) || 'there'},`)}
     ${p(`Here is your invoice <strong>${esc(opts.number)}</strong>${opts.businessName ? ` from <strong>${esc(opts.businessName)}</strong>` : ''}, for <strong>${total}</strong>.`)}
+    ${vatLine}
     ${button(link, 'View and pay the invoice')}
     ${pMuted(`Or open this link: <a href="${link}" style="color:${RIVER}">${esc(link)}</a>`)}`;
   // Invoices are branded as the trader "via Lekhio" so the customer recognises who it is from.
@@ -224,7 +269,7 @@ export async function sendWaitlistWelcomeEmail(to: string, name?: string | null)
   const inner = `
     ${h1(hi)}
     ${p('Thanks for putting your name down for Lekhio. You’ll be one of the first we let in.')}
-    ${p('Lekhio is your first employee: it connects to your bank, sorts every payment in the background, and finds the tax you never need to pay. The shoebox and the January panic are done, it all happens in WhatsApp, and you approve everything.')}
+    ${p('Lekhio is your first employee: photograph a receipt, import a bank statement or just say what you spent, and it sorts every payment in the background and finds the tax you never need to pay. The shoebox and the January panic are done, and you approve everything.')}
     ${p('<strong>What happens next:</strong> we’ll message you the moment your spot is ready. Your first 7 days are free, and there’s no card to enter to start.')}
     ${button(APP, 'See how it works')}
     ${pMuted('If you didn’t sign up, just reply and we’ll take you off.')}`;

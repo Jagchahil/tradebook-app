@@ -32,11 +32,27 @@ const stage = mkdtempSync(path.join(tmpdir(), 'ledger-'));
 // personalincome.ts, which is the same whole-person engine taxPosition uses. See the baseline note
 // in lib/ledger.ts: taxing the trade alone gave a man with a job his personal allowance twice.
 const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'nistudentloan', 'ltdengine', 'personalincome', 'ledger']) {
+// 🔴 THE OPTIMISER IS STAGED ALONGSIDE, AND IT IS NOT DECORATION. lib/ledger.ts and
+// lib/taxoptimiser.ts each carry their own copy of the use of home rule, because a lib module may
+// not take a new lib import (three suites stage these files with a fixed dependency list and Node's
+// type stripping cannot resolve an extensionless import). Two copies of a money rule drift, and the
+// copy that drifts is the one he is looking at, so the two are run side by side further down.
+for (const f of [
+  'taxengine', 'nistudentloan', 'ltdengine', 'personalincome', 'propertyengine', 'autonomy',
+  'taxoptimiser', 'ledger', 'incomeproof', 'quarterpack', 'personal',
+]) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
 const L = await import(pathToFileURL(path.join(stage, 'ledger.ts')).href);
 const E = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);
+const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);
+// The three other money documents fixed in the same wave. They are pinned in this suite because it
+// is the one that already reaches across every surface money is printed on, and because the suites
+// that own those modules were being edited elsewhere while this went in. Their sections are at the
+// bottom of this file, under their own headings.
+const IP = await import(pathToFileURL(path.join(stage, 'incomeproof.ts')).href);
+const QP = await import(pathToFileURL(path.join(stage, 'quarterpack.ts')).href);
+const PERSONAL = await import(pathToFileURL(path.join(stage, 'personal.ts')).href);
 const { ledger, headline, ENOUGH_MONTHS } = L;
 const { soleTraderTax } = E;
 
@@ -232,9 +248,16 @@ ok('...and it reuses getOptimiserInput rather than assembling a SECOND set of fi
 // made.
 
 const ledgerSrc = rf(path.join(root, 'lib/ledger.ts'), 'utf8');
-const movedNotAdded = (src) => /expenses:\s*Math\.max\(0,\s*input\.ytdTradeExpenses\s*-\s*mileage\)/.test(src);
+// ⚠️ THIS PATTERN GAINED A SECOND SUBTRACTION ON 31 JULY 2026, AND THE OLD ONE WAS WRONG.
+//
+// It used to read `input.ytdTradeExpenses - mileage`, full stop, because the file believed use of
+// home could not be inside expenses. It can: app/api/whatsapp/route.ts writes a real 'Use of home'
+// transaction, so the logged pounds sit in ytdTradeExpenses exactly as mileage does and have to come
+// out of the expenses line for the same reason. Pinning the OLD text would now pin the double count.
+const movedNotAdded = (src) => /expenses:\s*Math\.max\(0,\s*input\.ytdTradeExpenses\s*-\s*mileage\s*-\s*loggedHomeOffice\)/.test(src);
 
-ok('🔴 THE SUBTRACTION LIVES IN lib/ledger.ts, ONCE', movedNotAdded(ledgerSrc) && /\bmileage,/.test(ledgerSrc));
+ok('🔴 THE SUBTRACTION LIVES IN lib/ledger.ts, ONCE, AND IT TAKES OUT BOTH SLICES',
+  movedNotAdded(ledgerSrc) && /\bmileage,/.test(ledgerSrc));
 
 ok('🔴 the API route DELEGATES rather than assembling its own figures',
   api.includes('ledgerFor(input)') && !movedNotAdded(api));
@@ -253,6 +276,162 @@ ok('...and no caller passes a raw ytdMileage into the ledger without the subtrac
 ok('🔴 THE USE OF HOME ELECTION REACHES THE LEDGER, and no caller hardcodes it to zero',
   /homeOffice:\s*Math\.max\(0,\s*input\.ytdHomeOffice\s*\?\?\s*0\)/.test(ledgerSrc)
   && !/homeOffice:\s*0/.test(api) && !/homeOffice:\s*0/.test(wa));
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE USE OF HOME, COUNTED TWICE, ON A MAN WHO USED BOTH DOORS.
+// ---------------------------------------------------------------------------------------------
+//
+// There are two ways use of home reaches this file and until now they were ADDED TOGETHER.
+//
+//   THE ELECTION  lib/elections.ts turns his hours band into pounds a month. That fills
+//                 ytdHomeOffice, and ledgerFor() put it on its own line, on top of everything else.
+//   THE TEXT      app/api/whatsapp/route.ts handleHomeOffice writes a REAL TRANSACTION, vendor
+//                 'Use of home', which lands inside ytdTradeExpenses like any other cost.
+//
+// So a man who elected AND texted his hours had the same deduction twice, and lib/ledger.ts carried
+// a long comment arguing that this could not happen because use of home "cannot be inside expenses".
+// It could. It was. A comment is not a test, which is the entire reason for the block below.
+//
+// THE RULE: take what he LOGGED out of expenses, always; then the deduction is the ELECTION if he
+// has one, and the logged rows if he has not. Whichever door he came through, it lands once.
+{
+  const shape = {
+    monthsElapsed: 12, ytdTradeIncome: 40_000, ytdTradeExpenses: 8_000, ytdCisSuffered: 0,
+  };
+  const elected = 312;   // six months of the 25 to 50 hour band, near enough
+  const logged = 200;    // what he texted, already inside the £8,000 of expenses
+  const totalDeducted = (l) => l.lines.reduce((n, x) => n + x.deducted, 0);
+  const home = (l) => l.lines.find((x) => x.key === 'home_office');
+
+  const neither = L.ledgerFor({ ...shape });
+  const electedOnly = L.ledgerFor({ ...shape, ytdHomeOffice: elected });
+  const textedOnly = L.ledgerFor({ ...shape, ytdHomeOfficeLogged: logged });
+  const both = L.ledgerFor({ ...shape, ytdHomeOffice: elected, ytdHomeOfficeLogged: logged });
+
+  ok('🔴 THE BUG: a man who elects AND texts is no longer deducted twice',
+    totalDeducted(both) === 8_000 - logged + elected);
+  ok('...and the old answer was provably bigger, by exactly the amount he was given twice',
+    8_000 + elected - totalDeducted(both) === logged);
+  ok('...he is counted at the ELECTION, which is the authoritative figure',
+    home(both).deducted === elected);
+
+  // ⚠️ AND NOW THE THREE WAYS NOBODY IS ALLOWED TO LOSE A PENNY.
+  ok('ELECTED ONLY is unchanged to the penny: nothing logged, nothing to take out',
+    totalDeducted(electedOnly) === 8_000 + elected && home(electedOnly).deducted === elected
+    && electedOnly.withLekhio === L.ledger({
+      monthsElapsed: 12, grossIncome: 40_000, expenses: 8_000, mileage: 0,
+      homeOffice: elected, capitalAllowances: 0, pension: 0, cisSuffered: 0,
+    }).withLekhio);
+  ok('🔴 TEXTED ONLY KEEPS THE SAME TOTAL HE ALREADY HAD. It moves onto a line, it does not shrink',
+    totalDeducted(textedOnly) === totalDeducted(neither)
+    && textedOnly.withLekhio === neither.withLekhio
+    && textedOnly.saved === neither.saved);
+  ok('...and he can finally SEE it, which is the only thing that changed for him',
+    home(textedOnly).deducted === logged && !home(neither));
+  ok('nobody with a deduction ends up worse off than a man who never claimed it',
+    [electedOnly, textedOnly, both].every((l) => l.saved >= neither.saved));
+
+  // The expenses line is the one that gives the slice up, exactly as it does for mileage.
+  ok('the logged pounds come OFF the expenses line rather than being added anywhere',
+    both.lines.find((x) => x.key === 'expenses').deducted === 8_000 - logged
+    && electedOnly.lines.find((x) => x.key === 'expenses').deducted === 8_000);
+}
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 AND THE TWO FILES THAT HOLD THAT RULE MUST NEVER PART COMPANY.
+// ---------------------------------------------------------------------------------------------
+//
+// lib/ledger.ts and lib/taxoptimiser.ts each carry their own copy, because neither may import the
+// other. That is a real constraint and not an excuse: the rule is run through BOTH modules here, on
+// the same grid of figures, and the deduction each one arrives at has to be the same number. The
+// optimiser does not publish its trade profit, so it is read back out of totalIncome, which with no
+// other income and a full year IS the trade profit.
+{
+  let mismatch = 0;
+  let checked = 0;
+  for (const electedHome of [0, 78, 312, 1_500]) {
+    for (const loggedHome of [0, 60, 312, 900]) {
+      const input = {
+        startYear: 2026, monthsElapsed: 12,
+        ytdTradeIncome: 40_000, ytdTradeExpenses: 8_000, ytdCisSuffered: 0,
+        employmentIncome: 0, categoriesLogged: [], homeOfficeClaimed: false, mileageClaimed: true,
+        ytdHomeOffice: electedHome, ytdHomeOfficeLogged: loggedHome,
+      };
+      const fromLedger = L.ledgerFor(input).lines.find((x) => x.key === 'home_office')?.deducted ?? 0;
+      // income - (expenses - logged) - deduction = totalIncome, so deduction falls out of it.
+      const fromOptimiser = 40_000 - (8_000 - loggedHome) - O.taxPosition(input).totalIncome;
+      if (Math.round(fromLedger) !== Math.round(fromOptimiser)) mismatch += 1;
+      checked += 1;
+    }
+  }
+  ok(`🔴 THE LEDGER AND THE OPTIMISER AGREE ON THE USE OF HOME, ${checked} SHAPES, NO EXCEPTIONS`,
+    checked === 16 && mismatch === 0);
+  ok('and the optimiser publishes the rule as one function, so it has one place to go wrong',
+    typeof O.homeOfficeParts === 'function'
+    && O.homeOfficeParts({ ytdHomeOffice: 300, ytdHomeOfficeLogged: 100 }).deduction === 300
+    && O.homeOfficeParts({ ytdHomeOffice: 0, ytdHomeOfficeLogged: 100 }).deduction === 100
+    && O.homeOfficeParts({}).deduction === 0);
+}
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 A LANDLORD HAD NO LEDGER AT ALL. "Nothing confirmed yet", on a year of confirmed rent.
+// ---------------------------------------------------------------------------------------------
+//
+// grossIncome was input.ytdTradeIncome, the trade alone, and the empty state is gated on it. So a
+// customer whose whole business is letting could confirm every pound of rent he took and every cost
+// he paid, open the one screen whose job is to show what we saved him, and be told nothing had been
+// confirmed. His property figures were in the same object the whole time, used for one thing: raising
+// the rate his TRADE was taxed at, a trade he has not got.
+{
+  const landlord = L.ledgerFor({
+    monthsElapsed: 12, ytdTradeIncome: 0, ytdTradeExpenses: 0, ytdCisSuffered: 0,
+    ytdPropertyIncome: 30_000, ytdPropertyExpenses: 7_000,
+  });
+
+  ok('🔴 THE BUG: a landlord with confirmed rent is no longer told nothing is confirmed',
+    landlord.enough === true && landlord.note === null);
+  ok('...his property costs are a line, by name, with his own figure on it',
+    !!landlord.lines.find((x) => x.key === 'property' && x.deducted === 7_000));
+  ok('...and they saved him real money, which is the whole point of the screen',
+    landlord.saved > 1_000 && landlord.withoutLekhio > landlord.withLekhio);
+
+  // 🔴 AND NOT A PENNY OF NATIONAL INSURANCE ON HIS RENT. The same error lib/incomeproof.ts was
+  // printing on a document going to a lender. A pound of trade deduction saves income tax AND
+  // Class 4; a pound of property cost saves income tax alone, so the same numbers must save LESS
+  // through a property than through a trade.
+  const trader = L.ledgerFor({
+    monthsElapsed: 12, ytdTradeIncome: 30_000, ytdTradeExpenses: 7_000, ytdCisSuffered: 0,
+  });
+  ok('🔴 RENT CARRIES NO CLASS 4, SO THE SAME COSTS SAVE LESS THROUGH A PROPERTY THAN A TRADE',
+    landlord.saved < trader.saved);
+  ok('...and the gap is Class 4 on the costs, near enough, not some rounding',
+    Math.abs((trader.saved - landlord.saved) - 7_000 * 0.06) < 5);
+
+  // A man with both. His actual bill cannot move; only the baseline and the credit for his costs do.
+  const shape = {
+    monthsElapsed: 12, ytdTradeIncome: 40_000, ytdTradeExpenses: 9_000, ytdCisSuffered: 0,
+    ytdPropertyIncome: 12_000, ytdPropertyExpenses: 4_000,
+  };
+  const mixed = L.ledgerFor(shape);
+  const netted = L.ledger({
+    monthsElapsed: 12, grossIncome: 40_000, expenses: 9_000, mileage: 0, homeOffice: 0,
+    capitalAllowances: 0, pension: 0, cisSuffered: 0,
+    otherIncome: { otherNonSavings: 8_000 },  // exactly what ledgerFor used to pass
+  });
+  ok('🔴 A MAN WITH BOTH STREAMS OWES EXACTLY WHAT HE OWED BEFORE. His bill did not move',
+    mixed.withLekhio === netted.withLekhio);
+  ok('...and what we claim to have saved him goes UP, never down, because his property costs count now',
+    mixed.saved > netted.saved && mixed.withoutLekhio > netted.withoutLekhio);
+  ok('a property loss cannot come off his trade: only the part that bit is ever counted',
+    L.ledgerFor({ ...shape, ytdPropertyExpenses: 30_000 })
+      .lines.find((x) => x.key === 'property').deducted === 12_000);
+  ok('nothing moves for a man with no property at all',
+    JSON.stringify(L.ledgerFor({ monthsElapsed: 12, ytdTradeIncome: 40_000, ytdTradeExpenses: 9_000, ytdCisSuffered: 0 }))
+    === JSON.stringify(L.ledgerFor({
+      monthsElapsed: 12, ytdTradeIncome: 40_000, ytdTradeExpenses: 9_000, ytdCisSuffered: 0,
+      ytdPropertyIncome: 0, ytdPropertyExpenses: 0,
+    })));
+}
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 NO FLOATING POINT TAIL IN ANYTHING A MAN READS. Found on a live screen, 28 July 2026.
@@ -427,6 +606,162 @@ console.log('\n🔴 A MAN WITH A JOB WAS BEING GIVEN HIS PERSONAL ALLOWANCE TWIC
   ok('...and neither does savings interest', alsoDividends.withoutLekhio === withSalary.withoutLekhio);
 }
 
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n🔴 NATIONAL INSURANCE ON RENT, ON A DOCUMENT GOING TO A LENDER. lib/incomeproof.ts');
+//
+// buildIncomeProof summed every confirmed row into one profit and ran soleTraderTax over it, which
+// adds Class 4. Class 4 is charged on the profits of a TRADE. Rent is property income and carries
+// none of it. So a landlord's proof of income, the page he hands a mortgage broker, showed him
+// National Insurance he does not owe, over our name, on a document whose entire job is to be
+// believed by somebody who checks. The rows carried income_type all along; the interface never
+// asked for it.
+{
+  const now = new Date('2026-12-01T00:00:00Z');
+  const rent = [
+    { amount: 30000, transaction_date: '2026-05-10', income_type: 'property' },
+    { amount: -7000, transaction_date: '2026-06-10', income_type: 'property' },
+  ];
+  const trade = [
+    { amount: 30000, transaction_date: '2026-05-10' },
+    { amount: -7000, transaction_date: '2026-06-10' },
+  ];
+
+  const landlord = IP.buildIncomeProof(rent, 'A. Landlord', 2026, now);
+  const sparky = IP.buildIncomeProof(trade, 'A. Sparky', 2026, now);
+
+  ok('🔴 THE BUG: a pure landlord is charged no National Insurance on his rent',
+    landlord.nationalInsurance === 0 && landlord.propertyProfit === 23000 && landlord.tradeProfit === 0);
+  ok('...and his tax is income tax alone, to the penny',
+    landlord.estimatedTax === E.incomeTaxOnProfit(23000));
+  ok('🔴 ...AND THE WORDS FOLLOW THE FIGURE, so the document does not claim a tax he is not paying',
+    landlord.estimatedTaxLabel === 'Estimated Income Tax'
+    && !/National Insurance/.test(IP.renderIncomeProofHtml(landlord)));
+  ok('...while a tradesman is still told about his, because his is real',
+    sparky.estimatedTaxLabel === 'Estimated Income Tax and National Insurance'
+    && /National Insurance/.test(IP.renderIncomeProofHtml(sparky)));
+
+  ok('🔴 A TRADE ONLY SUMMARY IS UNCHANGED, TO THE PENNY',
+    sparky.estimatedTax === soleTraderTax(23000).total && sparky.nationalInsurance > 0);
+  ok('...and so is everything a lender actually reads: income, expenses, profit, entries',
+    sparky.income === 30000 && sparky.expenses === 7000 && sparky.profit === 23000 && sparky.txCount === 2);
+
+  // A man with both. One personal allowance between the two streams, Class 4 on the trade alone.
+  const mixed = IP.buildIncomeProof([...trade, ...rent], 'Both', 2026, now);
+  ok('🔴 THE TWO STREAMS SHARE ONE PERSONAL ALLOWANCE, so the tax is worked out on them together',
+    mixed.estimatedTax === E.incomeTaxOnProfit(46000) + E.class4NIC(23000));
+  ok('...which is MORE than taxing them apart would have said, because that hands him the allowance twice',
+    mixed.estimatedTax > soleTraderTax(23000).total + E.incomeTaxOnProfit(23000));
+  ok('...and LESS than the old answer, which charged Class 4 on the rent as well',
+    mixed.estimatedTax < soleTraderTax(46000).total);
+  ok('...with the National Insurance in it being the trade\'s, and only the trade\'s',
+    mixed.nationalInsurance === E.class4NIC(23000));
+  ok('the document still carries no em, en or minus dash',
+    !/[–—−]/.test(IP.renderIncomeProofHtml(mixed)));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n🔴 A COMPANY\'S TURNOVER IS NOT THE DIRECTOR\'S QUALIFYING INCOME. lib/quarterpack.ts');
+//
+// The pack had no structure awareness at all. It put a company's turnover into the Making Tax
+// Digital for Income Tax threshold test and told the customer quarterly updates apply; a company
+// files its own return and its trade is not his qualifying income. Then it called the company's
+// profit "your trade profit", ran soleTraderTax over it, and printed "Estimated Class 4 National
+// Insurance" on the document he hands his accountant.
+{
+  const rows = [
+    { amount: 80000, category: 'income', transaction_date: '2026-05-01' },
+    { amount: -20000, category: 'materials', transaction_date: '2026-05-02' },
+  ];
+  // The clock is pinned so that two packs can be compared character for character below.
+  const packOf = (over = {}) => QP.buildQuarterPack({
+    transactions: rows, startYear: 2026, quarter: 1, businessName: 'Sparks Ltd',
+    now: new Date('2026-07-10T09:00:00Z'), ...over,
+  });
+  const asIs = packOf();
+  const asCompany = packOf({ structure: 'limited_company' });
+
+  ok('🔴 THE BUG: a company\'s turnover no longer counts towards HIS Making Tax Digital threshold',
+    asIs.ytd.grossQualifyingIncome === 80000 && asIs.ytd.mtdApplies === true
+    && asCompany.ytd.grossQualifyingIncome === 0 && asCompany.ytd.mtdApplies === false);
+  ok('...but his RENT still does, because rent on a personal return counts whatever else he runs',
+    QP.buildQuarterPack({
+      transactions: [...rows, { amount: 60000, transaction_date: '2026-05-03', income_type: 'property' }],
+      startYear: 2026, quarter: 1, structure: 'limited_company',
+    }).ytd.mtdApplies === true);
+
+  ok('🔴 AND HE IS NOT CHARGED CLASS 4 NATIONAL INSURANCE ON HIS COMPANY\'S PROFIT',
+    asIs.ytd.estimatedTax.class4 > 0 && asCompany.ytd.estimatedTax.class4 === 0
+    && asCompany.ytd.estimatedTax.total === 0 && asCompany.ytd.estimatedTax.companyProfitExcluded === true);
+  ok('...and the pack says where that tax actually lives, rather than going quiet',
+    /Corporation Tax/.test(asCompany.ytd.estimatedTax.note)
+    && !/trade profit/.test(asCompany.ytd.estimatedTax.note));
+  ok('...his money itself is untouched: the figures his accountant needs are all still there',
+    asCompany.ytd.trade.net === 60000 && asCompany.submission.trade.income === 80000
+    && asCompany.trade.expenses === 20000);
+
+  const html = QP.renderQuarterPackHtml(asCompany);
+  ok('🔴 THE PRINTED DOCUMENT CARRIES NEITHER SENTENCE THAT WAS FALSE OF HIM',
+    !/Estimated Class 4 National Insurance/.test(html) && !/quarterly updates apply/.test(html));
+  ok('...it says plainly that his company files its own return',
+    /the company files its own return/.test(html));
+  ok('...and it never calls his company\'s money his trade, anywhere on the page',
+    !/Trade/.test(html) && /Company profit, year so far/.test(html));
+  ok('...and it never tells him his gross income for the year was zero',
+    !/gross income so far this year is £0\.00/.test(html));
+  ok('the sole trader document still says both, because for him they are true',
+    /Estimated Class 4 National Insurance/.test(QP.renderQuarterPackHtml(asIs))
+    && /quarterly updates apply/.test(QP.renderQuarterPackHtml(asIs)));
+  ok('no em, en or minus dash reached the director\'s document', !/[–—−]/.test(html));
+
+  // ⚠️ UNKNOWN IS NEVER AN ANSWER. Every existing caller passes nothing and must get the same pack.
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  ok('🔴 AN UNKNOWN STRUCTURE GETS THE IDENTICAL PACK, TO THE CHARACTER',
+    same(packOf({ structure: null }), asIs) && same(packOf({ structure: undefined }), asIs));
+  ok('a known sole trader and a partner get it too',
+    same(packOf({ structure: 'sole_trader' }), asIs) && same(packOf({ structure: 'partnership' }), asIs));
+
+  // It is WIRED, which is this codebase's actual disease when it is not.
+  const packRoute = rf(path.join(root, 'app/api/quarter-pack/route.ts'), 'utf8');
+  ok('🔴 THE ROUTE ACTUALLY PASSES WHO HE IS, or none of the above ever reaches a customer',
+    packRoute.includes('getBusinessProfile') && /structure: biz\?\.businessType \?\? null/.test(packRoute));
+  ok('...and it does not restate the rule: the route has no idea what a limited company is',
+    !/limited_company/.test(packRoute));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n🔴 THE CHECK THAT KNOWS WHO HE IS WAS NEVER RUN. lib/personal.ts findPersonal');
+//
+// looksPersonal takes his own names and puts that check FIRST, because knowing who he is beats
+// inferring it from the shape of a word. findPersonal called it with two arguments, so the names
+// fell back to the empty default and the check was dead on the two surfaces that use it,
+// /api/anomalies and /api/personal. A transfer to his own account went on being counted as a
+// business cost, taking money off his taxable profit that should not come off. That is the
+// direction he never notices, because the number moved in his favour.
+{
+  const rows = [
+    { id: '1', vendor: 'Jag Chahil', amount: -496, transaction_date: '2026-05-01' },
+    { id: '2', vendor: 'Jaguar Land Rover', amount: -820, transaction_date: '2026-05-02' },
+    { id: '3', vendor: 'Screwfix', amount: -120, transaction_date: '2026-05-03' },
+  ];
+
+  const blind = PERSONAL.findPersonal(rows);
+  const knowing = PERSONAL.findPersonal(rows, ['Jag Chahil']);
+
+  ok('🔴 THE BUG: his own name is finally recognised when the caller knows it',
+    knowing.length === 1 && knowing[0].id === '1' && knowing[0].reason === 'self');
+  ok('...and it was invisible before, on his own real second account',
+    blind.length === 0);
+  ok('🔴 A CUSTOMER CALLED JAG DOES NOT LOSE HIS JAGUAR INVOICE. Whole words, never a substring',
+    !knowing.some((p) => p.id === '2') && !knowing.some((p) => p.id === '3'));
+  ok('a caller that passes nothing is exactly as safe as it was: it can only ever raise fewer rows',
+    PERSONAL.findPersonal(rows, []).length === blind.length);
+  ok('...and everything else it already caught is untouched',
+    PERSONAL.findPersonal([{ id: '9', vendor: 'CHILD TAX CREDIT', amount: 345.13 }], ['Jag Chahil'])
+      .some((p) => p.reason === 'benefit'));
+  ok('the names really do travel through to the matcher rather than being read twice',
+    /looksPersonal\(r\.vendor, r\.description, ownNames\)/.test(rf(path.join(root, 'lib/personal.ts'), 'utf8')));
+}
 
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

@@ -250,7 +250,21 @@ export function welcomeAfterBinding(storedName?: string | null): string {
     'Say what you spent or got paid and I will log it.',
     'Ask me what you owe, or what you made this week, and I will tell you.',
     '',
-    'The one thing worth doing next is connecting your bank on the website. Everything you spend from it lands here on its own, and you never type your own figures again.',
+    // 🔴 THIS SENTENCE USED TO SAY "connecting your bank on the website", AND IT IS THE WORST
+    // PLACE IN THE PRODUCT FOR IT TO HAVE BEEN WRONG. It is the single instruction of his welcome
+    // message, sent as a plain WhatsApp reply the instant he binds his phone, on a channel that
+    // reaches him whether he is looking or not. TrueLayer declined production authorisation, so
+    // there is no provider and no bank to connect: the first thing we ever asked a new customer to
+    // do was a thing he could not do.
+    //
+    // It survived two sweeps. test/frontdoor.test.mjs looked for "connect your bank" and this says
+    // "connecting", and test/walink.test.mjs PINNED IT IN PLACE with an assertion whose name
+    // ("the one thing that needs nothing typed") was still true of the idea and false of the door.
+    // That is exactly how test/banknudge.test.mjs held the same defect until 31 July.
+    //
+    // The statement import is the door that is actually open, it needs no provider, and it is the
+    // one thing here that genuinely needs nothing typed: a whole month lands in one go.
+    'The one thing worth doing next is importing a bank statement on the website. A whole month of spending lands in your books in one go, with nothing to photograph and nothing to type.',
   ].join('\n');
 }
 

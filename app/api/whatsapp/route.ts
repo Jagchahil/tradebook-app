@@ -148,7 +148,7 @@ import { quarterForDate } from '../../../lib/quarterpack';
 import { openTicket } from '../../../lib/support';
 import { matchKb } from '../../../lib/supportkb';
 import { soleTraderTax, homeOfficeFlatRateMonthly, FACTS } from '../../../lib/taxengine';
-import { taxPosition } from '../../../lib/taxoptimiser';
+import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
 import { aprilDelta } from '../../../lib/propertyengine';
 import { niPosition, studentLoanRepayment, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
@@ -434,6 +434,23 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handleCIS(from, messageId, text);
           } else if (isMileage(text)) {
             await handleMileage(from, messageId, text);
+          } else if (matchUseOfHomeElection(text)) {
+            // 🔴 THIS MOVED ON 1 AUGUST 2026, AND IT CHANGES WHICH MECHANISM HIS WORDS CREATE.
+            //
+            // isHomeOffice used to be tested here and matchUseOfHomeElection eighteen lines and
+            // nine branches further down. HOMEOFFICE_RE carries every phrase in HOME_WORDS except
+            // "home as office", so the election door was reachable in production by that one
+            // phrasing and by nothing else. "claim use of home, 30 hours a month" hit the
+            // TRANSACTION door, which writes a row into expenses, which is the door that double
+            // counts against the election. Every phrase test/waintents.test.mjs asserts as an
+            // election was being eaten before matchUseOfHomeElection was ever called.
+            //
+            // The election is the durable, correct mechanism: it belongs to one tax year, it
+            // stores the HMRC hours band rather than the money, and lib/elections.ts refuses it to
+            // a company and to a property only customer at the door. So it goes first, and
+            // isHomeOffice keeps everything the election matcher deliberately refuses: a question
+            // ("can i claim use of home"), a message with a pound sign, or a bare mention.
+            await handleUseOfHomeElection(from, text);
           } else if (isHomeOffice(text)) {
             await handleHomeOffice(from, messageId, text);
           } else if (isPhoneShare(text)) {
@@ -452,8 +469,6 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handlePricing(from);
           } else if (isDeadlineQuestion(text)) {
             await sendText(from, deadlineAnswer());
-          } else if (matchUseOfHomeElection(text)) {
-            await handleUseOfHomeElection(from, text);
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);
           } else if (isSetupRequest(text)) {
@@ -1598,7 +1613,16 @@ async function handleTotals(from: string, body: string): Promise<void> {
   // A figure off his own rows is exactly what WhatsApp is for, so it is answered here in full.
   const optimiser = await getOptimiserInput(userId);
   const tax = taxPosition(optimiser);
-  await sendText(from, oweAnswer(tax.setAside, tax.projected));
+  // 🔴 A DIRECTOR MUST NOT GET THE SMALLER NUMBER WITHOUT THE SENTENCE THAT EXPLAINS IT.
+  //
+  // taxPosition() stopped charging a company's trading profit to income tax and Class 4 on the
+  // director's personal return on 1 August 2026, which is right and which makes his figure a lot
+  // smaller. The web screens render setAsideBasisLine beside it so he reads "your company's own
+  // Corporation Tax is not in this". WhatsApp rendered the figure alone, so the one channel he uses
+  // from a van would have handed him a smaller number and no reason for it, which is the single way
+  // that fix could do harm. Same function, same sentence, both channels, so they cannot drift.
+  const basis = setAsideBasisLine(optimiser, tax);
+  await sendText(from, basis ? `${oweAnswer(tax.setAside, tax.projected)} ${basis}` : oweAnswer(tax.setAside, tax.projected));
 }
 
 // The UK tax year starts 6 April. Same rule as matchTotalsQuestion.

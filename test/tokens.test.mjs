@@ -265,5 +265,60 @@ for (const file of walk(root)) {
 if (accentWhite.length) accentWhite.forEach((w) => console.log(`        ${w}`));
 ok('no CSS rule pairs an accent and white the wrong way round', accentWhite.length === 0);
 
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE LOOK, LOCKED 1 AUGUST 2026. THESE ARE NOT STYLE PREFERENCES.
+//
+// Four looks were built on the same screen and the same markup, and the one chosen was chosen on
+// the business rather than on taste. Each assertion below is one of those business reasons, so if
+// somebody changes a number here they have to argue with the reason rather than with a number.
+// The full argument is written at the top of lib/tokens.ts above RADIUS.
+// ---------------------------------------------------------------------------------------------
+const appOnly = T.APP_CSS.replace(T.APP_THEME_CSS, '');
+
+// REASON 2. Dark follows the system and has no toggle, so whatever carries the design has to work
+// in both. Every shadow in this file is ink on paper and vanishes on a dark panel, so a shadow may
+// never be the thing that carries an affordance.
+ok('🔴 no hover state in the app is carried by a shadow, because a shadow is invisible in dark',
+  !/\.lek-hit:hover\{[^}]*box-shadow/.test(appOnly));
+ok('the hover affordance is a border, which is identical in both appearances',
+  /\.lek-hit:hover\{[^}]*border-color/.test(appOnly));
+
+// REASON 1. The doctrine forbids looking like software. The sharper option was out on doctrine.
+ok('the large radius stays at 16, panel rather than instrument', T.RADIUS.lg === 16);
+ok('the radius scale is still three steps and a pill, not a fourth invented one',
+  Object.keys(T.RADIUS).length === 4);
+
+// The scale exists so two jobs never share a size. lead went to 18 and NOT to 17 for that reason.
+ok('lead and strong are still different sizes, so neither is lying about mattering',
+  T.TYPE.lead !== T.TYPE.strong && T.TYPE.lead > T.TYPE.strong);
+ok('the type scale is still nine named jobs', Object.keys(T.TYPE).length === 9);
+
+// The calm rule: the gap BETWEEN two cards is never smaller than the air INSIDE one, or the eye
+// groups across the join instead of down the page.
+ok('🔴 on a phone the gap between cards is not smaller than the padding inside one',
+  appOnly.includes(`padding:${T.SPACE.md}px;margin-bottom:${T.SPACE.md}px`));
+ok('and the same holds on a desk', appOnly.includes(`padding:${T.SPACE.xl}px;margin-bottom:${T.SPACE.xl}px`));
+ok('the spacing rhythm was not broken to get there: no invented step',
+  Object.values(T.SPACE).every((n) => [4, 8, 12, 16, 24, 32, 48].includes(n)));
+
+// The one thing borrowed from the sharper option. Every screen here is a number a man came for.
+ok('🔴 there is a shared tabular numeral rule, so columns of pounds line up',
+  /\.lek-num\{[^}]*tabular-nums/.test(appOnly));
+ok('and the money tile still uses it too', /\.lek-tile-value\{[^}]*tabular-nums/.test(appOnly));
+
+// REASON 3. The palette is canonical and a polish may not touch it.
+ok('🔴 river is still the canonical river', T.RIVER === '#1B59A6');
+ok('saffron is still the canonical saffron', T.SAFFRON === '#E0A33E');
+ok('ink is still ink', T.INK === '#111111');
+ok('the font is still Inter, first in the stack', /^'Inter'/.test(T.FONT));
+
+// And the argument itself has to stay in the file, because a future session reads the code, not a doc.
+const tokensSrc = readFileSync(path.join(root, 'lib/tokens.ts'), 'utf8');
+ok('the reasoning for the locked look is written down where it will be read',
+  /THE LOOK, LOCKED 1 AUGUST 2026/.test(tokensSrc)
+  && /Apple move/.test(tokensSrc)
+  && /destination is a bank/i.test(tokensSrc));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

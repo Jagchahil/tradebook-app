@@ -1,16 +1,40 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
+import { bankFeedLive, filingBadge } from '../lib/features';
 import {
   INK, PAPER, FONT, SITE, faqs, reviews,
   SharedHead, SiteNav, SiteFooter, StickyCta, HeroPhone, Ic,
 } from './_shared/site';
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE FRONT DOOR ASKS lib/features.ts LIKE EVERY OTHER PUBLIC PAGE.
+//
+// Until 31 July this was the one public page that did not, and it was the highest traffic page
+// we have. It promised a bank feed in twelve places, including the JSON-LD that Google reads,
+// while TrueLayer had declined production authorisation and bankFeedOffered() defaulted off.
+// It also drew "Approve and send to HMRC" as a live button while our HMRC production
+// recognition was still pending, which contradicts our own application to them.
+//
+// So the page now leads with what a customer can actually do on day one: photograph a receipt,
+// import a bank statement (/app/money/import is real and proven), say or type a line, work the
+// review pile, and let the tax build itself. The bank feed is described as coming, never as the
+// way it works today, and the day the flag flips the front door upgrades itself.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The one phrase that describes how money gets in. Both wordings live side by side, the same
+// discipline lib/features.ts uses, so the "before" and the "after" can never drift apart.
+function captureLine(): string {
+  return bankFeedLive()
+    ? 'Connect your bank, snap a receipt, or just say what you spent'
+    : 'Snap a receipt, import your bank statement, or just say what you spent';
+}
+
 export const metadata: Metadata = {
   alternates: { canonical: '/' },
   title: 'Lekhio. Your first employee. The one that saves you money.',
   description:
-    'Lekhio is the first employee your business hires, and the first that pays for itself. Connect your bank and it works in the background, finding every legal way to lower your tax and keeping you ready to file. Filing is the easy part. Saving you money is the job. You approve. 7 days free.',
+    `Lekhio is the first employee your business hires, and the first that pays for itself. ${captureLine()}, and it works in the background, finding every legal way to lower your tax and keeping you ready for Making Tax Digital. Filing is the easy part. Saving you money is the job. You approve. 7 days free.`,
   openGraph: {
     title: 'Lekhio. Your first employee. The one that saves you money.',
     description: 'Not software you buy. The first employee your business hires. It finds the money, you approve, it keeps you ready to file.',
@@ -191,6 +215,10 @@ const CBARS = [
 ];
 
 export default function HomePage() {
+  // Read once, at the top, so every sentence below answers to the same switch.
+  const bankLive = bankFeedLive();
+  const filing = filingBadge();
+  const capture = captureLine();
   return (
     <main className="home" style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <script
@@ -199,8 +227,8 @@ export default function HomePage() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@graph': [
-              { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: 'The first employee for the UK self-employed. Connect your bank and it sorts every transaction, finds the reliefs you are owed, and keeps you ready for Making Tax Digital. For trades, freelancers, drivers, carers, consultants and landlords.' },
-              { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'iOS, Android, Web', url: SITE, description: 'Connect your bank and Lekhio sorts every transaction, finds every legal way to lower your tax, and keeps you ready for Making Tax Digital. You approve before anything reaches HMRC.', offers: [ { '@type': 'Offer', price: '12.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '129', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
+              { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: `The first employee for the UK self employed. ${capture}, and Lekhio sorts every transaction, finds the reliefs you are owed, and keeps you ready for Making Tax Digital. For trades, freelancers, drivers, carers, consultants, limited company directors and landlords.` },
+              { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'iOS, Android, Web', url: SITE, description: `${capture}, and Lekhio sorts every transaction, finds every legal way to lower your tax, and keeps you ready for Making Tax Digital. Lekhio prepares your figures. You approve them, and nothing reaches HMRC without your yes.`, offers: [ { '@type': 'Offer', price: '12.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '129', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
               { '@type': 'FAQPage', mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
             ],
           }),
@@ -210,7 +238,7 @@ export default function HomePage() {
       <style dangerouslySetInnerHTML={{ __html: HOME_CSS }} />
 
       {/* One clean top bar: the MTD announcement CTA */}
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for the self employed earning over £50k. <span className="go">See if it affects you →</span></Link></div>
+      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for sole traders and landlords with gross qualifying income over £50,000. <span className="go">See if it affects you →</span></Link></div>
 
       <SiteNav />
 
@@ -220,7 +248,7 @@ export default function HomePage() {
           <div>
             <span className="pill"><span className="dot" /> Your first employee. The one that pays for itself.</span>
             <h1>Your first<br />employee.<br />The one that <span className="gt">saves you money.<svg className="squig" viewBox="0 0 320 16" preserveAspectRatio="none"><path d="M4 11 C 60 3, 110 3, 150 9 S 260 15, 316 6" /></svg></span></h1>
-            <p className="sub">Connect your bank and it works in the background, sorting every payment and finding the tax you never need to pay. Filing is the easy part. Saving you money is the job. You approve, it does the rest.</p>
+            <p className="sub">Snap a receipt, import your bank statement, or just say what you spent. Lekhio sorts the lot in the background and finds the tax you never need to pay. Filing is the easy part. Saving you money is the job. You approve, it does the rest.</p>
             <div className="cta-row">
               <Link href="/start" className="btn primary">Start free</Link>
               <Link href="/product" className="btn ghost">See how it works</Link>
@@ -239,7 +267,11 @@ export default function HomePage() {
         <div className="row">
           <div className="ti"><span className="tc" style={{ background: 'var(--green-tint)' }}><Ic e="🔒" color="var(--green)" size={18} /></span><span>Encrypted, <b>never sold</b></span></div>
           <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}><Ic e="✅" color="var(--river)" size={18} /></span><span><b>You approve</b> everything</span></div>
-          <div className="ti"><span className="tc" style={{ background: 'var(--saffron-tint)' }}><Ic e="📐" color="var(--saffron-deep)" size={18} /></span><span><b>HMRC 2026/27 rules</b>, 104 tests</span></div>
+          {/* NOT "104 tests". Nothing in the repo produced or enforced that number, so it was a
+              figure we asserted publicly and could not check. What IS true, and checkable, is the
+              first line of lib/taxengine.ts: every rate is the published 2026/27 figure with its
+              source noted. */}
+          <div className="ti"><span className="tc" style={{ background: 'var(--saffron-tint)' }}><Ic e="📐" color="var(--saffron-deep)" size={18} /></span><span><b>2026/27 rates</b>, published figures</span></div>
           <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}>🇬🇧</span><span>A <b>real UK company</b></span></div>
         </div>
       </div>
@@ -266,7 +298,7 @@ export default function HomePage() {
             <div className="new">
               <h3>The Lekhio way</h3>
               <ul>
-                <li><span className="m">✓</span> Connect your bank. Every payment sorted for you.</li>
+                <li><span className="m">✓</span> Snap it, say it, or import the statement. Sorted for you.</li>
                 <li><span className="m">✓</span> It finds the reliefs you are owed, all year.</li>
                 <li><span className="m">✓</span> Your tax figures always sat there, ready.</li>
                 <li><span className="m">✓</span> One flat price, everything in.</li>
@@ -282,11 +314,14 @@ export default function HomePage() {
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 44 }}>
             <h2 className="h2">Three steps. That is the whole thing.</h2>
-            <p className="lead">Connect it once. It works in the background from then on.</p>
+            <p className="lead">Set it up once. It works in the background from then on.</p>
           </div>
+          {/* 🔴 STEP ONE IS SOMETHING HE CAN DO ON DAY ONE. It used to be "Connect your bank",
+              which needs a provider we do not have. All three of these work the moment he signs
+              up, and none of them waits on anybody else's approval. */}
           <div className="steps reveal">
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--river),var(--river-deep))', boxShadow: '0 12px 26px rgba(27,89,166,.32)' }}>1</div><h3>Connect your bank</h3><p className="mut" style={{ fontSize: 15 }}>Every card payment is read and sorted automatically. Nothing to type, nothing to file. That is the whole job.</p></div>
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--saffron),var(--saffron-deep))', boxShadow: '0 12px 26px rgba(224,163,62,.32)' }}>2</div><h3>It finds your money</h3><p className="mut" style={{ fontSize: 15 }}>It sorts every transaction, claims the reliefs you are owed, tracks your refund, and keeps your tax ready as you go.</p></div>
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--river),var(--river-deep))', boxShadow: '0 12px 26px rgba(27,89,166,.32)' }}>1</div><h3>Snap it, say it, or import it</h3><p className="mut" style={{ fontSize: 15 }}>A photo of a receipt, a line of plain words, or a statement exported straight from your bank. Whatever is quickest with one hand on the ladder.</p></div>
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--saffron),var(--saffron-deep))', boxShadow: '0 12px 26px rgba(224,163,62,.32)' }}>2</div><h3>It finds your money</h3><p className="mut" style={{ fontSize: 15 }}>It reads the shop, the total and the date, files it in the right category, claims the reliefs you are owed, and keeps your tax ready as you go.</p></div>
             <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--green),#0F5C2E)', boxShadow: '0 12px 26px rgba(21,128,61,.32)' }}>3</div><h3>You approve</h3><p className="mut" style={{ fontSize: 15 }}>Your figures sit there ready. You check them and send them. Nothing reaches HMRC without your yes.</p></div>
           </div>
         </div>
@@ -348,18 +383,21 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* ⚠️ THIS CARD USED TO BE "Bank connected", with a mock reading "34 payments this week,
+              all sorted". There is no provider behind that sentence. It now shows the three ways in
+              that genuinely work today, and the feed is named as coming, chosen by the flag. */}
           <div className="drow flip reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--river)' }}>Bank connected</div>
-              <h3>Connect it once. It reads everything.</h3>
-              <p>Connect your bank and every card payment is read, sorted and logged for you, automatically. No typing, no chasing. Paid cash? Add it in a line and it does the rest.</p>
+              <div className="eyebrow" style={{ color: 'var(--river)' }}>Three ways in</div>
+              <h3>Whichever is quickest, it lands sorted.</h3>
+              <p>Photograph a receipt and Lekhio reads the shop, the total and the date. Paid cash, or nowhere near a receipt? Say it in a line. Months behind? Export your bank statement and it reads the lot in one go, without a single thing typed twice. {bankLive ? 'And your bank feed reads new card payments as they land.' : 'A read only bank feed is built and switching on soon.'}</p>
             </div>
             <div className="dvis">
-              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>THIS WEEK · SORTED FOR YOU</div>
-              <div className="splitrow"><span>Screwfix · card</span><span style={{ color: 'var(--tx-mut)' }}>Materials</span></div>
-              <div className="splitrow"><span>Shell · card</span><span style={{ color: 'var(--tx-mut)' }}>Fuel</span></div>
-              <div className="splitrow"><span>🧾 Cash receipt</span><span style={{ color: 'var(--tx-mut)' }}>Materials</span></div>
-              <div className="splitrow"><span>34 payments this week</span><span style={{ color: 'var(--green)' }}>all sorted ✅</span></div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>THIS WEEK · READ AND SORTED</div>
+              <div className="splitrow"><span>🧾 Screwfix receipt</span><span style={{ color: 'var(--tx-mut)' }}>Materials</span></div>
+              <div className="splitrow"><span>&quot;spent 40 on diesel&quot;</span><span style={{ color: 'var(--tx-mut)' }}>Fuel</span></div>
+              <div className="splitrow"><span>Statement, 62 lines</span><span style={{ color: 'var(--tx-mut)' }}>Sorted for you</span></div>
+              <div className="splitrow"><span>Waiting on your yes</span><span style={{ color: 'var(--green)' }}>3 questions</span></div>
             </div>
           </div>
 
@@ -397,14 +435,18 @@ export default function HomePage() {
             <div className="dtext">
               <div className="eyebrow" style={{ color: 'var(--green)' }}>You approve</div>
               <h3>Prepared for you. Sent by you.</h3>
-              <p>Your quarterly figures sit there ready. You check them and send them. Nothing reaches HMRC without your yes. That is the line we never cross.</p>
+              <p>Your quarterly figures sit there ready. You check them and you send them. Nothing reaches HMRC without your yes. That is the line we never cross.{filing.live ? '' : ' Filing straight from Lekhio is coming, and our HMRC recognition is in progress. Until it lands, Lekhio does all the preparation so filing takes minutes.'}</p>
             </div>
             <div className="dvis">
               <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>Q2 SUMMARY · READY TO APPROVE</div>
               <div className="splitrow"><span>Income</span><span>£28,400</span></div>
               <div className="splitrow"><span>Expenses</span><span>£9,140</span></div>
               <div className="splitrow"><span>Tax to set aside</span><span style={{ color: 'var(--river)' }}>£3,240</span></div>
-              <div className="approvebtn">Approve &amp; send to HMRC →</div>
+              {/* 🔴 THE BUTTON MAY NOT SAY "send to HMRC" WHILE RECOGNITION IS PENDING. Both
+                  wordings come from filingBadge(), so the day it is granted this upgrades itself
+                  and until then the caption underneath says exactly where we stand. */}
+              <div className="approvebtn">{filing.live ? 'Approve and send to HMRC →' : 'Approve my figures →'}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--tx-mut)', textAlign: 'center', marginTop: 2 }}>{filing.live ? 'Sent through a recognised route, only when you say so.' : 'HMRC recognition in progress. You approve, always.'}</div>
             </div>
           </div>
 
@@ -444,7 +486,7 @@ export default function HomePage() {
           </div>
           <div className="compliance reveal">
             <div className="ci">Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
-            <div className="ci"><b>104 tests</b> on the tax engine</div>
+            <div className="ci"><b>Every rate</b> the published figure, source recorded</div>
             <div className="ci"><b>Nothing filed</b> without your yes</div>
           </div>
         </div>
@@ -491,7 +533,7 @@ export default function HomePage() {
           <div className="incl-panel reveal">
             <h3>Everything, in both plans</h3>
             <ul className="incl-grid">
-              <li><span className="t">✓</span> Bank connected, every payment sorted for you</li>
+              <li><span className="t">✓</span> {bankLive ? 'Bank connected, every payment sorted for you' : 'Receipts, statements and plain text, read and sorted for you'}</li>
               <li><span className="t">✓</span> Reliefs found on your own numbers, all year</li>
               <li><span className="t">✓</span> Unlimited receipts, voice notes and mileage</li>
               <li><span className="t">✓</span> MTD ready summaries and invoices, you approve</li>
@@ -507,7 +549,7 @@ export default function HomePage() {
         <div className="wrap">
           <div className="final reveal">
             <h2>Your first employee starts today.</h2>
-            <p>Connect your bank and it goes to work, finding your money and keeping you ready to file. 7 days free, no card needed.</p>
+            <p>Snap your first receipt and it goes to work, finding your money and keeping you ready to file. 7 days free, no card needed.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
           </div>
         </div>

@@ -320,6 +320,17 @@ console.log('\n7. THE INLINE sendText COUNT MAY FALL BUT NEVER RISE');
 // paywall's WhatsApp side was written with three sends, one each for a photo, a voice note and a
 // text. The ratchet refused it at 156. Collapsing them into sayWorkPaused(), which asks the table,
 // left one. The rule worked as intended: it did not stop the feature, it stopped the sprawl.
+//
+// 🔴 AND 154 WENT BACK TO 153 ON 31 JULY, BECAUSE THE CEILING HAD DRIFTED ABOVE THE CODE IT GUARDS.
+//
+// The rise above was argued for honestly. What it left behind was a ceiling one higher than the
+// count: measured with this test's own algorithm on 31 July the repo held 153 call sites while this
+// number said 154. A ratchet with a spare slot in it is not a ratchet, it is a countdown, and it
+// spends itself on whichever send happens to be written next rather than on one anybody weighed.
+//
+// So the ceiling now sits ON the count, which is the only value at which a new send is a
+// conversation. If a legitimate one lands, raise this to the new count and write the argument here,
+// the way every rise above did.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', '_to_delete']);
@@ -343,15 +354,48 @@ function stripComments(s) {
   return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
-const CALL_SITE_CEILING = 154;
+const CALL_SITE_CEILING = 153;
 let callSites = 0;
+const perFile = [];
 for (const f of [...walk(path.join(repo, 'app')), ...walk(lib)]) {
   if (f === path.join(lib, 'whatsapp.ts')) continue; // where sendText is defined, not called
   const body = stripComments(readFileSync(f, 'utf8'));
-  callSites += (body.match(/\bsendText\s*\(/g) || []).length;
+  const n = (body.match(/\bsendText\s*\(/g) || []).length;
+  if (n > 0) perFile.push([path.relative(repo, f), n]);
+  callSites += n;
 }
+perFile.sort((a, b) => b[1] - a[1]);
+
+// ⚠️ THE FAILURE HAS TO ARGUE, OR IT ONLY TEACHES PEOPLE TO EDIT THE NUMBER.
+//
+// This used to fail as a bare boolean with a count in brackets. The only move such a failure
+// suggests is raising the ceiling, so that is the move it gets, and the ratchet quietly becomes a
+// record of how many sends we have rather than a limit on them. So the failure says the count, the
+// ceiling, where the sends actually are, and both of the two answers that are allowed.
+const ratchetFailure = [
+  `🔴 inline sendText call sites ROSE to ${callSites}. The ceiling is ${CALL_SITE_CEILING}, so this is ${callSites - CALL_SITE_CEILING} over.`,
+  '',
+  '     WHY THIS IS A FAILURE AND NOT A NUISANCE. Outbound WhatsApp was deliberately concentrated',
+  '     into a small number of sends, and from 1 October Meta bills per message rather than per',
+  '     conversation. A send that spreads back out is a cost decision nobody recorded taking.',
+  '',
+  '     TWO WAYS OUT. RAISING THE NUMBER ON ITS OWN IS NEITHER OF THEM.',
+  '       1. CONCENTRATE THE SEND. Work out the verdict in one place and send once, or hand the',
+  '          words to a send that already exists. handleConnectCode went from six sends to one that',
+  '          way, and the paywall went from three to sayWorkPaused().',
+  '       2. ARGUE FOR THE RATCHET OUT LOUD. It may rise ONLY for a new message type that has a row',
+  '          in ROUTES, whose send asks channelsFor rather than deciding for itself, and by at most',
+  '          one call site per message type. Then raise CALL_SITE_CEILING in the same commit and',
+  '          write the reason in the block above it, the way every rise so far has.',
+  '',
+  '     Where the sends are today:',
+  ...perFile.map(([f, n]) => `       ${String(n).padStart(4)}  ${f}`),
+].join('\n');
+
 ok(
-  `inline sendText call sites are at or below the ceiling (${callSites} of ${CALL_SITE_CEILING})`,
+  callSites <= CALL_SITE_CEILING
+    ? `inline sendText call sites are at or below the ceiling (${callSites} of ${CALL_SITE_CEILING})`
+    : ratchetFailure,
   callSites <= CALL_SITE_CEILING,
 );
 

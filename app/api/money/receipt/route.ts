@@ -4,8 +4,9 @@ import { parseReceipt, hasClaudeConfig } from '../../../../lib/claude';
 import { clampReceiptDate } from '../../../../lib/waintents';
 import {
   insertTransaction, recentUnconfirmedForMatch, mergeIntoTransaction, bumpAiUsage,
-  countActiveSubscribers, storeReceiptImage,
+  countActiveSubscribers, storeReceiptImage, readVatProfile,
 } from '../../../../lib/supabase';
+import type { NewTransaction } from '../../../../lib/supabase';
 import { findDuplicate } from '../../../../lib/dedupe';
 import { normaliseVendor } from '../../../../lib/memory';
 import { aiCapsFor } from '../../../../lib/margin';
@@ -46,6 +47,22 @@ import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
 // lost image must never lose the figures. The WhatsApp capture still reads and discards its
 // download; it is the remaining caller the helper was shaped for, and wiring it means
 // respecting the webhook's five second budget, a decision that path's owner makes.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE VAT IS WRITTEN DOWN AND IT IS NOT CLAIMED. vat_confirmed STAYS FALSE HERE, FOR EVER.
+//
+// parseReceipt now reads the VAT off the paper. That is a READING, and a reading of a VAT figure
+// is not the same class of thing as a reading of a total: getting the total wrong shows up the
+// moment he looks at his own money, while a VAT figure wrong one time in seven goes quietly into
+// a reclaim he will be asked to stand behind. So it lands as vat_amount with vat_confirmed left
+// at its default of false, and the only thing in the product that flips that flag is
+// confirmTransactionVat, called from a form he filled in on /app/pile.
+//
+// 🔴 AND ONLY FOR A MAN WHO IS VAT REGISTERED. Most of this audience is not and never will be.
+// He has no input tax to reclaim, so a VAT figure against his rows is a number he can never use
+// and a question he would have to dismiss. readVatProfile returning null means the READ FAILED,
+// which is not the same answer as "not registered", so that stores nothing either: guessing in
+// either direction is worse than carrying on without it, and the figures do not depend on it.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 export const runtime = 'nodejs';
@@ -145,6 +162,16 @@ export async function POST(req: NextRequest) {
 
   const receiptDate = clampReceiptDate(parsed.transaction_date);
 
+  // WHOSE VAT IS THIS, AND IS IT ANY USE TO HIM? See the header. The profile is only read when
+  // the paper actually printed a figure, so the man who is not registered, and the receipt that
+  // never showed the VAT, both cost nothing at all.
+  //
+  // ⚠️ null FROM readVatProfile IS A FAILED READ AND NOT AN ANSWER. Both it and a plain "no"
+  // land in the same place here, which is storing no VAT, because that is the state the row
+  // would have been in anyway and nothing about his figures depends on it.
+  const vatProfile = parsed.vat === null ? null : await readVatProfile(user.id);
+  const receiptVat = vatProfile !== null && vatProfile.registered ? parsed.vat : null;
+
   // IS THIS THE CARD PAYMENT WE ALREADY HAVE? Same window, same filter, same matcher, same
   // merge as handleReceiptImage. Never fatal: a failed lookup falls through to a plain insert
   // and the duplicate rule in Things to check remains the safety net.
@@ -158,6 +185,12 @@ export async function POST(req: NextRequest) {
       normaliseVendor,
     );
     if (hit && hit.strength === 'same') {
+      // ⚠️ THE MERGE CARRIES NO VAT, AND THAT IS A GAP RATHER THAN A DECISION.
+      // mergeIntoTransaction copies a fixed list of fields and vat_amount is not on it, so a
+      // registered man whose receipt folds into a bank line loses the reading. He is no worse
+      // off than he was yesterday, when there was no reading at all, and the row is still his
+      // to answer on /app/pile. Closing it means adding vat_amount to that patch in
+      // lib/supabase.ts, which is not this file's to change.
       await mergeIntoTransaction(user.id, String(hit.match.id), {
         vendor: parsed.merchant_name,
         category: parsed.category,
@@ -171,22 +204,52 @@ export async function POST(req: NextRequest) {
     /* the merge is a kindness, never a dependency */
   }
 
-  try {
-    await insertTransaction({
-      user_id: user.id,
-      vendor: parsed.merchant_name,
-      // Receipts are an expense, stored negative, exactly as the webhook stores them.
-      amount: -Math.abs(parsed.amount),
-      category: parsed.category,
-      transaction_date: receiptDate,
-      source_type: 'web_image',
-      // Captured, read, and WAITING. Never confirmed here: see the header.
-      confirmed: false,
-      // The photograph's path in the private bucket, or null when storage failed. The figures
-      // above are already in hand either way: see the header, a lost image never loses them.
-      raw_input_url: storedPath,
-    });
-  } catch {
+  // ⚠️ THE TWO VAT COLUMNS RIDE ON THE RECORD RATHER THAN BEING NAMED BY NewTransaction, which
+  // does not carry them yet. insertTransaction posts the record whole, so the columns land, and
+  // widening the shared type is a change to lib/supabase.ts that this file does not own.
+  const row: NewTransaction & { vat_amount?: number; vat_confirmed?: boolean } = {
+    user_id: user.id,
+    vendor: parsed.merchant_name,
+    // Receipts are an expense, stored negative, exactly as the webhook stores them.
+    amount: -Math.abs(parsed.amount),
+    category: parsed.category,
+    transaction_date: receiptDate,
+    source_type: 'web_image',
+    // Captured, read, and WAITING. Never confirmed here: see the header.
+    confirmed: false,
+    // The photograph's path in the private bucket, or null when storage failed. The figures
+    // above are already in hand either way: see the header, a lost image never loses them.
+    raw_input_url: storedPath,
+  };
+  if (receiptVat !== null) {
+    row.vat_amount = receiptVat;
+    // Said out loud rather than left to the column default, because this is the whole argument.
+    // What we have is what the paper said. It becomes a reclaim when HE says so, on /app/pile,
+    // and confirmTransactionVat is the only thing anywhere that flips it.
+    row.vat_confirmed = false;
+  }
+
+  const write = async (): Promise<boolean> => {
+    try {
+      await insertTransaction(row);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  let landed = await write();
+  // 🔴 A VAT READING MUST NEVER COST HIM THE ROW. supabase/APPLY_2026-08-01_vat.sql is what adds
+  // these two columns, and on a database where it has not been run yet, naming them is enough for
+  // the whole write to be refused. His receipt is the thing that matters, so the second attempt
+  // drops the reading and keeps the money. The same rule as the stored image above: evidence is
+  // never a dependency.
+  if (!landed && receiptVat !== null) {
+    delete row.vat_amount;
+    delete row.vat_confirmed;
+    landed = await write();
+  }
+  if (!landed) {
     return isForm ? back('problem=unavailable') : NextResponse.json({ error: 'unavailable' }, { status: 503 });
   }
 

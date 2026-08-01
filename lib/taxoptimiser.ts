@@ -57,6 +57,22 @@ export interface OptimiserInput {
   //
   // Default 0, so a caller that does not compute it behaves exactly as before.
   ytdMileage?: number;
+
+  // 🔴 THE USE OF HOME ALREADY INSIDE ytdTradeExpenses, AND THE REASON A MAN WAS DEDUCTED TWICE.
+  //
+  // ytdHomeOffice above is what he ELECTED. This is what he TEXTED: app/api/whatsapp/route.ts
+  // handleHomeOffice writes a real transaction, vendor 'Use of home', which lands in
+  // ytdTradeExpenses like any other cost. A man who did both got the same deduction twice, and
+  // lib/ledger.ts said in its own comment that this could not happen because "use of home cannot
+  // be inside expenses". It could, and it was.
+  //
+  // ⚠️ NEVER ADD THIS TO ytdTradeExpenses. It is a slice of that number, exactly like ytdMileage.
+  // The rule both consumers follow: take this OUT of expenses, then put the election back in, and
+  // where there is no election the logged rows ARE the claim so they go back in instead. That way
+  // the deduction lands once whichever door he used, and nobody who already had it loses it.
+  //
+  // Default 0, so a caller that does not compute it behaves exactly as before.
+  ytdHomeOfficeLogged?: number;
   // Property stream this year, for the property levers. Default 0.
   ytdPropertyIncome?: number;
   ytdPropertyExpenses?: number;
@@ -126,6 +142,46 @@ export function marginalRate(projectedTotalIncome: number): number {
   return 0;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE USE OF HOME, COUNTED ONCE, WHICHEVER DOOR HE CAME THROUGH.
+//
+// There are two doors and they used to be added together. An ELECTION (lib/elections.ts, his hours
+// band turned into pounds a month) fills ytdHomeOffice. TEXTING his hours writes a real transaction,
+// vendor 'Use of home', which lands inside ytdTradeExpenses like any other cost and fills
+// ytdHomeOfficeLogged. A man who did both was deducted twice, and lib/ledger.ts carried a comment
+// arguing that could not happen.
+//
+// THE RULE: take what he LOGGED out of expenses, always; then the deduction is what he ELECTED if
+// there is an election, and what he logged if there is not.
+//
+// ⚠️ IT LIVES IN ONE FUNCTION HERE AND IN ONE EXPRESSION IN lib/ledger.ts ledgerFor(), and it is
+// spelled the same way in both ON PURPOSE. It cannot be shared: three test suites stage this module
+// into a temp directory with a fixed dependency list, because Node's type stripping cannot resolve
+// an extensionless relative import, so a lib module may not take a new lib import. lib/persona.ts
+// and lib/circumstances.ts re-declare shared literals for exactly the same reason. test/ledger.test.mjs
+// runs the same grid of figures through both modules and fails if the two answers ever part company.
+//
+// ⚠️ WHICH WAY EACH MAN'S MONEY MOVES. Elected only: unchanged. Texted only: the same total to the
+// penny, because it comes off the expenses and goes straight back on as the claim. Both: counted
+// once, at the election, which is the authoritative figure. The duplicate goes; the deduction stays.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+export function homeOfficeParts(
+  input: { ytdHomeOffice?: number; ytdHomeOfficeLogged?: number },
+): { logged: number; deduction: number } {
+  const logged = Math.max(0, input.ytdHomeOfficeLogged ?? 0);
+  // A zero election is no election: useOfHomeToDate only ever accrues months that have happened,
+  // so reading it this way costs nobody a penny and keeps the rule to one line.
+  return { logged, deduction: Math.max(0, input.ytdHomeOffice ?? 0) || logged };
+}
+
+// His TRADE profit as the tax engines should see it: what he took in, less what he spent, with the
+// use of home landing exactly once. Realised, never projected. Floored at zero, because a loss is
+// carried, not refunded, and this file has never modelled loss relief.
+function tradeNetOf(input: OptimiserInput): number {
+  const home = homeOfficeParts(input);
+  return Math.max(0, input.ytdTradeIncome - (input.ytdTradeExpenses - home.logged) - home.deduction);
+}
+
 // HIS WHOLE TAX, not just his trade. The figure an accountant puts at the bottom of the return:
 // income tax across employment, self-employment, property, savings and dividends, stacked in the
 // legal order (lib/personalincome.ts), plus Class 4 NIC on the trade. Projected to the full year the
@@ -139,16 +195,65 @@ export function taxPosition(
   selfAssessmentTax: number;
   studentLoan: number;
   setAside: number;
+  companyProfitExcluded: number;
 } {
-  const tradeNet = Math.max(0, input.ytdTradeIncome - input.ytdTradeExpenses);
+  // 🔴 THE USE OF HOME NOW REACHES THIS FIGURE AT ALL. ytdHomeOffice was declared on OptimiserInput
+  // and read NOWHERE in this file, so a man who made the election saw not one penny come off the
+  // number the app prints in its largest type. tradeNetOf() applies it, once, by the rule above.
+  // His set aside FALLS, which is the correct direction: it is a deduction he is entitled to and
+  // was already being shown on his ledger.
+  const tradeNet = tradeNetOf(input);
   const canProject = input.monthsElapsed >= 3;
   const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
   const projTradeNet = tradeNet * factor;
   const propertyNet = Math.max(0, (input.ytdPropertyIncome ?? 0) - (input.ytdPropertyExpenses ?? 0)) * factor;
   const employment = Math.max(0, input.employmentIncome);
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A COMPANY'S PROFIT IS NOT THE DIRECTOR'S INCOME, AND THIS FUNCTION USED TO CHARGE HIM
+  // INCOME TAX AND CLASS 4 NATIONAL INSURANCE ON IT.
+  //
+  // This file had no idea what businessType was. So a director's company profit went in as
+  // `selfEmployment`, which is the one slot that carries Class 4, and the answer became the headline
+  // "put by for tax" figure in the largest type on the screen. It is the wrong tax, on the wrong
+  // person, in the wrong entity: a company's trading profit is chargeable to CORPORATION TAX in the
+  // company (CTA 2009 s2 charges the tax on a company's profits, s35 charges the profits of its
+  // trade), and what reaches him personally is his salary and his dividends, which this function
+  // already counts and taxes correctly.
+  //
+  // ⚠️ THE HARD PART IS NOT THE ARITHMETIC, IT IS WHICH WAY TO BE WRONG, so here is the reasoning.
+  //
+  // Simply deleting the profit makes his number much smaller, and a man who reads a smaller number
+  // sets aside less. If he then owed that tax, we would have caused the harm we exist to prevent.
+  // So the question is not "is the old figure too big", it is "is there any reading of a personal
+  // set aside under which a company's trading profit belongs in it". There is not. He does not pay
+  // it. His company does, on its own accounting period, at its own rate, on its own return, and
+  // it is due nine months and a day after the company's year end rather than on 31 January. Every
+  // component of the old number was wrong: the taxpayer, the tax, the rate and the date. A figure
+  // that is right by accident is not a figure, and this one was not even that.
+  //
+  // The rest of this codebase's rule is that we would rather say something honest and incomplete
+  // than a confident wrong number, and that an unknown is never treated as an answer. Both point
+  // the same way here, because this is not an unknown: businessType === 'limited_company' is
+  // something he told us at signup. So the engine does not produce a personal set aside from
+  // company profit AT ALL, and it does not go quiet about it either: `companyProfitExcluded` carries
+  // the profit that was left out, and setAsideBasisLine() below turns it into a sentence, so no
+  // surface can print a smaller number with nothing to explain it. Saying "your company's own
+  // Corporation Tax is not in this" is the honest incomplete answer. The old figure was the
+  // confident wrong one.
+  //
+  // ⚠️ ONLY AN EXPLICIT COMPANY LOSES ANYTHING. undefined and null are unknown, and unknown behaves
+  // exactly as it did before this existed, to the penny, which is the same direction
+  // app/app/tax/page.tsx already takes when it withholds the MTD row from a director: hiding a real
+  // obligation from a sole trader because a profile read timed out is by far the worse failure.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  const isCompany = input.businessType === 'limited_company';
+  const personalTradeNet = isCompany ? 0 : projTradeNet;
+  const companyProfitExcluded = isCompany ? round(projTradeNet) : 0;
+
   const result = combinedIncomeTax({
     employment,
-    selfEmployment: projTradeNet,
+    selfEmployment: personalTradeNet,
     otherNonSavings: propertyNet,
     savings: Math.max(0, input.savingsIncome ?? 0),
     dividends: Math.max(0, input.dividendIncome ?? 0),
@@ -194,8 +299,15 @@ export function taxPosition(
   // rules, and there is no sourced constant in this codebase for them. An understatement we can
   // explain beats a confident figure we cannot.
   // ═════════════════════════════════════════════════════════════════════════════════════════════
+  //
+  // ⚠️ AND IT IS personalTradeNet, NOT projTradeNet, FOR THE SAME REASON. A director's company
+  // profit is not self employed income, so it cannot be what his student loan is charged on. What
+  // reaches him personally as dividends may count as unearned income above the £2,000 line, and
+  // there is no sourced constant for that rule in this codebase, so it is left out and said so,
+  // exactly as property is left out two paragraphs up. An understatement we can explain beats a
+  // confident figure we cannot.
   const plans = input.studentPlans ?? [];
-  const studentLoan = plans.length > 0 ? round(studentLoanForSA(projTradeNet, employment, plans)) : 0;
+  const studentLoan = plans.length > 0 ? round(studentLoanForSA(personalTradeNet, employment, plans)) : 0;
 
   return {
     ...result,
@@ -203,6 +315,9 @@ export function taxPosition(
     employmentTax: round(employmentTax),
     selfAssessmentTax,
     studentLoan,
+    // The company profit deliberately left out of every figure above. 0 for everybody else, so it
+    // is never a line on a sole trader's screen. See the note above it.
+    companyProfitExcluded,
     // ONE HONEST NUMBER. Doc 103: the screen a man opens to find out what he owes gets one figure,
     // not a stack he has to add up himself.
     setAside: selfAssessmentTax + studentLoan,
@@ -228,7 +343,20 @@ export function taxPosition(
 // to for a number.
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 export function setAsideBasis(input: OptimiserInput): string[] {
-  const parts: string[] = ['your business'];
+  // 🔴 THE BUSINESS IS NAMED ONLY WHEN THE FIGURE ACTUALLY CONTAINS ONE. It was seeded here
+  // unconditionally while every other stream had a guard, so a customer whose whole business is
+  // letting read "It covers your business and your rent" about a business he has not got, on four
+  // surfaces, under the one number he came to the screen for. The comment directly above this
+  // function already stated the rule it was breaking.
+  //
+  // TWO WAYS THERE IS NO BUSINESS IN THE FIGURE, and this list has to match taxPosition() exactly,
+  // because a sentence that does not describe the number above it is worse than no sentence:
+  //   NO TRADE INCOME CONFIRMED. A landlord, or a brand new account. Nothing of a trade is in it.
+  //   A LIMITED COMPANY. His company's profit is excluded on purpose, see taxPosition(). What is
+  //   left in the figure is his salary and his dividends, and those name themselves below.
+  const hasTrade =
+    Math.max(0, input.ytdTradeIncome) > 0 && input.businessType !== 'limited_company';
+  const parts: string[] = hasTrade ? ['your business'] : [];
   if (Math.max(0, input.employmentIncome) > 0) parts.push('your wages');
   if (Math.max(0, (input.ytdPropertyIncome ?? 0) - (input.ytdPropertyExpenses ?? 0)) > 0) parts.push('your rent');
   if (Math.max(0, input.dividendIncome ?? 0) > 0) parts.push('your dividends');
@@ -247,18 +375,42 @@ export function inPlainList(parts: string[]): string {
 // The sentence under the big number. Null when there is nothing worth explaining, which is a pure
 // sole trader with no job and no dividends: for him the figure is simply his business's tax and
 // saying so adds a line without adding a fact.
-export function setAsideBasisLine(input: OptimiserInput, position: { studentLoan: number; employmentTax: number }): string | null {
+export function setAsideBasisLine(
+  input: OptimiserInput,
+  position: { studentLoan: number; employmentTax: number; companyProfitExcluded?: number },
+): string | null {
   const parts = setAsideBasis(input);
-  if (parts.length < 2 && position.studentLoan <= 0 && position.employmentTax <= 0) return null;
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A DIRECTOR IS TOLD WHAT IS NOT IN THE NUMBER, ALWAYS, AND BEFORE ANYTHING ELSE.
+  //
+  // taxPosition() refuses to charge him income tax and Class 4 on his company's profit, which is
+  // right and which makes his figure much smaller than it was. A smaller number with no explanation
+  // is the one way that fix could do harm: he reads it, sets aside less, and nothing on the screen
+  // ever mentions the Corporation Tax his company still owes. So the engine that dropped the profit
+  // is the thing that says so, in one sentence, on every surface that renders this line.
+  //
+  // ⚠️ AND IT OVERRIDES THE SILENCE BELOW RATHER THAN JOINING THE LIST. A director with no salary
+  // and no dividends captured has an EMPTY list, and the guards below would return null and leave
+  // the smaller number standing on its own with nothing beside it. The rest of the sentence is
+  // still built normally around it, because his payslip has still paid some of what is left.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  const excludedCompanyProfit = Math.max(0, position.companyProfitExcluded ?? 0) > 0;
+
+  if (parts.length === 0 && !excludedCompanyProfit) return null;
+  if (!excludedCompanyProfit && parts.length < 2 && position.studentLoan <= 0 && position.employmentTax <= 0) return null;
   // ⚠️ "and your savings interest and your student loan" is two ANDs in one sentence, which is how
   // the first version read on a real account. The loan is not another income stream, it is another
   // thing the January bill collects, so it joins with "plus" rather than pretending to be one.
-  let line = `It covers ${inPlainList(parts)}`;
-  line += position.studentLoan > 0 ? ', plus your student loan.' : '.';
+  let line = parts.length > 0 ? `It covers ${inPlainList(parts)}` : '';
+  if (line) line += position.studentLoan > 0 ? ', plus your student loan.' : '.';
   // ⚠️ AND IT SAYS WHAT HAS ALREADY BEEN PAID, or a man with a job reads this as a bill on top of
   // the tax his payslip has been taking all year.
   if (position.employmentTax > 0) {
-    line += ' The tax your wages have already paid through your payslip is taken off.';
+    line += `${line ? ' ' : ''}The tax your wages have already paid through your payslip is taken off.`;
+  }
+  if (excludedCompanyProfit) {
+    line += `${line ? ' ' : ''}Your company's profit is not in it. A company pays Corporation Tax on its own return, and this figure is your personal tax on what you take out.`;
   }
   return line;
 }
@@ -271,15 +423,31 @@ const COMMON_COSTS = ['fuel', 'phone', 'insurance', 'tools'];
 export function findOptimisations(input: OptimiserInput): Optimisation[] {
   const out: Optimisation[] = [];
 
-  const tradeNet = Math.max(0, input.ytdTradeIncome - input.ytdTradeExpenses);
+  // The same trade profit taxPosition() works from, use of home applied once. Two functions in one
+  // file that disagree about one man's profit is how this file's own bugs get written.
+  const tradeNet = tradeNetOf(input);
   const canProject = input.monthsElapsed >= 3;
   const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
   const projTradeNet = tradeNet * factor;
-  // His projected income across every stream we know about. Employment was always here; savings and
-  // dividends are added so the marginal-rate levers below judge his rate on his WHOLE income, not
-  // just the trade. All three default to zero, so nothing changes for a caller that has not set them.
+  const propIncome = Math.max(0, input.ytdPropertyIncome ?? 0);
+  const propExpenses = Math.max(0, input.ytdPropertyExpenses ?? 0);
+  // 🔴 AND HIS RENT IS IN IT. His projected income across every stream we know about. Employment was
+  // always here; savings and dividends were added so the marginal-rate levers below judge his rate on
+  // his WHOLE income; property was left out, and it was read fourteen lines later in the same
+  // function, so a landlord with a small trade had his levers priced at a rate his rent had already
+  // pushed him past. taxPosition() has always counted it. Now they agree.
+  //
+  // ⚠️ NET, AND PROJECTED WITH THE SAME factor THE TRADE USES, because that is exactly what
+  // taxPosition() does with it, and the two figures have to describe the same man.
+  //
+  // WHOSE SUGGESTIONS THIS MOVES, all through marginalRate(): pension_higher_rate, aia_timing,
+  // missed_expenses, home_office and both marriage allowance cards. A landlord's rate can now only
+  // go UP, so a quoted saving gets bigger and a lever that was silent may start speaking. Nothing
+  // is taken away from anybody: a man with no property is unchanged to the penny.
+  const projPropertyNet = Math.max(0, propIncome - propExpenses) * factor;
   const projTotalIncome =
     projTradeNet +
+    projPropertyNet +
     Math.max(0, input.employmentIncome) +
     Math.max(0, input.savingsIncome ?? 0) +
     Math.max(0, input.dividendIncome ?? 0);
@@ -417,8 +585,8 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   // 8. Property costs. Rental income with almost no expenses logged means likely
   //    unclaimed deductions (mortgage interest for the 20% credit, repairs, agent
   //    fees, insurance). Reversible admin: a prompt to log them.
-  const propIncome = Math.max(0, input.ytdPropertyIncome ?? 0);
-  const propExpenses = Math.max(0, input.ytdPropertyExpenses ?? 0);
+  //    (propIncome and propExpenses are read at the top of this function now, because his rent
+  //    belongs in projTotalIncome and they were being declared after the figure that needed them.)
   if (propIncome > 0 && propExpenses < propIncome * 0.1) {
     out.push({
       key: 'property_costs',

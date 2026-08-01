@@ -141,7 +141,41 @@ export const FOREIGN = {
 
 export const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
-export const RADIUS = { sm: 8, md: 12, lg: 18, pill: 999 } as const;
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE LOOK, LOCKED 1 AUGUST 2026. READ THIS BEFORE CHANGING A NUMBER IN THIS FILE.
+//
+// Four options were built on the same screen and the same markup and Jag chose on the business,
+// not on taste. The answer was B, "Quieter", plus one thing borrowed from D. The reasoning is
+// written here rather than in a doc because this file is what a future session will actually read.
+//
+//   1. THE DOCTRINE FORBIDS LOOKING LIKE SOFTWARE. Doc 104: "an employee, not software ... no AI,
+//      no dashboard, no MTD platform ... we lead with the outcome, never the mechanism. This is the
+//      Apple move." The sharper option, tight corners and heavy tracking and a 52px figure, reads
+//      as an instrument you operate. That is precisely the thing we have promised never to be, so
+//      it was out on doctrine before taste got a vote.
+//   2. DARK FOLLOWS THE SYSTEM AND HAS NO TOGGLE. So whatever carries the design has to work in
+//      both, and a shadow does not: every shadow in this file is rgba(17,17,17,...) and vanishes on
+//      a dark panel. A hairline is identical in both. Any look whose weight sits in shadow is two
+//      designs pretending to be one.
+//   3. THE PALETTE IS CANONICAL AND NOT A POLISH DECISION. River, saffron, ink and Inter are locked
+//      in the source of truth doc. The warmer option moved paper towards saffron, which is a brand
+//      change wearing a token change's clothes.
+//   4. THE DESTINATION IS A BANK. Lekhio Business, Lekhio Personal, a card, the tax set aside pot.
+//      Whatever is locked today has to still look right holding somebody's money in two years.
+//      Soft and rounded is charming on a receipts app and wrong on an account.
+//
+// AND THE ONE THING BORROWED FROM THE SHARPER OPTION: tabular numerals on every money figure, so
+// columns of pounds line up. Not its corners, not its tracking, just the numerals, because every
+// screen in this product is fundamentally a number a man came for.
+//
+// ⚠️ WHAT THIS IS NOT. It is not a redesign and no row moved. The live app was already most of the
+// way here: .lek-card has carried a border and no shadow all along. What changed is the four
+// places where that was not true.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// 18 became 16. At 18 a card corner starts reading as a rounded tile, which is the softer look we
+// did not choose; 16 still says panel and not box.
+export const RADIUS = { sm: 8, md: 12, lg: 16, pill: 999 } as const;
 export const SHADOW = {
   card: '0 1px 2px rgba(17,17,17,0.04), 0 8px 24px rgba(17,17,17,0.06)',
   raised: '0 12px 40px rgba(17,17,17,0.12)',
@@ -170,7 +204,10 @@ export const TYPE = {
   // A money figure in a tile on a phone, a screen's own heading on a desk.
   stat: 24,
   // A leading sentence: the pile's headline, the saved figure in words.
-  lead: 19,
+  // ⚠️ 19 BECAME 18, AND NOT 17, ON PURPOSE. Shortening the fall between the one big figure and
+  // everything under it is how the quieter look buys hierarchy without making anything bigger. But
+  // strong is 17, and two named jobs at the same size is exactly what this scale exists to stop.
+  lead: 18,
   // A vendor name, an amount on a row, an empty state. Strong, never loud.
   strong: 17,
   // Ordinary reading, a heading inside a card, a button.
@@ -355,9 +392,21 @@ export const APP_CSS = `
 ${APP_THEME_CSS}
 @keyframes lek-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .lek-wrap{box-sizing:border-box;max-width:672px;margin:0 auto;padding:${SPACE.md}px ${SPACE.md}px ${SPACE.xxl}px}
-.lek-card{background:var(--panel);border:1px solid var(--bd);border-radius:${RADIUS.lg}px;padding:${SPACE.md}px;margin-bottom:${SPACE.sm}px;animation:lek-in ${MOTION.enter} ${MOTION.ease} both}
-.lek-hit{transition:transform ${MOTION.quick} ${MOTION.ease},box-shadow ${MOTION.quick} ${MOTION.ease}}
-.lek-hit:hover{transform:translateY(-1px);box-shadow:${SHADOW.card}}
+/* ⚠️ THE GAP BETWEEN CARDS IS NOW THE SAME AS THE PADDING INSIDE THEM, AND IT USED TO BE SMALLER.
+   12 between and 16 inside meant two cards sat closer to each other than a card's own contents sat
+   to its edge, so the eye grouped across the join rather than down the page. Equal is the calm
+   answer, and it stays on the SPACE scale rather than inventing a step: there is no 14. */
+.lek-card{background:var(--panel);border:1px solid var(--bd);border-radius:${RADIUS.lg}px;padding:${SPACE.md}px;margin-bottom:${SPACE.md}px;animation:lek-in ${MOTION.enter} ${MOTION.ease} both}
+/* 🔴 THE HOVER LIFT USED A SHADOW AND THE SHADOW IS INVISIBLE IN DARK. Every shadow in this file is
+   rgba(17,17,17,...), which is ink on paper and nothing at all on a dark panel, so half the
+   customers got a 1px nudge and no affordance. The border does the same job in both appearances,
+   and it is the same reason the quieter look won: what carries the design has to survive the dark. */
+.lek-hit{transition:transform ${MOTION.quick} ${MOTION.ease},border-color ${MOTION.quick} ${MOTION.ease}}
+.lek-hit:hover{transform:translateY(-1px);border-color:var(--tx-mut)}
+/* Every money figure, everywhere. Borrowed from the sharper option and the only thing borrowed
+   from it: pounds in a column have to line up, and a proportional 1 against a proportional 8 is a
+   ragged edge on the one screen a man opened to read a number. */
+.lek-num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 .lek-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:${SPACE.sm}px}
 .lek-tile{background:var(--surface);border-radius:${RADIUS.md}px;padding:${SPACE.sm}px ${SPACE.md}px}
 .lek-tile-label{font-size:${TYPE.label}px;font-weight:700;color:var(--tx-mut);margin-bottom:${SPACE.hair}px}
@@ -366,7 +415,8 @@ ${APP_THEME_CSS}
 @media(max-width:${BREAK.stack}px){.lek-grid{grid-template-columns:1fr}}
 @media(min-width:${BREAK.desk}px){
   .lek-wrap{max-width:992px;padding:${SPACE.xl}px ${SPACE.md}px ${SPACE.xxl * 2}px;margin-left:max(${SIDEBAR + SPACE.lg}px,calc((100vw + ${SIDEBAR}px - 992px)/2));margin-right:auto}
-  .lek-card{padding:${SPACE.xl}px;margin-bottom:${SPACE.lg}px}
+  /* Same rule on a desk: the gap between two cards matches the air inside one. 24 became 32. */
+  .lek-card{padding:${SPACE.xl}px;margin-bottom:${SPACE.xl}px}
   .lek-grid{gap:${SPACE.md}px}
   .lek-tile{padding:${SPACE.lg}px}
   .lek-tile-value{font-size:${TYPE.title}px}

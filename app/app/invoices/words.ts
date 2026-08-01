@@ -15,9 +15,15 @@
 // claim until it is checked, so every row passes normaliseInvoiceRow and a row that fails it is
 // dropped rather than rendered wrong: a list missing a broken row is a smaller lie than a £NaN
 // on a screen about money he is owed.
+//
+// ⚠️ AND `total` IS THE ONLY MONEY FIGURE THIS MODULE EVER SEES (1 August 2026). That is on
+// purpose now that invoices carry VAT. Under the CIS domestic reverse charge an invoice also
+// carries the VAT the CUSTOMER must account for, and that figure is NOT part of the total, is NOT
+// owed to him, and must never find its way into "£X is owed to you" or into a chaser. A row here
+// has no field for it, so it cannot. VATREVCON37100, and lib/vat.ts holds the reasoning.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-import { gbp0 } from '../../../lib/money';
+import { gbp0, gbp2 } from '../../../lib/money';
 
 export interface InvoiceListRow {
   id: string;
@@ -160,6 +166,13 @@ export function sortInvoices(rows: InvoiceListRow[], todayISO: string): InvoiceL
 
 // The one sentence above the list, and doc 103's empty test decides when it exists: nothing is
 // owed, nothing is said. When something is owed it is THE answer he opened the page for.
+//
+// ⚠️ THIS STAYS IN WHOLE POUNDS, AND THAT SURVIVED THE VAT REVIEW. It adds several invoices into
+// one sentence a man reads on his way past. Nobody pays against it, nothing is reconciled to it,
+// and "£12,204.00 is owed to you" is a figure pretending to a precision the sentence does not
+// need. The figure a customer is ASKED for is a different job and is written differently: see
+// owedFigure below. The totals it adds are what he is owed and nothing else, so an invoice under
+// the reverse charge contributes its total and never the VAT its customer accounts for.
 export function owedLine(rows: InvoiceListRow[], todayISO: string): string | null {
   let owed = 0;
   let late = 0;
@@ -205,15 +218,36 @@ export const CHASER_TONES: ReadonlyArray<{ tone: ChaserTone; label: string }> = 
 export interface ChaserContext {
   customer: string;
   number: string;
+  // What the invoice says he is owed. Under the reverse charge that is the total BEFORE the VAT
+  // his customer accounts for, which is exactly the figure the document asks to be paid.
   total: number;
   daysSinceIssued: number;
   daysLate: number;
   link: string;
 }
 
+// ⚠️ THE FIGURE IN A DEMAND FOR PAYMENT, AND WHY IT IS NOT SIMPLY gbp0 (1 August 2026).
+//
+// Every chaser here names one invoice and asks a named man to pay it. Before VAT the totals were
+// whatever the tradesman typed, which is whole pounds nearly every time, so rounding was invisible
+// and gbp0 was right. VAT makes pence ordinary: £127 of work at the standard rate is £152.40, and
+// a message saying "invoice INV-0004 for £152" against a document that reads £152.40 invites a
+// payment 40p short, which leaves the invoice unpaid, the list calling it late, and a man chasing
+// his own customer over our rounding.
+//
+// So: whole pounds when the figure is whole pounds, which is what gbpShort in lib/waintents.ts
+// gives and what every chaser this product has ever sent said. Pence only when there are pence.
+// The two voices stay identical on every figure the WhatsApp chaser has ever met, which is what
+// the parity test in test/invoicesweb.test.mjs pins, and they part company only where the
+// alternative is a wrong number on a demand for money.
+function owedFigure(n: number): string {
+  const v = Number.isFinite(n) ? n : 0;
+  return Math.round(v * 100) % 100 === 0 ? gbp0(v) : gbp2(v);
+}
+
 export function chaserDraft(tone: ChaserTone, c: ChaserContext): string {
   const name = c.customer.trim() || 'there';
-  const total = gbp0(c.total);
+  const total = owedFigure(c.total);
   // "a day" rather than "1 days". chaseMessage never meets a singular on its own inputs, so this
   // costs the parity test nothing and reads properly when his choice does meet one.
   const sentAgo = c.daysSinceIssued === 1 ? 'a day' : `${c.daysSinceIssued} days`;

@@ -52,6 +52,12 @@ export interface EstimatedTax {
   total: number;
   propertyProfitExcluded: number; // property profit is taxed separately, shown but not folded in
   note: string;
+  // 🔴 TRUE WHEN THE TRADE FIGURES ARE A COMPANY'S AND THIS IS THEREFORE NOT HIS PERSONAL TAX.
+  //
+  // A known limited company gets no personal tax estimate at all, so every figure above is zero and
+  // the note says why. See the reasoning on `structure` in BuildInput. False for everybody else,
+  // including an unknown structure, so nothing existing moves.
+  companyProfitExcluded: boolean;
 }
 
 export interface QuarterPack {
@@ -236,6 +242,30 @@ export interface BuildInput {
   // A one-line pre-filing assurance, filled in by the route once it has refreshed the
   // live facts, so the year-end document can say the numbers were just re-checked.
   finalCheck?: string;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HOW HE TRADES. THIS FILE HAD NO IDEA, AND IT WAS HANDING A DIRECTOR'S ACCOUNTANT TWO
+  // SENTENCES THAT WERE NOT TRUE OF HIM.
+  //
+  //   1. MAKING TAX DIGITAL. The threshold test runs on GROSS QUALIFYING INCOME, which is self
+  //      employment plus property on a PERSONAL return. A company's turnover is neither: the
+  //      company files its own return, and the director's qualifying income does not include a
+  //      penny of it. The pack was totting up his company's sales and telling him quarterly
+  //      updates apply. app/app/tax/page.tsx already withholds that row from a director for
+  //      exactly this reason, in these words, and the document he prints was still saying it.
+  //
+  //   2. "YOUR TRADE PROFIT", RUN THROUGH soleTraderTax. That prints "Estimated Class 4 National
+  //      Insurance" on a page a director hands his accountant. A company's profit is chargeable to
+  //      Corporation Tax in the company; he pays income tax on what he takes out as salary and
+  //      dividends, and none of that is in this pack.
+  //
+  // ⚠️ OPTIONAL, AND UNDEFINED IS UNKNOWN, WHICH IS NEVER AN ANSWER. Every existing caller passes
+  // nothing and gets the identical pack, to the penny and to the character. Only a customer who
+  // has told us he runs a company loses a sentence, and what he loses is a sentence that was
+  // false. That is the same direction lib/taxoptimiser.ts and lib/elections.ts take: a real
+  // obligation must never be hidden from a sole trader because a profile read came back empty.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  structure?: 'sole_trader' | 'partnership' | 'limited_company' | null;
 }
 
 // The MTD for Income Tax gross qualifying income threshold by tax year opening
@@ -266,10 +296,18 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
   const ytdTrade = summariseStream(ytdTx, false);
   const ytdProperty = summariseStream(ytdTx, true);
 
+  // Only an explicit company is treated as one. Undefined and null are unknown, and unknown gets
+  // exactly the pack it got before this field existed. See the note on BuildInput.structure.
+  const isCompany = input.structure === 'limited_company';
+
   // The MTD for Income Tax test is on GROSS qualifying income, trade plus
   // property, before expenses. We test the year to date gross, which is
   // conservative: if it already clears the threshold, mandation certainly applies.
-  const grossQualifying = round2(ytdTrade.income + ytdProperty.income);
+  //
+  // 🔴 EXCEPT THAT A COMPANY'S TURNOVER IS NOT HIS QUALIFYING INCOME. It is the company's, and the
+  // company is outside Making Tax Digital for Income Tax altogether. His rent stays in the test,
+  // because rent on a personal return does count towards the line whatever else he runs.
+  const grossQualifying = round2((isCompany ? 0 : ytdTrade.income) + ytdProperty.income);
   const mtdApplies = mtdForIncomeTaxRequired(grossQualifying, mtdYearFor(startYear));
   const mtdThreshold = mtdThresholdFor(startYear);
 
@@ -277,21 +315,30 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
   // taxed on its own schedule (and from April 2027 its own rates), so folding it
   // into soleTraderTax would misstate the number. We show it separately instead.
   const tradeProfit = Math.max(0, ytdTrade.net);
-  const st = soleTraderTax(tradeProfit);
+  // 🔴 AND FOR A COMPANY THERE IS NO PERSONAL ESTIMATE TO GIVE. soleTraderTax over a company's
+  // profit charges the director income tax and Class 4 National Insurance on money that is taxable
+  // in the company, and prints the words "Estimated Class 4 National Insurance" on a document he
+  // hands his accountant. There is no Corporation Tax figure offered in its place: this pack knows
+  // his personal tax year, not the company's accounting period, and a plausible number on the wrong
+  // period is worse than a plain sentence saying where the answer lives. lib/taxoptimiser.ts
+  // taxPosition() reaches the same conclusion about the same money, and says so at length.
+  const st = isCompany ? { incomeTax: 0, class4: 0, total: 0 } : soleTraderTax(tradeProfit);
   const c2 = class2Voluntary();
-  const class2 = c2.compulsory ? c2.annual : 0;
+  const class2 = isCompany ? 0 : c2.compulsory ? c2.annual : 0;
 
   const estimatedTax: EstimatedTax = {
-    tradeProfit: round2(tradeProfit),
+    tradeProfit: round2(isCompany ? 0 : tradeProfit),
     incomeTax: round2(st.incomeTax),
     class4: round2(st.class4),
     class2: round2(class2),
     total: round2(st.total + class2),
     propertyProfitExcluded: round2(Math.max(0, ytdProperty.net)),
-    note:
-      'A running estimate on your trade profit so far this tax year, using the published ' +
-      taxYearLabel(startYear) +
-      ' figures. It is for guidance, not a filing. Property profit, where present, is taxed separately and is not included here.',
+    note: isCompany
+      ? 'These are your company\'s figures, so there is no personal tax estimate on them here. A company pays Corporation Tax on its own return, for its own accounting period, and you pay tax on what you take out as salary or dividends. Your accountant works both out from the figures above.'
+      : 'A running estimate on your trade profit so far this tax year, using the published ' +
+        taxYearLabel(startYear) +
+        ' figures. It is for guidance, not a filing. Property profit, where present, is taxed separately and is not included here.',
+    companyProfitExcluded: isCompany,
   };
 
   return {
@@ -373,6 +420,9 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
   const t = pack.trade;
   const showProperty = pack.hasProperty;
   const est = pack.ytd.estimatedTax;
+  // Whether the trade half of this document is a company's. Read off the pack rather than a second
+  // structure argument, so the document and the figures can never disagree about who he is.
+  const isCompany = est.companyProfitExcluded;
 
   const propertyBlock = showProperty
     ? `
@@ -384,9 +434,17 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
       </table>`
     : '';
 
-  const mtdLine = pack.ytd.mtdApplies
-    ? `Your gross income so far this year (${gbp(pack.ytd.grossQualifyingIncome)}) is over the ${gbp(pack.ytd.mtdThreshold)} Making Tax Digital for Income Tax threshold for ${esc(pack.taxYear)}, so quarterly updates apply.`
-    : `Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}. Making Tax Digital for Income Tax applies from £${FACTS.mtdThreshold2026.toLocaleString('en-GB')} gross (from April 2026), £${FACTS.mtdThreshold2027.toLocaleString('en-GB')} (April 2027), then £${FACTS.mtdThreshold2028.toLocaleString('en-GB')} (April 2028).`;
+  // 🔴 AND THE MAKING TAX DIGITAL SENTENCE IS NOT ADDRESSED TO A DIRECTOR AT ALL.
+  //
+  // Without this branch he read "your gross income so far this year is £0.00" underneath a page of
+  // his own turnover, because the test base correctly excludes a company's trade and nothing said
+  // why. The wording is app/app/tax/summary/page.tsx's, deliberately: a product that argues two ways
+  // about one fact argues wrong once.
+  const mtdLine = isCompany
+    ? `Making Tax Digital for Income Tax covers self employment and rent on a personal return, and your company's trade is neither: the company files its own return.`
+    : pack.ytd.mtdApplies
+      ? `Your gross income so far this year (${gbp(pack.ytd.grossQualifyingIncome)}) is over the ${gbp(pack.ytd.mtdThreshold)} Making Tax Digital for Income Tax threshold for ${esc(pack.taxYear)}, so quarterly updates apply.`
+      : `Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}. Making Tax Digital for Income Tax applies from £${FACTS.mtdThreshold2026.toLocaleString('en-GB')} gross (from April 2026), £${FACTS.mtdThreshold2027.toLocaleString('en-GB')} (April 2027), then £${FACTS.mtdThreshold2028.toLocaleString('en-GB')} (April 2028).`;
 
   // A safety banner if the underlying data may have been capped, so a truncated
   // summary is never presented to an accountant as complete.
@@ -443,43 +501,48 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
       ${truncatedBanner}
 
       <div class="kpis">
-        <div class="kpi"><div class="n">${gbp(t.income)}</div><div class="l">Trade income this quarter</div></div>
-        <div class="kpi"><div class="n">${gbp(t.expenses)}</div><div class="l">Trade expenses this quarter</div></div>
-        <div class="kpi"><div class="n">${gbp(t.net)}</div><div class="l">Trade profit this quarter</div></div>
+        <div class="kpi"><div class="n">${gbp(t.income)}</div><div class="l">${isCompany ? 'Company' : 'Trade'} income this quarter</div></div>
+        <div class="kpi"><div class="n">${gbp(t.expenses)}</div><div class="l">${isCompany ? 'Company' : 'Trade'} expenses this quarter</div></div>
+        <div class="kpi"><div class="n">${gbp(t.net)}</div><div class="l">${isCompany ? 'Company' : 'Trade'} profit this quarter</div></div>
         ${pack.cisSuffered > 0 ? `<div class="kpi"><div class="n">${gbp(pack.cisSuffered)}</div><div class="l">CIS suffered this quarter</div></div>` : ''}
       </div>
 
-      <h2>Trade, this quarter</h2>
+      <h2>${isCompany ? 'The company, this quarter' : 'Trade, this quarter'}</h2>
       <table>
         <tr><td style="padding:6px 0;font-weight:600">Income</td><td style="padding:6px 0;text-align:right;font-weight:600">${gbp(t.income)}</td></tr>
         ${streamRows(t)}
-        <tr style="border-top:1px solid ${BORDER}"><td style="padding:8px 0;font-weight:700">Trade profit this quarter</td><td style="padding:8px 0;text-align:right;font-weight:700">${gbp(t.net)}</td></tr>
+        <tr style="border-top:1px solid ${BORDER}"><td style="padding:8px 0;font-weight:700">${isCompany ? 'Company' : 'Trade'} profit this quarter</td><td style="padding:8px 0;text-align:right;font-weight:700">${gbp(t.net)}</td></tr>
         ${pack.cisSuffered > 0 ? `<tr><td style="padding:6px 0" class="muted">CIS deducted at source (tax already paid)</td><td style="padding:6px 0;text-align:right" class="muted">${gbp(pack.cisSuffered)}</td></tr>` : ''}
       </table>
 
       ${propertyBlock}
 
-      <h2>What your quarterly update reports</h2>
+      <h2>${isCompany ? 'Your money since 6 April' : 'What your quarterly update reports'}</h2>
       <p class="muted" style="font-size:13px;margin:0 0 10px">
-        A Making Tax Digital update covers <strong>${esc(prettyDay(pack.submission.periodStartDate))} to ${esc(prettyDay(pack.submission.periodEndDate))}</strong>,
-        the whole tax year so far, not just these three months. Each update restates the year and replaces the one before it,
-        so the figures below are the ones that go on the update, and the quarter above is there so you can see what these
-        three months did on their own.
+        ${isCompany
+          ? `Your figures from <strong>${esc(prettyDay(pack.submission.periodStartDate))} to ${esc(prettyDay(pack.submission.periodEndDate))}</strong>, added up.
+             This is not a quarterly update: your company files its own return, over its own accounting period, so read this as a
+             running total rather than a set of accounts, and the quarter above as what these three months did on their own.`
+          : `A Making Tax Digital update covers <strong>${esc(prettyDay(pack.submission.periodStartDate))} to ${esc(prettyDay(pack.submission.periodEndDate))}</strong>,
+             the whole tax year so far, not just these three months. Each update restates the year and replaces the one before it,
+             so the figures below are the ones that go on the update, and the quarter above is there so you can see what these
+             three months did on their own.`}
       </p>
       <table>
-        <tr><td style="padding:6px 0">Trade income, year so far</td><td style="padding:6px 0;text-align:right">${gbp(pack.submission.trade.income)}</td></tr>
-        <tr><td style="padding:6px 0">Trade expenses, year so far</td><td style="padding:6px 0;text-align:right">${gbp(pack.submission.trade.expenses)}</td></tr>
-        <tr style="border-top:1px solid ${BORDER}"><td style="padding:8px 0;font-weight:700">Trade profit, year so far</td><td style="padding:8px 0;text-align:right;font-weight:700">${gbp(pack.submission.trade.net)}</td></tr>
+        <tr><td style="padding:6px 0">${isCompany ? 'Company income, year so far' : 'Trade income, year so far'}</td><td style="padding:6px 0;text-align:right">${gbp(pack.submission.trade.income)}</td></tr>
+        <tr><td style="padding:6px 0">${isCompany ? 'Company expenses, year so far' : 'Trade expenses, year so far'}</td><td style="padding:6px 0;text-align:right">${gbp(pack.submission.trade.expenses)}</td></tr>
+        <tr style="border-top:1px solid ${BORDER}"><td style="padding:8px 0;font-weight:700">${isCompany ? 'Company profit, year so far' : 'Trade profit, year so far'}</td><td style="padding:8px 0;text-align:right;font-weight:700">${gbp(pack.submission.trade.net)}</td></tr>
       </table>
 
-      <h2>The running tax picture</h2>
+      <h2>${isCompany ? 'The profit so far' : 'The running tax picture'}</h2>
       <table>
-        <tr><td style="padding:6px 0">Trade profit so far this year</td><td style="padding:6px 0;text-align:right">${gbp(pack.ytd.trade.net)}</td></tr>
+        <tr><td style="padding:6px 0">${isCompany ? 'Company profit so far this year' : 'Trade profit so far this year'}</td><td style="padding:6px 0;text-align:right">${gbp(pack.ytd.trade.net)}</td></tr>
         ${showProperty ? `<tr><td style="padding:6px 0">Property profit so far this year</td><td style="padding:6px 0;text-align:right">${gbp(pack.ytd.property.net)}</td></tr>` : ''}
+        ${isCompany ? '' : `
         <tr><td style="padding:6px 0">Estimated Income Tax on trade profit</td><td style="padding:6px 0;text-align:right">${gbp(est.incomeTax)}</td></tr>
         <tr><td style="padding:6px 0">Estimated Class 4 National Insurance</td><td style="padding:6px 0;text-align:right">${gbp(est.class4)}</td></tr>
         ${est.class2 > 0 ? `<tr><td style="padding:6px 0">Class 2 National Insurance</td><td style="padding:6px 0;text-align:right">${gbp(est.class2)}</td></tr>` : ''}
-        <tr style="border-top:1px solid ${BORDER}"><td style="padding:8px 0;font-weight:700">Estimated tax set aside so far</td><td style="padding:8px 0;text-align:right;font-weight:700">${gbp(est.total)}</td></tr>
+        <tr style="border-top:1px solid ${BORDER}"><td style="padding:8px 0;font-weight:700">Estimated tax set aside so far</td><td style="padding:8px 0;text-align:right;font-weight:700">${gbp(est.total)}</td></tr>`}
       </table>
       <p class="muted" style="font-size:13px;margin-top:8px">${esc(est.note)}</p>
       <p class="muted" style="font-size:13px">${esc(mtdLine)}</p>

@@ -69,13 +69,33 @@ export const ENOUGH_MONTHS = 3;
 export interface LedgerInput {
   monthsElapsed: number;
   // CONFIRMED figures only. Nothing "to review" belongs in a ledger.
-  grossIncome: number;
+  grossIncome: number;       // the TRADE gross. Rent has its own two fields below.
   // The deductions he has actually claimed, broken out so we can tell him WHERE the money came from.
   expenses: number;          // receipts, bank lines, anything he confirmed as a business cost
   mileage: number;           // the £ value of miles claimed, not the miles
   homeOffice: number;        // the flat rate actually applied
   capitalAllowances: number; // AIA and the rest, on things he actually bought
   pension: number;           // contributions actually made
+
+  // 🔴 HIS RENT, AS ITS OWN STREAM, BECAUSE A LANDLORD HAD NO LEDGER AT ALL.
+  //
+  // grossIncome above is the trade, and it was the ONLY thing this file counted as income. So a
+  // customer whose whole business is letting could confirm a year of rent and every one of his
+  // property costs, open the screen whose entire job is to show what we saved him, and read
+  // "Nothing confirmed yet". His property figures were in the object the whole time and were used
+  // for one thing only: raising the rate his TRADE was taxed at, a trade he has not got.
+  //
+  // ⚠️ RENT IS NOT FOLDED INTO grossIncome, AND THAT IS THE POINT. Rental profit carries no Class 4
+  // National Insurance. Adding it to the trade would charge him NI on his rent inside the very
+  // figure we ask him to believe, which is the same error lib/incomeproof.ts was printing on a
+  // document going to a lender. So it goes in as non savings income, taxed beside the trade and
+  // never as it.
+  //
+  // Both default to 0, so a caller that has no property behaves exactly as it did before they
+  // existed, to the penny.
+  propertyIncome?: number;
+  propertyExpenses?: number;
+
   // CIS suffered. HIS OWN MONEY, held by HMRC. A repayment, never a saving. See rule 3.
   cisSuffered: number;
 
@@ -86,7 +106,11 @@ export interface LedgerInput {
   // job his personal allowance twice and printed "With Lekhio £0" over a real tax bill.
   otherIncome?: {
     employment?: number;       // a PAYE job or a pension
-    otherNonSavings?: number;  // property profit
+    // Any other non savings income the ledger does not itemise. Rent used to arrive here as a NET
+    // figure; it now has its own gross and costs above, so that his property costs can be shown as
+    // the deduction they are instead of quietly vanishing into a net. A caller that only holds a
+    // net figure can still put it here and nothing about it has changed.
+    otherNonSavings?: number;
     savings?: number;          // bank interest, not ISAs
     dividends?: number;
   };
@@ -119,7 +143,21 @@ const round = (n: number) => Math.round(Number.isFinite(n) ? n : 0);
 
 // The whole thing.
 export function ledger(input: LedgerInput): Ledger {
-  const gross = Math.max(0, input.grossIncome);
+  const tradeGross = Math.max(0, input.grossIncome);
+  const propertyGross = Math.max(0, input.propertyIncome ?? 0);
+
+  // 🔴 A PROPERTY LOSS CANNOT COME OFF HIS TRADE, SO THE LEDGER ONLY EVER COUNTS THE PART THAT BIT.
+  //
+  // Property costs above the rent are not lost, but they are not a saving THIS year either: they are
+  // carried forward against future rental profit. Counting the whole spend as a deduction would hand
+  // that line a share of a saving it did not produce, which is failure mode 4 in this file's header
+  // (the parts exceeding the whole) arriving through a new door.
+  const propertyCosts = Math.min(propertyGross, Math.max(0, input.propertyExpenses ?? 0));
+
+  // Everything he has taken in, both streams. The "nothing confirmed yet" gate further down runs on
+  // this figure, and it used to run on the trade alone, which is exactly why a landlord could confirm
+  // a year of rent and still be told nothing had been confirmed.
+  const gross = tradeGross + propertyGross;
 
   const deductions: Array<{ key: string; label: string; amount: number; basis: string }> = [
     {
@@ -131,8 +169,15 @@ export function ledger(input: LedgerInput): Ledger {
       basis: `Your business miles at HMRC's rate. ${asPence(FACTS.mileageCarFirst10k)}p a mile for the first ${FACTS.mileageFirstBandMiles.toLocaleString('en-GB')}.`,
     },
     {
+      // ⚠️ THE SECOND SENTENCE IS NOT DECORATION AND IT IS NOT A HEDGE.
+      //
+      // HMRC allows the flat rate OR a share of his actual household bills, never both, and a man
+      // who takes this line and also puts his gas bill through has claimed the same thing twice.
+      // That is the one way use of home can still be double counted, and lib/elections.ts's header
+      // rests on every place that describes the flat rate saying so. This line is the one it named
+      // as not saying it. It says it now, on the screen where he reads what the claim actually is.
       key: 'home_office', label: 'Use of home', amount: Math.max(0, input.homeOffice),
-      basis: 'The flat rate for doing your quotes and paperwork at home. No receipts needed.',
+      basis: 'The flat rate for doing your quotes and paperwork at home. No receipts needed, and it goes in instead of a share of your actual home bills rather than as well as.',
     },
     {
       key: 'capital', label: 'Tools and equipment', amount: Math.max(0, input.capitalAllowances),
@@ -142,9 +187,19 @@ export function ledger(input: LedgerInput): Ledger {
       key: 'pension', label: 'Pension', amount: Math.max(0, input.pension),
       basis: 'What you put into your pension comes off your taxable profit.',
     },
+    {
+      key: 'property', label: 'Property costs', amount: propertyCosts,
+      basis: 'Repairs, agent fees, insurance and the rest, off the rent you took in.',
+    },
   ].filter((d) => d.amount > 0);
 
-  const totalDeducted = deductions.reduce((n, d) => n + d.amount, 0);
+  // ⚠️ THE PROPERTY LINE COMES OFF THE RENT, NEVER OFF THE TRADE, so the two are totalled apart.
+  // Subtracting his boiler service from his trade profit would move tax between two streams HMRC
+  // keeps separate, and it would charge him Class 4 relief on a cost that never carried Class 4.
+  const tradeDeducted = deductions
+    .filter((d) => d.key !== 'property')
+    .reduce((n, d) => n + d.amount, 0);
+  const totalDeducted = tradeDeducted + propertyCosts;
 
   // ⚠️ THE BASELINE. Read the header of this file before you change it.
   //
@@ -200,17 +255,25 @@ export function ledger(input: LedgerInput): Ledger {
   // saved him. Understating is the direction a man forgives; a headline saving that shrinks when
   // his accountant checks it is the one he never forgives, and it is the one this file's header
   // calls a marketing number.
+  //
+  // ⚠️ AND HIS RENT GOES IN AS RENT. It is non savings income like his wages, so it stacks
+  // UNDERNEATH his trade and decides which band his profit lands in, but it carries no Class 4
+  // National Insurance of its own. That is why it is a second argument here rather than another
+  // pound added to the trade.
   const other = input.otherIncome;
-  const wholeTaxWith = (tradeProfit: number) => combinedIncomeTax({
+  const wholeTaxWith = (tradeProfit: number, propertyProfit: number) => combinedIncomeTax({
     selfEmployment: Math.max(0, tradeProfit),
     employment: Math.max(0, other?.employment ?? 0),
-    otherNonSavings: Math.max(0, other?.otherNonSavings ?? 0),
+    otherNonSavings: Math.max(0, propertyProfit) + Math.max(0, other?.otherNonSavings ?? 0),
   }).totalTax;
 
-  // His tax with no trade at all. Everything above this line is what the trade costs him.
-  const withoutTrade = wholeTaxWith(0);
-  const withoutLekhio = round(wholeTaxWith(gross) - withoutTrade);
-  const withLekhio = round(wholeTaxWith(Math.max(0, gross - totalDeducted)) - withoutTrade);
+  // His tax with no business at all, trade or rent. Everything above this line is what his own
+  // money costs him.
+  const withoutTrade = wholeTaxWith(0, 0);
+  const withoutLekhio = round(wholeTaxWith(tradeGross, propertyGross) - withoutTrade);
+  const withLekhio = round(
+    wholeTaxWith(Math.max(0, tradeGross - tradeDeducted), propertyGross - propertyCosts) - withoutTrade,
+  );
   const saved = Math.max(0, withoutLekhio - withLekhio);
 
   // ⚠️ NOT ENOUGH IS NOT ZERO.
@@ -286,8 +349,8 @@ export function headline(l: Ledger): string {
 // be the worst of them, because the disagreement would be between the number on his screen and the
 // number in his quarter pack.
 //
-// So the route calls this, the web app calls this, and there is one place where the mileage is
-// subtracted and the use of home is added.
+// So the route calls this, the web app calls this, and there is one place where the mileage and the
+// use of home are taken back off the expenses before either is shown on a line of its own.
 export interface LedgerSource {
   monthsElapsed: number;
   ytdTradeIncome: number;
@@ -295,6 +358,9 @@ export interface LedgerSource {
   ytdCisSuffered: number;
   ytdMileage?: number;
   ytdHomeOffice?: number;
+  // The use of home he TEXTED, already inside ytdTradeExpenses. See the note in ledgerFor() below,
+  // and OptimiserInput.ytdHomeOfficeLogged, which is where it is counted. Default 0.
+  ytdHomeOfficeLogged?: number;
 
   // 🔴 THE REST OF HIS INCOME. All optional, all zero by default, so a caller that does not pass
   // them behaves exactly as it did before this existed. OptimiserInput already carries every one of
@@ -321,23 +387,38 @@ export function ledgerFor(input: LedgerSource): Ledger {
   // lie the product cannot afford.
   const mileage = Math.max(0, input.ytdMileage ?? 0);
 
+  // 🔴 AND THE USE OF HOME IS MOVED TOO, WHICH IS THE OPPOSITE OF WHAT THIS FILE USED TO ARGUE.
+  //
+  // The comment that stood here said use of home is an ELECTION rather than a transaction, so it
+  // "cannot be inside expenses" and must be added on top. That was true the day it was written and
+  // false by the time anybody read it: app/api/whatsapp/route.ts handleHomeOffice writes a REAL
+  // transaction, vendor 'Use of home', which lands in ytdTradeExpenses like any other cost. So a man
+  // who elected AND texted his hours had the same deduction counted twice, and the comment was the
+  // reason nobody looked.
+  //
+  // THE RULE, and lib/taxoptimiser.ts applies the identical one so the two cannot drift:
+  //   take what he LOGGED out of expenses, always;
+  //   then the deduction is what he ELECTED if there is an election, and what he logged if not.
+  //
+  // WHICH WAY EACH MAN'S MONEY MOVES, because that is the only question that matters here:
+  //   ELECTED ONLY  nothing logged to take out, deduction is the election. Identical to today.
+  //   TEXTED ONLY   taken off expenses and put straight back as the claim. Same total to the penny,
+  //                 and now on a line with its name on it. He loses nothing.
+  //   BOTH          counted ONCE, at the election, which is the authoritative figure. His deduction
+  //                 falls, and that is the correct direction: it was never his twice. Nobody who was
+  //                 entitled to the deduction loses it, only the duplicate goes.
+  const loggedHomeOffice = Math.max(0, input.ytdHomeOfficeLogged ?? 0);
+
   return ledger({
     monthsElapsed: input.monthsElapsed,
     grossIncome: input.ytdTradeIncome,
-    expenses: Math.max(0, input.ytdTradeExpenses - mileage),
+    expenses: Math.max(0, input.ytdTradeExpenses - mileage - loggedHomeOffice),
     mileage,
 
-    // 🔴 USE OF HOME IS ADDED, NOT MOVED, AND THAT IS THE OPPOSITE OF THE MILEAGE LINE ABOVE.
-    //
-    // The difference is not a style choice, it is a fact about the data. Use of home is an
-    // ELECTION, not a transaction: lib/categories.ts refuses to create a 'home' category on
-    // purpose, because a rule on rent or a household energy bill would sweep up a man's OWN HOUSE
-    // and claim tax relief on it. So it cannot be inside expenses, and subtracting it the way
-    // mileage is subtracted would UNDERSTATE his deductions by exactly the amount he elected.
-    //
-    // test/elections.test.mjs asserts both directions against this file's real output, so a future
-    // refactor that "makes them consistent" has to break a test that explains why they are not.
-    homeOffice: Math.max(0, input.ytdHomeOffice ?? 0),
+    // The election if he has one, the rows he texted if he has not. A zero election is no election:
+    // lib/elections.ts only ever accrues months that have happened, so nothing is lost by reading it
+    // that way, and a negative can never draw a line. See the rule above.
+    homeOffice: Math.max(0, input.ytdHomeOffice ?? 0) || loggedHomeOffice,
 
     // STILL NOT WIRED, AND THESE ZEROS ARE HONEST RATHER THAN LAZY.
     //
@@ -350,15 +431,29 @@ export function ledgerFor(input: LedgerSource): Ledger {
     capitalAllowances: 0,
     pension: 0,
 
+    // 🔴 HIS RENT, AS A STREAM, NOT AS A RATE ADJUSTMENT. It used to arrive NETTED, in otherIncome
+    // below, where its only effect was to push his trade up a band. That is why a landlord with no
+    // trade was told "Nothing confirmed yet" however much rent he had confirmed: the gross the
+    // ledger tested was the trade's. Now the rent is income and the property costs are a deduction
+    // with their own line, which is what they have always been.
+    //
+    // ⚠️ WHICH WAY THIS MOVES A MAN'S MONEY: UP, never down. His "with Lekhio" figure, the tax he
+    // actually owes, is unchanged to the penny, because netting the rent before the engine and
+    // netting it inside the engine give the same tax. What changes is the BASELINE: a man who
+    // claimed nothing would be taxed on his whole rent, so his property costs are a real saving and
+    // they now show as one.
+    propertyIncome: Math.max(0, input.ytdPropertyIncome ?? 0),
+    propertyExpenses: Math.max(0, input.ytdPropertyExpenses ?? 0),
+
     // HIS OWN MONEY, HELD BY HMRC. Its own number on the screen, never added to "saved".
     cisSuffered: input.ytdCisSuffered,
 
     // 🔴 WHAT RATE HIS TRADE IS ACTUALLY TAXED AT. See the baseline note in ledger() above: without
     // this a man with a job was handed a second personal allowance and told his trade cost him
-    // nothing. Property is netted here the same way the optimiser nets it.
+    // nothing. Property is NOT here any more, it is a stream of its own above; putting it in both
+    // places would tax his rent twice.
     otherIncome: {
       employment: Math.max(0, input.employmentIncome ?? 0),
-      otherNonSavings: Math.max(0, (input.ytdPropertyIncome ?? 0) - (input.ytdPropertyExpenses ?? 0)),
       savings: Math.max(0, input.savingsIncome ?? 0),
       dividends: Math.max(0, input.dividendIncome ?? 0),
     },

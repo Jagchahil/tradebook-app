@@ -8,6 +8,8 @@ import {
   confirmIncome,
   setManyPersonal,
   learnVendor,
+  readVatProfile,
+  confirmTransactionVat,
 } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
 import { buildPile, summarisePile, canBulkConfirm, bulkConfirmPlan } from '../../../lib/reviewpile';
@@ -15,11 +17,14 @@ import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
 import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
+import { VAT_STANDARD_RATE, vatFromGross } from '../../../lib/vat';
 
 // The pile: what a man faces the morning after he connects his bank.
 //
 //   GET  /api/pile           what is waiting, grouped by shop, in the order he should be asked
 //   POST /api/pile           one decision, applied to every row in a group
+//   POST /api/pile           verdict=vat: the VAT inside ONE cost, for a VAT registered man only.
+//                            Its own sentence, never a side effect of filing the row.
 //
 // The grouping is the feature. Ninety days of a working tradesman's bank is two to three
 // hundred lines, and a swipe deck over two hundred cards is just a nicer way of asking two
@@ -90,11 +95,27 @@ interface Decision {
   //             in a one tap confirm across the whole pile. This is the one payer at a time door,
   //             and the reason it exists at all is that until 31 July 2026 there was no door and
   //             imported income was invisible everywhere. See the migration for what that cost.
-  verdict: 'business' | 'personal' | 'confirm_known' | 'income';
+  // 🔴 'vat'     yes, the VAT inside this one cost was this much. It files NOTHING and confirms no
+  //             category: it is its own sentence, about its own column, and it is the only thing
+  //             in the product that may set vat_confirmed. See the branch for why it is separate.
+  verdict: 'business' | 'personal' | 'confirm_known' | 'income' | 'vat';
   category?: string;
   // Remember the answer for next time, so this shop is never asked about again. Default true:
   // the whole point is that he tells us once. He can turn it off per decision.
   remember?: boolean;
+  // Only read by the 'vat' verdict. What HE says the VAT was, in pounds, as typed. Validated
+  // against his own row server side and never trusted as it stands.
+  vat?: string | number;
+}
+
+// The words the form is allowed to send. A nested ternary was readable at three verdicts and
+// stopped being readable at five, and anything not on this list is read as 'business', which is
+// what the plain file button has always meant.
+const VERDICTS = ['personal', 'confirm_known', 'income', 'vat'] as const;
+
+function verdictFrom(raw: unknown): Decision['verdict'] {
+  const v = String(raw ?? '');
+  return (VERDICTS as readonly string[]).includes(v) ? (v as Decision['verdict']) : 'business';
 }
 
 // 303 AND NOT 302, AND THAT IS NOT PEDANTRY. A 303 tells the browser to follow with a GET, so his
@@ -136,14 +157,9 @@ export async function POST(req: NextRequest) {
     body = {
       ids: String(f.get('ids') ?? '').split(',').map((x) => x.trim()).filter(Boolean),
       vendor: String(f.get('vendor') ?? ''),
-      verdict: f.get('verdict') === 'personal'
-        ? 'personal'
-        : f.get('verdict') === 'confirm_known'
-          ? ('confirm_known' as Decision['verdict'])
-          : f.get('verdict') === 'income'
-            ? ('income' as Decision['verdict'])
-            : 'business',
+      verdict: verdictFrom(f.get('verdict')),
       category: String(f.get('category') ?? ''),
+      vat: String(f.get('vat') ?? ''),
     };
   } else {
     try {
@@ -195,6 +211,67 @@ export async function POST(req: NextRequest) {
 
   const ids = Array.isArray(body?.ids) ? body.ids.slice(0, 500) : [];
   if (ids.length === 0) return NextResponse.json({ error: 'Nothing to do.' }, { status: 400 });
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE VAT ON ONE COST. A SEPARATE SENTENCE FROM FILING THE COST, AND DELIBERATELY SO.
+  //
+  // "This payment was materials" and "the VAT inside it was £4.83" are two different claims about
+  // two different columns, and rolling them into one press is precisely how a figure a model read
+  // off a crumpled photograph ends up inside a reclaim he has never looked at. So filing a row
+  // never touches its VAT, and this never files a row. He can do either, in either order, or one
+  // and not the other. getConfirmedInputVat wants BOTH before a penny counts, which is the
+  // arithmetic saying the same thing.
+  //
+  // 🔴 THIS IS THE ONLY PLACE IN THE PRODUCT THAT MAY SET vat_confirmed, and it is reached from a
+  // form with the figure printed on it, which he read and pressed. No parser, no import, no
+  // nightly job, and nothing here does it as a side effect of doing something else.
+  //
+  // ⚠️ AND ONLY FOR A MAN WHO IS VAT REGISTERED. Nobody else has input tax to reclaim, so nobody
+  // else is ever shown this question. null from readVatProfile means the READ FAILED, which is
+  // not a yes, so it refuses rather than guesses.
+  //
+  // 🔴 THE CEILING COMES FROM HIS OWN ROW, READ SERVER SIDE. The pile is read again, the row is
+  // found by id among HIS unconfirmed money out, and the figure has to clear two limits: the
+  // payment itself, and the most VAT that can arithmetically sit inside a gross amount at the
+  // standard rate. lib/vat.ts owns that second sum and nothing here works it out again.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  if (body.verdict === 'vat') {
+    // One row, one figure. A VAT amount cannot answer for fourteen different receipts, and a
+    // branch that let it would be the bulk confirm with the dangerous column attached.
+    if (ids.length !== 1) {
+      return form ? backToPile(req, 'nothing', 0) : NextResponse.json({ error: 'One at a time.' }, { status: 400 });
+    }
+
+    const profile = await readVatProfile(user.id);
+    if (profile === null || !profile.registered) {
+      return form
+        ? backToPile(req, 'novat', 0)
+        : NextResponse.json({ error: 'not_vat_registered' }, { status: 403 });
+    }
+
+    // HIS row, still waiting, and money OUT. Input tax is what he paid on what he bought, so a
+    // credit has none, and a row that is not in his pile is either not his or already answered.
+    const row = (await pileEntries(user.id)).find((r) => r.id === ids[0]);
+    if (!row || !(row.amount < 0)) {
+      return form ? backToPile(req, 'nothing', 0) : NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+
+    const gross = Math.abs(Number(row.amount) || 0);
+    // A pound sign and a stray comma are him typing what he sees on the paper, not him being
+    // wrong. An empty box is not a zero: zero VAT is a real answer and he has to type it.
+    const typed = String(body.vat ?? '').trim().replace(/[£,\s]/g, '');
+    const claimed = typed === '' ? Number.NaN : Number(typed);
+    const most = Math.min(gross, vatFromGross(gross, VAT_STANDARD_RATE));
+    if (!Number.isFinite(claimed) || claimed < 0 || claimed > most) {
+      return form
+        ? backToPile(req, 'vatbad', 0)
+        : NextResponse.json({ error: 'bad_vat', most }, { status: 400 });
+    }
+
+    const saved = await confirmTransactionVat(user.id, ids[0], claimed);
+    if (form) return backToPile(req, saved ? 'vat' : 'nothing', saved ? 1 : 0);
+    return NextResponse.json({ ok: saved, vat: claimed });
+  }
 
   const vendor = (body.vendor ?? '').trim();
   const remember = body.remember !== false;

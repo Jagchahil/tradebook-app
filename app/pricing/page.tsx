@@ -5,7 +5,7 @@ import {
   INK, PAPER, FONT, faqs, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
   Ic,
-} from '../_shared/site';
+ MtdBanner,} from '../_shared/site';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/pricing' },
@@ -93,7 +93,7 @@ export default function PricingPage() {
       <style dangerouslySetInnerHTML={{ __html: PRICING_CSS }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
 
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for sole traders and landlords with gross qualifying income over £50,000. <span className="go">See if it affects you →</span></Link></div>
+      <MtdBanner />
       <SiteNav />
 
       {/* Hero */}

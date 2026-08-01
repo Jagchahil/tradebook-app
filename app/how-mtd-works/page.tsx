@@ -5,7 +5,7 @@ import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
   Ic,
-} from '../_shared/site';
+ MtdBanner,} from '../_shared/site';
 import { FACTS } from '../../lib/taxengine';
 
 export const metadata: Metadata = {
@@ -134,7 +134,7 @@ export default function HowMtdWorksPage() {
       {/* Not "the self employed earning over £50k". The test catches landlords too, which is the
           whole point of our own /for-landlords page, and it runs on gross income rather than on
           what a man earns, which everybody reads as profit. Both wrong words are fixed here. */}
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for sole traders and landlords with gross income over £{T26 / 1000}k. <span className="go">See if it affects you →</span></Link></div>
+      <MtdBanner />
       <SiteNav />
 
       {/* Hero */}

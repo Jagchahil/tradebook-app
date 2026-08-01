@@ -6,7 +6,7 @@ import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
   Ic,
-} from '../_shared/site';
+ MtdBanner,} from '../_shared/site';
 import { FACTS } from '../../lib/taxengine';
 
 export const metadata: Metadata = {
@@ -188,7 +188,7 @@ export default function ComparePage() {
       {/* The threshold is on GROSS qualifying income, trade plus rent added together before any
           expenses, and it catches landlords as squarely as it catches the self employed. "Earning
           over £50k" said neither, so a landlord read past it and a sole trader read it as profit. */}
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for sole traders and landlords with gross income over £{FACTS.mtdThreshold2026 / 1000}k. <span className="go">See if it affects you →</span></Link></div>
+      <MtdBanner />
       <SiteNav />
 
       {/* Hero */}

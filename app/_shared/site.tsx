@@ -9,6 +9,7 @@ import { filingFaqAnswer, filingMark, bankMark, hmrcFilingLive, bankFeedLive } f
 import type { CSSProperties } from 'react';
 import { TRADES } from '../../lib/trades';
 import { A11Y_CSS, THEME_CSS, THEME_SWAP_JS } from '../../lib/tokens';
+import { FACTS } from '../../lib/taxengine';
 
 // Colours are CSS variables so the whole site themes light and dark from one place. The raw
 // palette is lib/tokens.ts and arrives here as THEME_CSS, injected by SharedHead. Components keep
@@ -887,6 +888,39 @@ const REVEAL_JS = `
   if (document.readyState !== 'loading') run(); else document.addEventListener('DOMContentLoaded', run);
 })();
 `;
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE MTD BANNER, ONCE. IT USED TO BE SIX COPIES AND THEY HAD ALREADY DRIFTED.
+//
+// Found by walking the deployed site on 1 August 2026, minutes after a deploy whose whole point
+// was fixing this banner. Six pages carried it. Four had just been corrected to name landlords and
+// to say gross income rather than "earning", and they had been corrected in TWO DIFFERENT SITTINGS,
+// so the site went live saying "gross qualifying income over £50,000" on the front door and "gross
+// income over £50k" one click away. Two of the six typed the threshold as a literal; three read it
+// from FACTS, where khoji checks it against GOV.UK every night. So a Budget that moved the number
+// would have quietly left two pages wrong.
+//
+// Neither wording was false, which is exactly why it survived a house style sweep, a test run and a
+// review. A sentence duplicated at six call sites is not copy, it is six chances to be wrong, and
+// the one that drifts is always the one he is looking at. This is the same lesson lib/features.ts
+// was written for and the same lesson lib/reviewpile.ts learned about counting the pile.
+//
+// ⚠️ NEVER INLINE THIS AGAIN. If a page needs different wording, that is a product decision worth
+// arguing for out loud, and it belongs here as a second exported banner with its reason written
+// down, not as a seventh literal.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export function MtdBanner() {
+  return (
+    <div className="mtdtop">
+      <Link href="/how-mtd-works">
+        <span className="tag">New</span>{' '}
+        <b>Making Tax Digital is now live</b> for sole traders and landlords with gross qualifying
+        income over £{FACTS.mtdThreshold2026.toLocaleString('en-GB')}.{' '}
+        <span className="go">See if it affects you →</span>
+      </Link>
+    </div>
+  );
+}
 
 export function SharedHead() {
   return (

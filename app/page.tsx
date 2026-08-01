@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
 import { bankFeedLive, filingBadge } from '../lib/features';
 import {
   INK, PAPER, FONT, SITE, faqs, reviews,
-  SharedHead, SiteNav, SiteFooter, StickyCta, HeroPhone, Ic,
+  SharedHead, SiteNav, SiteFooter, StickyCta, HeroPhone, Ic, MtdBanner,
 } from './_shared/site';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -238,7 +238,7 @@ export default function HomePage() {
       <style dangerouslySetInnerHTML={{ __html: HOME_CSS }} />
 
       {/* One clean top bar: the MTD announcement CTA */}
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for sole traders and landlords with gross qualifying income over £50,000. <span className="go">See if it affects you →</span></Link></div>
+      <MtdBanner />
 
       <SiteNav />
 

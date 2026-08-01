@@ -6,7 +6,7 @@ import OnboardingShow from './OnboardingShow';
 import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta, Ic,
-} from '../_shared/site';
+ MtdBanner,} from '../_shared/site';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/product' },
@@ -163,7 +163,7 @@ export default function ProductPage() {
       <style dangerouslySetInnerHTML={{ __html: MARKETING_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: PRODUCT_CSS }} />
 
-      <div className="mtdtop"><Link href="/how-mtd-works"><span className="tag">New</span> <b>Making Tax Digital is now live</b> for sole traders and landlords with gross qualifying income over £50,000. <span className="go">See if it affects you →</span></Link></div>
+      <MtdBanner />
       <SiteNav />
 
       {/* Hero */}

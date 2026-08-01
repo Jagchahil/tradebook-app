@@ -512,5 +512,42 @@ console.log('\n=== a customer can get back in ===\n');
   ok('"Team sign in" is not the only sign in on the page', !teamOnly);
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 ONE BANNER, NOT SIX. FOUND BY WALKING THE DEPLOYED SITE, MINUTES AFTER A DEPLOY.
+//
+// The MTD banner sat inline on six pages. Four were corrected on 1 August to name landlords and to
+// say GROSS income rather than "earning", and because they were corrected in two separate sittings
+// the site went live saying "gross qualifying income over £50,000" on the front door and "gross
+// income over £50k" one click away. Two of the six typed the threshold as a literal while three
+// read it from FACTS, so a Budget that moved the number would have left two pages quietly wrong.
+//
+// Neither wording was false, which is exactly why a house style sweep, a full test run and a review
+// all walked past it. A sentence duplicated at six call sites is six chances to be wrong.
+// ---------------------------------------------------------------------------------------------
+const BANNER_PAGES = [
+  'app/page.tsx', 'app/how-mtd-works/page.tsx', 'app/compare/page.tsx',
+  'app/product/page.tsx', 'app/pricing/page.tsx', 'app/security/page.tsx',
+];
+const shared = read('app/_shared/site.tsx');
+
+ok('🔴 the MTD banner is defined exactly once, in the shared module',
+  (shared.match(/export function MtdBanner/g) || []).length === 1);
+ok('and it reads the threshold rather than typing it, so a Budget cannot leave it stale',
+  /FACTS\.mtdThreshold2026/.test(shared.slice(shared.indexOf('export function MtdBanner'),
+    shared.indexOf('export function MtdBanner') + 900)));
+
+for (const f of BANNER_PAGES) {
+  const src = read(f);
+  ok(`${f} renders the shared banner`, /<MtdBanner \/>/.test(src));
+  ok(`${f} carries no inline copy of it`, !/className="mtdtop"><Link/.test(src));
+}
+
+// The threshold may not be typed as a literal anywhere a banner lives, for the same reason.
+for (const f of BANNER_PAGES) {
+  ok(`${f} does not hardcode the MTD threshold beside the banner`,
+    !/Making Tax Digital is now live/.test(read(f)));
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

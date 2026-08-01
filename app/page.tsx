@@ -101,7 +101,11 @@ const HOME_CSS = `
 .squig{position:absolute;left:-2%;bottom:-14px;width:104%;height:16px;overflow:visible}
 .squig path{stroke:var(--saffron);stroke-width:6;fill:none;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:hdraw 1s ease forwards .6s}
 @keyframes hdraw{to{stroke-dashoffset:0}}
-.hero p.sub{font-size:20px;color:var(--tx-mut);max-width:520px;margin:22px 0 30px}
+/* ⚠️ THE ONE HERO ON THE SITE THAT IS NOT CENTRED, so it opts out of the shared default
+   explicitly rather than relying on which stylesheet the browser read last. This hero is a
+   two column grid: the words sit left, the phone sits right. margin-inline:0 is correct here
+   and wrong everywhere else, which is exactly why the shared rule now centres by default. */
+.hero p.sub{font-size:20px;color:var(--tx-mut);max-width:520px;margin:22px 0 30px;margin-inline:0}
 .cta-row{display:flex;gap:14px;flex-wrap:wrap}
 .hero .micro{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:13.5px;color:var(--tx-mut)}
 .avs{display:flex}

@@ -164,7 +164,16 @@ export const MARKETING_CSS = `
 .squig{position:absolute;left:-2%;bottom:-14px;width:104%;height:16px;overflow:visible}
 .squig path{stroke:var(--saffron);stroke-width:6;fill:none;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:hdraw 1s ease forwards .6s}
 @keyframes hdraw{to{stroke-dashoffset:0}}
-.hero p.sub{font-size:20px;color:var(--tx-mut);max-width:520px;margin:22px 0 30px}
+/* 🔴 margin-inline IS auto, AND IT USED TO BE 0. Found by Jag looking at /how-mtd-works on a
+   laptop on 1 August 2026: the paragraph under a centred h1 sat visibly left of centre.
+   This rule was written for the HOMEPAGE, whose hero is a two column grid with left aligned
+   text, and 0 is right there. Every other hero on the site is centred, and they all inherit
+   this, so four pages (/how-mtd-works, /compare, /pricing, /security) drew a 520px block
+   pinned to the left of a wider container. It only looked right on a phone, because the
+   media query below rescues it with margin-inline:auto under 900px.
+   The default is now the common case. The homepage keeps its own copy of this rule with an
+   explicit margin-inline:0 and says why, so it opts out on purpose rather than by cascade. */
+.hero p.sub{font-size:20px;color:var(--tx-mut);max-width:520px;margin:22px auto 30px}
 .cta-row{display:flex;gap:14px;flex-wrap:wrap}
 .hero .micro{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:13.5px;color:var(--tx-mut)}
 .avs{display:flex}.avs span{width:30px;height:30px;border-radius:999px;border:2px solid var(--bg);margin-left:-8px}.avs span:first-child{margin-left:0}

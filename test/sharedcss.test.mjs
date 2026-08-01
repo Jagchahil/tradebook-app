@@ -78,7 +78,16 @@ if (mkt && hom) {
   // Same selector, different layout, on purpose. This is the ONLY entry that belongs in here: if a
   // second one turns up, the honest move is almost always to make the two copies agree, not to
   // extend this list. Anything added here should say why, in a sentence, like this one.
-  const ALLOWED_TO_DIFFER = new Set(['.truststrip .row']);
+  //
+  // ⚠️ SECOND DELIBERATE DIFFERENCE, ADDED 1 AUGUST 2026, AND HERE IS THE SENTENCE.
+  // Every hero on the site is centred EXCEPT the home page's, which is a two column grid with the
+  // words left and the phone right. So the shared copy centres the subhead (margin-inline auto)
+  // and the home copy pins it left (margin-inline 0). Making them agree would either shove the
+  // front door's subhead 40px right inside its own column, or leave four other pages drawing a
+  // 520px paragraph off centre under a centred h1, which is the bug this fixed. The two layouts
+  // are genuinely different, so the two rules genuinely differ, and it is said here rather than
+  // left to whichever stylesheet the browser read last.
+  const ALLOWED_TO_DIFFER = new Set(['.truststrip .row', '.hero p.sub']);
 
   const drift = shared.filter((k) => A.get(k) !== B.get(k) && !ALLOWED_TO_DIFFER.has(k));
   const excused = shared.filter((k) => A.get(k) !== B.get(k) && ALLOWED_TO_DIFFER.has(k));
@@ -98,6 +107,29 @@ if (mkt && hom) {
     !!approve && B.has(approve) && A.get(approve) === B.get(approve));
   ok('.approvebtn does not write white on the green', !!approve && !/color:#fff\b/.test(A.get(approve)));
 }
+
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE HERO SUBHEAD CENTRES BY DEFAULT. Found by eye on a laptop, 1 August 2026.
+//
+// The shared rule had margin-inline 0, which is right for the HOMEPAGE (a two column grid, words
+// left, phone right) and wrong for every other hero on the site, all of which are centred. So
+// /how-mtd-works, /compare, /pricing and /security each drew a 520px paragraph pinned to the left
+// of a wider container under a centred h1. It looked correct on a phone only because the media
+// query under 900px sets margin-inline:auto, so nobody testing on a narrow window would see it.
+//
+// The default is now the common case, and the homepage opts out EXPLICITLY rather than relying on
+// which stylesheet the browser happened to read last.
+// ---------------------------------------------------------------------------------------------
+const sharedCss = site;
+const homeCss = home;
+
+ok('🔴 the shared hero subhead centres itself',
+  /\.hero p\.sub\{[^}]*margin:22px auto 30px/.test(sharedCss));
+ok('the homepage opts out on purpose, not by cascade order',
+  /\.hero p\.sub\{[^}]*margin-inline:0/.test(homeCss));
+ok('and it says why, so the next person does not "fix" it back',
+  /NOT CENTRED/.test(homeCss) && /two column grid/.test(homeCss));
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

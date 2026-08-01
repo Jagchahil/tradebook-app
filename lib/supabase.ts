@@ -1616,7 +1616,7 @@ export async function reconcileSignupToUser(
   // 3. VAT status -> the circumstance AND the vat profile. They answer the same question to
   // different halves of the product, and for two and a half weeks this door wrote only one.
   //
-  // 🔴 FOUND BY WALKING THE LIVE SITE ON 2 AUGUST, on an account that answered yes at signup.
+  // 🔴 FOUND BY WALKING THE LIVE SITE ON 1 AUGUST, on an account that answered yes at signup.
   // /app/you read the circumstance and said "VAT registered, as you told us." One click away,
   // /app/tax/vat read the profile and said "You are not VAT registered, so there is nothing to
   // work out here." /app/tax drew no VAT door at all, and /app/invoices/new drew no rate boxes
@@ -3961,6 +3961,19 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     console.error('[optimiser] could not read the use of home election:', e instanceof Error ? e.message : 'unknown');
     return null;
   });
+
+  // 🔴 THE TRADING ALLOWANCE ELECTION, READ THE SAME WAY AND FAILING THE SAME DIRECTION.
+  //
+  // A failed read is treated as NOT ELECTED, and that is the safe direction here even though it is
+  // the opposite of the safe direction for use of home. Use of home only ever ADDS a deduction, so
+  // losing it costs him money. The trading allowance REPLACES his real costs, so wrongly believing
+  // he elected it would throw away every expense he logged and hand him a £1,000 flat figure he
+  // never asked for. Failing to "not elected" leaves his own numbers exactly as he entered them,
+  // which is the state he can see and check.
+  const tradingElection = await readAllowanceElection(userId, 'trading_allowance', startYear).catch((e) => {
+    console.error('[optimiser] could not read the trading allowance election:', e instanceof Error ? e.message : 'unknown');
+    return null;
+  });
   const purchase = goals.find((g) => g.kind === 'purchase');
 
   // WHAT HE HAS TOLD US ABOUT HIMSELF, read ONCE (see the note on the return): the answers as a map.
@@ -4006,6 +4019,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     // he keeps being reminded about a deduction he has already taken, which is a nuisance, rather
     // than silently losing a deduction he elected, which is money.
     homeOfficeClaimed: !!election,
+    tradingAllowanceElected: !!tradingElection,
     ytdHomeOffice: election ? useOfHomeToDate(election.hoursBand as 25 | 51 | 101, monthsElapsed) : 0,
     mileageClaimed: ytdMileage > 0,
     ytdMileage: Math.round(ytdMileage * 100) / 100,
@@ -7592,11 +7606,24 @@ export async function readAnnouncementsForTeam(limit = 40): Promise<
 // mileage page came to say 45p while the engine said 55p.
 
 export interface AllowanceElection {
-  key: 'use_of_home';
+  key: AllowanceElectionKey;
   startYear: number;
-  hoursBand: number;
+  // ⚠️ NULL FOR AN ELECTION THAT HAS NO BAND, AND THE TRADING ALLOWANCE IS ONE.
+  //
+  // use_of_home stores WHICH BAND he is in, because the claim is a rate per month. The trading
+  // allowance stores nothing at all: the row existing IS the election, and the amount comes from
+  // FACTS. A nullable column rather than a second table, because the two are the same kind of
+  // thing (a choice about one tax year, reversible, his) and the CHECK constraint in the migration
+  // ties the shape of the row to its key so a bandless use of home row cannot exist either.
+  hoursBand: number | null;
   electedAt: string;
 }
+
+// Re-declared rather than imported from lib/elections.ts: this module is the database layer and it
+// must not depend on the tax module to know a string. test/tradingallowance.test.mjs pins the two
+// unions against each other so they cannot drift apart in silence, the same way persona and
+// circumstances are pinned.
+export type AllowanceElectionKey = 'use_of_home' | 'trading_allowance';
 
 // Null means NO ELECTION. It does not mean the read failed, and the difference matters: a failed
 // read that returned null would silently stop claiming a deduction he elected, and he would never
@@ -7604,7 +7631,7 @@ export interface AllowanceElection {
 // elect". Callers that cannot tolerate a throw wrap it, and getOptimiserInput does.
 export async function readAllowanceElection(
   userId: string,
-  key: 'use_of_home',
+  key: AllowanceElectionKey,
   startYear: number,
 ): Promise<AllowanceElection | null> {
   const { url } = config();
@@ -7615,10 +7642,18 @@ export async function readAllowanceElection(
     { headers: headers(), signal: AbortSignal.timeout(6000) },
   );
   if (!res.ok) throw new Error(`allowance_elections read failed: HTTP ${res.status}`);
-  const rows = (await res.json()) as Array<{ key: string; start_year: number; hours_band: number; elected_at: string }>;
+  const rows = (await res.json()) as Array<{ key: string; start_year: number; hours_band: number | null; elected_at: string }>;
   const r = rows[0];
   if (!r) return null;
-  return { key: 'use_of_home', startYear: r.start_year, hoursBand: r.hours_band, electedAt: r.elected_at };
+  // The key echoed back is the one that was ASKED FOR, never the one the row happens to carry: the
+  // query filters on it, so they cannot differ, and trusting the caller's own constant keeps the
+  // return type honest without a second validation nobody would read.
+  return {
+    key,
+    startYear: r.start_year,
+    hoursBand: r.hours_band === null || r.hours_band === undefined ? null : Number(r.hours_band),
+    electedAt: r.elected_at,
+  };
 }
 
 // Elect, or change the band. Idempotent on (user, key, year), so saying it twice is not an error and
@@ -7626,11 +7661,20 @@ export async function readAllowanceElection(
 // well as by the caller: two gates, because a bad band would be a wrong figure on a tax return.
 export async function writeAllowanceElection(
   userId: string,
-  key: 'use_of_home',
+  key: AllowanceElectionKey,
   startYear: number,
-  hoursBand: number,
+  hoursBand: number | null,
 ): Promise<boolean> {
-  if (!userId || ![25, 51, 101].includes(hoursBand)) return false;
+  if (!userId) return false;
+  // 🔴 THE SHAPE OF THE ROW HAS TO MATCH ITS KEY, AND IT IS CHECKED HERE AND IN THE DATABASE.
+  //
+  // Two gates for the same reason the band always had two: a wrong row here is a wrong figure on a
+  // tax return. A use_of_home election with no band would claim nothing while looking like a claim,
+  // and a trading_allowance row carrying a band would look like it had one rate among several when
+  // it has none at all. Both are refused before the request is made and again by the CHECK in
+  // supabase/APPLY_2026-08-01_trading_allowance_election.sql.
+  if (key === 'use_of_home' && !(hoursBand !== null && [25, 51, 101].includes(hoursBand))) return false;
+  if (key === 'trading_allowance' && hoursBand !== null) return false;
   try {
     const { url } = config();
     const res = await fetch(`${url}/rest/v1/allowance_elections`, {
@@ -7655,7 +7699,7 @@ export async function writeAllowanceElection(
 // his. An election made in error comes off in one step, and his figures move back the same day.
 export async function clearAllowanceElection(
   userId: string,
-  key: 'use_of_home',
+  key: AllowanceElectionKey,
   startYear: number,
 ): Promise<boolean> {
   if (!userId) return false;

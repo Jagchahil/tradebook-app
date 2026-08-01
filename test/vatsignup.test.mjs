@@ -12,7 +12,7 @@
 //                                VAT confirm section.
 //   circumstances.vat_registered the agent's threshold signal, the weekly update, and /app/you.
 //
-// 🔴 ON 2 AUGUST 2026, WALKING THE LIVE SITE ON AN ACCOUNT THAT ANSWERED YES AT SIGNUP:
+// 🔴 ON 1 AUGUST 2026, WALKING THE LIVE SITE ON AN ACCOUNT THAT ANSWERED YES AT SIGNUP:
 //
 //   /app/you        "VAT registered, as you told us."
 //   /app/tax/vat    "You are not VAT registered, so there is nothing to work out here."
@@ -200,7 +200,7 @@ ok('it only runs when signup actually carried an answer, so an unasked customer 
 // 5. THE SURFACES THIS UNBLOCKS, named so the next reader knows what to walk.
 //
 // Not copy pins. Each of these is the CONDITION that decides whether a whole surface draws, and
-// each was answered "no" on 2 August for a man who had answered "yes" on the front door.
+// each was answered "no" on 1 August for a man who had answered "yes" on the front door.
 // ---------------------------------------------------------------------------------------------
 ok('the tax hub draws its VAT door on the profile, so it was dark for him',
   /vat !== null && vat\.registered/.test(read('app/app/tax/page.tsx')));

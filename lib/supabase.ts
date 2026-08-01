@@ -1613,12 +1613,39 @@ export async function reconcileSignupToUser(
     if (pr.ok) applied.push('profile');
   }
 
-  // 3. VAT status -> a circumstance, logged with the wording he saw on the web.
+  // 3. VAT status -> the circumstance AND the vat profile. They answer the same question to
+  // different halves of the product, and for two and a half weeks this door wrote only one.
+  //
+  // 🔴 FOUND BY WALKING THE LIVE SITE ON 2 AUGUST, on an account that answered yes at signup.
+  // /app/you read the circumstance and said "VAT registered, as you told us." One click away,
+  // /app/tax/vat read the profile and said "You are not VAT registered, so there is nothing to
+  // work out here." /app/tax drew no VAT door at all, and /app/invoices/new drew no rate boxes
+  // and none of the three reverse charge questions, so a registered subcontractor sent an invoice
+  // with no VAT and no VAT number on the paper.
+  //
+  // The mechanism: readVatProfile treats a MISSING ROW as a real answer of "not registered"
+  // rather than as silence. That is right for a man who has never been asked and wrong for a man
+  // who was asked on the front door and answered. app/api/vat/route.ts already writes both, and
+  // its own comment gives the reason: a customer whose two records disagree gets told to go and
+  // register by a paid WhatsApp template. Signup is the same fault with the halves swapped.
+  //
+  // ⚠️ THE PATCH IS DELIBERATELY ONLY `registered`. saveVatProfile is partial by design, so this
+  // can never reach a VRN, a scheme or a registration date already given. And it runs only when
+  // signup actually carried an answer, so a customer who never saw the question keeps no row at
+  // all, which is the honest starting point readVatProfile was built to return.
   if (s.vat_registered !== null && s.vat_registered !== undefined) {
+    const vatRegistered = Boolean(s.vat_registered);
     if (await saveCircumstance(
-      userId, 'vat_registered', s.vat_registered ? 'yes' : 'no',
+      userId, 'vat_registered', vatRegistered ? 'yes' : 'no',
       'Are you VAT registered? (you answered this when you signed up on the Lekhio website)', 'web',
     )) applied.push('vat_registered');
+    // The circumstance goes first and this is best effort, on purpose. The circumstance is the
+    // LOG, the exhibit of what we asked and what he answered, and it must not be lost because a
+    // second write failed. A failure here costs him the VAT screens until he sets it himself, and
+    // it says so out loud rather than looking like a clean sheet.
+    if (!(await saveVatProfile(userId, { registered: vatRegistered }))) {
+      console.error('[signup-reconcile] vat profile write failed, so the app will read him as not registered until he answers again on /app/you/vat');
+    }
   }
 
   // 4. A PAYE job alongside the trade -> the other_job circumstance. The salary itself is asked later.

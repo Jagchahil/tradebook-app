@@ -617,5 +617,49 @@ console.log('\n11. Never the mileage rate on a vehicle he bought through the boo
     !/instead/i.test(bought.detail));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 12. THREE NOUGHTS AND A CONFIDENT RECOMMENDATION BETWEEN THEM.
+//
+// Walking /app/tax/vehicle on 2 August with a real account carrying a loss: "A brand new electric
+// car £0", "A hybrid £0", "A petrol or diesel car £0", and underneath, in red, "ON YOUR NUMBERS: A
+// HYBRID... That is about £0 of tax in the first year."
+//
+// Not an arithmetic bug. Every figure on that screen is a deduction times his marginal rate, and a
+// man with no taxable profit has a rate of nought. The screen was RIGHT and unreadable, which on a
+// screen whose whole job is to be believed is the same as being wrong.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n12. The vehicle screen when there is no tax to save');
+{
+  const ask = (rate) => C.recommendVehicle({
+    want: 'car', budget: 40000, businessMilesPerYear: 9000, businessUsePct: 75,
+    runningCostsPerYear: 3000, charging: 'home', marginalRate: rate, spendable: 50000,
+  });
+
+  const normal = ask(0.29);
+  const broke = ask(0);
+
+  ok('CONTROL: at a real marginal rate nothing changes', normal.noTaxToSaveYet === false);
+  ok('🔴 at a rate of nought the screen knows it', broke.noTaxToSaveYet === true);
+
+  const said = (r) => r.lines.join(' ');
+  ok('CONTROL: the normal answer still quotes a tax figure',
+    /of tax in the first year/.test(said(normal)));
+  ok('🔴 AND THE £0 ONE DOES NOT, because "about £0 of tax" tells him nothing',
+    !/of tax in the first year/.test(said(broke)));
+  ok('it says plainly that he has no tax to pay this year',
+    /no tax\s+to pay this year/.test(said(broke)));
+  // ⚠️ AND IT DOES NOT LEAVE HIM THINKING THE RELIEF IS WASTED. Claimed against no profit it makes
+  // a loss, and a loss is carried forward. Saying "worth nothing" would be the wrong lesson.
+  ok('🔴 and that the relief is carried forward rather than lost',
+    /carried forward|carries forward/.test(said(broke)));
+
+  // The RECOMMENDATION itself must survive: which vehicle is best does not depend on his rate,
+  // because the deduction it earns is the same either way.
+  ok('the recommendation is still made, and it is the same one',
+    Boolean(broke.best) && broke.best.kind === normal.best.kind);
+  ok('and the options still differ from each other on the deduction',
+    new Set(broke.options.map((o) => o.firstYear)).size > 1);
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

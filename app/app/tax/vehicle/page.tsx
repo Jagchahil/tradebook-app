@@ -247,16 +247,35 @@ export default async function Page({
         <>
           <section className="lek-card">
             <h2 className="lek-h2">What each one is worth</h2>
-            <p style={S.quiet}>
-              First year, in tax, on {gbp0(budget as number)} and {Math.round(miles as number).toLocaleString('en-GB')} business
-              miles. The bigger of the two routes for each, so nothing is judged on its weaker half.
-            </p>
+            {/* 🔴 THE HEADLINE IS A DEDUCTION TIMES HIS MARGINAL RATE, AND HIS RATE CAN BE NOUGHT.
+                Walking this screen on 2 August with a real account carrying a loss printed "£0",
+                "£0", "£0" and then picked a winner between them. The arithmetic was right and the
+                screen was unreadable, which on a screen whose job is to be believed is the same as
+                being wrong. So when there is no tax to save, it stops printing a tax figure and
+                shows the DEDUCTION instead, which is real, differs between the options, and is the
+                thing his decision actually turns on. */}
+            {rec.noTaxToSaveYet ? (
+              <p style={S.note}>
+                These are what each one takes off your profit, not what it saves you in tax. On the
+                figures you have confirmed you have no tax to pay this year, so none of them would
+                save you any yet. The relief is not lost: claimed against no profit it makes a loss,
+                and a loss carries forward to the years you do make money.
+              </p>
+            ) : (
+              <p style={S.quiet}>
+                First year, in tax, on {gbp0(budget as number)} and {Math.round(miles as number).toLocaleString('en-GB')} business
+                miles. The bigger of the two routes for each, so nothing is judged on its weaker half.
+              </p>
+            )}
             <div style={S.opts}>
               {rec.options.map((o) => (
                 <div key={o.kind} style={{ ...S.opt, ...(rec.best && rec.best.kind === o.kind ? S.optBest : null), ...(o.practical === 'no' ? S.optNo : null) }}>
                   <div style={S.optTop}>
                     <span style={S.optTitle}>{o.title}</span>
-                    <span style={S.optMoney} className="lek-num">{gbp0(o.worthPerYearOne)}</span>
+                    {/* The deduction when the tax figure would be a meaningless nought. */}
+                    <span style={S.optMoney} className="lek-num">
+                      {gbp0(rec.noTaxToSaveYet ? Math.max(o.firstYear, o.mileageFirstYear) : o.worthPerYearOne)}
+                    </span>
                   </div>
                   <p style={S.optBody}>
                     {o.bestRoute === 'mileage'
@@ -316,6 +335,9 @@ const S: Record<string, React.CSSProperties> = {
   label: { display: 'block', fontSize: TYPE.label, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: MUTED, margin: `${SPACE.md}px 0 ${SPACE.xs}px` },
   hint: { fontSize: TYPE.note, lineHeight: 1.5, color: MUTED, margin: `${SPACE.xs}px 0 0` },
   quiet: { fontSize: TYPE.note, lineHeight: 1.5, color: MUTED, margin: `0 0 ${SPACE.sm}px` },
+  // The no-tax-to-save note. Louder than `quiet`, because it is not an aside: it explains why
+  // every figure beside it is a different kind of number from the one he expected.
+  note: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px', margin: `0 0 ${SPACE.sm}px` },
   body: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, margin: `${SPACE.sm}px 0 0` },
   verdict: { fontSize: TYPE.strong, lineHeight: 1.5, fontWeight: 700, color: RIVER_DEEP, background: RIVER_TINT, padding: SPACE.sm, borderRadius: RADIUS.md, margin: `${SPACE.sm}px 0 0` },
   warn: { fontSize: TYPE.body, lineHeight: 1.55, color: RED, background: RED_TINT, padding: SPACE.sm, borderRadius: RADIUS.md, margin: 0, fontWeight: 600 },

@@ -612,6 +612,12 @@ export interface VehicleOption {
 }
 
 export interface VehicleRecommendation {
+  // 🔴 HIS MARGINAL RATE IS NOUGHT, SO EVERY TAX FIGURE ON THIS SCREEN IS NOUGHT AND SAYS NOTHING.
+  // A man below the personal allowance, in his first months, or carrying a loss. Not an error and
+  // not an empty state: the DEDUCTIONS are all still real and still differ from each other, and
+  // the screen has to say which number went quiet and why rather than printing £0 three times and
+  // picking a winner between them.
+  noTaxToSaveYet: boolean;
   options: VehicleOption[];
   // The one we would actually tell him to do, or null when nothing is affordable or answerable.
   best: VehicleOption | null;
@@ -731,17 +737,35 @@ export function recommendVehicle(input: RecommendInput): VehicleRecommendation {
     );
   }
 
+  // See VehicleRecommendation.noTaxToSaveYet. Every figure here is a deduction times his marginal
+  // rate, so at a rate of nought they are all nought and none of them is telling him anything.
+  const noTaxToSaveYet = !(input.marginalRate > 0);
+
   if (best) {
     const vetoed = ranked.find((o) => o.practical === 'no' && o.worthPerYearOne > best.worthPerYearOne);
     lines.push(
-      `🔴 ON YOUR NUMBERS: ${best.title.toUpperCase()}, and ${best.bestRoute === 'mileage'
-        ? 'keep it in your own name and claim mileage'
-        : 'buy it through the business'}. `
-      + `That is about ${gbp0(best.worthPerYearOne)} of tax in the first year.`,
+      noTaxToSaveYet
+        // ⚠️ THE RECOMMENDATION SURVIVES, THE POUND FIGURE DOES NOT. Which vehicle is best for him
+        // does not depend on his rate: the deduction it earns is the same either way, and the
+        // practical answers that overrule the tax are unchanged. Only the "worth £X" half is dead.
+        ? `🔴 ON YOUR NUMBERS: ${best.title.toUpperCase()}, and ${best.bestRoute === 'mileage'
+          ? 'keep it in your own name and claim mileage'
+          : 'buy it through the business'}. `
+          + `I am not putting a tax figure on it, because on your confirmed books you have no tax `
+          + `to pay this year, so nothing here would save you any. That does not make the relief `
+          + `worthless: claimed against no profit it makes a loss, and a loss is carried forward `
+          + `against the years you do make money. Come back once you are in profit and this screen `
+          + `will be able to tell you what each one is worth.`
+        : `🔴 ON YOUR NUMBERS: ${best.title.toUpperCase()}, and ${best.bestRoute === 'mileage'
+          ? 'keep it in your own name and claim mileage'
+          : 'buy it through the business'}. `
+          + `That is about ${gbp0(best.worthPerYearOne)} of tax in the first year.`,
     );
     if (vetoed && vetoed.practicalNote) {
       lines.push(
-        `${vetoed.title} would actually be worth more, about ${gbp0(vetoed.worthPerYearOne)}. `
+        (noTaxToSaveYet
+          ? `${vetoed.title} would actually earn you more relief. `
+          : `${vetoed.title} would actually be worth more, about ${gbp0(vetoed.worthPerYearOne)}. `)
         + `I am not putting it first, and here is why. ${vetoed.practicalNote}`,
       );
     } else if (best.practicalNote) {
@@ -767,5 +791,5 @@ export function recommendVehicle(input: RecommendInput): VehicleRecommendation {
 
   lines.push('Every figure here is the published rules against what you have confirmed. What you buy is yours to decide, and nothing here is advice.');
 
-  return { options: ranked, best, affordable, spendable, lines };
+  return { options: ranked, best, affordable, spendable, noTaxToSaveYet, lines };
 }

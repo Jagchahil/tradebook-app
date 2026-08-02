@@ -36,6 +36,17 @@ export interface OptimiserInput {
   studentPlans?: StudentPlan[];
   categoriesLogged: string[]; // distinct trade expense categories seen this year, lowercased
   homeOfficeClaimed: boolean;
+
+  // 🔴 HAS HE ELECTED THE TRADING ALLOWANCE FOR THIS YEAR. ITTOIA 2005 Part 6A; HMRC BIM86015.
+  //
+  // Optional and defaulting to false, so every caller written before it existed behaves exactly as
+  // it did, to the penny. It is a BOOLEAN and not an amount: the amount is FACTS.tradingAllowance,
+  // watched nightly, and a figure captured here would go stale the day HMRC moved it.
+  //
+  // ⚠️ IT IS NOT A DEDUCTION THAT ADDS. It REPLACES his expenses, his mileage and the use of home
+  // flat rate with one flat figure (GOV.UK: "You cannot deduct any other expenses or allowances if
+  // you claim the allowances"), which is why it cannot simply be another field in tradeNetOf.
+  tradingAllowanceElected?: boolean;
   // The £ of use of home he has actually accrued this year, from his election. Realised, never
   // projected: lib/elections.ts useOfHomeToDate() counts only months that have happened. Default 0
   // means no election, which is what a man who has never been asked has.
@@ -205,7 +216,27 @@ export function taxPosition(
   const tradeNet = tradeNetOf(input);
   const canProject = input.monthsElapsed >= 3;
   const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
-  const projTradeNet = tradeNet * factor;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE TRADING ALLOWANCE LANDS AFTER THE PROJECTION, AND GETTING THAT BACKWARDS WOULD HAVE
+  // HANDED HIM AN ALLOWANCE OF £4,000 IN MONTH THREE.
+  //
+  // Every other figure in this function is a year to date amount multiplied up by 12/months. The
+  // trading allowance is not that shape: it is ONE FLAT £1,000 for the whole tax year, whether he
+  // is three months in or eleven. Subtracting it from the year to date figure and then projecting
+  // would multiply the allowance by the same factor as the money, so a man three months into the
+  // year would have been given four times the relief the law allows. The temptation to put it
+  // inside tradeNetOf, where the use of home already sits, is exactly that mistake.
+  //
+  // So: project his GROSS trade income the way everything else is projected, then take the flat
+  // allowance off the annual figure once.
+  //
+  // ⚠️ AND HIS COSTS DROP OUT ENTIRELY WHEN HE HAS ELECTED, which is the whole meaning of the
+  // election and the reason lib/elections.ts refuses to offer it without both totals side by side.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const projTradeNet = input.tradingAllowanceElected
+    ? Math.max(0, (Math.max(0, input.ytdTradeIncome) * factor) - FACTS.tradingAllowance)
+    : tradeNet * factor;
   const propertyNet = Math.max(0, (input.ytdPropertyIncome ?? 0) - (input.ytdPropertyExpenses ?? 0)) * factor;
   const employment = Math.max(0, input.employmentIncome);
 

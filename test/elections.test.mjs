@@ -91,7 +91,11 @@ ok('the source hardcodes none of the three rates', ![E.FACTS.homeFlatRate25to50,
 ok('the only numbers in the source are the hour boundaries and small maths', (() => {
   const nums = [...code.matchAll(/\b\d+(?:\.\d+)?\b/g)].map((m) => Number(m[0]));
   // 50 and 100 are the upper edges of the first two bands and appear in the labels he reads.
-  const allowed = new Set([0, 1, 2, 12, 25, 50, 51, 100, 101]);
+  // 3 is the projection floor, added 1 August 2026 with the trading allowance: below three months
+  // there is not enough of the tax year to say whether a flat allowance beats a man's real costs,
+  // and the same floor is written inline in lib/taxoptimiser.ts (canProject) and lib/ledger.ts
+  // (ENOUGH_MONTHS). It is not a rate, which is what this guard is about.
+  const allowed = new Set([0, 1, 2, 3, 12, 25, 50, 51, 100, 101]);
   return nums.every((n) => allowed.has(n));
 })());
 ok('it imports the rates from the engine', /from '\.\/taxengine'/.test(SRC));

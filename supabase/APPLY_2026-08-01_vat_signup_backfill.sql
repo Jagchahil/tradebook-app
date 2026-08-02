@@ -1,7 +1,7 @@
 -- BACKFILL: the VAT answer given at signup never reached the table the app reads.
 --
 -- ═══════════════════════════════════════════════════════════════════════════════════════════════
--- WHY THIS EXISTS. Found by walking lekhio.app on 2 August 2026, on an account that answered
+-- WHY THIS EXISTS. Found by walking lekhio.app on 1 August 2026, on an account that answered
 -- "yes" to "Are you VAT registered?" on /start step 6.
 --
 --   /app/you          "VAT registered, as you told us."

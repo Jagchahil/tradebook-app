@@ -66,9 +66,16 @@
 import { homeOfficeFlatRateMonthly, FACTS } from './taxengine';
 import { gbp0 } from './money';
 
-// The only election this file knows about today. A named union rather than a free string, so a
-// caller cannot invent one and quietly get a zero back.
-export type ElectionKey = 'use_of_home';
+// The elections this file knows about. A named union rather than a free string, so a caller cannot
+// invent one and quietly get a zero back.
+//
+// ⚠️ THE TWO ARE NOT THE SAME SHAPE, AND THE DIFFERENCE IS THE WHOLE OF THE SECOND ONE.
+//
+// use_of_home ADDS a deduction he would not otherwise have, so electing it can only help him.
+// trading_allowance REPLACES every expense he has logged with a flat figure, so electing it can
+// help him or cost him, and which one depends on numbers only his own books know. That is why the
+// second one is never offered without both totals next to it. See tradingAllowanceChoice below.
+export type ElectionKey = 'use_of_home' | 'trading_allowance';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // 🔴 WHO THIS ELECTION IS EVEN FOR. FOUND BY AUDIT ON 31 JULY 2026: EVERYBODY COULD TAKE IT.
@@ -158,6 +165,29 @@ const ELECTION_RULES: Record<ElectionKey, {
         "Use of home at HMRC's flat rate is a simplified expense for sole traders and partnerships of individuals, and a limited company cannot claim it.",
       income:
         "Use of home at HMRC's flat rate is a simplified expense for a trade, and a property business cannot claim it.",
+    },
+  },
+  // 🔴 THE TRADING ALLOWANCE. ITTOIA 2005 Part 6A Chapter 1, s783A onwards.
+  //
+  //   A LIMITED COMPANY.   ITTOIA taxes INDIVIDUALS. The allowance is relief against an individual's
+  //                        trading and miscellaneous income, and a company's trade is the company's,
+  //                        taxed under CTA 2009 on its own return. Not a smaller relief for a
+  //                        director. No relief at all.
+  //
+  //   A PROPERTY BUSINESS. It is the TRADING allowance and letting is not a trade. There is a
+  //                        separate £1,000 property allowance in the same Part 6A, and it is a
+  //                        different relief with its own election. ⚠️ THE REFUSAL DOES NOT MENTION
+  //                        IT, on purpose and by the same rule as the company refusal above: we
+  //                        have not built a door for the property allowance, and naming a relief we
+  //                        cannot give him is how a man stops looking for the one that works.
+  trading_allowance: {
+    refusedStructures: ['limited_company'],
+    refusedIncomes: ['property_only'],
+    refusals: {
+      structure:
+        'The trading allowance is relief against your own trading income on your own tax return, and a limited company is taxed on its own return instead, so it is not one your company can take.',
+      income:
+        'The trading allowance is relief against trading income, and letting property is not a trade, so it is not one you can take.',
     },
   },
 };
@@ -293,4 +323,207 @@ export function ratesAreOrdered(): boolean {
     FACTS.homeFlatRate51to100 > FACTS.homeFlatRate25to50 &&
     FACTS.homeFlatRate101plus > FACTS.homeFlatRate51to100
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE TRADING ALLOWANCE. THE ONE THE PRODUCT HAS BEEN CLAIMING TO APPLY AND NEVER APPLIED.
+//
+// Until 1 August 2026 lib/agent.ts sent a card, and a paid WhatsApp template, that read: "On your
+// return the flat £1,000 trading allowance beats totting up your actual expenses, so Lekhio uses
+// it automatically... Nothing for you to do." taxengine.taxableTradingProfit(), the only function
+// that could have applied it, was called by NOTHING in app/ or lib/. Every engine computed trade
+// profit as plain income minus expenses.
+//
+// So the claim was false twice over, and the second way is the one that matters:
+//
+//   1. NOTHING APPLIED IT. Same class as "104 tests on the tax engine": a precise, checkable claim
+//      about what we do, that nothing in the repo did. Except this one cost money to send.
+//
+//   2. IT IS NOT OURS TO APPLY. HMRC BIM86015: "An individual qualifies for partial relief for a
+//      tax year if the individual has relevant income for the tax year which exceeds the trading
+//      allowance, and AN ELECTION BY THE INDIVIDUAL FOR PARTIAL RELIEF HAS BEEN MADE for the tax
+//      year. This election will be made by the individual completing a Self Assessment return."
+//      So even a version that worked would have been wrong: telling a man an election is automatic
+//      and there is nothing for him to do is telling him not to decide the one thing only he can
+//      decide. CLAUDE.md: we PREPARE, he APPROVES. Doc 103's hard limit: money and tax filing
+//      ALWAYS ask.
+//
+// ⚠️ AND IT IS THE OPPOSITE SHAPE TO USE OF HOME, WHICH IS WHY IT GETS ITS OWN COMPARISON.
+//
+// GOV.UK, tax free allowances on property and trading income: "You cannot deduct any other
+// expenses or allowances if you claim the allowances." Electing does not add £1,000 to his
+// deductions. It THROWS AWAY every expense he has logged and puts £1,000 in their place. For a man
+// with £300 of costs that is worth having. For a man with £4,000 of costs it would cost him £3,000
+// of deduction, and he would have done it on our say so, from a screen that told him it was free
+// money.
+//
+// So this election is never offered as a number on its own. tradingAllowanceChoice() returns BOTH
+// totals and names the winner, and the surface shows both. That is the product doing the one job
+// it exists for: prepare the comparison, let him approve it.
+//
+// ⚠️ AND ELECTING IT TAKES THE USE OF HOME FLAT RATE WITH IT. "Any other expenses OR ALLOWANCES"
+// includes the s94H simplified expense. A man holding both elections claims the allowance and
+// nothing else, and every sentence about it has to say so or he will believe he has both.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The amount, read from FACTS at call time and never written down here, exactly as the use of home
+// rates are. khoji/diff.mjs watches it against GOV.UK nightly, so if it moves, this file needs no
+// edit at all.
+export function tradingAllowanceAmount(): number {
+  return FACTS.tradingAllowance;
+}
+
+export interface TradingAllowanceChoice {
+  // What he would deduct if he does nothing: his real, logged costs.
+  actualCosts: number;
+  // What he would deduct instead if he elects. The flat allowance, never added to the above.
+  allowance: number;
+  // His taxable trade profit each way, so the screen never has to do arithmetic of its own.
+  taxableWithCosts: number;
+  taxableWithAllowance: number;
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HIS COSTS AT THIS PACE, AND WHY THE COMPARISON CANNOT BE MADE WITHOUT IT.
+  //
+  // Caught by test/tradingallowance.test.mjs before this ever reached a screen. The first draft
+  // compared his YEAR TO DATE costs against the allowance, and the allowance is an ANNUAL £1,000.
+  // A man three months in with £300 of costs was going to be told the allowance beat them by £700.
+  // At that pace his costs for the year are £1,200 and beat the allowance by £200, so the screen
+  // would have talked him into the worse of the two with a confident number next to it.
+  //
+  // That is the projected against realised line this codebase keeps getting cut on, arriving in a
+  // new file. The rule is the ledger's rule: say which one you are showing, and never compare one
+  // to the other.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  projectedCosts: number;
+
+  // Which leaves him better off OVER THE YEAR, and by how much of DEDUCTION (not of tax: the rate
+  // depends on his whole position and this function does not know it, and guessing would be the
+  // kind of confident wrong number this codebase keeps deleting).
+  //
+  // ⚠️ 'too_early' IS A REAL ANSWER AND IT IS THE HONEST ONE BEFORE THREE MONTHS. Every other
+  // projection in this product waits for monthsElapsed >= 3 (lib/ledger.ts rule 1, taxPosition's
+  // canProject) because two weeks of trading says nothing about a year. A man in April with £40 of
+  // costs has not told us his costs will be under £1,000, he has told us it is April.
+  better: 'allowance' | 'costs' | 'level' | 'too_early';
+  difference: number;
+  // 🔴 FULL RELIEF, WHICH IS AUTOMATIC AND IS NOT THIS ELECTION.
+  //
+  // Gross trading income at or under the allowance is relieved in full without anybody electing
+  // anything (GOV.UK: "If your annual gross trading income is £1,000 or less... you may not have
+  // to tell HMRC"). So there is no choice to put in front of him and doc 103 says do not invent
+  // one.
+  //
+  // ⚠️ BUT ONLY WHEN IT COSTS HIM NOTHING. A man with £800 of income and £3,000 of costs has a
+  // LOSS, and full relief would quietly take it off him. Taking a claim off a man's return without
+  // asking is what CLAUDE.md forbids, so the flag is false whenever his costs exceed his income and
+  // the engine leaves his figures exactly as they are. Same test lib/propertyengine.ts already
+  // applies to the property allowance: income within the allowance AND expenses within the income.
+  fullRelief: boolean;
+}
+
+// THE COMPARISON. Pure arithmetic on two numbers he already has, so it can be shown anywhere.
+//
+// Negative and non finite inputs are floored at zero rather than trusted: these come from summed
+// database rows, and a single bad row must not turn into a recommendation.
+// ⚠️ monthsElapsed IS REQUIRED, not optional with a default. A default of 12 would quietly tell
+// every caller that has not thought about it that the year is over, and a default of 0 would make
+// every answer 'too_early'. Both are a guess wearing an answer's clothes, so the caller has to say.
+export function tradingAllowanceChoice(
+  grossTradeIncome: number,
+  actualCosts: number,
+  monthsElapsed: number,
+): TradingAllowanceChoice {
+  const gross = Math.max(0, Number.isFinite(grossTradeIncome) ? grossTradeIncome : 0);
+  const costs = Math.max(0, Number.isFinite(actualCosts) ? actualCosts : 0);
+  const allowance = tradingAllowanceAmount();
+  const months = Math.max(0, Math.min(12, Math.floor(Number.isFinite(monthsElapsed) ? monthsElapsed : 0)));
+
+  // The same three month floor and the same 12/months factor taxPosition and the ledger use, so the
+  // pace shown here can never disagree with the pace shown there.
+  const canProject = months >= 3;
+  const projectedCosts = canProject ? Math.round(costs * (12 / months) * 100) / 100 : costs;
+
+  const taxableWithCosts = Math.round(Math.max(0, gross - costs) * 100) / 100;
+  const taxableWithAllowance = Math.round(Math.max(0, gross - allowance) * 100) / 100;
+
+  // 🔴 THE WINNER IS DECIDED ON THE YEAR, BECAUSE THE ELECTION IS FOR THE YEAR. And it is not
+  // decided at all before there is enough year to judge by.
+  const better = !canProject
+    ? 'too_early'
+    : projectedCosts > allowance ? 'costs' : projectedCosts < allowance ? 'allowance' : 'level';
+  const difference = canProject ? Math.round(Math.abs(projectedCosts - allowance) * 100) / 100 : 0;
+
+  return {
+    actualCosts: Math.round(costs * 100) / 100,
+    projectedCosts,
+    allowance,
+    taxableWithCosts,
+    taxableWithAllowance,
+    better,
+    difference,
+    fullRelief: gross > 0 && gross <= allowance && costs <= gross,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE ONE FUNCTION EVERY ENGINE ASKS. What his taxable trade profit is, given what he elected.
+//
+// 🔴 IT EXISTS SO THERE IS ONE ANSWER. taxengine.taxableTradingProfit() implements a DIFFERENT
+// rule, the automatic "whichever is bigger" version, and it is called by nothing. Leaving two
+// functions that both look like the trading allowance, one of them wrong about whose choice it is,
+// is how the next reader picks the wrong one. That function is now documented as the arithmetic
+// only, and THIS is the door.
+//
+// ⚠️ THE ELECTION IS NOT CONSULTED FOR FULL RELIEF, because full relief is not an election.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ NO monthsElapsed, AND THAT IS NOT AN OMISSION. tradingAllowanceChoice needs the horizon to
+// decide which option is BETTER, which is advice. This function decides what his profit IS given
+// what he actually elected, and that does not depend on the pace of the year at all. Handing it a
+// fake 12 to satisfy the other signature would put a horizon in the arithmetic that means nothing.
+export function tradeProfitAfterAllowance(
+  grossTradeIncome: number,
+  actualCosts: number,
+  elected: boolean,
+): number {
+  const gross = Math.max(0, Number.isFinite(grossTradeIncome) ? grossTradeIncome : 0);
+  const costs = Math.max(0, Number.isFinite(actualCosts) ? actualCosts : 0);
+  const allowance = tradingAllowanceAmount();
+  // Full relief, automatic, and never when it would take a loss off him. Same test as above.
+  if (gross > 0 && gross <= allowance && costs <= gross) return 0;
+  return Math.round(Math.max(0, gross - (elected ? allowance : costs)) * 100) / 100;
+}
+
+// What we say the moment he elects. A statement of what has been applied and what it replaced,
+// never a congratulation: he may well have just chosen the worse of the two, and it is still his
+// choice to make. The sentence that matters most is the last one.
+export function tradingAllowanceConfirmation(choice: TradingAllowanceChoice): string {
+  const money = gbp0;
+  return [
+    `Done. You are claiming the ${money(choice.allowance)} trading allowance for this tax year.`,
+    choice.better === 'costs'
+      ? `Your costs are running at about ${money(choice.projectedCosts)} for the year, which is ${money(choice.difference)} more than the allowance, so this leaves you worse off on today's figures. You can take it off again whenever you like.`
+      : choice.better === 'too_early'
+        ? `It is early in the tax year, so there is not enough of it yet to say whether this beats your own costs. Keep logging them and check back.`
+        : `Your costs are running at about ${money(choice.projectedCosts)} for the year, so this is ${money(choice.difference)} more deduction than they would have given you.`,
+    'It replaces your expenses rather than adding to them. While it is on, none of your logged costs, your mileage or the use of home flat rate is deducted, and it applies to this tax year only.',
+  ].join(' ');
+}
+
+// The sentence for a man who has not elected, wherever the choice is described. It states the
+// consequence before the benefit, deliberately: the benefit is the part he will remember anyway.
+export function tradingAllowanceOffer(choice: TradingAllowanceChoice): string {
+  const money = gbp0;
+  if (choice.fullRelief) {
+    return `Your trade income this year is ${money(choice.taxableWithCosts + choice.actualCosts)}, which is within the ${money(choice.allowance)} trading allowance, so there is nothing to tax on it and nothing for you to elect.`;
+  }
+  if (choice.better === 'too_early') {
+    return `You have logged ${money(choice.actualCosts)} of costs so far. The allowance is a flat ${money(choice.allowance)} for the whole tax year, so there is not enough of the year yet to say which leaves you better off. Keep logging and this will tell you.`;
+  }
+  if (choice.better === 'costs') {
+    return `Your costs are running at about ${money(choice.projectedCosts)} for the year, which beats the ${money(choice.allowance)} trading allowance by ${money(choice.difference)}, so claiming it would leave you worse off. It is here because your costs can change, and it is your choice either way.`;
+  }
+  if (choice.better === 'level') {
+    return `Your costs are running at about the ${money(choice.allowance)} trading allowance for the year, so it would make no difference to your figures.`;
+  }
+  return `Your costs are running at about ${money(choice.projectedCosts)} for the year. The ${money(choice.allowance)} trading allowance would be claimed instead of them, not as well, which is ${money(choice.difference)} more off your profit. It replaces your mileage and the use of home flat rate too.`;
 }

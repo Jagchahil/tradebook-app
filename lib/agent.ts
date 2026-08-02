@@ -773,9 +773,33 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
           signalKey: 'trading_allowance_saving',
           periodKey: `${year}#tra`,
           priority: 'card',
-          title: 'The £1,000 trading allowance is beating your costs',
-          body: `Your business costs this year are running under £1,000 (about ${gbp(projTradeExpenses)} at this pace). On your return the flat £1,000 trading allowance beats totting up your actual expenses, so Lekhio uses it automatically, worth roughly ${gbp(benefit)} less tax than your logged costs alone. Nothing for you to do. Keep snapping receipts though: the day your real costs pass £1,000, Lekhio switches to whichever leaves you better off. A suggestion from your numbers, not advice. You decide.`,
-          waText: `your costs are running under £1,000, so Lekhio uses the flat £1,000 trading allowance instead, worth about ${gbp(benefit)} less tax. Keep logging receipts and it switches the day your costs pass £1,000`,
+          // ═══════════════════════════════════════════════════════════════════════════════════
+          // 🔴 THIS COPY WAS FALSE IN TWO DIRECTIONS AT ONCE UNTIL 1 AUGUST 2026.
+          //
+          // It read: "the flat £1,000 trading allowance beats totting up your actual expenses, so
+          // Lekhio uses it automatically... Nothing for you to do." It went out as a card AND as a
+          // paid WhatsApp template.
+          //
+          //   1. NOTHING APPLIED IT. taxengine.taxableTradingProfit(), the only function that could
+          //      have, was called by no code in app/ or lib/. Every engine computed trade profit as
+          //      plain income minus expenses. Same class of claim as "104 tests on the tax engine",
+          //      except this one cost money to send.
+          //
+          //   2. IT IS NOT OURS TO APPLY. HMRC BIM86015: partial relief requires "an election by
+          //      the individual... made by the individual completing a Self Assessment return." So
+          //      telling him it is automatic and there is nothing to do was telling him not to
+          //      decide the one thing only he can decide. CLAUDE.md: we PREPARE, he APPROVES.
+          //
+          // ⚠️ AND THE NEW COPY LEADS WITH THE COST, NOT THE BENEFIT. Electing does not add £1,000
+          // to his deductions, it throws away every expense he has logged and puts £1,000 in their
+          // place (GOV.UK: "You cannot deduct any other expenses or allowances if you claim the
+          // allowances"). This signal only fires when his costs are running UNDER £1,000, so it is
+          // the right call for the man reading it today, but his costs can change and the sentence
+          // has to be true of him in November as well as tonight.
+          // ═══════════════════════════════════════════════════════════════════════════════════
+          title: 'The £1,000 trading allowance would beat your costs',
+          body: `Your business costs this year are running under £1,000 (about ${gbp(projTradeExpenses)} at this pace). The flat £1,000 trading allowance is claimed instead of your real costs rather than as well as them, so on today's figures it would take roughly ${gbp(benefit)} more off your tax than your logged costs do. It is your election to make on your own return, so we have not made it for you: it is under You, then Allowances, and it comes off again in one tap. Keep sending receipts either way, because the day your real costs pass £1,000 you are better off without it. A suggestion from your numbers, not advice. You decide.`,
+          waText: `your costs are running under £1,000, so the flat £1,000 trading allowance would beat them by about ${gbp(benefit)} of tax. It is claimed INSTEAD of your costs, not as well, and it is your election to make: open your Lekhio under You, then Allowances`,
           numbers: { benefit, projExpenses: projTradeExpenses, marginalRatePct: Math.round(marginalRate * 100) },
         });
       }

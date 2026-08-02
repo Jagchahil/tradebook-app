@@ -334,7 +334,11 @@ ok(
 );
 const printsMoney = appPages.filter((f) => /£/.test(stripComments(read(f))) || /gbp0|gbp2|gbpAbs/.test(read(f)));
 for (const f of printsMoney) {
-  ok(`${rel(f)}: writes pounds through lib/money.ts`, read(f).includes("from '../../../lib/money'") || read(f).includes("from '../../lib/money'"));
+  // ⚠️ DEPTH AGNOSTIC ON PURPOSE, SINCE 1 AUGUST 2026. This used to name the two relative depths
+  // that happened to exist, and app/app/you/elections/page.tsx is the first screen four levels
+  // down that prints a pound. A guard that has to be edited every time a folder is added is a
+  // guard that gets edited to pass rather than read. The property is that it asks lib/money.ts.
+  ok(`${rel(f)}: writes pounds through lib/money.ts`, /from '(\.\.\/)+lib\/money'/.test(read(f)));
 }
 
 console.log('\n7. THE PILE IS A SURFACE, NOT A SECOND PILE');

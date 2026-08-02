@@ -254,10 +254,54 @@ const ledgerSrc = rf(path.join(root, 'lib/ledger.ts'), 'utf8');
 // home could not be inside expenses. It can: app/api/whatsapp/route.ts writes a real 'Use of home'
 // transaction, so the logged pounds sit in ytdTradeExpenses exactly as mileage does and have to come
 // out of the expenses line for the same reason. Pinning the OLD text would now pin the double count.
-const movedNotAdded = (src) => /expenses:\s*Math\.max\(0,\s*input\.ytdTradeExpenses\s*-\s*mileage\s*-\s*loggedHomeOffice\)/.test(src);
+const movedNotAdded = (src) => /input\.ytdTradeExpenses\s*-\s*mileage\s*-\s*loggedHomeOffice/.test(src);
 
-ok('🔴 THE SUBTRACTION LIVES IN lib/ledger.ts, ONCE, AND IT TAKES OUT BOTH SLICES',
-  movedNotAdded(ledgerSrc) && /\bmileage,/.test(ledgerSrc));
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 REWRITTEN 1 AUGUST 2026, FROM A SOURCE REGEX INTO A RUN, BECAUSE IT FOUGHT A CORRECT CHANGE.
+//
+// This assertion and the use of home one below used to pin the LITERAL EXPRESSION in lib/ledger.ts,
+// character for character. When the trading allowance election was added, that expression had to be
+// wrapped in a ternary (a man who elects the allowance deducts no expenses, no mileage and no use of
+// home at all), and both assertions went red on a change that moved nobody's money by a penny.
+//
+// That is the Tier 1 failure this codebase catalogued on the same day: an assertion named for the
+// idea, written against the text. It cannot tell a refactor from a regression, so it fights the
+// first and would wave the second straight through, since `- mileage - loggedHomeOffice` could stay
+// in the file while nothing ever called it.
+//
+// So the rule is now RUN rather than READ. The fixture puts real money through ledgerFor and checks
+// the arithmetic: £3,000 of expenses that already CONTAIN £500 of mileage and £200 of logged use of
+// home must come out as three lines totalling £3,000, never £3,700. That is the actual property,
+// and it survives any way somebody chooses to write the subtraction.
+//
+// The source check is kept alongside, loosened to the subtraction rather than the whole statement,
+// because it is still worth knowing the arithmetic lives in ONE file. It is the corroboration now,
+// not the assertion.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const dedFixture = (extra = {}) => L.ledgerFor({
+  monthsElapsed: 6,
+  ytdTradeIncome: 20000,
+  // ⚠️ THE MILEAGE AND THE LOGGED USE OF HOME ARE INSIDE THIS FIGURE, which is the whole point:
+  // both arrive as ordinary transactions, so adding them again is the double count being defended
+  // against. See the header above ledgerFor().
+  ytdTradeExpenses: 3000,
+  ytdCisSuffered: 0,
+  ytdMileage: 500,
+  ytdHomeOfficeLogged: 200,
+  ...extra,
+});
+const deducted = (l, key) => (l.lines.find((x) => x.key === key)?.deducted ?? 0);
+const totalDeducted = (l) => l.lines.reduce((t, x) => t + x.deducted, 0);
+
+const moved = dedFixture();
+ok('🔴 BOTH SLICES COME OUT OF EXPENSES AND BACK AS THEIR OWN LINES, and the total does not move',
+  deducted(moved, 'expenses') === 2300
+  && deducted(moved, 'mileage') === 500
+  && deducted(moved, 'home_office') === 200
+  && totalDeducted(moved) === 3000);
+
+ok('...and the arithmetic still lives in lib/ledger.ts rather than at a call site',
+  movedNotAdded(ledgerSrc) && /\bmileage:/.test(ledgerSrc));
 
 ok('🔴 the API route DELEGATES rather than assembling its own figures',
   api.includes('ledgerFor(input)') && !movedNotAdded(api));
@@ -273,9 +317,17 @@ ok('...and no caller passes a raw ytdMileage into the ledger without the subtrac
   && !/expenses:\s*input\.ytdTradeExpenses,[\s\S]{0,120}mileage:\s*input\.ytdMileage/.test(wa));
 
 // The use of home half of the same lesson, pinned so it cannot silently go back to zero anywhere.
-ok('🔴 THE USE OF HOME ELECTION REACHES THE LEDGER, and no caller hardcodes it to zero',
-  /homeOffice:\s*Math\.max\(0,\s*input\.ytdHomeOffice\s*\?\?\s*0\)/.test(ledgerSrc)
-  && !/homeOffice:\s*0/.test(api) && !/homeOffice:\s*0/.test(wa));
+// Same repair, same reason. The election must WIN over the logged rows rather than add to them, and
+// that is a fact about two numbers, not about how the ternary is spelled. The caller checks stay as
+// source reads: they are about OTHER files not hardcoding a zero, which no fixture here can observe.
+const withElection = dedFixture({ ytdHomeOffice: 312 });
+ok('🔴 THE USE OF HOME ELECTION REACHES THE LEDGER AND BEATS THE LOGGED ROWS rather than adding to them',
+  deducted(withElection, 'home_office') === 312
+  && deducted(withElection, 'expenses') === 2300
+  && deducted(withElection, 'mileage') === 500);
+
+ok('...and no caller hardcodes the election to zero',
+  !/homeOffice:\s*0[,\s]/.test(api) && !/homeOffice:\s*0[,\s]/.test(wa));
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 THE USE OF HOME, COUNTED TWICE, ON A MAN WHO USED BOTH DOORS.

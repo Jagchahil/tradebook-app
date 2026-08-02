@@ -348,6 +348,18 @@ export default async function YouPage({
                 : 'What you have told us about yourself, and the questions still waiting.'}
             </span>
           </a>
+          {/* ⚠️ IT LIVES HERE RATHER THAN IN THE NAV, and that is doc 103's once test doing its job.
+              An election is a choice a man makes at most once a tax year. A permanent rail row for
+              it would cost every customer a line to read and reject on every screen, for ever, to
+              save two of them one tap in April. The circumstances question above is what sends him
+              here in the first place. */}
+          <a href="/app/you/elections" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Allowances</span>
+            <span style={S.rowBody}>
+              Working from home, and the flat trading allowance. The two we cannot decide for you,
+              because the answer is something only you know.
+            </span>
+          </a>
           <a href="/app/you/settings" style={S.door} className="lek-hit">
             <span style={S.doorLabel}>Settings</span>
             <span style={S.rowBody}>The daily reminder and the weekly summary, on or off.</span>

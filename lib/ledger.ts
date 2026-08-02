@@ -96,6 +96,24 @@ export interface LedgerInput {
   propertyIncome?: number;
   propertyExpenses?: number;
 
+  // 🔴 THE TRADING ALLOWANCE HE HAS ELECTED, IF HE HAS. ITTOIA 2005 Part 6A.
+  //
+  // Its own line rather than a number folded into `expenses`, for the reason mileage got its own:
+  // a deduction on a screen whose whole job is to be believed has to say where it came from, and
+  // "Costs you logged: £1,000" would be false of a man who logged £4,000 and elected instead.
+  //
+  // ⚠️ WHEN THIS IS SET, THE CALLER SENDS ZERO FOR expenses, mileage AND homeOffice. That is not a
+  // convention this file enforces, it is what the election MEANS (GOV.UK: "You cannot deduct any
+  // other expenses or allowances if you claim the allowances"), and ledgerFor() below is the one
+  // place that assembles it. A caller that sent both would be describing a man claiming twice.
+  //
+  // ⚠️ AND IT IS NOT ACCRUED BY MONTH, unlike the use of home flat rate, which is a rate PER MONTH
+  // and so is only realised as the months happen. The trading allowance is one annual amount and
+  // he is entitled to all of it for the year the moment the year starts, so the full figure is a
+  // realised deduction in month one. Different facts, different treatment; rule 1 of this file is
+  // not broken by either.
+  tradingAllowance?: number;
+
   // CIS suffered. HIS OWN MONEY, held by HMRC. A repayment, never a saving. See rule 3.
   cisSuffered: number;
 
@@ -160,6 +178,14 @@ export function ledger(input: LedgerInput): Ledger {
   const gross = tradeGross + propertyGross;
 
   const deductions: Array<{ key: string; label: string; amount: number; basis: string }> = [
+    {
+      // ⚠️ FIRST, BECAUSE WHEN IT IS ON IT IS THE ONLY ONE. The basis sentence says what it
+      // replaced rather than only what it is: a man who sees one £1,000 line where last month he
+      // had four lines of real costs has to be able to read WHY from the line itself, not work it
+      // out from what is missing. The filter below drops it to nothing for everybody else.
+      key: 'trading_allowance', label: 'Trading allowance', amount: Math.max(0, input.tradingAllowance ?? 0),
+      basis: 'The flat allowance you elected for this tax year. It is claimed instead of your logged costs, your mileage and the use of home flat rate, never as well as them.',
+    },
     {
       key: 'expenses', label: 'Costs you logged', amount: Math.max(0, input.expenses),
       basis: 'Every receipt you sent and every bank line you confirmed as work.',
@@ -371,6 +397,11 @@ export interface LedgerSource {
   dividendIncome?: number;
   ytdPropertyIncome?: number;
   ytdPropertyExpenses?: number;
+
+  // Has he elected the trading allowance for this year. Optional and false by default, so every
+  // caller written before it existed produces the identical ledger to the penny. See LedgerInput
+  // .tradingAllowance above for what it does to the other three deduction lines, and why.
+  tradingAllowanceElected?: boolean;
 }
 
 export function ledgerFor(input: LedgerSource): Ledger {
@@ -409,16 +440,26 @@ export function ledgerFor(input: LedgerSource): Ledger {
   //                 entitled to the deduction loses it, only the duplicate goes.
   const loggedHomeOffice = Math.max(0, input.ytdHomeOfficeLogged ?? 0);
 
+  // 🔴 THE TRADING ALLOWANCE REPLACES THE THREE LINES ABOVE IT RATHER THAN JOINING THEM.
+  //
+  // He elected to deduct one flat figure INSTEAD of his real costs, so on the screen that tells him
+  // what we saved him, his real costs saved him nothing this year and saying otherwise would be the
+  // one direction this file exists to prevent. Expenses, mileage and the use of home all go to zero
+  // and the allowance stands alone. taxPosition() does the same thing to the same man's figures, so
+  // the two cannot disagree about his profit.
+  const electedTradingAllowance = input.tradingAllowanceElected === true;
+
   return ledger({
     monthsElapsed: input.monthsElapsed,
     grossIncome: input.ytdTradeIncome,
-    expenses: Math.max(0, input.ytdTradeExpenses - mileage - loggedHomeOffice),
-    mileage,
+    tradingAllowance: electedTradingAllowance ? FACTS.tradingAllowance : 0,
+    expenses: electedTradingAllowance ? 0 : Math.max(0, input.ytdTradeExpenses - mileage - loggedHomeOffice),
+    mileage: electedTradingAllowance ? 0 : mileage,
 
     // The election if he has one, the rows he texted if he has not. A zero election is no election:
     // lib/elections.ts only ever accrues months that have happened, so nothing is lost by reading it
     // that way, and a negative can never draw a line. See the rule above.
-    homeOffice: Math.max(0, input.ytdHomeOffice ?? 0) || loggedHomeOffice,
+    homeOffice: electedTradingAllowance ? 0 : (Math.max(0, input.ytdHomeOffice ?? 0) || loggedHomeOffice),
 
     // STILL NOT WIRED, AND THESE ZEROS ARE HONEST RATHER THAN LAZY.
     //

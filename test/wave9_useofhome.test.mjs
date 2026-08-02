@@ -207,15 +207,25 @@ ok('it passes BOTH facts, structure and shape', /structure: biz\?\.businessType/
 
 ok('🔴 THE POST REFUSES BEFORE IT WRITES', POST_BODY.includes('electionRefusal')
   && POST_BODY.indexOf('electionRefusal') < POST_BODY.indexOf('writeAllowanceElection'));
-ok('...and before it even reads the body, because the answer is about the man and not his request',
-  POST_BODY.indexOf('electionRefusal') < POST_BODY.indexOf('req.json()'));
+// ⚠️ REWRITTEN 1 AUGUST 2026. It used to demand that electionRefusal appear before req.json(),
+// which was true when there was one election and became impossible when there were two: the route
+// has to read ONE field, the key, to know which relief it is being asked about. The reason given
+// for the old ordering still holds and is what is asserted now: the refusal is decided from the
+// MAN, never from his request. So the argument handed to electionRefusal must be the profile read,
+// and nothing off the body may reach it.
+ok('...and the refusal is decided from the MAN, never from anything in his request',
+  /electionRefusal\(key, await electingAs\(user\.id\)\)/.test(POST_BODY)
+  && !/electionRefusal\([^)]*body\./.test(POST_BODY));
 ok('the refusal returns the sentence lib/elections.ts wrote, never one of its own',
   /message: refusal\.message/.test(POST_BODY));
 ok('the refusal is a 400, the same honest shape as under_threshold, not a 500',
   /error: 'not_eligible'[\s\S]{0,80}status: 400/.test(POST_BODY));
 
+// The bands carry a pound figure each, so offering them to a man who cannot claim is the product
+// telling him to. Loosened from the exact ternary to the property after a second election made the
+// condition wider (a trading allowance request has no bands to offer either).
 ok('🔴 THE GET STOPS OFFERING IT: no bands, no pound figures, for a man who cannot claim',
-  GET_BODY.includes('electionRefusal') && /options: refusal \? \[\] :/.test(GET_BODY));
+  GET_BODY.includes('electionRefusal') && /options: \(?refusal[^:]*\? \[\] :/.test(GET_BODY));
 ok('...but an election already on his record is still shown, because DELETE is how it comes off',
   /elected: election/.test(GET_BODY) && /refused: refusal \?/.test(GET_BODY));
 
@@ -297,8 +307,15 @@ ok('a real election draws exactly one, by name', (() => {
 })());
 ok('the row is conditional on the amount, in the source, not by accident of the data',
   /\.filter\(\(d\) => d\.amount > 0\)/.test(LEDGER_SRC));
+// ⚠️ THE SOURCE HALF OF THIS WAS LOOSENED ON 1 AUGUST 2026, AND THE RUN IS NOW THE ASSERTION.
+//
+// It used to pin `homeOffice: Math.max(0, input.ytdHomeOffice ?? 0)` character for character. The
+// trading allowance election made that a ternary (a man claiming the flat allowance deducts no use
+// of home at all), and the assertion went red on a change that moves nobody's money. The floor is
+// the property; where the ternary puts it is not. The regex now looks for the floor wherever it
+// sits, and the negative fixture below is what actually proves it.
 ok('the assembler floors the amount at zero, so a negative cannot draw one either',
-  /homeOffice: Math\.max\(0, input\.ytdHomeOffice \?\? 0\)/.test(LEDGER_SRC)
+  /Math\.max\(0, input\.ytdHomeOffice \?\? 0\)/.test(LEDGER_SRC)
   && !L.ledgerFor({ monthsElapsed: 6, ytdTradeIncome: 40_000, ytdTradeExpenses: 8_000, ytdCisSuffered: 0, ytdHomeOffice: -312 })
     .lines.find((l) => l.key === 'home_office'));
 

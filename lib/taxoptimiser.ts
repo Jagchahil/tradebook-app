@@ -71,6 +71,29 @@ export interface OptimiserInput {
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   ytdCapitalAllowances?: number;
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HAS A VEHICLE'S PURCHASE GONE THROUGH HIS BOOKS. THE MILEAGE RATE IS THEN CLOSED TO IT,
+  // FOR GOOD, AND THIS PRODUCT WAS ACTIVELY TELLING HIM TO USE IT.
+  //
+  // GOV.UK, simplified expenses, vehicles: "You cannot claim simplified expenses for a vehicle
+  // you've already claimed capital allowances for, or you've included as an expense when you
+  // worked out your business profits." HMRC BIM75005 puts it the same way and gives the reason:
+  // "the rate already contains an element to allow for depreciation."
+  //
+  // ⚠️ READ THE SECOND HALF OF THAT SENTENCE. It is not only a car carrying a writing down
+  // allowance. A VAN taken in full under the Annual Investment Allowance has been "included as an
+  // expense", and the flat rate is closed to that van too, permanently. That is why this is true
+  // of every capital_kind and not just the car ones.
+  //
+  // The lever below has been telling a man who bought a van through his books that he could
+  // "often claim more by logging miles at 55p a mile instead". Following that advice puts a claim
+  // on his return that he is not entitled to make, on the strength of a suggestion from us. It is
+  // the exact opposite of what this file is for.
+  //
+  // Optional and false by default, so every caller written before it existed behaves as it did.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  vehicleBoughtThroughBooks?: boolean;
+
   // The £ of use of home he has actually accrued this year, from his election. Realised, never
   // projected: lib/elections.ts useOfHomeToDate() counts only months that have happened. Default 0
   // means no election, which is what a man who has never been asked has.
@@ -613,13 +636,30 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   // 5. Mileage instead of fuel, where they log fuel but no miles. Cannot quantify
   //    without the miles, so it is a prompt, not a number.
   if (!input.mileageClaimed && (cats.includes('fuel') || cats.includes('van')) && projTradeNet > 0) {
-    out.push({
-      key: 'mileage',
-      title: 'Claim your mileage',
-      detail: `You are logging fuel but no mileage. For a van or car you can often claim more by logging miles at 55p a mile for the first 10,000 instead. Text "log 24 miles" whenever you drive for work.`,
-      estSaving: 0,
-      action: 'log_entry',
-    });
+    // 🔴 AND NOT TO A MAN WHOSE VEHICLE WENT THROUGH HIS BOOKS. See
+    // OptimiserInput.vehicleBoughtThroughBooks: the flat rate is closed to that vehicle for good,
+    // and this card was telling him to use it anyway.
+    //
+    // ⚠️ IT DOES NOT GO SILENT, IT TELLS HIM THE TRUE THING. He is logging fuel because fuel is
+    // now his route, and he is doing it right. A card that vanishes teaches him nothing; a card
+    // that says "keep going, and here is what else counts" is the same helpfulness pointed at an
+    // answer he is actually allowed to give.
+    out.push(input.vehicleBoughtThroughBooks
+      ? {
+        key: 'mileage',
+        title: 'Keep logging what the van costs you',
+        detail: `You have put a vehicle through your books, so the 55p a mile flat rate is not open to you for it: HMRC lets you have one or the other, never both. Actual costs are your route now, and more counts than most people log. Fuel, insurance, road tax, servicing, tyres, MOT, repairs, breakdown cover, parking and tolls on a job all come off your profit.`,
+        estSaving: 0,
+        info: true,
+        action: 'log_entry',
+      }
+      : {
+        key: 'mileage',
+        title: 'Claim your mileage',
+        detail: `You are logging fuel but no mileage. For a van or car you can often claim more by logging miles at 55p a mile for the first 10,000 instead. Text "log 24 miles" whenever you drive for work.`,
+        estSaving: 0,
+        action: 'log_entry',
+      });
   }
 
   // 6. A CIS refund building. Pure information, no action, but a big reassurance

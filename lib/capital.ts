@@ -184,13 +184,38 @@ export interface CapitalRelief {
   says: string;
 }
 
-export function capitalRelief(cost: number, kind: CapitalKind, businessUsePct: number = 100): CapitalRelief {
+export function capitalRelief(
+  cost: number,
+  kind: CapitalKind,
+  businessUsePct: number = 100,
+  // 🔴 HOW MANY TAX YEARS SINCE HE BOUGHT IT. 0 is the year of purchase, which is what every
+  // caller written before this existed passes by omission, so nothing moves for them.
+  //
+  // A writing down allowance is not a repeating figure: it is a percentage of what is LEFT, so it
+  // shrinks every year. Reading it as "3,600 a year forever" would over claim from year two, and
+  // producing nothing at all from year two, which is what the product actually did until now,
+  // silently contradicts the sentence this same function prints.
+  yearsHeld: number = 0,
+): CapitalRelief {
   const c = Math.max(0, Number.isFinite(cost) ? cost : 0);
   const use = clampUse(businessUsePct);
   const share = use / 100;
+  const years = Math.max(0, Math.floor(Number.isFinite(yearsHeld) ? yearsHeld : 0));
 
   // Full relief: not a car at all (AIA, plant and machinery), or a new unused zero emission car
   // (100% first year allowance, available until April 2027).
+  //
+  // ⚠️ AND IT HAPPENS ONCE. Both of these take the whole cost in the year of purchase, so the pool
+  // is nil afterwards and there is nothing left to claim. A man who bought a van two years ago has
+  // had his relief; telling him he has it again every year would be the plainest over claim in the
+  // file. Everything is zero rather than absent so the shape of the answer never changes.
+  if (years > 0 && (kind === 'not_a_car' || kind === 'car_zero_new')) {
+    return {
+      cost: round2(c), kind, businessUsePct: use, rate: 1,
+      thisYear: 0, carriedForward: 0, inFull: true,
+      says: 'The whole cost came off your profit in the year you bought it, so there is nothing left to claim on it.',
+    };
+  }
   if (kind === 'not_a_car' || kind === 'car_zero_new') {
     const amount = round2(c * share);
     return {
@@ -208,8 +233,15 @@ export function capitalRelief(cost: number, kind: CapitalKind, businessUsePct: n
   }
 
   const rate = kind === 'car_low_or_used_electric' ? FACTS.wdaMainRate : FACTS.wdaSpecialRate;
-  const thisYear = round2(c * rate * share);
-  const carriedForward = round2(c - round2(c * rate));
+  // What is left in the pool at the START of this year. The whole point of a reducing balance:
+  // year one is a percentage of the price, year five is a percentage of what survived four years
+  // of writing down. See the block above capitalRelief for why nothing needs to be stored.
+  const opening = c * Math.pow(1 - rate, years);
+  const thisYear = round2(opening * rate * share);
+  // ⚠️ THE POOL FALLS BY THE WHOLE ALLOWANCE, NOT BY THE PART HE CLAIMED. CAA 2001 s205 reduces
+  // the claim, not the expenditure, so the private share of each year is gone rather than saved
+  // up for later. Carrying it would hand him back relief the law has already taken off him.
+  const carriedForward = round2(opening - opening * rate);
 
   return {
     cost: round2(c),
@@ -220,11 +252,17 @@ export function capitalRelief(cost: number, kind: CapitalKind, businessUsePct: n
     carriedForward,
     inFull: false,
     says: [
-      `A car cannot come off your profit in one go: HMRC keeps cars out of the Annual Investment Allowance.`,
+      years > 0
+        ? `This is year ${years + 1} of claiming for it, and the allowance shrinks a little every year because it is a percentage of what is left.`
+        : `A car cannot come off your profit in one go: HMRC keeps cars out of the Annual Investment Allowance.`,
       `You claim ${asPct(rate)}% of it a year instead, for as long as you own it.`,
+      // 🔴 THE FIGURE THE PERCENTAGE IS OF, AND IN YEAR TWO IT IS NOT THE PRICE HE PAID.
+      // "On £60,000 that is £3,384" is arithmetic a man can check and find wrong, on the one
+      // screen whose whole job is that he can check our working. From year two it is what is
+      // LEFT in the pool, which is the figure the rate is actually applied to.
       use < 100
-        ? `On ${gbp0(c)} at ${use}% business use, that is ${gbp0(thisYear)} off your profit this year.`
-        : `On ${gbp0(c)} that is ${gbp0(thisYear)} off your profit this year.`,
+        ? `On ${gbp0(round2(opening))} at ${use}% business use, that is ${gbp0(thisYear)} off your profit this year.`
+        : `On ${gbp0(round2(opening))} that is ${gbp0(thisYear)} off your profit this year.`,
       `The rest is not lost. It keeps coming, a bit smaller each year, until you sell it or stop trading.`,
     ].join(' '),
   };

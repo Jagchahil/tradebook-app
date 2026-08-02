@@ -522,5 +522,100 @@ export async function setCapitalKind(userId, ids, kind, pct) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 10. 🔴 THE YEARS AFTER THE FIRST ONE, WHICH PRODUCED NOTHING AT ALL.
+//
+// capitalRelief printed "The rest is not lost. It keeps coming, a bit smaller each year" and then
+// getOptimiserInput read only the current tax year, so a car bought last April earned exactly
+// nothing. The product was contradicting its own sentence and the man losing by it would never
+// have known, because the number he was owed simply was not there.
+//
+// A single asset pool needs no table: balance after n years = cost x (1-rate)^n. These assertions
+// are what make that arithmetic true rather than plausible.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n10. The allowance keeps coming, and it shrinks');
+{
+  const y = (n) => C.capitalRelief(60000, 'car_other', 100, n).thisYear;
+
+  ok('CONTROL: year one is unchanged by the new argument',
+    near(y(0), C.capitalRelief(60000, 'car_other', 100).thisYear));
+  ok('🔴 year two is NOT zero, which is what the product actually produced', y(1) > 0);
+  ok('year two is 6% of what is left, not 6% of the price',
+    near(y(1), (60000 - 3600) * 0.06, 1));
+  ok('and it shrinks every year rather than repeating', y(0) > y(1) && y(1) > y(2) && y(2) > y(3));
+  ok('it never goes negative however long he keeps it', y(40) >= 0);
+
+  // 🔴 THE ONES THAT MUST NOT REPEAT. A van and a new electric car both take the WHOLE cost in
+  // year one. Handing it over again every year would be the plainest over claim in the codebase.
+  ok('🔴 a van gives nothing from year two, because it was all taken in year one',
+    C.capitalRelief(20000, 'not_a_car', 100, 1).thisYear === 0
+    && C.capitalRelief(20000, 'not_a_car', 100, 5).thisYear === 0);
+  ok('🔴 and so does a new electric car',
+    C.capitalRelief(45000, 'car_zero_new', 100, 1).thisYear === 0);
+  ok('CONTROL: both still give the lot in the year of purchase',
+    near(C.capitalRelief(20000, 'not_a_car', 100, 0).thisYear, 20000)
+    && near(C.capitalRelief(45000, 'car_zero_new', 100, 0).thisYear, 45000));
+
+  // ⚠️ CAA 2001 s205 reduces the CLAIM, not the expenditure. The pool falls by the whole writing
+  // down allowance either way, so the private share of each year is lost rather than saved up.
+  // Modelling it the other way hands him back relief the law has already taken off him.
+  const half = C.capitalRelief(60000, 'car_other', 50, 1).thisYear;
+  const whole = C.capitalRelief(60000, 'car_other', 100, 1).thisYear;
+  ok('🔴 the private share comes off the claim, and it does NOT come back later',
+    near(half, whole / 2, 1));
+  ok('the pool written down at 50% use is the same as at 100%, because s205 reduces the claim only',
+    near(C.capitalRelief(60000, 'car_other', 50, 0).carriedForward,
+         C.capitalRelief(60000, 'car_other', 100, 0).carriedForward));
+
+  // The words follow the money. "On £60,000 that is £3,384" is arithmetic he can check and find
+  // wrong, on the one screen whose job is that he can check our working.
+  const y2 = C.capitalRelief(60000, 'car_other', 100, 1);
+  ok('🔴 year two quotes what is LEFT, not the price he paid',
+    y2.says.includes('56,400') && !y2.says.includes('On £60,000'));
+  ok('and it says which year of claiming he is on', /year 2 of claiming/i.test(y2.says));
+  ok('a van in a later year says its relief is spent rather than quoting a rate',
+    /nothing left to claim/i.test(C.capitalRelief(20000, 'not_a_car', 100, 2).says));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 11. 🔴 THE ADVICE THAT WOULD HAVE PUT A CLAIM ON HIS RETURN HE IS NOT ENTITLED TO MAKE.
+//
+// GOV.UK, simplified expenses, vehicles: "You cannot claim simplified expenses for a vehicle
+// you've already claimed capital allowances for, or you've included as an expense when you worked
+// out your business profits." BIM75005 gives the reason: "the rate already contains an element to
+// allow for depreciation."
+//
+// Ways to save was telling a man who had put a van through his books that he "could often claim
+// more by logging miles at 55p a mile instead". Note the second half of the GOV.UK sentence: this
+// is not only cars with a writing down allowance, it is a van taken in full under the AIA too.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n11. Never the mileage rate on a vehicle he bought through the books');
+{
+  const FUEL = { ...BASE, categoriesLogged: ['fuel'], mileageClaimed: false };
+  const card = (input) => O.findOptimisations(input).find((o) => o.key === 'mileage');
+
+  const control = card(FUEL);
+  ok('CONTROL: a man logging fuel and no mileage is still told about the flat rate',
+    Boolean(control) && /55p a mile/.test(control.detail));
+
+  const bought = card({ ...FUEL, vehicleBoughtThroughBooks: true });
+  // ⚠️ NOT "the rate is not mentioned". The correction sentence names the rate on purpose, because
+  // "the flat rate is not open to you" means nothing to a man who does not know which rate. What
+  // must be gone is the RECOMMENDATION, and an assertion that only checks for the number would
+  // have failed on copy that is exactly right.
+  ok('🔴 BUT NOT ONE WHO HAS PUT A VEHICLE THROUGH HIS BOOKS',
+    Boolean(bought) && !/claim more by logging miles/i.test(bought.detail));
+  ok('and it is stated as closed to him, not offered', /not open to you/i.test(bought.detail));
+  ok('he is told WHY it is closed to him rather than the card just vanishing',
+    /never both|one or the other/i.test(bought.detail));
+  ok('and pointed at what he CAN claim, which is the same helpfulness aimed somewhere legal',
+    /insurance/i.test(bought.detail) && /servicing/i.test(bought.detail));
+  ok('it claims no saving, because it is a correction and not a lever', bought.estSaving === 0);
+
+  // It must not quietly become an instruction either.
+  ok('🔴 the word "instead" is gone, so nothing reads as a suggestion to switch',
+    !/instead/i.test(bought.detail));
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

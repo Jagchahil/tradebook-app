@@ -3811,6 +3811,60 @@ export interface PackRow {
   business_use_pct: number | null;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// EVERY VEHICLE HE HAS EVER TOLD US ABOUT, WHATEVER YEAR HE BOUGHT IT IN.
+//
+// 🔴 WHY THIS IS NOT PART OF getConfirmedTransactionsForRange. That reader is scoped to the
+// CURRENT tax year, which is right for income and costs and wrong for exactly one thing: a car
+// bought in April 2026 still earns a writing down allowance in 2027, 2028 and every year after
+// until he sells it. lib/capital.ts printed "The rest is not lost. It keeps coming, a bit smaller
+// each year" and the product then produced nothing at all from year two, because the purchase row
+// had fallen out of range.
+//
+// ⚠️ NO POOLS TABLE, AND THAT IS DELIBERATE. A single asset pool holds one thing and its balance
+// is a pure function of the price and the number of years gone by, so the purchase row IS the
+// asset. A pools table would be a second copy of a number this row already carries, and the two
+// would disagree the first time somebody edited one.
+//
+// Confirmed, not personal, money out, and only rows he has actually answered the question on.
+// A null capital_kind means nobody asked him, and an unanswered row is an ordinary cost.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export interface CapitalAsset {
+  amount: number;            // as stored, negative for money out
+  transaction_date: string;  // YYYY-MM-DD
+  capital_kind: string;
+  business_use_pct: number | null;
+}
+
+export async function getCapitalAssets(userId: string): Promise<CapitalAsset[]> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+        `&confirmed=eq.true&is_personal=eq.false&amount=lt.0&capital_kind=not.is.null` +
+        `&select=amount,transaction_date,capital_kind,business_use_pct` +
+        `&order=transaction_date.asc&limit=500`,
+      { headers: headers() },
+    );
+    // ⚠️ AN EMPTY LIST ON FAILURE, WHICH UNDERSTATES HIM. That is the safe direction here and the
+    // only one available: a missing column (the migration not run) and a genuine outage look the
+    // same from here, and inventing an allowance for a car we cannot see would be worse than
+    // losing one he can ask about.
+    if (!res.ok) return [];
+    const rows = (await res.json()) as Array<Record<string, unknown>>;
+    return rows
+      .filter((r) => typeof r.transaction_date === 'string' && typeof r.capital_kind === 'string')
+      .map((r) => ({
+        amount: Number(r.amount) || 0,
+        transaction_date: (r.transaction_date as string).slice(0, 10),
+        capital_kind: r.capital_kind as string,
+        business_use_pct: r.business_use_pct == null ? null : Number(r.business_use_pct),
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getConfirmedTransactionsForRange(
   userId: string,
   startISO: string,
@@ -3910,11 +3964,14 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   const taxYearStart = quarterBounds(startYear, 1).start;
   const todayISO = now.toISOString().slice(0, 10);
 
-  const [rows, sl, goals, biz] = await Promise.all([
+  const [rows, sl, goals, biz, assets] = await Promise.all([
     getConfirmedTransactionsForRange(userId, taxYearStart, todayISO),
     getStudentLoanSettings(userId),
     getActiveGoals(userId),
     getBusinessProfile(userId),
+    // Every year, not just this one. See getCapitalAssets: a car bought two Aprils ago is still
+    // earning an allowance and its purchase row is nowhere near the current year's range.
+    getCapitalAssets(userId),
   ]);
 
   let ytdTradeIncome = 0;
@@ -3967,12 +4024,13 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
       // told us it was a van". A van is plant and machinery, inside the AIA, and correctly comes
       // off in full. Storing his answer is worth doing even where it changes no arithmetic.
       // ═══════════════════════════════════════════════════════════════════════════════════════
+      // ⚠️ THE COST LEAVES EXPENSES HERE AND THE ALLOWANCE IS WORKED OUT SOMEWHERE ELSE. It used
+      // to be added up on this line, which was right for a car bought this year and produced
+      // nothing at all for one bought last year, because this loop only ever sees the current tax
+      // year. getCapitalAssets reads every year and the sum is below, so this branch now has one
+      // job: keep the purchase price out of his running costs.
       const kind = isCapitalKind(r.capital_kind) ? r.capital_kind : null;
-      if (kind && kind !== 'not_a_car') {
-        const use = r.business_use_pct == null ? 100 : r.business_use_pct;
-        ytdCapitalAllowances += capitalRelief(-amt, kind, use).thisYear;
-        continue;
-      }
+      if (kind && kind !== 'not_a_car') continue;
 
       ytdTradeExpenses += -amt;
       if (isMileageRow(r)) ytdMileage += -amt;
@@ -3984,6 +4042,40 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     if (Number.isFinite(c) && c > 0) ytdCisSuffered += c;
   }
   const categoriesLogged = [...cats];
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // WHAT EVERY VEHICLE HE OWNS IS WORTH THIS YEAR.
+  //
+  // yearsHeld is the gap between the tax year he bought it in and the one we are in now, so a car
+  // bought in year one is on its second slice this year and its third the year after. Everything
+  // else about the arithmetic lives in lib/capital.ts, which is the only file allowed to know a
+  // rate.
+  //
+  // ⚠️ 'not_a_car' PRODUCES NOTHING HERE AND THAT IS CORRECT. A van is plant and machinery, its
+  // whole cost came off in the year he bought it through the ordinary expenses line, and
+  // capitalRelief returns zero for it from year two. It is in the list so that the row still
+  // carries what he SAID, and so that the mileage lock-in below can see it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  for (const a of assets) {
+    const kind = isCapitalKind(a.capital_kind) ? a.capital_kind : null;
+    if (!kind) continue;
+    const boughtYear = quarterForDate(new Date(`${a.transaction_date}T00:00:00Z`)).startYear;
+    const yearsHeld = Math.max(0, startYear - boughtYear);
+    // A purchase in the current year is already out of ytdTradeExpenses by the loop above; one
+    // from an earlier year was never in it. Either way this is the whole of its relief.
+    if (kind === 'not_a_car') continue;
+    const use = a.business_use_pct == null ? 100 : a.business_use_pct;
+    ytdCapitalAllowances += capitalRelief(Math.abs(a.amount), kind, use, yearsHeld).thisYear;
+  }
+
+  // 🔴 HAS HE PUT A VEHICLE THROUGH HIS BOOKS AT ALL. GOV.UK, simplified expenses, vehicles:
+  // "You cannot claim simplified expenses for a vehicle you've already claimed capital allowances
+  // for, or you've included as an expense when you worked out your business profits."
+  //
+  // Note the second half. It is not only a car with a writing down allowance: a VAN taken in full
+  // under the AIA is "included as an expense", and the flat rate is closed to that vehicle too,
+  // permanently. So this is true of every capital_kind, 'not_a_car' included.
+  const vehicleBoughtThroughBooks = assets.some((a) => isCapitalKind(a.capital_kind));
 
   // 🔴 A PARTNERSHIP SHARES ONE SET OF BOOKS. The app sees the WHOLE partnership's income and expenses
   // (the shared account), but this man is taxed only on HIS SLICE of the profit. GOV.UK,
@@ -4037,6 +4129,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     ytdTradeIncome: Math.round(ytdTradeIncome * 100) / 100,
     ytdTradeExpenses: Math.round(ytdTradeExpenses * 100) / 100,
     ytdCapitalAllowances: Math.round(ytdCapitalAllowances * 100) / 100,
+    vehicleBoughtThroughBooks,
     ytdCisSuffered: Math.round(ytdCisSuffered * 100) / 100,
     employmentIncome: sl?.employmentIncome ?? 0,
     // THE PLANS WERE ALREADY FETCHED AND THEN THROWN AWAY.

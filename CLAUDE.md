@@ -151,16 +151,6 @@ Doc 104 is the doctrine and it sits above every other doc. It holds the position
 
 Two kinds of authorisation, and we need both. The user's is our moat. The FCA's is our gate. **The approval gate is NOT a regulatory shield.** Preparing an investment and having the user hit run is article 53 AND article 25. See doc 104 section 5 and doc 98.
 
-## What Lekhio Is. Read `docs/104` Before Writing Any Copy Or Positioning.
-
-**Lekhio is not software you buy. It is the first employee a business ever hires.** It prepares. The human approves. That is not a compliance chore, it is the product.
-
-Doc 104 is the doctrine and it sits above every other doc. It holds the positioning, the category ("the business for businesses"), what we will never call ourselves (never "the AI operating system for business", never "we file your tax"), the Apple lessons and where we go further than them, the six marketing angles with the actual lines, and the front door: 17 to 18 million UK adults intend to start a business this year and nobody in our category is talking to them.
-
-**The line: one less button at a time. Until only one is left. Approve.**
-
-Two kinds of authorisation, and we need both. The user's is our moat. The FCA's is our gate. **The approval gate is NOT a regulatory shield.** Preparing an investment and having the user hit run is article 53 AND article 25. See doc 104 section 5 and doc 98.
-
 ## Design Restraint. Read `docs/103` Before Adding Anything To A Screen.
 
 **A feature is not free because it is small.** Every button is a decision handed to the user, and every row is a thing he has to read and reject before he reaches what he came for. Ten helpful additions make an unhelpful product, and nobody is ever blamed for adding just one.

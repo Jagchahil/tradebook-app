@@ -1,17 +1,29 @@
 // lib/logindoor.ts. ONE LOGIN, TWO CHANNELS. What a man types to get in.
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-// WHY THERE IS ONE FIELD AND NOT TWO.
+// WHY THERE IS ONE FIELD AND NOT TWO, AND WHY THE WEB NOW FILLS IT WITH AN ADDRESS.
 //
 // The app signs in by phone. The web could have signed in by email. Jag's objection to that was
 // not technical and it was right: "why is it two different forms of login? It can look a little
 // bit dodgy as well." A man whose books and tax we hold notices when the front door changes shape
 // between two screens with the same name over them.
 //
-// So there is ONE screen, on the web and in the app, with ONE field: his email or his mobile. He
-// types whichever he has to hand, we send a 6 digit code to it, he types the code. It is not two
-// forms of login. It is one form of login with two ways for the code to arrive, and this file is
-// the part that works out which he gave us.
+// The answer was ONE screen with ONE field taking either, and this file is the part that works
+// out which he gave us. 🔴 FROM 2 AUGUST 2026 THE WEB SCREEN OFFERS THE ADDRESS ONLY. THIS FILE
+// DID NOT CHANGE, AND MUST NOT. The parser still reads a mobile, /api/auth/start still accepts
+// the sms channel, and the phone app still signs in by phone and has no email door at all.
+//
+// ⚠️ THAT IS NOT A RETREAT FROM JAG'S OBJECTION, IT IS STILL THE ANSWER TO IT. The shape he
+// objected to was a screen that presents a CHOICE, because a choice implies the two are different
+// kinds of thing. Each surface still shows exactly one field and sends exactly one 6 digit code
+// in the same words. The web asks for the address because he is at a keyboard with his mail open;
+// the app asks for the number because the app IS the phone. Neither screen offers a fork.
+//
+// WHY THE WEB STOPPED OFFERING THE NUMBER: the cost note below, at the scale it actually runs at.
+// A text is about 175 times dearer than an email for identical proof, and only the text is worth
+// attacking for money. Nobody is excluded, because email is compulsory at signup and
+// app/api/signup/verify.ts mints the auth user on the PROVED address, so every customer who has
+// finished signing up already holds a working email door.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 //
 // ⚠️ A CODE, NOT A MAGIC LINK, AND THAT IS A DELIBERATE REFUSAL.

@@ -9,7 +9,7 @@ import { INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RIVER, RIVER_DEEP, SURFA
 
 export const metadata: Metadata = {
   title: 'Sign in to Lekhio',
-  description: 'Sign in with your mobile number to see your money, your costs and what you owe.',
+  description: 'Sign in with your email address to see your money, your costs and what you owe.',
   robots: { index: false, follow: false },
 };
 
@@ -29,19 +29,25 @@ export const dynamic = 'force-dynamic';
 // turned into a sentence here. That is a fair trade and it keeps the wording where a human can
 // read it, rather than in a route handler.
 //
-// TWO STEPS, ONE NUMBER. Step one posts the number and we text a code. Step two posts the code.
-// The number itself never appears in the URL: it rides in a signed, short lived cookie, because a
-// phone number is the account key in this product and a URL is written into browser history, into
-// Referer headers, and into every error report that ever records one.
+// TWO STEPS, ONE CONTACT. Step one posts what he typed and we send a code to it. Step two posts
+// the code. ⚠️ On the web that contact is now his EMAIL ADDRESS and nothing else, from 2 Aug 2026;
+// the phone app still posts a number to the same route. The contact itself never appears in the
+// URL either way: it rides in a signed, short lived cookie, because it is the account key in this
+// product and a URL is written into browser history, into Referer headers, and into every error
+// report that ever records one.
 
 // A failure code from the routes, turned into something a person can act on. Never a stack trace,
 // never "an error occurred", and never blame.
 function message(code: string | undefined): string | null {
   switch (code) {
-    case 'contact': return 'That does not look like an email address or a UK mobile number. Try it like dave@example.com or 07123 456789.';
-    case 'capped': return 'We cannot send a code by text just now. Try your email address instead, or come back in a little while.';
-    case 'code': return 'That code did not work. Check the text and try again.';
-    case 'expired': return 'That took a little too long. Put your number in again and we will send a fresh code.';
+    // ⚠️ THESE FOUR ALL NAMED A TEXT MESSAGE, and from 2 Aug the web door only sends email. The
+    // worst of them was 'capped', which told him to "try your email address instead" on the one
+    // screen where his email address is the only thing he can type. Advice he cannot follow is
+    // worse than no advice, because he goes looking for the option we told him about.
+    case 'contact': return 'That does not look like an email address. Try it like dave@example.com.';
+    case 'capped': return 'We have sent as many codes as we can for the moment. Give it a little while and try again.';
+    case 'code': return 'That code did not work. Check the email and try again.';
+    case 'expired': return 'That took a little too long. Put your address in again and we will send a fresh code.';
     case 'toomany': return 'Too many tries. Give it a few minutes and try again.';
     case 'send': return 'We could not send the code just now. Try again in a minute.';
     case 'session': return 'We could not sign you in just now. Try again in a minute.';
@@ -94,7 +100,7 @@ export default async function SignInPage({
             // ⚠️ THE SIGNUP CODE IS DIFFERENT AND ITS COPY STAYS. lib/signupcode.ts mints that one
             // and it really is six digits, guaranteed by a test, so app/start may say so.
             ? 'We have sent you a code. It lasts a few minutes.'
-            : 'Your email address or your mobile number, whichever you gave us. We will send you a code.'}
+            : 'The email address you gave us. We will send you a code.'}
         </p>
 
         {signedOut && <p style={S.note}>You are signed out.</p>}
@@ -147,25 +153,47 @@ export default async function SignInPage({
             <p style={S.hint}>Nothing after a minute? Check the address you typed.</p>
           </form>
         ) : (
-          /* ONE FIELD, TWO DOORS. Not two forms of login, one form of login with two ways for the
-             code to arrive. The app shows the same words, so the front door never changes shape
-             between two screens with the same name over them. lib/logindoor.ts decides which he
-             gave us, on the presence of an @ and nothing cleverer. */
+          /* 🔴 THE WEB DOOR IS EMAIL ONLY FROM 2 AUGUST 2026. THE APP DOOR IS NOT.
+             This was one field taking either. lib/logindoor.ts STILL reads a mobile and
+             /api/auth/start STILL accepts one, because THE PHONE APP SIGNS IN BY PHONE and has no
+             email door at all. What changed is what the WEB offers, not what the system
+             understands, so do not read this screen as permission to tear the parser out.
+
+             WHY, and it is a cost and abuse decision rather than a technical one. A text is
+             roughly 7p through Twilio and an email roughly 0.04p, which is about 175 times dearer
+             for exactly the same proof: that he holds something we already have on file. Against
+             the 215p a month a customer may cost us at the 80% margin floor, signing in by text
+             twice a month spends 6% of his whole budget on arriving. And only one of the two
+             doors pays an attacker. SMS pumping bills us for every code sent to a number he
+             controls, and there is no email equivalent because nobody is paid when an email is
+             sent.
+
+             ⚠️ NOBODY IS EXCLUDED BY THIS, and that is what made it safe rather than merely
+             cheaper. Email is compulsory at signup and app/api/signup/verify.ts mints the auth
+             user on the PROVED address, so every customer who has finished signing up already has
+             a working email door. A survey on 2 Aug found exactly one account that could not use
+             one: a test row on the Ofcom fictitious number, no subscription. The line under the
+             button is for the phone era customer anyway, because a dead end with no way out is
+             the one thing this screen must never be. */
           <form action="/api/auth/start" method="post">
-            <label htmlFor="contact" style={S.label}>Email or mobile number</label>
+            <label htmlFor="contact" style={S.label}>Your email address</label>
             <input
               id="contact"
               name="contact"
+              type="email"
               style={S.input}
               inputMode="email"
               autoComplete="username"
               autoFocus
-              placeholder="dave@example.com or 07123 456789"
+              placeholder="dave@example.com"
               maxLength={254}
               required
             />
             <button type="submit" style={S.btn}>Send me a code</button>
-            <p style={S.hint}>Email is instant and free. A text works too.</p>
+            <p style={S.hint}>
+              We send a 6 digit code to that address. If you only ever signed in with your mobile,
+              email info@lekhio.app and we will put your address on the account.
+            </p>
           </form>
         )}
 

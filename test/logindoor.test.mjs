@@ -117,5 +117,46 @@ ok('the daily window really is a day', D.SMS_DAILY_WINDOW_SECONDS === 86400);
 ok('the per target window is minutes, not hours', D.PER_TARGET_WINDOW_SECONDS <= 3600);
 ok('a whole day of per target sends cannot alone exhaust the daily cap', (86400 / D.PER_TARGET_WINDOW_SECONDS) * D.PER_TARGET_SENDS < D.SMS_DAILY_CAP * 10);
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 7. THE WEB DOOR IS EMAIL ONLY. THE APP DOOR IS NOT, AND THIS SUITE IS NOT PERMISSION TO
+// TEAR THE PARSER OUT.
+//
+// From 2 August 2026 the WEB sign in screen offers one thing, an email address. Everything above
+// this line still reads a mobile, and /api/auth/start still accepts one, BECAUSE THE PHONE APP
+// SIGNS IN BY PHONE. What changed is what the web OFFERS, not what the system understands.
+//
+// Why: a text is roughly 7p through Twilio and an email roughly 0.04p, so a text is about 175
+// times dearer for the same proof. Against the 215p a month a customer may cost us at the 80%
+// margin floor, signing in by text twice a month spends 6% of his whole budget on arriving. And
+// only one of the two doors pays an attacker. SMS pumping bills us for every code sent to a
+// number he controls; nobody is paid when an email is sent.
+//
+// ⚠️ NOBODY IS EXCLUDED, and that is the fact that made it safe rather than merely cheaper.
+// Email is compulsory at signup and app/api/signup/verify.ts mints the auth user on the PROVED
+// address, so every customer who has finished signing up already has a working email door. The
+// survey on 2 Aug found one account that could not use it, and it was a test row on the Ofcom
+// fictitious number with no subscription.
+//
+// THIS IS A FILE SWEEP AND NOT A PARSER TEST ON PURPOSE. The defect it guards against is a
+// future session helpfully putting the field back, and that shows up in the page, never here.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n7. THE WEB SIGN IN DOOR OFFERS EMAIL AND NOTHING ELSE');
+const inPage = readFileSync(path.resolve(here, '../app/in/page.tsx'), 'utf8');
+ok('the label does not offer a mobile number', !/Email or mobile/i.test(inPage));
+ok('🔴 THE PHONE PLACEHOLDER IS GONE, so nobody is invited to type a number', !inPage.includes('07123 456789'));
+ok('🔴 IT NO LONGER PROMISES A TEXT WORKS, which is no longer offered', !/A text works too/i.test(inPage));
+ok('the field is typed as an email, so a number is refused before it can cost anything', /type="email"/.test(inPage));
+ok('the phone era customer is given a route rather than a dead end', inPage.includes('info@lekhio.app'));
+ok('the meta description does not still sell a mobile sign in', !/Sign in with your mobile/i.test(inPage));
+ok('the subheading does not offer a choice of two contacts', !/address or your mobile/i.test(inPage));
+// ⚠️ ASSERT ON THE CASE LINE, NOT THE FILE. The first draft of this swept the whole page and
+// matched the COMMENT above the switch, which quotes the old wording to explain why it went.
+// A checker that fires on its own explanation would have had me 'fixing' correct copy.
+const cappedLine = (inPage.match(/case 'capped':.*/) || [''])[0];
+ok('🔴 THE CAPPED MESSAGE NO LONGER SENDS HIM TO AN OPTION THAT IS GONE', cappedLine.length > 0 && !/email address instead/i.test(cappedLine));
+ok('the code error names the email, not a text', !/Check the text/i.test(inPage));
+ok('the parser STILL reads a mobile, because the phone app still signs in by one', D.readIdentifier('07123456789')?.channel === 'sms');
+ok('the parser still normalises that mobile correctly', D.readIdentifier('07123456789')?.value === '+447123456789');
+
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

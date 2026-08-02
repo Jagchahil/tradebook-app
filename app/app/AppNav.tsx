@@ -77,6 +77,14 @@ export const SECTIONS: ReadonlyArray<NavSection> = [
       { href: '/app/tax/summary', label: 'Quarterly summary', hint: 'Your figures since 6 April, and the quarter on its own' },
       { href: '/app/tax/what-if', label: 'What if', hint: 'Try a change to your profit, on your real figures' },
       { href: '/app/tax/ways-to-save', label: 'Ways to save', hint: 'Every lever we can find you, with the working' },
+      // ⚠️ IT IS IN THE RAIL RATHER THAN BEHIND A TOOLS ROW, WHICH DOC 103'S ONCE TEST WOULD
+      // NORMALLY REFUSE. A man buys a vehicle every few years, so by the once test this belongs
+      // out of sight. It is here anyway, and the reason is that the whole value of the screen is
+      // being SEEN BEFORE HE SIGNS. The fork it explains is permanent per vehicle and worth four
+      // figures, and a man who has to go looking for it has already been to the dealer. What it
+      // replaced to earn the room: nothing, and that is the honest answer. This one is an argued
+      // exception rather than a quiet addition.
+      { href: '/app/tax/vehicle', label: 'Vehicles', hint: 'Van or car, and the cheapest way to buy one' },
       { href: '/app/tax/can-i-claim', label: 'Can I claim it', hint: 'The expense rules, with HMRC sources' },
       { href: '/app/pay-yourself', label: 'Pay yourself', hint: 'The most tax efficient way to take your money out' },
     ],

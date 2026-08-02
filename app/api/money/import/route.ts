@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
     // length in lib/banksync.ts: the flag must be on the row before anything can bulk confirm
     // it, because confirm_pile enforces it in SQL against that column.
     for (const entry of entries) {
-      if (looksPersonal(entry.vendor, entry.description, ownNames) !== null) {
+      if (looksPersonal(entry.vendor, entry.description, ownNames, entry.amount) !== null) {
         entry.looks_personal = true;
       }
     }

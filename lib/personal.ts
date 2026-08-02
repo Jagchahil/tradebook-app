@@ -114,10 +114,40 @@ export function matchesOwnName(vendor: string | null | undefined, ownNames: stri
 //
 // Order matters: the most specific and most confident checks come first, so the
 // reason the user is shown is the most useful one available.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE DIRECTION MATTERS FOR EXACTLY ONE OF THESE CHECKS, AND IT IS THE ONE THAT MATTERS MOST.
+//
+// Found by walking a real 78 row statement on 2 August 2026, on an electrician's account. Three
+// domestic customers, MR A WHITELEY £1,450, MRS H BARLOW £920 and MRS D OKONKWO £680, were flagged
+// by PERSON_NAME and dropped into the careful pile. A careful row has ONE button, "Not business
+// money", and confirm_pile and confirm_income both refuse a flagged row in SQL, so there was no
+// way to record them as income at all, by any route.
+//
+// For a domestic trade that is not an edge case. It is most of the book. The product was making
+// understating income the only available action, which app/app/money/add correctly calls the one
+// direction of error this product must never make easy.
+//
+// ⚠️ AND ONLY PERSON_NAME IS WRONG ON A CREDIT. Work through the others and every one of them is
+// still right when the money is coming IN: his own name is a transfer between his accounts, a
+// benefit is not trade income, a gambling win is not taxable, a refund is his own money back,
+// savings interest is not trade income, and a loan is not income. Each of those genuinely belongs
+// in the careful pile whichever way it points, and "not business money" is the correct answer to
+// all of them. So the fix is one check, not the rule.
+//
+// A person paying money INTO a trading account is a customer. That is the ordinary case, and the
+// warning that made sense on a payment out ("if it was family or a friend") reads as an accusation
+// on a payment in.
+//
+// ⚠️ amount IS OPTIONAL AND ABSENT MEANS "TREAT IT AS A PAYMENT OUT", which is the behaviour every
+// caller had before this existed. Widening a parameter that four call sites pass is how a check
+// quietly stops running on the one caller nobody updated, so the default is the old behaviour and
+// each caller opts in by handing over the figure it already has.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export function looksPersonal(
   vendor: string | null | undefined,
   description?: string | null,
   ownNames: string[] = [],
+  amount?: number | null,
 ): PersonalHit | null {
   // FIRST, because it is the only check here that is not an inference. Everything below reads the
   // shape of a word and decides what it probably is. This one knows.
@@ -170,7 +200,11 @@ export function looksPersonal(
     };
   }
 
-  if (PERSON_NAME.test(text)) {
+  // 🔴 NOT ON MONEY IN. See the block above the signature: a person paying into a trading account
+  // is a customer, and flagging him made a domestic trade's income unfilable. The check stays whole
+  // for money out, where a payment to a person's name really might be family rather than a cost.
+  const moneyIn = typeof amount === 'number' && Number.isFinite(amount) && amount > 0;
+  if (!moneyIn && PERSON_NAME.test(text)) {
     return {
       reason: 'transfer',
       why: 'This looks like money to or from a person rather than a business. If it was a customer paying you, keep it. If it was family or a friend, it is not business income.',

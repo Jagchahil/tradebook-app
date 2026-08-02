@@ -156,5 +156,50 @@ ok('the reason explains drawings rather than just refusing', /drawings/i.test(se
 ok('the self reason carries no dashes', !/[–—−]/.test(selfWhy));
 ok('there is a short label for it', P.personalLabel('self') === 'Looks like your own account');
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE DIRECTION. A PERSON PAYING MONEY IN IS A CUSTOMER, NOT A TRANSFER.
+//
+// Found by walking a real 78 row statement on 2 August 2026. Three of an electrician's domestic
+// customers, paying £1,450, £920 and £680, were flagged by PERSON_NAME and dropped into the
+// careful pile. A careful row offers one button, "not business money", and confirm_pile and
+// confirm_income both refuse a flagged row in SQL, so £3,050 of real income could not be recorded
+// by any route at all. For a domestic trade that is most of the book, and it made understating
+// income the only available action, which app/app/money/add calls the one direction of error this
+// product must never make easy.
+//
+// ⚠️ ONLY PERSON_NAME IS WRONG ON A CREDIT, which is why the fix is one check and not the rule.
+// Every other pattern is still right when the money comes in, and the assertions below hold each
+// of them to that.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const IN = 1450;
+const OUT = -1450;
+
+ok('🔴 A PERSON PAYING MONEY IN IS NOT FLAGGED. This is the whole finding',
+  P.looksPersonal('MR A WHITELEY', 'Garden office supply', [], IN) === null);
+
+ok('...and the same name paying money OUT still is, because that one might be family',
+  P.looksPersonal('MR A WHITELEY', 'Garden office supply', [], OUT)?.reason === 'transfer');
+
+ok('...and with no amount at all it behaves exactly as it did before, which is the safe default',
+  P.looksPersonal('MR A WHITELEY', null, [])?.reason === 'transfer');
+
+ok('a title prefixed woman paying in is a customer too',
+  P.looksPersonal('MRS H BARLOW', 'Kitchen rewire', [], IN) === null
+  && P.looksPersonal('MRS D OKONKWO', 'Consumer unit', [], IN) === null);
+
+ok('🔴 HIS OWN NAME IS STILL A TRANSFER WHEN THE MONEY COMES IN',
+  P.looksPersonal('RYAN VASEY', null, ['Ryan Vasey'], IN)?.reason === 'self');
+ok('a benefit paid in is still a benefit', P.looksPersonal('HMRC CHILD BENEFIT', null, [], IN)?.reason === 'benefit');
+ok('a gambling win paid in is still gambling', P.looksPersonal('BET365', null, [], IN)?.reason === 'gambling');
+ok('a refund paid in is still a refund', P.looksPersonal('DVLA REFUND', null, [], IN)?.reason === 'refund');
+
+ok('and a real business paying in was never flagged either way',
+  P.looksPersonal('MARSH BUILDING SERVICES LTD', null, [], IN) === null
+  && P.looksPersonal('MARSH BUILDING SERVICES LTD', null, [], OUT) === null);
+
+ok('a non finite or zero amount falls back to the safe direction rather than guessing',
+  P.looksPersonal('MR A WHITELEY', null, [], Number.NaN)?.reason === 'transfer'
+  && P.looksPersonal('MR A WHITELEY', null, [], 0)?.reason === 'transfer');
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

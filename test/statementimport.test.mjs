@@ -365,7 +365,19 @@ const G = await import(pathToFileURL(path.join(root, 'lib/gate.ts')).href);
     /parseStatement\(text, user\.id, \(line\) => mapBankTransaction\(line, categoriseBankLine\)\)/.test(route));
   ok('🔴 NOTHING IN THE ROUTE EVER CONFIRMS A ROW', !/confirmed:\s*true/.test(codeOnly(route)));
   ok('🔴 and the sync\'s auto file is deliberately not imported: a statement lands months in one press', !/shouldAutoFile/.test(route));
-  ok('the personal check runs on every line so the flag lands ON the row', /looksPersonal\(entry\.vendor, entry\.description, ownNames\)/.test(route));
+  // ⚠️ LOOSENED 2 AUGUST 2026. This pinned the exact argument list, so adding the AMOUNT as a
+  // fourth argument broke it while the property it is named for stayed true. The property is that
+  // the check runs per line and the flag lands on the row.
+  ok('the personal check runs on every line so the flag lands ON the row',
+    /looksPersonal\(entry\.vendor, entry\.description, ownNames/.test(route)
+    && /entry\.looks_personal = true/.test(route));
+  // 🔴 AND THE DIRECTION GOES WITH IT. Without the amount, PERSON_NAME fires on a CREDIT, and a
+  // person paying money into a trading account is a customer. Walking a real statement on
+  // 2 August 2026 put three of an electrician's domestic customers in the careful pile, where the
+  // only button is "not business money" and the SQL refuses a flagged row, so £3,050 of real
+  // income could not be recorded by any route. See the block above looksPersonal in lib/personal.ts.
+  ok('🔴 AND THE AMOUNT TRAVELS WITH IT, so a customer paying in is not read as a transfer',
+    /looksPersonal\(entry\.vendor, entry\.description, ownNames, entry\.amount\)/.test(route));
   ok('his taught vendors arrive as suggestions through the same recall the sync uses', /recall\(entry\.vendor, rules, patterns\)/.test(route));
   ok('there is a size ceiling', /MAX_BYTES/.test(route) && /part\.size > MAX_BYTES/.test(route));
   ok('and a type check that falls back to the filename, because browsers disagree about CSV',

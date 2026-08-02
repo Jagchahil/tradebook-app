@@ -442,7 +442,7 @@ export default async function PilePage({
                 <span style={S.amount}>{gbp0(g.total)}</span>
               </div>
               <p style={S.meta}>{g.count === 1 ? 'One payment' : `${g.count} payments`}.</p>
-              <p style={S.reason}>{looksPersonal(g.vendor, null, ownNames)?.why ?? g.reason}</p>
+              <p style={S.reason}>{looksPersonal(g.vendor, null, ownNames, g.kind === 'income' ? g.total : -g.total)?.why ?? g.reason}</p>
               <p style={S.aside}>
                 We will not file {g.count === 1 ? 'this' : 'these'} for you in one go, because getting
                 it wrong costs you. If it really is business, confirm it on its own.

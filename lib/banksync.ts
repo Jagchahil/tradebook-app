@@ -155,7 +155,7 @@ export async function syncWithAccessToken(
     }
 
     for (const entry of toInsert) {
-      if (looksPersonal(entry.vendor, entry.description, ownNames) !== null) {
+      if (looksPersonal(entry.vendor, entry.description, ownNames, entry.amount) !== null) {
         entry.looks_personal = true;
       }
     }
@@ -199,7 +199,7 @@ export async function syncWithAccessToken(
             // personal, which is the whole reason a benefit never slips into the books unseen. His
             // own name has to be part of that answer or a learned rule could file his drawings
             // without ever asking, which is the one thing this gate exists to stop.
-            looksPersonal: looksPersonal(entry.vendor, entry.description, ownNames) !== null,
+            looksPersonal: looksPersonal(entry.vendor, entry.description, ownNames, entry.amount) !== null,
           })
         ) {
           entry.confirmed = true;

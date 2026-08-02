@@ -110,7 +110,7 @@ console.log("\n3. The £60,000 Audi, in his own numbers");
 // £82,800 in, £60,000 of ordinary costs. That is a £22,800 profit before the car.
 const BASE = {
   startYear: 2026,
-  monthsElapsed: 12,
+  monthsElapsed: 12, daysElapsed: 365,
   ytdTradeIncome: 82800,
   ytdTradeExpenses: 60000,
   ytdCisSuffered: 0,
@@ -159,8 +159,12 @@ const BASE = {
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 console.log('\n4. The allowance is annual, and the projection must not multiply it');
 {
-  const THREE = { ...BASE, monthsElapsed: 3, ytdTradeIncome: 20700, ytdTradeExpenses: 15000 };
-  const factor = 12 / 3;
+  const THREE = { ...BASE, monthsElapsed: 3, daysElapsed: 92, ytdTradeIncome: 20700, ytdTradeExpenses: 15000 };
+  // ⚠️ ASK THE ENGINE FOR THE FACTOR, DO NOT KEEP A SECOND COPY OF IT. This read `12 / 3`, which
+  // was the engine's own rule written out a second time, so when the projection moved to days on
+  // 2 August this test failed for being right about the OLD engine. A test that hardcodes the
+  // rule it is checking cannot catch the rule changing under it.
+  const factor = O.projectionFactor(THREE).factor;
 
   const allowance = O.taxPosition({ ...THREE, ytdCapitalAllowances: 3600 });
   // £3,600 off the ANNUAL figure is £900 off the year-to-date figure once it is projected.

@@ -165,7 +165,7 @@ ok('a man with a loss is left exactly as he was, because it is his to claim',
 // penalised rather than us.
 // ---------------------------------------------------------------------------------------------
 const base = {
-  startYear: 2026, monthsElapsed: 3,
+  startYear: 2026, monthsElapsed: 3, daysElapsed: 92,
   // £100 over three months is £400 at this pace, comfortably under the allowance, so this is a man
   // the election genuinely suits. £300 would have been £1,200 for the year and would NOT suit him,
   // which is the trap the section above exists to hold shut.
@@ -177,15 +177,24 @@ const base = {
 const elected = O.taxPosition({ ...base, tradingAllowanceElected: true });
 const notElected = O.taxPosition({ ...base, tradingAllowanceElected: false });
 
-ok('🔴 THE ALLOWANCE IS TAKEN ONCE FROM THE ANNUAL FIGURE, NEVER MULTIPLIED BY THE PROJECTION',
-  Math.round(elected.taxable.nonSavings) === 19000 - 12570
-  || Math.round(elected.totalIncome) === 19000);
+// ⚠️ THE FACTOR COMES FROM THE ENGINE, IT IS NOT WRITTEN OUT AGAIN HERE. These three read 19000,
+// 16000 and `* 4`, which was the engine's `12 / monthsElapsed` rule copied into the test. When the
+// projection moved to days on 2 August they failed for being right about the old engine. The
+// SHAPES below are what this section is actually defending, and they are unchanged:
+//   right: (gross x factor) - 1000, the allowance taken ONCE off the annual figure
+//   wrong: (gross - 1000) x factor, the allowance multiplied up by the projection
+const taFactor = O.projectionFactor(base).factor;
+const rightShape = Math.round((5000 * taFactor) - 1000);
+const wrongShape = Math.round((5000 - 1000) * taFactor);
 
-ok('...and it is NOT the £16,000 the obvious implementation would have produced',
-  Math.round(elected.totalIncome) !== 16000);
+ok('🔴 THE ALLOWANCE IS TAKEN ONCE FROM THE ANNUAL FIGURE, NEVER MULTIPLIED BY THE PROJECTION',
+  Math.round(elected.totalIncome) === rightShape);
+
+ok('...and it is NOT what the obvious implementation would have produced',
+  Math.round(elected.totalIncome) !== wrongShape);
 
 ok('a man who has not elected keeps his own costs, projected the ordinary way',
-  Math.round(notElected.totalIncome) === Math.round((5000 - 100) * 4));
+  Math.round(notElected.totalIncome) === Math.round((5000 - 100) * taFactor));
 
 ok('electing lowers what he sets aside here, which is the point of the choice',
   elected.setAside < notElected.setAside);
@@ -194,7 +203,7 @@ ok('electing lowers what he sets aside here, which is the point of the choice',
 // 5. IT REPLACES, IT DOES NOT JOIN. The mileage and the use of home go with the expenses.
 // ---------------------------------------------------------------------------------------------
 const withEverything = {
-  monthsElapsed: 6, ytdTradeIncome: 20000, ytdTradeExpenses: 4000, ytdCisSuffered: 0,
+  monthsElapsed: 6, daysElapsed: 184, ytdTradeIncome: 20000, ytdTradeExpenses: 4000, ytdCisSuffered: 0,
   ytdMileage: 900, ytdHomeOffice: 156, ytdHomeOfficeLogged: 0,
 };
 const ledgerNormal = L.ledgerFor(withEverything);

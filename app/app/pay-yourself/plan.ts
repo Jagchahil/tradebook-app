@@ -15,7 +15,9 @@
 // app/app/tax/due.ts is attacked.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-import { taxPosition, setAsideBasisLine, type OptimiserInput } from '../../../lib/taxoptimiser';
+import {
+  taxPosition, setAsideBasisLine, projectionFactor, projectedTradeNetOf, type OptimiserInput,
+} from '../../../lib/taxoptimiser';
 import { payYourself, salaryRungs, type PayPlan } from '../../../lib/payyourself';
 import { computePosition, type BusinessType } from '../../../lib/position';
 
@@ -95,10 +97,26 @@ export function payModel(structure: BusinessType, optimiser: OptimiserInput): Pa
 
   // The monthly figures only exist once the engine itself is willing to project the year. Before
   // that the page says the year is too young, which is the truth, instead of a confident number.
-  const months = Math.max(0, Math.floor(optimiser.monthsElapsed));
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 BOTH SIDES OF THIS COMPARISON ARE AN ANNUAL FIGURE OVER TWELVE, AND THEY DID NOT USED TO BE.
+  //
+  // It read `tradeNet / Math.floor(monthsElapsed)`: his YEAR TO DATE profit over whole elapsed
+  // months, held up against `setAside / 12`, which is a PROJECTED ANNUAL tax over twelve. Two
+  // different shapes on one line, and the man reads the difference and takes it out of the bank.
+  //
+  // ⚠️ AND THE DIVISOR WAS THE 2 AUGUST BUG POINTED THE OTHER WAY. floor(118 / 30.44) is 3, so a
+  // man 118 days in had his profit divided by 3 instead of 3.88, and the page invited him to draw
+  // about £1,000 a month MORE than he had made. The set aside erring high is money he cannot
+  // spend; this erring high is money he has already spent.
+  //
+  // Both sides now come off the same projection, through the same two functions the engine uses,
+  // so they cannot drift apart again.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const { canProject, factor } = projectionFactor(optimiser);
   let monthly: MonthlyDraw | null = null;
-  if (tax.projected && months > 0) {
-    const profit = Math.round(tradeNet / months);
+  if (tax.projected && canProject) {
+    const profit = Math.round(projectedTradeNetOf(optimiser, factor) / 12);
     const keepBack = Math.round(tax.setAside / 12);
     monthly = {
       profit,

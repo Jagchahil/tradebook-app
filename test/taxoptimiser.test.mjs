@@ -37,7 +37,7 @@ const ok = (name, cond) => { if (cond) { pass++; console.log(`  PASS  ${name}`);
 const find = (list, key) => list.find((o) => o.key === key);
 
 const base = {
-  startYear: 2026, monthsElapsed: 12,
+  startYear: 2026, monthsElapsed: 12, daysElapsed: 365,
   ytdTradeIncome: 0, ytdTradeExpenses: 0, ytdCisSuffered: 0,
   employmentIncome: 0, categoriesLogged: [], homeOfficeClaimed: true, mileageClaimed: true, purchaseGoal: null,
 };
@@ -181,7 +181,7 @@ const near = (a, b) => Math.abs(a - b) <= 0.01;
   ok('savings and dividends flow into the whole tax', near(full.incomeTax.savings, 400) && near(full.incomeTax.dividends, 893.75));
 
   // Early in the year it is a projection, and it says so rather than pretending to be a final figure.
-  const early = O.taxPosition({ ...base, monthsElapsed: 1, ytdTradeIncome: 3000, ytdTradeExpenses: 0 });
+  const early = O.taxPosition({ ...base, monthsElapsed: 1, daysElapsed: 31, ytdTradeIncome: 3000, ytdTradeExpenses: 0 });
   ok('early in the year the whole tax is flagged as a projection', early.projected === false);
 }
 
@@ -402,9 +402,13 @@ console.log('\n=== 🔴 HIS RENT WAS MISSING FROM THE INCOME THAT DECIDES HIS RA
   // double the rent exactly as they double the trade, or the two describe different men.
   ok('🔴 AND IT IS THE NET RENT, PROJECTED THE SAME WAY THE TRADE IS, so the two functions agree',
     (() => {
-      const half = { ...withRent, monthsElapsed: 6 };
+      // ⚠️ `* 2` WAS THE ENGINE'S OWN RULE COPIED IN. Half a year is 184 days, not exactly a half,
+      // so the factor comes from the engine now and the SHAPE is what is defended: the net rent is
+      // scaled by the same number the trade is, or the two functions describe different men.
+      const half = { ...withRent, monthsElapsed: 6, daysElapsed: 184 };
+      const f = O.projectionFactor(half).factor;
       const projected = O.taxPosition(half).totalIncome;
-      return projected === (30000 + 35000) * 2
+      return Math.round(projected) === Math.round((30000 + 35000) * f)
         && find(O.findOptimisations(half), 'aia_timing').estSaving === 10000 * O.marginalRate(projected);
     })());
   ok('a man with no property is unchanged, to the byte',
@@ -476,6 +480,48 @@ console.log('\n=== 🔴 A DIRECTOR WAS BEING CHARGED INCOME TAX AND CLASS 4 ON H
     !/[–—−]/.test(O.setAsideBasisLine({ ...shape, businessType: 'limited_company' }, asCompany)));
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE PROJECTION IS BY DAYS, NOT BY WHOLE MONTHS, AND GETTING THAT WRONG WAS A 51% ERROR
+// ON THE LARGEST NUMBER IN THE PRODUCT.
+//
+// Until 2 August taxPosition projected with `12 / monthsElapsed`, and monthsElapsed was
+// `floor(days / 30.44)`. So the numerator was real money over real days and the denominator
+// asserted whole 30.44 day months. On 2 August 2026 that divided 118 days of money by 91.3.
+//
+// The live account read "put by for tax £25,793" against a true figure near £17,100, and because
+// the divisor is a step function it FELL TO £16,228 on 5 August with nothing changed in the books.
+// At the very end of the year it is worst in a different way: floor(364/30.44) is 11, so the
+// divisor never reaches 12 and the engine inflates a FINISHED year by 9.09%.
+//
+// ⚠️ lib/agent.ts:268 projectAnnual() had always divided by DAYS. Two projections, one codebase,
+// £21,244 apart for the same man on the same day. This section pins the survivor.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 🔴 the projection is by DAYS ===\n');
+
+const audi = {
+  ...base,
+  ytdTradeIncome: 33579.60, ytdTradeExpenses: 10804, ytdCapitalAllowances: 2758,
+  homeOfficeClaimed: false, mileageClaimed: false,
+};
+const at = (months, days) => O.taxPosition({ ...audi, monthsElapsed: months, daysElapsed: days });
+
+ok('🔴 A FINISHED YEAR IS NOT PROJECTED AT ALL. 364 days must not inflate a done year by 9%',
+  Math.abs(at(11, 364).setAside - at(12, 365).setAside) < 60);
+
+const before = at(3, 121).setAside;
+const after = at(4, 123).setAside;
+ok('🔴 NO CLIFF AT A MONTH TICK. four days apart must not move the set aside by over 5%',
+  before > 0 && Math.abs(after - before) / before < 0.05);
+ok('the set aside still falls as the year runs on, it does not rise', after <= before);
+
+const projected = O.projectedTradeNetOf({ ...audi, monthsElapsed: 3, daysElapsed: 118 }, 365 / 118);
+ok('the projected trade net is ytd scaled by DAYS elapsed, then the annual allowance once',
+  Math.abs(projected - (((33579.60 - 10804) * (365 / 118)) - 2758)) < 1);
+ok('⚠️ THE CAPITAL ALLOWANCE IS STILL ANNUAL, it is not multiplied up by the projection',
+  Math.abs((projected + 2758) - ((33579.60 - 10804) * (365 / 118))) < 1);
+ok('⚠️ THE CONFIDENCE GATE HOLDS. under three months nothing is projected',
+  at(2, 60).projected === false);
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

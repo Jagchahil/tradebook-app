@@ -26,6 +26,20 @@ import { studentLoanForSA, type StudentPlan } from './nistudentloan';
 export interface OptimiserInput {
   startYear: number;
   monthsElapsed: number; // full months into the tax year, for projection confidence
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 DAYS INTO THE TAX YEAR. REQUIRED, AND REQUIRED ON PURPOSE.
+  //
+  // This is the DIVISOR for every projection in this file. monthsElapsed above is the confidence
+  // GATE and nothing else, because it is floor(days / 30.44) and dividing real days of money by
+  // whole months over-stated the largest number in this product by 51% on 2 August 2026.
+  //
+  // ⚠️ IT IS NOT OPTIONAL WITH A FALLBACK, and that is the point. An optional field defaulting to
+  // the old shape would keep the bug alive for every caller who did not get the memo, which is
+  // exactly how this codebase writes its own bugs. Required means tsc names every call site that
+  // forgets, the same way lib/gate.ts fails the build on a route it has never heard of.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  daysElapsed: number;
   ytdTradeIncome: number;
   ytdTradeExpenses: number;
   ytdCisSuffered: number;
@@ -261,14 +275,55 @@ function capitalAllowanceOf(input: OptimiserInput): number {
 // his set aside priced on the election and every lever underneath priced on his real costs.
 //
 // THE ORDER, and it is the whole of the correctness here:
-//   1. project the YEAR TO DATE money by 12/months, because that is money and it accrues;
+//   1. project the YEAR TO DATE money by the DAY based factor, because that is money and it accrues;
 //   2. THEN take the flat ANNUAL allowances off once, because they do not.
 //
 // Getting that backwards gives a man in month three four times the trading allowance and four
 // times the writing down allowance on his car. Both mistakes point the same way: at him, in a
 // letter from HMRC, two years later.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-function projectedTradeNetOf(input: OptimiserInput, factor: number): number {
+
+// 6 April to 5 April. A leap day falls inside one year in four and makes it 366, which moves a
+// projection by 0.27%. That is noise against the 29% this constant exists to stop, and a second
+// field to carry it would be a fact for every caller to get right again.
+const DAYS_IN_TAX_YEAR = 365;
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE PROJECTION FACTOR, IN ONE PLACE, BECAUSE IT WAS IN TWO AND BOTH WERE WRONG.
+//
+// It used to read `12 / monthsElapsed`, inline, in taxPosition AND in findOptimisations. And
+// monthsElapsed is floor(days / 30.44), so the numerator was real money over real DAYS and the
+// denominator asserted whole 30.44 day MONTHS. On 2 August 2026 that divided 118 days of money by
+// 91.3, and the live account read "put by for tax £25,793" against a true figure near £17,100.
+// He was being told to tie up £8,700 he did not owe, on the number printed in the largest type in
+// this product.
+//
+// ⚠️ AND IT WAS A STEP FUNCTION, so the same books re-priced themselves overnight: £25,793 on the
+// 5th of August and £16,228 on the 6th, with nothing changed. At the other end floor(364/30.44)
+// is 11, so the divisor NEVER reached 12 and a FINISHED year was still inflated by 9.09%.
+//
+// 🔴 lib/agent.ts:268 projectAnnual() had divided by DAYS all along, so two projections in one
+// codebase disagreed by £21,244 for the same man on the same day, and the app headline was the
+// wrong one. Anything that projects reads this function now.
+//
+// monthsElapsed survives, and only as the CONFIDENCE GATE it always should have been: three
+// months of real figures before we are willing to call anything a year. It is not a divisor.
+//
+// ⚠️ A DAY COUNT WE CANNOT USE MEANS WE DO NOT PROJECT, rather than that we guess. canProject
+// goes out false, every surface says so, and he sees an honest year to date figure. That is a
+// smaller failure than multiplying his money by a number we do not trust.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function projectionFactor(input: OptimiserInput): { canProject: boolean; factor: number } {
+  const rawDays = Math.floor(Number(input.daysElapsed));
+  // Clamped at the length of the year, so a clock that is ahead of itself can never project DOWN.
+  const usableDays = Number.isFinite(rawDays) && rawDays > 0
+    ? Math.min(DAYS_IN_TAX_YEAR, rawDays)
+    : 0;
+  const canProject = input.monthsElapsed >= 3 && usableDays > 0;
+  return { canProject, factor: canProject ? DAYS_IN_TAX_YEAR / usableDays : 1 };
+}
+
+export function projectedTradeNetOf(input: OptimiserInput, factor: number): number {
   const projected = input.tradingAllowanceElected
     ? Math.max(0, (Math.max(0, input.ytdTradeIncome) * factor) - FACTS.tradingAllowance)
     : tradeNetOf(input) * factor;
@@ -295,8 +350,7 @@ export function taxPosition(
   // number the app prints in its largest type. tradeNetOf() applies it, once, by the rule above.
   // His set aside FALLS, which is the correct direction: it is a deduction he is entitled to and
   // was already being shown on his ledger.
-  const canProject = input.monthsElapsed >= 3;
-  const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
+  const { canProject, factor } = projectionFactor(input);
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 THE TRADING ALLOWANCE LANDS AFTER THE PROJECTION, AND GETTING THAT BACKWARDS WOULD HAVE
@@ -540,8 +594,9 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   // The same trade profit taxPosition() works from, use of home applied once. Two functions in one
   // file that disagree about one man's profit is how this file's own bugs get written.
   const tradeNet = tradeNetOf(input);
-  const canProject = input.monthsElapsed >= 3;
-  const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
+  // Only the factor here. findOptimisations prices levers off the projection but never has to
+  // TELL him it is a projection, which is taxPosition's job and where canProject goes out.
+  const { factor } = projectionFactor(input);
   // THE SAME PROJECTION taxPosition() USES, and it did not used to be. See projectedTradeNetOf():
   // this line read `tradeNet * factor`, which ignored both annual allowances, so a man who elected
   // the trading allowance had his set aside priced one way and every lever below priced another.

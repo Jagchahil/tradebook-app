@@ -161,7 +161,7 @@ const P = await import(pathToFileURL(path.join(stage, 'payyourself.ts')).href);
 // A plain half year: £30,000 in, £6,000 out, six months gone, no other income.
 const fx = (over = {}) => ({
   startYear: 2026,
-  monthsElapsed: 6,
+  monthsElapsed: 6, daysElapsed: 184,
   ytdTradeIncome: 30000,
   ytdTradeExpenses: 6000,
   ytdCisSuffered: 0,
@@ -180,7 +180,14 @@ const fx = (over = {}) => ({
   ok('sole trader: the confirmed profit is income minus costs', m.tradeNet === 24000);
   ok('🔴 SOLE TRADER: THE SET ASIDE IS taxPosition\'S OWN FIGURE, TO THE POUND',
     m.setAside === tax.setAside && m.projected === tax.projected);
-  ok('sole trader: monthly profit is the confirmed run rate', m.monthly && m.monthly.profit === 4000);
+  // ⚠️ THIS READ `=== 4000`, WHICH WAS year-to-date profit over WHOLE months, and it is not the
+  // shape this tile carries any more. Both tiles are now a PROJECTED ANNUAL figure over twelve, so
+  // profit and keep back are the same kind of number and the subtraction between them means
+  // something. See the block in app/app/pay-yourself/plan.ts: the old divisor invited a man 118
+  // days in to draw about £1,000 a month more than he had made.
+  const expectedMonthly = Math.round(T.projectedTradeNetOf(fx(), T.projectionFactor(fx()).factor) / 12);
+  ok('sole trader: monthly profit is one twelfth of the projected year, the same shape as the keep back',
+    m.monthly && m.monthly.profit === expectedMonthly);
   ok('sole trader: the keep back is one twelfth of the engine\'s set aside',
     m.monthly && m.monthly.keepBack === Math.round(tax.setAside / 12));
   ok('sole trader: the three tiles reconcile to the pound, draw = profit minus keep back',

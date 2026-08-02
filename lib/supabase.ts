@@ -4094,6 +4094,12 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   const start = new Date(`${taxYearStart}T00:00:00Z`);
   const monthsElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (30.44 * 86400000)));
 
+  // 🔴 DAYS, AND IT IS THE DIVISOR. monthsElapsed above is floor(days / 30.44) and is now ONLY the
+  // confidence gate. Dividing real days of money by whole months over-stated the set aside by 51%
+  // on 2 August 2026 and made it fall by a third overnight at each month tick. See
+  // projectionFactor() in lib/taxoptimiser.ts, which is the one place that turns this into a rate.
+  const daysElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86400000));
+
   // The use of home election for THIS tax year. Best effort: a read that fails is logged and treated
   // as no election, so the optimiser keeps reminding him rather than silently dropping a claim.
   const election = await readAllowanceElection(userId, 'use_of_home', startYear).catch((e) => {
@@ -4126,6 +4132,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   return {
     startYear,
     monthsElapsed,
+    daysElapsed,
     ytdTradeIncome: Math.round(ytdTradeIncome * 100) / 100,
     ytdTradeExpenses: Math.round(ytdTradeExpenses * 100) / 100,
     ytdCapitalAllowances: Math.round(ytdCapitalAllowances * 100) / 100,

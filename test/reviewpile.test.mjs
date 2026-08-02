@@ -17,11 +17,20 @@ import pathStage from 'node:path';
 
 const libStage = pathStage.join(pathStage.resolve(pathStage.dirname(fileURLToPathStage(import.meta.url)), '..'), 'lib');
 const stageDir = mkdtempSync(pathStage.join(tmpdirStage(), 'reviewpile-'));
-writeStage(pathStage.join(stageDir, 'personal.ts'), readStage(pathStage.join(libStage, 'personal.ts'), 'utf8'));
-writeStage(
-  pathStage.join(stageDir, 'reviewpile.ts'),
-  readStage(pathStage.join(libStage, 'reviewpile.ts'), 'utf8').replace("from './personal'", "from './personal.ts'"),
-);
+// ⚠️ THE LIST USED TO BE ONE FILE AND THE REWRITE USED TO NAME IT. lib/reviewpile.ts grew a second
+// import (lib/capital.ts, for the rule that a payment big enough to be a vehicle never goes down
+// the one tap path) and this suite failed on a module resolution error rather than on anything it
+// was written to protect. A staging list that has to be edited every time the file under test gains
+// an import is a test that breaks for reasons unrelated to its subject. So: every file in the
+// chain, and a regex that gives ALL of them their extension back.
+const CHAIN = ['reviewpile', 'personal', 'capital', 'taxengine', 'money'];
+for (const name of CHAIN) {
+  writeStage(
+    pathStage.join(stageDir, `${name}.ts`),
+    readStage(pathStage.join(libStage, `${name}.ts`), 'utf8')
+      .replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'"),
+  );
+}
 const { buildPile: build, canBulkConfirm, summarisePile, partitionPile, bulkConfirmPlan, readAccountUse, MERCHANT_SETTLES } = await import(pathToFileURL(pathStage.join(stageDir, 'reviewpile.ts')).href);
 // The REAL normaliser, not a stand-in. If normaliseVendor ever changes how it collapses shop
 // names, these tests feel it, which is the whole reason it is injected rather than copied.

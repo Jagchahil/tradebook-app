@@ -5,6 +5,7 @@ import { SESSION_COOKIE } from '../../../../lib/websession';
 import { UNRECOGNISED_LINE, bankNameFor } from '../../../../lib/statementimport';
 import { gateForUser } from '../../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../../lib/gate';
+import { controlCopy } from '../../../../lib/control';
 import {
   A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE,
 } from '../../../../lib/tokens';
@@ -96,6 +97,9 @@ export default async function ImportPage({
 
   const payments = (n: number) => (n === 1 ? 'one payment' : `${n} payments`);
 
+  // lib/control.ts owns every word. See the block below the upload heading for why it is here.
+  const control = controlCopy();
+
   return (
     <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
@@ -160,10 +164,25 @@ export default async function ImportPage({
             row by row. No bank connection, nothing to sign up for.
           </p>
           <p style={S.sub}>
-            Every payment lands waiting for your yes, and none of it counts in your figures until
-            you give it. Upload the same statement twice, or overlapping months, and nothing
-            doubles up.
+            Upload the same statement twice, or overlapping months, and nothing doubles up.
           </p>
+
+          {/* ═══════════════════════════════════════════════════════════════════════════════
+              🔴 THE CONTROL DOCTRINE, SAID OUT LOUD, ON THE SCREEN WHERE IT IS THE POINT.
+              Jag, 2 August 2026: the philosophy is giving him back the control a bank
+              connection takes away. The app has always behaved this way and never once said
+              so, and a man cannot value a thing nobody told him he had. The line that used to
+              sit above ("every payment lands waiting for your yes") said the mechanism and not
+              the reason, so it has been folded into the block below rather than repeated.
+              ⚠️ AND THE INCOME SENTENCE IS PART OF THE BLOCK, NOT A FOOTNOTE UNDER IT. See
+              lib/control.ts: "you decide what goes in", alone, on a page about a bank
+              statement, reads as an offer to leave a few payments out. It is not one. ═══ */}
+          <section style={S.control}>
+            <p style={S.controlTitle}>{control.title}</p>
+            <p style={S.controlBody}>{control.why}</p>
+            <p style={S.controlBody}>{control.costs}</p>
+            <p style={S.controlBody}>{control.income}</p>
+          </section>
 
           <form action="/api/money/import" method="post" encType="multipart/form-data">
             {/* The accept attribute is a courtesy to the file picker. The route holds the real
@@ -214,6 +233,11 @@ const S: Record<string, React.CSSProperties> = {
   lead: { fontSize: TYPE.strong, lineHeight: 1.5, fontWeight: 700, margin: '0 0 8px' },
   sub: { fontSize: TYPE.body, lineHeight: 1.6, color: MUTED, margin: '0 0 14px' },
   small: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '14px 0 0' },
+  // Panelled rather than loose prose, because it is a statement about how the product treats him
+  // and not another instruction about CSV files. He should be able to see where it starts and stops.
+  control: { background: SURFACE, border: `1px solid ${LINE}`, borderRadius: RADIUS.md, padding: '14px 16px', margin: '0 0 16px' },
+  controlTitle: { fontSize: TYPE.body, lineHeight: 1.5, fontWeight: 800, color: INK, margin: '0 0 8px' },
+  controlBody: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, margin: '0 0 8px' },
 
   label: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, margin: '4px 0 6px' },
 };

@@ -9,6 +9,7 @@ import { household, notHousehold, mtdQuestions, progressIn, openQuestionsLead } 
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
+import { capitalOptions, capitalQuestion, capitalWhy, shouldAskCapital } from '../../../lib/capital';
 import { gbp0, gbp2 } from '../../../lib/money';
 import { bankFeedOffered } from '../../../lib/bankfeed';
 import { gateForUser } from '../../../lib/gateserver';
@@ -66,6 +67,12 @@ function message(code: string | undefined, n: string | undefined): string | null
     // 14 is how a man ends up with three transactions he believes are filed.
     case 'partial':
       return 'Some of those were left alone, because they look like they might not be business money. Have a look at them on their own.';
+    // 🔴 THE ONE FAILURE THAT REFUSES TO FILE RATHER THAN FILING WRONGLY. See setCapitalKind in
+    // lib/supabase.ts: recording that a purchase was a car has to land BEFORE the row is confirmed,
+    // because a confirmed car with its answer lost is a £60,000 deduction. So nothing was filed,
+    // the row is still here, and he is told plainly rather than being shown a success he did not get.
+    case 'carfailed':
+      return 'We could not save what that purchase was, so we have not filed it. It is still here. Please try again in a moment.';
     // 🔴 MONEY IN GETS ITS OWN WORDS, because "filed" says nothing about which side of his books it
     // landed on, and the whole point of the income section is that a payment in is not a cost.
     case 'incomefiled':
@@ -518,6 +525,32 @@ export default async function PilePage({
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
+
+                {/* ═══════════════════════════════════════════════════════════════════════════
+                    🔴 THE ONE QUESTION THAT WAS WORTH £52,000 AND WAS NOT BEING ASKED.
+                    AUDI LEEDS, £60,000, one line on a real Monzo export. It went through this
+                    exact form, was filed under a category, and came off his profit in full.
+                    GOV.UK: "Cars do not qualify for: annual investment allowance (AIA)."
+                    Year one on that car is about £3,600, not £60,000.
+                    ⚠️ ONE PAYMENT, OVER £1,000, AND DEFAULTED TO "Not a car". lib/capital.ts
+                    shouldAskCapital() owns both halves of that and the reason for each. On the
+                    ten or twenty rows a year it draws on, the man whose £1,400 was a materials
+                    order presses the button he was pressing anyway and nothing changes for him.
+                    ⚠️ AND ANSWERING "a car" DOES NOT FILE IT. /api/pile sends him to
+                    /app/pile/car, because the business use share is CAA 2001 s205 and assuming
+                    100% would be the same over claim in a quieter voice. ══════════════════ */}
+                {shouldAskCapital(g.total, g.count) && (
+                  <>
+                    <label htmlFor={`cap-${g.key}`} style={S.capLabel}>{capitalQuestion()}</label>
+                    <select id={`cap-${g.key}`} name="capital_kind" defaultValue="not_a_car" className="lek-select">
+                      {capitalOptions().map((o) => (
+                        <option key={o.kind} value={o.kind}>{o.label}</option>
+                      ))}
+                    </select>
+                    <p style={S.meta}>{capitalWhy()}</p>
+                  </>
+                )}
+
                 <button type="submit" className="lek-ghost">
                   File {g.count === 1 ? 'it' : `all ${g.count}`}
                 </button>
@@ -651,6 +684,9 @@ const S: Record<string, React.CSSProperties> = {
   // The input tax line. Quieter than a reason and louder than the meta, because it is a fact
   // about the rules rather than a question or a refusal.
   vatNote: { fontSize: TYPE.note, lineHeight: 1.55, color: INK, margin: '8px 0 0' },
+  // The car question sits under the category select inside the same form, so it needs the top
+  // margin the first label does not.
+  capLabel: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, margin: '14px 0 6px' },
   form: { margin: '14px 0 0' },
   formTight: { margin: '10px 0 0' },
   label: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, marginBottom: 6 },

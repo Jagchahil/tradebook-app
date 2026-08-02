@@ -47,6 +47,30 @@ export interface OptimiserInput {
   // flat rate with one flat figure (GOV.UK: "You cannot deduct any other expenses or allowances if
   // you claim the allowances"), which is why it cannot simply be another field in tradeNetOf.
   tradingAllowanceElected?: boolean;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE CAPITAL ALLOWANCE ON A VEHICLE HE TOLD US ABOUT. NOT A SLICE OF ytdTradeExpenses.
+  // THE OPPOSITE OF ONE.
+  //
+  // ytdMileage and ytdHomeOfficeLogged are both slices: the money is inside ytdTradeExpenses and
+  // they name a part of it. This field is the reverse, and reading it as a slice would be the
+  // £52,000 error again pointed the other way. When a man tells the pile a payment was a car,
+  // getOptimiserInput takes the WHOLE COST OUT of ytdTradeExpenses and puts the allowance here.
+  //
+  // GOV.UK, claim capital allowances, business cars: "Cars do not qualify for: annual investment
+  // allowance (AIA)." A £60,000 car is not a £60,000 deduction. It is about £3,600 in year one,
+  // and lib/capital.ts capitalRelief() is the one place that works out which.
+  //
+  // ⚠️ IT IS ANNUAL, LIKE THE TRADING ALLOWANCE, AND IT IS SUBTRACTED AFTER THE PROJECTION.
+  // The writing down allowance for a tax year is one figure whether he is three months in or
+  // eleven. Putting it inside tradeNetOf, where the use of home sits, would multiply it by
+  // 12/months and hand a man in month three four times the relief the law allows. See
+  // projectedTradeNetOf() below, which is the ONE place either annual allowance is applied.
+  //
+  // Optional, defaulting to 0, so every caller written before it existed is unchanged to the penny.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  ytdCapitalAllowances?: number;
+
   // The £ of use of home he has actually accrued this year, from his election. Realised, never
   // projected: lib/elections.ts useOfHomeToDate() counts only months that have happened. Default 0
   // means no election, which is what a man who has never been asked has.
@@ -193,6 +217,41 @@ function tradeNetOf(input: OptimiserInput): number {
   return Math.max(0, input.ytdTradeIncome - (input.ytdTradeExpenses - home.logged) - home.deduction);
 }
 
+// The vehicle allowance he is entitled to this year, or nothing.
+//
+// ⚠️ NOTHING IF HE ELECTED THE TRADING ALLOWANCE, and that is not a simplification. GOV.UK: "You
+// cannot deduct any other expenses or allowances if you claim the allowances." A capital allowance
+// is an allowance. A man who elected and also claimed the writing down allowance on his car would
+// be claiming twice, which is the one direction this codebase must never make easy.
+function capitalAllowanceOf(input: OptimiserInput): number {
+  if (input.tradingAllowanceElected) return 0;
+  const a = input.ytdCapitalAllowances ?? 0;
+  return Number.isFinite(a) && a > 0 ? a : 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 ONE PROJECTION, SHARED, BECAUSE THIS FILE ALREADY HAD TWO AND THEY ALREADY DISAGREED.
+//
+// tradeNetOf's comment says two functions in one file that disagree about one man's profit is how
+// this file's own bugs get written. It was already true when it was written: taxPosition applied
+// the trading allowance to its projection and findOptimisations did not, so a man who elected had
+// his set aside priced on the election and every lever underneath priced on his real costs.
+//
+// THE ORDER, and it is the whole of the correctness here:
+//   1. project the YEAR TO DATE money by 12/months, because that is money and it accrues;
+//   2. THEN take the flat ANNUAL allowances off once, because they do not.
+//
+// Getting that backwards gives a man in month three four times the trading allowance and four
+// times the writing down allowance on his car. Both mistakes point the same way: at him, in a
+// letter from HMRC, two years later.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+function projectedTradeNetOf(input: OptimiserInput, factor: number): number {
+  const projected = input.tradingAllowanceElected
+    ? Math.max(0, (Math.max(0, input.ytdTradeIncome) * factor) - FACTS.tradingAllowance)
+    : tradeNetOf(input) * factor;
+  return Math.max(0, projected - capitalAllowanceOf(input));
+}
+
 // HIS WHOLE TAX, not just his trade. The figure an accountant puts at the bottom of the return:
 // income tax across employment, self-employment, property, savings and dividends, stacked in the
 // legal order (lib/personalincome.ts), plus Class 4 NIC on the trade. Projected to the full year the
@@ -213,7 +272,6 @@ export function taxPosition(
   // number the app prints in its largest type. tradeNetOf() applies it, once, by the rule above.
   // His set aside FALLS, which is the correct direction: it is a deduction he is entitled to and
   // was already being shown on his ledger.
-  const tradeNet = tradeNetOf(input);
   const canProject = input.monthsElapsed >= 3;
   const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
 
@@ -234,9 +292,11 @@ export function taxPosition(
   // ⚠️ AND HIS COSTS DROP OUT ENTIRELY WHEN HE HAS ELECTED, which is the whole meaning of the
   // election and the reason lib/elections.ts refuses to offer it without both totals side by side.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
-  const projTradeNet = input.tradingAllowanceElected
-    ? Math.max(0, (Math.max(0, input.ytdTradeIncome) * factor) - FACTS.tradingAllowance)
-    : tradeNet * factor;
+  //
+  // ⚠️ AND THE VEHICLE ALLOWANCE IS THE SAME SHAPE AND COMES OFF IN THE SAME PLACE. See
+  // OptimiserInput.ytdCapitalAllowances: the car's COST has already been taken out of
+  // ytdTradeExpenses upstream, so this line is what replaces it, once, on the annual figure.
+  const projTradeNet = projectedTradeNetOf(input, factor);
   const propertyNet = Math.max(0, (input.ytdPropertyIncome ?? 0) - (input.ytdPropertyExpenses ?? 0)) * factor;
   const employment = Math.max(0, input.employmentIncome);
 
@@ -459,7 +519,10 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   const tradeNet = tradeNetOf(input);
   const canProject = input.monthsElapsed >= 3;
   const factor = canProject ? 12 / Math.max(1, input.monthsElapsed) : 1;
-  const projTradeNet = tradeNet * factor;
+  // THE SAME PROJECTION taxPosition() USES, and it did not used to be. See projectedTradeNetOf():
+  // this line read `tradeNet * factor`, which ignored both annual allowances, so a man who elected
+  // the trading allowance had his set aside priced one way and every lever below priced another.
+  const projTradeNet = projectedTradeNetOf(input, factor);
   const propIncome = Math.max(0, input.ytdPropertyIncome ?? 0);
   const propExpenses = Math.max(0, input.ytdPropertyExpenses ?? 0);
   // 🔴 AND HIS RENT IS IN IT. His projected income across every stream we know about. Employment was
@@ -561,6 +624,13 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
 
   // 6. A CIS refund building. Pure information, no action, but a big reassurance
   //    for subbies who overpay through the year.
+  //
+  // ⚠️ tradeNet HERE, NOT projTradeNet, AND DELIBERATELY WITHOUT THE ANNUAL ALLOWANCES. This is
+  // the one figure in this function about money that has ACTUALLY happened, and the trading
+  // allowance and the writing down allowance are both whole-year figures. Taking a full year of
+  // allowance off three months of profit would shrink the tax owed so far and inflate a refund we
+  // are telling him to expect. Leaving them out understates the refund, which is the only
+  // direction a number this file promises him is allowed to be wrong in.
   const taxDue = soleTraderTax(tradeNet).total;
   // CIS pays off the student loan too. See the note in lib/agent.ts.
   const slDue =

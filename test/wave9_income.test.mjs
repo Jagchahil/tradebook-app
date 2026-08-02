@@ -30,11 +30,15 @@ const read = (p) => readFileSync(path.join(root, p), 'utf8');
 // test/reviewpile.test.mjs, which explains it at length.
 const lib = path.join(root, 'lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'wave9income-'));
-writeFileSync(path.join(stage, 'personal.ts'), read('lib/personal.ts'));
-writeFileSync(
-  path.join(stage, 'reviewpile.ts'),
-  read('lib/reviewpile.ts').replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'"),
-);
+// Every file lib/reviewpile.ts reaches, not just the first one it grew. See the note in
+// test/reviewpile.test.mjs: capital.ts arrived on 2 August 2026 and both suites failed on module
+// resolution rather than on the pile behaviour they exist to protect.
+for (const name of ['reviewpile', 'personal', 'capital', 'taxengine', 'money']) {
+  writeFileSync(
+    path.join(stage, `${name}.ts`),
+    read(`lib/${name}.ts`).replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'"),
+  );
+}
 void lib;
 const R = await import(pathToFileURL(path.join(stage, 'reviewpile.ts')).href);
 const { buildPile, partitionPile, waitingCount, summarisePile } = R;

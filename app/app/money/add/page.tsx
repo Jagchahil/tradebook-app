@@ -8,6 +8,7 @@ import { CATEGORIES } from '../../../../lib/categories';
 import { isMonthKey } from '../../../../lib/moneylog';
 import { gateForUser } from '../../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../../lib/gate';
+import { controlChoice } from '../../../../lib/control';
 import {
   A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE,
 } from '../../../../lib/tokens';
@@ -104,6 +105,9 @@ export default async function AddEntryPage({
   floor.setFullYear(floor.getFullYear() - 2);
   const oldest = floor.toISOString().slice(0, 10);
 
+  // lib/control.ts, as a pair. See the block above the first field.
+  const choice = controlChoice();
+
   return (
     <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
@@ -137,6 +141,17 @@ export default async function AddEntryPage({
             Cash never reaches your bank, so it never reaches me. Put it down here and it is in
             your books like everything else.
           </p>
+
+          {/* 🔴 WHICH WAY EACH KIND OF MONEY CUTS, SAID TO HIM RATHER THAN TO THE NEXT DEVELOPER.
+              The header of this file has asserted since it was written that understating income is
+              "the one direction of error this product must never make easy". That sentence was
+              addressed to whoever opened the source next. HE never read it, and he is the one
+              deciding what to type. lib/control.ts owns the words; the title and the bank
+              connection framing stay on the upload screen, because they are about a choice he made
+              before he got here. ⚠️ The two sentences arrive as a pair from controlChoice() and
+              cannot be split: "what you claim is yours to decide", alone, is a different product. */}
+          <p style={S.control}>{choice.costs}</p>
+          <p style={S.control}>{choice.income}</p>
 
           <form action="/api/money/manual" method="post">
             <fieldset style={S.fieldset}>
@@ -266,6 +281,9 @@ const S: Record<string, React.CSSProperties> = {
   lockedBtn: { background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.md, fontFamily: FONT, fontSize: TYPE.body, fontWeight: 800, padding: '11px 18px', cursor: 'pointer' },
 
   sub: { fontSize: TYPE.body, lineHeight: 1.55, color: MUTED, margin: '0 0 4px' },
+  // Quieter than the lead and darker than the muted sub: it is a fact about how his figures work,
+  // not an instruction and not an aside he can skip.
+  control: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, margin: '10px 0 0' },
 
   fieldset: { border: 'none', margin: 0, padding: 0 },
   radioRow: { display: 'flex', gap: 10, alignItems: 'flex-start', background: SURFACE, borderRadius: RADIUS.md, padding: '11px 12px', marginBottom: 8, cursor: 'pointer' },

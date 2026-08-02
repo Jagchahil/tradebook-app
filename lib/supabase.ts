@@ -31,6 +31,7 @@ import { refreshFacts, resolveOverrides, isOverridableKey, isInBounds, type Fact
 import { advanceStage, normaliseWhatsapp, isContactStage, isCheckoutStage, isEventKind, type ContactStage, type CheckoutStage, type EventKind } from './crm';
 import { sicByCode } from './siccodes';
 import { useOfHomeToDate } from './elections';
+import { capitalRelief, isCapitalKind } from './capital';
 import { fromLegacyKind, toLegacyKind, isGoalKind, type LegacyGoalKind } from './goals';
 import { weekTotals, windowStart, type WeekRow } from './weekchart';
 import { isMonthKey, monthStart, monthEnd } from './moneylog';
@@ -3802,6 +3803,12 @@ export interface PackRow {
   transaction_date: string;
   cis_deduction: number | null;
   income_type: string | null;
+  // 🔴 WHAT HE SAID THIS PURCHASE WAS, IF HE WAS EVER ASKED. Null means nobody asked, which is
+  // every row written before 2 August 2026 and every payment under lib/capital.ts
+  // CAPITAL_QUESTION_FROM. A null row is an ordinary cost and behaves exactly as it always has;
+  // nothing is reinterpreted retrospectively. See supabase/APPLY_2026-08-02_capital_kind.sql.
+  capital_kind: string | null;
+  business_use_pct: number | null;
 }
 
 export async function getConfirmedTransactionsForRange(
@@ -3815,7 +3822,7 @@ export async function getConfirmedTransactionsForRange(
       `&confirmed=eq.true&is_personal=eq.false` +
       `&transaction_date=gte.${encodeURIComponent(startISO)}` +
       `&transaction_date=lte.${encodeURIComponent(endISO)}` +
-      `&select=amount,category,vendor,transaction_date,cis_deduction,income_type` +
+      `&select=amount,category,vendor,transaction_date,cis_deduction,income_type,capital_kind,business_use_pct` +
       `&order=transaction_date.asc&limit=20000`,
     { headers: headers() },
   );
@@ -3830,6 +3837,8 @@ export async function getConfirmedTransactionsForRange(
       transaction_date: (r.transaction_date as string).slice(0, 10),
       cis_deduction: r.cis_deduction == null ? null : Number(r.cis_deduction),
       income_type: (r.income_type as string | null) ?? null,
+      capital_kind: (r.capital_kind as string | null) ?? null,
+      business_use_pct: r.business_use_pct == null ? null : Number(r.business_use_pct),
     }));
 }
 
@@ -3920,6 +3929,9 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   // The same shape as ytdMileage: a SLICE of ytdTradeExpenses, never an addition to it. See
   // isHomeOfficeRow above for why it exists at all.
   let ytdHomeOfficeLogged = 0;
+  // The vehicle allowance. ⚠️ NOT a slice of ytdTradeExpenses like the two above it: the cost it
+  // replaces has been taken OUT of that figure. See the branch in the loop below.
+  let ytdCapitalAllowances = 0;
   for (const r of rows) {
     const amt = Number(r.amount) || 0;
     if ((r.income_type ?? '').toLowerCase() === 'property') {
@@ -3929,8 +3941,40 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     }
     if (amt > 0) ytdTradeIncome += amt;
     else if (amt < 0) {
-      ytdTradeExpenses += -amt;
+      // A category is a fact about the row whichever way it is relieved, so it is logged for both
+      // branches: a car filed under Vehicle should still count as a category he has logged.
       if (r.category) cats.add(String(r.category).toLowerCase());
+
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // 🔴 A CAR DOES NOT GO INTO ytdTradeExpenses AT ALL, AND THIS IS THE WHOLE FIX.
+      //
+      // A real 78 row Monzo export, 2 August 2026: AUDI LEEDS, £60,000, one line. It landed here
+      // like a bag of screws and took the whole £60,000 off his profit in the year he bought it.
+      // A £22,800 profit was reported as a £37,224 LOSS and his set aside went to zero.
+      //
+      // GOV.UK, claim capital allowances, business cars: "Cars do not qualify for: annual
+      // investment allowance (AIA)." So the COST is removed and the ALLOWANCE replaces it: about
+      // £3,600 on that Audi in year one, and lib/capital.ts capitalRelief() is the only thing in
+      // the codebase that decides which rate a given car earns.
+      //
+      // ⚠️ THE THREE SLICE COUNTERS ARE SKIPPED ON THIS BRANCH ON PURPOSE. ytdMileage and
+      // ytdHomeOfficeLogged are slices OF ytdTradeExpenses, and lib/ledger.ts subtracts them back
+      // out of it. A row that is not in that figure must not be in a slice of it either, or the
+      // ledger takes money off a line it was never on.
+      //
+      // ⚠️ 'not_a_car' AND null BOTH FALL THROUGH TO THE ORDINARY PATH, and they mean different
+      // things that happen to behave identically. null is "nobody asked him"; 'not_a_car' is "he
+      // told us it was a van". A van is plant and machinery, inside the AIA, and correctly comes
+      // off in full. Storing his answer is worth doing even where it changes no arithmetic.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      const kind = isCapitalKind(r.capital_kind) ? r.capital_kind : null;
+      if (kind && kind !== 'not_a_car') {
+        const use = r.business_use_pct == null ? 100 : r.business_use_pct;
+        ytdCapitalAllowances += capitalRelief(-amt, kind, use).thisYear;
+        continue;
+      }
+
+      ytdTradeExpenses += -amt;
       if (isMileageRow(r)) ytdMileage += -amt;
       // Counted here so lib/ledger.ts can take it back off. See isHomeOfficeRow above: without
       // this, a man who elects and also texts his hours has the same deduction twice.
@@ -3951,6 +3995,9 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   ytdTradeIncome *= partnerFactor;
   ytdTradeExpenses *= partnerFactor;
   ytdCisSuffered *= partnerFactor;
+  // A partnership's van is the partnership's, and so is its allowance. Scaled with everything else
+  // for the same reason: this man is taxed on his share, not on the whole book he can see.
+  ytdCapitalAllowances *= partnerFactor;
 
   const start = new Date(`${taxYearStart}T00:00:00Z`);
   const monthsElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (30.44 * 86400000)));
@@ -3989,6 +4036,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     monthsElapsed,
     ytdTradeIncome: Math.round(ytdTradeIncome * 100) / 100,
     ytdTradeExpenses: Math.round(ytdTradeExpenses * 100) / 100,
+    ytdCapitalAllowances: Math.round(ytdCapitalAllowances * 100) / 100,
     ytdCisSuffered: Math.round(ytdCisSuffered * 100) / 100,
     employmentIncome: sl?.employmentIncome ?? 0,
     // THE PLANS WERE ALREADY FETCHED AND THEN THROWN AWAY.
@@ -5701,6 +5749,56 @@ export async function setManyPersonal(userId: string, ids: string[]): Promise<nu
     },
   );
   return res.ok ? clean.length : 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// WHAT HE SAID A LARGE PURCHASE WAS. Written BEFORE the row is confirmed, never after.
+//
+// 🔴 THE ORDER IS THE SAFETY. confirm_pile flips confirmed=true, and the moment it does the row is
+// inside every total in the product. If the row were confirmed first and this write then failed, a
+// £60,000 car would sit in his books as a £60,000 deduction with his answer lost, which is the
+// exact defect this exists to fix. So app/api/pile/route.ts writes this first and REFUSES TO FILE
+// a car at all if it comes back false. A row that stays in the pile is a nuisance; a row that is
+// filed wrongly is a letter from HMRC.
+//
+// Returns false on any failure INCLUDING the migration not having been run, because a missing
+// column is exactly the case where filing anyway would be silently wrong.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function setCapitalKind(
+  userId: string,
+  ids: string[],
+  kind: string,
+  businessUsePct: number | null,
+): Promise<boolean> {
+  if (!isCapitalKind(kind)) return false;
+  // An id is a uuid or it is not an id. See setManyPersonal for why this is not encodeURIComponent's
+  // job: PostgREST decodes the string straight back and a quote reopens the list.
+  const clean = ids.filter((i) => UUID.test(i));
+  if (clean.length === 0) return false;
+
+  // The share is only meaningful on a vehicle, and the database says so too. Sending one on
+  // 'not_a_car' would leave the two columns disagreeing, which PART 3 of the migration checks for.
+  const pct =
+    kind !== 'not_a_car' && typeof businessUsePct === 'number' && Number.isFinite(businessUsePct)
+      ? Math.max(1, Math.min(100, Math.round(businessUsePct)))
+      : null;
+
+  try {
+    const { url } = config();
+    const list = clean.map((i) => `"${i}"`).join(',');
+    const res = await fetch(
+      `${url}/rest/v1/transactions?id=in.(${encodeURIComponent(list)})` +
+        `&user_id=eq.${encodeURIComponent(userId)}`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=minimal' }),
+        body: JSON.stringify({ capital_kind: kind, business_use_pct: pct }),
+      },
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 // Everything confirmed, INCLUDING personal, so the detector can look at the whole

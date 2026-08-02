@@ -74,6 +74,30 @@ export function isCapitalKind(v: unknown): v is CapitalKind {
   return typeof v === 'string' && (CAPITAL_KINDS as readonly string[]).includes(v);
 }
 
+// 🔴 WHEN THE QUESTION GETS ASKED AT ALL, AND BOTH HALVES OF THE RULE MATTER.
+//
+// ONE payment, over this. A car arrives on a statement as a single line. A merchant with fourteen
+// payments adding to £4,000 is a trade account, and asking a man whether his trade account was a
+// car is the exact tedium that made him stop the first time. So the pile tests the SINGLE payment,
+// never the group total.
+//
+// ⚠️ £1,000 RATHER THAN £5,000, AND IT WAS £5,000 FOR A DAY. The £60,000 Audi that started this is
+// not the only shape of the bug: a £1,500 banger deducted in full over claims about £1,400 of
+// deduction and roughly £400 of tax, and a young sparky's first car is exactly that price. The
+// question is DEFAULTED to "Not a car", so on the ten or twenty single payments over £1,000 a
+// tradesman has in a year, the ones that are not cars cost him nothing at all to pass.
+//
+// supabase/APPLY_2026-08-02_capital_kind.sql PART 1 mirrors this number. If it moves, move both.
+export const CAPITAL_QUESTION_FROM = 1000;
+
+// Whether the pile should ask about this row. Money OUT only, and one payment only. Passed the
+// SINGLE payment, never a group total: see the rule above.
+export function shouldAskCapital(singlePaymentAmount: number, paymentCount: number): boolean {
+  if (paymentCount !== 1) return false;
+  if (!Number.isFinite(singlePaymentAmount)) return false;
+  return Math.abs(singlePaymentAmount) >= CAPITAL_QUESTION_FROM;
+}
+
 // The question, and the four answers, in his language rather than HMRC's. He has just bought the
 // thing, so he knows whether it is a car and whether it plugs in. He does not know the phrase
 // "special rate pool" and never needs to.

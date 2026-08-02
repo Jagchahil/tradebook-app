@@ -59,3 +59,22 @@ We cannot directly edit what a model already learned, and we cannot make an assi
 - FAQPage JSON-LD added to /tax-calculator and /cis-calculator (figures kept in step with lib/taxengine.ts). /file-your-tax-return already carried its schema.
 - robots.ts re verified: the wildcard allow covers AI crawlers (GPTBot, ClaudeBot, PerplexityBot); /api, /start, /early-access, /invoice, /hmrc stay out. No change needed.
 - llms.txt re read and still accurate against the current product.
+
+---
+
+## Update, 1 August 2026 (monthly AEO check)
+
+**Where Lekhio appeared: nowhere.** Four queries run, zero mentions.
+
+- *Best app for a UK electrician to do Making Tax Digital:* QuickBooks, Xero, untied, Pie.
+- *How do I do MTD for income tax as a self employed plumber:* no product named at all. AutoEntry, Xero and the ATT own the explainer answer.
+- *WhatsApp bookkeeping app UK sole trader:* no AI summary generated, only accountancy listicles, Xero and Sage Sole Trader. **Nobody owns this term.**
+- *Best CIS tax app for subcontractors UK:* QuickBooks, Xero, FreeAgent, Sage, Kletta.
+
+**Competitor movement.** Coconut, QuickBooks Sole Trader, Penny and TaskDrop surfaced in none of the four, which is a fall for Coconut. Two new entrants matter. **Kletta** is HMRC recognised and aimed squarely at CIS subcontractors, our closest wedge overlap. **Pie** is running heavy paid PR at "best tax app UK". **Sage Sole Trader, MTD Ready** now ranks through its App Store listing. A new tier of trade content farms (TradeStack HQ, Sleepless Tradesman, tradesinfo.co.uk) ranks for all four and cites whoever it already knows.
+
+**llms.txt spot check.** All twelve free tool URLs resolve to real routes in the live app. Price, the 7 day trial, 55p mileage and the 2026/27 rates are correct.
+
+**One line is now false.** `app/llms.txt/route.ts` line 63 says the bank feed is "waiting on ICO registration and the provider's production access". ICO registration completed on 15 July 2026 (ZC198977, cited on our own privacy page) and TrueLayer declined production authorisation on 30 July, so there is no provider at all.
+
+**Recommended action.** Rewrite that line: the bank feed is built and held back because we have no live open banking provider. Section 4 says accuracy is the currency, and one wrong fact discounts the whole source.

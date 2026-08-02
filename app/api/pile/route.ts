@@ -5,6 +5,7 @@ import {
   readOwnNames,
   readAccountUse,
   confirmPile,
+  setCapitalKind,
   confirmIncome,
   setManyPersonal,
   learnVendor,
@@ -18,6 +19,7 @@ import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
 import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 import { VAT_STANDARD_RATE, vatFromGross } from '../../../lib/vat';
+import { isCapitalKind, isUseBand, type CapitalKind } from '../../../lib/capital';
 
 // The pile: what a man faces the morning after he connects his bank.
 //
@@ -103,6 +105,14 @@ interface Decision {
   // Remember the answer for next time, so this shop is never asked about again. Default true:
   // the whole point is that he tells us once. He can turn it off per decision.
   remember?: boolean;
+  // 🔴 WHAT HE SAID A LARGE PURCHASE WAS, ON THE 'business' VERDICT ONLY, AND ONLY WHERE THE PILE
+  // ASKED. Absent on every other row and on every caller written before 2 August 2026, which is
+  // why the whole thing is optional and an absent value changes nothing at all.
+  capitalKind?: string;
+  // The business use band, 100 / 75 / 50 / 25. Only ever set by /app/pile/car, which is the screen
+  // that asks. Its ABSENCE on a car is meaningful: see the branch in POST below, which sends him
+  // to that screen instead of filing on an assumption.
+  businessUsePct?: string | number;
   // Only read by the 'vat' verdict. What HE says the VAT was, in pounds, as typed. Validated
   // against his own row server side and never trusted as it stands.
   vat?: string | number;
@@ -160,6 +170,8 @@ export async function POST(req: NextRequest) {
       verdict: verdictFrom(f.get('verdict')),
       category: String(f.get('category') ?? ''),
       vat: String(f.get('vat') ?? ''),
+      capitalKind: String(f.get('capital_kind') ?? ''),
+      businessUsePct: String(f.get('business_use_pct') ?? ''),
     };
   } else {
     try {
@@ -316,6 +328,54 @@ export async function POST(req: NextRequest) {
 
   const category = (body.category ?? '').trim().toLowerCase();
   if (!category) return NextResponse.json({ error: 'No category.' }, { status: 400 });
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WAS IT A CAR. THE QUESTION WORTH £52,000, AND THE ORDER IT HAS TO HAPPEN IN.
+  //
+  // A real 78 row Monzo export, 2 August 2026: AUDI LEEDS, £60,000, filed through this branch as
+  // an ordinary cost. GOV.UK, business cars: "Cars do not qualify for: annual investment
+  // allowance (AIA)." The whole £60,000 came off his profit, a £22,800 profit was reported as a
+  // £37,224 LOSS, and his set aside went to zero.
+  //
+  // ⚠️ AN UNANSWERED BUSINESS USE SHARE STOPS THE FILING RATHER THAN DEFAULTING. CAA 2001 s205
+  // restricts the allowance to the business proportion of a vehicle. Filing at 100% because
+  // nobody asked would be a quieter version of the same over claim, so a car goes to
+  // /app/pile/car, which asks, shows him what each answer is worth, and posts back here with the
+  // band filled in. Nothing is written on the way past.
+  //
+  // ⚠️ AND THE ANSWER IS STORED BEFORE THE ROW IS CONFIRMED, NEVER AFTER. The moment confirm_pile
+  // flips confirmed=true the row is inside every total in the product. A confirmed car whose
+  // answer failed to save IS the original defect. So a failed write on a car refuses to file at
+  // all: the row stays in the pile, which is a nuisance he can see and fix.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const kind: CapitalKind | null = isCapitalKind(body.capitalKind) ? body.capitalKind : null;
+  const isCar = kind !== null && kind !== 'not_a_car';
+  const bandRaw = Number(body.businessUsePct);
+  const band = isUseBand(bandRaw) ? bandRaw : null;
+
+  if (isCar && band === null) {
+    if (form) {
+      const to = new URL('/app/pile/car', req.url);
+      to.searchParams.set('id', ids[0]);
+      to.searchParams.set('kind', kind);
+      to.searchParams.set('cat', category);
+      return NextResponse.redirect(to, 303);
+    }
+    return NextResponse.json(
+      { error: 'A vehicle needs a business use share. See lib/capital.ts USE_BANDS.' },
+      { status: 400 },
+    );
+  }
+
+  if (kind) {
+    const recorded = await setCapitalKind(user.id, ids, kind, band);
+    // 'not_a_car' failing changes no arithmetic: the row is an ordinary cost either way, and
+    // losing his answer costs him nothing he can measure. A CAR failing changes everything.
+    if (!recorded && isCar) {
+      if (form) return backToPile(req, 'carfailed', 0);
+      return NextResponse.json({ error: 'Could not record what that purchase was.' }, { status: 500 });
+    }
+  }
 
   // THE FAST PATH, AND THE GUARD.
   //

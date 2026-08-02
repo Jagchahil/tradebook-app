@@ -206,8 +206,13 @@ export function ledger(input: LedgerInput): Ledger {
       basis: 'The flat rate for doing your quotes and paperwork at home. No receipts needed, and it goes in instead of a share of your actual home bills rather than as well as.',
     },
     {
-      key: 'capital', label: 'Tools and equipment', amount: Math.max(0, input.capitalAllowances),
-      basis: 'The full cost of what you bought, off your profit, under the Annual Investment Allowance.',
+      // ⚠️ IT SAID "Tools and equipment", "the full cost", AND "Annual Investment Allowance", AND
+      // ALL THREE ARE NOW WRONG FOR THE ONLY THING THAT REACHES THIS LINE. Tools are ordinary
+      // costs and sit inside the expenses line above; the only figure that arrives here is the
+      // allowance on a vehicle a man told the pile about, and a car is specifically excluded from
+      // the AIA. A line explaining a deduction has to describe the deduction it is next to.
+      key: 'capital', label: 'Vehicle allowance', amount: Math.max(0, input.capitalAllowances),
+      basis: 'What a vehicle you told us about takes off your profit this year. A car is kept out of the Annual Investment Allowance, so it comes off a percentage a year instead of all at once. A brand new electric one comes off in full.',
     },
     {
       key: 'pension', label: 'Pension', amount: Math.max(0, input.pension),
@@ -402,6 +407,12 @@ export interface LedgerSource {
   // caller written before it existed produces the identical ledger to the penny. See LedgerInput
   // .tradingAllowance above for what it does to the other three deduction lines, and why.
   tradingAllowanceElected?: boolean;
+
+  // The vehicle allowance from getOptimiserInput. ⚠️ NOT A SLICE OF ytdTradeExpenses, unlike
+  // ytdMileage and ytdHomeOffice: the car's cost has already been taken OUT of that figure
+  // upstream, and this is what replaces it. See lib/taxoptimiser.ts OptimiserInput for the whole
+  // story, including why reading it as a slice would double count in the direction that hurts him.
+  ytdCapitalAllowances?: number;
 }
 
 export function ledgerFor(input: LedgerSource): Ledger {
@@ -461,15 +472,22 @@ export function ledgerFor(input: LedgerSource): Ledger {
     // that way, and a negative can never draw a line. See the rule above.
     homeOffice: electedTradingAllowance ? 0 : (Math.max(0, input.ytdHomeOffice ?? 0) || loggedHomeOffice),
 
-    // STILL NOT WIRED, AND THESE ZEROS ARE HONEST RATHER THAN LAZY.
+    // pension is STILL NOT WIRED, and the zero is honest rather than lazy: there is no category
+    // and no election for it yet. That zero really does understate him, and the fix is upstream.
     //
-    // pension is genuinely NOT CAPTURED ANYWHERE: there is no category and no election for it yet.
-    // That zero really does understate him, and the fix is upstream, not here.
+    // 🔴 capitalAllowances IS WIRED NOW, AND THE ZERO THAT USED TO BE HERE WAS LOAD BEARING FOR A
+    // REASON THAT NO LONGER HOLDS. The old comment said tools and equipment are logged as ordinary
+    // expense categories so their cost is already inside the expenses line, and passing a figure
+    // here would count them twice. That is still true OF TOOLS, and tools still never reach this
+    // line. What reaches it is a vehicle: when a man tells the pile a payment was a car,
+    // getOptimiserInput takes the whole cost OUT of ytdTradeExpenses and hands the allowance over
+    // separately, so this is a replacement rather than an addition and nothing is counted twice.
     //
-    // capitalAllowances is a different case and the zero is LOAD BEARING. Tools and equipment are
-    // logged as ordinary expense categories, so their cost is ALREADY inside the expenses line
-    // above. Passing a figure here as well would count them twice.
-    capitalAllowances: 0,
+    // ⚠️ ZERO WHEN HE ELECTED THE TRADING ALLOWANCE, for the same reason expenses and mileage go
+    // to zero six lines up: GOV.UK, "You cannot deduct any other expenses or allowances if you
+    // claim the allowances." lib/taxoptimiser.ts capitalAllowanceOf() applies the identical rule
+    // to the same man's figures, so the ledger and the tax cannot disagree about his profit.
+    capitalAllowances: electedTradingAllowance ? 0 : Math.max(0, input.ytdCapitalAllowances ?? 0),
     pension: 0,
 
     // 🔴 HIS RENT, AS A STREAM, NOT AS A RATE ADJUSTMENT. It used to arrive NETTED, in otherIncome

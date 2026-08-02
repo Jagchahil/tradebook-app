@@ -343,6 +343,18 @@ export function summarisePile() { return { entries: 0 }; }
 export function canBulkConfirm() { return false; }
 export function bulkConfirmPlan() { return []; }
 `);
+// 🔴 THE REAL lib/capital.ts, NOT A STUB, AND THAT IS THE POINT. app/api/pile/route.ts asks it
+// two questions: is this string one of the four kinds, and is this number one of the four business
+// use bands. A stub would have to restate both lists, and a restated list is a list that drifts
+// silently the day somebody adds a fifth. It is a pure file over two leaf files, so it costs
+// nothing to stage properly.
+for (const name of ['capital', 'taxengine', 'money']) {
+  writeFileSync(
+    path.join(pStage, `${name}.ts`),
+    readFileSync(path.join(root, 'lib', `${name}.ts`), 'utf8')
+      .replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'"),
+  );
+}
 writeFileSync(path.join(pStage, 'memory.ts'), 'export function normaliseVendor(v) { return String(v || "").toLowerCase(); }\n');
 writeFileSync(path.join(pStage, 'personal.ts'), 'export function looksPersonal() { return null; }\n');
 writeFileSync(path.join(pStage, 'categories.ts'), `
@@ -350,7 +362,7 @@ export const CATEGORIES = ['materials'];
 export function categoriseBankLine() { return 'materials'; }
 `);
 writeFileSync(path.join(pStage, 'supabase.ts'), `
-export const state = { profile: null, rows: [], calls: [], vatWriteOk: true };
+export const state = { profile: null, rows: [], calls: [], vatWriteOk: true, capitalWriteOk: true };
 export async function pileEntries() { return state.rows; }
 export async function readOwnNames() { return []; }
 export async function readAccountUse() { return 'mixed'; }
@@ -374,6 +386,13 @@ export async function readVatProfile(userId) {
 export async function confirmTransactionVat(userId, transactionId, vatAmount) {
   state.calls.push({ fn: 'confirmTransactionVat', transactionId, vatAmount });
   return state.vatWriteOk;
+}
+// What HE said a large purchase was. state.capitalWriteOk false is the case that matters: the
+// route must then REFUSE to confirm the row, because a confirmed car whose answer was lost is a
+// £60,000 deduction. See the ordering note in app/api/pile/route.ts.
+export async function setCapitalKind(userId, ids, kind, pct) {
+  state.calls.push({ fn: 'setCapitalKind', ids, kind, pct });
+  return state.capitalWriteOk;
 }
 `);
 writeFileSync(

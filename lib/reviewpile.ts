@@ -29,6 +29,7 @@
 // So it is passed in. The caller supplies the real normaliser, and so does the test, which
 // means the real one is what gets tested.
 import { matchesOwnName } from './personal';
+import { shouldAskCapital } from './capital';
 
 export type KeyOf = (vendor: string) => string;
 
@@ -233,6 +234,20 @@ export function canBulkConfirm(group: PileGroup, accountUse: AccountUse = 'mixed
   // He can still file anything here one at a time. What he cannot do is file a screenful of his own
   // life in one press because a merchant looked familiar.
   if (accountUse === 'personal') return false;
+
+  // 🔴 AND NEVER A SINGLE PAYMENT BIG ENOUGH TO BE A VEHICLE, WHOEVER IT WAS PAID TO.
+  //
+  // "It fails towards asking. Always." Six lines up, and this is the case that proved it. A car is
+  // excluded from the Annual Investment Allowance and cannot come off his profit in one go, and
+  // the ONLY way the product can know a payment was a car is to ask him. A merchant we recognise
+  // does not settle that question: a man can buy a car from anybody, and a £60,000 line to a
+  // familiar name swept up in a screenful of one tap confirms is exactly the £52,000 error that
+  // lib/capital.ts exists to stop. So it drops out of the fast path and gets asked on its own.
+  //
+  // ⚠️ THIS IS NOT A REFUSAL, IT IS A DETOUR. The group still appears, in the section where every
+  // card gets its own question, with the car question defaulted to "Not a car". A man whose
+  // £1,400 was a materials order answers it with the press he was going to make anyway.
+  if (shouldAskCapital(group.total, group.count)) return false;
 
   // And only where the merchant genuinely settles it. See MERCHANT_SETTLES.
   return MERCHANT_SETTLES.includes(group.suggested);

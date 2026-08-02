@@ -5016,6 +5016,22 @@ export async function getBusinessProfile(userId: string): Promise<BusinessProfil
   }> | null;
   if (!Array.isArray(rows) || rows.length === 0) return null;
   const r = rows[0];
+  // ⚠️ AN UNANSWERED STRUCTURE READS AS SOLE TRADER, AND THAT IS A REAL COST TO ONE MAN.
+  //
+  // Null here means nobody ever told us, not "he is a sole trader". /app/start always asks, so on
+  // the web path this is always set; the gap is a legacy row, a WhatsApp-only signup, or a write
+  // that failed. For a genuine sole trader the coercion is free. For an unanswered LIMITED COMPANY
+  // DIRECTOR it is not: taxPosition then charges him income tax and Class 4 National Insurance
+  // personally on profit that belongs to his company, which is the largest overstatement in the
+  // product and the one that is hardest for him to spot, because it looks like a big tax bill
+  // rather than like a bug.
+  //
+  // 🔴 IT IS LEFT COERCED ON PURPOSE, FOR NOW. incomeShape below models the honest shape (null
+  // means we do not know, and every gate that reads it asks him everything). businessType cannot
+  // follow it without changing the type every engine reads, and a half-migrated nullable would be
+  // worse than a documented default. The right fix is to ASK him, which is exactly what the
+  // business-understanding work is for. Until then this comment is the record that it is a choice
+  // and not an oversight, and which customer pays for it.
   const bt: BusinessType =
     r.business_type === 'limited_company' || r.business_type === 'partnership' ? r.business_type : 'sole_trader';
   // A share is only meaningful for a partnership, and defaults to the whole thing until told
@@ -5043,6 +5059,22 @@ async function getBusinessProfileLegacy(userId: string): Promise<BusinessProfile
   }> | null;
   if (!Array.isArray(rows) || rows.length === 0) return null;
   const r = rows[0];
+  // ⚠️ AN UNANSWERED STRUCTURE READS AS SOLE TRADER, AND THAT IS A REAL COST TO ONE MAN.
+  //
+  // Null here means nobody ever told us, not "he is a sole trader". /app/start always asks, so on
+  // the web path this is always set; the gap is a legacy row, a WhatsApp-only signup, or a write
+  // that failed. For a genuine sole trader the coercion is free. For an unanswered LIMITED COMPANY
+  // DIRECTOR it is not: taxPosition then charges him income tax and Class 4 National Insurance
+  // personally on profit that belongs to his company, which is the largest overstatement in the
+  // product and the one that is hardest for him to spot, because it looks like a big tax bill
+  // rather than like a bug.
+  //
+  // 🔴 IT IS LEFT COERCED ON PURPOSE, FOR NOW. incomeShape below models the honest shape (null
+  // means we do not know, and every gate that reads it asks him everything). businessType cannot
+  // follow it without changing the type every engine reads, and a half-migrated nullable would be
+  // worse than a documented default. The right fix is to ASK him, which is exactly what the
+  // business-understanding work is for. Until then this comment is the record that it is a choice
+  // and not an oversight, and which customer pays for it.
   const bt: BusinessType =
     r.business_type === 'limited_company' || r.business_type === 'partnership' ? r.business_type : 'sole_trader';
   const share = Number(r.partnership_share);

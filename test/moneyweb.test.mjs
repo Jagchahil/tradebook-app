@@ -179,8 +179,29 @@ ok('the correction posts the same fields the month page posts',
   && /name="m" value=\{month\}/.test(pageEntry)
   && /name="personal" value=\{entry\.personal \? 'false' : 'true'\}/.test(pageEntry));
 ok('🔴 money in is told it stays put, in words', /Money in stays put/.test(pageEntry));
-ok('the detail page invents no verbs of its own: /api/personal is its only action',
-  (pageEntry.match(/<form action="/g) || []).length === 1);
+// ⚠️ THIS ASSERTION USED TO SAY "/api/personal is its only action" AND COUNT ONE FORM. It was
+// right when it was written and stopped being right on 2 August 2026, when the detail page became
+// the place a man corrects what a large purchase WAS.
+//
+// The reason it existed is still live and still worth pinning: a detail page that grows its own
+// little routes is how a second implementation of a write appears next to the real one. So the
+// rule is not "one form", it is "no verbs of its own": every action on this page posts to a route
+// that exists in app/api, and the page itself writes nothing.
+//
+// The car question is three forms and only two of them post. The kind step is a GET back to this
+// same page, which is how a two step question works with no client script, and a GET that only
+// redraws a page is not a verb.
+{
+  const actions = [...pageEntry.matchAll(/<(?:form|CarBands)[\s\S]{0,260}?action=(?:"([^"]+)"|\{?'([^']+)'\}?)/g)]
+    .map((m) => m[1] ?? m[2]);
+  const posts = [...pageEntry.matchAll(/<form action="([^"]+)" method="post"/g)].map((m) => m[1]);
+  ok('the detail page still invents no verbs of its own', actions.length > 0
+    && actions.every((a) => a === '/api/personal' || a === '/api/money/capital' || a === '/app/entry'));
+  ok('🔴 and every POST on it goes to a route that exists',
+    posts.length >= 2 && posts.every((a) => ['/api/personal', '/api/money/capital'].includes(a)));
+  ok('the kind step is a GET, so choosing "a car" writes nothing until he presses Save',
+    /<form action="\/app\/entry" method="get"/.test(pageEntry));
+}
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 4. MANUAL ENTRY. His typing, his press, one insert path.

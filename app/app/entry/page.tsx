@@ -6,6 +6,11 @@ import { transactionsInMonth } from '../../../lib/supabase';
 import { logFor, monthTitle, dayLabel } from '../../../lib/moneylog';
 import { gbp0 } from '../../../lib/money';
 import { verifyEntryRef, refBelongsTo } from '../entryref';
+import {
+  CAPITAL_QUESTION_FROM, capitalOptions, capitalQuestion, capitalRelief, isCapitalKind,
+  useBandLabel as bandLabel, type CapitalKind,
+} from '../../../lib/capital';
+import { CarBands, CarVerdict, CAR_CSS } from '../CarQuestion';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import { GREEN, INK, LINE, MUTED, PAPER, RIVER, SURFACE } from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
@@ -55,6 +60,10 @@ export default async function EntryPage({
   if (!claim || !refBelongsTo(claim, user.id)) redirect('/app/money');
   const { row, month } = claim;
 
+  const askedKind = one('kind');
+  const saved = one('saved') === '1';
+  const failed = one('problem') === 'capital';
+
   const rows = await transactionsInMonth(user.id, month);
   // ⚠️ A FAILED READ IS NOT A MISSING ROW. Telling a man his payment is gone over a database
   // timeout is the kind of false he acts on, so the two get different screens.
@@ -62,6 +71,44 @@ export default async function EntryPage({
   const entry = read
     ? logFor(rows ?? [], month).entries.find((e) => e.id === row) ?? null
     : null;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE CAR HE HAS ALREADY FILED, WHICH THE PILE CANNOT REACH AND NEVER WILL.
+  //
+  // Walking the deployed site on 2 August 2026, an hour after the pile learned to ask: AUDI
+  // LEEDS, £60,000, filed under 'van', confirmed, capital_kind null. The pile asks BEFORE a row
+  // is confirmed, so it can only ever protect payments that have not been filed yet. Everything
+  // already in his books, everything typed straight into /app/money/add, and everything that
+  // arrives through WhatsApp is confirmed on the way in and is never asked at all.
+  //
+  // His two options on that row were: leave it as a £60,000 deduction, or press "Not business",
+  // which takes the whole cost out. Both are wrong. He DID buy it for the business and he IS
+  // entitled to the writing down allowance; what he is not entitled to is the lot in year one.
+  //
+  // ⚠️ SO THE CORRECTION LIVES HERE, ON THE SCREEN THE MONEY LOG ALREADY POINTS AT WHEN A LINE
+  // LOOKS WRONG, and it covers every door at once rather than being bolted onto each writer.
+  // The foot of this page has always promised "if it looks wrong, it is worth fixing". Until
+  // now the only thing it could fix was whether the payment happened at all.
+  //
+  // ⚠️ MONEY OUT, OVER THE THRESHOLD, AND NOT ALREADY MARKED PERSONAL. A row he has taken out of
+  // his books entirely has no allowance to argue about, and asking would be a question with no
+  // consequence, which doc 103 says never to ask.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const raw = read
+    ? ((rows ?? []).find((r) => r.id === row) as Record<string, unknown> | undefined) ?? null
+    : null;
+  const storedKind = isCapitalKind(raw?.capital_kind) ? raw.capital_kind : null;
+  const storedPct = raw && raw.business_use_pct != null ? Number(raw.business_use_pct) : null;
+  const cost = entry ? Math.abs(entry.amount) : 0;
+  const canAsk = Boolean(entry) && entry!.amount < 0 && !entry!.personal && cost >= CAPITAL_QUESTION_FROM;
+
+  // Step two of a two step question on ONE screen, with no client script anywhere: the kind form
+  // is a GET back to this same page carrying his answer, and this page then draws the priced
+  // bands instead of the select. A hidden field revealed on change would need JavaScript, and
+  // a business use share defaulted to 100% because nobody asked is CAA 2001 s205 answered by a
+  // machine on his behalf, in the direction that over claims.
+  const asking: CapitalKind | null =
+    canAsk && isCapitalKind(askedKind) && askedKind !== 'not_a_car' ? askedKind : null;
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -109,6 +156,84 @@ export default async function EntryPage({
             </p>
           ) : null}
 
+          {saved ? (
+            <p style={S.saved}>
+              Saved. Your figures have been worked out again with it.
+            </p>
+          ) : null}
+          {failed ? (
+            <p style={S.saved}>
+              We could not save that just now, so nothing has changed. Try again in a minute.
+            </p>
+          ) : null}
+
+          {/* ── WAS IT A CAR ────────────────────────────────────────────────────────────── */}
+          {canAsk && asking ? (
+            <section style={S.car}>
+              <h2 className="lek-h2">
+                {storedKind && storedKind !== 'not_a_car' ? 'Change what this was' : 'This changes what it is worth'}
+              </h2>
+              <CarVerdict cost={cost} kind={asking} />
+              <p style={S.carAsk}>How much of the driving is for work?</p>
+              <p style={S.quiet}>
+                HMRC only lets you claim the business share of a vehicle. A rough answer is the
+                right answer.
+              </p>
+              <CarBands
+                cost={cost}
+                kind={asking}
+                action="/api/money/capital"
+                hidden={{ ref: one('ref') ?? '', capital_kind: asking }}
+                submitLabel="Save it"
+              />
+              <p style={S.carOut}>
+                <a href={`/app/entry?ref=${encodeURIComponent(one('ref') ?? '')}`} style={S.crumbLink}>
+                  It was not a car after all
+                </a>
+              </p>
+            </section>
+          ) : canAsk ? (
+            <section style={S.car}>
+              <h2 className="lek-h2">{capitalQuestion()}</h2>
+              {storedKind ? (
+                <p style={S.quiet}>
+                  {storedKind === 'not_a_car'
+                    ? 'You told us this was not a car, so it comes off your profit in full this year.'
+                    : `You told us this was a car${storedPct && storedPct < 100 ? `, ${storedPct}% for work` : ''}. That is ${gbp0(capitalRelief(cost, storedKind, storedPct ?? 100).thisYear)} off your profit this year${storedPct && storedPct < 100 ? `, ${bandLabel(storedPct as 100 | 75 | 50 | 25).toLowerCase()}` : ''}.`}
+                </p>
+              ) : (
+                <p style={S.quiet}>
+                  A payment this size is worth one more question. A van, a digger or a tester comes
+                  off your profit in full this year. A car cannot, and we have never asked you.
+                </p>
+              )}
+              {/* ⚠️ A GET, NOT A POST, AND IT WRITES NOTHING. Choosing "a car" only redraws this
+                  page with the bands on it. Nothing about his books changes until he presses Save
+                  on the next step, so a man who opens the select and thinks better of it has
+                  changed nothing. */}
+              <form action="/app/entry" method="get" style={S.form}>
+                <input type="hidden" name="ref" value={one('ref') ?? ''} />
+                <label htmlFor="kind" style={S.label}>What was it</label>
+                <select id="kind" name="kind" defaultValue={storedKind ?? 'not_a_car'} className="lek-select">
+                  {capitalOptions().map((o) => (
+                    <option key={o.kind} value={o.kind}>{o.label}</option>
+                  ))}
+                </select>
+                <button type="submit" className="lek-ghost">Next</button>
+              </form>
+              {/* The one answer that needs no second step, and it is a real answer rather than a
+                  cancel: a van is plant and machinery and comes off in full, which is what the
+                  row is already doing. Recorded so the row carries what he SAID. */}
+              {storedKind !== 'not_a_car' ? (
+                <form action="/api/money/capital" method="post" style={S.form}>
+                  <input type="hidden" name="ref" value={one('ref') ?? ''} />
+                  <input type="hidden" name="capital_kind" value="not_a_car" />
+                  <button type="submit" className="lek-ghost">It was not a car, leave it as it is</button>
+                </form>
+              ) : null}
+            </section>
+          ) : null}
+
           {/* The same correction, through the same route, with the same words as the month page.
               The month travels with it so /api/personal lands him back on the right month. */}
           {entry.amount < 0 ? (
@@ -140,6 +265,9 @@ export default async function EntryPage({
 const CSS = [
   A11Y_CSS,
   APP_CSS,
+  CAR_CSS,
+  `.lek-select{width:100%;box-sizing:border-box;padding:${SPACE.sm}px;font-size:16px;font-family:${FONT};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;color:${INK};background:${SURFACE};margin-bottom:${SPACE.sm}px}`,
+  `select:focus,button:focus{outline:3px solid ${RIVER};outline-offset:2px}`,
   `.lek-title{font-size:${TYPE.lead}px;line-height:1.3;font-weight:800;letter-spacing:-0.02em;margin:0 0 ${SPACE.hair}px}`,
   `.lek-off{color:${MUTED};text-decoration:line-through}`,
   `.lek-figure{font-size:${TYPE.stat}px;font-weight:800;letter-spacing:-0.02em;margin:0 0 ${SPACE.md}px;font-variant-numeric:tabular-nums}`,
@@ -168,5 +296,12 @@ const S: Record<string, React.CSSProperties> = {
   lead: { fontSize: TYPE.strong, fontWeight: 700, margin: 0 },
   quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '12px 0 0', background: SURFACE, borderRadius: RADIUS.md, padding: '10px 12px' },
   form: { margin: '16px 0 0' },
+  // The car question, fenced off from the payment's own facts above it. It is a different kind of
+  // thing: not what this line IS, but what it is worth.
+  car: { marginTop: 20, paddingTop: 18, borderTop: `1px solid ${LINE}` },
+  carAsk: { fontSize: TYPE.strong, fontWeight: 700, margin: '18px 0 0' },
+  carOut: { margin: '14px 0 0', textAlign: 'center' },
+  label: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, margin: '0 0 6px' },
+  saved: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px', margin: '0 0 14px' },
   foot: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
 };

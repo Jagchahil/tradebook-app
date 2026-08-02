@@ -365,5 +365,47 @@ ok('taxengine.taxableTradingProfit is still not the door: nothing in app or lib 
   && !/taxableTradingProfit\(/.test(strip(read('lib/ledger.ts')))
   && !/taxableTradingProfit\(/.test(strip(read('lib/quarterpack.ts'))));
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE TRADING ALLOWANCE OFFERED TO A MAN WITH AN EMPTY BOOK.
+//
+// Three months in with nothing logged: gross 0, costs 0, so 0 < 1,000 and the verdict came back
+// 'allowance'. The screen told him the allowance beat his costs by a thousand pounds. It shelters
+// nothing, and if he had been spending to get going it would have thrown away a carried loss.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nNo income is nothing to judge, not a win for the allowance');
+{
+  const empty = X.tradingAllowanceChoice(0, 0, 6);
+  ok('🔴 an empty book gets no recommendation at all', empty.better === 'too_early');
+  ok('and it says which silence it is', empty.tooEarlyBecause === 'no_income');
+  ok('no difference is quoted, because there is nothing to differ', empty.difference === 0);
+
+  // The other direction, which is the one that costs him real money.
+  const spending = X.tradingAllowanceChoice(0, 5000, 6);
+  ok('🔴 nor is a man with start up spending and no income yet told to elect',
+    spending.better === 'too_early' && spending.tooEarlyBecause === 'no_income');
+
+  // CONTROL. The moment there IS income the comparison works exactly as it did.
+  const real = X.tradingAllowanceChoice(40000, 300, 6);
+  ok('CONTROL: with income on the board the allowance is recommended again',
+    real.better === 'allowance' && real.tooEarlyBecause === null);
+  const costly = X.tradingAllowanceChoice(40000, 9000, 6);
+  ok('CONTROL: and real costs still beat it',
+    costly.better === 'costs' && costly.tooEarlyBecause === null);
+
+  // The three month floor is untouched and keeps its own reason.
+  const early = X.tradingAllowanceChoice(40000, 300, 1);
+  ok('CONTROL: the three month floor still fires, for its own reason',
+    early.better === 'too_early' && early.tooEarlyBecause === 'not_enough_year');
+
+  // The words. Telling a man with an empty book that there is "not enough of the year yet" answers
+  // a question he did not ask: his year may be nearly over. What is missing is income, not time.
+  ok('🔴 the empty book is told what is actually missing',
+    /no trade income/i.test(X.tradingAllowanceOffer(empty))
+    && !/not enough of the year/i.test(X.tradingAllowanceOffer(empty)));
+  ok('and it names the loss he would be giving up', /carry/i.test(X.tradingAllowanceOffer(spending)));
+  ok('CONTROL: the three month wording is unchanged',
+    /not enough of the year/i.test(X.tradingAllowanceOffer(early)));
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);

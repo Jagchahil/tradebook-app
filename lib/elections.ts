@@ -405,6 +405,10 @@ export interface TradingAllowanceChoice {
   // canProject) because two weeks of trading says nothing about a year. A man in April with £40 of
   // costs has not told us his costs will be under £1,000, he has told us it is April.
   better: 'allowance' | 'costs' | 'level' | 'too_early';
+  // WHY there is no answer, when there is no answer. Null whenever better is a real verdict.
+  // 'not_enough_year' is the original three month floor. 'no_income' is a book with nothing in it,
+  // where the allowance shelters nothing and electing would throw away a carried loss.
+  tooEarlyBecause: 'not_enough_year' | 'no_income' | null;
   difference: number;
   // 🔴 FULL RELIEF, WHICH IS AUTOMATIC AND IS NOT THIS ELECTION.
   //
@@ -448,10 +452,21 @@ export function tradingAllowanceChoice(
 
   // 🔴 THE WINNER IS DECIDED ON THE YEAR, BECAUSE THE ELECTION IS FOR THE YEAR. And it is not
   // decided at all before there is enough year to judge by.
-  const better = !canProject
+  // 🔴 NO INCOME IS NOT A WIN FOR THE ALLOWANCE, IT IS NOTHING TO JUDGE. With gross at zero the
+  // arithmetic says 0 < 1,000 and the old line called that 'allowance', so a man three months in
+  // with an empty book was told the trading allowance beat his costs by a thousand pounds and
+  // offered the election. It shelters nothing. Worse, a man with no income and real start up
+  // spending has a loss to carry, and electing gives it up.
+  const nothingToJudge = gross <= 0;
+  const better = !canProject || nothingToJudge
     ? 'too_early'
     : projectedCosts > allowance ? 'costs' : projectedCosts < allowance ? 'allowance' : 'level';
-  const difference = canProject ? Math.round(Math.abs(projectedCosts - allowance) * 100) / 100 : 0;
+  const tooEarlyBecause: 'not_enough_year' | 'no_income' | null = better !== 'too_early'
+    ? null
+    : nothingToJudge ? 'no_income' : 'not_enough_year';
+  // Not quoted at all when there is no verdict, because a difference between two figures nobody
+  // is choosing between is a number on a screen doing no work.
+  const difference = better === 'too_early' ? 0 : Math.round(Math.abs(projectedCosts - allowance) * 100) / 100;
 
   return {
     actualCosts: Math.round(costs * 100) / 100,
@@ -460,6 +475,7 @@ export function tradingAllowanceChoice(
     taxableWithCosts,
     taxableWithAllowance,
     better,
+    tooEarlyBecause,
     difference,
     fullRelief: gross > 0 && gross <= allowance && costs <= gross,
   };
@@ -517,6 +533,12 @@ export function tradingAllowanceOffer(choice: TradingAllowanceChoice): string {
     return `Your trade income this year is ${money(choice.taxableWithCosts + choice.actualCosts)}, which is within the ${money(choice.allowance)} trading allowance, so there is nothing to tax on it and nothing for you to elect.`;
   }
   if (choice.better === 'too_early') {
+    // ⚠️ TWO DIFFERENT SILENCES, AND THEY ARE NOT INTERCHANGEABLE. Telling a man with an empty
+    // book that there is "not enough of the year yet" answers a question he did not ask: his year
+    // may be nearly over. What is missing is income, not time.
+    if (choice.tooEarlyBecause === 'no_income') {
+      return `There is no trade income on your books for this year yet, so there is nothing for the ${money(choice.allowance)} allowance to come off and nothing to compare it with. Worth coming back to once you have been paid: if you have been spending to get going, those costs are a loss you can carry forward, and claiming the allowance instead would give that up.`;
+    }
     return `You have logged ${money(choice.actualCosts)} of costs so far. The allowance is a flat ${money(choice.allowance)} for the whole tax year, so there is not enough of the year yet to say which leaves you better off. Keep logging and this will tell you.`;
   }
   if (choice.better === 'costs') {

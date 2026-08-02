@@ -8,20 +8,13 @@ import { normaliseVendor } from '../../../../lib/memory';
 import { categoriseBankLine } from '../../../../lib/categories';
 import { gateForUser } from '../../../../lib/gateserver';
 import { gbp0 } from '../../../../lib/money';
-// ⚠️ useBandLabel IS ALIASED, AND IT IS NOT STYLE. eslint react-hooks reads any exported function
-// beginning with "use" as a React Hook, so calling useBandLabel inside a .map() callback is a
-// rules-of-hooks error even though it is a pure string lookup with no React in it. The same trap
-// caught useOfHomeToDate in app/app/you/elections. Aliasing at the import is the codebase's
-// existing answer; renaming the export would drag lib/capital.ts and its tests along for a lint rule.
-import {
-  USE_BANDS, capitalOptions, capitalRelief, isCapitalKind, useBandLabel as bandLabel,
-  type CapitalKind,
-} from '../../../../lib/capital';
-import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
-import {
-  INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RIVER, RIVER_DEEP, SAFFRON_DEEP, SAFFRON_TINT,
-  SURFACE, edge,
-} from '../../../../lib/apptheme';
+import { capitalOptions, capitalRelief, isCapitalKind, type CapitalKind } from '../../../../lib/capital';
+// 🔴 THE ARITHMETIC AND THE TWO PARAGRAPHS LIVE IN ONE PLACE. /app/entry asks the same question
+// of a payment that was filed before we knew to ask it, and four figures of a man's money
+// rendered from two copies is how the copy he is looking at becomes the one that drifted.
+import { CarBands, CarVerdict, CAR_CSS } from '../../CarQuestion';
+import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
+import { INK, LINE, MUTED, PAPER, RIVER, RIVER_DEEP, SURFACE } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -92,11 +85,8 @@ export default async function CarPage({
   if (!group || group.kind === 'income') redirect('/app/pile');
 
   const cost = Math.abs(group.total);
-  const options = capitalOptions();
-  const chosen = options.find((o) => o.kind === kind);
-  // Every band, priced, so the answer he gives is one he can see the consequence of. This is the
-  // whole argument for the screen: four rows of arithmetic beat one paragraph of explanation.
-  const priced = USE_BANDS.map((band) => ({ band, relief: capitalRelief(cost, kind, band) }));
+  const chosen = capitalOptions().find((o) => o.kind === kind);
+  // Only for the heading. The figures themselves come from <CarVerdict> and <CarBands>.
   const atFull = capitalRelief(cost, kind, 100);
 
   return (
@@ -116,23 +106,8 @@ export default async function CarPage({
             {atFull.inFull ? 'Good news, and it is worth reading.' : 'A car is not like your other kit.'}
           </h1>
 
-          {/* The bad news first, in full, in his money. lib/capital.ts owns every word of this
-              sentence, because the pile, the vehicle calculator and this screen all have to say
-              the same thing about the same rule, and copy repeated in three files drifts in two. */}
-          <p style={S.says}>{atFull.says}</p>
-
-          {/* 🔴 THE MOST USEFUL SENTENCE IN THE PRODUCT, AND NOBODY TELLS HIM IT. The same money
-              spent on a VAN is plant and machinery, inside the AIA, and comes off in full this
-              year. That is not a clever trick, it is the plain difference between two things he
-              might buy. Only shown where it is TRUE: on a new zero emission car the relief is
-              already the whole cost, so there would be nothing to compare. */}
-          {!atFull.inFull && (
-            <p style={S.compare}>
-              For what it is worth: the same {gbp0(cost)} spent on a van would have come off your
-              profit in full this year. A van is plant and machinery and a car is not, and that is
-              the whole of the difference.
-            </p>
-          )}
+          {/* The bad news first, in full, in his money, and the van comparison under it. */}
+          <CarVerdict cost={cost} kind={kind} />
         </section>
 
         <section className="lek-card">
@@ -143,40 +118,19 @@ export default async function CarPage({
             precise number is worth less than an honest round one.
           </p>
 
-          <form action="/api/pile" method="post" style={S.form}>
-            <input type="hidden" name="ids" value={group.ids.join(',')} />
-            <input type="hidden" name="vendor" value={group.vendor} />
-            <input type="hidden" name="verdict" value="business" />
-            <input type="hidden" name="category" value={category} />
-            <input type="hidden" name="capital_kind" value={kind} />
-
-            {/* Radios rather than a select, because each answer carries a figure and a select
-                hides three quarters of them behind a tap. He is choosing between four amounts of
-                money, so he should be able to see four amounts of money. */}
-            <fieldset style={S.fieldset}>
-              <legend style={S.legend}>Pick the closest</legend>
-              {priced.map(({ band, relief }, i) => (
-                <label key={band} htmlFor={`band-${band}`} style={S.band}>
-                  <input
-                    type="radio"
-                    id={`band-${band}`}
-                    name="business_use_pct"
-                    value={band}
-                    defaultChecked={i === 0}
-                    style={S.radio}
-                  />
-                  <span style={S.bandText}>
-                    <span style={S.bandLabel}>{bandLabel(band)}</span>
-                    <span style={S.bandMoney}>
-                      {gbp0(relief.thisYear)} off your profit this year
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-
-            <button type="submit" className="lek-primary">File it</button>
-          </form>
+          <CarBands
+            cost={cost}
+            kind={kind}
+            action="/api/pile"
+            hidden={{
+              ids: group.ids.join(','),
+              vendor: group.vendor,
+              verdict: 'business',
+              category,
+              capital_kind: kind,
+            }}
+            submitLabel="File it"
+          />
         </section>
 
         {/* 🔴 THE WAY OUT. He picked the wrong thing in a dropdown, or he has realised the pickup
@@ -209,10 +163,9 @@ export default async function CarPage({
 const CSS = [
   A11Y_CSS,
   APP_CSS,
-  `select:focus,button:focus,input:focus{outline:3px solid ${RIVER};outline-offset:2px}`,
+  CAR_CSS,
+  `select:focus,button:focus{outline:3px solid ${RIVER};outline-offset:2px}`,
   `.lek-title{font-size:${TYPE.lead}px;line-height:1.3;font-weight:800;letter-spacing:-0.02em;margin:0 0 ${SPACE.xs}px}`,
-  `.lek-primary{width:100%;margin-top:${SPACE.md}px;padding:14px ${SPACE.md}px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${ON_RIVER};background:${RIVER};border:none;border-radius:${RADIUS.md}px;cursor:pointer;transition:background-color ${MOTION.quick} ${MOTION.ease}}`,
-  `.lek-primary:hover{background:${RIVER_DEEP}}`,
   `.lek-quiet{width:100%;padding:14px ${SPACE.md}px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${INK};background:${SURFACE};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;cursor:pointer}`,
   `@media(min-width:${BREAK.desk}px){
     .lek-queue{max-width:760px;margin:0 auto}
@@ -228,24 +181,7 @@ const S: Record<string, React.CSSProperties> = {
   vendor: { fontSize: TYPE.strong, fontWeight: 800, letterSpacing: '-0.01em' },
   amount: { fontSize: TYPE.strong, fontWeight: 800, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
   meta: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '4px 0 0' },
-  says: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: '0 0 12px' },
-  // The van comparison. Tinted, because it is the one thing on the screen he did not come looking
-  // for and the one thing he will repeat to somebody else.
-  compare: {
-    background: SAFFRON_TINT, border: `1px solid ${edge(SAFFRON_DEEP, 27)}`, borderRadius: RADIUS.md,
-    padding: 14, fontSize: TYPE.body, lineHeight: 1.55, color: INK, margin: 0,
-  },
   form: { margin: '14px 0 0' },
-  fieldset: { border: 'none', padding: 0, margin: 0 },
-  legend: { fontSize: TYPE.label, fontWeight: 700, color: MUTED, padding: 0, marginBottom: 8 },
-  band: {
-    display: 'flex', alignItems: 'flex-start', gap: 12, padding: '13px 14px', cursor: 'pointer',
-    background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, marginBottom: 8,
-  },
-  radio: { marginTop: 3, width: 20, height: 20, flexShrink: 0, accentColor: RIVER },
-  bandText: { display: 'flex', flexDirection: 'column', gap: 2 },
-  bandLabel: { fontSize: TYPE.body, lineHeight: 1.4, fontWeight: 700, color: INK },
-  bandMoney: { fontSize: TYPE.note, lineHeight: 1.5, color: MUTED, fontVariantNumeric: 'tabular-nums' },
   hint: { fontSize: TYPE.label, lineHeight: 1.5, color: MUTED, textAlign: 'center', margin: '14px 0 0' },
   crossLink: { color: RIVER_DEEP, fontWeight: 700 },
 };

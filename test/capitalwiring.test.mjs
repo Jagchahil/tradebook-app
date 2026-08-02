@@ -393,5 +393,134 @@ export async function confirmTransactionVat() { return true; }
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 9. 🔴 THE CAR HE HAD ALREADY FILED. The half of the fix the pile cannot reach.
+//
+// The pile asks BEFORE a row is confirmed. Walking the live site an hour after it learned to ask:
+// AUDI LEEDS, £60,000, filed under 'van', confirmed, capital_kind null, and no route in the whole
+// product that could change it. Everything typed into /app/money/add lands confirmed. So does
+// everything from WhatsApp. None of them are ever asked. /api/money/capital is the one door that
+// covers all of them, and this section is what makes sure it cannot be pushed open.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n9. Correcting a payment already in his books');
+{
+  // ⚠️ SET BEFORE THE IMPORT. app/app/entryref.ts reads WEB_SESSION_SECRET at module load, so a
+  // secret set afterwards would leave every reference unmintable and every assertion below would
+  // pass for the wrong reason: nothing written, because nothing could be addressed.
+  process.env.WEB_SESSION_SECRET = 'a'.repeat(48);
+
+  const cStage = mkdtempSync(path.join(tmpdir(), 'capwire-correct-'));
+  const put = (name, body) => writeFileSync(path.join(cStage, name), body);
+  for (const f of ['capital', 'taxengine', 'money', 'moneylog']) {
+    put(`${f}.ts`, fix(readFileSync(path.join(lib, `${f}.ts`), 'utf8')));
+  }
+  // The REAL reference module, sealing and opening for real. A stub would make this section a
+  // test of the stub, and the reference is the only thing standing between a hand rolled post and
+  // another man's row.
+  put('entryref.ts', read('app/app/entryref.ts').replace("from '../../lib/moneylog'", "from './moneylog.ts'"));
+  put('nextserver.ts', `
+export class NextRequest {}
+export const NextResponse = {
+  json(body, init) { return { kind: 'json', status: (init && init.status) || 200, body }; },
+  redirect(url, status) { return { kind: 'redirect', status, location: String(url) }; },
+};
+`);
+  put('webauth.ts', "export const who = { id: 'u-1' };\nexport async function sessionUser() { return who.id ? who : null; }\n");
+  put('ratelimit.ts', 'export async function rateLimitedShared() { return false; }\n');
+  put('gateserver.ts', `
+export const gate = { rule: 'ok' };
+export async function gateForUser() { return gate.rule; }
+export function refuseUnentitled() { return { kind: 'json', status: 402, body: { error: 'locked' } }; }
+`);
+  put('supabase.ts', `
+export const state = { calls: [], ok: true };
+export async function setCapitalKind(userId, ids, kind, pct) {
+  state.calls.push({ userId, ids, kind, pct });
+  return state.ok;
+}
+`);
+  put('route.ts', read('app/api/money/capital/route.ts')
+    .replace(/from 'next\/server'/g, "from './nextserver.ts'")
+    .replace(/from '(?:\.\.\/)+app\/entryref'/g, "from './entryref.ts'")
+    .replace(/from '(?:\.\.\/)+lib\/([a-zA-Z]+)'/g, "from './$1.ts'"));
+
+  const RT = await import(pathToFileURL(path.join(cStage, 'route.ts')).href);
+  const DB = await import(pathToFileURL(path.join(cStage, 'supabase.ts')).href);
+  const REF = await import(pathToFileURL(path.join(cStage, 'entryref.ts')).href);
+
+  const ROW = '11111111-2222-4333-8444-555555555555';
+  const mine = REF.entryRef('u-1', ROW, '2026-06');
+  const someoneElses = REF.entryRef('u-2', ROW, '2026-06');
+
+  const post = async (fields, { ok = true } = {}) => {
+    DB.state.calls.length = 0;
+    DB.state.ok = ok;
+    const body = new URLSearchParams(fields);
+    return RT.POST({
+      url: 'https://lekhio.app/api/money/capital',
+      headers: { get: (k) => (k.toLowerCase() === 'content-type' ? 'application/x-www-form-urlencoded' : null) },
+      formData: async () => body,
+    });
+  };
+
+  ok('the reference module is actually configured, so the rest of this section means something',
+    REF.entryRefsConfigured() && mine.length > 20);
+
+  // THE WRITE, AND WHAT IT IS ALLOWED TO TOUCH.
+  {
+    const res = await post({ ref: mine, capital_kind: 'car_other', business_use_pct: '50' });
+    ok('🔴 a car with a band writes his answer against HIS row',
+      DB.state.calls.length === 1 && DB.state.calls[0].userId === 'u-1'
+      && DB.state.calls[0].ids[0] === ROW && DB.state.calls[0].kind === 'car_other'
+      && DB.state.calls[0].pct === 50);
+    ok('and he is sent back to the same line, told it saved',
+      res.kind === 'redirect' && res.status === 303 && String(res.location).includes('saved=1'));
+  }
+  {
+    await post({ ref: mine, capital_kind: 'not_a_car' });
+    ok('"not a car" needs no band and sends none', DB.state.calls[0].kind === 'not_a_car' && DB.state.calls[0].pct === null);
+  }
+
+  // THE FOUR WAYS IN THAT MUST NOT WORK.
+  {
+    await post({ ref: someoneElses, capital_kind: 'car_other', business_use_pct: '50' });
+    ok("🔴 A VALID REFERENCE MINTED FOR ANOTHER MAN WRITES NOTHING", DB.state.calls.length === 0);
+  }
+  {
+    await post({ ref: `${mine}x`, capital_kind: 'car_other', business_use_pct: '50' });
+    ok('a tampered reference writes nothing', DB.state.calls.length === 0);
+  }
+  {
+    await post({ ref: '', capital_kind: 'car_other', business_use_pct: '50' });
+    ok('no reference at all writes nothing', DB.state.calls.length === 0);
+  }
+  {
+    await post({ ref: mine, capital_kind: 'a_spaceship', business_use_pct: '50' });
+    ok('a kind we never offered writes nothing', DB.state.calls.length === 0);
+  }
+
+  // 🔴 THE ONE THAT WOULD HAVE BEEN EASY TO GET WRONG. CAA 2001 s205: a car's allowance is
+  // restricted to the business share. Taking 100% because the field was empty is the same over
+  // claim this feature exists to stop, in a quieter voice.
+  {
+    const res = await post({ ref: mine, capital_kind: 'car_other' });
+    ok('🔴 A CAR WITH NO BAND WRITES NOTHING AND IS SENT BACK TO BE ASKED',
+      DB.state.calls.length === 0 && res.kind === 'redirect'
+      && String(res.location).includes('kind=car_other') && !String(res.location).includes('saved=1'));
+  }
+  {
+    const res = await post({ ref: mine, capital_kind: 'car_other', business_use_pct: '99' });
+    ok('and a band we never offered is not a band either',
+      DB.state.calls.length === 0 && String(res.location).includes('kind=car_other'));
+  }
+
+  // The failure is told, never dressed up.
+  {
+    const res = await post({ ref: mine, capital_kind: 'car_other', business_use_pct: '50' }, { ok: false });
+    ok('a failed write says so rather than reporting a save that did not happen',
+      String(res.location).includes('problem=capital') && !String(res.location).includes('saved=1'));
+  }
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

@@ -258,5 +258,24 @@ ok('mixed case and a reference do not break it', cat('Transport for London 12345
 ok('it did not start swallowing unrelated lines', cat('LONDON STONE PAVING') !== 'travel');
 ok('a merchant in another rule is untouched', cat('SCREWFIX DIRECT') === 'materials');
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// SELF STORAGE THAT IS NOT ONE OF THE SIX NATIONAL BRANDS.
+//
+// Walking a real statement on 2 August 2026: KIRKSTALL SELF STORAGE, £1,040 across four payments,
+// suggested as nothing at all, because the rule was a brand list. A tradesman's storage unit is
+// where his gear lives and it is one of the most ordinary costs in this trade.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nSelf storage, including the independents');
+ok('🔴 KIRKSTALL SELF STORAGE is rent, and it used to be nothing',
+  cat('KIRKSTALL SELF STORAGE') === 'rent');
+ok('so is any other independent', cat('HOLBECK SELF-STORAGE LTD') === 'rent');
+ok('and a storage unit by that name', cat('ARMLEY STORAGE UNIT 14') === 'rent');
+ok('CONTROL: the national brands still work', cat('BIG YELLOW SELF STORAGE') === 'rent');
+// 🔴 THE RULE THIS FILE EXISTS TO PROTECT. The bare word "rent" must never match, because a man's
+// own house rent is not a business cost and claiming it is a wrong return in his name.
+ok('🔴 AND THE BARE WORD "rent" STILL MATCHES NOTHING', cat('RENT') === 'other');
+ok('nor a standing order that just says rent', cat('SO RENT PAYMENT') === 'other');
+ok('cloud storage is not premises', cat('GOOGLE CLOUD STORAGE') !== 'rent');
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

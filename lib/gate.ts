@@ -246,6 +246,7 @@ export const GATED_ROUTES: GatedRoute[] = [
   // ── The web input layer, 30 July 2026. Capture from the dashboard itself. ─────────────────
   { route: 'app/api/money/manual', rule: 'entitled', why: 'A typed cash entry becoming a logged transaction. Capture is work, the same judgement as voice/complete, and it stops when he stops paying.' },
   { route: 'app/api/money/receipt', rule: 'entitled', why: 'A receipt photograph read by a paid model and written into his books. The same work the WhatsApp capture does, with the same per call cost to us.' },
+  { route: 'app/api/money/capital', rule: 'entitled', why: 'Correcting what a large purchase actually was, on a row already in his books. It changes no money and moves nothing: it changes how much of a cost comes off his profit this year, which is CAA 2001 s38B and was never his choice. Entitled because working his figures out again is work, and his existing rows stay readable and unchanged either way.' },
   { route: 'app/api/money/import', rule: 'entitled', why: 'A whole bank statement read into his books, deterministically and with no AI. It is the bank feed by another door while the feed has no provider, and continuous bookkeeping is the clearest work in the product, so it stops when he stops paying. His existing rows stay readable everywhere.' },
 
   // ── The invoices surface on the web, 30 July 2026. ────────────────────────────────────────

@@ -185,15 +185,23 @@ export async function POST(req: NextRequest) {
       normaliseVendor,
     );
     if (hit && hit.strength === 'same') {
-      // ⚠️ THE MERGE CARRIES NO VAT, AND THAT IS A GAP RATHER THAN A DECISION.
-      // mergeIntoTransaction copies a fixed list of fields and vat_amount is not on it, so a
-      // registered man whose receipt folds into a bank line loses the reading. He is no worse
-      // off than he was yesterday, when there was no reading at all, and the row is still his
-      // to answer on /app/pile. Closing it means adding vat_amount to that patch in
-      // lib/supabase.ts, which is not this file's to change.
+      // 🔴 THE MERGE CARRIES THE VAT NOW. The note that stood here said why it did not:
+      // mergeIntoTransaction copied a fixed list of fields and vat_amount was not on it, so a
+      // registered man whose receipt folded into a bank line lost the reading entirely. Closed on
+      // 2 August 2026 by adding it to that patch, which is where the "not this file's to change"
+      // pointed.
+      //
+      // ⚠️ receiptVat AND NOT parsed.vat. The gating above already asked whether this man is VAT
+      // registered at all, and writing a VAT figure onto the row of a man who is not is noise on
+      // a screen he should never see a VAT word on.
+      //
+      // ⚠️ IT ARRIVES UNCONFIRMED, exactly as on a fresh row. vat_confirmed is not on the patch,
+      // so the column keeps its false, and /app/pile asks him to agree the figure before a penny
+      // of it counts towards a reclaim he has to stand behind at an inspection.
       await mergeIntoTransaction(user.id, String(hit.match.id), {
         vendor: parsed.merchant_name,
         category: parsed.category,
+        ...(receiptVat !== null ? { vat_amount: receiptVat } : {}),
         // The bank line keeps the figures; the receipt gives it the shop name, the category,
         // and now the photograph. Only passed when storage actually kept one.
         ...(storedPath ? { raw_input_url: storedPath } : {}),

@@ -5833,7 +5833,9 @@ export async function transactionsInMonth(
         + '&confirmed=eq.true'
         + `&transaction_date=gte.${monthStart(month)}`
         + `&transaction_date=lt.${monthEnd(month)}`
-        + '&select=id,amount,vendor,category,transaction_date,description,is_personal'
+        // capital_kind and business_use_pct so app/app/entry can ask, and show, what a large
+        // purchase was. See supabase/APPLY_2026-08-02_capital_kind.sql: null means nobody asked.
+        + '&select=id,amount,vendor,category,transaction_date,description,is_personal,capital_kind,business_use_pct'
         + '&order=transaction_date.desc&limit=2000',
       { headers: headers() },
     );
@@ -6007,6 +6009,16 @@ export async function mergeIntoTransaction(
     category?: string | null;
     raw_input_url?: string | null;
     raw_whatsapp_message_id?: string | null;
+    // 🔴 THE VAT THE RECEIPT SAW. app/api/money/receipt/route.ts carried a note from the day it
+    // was written saying its absence here was a gap rather than a decision: a registered man
+    // whose receipt folded into a bank line lost the reading, and a bank line has no VAT of its
+    // own to lose. Closed 2 August 2026.
+    //
+    // ⚠️ THE FIGURE ONLY. vat_confirmed is NOT on this list and must never be. This is a model's
+    // reading of a crumpled bit of paper: it arrives unconfirmed exactly as it does on a fresh
+    // row, /app/pile prints it and asks him to agree it, and confirmTransactionVat is the only
+    // thing anywhere that flips it. Leaving the column alone leaves it false, which is right.
+    vat_amount?: number | null;
   },
 ): Promise<boolean> {
   const { url } = config();
@@ -6015,18 +6027,38 @@ export async function mergeIntoTransaction(
   if (patch.category !== undefined && patch.category !== null) row.category = patch.category;
   if (patch.raw_input_url !== undefined) row.raw_input_url = patch.raw_input_url;
   if (patch.raw_whatsapp_message_id !== undefined) row.raw_whatsapp_message_id = patch.raw_whatsapp_message_id;
+  // A null or a zero writes nothing rather than clearing what is there. A receipt that showed no
+  // VAT is not an instruction to erase a figure the row already had.
+  const withVat = typeof patch.vat_amount === 'number' && Number.isFinite(patch.vat_amount) && patch.vat_amount > 0;
+  if (withVat) row.vat_amount = patch.vat_amount;
   // Deliberately NOT touching amount or transaction_date: the bank's figures are
   // facts and must survive the merge. See lib/dedupe.ts.
 
-  const res = await fetch(
+  const send = (body: Record<string, unknown>) => fetch(
     `${url}/rest/v1/transactions?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}`,
     {
       method: 'PATCH',
       headers: headers({ Prefer: 'return=minimal' }),
-      body: JSON.stringify(row),
+      body: JSON.stringify(body),
     },
   );
-  return res.ok;
+
+  const res = await send(row);
+  if (res.ok) return true;
+
+  // 🔴 A VAT READING MUST NEVER COST HIM THE MERGE, AND THE MERGE IS WORTH MORE THAN THE READING.
+  //
+  // The same rule app/api/money/receipt/route.ts applies to its insert, and the reason is the
+  // same: on a database where supabase/APPLY_2026-08-01_vat.sql has not been run, naming the
+  // column is enough for PostgREST to refuse the whole statement. On an insert that costs him the
+  // receipt. Here it would cost him the shop name, the category and the photograph as well, and
+  // the caller does not check what comes back. So the second attempt drops the reading and keeps
+  // everything that matters more.
+  if (!withVat) return false;
+  const { vat_amount: _dropped, ...rest } = row;
+  void _dropped;
+  const retry = await send(rest);
+  return retry.ok;
 }
 
 // --- the daily digest ---------------------------------------------------------

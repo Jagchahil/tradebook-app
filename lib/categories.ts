@@ -127,6 +127,13 @@ const CATEGORY_MAP: Array<[RegExp, Category]> = [
   // completely different things depending on which door it is paying for.
   [/\b(regus|iwg\b|spaces works|wework|workspace group|bizspace|the office group|landmark space|orega|clockwise offices|huckletree|patch work)\b/i, 'rent'],
   [/\b(big yellow|safestore|access self storage|storage king|shurgard|lok'?n ?store)\b/i, 'rent'],
+  // 🔴 AND THE INDEPENDENTS, WHICH IS MOST OF THEM. Walking a real statement on 2 August 2026:
+  // KIRKSTALL SELF STORAGE, £1,040 across four payments, filed under nothing at all because the
+  // rule above is a brand list. A tradesman's storage unit is where his gear lives and it is one
+  // of the most ordinary costs in this trade; we were making him hunt it out of twenty four
+  // options every month. Unlike the bare word "rent" there is nothing ambiguous here, because
+  // nobody lives in one.
+  [/\b(self[ -]?storage|storage unit|storage centre|storage center)\b/i, 'rent'],
   [/\b(unit rent|shop rent|premises rent|office rent|studio rent|workshop rent|yard rent|rent (?:for|on) (?:the )?(?:unit|shop|premises|office|studio|workshop|yard)|commercial rent|ground rent|service charge)\b/i, 'rent'],
 
   // --- STOCK: GOODS FOR RESALE ------------------------------------------------------------

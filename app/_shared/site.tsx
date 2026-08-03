@@ -425,12 +425,20 @@ export const freeTools = [
   { href: '/free-mtd-filing', icon: '🆓', title: 'Free MTD filing', body: 'A straightforward return, prepared and filed free, forever. Join the list to be first.' },
 ];
 
-export const oldAccountant = [
-  'A bill of £150 to £900 a year, just to file.',
-  'You see them once, at year end, when it is too late to plan.',
+// 🔴 RENAMED FROM oldAccountant AND REWRITTEN, 3 AUGUST 2026, ON JAG'S STEER: do not pick a fight
+// with accountants. They are a referral channel and a future partner, and a product that shames
+// them on price invites trouble from people well placed to cause it for a tax product.
+//
+// ⚠️ EVERY PAIN SURVIVES, BECAUSE EVERY PAIN IS REAL. The shoebox, the jargon, the wait, finding
+// out too late. What went is the profession as the villain and the price tag on their work. The
+// name went with it: a constant called oldAccountant is a reminder of who we were arguing with,
+// and the next person to write copy from it would have written the argument again.
+export const oldWay = [
+  'A bill you only find out about in January.',
+  'Looking at last year, when it is too late to plan.',
   'A shoebox of receipts to dig out every January.',
   'Jargon and forms you do not follow.',
-  'Days, sometimes weeks, for a simple answer.',
+  'Waiting days, sometimes weeks, for a simple answer.',
 ];
 
 export const lekhioWay = [
@@ -543,22 +551,70 @@ export const faqs = [
 // ⚠️ WHATSAPP IS NOT DELETED FROM THE SITE, it is demoted from the hero. It is still how a man sends
 // a receipt and it is still named in the copy below. It is a door, not the house.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-export const heroReport: { label: string; value: string }[] = [
-  { label: 'Payments sorted', value: '62' },
-  { label: 'Reliefs found', value: '£1,390' },
-  { label: 'Put by for tax', value: '£3,240' },
+// 🔴 IT DOES NOT LIST WHAT AN EMPLOYEE DID. IT SHOWS ONE DOING IT. Jag, 3 August 2026: "can we make
+// the animation in the hero section look and feel more like an employee and act like an employee
+// that costs 12.99 a month as opposed to hundreds or even thousands."
+//
+// The first version was already the right CONTENT, and it was still a list of facts fading in. An
+// employee is not a list of facts, it is somebody getting on with it while you are somewhere else.
+// So every line arrives as work IN HAND and resolves to work DONE, one after another, and the last
+// line of the report is what the whole shift cost you.
+//
+// ⚠️ THE COST ROW IS THE ARGUMENT AND IT ASSERTS NOTHING. Three rows of what was done, then one row
+// of what it cost, in the same shape. The reader does the comparison, we never make it, so nobody
+// is named and no competitor's price is printed as fact on our front door. Doc 108 also stands:
+// NEVER price on the saving, so the cost sits against the WORK, never against the £1,390.
+export const heroWork: { doing: string; label: string; value: string }[] = [
+  { doing: 'Reading your statement', label: 'Payments sorted', value: '62' },
+  { doing: 'Checking what you can claim', label: 'Reliefs found', value: '£1,390' },
+  { doing: 'Working out your tax', label: 'Put by for tax', value: '£3,240' },
 ];
 export const heroSpot = {
   head: 'One thing worth a look',
   body: 'Your CIS refund is running at £1,120. That is your money, sitting with HMRC.',
 };
-const HERO_LOOP = 9.5;
-const rowAppear = [4, 16, 28, 42, 58];
+export const heroCost = { label: 'What it cost you', value: '£12.99' };
+// ⚠️ TIMED BY WATCHING IT, NOT BY GUESSING. The first pass ran an 11s loop with 8% of work in hand
+// per row, which is under a second: every line was already finished before a human could read that
+// it was happening, so it was a list fading in again, exactly the thing this replaced. And the gap
+// between the last row landing and the flagged item arriving left a large empty panel that reads as
+// a broken card rather than as a pause.
+//
+// Now: about 1.3s of visible work per line, the whole shift done inside six seconds, and the
+// finished report held for seven, which is the state most visitors will actually see.
+// 🔴 ONLY THE WORK ANIMATES. THE ARGUMENT IS ALWAYS ON SCREEN.
+// The second pass revealed the flagged item, the cost line and the Approve button on the same
+// stagger as the rows, and watching it showed what that costs: the card sat half empty for six
+// seconds out of every fourteen, and the six seconds it hid were the cost line and the button,
+// which are the entire point of the panel. A visitor who glances once has a better than even
+// chance of glancing then. So the report below the rows is STATIC and always complete, and the
+// only thing that moves is the employee working through the list.
+const HERO_LOOP = 14;
+// Row i starts at rowAppear[i], as a percentage of the loop. WORK_FOR is how long each line is
+// visibly in hand before it lands: about 1.3 seconds, which is long enough to read.
+const rowAppear = [2, 14, 26];
+const WORK_FOR = 9;
 export const reportCss =
-  `.hrow{opacity:0}` +
-  `@media (prefers-reduced-motion: reduce){.hrow{opacity:1 !important;animation:none !important;transform:none !important}}` +
+  // ⚠️ THE FINISHED STATE IS THE BASE STATE. The done label and value are visible with no animation
+  // at all and the "in hand" line is the thing that has to be animated IN, so a browser that runs
+  // no animations shows a complete, readable report rather than an empty card.
+  `.hrow{opacity:0}.hr-doing{opacity:0}` +
+  `@media (prefers-reduced-motion: reduce){.hrow{opacity:1 !important}.hr-doing{display:none !important}` +
+  `.hrow,.hr-doing,.hr-done{animation:none !important;transform:none !important}}` +
   rowAppear
-    .map((a, i) => `@keyframes hrow${i}{0%,${a}%{opacity:0;transform:translateY(8px)}${a + 4}%,93%{opacity:1;transform:none}98%,100%{opacity:0}}.hrow${i}{animation:hrow${i} ${HERO_LOOP}s infinite}`)
+    .map((a, i) => {
+      const done = a + WORK_FOR;
+      return (
+        `@keyframes hrow${i}{0%,${a}%{opacity:0;transform:translateY(8px)}${a + 3}%,94%{opacity:1;transform:none}98%,100%{opacity:0}}`
+        + `.hrow${i}{animation:hrow${i} ${HERO_LOOP}s infinite}`
+        // the line of work in hand: in as the row arrives, out as it lands
+        + `@keyframes hdoing${i}{0%,${a}%{opacity:0}${a + 3}%,${done - 2}%{opacity:1}${done}%,100%{opacity:0}}`
+        + `.hdoing${i}{animation:hdoing${i} ${HERO_LOOP}s infinite}`
+        // and the result, which only exists once the work is finished
+        + `@keyframes hdone${i}{0%,${done}%{opacity:0}${done + 2}%,94%{opacity:1}98%,100%{opacity:0}}`
+        + `.hdone${i}{animation:hdone${i} ${HERO_LOOP}s infinite}`
+      );
+    })
     .join('');
 
 // ---------- helper components ----------
@@ -762,33 +818,49 @@ export function HeroReport() {
 .hr-eye{font-size:10.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--tx-mut)}
 .hr-h{font-size:16px;font-weight:800;color:var(--tx);margin-top:3px}
 .hr-body{padding:6px 18px 18px}
-.hr-r{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--bd)}
+.hr-r{position:relative;display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--bd);min-height:24px}
+.hr-doing{position:absolute;left:0;right:0;top:13px;font-size:13.5px;color:var(--tx-mut);display:flex;align-items:center;gap:7px}
+.hr-dot{width:6px;height:6px;border-radius:999px;background:var(--river);flex:none;animation:hrpulse 1.1s ease-in-out infinite}
+@keyframes hrpulse{0%,100%{opacity:.35}50%{opacity:1}}
+@media (prefers-reduced-motion: reduce){.hr-dot{animation:none}}
 .hr-l{font-size:13.5px;color:var(--tx-mut)}
 .hr-v{font-size:20px;font-weight:800;color:var(--tx);font-variant-numeric:tabular-nums}
 .hr-spot{background:var(--saffron-tint);border-radius:14px;padding:13px 14px;margin-top:15px}
 .hr-sh{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--on-saffron-tint)}
 .hr-sb{font-size:13.5px;line-height:1.5;color:var(--tx);margin-top:5px}
-.hr-btn{margin-top:15px;background:var(--river);color:var(--on-river);border-radius:12px;text-align:center;font-size:15px;font-weight:800;padding:13px}
+.hr-cost{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:15px;padding-top:14px;border-top:2px solid var(--bd)}
+.hr-cl{font-size:13.5px;font-weight:700;color:var(--tx)}
+.hr-cv{font-size:20px;font-weight:800;color:var(--river);font-variant-numeric:tabular-nums}
+.hr-btn{margin-top:14px;background:var(--river);color:var(--on-river);border-radius:12px;text-align:center;font-size:15px;font-weight:800;padding:13px}
 .hr-note{font-size:11.5px;line-height:1.45;color:var(--tx-mut);text-align:center;margin-top:11px}
 ` }} />
       <div className="hr-top">
-        <div className="hr-eye">Lekhio</div>
+        <div className="hr-eye">Your first employee</div>
         <div className="hr-h">Your month, so far</div>
       </div>
-      <div className="hr-body" style={{ minHeight: 380 }}>
-        {heroReport.map((r, i) => (
+      <div className="hr-body">
+        {heroWork.map((r, i) => (
           <div key={r.label} className={`hrow hrow${i} hr-r`}>
-            <span className="hr-l">{r.label}</span>
-            <span className="hr-v">{r.value}</span>
+            {/* The work in hand. aria-hidden so a screen reader is read the finished report once,
+                rather than every line twice in two tenses. */}
+            <span className={`hr-doing hdoing${i}`} aria-hidden="true">
+              <i className="hr-dot" />{r.doing}
+            </span>
+            <span className={`hr-l hdone${i}`}>{r.label}</span>
+            <span className={`hr-v hdone${i}`}>{r.value}</span>
           </div>
         ))}
-        <div className={`hrow hrow${heroReport.length} hr-spot`}>
+        <div className="hr-spot">
           <div className="hr-sh">{heroSpot.head}</div>
           <div className="hr-sb">{heroSpot.body}</div>
         </div>
-        <div className={`hrow hrow${heroReport.length + 1} hr-btn`}>Approve</div>
-        {/* Not a footnote further down the page. A panel of specific pounds with no owner reads as
-            somebody's real month, and it costs one row to say otherwise on the card itself. */}
+        {/* 🔴 THE LAST LINE OF THE REPORT IS THE PRICE, in the same shape as the work above it, so
+            the contrast is structural rather than claimed. We never say what the alternative costs. */}
+        <div className="hr-cost">
+          <span className="hr-cl">{heroCost.label}</span>
+          <span className="hr-cv">{heroCost.value}</span>
+        </div>
+        <div className="hr-btn">Approve</div>
         <p className="hr-note">An example month. Your figures are your own, and nobody else ever sees them.</p>
       </div>
     </div>

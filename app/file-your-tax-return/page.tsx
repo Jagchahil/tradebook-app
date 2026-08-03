@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   alternates: { canonical: '/file-your-tax-return' },
   openGraph: {
-    title: 'File your own tax return. Stop paying for a 15 minute job.',
+    title: 'File your own tax return. The form is the easy part.',
     description:
       'A free, plain English guide for the UK self employed. The steps, the deadlines, the expenses you can claim by trade, and what Making Tax Digital means for you.',
     type: 'article',
@@ -419,10 +419,10 @@ export default function FileYourTaxReturnPage() {
           Free guide &middot; no sign up needed
         </div>
         <h1 style={{ fontSize: 40, lineHeight: 1.12, fontWeight: 700, letterSpacing: '-1px', margin: '0 0 18px' }}>
-          File your own tax return.<br />Stop paying for a 15 minute job.
+          File your own tax return.<br />The form is the easy part.
         </h1>
         <p style={{ fontSize: 19, color: MUTED, lineHeight: 1.6, maxWidth: 600, margin: '0 auto 14px' }}>
-          An accountant charges a few hundred pounds to fill in a form that, once your records are in order, takes about 15 minutes. Here is exactly how to do it yourself, in plain English, for free.
+          Once your records are in order, the form itself takes about 15 minutes. Here is exactly how to do it yourself, in plain English, for free.
         </p>
         <p style={{ fontSize: 15, color: MUTED, lineHeight: 1.6, maxWidth: 600, margin: '0 auto 26px' }}>
           The honest bit: the 15 minutes is the form. The hard part was always the year of receipts behind it. That is the part Lekhio does for you, so the form really is 15 minutes.

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import { bankFeedLive, filingBadge } from '../lib/features';
+import { bankFeedLive, filingBadge, alertChannels } from '../lib/features';
 import {
   INK, PAPER, FONT, SITE, faqs, reviews,
   SharedHead, SiteNav, SiteFooter, StickyCta, HeroReport, Ic,
@@ -263,17 +263,24 @@ export default function HomePage() {
           <div>
             <span className="pill"><span className="dot" /> Your first employee. The one that pays for itself.</span>
             <h1>Your first<br />employee.<br />The one that <span className="gt">saves you money.<svg className="squig" viewBox="0 0 320 16" preserveAspectRatio="none"><path d="M4 11 C 60 3, 110 3, 150 9 S 260 15, 316 6" /></svg></span></h1>
-            <p className="sub">Snap a receipt, import your bank statement, or just say what you spent. Lekhio sorts the lot in the background and finds the tax you never need to pay. Filing is the easy part. Saving you money is the job. You approve, it does the rest.</p>
-            {/* 🔴 THE LINE THAT CHANGES WHAT WE ARE COMPARED TO, doc 104 section 9, angle 1.
-                "As software, we are a £12.99 app next to a £7 Xero and a £0 Monzo bundle, and we
-                lose that fight on price forever. As an employee, we are £12.99 a month next to an
-                accountant at £500 to £2,000 a year who answers on Tuesdays."
-                The headline had said "employee" for weeks without ever naming what an employee is
-                measured against, so the reframe was asserted and never argued. This is the whole
-                argument, in one sentence, above the fold.
-                ⚠️ NO FIGURE FOR THE ACCOUNTANT. Doc 104 carries a range, but a competitor's price
-                printed as fact on our own front door is a number we cannot source per customer. */}
-            <p className="vs">An accountant costs hundreds a year and answers on Tuesdays. Your first hire costs £12.99 a month and answers now.</p>
+            <p className="sub">Snap a receipt or just say what you spent. Lekhio sorts it and finds the tax you never need to pay. Filing is the easy part. Saving you money is the job.</p>
+            {/* 🔴 THE LINE THAT CHANGES WHAT WE ARE COMPARED TO, doc 104 section 9, angle 1: as
+                software we are a £12.99 app next to a £7 Xero and we lose on price forever, and as
+                an employee £12.99 is remarkable. The headline had said "employee" for weeks without
+                ever making that argument, so the reframe was asserted and never earned.
+
+                🔴 AND IT NAMES NOBODY, ON JAG'S CALL, 3 AUGUST 2026. The first version read "An
+                accountant costs hundreds a year and answers on Tuesdays", which is doc 104's own
+                wording. His steer: do not pick a fight with accountants. They are a referral
+                channel and a future partner, not the enemy, and a shot fired from the front door
+                invites one back at a product they could make trouble for.
+
+                ⚠️ SO THE PRICE DOES THE WORK ON ITS OWN. Everybody already knows what the
+                alternative costs; we do not have to be the ones to say it, and saying it would put
+                a number on our front door that we cannot source per customer anyway.
+                ⚠️ DOC 104 SECTION 9 STILL CARRIES THE OLD LINE. It needs updating to match this,
+                or the next person to read the doctrine will "restore" the fight. */}
+            <p className="vs">Your first hire costs £12.99 a month, and it never clocks off.</p>
             <div className="cta-row">
               <Link href="/start" className="btn primary">Start free</Link>
               <Link href="/product" className="btn ghost">See how it works</Link>
@@ -315,8 +322,11 @@ export default function HomePage() {
               <ul>
                 <li><span className="m">✕</span> A shoebox of receipts you dread opening.</li>
                 <li><span className="m">✕</span> A lost weekend every January.</li>
-                <li><span className="m">✕</span> An accountant who takes days to reply.</li>
-                <li><span className="m">✕</span> A £150 to £900 bill, just to file.</li>
+                {/* Both of these used to name an accountant and his bill. The pain is real and it
+                    stays; the villain does not, per Jag's steer on 3 August. The old way is hard
+                    whoever you pay to help with it. */}
+                <li><span className="m">✕</span> Nobody to ask at the moment it matters.</li>
+                <li><span className="m">✕</span> A January bill you never saw coming.</li>
                 <li><span className="m">✕</span> Paying more tax than you needed to.</li>
               </ul>
             </div>
@@ -389,7 +399,9 @@ export default function HomePage() {
       <section>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 44 }}>
-            <h2 className="h2">More than an accountant. An employee.</h2>
+            {/* Doc 104's own framing, and it names nobody: "not software you buy, the first
+                employee a business ever hires". It used to read "More than an accountant". */}
+            <h2 className="h2">Not another app. An employee.</h2>
             <p className="lead">It keeps the books, and then it does the bit that actually puts money back in your pocket.</p>
           </div>
 
@@ -483,16 +495,25 @@ export default function HomePage() {
       <section style={{ background: 'var(--river-tint)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 40 }}>
-            <div className="eyebrow">The expert in your pocket</div>
-            <h2 className="h2">Two helpers. Day and night.</h2>
-            <p className="lead">The brains of an accountant, in the chat you already use. One answers the second you ask. One watches your money and speaks up before you have to.</p>
+            {/* 🔴 REWRITTEN 3 AUGUST 2026 ON JAG'S STEER: "puchio and rakha need to be sold a lot
+                better, the point of this employee is to save them money."
+                They were sold as FEATURES. "Any tax question, straight answer" and "It watches your
+                numbers for you" describe what they do and never once say what it is worth, which on
+                a page whose own headline is "the one that saves you money" is the argument being
+                dropped exactly where it should land.
+                ⚠️ AND THE LEAD NAMED THE CHANNEL: "the brains of an accountant, IN THE CHAT YOU
+                ALREADY USE". Wave A took the messaging app out of the picture and this sentence
+                survived it, because a sweep for a palette cannot see prose. */}
+            <div className="eyebrow">Where the money comes from</div>
+            <h2 className="h2">Two of them. Both looking for money.</h2>
+            <p className="lead">One answers the second you ask, so you never guess at what you can claim. One watches your figures all year and speaks up when there is money in it.</p>
           </div>
           <div className="helpers reveal">
             <div className="hcard">
               <div className="hicon" style={{ background: 'var(--river-tint)' }}><Ic e="💬" color="var(--river)" size={26} /></div>
-              <div className="role">Puchio · answers when you ask</div>
-              <h3>Any tax question, straight answer.</h3>
-              <p>Ask anything in plain English and get a clear answer in seconds, worked on your real numbers. No jargon, no waiting days for a callback.</p>
+              <div className="role">Puchio · answers the second you ask</div>
+              <h3>Never guess what you can claim.</h3>
+              <p>Most money is lost to a cost you were not sure counted, so you left it off. Ask in plain English and get a straight answer in seconds, worked on your own figures. Every answer says which rule it comes from.</p>
               <div className="hchat">
                 <div className="dbub out">can I claim my work boots?</div>
                 <div className="dbub in">Yes, protective boots for work are an allowable expense. Snap the receipt and I will log it.</div>
@@ -500,9 +521,14 @@ export default function HomePage() {
             </div>
             <div className="hcard">
               <div className="hicon" style={{ background: 'var(--saffron-tint)' }}><Ic e="🛡️" color="var(--saffron-deep)" size={26} /></div>
-              <div className="role">Rakha · speaks before you ask</div>
-              <h3>It watches your numbers for you.</h3>
-              <p>A threshold creeping up, a deadline, an unpaid invoice, a moment a purchase saves real tax. Rakha spots it and tells you first. Suggestions, never actions.</p>
+              <div className="role">Rakha · looks while you are working</div>
+              <h3>It finds the money you would have missed.</h3>
+              {/* 🔴 alertChannels() ADDED HERE, AND IT WAS MISSING. /product has said "on your
+                  dashboard, the next time you open it" since 2 August, because remindersLive() is
+                  false and no channel can deliver a message that reaches him when he is not
+                  looking. This card said "Rakha spots it and tells you first" with no such gate, so
+                  the two pages promised different things about the same agent. */}
+              <p>A relief you have not claimed, a purchase that would save real tax before April, an invoice nobody has paid, a threshold you are about to cross. Rakha finds it and tells you {alertChannels()}, while there is still time to act on it. It suggests, never acts.</p>
               <div className="hchat">
                 <div className="dbub in" style={{ background: 'var(--saffron-tint)', border: '1px solid var(--saffron)' }}>Heads up: you are about £900 from the VAT threshold. Worth planning before you cross it.</div>
                 <div className="dbub in" style={{ background: 'var(--saffron-tint)', border: '1px solid var(--saffron)' }}>Invoice 0012 is 18 days late. Want me to draft a chase in your voice?</div>

@@ -260,6 +260,19 @@ ok('the how it works list names no messaging channel as step one', !/WhatsApp/.t
 ok('🔴 IT SHOWS WHAT THE EMPLOYEE DID, and ends on the one button doc 104 says the product is',
   /export function HeroReport/.test(site) && /Payments sorted/.test(site)
   && />Approve</.test(codeOnly(site)));
+// 🔴 AND IT SHOWS THE WORK BEING DONE, NOT A LIST OF FACTS FADING IN. Jag: make it act like an
+// employee. Every line arrives as work in hand and resolves to work done, which is why each row
+// carries both a `doing` string and a result.
+ok('🔴 EVERY ROW IS WORK IN HAND BEFORE IT IS A RESULT',
+  /doing: '/.test(site) && /hdoing\$\{i\}/.test(site) && /hdone\$\{i\}/.test(site));
+ok('...and the in hand line is hidden from screen readers, so the report is read once, not twice',
+  /className=\{`hr-doing hdoing\$\{i\}`\} aria-hidden="true"/.test(site));
+// 🔴 THE LAST LINE OF THE REPORT IS THE PRICE, in the same shape as the work above it. The reader
+// makes the comparison; we never make it, so nobody is named and no rival's price is printed here.
+ok('🔴 THE REPORT ENDS ON WHAT IT COST, and the figure is the real one',
+  /heroCost = \{ label: 'What it cost you', value: '£12\.99' \}/.test(site));
+ok('...and the cost is set against the WORK, never against the money found (doc 108)',
+  !/heroCost[\s\S]{0,200}(saving|saved|£1,390)/i.test(site));
 ok('🔴 AND IT SAYS ON THE CARD THAT THE FIGURES ARE AN EXAMPLE, not in a footnote elsewhere',
   /An example month\. Your figures are your own/.test(site));
 // Every colour a token, or dark mode needs a second set of overrides to undo the first.
@@ -323,9 +336,37 @@ ok('🔴 AND THE HOMEPAGE RENDERS IT, or the component is a nicely tested orphan
   /<HeroReport \/>/.test(home) && !/HeroPhone/.test(codeOnly(home)));
 // Doc 104 section 9 angle 1: the reframe is worthless if the site never names what an employee is
 // measured against. It said "employee" for weeks and never once said "instead of what".
-ok('🔴 THE HERO NAMES WHAT AN EMPLOYEE IS COMPARED TO: an accountant, not a bookkeeping app',
-  /An accountant costs hundreds a year and answers on Tuesdays/.test(home)
-  && /£12\.99 a month and answers now/.test(home));
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS GUARD PINNED "An accountant costs hundreds a year and answers on Tuesdays", WHICH IS DOC
+// 104's OWN WORDING, AND JAG OVERRULED IT THE SAME DAY: do not pick a fight with accountants. They
+// are a referral channel and a future partner, and a shot fired from the front door invites one
+// back from people well placed to cause trouble for a tax product.
+//
+// The CLAIM the guard was made for survives: the hero must still make the employee argument rather
+// than assert the word. What changed is that the argument now names nobody, and the price is left
+// to do the work, because everybody already knows what the alternative costs.
+//
+// ⚠️ AND IT NOW POLICES THE OTHER DIRECTION TOO. The front door is the page most likely to grow a
+// jab back, so the sweep below fails if any public page shames a profession on price or speed.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+ok('🔴 THE HERO STILL MAKES THE EMPLOYEE ARGUMENT rather than just using the word',
+  /Your first hire costs £12\.99 a month/.test(home) && /never clocks off/.test(home));
+ok('🔴 AND IT PICKS A FIGHT WITH NOBODY',
+  !/accountant/i.test(codeOnly(home).slice(codeOnly(home).indexOf('className="vs"') - 200,
+    codeOnly(home).indexOf('className="vs"') + 300)));
+const JABS = [
+  /accountant[^.<]{0,40}(takes days|days to reply)/i,
+  /(£[\d,]+ to £[\d,]+)[^.<]{0,30}just to file/i,
+  /none of the bill/i,
+  /stop paying for a \d+ minute job/i,
+  /an accountant charges/i,
+];
+for (const f of publicPages) {
+  const src = codeOnly(read(rel(f)));
+  for (const jab of JABS) {
+    ok(`${rel(f)} does not shame a profession on price or speed (${jab.source.slice(0, 24)})`, !jab.test(src));
+  }
+}
 ok('the homepage names no messaging channel at all', !/WhatsApp/.test(home));
 
 // The steps array only, never the whole file: "Connect your bank" is legitimate inside the

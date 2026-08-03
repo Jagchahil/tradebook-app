@@ -357,19 +357,25 @@ export default function ProductPage() {
         </div>
       </section>
 
-      {/* Beat the accountant, short */}
+      {/* 🔴 THIS BLOCK WAS COMMENTED "Beat the accountant" AND READ LIKE IT. Jag's steer, 3 August
+          2026: do not pick a fight with accountants. They are a referral channel and a future
+          partner, and a product that shames them on price invites the trouble they are well placed
+          to cause. The pains are all still here, because they are real. The villain is the old way
+          of doing it, not a profession. */}
       <section>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 36 }}>
             <div className="eyebrow">The expert in your pocket</div>
-            <h2 className="h2">The brains of an accountant. None of the bill.</h2>
+            {/* The compliment stays and the jab goes. "The brains of an accountant" is a good thing
+                to be; "none of the bill" was the shot. */}
+            <h2 className="h2">The brains of an accountant, on call all year.</h2>
           </div>
           <div className="ba reveal" style={{ maxWidth: 900, margin: '0 auto' }}>
-            <div className="old"><h3>A traditional accountant</h3><ul>
-              <li><span className="m">✕</span> £150 to £900 a year, just to file.</li>
-              <li><span className="m">✕</span> You see them once, when it is too late to plan.</li>
+            <div className="old"><h3>The old way</h3><ul>
+              <li><span className="m">✕</span> A bill you only find out about in January.</li>
+              <li><span className="m">✕</span> Looking at last year, when it is too late to plan.</li>
               <li><span className="m">✕</span> A shoebox to dig out every January.</li>
-              <li><span className="m">✕</span> Days for a simple answer.</li>
+              <li><span className="m">✕</span> Waiting days for a simple answer.</li>
             </ul></div>
             <div className="new"><h3>The Lekhio way</h3><ul>
               <li><span className="m">✓</span> One flat price, everything in.</li>

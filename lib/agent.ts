@@ -11,7 +11,7 @@
 // finance products (the FCA line, doc 82 section 5). Visibly automated.
 // Writing rule: no em dashes, no en dashes anywhere, including every message.
 
-import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly } from './taxengine';
+import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly, mtdPosition } from './taxengine';
 import { studentLoanForSA, STUDENT_PLANS, type StudentPlan } from './nistudentloan';
 import { aprilDelta, PROPERTY_FACTS } from './propertyengine';
 import { chaseMessage } from './waintents';
@@ -86,6 +86,25 @@ export interface AgentInput {
   // the stored default, which treats the whole profit as theirs until they tell us otherwise.
   // Ignored for every other structure, so a sole trader cannot be accidentally halved.
   partnershipShare?: number;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHETHER HMRC HAS WRITTEN TO HIM ABOUT MAKING TAX DIGITAL. HIS ANSWER, NOT OUR ARITHMETIC.
+  //
+  // This engine watches THIS year's money, and HMRC decides mandation from a return already filed
+  // (2024/25 for April 2026), then writes to the people it has assessed. So two signals in this
+  // file were stating a legal conclusion off a figure that cannot support one: mtd_mandation and
+  // mtd_combined_trap both opened "Making Tax Digital applies to you" on year to date or projected
+  // gross. They now describe the figure, name the real test, and ask him.
+  //
+  // ⚠️ REQUIRED, NOT OPTIONAL, and both routes that build an AgentInput were named by tsc for it.
+  // Optional-with-a-default is how this codebase wrote the projection bug twice: it keeps the old
+  // behaviour alive for whoever did not read the memo, silently, for ever.
+  //
+  // ⚠️ IT IS THE RAW ANSWER RATHER THAN A CALL INTO lib/circumstances.ts, ON PURPOSE. Two suites
+  // stage this module with a FIXED dependency list and Node's type stripping cannot resolve an
+  // extensionless import, so a new import here breaks both on module resolution rather than on
+  // anything real. The routes map the answer with mtdStatedFrom() before it gets here.
+  mtdStated: 'yes' | 'no' | null;
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 THE SECOND AXIS: WHETHER HE TRADES AT ALL, WHICH businessType CANNOT ANSWER.
@@ -433,7 +452,22 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
   const rentsYtd = input.property?.rents ?? 0;
   const tradeGrossYtd = Math.max(0, d.ytdIncome - rentsYtd);
   const combinedTrap = rentsYtd > 0 && tradeGrossYtd < mtdThreshold && d.ytdIncome >= mtdThreshold;
-  if (combinedTrap) {
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HIS OWN ANSWER SILENCES BOTH MTD SIGNALS, AND IT HAS TO.
+  //
+  // He told us HMRC has not written to him. Sending "Making Tax Digital applies to you" to that
+  // man is the product arguing with the customer about a fact only he holds, on WhatsApp, where he
+  // cannot see our reasoning. And a man who told us it DID come already knows: a ping explaining
+  // his own answer back to him is doc 103's empty test with a notification attached.
+  //
+  // ⚠️ SO BOTH SIGNALS ARE FOR THE UNSTATED MAN ONLY, and for him they ask rather than conclude.
+  // ⚠️ AND SILENCE IS NOT THE FAILURE MODE HERE: the question itself still reaches every sole
+  // trader through unansweredMtd(), whatever his figures, so nobody goes unasked.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const mtdUnstated = mtdPosition({
+    excluded: false, stated: input.mtdStated, grossQualifyingIncome: 0, startYear: 2026,
+  }) === 'unstated_under';
+  if (combinedTrap && mtdUnstated) {
     // ═══════════════════════════════════════════════════════════════════════════════════════
     // 🔴 THE SAME SIGNAL REACHES TWO DIFFERENT MEN, AND IT USED TO SPEAK TO ONLY ONE OF THEM.
     //
@@ -460,29 +494,37 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
       title: hasTrade
         ? 'Your trade plus your rent crosses the MTD line together'
         : 'Your rent crosses the Making Tax Digital line on its own',
+      // 🔴 THE TRAP IS STILL WORTH SENDING, AND IT NO LONGER CONCLUDES. What people genuinely miss
+      // is that the two streams ADD UP, and that is a fact about the rule rather than about him, so
+      // it survives whole. What went is "so it applies to you", which is HMRC's call off a return
+      // already filed. The last sentence asks him the one question that settles it.
       body: hasTrade
-        ? `Making Tax Digital counts trade and property income TOGETHER. Your trade alone (${gbp(tradeGrossYtd)}) sits under the ${gbp(mtdThreshold)} level, but with ${gbp(rentsYtd)} of rent the combined ${gbp(d.ytdIncome)} crosses it. It is the adding up that people miss, because each stream on its own looks safe. No panic: your Lekhio records already fit the quarterly rhythm, both streams.`
-        : `Making Tax Digital counts property income, not just self employment. Your rent of ${gbp(rentsYtd)} is over the ${gbp(mtdThreshold)} level on its own, so it applies to you. Plenty of landlords take it for granted that it is a thing for the self employed. No panic: your Lekhio records already fit the quarterly rhythm.`,
+        ? `Making Tax Digital counts trade and property income TOGETHER. Your trade alone (${gbp(tradeGrossYtd)}) sits under the ${gbp(mtdThreshold)} level, but with ${gbp(rentsYtd)} of rent the combined ${gbp(d.ytdIncome)} crosses it. It is the adding up that people miss, because each stream on its own looks safe. HMRC decides who is actually in it from a tax return you have already filed, not this year, and writes to you. Has that letter come?`
+        : `Making Tax Digital counts property income, not just self employment. Your rent of ${gbp(rentsYtd)} is over the ${gbp(mtdThreshold)} level on its own. Plenty of landlords take it for granted that it is a thing for the self employed. HMRC decides who is actually in it from a tax return you have already filed, not this year, and writes to you. Has that letter come?`,
       waText: hasTrade
-        ? `trade (${gbp(tradeGrossYtd)}) plus rent (${gbp(rentsYtd)}) crosses the ${gbp(mtdThreshold)} Making Tax Digital level combined, which most people miss`
-        : `your rent (${gbp(rentsYtd)}) is over the ${gbp(mtdThreshold)} Making Tax Digital level on its own, and it counts property income just as it counts self employment`,
+        ? `trade (${gbp(tradeGrossYtd)}) plus rent (${gbp(rentsYtd)}) crosses the ${gbp(mtdThreshold)} Making Tax Digital level combined, which most people miss. HMRC decides it from a return already filed and writes to you: has that letter come?`
+        : `your rent (${gbp(rentsYtd)}) is over the ${gbp(mtdThreshold)} Making Tax Digital level on its own, and it counts property income just as it counts self employment. HMRC decides it from a return already filed and writes to you: has that letter come?`,
       numbers: { tradeGross: tradeGrossYtd, rents: rentsYtd, combined: d.ytdIncome, threshold: mtdThreshold },
     });
   }
-  const mtdHit = !combinedTrap && (d.ytdIncome >= mtdThreshold || (canProject && projIncome >= mtdThreshold));
+  const mtdHit = !combinedTrap && mtdUnstated && (d.ytdIncome >= mtdThreshold || (canProject && projIncome >= mtdThreshold));
   if (mtdHit) {
     const crossedNow = d.ytdIncome >= mtdThreshold;
     out.push({
       signalKey: 'mtd_mandation',
       periodKey: year,
       priority: 'ping',
-      title: 'Making Tax Digital applies to you',
+      // 🔴 THE TITLE WAS A VERDICT AND THIS ENGINE HAS NO STANDING TO GIVE ONE. "Making Tax Digital
+      // applies to you" was pushed to a man's phone off his running total, and worse, off a
+      // PROJECTION of his running total. HMRC decides it from a return already filed. The signal
+      // now says what it can see, names the test, and asks the one question that settles it.
+      title: 'One question about Making Tax Digital',
       body: crossedNow
-        ? `Your gross income this tax year is ${gbp(d.ytdIncome)}, over the ${gbp(mtdThreshold)} Making Tax Digital level. That means digital records and four short quarterly updates. The good news: Lekhio already keeps you ready, your records build themselves.`
-        : `At your current pace your gross income lands around ${gbp(projIncome)} this year, past the ${gbp(mtdThreshold)} Making Tax Digital level. Nothing to panic about: your Lekhio records already fit the quarterly rhythm.`,
+        ? `Your gross income this tax year is ${gbp(d.ytdIncome)}, over the ${gbp(mtdThreshold)} Making Tax Digital level. That is this year though, and HMRC decides who is in it from a tax return you have already filed, then writes to you to say so. Has that letter come? Tell me and I will keep the right things ready. Either way your records build themselves.`
+        : `At your current pace your gross income lands around ${gbp(projIncome)} this year, past the ${gbp(mtdThreshold)} Making Tax Digital level. HMRC decides who is actually in it from a tax return you have already filed rather than this one, and writes to you. Has that letter come? Nothing to panic about either way: your Lekhio records already fit the quarterly rhythm.`,
       waText: crossedNow
-        ? `your gross income (${gbp(d.ytdIncome)}) has passed the ${gbp(mtdThreshold)} Making Tax Digital level, quarterly updates apply`
-        : `your income is on track for ${gbp(projIncome)}, past the ${gbp(mtdThreshold)} Making Tax Digital level`,
+        ? `your gross income (${gbp(d.ytdIncome)}) has passed the ${gbp(mtdThreshold)} Making Tax Digital level. HMRC decides it from a return already filed and writes to you: has that letter come?`
+        : `your income is on track for ${gbp(projIncome)}, past the ${gbp(mtdThreshold)} Making Tax Digital level. HMRC decides it from a return already filed and writes to you: has that letter come?`,
       numbers: { ytdIncome: d.ytdIncome, projected: projIncome, threshold: mtdThreshold },
     });
   }

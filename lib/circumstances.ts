@@ -163,6 +163,28 @@ export interface Circumstance {
   mtd?: true;
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A QUESTION WE HAVE STOPPED ASKING, WHICH IS NOT THE SAME AS A QUESTION WE HAVE DELETED.
+  //
+  // Every `ask` in this file is stored verbatim on the answer row as the exhibit: the sentence a
+  // man actually read on the day he answered. So when a question turns out to have been the WRONG
+  // question, there are only bad options and one good one.
+  //
+  //   - Editing the `ask` rewrites what we asked him. That is the single thing the log exists to
+  //     prevent, and it is forbidden everywhere else in this file for that reason.
+  //   - Deleting the row orphans every answer already given: the key stays in the database with
+  //     nothing to explain what it meant.
+  //
+  // So the row stays, whole and unedited, and stops being OFFERED. mtdQuestions() filters it out,
+  // so he is never asked it again, an answer already given stays exactly as given, and anybody
+  // reading the database in two years can still find the sentence that produced it.
+  //
+  // ⚠️ RETIRING A QUESTION IS NOT A TIDY UP. Write on the row WHY it was retired and WHICH key
+  // replaced it, because a retired question with no successor is a fact we have quietly stopped
+  // collecting, and nobody notices that until the day it is needed.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  retired?: true;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 WHO A QUESTION IS EVEN FOR. The product branches by business structure; the questions must too.
   //
   // Found by walking /app/setup as a limited company: it asked "What were you doing before you went
@@ -639,6 +661,79 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // what we asked a man in 2026. This changes only WHO IS ASKED, so an answer already given
     // stays exactly as given, which is the whole point of the log.
     structures: ['sole_trader'],
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 RETIRED 3 AUGUST 2026. IT ASKED ABOUT THE WRONG TAX YEAR, AND SO DID THE WHOLE PRODUCT.
+    //
+    // "Do you expect to take more than £50,000 THIS YEAR" is a question about 2026/27. HMRC does
+    // not decide mandation from 2026/27. GOV.UK, verbatim: "to check if you needed to use Making
+    // Tax Digital for Income Tax from April 2026, we reviewed your 2024 to 2025 Self Assessment
+    // tax return." A man could answer this question perfectly honestly and still be told the
+    // opposite of the truth, in either direction.
+    //
+    // ⚠️ AND IT COULD NOT BE FIXED BY REWORDING, WHICH IS WHY IT IS RETIRED RATHER THAN EDITED.
+    // The `ask` is the stored exhibit. Changing "this year" to "in 2024/25" would rewrite what we
+    // asked a man in 2026, and changing the year every April would need a new key annually for
+    // ever. The successor asks about HMRC's LETTER instead, which is one fact, his, and true in
+    // every tax year without a figure or a date in it.
+    //
+    // ⚠️ IT IS NOT DELETED AND THE THREE FOLLOW UPS NO LONGER HANG OFF IT. They now depend on
+    // mtd_mandated_letter. An answer already recorded here stays recorded and is never read as a
+    // mandation fact: mtdStatedFrom() deliberately refuses to fall back to this key.
+    //
+    // Replaced by: mtd_mandated_letter, immediately below.
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    retired: true,
+  },
+  {
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THE GATE, REPLACED 3 AUGUST 2026. THE ONLY MTD FACT THIS PRODUCT CANNOT WORK OUT ITSELF.
+    //
+    // Lekhio holds this year's money. HMRC decides mandation from a return already filed, and then
+    // writes to the people it has assessed. GOV.UK, verbatim: "HMRC will write to you, confirming
+    // that you need to start using Making Tax Digital for Income Tax by the start of the following
+    // tax year." So the letter is the fact, and he is the only person who has it.
+    //
+    // ⚠️ THE `ask` CARRIES NO FIGURE AND NO YEAR, ON PURPOSE, AND THAT IS THE WHOLE IMPROVEMENT.
+    // Its predecessor hard coded £50,000 and "this year", so it needed replacing the moment either
+    // moved, and a stored exhibit cannot be edited. This sentence is true in 2026, in 2027 when the
+    // line drops to £30,000, and in 2028 at £20,000, because it asks about a letter rather than
+    // about a threshold. test/onboardingweb.test.mjs pins that: the ask must contain no digits.
+    //
+    // ⚠️ IT IS DELIBERATELY NOT "ARE YOU MANDATED". A man does not know the word, and a question he
+    // has to look up is a question he skips. He knows whether a brown envelope turned up.
+    //
+    // ⚠️ AND A "NO" IS A REAL ANSWER THAT BEATS HIS OWN FIGURES. A man turning over £80,000 this
+    // year who has had no letter is NOT in Making Tax Digital, because his 2024/25 return is what
+    // was read. That is the direction we used to get wrong loudly. The other direction, a quiet
+    // year after a big one, is the direction we used to get wrong silently, and it is worse: his
+    // updates were due in August, November and February and no screen said so.
+    //
+    // ⚠️ NO PENALTIES FOR A MISSED QUARTERLY UPDATE IN 2026/27, so nothing built on this answer may
+    // imply a fine for this year. Points based penalties start 2027/28.
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    mtd: true,
+    key: 'mtd_mandated_letter',
+    ask: 'Has HMRC written to you to say you need to use Making Tax Digital for Income Tax?',
+    why: 'HMRC decides this from a tax return you have already filed, not from how this year is going, so it is the one thing about it we cannot work out from your figures. If the letter came, we keep your quarterly updates ready. If it did not, we leave you be.',
+    worthOrder: 'small',
+    claimant: 'him',
+    backYears: 0,
+    evidence: 'Nothing. HMRC writes to you, and your HMRC online account says the same thing.',
+    source: 'GOV.UK, find out if and when you need to use Making Tax Digital for Income Tax: "HMRC will write to you, confirming that you need to start using Making Tax Digital for Income Tax by the start of the following tax year", and "to check if you needed to use Making Tax Digital for Income Tax from April 2026, we reviewed your 2024 to 2025 Self Assessment tax return".',
+    // ⚠️ NO `incomes` TAG, AND UNLIKE ITS PREDECESSOR THAT NOW COSTS NOTHING. Making Tax Digital
+    // for Income Tax counts trade AND property, so a man letting for more than the line with no
+    // trade at all is mandated, and the gate is genuinely his question. The old wording named self
+    // employment first, which read oddly to a landlord and was logged on that row as a copy problem
+    // we could not fix without a second key. This sentence names neither stream, so the same one
+    // question is true for a roofer, a landlord and a man who is both. The copy problem is gone
+    // rather than filtered, which is the better fix and the reason it is worth recording.
+    //
+    // 🔴 THE SAME EXCLUSIONS AS THE QUESTION IT REPLACES, FOR THE SAME REASONS, AND THEY ARE NOT
+    // COSMETIC. A company's trade is not self employment or rent on a personal return, so there is
+    // no qualifying income to assess. And GOV.UK on partnerships: "Partnerships will also need to
+    // use Making Tax Digital for Income Tax in the future. We'll set out the timeline for this at
+    // a later date." No date, no obligation, no letter to have received.
+    structures: ['sole_trader'],
   },
   {
     mtd: true,
@@ -654,9 +749,9 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // gate is unanswered, but a yes recorded before a man incorporated would release it: the
     // premise check reads his answers, not his structure. The question is as inapplicable to a
     // company as the gate itself, so it carries the same tag rather than relying on the gate's.
-    // Same reason as mtd_mandated above: not a partner's question.
+    // Same reason as mtd_mandated_letter above: not a partner's question.
     structures: ['sole_trader'],
-    dependsOn: { key: 'mtd_mandated', answer: 'yes' },
+    dependsOn: { key: 'mtd_mandated_letter', answer: 'yes' },
   },
   {
     // 🔴 THE ONE THAT ACTUALLY CHANGES WHAT WE DO. Two parties sending quarterly updates for one man
@@ -675,9 +770,9 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // gate is unanswered, but a yes recorded before a man incorporated would release it: the
     // premise check reads his answers, not his structure. The question is as inapplicable to a
     // company as the gate itself, so it carries the same tag rather than relying on the gate's.
-    // Same reason as mtd_mandated above: not a partner's question.
+    // Same reason as mtd_mandated_letter above: not a partner's question.
     structures: ['sole_trader'],
-    dependsOn: { key: 'mtd_mandated', answer: 'yes' },
+    dependsOn: { key: 'mtd_mandated_letter', answer: 'yes' },
   },
   {
     // ⚠️ ASKED FOR REASSURANCE, NEVER FOR HIS FIGURES. A quarterly update is cumulative: the one due
@@ -697,9 +792,9 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // gate is unanswered, but a yes recorded before a man incorporated would release it: the
     // premise check reads his answers, not his structure. The question is as inapplicable to a
     // company as the gate itself, so it carries the same tag rather than relying on the gate's.
-    // Same reason as mtd_mandated above: not a partner's question.
+    // Same reason as mtd_mandated_letter above: not a partner's question.
     structures: ['sole_trader'],
-    dependsOn: { key: 'mtd_mandated', answer: 'yes' },
+    dependsOn: { key: 'mtd_mandated_letter', answer: 'yes' },
   },
   {
     key: 'home_working',
@@ -973,8 +1068,31 @@ export function notHousehold(): Circumstance[] {
 //
 // The gate (`mtd_mandated`) comes first because the other three depend on it, and openIn() will not
 // release them until he has said yes. A man under the threshold answers one question and is done.
+// ⚠️ AND A RETIRED QUESTION IS NEVER OFFERED. mtd_mandated asked about the wrong tax year and was
+// retired on 3 August 2026; its row stays so the answers already given keep their exhibit, but a
+// man must never be asked it again, and he must never be asked it alongside its successor, which
+// would be two questions about one fact (doc 103).
 export function mtdQuestions(): Circumstance[] {
-  return CIRCUMSTANCES.filter((c) => c.mtd && !c.specialCategory);
+  return CIRCUMSTANCES.filter((c) => c.mtd && !c.specialCategory && !c.retired);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHAT HE TOLD US ABOUT HIS OWN MANDATION. THE ONLY WAY A SURFACE SHOULD EVER LEARN IT.
+//
+// Turns a bag of circumstance answers into the three states buildQuarterPack and mtdPosition
+// understand. 'yes' and 'no' are his answers. EVERYTHING ELSE IS null, and null means "we have not
+// been told", never "no": a skip, a missing key and a failed read are all the same fact, which is
+// that we do not know, and every surface says so out loud rather than guessing.
+//
+// 🔴 IT DELIBERATELY DOES NOT FALL BACK TO THE RETIRED mtd_mandated KEY, AND THAT IS THE POINT.
+// A fallback looks like kindness to the men who already answered it. It is not. That question
+// asked what he expected to take THIS year, and this year is not the test HMRC applies, so
+// reading it as a mandation fact would rebuild the exact bug this whole change exists to remove,
+// in the one place nobody would think to look for it again.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function mtdStatedFrom(answers: Record<string, string> | null | undefined): 'yes' | 'no' | null {
+  const v = answers?.mtd_mandated_letter;
+  return v === 'yes' ? 'yes' : v === 'no' ? 'no' : null;
 }
 
 // The MTD questions it is fair to ask him today. Same rule as the money queue, different list.

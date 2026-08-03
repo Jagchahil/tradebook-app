@@ -15,7 +15,21 @@
 // filing to HMRC, and the tax figure is a clearly labelled running estimate, not
 // a calculation submitted anywhere. Lekhio prepares, the user approves.
 
-import { soleTraderTax, class2Voluntary, mtdForIncomeTaxRequired, FACTS } from './taxengine';
+// 🔴 FACTS IS GONE FROM THIS IMPORT ON PURPOSE. The renderer used to print the whole 50k/30k/20k
+// ladder in its own copy, which is a second statement of a rule the engine already owns. The three
+// thresholds now reach this file only through mtdThresholdFor(), so there is one place to change
+// when a Budget moves one.
+// ⚠️ EXACTLY ONE EXTENSIONLESS ENGINE IMPORT IN THIS FILE, AND IT MUST STAY ONE. Six suites stage
+// this module into a temp directory and add the .ts extension with String.replace and NO /g flag,
+// so a second import line is left unrewritten and the whole suite dies on ERR_MODULE_NOT_FOUND.
+// The MtdPosition type rides inside the value import below for that reason, not for tidiness.
+//
+// ⚠️ AND NOTHING ABOVE THAT IMPORT MAY QUOTE IT, EITHER. This comment first spelled the import out
+// in full, which put a copy of the exact string the suites search for ABOVE the real one. Replace
+// without /g takes the FIRST match, so the rewrite would have patched the comment and left the
+// import untouched: a file that loads under tsc and dies in six suites, explained by a comment
+// that reads as if it prevents the problem. Say what the line is, never quote it.
+import { soleTraderTax, class2Voluntary, mtdPosition, mtdThresholdFor, mtdTestBaseReturn, type MtdPosition } from './taxengine';
 
 // A confirmed transaction, in the engine's sign convention: a positive amount is
 // income, a negative amount is an expense. Everything is optional and read
@@ -106,13 +120,24 @@ export interface QuarterPack {
     trade: StreamSummary;
     property: StreamSummary;
     cisSuffered: number;
-    grossQualifyingIncome: number; // trade gross + property gross, the MTD test base
-    mtdApplies: boolean;
+    // Trade gross plus property gross for THIS year to date. ⚠️ It is a proxy for the figure
+    // HMRC actually reads, which is the same total off a return already filed. Never present it
+    // as the test itself: see mtdPosition() in lib/taxengine.ts.
+    grossQualifyingIncome: number;
+    // 🔴 REPLACED mtdApplies: boolean ON 3 AUGUST 2026. The boolean could only say yes or no to a
+    // question this product cannot answer on its own, so five surfaces read "his figures are over
+    // the line" and printed "the law applies to you". The position keeps the two apart, and
+    // because there is no boolean left, tsc named every one of them.
+    mtdPosition: MtdPosition;
     // WHY the test base was zeroed, when it was. null means it was not: he is simply measured
     // against the line. The renderer needs this because "your gross income so far is £0.00" under a
     // page of his own takings reads as a broken screen, not as an exclusion.
     mtdExcluded: 'company' | 'partnership' | null;
     mtdThreshold: number; // the MTD gross threshold for this tax year (50k/30k/20k)
+    // The Self Assessment return HMRC actually reads to decide this April, as a human reads it:
+    // "2024 to 2025" for the 2026/27 year. Every surface that names the real test uses this
+    // rather than working the arithmetic out in its own copy.
+    mtdTestBaseReturn: string;
     estimatedTax: EstimatedTax;
   };
 }
@@ -270,15 +295,27 @@ export interface BuildInput {
   // obligation must never be hidden from a sole trader because a profile read came back empty.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   structure?: 'sole_trader' | 'partnership' | 'limited_company' | null;
-}
 
-// The MTD for Income Tax gross qualifying income threshold by tax year opening
-// year: 50k (April 2026), 30k (April 2027), 20k (April 2028+).
-function mtdThresholdFor(startYear: number): number {
-  return startYear >= 2028 ? FACTS.mtdThreshold2028 : startYear >= 2027 ? FACTS.mtdThreshold2027 : FACTS.mtdThreshold2026;
-}
-function mtdYearFor(startYear: number): 2026 | 2027 | 2028 {
-  return startYear >= 2028 ? 2028 : startYear >= 2027 ? 2027 : 2026;
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT HE TOLD US ABOUT HIS OWN MANDATION, AND IT BEATS EVERY FIGURE IN THIS FILE.
+  //
+  // HMRC decides Making Tax Digital from a RETURN ALREADY FILED (2024/25 for April 2026) and
+  // writes to the people it has assessed. This pack holds current year gross, which is a proxy
+  // for that return and is wrong in both directions. So his answer, from the
+  // mtd_mandated_letter circumstance, is preferred over the proxy wherever the two disagree.
+  // The full reasoning and the GOV.UK quotations are on mtdPosition() in lib/taxengine.ts.
+  //
+  // ⚠️ REQUIRED, NOT OPTIONAL. Every other field on this input that could be unknown is optional
+  // because unknown is a safe direction for it: an unknown structure gets asked everything. This
+  // one is different. An optional `mtdStated` defaulting to null would let a caller that never
+  // heard of it keep printing a conclusion from the wrong year, silently, for ever, which is the
+  // exact shape of the bug being fixed. Required means tsc names every call site, the way making
+  // daysElapsed required on OptimiserInput named every caller of the projection.
+  //
+  // ⚠️ null IS A REAL VALUE AND MEANS "WE HAVE NOT ASKED HIM YET". It is not a no. mtdPosition()
+  // returns unstated_over or unstated_under for it, and both of those say so out loud.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  mtdStated: 'yes' | 'no' | null;
 }
 
 // Build the pack. Quarter figures cover the selected quarter only, for a human reading it. The
@@ -333,8 +370,16 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
   // rent stays in the test for the same reason a director's does: rent on a personal return counts
   // towards the line whatever else he runs.
   const grossQualifying = round2((isCompany || isPartnership ? 0 : ytdTrade.income) + ytdProperty.income);
-  const mtdApplies = mtdForIncomeTaxRequired(grossQualifying, mtdYearFor(startYear));
   const mtdThreshold = mtdThresholdFor(startYear);
+  // 🔴 THE PACK NO LONGER DECIDES WHETHER HE IS MANDATED, BECAUSE IT CANNOT. It reports where his
+  // figures sit and what he has told us, and keeps those two facts apart. mtdPosition() in
+  // lib/taxengine.ts carries the GOV.UK quotations and the reason.
+  const position = mtdPosition({
+    excluded: isCompany || isPartnership,
+    stated: input.mtdStated,
+    grossQualifyingIncome: grossQualifying,
+    startYear,
+  });
 
   // The running tax estimate is on trade net profit only. Property profit is
   // taxed on its own schedule (and from April 2027 its own rates), so folding it
@@ -391,9 +436,10 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
       property: ytdProperty,
       cisSuffered: cisTotal(ytdTx),
       grossQualifyingIncome: grossQualifying,
-      mtdApplies,
+      mtdPosition: position,
       mtdExcluded: isCompany ? 'company' : isPartnership ? 'partnership' : null,
       mtdThreshold,
+      mtdTestBaseReturn: mtdTestBaseReturn(startYear),
       estimatedTax,
     },
   };
@@ -474,9 +520,20 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
     // not under the line, he is outside the regime, and those are different facts.
     : pack.ytd.mtdExcluded === 'partnership'
       ? `Making Tax Digital for Income Tax has not reached partnerships yet. GOV.UK says it will in the future and that the timeline comes at a later date, so there is no quarterly update to make and no date to keep. Your share goes on your own Self Assessment return, and the partnership files its own alongside it.`
-    : pack.ytd.mtdApplies
-      ? `Your gross income so far this year (${gbp(pack.ytd.grossQualifyingIncome)}) is over the ${gbp(pack.ytd.mtdThreshold)} Making Tax Digital for Income Tax threshold for ${esc(pack.taxYear)}, so quarterly updates apply.`
-      : `Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}. Making Tax Digital for Income Tax applies from £${FACTS.mtdThreshold2026.toLocaleString('en-GB')} gross (from April 2026), £${FACTS.mtdThreshold2027.toLocaleString('en-GB')} (April 2027), then £${FACTS.mtdThreshold2028.toLocaleString('en-GB')} (April 2028).`;
+    // 🔴 AND THE REMAINING THREE BRANCHES STOPPED STATING A CONCLUSION ON 3 AUGUST 2026.
+    //
+    // This document goes to an accountant and to a mortgage lender. It used to read "your gross
+    // income so far this year is over the threshold, so quarterly updates apply", which is a legal
+    // conclusion drawn from the wrong tax year: HMRC decides from the return already filed. So the
+    // document now reports the figure it holds, names the test HMRC actually applies, and says
+    // whose fact it is. See mtdPosition() in lib/taxengine.ts.
+    : pack.ytd.mtdPosition === 'stated_in'
+      ? `You have told us HMRC has confirmed you must use Making Tax Digital for Income Tax, so quarterly updates apply for ${esc(pack.taxYear)}. Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}, and these figures are kept the way an update wants them.`
+    : pack.ytd.mtdPosition === 'stated_out'
+      ? `You have told us HMRC has not confirmed you for Making Tax Digital for Income Tax, so there is no quarterly update to make for ${esc(pack.taxYear)}. Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}. HMRC decides this from your ${esc(pack.ytd.mtdTestBaseReturn)} Self Assessment return, so if that year was different, tell us and this changes.`
+    : pack.ytd.mtdPosition === 'unstated_over'
+      ? `Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}, which is over the ${gbp(pack.ytd.mtdThreshold)} Making Tax Digital for Income Tax line for ${esc(pack.taxYear)}. That is this year's figure, and it is not the test: HMRC decides from your ${esc(pack.ytd.mtdTestBaseReturn)} Self Assessment return and writes to you to confirm it. We have not been told whether that letter arrived, so this document does not state whether quarterly updates apply.`
+      : `Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}, which is under the ${gbp(pack.ytd.mtdThreshold)} Making Tax Digital for Income Tax line for ${esc(pack.taxYear)}. That does not settle it either way: HMRC decides from your ${esc(pack.ytd.mtdTestBaseReturn)} Self Assessment return, not from this year, and writes to you to confirm it. If that letter arrived, quarterly updates apply however this year is going.`;
 
   // A safety banner if the underlying data may have been capped, so a truncated
   // summary is never presented to an accountant as complete.

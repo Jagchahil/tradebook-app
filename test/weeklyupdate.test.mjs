@@ -120,6 +120,26 @@ console.log('\n=== branch 2: the FIRST MTD quarterly update deadline (the only o
     s.includes('7 August 2026') && E.concept('mtd_first_quarter_deadline') === '2026-08-07');
   ok('names the period the update covers', s.includes('6 April 2026 to 5 July 2026'));
   ok('never says we file it for him', !/\bwe (will )?(file|submit)\b/i.test(s));
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE SHARPEST SENTENCE THIS PRODUCT SENDS, AND ITS WORDING WAS PINNED BY NOTHING.
+  //
+  // Every guard above tests the DATE and the PERIOD, both of which are sourced constants. The
+  // sentence around them could say anything. It used to open "Your first Making Tax Digital
+  // quarterly update ... is due by", addressed to a man on this year's gross, when HMRC decides
+  // mandation from a return already filed and writes to the people it has assessed. A deadline is
+  // the one thing a man reads and then rearranges his week for.
+  //
+  // ⚠️ THE FIX WAS THE WORDING RATHER THAN A NEW INPUT FIELD, because this module's header forbids
+  // circumstances reaching it. A conditional sentence is true for every reader without the module
+  // ever learning his answer, which is why the guard is on the CONDITION, not on a filter.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  ok('🔴 IT NEVER TELLS HIM THE DEADLINE IS HIS, because this module cannot know that',
+    !/^Your first/.test(s) && !/\byour first Making Tax Digital/i.test(s));
+  ok('🔴 IT IS CONDITIONAL ON THE ONE FACT ONLY HE HOLDS: HMRC\'s letter',
+    /^If HMRC has written to tell you/.test(s));
+  ok('...and the date and period still sit inside that condition, not beside it',
+    s.indexOf('If HMRC has written') < s.indexOf('7 August 2026'));
 }
 ok('silent for income under the MTD threshold (a deadline that is not his is just anxiety)',
   line({ now: BEFORE_DEADLINE, ytdGrossQualifyingIncome: E.FACTS.mtdThreshold2026 }) === null);

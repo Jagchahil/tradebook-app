@@ -177,8 +177,30 @@ export function personalLine(input: WeeklyUpdateInput): string | null {
   // one data point and print it as fact, this branch simply does not fire for them. A quiet week
   // is cheap. A confidently wrong date is not.
   //
-  // Gated on mandation, because a man under the threshold has no quarterly update to make and a
-  // deadline that is not his is just anxiety.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 REWRITTEN 3 AUGUST 2026. IT WAS PUSHING A DEADLINE TO A PHONE OFF THE WRONG TAX YEAR.
+  //
+  // It read "Your first Making Tax Digital quarterly update ... is due by 7 August 2026", decided
+  // by mtdForIncomeTaxRequired() on THIS year's gross. HMRC decides mandation from a return already
+  // filed (2024/25 for April 2026) and writes to the people it has assessed. A deadline is the
+  // sharpest thing this product says: a man reads it and rearranges his week.
+  //
+  // ⚠️ THE FIX IS THE WORDING, NOT A NEW INPUT FIELD, AND THAT IS DELIBERATE. The header of this
+  // file forbids adding circumstances to WeeklyUpdateInput: it is money, dates and two booleans,
+  // so there is nothing here to leak. The sentence is now CONDITIONAL on the fact only he holds,
+  // which makes it true for every reader without this module ever learning his answer. No new
+  // input, no change to the weekly_update_facts_for RPC, and no SQL.
+  //
+  // The gross test survives as what it honestly is: a filter for whether this is worth one of his
+  // weekly lines at all, never a statement that the duty is his.
+  //
+  // ⚠️ AND IT IS NOT PARTNERSHIP GATED, which is logged rather than fixed. This input carries no
+  // structure either, GOV.UK has announced no date for partnerships, and a partner reading a
+  // sentence that opens "If HMRC has written to tell you" has simply not had that letter. The
+  // branch can only fire inside a notice window before 2026-08-07 and is dead after it, and there
+  // are no customers, so nobody can ever read it. The real coverage is the mtd_mandated_letter
+  // question, which reaches every sole trader and no partner, plus /app/tax/summary.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   const gross = input.ytdGrossQualifyingIncome;
   const haveGross = typeof gross === 'number' && Number.isFinite(gross) && gross >= 0;
   const firstDeadline = concept('mtd_first_quarter_deadline');
@@ -191,8 +213,8 @@ export function personalLine(input: WeeklyUpdateInput): string | null {
     // The 2026 threshold, because the deadline we hold belongs to the 2026/27 first quarter.
     if (inWindow && mtdForIncomeTaxRequired(gross as number, 2026)) {
       return (
-        `Your first Making Tax Digital quarterly update covers ${q1.label.replace('Quarter 1, ', '')} ` +
-        `and is due by ${prettyDate(firstDeadline)}.`
+        `If HMRC has written to tell you Making Tax Digital applies to you, your first quarterly ` +
+        `update covers ${q1.label.replace('Quarter 1, ', '')} and is due by ${prettyDate(firstDeadline)}.`
       );
     }
   }

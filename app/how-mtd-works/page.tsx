@@ -104,10 +104,10 @@ const MTD_JS = `
     var k=+slider.value;var iv=document.getElementById('incomeVal');if(iv)iv.textContent=money(k);
     var r=document.getElementById('result');if(!r)return;var title,date,note,bg,col;
     var gross=k*1000;
-    if(gross>${T26}){title='MTD applies to you now';date='FROM APRIL 2026';note='You send HMRC four short updates a year. Lekhio prepares every one, ready for your approval.';bg='var(--river-tint)';col='var(--river)';}
-    else if(gross>${T27}){title='MTD applies from April 2027';date='THE ${gbp(T27)} THRESHOLD';note='You have time. Start now and your records are already ready when it kicks in.';bg='var(--saffron-tint)';col='var(--on-saffron-tint)';}
-    else if(gross>${T28}){title='MTD applies from April 2028';date='THE ${gbp(T28)} THRESHOLD';note='Plenty of time. Lekhio keeps you ready either way, with zero effort.';bg='var(--saffron-tint)';col='var(--on-saffron-tint)';}
-    else{title='Not required yet';date='${gbp(T28)} GROSS OR LESS';note='No MTD duty for now. Tidy books still save you money and stress, so Lekhio keeps you sorted.';bg='var(--green-tint)';col='var(--green)';}
+    if(gross>${T26}){title='That is over the April 2026 line';date='THE ${gbp(T26)} THRESHOLD';note='HMRC applies this test to a tax return you have already filed, not to the year you are in, and writes to you if you are in. For April 2026 it read your 2024 to 2025 return. If that letter came, you send four short updates a year and Lekhio prepares every one, ready for your approval.';bg='var(--river-tint)';col='var(--river)';}
+    else if(gross>${T27}){title='That is over the April 2027 line';date='THE ${gbp(T27)} THRESHOLD';note='HMRC applies this test to a tax return you have already filed, and writes to you if you are in. April 2027 is decided by your 2025 to 2026 return. Start now and your records are ready whenever the letter comes.';bg='var(--saffron-tint)';col='var(--on-saffron-tint)';}
+    else if(gross>${T28}){title='That is over the April 2028 line';date='THE ${gbp(T28)} THRESHOLD';note='HMRC applies this test to a tax return you have already filed, and writes to you if you are in. April 2028 is decided by your 2026 to 2027 return. Plenty of time, and Lekhio keeps you ready either way.';bg='var(--saffron-tint)';col='var(--on-saffron-tint)';}
+    else{title='That is under every line so far';date='${gbp(T28)} GROSS OR LESS';note='The lines announced so far are ${gbp(T26)}, then ${gbp(T27)}, then ${gbp(T28)}. HMRC applies them to a tax return you have already filed and writes to you if you are in, so a bigger year gone by can still put you in. Tidy books save you money either way.';bg='var(--green-tint)';col='var(--green)';}
     r.style.background=bg;
     r.innerHTML='<div class="rtitle" style="color:'+col+'">'+title+'</div><div class="rdate" style="color:'+col+'">'+date+'</div><div class="rnote">'+note+'</div>';
   }
@@ -150,15 +150,22 @@ export default function HowMtdWorksPage() {
       <section style={{ paddingTop: 20 }}>
         <div className="wrap">
           <div className="checker reveal">
-            <div className="ct">Does it affect you? Drag your gross income.</div>
-            <div className="csub">Your turnover and any rent added together, before a single expense comes off. That is not your profit, which is the number most people reach for.</div>
+            {/* 🔴 "DOES IT AFFECT YOU" IS A QUESTION THIS PAGE CANNOT ANSWER, AND IT USED TO ANSWER IT.
+                A stranger drags a slider and the result said "MTD applies to you now". HMRC decides
+                mandation from a tax return already filed and writes to the people it has assessed, so
+                nothing a visitor can type on a public page settles it. The checker now does the one
+                honest job it can: it tells him which announced line a figure sits above, and names the
+                test HMRC actually runs. See mtdPosition() in lib/taxengine.ts for the same reasoning
+                inside the product. */}
+            <div className="ct">Which line does your income sit above? Drag it.</div>
+            <div className="csub">Your turnover and any rent added together, before a single expense comes off. That is not your profit, which is the number most people reach for. HMRC runs this test on a tax return you have already filed, so the year to use is the one on your last return.</div>
             <div className="incomeval" id="incomeVal">£60,000</div>
             <input type="range" min="0" max="100" step="5" defaultValue="60" className="slider" id="slider" aria-label="Your gross income for the year, turnover and rent added together before expenses" />
             <div className="ticks"><span>£0</span><span>£{T28 / 1000}k</span><span>£{T27 / 1000}k</span><span>£{T26 / 1000}k</span><span>£100k+</span></div>
             <div className="result" id="result" style={{ background: 'var(--river-tint)' }}>
-              <div className="rtitle" style={{ color: 'var(--river)' }}>MTD applies to you now</div>
-              <div className="rdate" style={{ color: 'var(--river)' }}>FROM APRIL 2026</div>
-              <div className="rnote">You send HMRC four short updates a year. Lekhio prepares every one, ready for your approval.</div>
+              <div className="rtitle" style={{ color: 'var(--river)' }}>That is over the April 2026 line</div>
+              <div className="rdate" style={{ color: 'var(--river)' }}>THE {gbp(T26)} THRESHOLD</div>
+              <div className="rnote">HMRC applies this test to a tax return you have already filed, not to the year you are in, and writes to you if you are in. For April 2026 it read your 2024 to 2025 return. If that letter came, you send four short updates a year and Lekhio prepares every one, ready for your approval.</div>
             </div>
           </div>
           {/* Doc 103, and the standing question. Nothing was taken out to make room for this, so it

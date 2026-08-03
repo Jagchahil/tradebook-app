@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile, refreshFactsFromDb, preFilingAssurance } from '../../../lib/supabase';
+import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile, readCircumstances, refreshFactsFromDb, preFilingAssurance } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
 import { buildQuarterPack, quarterBounds, quarterForDate, renderQuarterPackHtml } from '../../../lib/quarterpack';
+import { mtdStatedFrom } from '../../../lib/circumstances';
 import { packUrl, verifyPackToken } from '../../../lib/packtoken';
 
 // The quarter end pack. Two ways in:
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
   // Pull the whole tax year up to this quarter end, so the pack can show the
   // quarter itself and the year to date running position from one fetch.
   const taxYearStart = quarterBounds(startYear, 1).start;
-  const [transactions, businessName, biz] = await Promise.all([
+  const [transactions, businessName, biz, circ] = await Promise.all([
     getConfirmedTransactionsForRange(userId, taxYearStart, bounds.end),
     getBusinessName(userId),
     // 🔴 WHO HE IS, so the document stops telling a director that his company's turnover puts him
@@ -84,7 +85,18 @@ export async function GET(req: NextRequest) {
     // unknown gets exactly the document it got before this line existed. Withholding a real
     // obligation from a sole trader because a profile read timed out is the worse failure by far.
     getBusinessProfile(userId).catch(() => null),
+    // 🔴 AND WHETHER HMRC HAS WRITTEN TO HIM ABOUT MAKING TAX DIGITAL, which is the fact this
+    // document cannot derive from a single figure it holds. HMRC decides mandation from a return
+    // already filed, so his own answer is the only evidence there is. See mtdPosition() in
+    // lib/taxengine.ts.
+    //
+    // ⚠️ A FAILED READ IS UNKNOWN, NOT A NO, for the same reason the profile read above is. null
+    // reaches mtdPosition() and the document says plainly that it has not been told, which is
+    // true. Reading a timeout as "he is not mandated" would print a false all clear on a document
+    // an accountant relies on.
+    readCircumstances(userId).catch(() => null),
   ]);
+  const circAnswers = Object.fromEntries((circ ?? []).map((a) => [a.key, a.answer]));
 
   // If the fetch hit its 20000-row cap the summary may be short, so flag it and
   // the document shows a warning rather than passing an accountant a partial pack.
@@ -96,6 +108,7 @@ export async function GET(req: NextRequest) {
   const pack = buildQuarterPack({
     transactions, startYear, quarter, businessName, truncated, finalCheck,
     structure: biz?.businessType ?? null,
+    mtdStated: mtdStatedFrom(circAnswers),
   });
 
   if (sp.get('format') === 'json') {

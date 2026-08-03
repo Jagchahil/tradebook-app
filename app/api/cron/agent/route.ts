@@ -41,6 +41,7 @@ import {
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
 import { T_AGENT_THRESHOLD, T_AGENT_DEADLINE, T_AGENT_OPPORTUNITY } from '../../../../lib/watemplates';
 import { computeSignalsForStructure, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
+import { mtdStatedFrom } from '../../../../lib/circumstances';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -163,6 +164,12 @@ async function processUser(user: {
     // register. An unreadable answer is FALSE, not true: silencing the warning for a man heading
     // past the threshold is the expensive direction, and it has a date on it.
     vatRegistered: (circs ?? []).some((c) => c.key === 'vat_registered' && c.answer === 'yes'),
+    // 🔴 AND WHETHER HMRC HAS WRITTEN TO HIM ABOUT MAKING TAX DIGITAL, from the same log, because
+    // the agent cannot work this one out. HMRC decides mandation from a return already filed
+    // (2024/25 for April 2026) and writes to the people it has assessed, while this engine sees
+    // only this year's money. mtdStatedFrom() maps a skip, a missing key and a failed read all to
+    // null, which means "not asked yet" and never "no". See mtdPosition() in lib/taxengine.ts.
+    mtdStated: mtdStatedFrom(Object.fromEntries((circs ?? []).map((c) => [c.key, c.answer]))),
   };
   let signals = computeSignalsForStructure(input);
   if (signals.length === 0) return { inserted: 0, pinged: 0 };

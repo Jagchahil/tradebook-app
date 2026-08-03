@@ -733,14 +733,19 @@ console.log('\n🔴 A COMPANY\'S TURNOVER IS NOT THE DIRECTOR\'S QUALIFYING INCO
   const asIs = packOf();
   const asCompany = packOf({ structure: 'limited_company' });
 
+  // ⚠️ mtdApplies BECAME mtdPosition ON 3 AUGUST 2026, and the claim this guard makes is unchanged:
+  // a company's turnover is not his qualifying income. What moved is that "over the line" is no
+  // longer spelled "true", because HMRC decides mandation from a return already filed and the pack
+  // holds this year. 'excluded' is a stronger statement than the old false: the director is not
+  // under the line, he is outside the regime.
   ok('🔴 THE BUG: a company\'s turnover no longer counts towards HIS Making Tax Digital threshold',
-    asIs.ytd.grossQualifyingIncome === 80000 && asIs.ytd.mtdApplies === true
-    && asCompany.ytd.grossQualifyingIncome === 0 && asCompany.ytd.mtdApplies === false);
+    asIs.ytd.grossQualifyingIncome === 80000 && asIs.ytd.mtdPosition === 'unstated_over'
+    && asCompany.ytd.grossQualifyingIncome === 0 && asCompany.ytd.mtdPosition === 'excluded');
   ok('...but his RENT still does, because rent on a personal return counts whatever else he runs',
     QP.buildQuarterPack({
       transactions: [...rows, { amount: 60000, transaction_date: '2026-05-03', income_type: 'property' }],
       startYear: 2026, quarter: 1, structure: 'limited_company',
-    }).ytd.mtdApplies === true);
+    }).ytd.grossQualifyingIncome === 60000);
 
   ok('🔴 AND HE IS NOT CHARGED CLASS 4 NATIONAL INSURANCE ON HIS COMPANY\'S PROFIT',
     asIs.ytd.estimatedTax.class4 > 0 && asCompany.ytd.estimatedTax.class4 === 0
@@ -761,9 +766,27 @@ console.log('\n🔴 A COMPANY\'S TURNOVER IS NOT THE DIRECTOR\'S QUALIFYING INCO
     !/Trade/.test(html) && /Company profit, year so far/.test(html));
   ok('...and it never tells him his gross income for the year was zero',
     !/gross income so far this year is £0\.00/.test(html));
-  ok('the sole trader document still says both, because for him they are true',
-    /Estimated Class 4 National Insurance/.test(QP.renderQuarterPackHtml(asIs))
-    && /quarterly updates apply/.test(QP.renderQuarterPackHtml(asIs)));
+  // 🔴 AND THE SOLE TRADER HALF OF THIS GUARD CHANGED, WHICH IS THE FIX, NOT A LOOSENING.
+  // Class 4 is still true of him on his own figures, so that half stands untouched. "Quarterly
+  // updates apply" is NOT true of him on his own figures: he is over the line THIS year and HMRC
+  // reads 2024/25. So the document may say it only once he has told us the letter came, and the
+  // guard now pins both halves of that.
+  const asIsHtml = QP.renderQuarterPackHtml(asIs);
+  ok('the sole trader document still charges him Class 4, because that IS true of him',
+    /Estimated Class 4 National Insurance/.test(asIsHtml));
+  // ⚠️ THE NEGATIVE HALF IS ANCHORED ON "so quarterly updates apply", NOT ON THE BARE PHRASE, AND
+  // THAT IS THE SIXTH TIME THIS CODEBASE HAS BEEN CAUGHT BY THE SAME SHAPE. The honest sentence for
+  // a man we have not asked ENDS "...so this document does not state whether quarterly updates
+  // apply". A bare /quarterly updates apply/ therefore fires on the sentence that DENIES the claim,
+  // so the guard would have failed against a document that was already correct, and would have
+  // passed against nothing. The rule is now wider than codeOnly(): whenever a negative assertion
+  // names a claim, check the wording that REFUTES that claim does not contain it.
+  ok('...but it no longer states quarterly updates apply on this year\'s money alone',
+    !/so quarterly updates apply/.test(asIsHtml)
+    && /does not state whether quarterly updates apply/.test(asIsHtml)
+    && /2024 to 2025 Self Assessment return/.test(asIsHtml));
+  ok('...and it does state it the moment he tells us HMRC wrote to him',
+    /quarterly updates apply/.test(QP.renderQuarterPackHtml(packOf({ mtdStated: 'yes' }))));
   ok('no em, en or minus dash reached the director\'s document', !/[–—−]/.test(html));
 
   // ⚠️ UNKNOWN IS NEVER AN ANSWER. Every existing caller passes nothing and must get the same pack.
@@ -789,11 +812,11 @@ console.log('\n🔴 A COMPANY\'S TURNOVER IS NOT THE DIRECTOR\'S QUALIFYING INCO
   // ════════════════════════════════════════════════════════════════════════════════════════
   const asPartner = packOf({ structure: 'partnership' });
   ok('\ud83d\udd34 A PARTNER IS OUT OF MAKING TAX DIGITAL: partnerships have no announced date',
-    asPartner.ytd.grossQualifyingIncome === 0 && asPartner.ytd.mtdApplies === false);
+    asPartner.ytd.grossQualifyingIncome === 0 && asPartner.ytd.mtdPosition === 'excluded');
   // The three MANDATION fields are blanked on both sides and everything else must then match. Listed
   // by name on purpose: a blanket "ignore ytd" would let a real figure drift through unnoticed, and
   // this guard already earned its keep once by failing the moment mtdExcluded was added.
-  const noMtd = (p) => ({ ...p, ytd: { ...p.ytd, grossQualifyingIncome: null, mtdApplies: null, mtdExcluded: null } });
+  const noMtd = (p) => ({ ...p, ytd: { ...p.ytd, grossQualifyingIncome: null, mtdPosition: null, mtdExcluded: null } });
   ok('\ud83d\udd34 AND NOTHING ELSE MOVES: his tax on his share is untouched, to the character',
     same(noMtd(asPartner), noMtd(asIs)));
   ok('...he is still charged Class 4, unlike a director, because his share IS self employment',

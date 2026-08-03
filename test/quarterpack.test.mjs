@@ -103,14 +103,37 @@ ok('estimated income tax matches engine', near(pack.ytd.estimatedTax.incomeTax, 
 ok('estimated class 4 matches engine', near(pack.ytd.estimatedTax.class4, engineTax.class4));
 ok('property profit shown as excluded from the trade estimate', near(pack.ytd.estimatedTax.propertyProfitExcluded, 730));
 ok('gross qualifying income = trade gross + property gross = 2850', near(pack.ytd.grossQualifyingIncome, 2850));
-ok('MTD does not apply at 2850 gross', pack.ytd.mtdApplies === false);
+// 🔴 mtdApplies WAS A BOOLEAN AND IT ANSWERED A QUESTION THIS PRODUCT CANNOT ANSWER.
+// HMRC decides mandation from a return already filed (2024/25 for April 2026), and the pack holds
+// this year. So the pack reports a POSITION: where his figures sit, and separately what he told us.
+// "unstated_under" is not "he is not mandated". It is "we have not asked him, and this year's
+// figure is under the line", which is exactly what the pack knows and no more.
+ok('under the line and unasked is unstated_under, not a verdict', pack.ytd.mtdPosition === 'unstated_under');
+ok('the pack names the return HMRC actually reads', pack.ytd.mtdTestBaseReturn === '2024 to 2025');
 
 // A high earner crosses the MTD gross threshold.
 const big = Q.buildQuarterPack({
   transactions: [{ amount: 60000, category: 'income', transaction_date: '2026-04-10' }],
   startYear: 2026, quarter: 1,
 });
-ok('MTD applies at 60000 gross', big.ytd.mtdApplies === true);
+ok('over the line and unasked is unstated_over, still not a verdict', big.ytd.mtdPosition === 'unstated_over');
+
+// 🔴 THE WHOLE POINT: HIS ANSWER BEATS HIS FIGURES, IN BOTH DIRECTIONS.
+// HMRC writes to the people it has assessed ("HMRC will write to you, confirming that you need to
+// start using Making Tax Digital for Income Tax by the start of the following tax year"), so a man
+// saying no letter came is better evidence than any figure in this pack.
+const bigSaidNo = Q.buildQuarterPack({
+  transactions: [{ amount: 60000, category: 'income', transaction_date: '2026-04-10' }],
+  startYear: 2026, quarter: 1, mtdStated: 'no',
+});
+ok('£60,000 this year and no letter is stated_out: his answer beats the figure', bigSaidNo.ytd.mtdPosition === 'stated_out');
+const smallSaidYes = Q.buildQuarterPack({
+  transactions: [{ amount: 900, category: 'income', transaction_date: '2026-04-10' }],
+  startYear: 2026, quarter: 1, mtdStated: 'yes',
+});
+// The silent failure this change exists to close: a big 2024/25 followed by a quiet 2026/27. His
+// updates are real and the old boolean said nothing at all until his year to date crossed.
+ok('£900 this year and a letter is stated_in: the quiet year after a big one', smallSaidYes.ytd.mtdPosition === 'stated_in');
 ok('default business name when none given', big.businessName === 'Your business');
 
 console.log('\n=== quarterpack: HTML document ===\n');
@@ -141,12 +164,29 @@ const p2027 = Q.buildQuarterPack({
   startYear: 2027, quarter: 1,
 });
 ok('2027 threshold is 30000, not 50000', p2027.ytd.mtdThreshold === 30000);
-ok('35k gross clears the 2027 MTD threshold', p2027.ytd.mtdApplies === true);
+ok('35k is over the 2027 line, and that is all it means', p2027.ytd.mtdPosition === 'unstated_over');
+ok('2027 reads the 2025 to 2026 return', p2027.ytd.mtdTestBaseReturn === '2025 to 2026');
 const p2028 = Q.buildQuarterPack({ transactions: [{ amount: 25000, category: 'income', transaction_date: '2028-05-01' }], startYear: 2028, quarter: 1 });
 ok('2028 threshold is 20000', p2028.ytd.mtdThreshold === 20000);
-ok('25k gross clears the 2028 MTD threshold', p2028.ytd.mtdApplies === true);
+ok('25k is over the 2028 line, and that is all it means', p2028.ytd.mtdPosition === 'unstated_over');
+ok('2028 reads the 2026 to 2027 return', p2028.ytd.mtdTestBaseReturn === '2026 to 2027');
 ok('2026 threshold stays 50000', pack.ytd.mtdThreshold === 50000);
 ok('2027 MTD line shows the correct threshold', Q.renderQuarterPackHtml(p2027).includes('£30,000'));
+
+console.log('\n=== quarterpack: the document may describe, and may never conclude ===\n');
+// 🔴 THE DOCUMENT GOES TO AN ACCOUNTANT AND TO A MORTGAGE LENDER. It used to read "your gross
+// income so far this year is over the threshold, SO QUARTERLY UPDATES APPLY", which is a legal
+// conclusion drawn from the wrong tax year. It may state that only when HE has told us.
+const overHtml = Q.renderQuarterPackHtml(big);
+ok('an unasked man over the line is never told updates apply', !/so quarterly updates apply/i.test(overHtml));
+ok('and the document names the real test instead', /2024 to 2025 Self Assessment return/.test(overHtml) && /writes to you/.test(overHtml));
+const statedHtml = Q.renderQuarterPackHtml(Q.buildQuarterPack({
+  transactions: [{ amount: 60000, category: 'income', transaction_date: '2026-04-10' }],
+  startYear: 2026, quarter: 1, mtdStated: 'yes',
+}));
+ok('a man who told us gets the plain statement, because now it is true', /quarterly updates apply/i.test(statedHtml));
+// The under the line document must not read as an all clear either, for the same reason.
+ok('under the line does not read as an all clear', /does not settle it either way/i.test(Q.renderQuarterPackHtml(pack)));
 
 console.log('\n=== quarterpack: truncation warning (scale audit M2) ===\n');
 ok('default pack is not truncated', pack.truncated === false);

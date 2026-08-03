@@ -134,7 +134,12 @@ const SOLE_ONLY = [
 // date, so no obligation, so nothing to ask him about. lib/agent.ts already refused to send a
 // partner the mandation signal, on that exact reasoning, so the product was asking a man a question
 // on the web that its own WhatsApp had decided not to raise with him.
-const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_signed_up', 'mtd_agent', 'mtd_already_filed'];
+// ⚠️ FIVE ROWS, NOT FOUR, SINCE 3 AUGUST 2026. mtd_mandated asked about THIS year and HMRC decides
+// mandation from a return already filed, so it was RETIRED and replaced by mtd_mandated_letter. The
+// retired row keeps its structures tag and its exhibit and is simply never offered again, so it
+// stays on this list: the claim "no MTD question is ever put to a partner" has to hold for the row
+// that is still in the file, not only for the ones still being asked.
+const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_mandated_letter', 'mtd_signed_up', 'mtd_agent', 'mtd_already_filed'];
 {
   ok('🔴 the three sole trader questions carry their structures on the entry, with reasoning beside them',
     SOLE_ONLY.every((k) => {
@@ -143,14 +148,26 @@ const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_signed_up', 'mtd_agent', 'mtd_alread
         && c.structures.includes('sole_trader') && c.structures.includes('partnership')
         && !c.structures.includes('limited_company');
     }));
-  ok('\ud83d\udd34 THE FOUR MTD QUESTIONS ARE SOLE TRADER ONLY: a partner has no update to make',
+  ok('\ud83d\udd34 EVERY MTD QUESTION IS SOLE TRADER ONLY: a partner has no update to make',
     MTD_SOLE_ONLY.every((k) => {
       const c = CIRCUMSTANCES.find((x) => x.key === k);
       return Array.isArray(c.structures) && c.structures.length === 1 && c.structures[0] === 'sole_trader';
     }));
-  ok('\u26a0\ufe0f AND THE GATE\'S OWN WORDS ARE UNTOUCHED: only the audience moved, never the exhibit',
+  // 🔴 THE RETIRED GATE'S OWN WORDS ARE STILL UNTOUCHED, AND THAT IS THE WHOLE ARGUMENT FOR
+  // RETIRING RATHER THAN EDITING. The question was wrong: it asked about this year and HMRC reads a
+  // return already filed. It could not be reworded, because `ask` is stored verbatim on every
+  // answer row as the sentence a man actually read. So the row survives, character for character,
+  // and stops being offered. This guard is what stops a future tidy up from "fixing" the wording.
+  ok('\u26a0\ufe0f THE RETIRED GATE\'S OWN WORDS ARE UNTOUCHED: an exhibit is never rewritten',
     CIRCUMSTANCES.find((x) => x.key === 'mtd_mandated').ask
-      === 'Do you expect to take more than £50,000 this year, before any expenses, from self employment and rent put together?');
+      === 'Do you expect to take more than £50,000 this year, before any expenses, from self employment and rent put together?'
+    && CIRCUMSTANCES.find((x) => x.key === 'mtd_mandated').retired === true);
+  // ⚠️ AND THE SUCCESSOR CARRIES NO FIGURE AND NO YEAR, which is why it will not need replacing when
+  // the line drops to £30,000 in 2027 and £20,000 in 2028. A stored exhibit cannot be edited, so a
+  // question with a number in it is a question with an expiry date on it.
+  const letterAsk = CIRCUMSTANCES.find((x) => x.key === 'mtd_mandated_letter').ask;
+  ok('\ud83d\udd34 THE SUCCESSOR ASKS ABOUT HMRC\'S LETTER AND CONTAINS NO DIGIT AT ALL',
+    /HMRC/.test(letterAsk) && /written/.test(letterAsk) && !/[0-9]/.test(letterAsk));
   ok('every other question is for every structure: absent means everyone',
     CIRCUMSTANCES.filter((c) => !SOLE_ONLY.includes(c.key) && !MTD_SOLE_ONLY.includes(c.key))
       .every((c) => c.structures === undefined));
@@ -172,18 +189,28 @@ const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_signed_up', 'mtd_agent', 'mtd_alread
 
   ok('🔴 THE MTD GATE IS REFUSED FOR A COMPANY, and the three follow ups stop with it',
     unansweredMtd([], 'limited_company').length === 0);
-  ok('the MTD gate still opens for a sole trader',
-    unansweredMtd([], 'sole_trader')[0]?.key === 'mtd_mandated');
+  ok('the MTD gate still opens for a sole trader, and it is the letter question now',
+    unansweredMtd([], 'sole_trader')[0]?.key === 'mtd_mandated_letter');
+  // 🔴 AND HE IS NEVER ASKED BOTH. Two questions about one fact is exactly what doc 103 forbids, and
+  // it is the reason mtdQuestions() filters retired rows rather than leaving them in the list.
+  ok('\ud83d\udd34 THE RETIRED GATE IS NEVER OFFERED TO ANYBODY, on any structure',
+    [undefined, 'sole_trader', 'partnership', 'limited_company']
+      .every((who) => !unansweredMtd([], who).some((c) => c.key === 'mtd_mandated')));
   ok('\ud83d\udd34 AND IT IS REFUSED FOR A PARTNER TOO, for a different reason than the company\'s',
     unansweredMtd([], 'partnership').length === 0);
   ok('...even with a yes somehow already on record from before this changed',
-    unansweredMtd([{ key: 'mtd_mandated', answer: 'yes' }], 'partnership').length === 0);
+    unansweredMtd([{ key: 'mtd_mandated_letter', answer: 'yes' }], 'partnership').length === 0);
   ok('\ud83d\udd34 AN UNKNOWN STRUCTURE STILL GETS ASKED, the safe direction: a real obligation is never\n    hidden from a sole trader because a profile read came back empty',
-    unansweredMtd([])[0]?.key === 'mtd_mandated');
+    unansweredMtd([])[0]?.key === 'mtd_mandated_letter');
   ok('and answering yes still releases the follow ups for a sole trader',
-    unansweredMtd([{ key: 'mtd_mandated', answer: 'yes' }], 'sole_trader').length === 3);
+    unansweredMtd([{ key: 'mtd_mandated_letter', answer: 'yes' }], 'sole_trader').length === 3);
   ok('but never for a company, even with a yes somehow on record',
-    unansweredMtd([{ key: 'mtd_mandated', answer: 'yes' }], 'limited_company').length === 0);
+    unansweredMtd([{ key: 'mtd_mandated_letter', answer: 'yes' }], 'limited_company').length === 0);
+  // 🔴 AND AN ANSWER TO THE RETIRED QUESTION RELEASES NOTHING, which is the point of repointing
+  // dependsOn. Its yes meant "I expect a big year", never "HMRC has written to me", so treating it
+  // as the gate would rebuild the bug in the one place nobody would look for it again.
+  ok('\ud83d\udd34 A YES ON THE RETIRED GATE OPENS NO FOLLOW UP: it answered a different question',
+    unansweredMtd([{ key: 'mtd_mandated', answer: 'yes' }], 'sole_trader').length === 1);
 
   // The counts a director is shown. A question that is not for him is not "waiting for him".
   const ltdMtd = progressIn(mtdQuestions(), [], 'limited_company');
@@ -209,6 +236,31 @@ const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_signed_up', 'mtd_agent', 'mtd_alread
   const setup = read('app/app/setup/page.tsx');
   ok('the setup MTD step explains the company case in words, not a blank',
     /structure === 'limited_company'/.test(setup) && /the company files its own return/.test(setup));
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE STEP READS THE NEW GATE, AND ITS "NOTHING ELSE TO ASK" CARD SAID TWO FALSE THINGS.
+  //
+  // It keyed off mtd_mandated, retired on 3 August 2026 for asking about the wrong tax year, so
+  // after the swap it would have keyed off an answer nobody will ever give again. And its sentence
+  // read "Making Tax Digital does not apply to you AT THAT LEVEL, and we will tell you before HMRC
+  // does": a conclusion from a threshold HMRC does not use, followed by a proactive alert promise
+  // that remindersLive() says no channel can keep.
+  //
+  // Neither half was pinned by anything. Both are now.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  ok("🔴 THE SETUP STEP READS THE NEW GATE, NOT THE RETIRED ONE",
+    /answers\.get\('mtd_mandated_letter'\)/.test(codeOnly(setup))
+    && !/answers\.get\('mtd_mandated'\)/.test(codeOnly(setup)));
+  // ⚠️ ON codeOnly(), AND THE FIRST DRAFT WAS NOT. EIGHTH INSTANCE OF THIS CODEBASE'S OLDEST TRAP,
+  // and the third in one session. The comment written on the page to explain WHY those two
+  // sentences went quotes both of them, so a negative assertion over the raw file fires on the
+  // explanation and reports a page that is already correct as broken. The rule has no exceptions:
+  // a negative assertion over a source file runs on codeOnly(), because the comment explaining a
+  // removal always contains the removed string.
+  const setupCode = codeOnly(setup);
+  ok('🔴 AND ITS DONE CARD NEITHER CONCLUDES FROM A LEVEL NOR PROMISES TO WATCH ONE',
+    !/does not apply to you at that level/i.test(setupCode)
+    && !/we will tell you before HMRC does/i.test(setupCode)
+    && /tell us here and we will have your updates ready/.test(setupCode));
   ok('🔴 the VAT sentence on /start is structure aware: a company is not "most sole traders"',
     /tradeType === 'ltd'/.test(read('app/start/page.tsx').slice(read('app/start/page.tsx').indexOf('Are you VAT registered')))
     && /This one is about the company/.test(read('app/start/page.tsx')));

@@ -12,6 +12,7 @@ import {
 import { sessionUser } from '../../../../lib/webauth';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
 import { computeSignalsForStructure, type AgentInput } from '../../../../lib/agent';
+import { mtdStatedFrom } from '../../../../lib/circumstances';
 import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
 
 export const runtime = 'nodejs';
@@ -88,6 +89,12 @@ export async function POST(req: NextRequest) {
     // register. An unreadable answer is FALSE, not true: silencing the warning for a man heading
     // past the threshold is the expensive direction, and it has a date on it.
     vatRegistered: (circs ?? []).some((c) => c.key === 'vat_registered' && c.answer === 'yes'),
+    // 🔴 AND WHETHER HMRC HAS WRITTEN TO HIM ABOUT MAKING TAX DIGITAL, from the same log, because
+    // the agent cannot work this one out. HMRC decides mandation from a return already filed
+    // (2024/25 for April 2026) and writes to the people it has assessed, while this engine sees
+    // only this year's money. mtdStatedFrom() maps a skip, a missing key and a failed read all to
+    // null, which means "not asked yet" and never "no". See mtdPosition() in lib/taxengine.ts.
+    mtdStated: mtdStatedFrom(Object.fromEntries((circs ?? []).map((c) => [c.key, c.answer]))),
   };
 
   const signals = computeSignalsForStructure(input);

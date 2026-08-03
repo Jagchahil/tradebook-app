@@ -186,7 +186,7 @@ const keys = (list) => list.map((c) => c.key);
     ['married', 'children', 'grandparent_childcare', 'pension', 'vat_registered', 'other_job',
       'gift_aid', 'rental'].every((k) => forLandlord.includes(k)));
   ok('🔴 AND HE KEEPS THE MTD GATE, which counts trade AND property: a man letting for £52,000 with no trade at all is mandated',
-    keys(unansweredMtd([], LANDLORD)).includes('mtd_mandated'));
+    keys(unansweredMtd([], LANDLORD)).includes('mtd_mandated_letter'));
   ok('a landlord filter never leaks a special category question either',
     unanswered([], LANDLORD).every((c) => !c.specialCategory));
 

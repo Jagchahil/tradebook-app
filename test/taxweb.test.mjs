@@ -111,7 +111,7 @@ ok('🔴 JANUARY\'S DATES COME FROM THE ENGINE, NOT A STRING IN A PAGE',
 ok('payments on account run on the bill WITHOUT the student loan, as HMRC does',
   /paymentsOnAccount\(tax\.selfAssessmentTax/.test(src.hub));
 ok('the hub\'s MTD line is the quarter pack\'s own answer',
-  src.hub.includes('buildQuarterPack') && /pack\.ytd\.mtdApplies/.test(src.hub));
+  src.hub.includes('buildQuarterPack') && /pack\.ytd\.mtdPosition/.test(src.hub));
 
 // The pages never do their own arithmetic over his money. A reduce or a running += on a tax
 // screen is a second engine being born.
@@ -237,7 +237,17 @@ for (const k of ['ni', 'loan', 'cis']) {
 }
 
 // The empty test on the hub: the MTD row and the payments on account card only exist when true.
-ok('the MTD row is drawn only when mandation is real', /\{mtd \? \(/.test(src.hub));
+// 🔴 THE EMPTY TEST STILL BITES, ON FIVE POSITIONS RATHER THAN A BOOLEAN. Only two of them draw a
+// row at all: the man who told us HMRC wrote to him, and the man whose figures are over the line
+// and who has not been asked. stated_out, unstated_under and excluded draw nothing here, and the
+// question still reaches the last two of those through unansweredMtd(), which is asked of every
+// sole trader whatever his figures.
+ok('the MTD row is drawn only when there is something true to say',
+  /\{mtdPos === 'stated_in' \? \(/.test(src.hub)
+  && /: mtdPos === 'unstated_over' \? \(/.test(src.hub)
+  && /\) : null\}/.test(src.hub));
+ok('🔴 AND THE VERDICT SENTENCE IS UNREACHABLE WITHOUT HIS OWN ANSWER',
+  !/mtdPos === 'unstated_(over|under)'[\s\S]{0,400}?Making Tax Digital applies to you/.test(src.hub));
 ok('the payments on account card is drawn only when they apply', /poa\.required \? \(/.test(src.hub));
 
 // ---------------------------------------------------------------------------------------------
@@ -299,8 +309,12 @@ ok('the floor is the engine concept, not a second copy of the date',
 // The empty test on the summary page, the same shape the hub already passes above.
 ok('\ud83d\udd34 THE CALENDAR CARD IS DRAWN ONLY WHEN MANDATION IS REAL',
   /\{isCompany \? null : mandated \? \(/.test(src.summary));
+// ⚠️ THE ANCHOR MOVED, THE CLAIM DID NOT. `pack.ytd.mtdApplies && !isCompany` became a read of the
+// pack's POSITION, because mandation is decided by HMRC from a return already filed and a boolean
+// could not hold that. The page still re-derives nothing: both halves come from the pack.
 ok('mandation is the pack\'s answer, never re-derived on the page',
-  /const mandated = pack\.ytd\.mtdApplies && !isCompany;/.test(src.summary));
+  /const mtdPos = isCompany \? 'excluded' : pack\.ytd\.mtdPosition;/.test(src.summary)
+  && /const mandated = mtdPos === 'stated_in';/.test(src.summary));
 ok('the open update is named before the quarter he is standing in',
   /outstanding \? \(/.test(src.summary));
 // \u26a0\ufe0f RENDERED COPY IS ASSERTED ON codeOnly(), NOT ON THE RAW FILE, and the sabotage pass is
@@ -310,9 +324,19 @@ ok('the open update is named before the quarter he is standing in',
 // A guard that a comment can satisfy is not a guard.
 const summaryCode = codeOnly(src.summary);
 ok('a man under the line is told where he stands, not shown a blank',
-  /No quarterly update is due from you/.test(summaryCode));
+  /No quarterly update is due from you/.test(summaryCode) || /One question settles this/.test(summaryCode));
+// 🔴 REWRITTEN 3 AUGUST 2026. THE OLD COPY NAMED HMRC'S TEST AND THEN IGNORED IT IN THE SAME CARD.
+// It read "Making Tax Digital starts at £50,000 and yours since 6 April is £8,400, so there is no
+// update here for anyone to be waiting on", and then added that HMRC actually decides from a return
+// already filed. Both cannot be true at once, and the first is the one a man acts on. So the card
+// stopped concluding: it says where his figures sit, names the return HMRC reads, and asks him.
 ok('\ud83d\udd34 AND HE IS TOLD HMRC\'S ACTUAL TEST BASE, which is a return already filed',
-  /return already filed/.test(summaryCode));
+  /taxYearLabel\(startYear - 2\)/.test(summaryCode) && /writes to you/.test(summaryCode));
+ok('\ud83d\udd34 AND THE PAGE NEVER TELLS AN UNASKED MAN THAT NOBODY IS WAITING ON HIM',
+  !/there is no\s+update here for anyone to be waiting on/.test(summaryCode.replace(/\s+/g, ' '))
+  || /You told us HMRC has not written to you/.test(summaryCode));
+ok('\ud83d\udd34 AND THE ONE THING ONLY HE KNOWS IS ASKED, rather than guessed at',
+  /One question settles this/.test(summaryCode) && /app\/you\/circumstances/.test(summaryCode));
 // \u26a0\ufe0f THE 20,000 ROW CAP IS NOT A TAX THRESHOLD, and it is the one number on this page that
 // looks like one. The first draft of this guard fired on `txns.length >= 20000` and said the page
 // had typed a threshold, which it had not. Stripped BY NAME rather than by loosening the pattern:

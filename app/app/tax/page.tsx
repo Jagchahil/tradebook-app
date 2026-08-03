@@ -10,6 +10,7 @@ import { shareCaption } from '../../../lib/position';
 import { bankFeedOffered } from '../../../lib/bankfeed';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { buildQuarterPack, quarterBounds, quarterForDate } from '../../../lib/quarterpack';
+import { mtdStatedFrom } from '../../../lib/circumstances';
 import { gbp0 } from '../../../lib/money';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
@@ -109,11 +110,21 @@ export default async function TaxHubPage() {
   //
   // `&& !isCompany` STAYS. It is belt and braces on a row about a man's own money, and if the pack
   // ever forgets the exclusion the row still does not draw for him.
+  //
+  // 🔴 AND THE PACK CAN NO LONGER DECIDE MANDATION FROM THIS YEAR'S MONEY, BECAUSE HMRC DOES NOT.
+  // getOptimiserInput already carries his circumstance answers, so the one fact only he holds,
+  // whether HMRC's letter arrived, reaches the pack from the same read the rest of this page uses.
+  // mtdStatedFrom() maps a skip, a missing key and a failed read all to null, which means "we have
+  // not been told" and never "no". See mtdPosition() in lib/taxengine.ts.
   const pack = buildQuarterPack({
     transactions: txns, startYear, quarter: index, truncated: txns.length >= 20000,
     structure: biz?.businessType ?? null,
+    mtdStated: mtdStatedFrom(optimiser.circumstances),
   });
-  const mtd = pack.ytd.mtdApplies && !isCompany;
+  // ⚠️ FOUR STATES, NOT A BOOLEAN, AND THE ROW BELOW SAYS SOMETHING DIFFERENT IN EACH. The old
+  // `pack.ytd.mtdApplies && !isCompany` collapsed "his figures are over the line" into "the law
+  // applies to him", which is the defect. `excluded` never draws the row at all.
+  const mtdPos = isCompany ? 'excluded' : pack.ytd.mtdPosition;
 
   // ⚠️ THE EMPTY TEST. A proud £0 for a brand new account teaches him this screen says nothing.
   // The tax card is drawn once there is money behind it, and the empty state names the one thing
@@ -235,15 +246,45 @@ export default async function TaxHubPage() {
         </section>
       ) : null}
 
-      {/* ── HIS MTD POSITION, ONLY IF MANDATED. The empty test again: a man under the threshold
-          gets nothing here, and the whole picture waits behind the summary door below. ───────── */}
-      {mtd ? (
+      {/* ── HIS MTD POSITION. ────────────────────────────────────────────────────────────────
+          🔴 REWRITTEN 3 AUGUST 2026. THIS ROW USED TO STATE A LEGAL CONCLUSION FROM THE WRONG YEAR.
+
+          It read "Making Tax Digital applies to you. Your income this year is over the line, so
+          quarterly updates apply." HMRC does not decide from this year. GOV.UK: "to check if you
+          needed to use Making Tax Digital for Income Tax from April 2026, we reviewed your 2024 to
+          2025 Self Assessment tax return." So a man having a big year after a small one was told an
+          obligation applied when it did not, and a man having a small year after a big one was told
+          nothing at all while his August, November and February updates went past.
+
+          Two of the five positions draw, and doc 103's empty test decides the other three:
+            stated_in      he told us the letter came. The obligation is his, so say so.
+            unstated_over  his figures are over the line and we have not asked him. Worth one row,
+                           because there is a real question with two sensible answers behind it.
+            stated_out     he told us it did not come. Nothing to check, so nothing drawn.
+            unstated_under nothing drawn HERE, and that is not the same as nothing done: the
+                           question is asked of EVERY sole trader through unansweredMtd(), whatever
+                           his figures, which is the only channel that reaches the quiet year after
+                           a big one. A permanent "we are not sure" row on the screen of every man
+                           under the line is the row he learns to skip.
+            excluded       a director or a partner, who is outside the regime, not under its line.
+          ───────────────────────────────────────────────────────────────────────────────────── */}
+      {mtdPos === 'stated_in' ? (
         <a href="/app/tax/summary" style={S.mtdRow} className="lek-hit">
           <span style={S.mtdTop}>Making Tax Digital applies to you</span>
           <span style={S.rowBody}>
-            Your income this year, {gbp0(pack.ytd.grossQualifyingIncome)} before costs, is over the{' '}
-            {gbp0(pack.ytd.mtdThreshold)} line for {pack.taxYear}, so quarterly updates apply. Your
+            You told us HMRC has written to you, so quarterly updates apply for {pack.taxYear}. Your
             figures are already kept the way an update wants them. See where the quarter stands.
+          </span>
+        </a>
+      ) : mtdPos === 'unstated_over' ? (
+        <a href="/app/you/circumstances" style={S.mtdRow} className="lek-hit">
+          <span style={S.mtdTop}>One question about Making Tax Digital</span>
+          <span style={S.rowBody}>
+            Your income this year, {gbp0(pack.ytd.grossQualifyingIncome)} before costs, is over the{' '}
+            {gbp0(pack.ytd.mtdThreshold)} line for {pack.taxYear}. That is this year, and this year
+            is not the test: HMRC decides it from your {pack.ytd.mtdTestBaseReturn} tax return and
+            writes to you to confirm it. Tell us whether that letter came and we will know what to
+            keep ready for you.
           </span>
         </a>
       ) : null}
@@ -267,13 +308,17 @@ export default async function TaxHubPage() {
             {/* The door stays for a director, because the figures behind it are his own money added
                 up. What goes is the promise of an update he does not have to make. */}
             {/* \u26a0\ufe0f AND THE DOOR MUST NOT PROMISE A DEADLINE EITHER. "When the next one is due"
-                asserts there IS a next one, which for a man under the Making Tax Digital line there
-                is not. `mtd` is already in scope here for the row above; the third branch says what
-                is behind the door for him, which is his own figures. */}
+                asserts there IS a next one, which for a man who is not mandated there is not.
+
+                🔴 AND IT NOW READS THE POSITION, NOT A BOOLEAN. "When the next one is due" is only
+                true of a man HMRC has actually written to. Promising a due date to a man whose only
+                qualification is a good year to date is the same wrong statement as the row above,
+                made quietly in a door label. Everything that is not stated_in gets the honest
+                sentence, which is true of all four of the others. */}
             <span style={S.rowBody}>
               {isCompany
                 ? 'Your figures since 6 April, and the quarter on its own.'
-                : mtd
+                : mtdPos === 'stated_in'
                   ? 'What an update would report today, and when the next one is due.'
                   : 'What an update would report today, and where you stand against the line.'}
             </span>

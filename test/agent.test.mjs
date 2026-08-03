@@ -65,6 +65,10 @@ function input(today, months, extra = {}) {
     studentLoanPostgrad: false,
     employmentIncome: 0,
     goals: [],
+    // ⚠️ NOT ASKED YET, WHICH IS THIS SUITE'S DEFAULT ON PURPOSE. null is what a real account looks
+    // like before anybody has answered the Making Tax Digital question, so every existing case here
+    // keeps testing the path a live customer is actually on. 'yes' and 'no' get their own cases.
+    mtdStated: null,
     ...extra,
   };
 }
@@ -122,6 +126,42 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   ok('mtd period is the tax year', m.periodKey === '2026-27');
   const projOnly = A.computeSignals(input(today, monthsFor(today, 12, { incomePerMonth: 4500 }))); // ytd 40.5k proj ~57k
   ok('projected cross fires too', Boolean(find(projOnly, 'mtd_mandation')));
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT THIS SIGNAL IS ALLOWED TO SAY, AND IT WAS PINNED BY NOTHING UNTIL 3 AUGUST 2026.
+  //
+  // Every guard above tests only whether the signal FIRES. So the title could have been rewritten
+  // to anything at all, including back to a verdict, and this suite would have stayed green. That
+  // is this codebase's named disease and it earned its own section here.
+  //
+  // The rule: HMRC decides mandation from a return already filed (2024/25 for April 2026) and
+  // WRITES to the people it has assessed. This engine sees this year's money. So it may describe
+  // the figure and name the test, and it may never conclude, least of all off a PROJECTION of a
+  // running total pushed to a man's phone.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  for (const [label, sig] of [['crossed', m], ['projected', find(projOnly, 'mtd_mandation')]]) {
+    ok(`🔴 ${label}: the signal never states that it applies to him`,
+      !/applies to you/i.test(sig.title) && !/applies to you/i.test(sig.body)
+      && !/quarterly updates apply/i.test(sig.waText));
+    ok(`🔴 ${label}: it names the test HMRC actually runs, in the app AND on WhatsApp`,
+      /return you have already filed/i.test(sig.body) && /writes to you/i.test(sig.body)
+      && /return already filed/i.test(sig.waText));
+    ok(`${label}: and it asks him the one question that settles it`,
+      /has that letter come\?/i.test(sig.body) && /has that letter come\?/i.test(sig.waText));
+  }
+
+  // 🔴 AND HIS OWN ANSWER SILENCES IT, IN BOTH DIRECTIONS.
+  // A "no" means he told us HMRC has not written to him, and pushing "Making Tax Digital" at that
+  // man is the product arguing with the customer about a fact only he holds. A "yes" means he
+  // already knows, so the ping would be explaining his own answer back to him.
+  const crossMonths = monthsFor(today, 12, { incomePerMonth: 6000 });
+  ok('🔴 A MAN WHO TOLD US NO LETTER CAME IS NOT PINGED, however big his year',
+    !find(A.computeSignals(input(today, crossMonths, { mtdStated: 'no' })), 'mtd_mandation'));
+  ok('🔴 AND NEITHER IS A MAN WHO TOLD US IT DID: he does not need his own answer read back',
+    !find(A.computeSignals(input(today, crossMonths, { mtdStated: 'yes' })), 'mtd_mandation'));
+  ok('...and nothing else he was getting goes quiet with it',
+    keys(A.computeSignals(input(today, crossMonths, { mtdStated: 'no' }))).length
+      === keys(A.computeSignals(input(today, crossMonths))).length - 1);
 }
 
 // --- signal 3 and 4: higher rate and the taper ---------------------------------------
@@ -407,6 +447,14 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   ok('combined trap fires as ping', trap && trap.priority === 'ping');
   ok('trap replaces generic mandation', !find(sig, 'mtd_mandation'));
   ok('trap names both streams', trap.body.includes('£30,600') && trap.body.includes('£24,300'));
+  // 🔴 THE SAME RULE AS THE GENERIC SIGNAL, AND THE SAME HOLE: nothing pinned this copy either.
+  // The trap earns its place because the two streams ADDING UP is a fact about the rule that
+  // people genuinely miss. "So it applies to you" was a fact about him that we do not hold.
+  ok('🔴 the trap explains the rule and never delivers a verdict',
+    !/applies to you/i.test(trap.title) && !/applies to you/i.test(trap.body)
+    && /return you have already filed/i.test(trap.body) && /has that letter come\?/i.test(trap.body));
+  ok('🔴 AND A LANDLORD WHO TOLD US NO LETTER CAME IS LEFT ALONE',
+    !find(A.computeSignals(input(today, months, { property, mtdStated: 'no' })), 'mtd_combined_trap'));
 
   // Trade alone over the line: generic fires, trap stays quiet.
   const bigTrade = A.computeSignals(input(today, monthsFor(today, 9, { incomePerMonth: 6500 }), {

@@ -2,10 +2,11 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getBusinessProfile, getConfirmedTransactionsForRange } from '../../../../lib/supabase';
+import { getBusinessProfile, getConfirmedTransactionsForRange, readCircumstances } from '../../../../lib/supabase';
 import { buildQuarterPack, quarterBounds, quarterForDate, taxYearLabel } from '../../../../lib/quarterpack';
 import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { wholeFirmCaption } from '../../../../lib/position';
+import { mtdStatedFrom } from '../../../../lib/circumstances';
 import { gbp0 } from '../../lib/money';
 import { outstandingUpdate, updateDue, UPDATE_ORDINAL } from '../due';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
@@ -80,17 +81,22 @@ export default async function TaxSummaryPage() {
   const taxYearStart = quarterBounds(startYear, 1).start;
   const bounds = quarterBounds(startYear, index);
 
-  const [txns, biz] = await Promise.all([
+  const [txns, biz, circ] = await Promise.all([
     getConfirmedTransactionsForRange(user.id, taxYearStart, bounds.end).catch(() => []),
     // Who he is, from the same source every other structure aware screen reads. Null is unknown,
     // and unknown reads exactly as it did before wave nine.
     getBusinessProfile(user.id).catch(() => null),
+    // 🔴 AND WHETHER HMRC'S LETTER ARRIVED, which is the only evidence of mandation that exists,
+    // because HMRC reads a return already filed and this page holds only this year. A failed read
+    // is unknown and never a no. See mtdPosition() in lib/taxengine.ts.
+    readCircumstances(user.id).catch(() => null),
   ]);
   const pack = buildQuarterPack({
     transactions: txns, startYear, quarter: index, truncated: txns.length >= 20000,
     // 🔴 THIS WAS MISSING, so the pack could not exclude a partner's share (or a company's
     // turnover) from the mandation test. See the calendar card below and lib/quarterpack.ts.
     structure: biz?.businessType ?? null,
+    mtdStated: mtdStatedFrom(Object.fromEntries((circ ?? []).map((a) => [a.key, a.answer]))),
   });
 
   const isCompany = biz?.businessType === 'limited_company';
@@ -117,9 +123,22 @@ export default async function TaxSummaryPage() {
   const hasFigures = sub.txCount > 0;
   const entryCount = sub.txCount === 1 ? 'the one entry' : `${sub.txCount} entries`;
 
-  // Mandation, asked of the pack rather than re-derived, in the same words app/app/tax/page.tsx
-  // asks it. See the calendar card below for what this screen was saying without it.
-  const mandated = pack.ytd.mtdApplies && !isCompany;
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 MANDATION IS NOT A FIGURE THIS PAGE HOLDS. REWRITTEN 3 AUGUST 2026.
+  //
+  // `pack.ytd.mtdApplies && !isCompany` read "his gross this year is over the line" and called it
+  // "he is mandated". GOV.UK decides it from a return already filed: "to check if you needed to
+  // use Making Tax Digital for Income Tax from April 2026, we reviewed your 2024 to 2025 Self
+  // Assessment tax return." So this page could put a deadline in front of a man who has none, and
+  // withhold one from a man whose three updates had already gone.
+  //
+  // ⚠️ `mandated` NOW MEANS ONE THING AND ONLY ONE: he told us HMRC wrote to him. Everything that
+  // drives a DATE hangs off it, because a date is a promise, and the cost of an invented deadline
+  // is a man rearranging his week for an obligation he does not have. What the page can still say
+  // to everyone else, honestly, is where his figures sit and what the real test is.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const mtdPos = isCompany ? 'excluded' : pack.ytd.mtdPosition;
+  const mandated = mtdPos === 'stated_in';
   // UTC, because quarterForDate() above reads the clock in UTC. Two readings of "today" on one
   // page is how a boundary day comes to disagree with itself.
   const outstanding = mandated ? outstandingUpdate(now.toISOString().slice(0, 10), startYear, index) : null;
@@ -306,19 +325,63 @@ export default async function TaxSummaryPage() {
             kept in the shape an update reports, so it will be a date rather than a job.
           </p>
         </section>
-      ) : (
+      ) : mtdPos === 'stated_out' ? (
+        /* 🔴 HE TOLD US. THE ONLY BRANCH LEFT THAT IS ENTITLED TO ASSERT ANYTHING.
+           HMRC writes to the people it has assessed, so a man saying no letter came is better
+           evidence than any figure on this page, and it holds even if his year to date is well
+           over the line. The second sentence is the way back: an answer given in error, or a
+           letter that turns up in October, must not be a dead end. */
         <section className="lek-card">
           <h2 className="lek-h2">No quarterly update is due from you</h2>
           <p style={S.body}>
-            Making Tax Digital for Income Tax starts at {gbp0(pack.ytd.mtdThreshold)} of income before
-            costs, and yours since 6 April is {gbp0(pack.ytd.grossQualifyingIncome)}. So there is no
-            update here for anyone to be waiting on. The figures above are yours to check.
+            You told us HMRC has not written to you about Making Tax Digital for Income Tax, so
+            there is no update here for anyone to be waiting on. The figures above are yours to
+            check, and your Lekhio keeps them in update shape anyway.
           </p>
           <p style={S.quiet}>
-            HMRC decides who is in it from a return already filed rather than the year you are in, so
-            for {pack.taxYear} it is your {taxYearLabel(startYear - 2)} figures that settle it and not
-            the ones on this page. Your Lekhio is kept in update shape either way, so the day it does
-            apply there is nothing to catch up on.
+            HMRC decides who is in it from your {taxYearLabel(startYear - 2)} tax return rather than
+            the year you are in, and writes to say so. If that letter turns up, tell us in{' '}
+            <a href="/app/you/circumstances" style={S.link}>your answers</a> and this page changes
+            the same day.
+          </p>
+        </section>
+      ) : (
+        /* ═══════════════════════════════════════════════════════════════════════════════════
+           🔴 WE HAVE NOT ASKED HIM, SO THIS PAGE MAY NOT ANSWER. REWRITTEN 3 AUGUST 2026.
+
+           This branch used to read "Making Tax Digital starts at £50,000 and yours since 6 April
+           is £8,400, so there is no update here for anyone to be waiting on." Both halves of that
+           are this year's figures, and this year is not the test. Two men land here:
+
+             - The quiet year after a big one. His 2024/25 was £60,000, HMRC wrote to him in
+               February, and his August, November and February updates are real. The old sentence
+               told him nobody was waiting on anything. That is the silent failure, and it is the
+               one that costs him.
+             - The big year after a quiet one. He is over the line today and mandated by nothing,
+               because HMRC read a smaller return.
+
+           So the card states where his figures sit, names the test HMRC actually applies, and asks
+           the one question that settles it. It does not guess, and it does not go blank: a blank
+           where a deadline used to be reads as a page that could not work it out.
+
+           ⚠️ IT DRAWS FOR BOTH UNSTATED POSITIONS, over the line and under it, and the only thing
+           that changes between them is which way the figure sits. Drawing only for the man over
+           the line would rebuild the exact hole this fixes.
+           ═══════════════════════════════════════════════════════════════════════════════════ */
+        <section className="lek-card">
+          <h2 className="lek-h2">One question settles this</h2>
+          <p style={S.body}>
+            Your income since 6 April is {gbp0(pack.ytd.grossQualifyingIncome)}, which is{' '}
+            {mtdPos === 'unstated_over' ? 'over' : 'under'} the {gbp0(pack.ytd.mtdThreshold)} Making
+            Tax Digital for Income Tax line for {pack.taxYear}. That is this year, and this year is
+            not the test: HMRC decides it from your {taxYearLabel(startYear - 2)} tax return, and
+            writes to you to say so.
+          </p>
+          <p style={S.quiet}>
+            So the one thing we cannot work out from your figures is whether that letter arrived.{' '}
+            <a href="/app/you/circumstances" style={S.link}>Tell us</a> and this page will say plainly
+            whether an update is due and when. Your Lekhio is kept in update shape either way, so
+            whichever the answer is there is nothing to catch up on.
           </p>
         </section>
       )}
@@ -379,6 +442,9 @@ const S: Record<string, React.CSSProperties> = {
   body: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: 0, maxWidth: '62ch' },
   quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '10px 0 0' },
   empty: { fontSize: TYPE.strong, fontWeight: 700, margin: 0 },
+  // The one inline link on this page. Same shape as labelLink in /app/money and /app/invoices,
+  // so a link inside a sentence looks the same wherever he meets one.
+  link: { color: INK, fontWeight: 700, textDecoration: 'underline', textDecorationColor: LINE, textUnderlineOffset: 3 },
 
   propBlock: { borderTop: `1px solid ${LINE}`, marginTop: SPACE.md, paddingTop: SPACE.md },
   refund: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: 14, margin: '14px 0 0' },

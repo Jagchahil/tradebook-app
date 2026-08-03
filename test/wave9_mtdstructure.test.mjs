@@ -124,34 +124,58 @@ console.log('\nwave nine: MTD, payments on account and National Insurance belong
   ok('the hub reads who he is from getBusinessProfile, and a failed read is null, never a throw',
     hub.includes('getBusinessProfile(user.id)') && /getBusinessProfile\(user\.id\)\.catch\(\(\) => null\)/.test(hub));
 
-  const over = { ytd: { mtdApplies: true } };
-  const under = { ytd: { mtdApplies: false } };
-  const g = (biz, pack) => gates(hub, ['isCompany', 'mtd'], { biz, pack });
+  // ⚠️ THE ANCHOR MOVED ON 3 AUGUST 2026 AND THE CLAIM DID NOT, so this is fixed rather than
+  // deleted. `const mtd = pack.ytd.mtdApplies && !isCompany` became `const mtdPos = isCompany ?
+  // 'excluded' : pack.ytd.mtdPosition`, because a boolean could only answer yes or no to a question
+  // HMRC answers from a return already filed. Everything this section is about, that a director is
+  // never handed a Self Assessment obligation and that nobody else loses one, is unchanged, and it
+  // is now stated on five positions instead of two.
+  const over = { ytd: { mtdPosition: 'unstated_over' } };
+  const under = { ytd: { mtdPosition: 'unstated_under' } };
+  const told = { ytd: { mtdPosition: 'stated_in' } };
+  const g = (biz, pack) => gates(hub, ['isCompany', 'mtdPos'], { biz, pack });
   ok('the hub still has the two gates this suite is about', g(NOBODY, over) !== null);
 
-  ok('🔴 A DIRECTOR OVER THE TURNOVER LINE IS NOT TOLD MAKING TAX DIGITAL APPLIES TO HIM',
-    g(DIRECTOR, over).mtd === false && g(DIRECTOR_UNKNOWN, over).mtd === false);
-  ok('🔴 AND A SOLE TRADER OVER IT STILL IS: nothing was taken from the man the row was built for',
-    g(SOLE_TRADE, over).mtd === true && g(SOLE_UNKNOWN, over).mtd === true);
-  ok('a partner keeps it too, because his share IS self employment income',
-    g(PARTNER, over).mtd === true);
+  ok('🔴 A DIRECTOR IS NEVER HANDED A MAKING TAX DIGITAL POSITION AT ALL, whatever the pack says',
+    [over, under, told].every((pk) =>
+      g(DIRECTOR, pk).mtdPos === 'excluded' && g(DIRECTOR_UNKNOWN, pk).mtdPos === 'excluded'));
+  ok('🔴 AND EVERYONE ELSE KEEPS THE PACK\'S ANSWER WHOLE: nothing was taken from the man the row was built for',
+    [SOLE_TRADE, SOLE_UNKNOWN, PARTNER, LANDLORD, NOBODY].every((b) =>
+      g(b, over).mtdPos === 'unstated_over' && g(b, told).mtdPos === 'stated_in'));
   ok('🔴 A FAILED PROFILE READ KEEPS THE ROW: unknown shows everything, which is the safe direction',
-    g(NOBODY, over).mtd === true);
-  ok('a landlord keeps it, because rent on a personal return counts towards the same line',
-    g(LANDLORD, over).mtd === true);
-  ok('and the turnover test still decides for everybody under it',
-    g(SOLE_TRADE, under).mtd === false && g(NOBODY, under).mtd === false);
+    g(NOBODY, over).mtdPos === 'unstated_over');
+  ok('and a man under the line is no longer collapsed into a no: the position still says which it is',
+    g(SOLE_TRADE, under).mtdPos === 'unstated_under' && g(NOBODY, under).mtdPos === 'unstated_under');
   ok('the structure gate bites on an explicit company and on nothing else',
     g(DIRECTOR, over).isCompany === true
     && [NOBODY, SOLE_UNKNOWN, SOLE_TRADE, PARTNER, LANDLORD].every((b) => g(b, over).isCompany === false));
 
-  // The row itself is untouched: this is a gate, not a rewrite of what a mandated man reads.
-  const mtdRow = arm(hub, '{mtd ? (');
-  ok('the MTD row is still drawn from the quarter pack for the man it is his',
+  // 🔴 THE ROW ITSELF WAS REWRITTEN, AND THE GUARD SAYS WHAT IT MAY AND MAY NOT CLAIM.
+  // "Making Tax Digital applies to you" is a legal conclusion. It is now reachable only from
+  // stated_in, which means HE told us HMRC wrote to him. The man who is merely over the line this
+  // year gets a different row that names HMRC's real test and asks him the one question.
+  const mtdRow = arm(hub, "{mtdPos === 'stated_in' ? (");
+  ok('🔴 THE PLAIN STATEMENT IS BEHIND stated_in AND NOTHING ELSE',
     typeof mtdRow === 'string' && /Making Tax Digital applies to you/.test(flat(mtdRow))
-    && /pack\.ytd\.grossQualifyingIncome/.test(mtdRow));
-  ok('🔴 and no other sentence on the hub asserts mandation outside that gate',
-    !/Making Tax Digital|quarterly updates apply/.test(flat(without(hub, [mtdRow]))));
+    && /You told us HMRC has written to you/.test(flat(mtdRow)));
+  // ⚠️ THE MARKER IS THE ELSE ARM, `) : mtdPos === ...`, NOT `{mtdPos === ...`. The first branch of
+  // a chained ternary opens with a brace and the rest do not, and arm() matches a literal.
+  const askRow = arm(hub, ": mtdPos === 'unstated_over' ? (");
+  ok('🔴 AND THE MAN WE HAVE NOT ASKED IS TOLD THE REAL TEST, not given a verdict',
+    typeof askRow === 'string' && /pack\.ytd\.grossQualifyingIncome/.test(askRow)
+    && /this year is\s+not the test/.test(flat(askRow))
+    && /mtdTestBaseReturn/.test(askRow));
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // ⚠️ ON codeOnly(), AND IT WAS NOT BEFORE. SEVENTH INSTANCE OF THIS CODEBASE'S OLDEST TRAP.
+  //
+  // This guard swept the raw file for "Making Tax Digital" outside the two arms. It passed for a
+  // year by luck: the comment above the row happened not to use the phrase. Rewriting that comment
+  // to explain WHY the row changed put both policed phrases into a comment, and the guard failed
+  // against a page that was correct. A negative assertion over a source file must run on
+  // codeOnly(), because the comment explaining a rule always quotes the rule.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  ok('🔴 and no other sentence on the hub asserts mandation outside those two arms',
+    !/Making Tax Digital|quarterly updates apply/.test(flat(without(codeOnly(hub), [codeOnly(mtdRow), codeOnly(askRow)]))));
 
   // Payments on account, TMA 1970 s59A. A Self Assessment mechanism, gated the same way.
   const poaCard = arm(hub, '{showPosition && !isCompany && poa.required ? (');
@@ -172,6 +196,11 @@ console.log('\nwave nine: MTD, payments on account and National Insurance belong
     !/Corporation Tax/i.test(flat(codeOnly(hub))));
   ok('the door down to the quarter still opens for him, under a name that is true for him',
     /href="\/app\/tax\/summary"/.test(hub) && /isCompany\s*\?\s*'Your figures since 6 April/.test(flat(hub)));
+  // 🔴 AND THE DOOR LABEL IS A CLAIM TOO. "When the next one is due" promises a date, so it may
+  // only be shown to a man who has one. It used to hang off the same boolean as the row, which meant
+  // a good year to date bought him an invented deadline in a subtitle.
+  ok('🔴 THE DOOR PROMISES A DUE DATE ONLY TO A MAN WHO HAS ONE',
+    /mtdPos === 'stated_in'\s*\?\s*'What an update would report today, and when the next one is due\.'/.test(flat(hub)));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -226,11 +255,16 @@ console.log('\nwave nine: MTD, payments on account and National Insurance belong
   // what this guard is for: a DIRECTOR must fall out on the FIRST condition, ahead of mandation and
   // ahead of everything else, so there is no path on which he is handed a date. Pinning the head of
   // the ternary is what says that, and it now says it about the card as it actually is.
+  // ⚠️ AND `mandated` NARROWED AGAIN ON 3 AUGUST 2026: it now means stated_in and nothing else, so
+  // every date on this page hangs off a fact HE gave us rather than off a figure we hold. The claim
+  // this guard makes is untouched: the director falls out on the FIRST condition, ahead of all of it.
   const cal = summary.indexOf('update of ${pack.taxYear}');
   ok('🔴 THE DUE DATE CARD IS WITHHELD WHOLE, rather than filled in with an invented deadline',
     cal > -1 && /\{isCompany \? null : mandated \? \(/.test(summary.slice(Math.max(0, cal - 800), cal)));
   ok('🔴 AND THE UNDER THE LINE CARD IS OUT OF HIS REACH TOO: isCompany is tested first',
     summary.indexOf('{isCompany ? null : mandated ? (') < summary.indexOf('No quarterly update is due from you'));
+  ok('🔴 AND mandated NOW MEANS HE TOLD US, so no date on this page rests on a figure we hold',
+    /const mandated = mtdPos === 'stated_in';/.test(summary));
   ok('and it still draws for the man who does make an update',
     /updateDue\(startYear, index\)/.test(summary) && /UPDATE_ORDINAL\[index\]/.test(summary));
   ok('🔴 NO CORPORATION TAX DEADLINE IS INVENTED IN ITS PLACE',

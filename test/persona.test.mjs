@@ -157,11 +157,22 @@ const TRADE_ONLY = ['prior_employment', 'low_profit_year', 'start_date', 'premis
 {
   const landlordMtd = unansweredMtd([], { structure: 'sole_trader', income: 'property_only' }).map((c) => c.key);
   ok('🔴 A LANDLORD IS STILL ASKED THE MTD GATE: letting for over £50,000 IS mandated',
-    landlordMtd.includes('mtd_mandated'));
+    landlordMtd.includes('mtd_mandated_letter'));
   ok('and a company still gets no MTD questions at all, on either axis',
     unansweredMtd([], { structure: 'limited_company', income: 'trade' }).length === 0);
-  ok('the wording problem is written on the row rather than silently filtered',
-    read('lib/circumstances.ts').includes('CARRIES NO `incomes` TAG'));
+  // 🔴 THE WORDING PROBLEM THIS SECTION WAS LOGGING IS NOW SOLVED, NOT FILTERED.
+  // The retired gate opened "Do you expect to take more than £50,000 this year ... from SELF
+  // EMPLOYMENT and rent put together", which named a stream a landlord does not have, and the row
+  // said so in a comment because a stored exhibit cannot be reworded. Its successor asks about
+  // HMRC's letter and names neither stream, so one sentence is true for a roofer, a landlord and a
+  // man who is both. A guard that only checked the comment still existed would have gone on passing
+  // while the thing it described was fixed, so it checks the sentence itself.
+  const gateAsk = unansweredMtd([], { structure: 'sole_trader', income: 'property_only' })
+    .find((c) => c.key === 'mtd_mandated_letter').ask;
+  ok('🔴 AND THE GATE A LANDLORD READS NAMES NEITHER SELF EMPLOYMENT NOR RENT',
+    !/self employment/i.test(gateAsk) && !/\brent\b/i.test(gateAsk));
+  ok('the reasoning for leaving it untagged is written on the row, not left to be rediscovered',
+    read('lib/circumstances.ts').includes('NO `incomes` TAG'));
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -298,12 +298,105 @@ export function projectionFactor(input: { monthsElapsed: number; daysElapsed: nu
 }
 
 // --- MTD for Income Tax -----------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 HMRC DOES NOT DECIDE MANDATION FROM THE YEAR HE IS IN. IT DECIDES IT FROM A RETURN ALREADY
+// FILED, AND EVERY SURFACE IN THIS PRODUCT USED TO STATE THE CONCLUSION FROM THE WRONG YEAR.
+//
+// GOV.UK, "Find out if and when you need to use Making Tax Digital for Income Tax", verbatim:
+//   "to check if you needed to use Making Tax Digital for Income Tax from April 2026, we
+//    reviewed your 2024 to 2025 Self Assessment tax return."
+// April 2026 is set by the 2024/25 return, April 2027 by 2025/26, April 2028 by 2026/27. The
+// thresholds move with them: over £50,000, then over £30,000, then over £20,000.
+//
+// Lekhio holds CURRENT YEAR to date gross, because that is what the money log is. As a stand in
+// for the filed return it is wrong in BOTH directions:
+//
+//   - 2024/25 under the line, a big 2026/27. We told him quarterly updates apply. They do not.
+//   - 2024/25 over the line, a slow 2026/27. We told him nothing until his year to date crossed,
+//     which for a £60,000 trader is about month ten. His first three updates were due in August,
+//     November and February and no screen mentioned any of them.
+//
+// The second one is the one that costs him his own money, and it is the silent one.
+//
+// 🔴 SO THE PROXY MAY DESCRIBE AND MAY NEVER CONCLUDE. HMRC writes to the people it has assessed,
+// in its own words: "HMRC will write to you, confirming that you need to start using Making Tax
+// Digital for Income Tax by the start of the following tax year." HE holds the fact, we do not,
+// and his answer beats the proxy everywhere the two disagree.
+//
+// ⚠️ THAT IS WHY THERE IS NO BOOLEAN HERE ANY MORE. A boolean is what let five surfaces collapse
+// "his figures are over the line" into "the law applies to him", and a helper that turned the
+// position back into one would rebuild the same trap for whoever did not read this. Every caller
+// branches on the position, so no caller can accidentally treat "we do not know" as "yes".
+//
+// ⚠️ NO PENALTIES APPLY FOR A MISSED QUARTERLY UPDATE IN 2026/27 (HMRC transitional easement,
+// gov.uk/guidance/penalties-for-making-tax-digital-for-income-tax). Points based penalties start
+// in 2027/28, four points then £200. Nothing here may imply a fine for this year.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 
-// Whether MTD for Income Tax applies, by qualifying income and the tax year being
-// tested. £50,000+ from April 2026, £30,000+ from April 2027, £20,000+ from 2028.
-export function mtdForIncomeTaxRequired(qualifyingIncome: number, startYear: 2026 | 2027 | 2028 = 2026): boolean {
-  const threshold = startYear >= 2028 ? FACTS.mtdThreshold2028 : startYear === 2027 ? FACTS.mtdThreshold2027 : FACTS.mtdThreshold2026;
-  return qualifyingIncome > threshold;
+export type MtdStartYear = 2026 | 2027 | 2028;
+
+export type MtdPosition =
+  // The regime does not reach him at all: a company's trade is not self employment or rent, and
+  // GOV.UK has announced no date for partnerships. Not "under the line", OUTSIDE the line.
+  | 'excluded'
+  // He told us HMRC has him in. This is the only value that means mandated.
+  | 'stated_in'
+  // He told us HMRC has not. Beats a year to date figure over the line, because HMRC read a
+  // return we have never seen.
+  | 'stated_out'
+  // We have not asked him yet, or he skipped, and this year's gross is over the line.
+  | 'unstated_over'
+  // We have not asked him yet, or he skipped, and this year's gross is not over the line. NOT a
+  // safe state: this is the man whose 2024/25 was big and whose deadlines are passing now.
+  | 'unstated_under';
+
+// The tax year opening year, clamped to the three HMRC has announced.
+export function mtdStartYear(startYear: number): MtdStartYear {
+  return startYear >= 2028 ? 2028 : startYear >= 2027 ? 2027 : 2026;
+}
+
+// The gross qualifying income threshold for a tax year. THE ONE DEFINITION: lib/quarterpack.ts
+// carried a second copy of this ladder and it is gone.
+export function mtdThresholdFor(startYear: number): number {
+  const y = mtdStartYear(startYear);
+  return y === 2028 ? FACTS.mtdThreshold2028 : y === 2027 ? FACTS.mtdThreshold2027 : FACTS.mtdThreshold2026;
+}
+
+// The Self Assessment return HMRC actually reads to decide that April, as a human reads it:
+// "2024 to 2025" for April 2026. Named so no surface has to work the arithmetic out in copy.
+export function mtdTestBaseReturn(startYear: number): string {
+  const y = mtdStartYear(startYear);
+  return `${y - 2} to ${y - 1}`;
+}
+
+// Whether a gross qualifying income figure is over the line for a tax year. GOV.UK says "more
+// than", so this is strictly over, not "and up".
+//
+// ⚠️ THIS IS A THRESHOLD TEST AND IT IS NOT A MANDATION TEST. It answers "is this number over
+// that number" and nothing else. Do not read a legal conclusion off it: go through mtdPosition,
+// which knows the difference between a figure we hold and a fact HMRC holds.
+export function mtdForIncomeTaxRequired(qualifyingIncome: number, startYear: number = 2026): boolean {
+  return qualifyingIncome > mtdThresholdFor(startYear);
+}
+
+export interface MtdPositionInput {
+  // The regime does not reach him: a limited company's trade, or a partnership.
+  excluded: boolean;
+  // What HE told us, from the mtd_mandated_letter circumstance. null means unanswered or skipped.
+  // ⚠️ REQUIRED, NOT OPTIONAL WITH A FALLBACK. An optional field defaulting to null keeps the old
+  // behaviour alive for every caller that did not get the memo, which is exactly how this codebase
+  // wrote the projection bug twice. Required means tsc names every call site.
+  stated: 'yes' | 'no' | null;
+  grossQualifyingIncome: number;
+  startYear: number;
+}
+
+export function mtdPosition(input: MtdPositionInput): MtdPosition {
+  if (input.excluded) return 'excluded';
+  if (input.stated === 'yes') return 'stated_in';
+  if (input.stated === 'no') return 'stated_out';
+  const gross = Number.isFinite(input.grossQualifyingIncome) ? input.grossQualifyingIncome : 0;
+  return mtdForIncomeTaxRequired(gross, input.startYear) ? 'unstated_over' : 'unstated_under';
 }
 
 // --- Capital allowances: writing down allowance -----------------------------

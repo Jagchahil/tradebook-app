@@ -447,10 +447,13 @@ async function QuestionsStep({ userId, step }: { userId: string; step: 'househol
 // WHERE HE STANDS WITH HMRC. The only screen in setup that offers him nothing, and earns its place
 // anyway because of what the answers change on our side.
 //
-// 🔴 IT ASKS ONE QUESTION OF MOST PEOPLE. Making Tax Digital applies over £50,000 of gross trade and
-// rent, so the other three hang off that gate and lib/circumstances.ts will not release them until
-// he says yes. A man under the line answers once and moves on, and is never asked whether he has
-// signed up for something that does not apply to him.
+// 🔴 IT ASKS ONE QUESTION OF MOST PEOPLE, AND ON 3 AUGUST 2026 IT BECAME A DIFFERENT QUESTION.
+// The gate used to ask what he expected to take THIS year. HMRC decides mandation from a return
+// already filed (2024/25 for April 2026) and writes to the people it has assessed, so the gate now
+// asks about that letter, which is the one fact only he holds. The other three still hang off it
+// and lib/circumstances.ts will not release them until he says yes, so a man who has had no letter
+// answers once and moves on, and is never asked whether he has signed up for something that has
+// not reached him.
 //
 // 🔴 AND IT DOES NOT ASK HIM WHAT HE SUBMITTED IN AUGUST, WHICH IS THE OBVIOUS QUESTION AND THE
 // WRONG ONE. A quarterly update is cumulative: the one due 7 November covers 6 April to 5 October
@@ -483,7 +486,10 @@ async function MtdStep({ userId }: { userId: string }) {
   const list = unansweredMtd(rows, who);
   const { answered: answeredHere, askable } = progressIn(mtdQuestions(), rows, who);
   const answers = new Map(rows.map((r) => [r.key, r.answer]));
-  const mandated = answers.get('mtd_mandated');
+  // 🔴 THE NEW GATE, NOT THE RETIRED ONE. mtd_mandated asked about this year and was retired on
+  // 3 August 2026; reading it here would key this card to an answer nobody will ever give again,
+  // and worse, to an answer that meant something else. See lib/circumstances.ts.
+  const mandated = answers.get('mtd_mandated_letter');
 
   return (
     <section style={S.card}>
@@ -504,9 +510,20 @@ async function MtdStep({ userId }: { userId: string }) {
             // return. Saying so beats a blank card that implies we wanted something.
             ? 'Nothing to ask you here. Making Tax Digital for Income Tax covers self employment and rent on a personal return, and your company’s trade is neither: the company files its own return.'
             : mandated === 'no'
-              // Doc 103's empty test. He has told us he is under the line, so there is nothing
-              // further to ask and we say so rather than leaving a blank card implying we want more.
-              ? 'Nothing else to ask. Making Tax Digital does not apply to you at that level, and if your takings grow past it we will tell you before HMRC does.'
+              // ═══════════════════════════════════════════════════════════════════════════════
+              // 🔴 TWO THINGS WERE WRONG WITH THIS SENTENCE AND ONLY ONE OF THEM WAS THE TAX YEAR.
+              //
+              // It read "Making Tax Digital does not apply to you AT THAT LEVEL", which concluded
+              // from a threshold answer about the current year when HMRC reads a return already
+              // filed. And it ended "we will tell you before HMRC does", which is a proactive
+              // alert: remindersLive() is false and no channel can deliver one, so it was the
+              // product promising to watch a line on his behalf and then not watching it.
+              //
+              // Doc 103's empty test still applies: he told us, so there is nothing further to ask
+              // and we say so rather than leaving a blank card. What changed is that the card now
+              // asks HIM to tell US, which is a thing we can actually honour.
+              // ═══════════════════════════════════════════════════════════════════════════════
+              ? 'Nothing else to ask. You have told us HMRC has not written to you about Making Tax Digital, so there is nothing for you to send during the year. If that letter ever turns up, tell us here and we will have your updates ready.'
               : 'That is everything. We know where you stand.'}
         </p>
       ) : (

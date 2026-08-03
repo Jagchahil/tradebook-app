@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { readNudgePrefs } from '../../../../lib/supabase';
+import { readNudgePrefs, readIdentityCard } from '../../../../lib/supabase';
+import { T_NUDGE, templateSendable } from '../../../../lib/watemplates';
 import { settingsNotice } from '../identity';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
@@ -76,7 +77,32 @@ export default async function SettingsPage({
   const notice = settingsNotice(one('done') ?? one('e'));
   const saved = one('done') === 'saved';
 
-  const prefs = await readNudgePrefs(user.id);
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE DAILY REMINDER SWITCH SAID "ON" FOR A MESSAGE THAT IS NEVER SENT.
+  //
+  // The page opens with "These are the only messages Lekhio ever sends without you asking first",
+  // then described a nudge at the end of a working day and showed it switched ON. It has never
+  // gone out: app/api/cron/reminders bails at templateSendable(T_NUDGE) because Meta has not
+  // approved the template, and it says so in its own skip reason.
+  //
+  // 🔴 AND EVEN APPROVED IT ONLY REACHES A CONNECTED PHONE. The nudge is sendTemplate(t.phone,
+  // T_NUDGE), WhatsApp and nothing else, so a man who signed up on the web and never connected a
+  // phone would still get nothing. Both conditions are asked here, because gating on the template
+  // alone just defers the same lie to the day the template lands.
+  //
+  // \u26a0\ufe0f THE PREFERENCE IS NOT TOUCHED. Hiding the row hides the row; daily_nudges keeps
+  // whatever he set, and the switch comes back saying what he already chose the day it can fire.
+  //
+  // \u26a0\ufe0f THE WEEKLY SUMMARY STAYS, because it is REAL: channelsFor('weekly_ready') routes it
+  // by push and email with hasWhatsApp false, so it reaches a web only customer today. This page
+  // was half true, which is the hardest kind to see.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const [prefs, card] = await Promise.all([
+    readNudgePrefs(user.id),
+    readIdentityCard(user.id).catch(() => null),
+  ]);
+  // Unknown is not a promise. A failed read draws no daily row rather than claiming one.
+  const dailyCanFire = templateSendable(T_NUDGE) && Boolean(card?.phone);
   const current = prefs === null || prefs === 'none'
     ? { daily_nudges: true, weekly_summary: true }
     : prefs;
@@ -90,8 +116,9 @@ export default async function SettingsPage({
       <section className="lek-card">
         <h1 className="lek-eyebrow">Settings</h1>
         <p style={S.blurb}>
-          These are the only messages Lekhio ever sends without you asking first. Turn either off
-          and it stops from the next one we would have sent.
+          {dailyCanFire
+            ? 'These are the only messages Lekhio ever sends without you asking first. Turn either off and it stops from the next one we would have sent.'
+            : 'This is the only message Lekhio ever sends without you asking first. Turn it off and it stops from the next one we would have sent.'}
         </p>
 
         {notice ? <p style={saved ? S.good : S.warn}>{notice}</p> : null}
@@ -104,12 +131,14 @@ export default async function SettingsPage({
           </p>
         ) : (
           <div style={S.stack}>
-            <Row
-              which="daily_nudges"
-              title="The daily reminder"
-              body="A nudge at the end of a working day when nothing has been logged, so a busy day does not become a lost day."
-              on={current.daily_nudges}
-            />
+            {dailyCanFire ? (
+              <Row
+                which="daily_nudges"
+                title="The daily reminder"
+                body="A nudge at the end of a working day when nothing has been logged, so a busy day does not become a lost day."
+                on={current.daily_nudges}
+              />
+            ) : null}
             <Row
               which="weekly_summary"
               title="The weekly summary"

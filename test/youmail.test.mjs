@@ -370,5 +370,47 @@ for (const href of ['/app/you', '/app/you/circumstances', '/app/connect', '/app/
   ok(`the nav knows ${href}`, navBlock.includes(`'${href}'`));
 }
 
+// ---------------------------------------------------------------------------------------------
+// \ud83d\udd34 THE NINTH REMINDER PROMISE, AND THE FIRST ONE INSIDE THE APP.
+// ---------------------------------------------------------------------------------------------
+// /app/you/settings opened with "These are the only messages Lekhio ever sends without you asking
+// first", described "a nudge at the end of a working day when nothing has been logged", and showed
+// it switched ON. It has never been sent. app/api/cron/reminders bails at templateSendable(T_NUDGE)
+// because Meta has not approved the template, and the cron says exactly that in its own skip
+// reason. The sweep in test/frontdoor.test.mjs could not have caught this: it walks PUBLIC pages
+// and excludes app/app/ by construction, so the whole signed in surface had never been swept.
+//
+// \u26a0\ufe0f THE WEEKLY SUMMARY IS REAL and must stay. channelsFor('weekly_ready') routes it by push
+// and email with hasWhatsApp false, so it reaches a web only customer today. The page was HALF
+// true, which is the hardest kind to see and the reason this is a gate rather than a deletion.
+{
+  const setPage = read('app/app/you/settings/page.tsx');
+  const setCode = codeOnly(setPage);
+
+  ok('\ud83d\udd34 THE DAILY REMINDER ROW IS DRAWN ONLY WHEN IT COULD ACTUALLY BE SENT',
+    /\{dailyCanFire \? \(/.test(setCode) && /which="daily_nudges"/.test(setCode));
+  ok('\ud83d\udd34 AND IT ASKS THE GATE THE CRON ITSELF ASKS, never a second copy of the answer',
+    /templateSendable\(T_NUDGE\)/.test(setCode)
+    && /templateSendable\(T_NUDGE\)/.test(codeOnly(read('app/api/cron/reminders/route.ts'))));
+  ok('\ud83d\udd34 AND IT ASKS FOR A PHONE TOO, because the nudge is WhatsApp and nothing else',
+    /Boolean\(card\?\.phone\)/.test(setCode)
+    && /sendTemplate\(t\.phone, T_NUDGE/.test(codeOnly(read('app/api/cron/reminders/route.ts'))));
+  ok('\u26a0\ufe0f a failed identity read draws no row rather than promising one',
+    /readIdentityCard\(user\.id\)\.catch\(\(\) => null\)/.test(setCode));
+  ok('\u26a0\ufe0f THE WEEKLY SUMMARY IS UNGATED, because it is real and reaches a web only customer',
+    /which="weekly_summary"/.test(setCode) && !/dailyCanFire[\s\S]{0,200}which="weekly_summary"/.test(setCode));
+  ok('the opening sentence counts what is actually on the page',
+    /This is the only message Lekhio ever sends/.test(setCode)
+    && /These are the only messages Lekhio ever sends/.test(setCode));
+  ok('the preference itself is untouched: hiding a row is not forgetting a choice',
+    /readNudgePrefs\(user\.id\)/.test(setCode) && /current\.daily_nudges/.test(setCode));
+
+  // The two places that DESCRIBED the page by listing a message it does not send. Neither can
+  // afford the two reads that decide whether the row draws, so neither lists any more.
+  ok('\ud83d\udd34 NO NAV OR ROW HINT NAMES THE DAILY REMINDER as a thing we send',
+    !/The daily reminder and the weekly summary/.test(codeOnly(read('app/app/AppNav.tsx')))
+    && !/The daily reminder and the weekly summary/.test(codeOnly(read('app/app/you/page.tsx'))));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

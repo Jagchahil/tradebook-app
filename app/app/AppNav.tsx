@@ -115,7 +115,9 @@ export const SECTIONS: ReadonlyArray<NavSection> = [
       // stays alive for the phone era customers who still use it; the rail sends a web customer
       // through the page that rides the session he is already signed in with.
       { href: '/app/you/billing', label: 'Billing', hint: 'Your card, invoices and cancelling' },
-      { href: '/app/you/settings', label: 'Settings', hint: 'The daily reminder and the weekly summary' },
+      // The hint named the daily reminder, which is not sent. A nav cannot afford the two reads that
+      // decide whether that row draws, so it describes the page instead of listing its contents.
+      { href: '/app/you/settings', label: 'Settings', hint: 'What Lekhio sends you, and how to stop it' },
     ],
   },
 ];

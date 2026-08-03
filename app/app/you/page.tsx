@@ -362,7 +362,7 @@ export default async function YouPage({
           </a>
           <a href="/app/you/settings" style={S.door} className="lek-hit">
             <span style={S.doorLabel}>Settings</span>
-            <span style={S.rowBody}>The daily reminder and the weekly summary, on or off.</span>
+            <span style={S.rowBody}>What Lekhio sends you without being asked, and how to stop it.</span>
           </a>
           {/* Not /account, which needs an SMS code a web account cannot get. This door rides the
               session he is already in. */}

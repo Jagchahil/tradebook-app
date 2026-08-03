@@ -189,15 +189,16 @@ export default function CanIClaimPage() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <div style={{ width: 300, maxWidth: '100%', background: 'var(--panel)', borderRadius: 26, border: `1px solid ${LINE}`, boxShadow: '0 24px 60px rgba(17,17,17,.14)', overflow: 'hidden' }}>
-              <div style={{ background: '#075E54', color: '#fff', padding: '12px 15px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ width: 32, height: 32, borderRadius: 16, background: '#25D366', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>💬</span>
-                <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>Lekhio</div><div style={{ fontSize: 10.5, opacity: 0.85 }}>online</div></div>
+              {/* Own tokens, not Meta's. See the hero note in app/_shared/site.tsx. */}
+              <div style={{ background: 'var(--river-deep)', color: '#fff', padding: '12px 15px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 32, height: 32, borderRadius: 16, background: 'var(--river)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>✅</span>
+                <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>Lekhio</div><div style={{ fontSize: 10.5, opacity: 0.85 }}>your first employee</div></div>
               </div>
-              <div style={{ background: '#ECE5DD', padding: '16px 13px', display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {/* Hardcoded light chat bubbles need hardcoded dark text: var(--tx)
-                    goes near white in dark mode and vanished on these surfaces. */}
+              <div style={{ background: 'var(--panel-2)', padding: '16px 13px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+                {/* Themed surfaces, so the text can follow var(--tx) and no longer needs a hardcoded
+                    dark ink to survive a light bubble that never flipped. */}
                 {demo.map((m, i) => (
-                  <div key={i} style={{ alignSelf: m.side === 'out' ? 'flex-end' : 'flex-start', background: m.side === 'out' ? '#DCF8C6' : '#fff', borderRadius: m.side === 'out' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '9px 12px', maxWidth: '86%', fontSize: 13, color: '#111111', boxShadow: m.side === 'in' ? '0 1px 2px rgba(0,0,0,.08)' : 'none', lineHeight: 1.5 }}>{m.text}</div>
+                  <div key={i} style={{ alignSelf: m.side === 'out' ? 'flex-end' : 'flex-start', background: m.side === 'out' ? 'var(--river-tint)' : 'var(--panel)', border: m.side === 'in' ? '1px solid var(--bd)' : 'none', borderRadius: m.side === 'out' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '9px 12px', maxWidth: '86%', fontSize: 13, color: m.side === 'out' ? 'var(--river-deep)' : 'var(--tx)', lineHeight: 1.5 }}>{m.text}</div>
                 ))}
               </div>
             </div>

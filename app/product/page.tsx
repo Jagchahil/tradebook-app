@@ -7,7 +7,7 @@ import OnboardingShow from './OnboardingShow';
 import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta, Ic,
- MtdBanner,} from '../_shared/site';
+} from '../_shared/site';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/product' },
@@ -34,17 +34,17 @@ const PRODUCT_CSS = `
 .compliance b{color:var(--tx);font-weight:800}
 .wphone{width:290px;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:30px;overflow:hidden;box-shadow:0 30px 70px rgba(17,17,17,.2)}
 [data-theme="dark"] .wphone{box-shadow:0 30px 70px rgba(0,0,0,.6)}
-.wahead{background:#075E54;color:#fff;padding:12px 15px;display:flex;align-items:center;gap:9px}
-.wahead .a{width:32px;height:32px;border-radius:999px;background:var(--wa);display:grid;place-items:center;font-size:15px}
+/* Own tokens, not Meta's. See the note on the hero in app/_shared/site.tsx: the illustration
+   is the outcome and stays, the borrowed brand palette is the technology and goes. Tokens also
+   delete the dark override that existed only to undo the borrowed green. */
+.wahead{background:var(--river-deep);color:#fff;padding:12px 15px;display:flex;align-items:center;gap:9px}
+.wahead .a{width:32px;height:32px;border-radius:999px;background:var(--river);display:grid;place-items:center;font-size:15px}
 .wahead b{font-size:13px;display:block}.wahead small{font-size:10px;opacity:.85}
-.wchat{background:#ECE5DD;padding:14px 12px;min-height:250px;display:flex;flex-direction:column;gap:8px}
-[data-theme="dark"] .wchat{background:#0b141a}
-.wb{max-width:84%;padding:8px 11px;font-size:13px;border-radius:12px;color:#111}
-.wb.out{align-self:flex-end;background:#DCF8C6;border-bottom-right-radius:4px}
-.wb.in{align-self:flex-start;background:#fff;border-bottom-left-radius:4px;box-shadow:0 1px 1px rgba(0,0,0,.08)}
-[data-theme="dark"] .wb.out{background:#005c4b;color:#e8f0ee}
-[data-theme="dark"] .wb.in{background:#202c33;color:#e8f0ee}
-.wb .rc{background:#cde7b4;border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:4px}
+.wchat{background:var(--panel-2);padding:14px 12px;min-height:250px;display:flex;flex-direction:column;gap:8px}
+.wb{max-width:84%;padding:8px 11px;font-size:13px;border-radius:12px;color:var(--tx)}
+.wb.out{align-self:flex-end;background:var(--river-tint);color:var(--river-deep);border-bottom-right-radius:4px}
+.wb.in{align-self:flex-start;background:var(--panel);border:1px solid var(--bd);border-bottom-left-radius:4px}
+.wb .rc{background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:4px}
 .journey{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:center;justify-items:center;max-width:820px;margin:0 auto}
 @media(max-width:820px){.journey{grid-template-columns:1fr;gap:30px}}
 .jarrow{font-size:34px;color:var(--saffron);font-weight:900;animation:jarrowmv 1.8s ease-in-out infinite}
@@ -76,9 +76,9 @@ const PRODUCT_CSS = `
 .ftext p{font-size:16px;color:var(--tx-mut)}
 .fdemo{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow);min-height:200px;display:flex;flex-direction:column;justify-content:center;gap:8px}
 .db{max-width:86%;padding:9px 12px;font-size:13.5px;border-radius:12px;margin:6px 0;opacity:0;transform:translateY(8px);animation:dbin .45s forwards}
-.db.out{align-self:flex-end;margin-left:auto;background:#DCF8C6;color:#111;border-bottom-right-radius:4px}
+/* Own tokens, not Meta's. Same reason as .wb.out above. */
+.db.out{align-self:flex-end;margin-left:auto;background:var(--river-tint);color:var(--river-deep);border-bottom-right-radius:4px}
 .db.in{align-self:flex-start;background:var(--panel-2);border-bottom-left-radius:4px}
-[data-theme="dark"] .db.out{background:#005c4b;color:#e8f0ee}
 .db.d1{animation-delay:.15s}.db.d2{animation-delay:.7s}.db.d3{animation-delay:1.2s}
 @keyframes dbin{to{opacity:1;transform:none}}
 .wave{display:flex;align-items:flex-end;gap:3px;height:26px}
@@ -124,7 +124,7 @@ const PRODUCT_CSS = `
 
 const PRODUCT_JS = `
 (function(){  var FEAT=[
-   {t:'Snap a receipt',p:'Photograph it and Lekhio pulls the shop, the total and the date, and files it in seconds.',demo:'<div class="db out d1"><div style="background:#cde7b4;border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:4px">🧾</div>Screwfix receipt</div><div class="db in d2">Logged. £42.60, materials ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">Screwfix · Materials · 3 Jul</div>'},
+   {t:'Snap a receipt',p:'Photograph it and Lekhio pulls the shop, the total and the date, and files it in seconds.',demo:'<div class="db out d1"><div style="background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:4px">🧾</div>Screwfix receipt</div><div class="db in d2">Logged. £42.60, materials ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">Screwfix · Materials · 3 Jul</div>'},
    {t:'Say it out loud',p:'Hands full on the job? Leave a voice note. Lekhio hears it and logs it before you have put the phone down.',demo:'<div class="db out d1" style="display:flex;align-items:center;gap:10px"><span style="font-size:18px">🎙️</span><span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div><div class="db out d2">"spent forty on diesel"</div><div class="db in d3">£40 fuel, logged ✅</div>'},
    {t:'Mileage in a text',p:'Text the trip. Lekhio works out the claim at the HMRC rate and logs it. No fiddly logbook.',demo:'<div class="db out d1">drove 24 miles to the job</div><div class="db in d2">£13.20 mileage claimed at the HMRC rate ✅</div><div class="db in d3" style="background:transparent;font-size:12px;color:var(--tx-mut)">55p a mile · logged to travel</div>'},
    {t:'Invoice from a text',p:'Type it in plain words. Lekhio builds a clean invoice and sends it, then tracks who has paid.',demo:'<div class="db out d1">invoice Dave £450 for the rewire</div><div class="db in d2">Invoice #0043 sent to Dave ✅</div><div class="db in d3">Dave paid. +£450 income 💷</div>'},
@@ -164,7 +164,6 @@ export default function ProductPage() {
       <style dangerouslySetInnerHTML={{ __html: MARKETING_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: PRODUCT_CSS }} />
 
-      <MtdBanner />
       <SiteNav />
 
       {/* Hero */}
@@ -215,7 +214,7 @@ export default function ProductPage() {
             <div>
               <div className="jlabel">1 · You tell Lekhio</div>
               <div className="wphone">
-                <div className="wahead"><span className="a">💬</span><div><b>Lekhio</b><small>online</small></div></div>
+                <div className="wahead"><span className="a">✅</span><div><b>Lekhio</b><small>your first employee</small></div></div>
                 <div className="wchat">
                   <div className="wb out jA"><div className="rc">🧾</div>Screwfix receipt</div>
                   <div className="wb in jB">Logged. £42.60, materials ✅</div>
@@ -259,7 +258,7 @@ export default function ProductPage() {
           <div className="fstage reveal">
             <div className="ftext" id="ftext"><h3>Snap a receipt</h3><p>Photograph it and Lekhio pulls the shop, the total and the date, and files it in seconds.</p></div>
             <div className="fdemo" id="fdemo">
-              <div className="db out d1"><div style={{ background: '#cde7b4', borderRadius: 8, padding: 12, textAlign: 'center', fontSize: 20, marginBottom: 4 }}>🧾</div>Screwfix receipt</div>
+              <div className="db out d1"><div style={{ background: 'var(--surface)', border: '1px solid var(--bd)', borderRadius: 8, padding: 12, textAlign: 'center', fontSize: 20, marginBottom: 4 }}>🧾</div>Screwfix receipt</div>
               <div className="db in d2">Logged. £42.60, materials ✅</div>
               <div className="db in d3" style={{ background: 'transparent', fontSize: 12, color: 'var(--tx-mut)' }}>Screwfix · Materials · 3 Jul</div>
             </div>

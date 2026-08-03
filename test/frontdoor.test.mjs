@@ -236,7 +236,96 @@ ok('every action on it is a form post or a plain link',
 // ---------------------------------------------------------------------------------------------
 const site = read('app/_shared/site.tsx');
 const home = read('app/page.tsx');
-ok('the how it works list names no messaging channel as step one', !/WhatsApp/.test(site));
+// ⚠️ ON codeOnly(), AND IT WAS NOT. NINTH INSTANCE OF THIS CODEBASE'S OLDEST TRAP.
+// The guard sweeps the whole shared module for the word, which passed while the hero WAS a WhatsApp
+// mock only because the mock spelled it in colours rather than in prose. Replacing that hero meant
+// writing a comment explaining what was removed and why, and the comment necessarily says the word
+// a dozen times. A negative assertion over a source file runs on codeOnly(), because the note
+// explaining a removal always contains the removed thing.
+ok('the how it works list names no messaging channel as step one', !/WhatsApp/.test(codeOnly(site)));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE HERO. IT WAS AN ANIMATED WHATSAPP CONVERSATION AND NOTHING PINNED IT EITHER WAY.
+//
+// The guard above proves no SENTENCE names the channel. It could not see the picture, which used
+// WhatsApp's own header green, WhatsApp's own bubble colours and the word "online", 320 pixels
+// wide, above the fold, on the page everybody sees. Doc 104 says sell the outcome and never the
+// technology, and the loudest thing on the front door was the technology.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ THE PALETTE HALF OF THIS GUARD LIVED HERE FIRST AND FAILED ON ITS OWN EXPLANATION, which is
+// the TENTH time this codebase has been caught by that shape and the fourth in one sitting. The
+// comment recording which hex codes were removed necessarily contains them. It is not patched with
+// codeOnly() and left in place, because the whole public site sweep below already covers this file
+// and already runs on codeOnly(): two guards for one claim is how the weaker one rots unnoticed.
+ok('🔴 IT SHOWS WHAT THE EMPLOYEE DID, and ends on the one button doc 104 says the product is',
+  /export function HeroReport/.test(site) && /Payments sorted/.test(site)
+  && />Approve</.test(codeOnly(site)));
+ok('🔴 AND IT SAYS ON THE CARD THAT THE FIGURES ARE AN EXAMPLE, not in a footnote elsewhere',
+  /An example month\. Your figures are your own/.test(site));
+// Every colour a token, or dark mode needs a second set of overrides to undo the first.
+ok('the hero card pairs no accent with a literal white',
+  !/background:var\(--river\);color:#fff/.test(site));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE SWEEP IS THE WHOLE PUBLIC SITE, BECAUSE THE HERO WAS NOT THE ONLY ONE.
+//
+// The guard above was written for app/_shared/site.tsx and, run once, immediately found FOUR MORE
+// mockups nobody had listed: two further bubble styles in the shared module and on the homepage,
+// a full phone with a green header and the word "online" on /product, another on /can-i-claim, and
+// a fourth on /compare. Five public pages drawing somebody else's product in somebody else's brand
+// colours, while the copy beside them argued we are not a messaging tool.
+//
+// ⚠️ THE ILLUSTRATIONS THEMSELVES ARE FINE AND WERE KEPT. A man says what he spent and it comes
+// back logged: that is the outcome, it is real, and doc 104 says sell the outcome. What went is the
+// borrowed palette, which is the technology. Every one of them now paints in our own tokens, which
+// also deleted six dark mode overrides that existed only to undo the borrowed green.
+//
+// ⚠️ THE APP KEEPS #25D366. app/app/connect and the invoice page put real WhatsApp BUTTONS on
+// screen, and a button that opens WhatsApp should look like it opens WhatsApp. The palette is a
+// lie only where it is used to draw a fake conversation and imply the product IS that app.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const BORROWED_PALETTE = /#DCF8C6|#075E54|#ECE5DD|#005c4b|#cde7b4|#0b141a/i;
+const publicPages = pages.filter((f) => !rel(f).startsWith('app/app/') && !rel(f).startsWith('app/api/'));
+ok('the public page sweep is not vacuous', publicPages.length > 15);
+for (const f of publicPages) {
+  ok(`${rel(f)} draws no borrowed messaging palette`, !BORROWED_PALETTE.test(codeOnly(read(rel(f)))));
+}
+ok('🔴 AND NO PUBLIC PAGE CLAIMS A PRESENCE IT CANNOT HAVE: nothing here is "online"',
+  publicPages.every((f) => !/<small>online<\/small>|>online</.test(codeOnly(read(rel(f))))));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE NOSCRIPT FALLBACK MUST NAME CLASSES THAT EXIST, AND IT DID NOT.
+//
+// SharedHead ships one stylesheet nobody ever looks at: the noscript block that makes the page
+// readable when the reveal script never runs. It forces `opacity:1` on the elements that start
+// hidden. Replacing the hero renamed `.cmsg` to `.hrow` everywhere it was USED, and left the
+// fallback pointing at a class that no longer exists.
+//
+// ⚠️ THAT FAILURE IS INVISIBLE BY CONSTRUCTION. Nothing throws, nothing logs, no test that renders
+// the page notices, and tsc cannot see inside a template literal of CSS. The only symptom is a
+// visitor with the script blocked seeing an empty card where the product's headline figures should
+// be, and that visitor never tells us.
+//
+// So the rule is mechanical: every selector in the noscript block is a class this module actually
+// uses. It costs one guard and it closes a whole category of silent rot behind renames.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+{
+  const block = site.slice(site.indexOf('<noscript>'), site.indexOf('</noscript>'));
+  ok('the noscript fallback block was found', block.length > 20 && /opacity:1/.test(block));
+  const selectors = [...block.matchAll(/\.([a-zA-Z][\w-]*)\s*\{/g)].map((m) => m[1]);
+  ok('and it names at least the two it is there for', selectors.length >= 2);
+  for (const cls of selectors) {
+    ok(`noscript .${cls} is a class this module actually uses`,
+      new RegExp(`className=[\`"'][^\`"']*\\b${cls}\\b|\\.${cls}\\{`).test(site.replace(block, '')));
+  }
+}
+ok('🔴 AND THE HOMEPAGE RENDERS IT, or the component is a nicely tested orphan',
+  /<HeroReport \/>/.test(home) && !/HeroPhone/.test(codeOnly(home)));
+// Doc 104 section 9 angle 1: the reframe is worthless if the site never names what an employee is
+// measured against. It said "employee" for weeks and never once said "instead of what".
+ok('🔴 THE HERO NAMES WHAT AN EMPLOYEE IS COMPARED TO: an accountant, not a bookkeeping app',
+  /An accountant costs hundreds a year and answers on Tuesdays/.test(home)
+  && /£12\.99 a month and answers now/.test(home));
 ok('the homepage names no messaging channel at all', !/WhatsApp/.test(home));
 
 // The steps array only, never the whole file: "Connect your bank" is legitimate inside the
@@ -525,8 +614,19 @@ console.log('\n=== a customer can get back in ===\n');
 // Neither wording was false, which is exactly why a house style sweep, a full test run and a review
 // all walked past it. A sentence duplicated at six call sites is six chances to be wrong.
 // ---------------------------------------------------------------------------------------------
-const BANNER_PAGES = [
-  'app/page.tsx', 'app/how-mtd-works/page.tsx', 'app/compare/page.tsx',
+// 🔴 DEMOTED 3 AUGUST 2026, FROM SIX PAGES TO ONE. The banner ran ABOVE THE NAVIGATION on every
+// public page, so the first thing anybody read about Lekhio, anywhere, was an announcement about a
+// filing regime. Doc 104: "as software, we are a £12.99 app next to a £7 Xero and a £0 Monzo
+// bundle, and we lose that fight on price forever." Leading with MTD on the pricing page and the
+// security page put us in exactly that category on our own front door.
+//
+// ⚠️ THE GUARD IS NOT WEAKENED, IT IS POINTED THE OTHER WAY. It still proves the banner is defined
+// once and reads the threshold from FACTS, and it now ALSO proves the five demoted pages carry
+// neither the component nor a hand rolled copy of its sentence, which is the failure this whole
+// section was written about: six literals, two of them stale.
+const BANNER_PAGES = ['app/how-mtd-works/page.tsx'];
+const DEMOTED_PAGES = [
+  'app/page.tsx', 'app/compare/page.tsx',
   'app/product/page.tsx', 'app/pricing/page.tsx', 'app/security/page.tsx',
 ];
 const shared = read('app/_shared/site.tsx');
@@ -541,6 +641,13 @@ for (const f of BANNER_PAGES) {
   const src = read(f);
   ok(`${f} renders the shared banner`, /<MtdBanner \/>/.test(src));
   ok(`${f} carries no inline copy of it`, !/className="mtdtop"><Link/.test(src));
+}
+
+// 🔴 AND THE FIVE DEMOTED PAGES DO NOT LEAD WITH MAKING TAX DIGITAL, in either form.
+for (const f of DEMOTED_PAGES) {
+  const src = codeOnly(read(f));
+  ok(`${f} no longer leads with the MTD banner`, !/<MtdBanner \/>/.test(src));
+  ok(`${f} did not grow a hand rolled copy of it instead`, !/className="mtdtop"/.test(src));
 }
 
 // The threshold may not be typed as a literal anywhere a banner lives, for the same reason.

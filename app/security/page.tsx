@@ -4,7 +4,7 @@ import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
   Ic,
- MtdBanner,} from '../_shared/site';
+} from '../_shared/site';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/security' },
@@ -87,7 +87,6 @@ export default function SecurityPage() {
       <style dangerouslySetInnerHTML={{ __html: MARKETING_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: SECURITY_CSS }} />
 
-      <MtdBanner />
       <SiteNav />
 
       {/* Hero */}

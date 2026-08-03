@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
 import { bankFeedLive, filingBadge } from '../lib/features';
 import {
   INK, PAPER, FONT, SITE, faqs, reviews,
-  SharedHead, SiteNav, SiteFooter, StickyCta, HeroPhone, Ic, MtdBanner,
+  SharedHead, SiteNav, SiteFooter, StickyCta, HeroReport, Ic,
 } from './_shared/site';
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -105,13 +105,17 @@ const HOME_CSS = `
    explicitly rather than relying on which stylesheet the browser read last. This hero is a
    two column grid: the words sit left, the phone sits right. margin-inline:0 is correct here
    and wrong everywhere else, which is exactly why the shared rule now centres by default. */
-.hero p.sub{font-size:20px;color:var(--tx-mut);max-width:520px;margin:22px 0 30px;margin-inline:0}
+.hero p.sub{font-size:20px;color:var(--tx-mut);max-width:520px;margin:22px 0 18px;margin-inline:0}
+/* The comparison line. Quieter than the sub and set on the ink colour rather than the muted
+   one, because it is the argument rather than the description. Doc 103: it earns its place by
+   changing what he compares us to, which nothing else above the fold did. */
+.hero p.vs{font-size:16px;line-height:1.55;color:var(--tx);font-weight:600;max-width:520px;margin:0 0 30px;margin-inline:0}
 .cta-row{display:flex;gap:14px;flex-wrap:wrap}
 .hero .micro{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:13.5px;color:var(--tx-mut)}
 .avs{display:flex}
 .avs span{width:30px;height:30px;border-radius:999px;border:2px solid var(--bg);margin-left:-8px}
 .avs span:first-child{margin-left:0}
-@media(max-width:900px){.hero .grid{grid-template-columns:1fr;gap:34px;text-align:center}.cta-row,.hero .micro{justify-content:center}.hero p.sub{margin-inline:auto}}
+@media(max-width:900px){.hero .grid{grid-template-columns:1fr;gap:34px;text-align:center}.cta-row,.hero .micro{justify-content:center}.hero p.sub,.hero p.vs{margin-inline:auto}}
 
 .ba{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
 @media(max-width:760px){.ba{grid-template-columns:1fr}}
@@ -158,10 +162,14 @@ const HOME_CSS = `
 .dtext p{font-size:16px;color:var(--tx-mut)}
 .dvis{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow);min-height:186px;display:flex;flex-direction:column;justify-content:center;gap:9px}
 .dbub{max-width:82%;padding:9px 13px;font-size:13.5px;border-radius:13px}
-.dbub.out{align-self:flex-end;background:#DCF8C6;color:#111;border-bottom-right-radius:4px}
+/* 🔴 THE OUTGOING BUBBLE WAS WHATSAPP'S OWN #DCF8C6, AND SO WAS THE RECEIPT CHIP.
+   Found by the hero guard sweeping for that palette, not by reading. The ILLUSTRATION is fine and
+   stays: a man says what he spent and it comes back logged, which is the outcome and it is real.
+   Borrowing Meta's brand colours to draw it is the technology, and doc 104 sells the outcome.
+   Tokens also delete the dark override underneath, which existed only to undo the borrowed green. */
+.dbub.out{align-self:flex-end;background:var(--river-tint);color:var(--river-deep);border-bottom-right-radius:4px}
 .dbub.in{align-self:flex-start;background:var(--panel-2);border-bottom-left-radius:4px}
-[data-theme="dark"] .dbub.out{background:#005c4b;color:#e8f0ee}
-.dbub .rc{background:#cde7b4;border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:5px}
+.dbub .rc{background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:5px}
 .wf{display:flex;align-items:flex-end;gap:3px;height:30px;padding:2px 0}
 .wf i{width:4px;border-radius:2px;background:var(--river)}
 .splitrow{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
@@ -241,9 +249,12 @@ export default function HomePage() {
       <SharedHead />
       <style dangerouslySetInnerHTML={{ __html: HOME_CSS }} />
 
-      {/* One clean top bar: the MTD announcement CTA */}
-      <MtdBanner />
-
+      {/* 🔴 THE MTD BANNER IS GONE FROM THE FRONT DOOR, AND FROM FOUR OTHER PAGES WITH IT.
+          It ran above the navigation on six public pages, so the first thing anybody read about
+          Lekhio, anywhere on the site, was an announcement about a filing regime. That is the
+          category doc 104 says we are not in: "as software, we are a £12.99 app next to a £7 Xero
+          and we lose that fight on price forever". It now lives on /how-mtd-works, which is the
+          page about Making Tax Digital, where a man who came for that answer will find it. */}
       <SiteNav />
 
       {/* Hero */}
@@ -253,6 +264,16 @@ export default function HomePage() {
             <span className="pill"><span className="dot" /> Your first employee. The one that pays for itself.</span>
             <h1>Your first<br />employee.<br />The one that <span className="gt">saves you money.<svg className="squig" viewBox="0 0 320 16" preserveAspectRatio="none"><path d="M4 11 C 60 3, 110 3, 150 9 S 260 15, 316 6" /></svg></span></h1>
             <p className="sub">Snap a receipt, import your bank statement, or just say what you spent. Lekhio sorts the lot in the background and finds the tax you never need to pay. Filing is the easy part. Saving you money is the job. You approve, it does the rest.</p>
+            {/* 🔴 THE LINE THAT CHANGES WHAT WE ARE COMPARED TO, doc 104 section 9, angle 1.
+                "As software, we are a £12.99 app next to a £7 Xero and a £0 Monzo bundle, and we
+                lose that fight on price forever. As an employee, we are £12.99 a month next to an
+                accountant at £500 to £2,000 a year who answers on Tuesdays."
+                The headline had said "employee" for weeks without ever naming what an employee is
+                measured against, so the reframe was asserted and never argued. This is the whole
+                argument, in one sentence, above the fold.
+                ⚠️ NO FIGURE FOR THE ACCOUNTANT. Doc 104 carries a range, but a competitor's price
+                printed as fact on our own front door is a number we cannot source per customer. */}
+            <p className="vs">An accountant costs hundreds a year and answers on Tuesdays. Your first hire costs £12.99 a month and answers now.</p>
             <div className="cta-row">
               <Link href="/start" className="btn primary">Start free</Link>
               <Link href="/product" className="btn ghost">See how it works</Link>
@@ -262,7 +283,7 @@ export default function HomePage() {
               <span><b style={{ color: 'var(--saffron)' }}>★★★★★</b> &nbsp;Built with UK sole traders. 7 days free, no card.</span>
             </div>
           </div>
-          <div><HeroPhone /></div>
+          <div><HeroReport /></div>
         </div>
       </section>
 

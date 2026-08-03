@@ -34,14 +34,17 @@ export const PAPER = 'var(--bg)';
 export const SURFACE = 'var(--surface)';
 export const LINE = 'var(--bd)';
 export const MUTED = 'var(--tx-mut)';
-export const WHATSAPP = '#25D366';
+// 🔴 WHATSAPP AND ON_WHATSAPP USED TO BE EXPORTED FROM HERE AND ARE GONE. They existed for the
+// hero's WhatsApp mock and for nothing else in this module; every app screen that puts a REAL
+// WhatsApp button on screen (app/app/connect, the invoice page) imports them from lib/tokens.ts,
+// which is where a brand colour belongs. Once the mock went they were two exported constants that
+// nothing read, and doc 103 counts dead code as shipped weight rather than harmless.
 // The ink that belongs ON each accent. Never plain white: the dark theme lifts every accent so it
 // can be seen against a near black page, and white on those lifted colours drops to 2.4:1. See the
 // long note in lib/tokens.ts. Use these anywhere an accent is a BACKGROUND.
 export const ON_RIVER = 'var(--on-river)';
 export const ON_GREEN = 'var(--on-green)';
 export const ON_SAFFRON = 'var(--on-saffron)';
-export const ON_WHATSAPP = 'var(--on-whatsapp)';
 // A white card surface that becomes a dark panel in dark mode.
 export const PANEL = 'var(--panel)';
 // A deep contrast band (footer, feature-dark sections) in both themes.
@@ -216,10 +219,14 @@ export const MARKETING_CSS = `
 .dtext h3{font-size:26px;letter-spacing:-.03em;margin:0 0 12px}.dtext p{font-size:16px;color:var(--tx-mut)}
 .dvis{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow);min-height:186px;display:flex;flex-direction:column;justify-content:center;gap:9px}
 .dbub{max-width:82%;padding:9px 13px;font-size:13.5px;border-radius:13px}
-.dbub.out{align-self:flex-end;background:#DCF8C6;color:#111;border-bottom-right-radius:4px}
+/* 🔴 THE OUTGOING BUBBLE WAS WHATSAPP'S OWN #DCF8C6, AND SO WAS THE RECEIPT CHIP.
+   Found by the hero guard sweeping for that palette, not by reading. The ILLUSTRATION is fine and
+   stays: a man says what he spent and it comes back logged, which is the outcome and it is real.
+   Borrowing Meta's brand colours to draw it is the technology, and doc 104 sells the outcome.
+   Tokens also delete the dark override underneath, which existed only to undo the borrowed green. */
+.dbub.out{align-self:flex-end;background:var(--river-tint);color:var(--river-deep);border-bottom-right-radius:4px}
 .dbub.in{align-self:flex-start;background:var(--panel-2);border-bottom-left-radius:4px}
-[data-theme="dark"] .dbub.out{background:#005c4b;color:#e8f0ee}
-.dbub .rc{background:#cde7b4;border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:5px}
+.dbub .rc{background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:5px}
 .wf{display:flex;align-items:flex-end;gap:3px;height:30px;padding:2px 0}.wf i{width:4px;border-radius:2px;background:var(--river)}
 .splitrow{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
 .splitrow:last-child{border:0;font-weight:800}
@@ -284,8 +291,8 @@ export const MARKETING_CSS = `
 .claims{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 @media(max-width:760px){.claims{grid-template-columns:1fr 1fr}}
 .claim{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;text-align:center;box-shadow:var(--shadow)}
-.claim .q{display:inline-block;background:#DCF8C6;color:#111;border-radius:12px 12px 4px 12px;padding:9px 13px;font-size:13.5px;font-weight:600}
-[data-theme="dark"] .claim .q{background:#005c4b;color:#e8f0ee}
+/* Same borrowed palette, same fix. See the note on .dbub.out above. */
+.claim .q{display:inline-block;background:var(--river-tint);color:var(--river-deep);border-radius:12px 12px 4px 12px;padding:9px 13px;font-size:13.5px;font-weight:600}
 .claim .arr{font-size:20px;color:var(--river);margin:8px 0}
 .claim .r{font-size:14px;font-weight:800;color:var(--river-deep)}
 [data-theme="dark"] .claim .r{color:var(--river)}
@@ -511,31 +518,47 @@ export const faqs = [
   { q: 'Is my financial data safe?', a: 'Yes. Your data is encrypted in transit and at rest, you can only ever see your own records, and you can export or delete everything whenever you want.' },
 ];
 
-// The looping hero conversation, pure CSS.
-// 🔴 THE FIRST LINE A VISITOR READS. It renders in HeroPhone on the homepage, so it is the very
-// first sentence of the product anybody sees, and it used to be "Your bank is connected. I sorted
-// 34 payments this week", a feed that has no provider. This is the statement importer, which is
-// real, proven, and reports exactly these counts back at /app/money/import.
-export const chatMessages: { side: 'out' | 'in'; text: string; image?: string }[] = [
-  { side: 'in', text: 'Statement read. 62 payments sorted, 3 for you to check ✅' },
-  { side: 'out', text: 'how much have I saved this year?' },
-  { side: 'in', text: "£1,390 in reliefs so far 💷" },
-  { side: 'in', text: 'Use of home, mileage, a pension move. All legit, your call.' },
-  { side: 'out', text: 'and my tax bill?' },
-  { side: 'in', text: '£3,240 set aside. Nothing you did not plan for ✅' },
-  { side: 'out', image: '🧾', text: 'paid cash, £42.60' },
-  { side: 'in', text: 'Snapped and logged. CIS refund up to £1,120 too 👀' },
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE HERO. IT WAS AN ANIMATED WHATSAPP CONVERSATION, AND THAT SOLD THE CHANNEL AS THE PRODUCT.
+//
+// The first thing a visitor saw was a phone with WhatsApp's own green header, WhatsApp's own bubble
+// colours and the word "online". Doc 104: "Lekhio is not software you buy. It is the first employee
+// a business ever hires", and section 3, "sell the outcome, never the technology". A picture of the
+// messaging app we happen to use is the technology, drawn 320 pixels wide, above the fold, on the
+// one page everybody sees. The headline beside it had already said "Your first employee" for weeks.
+// The picture had not caught up, and a picture argues louder than a headline.
+//
+// So the hero is now what an employee actually hands you: a report of the month, and one button.
+// That is doc 104's line made visible, "one less button at a time, until only one is left, approve",
+// which is otherwise a sentence we say about ourselves and never show.
+//
+// ⚠️ THE FIGURES ARE THE ONES THE OLD CHAT ALREADY USED, deliberately. Changing the picture is not a
+// licence to invent a bigger number, and doc 108's rule stands: NEVER price on the saving.
+//
+// ⚠️ AND IT SAYS IT IS AN EXAMPLE, ON THE CARD, not in a footnote elsewhere on the page. A panel of
+// specific pounds with no owner reads as somebody's real month, and "is it true" is doc 104's fifth
+// standing question. The line costs one row and it is the difference between an illustration and an
+// implied promise.
+//
+// ⚠️ WHATSAPP IS NOT DELETED FROM THE SITE, it is demoted from the hero. It is still how a man sends
+// a receipt and it is still named in the copy below. It is a door, not the house.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export const heroReport: { label: string; value: string }[] = [
+  { label: 'Payments sorted', value: '62' },
+  { label: 'Reliefs found', value: '£1,390' },
+  { label: 'Put by for tax', value: '£3,240' },
 ];
-const HERO_CHAT_LOOP = 9.5;
-const chatAppear = [2, 12, 23, 34, 45, 56, 67, 79];
-export const chatCss =
-  `.cmsg{opacity:0}` +
-  `@media (prefers-reduced-motion: reduce){.cmsg{opacity:1 !important;animation:none !important;transform:none !important}}` +
-  chatMessages
-    .map((_, i) => {
-      const a = chatAppear[i];
-      return `@keyframes cmsg${i}{0%,${a}%{opacity:0;transform:translateY(8px)}${a + 3}%,93%{opacity:1;transform:none}98%,100%{opacity:0}}.cmsg${i}{animation:cmsg${i} ${HERO_CHAT_LOOP}s infinite}`;
-    })
+export const heroSpot = {
+  head: 'One thing worth a look',
+  body: 'Your CIS refund is running at £1,120. That is your money, sitting with HMRC.',
+};
+const HERO_LOOP = 9.5;
+const rowAppear = [4, 16, 28, 42, 58];
+export const reportCss =
+  `.hrow{opacity:0}` +
+  `@media (prefers-reduced-motion: reduce){.hrow{opacity:1 !important;animation:none !important;transform:none !important}}` +
+  rowAppear
+    .map((a, i) => `@keyframes hrow${i}{0%,${a}%{opacity:0;transform:translateY(8px)}${a + 4}%,93%{opacity:1;transform:none}98%,100%{opacity:0}}.hrow${i}{animation:hrow${i} ${HERO_LOOP}s infinite}`)
     .join('');
 
 // ---------- helper components ----------
@@ -717,36 +740,56 @@ export function AppInv() {
   );
 }
 
-export function HeroPhone() {
+// The employee's report. See the long note above heroReport for why this is not a phone any more.
+//
+// ⚠️ EVERY COLOUR IS A TOKEN, none is a literal. The old version hardcoded WhatsApp's palette and
+// then needed four dark mode overrides to undo it, which is how a component ends up with white text
+// on a white bubble for anybody on dark. Themed variables flip by themselves.
+//
+// ⚠️ TABULAR NUMERALS, because the figures animate in one under another and proportional digits make
+// a column of money jump sideways as it lands. Same reason lib/tokens.ts pinned them product wide.
+//
+// 🔴 THE APPROVE BUTTON IS var(--on-river), NOT #fff, AND test/tokens.test.mjs CAUGHT ME TYPING #fff.
+// The dark theme LIFTS every accent so it can be seen against a near black page, and white on the
+// lifted river drops to about 2.4:1. The rule is thirty lines up this same file and I broke it
+// anyway, in the one component every visitor sees. Never pair an accent background with a literal
+// white; the --on-* variable already knows which ink each theme needs.
+export function HeroReport() {
   return (
-    <div className="phone" style={{ width: 320, maxWidth: '100%', backgroundColor: PANEL, borderRadius: 28, border: `1px solid ${LINE}`, boxShadow: '0 30px 70px rgba(17,17,17,.16)', overflow: 'hidden' }}>
-      <div style={{ backgroundColor: '#075E54', color: '#fff', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: WHATSAPP, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>💬</span>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Lekhio</div>
-          <div style={{ fontSize: 11, opacity: 0.85 }}>online</div>
-        </div>
-      </div>
-      {/* Bubble colours live in classes so dark mode flips background and text
-          TOGETHER, the same treatment as the product page's .wb bubbles. The old
-          inline version kept light bubbles but let the text follow var(--tx),
-          which went white on white for dark mode visitors. */}
-      <style dangerouslySetInnerHTML={{ __html: chatCss + `
-.hp-chat{background:#ECE5DD}
-[data-theme="dark"] .hp-chat{background:#0b141a}
-.hp-b{color:#111;font-size:13.5px;padding:10px 12px}
-.hp-b.out{background:#DCF8C6}
-.hp-b.in{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)}
-[data-theme="dark"] .hp-b.out{background:#005c4b;color:#e8f0ee}
-[data-theme="dark"] .hp-b.in{background:#202c33;color:#e8f0ee;box-shadow:none}
+    <div className="phone" style={{ width: 320, maxWidth: '100%', backgroundColor: PANEL, borderRadius: 24, border: `1px solid ${LINE}`, boxShadow: '0 30px 70px rgba(17,17,17,.16)', overflow: 'hidden' }}>
+      <style dangerouslySetInnerHTML={{ __html: reportCss + `
+.hr-top{border-bottom:1px solid var(--bd);padding:15px 18px}
+.hr-eye{font-size:10.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--tx-mut)}
+.hr-h{font-size:16px;font-weight:800;color:var(--tx);margin-top:3px}
+.hr-body{padding:6px 18px 18px}
+.hr-r{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--bd)}
+.hr-l{font-size:13.5px;color:var(--tx-mut)}
+.hr-v{font-size:20px;font-weight:800;color:var(--tx);font-variant-numeric:tabular-nums}
+.hr-spot{background:var(--saffron-tint);border-radius:14px;padding:13px 14px;margin-top:15px}
+.hr-sh{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--on-saffron-tint)}
+.hr-sb{font-size:13.5px;line-height:1.5;color:var(--tx);margin-top:5px}
+.hr-btn{margin-top:15px;background:var(--river);color:var(--on-river);border-radius:12px;text-align:center;font-size:15px;font-weight:800;padding:13px}
+.hr-note{font-size:11.5px;line-height:1.45;color:var(--tx-mut);text-align:center;margin-top:11px}
 ` }} />
-      <div className="hp-chat" style={{ padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 380 }}>
-        {chatMessages.map((m, i) => (
-          <div key={i} className={`cmsg cmsg${i} hp-b ${m.side}`} style={{ alignSelf: m.side === 'out' ? 'flex-end' : 'flex-start', borderRadius: m.side === 'out' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', maxWidth: m.side === 'out' ? '80%' : '84%' }}>
-            {m.image ? <div style={{ backgroundColor: '#cde7b4', borderRadius: 8, padding: '16px 12px', textAlign: 'center', marginBottom: 6, fontSize: 22 }}>{m.image}</div> : null}
-            {m.text}
+      <div className="hr-top">
+        <div className="hr-eye">Lekhio</div>
+        <div className="hr-h">Your month, so far</div>
+      </div>
+      <div className="hr-body" style={{ minHeight: 380 }}>
+        {heroReport.map((r, i) => (
+          <div key={r.label} className={`hrow hrow${i} hr-r`}>
+            <span className="hr-l">{r.label}</span>
+            <span className="hr-v">{r.value}</span>
           </div>
         ))}
+        <div className={`hrow hrow${heroReport.length} hr-spot`}>
+          <div className="hr-sh">{heroSpot.head}</div>
+          <div className="hr-sb">{heroSpot.body}</div>
+        </div>
+        <div className={`hrow hrow${heroReport.length + 1} hr-btn`}>Approve</div>
+        {/* Not a footnote further down the page. A panel of specific pounds with no owner reads as
+            somebody's real month, and it costs one row to say otherwise on the card itself. */}
+        <p className="hr-note">An example month. Your figures are your own, and nobody else ever sees them.</p>
       </div>
     </div>
   );
@@ -973,7 +1016,13 @@ export function SharedHead() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: SHARED_CSS }} />
-      <noscript><style dangerouslySetInnerHTML={{ __html: `.reveal{opacity:1;transform:none}.cmsg{opacity:1 !important}` }} /></noscript>
+      {/* ⚠️ THE CLASS NAMES IN HERE MUST EXIST. This is the fallback that makes the page readable
+          when the reveal script never runs, and it is the one stylesheet nobody ever looks at, so a
+          rename elsewhere leaves it pointing at nothing and the failure is invisible: an element
+          that starts at opacity 0 and stays there. It said `.cmsg` for a hero that has not existed
+          since the WhatsApp mock was replaced. test/frontdoor.test.mjs now proves every selector in
+          this block is a class the module actually uses. */}
+      <noscript><style dangerouslySetInnerHTML={{ __html: `.reveal{opacity:1;transform:none}.hrow{opacity:1 !important}` }} /></noscript>
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
       <ClientScript js={REVEAL_JS} />
     </>

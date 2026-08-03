@@ -5,7 +5,7 @@ import {
   INK, PAPER, FONT, faqs, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
   Ic,
- MtdBanner,} from '../_shared/site';
+} from '../_shared/site';
 import { diaryRowLabel } from '../../lib/features';
 
 export const metadata: Metadata = {
@@ -96,7 +96,6 @@ export default function PricingPage() {
       <style dangerouslySetInnerHTML={{ __html: PRICING_CSS }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
 
-      <MtdBanner />
       <SiteNav />
 
       {/* Hero */}

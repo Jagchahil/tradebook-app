@@ -6,7 +6,7 @@ import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
   Ic,
- MtdBanner,} from '../_shared/site';
+} from '../_shared/site';
 import { FACTS } from '../../lib/taxengine';
 
 export const metadata: Metadata = {
@@ -91,9 +91,11 @@ const COMPARE_CSS = `
 .ocard .demo{background:var(--panel-2);border-radius:14px;padding:14px;margin-top:12px;display:flex;flex-direction:column;gap:7px}
 .bub{max-width:88%;padding:8px 11px;font-size:13px;border-radius:11px;animation:bin .5s both}
 .bub.two{animation-delay:.5s}
-.bub.out{align-self:flex-end;background:#DCF8C6;color:#111;border-bottom-right-radius:3px}
+/* Own tokens, not Meta's. See the note on the hero in app/_shared/site.tsx: the illustration
+   is the outcome and stays, the borrowed brand palette is the technology and goes. Tokens also
+   delete the dark override that existed only to undo the borrowed green. */
+.bub.out{align-self:flex-end;background:var(--river-tint);color:var(--river-deep);border-bottom-right-radius:3px}
 .bub.in{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:3px}
-[data-theme="dark"] .bub.out{background:#005c4b;color:#e8f0ee}
 @keyframes bin{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:none}}
 .wave{display:flex;align-items:flex-end;gap:3px;height:22px}
 .wave i{width:4px;border-radius:2px;background:var(--river);animation:wv .8s ease infinite}
@@ -188,7 +190,6 @@ export default function ComparePage() {
       {/* The threshold is on GROSS qualifying income, trade plus rent added together before any
           expenses, and it catches landlords as squarely as it catches the self employed. "Earning
           over £50k" said neither, so a landlord read past it and a sole trader read it as profit. */}
-      <MtdBanner />
       <SiteNav />
 
       {/* Hero */}

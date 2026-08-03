@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { getConfirmedTransactionsForRange, getBusinessName } from '../../../lib/supabase';
+import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile } from '../../../lib/supabase';
 import { buildIncomeProof } from '../../../lib/incomeproof';
 import { gbp2 } from '../../../lib/money';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
@@ -73,11 +73,18 @@ export default async function ProofOfIncomePage({
   const todayISO = now.toISOString().slice(0, 10);
   const endISO = todayISO < yearEndISO ? todayISO : yearEndISO;
 
-  const [rows, businessName] = await Promise.all([
+  const [rows, businessName, biz] = await Promise.all([
     getConfirmedTransactionsForRange(user.id, startISO, endISO),
     getBusinessName(user.id),
+    // \U0001F534 THIS PAGE NEVER ASKED WHO HE WAS, and it is the one sheet that leaves the building.
+    // A 50% partner was handed the WHOLE firm's income as his own, over our name, on a document
+    // headed "for income verification". A failed read is null, which is unknown, which gets exactly
+    // the proof this page drew before. See lib/incomeproof.ts for the argument.
+    getBusinessProfile(user.id).catch(() => null),
   ]);
-  const proof = buildIncomeProof(rows, businessName, year, now);
+  const proof = buildIncomeProof(rows, businessName, year, now, biz
+    ? { type: biz.businessType, sharePercent: biz.partnershipShare }
+    : null);
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -140,10 +147,30 @@ export default async function ProofOfIncomePage({
                     so for a landlord that line named a tax he does not pay, and the figure under it
                     included it. lib/incomeproof.ts now splits trade from property and hands back
                     the honest wording with the honest number. */}
-                <dt style={S.thMut}>{proof.estimatedTaxLabel}</dt>
-                <dd style={S.tdMut}>{gbp2(proof.estimatedTax)}</dd>
+                {/* \U0001F534 AND NO PERSONAL TAX ESTIMATE ON A COMPANY'S PROFIT. Running the sole trader
+                    rates over a director's company turnover charges him income tax and Class 4 on
+                    money that is taxable IN THE COMPANY, and prints the words on a page he hands a
+                    lender. The row goes rather than being reworded, and the note below says where
+                    the answer actually lives. */}
+                {proof.companyExcluded ? null : (
+                  <>
+                    <dt style={S.thMut}>{proof.estimatedTaxLabel}</dt>
+                    <dd style={S.tdMut}>{gbp2(proof.estimatedTax)}</dd>
+                  </>
+                )}
               </div>
             </dl>
+
+            {/* The sentence that says whose figures these are. Null for a sole trader, whose figures
+                are simply his, so nothing is added to the one page he wants to keep short. */}
+            {proof.shareNote ? <p style={S.shareNote}>{proof.shareNote}</p> : null}
+            {proof.companyExcluded ? (
+              <p style={S.shareNote}>
+                These are the company&apos;s figures, not this person&apos;s personal income. A
+                company pays Corporation Tax on its own return, and the director is paid in salary
+                and dividends, which are not shown here.
+              </p>
+            ) : null}
 
             <p style={S.stamp}>
               Prepared by Lekhio {'·'} {longDate(proof.generatedAt.slice(0, 10))} {'·'} {proof.txCount} entries
@@ -153,8 +180,9 @@ export default async function ProofOfIncomePage({
               This is a summary prepared from the figures {proof.businessName} has recorded and
               confirmed in Lekhio, for income verification. It is not an HMRC document, an SA302,
               or a filed tax return, and it is only as complete as the records kept. The estimated
-              tax figure is guidance based on the published {proof.taxYear} rates and does not
-              include any other income, reliefs or allowances the person may have. For an official
+              tax figure, where one is shown, is guidance based on the published {proof.taxYear}
+              rates and does not include any other income, reliefs or allowances the person may
+              have. For an official
               SA302 or tax year overview, the person can log in to their HMRC account. Some
               lenders ask for HMRC documents as well as a summary like this.
             </p>
@@ -211,6 +239,9 @@ const S: Record<string, React.CSSProperties> = {
   tdMut: { fontSize: TYPE.body, fontWeight: 700, color: MUTED, margin: 0, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
   tdBold: { fontSize: TYPE.body, fontWeight: 800, margin: 0, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
 
+  // Sits under the table, above the stamp, in the document's own ink rather than muted: it is a
+  // statement about what the figures ARE, not a footnote about them.
+  shareNote: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, margin: `${SPACE.md}px 0 0`, maxWidth: '62ch' },
   stamp: { display: 'inline-block', marginTop: 18, background: SURFACE, borderRadius: RADIUS.sm, padding: '8px 12px', fontSize: TYPE.label, fontWeight: 700, color: RIVER_DEEP },
   note: { fontSize: TYPE.label, color: MUTED, lineHeight: 1.6, margin: '18px 0 0' },
 

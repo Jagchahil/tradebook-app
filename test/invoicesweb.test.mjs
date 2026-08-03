@@ -535,7 +535,34 @@ ok('the proof resolves the session and sends a stranger to the door',
   pageProof.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(pageProof));
 ok('🔴 every figure comes from buildIncomeProof over the session user\'s confirmed rows',
   /getConfirmedTransactionsForRange\(user\.id, startISO, endISO\)/.test(pageProof)
-  && /buildIncomeProof\(rows, businessName, year, now\)/.test(pageProof));
+  && /buildIncomeProof\(rows, businessName, year, now, biz/.test(pageProof));
+
+// \ud83d\udd34 3 AUGUST 2026: AND IT MUST ASK WHO HE IS, WHICH FOR MONTHS IT DID NOT.
+//
+// This page never read getBusinessProfile, so a 50% partner was handed the WHOLE firm's income as
+// his own, on a document headed "for income verification", over our name. /app/tax had said "These
+// figures are your 50% share of the firm's books" on the screen next door. At a 50% share this
+// sheet DOUBLED him, to a mortgage broker.
+//
+// \u26a0\ufe0f PINNED ON BOTH SURFACES. The route serves the same document as printable HTML, and if
+// only the page asked, a partner could print the firm's figures from /api/income-proof after the
+// screen had shown him his share. One document, two doors, one answer.
+{
+  const routeProof = read('app/api/income-proof/route.ts');
+  ok('\ud83d\udd34 THE PAGE ASKS WHO HE IS, and a failed read is unknown rather than a guess',
+    /getBusinessProfile\(user\.id\)\.catch\(\(\) => null\)/.test(pageProof));
+  ok('\ud83d\udd34 AND SO DOES THE PRINTABLE ROUTE, or the two doors hand out different documents',
+    /getBusinessProfile\(userId\)\.catch\(\(\) => null\)/.test(routeProof)
+    && /buildIncomeProof\(rows, businessName, year, now, biz/.test(routeProof));
+  ok('...both pass the type AND the share, because the share is what was being dropped',
+    (pageProof.match(/type: biz\.businessType, sharePercent: biz\.partnershipShare/g) || []).length === 1
+    && (routeProof.match(/type: biz\.businessType, sharePercent: biz\.partnershipShare/g) || []).length === 1);
+  ok('\ud83d\udd34 THE SHARE SENTENCE IS ON THE SHEET, so a lender cannot read the figure without it',
+    /proof\.shareNote/.test(pageProof) && /p\.shareNote/.test(read('lib/incomeproof.ts')));
+  ok('\ud83d\udd34 AND NO PERSONAL TAX ESTIMATE IS PRINTED OVER A COMPANY\'S PROFIT',
+    /proof\.companyExcluded \? null : \(/.test(pageProof)
+    && /p\.companyExcluded \? '' : row\(p\.estimatedTaxLabel/.test(read('lib/incomeproof.ts')));
+}
 ok('🔴 the page computes no figure of its own',
   !/income\s*\+|expenses\s*\+|\+=|profit\s*=/.test(codeOnly(pageProof)));
 ok('🔴 there is a print stylesheet in the page\'s own style block',

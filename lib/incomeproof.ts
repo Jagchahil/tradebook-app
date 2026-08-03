@@ -46,6 +46,23 @@ export interface IncomeProof {
   estimatedTaxLabel: string;
   txCount: number;
   generatedAt: string; // ISO
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // \u26a0\ufe0f WHO THESE FIGURES BELONG TO. Null for a sole trader, whose figures are simply his.
+  //
+  // `shareNote` is the sentence the document must carry when the numbers above are a SLICE of a
+  // bigger set of books. `companyExcluded` says the opposite thing: these are not his personal
+  // income at all and no personal tax estimate is offered on them.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  shareNote: string | null;
+  companyExcluded: boolean;
+}
+
+// How he trades, for the one document a lender reads. Optional, and undefined is UNKNOWN, which
+// gets the identical proof it got before this existed.
+export interface ProofStructure {
+  type: 'sole_trader' | 'partnership' | 'limited_company' | null;
+  sharePercent?: number; // partnership only, 0 to 100
 }
 
 export function taxYearLabel(startYear: number): string {
@@ -65,7 +82,39 @@ export function buildIncomeProof(
   businessName: string | null,
   startYear: number,
   now: Date = new Date(),
+  structure?: ProofStructure | null,
 ): IncomeProof {
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // \U0001F534 THIS DOCUMENT WAS HANDING A PARTNER THE WHOLE FIRM'S INCOME AS HIS OWN.
+  //
+  // Found 3 August 2026 by setting a live account to "Me and somebody else" at 50%. /app/tax then
+  // said "These figures are your 50% share of the firm's books" and showed £22,305. THIS page,
+  // titled Income summary, for income verification, over our name, showed the FIRM'S £53,400 of
+  // gross income and £52,190 of net profit with no share applied and nothing saying so.
+  //
+  // \U0001F534 IT IS THE WORST PLACE IN THE PRODUCT TO OVERSTATE A MAN'S INCOME. The whole job of this
+  // page is to be believed by a mortgage broker or a lender who checks, and at a 50% share it
+  // DOUBLED him. lib/supabase.ts's getOptimiserInput already scales by the partner factor and
+  // /app/pay-yourself already reads partnershipShare, so the product knew his share everywhere
+  // except on the one sheet that leaves the building.
+  //
+  // \U0001F534 AND A DIRECTOR'S COMPANY TURNOVER IS NOT HIS PERSONAL INCOME EITHER. His is salary and
+  // dividends, which this file does not hold, so no personal tax estimate is offered on a company's
+  // profit. That is the same conclusion lib/quarterpack.ts reached about the same money, in the
+  // same words, for the same reason.
+  //
+  // \u26a0\ufe0f UNKNOWN IS NEVER AN ANSWER. No structure, a null type, or a failed profile read all
+  // produce the proof this function produced before the parameter existed, to the penny and to the
+  // character. Only a man who has TOLD US he shares a business, or runs a company, sees a change,
+  // and what he loses is a figure that was not his.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  const isPartnership = structure?.type === 'partnership';
+  const isCompany = structure?.type === 'limited_company';
+  const rawShare = Number(structure?.sharePercent);
+  const sharePct = isPartnership && Number.isFinite(rawShare) && rawShare > 0 && rawShare <= 100
+    ? rawShare
+    : 100;
+  const share = sharePct / 100;
   let income = 0;
   let expenses = 0;
   let tradeIncome = 0;
@@ -84,8 +133,15 @@ export function buildIncomeProof(
     }
   }
   const round2 = (n: number) => Math.round(n * 100) / 100;
-  income = round2(income);
-  expenses = round2(expenses);
+  // \U0001F534 THE SLICE IS TAKEN HERE, before profit or any tax is derived, so every figure below and
+  // every figure on the page is his and none of them can disagree with another. share is 1 for a
+  // sole trader, an unknown structure and a company, so those three are untouched arithmetic.
+  income = round2(income * share);
+  expenses = round2(expenses * share);
+  tradeIncome = round2(tradeIncome * share);
+  tradeExpenses = round2(tradeExpenses * share);
+  propertyIncome = round2(propertyIncome * share);
+  propertyExpenses = round2(propertyExpenses * share);
   // The headline the lender reads: everything in, everything out. Unchanged.
   const profit = Math.max(0, round2(income - expenses));
   // The two streams, each floored at zero, because the tax below is charged on them apart, and what
@@ -113,8 +169,15 @@ export function buildIncomeProof(
   // incomeTaxOnProfit(p) + class4NIC(p) IS soleTraderTax(p).total. A landlord's estimated tax falls,
   // which is correct: he was being charged a tax that is not his. Nobody's income or profit moves.
   // ═════════════════════════════════════════════════════════════════════════════════════════════
-  const nationalInsurance = round2(class4NIC(tradeProfit));
-  const estimatedTax = round2(incomeTaxOnProfit(tradeProfit + propertyProfit) + nationalInsurance);
+  //
+  // \U0001F534 AND NONE OF IT IS OFFERED ON A COMPANY'S PROFIT. Running these over a director's company
+  // turnover charges him income tax and Class 4 on money that is taxable IN THE COMPANY, and prints
+  // the words on a document he hands a lender. A plain sentence saying where the answer lives beats
+  // a plausible number on the wrong money.
+  const nationalInsurance = isCompany ? 0 : round2(class4NIC(tradeProfit));
+  const estimatedTax = isCompany
+    ? 0
+    : round2(incomeTaxOnProfit(tradeProfit + propertyProfit) + nationalInsurance);
 
   return {
     businessName: (businessName ?? '').trim() || 'Your business',
@@ -133,6 +196,12 @@ export function buildIncomeProof(
       nationalInsurance > 0 ? 'Estimated Income Tax and National Insurance' : 'Estimated Income Tax',
     txCount: txns.length,
     generatedAt: now.toISOString(),
+    // The sentence a reader needs to understand what he is looking at. A sole trader gets null,
+    // because a caption explaining a share he does not have is a line he reads and rejects.
+    shareNote: isPartnership
+      ? `These figures are ${sharePct}% of the firm's books, this person's share of the partnership.`
+      : null,
+    companyExcluded: isCompany,
   };
 }
 
@@ -181,6 +250,9 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
   .muted { color:${MUTED} }
   .card { background:#fff; border:1px solid ${BORDER}; border-radius:16px; padding:22px 24px; margin-top:20px }
   table { width:100%; border-collapse:collapse }
+  /* Whose figures these are. In the document's own ink, not muted: it states what the numbers
+     ARE rather than footnoting them, and a lender must not be able to skim past it. */
+  .whose { margin-top:16px; font-size:13.5px; line-height:1.6; color:${INK}; max-width:62ch }
   .stamp { display:inline-block; margin-top:18px; background:${OFF_WHITE}; border:1px solid ${BORDER}; border-radius:10px; padding:8px 12px; font-size:12px; font-weight:700; color:${INDIGO} }
   .note { font-size:12px; color:${MUTED}; line-height:1.6; margin-top:22px }
   .btn { display:inline-block; margin-top:24px; background:${INDIGO}; color:#fff; text-decoration:none; font-weight:700; padding:12px 20px; border-radius:11px; border:0; cursor:pointer; font-family:inherit; font-size:15px }
@@ -196,8 +268,10 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
       ${row('Gross income', gbp(p.income))}
       ${row('Allowable expenses', gbp(p.expenses), { muted: true })}
       ${row('Net profit', gbp(p.profit), { bold: true })}
-      ${row(p.estimatedTaxLabel, gbp(p.estimatedTax), { muted: true })}
+      ${p.companyExcluded ? '' : row(p.estimatedTaxLabel, gbp(p.estimatedTax), { muted: true })}
     </table>
+    ${p.shareNote ? `<div class="whose">${esc(p.shareNote)}</div>` : ''}
+    ${p.companyExcluded ? `<div class="whose">These are the company's figures, not this person's personal income. A company pays Corporation Tax on its own return, and the director is paid in salary and dividends, which are not shown here.</div>` : ''}
     <div class="stamp">Prepared by Lekhio &middot; ${esc(generated)} &middot; ${p.txCount} entries</div>
   </div>
 
@@ -206,7 +280,7 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
   <p class="note">
     This is a summary prepared from the figures ${esc(p.businessName)} has recorded and confirmed in Lekhio, for income verification.
     It is not an HMRC document, an SA302, or a filed tax return, and it is only as complete as the records kept.
-    The estimated tax figure is guidance based on the published ${esc(p.taxYear)} rates and does not include any other income, reliefs or allowances the person may have.
+    The estimated tax figure, where one is shown, is guidance based on the published ${esc(p.taxYear)} rates and does not include any other income, reliefs or allowances the person may have.
     For an official SA302 or tax year overview, the person can log in to their HMRC account. Some lenders ask for HMRC documents as well as a summary like this.
   </p>
 </div></body></html>`;

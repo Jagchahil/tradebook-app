@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConfirmedTransactionsForRange, getBusinessName } from '../../../lib/supabase';
+import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
 import { buildIncomeProof, renderIncomeProofHtml } from '../../../lib/incomeproof';
 import { packToken, verifyPackToken, siteBase } from '../../../lib/packtoken';
@@ -56,11 +56,17 @@ export async function GET(req: NextRequest) {
   const todayISO = now.toISOString().slice(0, 10);
   const endISO = todayISO < yearEndISO ? todayISO : yearEndISO;
 
-  const [rows, businessName] = await Promise.all([
+  const [rows, businessName, biz] = await Promise.all([
     getConfirmedTransactionsForRange(userId, startISO, endISO),
     getBusinessName(userId),
+    // The printable document and the screen must be the same document. If this route did not ask
+    // who he is, a partner could print the firm's whole income from here after the page had
+    // correctly shown him his share. See lib/incomeproof.ts.
+    getBusinessProfile(userId).catch(() => null),
   ]);
-  const proof = buildIncomeProof(rows, businessName, year, now);
+  const proof = buildIncomeProof(rows, businessName, year, now, biz
+    ? { type: biz.businessType, sharePercent: biz.partnershipShare }
+    : null);
 
   if (sp.get('format') === 'json') {
     return NextResponse.json(proof);

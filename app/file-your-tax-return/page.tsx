@@ -429,7 +429,7 @@ export default function FileYourTaxReturnPage() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <a href="#steps" style={{ backgroundColor: RIVER, color: 'var(--on-river)', fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12, textDecoration: 'none' }}>Start the walkthrough</a>
-          <Link href="/start" style={{ background: 'var(--panel)', color: RIVER, border: `1.5px solid ${RIVER}`, fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12, textDecoration: 'none' }}>Get the reminders</Link>
+          <Link href="/start" style={{ background: 'var(--panel)', color: RIVER, border: `1.5px solid ${RIVER}`, fontSize: 16, fontWeight: 600, padding: '14px 26px', borderRadius: 12, textDecoration: 'none' }}>Get set up</Link>
         </div>
       </section>
 
@@ -564,7 +564,7 @@ export default function FileYourTaxReturnPage() {
       <section style={{ maxWidth: 900, margin: '0 auto', padding: '54px 24px' }}>
         <h2 style={{ fontSize: 26, fontWeight: 700, textAlign: 'center', margin: '0 0 8px' }}>The deadlines for 2025/26</h2>
         <p style={{ fontSize: 16, color: MUTED, textAlign: 'center', maxWidth: 560, margin: '0 auto 26px' }}>
-          The tax year ran 6 April 2025 to 5 April 2026. Miss the 31 January and it is an automatic £100 penalty, even if you owe nothing. So we remind you.
+          The tax year ran 6 April 2025 to 5 April 2026. Miss the 31 January and it is an automatic £100 penalty, even if you owe nothing. Your Lekhio keeps the date and the figure in front of you all year.
         </p>
         <div style={{ display: 'grid', gap: 12 }}>
           {deadlines.map((d) => (

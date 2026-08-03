@@ -143,7 +143,9 @@ export default async function SignInPage({
               </span>
             </label>
             <button type="submit" style={S.btn}>Sign in</button>
-            <a href="/in" style={S.link}>Use a different email or number</a>
+            {/* ⚠️ "or number" survived the 2 Aug pass because the sweep looked at the FORM, not at the
+                code step. Found by walking the live sign in on 3 August. */}
+            <a href="/in" style={S.link}>Use a different email address</a>
             {/* ⚠️ WE NEVER SAY "NO ACCOUNT WITH THAT ADDRESS", AND WE ARE NOT GOING TO. Telling a
                 stranger which addresses are registered hands him a list of our customers, so this
                 screen looks identical whether the code went out or there was nobody to send it to.

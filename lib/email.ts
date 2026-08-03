@@ -68,7 +68,7 @@ function shell(inner: string, opts: { preheader?: string; unsubscribeLink?: stri
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${CREAM}">${esc(opts.preheader)}</div>`
     : '';
   const unsub = opts.unsubscribeLink
-    ? `<p style="margin:10px 0 0">You're getting this because you asked Lekhio for tax reminders and tips. <a href="${safeUrl(opts.unsubscribeLink)}" style="color:${MUTED};text-decoration:underline">Unsubscribe</a> any time.</p>`
+    ? `<p style="margin:10px 0 0">You're getting this because you gave Lekhio your email address. <a href="${safeUrl(opts.unsubscribeLink)}" style="color:${MUTED};text-decoration:underline">Unsubscribe</a> any time.</p>`
     : '';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
 <body style="margin:0;padding:0;background:${CREAM};font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased">
@@ -369,11 +369,11 @@ export async function sendWeeklyReadyEmail(to: string): Promise<boolean> {
 export async function sendLeadConfirmEmail(to: string, confirmLink: string, unsubscribeLink: string): Promise<boolean> {
   const inner = `
     ${h1('One quick tap to confirm.')}
-    ${p('You asked us to send your result and keep you right on your tax deadlines. Tap below to confirm and you’re all set.')}
+    ${p('You asked us to send you your result. Tap below to confirm and you’re all set.')}
     ${button(confirmLink, 'Confirm my email')}
     ${pMuted('If you didn’t request this, ignore this email and nothing will happen.')}`;
   return send({
-    to, subject: 'Confirm your email to get your result and reminders',
+    to, subject: 'Confirm your email to get your result',
     html: shell(inner, { preheader: 'One tap and your result is on its way.', unsubscribeLink }),
     listUnsub: unsubscribeLink, tag: 'lead-confirm',
   });

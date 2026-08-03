@@ -147,6 +147,7 @@ ok('🔴 THE PHONE PLACEHOLDER IS GONE, so nobody is invited to type a number', 
 ok('🔴 IT NO LONGER PROMISES A TEXT WORKS, which is no longer offered', !/A text works too/i.test(inPage));
 ok('the field is typed as an email, so a number is refused before it can cost anything', /type="email"/.test(inPage));
 ok('the phone era customer is given a route rather than a dead end', inPage.includes('info@lekhio.app'));
+ok('🔴 THE CODE STEP DOES NOT OFFER A NUMBER EITHER, which the first sweep missed', !/email or number/i.test(inPage));
 ok('the meta description does not still sell a mobile sign in', !/Sign in with your mobile/i.test(inPage));
 ok('the subheading does not offer a choice of two contacts', !/address or your mobile/i.test(inPage));
 // ⚠️ ASSERT ON THE CASE LINE, NOT THE FILE. The first draft of this swept the whole page and

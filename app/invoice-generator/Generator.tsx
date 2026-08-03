@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import LeadCapture from '../../components/LeadCapture';
+// ⚠️ A CLIENT COMPONENT, which is exactly why remindersLive() is a NEXT_PUBLIC flag: a server only
+// read would be false here and true on the server, and the same sentence would render two ways.
+import { nudgeClause } from '../../lib/features';
 
 // Fully client side. No AI, no server, no cost. The browser does the maths and
 // the "Save as PDF" is the browser's own print to PDF, so it never calls us.
@@ -370,7 +373,7 @@ export default function Generator() {
         <LeadCapture
           source="invoice-generator"
           heading="Never miss a tax deadline"
-          sub="Invoice sorted. Now let us keep you right on the tax side. Pop your email in for MTD deadline reminders and money saving tips. No spam, unsubscribe any time."
+          sub={`Invoice sorted. Pop your email in and we will send you a copy of the figures and what they mean for your tax.${nudgeClause()} No spam, unsubscribe any time.`}
           resultNote="used invoice generator"
         />
       </div>

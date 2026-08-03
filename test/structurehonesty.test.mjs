@@ -123,8 +123,18 @@ const { CIRCUMSTANCES, unanswered, unansweredMtd, progressIn, mtdQuestions, hous
 // "no receipts to keep at all" was promising him the wrong thing entirely.
 const SOLE_ONLY = [
   'prior_employment', 'low_profit_year', 'home_working',
-  'mtd_mandated', 'mtd_signed_up', 'mtd_agent', 'mtd_already_filed',
 ];
+
+// \ud83d\udd34 3 AUGUST 2026: THE FOUR MTD KEYS CAME OFF THE LIST ABOVE, AND THAT WAS THE BUG.
+//
+// They were bundled in with the three that genuinely are "sole trader and partner, never a company",
+// and the reasoning printed beside them, "his share IS self employment income", is TRUE for those
+// three and FALSE for Making Tax Digital. GOV.UK: "Partnerships will also need to use Making Tax
+// Digital for Income Tax in the future. We'll set out the timeline for this at a later date." No
+// date, so no obligation, so nothing to ask him about. lib/agent.ts already refused to send a
+// partner the mandation signal, on that exact reasoning, so the product was asking a man a question
+// on the web that its own WhatsApp had decided not to raise with him.
+const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_signed_up', 'mtd_agent', 'mtd_already_filed'];
 {
   ok('🔴 the three sole trader questions carry their structures on the entry, with reasoning beside them',
     SOLE_ONLY.every((k) => {
@@ -133,8 +143,17 @@ const SOLE_ONLY = [
         && c.structures.includes('sole_trader') && c.structures.includes('partnership')
         && !c.structures.includes('limited_company');
     }));
+  ok('\ud83d\udd34 THE FOUR MTD QUESTIONS ARE SOLE TRADER ONLY: a partner has no update to make',
+    MTD_SOLE_ONLY.every((k) => {
+      const c = CIRCUMSTANCES.find((x) => x.key === k);
+      return Array.isArray(c.structures) && c.structures.length === 1 && c.structures[0] === 'sole_trader';
+    }));
+  ok('\u26a0\ufe0f AND THE GATE\'S OWN WORDS ARE UNTOUCHED: only the audience moved, never the exhibit',
+    CIRCUMSTANCES.find((x) => x.key === 'mtd_mandated').ask
+      === 'Do you expect to take more than £50,000 this year, before any expenses, from self employment and rent put together?');
   ok('every other question is for every structure: absent means everyone',
-    CIRCUMSTANCES.filter((c) => !SOLE_ONLY.includes(c.key)).every((c) => c.structures === undefined));
+    CIRCUMSTANCES.filter((c) => !SOLE_ONLY.includes(c.key) && !MTD_SOLE_ONLY.includes(c.key))
+      .every((c) => c.structures === undefined));
 
   const forLtd = unanswered([], 'limited_company').map((c) => c.key);
   const forSole = unanswered([], 'sole_trader').map((c) => c.key);
@@ -153,9 +172,14 @@ const SOLE_ONLY = [
 
   ok('🔴 THE MTD GATE IS REFUSED FOR A COMPANY, and the three follow ups stop with it',
     unansweredMtd([], 'limited_company').length === 0);
-  ok('the MTD gate still opens for a sole trader and a partner',
-    unansweredMtd([], 'sole_trader')[0]?.key === 'mtd_mandated'
-    && unansweredMtd([], 'partnership')[0]?.key === 'mtd_mandated');
+  ok('the MTD gate still opens for a sole trader',
+    unansweredMtd([], 'sole_trader')[0]?.key === 'mtd_mandated');
+  ok('\ud83d\udd34 AND IT IS REFUSED FOR A PARTNER TOO, for a different reason than the company\'s',
+    unansweredMtd([], 'partnership').length === 0);
+  ok('...even with a yes somehow already on record from before this changed',
+    unansweredMtd([{ key: 'mtd_mandated', answer: 'yes' }], 'partnership').length === 0);
+  ok('\ud83d\udd34 AN UNKNOWN STRUCTURE STILL GETS ASKED, the safe direction: a real obligation is never\n    hidden from a sole trader because a profile read came back empty',
+    unansweredMtd([])[0]?.key === 'mtd_mandated');
   ok('and answering yes still releases the follow ups for a sole trader',
     unansweredMtd([{ key: 'mtd_mandated', answer: 'yes' }], 'sole_trader').length === 3);
   ok('but never for a company, even with a yes somehow on record',

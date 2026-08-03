@@ -770,8 +770,45 @@ console.log('\n🔴 A COMPANY\'S TURNOVER IS NOT THE DIRECTOR\'S QUALIFYING INCO
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   ok('🔴 AN UNKNOWN STRUCTURE GETS THE IDENTICAL PACK, TO THE CHARACTER',
     same(packOf({ structure: null }), asIs) && same(packOf({ structure: undefined }), asIs));
-  ok('a known sole trader and a partner get it too',
-    same(packOf({ structure: 'sole_trader' }), asIs) && same(packOf({ structure: 'partnership' }), asIs));
+  ok('a known sole trader gets it too', same(packOf({ structure: 'sole_trader' }), asIs));
+
+  // ════════════════════════════════════════════════════════════════════════════════════════
+  // \ud83d\udd34 A PARTNER USED TO BE ON THIS LINE, AND THAT LINE WAS WRONG.
+  //
+  // It said a partner's pack is byte identical to a sole trader's, which made his share of the
+  // firm's turnover count towards HIS Making Tax Digital threshold. GOV.UK: "Partnerships will also
+  // need to use Making Tax Digital for Income Tax in the future. We'll set out the timeline for this
+  // at a later date." No date, so no obligation. lib/agent.ts already suppressed the mandation
+  // signal for partnerships on exactly that reasoning; this file was pinning the opposite, so the
+  // web said one thing and WhatsApp said another about one man.
+  //
+  // \u26a0\ufe0f THE GUARD IS SPLIT RATHER THAN LOOSENED. "Nothing else moves" is still the claim worth
+  // making, and it is now made precisely: ONLY the two mandation fields differ, and every other
+  // figure in the pack is identical to the character, because a partner IS charged income tax and
+  // Class 4 on his share and none of that may move.
+  // ════════════════════════════════════════════════════════════════════════════════════════
+  const asPartner = packOf({ structure: 'partnership' });
+  ok('\ud83d\udd34 A PARTNER IS OUT OF MAKING TAX DIGITAL: partnerships have no announced date',
+    asPartner.ytd.grossQualifyingIncome === 0 && asPartner.ytd.mtdApplies === false);
+  // The three MANDATION fields are blanked on both sides and everything else must then match. Listed
+  // by name on purpose: a blanket "ignore ytd" would let a real figure drift through unnoticed, and
+  // this guard already earned its keep once by failing the moment mtdExcluded was added.
+  const noMtd = (p) => ({ ...p, ytd: { ...p.ytd, grossQualifyingIncome: null, mtdApplies: null, mtdExcluded: null } });
+  ok('\ud83d\udd34 AND NOTHING ELSE MOVES: his tax on his share is untouched, to the character',
+    same(noMtd(asPartner), noMtd(asIs)));
+  ok('...he is still charged Class 4, unlike a director, because his share IS self employment',
+    /Estimated Class 4 National Insurance/.test(QP.renderQuarterPackHtml(asPartner)));
+  ok('...and his document never tells him quarterly updates apply',
+    !/quarterly updates apply/.test(QP.renderQuarterPackHtml(asPartner)));
+  // \ud83d\udd34 THE SAME TRAP THE DIRECTOR GUARD ABOVE EXISTS TO CATCH. Zeroing the test base without
+  // giving him a sentence of his own printed "your gross income so far this year is £0.00" over a
+  // page of the firm's takings. Caught by reasoning about the fix, not by a failing test, which is
+  // why it gets one now.
+  ok('\ud83d\udd34 ...AND IT NEVER TELLS HIM HIS GROSS INCOME FOR THE YEAR WAS ZERO',
+    !/gross income so far this year is £0\.00/.test(QP.renderQuarterPackHtml(asPartner)));
+  ok('...it says plainly that partnerships are not in it yet, with no date invented',
+    /has not reached partnerships yet/.test(QP.renderQuarterPackHtml(asPartner))
+    && !/7 (August|November|February|May)/.test(QP.renderQuarterPackHtml(asPartner)));
 
   // It is WIRED, which is this codebase's actual disease when it is not.
   const packRoute = rf(path.join(root, 'app/api/quarter-pack/route.ts'), 'utf8');

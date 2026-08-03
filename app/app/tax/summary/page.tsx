@@ -87,9 +87,13 @@ export default async function TaxSummaryPage() {
   ]);
   const pack = buildQuarterPack({
     transactions: txns, startYear, quarter: index, truncated: txns.length >= 20000,
+    // 🔴 THIS WAS MISSING, so the pack could not exclude a partner's share (or a company's
+    // turnover) from the mandation test. See the calendar card below and lib/quarterpack.ts.
+    structure: biz?.businessType ?? null,
   });
 
   const isCompany = biz?.businessType === 'limited_company';
+  const isPartnership = biz?.businessType === 'partnership';
   const sub = pack.submission;
   const due = updateDue(startYear, index);
   const ordinal = UPDATE_ORDINAL[index];
@@ -248,6 +252,26 @@ export default async function TaxSummaryPage() {
               already kept in the shape an update reports, so the deadline is a date, not a job.
             </p>
           )}
+        </section>
+      ) : isPartnership ? (
+        /* 🔴 A PARTNER IS OUT FOR A DIFFERENT REASON, AND THE THRESHOLD SENTENCE WOULD LIE TO HIM.
+           He is not under the line, he is outside the regime: GOV.UK says partnerships will need
+           Making Tax Digital "in the future" and that the timeline comes "at a later date". Handing
+           him the threshold branch would also print his gross as £0, because lib/quarterpack.ts now
+           correctly leaves partnership trade out of the test, and £0 on a page showing £53,400 of
+           takings reads as a broken screen rather than an exclusion. */
+        <section className="lek-card">
+          <h2 className="lek-h2">No quarterly update is due from you</h2>
+          <p style={S.body}>
+            Making Tax Digital for Income Tax has not reached partnerships yet. HMRC has said it will,
+            and that the timeline comes later, so there is no update for you to make and no date to
+            keep. The figures above are yours to check.
+          </p>
+          <p style={S.quiet}>
+            Your share of the profit goes on your own Self Assessment return the way it does today, and
+            the partnership files its own alongside it. When a date is announced your Lekhio is already
+            kept in the shape an update reports, so it will be a date rather than a job.
+          </p>
         </section>
       ) : (
         <section className="lek-card">

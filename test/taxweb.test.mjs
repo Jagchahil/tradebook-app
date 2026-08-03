@@ -321,5 +321,21 @@ const summaryNumbers = codeOnly(src.summary).replace(/txns\.length >= 20000/g, '
 ok('the page types no MTD threshold of its own',
   !/(?<![\d.])(50000|30000|20000)(?![\d.])/.test(summaryNumbers));
 
+// ---------------------------------------------------------------------------------------------
+// 7. IT IS WIRED. Three of these were written, shipped green, and pinned by NOTHING until a
+//    sabotage pass deleted each one and the suite did not notice. That is this codebase's own
+//    named disease, so they get guards of their own rather than a note in a commit message.
+// ---------------------------------------------------------------------------------------------
+ok('\ud83d\udd34 THE SUMMARY PAGE ACTUALLY PASSES WHO HE IS, or the pack can exclude nobody',
+  /structure: biz\?\.businessType \?\? null,/.test(src.summary));
+ok('\ud83d\udd34 AND SO DOES THE HUB, which asks the same pack the same question',
+  /structure: biz\?\.businessType \?\? null,/.test(src.hub));
+ok('a partner is read from the profile, never guessed from a figure',
+  /const isPartnership = biz\?\.businessType === 'partnership';/.test(src.summary));
+ok('\ud83d\udd34 AND HE GETS HIS OWN CARD: outside the regime is not the same fact as under the line',
+  /\) : isPartnership \? \(/.test(src.summary) && /has not reached partnerships yet/.test(summaryCode));
+ok('...with no date invented for a timeline HMRC has not published',
+  !/partnerships[^.]*\b(7 August|7 November|7 February|7 May|April 202)/.test(summaryCode));
+
 console.log(`\n  ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

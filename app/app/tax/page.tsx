@@ -98,8 +98,20 @@ export default async function TaxHubPage() {
   // than hand him a row explaining what does not apply. Rent is not buried with it, because rent on
   // a personal return does count towards the line: /app/tax/summary says so to a director in
   // exactly those words, which is where a man who lets property will read it.
+  //
+  // 🔴 AND IT WAS NOT PASSING `structure`, SO THE PACK COULD NOT APPLY EITHER EXCLUSION.
+  // The company half was covered by `&& !isCompany` below. The PARTNERSHIP half was not covered by
+  // anything, so on 3 August 2026 a 50% partner read "Making Tax Digital applies to you. Your income
+  // this year, £53,400 before costs, is over the £50,000 line", where £53,400 was the FIRM'S turnover
+  // and his own share was £26,700, for a regime that has not reached partnerships at all. The rule
+  // lives in buildQuarterPack now, cited to GOV.UK, so this page asks rather than re-derives, and the
+  // printed document at /api/quarter-pack (which always passed structure) cannot disagree with it.
+  //
+  // `&& !isCompany` STAYS. It is belt and braces on a row about a man's own money, and if the pack
+  // ever forgets the exclusion the row still does not draw for him.
   const pack = buildQuarterPack({
     transactions: txns, startYear, quarter: index, truncated: txns.length >= 20000,
+    structure: biz?.businessType ?? null,
   });
   const mtd = pack.ytd.mtdApplies && !isCompany;
 

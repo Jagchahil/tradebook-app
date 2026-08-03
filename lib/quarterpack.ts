@@ -108,6 +108,10 @@ export interface QuarterPack {
     cisSuffered: number;
     grossQualifyingIncome: number; // trade gross + property gross, the MTD test base
     mtdApplies: boolean;
+    // WHY the test base was zeroed, when it was. null means it was not: he is simply measured
+    // against the line. The renderer needs this because "your gross income so far is £0.00" under a
+    // page of his own takings reads as a broken screen, not as an exclusion.
+    mtdExcluded: 'company' | 'partnership' | null;
     mtdThreshold: number; // the MTD gross threshold for this tax year (50k/30k/20k)
     estimatedTax: EstimatedTax;
   };
@@ -299,6 +303,7 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
   // Only an explicit company is treated as one. Undefined and null are unknown, and unknown gets
   // exactly the pack it got before this field existed. See the note on BuildInput.structure.
   const isCompany = input.structure === 'limited_company';
+  const isPartnership = input.structure === 'partnership';
 
   // The MTD for Income Tax test is on GROSS qualifying income, trade plus
   // property, before expenses. We test the year to date gross, which is
@@ -307,7 +312,27 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
   // 🔴 EXCEPT THAT A COMPANY'S TURNOVER IS NOT HIS QUALIFYING INCOME. It is the company's, and the
   // company is outside Making Tax Digital for Income Tax altogether. His rent stays in the test,
   // because rent on a personal return does count towards the line whatever else he runs.
-  const grossQualifying = round2((isCompany ? 0 : ytdTrade.income) + ytdProperty.income);
+  //
+  // 🔴 AND A PARTNER'S SHARE OF PARTNERSHIP TRADE IS NOT HIS QUALIFYING INCOME EITHER, FOR A
+  // DIFFERENT REASON: MAKING TAX DIGITAL HAS NOT REACHED PARTNERSHIPS AT ALL.
+  //
+  // GOV.UK, "Find out if and when you need to use Making Tax Digital for Income Tax": "Partnerships
+  // will also need to use Making Tax Digital for Income Tax in the future. We'll set out the
+  // timeline for this at a later date." No date, so no obligation, so no threshold to be over.
+  //
+  // ⚠️ THIS IS NOT A NEW POSITION. lib/agent.ts already holds it and already acts on it:
+  // PARTNERSHIP_SUPPRESSED_SIGNALS carries 'mtd_mandation' and 'mtd_combined_trap' with the note
+  // that a partner's share "is NOT Making Tax Digital qualifying income". The agent was right and
+  // this file did not know, so on 3 August 2026 a 50% partner read "Making Tax Digital applies to
+  // you. Your income this year, £53,400 before costs, is over the £50,000 line" on /app/tax while his
+  // WhatsApp stayed correctly silent. TWO SURFACES, ONE FACT, TWO ANSWERS. And worse than either
+  // half alone: the £53,400 was the FIRM'S turnover, while his own share was £26,700.
+  //
+  // ⚠️ ONLY THE MANDATION TEST MOVES. A partner IS charged income tax and Class 4 on his share,
+  // so isPartnership deliberately does NOT join isCompany in the estimatedTax branch below. And his
+  // rent stays in the test for the same reason a director's does: rent on a personal return counts
+  // towards the line whatever else he runs.
+  const grossQualifying = round2((isCompany || isPartnership ? 0 : ytdTrade.income) + ytdProperty.income);
   const mtdApplies = mtdForIncomeTaxRequired(grossQualifying, mtdYearFor(startYear));
   const mtdThreshold = mtdThresholdFor(startYear);
 
@@ -367,6 +392,7 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
       cisSuffered: cisTotal(ytdTx),
       grossQualifyingIncome: grossQualifying,
       mtdApplies,
+      mtdExcluded: isCompany ? 'company' : isPartnership ? 'partnership' : null,
       mtdThreshold,
       estimatedTax,
     },
@@ -442,6 +468,12 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
   // about one fact argues wrong once.
   const mtdLine = isCompany
     ? `Making Tax Digital for Income Tax covers self employment and rent on a personal return, and your company's trade is neither: the company files its own return.`
+    // 🔴 AND A PARTNER NEEDS HIS OWN SENTENCE FOR THE SAME REASON THE DIRECTOR DOES. Without it
+    // he fell to the threshold branch and read "Your gross income so far this year is £0.00" on a
+    // document showing the firm's takings, because the test base is correctly zeroed for him. He is
+    // not under the line, he is outside the regime, and those are different facts.
+    : pack.ytd.mtdExcluded === 'partnership'
+      ? `Making Tax Digital for Income Tax has not reached partnerships yet. GOV.UK says it will in the future and that the timeline comes at a later date, so there is no quarterly update to make and no date to keep. Your share goes on your own Self Assessment return, and the partnership files its own alongside it.`
     : pack.ytd.mtdApplies
       ? `Your gross income so far this year (${gbp(pack.ytd.grossQualifyingIncome)}) is over the ${gbp(pack.ytd.mtdThreshold)} Making Tax Digital for Income Tax threshold for ${esc(pack.taxYear)}, so quarterly updates apply.`
       : `Your gross income so far this year is ${gbp(pack.ytd.grossQualifyingIncome)}. Making Tax Digital for Income Tax applies from £${FACTS.mtdThreshold2026.toLocaleString('en-GB')} gross (from April 2026), £${FACTS.mtdThreshold2027.toLocaleString('en-GB')} (April 2027), then £${FACTS.mtdThreshold2028.toLocaleString('en-GB')} (April 2028).`;

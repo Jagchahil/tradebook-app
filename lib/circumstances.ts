@@ -630,7 +630,15 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // capture him: `ask` is stored verbatim as the exhibit, and his trade income is not "self
     // employment". If property only mandation is ever surfaced for directors it gets a NEW key with
     // its own wording, never an edit to this one.
-    structures: ['sole_trader', 'partnership'],
+    // 🔴 NARROWED 3 AUGUST 2026. A PARTNER WAS BEING ASKED A QUESTION THAT IS NOT HIS.
+    // GOV.UK: "Partnerships will also need to use Making Tax Digital for Income Tax in the
+    // future. We'll set out the timeline for this at a later date." No date, so no obligation,
+    // so no threshold to be over, so nothing here to answer. lib/agent.ts already held this
+    // position (PARTNERSHIP_SUPPRESSED_SIGNALS) and lib/quarterpack.ts now does too.
+    // ⚠️ THE `ask` STRING IS UNTOUCHED. It is the stored exhibit and rewriting it would rewrite
+    // what we asked a man in 2026. This changes only WHO IS ASKED, so an answer already given
+    // stays exactly as given, which is the whole point of the log.
+    structures: ['sole_trader'],
   },
   {
     mtd: true,
@@ -646,7 +654,8 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // gate is unanswered, but a yes recorded before a man incorporated would release it: the
     // premise check reads his answers, not his structure. The question is as inapplicable to a
     // company as the gate itself, so it carries the same tag rather than relying on the gate's.
-    structures: ['sole_trader', 'partnership'],
+    // Same reason as mtd_mandated above: not a partner's question.
+    structures: ['sole_trader'],
     dependsOn: { key: 'mtd_mandated', answer: 'yes' },
   },
   {
@@ -666,7 +675,8 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // gate is unanswered, but a yes recorded before a man incorporated would release it: the
     // premise check reads his answers, not his structure. The question is as inapplicable to a
     // company as the gate itself, so it carries the same tag rather than relying on the gate's.
-    structures: ['sole_trader', 'partnership'],
+    // Same reason as mtd_mandated above: not a partner's question.
+    structures: ['sole_trader'],
     dependsOn: { key: 'mtd_mandated', answer: 'yes' },
   },
   {
@@ -687,7 +697,8 @@ export const CIRCUMSTANCES: Circumstance[] = [
     // gate is unanswered, but a yes recorded before a man incorporated would release it: the
     // premise check reads his answers, not his structure. The question is as inapplicable to a
     // company as the gate itself, so it carries the same tag rather than relying on the gate's.
-    structures: ['sole_trader', 'partnership'],
+    // Same reason as mtd_mandated above: not a partner's question.
+    structures: ['sole_trader'],
     dependsOn: { key: 'mtd_mandated', answer: 'yes' },
   },
   {

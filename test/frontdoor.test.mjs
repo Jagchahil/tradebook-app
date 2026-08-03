@@ -549,5 +549,50 @@ for (const f of BANNER_PAGES) {
     !/Making Tax Digital is now live/.test(read(f)));
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WE PROMISED DEADLINE REMINDERS THAT NO CHANNEL COULD SEND.
+//
+// /resources printed "Lekhio reminds you well before each, so you never do" directly above a
+// table of NINE penalty dates. /product and /file-your-tax-return both promised "on your
+// dashboard and by email". Every channel that could have delivered one was off: the reminder cron
+// bails on an unapproved template, Rakha's alerts route whatsapp_template and push (gated, and a
+// mobile app that is not in the stores), and the only email that exists carries no dates at all.
+//
+// ⚠️ THIS IS A WORSE CLASS OF LIE THAN ADVERTISING A FEATURE EARLY. A man reads it and stops
+// keeping his own calendar, and the failure mode is an automatic £100 penalty out of HIS pocket.
+//
+// The wordings now live in lib/features.ts next to remindersLive(), so the promise returns by
+// itself the day a channel can keep it, exactly as the filing and bank feed copy already does.
+//
+// ⚠️ SWEPT WITH codeOnly(), because the comments ON those pages quote the old promise to explain
+// why it went, and a checker that fires on its own explanation is how you end up "fixing" copy
+// that is already correct.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const REMINDER_PAGES = [
+    ['app/resources/page.tsx', /reminds you well before each/i],
+    ['app/product/page.tsx', /on your dashboard and by email/i],
+    ['app/file-your-tax-return/page.tsx', /we remind you well before it/i],
+  ];
+  for (const [file, promise] of REMINDER_PAGES) {
+    const code = codeOnly(read(file));
+    ok(`🔴 ${file} does not promise a reminder no channel can send`, !promise.test(code));
+    ok(`...and it asks lib/features for the wording instead of holding its own`,
+      /from '(\.\.\/)+lib\/features'/.test(code));
+  }
+
+  // ⚠️ BOTH WORDINGS MUST EXIST. The point of this file is that the launch copy is written NOW and
+  // gated, so nobody has to remember to write it on the day. A gate with only the honest half is
+  // a deletion wearing a flag's clothes.
+  const feat = read('lib/features.ts');
+  ok('lib/features.ts holds the HONEST wording, for today',
+    /kept ready inside your Lekhio/.test(feat));
+  ok('...and the PROMISE, ready for the day a channel can keep it',
+    /reminds you well before each/.test(feat) && /on your dashboard and by email/.test(feat));
+  ok('...behind one flag, named the same way as the others on that page',
+    /NEXT_PUBLIC_REMINDERS_LIVE/.test(feat) && /export function remindersLive/.test(feat));
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

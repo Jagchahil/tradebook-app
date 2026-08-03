@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter, SITE } from '../_shared/site';
+// 🔴 THE ANSWER PROMISED A REMINDER BY EMAIL. No channel could send one. lib/features.ts owns it.
+import { missedDeadlineAnswer } from '../../lib/features';
 
 export const metadata: Metadata = {
   title: 'How to file your own tax return. A free step by step guide for the self employed | Lekhio',
@@ -209,7 +211,7 @@ const faqs = [
   { q: 'What are payments on account?', a: 'If your tax bill is over £1,000, HMRC asks you to pay towards next year in advance, half on 31 January and half on 31 July. It catches first timers out, so set money aside. Lekhio gives you a running set aside figure.' },
   { q: 'When do I need to charge VAT?', a: 'Only once your turnover passes £90,000 in a 12 month period. Below that you do not register for VAT unless you choose to. Most sole traders are well under it.' },
   { q: 'What records do I need to keep?', a: 'Your sales and income, your business expenses with receipts, and your mileage if you claim it. Keep them for at least 5 years after the 31 January deadline. Lekhio stores all of this for you as you go.' },
-  { q: 'What if I miss the deadline?', a: 'You get an automatic £100 penalty the day after, even if you owe no tax. After 3 months daily penalties start, and interest is charged on tax paid late. That is exactly why we remind you well before it, on your dashboard and by email.' },
+  { q: 'What if I miss the deadline?', a: missedDeadlineAnswer() },
   { q: 'I am in construction and tax is taken off my pay. What then?', a: 'That is the Construction Industry Scheme, CIS. Contractors deduct tax from your pay at source. You still file a return, and that deducted tax comes off your final bill or is refunded to you. Keep your CIS statements.' },
   { q: 'Can I claim my van and fuel?', a: 'Yes. Either claim a share of your actual running costs, or use the flat mileage rate. For the 2026/27 tax year that rate is 55p a mile for the first 10,000 business miles, then 25p after that. HMRC raised it from 45p to 55p from 6 April 2026.' },
   { q: 'What is Making Tax Digital and does it affect me?', a: 'It is the biggest change to Self Assessment in years. From April 2026, if your turnover is over £50,000 you must keep digital records and send four short updates a year instead of one return. It reaches £30,000 turnover in 2027 and £20,000 in 2028, so it is coming for nearly everyone. Lekhio keeps the digital records both routes now expect.' },
@@ -608,7 +610,12 @@ export default function FileYourTaxReturnPage() {
         <div style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 22, padding: 36, textAlign: 'center', boxShadow: '0 14px 40px rgba(17,17,17,.06)' }}>
           <h2 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 12px' }}>Make the 15 minutes actually 15 minutes</h2>
           <p style={{ fontSize: 16.5, color: MUTED, lineHeight: 1.65, maxWidth: 520, margin: '0 auto 22px' }}>
-            Keep your records with Lekhio through the year. Snap a receipt, leave a voice note, or just type it. When the deadline comes, your numbers are already added up and ready, and we remind you well before it. Your first 7 days are free.
+            {/* ⚠️ THIS ALSO ENDED "and we remind you well before it", and it is the SECOND place on
+                this page that did. The FAQ one was found by reading; this one was found by the
+                sweep in test/frontdoor.test.mjs, which is the whole argument for having the sweep.
+                The first half of the sentence is true and stays: the numbers really are added up
+                and waiting. Only the promise nobody could keep has gone. */}
+            Keep your records with Lekhio through the year. Snap a receipt, leave a voice note, or just type it. When the deadline comes, your numbers are already added up and ready. Your first 7 days are free.
           </p>
           <Link href="/start" style={{ display: 'inline-block', backgroundColor: RIVER, color: 'var(--on-river)', fontSize: 16, fontWeight: 600, padding: '15px 32px', borderRadius: 12, textDecoration: 'none' }}>Start free for 7 days</Link>
         </div>

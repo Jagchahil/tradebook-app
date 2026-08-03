@@ -114,6 +114,8 @@ export async function POST(req: NextRequest) {
   let customerVat: 'yes' | 'no' | null = null;
   let customerCis: 'yes' | 'no' | null = null;
   let endUser: 'yes' | 'no' | null = null;
+  // 🔴 IS THIS JOB WITHIN CIS. A PER INVOICE FACT, and it used to be hardcoded true. See below.
+  let withinCis: 'yes' | 'no' | null = null;
   if (isForm) {
     const f = await req.formData().catch(() => null);
     if (!f) return back('problem=bad');
@@ -129,6 +131,7 @@ export async function POST(req: NextRequest) {
     customerVat = answer(f.get('customer_vat'));
     customerCis = answer(f.get('customer_cis'));
     endUser = answer(f.get('end_user'));
+    withinCis = answer(f.get('within_cis'));
   } else {
     let body: Record<string, unknown> = {};
     try {
@@ -149,6 +152,7 @@ export async function POST(req: NextRequest) {
     customerVat = answer(body.customer_vat);
     customerCis = answer(body.customer_cis);
     endUser = answer(body.end_user);
+    withinCis = answer(body.within_cis);
   }
 
   // ── His own row's status, said by him. Form posts from /app/invoice, never gated. ──────────
@@ -235,9 +239,28 @@ export async function POST(req: NextRequest) {
 
   // The three reverse charge facts are only ever PUT to a VAT registered CIS subcontractor. For
   // everybody else they are decided here, because for everybody else there is only one answer.
-  const asked: VatFormShape = profile.registered
-    ? (profile.cisSubcontractor ? 'rc' : 'rates')
-    : 'none';
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 EVERY VAT REGISTERED TRADER IS ASKED. IT USED TO DEPEND ON A FLAG NOTHING EVER SET.
+  //
+  // This read `profile.cisSubcontractor ? 'rc' : 'rates'`, and cis_subcontractor is `not null
+  // default false`, written by exactly ONE radio on /app/you/vat that nothing in the product ever
+  // pointed him at. So the commonest customer this product has, a VAT registered subcontractor
+  // billing a main contractor, was never asked and silently charged 20%.
+  //
+  // Proven on the live site on 2 August with a control: the same customer, the same work, the same
+  // day, only that answer moved. Yes gave £3,013.50 with no VAT and the s55A wording. No, which is
+  // what everybody has by default, gave £3,616.20 with £602.70 of VAT on it. That VAT is not his
+  // to charge under VATA 1994 s55A and his contractor cannot reclaim it.
+  //
+  // ⚠️ AND withinCis WAS HARDCODED TRUE below, which was the same mistake pointing the other way:
+  // a flagged subcontractor doing a NON CIS supply (plant hire without an operator, professional
+  // services, materials only) had the reverse charge applied to work it does not cover. Whether a
+  // JOB is within CIS is a fact about the job, so it is now asked about the job.
+  //
+  // The profile flag survives as what it always should have been: the DEFAULT on that radio, so a
+  // man who has told us he works under CIS does not answer the same thing every week.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const asked: VatFormShape = profile.registered ? 'rc' : 'none';
 
   let facts: Omit<ReverseChargeFacts, 'supplierRegistered'>;
   if (asked === 'rc') {
@@ -245,11 +268,18 @@ export async function POST(req: NextRequest) {
     // before he told us he was a CIS subcontractor, or a post made by hand, carries no answers,
     // and reading that silence as three noes would charge 20% on the one invoice in this product
     // that must carry none. Refused, and the fresh form asks him properly.
-    if (vatForm !== 'rc' || !customerVat || !customerCis || !endUser) {
+    // ⚠️ THE THREE CUSTOMER ANSWERS ARE ONLY REQUIRED WHEN THE JOB IS WITHIN CIS. Outside it they
+    // decide nothing, and demanding them would put three questions on every invoice a VAT
+    // registered trader sends for work the scheme has never covered. The within_cis answer itself
+    // is ALWAYS required, because its silence is the thing that caused this.
+    if (vatForm !== 'rc' || !withinCis) {
+      return isForm ? back('problem=vatasked') : NextResponse.json({ error: 'vat_answers_missing' }, { status: 400 });
+    }
+    if (withinCis === 'yes' && (!customerVat || !customerCis || !endUser)) {
       return isForm ? back('problem=vatasked') : NextResponse.json({ error: 'vat_answers_missing' }, { status: 400 });
     }
     facts = {
-      withinCis: true,
+      withinCis: withinCis === 'yes',
       customerVatRegistered: customerVat === 'yes',
       customerCisRegistered: customerCis === 'yes',
       customerIsEndUser: endUser === 'yes',

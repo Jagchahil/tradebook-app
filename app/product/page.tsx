@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import ClientScript from '../_shared/ClientScript';
-import { filingBadge, bankBadge } from '../../lib/features';
+// alertChannels: the email half of this was never true. See lib/features.ts remindersLive().
+import { filingBadge, bankBadge, alertChannels } from '../../lib/features';
 import Link from 'next/link';
 import OnboardingShow from './OnboardingShow';
 import {
@@ -335,7 +336,7 @@ export default function ProductPage() {
               <div className="hic"><Ic e="🛡️" color="var(--saffron-deep)" size={26} /></div>
               <h3>Rakha</h3>
               <div className="htag">Speaks before you ask</div>
-              <p>Rakha watches your numbers all year: the VAT threshold creeping closer, a State Pension year about to slip, the January bill quietly building. When something needs you, Rakha tells you first, on your dashboard and by email. It suggests, never acts. You decide everything.</p>
+              <p>Rakha watches your numbers all year: the VAT threshold creeping closer, a State Pension year about to slip, the January bill quietly building. When something needs you, Rakha tells you first, {alertChannels()}. It suggests, never acts. You decide everything.</p>
               <p className="hname">Rakha is Punjabi for guardian. Lekhio keeps your books. Rakha watches them.</p>
             </div>
           </div>

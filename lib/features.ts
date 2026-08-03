@@ -45,6 +45,56 @@ export function bankFeedLive(): boolean {
   return on(process.env.NEXT_PUBLIC_BANK_FEED_LIVE);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 PROACTIVE ALERTS. THE THING THAT REACHES HIM WHEN HE IS NOT LOOKING AT THE APP.
+//
+// FALSE until at least one channel can actually deliver one, and on 2 August 2026 not one could.
+// The reminder cron bails because T_NUDGE is unapproved and gated on REMINDER_TEMPLATES_APPROVED;
+// Rakha's own alerts route whatsapp_template and push, gated on AGENT_TEMPLATES_APPROVED and on a
+// mobile app that is not in the stores; and the only email that exists, sendWeeklyReadyEmail,
+// carries no figures and no dates by design.
+//
+// ⚠️ WHY THIS MATTERS MORE THAN THE OTHER FLAGS ON THIS PAGE. /resources was printing "Lekhio
+// reminds you well before each, so you never do" directly above a table of NINE penalty dates,
+// and /product and /file-your-tax-return both promised "on your dashboard and by email". A man
+// reads that and stops keeping his own calendar. The failure mode is an automatic £100 penalty
+// and it is HIS money, not ours. That is a worse class of lie than advertising a feature early.
+//
+// ⚠️ IT IS ITS OWN NEXT_PUBLIC FLAG RATHER THAN A READ OF THE TEMPLATE GATES, on purpose. The
+// template gates are server only, so a client component importing this file would silently get
+// false while the server got true, and the same sentence would render two ways. One flag, one
+// meaning, readable everywhere. Set it in the same breath as the template gates.
+//
+//   NEXT_PUBLIC_REMINDERS_LIVE = true   (the day a deadline alert can actually be delivered)
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function remindersLive(): boolean {
+  return on(process.env.NEXT_PUBLIC_REMINDERS_LIVE);
+}
+
+// The line under the key dates table on /resources. The "after" wording is the promise we intend
+// to keep; the "before" wording says the true and still useful thing, which is that the work for
+// each date is already done when the date arrives.
+export function keyDatesPromise(): string {
+  return remindersLive()
+    ? 'Miss one and HMRC charges a penalty. Lekhio reminds you well before each, so you never do.'
+    : 'Miss one and HMRC charges a penalty. Your figures for every one of these are kept ready inside your Lekhio, so when the date comes the work is already done.';
+}
+
+// How Rakha reaches him. The dashboard half was always true. The email half never was.
+export function alertChannels(): string {
+  return remindersLive()
+    ? 'on your dashboard and by email'
+    : 'on your dashboard, the next time you open it';
+}
+
+// The FAQ answer to "What if I miss the deadline?".
+export function missedDeadlineAnswer(): string {
+  const base = 'You get an automatic £100 penalty the day after, even if you owe no tax. After 3 months daily penalties start, and interest is charged on tax paid late.';
+  return remindersLive()
+    ? `${base} That is exactly why we remind you well before it, on your dashboard and by email.`
+    : `${base} That is exactly why your Lekhio keeps the date and the figure in front of you all year, so the deadline is never news.`;
+}
+
 // The store links, only ever rendered when appStoreLive() is true.
 export const APP_STORE_URL = process.env.NEXT_PUBLIC_APP_STORE_URL ?? '';
 export const PLAY_STORE_URL = process.env.NEXT_PUBLIC_PLAY_STORE_URL ?? '';

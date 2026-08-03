@@ -100,8 +100,18 @@ export default async function NewInvoicePage({
   const vatProfile = locked ? null : await readVatProfile(user.id);
   const vatUnknown = !locked && vatProfile === null;
   const registered = Boolean(vatProfile?.registered);
-  // The one man whose commonest invoice carries no VAT and has to say so.
-  const asksReverseCharge = registered && Boolean(vatProfile?.cisSubcontractor);
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 EVERY VAT REGISTERED TRADER IS ASKED. This read `registered && cisSubcontractor`, and that
+  // flag is `not null default false`, set by one radio on /app/you/vat that nothing pointed him
+  // at. So the commonest customer this product has never saw these questions and silently charged
+  // 20% on the one invoice that must carry none. Proven live on 2 August with a control: same
+  // customer, same work, same day, £3,013.50 against £3,616.20.
+  //
+  // The flag is now what it should always have been: the DEFAULT on the first question, so a man
+  // who has told us he works under CIS is not answering the same thing every week.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const asksReverseCharge = registered;
+  const cisByDefault = Boolean(vatProfile?.cisSubcontractor);
   // What the form put to him, sent with it. The route works out what it should have been and
   // refuses the mismatch rather than making an invoice out of questions nobody answered.
   const vatFormShape = registered ? (asksReverseCharge ? 'rc' : 'rates') : 'none';
@@ -231,8 +241,31 @@ export default async function NewInvoicePage({
                 <legend style={S.label}>About your customer</legend>
                 <p style={S.fieldNote}>
                   On construction work for a contractor you often charge no VAT at all. He pays it
-                  to HMRC himself. These three answers decide it, and the man who gave you the job
+                  to HMRC himself. These answers decide it, and the man who gave you the job
                   will know them.
+                </p>
+                {/* ⚠️ ASKED ABOUT THE JOB, NOT ABOUT HIM, and it used to be neither: withinCis was
+                    hardcoded true in the route. A sparky who wires a house one week and hires out
+                    a cherry picker the next has one job inside the scheme and one outside it. */}
+                <fieldset style={S.ask}>
+                  <legend style={S.askQ}>Is this job construction work reported under CIS?</legend>
+                  <span style={S.askWhy}>
+                    Building, plumbing, sparks, groundwork and the rest of it, done for a
+                    contractor rather than for a householder. Say no for anything else, including
+                    plant you hired out without an operator.
+                  </span>
+                  <span style={S.askRow}>
+                    <label style={S.pick}>
+                      <input type="radio" name="within_cis" value="yes" defaultChecked={cisByDefault} required /> Yes
+                    </label>
+                    <label style={S.pick}>
+                      <input type="radio" name="within_cis" value="no" defaultChecked={!cisByDefault} required /> No
+                    </label>
+                  </span>
+                </fieldset>
+                <p style={S.fieldNote}>
+                  If it is, these three decide the rest. If it is not, you charge VAT the normal
+                  way and they are ignored.
                 </p>
                 <p style={S.fieldNote}>
                   Yes, yes and no is the reverse charge. {rcVerdict.because} Any other set of
@@ -264,10 +297,13 @@ export default async function NewInvoicePage({
                     <span style={S.askWhy}>{ask.why}</span>
                     <span style={S.askRow}>
                       <label style={S.pick}>
-                        <input type="radio" name={ask.name} value="yes" required /> Yes
+                        {/* ⚠️ NOT `required`. The route demands these ONLY when the job is within
+                            CIS, because outside it they decide nothing. Marking them required here
+                            would block a VAT registered trader from invoicing ordinary work. */}
+                        <input type="radio" name={ask.name} value="yes" /> Yes
                       </label>
                       <label style={S.pick}>
-                        <input type="radio" name={ask.name} value="no" required /> No
+                        <input type="radio" name={ask.name} value="no" /> No
                       </label>
                     </span>
                   </fieldset>

@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { TRADES } from '../../lib/trades';
 import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter, Ic } from '../_shared/site';
+// 🔴 THIS PAGE PROMISED A REMINDER NO CHANNEL COULD SEND, above a table of nine penalty dates.
+// lib/features.ts owns both wordings so the promise returns the day it becomes true.
+import { keyDatesPromise } from '../../lib/features';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/resources' },
@@ -119,7 +122,7 @@ export default function ResourcesPage() {
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <span style={{ display: 'inline-block', backgroundColor: 'var(--panel)', border: `1px solid ${LINE}`, color: RIVER_DEEP, fontSize: 12, fontWeight: 700, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>KEY DATES</span>
             <h2 style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.6px', margin: '0 0 10px' }}>The tax dates that matter, 2026 to 2027.</h2>
-            <p style={{ fontSize: 16, color: MUTED, maxWidth: 540, margin: '0 auto' }}>Miss one and HMRC charges a penalty. Lekhio reminds you well before each, so you never do.</p>
+            <p style={{ fontSize: 16, color: MUTED, maxWidth: 540, margin: '0 auto' }}>{keyDatesPromise()}</p>
           </div>
           <div style={{ background: PAPER, border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
             {dates.map((d, i) => (

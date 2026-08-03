@@ -673,11 +673,33 @@ ok('🔴 THE ROUTE WORKS OUT NO VAT OF ITS OWN: no rate, no gross up, anywhere i
 ok('🔴 the rate is validated with isVatRateKey and read at its own row\'s index',
   /const rateRaw = \(rates\[i\] \?\? ''\)\.trim\(\);/.test(routeInvoices)
   && /isVatRateKey\(rateRaw\) \? rateRaw : 'standard'/.test(routeInvoices));
-ok('🔴 the three reverse charge answers are only ever asked of a registered CIS subcontractor',
-  /profile\.registered\s*\n?\s*\? \(profile\.cisSubcontractor \? 'rc' : 'rates'\)/.test(routeInvoices));
-ok('🔴 and silence is refused, never read as three noes',
-  /vatForm !== 'rc' \|\| !customerVat \|\| !customerCis \|\| !endUser/.test(routeInvoices)
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS GUARD USED TO PIN THE DEFECT, AND IT WAS RIGHT ABOUT THE OLD DESIGN.
+//
+// It asserted the questions were "only ever asked of a registered CIS subcontractor", which was
+// the intent: ask nobody a question that decides nothing for him. But cis_subcontractor is
+// `not null default false` and was written by ONE radio on /app/you/vat that nothing in the
+// product ever pointed him at, so the commonest customer this product has was never asked and
+// silently charged 20% on the one invoice that must carry none. Proven live on 2 August with a
+// control: same customer, same work, same day, £3,013.50 against £3,616.20.
+//
+// So the guard now says the TRUE thing rather than being deleted: every VAT registered trader is
+// asked, and the profile flag is demoted to the DEFAULT on the answer.
+// ⚠️ THE SAFETY PROPERTY UNDERNEATH IS UNCHANGED AND IS ASSERTED BELOW: silence is still refused,
+// never read as a no. It is just a different silence now.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+ok('🔴 EVERY VAT REGISTERED TRADER IS ASKED, not only one carrying a flag nothing ever set',
+  /const asked: VatFormShape = profile\.registered \? 'rc' : 'none';/.test(routeInvoices)
+  // ⚠️ codeOnly. The COMMENT above that line quotes the old expression to explain why it went,
+  // and the first draft of this assertion fired on that comment. Fifth time on this project.
+  && !/profile\.cisSubcontractor \? 'rc'/.test(codeOnly(routeInvoices)));
+ok('🔴 and silence is still refused, never read as a no',
+  /vatForm !== 'rc' \|\| !withinCis/.test(routeInvoices)
+  && /withinCis === 'yes' && \(!customerVat \|\| !customerCis \|\| !endUser\)/.test(routeInvoices)
   && /problem=vatasked/.test(routeInvoices));
+ok('🔴 AND WHETHER THE JOB IS WITHIN CIS IS ASKED, not hardcoded true as it was',
+  /withinCis: withinCis === 'yes'/.test(routeInvoices)
+  && !/withinCis: true/.test(codeOnly(routeInvoices)));
 ok('the priced figures are handed to createInvoice whole, none of them reworked',
   /treatment: priced\.treatment/.test(routeInvoices) && /tax: priced\.vat/.test(routeInvoices)
   && /total: priced\.total/.test(routeInvoices)
@@ -705,17 +727,24 @@ ok('🔴 the rate picker is a plain server rendered select, not a live widget',
   && /name="rate"/.test(pageNew) && /defaultValue="standard"/.test(pageNew));
 ok('its labels come from lib/vat rateLabel, so they cannot drift from the arithmetic',
   /rateLabel\(key\)/.test(pageNew) && !/'20%'|"20%"/.test(pageNew));
-ok('🔴 the three questions are drawn only for a VAT registered CIS subcontractor',
-  /const asksReverseCharge = registered && Boolean\(vatProfile\?\.cisSubcontractor\)/.test(pageNew)
+ok('🔴 the questions are drawn for EVERY VAT registered trader, not only a flagged one',
+  /const asksReverseCharge = registered;/.test(pageNew)
   && /\{asksReverseCharge \? \(/.test(pageNew));
+ok('...and the profile flag survives only as the DEFAULT on the within CIS answer',
+  /const cisByDefault = Boolean\(vatProfile\?\.cisSubcontractor\)/.test(pageNew)
+  && /defaultChecked=\{cisByDefault\}/.test(pageNew));
 ok('they are the three the law turns on, in a man\'s own words',
   /Is your customer VAT registered\?/.test(pageNew)
   && /Is he registered for CIS\?/.test(pageNew)
   && /Has he told you in writing that he is the end user\?/.test(pageNew));
-ok('each one takes yes or no and neither can be left unsaid',
-  (pageNew.match(/name: '(customer_vat|customer_cis|end_user)'/g) || []).length === 3
-  && (pageNew.match(/type="radio"/g) || []).length === 2
-  && /value="yes" required/.test(pageNew) && /value="no" required/.test(pageNew));
+// ⚠️ THE WITHIN CIS ANSWER IS REQUIRED BY THE BROWSER. The three customer ones deliberately are
+// NOT, because the route demands them only when the job is within CIS, and marking them required
+// here would block a VAT registered trader from invoicing ordinary non construction work at all.
+ok('the within CIS answer cannot be left unsaid',
+  /name="within_cis" value="yes" defaultChecked=\{cisByDefault\} required/.test(pageNew)
+  && /name="within_cis" value="no" defaultChecked=\{!cisByDefault\} required/.test(pageNew));
+ok('the three customer questions are still the three the law turns on',
+  (pageNew.match(/name: '(customer_vat|customer_cis|end_user)'/g) || []).length === 3);
 ok('the outcome is explained in lib/vat\'s own words, not a second copy of the rule',
   /reverseChargeApplies\(\{/.test(pageNew) && /\{rcVerdict\.because\}/.test(pageNew));
 ok('🔴 a failed VAT read draws NO FORM, rather than one that would make the wrong invoice',

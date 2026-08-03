@@ -582,6 +582,36 @@ for (const f of BANNER_PAGES) {
       /from '(\.\.\/)+lib\/features'/.test(code));
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND NOW THE WHOLE PUBLIC SITE, BECAUSE THREE NAMED PAGES WAS NOT ENOUGH.
+  //
+  // The first version of this guard checked three files for three exact phrases. A walk on
+  // 3 August then found FOUR MORE, and the worst two were not on feature pages at all: they
+  // were the inducement on an EMAIL CAPTURE. "Pop your email in for MTD deadline reminders"
+  // on the free invoice generator, and "Get the claim answers, plus your tax reminders" on
+  // /can-i-claim. lib/nurture.ts ships dark, and switched on it is two emails, neither keyed
+  // to a deadline. He was handing over his address for a thing that does not exist.
+  //
+  // So this sweeps every public page for the CLAIM rather than for three sentences.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const CLAIMS_A_REMINDER = /(we|lekhio)\s+(will\s+)?remind|deadline reminders|tax reminders|get the reminders/i;
+  // ⚠️ ONE ALLOWED, AND IT IS ALLOWED BECAUSE IT IS TRUE. app/terms says "We will remind you
+  // before the trial ends", and trial_ending routes to ['whatsapp_template','email'] in
+  // lib/routing.ts, with the email arm verified by a real email arriving on 30 July. A guard
+  // that refused a true sentence would teach the next person to widen the guard, not the copy.
+  const TRUE_REMINDER = ['app/terms/page.tsx'];
+  const publicPages = pages
+    .map(rel)
+    .filter((f) => !f.startsWith('app/app/') && !f.startsWith('app/api/'))
+    .filter((f) => !TRUE_REMINDER.includes(f));
+  const offenders = publicPages.filter((f) => CLAIMS_A_REMINDER.test(codeOnly(read(f))));
+  ok(`🔴 NO PUBLIC PAGE PROMISES A REMINDER WE CANNOT SEND${offenders.length ? ': ' + offenders.join(', ') : ''}`,
+    offenders.length === 0);
+  ok('⚠️ and the one that DOES promise it still says so, because the trial reminder is real',
+    /We will remind you before the trial ends/.test(read('app/terms/page.tsx')));
+  ok('the email capture clause is gated too, not just the page copy',
+    /export function nudgeClause/.test(read('lib/features.ts')));
+
   // ⚠️ BOTH WORDINGS MUST EXIST. The point of this file is that the launch copy is written NOW and
   // gated, so nobody has to remember to write it on the day. A gate with only the honest half is
   // a deletion wearing a flag's clothes.
@@ -592,6 +622,53 @@ for (const f of BANNER_PAGES) {
     /reminds you well before each/.test(feat) && /on your dashboard and by email/.test(feat));
   ok('...behind one flag, named the same way as the others on that page',
     /NEXT_PUBLIC_REMINDERS_LIVE/.test(feat) && /export function remindersLive/.test(feat));
+
+  // \ud83d\udd34 THE EIGHTH ONE, AND IT IS WHY THIS SWEEP GREW A SECOND SHAPE.
+  //
+  // The sweep above hunts the reminder claim AS PROSE, and it found seven. It could never have
+  // found the eighth, because the eighth is a three word cell in the "replaces a whole shelf of
+  // subscriptions" table: "Diary and reminders". The promise is made by the "All of it, in Lekhio"
+  // heading over the table, not by the cell's own grammar. A sweep looks for the shape of a lie,
+  // and a lie can change shape.
+  ok('\ud83d\udd34 NO SUBSCRIPTION TABLE SELLS THE REMINDERS EITHER, in either of the two tables',
+    !/label: 'Diary and reminders'/.test(codeOnly(read('app/_shared/site.tsx')))
+    && !/label: 'Diary and reminders'/.test(codeOnly(read('app/pricing/page.tsx'))));
+  ok('...both rows ask the same helper, so the two tables cannot drift apart',
+    /label: diaryRowLabel\(\)/.test(read('app/_shared/site.tsx'))
+    && /label: diaryRowLabel\(\)/.test(read('app/pricing/page.tsx')));
+  ok('...and it holds BOTH wordings, like every other gate on that page',
+    /'Diary and reminders' : 'Jobs diary'/.test(feat));
+}
+
+// ---------------------------------------------------------------------------------------------
+// \ud83d\udd34 THE STATUTORY COMPANY PARTICULARS. AN OFFENCE IF THEY ARE NOT THERE.
+// ---------------------------------------------------------------------------------------------
+// SI 2015/17 reg 24(2) requires the registered name on a company's websites, and reg 25 requires
+// the part of the UK where it is registered, the registered number, and the registered office
+// address. reg 28 makes failure an offence by the company and by every officer in default.
+//
+// The footer carried "© 2026 Lekhio" and none of the four. This test exists because docs/81 had
+// already logged the job, as a note that said to do it "when the company is incorporated", and the
+// company was incorporated on 8 July 2026 and the note went stale. A note goes stale. A test does
+// not.
+{
+  const site = read('app/_shared/site.tsx');
+  ok('\ud83d\udd34 THE REGISTERED NAME IS DISCLOSED (reg 24(2))', /name: 'Lekhio Ltd'/.test(site));
+  ok('\ud83d\udd34 THE REGISTERED NUMBER IS DISCLOSED (reg 25)', /number: '17329341'/.test(site));
+  ok('\ud83d\udd34 THE PART OF THE UK IS DISCLOSED (reg 25)', /jurisdiction: 'England and Wales'/.test(site));
+  ok('\ud83d\udd34 THE REGISTERED OFFICE IS DISCLOSED (reg 25)', /office: '[^']*E11 4QW'/.test(site));
+  ok('...and the footer actually renders all four, not just declares them',
+    /COMPANY\.name\} is a company registered in \{COMPANY\.jurisdiction\}/.test(site)
+    && /company number \{COMPANY\.number\}/.test(site)
+    && /Registered office: \{COMPANY\.office\}/.test(site));
+  ok('...the copyright line carries the REGISTERED name, not the trading one',
+    /© 2026 \{COMPANY\.name\}/.test(site) && !/© 2026 Lekhio</.test(site));
+  // codeOnly, because the doctrine comment beside the constant cites the Companies House URL the
+  // number was verified against, and that citation is worth keeping. Third time today a guard has
+  // fired on a comment quoting the thing it polices: the rule is now simply that ANY assertion
+  // about source content runs on codeOnly(), positive or negative.
+  ok('\u26a0\ufe0f and the particulars are written ONCE: a second copy is a second thing to forget',
+    (codeOnly(site).match(/17329341/g) || []).length === 1);
 }
 
 console.log(`\n  ${pass} passed, ${fail} failed`);

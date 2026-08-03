@@ -6,6 +6,7 @@ import {
   SharedHead, SiteNav, SiteFooter, StickyCta,
   Ic,
  MtdBanner,} from '../_shared/site';
+import { diaryRowLabel } from '../../lib/features';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/pricing' },
@@ -19,7 +20,9 @@ const STACK = [
   { e: '🧾', label: 'Invoicing tool', cost: '£10 to £25' },
   { e: '🚗', label: 'Mileage tracker', cost: '£5 to £10' },
   { e: '🧮', label: 'Tax software', cost: '£10 to £20' },
-  { e: '🗓️', label: 'Diary and reminders', cost: '£5 to £15' },
+  // The same claim as app/_shared/site.tsx's `replaces` row, and it had the same problem. One
+  // helper so the two tables cannot drift, and so both flip on the same env var.
+  { e: '🗓️', label: diaryRowLabel(), cost: '£5 to £15' },
   { e: '🧑‍💼', label: 'Accountant fees', cost: '£20 to £60' },
 ];
 

@@ -95,6 +95,40 @@ export function missedDeadlineAnswer(): string {
     : `${base} That is exactly why your Lekhio keeps the date and the figure in front of you all year, so the deadline is never news.`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ THE CLAUSE ON AN EMAIL CAPTURE THAT PROMISES DEADLINE NUDGES. EMPTY UNTIL ONE CAN BE SENT.
+//
+// Three lead captures offered "MTD deadline reminders", "your tax reminders" and "the odd
+// genuinely useful nudge about deadlines" IN EXCHANGE FOR AN EMAIL ADDRESS, and the confirm email
+// repeated it in its own subject line. None of it was sent: lib/nurture.ts ships dark behind
+// NURTURE_ENABLED, and even switched on it is TWO emails, neither of them keyed to a deadline.
+//
+// 🔴 THAT IS A WORSE PLACE FOR THIS LIE THAN A FEATURE PAGE. It is the inducement. He hands over
+// his address because of the sentence, so the sentence is the consideration for the exchange.
+//
+// ⚠️ WHAT IS ACTUALLY DELIVERED STAYS PROMISED, because it is real: app/api/lead confirms the
+// address and sendLeadResultEmail fires on confirm with the result he asked for.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function nudgeClause(): string {
+  return remindersLive() ? ' Then the odd genuinely useful nudge about deadlines and money you could claim back.' : '';
+}
+
+// 🔴 THE ROW IN THE "REPLACES A WHOLE SHELF OF SUBSCRIPTIONS" TABLE. THE EIGHTH ONE.
+//
+// The table lists what a man pays for today and prints "All of it, in Lekhio, for £12.99 a month"
+// underneath, so every label in it is a claim about what Lekhio does. One row read "Diary and
+// reminders". The jobs diary is real and shipped. The reminders are not, and the whole point of
+// remindersLive() is that we do not sell one until it can be delivered.
+//
+// ⚠️ IT SURVIVED THE FIRST SWEEP BECAUSE IT IS NOT A SENTENCE. The 2 August pass searched every
+// public page for the reminder CLAIM as prose (/we|lekhio\s+will\s+remind/ and friends) and found
+// seven. A table cell of three words matches none of that, and the promise it makes is made by the
+// heading above it rather than by its own grammar. Sweeps look for the shape of a lie, and a lie
+// can change shape.
+export function diaryRowLabel(): string {
+  return remindersLive() ? 'Diary and reminders' : 'Jobs diary';
+}
+
 // The store links, only ever rendered when appStoreLive() is true.
 export const APP_STORE_URL = process.env.NEXT_PUBLIC_APP_STORE_URL ?? '';
 export const PLAY_STORE_URL = process.env.NEXT_PUBLIC_PLAY_STORE_URL ?? '';

@@ -5,7 +5,7 @@
 // behaviour is injected as an idempotent inline script by <SharedHead />.
 import Link from 'next/link';
 import ClientScript from './ClientScript';
-import { filingFaqAnswer, filingMark, bankMark, hmrcFilingLive, bankFeedLive } from '../../lib/features';
+import { filingFaqAnswer, filingMark, bankMark, hmrcFilingLive, bankFeedLive, diaryRowLabel } from '../../lib/features';
 import type { CSSProperties } from 'react';
 import { TRADES } from '../../lib/trades';
 import { A11Y_CSS, THEME_CSS, THEME_SWAP_JS } from '../../lib/tokens';
@@ -450,10 +450,48 @@ export const included = [
   'Records exported any time, and cancel in one tap',
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE COMPANY PARTICULARS. NOT DECORATION. A STATUTORY DISCLOSURE THAT WAS MISSING.
+//
+// The Company, Limited Liability Partnership and Business (Names and Trading Disclosures)
+// Regulations 2015, SI 2015/17:
+//
+//   reg 24(2)  "Every company shall disclose its registered name on its websites."
+//   reg 25     and on its websites also: the part of the United Kingdom in which the company is
+//              registered, the company's registered number, and the address of its registered
+//              office.
+//   reg 28     failure without reasonable excuse is an offence committed by the company AND by
+//              every officer of it who is in default. Level 3 fine, plus a daily default fine for
+//              as long as it continues.
+//
+// 🔴 THE FOOTER SAID "© 2026 Lekhio" AND NOTHING ELSE. Not the registered name, not the number,
+// not the jurisdiction, not the office. LEKHIO LTD was incorporated on 8 July 2026, so the duty had
+// been live for four weeks on a site that takes card payments and is indexed.
+//
+// ⚠️ AND IT WAS ALREADY WRITTEN DOWN AS A THING TO DO. docs/81 logged the footer for reconciliation
+// "when the company is incorporated". That condition was met and the note went stale instead of
+// being actioned, which is the failure mode a to-do list has and a test does not. Hence
+// test/frontdoor.test.mjs now holds the footer to all four particulars.
+//
+// ⚠️ VERIFIED AGAINST THE REGISTER ON 3 AUGUST 2026, never typed from memory:
+// find-and-update.company-information.service.gov.uk/company/17329341
+//
+// ⚠️ IF THE REGISTERED OFFICE MOVES, THIS MOVES THE SAME DAY. A stale statutory disclosure is the
+// same offence as a missing one, and this is the only place it is written.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const COMPANY = {
+  name: 'Lekhio Ltd',
+  number: '17329341',
+  jurisdiction: 'England and Wales',
+  office: '52 Harrington Road, London, E11 4QW',
+} as const;
+
 export const replaces = [
   { icon: '📒', label: 'Bookkeeping app', cost: '£10 to £20' },
   { icon: '🧾', label: 'Invoicing tool', cost: '£10 to £25' },
-  { icon: '🗓️', label: 'Diary and reminders', cost: '£5 to £15' },
+  // See diaryRowLabel() in lib/features.ts: the reminders half is not live and this table says
+  // "All of it, in Lekhio" underneath itself.
+  { icon: '🗓️', label: diaryRowLabel(), cost: '£5 to £15' },
   { icon: '🧮', label: 'Tax software', cost: '£10 to £20' },
   { icon: '🚗', label: 'Mileage tracker', cost: '£5 to £10' },
   { icon: '🧑‍💼', label: 'Accountant fees', cost: '£20 to £60' },
@@ -1068,7 +1106,14 @@ export function SiteFooter() {
           </div>
           {/* The team link used to be here, at 13px grey, and it was invisible. It lives in the
               Company column above now, where a person would actually look for it. */}
-          <div style={{ fontSize: 13, color: '#8A93A0' }}>© 2026 Lekhio</div>
+          <div style={{ fontSize: 13, color: '#8A93A0' }}>© 2026 {COMPANY.name}</div>
+        </div>
+        {/* The statutory particulars, on their own row so they are never squeezed out by the
+            sentence above them. Plain text, not a link: reg 25 wants them disclosed, and a
+            disclosure a reader has to click for is not one. */}
+        <div style={{ borderTop: '1px solid #2C2C2C', marginTop: 20, paddingTop: 18, fontSize: 12.5, color: '#7A828E', lineHeight: 1.7 }}>
+          {COMPANY.name} is a company registered in {COMPANY.jurisdiction}, company number {COMPANY.number}.
+          {' '}Registered office: {COMPANY.office}.
         </div>
       </div>
     </footer>

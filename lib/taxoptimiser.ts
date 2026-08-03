@@ -11,7 +11,10 @@
 // classed irreversible, so applyDial can never auto-execute it, only draft it
 // for the user's yes. Timing and tax-treatment guidance only. You decide.
 
-import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly, marriageAllowance } from './taxengine';
+import {
+  FACTS, soleTraderTax, homeOfficeFlatRateMonthly, marriageAllowance,
+  projectionFactor, DAYS_IN_TAX_YEAR,
+} from './taxengine';
 // The property engine, doc 82 section 4. There is ONE place that knows how the £1,000 property
 // allowance stands against actual costs, and it is lib/propertyengine.ts (verified against the
 // HMRC technical note of 26 November 2025, see its header). The lever below asks it and repeats
@@ -283,45 +286,21 @@ function capitalAllowanceOf(input: OptimiserInput): number {
 // letter from HMRC, two years later.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-// 6 April to 5 April. A leap day falls inside one year in four and makes it 366, which moves a
-// projection by 0.27%. That is noise against the 29% this constant exists to stop, and a second
-// field to carry it would be a fact for every caller to get right again.
-const DAYS_IN_TAX_YEAR = 365;
-
-// ═══════════════════════════════════════════════════════════════════════════════════════════
-// 🔴 THE PROJECTION FACTOR, IN ONE PLACE, BECAUSE IT WAS IN TWO AND BOTH WERE WRONG.
+// 🔴 THE PROJECTION FACTOR NOW LIVES IN lib/taxengine.ts, AND IT MOVED FOR A REASON.
 //
-// It used to read `12 / monthsElapsed`, inline, in taxPosition AND in findOptimisations. And
-// monthsElapsed is floor(days / 30.44), so the numerator was real money over real DAYS and the
-// denominator asserted whole 30.44 day MONTHS. On 2 August 2026 that divided 118 days of money by
-// 91.3, and the live account read "put by for tax £25,793" against a true figure near £17,100.
-// He was being told to tie up £8,700 he did not owe, on the number printed in the largest type in
-// this product.
+// It was defined here, and lib/elections.ts held a THIRD copy of the same arithmetic as
+// `12 / months`. Importing this file to fix that would have dragged the whole engine, and its six
+// dependencies, into every test that stages elections. taxengine.ts imports NOTHING, both files
+// already import it, so the one definition sits at the leaf where anything can reach it.
 //
-// ⚠️ AND IT WAS A STEP FUNCTION, so the same books re-priced themselves overnight: £25,793 on the
-// 5th of August and £16,228 on the 6th, with nothing changed. At the other end floor(364/30.44)
-// is 11, so the divisor NEVER reached 12 and a FINISHED year was still inflated by 9.09%.
-//
-// 🔴 lib/agent.ts:268 projectAnnual() had divided by DAYS all along, so two projections in one
-// codebase disagreed by £21,244 for the same man on the same day, and the app headline was the
-// wrong one. Anything that projects reads this function now.
-//
-// monthsElapsed survives, and only as the CONFIDENCE GATE it always should have been: three
-// months of real figures before we are willing to call anything a year. It is not a divisor.
-//
-// ⚠️ A DAY COUNT WE CANNOT USE MEANS WE DO NOT PROJECT, rather than that we guess. canProject
-// goes out false, every surface says so, and he sees an honest year to date figure. That is a
-// smaller failure than multiplying his money by a number we do not trust.
-// ═══════════════════════════════════════════════════════════════════════════════════════════
-export function projectionFactor(input: OptimiserInput): { canProject: boolean; factor: number } {
-  const rawDays = Math.floor(Number(input.daysElapsed));
-  // Clamped at the length of the year, so a clock that is ahead of itself can never project DOWN.
-  const usableDays = Number.isFinite(rawDays) && rawDays > 0
-    ? Math.min(DAYS_IN_TAX_YEAR, rawDays)
-    : 0;
-  const canProject = input.monthsElapsed >= 3 && usableDays > 0;
-  return { canProject, factor: canProject ? DAYS_IN_TAX_YEAR / usableDays : 1 };
-}
+// ⚠️ RE-EXPORTED, not moved away. app/app/pay-yourself/plan.ts and four test suites import
+// projectionFactor FROM HERE, and a move that renames an import path is a change to files that had
+// no reason to change.
+// ⚠️ ONE `from './taxengine'` IN THIS FILE, ON PURPOSE. Six test suites stage these modules
+// into a temp directory and rewrite the extensionless import with String.replace and NO /g flag, so
+// a second `from './taxengine'` anywhere in the file is silently left unrewritten and the suite dies
+// on ERR_MODULE_NOT_FOUND. The re-export therefore carries no `from` of its own.
+export { projectionFactor, DAYS_IN_TAX_YEAR };
 
 export function projectedTradeNetOf(input: OptimiserInput, factor: number): number {
   const projected = input.tradingAllowanceElected

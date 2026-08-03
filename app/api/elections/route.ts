@@ -111,7 +111,7 @@ export async function GET(req: NextRequest) {
   let choice = null;
   if (key === 'trading_allowance' && !refusal) {
     const oi = await getOptimiserInput(user.id).catch(() => null);
-    if (oi) choice = tradingAllowanceChoice(oi.ytdTradeIncome, oi.ytdTradeExpenses, oi.monthsElapsed);
+    if (oi) choice = tradingAllowanceChoice(oi.ytdTradeIncome, oi.ytdTradeExpenses, oi);
   }
 
   return NextResponse.json({
@@ -238,7 +238,9 @@ export async function POST(req: NextRequest) {
     // CHOSEN THE WORSE OF THE TWO. tradingAllowanceConfirmation() says so plainly rather than
     // congratulating him, because it is still his choice and he can take it off in one press.
     const oi = await getOptimiserInput(user.id).catch(() => null);
-    const choice = tradingAllowanceChoice(oi?.ytdTradeIncome ?? 0, oi?.ytdTradeExpenses ?? 0, oi?.monthsElapsed ?? 0);
+    const choice = // No optimiser input is no horizon, and no horizon must read as 'not enough year yet' rather
+    // than as a full one. Zeroes on both fields put projectionFactor on its canProject === false arm.
+    tradingAllowanceChoice(oi?.ytdTradeIncome ?? 0, oi?.ytdTradeExpenses ?? 0, oi ?? { monthsElapsed: 0, daysElapsed: 0 });
     return isForm
       ? back('done=elected&key=trading_allowance')
       : NextResponse.json({ ok: true, startYear, key, choice, message: tradingAllowanceConfirmation(choice) });

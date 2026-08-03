@@ -407,6 +407,15 @@ console.log('\n=== 🔴 HIS RENT WAS MISSING FROM THE INCOME THAT DECIDES HIS RA
       // scaled by the same number the trade is, or the two functions describe different men.
       const half = { ...withRent, monthsElapsed: 6, daysElapsed: 184 };
       const f = O.projectionFactor(half).factor;
+      // 🔴 THE CLAMP, PINNED. A sabotage pass on 3 August removed Math.min(365, days) and NO
+      // suite noticed. Without it a clock that is ahead of itself, a bad row, or a year rolled over
+      // gives a factor BELOW 1 and projects a man's year DOWNWARDS from money he has already made.
+      // The floor is the more obvious half and it was already covered; this is the other end.
+      if (O.projectionFactor({ monthsElapsed: 12, daysElapsed: 400 }).factor !== 1) return false;
+      if (O.projectionFactor({ monthsElapsed: 12, daysElapsed: 365 }).factor !== 1) return false;
+      // And a day count we cannot use means we do not project, rather than that we guess.
+      if (O.projectionFactor({ monthsElapsed: 6, daysElapsed: 0 }).canProject !== false) return false;
+      if (O.projectionFactor({ monthsElapsed: 6, daysElapsed: NaN }).canProject !== false) return false;
       const projected = O.taxPosition(half).totalIncome;
       return Math.round(projected) === Math.round((30000 + 35000) * f)
         && find(O.findOptimisations(half), 'aia_timing').estSaving === 10000 * O.marginalRate(projected);

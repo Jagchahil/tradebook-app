@@ -63,7 +63,8 @@
 // PURE. No I/O, no clock of its own. Every rate comes from lib/taxengine.ts, which is watched
 // nightly by khoji/diff.mjs against GOV.UK. Not one number is written down in this file.
 
-import { homeOfficeFlatRateMonthly, FACTS } from './taxengine';
+import { homeOfficeFlatRateMonthly, FACTS, projectionFactor } from './taxengine';
+
 import { gbp0 } from './money';
 
 // The elections this file knows about. A named union rather than a free string, so a caller cannot
@@ -432,20 +433,40 @@ export interface TradingAllowanceChoice {
 // ⚠️ monthsElapsed IS REQUIRED, not optional with a default. A default of 12 would quietly tell
 // every caller that has not thought about it that the year is over, and a default of 0 would make
 // every answer 'too_early'. Both are a guess wearing an answer's clothes, so the caller has to say.
+//
+// ══════════════════════════════════════════════════
+// 🔴 AND IT HELD THE THIRD COPY OF A DIVISOR THAT WAS FIXED ON 3 AUGUST 2026.
+//
+// This projected costs with `costs * (12 / months)`, WHOLE MONTHS, and the comment beside it
+// claimed "the same 12/months factor taxPosition and the ledger use, so the pace shown here can
+// never disagree with the pace shown there". THAT STOPPED BEING TRUE the morning taxPosition moved
+// to a DAY based factor: 119 days of real money divided by 3 whole months overstates a year by
+// about a third, and drops by a third again at every month tick.
+//
+// ⚠️ IT SURVIVED THAT FIX BECAUSE tsc COULD ONLY NAME WHAT IT COULD SEE. Making daysElapsed
+// required on OptimiserInput named every caller of taxPosition. This function does not take an
+// OptimiserInput, it takes loose numbers, so it kept its own arithmetic AND its own comment
+// asserting a parity that had quietly ended. A copy is only found by the thing that names copies.
+//
+// 🔴 WHAT IT COST A MAN. On 3 August a partner with 605 pounds of costs was told his year was
+// heading for 2,420 when the engine says 1,856, and that figure is the ONLY thing weighed against
+// the 1,000 pound trading allowance. Between roughly 250 and 326 pounds of costs to date the two
+// projections DISAGREE ABOUT WHICH WINS, so he was steered off a 1,000 pound election that was his
+// to make, on the one page that tells him the choice is his.
+// ══════════════════════════════════════════════════
 export function tradingAllowanceChoice(
   grossTradeIncome: number,
   actualCosts: number,
-  monthsElapsed: number,
+  horizon: { monthsElapsed: number; daysElapsed: number },
 ): TradingAllowanceChoice {
   const gross = Math.max(0, Number.isFinite(grossTradeIncome) ? grossTradeIncome : 0);
   const costs = Math.max(0, Number.isFinite(actualCosts) ? actualCosts : 0);
   const allowance = tradingAllowanceAmount();
-  const months = Math.max(0, Math.min(12, Math.floor(Number.isFinite(monthsElapsed) ? monthsElapsed : 0)));
-
-  // The same three month floor and the same 12/months factor taxPosition and the ledger use, so the
-  // pace shown here can never disagree with the pace shown there.
-  const canProject = months >= 3;
-  const projectedCosts = canProject ? Math.round(costs * (12 / months) * 100) / 100 : costs;
+  // THE ONE DEFINITION, ASKED RATHER THAN COPIED. projectionFactor carries the three month floor,
+  // the day based divisor and the clamp at the length of the year, so the pace shown here cannot
+  // disagree with the pace shown on the Tax screen however either of them changes later.
+  const { canProject, factor } = projectionFactor(horizon);
+  const projectedCosts = canProject ? Math.round(costs * factor * 100) / 100 : costs;
 
   const taxableWithCosts = Math.round(Math.max(0, gross - costs) * 100) / 100;
   const taxableWithAllowance = Math.round(Math.max(0, gross - allowance) * 100) / 100;

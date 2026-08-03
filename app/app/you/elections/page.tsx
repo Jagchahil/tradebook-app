@@ -135,7 +135,7 @@ export default async function Page({
   const tradeElected = tradeRow.row !== null;
 
   const choice = optimiser
-    ? tradingAllowanceChoice(optimiser.ytdTradeIncome, optimiser.ytdTradeExpenses, optimiser.monthsElapsed)
+    ? tradingAllowanceChoice(optimiser.ytdTradeIncome, optimiser.ytdTradeExpenses, optimiser)
     : null;
 
   const msg = notice(one(sp.done), one(sp.problem), one(sp.key));

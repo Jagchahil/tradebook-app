@@ -81,12 +81,29 @@ ok('lib/elections.ts writes no pound amount of its own',
 // ---------------------------------------------------------------------------------------------
 // 2. THE COMPARISON. Both totals, always, and the winner named honestly.
 // ---------------------------------------------------------------------------------------------
-const lowCost = X.tradingAllowanceChoice(20000, 300, 12);
+
+// ══════════════════════════════════════════════════
+// 🔴 THE HORIZON IS A MONTH COUNT AND A DAY COUNT NOW, AND THE DAY COUNT IS THE DIVISOR.
+//
+// tradingAllowanceChoice used to project with `costs * (12 / months)`, which is the divisor that was
+// wrong everywhere else in this product and was fixed on 3 August 2026. It held a THIRD copy, and
+// its own comment claimed parity with taxPosition, which had stopped being true that morning.
+//
+// ⚠️ SO THESE FIGURES MOVED, AND THAT IS THE FIX RATHER THAN A REGRESSION. 300 pounds of costs
+// at three months was projected to 1,200 by whole months and is 1,190.22 by days (365/92). The old
+// number is the one that steered a man off a 1,000 pound election he was entitled to make.
+//
+// The pairs below are real: days actually elapsed from 6 April at each month mark.
+const H = (months, days) => ({ monthsElapsed: months, daysElapsed: days });
+const H1 = H(1, 30), H2 = H(2, 61), H3 = H(3, 92), H6 = H(6, 183), H12 = H(12, 365);
+// ══════════════════════════════════════════════════
+
+const lowCost = X.tradingAllowanceChoice(20000, 300, H12);
 ok('a man with small costs is told the allowance wins, and by how much of DEDUCTION',
   lowCost.better === 'allowance' && lowCost.difference === 700
   && lowCost.taxableWithCosts === 19700 && lowCost.taxableWithAllowance === 19000);
 
-const highCost = X.tradingAllowanceChoice(20000, 4000, 12);
+const highCost = X.tradingAllowanceChoice(20000, 4000, H12);
 ok('🔴 A MAN WITH REAL COSTS IS TOLD HIS COSTS WIN. This is the whole reason both totals travel together',
   highCost.better === 'costs' && highCost.difference === 3000
   && highCost.taxableWithCosts === 16000 && highCost.taxableWithAllowance === 19000);
@@ -100,24 +117,35 @@ ok('🔴 A MAN WITH REAL COSTS IS TOLD HIS COSTS WIN. This is the whole reason b
 // it, on the screen where he decides. It is the projected against realised line, in new code, in
 // the direction that talks him into the worse of the two.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-const earlyLowCosts = X.tradingAllowanceChoice(20000, 300, 3);
-ok('🔴 £300 OF COSTS IN MONTH THREE IS £1,200 FOR THE YEAR, AND HIS COSTS WIN',
-  earlyLowCosts.projectedCosts === 1200 && earlyLowCosts.better === 'costs'
-  && earlyLowCosts.difference === 200);
+const earlyLowCosts = X.tradingAllowanceChoice(20000, 300, H3);
+// 🔴 THIS USED TO SAY £1,200, AND £1,200 WAS THE BUG. Whole months made it 300 x (12/3). By
+// days it is 300 x (365/92) = 1,190.22, and the gap between those two numbers is the gap that
+// decides a £1,000 election. He still wins on costs here, by £190.22 rather than by £200.
+ok('🔴 £300 OF COSTS AT THREE MONTHS IS £1,190.22 FOR THE YEAR, AND HIS COSTS WIN',
+  earlyLowCosts.projectedCosts === 1190.22 && earlyLowCosts.better === 'costs'
+  && earlyLowCosts.difference === 190.22);
+
+// 🔴 AND THE CASE THE OLD ARITHMETIC GOT BACKWARDS. At £260 of costs by three months, whole
+// months project £1,040 and tell him his costs beat the allowance. Days project £1,031.52, which
+// also beats it, so take the real boundary: £250 projects to £1,000 by months (level, no verdict
+// either way) but only £991.85 by days, where THE ALLOWANCE WINS and he should claim it.
+const boundary = X.tradingAllowanceChoice(20000, 250, H3);
+ok('🔴 £250 AT THREE MONTHS: the allowance wins, where whole months called it level',
+  boundary.projectedCosts === 991.85 && boundary.better === 'allowance');
 
 ok('...and before three months there is no verdict at all, which is the honest answer',
-  X.tradingAllowanceChoice(20000, 40, 1).better === 'too_early'
-  && X.tradingAllowanceChoice(20000, 40, 1).difference === 0);
+  X.tradingAllowanceChoice(20000, 40, H1).better === 'too_early'
+  && X.tradingAllowanceChoice(20000, 40, H1).difference === 0);
 
 ok('the too early sentence says why rather than showing him a number to act on',
-  /not enough of the year yet/.test(X.tradingAllowanceOffer(X.tradingAllowanceChoice(20000, 40, 1))));
+  /not enough of the year yet/.test(X.tradingAllowanceOffer(X.tradingAllowanceChoice(20000, 40, H1))));
 
 ok('the same three month floor every other projection in the product uses',
-  X.tradingAllowanceChoice(20000, 300, 2).better === 'too_early'
-  && X.tradingAllowanceChoice(20000, 300, 3).better !== 'too_early');
+  X.tradingAllowanceChoice(20000, 300, H2).better === 'too_early'
+  && X.tradingAllowanceChoice(20000, 300, H3).better !== 'too_early');
 
 ok('exactly level is its own answer, never a nudge either way',
-  X.tradingAllowanceChoice(20000, ALLOWANCE, 12).better === 'level');
+  X.tradingAllowanceChoice(20000, ALLOWANCE, H12).better === 'level');
 
 ok('the offer sentence for a man whose costs win says so plainly rather than selling to him',
   /beats the .* trading allowance/.test(X.tradingAllowanceOffer(highCost))
@@ -139,20 +167,20 @@ ok('every confirmation carries the replacement warning, whichever way he went',
 // 3. FULL RELIEF IS AUTOMATIC, AND IT MUST NEVER TAKE A LOSS OFF HIM.
 // ---------------------------------------------------------------------------------------------
 ok('under the allowance with costs under the income is full relief, and no election to make',
-  X.tradingAllowanceChoice(800, 200).fullRelief === true);
+  X.tradingAllowanceChoice(800, 200, H12).fullRelief === true);
 
 ok('🔴 BUT NOT WHEN HE HAS A LOSS. £800 in and £3,000 out is a loss, and full relief would quietly take it',
-  X.tradingAllowanceChoice(800, 3000).fullRelief === false);
+  X.tradingAllowanceChoice(800, 3000, H12).fullRelief === false);
 
 ok('nor above the allowance, where it is a real election',
-  X.tradingAllowanceChoice(20000, 300).fullRelief === false);
+  X.tradingAllowanceChoice(20000, 300, H12).fullRelief === false);
 
 ok('full relief zeroes the trade profit without anybody electing anything',
   X.tradeProfitAfterAllowance(800, 200, false) === 0);
 
 ok('a man with a loss is left exactly as he was, because it is his to claim',
   X.tradeProfitAfterAllowance(800, 3000, false) === 0
-  && X.tradingAllowanceChoice(800, 3000).taxableWithCosts === 0);
+  && X.tradingAllowanceChoice(800, 3000, H12).taxableWithCosts === 0);
 
 // ---------------------------------------------------------------------------------------------
 // 4. 🔴 THE PROJECTION. THE ONE THAT WOULD HAVE GIVEN A MAN FOUR TIMES THE RELIEF.
@@ -383,26 +411,26 @@ ok('taxengine.taxableTradingProfit is still not the door: nothing in app or lib 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 console.log('\nNo income is nothing to judge, not a win for the allowance');
 {
-  const empty = X.tradingAllowanceChoice(0, 0, 6);
+  const empty = X.tradingAllowanceChoice(0, 0, H6);
   ok('🔴 an empty book gets no recommendation at all', empty.better === 'too_early');
   ok('and it says which silence it is', empty.tooEarlyBecause === 'no_income');
   ok('no difference is quoted, because there is nothing to differ', empty.difference === 0);
 
   // The other direction, which is the one that costs him real money.
-  const spending = X.tradingAllowanceChoice(0, 5000, 6);
+  const spending = X.tradingAllowanceChoice(0, 5000, H6);
   ok('🔴 nor is a man with start up spending and no income yet told to elect',
     spending.better === 'too_early' && spending.tooEarlyBecause === 'no_income');
 
   // CONTROL. The moment there IS income the comparison works exactly as it did.
-  const real = X.tradingAllowanceChoice(40000, 300, 6);
+  const real = X.tradingAllowanceChoice(40000, 300, H6);
   ok('CONTROL: with income on the board the allowance is recommended again',
     real.better === 'allowance' && real.tooEarlyBecause === null);
-  const costly = X.tradingAllowanceChoice(40000, 9000, 6);
+  const costly = X.tradingAllowanceChoice(40000, 9000, H6);
   ok('CONTROL: and real costs still beat it',
     costly.better === 'costs' && costly.tooEarlyBecause === null);
 
   // The three month floor is untouched and keeps its own reason.
-  const early = X.tradingAllowanceChoice(40000, 300, 1);
+  const early = X.tradingAllowanceChoice(40000, 300, H1);
   ok('CONTROL: the three month floor still fires, for its own reason',
     early.better === 'too_early' && early.tooEarlyBecause === 'not_enough_year');
 

@@ -253,6 +253,50 @@ export function vatRegistrationRequired(rolling12mTurnover: number): boolean {
   return rolling12mTurnover > FACTS.vatRegistrationThreshold;
 }
 
+// 6 April to 5 April. A leap day falls inside one year in four and makes it 366, which moves a
+// projection by 0.27%. That is noise against the 29% this constant exists to stop, and a second
+// field to carry it would be a fact for every caller to get right again.
+export const DAYS_IN_TAX_YEAR = 365;
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE PROJECTION FACTOR, IN ONE PLACE, BECAUSE IT WAS IN TWO AND BOTH WERE WRONG.
+//
+// It used to read `12 / monthsElapsed`, inline, in taxPosition AND in findOptimisations. And
+// monthsElapsed is floor(days / 30.44), so the numerator was real money over real DAYS and the
+// denominator asserted whole 30.44 day MONTHS. On 2 August 2026 that divided 118 days of money by
+// 91.3, and the live account read "put by for tax £25,793" against a true figure near £17,100.
+// He was being told to tie up £8,700 he did not owe, on the number printed in the largest type in
+// this product.
+//
+// ⚠️ AND IT WAS A STEP FUNCTION, so the same books re-priced themselves overnight: £25,793 on the
+// 5th of August and £16,228 on the 6th, with nothing changed. At the other end floor(364/30.44)
+// is 11, so the divisor NEVER reached 12 and a FINISHED year was still inflated by 9.09%.
+//
+// 🔴 lib/agent.ts:268 projectAnnual() had divided by DAYS all along, so two projections in one
+// codebase disagreed by £21,244 for the same man on the same day, and the app headline was the
+// wrong one. Anything that projects reads this function now.
+//
+// monthsElapsed survives, and only as the CONFIDENCE GATE it always should have been: three
+// months of real figures before we are willing to call anything a year. It is not a divisor.
+//
+// ⚠️ A DAY COUNT WE CANNOT USE MEANS WE DO NOT PROJECT, rather than that we guess. canProject
+// goes out false, every surface says so, and he sees an honest year to date figure. That is a
+// smaller failure than multiplying his money by a number we do not trust.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ THE PARAMETER IS STRUCTURAL, NOT OptimiserInput, so any caller holding the two fields can
+// ask the one definition instead of keeping a copy. OptimiserInput satisfies it unchanged, so every
+// existing call is identical. lib/elections.ts was the third copy of this arithmetic and the reason
+// this widened: see tradingAllowanceChoice.
+export function projectionFactor(input: { monthsElapsed: number; daysElapsed: number }): { canProject: boolean; factor: number } {
+  const rawDays = Math.floor(Number(input.daysElapsed));
+  // Clamped at the length of the year, so a clock that is ahead of itself can never project DOWN.
+  const usableDays = Number.isFinite(rawDays) && rawDays > 0
+    ? Math.min(DAYS_IN_TAX_YEAR, rawDays)
+    : 0;
+  const canProject = input.monthsElapsed >= 3 && usableDays > 0;
+  return { canProject, factor: canProject ? DAYS_IN_TAX_YEAR / usableDays : 1 };
+}
+
 // --- MTD for Income Tax -----------------------------------------------------
 
 // Whether MTD for Income Tax applies, by qualifying income and the tax year being

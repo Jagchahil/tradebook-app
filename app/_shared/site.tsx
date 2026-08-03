@@ -806,9 +806,6 @@ a{text-decoration:none}
 .brandrow{display:inline-flex;align-items:center;gap:10px}
 .logo-chip{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--river),var(--saffron));display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:19px;box-shadow:0 6px 16px rgba(27,89,166,.35)}
 .logo-word{font-size:23px;font-weight:900;letter-spacing:-1px;color:var(--tx)}
-/* dark/light toggle in the nav */
-.theme-toggle{display:none !important}
-.theme-toggle:hover{transform:translateY(-2px)}
 @keyframes riseIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 @keyframes flow{to{stroke-dashoffset:0}}
 @keyframes sheen{0%{background-position:0% 50%}100%{background-position:200% 50%}}
@@ -938,32 +935,41 @@ const REVEAL_JS = `
   // the old palette, because Chrome will not re-resolve a property that is mid transition when
   // only the custom property behind it changed. The full story is in lib/tokens.ts.
   var swapTheme = ${THEME_SWAP_JS};
-  var saved = null;
-  try{ saved = localStorage.getItem('lekhio-theme'); }catch(e){}
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE SITE FOLLOWS THE DEVICE. THERE IS NO STORED OVERRIDE, BECAUSE THERE IS NO CONTROL.
+  //
+  // Reported live on 3 August 2026: "the website is stuck in dark mode, it should match my
+  // laptop." The detection was never broken. A clean browser follows the device correctly in
+  // both directions, proven by driving a real Chromium at both OS settings.
+  //
+  // What was broken: 430fa37 on 3 July, "Light-only theme sitewide", hid the toggle with
+  // display:none !important. It removed the CONTROL and left the BEHAVIOUR. The dark palette,
+  // the media query and the read of localStorage all survived it. So a stored choice still
+  // outranked the device for ever, and the button that made that choice no longer existed on any
+  // screen at any width. Anybody who had tapped the moon even once, possibly by accident, was
+  // pinned to that choice with nothing left to press.
+  //
+  // ⚠️ THE KEY IS DELETED, NOT MERELY IGNORED. Ignoring it fixes the symptom and leaves a
+  // landmine in the browser of every early visitor, waiting for the day somebody restores a
+  // toggle and cannot work out why one man's site is the wrong colour.
+  //
+  // ⚠️ AND IF A TOGGLE EVER COMES BACK IT NEEDS THREE STATES: device, light, dark. Two states
+  // cannot express "I have no opinion", which is the state everybody starts in and the one this
+  // bug made unreachable.
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  try{ localStorage.removeItem('lekhio-theme'); }catch(e){}
   try{
     var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme:dark)') : null;
-    swapTheme(saved || ((mq && mq.matches) ? 'dark' : 'light'));
-    // ⚠️ His explicit choice outranks the device. Without this check, a phone that flips to dark
-    // at sunset would undo the light mode he deliberately picked ten minutes earlier.
+    swapTheme((mq && mq.matches) ? 'dark' : 'light');
+    // Keeps step if he changes the laptop while the page is open, at sunset or by hand.
     if(mq && mq.addEventListener){ mq.addEventListener('change', function(e){
-      var chosen = null; try{ chosen = localStorage.getItem('lekhio-theme'); }catch(err){}
-      if(!chosen) swapTheme(e.matches ? 'dark' : 'light');
+      swapTheme(e.matches ? 'dark' : 'light');
     }); }
   }catch(e){}
-  var setIcon = function(){ var b=document.getElementById('lekhio-theme'); if(b) b.textContent = document.documentElement.getAttribute('data-theme')==='dark' ? '☀️' : '🌙'; };
-  var wireToggle = function(){
-    var b=document.getElementById('lekhio-theme');
-    if(b && !b.__wired){ b.__wired=true; b.addEventListener('click', function(){
-      var n = document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
-      swapTheme(n);
-      // Remembered, and now actually read back on the next page load. It used to be written here
-      // and never read anywhere, so his choice was lost the moment he clicked a link.
-      try{ localStorage.setItem('lekhio-theme', n); }catch(e){}
-      setIcon();
-    }); }
-    setIcon();
-  };
-  if (document.readyState !== 'loading') wireToggle(); else document.addEventListener('DOMContentLoaded', wireToggle);  var run = function(){
+  // 🔴 THE TOGGLE, ITS ICON AND ITS CLICK HANDLER WENT WITH THE BUTTON. Doc 103's honesty test: a
+  // control hidden by display:none at every width is not a control, it is behaviour shipped to
+  // every visitor to serve nobody, and this one was still writing the override that stranded them.
+  var run = function(){
     var els = document.querySelectorAll('.reveal');
     if ('IntersectionObserver' in window){
       var io = new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.12,rootMargin:'0px 0px -40px 0px'});
@@ -1078,10 +1084,6 @@ export function SiteNav() {
           <Link href="/in" className="navtop">Sign in</Link>
           <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
         </div>
-        {/* suppressHydrationWarning: the head script sets this button's icon from the
-            OS theme before React hydrates, so dark mode visitors would otherwise get a
-            React 418 text mismatch on every page. The icon is cosmetic, let it differ. */}
-        <button id="lekhio-theme" className="theme-toggle" type="button" aria-label="Toggle dark mode" suppressHydrationWarning>🌙</button>
         <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu">Menu <span className="nav-burger-lines"><i /><i /><i /></span></label>
       </div>
 

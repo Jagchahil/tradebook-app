@@ -132,8 +132,26 @@ const bareSets = site.split('\n')
   .filter(([l]) => /setAttribute\(\s*'data-theme'/.test(l) && !l.trim().startsWith('//'));
 if (bareSets.length) bareSets.forEach(([l, n]) => console.log(`        site.tsx:${n} ${l.trim().slice(0, 70)}`));
 ok('no theme change in site.tsx bypasses swapTheme', bareSets.length === 0);
-ok('the toggle reads back the choice it saves',
-  site.includes("localStorage.setItem('lekhio-theme'") && site.includes("localStorage.getItem('lekhio-theme'"));
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS GUARD USED TO READ "the toggle reads back the choice it saves", AND IT WAS RIGHT WHEN IT
+// WAS WRITTEN. The bug it caught was real: the toggle wrote localStorage and nothing ever read it,
+// so a man's choice was lost the moment he clicked a link. The premise has since gone.
+//
+// 430fa37, 3 July, "Light-only theme sitewide", hid the toggle with display:none !important and
+// left everything it drove still running. On 3 August that was reported live as "the website is
+// stuck in dark mode, it should match my laptop": the stored choice still outranked the device
+// FOREVER, and the button that made it no longer existed on any screen at any width. The state was
+// reachable, permanent, and impossible to undo.
+//
+// So the claim inverts. There is no toggle, therefore there is no choice to persist, therefore
+// nothing may outrank the device. Fixed to say the true thing rather than deleted, because the old
+// wording is the record of why setItem and getItem were ever paired here.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+ok('🔴 NO STORED CHOICE OUTRANKS THE DEVICE, because there is no control left to make one',
+  !site.includes("localStorage.setItem('lekhio-theme'")
+  && !site.includes("localStorage.getItem('lekhio-theme'"));
+ok('...and the stale key in an early visitor\'s browser is cleared rather than left as a landmine',
+  site.includes("localStorage.removeItem('lekhio-theme')"));
 ok('site.tsx no longer hand types a palette',
   !/--river:#[0-9A-Fa-f]{6}/.test(site) && !/--tx-mut:#[0-9A-Fa-f]{6}/.test(site));
 

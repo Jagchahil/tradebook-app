@@ -778,5 +778,67 @@ for (const f of BANNER_PAGES) {
     (codeOnly(site).match(/17329341/g) || []).length === 1);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE TWO SENTENCES THAT LEAVE THE SITE, AND NOTHING HAS EVER LOOKED AT EITHER.
+//
+// Every guard above polices a PAGE. The most repeated sentence in the whole product is not on a
+// page: it is the footer of every email we send, on every receipt, every invoice notice and every
+// trial message. It read "Lekhio. Your books and tax, handled in WhatsApp", and it went out under
+// a homepage that had been selling an employee for weeks. No suite imported lib/email.ts, so the
+// line a customer sees most often was the one line nothing could catch.
+//
+// ⚠️ THE CLAIM IS ABOUT THE CATEGORY, NOT THE WORDING. These do not pin a sentence, which would
+// make every copy edit a test failure and teach whoever hits it to delete the guard. They pin the
+// thing doc 104 actually forbids: naming the channel as if it were the product.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+{
+  const emailSrc = codeOnly(read('lib/email.ts'));
+  const footer = emailSrc.slice(emailSrc.indexOf('${unsub}') - 700, emailSrc.indexOf('${unsub}'));
+  ok('the email footer block was found', /Lekhio\./.test(footer) && footer.length > 40);
+  ok('🔴 THE EMAIL FOOTER DOES NOT SELL THE CHANNEL AS THE PRODUCT',
+    !/in WhatsApp|from WhatsApp|on WhatsApp/i.test(footer));
+  ok('...and it names what Lekhio is instead, in doc 104\'s own words',
+    /first employee your business hires/i.test(footer));
+  // The honesty half of the footer is load bearing and predates this. It stays.
+  ok('...while the independence and approval sentence is untouched',
+    /not affiliated with HMRC/.test(footer) && /without your approval/.test(footer));
+
+  const nurture = codeOnly(read('lib/nurture.ts'));
+  ok('🔴 AND NEITHER DOES THE NURTURE SEQUENCE, the other copy that leaves the building',
+    !/books and tax handled from WhatsApp/i.test(nurture));
+  ok('...it still promises the approval gate, which is the part that must never go',
+    /before anything moves/.test(nurture));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE THEME FOLLOWS THE DEVICE, AND NOTHING MAY OUTRANK IT.
+//
+// Reported live: "the website is stuck in dark mode, it should match my laptop." Detection was
+// never broken. 430fa37 on 3 July, "Light-only theme sitewide", hid the toggle with display:none
+// !important and left everything the toggle drove still running: the dark palette, the media
+// query, and a localStorage override that beat the device FOREVER. So one tap of a button that no
+// longer exists on any screen at any width pinned a man to the wrong colour with nothing to press.
+//
+// ⚠️ THE LESSON IS BIGGER THAN THE COLOUR. Hiding a control with CSS is not removing a feature. It
+// removes the way IN and leaves every consequence of having used it, which is the worst of both:
+// the state is still reachable, still permanent, and now unreachable to fix.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+{
+  const shared = codeOnly(read('app/_shared/site.tsx'));
+  ok('🔴 NOTHING READS A STORED THEME OVERRIDE: the device is the only opinion that counts',
+    !/getItem\(\s*'lekhio-theme'\s*\)/.test(shared) && !/setItem\(\s*'lekhio-theme'/.test(shared));
+  ok('...and the stale key left in early visitors\' browsers is cleaned up, not just ignored',
+    /removeItem\('lekhio-theme'\)/.test(shared));
+  ok('🔴 THE THEME COMES FROM prefers-color-scheme, both on load and when the laptop changes',
+    /matchMedia\('\(prefers-color-scheme:dark\)'\)/.test(shared)
+    && /addEventListener\('change'/.test(shared));
+  ok('🔴 AND THE DEAD TOGGLE IS GONE, not hidden: a control display:none at every width is not a control',
+    !/theme-toggle/.test(shared) && !/id="lekhio-theme"/.test(shared));
+  // The whole public site, because a second copy of the button anywhere brings the trap back.
+  for (const f of publicPages) {
+    ok(`${rel(f)} ships no theme toggle`, !/id="lekhio-theme"|className="theme-toggle"/.test(codeOnly(read(rel(f)))));
+  }
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

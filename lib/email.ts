@@ -82,7 +82,15 @@ function shell(inner: string, opts: { preheader?: string; unsubscribeLink?: stri
         ${inner}
       </td></tr>
       <tr><td style="padding:20px 6px 8px;font-size:12px;line-height:1.6;color:${MUTED}">
-        <p style="margin:0">Lekhio. Your books and tax, handled in WhatsApp.</p>
+        <!-- 🔴 THE FOOTER OF EVERY EMAIL WE SEND, AND IT SOLD THE CHANNEL AS THE PRODUCT.
+             It read "Your books and tax, handled in WhatsApp". Doc 104: "Lekhio is not software you
+             buy. It is the first employee a business ever hires", and section 3, sell the outcome
+             and never the technology. WhatsApp is one of three ways in, alongside a photo and a
+             statement import, and naming it here made the narrowest door the whole house. This is
+             the sentence that goes to a customer more often than any other in the product, on every
+             receipt, every invoice notice and every trial email, and until 3 August 2026 nothing in
+             the test suite so much as looked at it. -->
+        <p style="margin:0">Lekhio. The first employee your business hires.</p>
         <p style="margin:6px 0 0">Lekhio is an independent UK company. It is not affiliated with HMRC, and nothing is ever filed to HMRC without your approval.</p>
         ${unsub}
       </td></tr>

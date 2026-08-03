@@ -185,8 +185,17 @@ console.log('\nwave nine: MTD, payments on account and National Insurance belong
     g(DIRECTOR).isCompany === true && g(DIRECTOR_UNKNOWN).isCompany === true
     && [NOBODY, SOLE_UNKNOWN, SOLE_TRADE, PARTNER, LANDLORD].every((b) => g(b).isCompany === false));
 
-  ok('🔴 THE PAGE NO LONGER ADDRESSES EVERY READER AS AN MTD FILER: the heading is branched',
-    /\{isCompany \? '[^']+' : 'What a quarterly update would report today'\}/.test(flat(summary)));
+  // \ud83d\udd34 3 AUGUST 2026: THE BRANCH HEAD MOVED FROM isCompany TO makesUpdates, AND THAT IS THE FIX.
+  //
+  // Wave nine taught this page that a DIRECTOR does not make quarterly updates. It did not teach it
+  // that a PARTNER does not either: Making Tax Digital has not reached partnerships, and GOV.UK has
+  // published no date. So every one of these branches was addressed to a third man who will never
+  // make an update, and answered him as though he would. The guards below are unchanged in what
+  // they claim; they now hold the page to it for everyone it is true of.
+  ok('\ud83d\udd34 THE PAGE NO LONGER ADDRESSES EVERY READER AS AN MTD FILER: the heading is branched',
+    /\{makesUpdates \? 'What a quarterly update would report today' : '[^']+'\}/.test(flat(summary)));
+  ok('\ud83d\udd34 AND A PARTNER IS OUTSIDE THAT AUDIENCE, not just a director',
+    /const makesUpdates = !isCompany && !isPartnership;/.test(summary));
   ok('and a sole trader still reads the cumulative argument, word for word',
     /restates the whole year/.test(flat(summary)) && /pack\.submission/.test(summary));
 
@@ -205,8 +214,8 @@ console.log('\nwave nine: MTD, payments on account and National Insurance belong
   ok('his own figures are kept: the same submission block, unbranched',
     /sub\.trade\.income/.test(summary) && /sub\.trade\.expenses/.test(summary) && /sub\.trade\.net/.test(summary));
   ok('the property figures are kept too, and only the claim about what an UPDATE does with them moves',
-    /isCompany\s*\?\s*'Rent is kept as its own stream/.test(flat(summary))
-    && /An update carries property as its own stream/.test(flat(summary)));
+    /makesUpdates\s*\?\s*'An update carries property as its own stream/.test(flat(summary))
+    && /Rent is kept as its own stream/.test(flat(summary)));
 
   // The calendar card is a due date for a return he does not file.
   //
@@ -228,7 +237,7 @@ console.log('\nwave nine: MTD, payments on account and National Insurance belong
     !/Corporation Tax/i.test(flat(codeOnly(summary))));
 
   // The filing promise. Kept for a filer, and never aimed at a man who files nothing here.
-  const foot = arm(summary, '{isCompany ? (', summary.indexOf('THE HONEST LINE ABOUT FILING'));
+  const foot = arm(summary, '{!makesUpdates ? (', summary.indexOf('THE HONEST LINE ABOUT FILING'));
   ok('the standing honesty is still said to everyone: nothing has been sent anywhere',
     typeof foot === 'string' && /Nothing on this page has been sent anywhere/.test(flat(foot))
     && /Nothing on this page has been sent anywhere/.test(flat(summary)));

@@ -5,6 +5,7 @@ import { SESSION_COOKIE } from '../../../../lib/websession';
 import { getBusinessProfile, getConfirmedTransactionsForRange } from '../../../../lib/supabase';
 import { buildQuarterPack, quarterBounds, quarterForDate, taxYearLabel } from '../../../../lib/quarterpack';
 import { bankFeedOffered } from '../../../../lib/bankfeed';
+import { wholeFirmCaption } from '../../../../lib/position';
 import { gbp0 } from '../../lib/money';
 import { outstandingUpdate, updateDue, UPDATE_ORDINAL } from '../due';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
@@ -94,10 +95,27 @@ export default async function TaxSummaryPage() {
 
   const isCompany = biz?.businessType === 'limited_company';
   const isPartnership = biz?.businessType === 'partnership';
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHO THIS PAGE'S UPDATE FRAMING IS ACTUALLY ADDRESSED TO.
+  //
+  // The page was written for a man who makes quarterly updates, and in July it learned that a
+  // DIRECTOR is not one. It did not learn that a PARTNER is not one either: Making Tax Digital has
+  // not reached partnerships, so "what an update would report", "an update always restates the
+  // whole year", "it is not what an update reports" and "you will approve before anything goes"
+  // were all addressed to a man who will never make one.
+  //
+  // ⚠️ HE IS NOT A DIRECTOR THOUGH, and the director branches say things that are false of him
+  // ("the company files its own return"). So this is a third audience, not a reuse of the second.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const makesUpdates = !isCompany && !isPartnership;
+  // The figures below are the FIRM'S whole books, not his slice. /app/money says so in these exact
+  // words for the same shape of data, out of lib/position.ts, so the two screens cannot drift.
+  const firmNote = biz ? wholeFirmCaption(biz.businessType) : null;
   const sub = pack.submission;
   const due = updateDue(startYear, index);
   const ordinal = UPDATE_ORDINAL[index];
   const hasFigures = sub.txCount > 0;
+  const entryCount = sub.txCount === 1 ? 'the one entry' : `${sub.txCount} entries`;
 
   // Mandation, asked of the pack rather than re-derived, in the same words app/app/tax/page.tsx
   // asks it. See the calendar card below for what this screen was saying without it.
@@ -124,7 +142,7 @@ export default async function TaxSummaryPage() {
           money is his book either way and it is only the update framing that was never his. */}
       <section className="lek-card">
         <h1 className="lek-h2">
-          {isCompany ? 'Your money since 6 April' : 'What a quarterly update would report today'}
+          {makesUpdates ? 'What a quarterly update would report today' : 'Your money since 6 April'}
         </h1>
         {isCompany ? (
           <p style={S.window}>
@@ -133,6 +151,12 @@ export default async function TaxSummaryPage() {
             not an update, it is your own figures for {pack.taxYear} added up. That window is the
             personal tax year rather than your company&apos;s accounting period, so read it as a
             running total and not as a set of accounts.
+          </p>
+        ) : isPartnership ? (
+          <p style={S.window}>
+            Tax year {pack.taxYear}, 6 April to today. Making Tax Digital has not reached
+            partnerships, so this is not an update: it is the firm&apos;s money added up, and your
+            share of the profit goes on your own Self Assessment return.
           </p>
         ) : (
           <p style={S.window}>
@@ -158,8 +182,17 @@ export default async function TaxSummaryPage() {
               </div>
             </div>
             <p style={S.quiet}>
-              Your trade, from {sub.txCount === 1 ? 'the one entry' : `${sub.txCount} entries`} you
-              have confirmed since 6 April. Anything still waiting on you is not in these figures.
+              {/* \u26a0\ufe0f "YOUR TRADE" IS THE FIRM'S TRADE FOR A PARTNER, and the number beside it is
+                  the whole firm's, not his slice. /app/tax one click away says "These figures are
+                  your 50% share"; without this line the two screens show two profits and neither
+                  explains the other. The words are lib/position.ts's, the same ones /app/money
+                  uses for the same shape of data, so no page writes its own. */}
+              {firmNote ? (
+                <>{firmNote}{' '}It covers {entryCount} you have confirmed since 6 April.</>
+              ) : (
+                <>Your trade, from {entryCount} you have confirmed since 6 April.</>
+              )}
+              {' '}Anything still waiting on you is not in these figures.
             </p>
 
             {/* Property is its own stream on a real update, so it is its own block here, and only
@@ -172,9 +205,9 @@ export default async function TaxSummaryPage() {
                   {gbp0(sub.property.net)} of property profit so far.{' '}
                   {/* The figures are the same either way. Only the claim about what an update does
                       with them belongs to a man who makes one. */}
-                  {isCompany
-                    ? 'Rent is kept as its own stream here, never mixed into the trade.'
-                    : 'An update carries property as its own stream, never mixed into the trade.'}
+                  {makesUpdates
+                    ? 'An update carries property as its own stream, never mixed into the trade.'
+                    : 'Rent is kept as its own stream here, never mixed into the trade.'}
                 </p>
               </div>
             ) : null}
@@ -299,7 +332,7 @@ export default async function TaxSummaryPage() {
             {gbp0(pack.trade.net)} of trade profit. Useful for seeing what the quarter itself did.
             {/* The disclaimer answers the heading above it. For a director there is no update claim
                 to correct, so the sentence would be arguing with nobody. */}
-            {isCompany ? null : <>{' '}It is not what an update reports.</>}
+            {makesUpdates ? <>{' '}It is not what an update reports.</> : null}
           </p>
         </section>
       ) : null}
@@ -307,7 +340,7 @@ export default async function TaxSummaryPage() {
       {/* ── THE HONEST LINE ABOUT FILING. We prepare. He approves. The switch waits on HMRC. ──
           A director gets the first sentence and not the rest: the rest is a promise about an update
           he will never make, and a promise aimed at the wrong man is how a product loses him. */}
-      {isCompany ? (
+      {!makesUpdates ? (
         <p style={S.foot}>
           Nothing on this page has been sent anywhere. These are your own figures, prepared from
           what you have confirmed, for you to check and to hand to whoever prepares your returns.

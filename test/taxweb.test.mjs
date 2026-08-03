@@ -336,6 +336,11 @@ ok('\ud83d\udd34 AND HE GETS HIS OWN CARD: outside the regime is not the same fa
   /\) : isPartnership \? \(/.test(src.summary) && /has not reached partnerships yet/.test(summaryCode));
 ok('...with no date invented for a timeline HMRC has not published',
   !/partnerships[^.]*\b(7 August|7 November|7 February|7 May|April 202)/.test(summaryCode));
+ok('\ud83d\udd34 AND THE FIRM WIDE FIGURES ARE CAPTIONED AS THE FIRM\'S, or two screens show two profits',
+  /const firmNote = biz \? wholeFirmCaption\(biz\.businessType\) : null;/.test(src.summary)
+  && /\{firmNote \? \(/.test(src.summary));
+ok('...in lib/position.ts\'s words, never the page\'s own, so /app/money cannot drift from it',
+  !/everything through the business/.test(summaryCode));
 
 console.log(`\n  ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

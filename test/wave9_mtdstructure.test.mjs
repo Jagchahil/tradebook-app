@@ -209,9 +209,19 @@ console.log('\nwave nine: MTD, payments on account and National Insurance belong
     && /An update carries property as its own stream/.test(flat(summary)));
 
   // The calendar card is a due date for a return he does not file.
-  const cal = summary.indexOf('The {ordinal} update of');
+  //
+  // ⚠️ THE ANCHOR MOVED. THE CLAIM DID NOT, AND THAT IS WHY THIS GUARD WAS FIXED RATHER
+  // THAN DELETED. The heading became a template literal when the card grew its "your first update
+  // is still open" branch, and the gate grew a second condition when it learned to ask
+  // pack.ytd.mtdApplies (test/taxweb.test.mjs section 6 carries that argument). Neither touched
+  // what this guard is for: a DIRECTOR must fall out on the FIRST condition, ahead of mandation and
+  // ahead of everything else, so there is no path on which he is handed a date. Pinning the head of
+  // the ternary is what says that, and it now says it about the card as it actually is.
+  const cal = summary.indexOf('update of ${pack.taxYear}');
   ok('🔴 THE DUE DATE CARD IS WITHHELD WHOLE, rather than filled in with an invented deadline',
-    cal > -1 && /\{isCompany \? null : \(/.test(summary.slice(Math.max(0, cal - 500), cal)));
+    cal > -1 && /\{isCompany \? null : mandated \? \(/.test(summary.slice(Math.max(0, cal - 800), cal)));
+  ok('🔴 AND THE UNDER THE LINE CARD IS OUT OF HIS REACH TOO: isCompany is tested first',
+    summary.indexOf('{isCompany ? null : mandated ? (') < summary.indexOf('No quarterly update is due from you'));
   ok('and it still draws for the man who does make an update',
     /updateDue\(startYear, index\)/.test(summary) && /UPDATE_ORDINAL\[index\]/.test(summary));
   ok('🔴 NO CORPORATION TAX DEADLINE IS INVENTED IN ITS PLACE',

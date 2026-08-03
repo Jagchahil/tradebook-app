@@ -3,10 +3,10 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { getBusinessProfile, getConfirmedTransactionsForRange } from '../../../../lib/supabase';
-import { buildQuarterPack, quarterBounds, quarterForDate } from '../../../../lib/quarterpack';
+import { buildQuarterPack, quarterBounds, quarterForDate, taxYearLabel } from '../../../../lib/quarterpack';
 import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { gbp0 } from '../../lib/money';
-import { updateDue, UPDATE_ORDINAL } from '../due';
+import { outstandingUpdate, updateDue, UPDATE_ORDINAL } from '../due';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
   INK, LINE, MUTED, ON_GREEN_TINT, PAPER, RIVER, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge,
@@ -94,6 +94,13 @@ export default async function TaxSummaryPage() {
   const due = updateDue(startYear, index);
   const ordinal = UPDATE_ORDINAL[index];
   const hasFigures = sub.txCount > 0;
+
+  // Mandation, asked of the pack rather than re-derived, in the same words app/app/tax/page.tsx
+  // asks it. See the calendar card below for what this screen was saying without it.
+  const mandated = pack.ytd.mtdApplies && !isCompany;
+  // UTC, because quarterForDate() above reads the clock in UTC. Two readings of "today" on one
+  // page is how a boundary day comes to disagree with itself.
+  const outstanding = mandated ? outstandingUpdate(now.toISOString().slice(0, 10), startYear, index) : null;
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -192,13 +199,69 @@ export default async function TaxSummaryPage() {
       {/* ── THE CALENDAR. Which update this is and when it is due. ─────────────────────────────
           Withheld from a director whole. A due date is the date of a return he does not file, and
           there is nothing honest to put in its place without inventing a company deadline, so the
-          card simply is not there. */}
-      {isCompany ? null : (
+          card simply is not there.
+
+          ═══════════════════════════════════════════════════════════════════════════════════
+          🔴 AND IT WAS HANDING A GARDENER ON £8,400 A QUARTERLY DEADLINE.
+
+          The gate was isCompany and nothing else, so EVERY sole trader read "The second update of
+          2026/27 ... is due by 7 November 2026", whatever he earned. Making Tax Digital for Income
+          Tax starts at £50,000 of gross qualifying income. buildQuarterPack() had already worked
+          that test out and put the answer in pack.ytd.mtdApplies; app/app/tax/page.tsx already
+          withholds its own MTD row on it, in these words; renderQuarterPackHtml() already branches
+          its Making Tax Digital sentence on it. Only this card ignored it, so the SCREEN AND THE
+          DOCUMENT HE PRINTS FROM THE SAME PACK said different things about the same fact, which is
+          the one thing lib/quarterpack.ts's own header says must never happen.
+
+          ⚠️ THE UNDER THE LINE BRANCH SAYS WHERE HE STANDS RATHER THAN NOTHING. A blank space
+          where a deadline used to be reads as "we could not work it out". His gross and the
+          threshold are both already in the pack, so the truth costs the same box.
+
+          ⚠️ AND IT NAMES HMRC'S ACTUAL TEST, which is not the one this page can run. Mandation
+          is decided on a return already filed (2026/27 is set by the 2024/25 figures), and the pack
+          tests gross income in the year you are in because that is what Lekhio holds. Saying so is
+          not a hedge: for a man under the line it is the only sentence that tells him where the
+          answer really comes from. See docs and Jag's note on the wider sweep.
+          ═══════════════════════════════════════════════════════════════════════════════════ */}
+      {isCompany ? null : mandated ? (
         <section className="lek-card">
-          <h2 className="lek-h2">The {ordinal} update of {pack.taxYear}</h2>
+          <h2 className="lek-h2">
+            {outstanding
+              ? `Your ${outstanding.ordinal} update is still open`
+              : `The ${ordinal} update of ${pack.taxYear}`}
+          </h2>
+          {outstanding ? (
+            <>
+              <p style={S.body}>
+                It covers 6 April to {prettyEnd(outstanding.end)} and is due by <b>{outstanding.due}</b>.
+                Your figures are already kept in the shape an update reports, so the deadline is a
+                date, not a job.
+              </p>
+              <p style={S.quiet}>
+                The {ordinal} update, 6 April to {prettyEnd(bounds.end)}, follows it and is due by{' '}
+                {due}. It restates the whole year again, everything above included.
+              </p>
+            </>
+          ) : (
+            <p style={S.body}>
+              It covers 6 April to {prettyEnd(bounds.end)} and is due by <b>{due}</b>. Your figures are
+              already kept in the shape an update reports, so the deadline is a date, not a job.
+            </p>
+          )}
+        </section>
+      ) : (
+        <section className="lek-card">
+          <h2 className="lek-h2">No quarterly update is due from you</h2>
           <p style={S.body}>
-            It covers 6 April to {prettyEnd(bounds.end)} and is due by <b>{due}</b>. Your figures are
-            already kept in the shape an update reports, so the deadline is a date, not a job.
+            Making Tax Digital for Income Tax starts at {gbp0(pack.ytd.mtdThreshold)} of income before
+            costs, and yours since 6 April is {gbp0(pack.ytd.grossQualifyingIncome)}. So there is no
+            update here for anyone to be waiting on. The figures above are yours to check.
+          </p>
+          <p style={S.quiet}>
+            HMRC decides who is in it from a return already filed rather than the year you are in, so
+            for {pack.taxYear} it is your {taxYearLabel(startYear - 2)} figures that settle it and not
+            the ones on this page. Your Lekhio is kept in update shape either way, so the day it does
+            apply there is nothing to catch up on.
           </p>
         </section>
       )}

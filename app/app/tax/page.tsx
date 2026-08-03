@@ -254,10 +254,16 @@ export default async function TaxHubPage() {
             <span style={S.doorLabel}>Quarterly summary</span>
             {/* The door stays for a director, because the figures behind it are his own money added
                 up. What goes is the promise of an update he does not have to make. */}
+            {/* \u26a0\ufe0f AND THE DOOR MUST NOT PROMISE A DEADLINE EITHER. "When the next one is due"
+                asserts there IS a next one, which for a man under the Making Tax Digital line there
+                is not. `mtd` is already in scope here for the row above; the third branch says what
+                is behind the door for him, which is his own figures. */}
             <span style={S.rowBody}>
               {isCompany
                 ? 'Your figures since 6 April, and the quarter on its own.'
-                : 'What an update would report today, and when the next one is due.'}
+                : mtd
+                  ? 'What an update would report today, and when the next one is due.'
+                  : 'What an update would report today, and where you stand against the line.'}
             </span>
           </a>
           <a href="/app/tax/what-if" style={S.door} className="lek-hit">

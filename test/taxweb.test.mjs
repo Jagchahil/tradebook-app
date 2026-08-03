@@ -253,7 +253,9 @@ writeFileSync(
 );
 writeFileSync(
   path.join(stage, 'due.ts'),
-  read('app/app/tax/due.ts').replace("from '../../../lib/quarterpack'", "from './quarterpack.ts'"),
+  read('app/app/tax/due.ts')
+    .replace("from '../../../lib/quarterpack'", "from './quarterpack.ts'")
+    .replace("from '../../../lib/taxengine'", "from './taxengine.ts'"),
 );
 const D = await import(pathToFileURL(path.join(stage, 'due.ts')).href);
 const T = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);
@@ -268,6 +270,56 @@ ok('🔴 PARITY WITH THE ENGINE\'S GRADED CONCEPT: the exam bank and the screen 
   D.updateDueISO(2026, 1) === T.concept('mtd_first_quarter_deadline'));
 ok('the ordinal words read like a person', D.UPDATE_ORDINAL[1] === 'first' && D.UPDATE_ORDINAL[2] === 'second'
   && D.UPDATE_ORDINAL[3] === 'third' && D.UPDATE_ORDINAL[4] === 'fourth');
+
+// ---------------------------------------------------------------------------------------------
+// 6. THE UPDATE THAT IS STILL OPEN, AND THE CARD THAT USED TO NAME THE WRONG ONE.
+// ---------------------------------------------------------------------------------------------
+// On 3 August 2026 the summary page said "The second update of 2026/27 ... is due by 7 November
+// 2026" while HMRC's first quarterly update, 6 April to 5 July, was due on 7 August 2026, four days
+// later. outstandingUpdate() exists to close that window, and it opens four times a year.
+ok('\ud83d\udd34 3 AUGUST 2026: the first update is still open, and it is the one that matters',
+  (() => { const o = D.outstandingUpdate('2026-08-03', 2026, 2);
+    return o && o.ordinal === 'first' && o.due === '7 August 2026' && o.end === '2026-07-05'; })());
+ok('on its own due date it is still open, because that day is the deadline',
+  D.outstandingUpdate('2026-08-07', 2026, 2) !== null);
+ok('the day after, it is history and stops being a nudge',
+  D.outstandingUpdate('2026-08-08', 2026, 2) === null);
+ok('\ud83d\udd34 APRIL 2026 INVENTS NOTHING: there was no update before the first one',
+  D.outstandingUpdate('2026-04-20', 2026, 1) === null);
+ok('October sits inside quarter three with quarter two still open',
+  (D.outstandingUpdate('2026-10-20', 2026, 3) || {}).due === '7 November 2026');
+ok('January sits inside quarter four with quarter three still open',
+  (D.outstandingUpdate('2027-01-20', 2026, 4) || {}).due === '7 February 2027');
+ok('April 2027 reaches back across the tax year to the fourth update',
+  (() => { const o = D.outstandingUpdate('2027-04-20', 2027, 1);
+    return o && o.ordinal === 'fourth' && o.due === '7 May 2027' && o.startYear === 2026; })());
+ok('the floor is the engine concept, not a second copy of the date',
+  /concept\('mtd_first_quarter_deadline'\)/.test(read('app/app/tax/due.ts')));
+
+// The empty test on the summary page, the same shape the hub already passes above.
+ok('\ud83d\udd34 THE CALENDAR CARD IS DRAWN ONLY WHEN MANDATION IS REAL',
+  /\{isCompany \? null : mandated \? \(/.test(src.summary));
+ok('mandation is the pack\'s answer, never re-derived on the page',
+  /const mandated = pack\.ytd\.mtdApplies && !isCompany;/.test(src.summary));
+ok('the open update is named before the quarter he is standing in',
+  /outstanding \? \(/.test(src.summary));
+// \u26a0\ufe0f RENDERED COPY IS ASSERTED ON codeOnly(), NOT ON THE RAW FILE, and the sabotage pass is
+// what caught it. The negative-assertion rule ("never let a comment answer for the code") turns out
+// to run in BOTH directions: `/return already filed/` passed against a header comment that quoted
+// the very sentence it was meant to police, so deleting the copy would have left the suite green.
+// A guard that a comment can satisfy is not a guard.
+const summaryCode = codeOnly(src.summary);
+ok('a man under the line is told where he stands, not shown a blank',
+  /No quarterly update is due from you/.test(summaryCode));
+ok('\ud83d\udd34 AND HE IS TOLD HMRC\'S ACTUAL TEST BASE, which is a return already filed',
+  /return already filed/.test(summaryCode));
+// \u26a0\ufe0f THE 20,000 ROW CAP IS NOT A TAX THRESHOLD, and it is the one number on this page that
+// looks like one. The first draft of this guard fired on `txns.length >= 20000` and said the page
+// had typed a threshold, which it had not. Stripped BY NAME rather than by loosening the pattern:
+// if anyone ever types 20000 for another reason, this still fires and they have to justify it.
+const summaryNumbers = codeOnly(src.summary).replace(/txns\.length >= 20000/g, '');
+ok('the page types no MTD threshold of its own',
+  !/(?<![\d.])(50000|30000|20000)(?![\d.])/.test(summaryNumbers));
 
 console.log(`\n  ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

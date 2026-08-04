@@ -113,9 +113,7 @@ const HOME_CSS = css`
 .hero p.vs{font-size:16px;line-height:1.55;color:var(--tx);font-weight:600;max-width:520px;margin:0 0 30px;margin-inline:0}
 .cta-row{display:flex;gap:14px;flex-wrap:wrap}
 .hero .micro{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:13.5px;color:var(--tx-mut)}
-.avs{display:flex}
-.avs span{width:30px;height:30px;border-radius:999px;border:2px solid var(--bg);margin-left:-8px}
-.avs span:first-child{margin-left:0}
+/* .avs, the four avatar circles, went with the invented customers. Nothing draws them. */
 @media(max-width:900px){.hero .grid{grid-template-columns:1fr;gap:34px;text-align:center}.cta-row,.hero .micro{justify-content:center}.hero p.sub,.hero p.vs{margin-inline:auto}}
 
 .ba{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
@@ -184,7 +182,8 @@ const HOME_CSS = css`
 .rev-marquee:hover .rev-track{animation-play-state:paused}
 @keyframes hslide{to{transform:translateX(-50%)}}
 .quote{width:360px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px;box-shadow:var(--shadow)}
-.quote .stars{color:var(--saffron);font-size:15px;margin-bottom:12px}
+/* .quote .stars went too. A real quote is a real quote; a rating is a separate claim and
+   nobody has given us one. If a customer ever rates us in writing, it comes back then. */
 .quote p{font-size:16px;margin:0 0 18px}
 .who{display:flex;align-items:center;gap:12px}
 .who .a{width:42px;height:42px;border-radius:999px;display:grid;place-items:center;font-weight:800;font-size:16px}
@@ -286,9 +285,15 @@ export default function HomePage() {
               <Link href="/start" className="btn primary">Start free</Link>
               <Link href="/product" className="btn ghost">See how it works</Link>
             </div>
+            {/* 🔴 THIS LINE CARRIED FIVE STARS AND FOUR AVATARS, AND NEITHER STOOD FOR ANYBODY.
+                Four coloured circles and a ★★★★★ beside "Built with UK sole traders" is the
+                "hundreds of people already use this" pattern with the number left off, which is
+                how you make the claim without ever having to hold it up. There is no rating,
+                because nobody has given one. What is left is the only part that was ever true and
+                is the only part a man reads anyway: seven days free and no card. See the header on
+                `reviews` in app/_shared/site.tsx for the rule and for CAP 3.47 and 3.50. */}
             <div className="micro">
-              <span className="avs"><span style={{ background: '#1B59A6' }} /><span style={{ background: '#E0A33E' }} /><span style={{ background: '#15803D' }} /><span style={{ background: '#134277' }} /></span>
-              <span><b style={{ color: 'var(--saffron)' }}>★★★★★</b> &nbsp;Built with UK sole traders. 7 days free, no card.</span>
+              <span>7 days free, no card. Cancel in one tap.</span>
             </div>
           </div>
           <div><HeroReport /></div>
@@ -544,23 +549,35 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Proof slider */}
-      <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
-        <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">Built with people who work for themselves.</h2><p className="mut" style={{ fontSize: 13, marginTop: 8 }}>Illustrative examples, based on real self employed people.</p></div>
-        </div>
-        <div className="rev-marquee reveal">
-          <div className="rev-track">
-            {[...reviews, ...reviews].map((r, i) => (
-              <div className="quote" key={i} aria-hidden={i >= reviews.length ? true : undefined}>
-                <div className="stars" aria-hidden="true">★★★★★</div>
-                <p>&quot;{r.quote}&quot;</p>
-                <div className="who"><span className="a" style={{ background: r.tint, color: r.fg }}>{r.name.charAt(0)}</span><div><b>{r.name}</b><small>{r.trade}</small></div></div>
-              </div>
-            ))}
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          🔴 SIX INVENTED CUSTOMERS SCROLLED PAST HERE, FOREVER, WITH FIVE STARS EACH.
+          "Jas, Electrician, Birmingham." Nobody said it. The hedge under the heading read
+          "Illustrative examples, based on real self employed people" at 13px in grey, which is
+          not what CAP 3.47's "obviously fictitious" means and is not the permission CAP 3.50
+          requires, because there was nobody to ask. The full reasoning, and the three tests a
+          quote has to pass to go in, are on `reviews` in app/_shared/site.tsx.
+          ⚠️ THE SECTION IS NOT DELETED, IT IS EMPTY, and that is deliberate. Today reviews is []
+          so this renders NOTHING and the front door simply does not have this block. Put one real
+          quote in the array and the section comes back on its own, in place, already styled. No
+          page to rebuild and nothing for anybody to remember six months from now.
+          ═══════════════════════════════════════════════════════════════════════════════════════ */}
+      {reviews.length > 0 ? (
+        <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
+          <div className="wrap">
+            <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">In their own words.</h2></div>
           </div>
-        </div>
-      </section>
+          <div className="rev-marquee reveal">
+            <div className="rev-track">
+              {[...reviews, ...reviews].map((r, i) => (
+                <div className="quote" key={i} aria-hidden={i >= reviews.length ? true : undefined}>
+                  <p>&quot;{r.quote}&quot;</p>
+                  <div className="who"><span className="a" style={{ background: r.tint, color: r.fg }}>{r.name.charAt(0)}</span><div><b>{r.name}</b><small>{r.trade}</small></div></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* Pricing */}
       <section className="pricewrap">

@@ -368,14 +368,49 @@ export const compareRows = [
   { label: 'Connect your bank, read only', lekhio: bankMark(), apps: true, diy: false },
 ];
 
-export const reviews = [
-  { quote: 'I tried one of the big accounting apps and lost a whole Sunday just setting it up. With Lekhio I sent one photo and it was already working.', name: 'Jas', trade: 'Electrician, Birmingham', tint: RIVER_TINT, fg: RIVER },
-  { quote: 'My old app started charging me once I went over a receipt limit. Lekhio is one price and I snap as many as I like.', name: 'Sophie', trade: 'Mobile hairdresser, Leeds', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
-  { quote: 'The old software talked to me like I was an accountant. I am not. This one just speaks plain English.', name: 'Marcus', trade: 'Plasterer, Bristol', tint: GREEN_TINT, fg: GREEN },
-  { quote: 'Every time I had a question the other one put me through a robot. On Lekhio I got a straight answer on the same chat, in seconds.', name: 'Priya', trade: 'Freelance designer, London', tint: RIVER_TINT, fg: RIVER },
-  { quote: 'I used to dread the quarter. Now the figures are sat there ready and I just check them over a brew.', name: 'Tom', trade: 'Plumber, Manchester', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
-  { quote: 'Voice notes are the best bit. Hands full on the roof, I just say what I spent and carry on.', name: 'Danny', trade: 'Roofer, Glasgow', tint: GREEN_TINT, fg: GREEN },
-];
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS HELD SIX INVENTED CUSTOMERS, WITH NAMES, TRADES, TOWNS AND FIVE STARS EACH.
+//
+// "Jas, Electrician, Birmingham." "Sophie, Mobile hairdresser, Leeds." Nobody said any of it. They
+// ran in an auto scrolling marquee on the front door with a five pointed rating on every card, and
+// the only hedge was "Illustrative examples, based on real self employed people" at 13px in grey.
+//
+// ⚠️ AND THE PRODUCT ALREADY SAID, IN WRITING, THAT IT DID NOT DO THIS. app/llms.txt publishes
+// "Lekhio does not publish invented testimonials or user numbers" to every assistant that reads it.
+// Two answers to one question, and the one a customer saw was the false one.
+//
+// 🔴 WHY IT COULD NOT STAY, WHATEVER THE SMALL PRINT SAID.
+//
+//   CAP 3.47  hold documentary evidence that a testimonial is genuine, "unless it is obviously
+//             fictitious", and hold contact details for the person who gave it.
+//   CAP 3.50  never feature a testimonial without permission.
+//
+// A plausible named tradesman with a star rating is not obviously fictitious. That is the entire
+// reason somebody writes one. And there was no permission to hold, because there was no person.
+// Fake consumer reviews are separately a banned practice under the DMCC Act 2024, Schedule 20
+// paragraph 13, in force 6 April 2025.
+//
+// ⚠️ THE ARRAY STAYS, EMPTY, AND THAT IS THE POINT. The section on app/page.tsx renders nothing
+// while it is empty, so the front door simply does not have that block today. The moment there is
+// ONE real quote it goes in here and the section comes back on its own, with no page to rebuild
+// and nothing to remember. What may go in:
+//
+//   1. a real customer said it, in their own words,
+//   2. we hold it in writing, with a way to contact them, and
+//   3. they have agreed to it being printed with the name shown.
+//
+// All three, or it does not go in. test/frontdoor.test.mjs holds this and names the six that were
+// here, so they cannot come back by a copy and paste.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export interface Review {
+  quote: string;
+  name: string;
+  trade: string;
+  tint: string;
+  fg: string;
+}
+
+export const reviews: Review[] = [];
 
 export const claimExamples = [
   { text: 'drove 24 miles', result: '£13.20 of travel, logged' },
@@ -398,19 +433,17 @@ export const comingSoon = [
   { icon: '🧑‍💼', title: 'A real accountant, on tap', body: 'For the tricky bits, a qualified accountant inside Lekhio. No leaving for help, ever.' },
 ];
 
-export const fixes = [
-  { stars: 1, who: 'A sole trader, reviewing another app', gripe: 'Tried for two days to reach a human. Every time I just got a bot going in circles.', fix: 'Ask Lekhio and get a straight answer fast, about your own figures. A real person is behind it when you need one.' },
-  { stars: 1, who: 'A tradesperson, reviewing another app', gripe: 'They put the price up again, and capped how many receipts I could scan. Felt like a trap.', fix: 'One flat £12.99 a month. Unlimited receipts, voice notes and mileage. No tiers, no surprises.' },
-  { stars: 1, who: 'A self employed driver, reviewing another app', gripe: 'The bank feed kept dropping. Half my month went missing and I had to relink it again and again.', fix: 'Lekhio never leans on a fragile feed. Snap it or text it and it is logged for good. Connecting your bank, when it lands, is a bonus, never a crutch.' },
-  // ⚠️ NOT "the VAT". We do not read VAT off a receipt: the vision prompt in lib/claude.ts asks for
-  // the merchant, the total, the category and the date, and the word VAT does not appear in it.
-  // This now says what the capture screen says, which is what actually comes back.
-  { stars: 2, who: 'A trades subcontractor, reviewing another app', gripe: 'I photographed a receipt and it would not even log it. It just tried to match it to something and gave up.', fix: 'Send a photo and Lekhio reads it and logs the lot: the shop, the total and the date, in seconds. No matching, no retyping.' },
-  { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'They held my own money for weeks with a copy and paste excuse. Never again.', fix: 'Lekhio never holds your money or touches your account. We keep the records, that is all. Your cash is only ever yours.' },
-  { stars: 2, who: 'A freelancer, reviewing another app', gripe: 'It talks to me like I am an accountant. I am not. Half of it I do not understand.', fix: 'Plain English, and it opens in your browser. If you can send a text, you can use Lekhio.' },
-  { stars: 2, who: 'A self employed cleaner, reviewing another app', gripe: 'Once it auto sorted something wrong, fixing it was a proper faff. I gave up correcting it.', fix: 'Wrong category? Just say "that was fuel, not food" and it is fixed in one line. You are always in charge of every entry.' },
-  { stars: 1, who: 'A small business owner, reviewing another app', gripe: 'Cancelling was a nightmare. I felt completely locked in.', fix: 'Cancel any time, in one tap. Your records export whenever you want.' },
-];
+// 🔴 AND EIGHT INVENTED ONE AND TWO STAR REVIEWS OF OTHER PEOPLE'S APPS WENT WITH THEM.
+//
+// "A sole trader, reviewing another app: tried for two days to reach a human." Nobody said that
+// either. Inventing praise for yourself is one thing; inventing complaints about a named
+// competitor's product is a second thing on top of it, and this export had NO caller at all, so it
+// was pure risk with not one byte of benefit. The gripes are gone. Nothing referenced them.
+//
+// ⚠️ THE FIXES THEMSELVES ARE NOT LOST. Every claim worth making from that list is already made,
+// in our own voice, where it belongs: the flat price and the receipt limits on /pricing, the plain
+// English promise on /product, "we never hold your money" on /security, and the one tap cancel on
+// /app/you/billing. A true claim does not need a fictional person to say it.
 
 export const freeTools = [
   { href: '/tax-calculator', icon: '🧮', title: 'Tax calculator', body: 'Your tax, National Insurance, take home and what to set aside, in seconds.' },
@@ -422,6 +455,7 @@ export const freeTools = [
   { href: '/landlord-tax-calculator', icon: '🏠', title: 'Landlord tax calculator', body: 'Your rental tax now, and what the new April 2027 property rates will add. A year early.' },
   { href: '/rent-a-room-checker', icon: '🛏️', title: 'Rent a Room checker', body: 'Lodger income and the £7,500 rule: tax free or not, and the election most people miss.' },
   { href: '/sole-trader-vs-limited', icon: '⚖️', title: 'Sole trader vs limited', body: 'Which keeps you more on 2026/27 rates, honestly, including the costs the folklore forgets.' },
+  { href: '/how-mtd-works', icon: '📅', title: 'MTD checker', body: 'Which line your income sits above, when it starts, and the return HMRC actually tests. No signup.' },
   { href: '/free-mtd-filing', icon: '🆓', title: 'Free MTD filing', body: 'A straightforward return, prepared and filed free, forever. Join the list to be first.' },
 ];
 
@@ -618,15 +652,12 @@ export const reportCss =
     .join('');
 
 // ---------- helper components ----------
-export function Stars() {
-  return (
-    <div aria-label="5 out of 5" style={{ display: 'flex', gap: 2, marginBottom: 14 }}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <span key={i} style={{ color: SAFFRON, fontSize: 15 }}>★</span>
-      ))}
-    </div>
-  );
-}
+// 🔴 Stars() AND ReviewCard() WERE DELETED WITH THE INVENTED CUSTOMERS THEY DREW.
+// Both were already dead exports: nothing outside this file imported either, because app/page.tsx
+// drew its own markup. A component whose only job is to put five stars on a quote is a loaded gun
+// left on the table next to an empty reviews array. When there are real quotes, the section on
+// app/page.tsx renders them, and a rating only goes back on the page if a customer actually gave
+// one and we hold it in writing.
 
 export function Mark({ value }: { value: boolean | string }) {
   if (value === true) {
@@ -642,21 +673,6 @@ export function Mark({ value }: { value: boolean | string }) {
   return <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{labels[value] ?? String(value)}</span>;
 }
 
-export function ReviewCard({ r }: { r: (typeof reviews)[number] }) {
-  return (
-    <div className="rev-card" style={{ backgroundColor: PANEL, border: `1px solid ${LINE}`, borderRadius: 18, padding: 26, display: 'flex', flexDirection: 'column' }}>
-      <Stars />
-      <p style={{ fontSize: 15.5, color: INK, lineHeight: 1.6, margin: '0 0 20px', flex: 1 }}>“{r.quote}”</p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: r.tint, color: r.fg, fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{r.name.charAt(0)}</span>
-        <div>
-          <div style={{ fontSize: 14.5, fontWeight: 700, color: INK }}>{r.name}</div>
-          <div style={{ fontSize: 13, color: MUTED }}>{r.trade}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function RiverDivider() {
   return (

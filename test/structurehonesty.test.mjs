@@ -359,5 +359,68 @@ const empty = {
     /Nothing to work out yet/.test(t) && /fills in by itself/.test(t));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n🔴 THE FIFTH LIE: THE WEB SIGNUP COULD NOT SAY "TWO OF US"\n');
+//
+// /start step 2 offered just me, a business name, a limited company. Two people running a business
+// together picked "A business name" and tradeTypeToBusinessType folded it to sole_trader.
+// lib/supabase.ts said so out loud: "Partnership is not offered on the web, so it never arrives
+// here." app/app/setup has offered it since 31 July and its own header records the cost: "a coffee
+// shop run by two people who chose 'A business name' is sitting in the database as a SOLE TRADER,
+// silently, and lib/partnership.ts has been ready for him since 17 July with nowhere to say so."
+//
+// GOV.UK, set up a business partnership: "each partner pays tax on their share." Stored as a sole
+// trader, EVERY figure the product shows him is the whole firm's.
+{
+  const start = read('app/start/page.tsx');
+  const startCode = codeOnly(start);
+  const supa = codeOnly(read('lib/supabase.ts'));
+
+  ok('🔴 /start step 2 offers a partnership at all',
+    /\['partnership', '', 'Me and somebody else'/.test(start));
+  ok('...in app/app/setup\'s own words, so one fact is not worded twice',
+    /Me and somebody else/.test(start) && /Me and somebody else/.test(read('app/app/setup/page.tsx')));
+  ok('the type admits it, so tsc names anywhere that forgot',
+    /type TradeType = 'sole' \| 'business' \| 'ltd' \| 'partnership' \| null;/.test(startCode));
+
+  // 🔴 THE SHARE, WHICH IS AS BIG A FACT AS THE STRUCTURE. getBusinessProfile reads a missing
+  // share as 100%, on purpose, so a half answered setup cannot halve a sole trader's tax. That is
+  // right for everyone but the one man the column exists for, who is then shown his partners'
+  // money as his own: the defect commit 0e9175e2 fixed on the income summary a lender reads.
+  ok('🔴 and it asks for his share of the profit',
+    /Your share of the profit/.test(start) && /id="signup-share"/.test(start));
+  ok('🔴 AND HE CANNOT GET PAST STEP 2 WITHOUT ANSWERING IT',
+    /tradeType !== 'partnership' \|\| shareValid/.test(startCode));
+  ok('...to a real percentage, 1 to 100, and never 0',
+    /shareNum >= 1 && shareNum <= 100/.test(startCode));
+  ok('🔴 and the box carries NO prefilled guess about his money',
+    !/value=\{share \|\| '50'\}/.test(startCode) && !/useState\('50'\)/.test(startCode));
+  ok('the answer is posted, and only when it means something',
+    /partnershipShare: tradeType === 'partnership' && shareValid \? shareNum : undefined/.test(startCode));
+
+  ok('🔴 the mapper no longer folds a partnership into a sole trader',
+    /if \(t === 'partnership'\) return 'partnership';/.test(supa));
+  ok('...and a trading name still folds, because that IS a sole trader',
+    !/if \(t === 'business'\) return 'partnership'/.test(supa));
+  ok('🔴 and the share is carried onto the user when he proves his email',
+    /select=trade_type,trade,name,address,postcode,vat_registered,streams,partnership_share/.test(supa)
+    && /setPartnershipShare\(userId, pct\)/.test(supa));
+  ok('...only for a partnership, and only for a number we believe',
+    /tradeTypeToBusinessType\(s\.trade_type\) === 'partnership'/.test(supa)
+    && /pct >= 1 && pct <= 100/.test(supa));
+  ok('the firm\'s name is filed as a business, not as the person',
+    /s\.trade_type === 'ltd' \|\| s\.trade_type === 'business' \|\| s\.trade_type === 'partnership'/.test(supa));
+
+  // ⚠️ THE COLUMN HAS TO EXIST OR THE ANSWER IS DROPPED IN SILENCE. The migration is the only
+  // thing standing between a man answering the question and nothing happening.
+  const sql = read('supabase/APPLY_2026-08-04_signup_partnership_share.sql');
+  ok('🔴 the migration that gives the answer somewhere to land is in the repo',
+    /add column if not exists partnership_share integer/.test(sql));
+  ok('...and the database refuses the same range the code refuses',
+    /partnership_share >= 1 and partnership_share <= 100/.test(sql));
+  ok('...and it carries a verify step that states what it must return',
+    /IT MUST RETURN EXACTLY ONE ROW/.test(sql) && /information_schema\.columns/.test(sql));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

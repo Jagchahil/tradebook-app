@@ -36,6 +36,11 @@ const CAPTURED_TOOLS = [
   ['app/rent-a-room-checker/Calc.tsx', 'rent-a-room-checker'],
   ['app/landlord-tax-calculator/Calc.tsx', 'landlord-tax-calculator'],
   ['app/invoice-generator/Generator.tsx', 'invoice-generator'],
+  // 🔴 /how-mtd-works JOINED THE FAMILY ON 4 AUGUST and had been the odd one out for months: a
+  // real checker a stranger could drag, with none of the machinery that makes a free tool pay.
+  // Note the file is the PAGE, not a Calc.tsx: the control is a range input driven by a vanilla
+  // script rather than a React component, because this page ships no client bundle of its own.
+  ['app/how-mtd-works/page.tsx', 'how-mtd-works'],
 ];
 
 for (const [file, source] of CAPTURED_TOOLS) {
@@ -77,6 +82,40 @@ ok('no AI claim is made for THIS path specifically (it is what makes it free)',
 
 ok('an FAQPage schema is present for SEO, same pattern as the other tool pages',
   /'@type': 'FAQPage'/.test(pageSrc));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 "SAME PATTERN AS THE OTHER TOOL PAGES" WAS ASSERTED OF ONE PAGE AND OF NO OTHER.
+//
+// The line above tested /free-mtd-filing and nothing else, so on 4 August a sabotage pass tore the
+// FAQPage schema clean off /how-mtd-works and all 157 suites stayed green. That is the same shape
+// as the CSS comment guard that named the three files it had just fixed: a claim about a FAMILY,
+// checked on one member.
+//
+// A missing schema is quiet in exactly the way that matters. Nothing breaks, no page looks wrong,
+// and the tool simply stops being eligible for the rich result it was built to win. These pages
+// exist to be found by a stranger with a question, so the schema IS the feature.
+//
+// ⚠️ THE LIST IS DERIVED FROM CAPTURED_TOOLS, not typed out again, so a tool added there is
+// covered here on the same line and cannot be added to one list and forgotten in the other.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ AND THE LOOP IS PROVED BY WHAT IT DID, NOT BY WHAT IT WAS GIVEN.
+//
+// The first version of this asserted CAPTURED_TOOLS.length === 8, and a sabotage pass pointed the
+// loop at [] instead: the length was still 8, so the assertion still passed, and sixteen checks
+// simply never happened. A sweep that iterates nothing passes every assertion it never makes. That
+// is the same hole the CSS comment guard had on 4 August, when it shipped green over 2,880 live
+// bytes, and a count of the INPUT does not close it. A count of the OUTPUT does.
+const beforeSweep = pass + fail;
+for (const [file] of CAPTURED_TOOLS) {
+  const page = file.replace(/\/(Calc|Generator)\.tsx$/, '/page.tsx');
+  const src = read(page);
+  ok(`${page.replace('/page.tsx', '').replace('app/', '')} carries an FAQPage schema too`,
+    /'@type': 'FAQPage'/.test(src));
+  ok(`...and actually renders it, rather than declaring one nothing reads`,
+    /ld\+json/.test(src) && /JSON\.stringify\(faqSchema\)/.test(src));
+}
+ok(`🔴 and the sweep above really ran, two checks on each of the ${CAPTURED_TOOLS.length} tools`,
+  pass + fail - beforeSweep === CAPTURED_TOOLS.length * 2 && CAPTURED_TOOLS.length === 8);
 
 // ---------------------------------------------------------------------------------------------
 // 3. The page is actually reachable: registered in the sitemap and the site's own tool listings.

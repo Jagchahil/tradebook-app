@@ -12,11 +12,11 @@ import {
 
 export const metadata: Metadata = {
   alternates: { canonical: '/product' },
-  title: 'What Lekhio does. Snap it, say it, sorted.',
+  title: 'What Lekhio does. The first employee your business hires.',
   // ⚠️ THE SEARCH RESULT HAS TO MATCH THE PAGE. This said "Connect your bank" while the card
   // further down correctly badges that feature BUILT, SWITCHING ON SOON from bankBadge().
   description:
-    'Snap a receipt, say it out loud, or import your bank statement, and Lekhio reads it, sorts it, and keeps it tidy and ready. Receipts, mileage, invoices, CIS and quarterly tax, all in your browser. You approve before anything reaches HMRC.',
+    'Lekhio keeps the books, works out the tax, chases the invoices and finds what you are owed, then brings it to you to sign off. Receipts, mileage, invoices, CIS and quarterly tax. £12.99 a month, and you approve before anything reaches HMRC.',
 };
 
 const PRODUCT_CSS = css`
@@ -167,12 +167,22 @@ export default function ProductPage() {
 
       <SiteNav />
 
-      {/* Hero */}
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          🔴 THE HERO SOLD THE BUTTONS. "Snap it. Say it. Sorted." over "the whole back office, in
+          one chat" describes what your THUMB does, and doc 104 is one line long about that: sell
+          the outcome, never the technology. Lekhio is not software you buy, it is the first
+          employee a business ever hires, and an employee is described by the job it does.
+          ⚠️ THE PRICE IS IN THE HERO ON PURPOSE. It is the argument, not a detail: nobody else in
+          this market will do this work for £12.99, and a man comparing us to an accountant or to
+          an evening of his own time needs the number in front of him before the feature list.
+          Doc 108 still holds, and this does not break it: we price on the WORK, never on the
+          saving. There is no "saves you £600" here and there never will be.
+          ═══════════════════════════════════════════════════════════════════════════════════════ */}
       <section className="hero center">
         <div className="wrap">
-          <span className="pill"><span className="dot" /> The whole back office, in one chat</span>
-          <h1 style={{ marginTop: 20 }}>Snap it. Say it.<br /><span className="gt">Sorted.</span></h1>
-          <p className="sub">Text Lekhio like you text a mate. It reads it, sorts it, and it lands in your app, tidy and ready. Watch how.</p>
+          <span className="pill"><span className="dot" /> Your first employee</span>
+          <h1 style={{ marginTop: 20 }}>Somebody to do<br /><span className="gt">the paperwork.</span></h1>
+          <p className="sub">Lekhio is the first person your business hires. It keeps the books, works out the tax, finds what you are owed, and brings you the answer. You say yes. It costs £12.99 a month.</p>
           <div className="cta-row"><Link href="/start" className="btn primary">Start free</Link><Link href="/pricing" className="btn ghost">See pricing</Link></div>
         </div>
       </section>
@@ -181,19 +191,24 @@ export default function ProductPage() {
       <section style={{ paddingTop: 8 }}>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 28 }}>
-            <div className="eyebrow">Everything it does</div>
-            <h2 className="h2">Your whole back office, in one place.</h2>
-            <p className="lead">Ten seconds a day. Lekhio does the rest and keeps it tidy, ready for tax.</p>
+            {/* 🔴 "Everything it does" IS A SPEC SHEET, AND A SPEC SHEET IS THE WRONG DOCUMENT.
+                Eight cards under "everything it does" is how software is sold. An employee is
+                described by the job, so the heading is the job and the cards are the tasks in it.
+                Not one card was cut and not one word of what it can do was lost: the same eight
+                things, said as work somebody does for you rather than as features you operate. */}
+            <div className="eyebrow">The job</div>
+            <h2 className="h2">What it does all week, so you do not.</h2>
+            <p className="lead">Ten seconds of yours. The rest is its problem, and it never clocks off.</p>
           </div>
           <div className="featgrid reveal">
-            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📸" color="var(--river)" size={26} /></div><h3>Snap a receipt</h3><p>Photo it, Lekhio reads the shop, the total and the date.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="🎙️" color="var(--saffron-deep)" size={26} /></div><h3>Say it or type it</h3><p>&quot;spent 40 on diesel&quot;, by voice note or text.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}><Ic e="🚐" color="var(--green)" size={26} /></div><h3>Mileage</h3><p>&quot;drove 24 miles&quot; and it claims it at the HMRC rate.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><h3>Invoices</h3><p>Built and sent from the chat, chased when late.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="👷" color="var(--saffron-deep)" size={26} /></div><h3>CIS refund</h3><p>Deductions tracked, your refund watched all year.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📊" color="var(--river)" size={26} /></div><h3>Tax set aside</h3><p>One honest number, updated as you earn.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}><Ic e="📈" color="var(--green)" size={26} /></div><h3>Ways to save</h3><p>The legal reliefs you are owed, on your numbers.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="✅" color="var(--saffron-deep)" size={26} /></div><h3>You approve</h3><p>MTD quarterly prep, nothing filed without your yes.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📸" color="var(--river)" size={26} /></div><h3>Files your receipts</h3><p>Photograph it and forget it. It reads the shop, the total and the date, and puts it where it belongs.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="🎙️" color="var(--saffron-deep)" size={26} /></div><h3>Takes it down as you say it</h3><p>&quot;Spent 40 on diesel.&quot; Said out loud with your hands full, or typed. Either way it is logged.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}><Ic e="🚐" color="var(--green)" size={26} /></div><h3>Claims your mileage</h3><p>&quot;Drove 24 miles.&quot; It knows the rate, does the sum, and puts the claim in for you.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><h3>Sends the invoices</h3><p>Written, sent, and chased when they run late, which is the part everybody puts off.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="👷" color="var(--saffron-deep)" size={26} /></div><h3>Watches your CIS refund</h3><p>Every deduction tracked all year, so the money you are owed back is counted and not forgotten.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📊" color="var(--river)" size={26} /></div><h3>Tells you what to put by</h3><p>One number, honest, kept up to date as you earn, so January is not a shock.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}><Ic e="📈" color="var(--green)" size={26} /></div><h3>Goes looking for money</h3><p>Every legal relief you are entitled to, checked against your own figures, with the working shown.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="✅" color="var(--saffron-deep)" size={26} /></div><h3>Brings it to you to sign off</h3><p>Your quarterly figures prepared and ready. Nothing goes anywhere until you say yes.</p></div>
           </div>
           <div className="compliance reveal">
             <div className="ci">Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
@@ -207,13 +222,15 @@ export default function ProductPage() {
       <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 40 }}>
-            <div className="eyebrow">From a text to your books</div>
-            <h2 className="h2">You text it. It lands in your app.</h2>
-            <p className="lead">One line. Seconds later it is logged, sorted, and sat in your books.</p>
+            {/* Showing beats telling, so the demo stays exactly as it was. Only the framing
+                moved: this is not "look how the messaging works", it is "look how little you do". */}
+            <div className="eyebrow">Your half of the work</div>
+            <h2 className="h2">You send one line. That is your job done.</h2>
+            <p className="lead">Seconds later it is read, sorted, filed and counted, without you opening anything.</p>
           </div>
           <div className="journey reveal">
             <div>
-              <div className="jlabel">1 · You tell Lekhio</div>
+              <div className="jlabel">1 · What you do</div>
               <div className="wphone">
                 <div className="wahead"><span className="a">✅</span><div><b>Lekhio</b><small>your first employee</small></div></div>
                 <div className="wchat">
@@ -224,7 +241,7 @@ export default function ProductPage() {
             </div>
             <div className="jarrow">→</div>
             <div>
-              <div className="jlabel">2 · It appears in your app</div>
+              <div className="jlabel">2 · What it does</div>
               <div className="jphone">
                 <div className="appbar"><b>Feed</b><Ic e="🔔" color="var(--tx-mut)" size={16} /></div>
                 <div className="appbody">
@@ -242,8 +259,10 @@ export default function ProductPage() {
       <section>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 8 }}>
+            {/* "One chat" is the channel again, and the channel is not the product. What a man
+                is choosing between is doing this himself and having it done. */}
             <div className="eyebrow">Tap one, watch it happen</div>
-            <h2 className="h2">One chat. Everything handled.</h2>
+            <h2 className="h2">Handed over, not learned.</h2>
           </div>
           {/* Real buttons, not divs: a div is not focusable and cannot be reached
               or activated with a keyboard, so these tabs were invisible to anyone
@@ -320,9 +339,9 @@ export default function ProductPage() {
       <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 38 }}>
-            <div className="eyebrow" style={{ color: 'var(--saffron-deep)' }}>Meet your back office</div>
-            <h2 className="h2">Two helpers. One answers, one watches.</h2>
-            <p className="lead">Every other app waits for you to ask. Lekhio comes with a second helper that speaks first.</p>
+            <div className="eyebrow" style={{ color: 'var(--saffron-deep)' }}>Who you are hiring</div>
+            <h2 className="h2">Two of them. One answers, one watches.</h2>
+            <p className="lead">Software waits to be opened. One of these speaks first, which is the difference between a tool and somebody working for you.</p>
           </div>
           <div className="helpers reveal">
             <div className="helpercard ai">
@@ -388,6 +407,45 @@ export default function ProductPage() {
         </div>
       </section>
 
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          🔴 THE PAGE NEVER SAID WHAT THE JOB COSTS, WHICH IS THE WHOLE ARGUMENT.
+          The word employee was on the page in July, inside a fake chat header, and nowhere else did
+          the page do anything with it. Doc 104: the category is the business FOR businesses, and
+          the pitch is that the first hire costs £12.99 rather than a salary. A man weighing this up
+          is not comparing us to another app, he is comparing us to doing it himself on a Sunday.
+          ⚠️ DOC 108 STILL HOLDS AND THIS DOES NOT BREAK IT. Not one number here is a SAVING. We
+          never price on what we save him, because that figure is his and it moves. £12.99 is the
+          price, the rest of the column is the WORK, and there is no arithmetic joining them.
+          ⚠️ AND NOTHING HERE COUNTS HOURS FOR HIM EITHER. "Saves you 9 hours a month" is the same
+          invented figure wearing a different hat. The list is what it does, not what that is worth.
+          ═══════════════════════════════════════════════════════════════════════════════════════ */}
+      <section>
+        <div className="wrap">
+          <div className="center reveal" style={{ marginBottom: 34 }}>
+            <div className="eyebrow">What it costs you</div>
+            <h2 className="h2">&pound;12.99 a month. That is the whole of it.</h2>
+            <p className="lead">One price, everything in. No limit on receipts, no tier above you, and no bill at the end of the year for the busy months.</p>
+          </div>
+          <div className="ba reveal" style={{ maxWidth: 900, margin: '0 auto' }}>
+            <div className="new"><h3>What you pay</h3><ul>
+              <li><span className="m">&#10003;</span> &pound;12.99 a month, or &pound;129 a year.</li>
+              <li><span className="m">&#10003;</span> 7 days free first, and no card to start.</li>
+              <li><span className="m">&#10003;</span> Cancel in one tap, and take your records with you.</li>
+              <li><span className="m">&#10003;</span> Unlimited receipts, voice notes and mileage.</li>
+            </ul></div>
+            <div className="new"><h3>What it does for it</h3><ul>
+              <li><span className="m">&#10003;</span> Every receipt read and filed, all year.</li>
+              <li><span className="m">&#10003;</span> Your invoices written, sent and chased.</li>
+              <li><span className="m">&#10003;</span> Your tax worked out as you go, not in January.</li>
+              <li><span className="m">&#10003;</span> Every relief you are owed, looked for and shown with the working.</li>
+            </ul></div>
+          </div>
+          <p className="center mut" style={{ fontSize: 13, marginTop: 18 }}>
+            The full breakdown, both plans and what is not included, is on <Link href="/pricing" style={{ color: 'var(--river)', fontWeight: 700 }}>pricing</Link>.
+          </p>
+        </div>
+      </section>
+
       {/* Coming soon */}
       <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
@@ -409,8 +467,8 @@ export default function ProductPage() {
       <section style={{ paddingTop: 20 }}>
         <div className="wrap">
           <div className="final reveal">
-            <h2>Snap it. Say it. Sorted.</h2>
-            <p>Your whole back office, from a text. 7 days free, no card needed.</p>
+            <h2>Hire it for a week.</h2>
+            <p>7 days free, no card. If it has not earned its keep, walk away in one tap.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
           </div>
         </div>

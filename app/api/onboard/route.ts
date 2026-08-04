@@ -173,6 +173,18 @@ export async function POST(req: NextRequest) {
         // The human being. For a sole trader the form sends the same value in both, which is
         // correct: his name IS the business name.
         person_name: str(b.personName) ?? str(b.name),
+        // 🔴 HIS SLICE OF THE FIRM'S PROFIT, AND IT IS DROPPED FOR EVERYBODY ELSE. A share on a
+        // sole trader is a percentage of nothing, and stored it would sit in the row waiting for
+        // somebody to read it as meaningful. Whole numbers 1 to 100 only: 0 is not an answer
+        // anybody means and would tell the engine he earns nothing at all.
+        partnership_share:
+          str(b.tradeType, 20) === 'partnership'
+          && typeof b.partnershipShare === 'number'
+          && Number.isInteger(b.partnershipShare)
+          && b.partnershipShare >= 1
+          && b.partnershipShare <= 100
+            ? b.partnershipShare
+            : null,
         company_number: co.companyNumber,
         company_name: co.companyName,
         registered_office: co.registeredOffice,

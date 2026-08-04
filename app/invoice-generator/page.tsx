@@ -26,6 +26,53 @@ const LINE = 'var(--bd)';
 const MUTED = 'var(--tx-mut)';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS TOOL HAD NO FAQ SCHEMA, AND IT WAS THE ONLY ONE IN THE FAMILY WITHOUT.
+//
+// Found on 4 August by widening a guard that had been asserting "same pattern as the other tool
+// pages" about exactly one page. Every other free tool carries an FAQPage block and this one, the
+// most searched thing on the list, did not. Nothing looked wrong, nothing broke, and the page was
+// simply not eligible for a result it was built to win. These pages exist to be found by a
+// stranger with a question, so the schema is the feature and not decoration.
+//
+// ⚠️ THE ANSWERS ARE THIS PAGE'S OWN, and the invoice rules are the ones the generator actually
+// applies. A FAQ that says something the page does not do is a rich result that misrepresents it.
+//
+// ⚠️ AND NOT ONE OF THEM MENTIONS VAT ON THE INVOICE ITSELF beyond what the tool does, because a
+// VAT invoice has statutory particulars this generator does not collect. Saying otherwise here
+// would be advice, on a page that gives none.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What has to go on an invoice if I am self employed?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Your name or trading name and address, the customer\u2019s name and address, a unique invoice number, the date, a clear description of what you did, the amount owed, and how and when to pay you. If you are VAT registered there are extra particulars HMRC requires, so check those separately.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What is the difference between a quote and an invoice?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'A quote is a price offered before the work, and it is not a request for money. An invoice comes after, and it asks to be paid. This tool makes either one, and the only thing that changes is the wording and whether payment terms appear.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Is this invoice generator really free?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes, and there is no signup. Everything happens in your own browser, nothing is sent anywhere, and you save the finished invoice as a PDF using your browser\u2019s own print to PDF. There is no watermark and no limit on how many you make.',
+      },
+    },
+  ],
+};
+
 export default function InvoiceGeneratorPage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
@@ -33,6 +80,7 @@ export default function InvoiceGeneratorPage() {
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       <SharedHead />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <div className="site-nav"><SiteNav /></div>
 
       <section className="site-hero" style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 24px 6px' }}>

@@ -1375,6 +1375,8 @@ export interface OnboardSignup {
   // confirms it themselves at Companies House. sic_label is set by createSignup itself from the
   // code, via lib/siccodes.sicByCode, never trusted verbatim from the caller.
   sic_code?: string | null;
+  /** Partnerships only, 1 to 100. Null for everybody else: see the note in app/api/onboard. */
+  partnership_share?: number | null;
 }
 
 // Save a completed web onboarding. Written with the service role key, server side only.
@@ -1385,6 +1387,13 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
   if (signup.trade_type) record.trade_type = signup.trade_type;
   if (signup.name) record.name = signup.name;
   if (signup.person_name) record.person_name = signup.person_name;
+  // 🔴 CLAMPED HERE TOO, not only at the route. This is the last thing between a number and the
+  // column that decides what slice of his firm's money the product calls his, and setPartnershipShare
+  // clamps on the other write for the same reason. Two doors, one rule, neither trusting the other.
+  if (typeof signup.partnership_share === 'number' && Number.isFinite(signup.partnership_share)) {
+    const pct = Math.round(signup.partnership_share);
+    if (pct >= 1 && pct <= 100) record.partnership_share = pct;
+  }
   if (signup.company_number) record.company_number = signup.company_number;
   if (signup.company_name) record.company_name = signup.company_name;
   if (signup.registered_office) record.registered_office = signup.registered_office;
@@ -1421,8 +1430,15 @@ export async function createSignup(signup: OnboardSignup): Promise<void> {
 // The web /start structure choice, mapped to the tax engine's business type. "A business name"
 // is still a sole trader for tax; only a registered company is a limited company. Partnership is
 // not offered on the web, so it never arrives here.
+// 🔴 'partnership' USED TO FALL THROUGH TO sole_trader, BECAUSE THE WEB NEVER SENT IT.
+// The header above this function said so: "Partnership is not offered on the web, so it never
+// arrives here." It is offered now, at /start step 2, so it arrives, and folding it to sole trader
+// would tax a man on his partners' profit as well as his own. 'business' still folds, correctly: a
+// trading name is a sole trader with a sign on the van.
 function tradeTypeToBusinessType(t: string | null | undefined): BusinessType {
-  return t === 'ltd' ? 'limited_company' : 'sole_trader';
+  if (t === 'ltd') return 'limited_company';
+  if (t === 'partnership') return 'partnership';
+  return 'sole_trader';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -1556,13 +1572,14 @@ export async function reconcileSignupToUser(
   // The most recent signup for this man that has not been reconciled yet.
   const res = await fetch(
     `${url}/rest/v1/signups?${match}&reconciled_at=is.null` +
-      `&select=trade_type,trade,name,address,postcode,vat_registered,streams&order=created_at.desc&limit=1`,
+      `&select=trade_type,trade,name,address,postcode,vat_registered,streams,partnership_share&order=created_at.desc&limit=1`,
     { headers: headers() },
   );
   if (!res.ok) return { reconciled: false, applied: [] };
   const rows = (await res.json().catch(() => null)) as Array<{
     trade_type: string | null; trade: string | null; name: string | null; address: string | null;
     postcode: string | null; vat_registered: boolean | null; streams: string[] | null;
+    partnership_share?: number | string | null;
   }> | null;
   if (!Array.isArray(rows) || rows.length === 0) return { reconciled: false, applied: [] };
   const s = rows[0];
@@ -1573,10 +1590,30 @@ export async function reconcileSignupToUser(
     if (await setBusinessType(userId, tradeTypeToBusinessType(s.trade_type))) applied.push('business_type');
   }
 
+  // 🔴 1b. AND HIS SLICE OF IT, WHICH IS AS BIG A FACT AS THE STRUCTURE ITSELF.
+  //
+  // getBusinessProfile reads a missing share as 100%, which is correct for everybody except the one
+  // person the column exists for: a partner with nothing here is shown the WHOLE firm's income,
+  // set aside and tax bill as his own. That is the same defect commit 0e9175e2 fixed on the income
+  // summary a mortgage lender reads, arriving by a different door.
+  //
+  // ⚠️ ONLY FOR A PARTNERSHIP, AND ONLY FOR A NUMBER WE BELIEVE. setPartnershipShare clamps as
+  // well, so a share that survived a hand edited row still cannot leave 1 to 100. A signup from
+  // before the column existed reads null and nothing is written, which leaves him exactly where he
+  // was and lets /app/setup ask him.
+  if (tradeTypeToBusinessType(s.trade_type) === 'partnership') {
+    const pct = Number(s.partnership_share);
+    if (Number.isFinite(pct) && pct >= 1 && pct <= 100) {
+      if (await setPartnershipShare(userId, pct)) applied.push('partnership_share');
+    }
+  }
+
   // 2. Name and address onto the profile, for invoices and the quarter pack header.
   const patch: Record<string, unknown> = {};
   if (s.name) {
-    if (s.trade_type === 'ltd' || s.trade_type === 'business') patch.business_name = s.name;
+    // A partnership's name belongs beside a company's and a trading name, not in the person field.
+    // /start asks a partner for his own full name separately, exactly as it does for the other two.
+    if (s.trade_type === 'ltd' || s.trade_type === 'business' || s.trade_type === 'partnership') patch.business_name = s.name;
     else patch.name = s.name;
   }
   const addr = [s.address, s.postcode].filter(Boolean).join(', ');
@@ -2854,7 +2891,10 @@ export async function latestSignupIdentity(email: string): Promise<SignupIdentit
     // A sole trader's `name` IS his own name, not a business, so it must not be filed as one: two
     // different sole traders called Dave Smith would otherwise collide on "business" as well as
     // "name" and look far more like the same man than they are.
-    const isBusiness = r.trade_type === 'ltd' || r.trade_type === 'business';
+    // ⚠️ A PARTNERSHIP JOINED THIS LIST ON 4 AUGUST, when /start started offering one. The firm's
+    // name is not his name, exactly as with a company and a trading name, and /start asks him for
+    // his own separately. Left out, a partner's business would have been filed as a person.
+    const isBusiness = r.trade_type === 'ltd' || r.trade_type === 'business' || r.trade_type === 'partnership';
     return {
       phone: r.phone ?? null,
       personName: r.person_name ?? r.name ?? null,

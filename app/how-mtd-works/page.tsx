@@ -7,6 +7,7 @@ import {
   Ic,
  MtdBanner,} from '../_shared/site';
 import { FACTS } from '../../lib/taxengine';
+import LeadCapture from '../../components/LeadCapture';
 import { css } from '../../lib/tokens';
 
 export const metadata: Metadata = {
@@ -33,6 +34,63 @@ const T26 = FACTS.mtdThreshold2026; // first mandated from April 2026
 const T27 = FACTS.mtdThreshold2027; // April 2027
 const T28 = FACTS.mtdThreshold2028; // April 2028
 const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS PAGE JOINS THE FREE TOOLS FAMILY, AND IT WAS THE ONLY CHECKER OUTSIDE IT.
+//
+// It already had the thing that makes a free tool work: a control a stranger can drag and get a
+// straight answer from, with no signup. What it did not have was any of the machinery the other
+// nine carry, so it earned no rich result, captured nobody, and did not appear in our own list of
+// free tools. It was doing the work and getting none of the benefit.
+//
+// ⚠️ THE ANSWERS BELOW ARE THE PAGE'S OWN ANSWERS, WORD FOR WORD IN SUBSTANCE. A FAQ schema that
+// says something the page does not say is a rich result that misrepresents the page, which Google
+// treats as spam and a reader treats as a bait and switch. The thresholds interpolate from
+// lib/taxengine.ts FACTS for the same reason every other figure on this page does: after a Budget,
+// a hand typed number here is how the site and the engine start disagreeing.
+//
+// ⚠️ AND NOT ONE ANSWER CONCLUDES MANDATION. HMRC decides it from a return already filed and
+// writes to the people it has assessed, so a public page cannot settle it for a stranger and must
+// not pretend to. See the header on the checker below, and mtdPosition() in lib/taxengine.ts.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'Who has to use Making Tax Digital for Income Tax?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: `HMRC decides it from a tax return you have already filed, not from the year you are in, and writes to you to say so. April ${2026} was decided by your 2024 to 2025 return, April 2027 by your 2025 to 2026 return, and April 2028 by your 2026 to 2027 return. The announced lines are ${gbp(T26)}, then ${gbp(T27)}, then ${gbp(T28)} of qualifying income.`,
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Is the threshold based on my profit or my turnover?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Neither exactly. It is qualifying income: your gross turnover plus any gross rent, added together, before a single expense comes off. It is not your profit, which is the number most people reach for and is usually far lower.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What is a quarterly update, and is it a tax return?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'It is a short summary of your income and costs for the year so far, sent four times a year. Each one restates the whole year to date and replaces the one before it, so nothing has to be perfect first time. It is not a tax return and no tax is paid on it.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Does Making Tax Digital apply to my limited company?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Not for this. Making Tax Digital for Income Tax covers self employment and rent on a personal return, and a company files its own return. If you also have a sole trade or rent of your own, that income is tested on its own.',
+      },
+    },
+  ],
+};
 
 const MTD_CSS = css`
 .mkt .hero{padding:52px 0 12px}
@@ -129,6 +187,8 @@ export default function HowMtdWorksPage() {
   return (
     <main className="mkt" style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <SharedHead />
+      {/* The rich result. Same pattern and same position as every other free tool page. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <style dangerouslySetInnerHTML={{ __html: MARKETING_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: MTD_CSS }} />
 
@@ -179,6 +239,25 @@ export default function HowMtdWorksPage() {
             <b>Running a limited company?</b> Making Tax Digital for Income Tax covers self employment and rent on a personal return, and your company&apos;s trade is neither: the company files its own return. If you also have a sole trade or rent of your own, drag the slider for that income alone.
           </p>
           <p className="center mut" style={{ fontSize: 12.5, marginTop: 14 }}>A guide based on the announced thresholds, which are tested on gross qualifying income and never on profit. Your books stay ready with Lekhio either way.</p>
+
+          {/* ═══════════════════════════════════════════════════════════════════════════════
+              🔴 THE ANSWER IS ABOVE THIS, FREE, AND IT ALWAYS WILL BE.
+              LeadCapture's own header states the rule the other nine tools follow: the result is
+              shown in full before the box exists, so handing over an email is never the price of
+              using the tool and the consent is freely given. The marketing tick is unticked, and
+              the exact words agreed to are stored with the address.
+              ⚠️ THE HEADING IS THIS PAGE'S OWN. The default asks whether he wants "your MTD
+              reminders", and remindersLive() is false: no channel can send one. The offer here is
+              the thing we will genuinely do, which is write to him when the line moves. Nothing
+              on this site may promise a reminder, and test/frontdoor.test.mjs sweeps for it.
+              ═══════════════════════════════════════════════════════════════════════════════ */}
+          <div style={{ maxWidth: 640, margin: '26px auto 0' }}>
+            <LeadCapture
+              source="how-mtd-works"
+              heading="Want to know when this changes?"
+              sub="The lines move, and the year HMRC tests moves with them. Leave your email and we will tell you when one does, in plain English. No spam, unsubscribe any time."
+            />
+          </div>
         </div>
       </section>
 

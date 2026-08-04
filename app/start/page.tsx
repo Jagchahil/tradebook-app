@@ -21,7 +21,29 @@ const LINE = '#E7E3D9';
 const MUTED = '#5B6470';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
-type TradeType = 'sole' | 'business' | 'ltd' | null;
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 'partnership' WAS MISSING HERE, AND app/app/setup HAS BEEN ASKING FOR IT SINCE 31 JULY.
+//
+// The web signup offered three answers and a partnership was not one of them, so two people
+// running a business together picked "A business name", and tradeTypeToBusinessType in
+// lib/supabase.ts folded that to sole_trader. lib/supabase.ts said so out loud: "Partnership is
+// not offered on the web, so it never arrives here." The setup screen's own header records what
+// that costs: "a coffee shop run by two people who chose 'A business name' is sitting in the
+// database as a SOLE TRADER, silently, and lib/partnership.ts has been ready for him since 17
+// July with nowhere to say so."
+//
+// The consequences are not cosmetic. He is taxed on his share of the firm's profit, not all of
+// it, and stored as a sole trader every figure the product shows him is the WHOLE firm's: his
+// set aside, his bill, and the income summary a mortgage lender reads.
+//
+// ⚠️ AND THE SHARE IS ASKED HERE, NOT LEFT FOR LATER. getBusinessProfile reads an unanswered
+// share as 100%, deliberately, so a half answered setup can never quietly halve a sole trader's
+// tax. That default is right for everyone except the one man it is wrong for: a partner with no
+// share on file is shown his partners' money as his own, which is exactly the defect commit
+// 0e9175e2 fixed on the proof of income document. One number, asked once, at the only point
+// every web customer passes through.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+type TradeType = 'sole' | 'business' | 'ltd' | 'partnership' | null;
 
 const trades = [
   'Electrician', 'Plumber', 'Builder', 'Plasterer', 'Roofer', 'Joiner',
@@ -65,6 +87,9 @@ export default function StartPage() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [tradeType, setTradeType] = useState<TradeType>(null);
+  // His percentage of the firm's profit. A string because it is a text input and an empty box is
+  // not zero: zero is an answer nobody means and would tell the engine he earns nothing.
+  const [share, setShare] = useState('');
   const [name, setName] = useState('');
   // ⚠️ THE HUMAN BEING, SEPARATE FROM THE BUSINESS. Added 27 July 2026 after a real signup on
   // lekhio.app was greeted as "Test", the first word of "Test Coffee Shop Ltd".
@@ -134,23 +159,32 @@ export default function StartPage() {
   // Email is required. One account, tied to a name, a mobile and an email, so nothing about a
   // person is ever split across two records. It must be present and valid to move on.
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const nameLabel = tradeType === 'ltd' ? 'Company name' : tradeType === 'business' ? 'Trading name' : 'Your full name';
+  const nameLabel = tradeType === 'ltd' ? 'Company name' : tradeType === 'business' ? 'Trading name' : tradeType === 'partnership' ? "The partnership's name" : 'Your full name';
   // A limited company and a trading name are not the person. A sole trader trades under his own
   // name, so his one answer is both.
-  const needsPersonName = tradeType === 'ltd' || tradeType === 'business';
+  // A limited company, a trading name and a partnership are all not the person. A sole trader
+  // trades under his own name, so his one answer is both.
+  const needsPersonName = tradeType === 'ltd' || tradeType === 'business' || tradeType === 'partnership';
+  // 1 to 100, whole numbers. Parsed once here so the gate below and the post agree on what counts.
+  const shareNum = Number(share);
+  const shareValid = /^\d{1,3}$/.test(share.trim()) && shareNum >= 1 && shareNum <= 100;
   // Who we greet, everywhere. One expression, so the success screen, the email and the app can
   // never disagree about what to call him.
   const greetName = (needsPersonName ? personName : name).trim();
 
   const canContinue = useMemo(() => {
     if (step === 1) return phoneReady && emailValid;
-    if (step === 2) return tradeType !== null && name.trim().length > 1 && (!needsPersonName || personName.trim().length > 1);
+    if (step === 2) return tradeType !== null && name.trim().length > 1 && (!needsPersonName || personName.trim().length > 1) && (tradeType !== 'partnership' || shareValid);
     if (step === 3) return trade !== '' && (trade !== 'Something else' || customTrade.trim().length > 1);
     if (step === 4) return true; // streams optional, none is a fine answer
     if (step === 5) return true; // address optional
     if (step === 6) return vat !== null;
     return false;
-  }, [step, phoneReady, emailValid, tradeType, name, personName, needsPersonName, trade, customTrade, vat]);
+    // 🔴 shareValid WAS MISSING HERE AND ESLINT CAUGHT IT BEFORE A CUSTOMER DID. Without it the
+    // memo does not recompute when he types his percentage, so a partner fills the box in and
+    // Continue stays dead until some other answer on the screen happens to change. He would read
+    // that as the page being broken, on the one step nobody else has to do.
+  }, [step, phoneReady, emailValid, tradeType, name, personName, needsPersonName, shareValid, trade, customTrade, vat]);
 
   // What they actually typed or picked, for the SIC matcher. Only a limited company needs a SIC
   // code at all (Companies House asks for it; a sole trader never does, see lib/siccodes), so this
@@ -182,6 +216,9 @@ export default function StartPage() {
           // The person, sent alongside the business name. app/api/onboard falls back to `name` when
           // this is empty, which is exactly right for a sole trader.
           personName: greetName,
+          // Only sent when it means something. A share on a sole trader is a number with nothing
+          // to be a share OF, and app/api/onboard drops it for exactly that reason.
+          partnershipShare: tradeType === 'partnership' && shareValid ? shareNum : undefined,
           trade: trade === 'Something else' ? customTrade.trim() : trade,
           postcode: postcode.trim(),
           address: address.trim(),
@@ -450,6 +487,10 @@ export default function StartPage() {
                     {([
                       ['sole', '', 'Just me', 'Self employed under my own name'],
                       ['business', '', 'A business name', 'I trade as a name, like Smith Electrical'],
+                      // ⚠️ THE SAME WORDS app/app/setup ALREADY USES. One fact worded twice is one
+                      // fact argued twice, and the setup screen's phrasing was written for a man who
+                      // does not call himself a partner and would scroll past the word.
+                      ['partnership', '', 'Me and somebody else', 'We share the business. You are taxed on your share of the profit, not all of it'],
                       ['ltd', '', 'A limited company', 'I have a registered company'],
                     ] as const).map(([val, icon, t, d]) => {
                       const active = tradeType === val;
@@ -492,6 +533,37 @@ export default function StartPage() {
                           paperwork, and nothing fills in on screen because nothing can yet. The
                           live type ahead comes to the web app's own setup screen at item 6. */}
                       {tradeType === 'ltd' && <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>Type it as it appears on the register. We look your company up on the Companies House register ourselves once you finish, so there is no paperwork to dig out.</p>}
+                      {/* 🔴 THE ONE NUMBER THAT DECIDES EVERY FIGURE HE IS EVER SHOWN.
+                          A partnership keeps ONE set of books and each partner is taxed on his
+                          slice: GOV.UK, set up a business partnership, "each partner pays tax on
+                          their share". Lekhio sees the whole account, so without this it hands him
+                          his partners' money as his own. It is asked here because getBusinessProfile
+                          reads a missing share as 100%, which is the safe answer for a sole trader
+                          and the wrong one for the only person it applies to.
+                          ⚠️ NO DEFAULT IN THE BOX. 50 is the common answer and it is still a guess
+                          about his money, and a prefilled guess is one he can walk past. */}
+                      {tradeType === 'partnership' && (
+                        <div style={{ marginTop: 16 }}>
+                          <label htmlFor="signup-share" style={fieldLabel}>Your share of the profit</label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <input
+                              id="signup-share"
+                              className="field"
+                              inputMode="numeric"
+                              value={share}
+                              onChange={(e) => setShare(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
+                              placeholder="50"
+                              aria-label="Your share of the partnership's profit, as a percentage"
+                              style={{ ...fieldStyle, maxWidth: 120 }}
+                            />
+                            <span style={{ fontSize: 18, fontWeight: 700, color: INK }}>%</span>
+                          </div>
+                          <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>
+                            Two of you splitting it evenly is 50. Your figures are worked out on your
+                            share, never the whole firm&rsquo;s. You can change it later in Settings.
+                          </p>
+                        </div>
+                      )}
                       {needsPersonName && (
                         <div style={{ marginTop: 16 }}>
                           <label htmlFor="signup-person" style={fieldLabel}>Your full name</label>

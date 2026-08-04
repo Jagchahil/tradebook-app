@@ -947,5 +947,111 @@ for (const f of BANNER_PAGES) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n🔴 SIX PEOPLE WHO DO NOT EXIST, WITH FIVE STARS EACH, ON THE FRONT DOOR\n');
+//
+// app/_shared/site.tsx held six invented customers with names, trades and towns. app/page.tsx ran
+// them in a marquee with a five pointed rating on every card, plus a second ★★★★★ and four avatar
+// circles in the hero. The only hedge was "Illustrative examples, based on real self employed
+// people", 13px, grey.
+//
+//   CAP 3.47  hold documentary evidence a testimonial is genuine, "unless it is obviously
+//             fictitious", and hold contact details for the person who gave it.
+//   CAP 3.50  never feature a testimonial without permission.
+//
+// A plausible named tradesman with a rating is not obviously fictitious, which is the whole reason
+// somebody writes one, and there was no permission to hold because there was no person. Fake
+// consumer reviews are separately a banned practice under the DMCC Act 2024, Schedule 20 para 13,
+// in force 6 April 2025. And app/llms.txt/route.ts published, at the same time, "Lekhio does not
+// publish invented testimonials or user numbers": two answers to one question, and the one a
+// customer saw was the false one.
+{
+  const site = read('app/_shared/site.tsx');
+  const home = read('app/page.tsx');
+  const homeCode = codeOnly(home);
+
+  // 🔴 NAMED, SO THEY CANNOT COME BACK BY A COPY AND PASTE FROM GIT HISTORY.
+  const GHOSTS = [
+    'lost a whole Sunday just setting it up',
+    'started charging me once I went over a receipt limit',
+    'talked to me like I was an accountant',
+    'put me through a robot',
+    'used to dread the quarter',
+    'Voice notes are the best bit',
+  ];
+  for (const g of GHOSTS) {
+    ok(`the invented quote "${g.slice(0, 34)}..." is gone from the whole site`,
+      !read('app/_shared/site.tsx').includes(g) && !home.includes(g));
+  }
+  ok('🔴 and the array they lived in is EMPTY, not deleted, so a real one turns the section back on',
+    /export const reviews: Review\[\] = \[\];/.test(codeOnly(site)));
+  ok('the section renders nothing while it is empty',
+    /\{reviews\.length > 0 \? \(/.test(homeCode));
+  ok('🔴 AND NO STAR IS DRAWN ANYWHERE ON THE FRONT DOOR',
+    !/★/.test(homeCode) && !/\.stars\{/.test(homeCode));
+  ok('...nor the four avatars that stood for nobody',
+    !/className="avs"/.test(homeCode) && !/\.avs\{/.test(homeCode));
+  // ⚠️ BOTH OF THESE RUN ON codeOnly() AND THE FIRST DRAFT DID NOT, AND BOTH WENT RED ON MY OWN
+  // COMMENTS. The note above `reviews` quotes the small print in order to explain why it went, and
+  // the note where `fixes` used to be quotes "reviewing another app" for the same reason. The rule
+  // this codebase already carries, once more: an assertion about rendered copy runs on codeOnly, in
+  // both directions, because a comment is a perfectly good place to write the thing you just banned.
+  ok('🔴 and the small print that was doing the excusing is gone with them',
+    !/Illustrative examples/i.test(homeCode));
+  ok('the eight invented reviews of OTHER apps went too, and nothing imported them',
+    !/export const fixes = \[/.test(codeOnly(site)) && !/reviewing another app/.test(codeOnly(site)));
+  ok('the star components that drew them are gone as well',
+    !/export function Stars\(\)/.test(codeOnly(site)) && !/export function ReviewCard\(/.test(codeOnly(site)));
+
+  // ⚠️ THE PRODUCT'S OWN PUBLISHED ANSWER AND ITS FRONT DOOR NOW AGREE. This is the assertion that
+  // would have caught it: llmstxt tests the STRING, and nothing tested whether it was true.
+  ok('🔴 and llms.txt\'s promise is now a fact about the site, not just a sentence in a file',
+    /does not publish invented testimonials or user numbers/i.test(read('app/llms.txt/route.ts'))
+    && !/★/.test(homeCode));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n/product sells the job, not the buttons\n');
+//
+// doc 104: not software you buy, the first employee a business ever hires, and sell the outcome
+// never the technology. The page led with "Snap it. Say it. Sorted." over "the whole back office,
+// in one chat", which is a description of what your thumb does, and then listed eight features
+// under "Everything it does", which is a spec sheet.
+{
+  const prod = read('app/product/page.tsx');
+  const code = codeOnly(prod);
+
+  ok('🔴 the hero describes the hire rather than the gesture',
+    /Your first employee/.test(code) && /the first person your business hires/.test(code));
+  ok('...and the old mechanism headline is gone from it',
+    !/Snap it\. Say it\./.test(code));
+  ok('the eight things it does are framed as a job, not a feature list',
+    /<div className="eyebrow">The job<\/div>/.test(code)
+    && /What it does all week, so you do not/.test(code));
+  ok('🔴 and not one of the eight was quietly dropped while it was reframed',
+    ['Files your receipts', 'Takes it down as you say it', 'Claims your mileage',
+     'Sends the invoices', 'Watches your CIS refund', 'Tells you what to put by',
+     'Goes looking for money', 'Brings it to you to sign off'].every((t) => code.includes(t)));
+
+  // 🔴 THE PRICE IS THE ARGUMENT AND THE PAGE NEVER MADE IT.
+  ok('🔴 the page says what the job costs', /What it costs you/.test(code) && /12\.99/.test(code));
+  // ⚠️ DOC 108: NEVER PRICE ON THE SAVING. A number claiming what he keeps, or hours saved, is a
+  // figure that is his and that moves, and it is the one thing this section must never grow.
+  ok('🔴 AND IT NEVER PRICES ON A SAVING OR ON HOURS',
+    !/saves? you (£|\d)/i.test(code) && !/\d+\s*hours? (a|per) (month|week|year)/i.test(code));
+  ok('...and it points at /pricing rather than restating the whole thing',
+    /href="\/pricing"/.test(code));
+
+  // ⚠️ EVERYTHING THE REWRITE HAD TO KEEP, because a rewrite is where a guarded claim quietly dies.
+  ok('it still asks lib/features for the reminder wording rather than holding its own',
+    /from '(\.\.\/)+lib\/features'/.test(code) && /\{alertChannels\(\)\}/.test(code));
+  ok('Rakha still names the one thing she watches that this suite pins',
+    prod.includes('the VAT threshold creeping closer'));
+  ok('the two badges are still asked of the flags, never typed',
+    /filingBadge\(\)/.test(code) && /bankBadge\(\)/.test(code));
+  ok('and it still picks no fight with accountants',
+    !/none of the bill|instead of an accountant|cheaper than an accountant/i.test(code));
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

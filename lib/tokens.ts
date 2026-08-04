@@ -134,7 +134,10 @@ export const FOREIGN = {
   // ⚠️ These may only ever appear inside a preview that is plainly labelled as somebody else's
   // website. Painting our own chrome in these would imply an endorsement we do not have, which
   // is the one thing we never do.
-  govuk: { ink: '#0B0C0C', green: '#00703C' },
+  // ⚠️ `page` and `onGreen` added 4 August: the preview draws a GOV.UK PAGE, not just its accents,
+  // and its white and its button ink are as much theirs as the green is. Leaving them as bare
+  // literals meant the tokens ratchet counted somebody else's brand as an unnamed colour of ours.
+  govuk: { ink: '#0B0C0C', green: '#00703C', page: '#FFFFFF', onGreen: '#FFFFFF' },
   // A drawing of a browser window around that preview. macOS window furniture.
   browserChrome: { bar: '#E8E8E8', close: '#F25F58', minimise: '#FBBE3C', zoom: '#58CB42' },
 } as const;

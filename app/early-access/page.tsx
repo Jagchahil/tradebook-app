@@ -1,6 +1,26 @@
 'use client';
 
 import { useState } from 'react';
+import { A11Y_CSS, APP_THEME_CSS } from '../../lib/tokens';
+import { INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RIVER, RIVER_TINT } from '../../lib/apptheme';
+
+// 🔴 THIS PAGE HAD NO THEME SHEET, so every palette variable resolved to nothing and it rendered
+// light whatever the device said. Found 4 August walking every public page in dark at 375px.
+//
+// ⚠️ APP_THEME_CSS, NOT THEME_CSS. THEME_CSS declares [data-theme="dark"] and only the swap script
+// inside SharedHead sets that attribute. A page with no shell gets a sheet whose dark half can
+// never match. APP_THEME_CSS hangs off prefers-color-scheme with no script at all.
+//
+// ⚠️ AND TOKENISED FIRST, THEMED SECOND. Handing a dark background to a page still holding light
+// hex gives you dark paper under unchanged dark text, which is worse than leaving it alone.
+function ThemeSheets() {
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: APP_THEME_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
+    </>
+  );
+}
 
 export default function EarlyAccessPage() {
   const [phone, setPhone] = useState('');
@@ -36,6 +56,7 @@ export default function EarlyAccessPage() {
   if (done) {
     return (
       <main style={styles.page}>
+        <ThemeSheets />
         <div style={{ ...styles.card, textAlign: 'center' }}>
           <div style={styles.tick}>✓</div>
           <h1 style={styles.heading}>You&apos;re on the list.</h1>
@@ -49,6 +70,7 @@ export default function EarlyAccessPage() {
 
   return (
     <main style={styles.page}>
+      <ThemeSheets />
       <div style={styles.card}>
         <div style={styles.wordmark}>Lekhio</div>
 
@@ -103,7 +125,7 @@ export default function EarlyAccessPage() {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: '100vh',
-    backgroundColor: '#FBFAF7',
+    backgroundColor: PAPER,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -117,21 +139,21 @@ const styles: Record<string, React.CSSProperties> = {
   wordmark: {
     fontSize: '20px',
     fontWeight: '700',
-    color: '#111111',
+    color: INK,
     marginBottom: '36px',
     letterSpacing: '-0.3px',
   },
   heading: {
     fontSize: '38px',
     fontWeight: '800',
-    color: '#111111',
+    color: INK,
     letterSpacing: '-1px',
     lineHeight: '1.15',
     margin: '0 0 14px 0',
   },
   sub: {
     fontSize: '16px',
-    color: '#5B6470',
+    color: MUTED,
     lineHeight: '1.6',
     margin: '0 0 32px 0',
   },
@@ -143,17 +165,17 @@ const styles: Record<string, React.CSSProperties> = {
   phoneRow: {
     display: 'flex',
     borderRadius: '12px',
-    border: '1.5px solid #E7E3D9',
-    backgroundColor: '#FFFFFF',
+    border: `1.5px solid ${LINE}`,
+    backgroundColor: PANEL,
     overflow: 'hidden',
   },
   prefix: {
     padding: '16px',
-    backgroundColor: '#E9F1FA',
-    color: '#1B59A6',
+    backgroundColor: RIVER_TINT,
+    color: RIVER,
     fontWeight: '600',
     fontSize: '14px',
-    borderRight: '1.5px solid #E7E3D9',
+    borderRight: `1.5px solid ${LINE}`,
     whiteSpace: 'nowrap',
     display: 'flex',
     alignItems: 'center',
@@ -162,7 +184,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     padding: '16px',
     fontSize: '16px',
-    color: '#111111',
+    color: INK,
     border: 'none',
     outline: 'none',
     backgroundColor: 'transparent',
@@ -171,23 +193,23 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     padding: '16px',
     fontSize: '16px',
-    color: '#111111',
-    border: '1.5px solid #E7E3D9',
+    color: INK,
+    border: `1.5px solid ${LINE}`,
     borderRadius: '12px',
     outline: 'none',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: PANEL,
     boxSizing: 'border-box',
   },
   error: {
-    color: '#C0392B',
+    color: RED,
     fontSize: '13px',
     margin: '0',
   },
   button: {
     width: '100%',
     padding: '17px',
-    backgroundColor: '#1B59A6',
-    color: '#FFFFFF',
+    backgroundColor: RIVER,
+    color: ON_RIVER,
     fontSize: '16px',
     fontWeight: '700',
     border: 'none',
@@ -197,7 +219,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   small: {
     fontSize: '12px',
-    color: '#5B6470',
+    color: MUTED,
     textAlign: 'center',
     lineHeight: '1.5',
     margin: '0',
@@ -205,13 +227,13 @@ const styles: Record<string, React.CSSProperties> = {
   tick: {
     width: '56px',
     height: '56px',
-    backgroundColor: '#E9F1FA',
+    backgroundColor: RIVER_TINT,
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '24px',
     margin: '0 auto 20px',
-    color: '#1B59A6',
+    color: RIVER,
   },
 };

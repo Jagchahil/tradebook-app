@@ -3,19 +3,28 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { findSic } from '../../lib/siccodes';
+import { FOREIGN } from '../../lib/tokens';
+import { BAND, GREEN, GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, RIVER, RIVER_DEEP, RIVER_TINT, SAFFRON,
+  SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge } from '../../lib/apptheme';
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const SAFFRON = '#E0A33E';
-const SAFFRON_DEEP = '#C9842A';
-const SAFFRON_TINT = '#FBEFD8';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
-const SURFACE = '#F2F0EA';
-const LINE = '#E7E3D9';
-const MUTED = '#5B6470';
+// 🔴 TOKENS, NOT THE PALETTE'S VALUES TYPED OUT AGAIN. This file held twelve of them by hand, so
+// it was byte identical to the palette in LIGHT and could not invert at all in DARK. Same defect as
+// components/LeadCapture.tsx, found the same way: walking the site in dark at 375px.
+//
+// ⚠️ THREE THINGS HERE ARE DELIBERATELY NOT TOKENS, AND THEY MUST STAY THAT WAY.
+//
+//   FOREIGN.govuk        GOV.UK's own black and green, inside a preview plainly labelled as their
+//                        website. lib/tokens.ts says these may ONLY appear there, because painting
+//                        our own chrome in them would imply an endorsement we do not have.
+//   FOREIGN.browserChrome the macOS window furniture around that preview. Changed to our palette
+//                        the drawing stops reading as a browser.
+//   ON_BAND              white, on the offer card below. BAND is dark in BOTH appearances
+//                        (#141821 light, #080A0E dark), so white is correct in both and this is
+//                        not a theme bug. The palette has no proven band ink pair for dark, so the
+//                        value stays local and explicit rather than inventing a token at speed.
+const ON_BAND = '#FFFFFF';
+const ON_BAND_MUTED = '#B6BDC8';
+const ON_BAND_QUIET = '#8A93A0';
 
 const OFFER_HREF = '/start?offer=setup20';
 
@@ -166,7 +175,7 @@ export default function Wizard() {
           <p style={{ fontSize: 16, color: MUTED, margin: '0 0 22px' }}>Tell us, and we will give you the exact steps, the forms, and the codes you need. Free, in plain English.</p>
           <div className="wz-grid">
             {CHOICES.map((c) => (
-              <button key={c.key} onClick={() => choose(c.key)} className="wz-choice" style={{ textAlign: 'left', cursor: 'pointer', background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 22, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <button key={c.key} onClick={() => choose(c.key)} className="wz-choice" style={{ textAlign: 'left', cursor: 'pointer', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: 16, padding: 22, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                 
                 <span>
                   <span style={{ display: 'block', fontSize: 17, fontWeight: 800, color: INK }}>{c.title}</span>
@@ -189,13 +198,13 @@ export default function Wizard() {
             <div className="wz-bar" style={{ height: 7, borderRadius: 4, width: `${((step + 1) / total) * 100}%`, background: `linear-gradient(90deg, ${RIVER}, ${SAFFRON})` }} />
           </div>
 
-          <div key={step} className="wz-anim" style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: '26px 26px', boxShadow: '0 14px 40px rgba(17,17,17,.05)' }}>
-            <div style={{ width: 44, height: 44, borderRadius: 22, background: RIVER, color: '#fff', fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>{step + 1}</div>
+          <div key={step} className="wz-anim" style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 18, padding: '26px 26px', boxShadow: '0 14px 40px rgba(17,17,17,.05)' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 22, background: RIVER, color: ON_RIVER, fontWeight: 800, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>{step + 1}</div>
             <h3 style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.4px', margin: '0 0 10px' }}>{steps[step].title}</h3>
             <p style={{ fontSize: 16, color: MUTED, lineHeight: 1.65, margin: 0 }}>{steps[step].body}</p>
 
             {steps[step].codeValue ? (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginTop: 16, background: SAFFRON_TINT, border: `1px solid #EAD6A8`, borderRadius: 12, padding: '10px 14px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginTop: 16, background: SAFFRON_TINT, border: `1px solid ${edge(SAFFRON, 40)}`, borderRadius: 12, padding: '10px 14px' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: SAFFRON_DEEP, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{steps[step].codeLabel}</span>
                 <span style={{ fontSize: 16, fontWeight: 800, color: INK }}>{steps[step].codeValue}</span>
               </div>
@@ -208,7 +217,7 @@ export default function Wizard() {
                   {CHIP_TRADES.map((t) => {
                     const active = sicQuery === t;
                     return (
-                      <button key={t} onClick={() => setSicQuery(t)} className="wz-chip" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: active ? '#fff' : INK, background: active ? RIVER : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 20, padding: '7px 13px' }}>{t}</button>
+                      <button key={t} onClick={() => setSicQuery(t)} className="wz-chip" style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: active ? ON_RIVER : INK, background: active ? RIVER : PANEL, border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 20, padding: '7px 13px' }}>{t}</button>
                     );
                   })}
                 </div>
@@ -218,13 +227,13 @@ export default function Wizard() {
                   onChange={(e) => setSicQuery(e.target.value)}
                   placeholder="Or type it, e.g. kitchen fitter, drainage, mobile mechanic"
                   className="wz-field"
-                  style={{ width: '100%', background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', fontSize: 15, color: INK, outline: 'none' }}
+                  style={{ width: '100%', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '13px 14px', fontSize: 15, color: INK, outline: 'none' }}
                 />
 
                 {sicMatches.length > 0 ? (
                   <div className="wz-anim" style={{ marginTop: 14 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: GREEN, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>Your recommended SIC code</div>
-                    <div style={{ background: GREEN_TINT, border: '1px solid #CFE9D8', borderRadius: 14, padding: '16px 18px' }}>
+                    <div style={{ background: GREEN_TINT, border: `1px solid ${edge(GREEN, 25)}`, borderRadius: 14, padding: '16px 18px' }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 26, fontWeight: 800, color: INK, fontVariantNumeric: 'tabular-nums', letterSpacing: '0.5px' }}>{sicMatches[0].code}</span>
                         <span style={{ fontSize: 15, fontWeight: 600, color: INK }}>{sicMatches[0].label}</span>
@@ -275,16 +284,16 @@ export default function Wizard() {
                     ═══════════════════════════════════════════════════════════════════════════ */}
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>What you will see on the government website</div>
                 <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, boxShadow: '0 8px 24px rgba(17,17,17,.06)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#E8E8E8', padding: '8px 12px' }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 5, background: '#F25F58' }} />
-                    <span style={{ width: 10, height: 10, borderRadius: 5, background: '#FBBE3C' }} />
-                    <span style={{ width: 10, height: 10, borderRadius: 5, background: '#58CB42' }} />
-                    <span style={{ marginLeft: 8, fontSize: 11, color: '#5B6470', background: '#fff', borderRadius: 6, padding: '3px 10px', fontVariantNumeric: 'tabular-nums' }}>{steps[step].preview!.site === 'Companies House' ? 'find-and-update.company-information.service.gov.uk' : 'gov.uk'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: FOREIGN.browserChrome.bar, padding: '8px 12px' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 5, background: FOREIGN.browserChrome.close }} />
+                    <span style={{ width: 10, height: 10, borderRadius: 5, background: FOREIGN.browserChrome.minimise }} />
+                    <span style={{ width: 10, height: 10, borderRadius: 5, background: FOREIGN.browserChrome.zoom }} />
+                    <span style={{ marginLeft: 8, fontSize: 11, color: MUTED, background: FOREIGN.govuk.page, borderRadius: 6, padding: '3px 10px', fontVariantNumeric: 'tabular-nums' }}>{steps[step].preview!.site === 'Companies House' ? 'find-and-update.company-information.service.gov.uk' : 'gov.uk'}</span>
                   </div>
-                  <div style={{ background: '#0b0c0c', color: '#fff', padding: '10px 16px', fontSize: 14, fontWeight: 700 }}>{steps[step].preview!.site}</div>
-                  <div style={{ background: '#fff', padding: '18px 16px' }}>
-                    <div style={{ fontSize: 17, fontWeight: 800, color: '#0b0c0c', marginBottom: 12 }}>{steps[step].preview!.heading}</div>
-                    <span style={{ display: 'inline-block', background: '#00703c', color: '#fff', fontSize: 13.5, fontWeight: 700, padding: '9px 16px', borderRadius: 3 }}>{steps[step].preview!.cta} ›</span>
+                  <div style={{ background: FOREIGN.govuk.ink, color: FOREIGN.govuk.page, padding: '10px 16px', fontSize: 14, fontWeight: 700 }}>{steps[step].preview!.site}</div>
+                  <div style={{ background: FOREIGN.govuk.page, padding: '18px 16px' }}>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: FOREIGN.govuk.ink, marginBottom: 12 }}>{steps[step].preview!.heading}</div>
+                    <span style={{ display: 'inline-block', background: FOREIGN.govuk.green, color: FOREIGN.govuk.onGreen, fontSize: 13.5, fontWeight: 700, padding: '9px 16px', borderRadius: 3 }}>{steps[step].preview!.cta} ›</span>
                   </div>
                 </div>
                 <p style={{ fontSize: 12, lineHeight: 1.5, color: MUTED, margin: '8px 2px 0' }}>
@@ -313,7 +322,7 @@ export default function Wizard() {
             {step > 0 ? (
               <button onClick={() => setStep(step - 1)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: MUTED }}>Back</button>
             ) : <span />}
-            <button onClick={() => setStep(step + 1)} className="wz-btn" style={{ background: RIVER, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 16, fontWeight: 700, padding: '14px 30px', borderRadius: 12 }}>
+            <button onClick={() => setStep(step + 1)} className="wz-btn" style={{ background: RIVER, color: ON_RIVER, border: 'none', cursor: 'pointer', fontSize: 16, fontWeight: 700, padding: '14px 30px', borderRadius: 12 }}>
               {step === total - 1 ? 'I am ready' : 'Next step'}
             </button>
           </div>
@@ -338,7 +347,7 @@ export default function Wizard() {
             <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 14, textAlign: 'center' }}>Now set up the rest, the way an accountant would, but free</div>
             <div className="wz-grid">
               {ESSENTIALS.map((e) => (
-                <div key={e.title} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 20 }}>
+                <div key={e.title} style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 16, padding: 20 }}>
                   
                   <div style={{ fontSize: 16.5, fontWeight: 800, marginTop: 8 }}>{e.title}</div>
                   <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.55, margin: '6px 0 10px' }}>{e.body}</p>
@@ -353,14 +362,14 @@ export default function Wizard() {
           </div>
 
           {/* The offer */}
-          <div style={{ maxWidth: 560, margin: '0 auto', background: INK, borderRadius: 20, padding: '30px 26px' }}>
+          <div style={{ maxWidth: 560, margin: '0 auto', background: BAND, borderRadius: 20, padding: '30px 26px' }}>
             <div style={{ display: 'inline-block', background: 'rgba(224,163,62,0.18)', color: SAFFRON, fontSize: 12, fontWeight: 800, letterSpacing: '0.6px', padding: '6px 12px', borderRadius: 20, marginBottom: 14 }}>YOUR BOOKS, SORTED FROM DAY ONE</div>
-            <h3 style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: '-0.5px', margin: '0 0 10px' }}>Try Lekhio free for 7 days.</h3>
-            <p style={{ fontSize: 15.5, color: '#B6BDC8', lineHeight: 1.6, margin: '0 0 22px' }}>
+            <h3 style={{ fontSize: 24, fontWeight: 800, color: ON_BAND, letterSpacing: '-0.5px', margin: '0 0 10px' }}>Try Lekhio free for 7 days.</h3>
+            <p style={{ fontSize: 15.5, color: ON_BAND_MUTED, lineHeight: 1.6, margin: '0 0 22px' }}>
               Get set up in minutes and let Lekhio keep your books from your first receipt. One simple price after your trial, £12.99 a month or £129 a year. No card needed to start, cancel any time.
             </p>
-            <Link href={OFFER_HREF} className="wz-btn" style={{ display: 'inline-block', background: RIVER, color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 34px', borderRadius: 12 }}>Start my 7 days free</Link>
-            <p style={{ fontSize: 12.5, color: '#8A93A0', marginTop: 14 }}>7 days free, no card needed. Cancel any time before it ends and pay nothing.</p>
+            <Link href={OFFER_HREF} className="wz-btn" style={{ display: 'inline-block', background: RIVER, color: ON_RIVER, fontSize: 16, fontWeight: 700, padding: '15px 34px', borderRadius: 12 }}>Start my 7 days free</Link>
+            <p style={{ fontSize: 12.5, color: ON_BAND_QUIET, marginTop: 14 }}>7 days free, no card needed. Cancel any time before it ends and pay nothing.</p>
           </div>
 
           {/* Extras */}
@@ -369,7 +378,7 @@ export default function Wizard() {
               <div style={{ fontSize: 13, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, textAlign: 'center' }}>Also, only if it applies to you</div>
               <div className="wz-grid">
                 {EXTRAS.map((e) => (
-                  <a key={e.title} href={e.href} {...linkProps} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: 18, color: INK }}>
+                  <a key={e.title} href={e.href} {...linkProps} style={{ background: PANEL, border: `1px solid ${LINE}`, borderRadius: 14, padding: 18, color: INK }}>
                     
                     <div style={{ fontSize: 15.5, fontWeight: 800, marginTop: 6 }}>{e.title}</div>
                     <div style={{ fontSize: 13.5, color: MUTED, marginTop: 4, lineHeight: 1.55 }}>{e.body}</div>

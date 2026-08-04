@@ -2,23 +2,16 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { A11Y_CSS } from '../../lib/tokens';
+import { A11Y_CSS, APP_THEME_CSS } from '../../lib/tokens';
+// 🔴 THE SIGNUP FLOW HAD NO THEME SHEET. Thirteen palette values were typed out by hand here, so
+// this page was byte identical to the palette in LIGHT and could not invert at all in DARK.
+// ⚠️ APP_THEME_CSS, not THEME_CSS: nothing on this page sets data-theme, so THEME_CSS's dark half
+// could never match and adding it would have looked like a fix while changing nothing.
+import { GREEN, GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RIVER, RIVER_DEEP,
+  RIVER_TINT, SAFFRON, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge } from '../../lib/apptheme';
 import { findSic } from '../../lib/siccodes';
 import { HOW_LONG, registeredShape } from '../../lib/onboarding';
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const SAFFRON = '#E0A33E';
-const SAFFRON_DEEP = '#C9842A';
-const SAFFRON_TINT = '#FBEFD8';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
-const PAPER = '#FBFAF7';
-const SURFACE = '#F2F0EA';
-const LINE = '#E7E3D9';
-const MUTED = '#5B6470';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -321,6 +314,7 @@ export default function StartPage() {
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: PAPER, color: INK, fontFamily: FONT, display: 'flex', flexDirection: 'column' }}>
+      <style dangerouslySetInnerHTML={{ __html: APP_THEME_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
       <style
         dangerouslySetInnerHTML={{
@@ -343,7 +337,7 @@ export default function StartPage() {
       />
 
       {/* Top bar */}
-      <div style={{ borderBottom: `1px solid ${LINE}`, backgroundColor: '#fff' }}>
+      <div style={{ borderBottom: `1px solid ${LINE}`, backgroundColor: PANEL }}>
         <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.5px', color: INK }}>Lekhio</Link>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: GREEN, backgroundColor: GREEN_TINT, padding: '5px 11px', borderRadius: 20 }}>🔒 Secure setup</span>
@@ -386,7 +380,7 @@ export default function StartPage() {
             style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
           />
           {offer ? (
-            <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, backgroundColor: GREEN_TINT, border: '1px solid #CFE9D8', borderRadius: 12, padding: '12px 14px' }}>
+            <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, backgroundColor: GREEN_TINT, border: `1px solid ${edge(GREEN, 25)}`, borderRadius: 12, padding: '12px 14px' }}>
               
               <span style={{ fontSize: 13.5, fontWeight: 600, color: GREEN, lineHeight: 1.4 }}>Your 7 days free is ready. No card needed. Finish to get started.</span>
             </div>
@@ -400,7 +394,7 @@ export default function StartPage() {
               </p>
               {/* The way in, not a way to a store queue. Both Stripe return screens land a man
                   who already has an account, so the only sensible button is his own books. */}
-              <a href="/app" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12, marginBottom: 22 }}>Open my Lekhio →</a>
+              <a href="/app" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: ON_RIVER, fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12, marginBottom: 22 }}>Open my Lekhio →</a>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
           ) : billingResult === 'cancelled' ? (
@@ -412,7 +406,7 @@ export default function StartPage() {
               </p>
               {/* The way in, not a way to a store queue. Both Stripe return screens land a man
                   who already has an account, so the only sensible button is his own books. */}
-              <a href="/app" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: '#fff', fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12, marginBottom: 22 }}>Open my Lekhio →</a>
+              <a href="/app" className="btn" style={{ display: 'inline-block', backgroundColor: RIVER, color: ON_RIVER, fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12, marginBottom: 22 }}>Open my Lekhio →</a>
               <Link href="/" style={{ fontSize: 15, fontWeight: 600, color: RIVER }}>Back to home</Link>
             </div>
           ) : done ? (
@@ -450,13 +444,13 @@ export default function StartPage() {
                   style={{ ...fieldStyle, textAlign: 'center', fontSize: 24, letterSpacing: '6px', fontWeight: 700 }}
                 />
                 {codeErr ? (
-                  <p role="alert" style={{ fontSize: 13.5, color: '#C0392B', lineHeight: 1.5, margin: '10px 0 0', textAlign: 'left' }}>{codeErr}</p>
+                  <p role="alert" style={{ fontSize: 13.5, color: RED, lineHeight: 1.5, margin: '10px 0 0', textAlign: 'left' }}>{codeErr}</p>
                 ) : null}
                 <button
                   className="btn"
                   onClick={() => void confirmCode()}
                   disabled={codeBusy || code.length < 4}
-                  style={{ width: '100%', marginTop: 14, cursor: codeBusy ? 'wait' : code.length < 4 ? 'not-allowed' : 'pointer', backgroundColor: code.length < 4 ? '#C7D2E8' : RIVER, color: '#fff', border: 'none', fontSize: 16, fontWeight: 700, padding: '15px 0', borderRadius: 12 }}
+                  style={{ width: '100%', marginTop: 14, cursor: codeBusy ? 'wait' : code.length < 4 ? 'not-allowed' : 'pointer', backgroundColor: code.length < 4 ? SURFACE : RIVER, color: code.length < 4 ? MUTED : ON_RIVER, border: 'none', fontSize: 16, fontWeight: 700, padding: '15px 0', borderRadius: 12 }}
                 >
                   {codeBusy ? 'Just a moment…' : 'Open my Lekhio →'}
                 </button>
@@ -476,7 +470,7 @@ export default function StartPage() {
               {step === 1 && (
                 <Step title="Let's set up your account" sub="Your email is your account, and we will send you a code at the end to prove it. Your mobile is what links your WhatsApp later, once you want to send receipts by text.">
                   <label htmlFor="signup-phone" style={fieldLabel}>Mobile number</label>
-                  <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', backgroundColor: PANEL, border: `1.5px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '15px 14px', backgroundColor: RIVER_TINT, color: RIVER, fontWeight: 700, fontSize: 16, borderRight: `1.5px solid ${LINE}` }}>🇬🇧 +44</span>
                     <input id="signup-phone" className="field" inputMode="tel" placeholder="7700 900 000" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={14} style={{ flex: 1, border: 'none', padding: '15px 14px', fontSize: 17, color: INK, letterSpacing: '0.5px', background: 'transparent' }} />
                   </div>
@@ -501,13 +495,13 @@ export default function StartPage() {
                     ] as const).map(([val, icon, t, d]) => {
                       const active = tradeType === val;
                       return (
-                        <button key={val} className="opt" onClick={() => setTradeType(val)} style={{ textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: active ? RIVER_TINT : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 14, padding: '16px 16px' }}>
+                        <button key={val} className="opt" onClick={() => setTradeType(val)} style={{ textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: active ? RIVER_TINT : PANEL, border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 14, padding: '16px 16px' }}>
                           <span style={{ fontSize: 24 }}>{icon}</span>
                           <span style={{ flex: 1 }}>
                             <span style={{ display: 'block', fontSize: 16, fontWeight: 700, color: INK }}>{t}</span>
                             <span style={{ display: 'block', fontSize: 13.5, color: MUTED, marginTop: 2 }}>{d}</span>
                           </span>
-                          <span style={{ width: 22, height: 22, borderRadius: 11, border: `2px solid ${active ? RIVER : LINE}`, backgroundColor: active ? RIVER : 'transparent', color: '#fff', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{active ? '✓' : ''}</span>
+                          <span style={{ width: 22, height: 22, borderRadius: 11, border: `2px solid ${active ? RIVER : LINE}`, backgroundColor: active ? RIVER : 'transparent', color: ON_RIVER, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{active ? '✓' : ''}</span>
                         </button>
                       );
                     })}
@@ -564,7 +558,7 @@ export default function StartPage() {
                           <button
                             type="button"
                             onClick={() => setTradeType(shape === 'llp' ? 'partnership' : 'ltd')}
-                            style={{ marginTop: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#fff', backgroundColor: RIVER, border: 0, borderRadius: 10, padding: '10px 14px', fontFamily: 'inherit' }}
+                            style={{ marginTop: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700, color: ON_RIVER, backgroundColor: RIVER, border: 0, borderRadius: 10, padding: '10px 14px', fontFamily: 'inherit' }}
                           >
                             {shape === 'llp' ? 'Yes, we share the business' : 'Yes, it is a limited company'}
                           </button>
@@ -623,7 +617,7 @@ export default function StartPage() {
                     {trades.map((t) => {
                       const active = trade === t;
                       return (
-                        <button key={t} className="chip" onClick={() => { setTrade(t); setSicPick(0); }} style={{ cursor: 'pointer', fontSize: 14.5, fontWeight: 600, color: active ? '#fff' : INK, backgroundColor: active ? RIVER : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 22, padding: '10px 16px' }}>{t}</button>
+                        <button key={t} className="chip" onClick={() => { setTrade(t); setSicPick(0); }} style={{ cursor: 'pointer', fontSize: 14.5, fontWeight: 600, color: active ? ON_RIVER : INK, backgroundColor: active ? RIVER : PANEL, border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 22, padding: '10px 16px' }}>{t}</button>
                       );
                     })}
                   </div>
@@ -665,13 +659,13 @@ export default function StartPage() {
                     ] as const).map(([val, icon, t, d]) => {
                       const active = streams.includes(val);
                       return (
-                        <button key={val} className="opt" onClick={() => setStreams(active ? streams.filter((x) => x !== val) : [...streams, val])} style={{ textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: active ? RIVER_TINT : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 14, padding: '15px 16px' }}>
+                        <button key={val} className="opt" onClick={() => setStreams(active ? streams.filter((x) => x !== val) : [...streams, val])} style={{ textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, backgroundColor: active ? RIVER_TINT : PANEL, border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 14, padding: '15px 16px' }}>
                           <span style={{ fontSize: 24 }}>{icon}</span>
                           <span style={{ flex: 1 }}>
                             <span style={{ display: 'block', fontSize: 16, fontWeight: 700, color: INK }}>{t}</span>
                             <span style={{ display: 'block', fontSize: 13, color: MUTED, marginTop: 2, lineHeight: 1.45 }}>{d}</span>
                           </span>
-                          <span style={{ width: 22, height: 22, borderRadius: 11, border: `2px solid ${active ? RIVER : LINE}`, backgroundColor: active ? RIVER : 'transparent', color: '#fff', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{active ? '✓' : ''}</span>
+                          <span style={{ width: 22, height: 22, borderRadius: 11, border: `2px solid ${active ? RIVER : LINE}`, backgroundColor: active ? RIVER : 'transparent', color: ON_RIVER, fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{active ? '✓' : ''}</span>
                         </button>
                       );
                     })}
@@ -705,7 +699,7 @@ export default function StartPage() {
                     {([['no', 'No', false], ['yes', 'Yes', true]] as const).map(([k, label, val]) => {
                       const active = vat === val;
                       return (
-                        <button key={k} className="opt" onClick={() => setVat(val)} style={{ flex: 1, cursor: 'pointer', fontSize: 16, fontWeight: 700, color: active ? RIVER : INK, backgroundColor: active ? RIVER_TINT : '#fff', border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 14, padding: '18px 0' }}>{label}</button>
+                        <button key={k} className="opt" onClick={() => setVat(val)} style={{ flex: 1, cursor: 'pointer', fontSize: 16, fontWeight: 700, color: active ? RIVER : INK, backgroundColor: active ? RIVER_TINT : PANEL, border: `1.5px solid ${active ? RIVER : LINE}`, borderRadius: 14, padding: '18px 0' }}>{label}</button>
                       );
                     })}
                   </div>
@@ -721,12 +715,12 @@ export default function StartPage() {
 
       {/* Footer nav */}
       {!done && !billingResult && (
-        <div style={{ borderTop: `1px solid ${LINE}`, backgroundColor: '#fff' }}>
+        <div style={{ borderTop: `1px solid ${LINE}`, backgroundColor: PANEL }}>
           <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
             {step > 1 ? (
               <button onClick={back} style={{ cursor: 'pointer', background: 'none', border: 'none', fontSize: 15, fontWeight: 600, color: MUTED, padding: '12px 4px' }}>Back</button>
             ) : <span />}
-            <button className="btn" onClick={() => void next()} disabled={!canContinue} style={{ cursor: canContinue ? 'pointer' : 'not-allowed', backgroundColor: canContinue ? RIVER : '#C7D2E8', color: '#fff', border: 'none', fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12 }}>
+            <button className="btn" onClick={() => void next()} disabled={!canContinue} style={{ cursor: canContinue ? 'pointer' : 'not-allowed', backgroundColor: canContinue ? RIVER : SURFACE, color: canContinue ? ON_RIVER : MUTED, border: 'none', fontSize: 16, fontWeight: 700, padding: '15px 32px', borderRadius: 12 }}>
               {step === TOTAL ? 'Start free trial' : 'Continue'}
             </button>
           </div>
@@ -748,7 +742,7 @@ function Step({ title, sub, children }: { title: string; sub: string; children: 
 }
 
 const fieldStyle: React.CSSProperties = {
-  width: '100%', backgroundColor: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '14px 14px', fontSize: 16, color: INK,
+  width: '100%', backgroundColor: PANEL, border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '14px 14px', fontSize: 16, color: INK,
 };
 const fieldLabel: React.CSSProperties = {
   display: 'block', fontSize: 12.5, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8,

@@ -250,7 +250,7 @@ export default function CanIClaimPage() {
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <div style={{ width: 300, maxWidth: '100%', background: 'var(--panel)', borderRadius: 26, border: `1px solid ${LINE}`, boxShadow: '0 24px 60px rgba(17,17,17,.14)', overflow: 'hidden' }}>
               {/* Own tokens, not Meta's. See the hero note in app/_shared/site.tsx. */}
-              <div style={{ background: 'var(--river-deep)', color: '#fff', padding: '12px 15px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ background: 'var(--river-deep)', color: 'var(--on-river)', padding: '12px 15px', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ width: 32, height: 32, borderRadius: 16, background: 'var(--river)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>✅</span>
                 <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>Lekhio</div><div style={{ fontSize: 10.5, opacity: 0.85 }}>your first employee</div></div>
               </div>

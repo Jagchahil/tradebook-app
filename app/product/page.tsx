@@ -38,7 +38,7 @@ const PRODUCT_CSS = css`
 /* Own tokens, not Meta's. See the note on the hero in app/_shared/site.tsx: the illustration
    is the outcome and stays, the borrowed brand palette is the technology and goes. Tokens also
    delete the dark override that existed only to undo the borrowed green. */
-.wahead{background:var(--river-deep);color:#fff;padding:12px 15px;display:flex;align-items:center;gap:9px}
+.wahead{background:var(--river-deep);color:var(--on-river);padding:12px 15px;display:flex;align-items:center;gap:9px}
 .wahead .a{width:32px;height:32px;border-radius:999px;background:var(--river);display:grid;place-items:center;font-size:15px}
 .wahead b{font-size:13px;display:block}.wahead small{font-size:10px;opacity:.85}
 .wchat{background:var(--panel-2);padding:14px 12px;min-height:250px;display:flex;flex-direction:column;gap:8px}

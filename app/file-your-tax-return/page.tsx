@@ -25,6 +25,10 @@ export const metadata: Metadata = {
 const INK = 'var(--tx)';
 const RIVER = 'var(--river)';
 const RIVER_DEEP = 'var(--river-deep)';
+// 🔴 NOT '#fff'. RIVER_DEEP is a DARK blue in light and a LIGHT blue in dark, because it is built
+// as a text colour. Used as a BACKGROUND the relationship inverts, and white on it fell to 2.56:1
+// in dark. var(--on-river) is white in light and #0B1A2B in dark, so it is correct in both.
+const ON_RIVER = 'var(--on-river)';
 const RIVER_TINT = 'var(--river-tint)';
 const SAFFRON_DEEP = 'var(--saffron-deep)';
 const SAFFRON_TINT = 'var(--saffron-tint)';
@@ -401,7 +405,7 @@ export default function FileYourTaxReturnPage() {
 
       {/* Trust bar */}
       <div style={{ background: RIVER_DEEP }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '9px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 500, color: '#fff' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '9px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 500, color: ON_RIVER }}>
           <span>A free guide from Lekhio</span><span style={{ opacity: 0.5 }}>&middot;</span>
           <span>Plain English</span><span style={{ opacity: 0.5 }}>&middot;</span>
           <span>Checked against GOV.UK</span><span style={{ opacity: 0.5 }}>&middot;</span>

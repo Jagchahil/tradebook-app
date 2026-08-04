@@ -341,7 +341,7 @@ console.log('\n=== a surface that paints a raw colour cannot invert ===\n');
 //
 // The list is DERIVED by walking the tree, never typed. The version of this that named its files
 // would have listed the ones just edited and passed for ever.
-const SURFACE_CEILING = 26;
+const SURFACE_CEILING = 23;
 const surfaces = [
   ...walk(path.join(root, 'app')),
   ...walk(path.join(root, 'components')),
@@ -443,19 +443,23 @@ ok('🔴 a page holding ONLY THEME_CSS still counts as unthemed, because nothing
 // 🔴 SO THE CEILING IS 3 AND IT MAY ONLY EVER GO DOWN. A new page arriving without a theme sheet
 // fails this immediately, which is the thing that actually needed guarding. Lowering it is the
 // only permitted edit.
-const UNTHEMED_CEILING = 3;
+const UNTHEMED_CEILING = 0;
 ok(`the public page sweep found something (${publicPages.length} pages)`, publicPages.length >= 20);
 if (unthemed.length) unthemed.forEach((r) => console.log(`        ${r}`));
 ok(`🔴 PUBLIC PAGES WITH NO THEME SHEET: ${unthemed.length}, at or under the ceiling of ${UNTHEMED_CEILING}`,
   unthemed.length <= UNTHEMED_CEILING);
 // Named individually, so the three that are left cannot be swapped for three different ones.
-const STILL_UNTHEMED = ['early-access', 'register-your-business', 'start'];
-ok(`and they are the three known ones, no others: ${STILL_UNTHEMED.join(', ')}`,
-  unthemed.length === STILL_UNTHEMED.length
-  && unthemed.every((r) => STILL_UNTHEMED.some((k) => r.includes(k))));
+// ✅ 4 AUGUST, LATER THE SAME NIGHT: the ceiling went 3 to ZERO. All six are themed. The three
+// that were "not mechanical" were done properly rather than skipped: Wizard.tsx's offer card moved
+// from INK (var(--tx), which goes near WHITE in dark) to BAND (dark in BOTH appearances), the
+// GOV.UK and browser chrome colours moved into FOREIGN instead of being tokenised, and /start's
+// disabled Continue button stopped being white on pale blue at 1.52:1.
+ok('🔴 NOTHING IS LEFT UNTHEMED, and the ceiling is zero so nothing may be added',
+  UNTHEMED_CEILING === 0 && unthemed.length === 0);
 // The three that WERE fixed, named, so nobody can drop a theme sheet back off one of them and
 // stay under the ceiling by fixing a different page.
-for (const fixed of ['privacy', 'terms', path.join('hmrc', 'connected')]) {
+for (const fixed of ['privacy', 'terms', path.join('hmrc', 'connected'),
+  'early-access', 'register-your-business', 'start']) {
   ok(`${fixed} still receives a theme sheet`, !unthemed.some((r) => r.includes(fixed)));
 }
 

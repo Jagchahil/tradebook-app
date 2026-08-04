@@ -33,7 +33,7 @@ const PRICING_CSS = `
 .billtoggle{display:inline-flex;background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:5px;gap:4px}
 .billtoggle button{padding:11px 20px;border-radius:10px;border:0;background:transparent;font-family:inherit;font-weight:700;font-size:14px;color:var(--tx-mut);cursor:pointer;transition:.2s}
 .billtoggle button.on{background:var(--panel);color:var(--tx);box-shadow:0 2px 8px rgba(0,0,0,.1)}
-.billtoggle .savepill{font-size:10px;font-weight:900;color:#fff;background:var(--green);padding:2px 7px;border-radius:999px;margin-left:6px}
+.billtoggle .savepill{font-size:10px;font-weight:900;color:var(--on-green);background:var(--green);padding:2px 7px;border-radius:999px;margin-left:6px}
 .pricebig{max-width:440px;margin:26px auto 0;border:1px solid transparent;border-radius:24px;padding:34px;text-align:center;box-shadow:0 24px 56px rgba(27,89,166,.18);position:relative;overflow:hidden;background:linear-gradient(180deg,var(--river-tint),var(--panel))}
 .pricebig::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--river),var(--saffron))}
 .pamt{font-size:60px;font-weight:900;letter-spacing:-.04em;line-height:1}

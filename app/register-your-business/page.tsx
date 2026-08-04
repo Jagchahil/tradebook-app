@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Wizard from './Wizard';
-import { A11Y_CSS } from '../../lib/tokens';
+import { A11Y_CSS, APP_THEME_CSS } from '../../lib/tokens';
+// 🔴 APP_THEME_CSS, not THEME_CSS: nothing here sets data-theme, so THEME_CSS's dark half could
+// never match. This page had neither, and rendered light whatever the device said.
+import { GREEN, GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PAPER, RIVER } from '../../lib/apptheme';
 // 🔴 THIS PAGE SAID "14 DAYS FREE" IN A CHIP AND "your first 7 days are free" IN THE PARAGRAPH
 // TWO LINES BELOW IT, LIVE, ON A PUBLIC PAGE. Found by the sweep in test/trial.test.mjs on 30 July,
 // not by anyone reading it. Both now come from the one place that knows.
@@ -19,24 +22,18 @@ export const metadata: Metadata = {
   },
 };
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const GREEN = '#15803D';
-const GREEN_TINT = '#E7F5EC';
-const PAPER = '#FBFAF7';
-const LINE = '#E7E3D9';
-const MUTED = '#5B6470';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 export default function RegisterPage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}a{text-decoration:none}.h1b{font-size:48px;line-height:1.06;letter-spacing:-1.9px}@media(max-width:820px){.h1b{font-size:33px}}` }} />
+      <style dangerouslySetInnerHTML={{ __html: APP_THEME_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       <nav style={{ maxWidth: 1180, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-1px', color: INK }}>Lekhio</Link>
-        <Link href="/start" style={{ backgroundColor: RIVER, color: '#fff', fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
+        <Link href="/start" style={{ backgroundColor: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
       </nav>
 
       <section style={{ maxWidth: 760, margin: '0 auto', padding: '28px 24px 4px' }}>

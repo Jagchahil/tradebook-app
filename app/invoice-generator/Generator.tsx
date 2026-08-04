@@ -176,6 +176,15 @@ function prettyDate(iso: string): string {
 const inputStyle: React.CSSProperties = { width: '100%', border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '11px 12px', fontSize: 14.5, color: INK, background: 'var(--panel)', outline: 'none', fontFamily: 'inherit' };
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 6 };
 
+// 🔴 THE INVOICE IS A DOCUMENT ON WHITE PAPER IN BOTH APPEARANCES, so its ink is deliberately NOT
+// themed: a customer prints this and emails it to HIS customer, and it must look the same to both.
+// That is why the preview reads as a light island on a dark page and is correct.
+//
+// ⚠️ BUT IT STILL HAS TO BE READABLE. Our own credit line was #A8AFB8 on white, 2.21:1 at 11.5px,
+// which is below AA on a document we put our name on. Measured 4 August walking a production build.
+// #6B7480 is the same grey family at 4.85:1.
+const INVOICE_MUTED = '#6B7480';
+
 export default function Generator() {
   const [docType, setDocType] = useState<DocType>('invoice');
   const [fromName, setFromName] = useState(PRESETS[0].fromName);
@@ -371,7 +380,7 @@ export default function Generator() {
             </div>
           ) : null}
 
-          <div style={{ marginTop: 26, textAlign: 'center', fontSize: 11.5, color: '#A8AFB8' }}>Made free with Lekhio · lekhio.app</div>
+          <div style={{ marginTop: 26, textAlign: 'center', fontSize: 11.5, color: INVOICE_MUTED }}>Made free with Lekhio · lekhio.app</div>
         </div>
       </div>
       <div className="no-print" style={{ maxWidth: 900, margin: '22px auto 0' }}>

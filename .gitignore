@@ -55,3 +55,15 @@ coverage/
 # They are not source. They got committed once; never again.
 .fuse_hidden*
 XX*
+
+# A BROKEN SYMLINK, COMMITTED 13 JULY, POINTING AT /nonexistent-target.
+#
+# It breaks any tree walk that follows links. On 4 August it took test/webauth.test.mjs down with
+# a stack trace about corepack, the moment that suite's walk was widened past app/app, and it will
+# do it again to the next walk somebody writes. Every walk in test/ now uses lstat and skips dot
+# directories, which is right anyway, but the file itself has no business being here.
+#
+# ⚠️ IGNORED RATHER THAN JUST REMOVED, because removing it is not enough. `git rm --cached` staged
+# the deletion and the very next `git add -A` put it straight back, in the same terminal, in the
+# same minute. A rule that only holds while somebody remembers is not a rule.
+app/.node/

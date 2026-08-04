@@ -422,5 +422,53 @@ console.log('\n🔴 THE FIFTH LIE: THE WEB SIGNUP COULD NOT SAY "TWO OF US"\n');
     /IT MUST RETURN EXACTLY ONE ROW/.test(sql) && /information_schema\.columns/.test(sql));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n🔴 THE SIXTH LIE: A COMPANY NAME TYPED INTO THE TRADING NAME BOX, AND SILENCE\n');
+//
+// Found on 4 August reading the signups table: "Firmus Nutrition LTD", trade_type 'business'.
+// tradeTypeToBusinessType folds that to sole_trader, so the engine charges income tax and Class 4
+// PERSONALLY on profit belonging to a company. lib/supabase.ts names the cost itself: "the largest
+// overstatement in the product and the one that is hardest for him to spot, because it looks like
+// a big tax bill rather than like a bug." He also never gets the Companies House lookup, because
+// app/api/onboard opens lookUpCompany with `if (tradeType !== 'ltd') return { outcome: 'not_ltd' }`.
+{
+  const O = await import(pathToFileURL(path.join(root, 'lib/onboarding.ts')).href);
+  const start = read('app/start/page.tsx');
+  const startCode = codeOnly(start);
+
+  for (const n of ['Firmus Nutrition LTD', 'Smith Electrical Limited', 'Acme Ltd.', 'Big Co PLC', 'Rhywbeth Cyf']) {
+    ok(`"${n}" reads as a registered company`, O.registeredShape(n) === 'company');
+  }
+  // 🔴 THE CONTROLS ARE THE POINT. A prompt that fires on an honest trading name is one people
+  // learn to dismiss, and then it is not there on the day it matters. Anchored at the end, which
+  // is where a suffix legally sits, and preceded by a boundary.
+  for (const n of ['Vasey Electrical', 'Priestley Grounds', 'Chahil Barbers', 'Unlimited Roofing',
+    'The Limited Edition Barbers', 'Limitless Cleaning', 'Ltd Services Group', '', '   ']) {
+    ok(`CONTROL: "${n}" is left alone`, O.registeredShape(n) === null);
+  }
+  ok('CONTROL: nothing at all is left alone too',
+    O.registeredShape(null) === null && O.registeredShape(undefined) === null);
+  // ⚠️ AN LLP IS TAXED LIKE A PARTNERSHIP, not like a company. Its members pay tax on their share
+  // of the profit, so calling one a director swaps one wrong structure for another.
+  ok('🔴 an LLP reads as an LLP and never as a company',
+    O.registeredShape('Smith & Jones LLP') === 'llp' && O.registeredShape('Foo L.L.P.') === 'llp');
+
+  ok('🔴 /start asks lib/onboarding rather than sniffing the name itself',
+    /registeredShape\(name\)/.test(startCode) && !/\/ltd\|limited\/i/.test(startCode));
+  ok('...and only when he has NOT already given a structure that fits',
+    /tradeType === 'sole' \|\| tradeType === 'business' \? registeredShape\(name\) : null/.test(startCode));
+  ok('🔴 AND IT ASKS HIM RATHER THAN SWITCHING HIM',
+    /Is that right\?/.test(start) || /If it is, your tax works differently/.test(start));
+  ok('...with the way out said plainly, so ignoring it is a real option',
+    /Nothing changes unless you press it/.test(start));
+  ok('🔴 the button only moves the answer, it does not submit anything',
+    /onClick=\{\(\) => setTradeType\(shape === 'llp' \? 'partnership' : 'ltd'\)\}/.test(startCode)
+    && /type="button"/.test(startCode));
+  // ⚠️ NOTHING MAY REWRITE tradeType FROM THE NAME WITHOUT A PRESS. The whole decision is that we
+  // ask, so an effect or a render time coercion would quietly undo it.
+  ok('🔴 and nothing sets the structure from the name without him pressing',
+    !/useEffect\([\s\S]{0,200}?setTradeType/.test(startCode));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

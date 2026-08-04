@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { A11Y_CSS } from '../../lib/tokens';
 import { findSic } from '../../lib/siccodes';
-import { HOW_LONG } from '../../lib/onboarding';
+import { HOW_LONG, registeredShape } from '../../lib/onboarding';
 
 const INK = '#111111';
 const RIVER = '#1B59A6';
@@ -165,6 +165,12 @@ export default function StartPage() {
   // A limited company, a trading name and a partnership are all not the person. A sole trader
   // trades under his own name, so his one answer is both.
   const needsPersonName = tradeType === 'ltd' || tradeType === 'business' || tradeType === 'partnership';
+  // 🔴 WHAT THE NAME HE TYPED SAYS ABOUT HIS STRUCTURE, WHICH MAY NOT BE WHAT HE PICKED.
+  // Only ever consulted when he has NOT already said limited company or partnership: a man who has
+  // picked the right answer does not need telling, and a prompt that fires on somebody who is
+  // already right is the kind people learn to dismiss. See registeredShape in lib/onboarding.ts.
+  const shape = tradeType === 'sole' || tradeType === 'business' ? registeredShape(name) : null;
+
   // 1 to 100, whole numbers. Parsed once here so the gate below and the post agree on what counts.
   const shareNum = Number(share);
   const shareValid = /^\d{1,3}$/.test(share.trim()) && shareNum >= 1 && shareNum <= 100;
@@ -532,6 +538,41 @@ export default function StartPage() {
                           copy says what actually happens: we do the looking, he does not dig out
                           paperwork, and nothing fills in on screen because nothing can yet. The
                           live type ahead comes to the web app's own setup screen at item 6. */}
+                      {/* ═══════════════════════════════════════════════════════════════════
+                          🔴 HE TYPED A COMPANY NAME INTO THE TRADING NAME BOX. WE ASK. WE NEVER
+                          SWITCH. Filed as 'business' he becomes a sole_trader, and the engine
+                          then charges him income tax and Class 4 personally on profit that is his
+                          COMPANY'S. lib/supabase.ts calls that the largest overstatement in the
+                          product and the hardest for him to spot, because it looks like a big tax
+                          bill rather than like a bug. He also never gets the Companies House
+                          lookup, which app/api/onboard runs for 'ltd' and nothing else.
+                          ⚠️ ONE BUTTON, AND IT ONLY MOVES THE ANSWER HE ALREADY GAVE. It does not
+                          submit, it does not reach a server, and the name he typed is kept. If he
+                          ignores it entirely, nothing changes and he carries on, which is right:
+                          this is a fact about his business and only he holds it.
+                          ⚠️ AN LLP GOES TO PARTNERSHIP, NOT TO LIMITED COMPANY. Its members are
+                          taxed on their share of the profit the way partners are, so calling one
+                          a director would swap one wrong structure for another.
+                          ═══════════════════════════════════════════════════════════════════ */}
+                      {shape ? (
+                        <div style={{ marginTop: 12, backgroundColor: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}33`, borderRadius: 12, padding: '13px 14px' }}>
+                          <p style={{ fontSize: 13.5, color: INK, lineHeight: 1.55, margin: 0 }}>
+                            {shape === 'llp'
+                              ? <>That name ends in LLP, so the business is registered and you are taxed on your <b>share</b> of its profit rather than all of it. Is that right?</>
+                              : <>That name ends in {name.trim().split(/\s+/).slice(-1)[0]}, which usually means a company registered at Companies House. If it is, your tax works differently and we can look the details up for you.</>}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setTradeType(shape === 'llp' ? 'partnership' : 'ltd')}
+                            style={{ marginTop: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#fff', backgroundColor: RIVER, border: 0, borderRadius: 10, padding: '10px 14px', fontFamily: 'inherit' }}
+                          >
+                            {shape === 'llp' ? 'Yes, we share the business' : 'Yes, it is a limited company'}
+                          </button>
+                          <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8, marginBottom: 0 }}>
+                            If it is not, carry on. Nothing changes unless you press it.
+                          </p>
+                        </div>
+                      ) : null}
                       {tradeType === 'ltd' && <p style={{ fontSize: 12.5, color: MUTED, marginTop: 8 }}>Type it as it appears on the register. We look your company up on the Companies House register ourselves once you finish, so there is no paperwork to dig out.</p>}
                       {/* 🔴 THE ONE NUMBER THAT DECIDES EVERY FIGURE HE IS EVER SHOWN.
                           A partnership keeps ONE set of books and each partner is taxed on his

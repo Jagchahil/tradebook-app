@@ -158,3 +158,47 @@ const TITLES: Record<Step, string> = {
 export function stepTitle(step: Step): string {
   return TITLES[step];
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A NAME ENDING IN "LTD" TYPED INTO THE TRADING NAME BOX, AND NOBODY SAYS A WORD.
+//
+// Found on 4 August reading the signups table: "Firmus Nutrition LTD", trade_type 'business'.
+// tradeTypeToBusinessType folds 'business' to sole_trader, so the tax engine then charges income
+// tax and Class 4 National Insurance PERSONALLY on profit that belongs to a company.
+// lib/supabase.ts names that cost in its own words: "the largest overstatement in the product and
+// the one that is hardest for him to spot, because it looks like a big tax bill rather than like
+// a bug."
+//
+// ⚠️ AND HE LOSES THE COMPANIES HOUSE LOOKUP TOO. app/api/onboard lookUpCompany opens with
+// `if (tradeType !== 'ltd') return { outcome: 'not_ltd' }`, so the register is never read and he
+// types everything by hand for a company we could have found in one call.
+//
+// 🔴 WE ASK. WE NEVER SWITCH. Doc 103's hard limit: acting for him is only kindness when it is
+// reversible and it is his, and which structure he trades under is neither our guess to make nor
+// a thing we can see. Reclassifying him silently would break his figures the other way if we were
+// ever wrong, and he would have no idea we had done it.
+//
+// ⚠️ ANCHORED AT THE END, WHICH IS WHERE A SUFFIX LEGALLY SITS, AND PRECEDED BY A BOUNDARY.
+// Without both, "Unlimited Roofing" reads as a limited company and "The Limited Edition Barbers"
+// reads as one too. Neither is, and a prompt that fires on an honest trading name is a prompt
+// people learn to dismiss.
+//
+// ⚠️ AN LLP IS NOT A COMPANY FOR THIS PURPOSE. It is a body corporate, and its members are taxed
+// on their share of the profit the way partners are, so the honest answer to offer an LLP is
+// PARTNERSHIP and not limited company. Telling a member of an LLP he is a director would swap one
+// wrong structure for another.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export type RegisteredShape = 'company' | 'llp' | null;
+
+// Cyf is the Welsh for Ltd and CCC the Welsh for PLC. Both are lawful suffixes on the register,
+// and leaving them out would mean the prompt works everywhere except Wales.
+const COMPANY_SUFFIX = /(?:^|[\s.,])(ltd|limited|plc|p\.l\.c|cyf|cyfyngedig|ccc)\.?$/i;
+const LLP_SUFFIX = /(?:^|[\s.,])(llp|l\.l\.p|pac)\.?$/i;
+
+export function registeredShape(name: string | null | undefined): RegisteredShape {
+  const v = (name ?? '').trim();
+  if (v.length === 0) return null;
+  if (LLP_SUFFIX.test(v)) return 'llp';
+  if (COMPANY_SUFFIX.test(v)) return 'company';
+  return null;
+}

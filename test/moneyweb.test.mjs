@@ -165,7 +165,70 @@ ok('🔴 a reference is verified AND checked against the session before anything
 ok('🔴 the row is read through the user scoped month query, like /app/money itself',
   /transactionsInMonth\(user\.id, month\)/.test(pageEntry));
 ok('the row is picked out by lib/moneylog, not by a second grouping',
-  /logFor\(rows \?\? \[\], month\)\.entries\.find/.test(pageEntry));
+  /logFor\(rows \?\? \[\], month,[\s\S]{0,80}?\)\.entries\.find/.test(pageEntry));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 BOTH PAGES ASK lib/capital.ts THE SAME QUESTION THE TAX ENGINE ASKS.
+//
+// logFor takes the written down test as a parameter rather than owning it, because moneylog.ts
+// imports nothing and may not start. That hands every caller a way to get it wrong: a page passing
+// () => false quietly reproduces the 4 August defect, where /app/money reported June as a £52,557
+// loss because a £60,000 Audi sat in Out while lib/supabase.ts had already held it out of his tax
+// figures. The test is not free choice, it is isWrittenDown.
+//
+// ⚠️ THE NEGATIVE IS SCOPED TO THE CALL AND NOT TO THE FILE, and the first draft was not. A blanket
+// ban on 'not_a_car' fired on three lines of app/app/entry that legitimately branch on it to decide
+// which form to draw, which is a rendering choice and not a tax one. A guard that forbids a string
+// a page has honest uses for is a guard somebody deletes.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const logForCall = (src) => (codeOnly(src).match(/logFor\([\s\S]{0,140}?\)\.entries/) ?? [''])[0];
+for (const [name, src] of [['app/app/entry', pageEntry], ['app/app/money', pageMoney]]) {
+  ok(`🔴 ${name} asks lib/capital which costs are written down`,
+    /isWrittenDown\(r\.capital_kind\)/.test(codeOnly(src))
+    && /from '\.\.\/\.\.\/\.\.\/lib\/capital'/.test(src));
+  ok(`...and does not decide it for itself in the call`,
+    !/not_a_car|capital_kind\s*===|\(\)\s*=>\s*(true|false)/.test(logForCall(src)));
+}
+
+// 🔴 AND THE MONEY THAT LEAVES Out IS NAMED ON THE SCREEN IT LEFT. Holding a car out of the total
+// and saying nothing about it swaps one wrong figure for a second one he cannot check, with
+// £60,000 sitting in plain sight two rows below the total that no longer counts it.
+ok('🔴 /app/money prints what went out on cars whenever there is some',
+  /log\.capitalCost > 0/.test(codeOnly(pageMoney))
+  && /gbp0\(log\.capitalCost\)/.test(codeOnly(pageMoney)));
+ok('...and says why it is not in Out, in words',
+  /not in Out/.test(pageMoney) && /several years/.test(pageMoney));
+ok('🔴 and the row itself is marked, so the row and the total stop contradicting',
+  /e\.writtenDown \?/.test(codeOnly(pageMoney)) && /spread over years/.test(pageMoney));
+ok('the car line is drawn only when there is one, doc 103 empty test',
+  !/log\.capitalCost >= 0|capitalCost !== null/.test(codeOnly(pageMoney)));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SENTENCE THAT TOLD A MAN £2,700 WAS "MOST OF" £60,000, AND WHICH NOTHING GUARDED.
+//
+// app/app/entry is the ONE screen in the product built to stop a man misreading what a car is
+// worth, and on 4 August 2026 it read: "You told us this was a car, 75% for work. That is £2,700
+// off your profit this year, most of it, about three quarters." The tail was useBandLabel(75),
+// written to be a dropdown option answering how much of the DRIVING is work. Appended to a
+// sentence it modifies the nearest thing, and the nearest thing was a pound figure. £2,700 is 4.5%
+// of that car.
+//
+// ⚠️ IT WAS FOUND BY READING IT, NOT BY A TEST, and a sabotage pass then put the old wording back
+// and all 157 suites stayed green. This codebase's own named disease: shipped, correct, and pinned
+// by nothing. So the claim is guarded from both ends.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+ok('🔴 the car sentence names the COST beside the relief, so neither can be mistaken for the other',
+  /\$\{gbp0\(cost\)\} left your account/.test(pageEntry)
+  && /of it comes off your profit this year/.test(pageEntry));
+ok('...and says where the rest went, because a man told only the small number thinks it is lost',
+  /written down a little at a time/.test(pageEntry));
+ok('🔴 AND NO BAND LABEL IS EVER GLUED ONTO A SENTENCE ABOUT MONEY',
+  !/useBandLabel|bandLabel/.test(codeOnly(pageEntry)));
+// ⚠️ AND THE SHARE IS STATED BEFORE THE FIGURE, NEVER AFTER IT. "£2,700, three quarters" reads as
+// a claim about £2,700 whichever label supplies the tail, so the ordering is the guard, not the
+// identifier. app/app/CarQuestion.tsx still uses the labels and should: there they are the options.
+ok('🔴 and the driving share is stated before the pound figure, not after it',
+  !/gbp0\([^)]*\)[^`]{0,40}(three quarters|about half|a quarter|most of it)/i.test(pageEntry));
 ok('a failed read is told apart from a missing row',
   /rows !== null/.test(pageEntry) && /Nothing is lost/.test(pageEntry));
 ok('pounds are written by lib/money', pageEntry.includes("from '../../../lib/money'") && /gbp0\(entry\.amount\)/.test(pageEntry));

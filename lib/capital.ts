@@ -74,6 +74,25 @@ export function isCapitalKind(v: unknown): v is CapitalKind {
   return typeof v === 'string' && (CAPITAL_KINDS as readonly string[]).includes(v);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE ONE PLACE THAT DECIDES WHETHER A COST COMES OFF NOW OR OVER YEARS.
+//
+// This test was written out by hand inside the ledger loop in lib/supabase.ts, as
+// `if (kind && kind !== 'not_a_car') continue`, and NOTHING ELSE IN THE PRODUCT COULD SEE IT.
+// So on 4 August 2026 the tax engine was quietly holding £61,284 out of a man's costs while
+// /app/tax/summary printed "Profit -£38,508" and /app/money printed "June, Profit -£52,557".
+// Same account, same day, and the engine's own figure for the same words was £22,776.
+//
+// A rule only one file can see is a rule every other file gets wrong. It is a function now, and
+// the screens that print a profit ask it the same question the engine asks.
+//
+// ⚠️ null IS FALSE HERE AND THAT IS DELIBERATE. null means nobody asked him, and an unasked row
+// is an ordinary cost. It is the same reading getCapitalAssets takes.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function isWrittenDown(capitalKind: unknown): boolean {
+  return isCapitalKind(capitalKind) && capitalKind !== 'not_a_car';
+}
+
 // 🔴 WHEN THE QUESTION GETS ASKED AT ALL, AND BOTH HALVES OF THE RULE MATTER.
 //
 // ONE payment, over this. A car arrives on a statement as a single line. A merchant with fourteen

@@ -216,5 +216,89 @@ ok('document shows the assurance text', checkHtml.includes('SWEEP-RAN-2026'));
 const noCheck = Q.buildQuarterPack({ transactions: [{ amount: 5000, category: 'income', transaction_date: '2026-05-01' }], startYear: 2026, quarter: 1 });
 ok('no final-check block when none supplied', !Q.renderQuarterPackHtml(noCheck).includes('Final check before you file'));
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 🔴 A CAR IS NOT A COST AN UPDATE REPORTS ===\n');
+//
+// GOV.UK, claim capital allowances, business cars: "Cars do not qualify for: annual investment
+// allowance (AIA)." Until 4 August 2026 this module added every negative row to expenses, so
+// /app/tax/summary printed In £33,580, Out £72,088, Profit MINUS £38,508 on an account where the
+// tax engine, reading the same rows, had £22,776. £61,284 of the difference was one Audi and one
+// tester. writtenDown arrives already decided from lib/supabase.ts, which asks lib/capital.ts.
+//
+// 🔴 EVERY ASSERTION HAS A CONTROL. The identical rows, once with the flag and once without, and
+// the claim is on the difference. Without one, a module that ignored writtenDown entirely would
+// pass the "van still counts" half and nothing would notice.
+
+{
+  const june = [
+    { amount: 10620, category: 'income', transaction_date: '2026-06-26' },
+    { amount: -3177, category: 'materials', transaction_date: '2026-06-04' },
+    { amount: -60000, category: 'van', transaction_date: '2026-06-02', writtenDown: true },
+  ];
+  // The control rows: the same three payments with the flag stripped off, which is every account
+  // that has never been asked a capital question and every row written before 2 August 2026.
+  const flat = june.map((r) => ({ ...r, writtenDown: undefined }));
+  const base = { startYear: 2026, quarter: 1, mtdStated: 'no' };
+
+  const before = Q.buildQuarterPack({ ...base, transactions: flat });
+  ok('CONTROL: with no flag at all it is the old arithmetic, to the pound',
+    before.ytd.trade.expenses === 63177 && before.ytd.trade.net === -52557);
+  ok('CONTROL: and it reports no capital cost, so the line stays off the screen',
+    before.ytd.trade.capitalCost === 0 && before.ytd.trade.capitalCount === 0);
+
+  const after = Q.buildQuarterPack({ ...base, transactions: june });
+  ok('🔴 the car is out of expenses', after.ytd.trade.expenses === 3177);
+  ok('🔴 so an update reports a profit, not a £52,557 loss', after.ytd.trade.net === 7443);
+  ok('and the money is named rather than dropped',
+    after.ytd.trade.capitalCost === 60000 && after.ytd.trade.capitalCount === 1);
+  ok('income is untouched either way', after.ytd.trade.income === before.ytd.trade.income);
+  ok('the three figures still agree with each other',
+    near(after.ytd.trade.income - after.ytd.trade.expenses, after.ytd.trade.net));
+
+  // 🔴 AND IT LEAVES THE CATEGORY BREAKDOWN TOO. An update files expenses under HMRC's own
+  // headings, so a car left in "van" would be reported as a £60,000 vehicle running cost on the
+  // document an accountant and a mortgage lender read, while the total beside it said £3,177.
+  const cats = after.ytd.trade.expensesByCategory.map((c) => c.category);
+  ok('🔴 and it is out of the category breakdown, not only out of the total',
+    !cats.includes('van')
+    && after.ytd.trade.expensesByCategory.reduce((s, c) => s + c.amount, 0) === after.ytd.trade.expenses);
+  ok('CONTROL: without the flag it WAS in the breakdown',
+    before.ytd.trade.expensesByCategory.some((c) => c.category === 'van' && c.amount === 60000));
+
+  // The estimate a man acts on. A loss taxes nothing, so this is the difference between "you owe
+  // nothing" and a real bill, which is the whole reason the three screens disagreed.
+  ok('🔴 the tax estimate follows the corrected profit and not the book loss',
+    after.ytd.estimatedTax.tradeProfit === 7443 && before.ytd.estimatedTax.tradeProfit <= 0);
+}
+
+{
+  // Property rows are a separate stream and a car in one must not leak into the other.
+  const rows = [
+    { amount: 9000, income_type: 'property', transaction_date: '2026-05-01' },
+    { amount: -30000, income_type: 'property', transaction_date: '2026-05-02', writtenDown: true },
+    { amount: -1000, transaction_date: '2026-05-03', writtenDown: true },
+  ];
+  const p = Q.buildQuarterPack({ transactions: rows, startYear: 2026, quarter: 1, mtdStated: 'no' });
+  ok('each stream counts only its own written down costs',
+    p.ytd.property.capitalCost === 30000 && p.ytd.trade.capitalCost === 1000);
+  ok('...and neither has them in expenses',
+    p.ytd.property.expenses === 0 && p.ytd.trade.expenses === 0);
+}
+
+{
+  // undefined and false are the same answer, and they are the answer this module has always given.
+  const rows = [{ amount: -500, transaction_date: '2026-05-01', writtenDown: false }];
+  const f = Q.buildQuarterPack({ transactions: rows, startYear: 2026, quarter: 1, mtdStated: 'no' });
+  ok('an explicit false is an ordinary cost', f.ytd.trade.expenses === 500 && f.ytd.trade.capitalCost === 0);
+  // ⚠️ ONLY true COUNTS. A truthy string arriving from a JSON API must not silently remove a cost
+  // from a man's expenses, because the direction of that error is more tax than he owes.
+  const junk = Q.buildQuarterPack({
+    transactions: [{ amount: -500, transaction_date: '2026-05-01', writtenDown: 'yes' }],
+    startYear: 2026, quarter: 1, mtdStated: 'no',
+  });
+  ok('🔴 and only a real true removes one, never a truthy string',
+    junk.ytd.trade.expenses === 500 && junk.ytd.trade.capitalCost === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

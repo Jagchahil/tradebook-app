@@ -10,6 +10,7 @@ import { wholeFirmCaption } from '../../../lib/position';
 import { buildPile, partitionPile, waitingCount } from '../../../lib/reviewpile';
 import { bankFeedOffered } from '../../../lib/bankfeed';
 import { normaliseVendor } from '../../../lib/memory';
+import { isWrittenDown } from '../../../lib/capital';
 import { categoriseBankLine } from '../../../lib/categories';
 import {
   isMonthKey, logFor, monthKeyOf, monthTitle, stepMonth, dayLabel,
@@ -18,7 +19,7 @@ import { gbp0 } from '../../../lib/money';
 import { entryRef } from '../entryref';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  GREEN, INK, LINE, MUTED, ON_GREEN_TINT, PANEL, PAPER, RIVER, SURFACE,
+  GREEN, INK, LINE, MUTED, ON_GREEN_TINT, PANEL, PAPER, RIVER, RIVER_TINT, SURFACE,
 } from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
@@ -92,7 +93,11 @@ export default async function MoneyPage({
   // ⚠️ A READ THAT FAILED IS NOT A QUIET MONTH. Printing an empty April over a database timeout
   // tells a man something false about his own money, and it is the kind of false he acts on.
   const read = rows !== null;
-  const log = logFor(rows ?? [], month);
+  // ⚠️ THE TEST COMES FROM lib/capital.ts AND IS NOT WRITTEN OUT HERE. It is the same call the tax
+  // engine makes on the same column, which is the whole point: on 4 August 2026 this page said
+  // June was a £52,557 loss because a £60,000 car was in Out, while the engine had already taken
+  // it out and /app/tax/what-if put the same period at a £22,776 profit.
+  const log = logFor(rows ?? [], month, (r) => isWrittenDown(r.capital_kind));
 
   // ⚠️ AN ARROW ONLY EXISTS WHERE THERE IS SOMETHING TO GO TO. Doc 103's third test: a button whose
   // only function is to show him a month from before he started trading is an advert for the fact
@@ -162,6 +167,22 @@ export default async function MoneyPage({
             <div className="lek-tile-value">{gbp0(log.profit)}</div>
           </div>
         </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════════════════════
+            🔴 WHERE THE REST OF THE MONEY WENT, SAID OUT LOUD ON THE PAGE THAT IS MISSING IT.
+            A car is out of Out, which is right, and a total that quietly omits £60,000 sitting in
+            plain sight two inches below it is worse than the wrong total was. So the figure is
+            named, the reason is given in one sentence, and he is pointed at the row that prices it.
+            ⚠️ SHOWN ONLY WHEN THERE IS ONE. Doc 103's empty test: a permanent footnote about cars
+            on the eleven months of the year he did not buy one is a line he learns to skip.
+            ═══════════════════════════════════════════════════════════════════════════════════ */}
+        {log.capitalCost > 0 ? (
+          <p style={S.quiet}>
+            {gbp0(log.capitalCost)} more went out on {log.capitalCount === 1 ? 'a car' : `${log.capitalCount} cars`}.
+            {' '}That is not in Out: a car comes off over several years, never in one.
+            {' '}Tap {log.capitalCount === 1 ? 'the line' : 'a line'} below to see what it is worth this year.
+          </p>
+        ) : null}
 
         {/* Whose money this log is. For a partner these are the shared account's raw rows, the
             whole firm, while his tax figures run on his share, and unlabelled the two contradict. */}
@@ -237,6 +258,9 @@ export default async function MoneyPage({
                 <div style={S.rowMeta}>
                   <span>{dayLabel(e.date)}</span>
                   {e.category ? <span style={S.chip}>{e.category}</span> : null}
+                  {/* The row keeps its full amount, because that IS what left his account. This
+                      says the total above is not counting it, so the two stop contradicting. */}
+                  {e.writtenDown ? <span style={S.chipCap}>spread over years</span> : null}
                   {/* ⚠️ ONE BUTTON, AND IT GOES BOTH WAYS. Doc 103: acting for him is only kindness
                       when it is reversible and it is his. Marking a line personal is as small and as
                       personal as a decision gets, so it takes one press and no confirmation, and it
@@ -312,6 +336,10 @@ const S: Record<string, React.CSSProperties> = {
   amountOff: { fontSize: TYPE.body, fontWeight: 800, color: MUTED, textDecoration: 'line-through', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
   rowMeta: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: TYPE.label, color: MUTED, marginTop: 6 },
   chip: { background: SURFACE, borderRadius: RADIUS.sm, padding: '2px 8px', fontWeight: 700 },
+  // 🔴 THE ONE ROW ON THE PAGE WHOSE FIGURE IS NOT WHAT COMES OFF HIS PROFIT. It is drawn apart
+  // from the category chip beside it because it is not a category, it is a warning that the number
+  // to its left and the total above it are answering different questions.
+  chipCap: { background: RIVER_TINT, color: RIVER, borderRadius: RADIUS.sm, padding: '2px 8px', fontWeight: 800 },
   inlineForm: { margin: 0, marginLeft: 'auto' },
 
   waiting: { display: 'flex', gap: 14, alignItems: 'center', textDecoration: 'none', background: PANEL, border: `1px solid ${LINE}`, borderLeft: `3px solid ${RIVER}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },

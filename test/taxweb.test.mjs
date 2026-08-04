@@ -345,6 +345,37 @@ const summaryNumbers = codeOnly(src.summary).replace(/txns\.length >= 20000/g, '
 ok('the page types no MTD threshold of its own',
   !/(?<![\d.])(50000|30000|20000)(?![\d.])/.test(summaryNumbers));
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE PROFIT TILE. IT SAID MINUS £38,508 WHILE TWO OTHER SCREENS OF THIS PRODUCT SAID £22,776.
+//
+// 4 August 2026, one account, one tax year, one day. This page: In £33,580, Out £72,088, Profit
+// MINUS £38,508. /app/tax/what-if: "Your confirmed profit since 6 April is £22,776. That is the
+// base: real figures, nothing projected." /app/tax: "£16,626 ... due by 31 January 2028." £61,284
+// apart, which is a £60,000 Audi and a £1,284 tester, to the pound.
+//
+// The tiles were his book. The heading above them says "What a quarterly update would report
+// today", and an update does not report a car as a cost: GOV.UK, claim capital allowances,
+// business cars, "Cars do not qualify for: annual investment allowance (AIA)". lib/quarterpack.ts
+// holds it out now, so the tiles are the update's figures.
+//
+// ⚠️ WHICH MADE NAMING IT COMPULSORY. Removing £61,284 from Out and saying nothing swaps a wrong
+// figure for a second one he cannot check. Both halves are guarded, because the half that is easy
+// to lose in a refactor is the sentence, and the sentence is what stops the fix becoming the bug.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+ok('🔴 the tiles are the pack\'s figures and the page adds nothing to them',
+  /gbp0\(sub\.trade\.expenses\)/.test(summaryCode) && /gbp0\(sub\.trade\.net\)/.test(summaryCode));
+ok('🔴 AND MONEY HELD OUT OF Out IS NAMED ON THE SAME SCREEN',
+  /sub\.trade\.capitalCost > 0/.test(summaryCode) && /gbp0\(sub\.trade\.capitalCost\)/.test(summaryCode));
+ok('...with the reason, in his words, not a footnote number',
+  /not in Out above/.test(summaryCode) && /never in one/.test(summaryCode));
+ok('🔴 and the line is drawn ONLY when there is one, doc 103\'s empty test',
+  !/capitalCost >= 0|capitalCost !== null|capitalCost != null/.test(summaryCode));
+// ⚠️ THE COST, NEVER THE ALLOWANCE. This page reads one tax year of rows, so a car bought last year
+// is invisible to it, and an allowance worked out from what it can see would be short. Understating
+// a man's relief in a confident voice is the same fault as overstating it.
+ok('🔴 and it never works an allowance out of one year of rows',
+  !/capitalRelief|wdaMainRate|wdaSpecialRate/.test(summaryCode));
+
 // ---------------------------------------------------------------------------------------------
 // 7. IT IS WIRED. Three of these were written, shipped green, and pinned by NOTHING until a
 //    sabotage pass deleted each one and the suite did not notice. That is this codebase's own

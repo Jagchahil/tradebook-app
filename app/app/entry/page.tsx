@@ -8,7 +8,7 @@ import { gbp0 } from '../../../lib/money';
 import { verifyEntryRef, refBelongsTo } from '../entryref';
 import {
   CAPITAL_QUESTION_FROM, capitalOptions, capitalQuestion, capitalRelief, isCapitalKind,
-  useBandLabel as bandLabel, type CapitalKind,
+  isWrittenDown, type CapitalKind,
 } from '../../../lib/capital';
 import { CarBands, CarVerdict, CAR_CSS } from '../CarQuestion';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
@@ -69,7 +69,7 @@ export default async function EntryPage({
   // timeout is the kind of false he acts on, so the two get different screens.
   const read = rows !== null;
   const entry = read
-    ? logFor(rows ?? [], month).entries.find((e) => e.id === row) ?? null
+    ? logFor(rows ?? [], month, (r) => isWrittenDown(r.capital_kind)).entries.find((e) => e.id === row) ?? null
     : null;
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -195,11 +195,22 @@ export default async function EntryPage({
           ) : canAsk ? (
             <section style={S.car}>
               <h2 className="lek-h2">{capitalQuestion()}</h2>
+              {/* ═══════════════════════════════════════════════════════════════════════════
+                    🔴 THIS SENTENCE TOLD A MAN THAT £2,700 WAS "MOST OF" £60,000.
+                    It read: "That is £2,700 off your profit this year, most of it, about three
+                    quarters." The tail was bandLabel(75), which is written to be a DROPDOWN OPTION
+                    answering how much of the driving is work. Bolted onto the end of a sentence it
+                    modifies the nearest thing, and the nearest thing was a pound figure. £2,700 is
+                    4.5% of that car, and this is the one screen in the product built to stop
+                    exactly this misunderstanding.
+                    ⚠️ SO THE SHARE IS STATED BEFORE THE FIGURE, NEVER AFTER IT, and the cost is
+                    named alongside the relief so the two numbers cannot be mistaken for each other.
+                    ═══════════════════════════════════════════════════════════════════════════ */}
               {storedKind ? (
                 <p style={S.quiet}>
                   {storedKind === 'not_a_car'
                     ? 'You told us this was not a car, so it comes off your profit in full this year.'
-                    : `You told us this was a car${storedPct && storedPct < 100 ? `, ${storedPct}% for work` : ''}. That is ${gbp0(capitalRelief(cost, storedKind, storedPct ?? 100).thisYear)} off your profit this year${storedPct && storedPct < 100 ? `, ${bandLabel(storedPct as 100 | 75 | 50 | 25).toLowerCase()}` : ''}.`}
+                    : `You told us this was a car${storedPct && storedPct < 100 ? `, and ${storedPct}% of the driving is work` : ''}. ${gbp0(cost)} left your account and ${gbp0(capitalRelief(cost, storedKind, storedPct ?? 100).thisYear)} of it comes off your profit this year. The rest is not lost: a car is written down a little at a time, every year you own it.`}
                 </p>
               ) : (
                 <p style={S.quiet}>

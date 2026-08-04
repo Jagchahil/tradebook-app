@@ -665,5 +665,68 @@ console.log('\n12. The vehicle screen when there is no tax to save');
     new Set(broke.options.map((o) => o.firstYear)).size > 1);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n🔴 ONE PLACE DECIDES WHETHER A COST COMES OFF NOW OR OVER YEARS');
+//
+// The 2 August fix put the test inside the ledger loop in lib/supabase.ts, written out by hand as
+// `if (kind && kind !== 'not_a_car') continue`. It was correct and it was INVISIBLE. On 4 August
+// the same account read, on three screens of one product, on one day, for one tax year:
+//
+//   /app/tax/summary      In £33,580   Out £72,088   Profit MINUS £38,508
+//   /app/tax/what-if      "Your confirmed profit since 6 April is £22,776"
+//   /app/tax              "£16,626 ... due by 31 January 2028"
+//
+// £61,284 apart, and £61,284 is a £60,000 Audi plus a £1,284 tester, to the pound. The engine was
+// right. Every screen that printed a profit was wrong, because none of them could see the rule.
+// It is isWrittenDown() in lib/capital.ts now, and the screens ask it what the engine asks it.
+
+ok('CONTROL: an unanswered row is an ordinary cost, exactly as it always was',
+  C.isWrittenDown(null) === false && C.isWrittenDown(undefined) === false);
+ok('CONTROL: so is anything that is not one of the four answers',
+  C.isWrittenDown('') === false && C.isWrittenDown('car') === false
+  && C.isWrittenDown(7) === false && C.isWrittenDown({}) === false);
+ok('a van he has told us about comes off in full', C.isWrittenDown('not_a_car') === false);
+for (const kind of ['car_zero_new', 'car_low_or_used_electric', 'car_other']) {
+  ok(`🔴 ${kind} is written down`, C.isWrittenDown(kind) === true);
+}
+ok('and every kind the product knows is covered by that answer either way',
+  C.CAPITAL_KINDS.every((k) => typeof C.isWrittenDown(k) === 'boolean')
+  && C.CAPITAL_KINDS.filter((k) => C.isWrittenDown(k)).length === C.CAPITAL_KINDS.length - 1);
+
+{
+  // The wiring, on source, because the arithmetic above passes just as happily when nothing calls
+  // it. A comment stripper first: this asserts what the code does, not what it says about itself.
+  const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const supa = codeOnly(read('lib/supabase.ts'));
+  const pack = codeOnly(read('lib/quarterpack.ts'));
+  const summary = read('app/app/tax/summary/page.tsx');
+
+  // ⚠️ THE NEGATIVE RAN ON THE WHOLE FILE FIRST AND IT WAS WRONG TWICE OVER. It fired on the
+  // assets loop and on setCapitalKind, both of which were asking the SAME question in their own
+  // words, which is the defect rather than an exception to it. So all three call isWrittenDown now
+  // and lib/supabase.ts holds no hand written copy of the rule at all. The one place the string
+  // still appears is a comment explaining what the answer means, which codeOnly strips.
+  ok('🔴 the ledger loop calls it rather than spelling it out',
+    /if \(isWrittenDown\(r\.capital_kind\)\) continue;/.test(supa));
+  ok('🔴 AND NO PART OF lib/supabase.ts DECIDES IT BY HAND ANY MORE',
+    !/not_a_car/.test(supa));
+  ok('🔴 and every row handed to the pack carries the decided answer',
+    /writtenDown: isWrittenDown\(r\.capital_kind\)/.test(supa));
+  ok('lib/quarterpack.ts obeys it and never re-decides it',
+    /t\.writtenDown === true/.test(pack) && !/not_a_car/.test(pack));
+  ok('🔴 and quarterpack still holds exactly ONE relative import, which six suites depend on',
+    (pack.match(/from '\.\/[a-zA-Z0-9._-]+'/g) ?? []).length === 1);
+
+  ok('🔴 the summary page names the money it is no longer counting',
+    /sub\.trade\.capitalCost > 0/.test(codeOnly(summary))
+    && /gbp0\(sub\.trade\.capitalCost\)/.test(codeOnly(summary)));
+  ok('...and says why, rather than leaving a hole',
+    /not in Out above/.test(summary) && /never in one/.test(summary));
+  // ⚠️ AND IT QUOTES THE COST, NEVER THE ALLOWANCE. This page reads one tax year of rows, so a car
+  // bought last year is invisible to it and any allowance it worked out here would be short.
+  ok('🔴 and it never works out an allowance from one year of rows',
+    !/capitalRelief|thisYear/.test(codeOnly(summary)));
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

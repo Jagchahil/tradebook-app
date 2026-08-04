@@ -16,7 +16,16 @@
 //   5. NOTHING IS EVER NAMELESS. A bank line with no vendor renders as a blank space beside a
 //      figure, and a man looking at £240 next to nothing does not think "missing field".
 //
-// moneylog.ts imports nothing, so it loads directly under Node's type stripping.
+//   6. A CAR IS NOT A RUNNING COST, AND THE ROW STILL SHOWS THE WHOLE PAYMENT. On 4 August 2026
+//      this module put a £60,000 Audi in Out and reported June as a £52,557 loss, while the tax
+//      engine reading the same row had already taken it out. Out is allowable costs now, the
+//      purchase is counted in capitalCost where a screen can name it, and the entry keeps its
+//      full amount because that IS what left his account.
+//
+// moneylog.ts imports nothing, so it loads directly under Node's type stripping. The written down
+// test is therefore PASSED IN, and this suite passes plain functions rather than importing
+// lib/capital.ts. That the real pages pass isWrittenDown and not something of their own is held by
+// test/moneyweb.test.mjs and test/capitalwiring.test.mjs, on the page source.
 //
 // Run: node test/moneylog.test.mjs   (Node 22.6+). Pure, no network, no clock of its own.
 
@@ -44,6 +53,13 @@ const row = (over = {}) => ({
   ...over,
 });
 
+// The written down test, passed in the way the pages pass isWrittenDown from lib/capital.ts.
+// NONE is the ordinary world: nobody has answered a capital question, so nothing is a car.
+const NONE = () => false;
+// And this one mirrors the real rule without importing it, so a fixture can say "he told us this
+// one was a car". lib/capital.ts is the only place the real list of answers lives.
+const BY_KIND = (r) => typeof r.capital_kind === 'string' && r.capital_kind !== 'not_a_car';
+
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n1. STRUCK OUT IS SHOWN, AND NEVER COUNTED');
 
@@ -53,7 +69,7 @@ console.log('\n1. STRUCK OUT IS SHOWN, AND NEVER COUNTED');
     row({ id: 'out', amount: -120 }),
     row({ id: 'mine', amount: -60, vendor: 'Odeon', is_personal: true }),
   ];
-  const log = M.logFor(rows, '2026-07');
+  const log = M.logFor(rows, '2026-07', NONE);
 
   ok('every row is on the screen, including the struck out one', log.entries.length === 3);
   ok('the struck out row is marked as such', log.entries.find((e) => e.id === 'mine').personal === true);
@@ -65,12 +81,12 @@ console.log('\n1. STRUCK OUT IS SHOWN, AND NEVER COUNTED');
 {
   // Money in that he has struck out is out of the totals too. It is his figure either way, and the
   // page must not quietly keep counting income he has told us is not his business's.
-  const log = M.logFor([row({ amount: 900, is_personal: true })], '2026-07');
+  const log = M.logFor([row({ amount: 900, is_personal: true })], '2026-07', NONE);
   ok('struck out income is not counted either', log.income === 0 && log.profit === 0);
 }
 
 {
-  const log = M.logFor([], '2026-07');
+  const log = M.logFor([], '2026-07', NONE);
   ok('an empty month is zeros, never an error', log.entries.length === 0 && log.profit === 0);
   ok('...and it knows it has nothing struck out', log.personalCount === 0);
 }
@@ -78,13 +94,13 @@ console.log('\n1. STRUCK OUT IS SHOWN, AND NEVER COUNTED');
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n2. A ROW WE CANNOT READ NEVER BECOMES A FIGURE');
 
-ok('a row with no date is dropped, not guessed at', M.toEntry(row({ transaction_date: null })) === null);
-ok('a row with a rubbish date is dropped', M.toEntry(row({ transaction_date: 'last Tuesday' })) === null);
-ok('a row with a NaN amount is dropped', M.toEntry(row({ amount: 'lots' })) === null);
-ok('a row with no amount at all is dropped', M.toEntry(row({ amount: null })) === null);
+ok('a row with no date is dropped, not guessed at', M.toEntry(row({ transaction_date: null }), NONE) === null);
+ok('a row with a rubbish date is dropped', M.toEntry(row({ transaction_date: 'last Tuesday' }), NONE) === null);
+ok('a row with a NaN amount is dropped', M.toEntry(row({ amount: 'lots' }), NONE) === null);
+ok('a row with no amount at all is dropped', M.toEntry(row({ amount: null }), NONE) === null);
 ok('a row with no id is dropped, because its button would do nothing',
-  M.toEntry(row({ id: null })) === null && M.toEntry(row({ id: '' })) === null);
-ok('a good row survives all of that', M.toEntry(row()) !== null);
+  M.toEntry(row({ id: null }), NONE) === null && M.toEntry(row({ id: '' }), NONE) === null);
+ok('a good row survives all of that', M.toEntry(row(), NONE) !== null);
 
 {
   const log = M.logFor([
@@ -92,7 +108,7 @@ ok('a good row survives all of that', M.toEntry(row()) !== null);
     row({ id: 'x', transaction_date: null }),
     row({ id: null }),
     row({ id: 'y', amount: Number.NaN }),
-  ], '2026-07');
+  ], '2026-07', NONE);
   ok('a month made of half rubbish still adds up', log.expenses === 100 && log.entries.length === 1);
   ok('nothing prints as NaN', Number.isFinite(log.income) && Number.isFinite(log.expenses) && Number.isFinite(log.profit));
 }
@@ -118,7 +134,7 @@ console.log('\n4. THE MONTH FILTER IS EXACT, AND THE ARROWS POINT SOMEWHERE REAL
     row({ id: 'jul31', transaction_date: '2026-07-31', amount: -30 }),
     row({ id: 'aug', transaction_date: '2026-08-01', amount: -40 }),
   ];
-  const july = M.logFor(rows, '2026-07');
+  const july = M.logFor(rows, '2026-07', NONE);
   ok('the first and last day of the month are in it', july.entries.length === 2 && july.expenses === 50);
   ok('the day before is not', !july.entries.some((e) => e.id === 'jun'));
   ok('and the day after is not', !july.entries.some((e) => e.id === 'aug'));
@@ -174,8 +190,8 @@ ok('...whatever rubbish the columns hold', M.labelFor({ vendor: 7, description: 
     row({ id: 'a', transaction_date: '2026-07-14' }),
     row({ id: 'c', transaction_date: '2026-07-20' }),
   ];
-  const one = M.logFor(rows, '2026-07').entries.map((e) => e.id).join(',');
-  const two = M.logFor([...rows].reverse(), '2026-07').entries.map((e) => e.id).join(',');
+  const one = M.logFor(rows, '2026-07', NONE).entries.map((e) => e.id).join(',');
+  const two = M.logFor([...rows].reverse(), '2026-07', NONE).entries.map((e) => e.id).join(',');
   ok('newest first', one.startsWith('c'));
   ok('🔴 AND TWO PAYMENTS ON ONE DAY DO NOT SWAP PLACES BETWEEN LOADS', one === two);
 }
@@ -191,6 +207,63 @@ ok('a day carries its weekday, because he remembers the job not the date',
 ok('...on the first of a month too', M.dayLabel('2026-08-01') === 'Sat 1 August');
 ok('an unreadable date falls back to itself rather than to "Invalid Date"',
   M.dayLabel('nonsense') === 'nonsense');
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n7. 🔴 A CAR IS NOT A RUNNING COST, AND THE ROW STILL SHOWS THE WHOLE PAYMENT');
+//
+// The real month, from the account that found this on 4 August 2026. June 2026: £10,620 in,
+// £3,177 of ordinary costs, and one AUDI LEEDS line at £60,000 that the pile had recorded as a
+// car. This module put all of it in Out and reported a £52,557 loss, while lib/supabase.ts,
+// reading the same capital_kind on the same row, had already held the car out of his tax figures.
+
+{
+  const june = [
+    row({ id: 'in1', amount: 10620, vendor: 'Haldane', category: 'income', transaction_date: '2026-06-26' }),
+    row({ id: 'cef', amount: -3177, vendor: 'CEF', category: 'materials', transaction_date: '2026-06-04' }),
+    row({ id: 'audi', amount: -60000, vendor: 'AUDI LEEDS', category: 'van', transaction_date: '2026-06-02', capital_kind: 'car_other' }),
+  ];
+
+  const before = M.logFor(june, '2026-06', NONE);
+  ok('CONTROL: with no capital answers at all it is the old arithmetic, to the pound',
+    before.expenses === 63177 && before.profit === -52557 && before.capitalCost === 0);
+
+  const after = M.logFor(june, '2026-06', BY_KIND);
+  ok('🔴 the car is out of Out', after.expenses === 3177);
+  ok('🔴 so the month is a profit and not a £52,557 loss', after.profit === 7443);
+  ok('and the money is NAMED rather than merely missing', after.capitalCost === 60000 && after.capitalCount === 1);
+  ok('the row is still on the screen', after.entries.some((e) => e.id === 'audi'));
+  ok('🔴 AND IT STILL SHOWS THE WHOLE £60,000, because that is what left his account',
+    after.entries.find((e) => e.id === 'audi').amount === -60000);
+  ok('the row carries the flag the screen needs to say so',
+    after.entries.find((e) => e.id === 'audi').writtenDown === true);
+  ok('and an ordinary cost does not', after.entries.find((e) => e.id === 'cef').writtenDown === false);
+  ok('every figure still adds up, In minus Out is Profit',
+    after.income - after.expenses === after.profit);
+}
+
+{
+  // 'not_a_car' IS AN ANSWER AND IT MEANS THE OPPOSITE. A van, a digger and a tester are plant
+  // and machinery, inside the AIA, and correctly come off in full. See lib/capital.ts.
+  const rows = [row({ id: 'van', amount: -18000, vendor: 'Ford', capital_kind: 'not_a_car' })];
+  const log = M.logFor(rows, '2026-07', BY_KIND);
+  ok('a van he has told us about still comes off in full',
+    log.expenses === 18000 && log.capitalCost === 0);
+  ok('...and is not labelled on the screen', log.entries[0].writtenDown === false);
+}
+
+{
+  // Money IN is never a purchase, and a row he has struck out has no relief to describe. A test
+  // that answered true for either would put a credit in capitalCost, which is not a number.
+  const rows = [
+    row({ id: 'credit', amount: 5000, capital_kind: 'car_other' }),
+    row({ id: 'mine', amount: -9000, capital_kind: 'car_other', is_personal: true }),
+  ];
+  const log = M.logFor(rows, '2026-07', () => true);
+  ok('🔴 a payment IN is never written down, whatever the test says',
+    log.income === 5000 && log.capitalCost === 0 && log.entries.find((e) => e.id === 'credit').writtenDown === false);
+  ok('and neither is a line he has struck out',
+    log.capitalCost === 0 && log.entries.find((e) => e.id === 'mine').writtenDown === false);
+}
 
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exitCode = fail === 0 ? 0 : 1;

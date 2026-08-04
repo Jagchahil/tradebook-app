@@ -31,7 +31,7 @@ import { refreshFacts, resolveOverrides, isOverridableKey, isInBounds, type Fact
 import { advanceStage, normaliseWhatsapp, isContactStage, isCheckoutStage, isEventKind, type ContactStage, type CheckoutStage, type EventKind } from './crm';
 import { sicByCode } from './siccodes';
 import { useOfHomeToDate } from './elections';
-import { capitalRelief, isCapitalKind } from './capital';
+import { capitalRelief, isCapitalKind, isWrittenDown } from './capital';
 import { fromLegacyKind, toLegacyKind, isGoalKind, type LegacyGoalKind } from './goals';
 import { weekTotals, windowStart, type WeekRow } from './weekchart';
 import { isMonthKey, monthStart, monthEnd } from './moneylog';
@@ -3809,6 +3809,12 @@ export interface PackRow {
   // nothing is reinterpreted retrospectively. See supabase/APPLY_2026-08-02_capital_kind.sql.
   capital_kind: string | null;
   business_use_pct: number | null;
+  // 🔴 THE ANSWER, NOT THE QUESTION. capital_kind above is what he SAID; this is what it MEANS for
+  // his costs, decided once by isWrittenDown() in lib/capital.ts. It is required rather than
+  // optional so tsc names the mapper below if anyone ever adds a second reader: a row that reaches
+  // lib/quarterpack.ts without it is a £60,000 car counted as a running cost, which is the exact
+  // defect this field exists to close.
+  writtenDown: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -3893,6 +3899,7 @@ export async function getConfirmedTransactionsForRange(
       income_type: (r.income_type as string | null) ?? null,
       capital_kind: (r.capital_kind as string | null) ?? null,
       business_use_pct: r.business_use_pct == null ? null : Number(r.business_use_pct),
+      writtenDown: isWrittenDown(r.capital_kind),
     }));
 }
 
@@ -4029,8 +4036,10 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
       // nothing at all for one bought last year, because this loop only ever sees the current tax
       // year. getCapitalAssets reads every year and the sum is below, so this branch now has one
       // job: keep the purchase price out of his running costs.
-      const kind = isCapitalKind(r.capital_kind) ? r.capital_kind : null;
-      if (kind && kind !== 'not_a_car') continue;
+      // ⚠️ THE TEST IS isWrittenDown() IN lib/capital.ts AND IT USED TO BE SPELLED OUT HERE.
+      // Written out by hand it was invisible to every screen that prints a profit, and three of
+      // them printed one that disagreed with this line by £61,284. See the header on that function.
+      if (isWrittenDown(r.capital_kind)) continue;
 
       ytdTradeExpenses += -amt;
       if (isMileageRow(r)) ytdMileage += -amt;
@@ -4063,7 +4072,9 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     const yearsHeld = Math.max(0, startYear - boughtYear);
     // A purchase in the current year is already out of ytdTradeExpenses by the loop above; one
     // from an earlier year was never in it. Either way this is the whole of its relief.
-    if (kind === 'not_a_car') continue;
+    // ⚠️ THE SAME isWrittenDown() THE LOOP ABOVE USES, AND IT WAS SPELLED OUT HERE TOO. One rule,
+    // three hand written copies, and a screen with none of them. See lib/capital.ts.
+    if (!isWrittenDown(kind)) continue;
     const use = a.business_use_pct == null ? 100 : a.business_use_pct;
     ytdCapitalAllowances += capitalRelief(Math.abs(a.amount), kind, use, yearsHeld).thisYear;
   }
@@ -5908,10 +5919,11 @@ export async function setCapitalKind(
   const clean = ids.filter((i) => UUID.test(i));
   if (clean.length === 0) return false;
 
-  // The share is only meaningful on a vehicle, and the database says so too. Sending one on
-  // 'not_a_car' would leave the two columns disagreeing, which PART 3 of the migration checks for.
+  // The share is only meaningful on a vehicle, and the database says so too. Sending one on a van
+  // would leave the two columns disagreeing, which PART 3 of the migration checks for. The test is
+  // isWrittenDown() and it used to be written out here as well: same rule, third copy.
   const pct =
-    kind !== 'not_a_car' && typeof businessUsePct === 'number' && Number.isFinite(businessUsePct)
+    isWrittenDown(kind) && typeof businessUsePct === 'number' && Number.isFinite(businessUsePct)
       ? Math.max(1, Math.min(100, Math.round(businessUsePct)))
       : null;
 

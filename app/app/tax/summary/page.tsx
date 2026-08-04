@@ -214,6 +214,38 @@ export default async function TaxSummaryPage() {
               {' '}Anything still waiting on you is not in these figures.
             </p>
 
+            {/* ═══════════════════════════════════════════════════════════════════════════════
+                🔴 £61,284 USED TO LEAVE THIS PAGE WITHOUT A WORD, AND IT LEFT IN THE WRONG
+                DIRECTION.
+                Until 4 August 2026 the tiles were his book: income minus everything that left.
+                On the account that found this they read In £33,580, Out £72,088, Profit MINUS
+                £38,508, because a £60,000 Audi and a £1,284 tester were in Out. One click away,
+                /app/tax/what-if said "Your confirmed profit since 6 April is £22,776" and
+                /app/tax quoted a bill of £16,626. Three screens, one account, one tax year.
+                The engine was right and this page was wrong: GOV.UK, claim capital allowances,
+                business cars, "Cars do not qualify for: annual investment allowance (AIA)", so a
+                car is not a cost an update reports. lib/quarterpack.ts holds it out of expenses
+                now, and the tiles above are what an update would actually report.
+                ⚠️ WHICH MAKES NAMING IT COMPULSORY, NOT OPTIONAL. A page headed "what a quarterly
+                update would report" that silently drops £61,284 of a man's own spending has only
+                traded one wrong number for a second one he cannot check. The money is named, the
+                reason is one sentence, and /app/money prices each one.
+                ⚠️ AND THE FIGURE IS THE COST, NEVER THE ALLOWANCE. An allowance is a year end
+                claim and this page holds one tax year of rows, so a car bought last year is
+                invisible here and its allowance would be understated. Stating a number this page
+                cannot see the whole of would be the same fault in a quieter voice.
+                ═══════════════════════════════════════════════════════════════════════════════ */}
+            {sub.trade.capitalCost > 0 ? (
+              <p style={S.quiet}>
+                {gbp0(sub.trade.capitalCost)} more went out on{' '}
+                {sub.trade.capitalCount === 1 ? 'a car' : `${sub.trade.capitalCount} cars`}, and an
+                update does not report{sub.trade.capitalCount === 1 ? ' it' : ' them'} as a cost. A
+                car comes off over several years, never in one, so it is not in Out above. Your
+                money log has {sub.trade.capitalCount === 1 ? 'the payment' : 'each payment'} in
+                full and what it is worth this year.
+              </p>
+            ) : null}
+
             {/* Property is its own stream on a real update, so it is its own block here, and only
                 for a man who has one. A permanent empty property row fails doc 103's empty test. */}
             {pack.hasProperty ? (

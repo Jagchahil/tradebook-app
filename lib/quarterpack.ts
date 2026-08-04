@@ -41,6 +41,21 @@ export interface PackTxn {
   transaction_date: string; // YYYY-MM-DD
   cis_deduction?: number | null;
   income_type?: string | null; // 'property' marks the property stream; anything else is trade
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A COST THAT IS RELIEVED OVER YEARS RATHER THAN TAKEN OFF NOW. TRUE FOR A CAR, FALSE FOR
+  // EVERYTHING ELSE, AND IT KEEPS A £60,000 AUDI OUT OF A QUARTERLY UPDATE.
+  //
+  // ⚠️ IT ARRIVES AS A DECIDED BOOLEAN AND NOT AS capital_kind, ON PURPOSE, TWICE OVER. First,
+  // the rule that turns a kind into this answer lives in lib/capital.ts and may only live there:
+  // spelling it out a second time here is how the last one drifted. Second, this module holds
+  // exactly one relative import and cannot take another, because suites stage it and add the .ts
+  // extension with a single fixed string replace. lib/supabase.ts PackRow decides it and this
+  // module obeys it, the same shape as income_type above.
+  //
+  // ⚠️ UNDEFINED READS AS FALSE, which is every fixture and every row written before anybody was
+  // asked, and false is the behaviour this module has always had.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  writtenDown?: boolean;
 }
 
 export interface QuarterBounds {
@@ -53,9 +68,17 @@ export interface QuarterBounds {
 
 export interface StreamSummary {
   income: number;
+  /** Allowable running costs. A written down purchase is NOT in here. See capitalCost. */
   expenses: number;
   net: number;
   expensesByCategory: Array<{ category: string; amount: number }>;
+  // 🔴 WHAT LEFT HIS ACCOUNT ON THINGS THAT ARE RELIEVED OVER YEARS, AND IT IS REPORTED RATHER
+  // THAN DROPPED. Taking a car out of expenses and saying nothing is how "Out £72,088" and
+  // "Profit £22,776" ended up on two screens of one product with nothing joining them. Every
+  // surface that prints expenses has this beside it and can say where the rest of the money went.
+  capitalCost: number;
+  /** How many payments make up capitalCost. Zero whenever capitalCost is zero. */
+  capitalCount: number;
 }
 
 export interface EstimatedTax {
@@ -223,6 +246,8 @@ export function quarterForDate(date: Date): { startYear: number; index: 1 | 2 | 
 function summariseStream(txns: PackTxn[], wantProperty: boolean): StreamSummary {
   let income = 0;
   let expenses = 0;
+  let capitalCost = 0;
+  let capitalCount = 0;
   const byCat = new Map<string, number>();
   for (const t of txns) {
     const isProperty = (t.income_type ?? '').toLowerCase() === 'property';
@@ -233,6 +258,15 @@ function summariseStream(txns: PackTxn[], wantProperty: boolean): StreamSummary 
       income += amt;
     } else {
       const mag = -amt;
+      // 🔴 A CAR IS NOT A RUNNING COST AND AN UPDATE DOES NOT REPORT IT AS ONE. GOV.UK, claim
+      // capital allowances, business cars: "Cars do not qualify for: annual investment allowance
+      // (AIA)." So it leaves expenses and it leaves the category breakdown, and it is counted
+      // where the reader can see it instead of vanishing. See writtenDown on PackTxn.
+      if (t.writtenDown === true) {
+        capitalCost += mag;
+        capitalCount += 1;
+        continue;
+      }
       expenses += mag;
       const cat = (t.category ?? 'other').trim().toLowerCase() || 'other';
       byCat.set(cat, (byCat.get(cat) ?? 0) + mag);
@@ -243,7 +277,14 @@ function summariseStream(txns: PackTxn[], wantProperty: boolean): StreamSummary 
     .sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category));
   income = round2(income);
   expenses = round2(expenses);
-  return { income, expenses, net: round2(income - expenses), expensesByCategory };
+  return {
+    income,
+    expenses,
+    net: round2(income - expenses),
+    expensesByCategory,
+    capitalCost: round2(capitalCost),
+    capitalCount,
+  };
 }
 
 function cisTotal(txns: PackTxn[]): number {

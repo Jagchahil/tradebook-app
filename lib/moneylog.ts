@@ -36,16 +36,26 @@ export interface LogEntry {
   /** Positive for money in, negative for money out, the convention the table uses. */
   amount: number;
   personal: boolean;
+  // 🔴 THE PAYMENT LEFT HIS ACCOUNT IN FULL AND ONLY A SLICE OF IT COMES OFF HIS PROFIT.
+  // A car. The row still shows the whole amount, because that IS what left, and this flag is
+  // what lets the screen say so beside it instead of quietly disagreeing with its own total.
+  writtenDown: boolean;
 }
 
 export interface MonthLog {
   month: string;          // YYYY-MM
   entries: LogEntry[];
   income: number;         // business only
-  expenses: number;       // business only
+  /** Allowable running costs. A written down purchase is NOT in here: see capitalCost. */
+  expenses: number;
   profit: number;
   /** Rows he has set aside as not business money. Shown, never counted. */
   personalCount: number;
+  // What went out on things relieved over years. Never folded into expenses and never dropped:
+  // a total that silently omits £60,000 sitting in plain sight one row below is worse than no
+  // total at all. app/app/money/page.tsx prints this whenever it is not zero.
+  capitalCost: number;
+  capitalCount: number;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
@@ -92,7 +102,22 @@ export function labelFor(row: LogRow): string {
   return 'No name on it';
 }
 
-export function toEntry(row: LogRow): LogEntry | null {
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHY THIS MODULE IS HANDED THE TEST INSTEAD OF KNOWING IT.
+//
+// Whether a cost is relieved over years is decided by isWrittenDown() in lib/capital.ts, and that
+// is the only file allowed to know which answers mean a car. This module imports NOTHING: its own
+// suite loads it straight off disk under Node's type stripping and says so in its header, and
+// test/moneyweb.test.mjs stages it as a bare copy with no import rewriting at all. An import here
+// breaks both, and copying the rule in would give the product a second one to drift from.
+//
+// ⚠️ SO IT IS A REQUIRED PARAMETER AND NOT AN OPTIONAL ONE. Defaulted to "nothing is written
+// down" it would silently reproduce today's defect at any call site that forgot, which is the
+// daysElapsed lesson: make tsc name every caller instead of picking a plausible answer for them.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export type WrittenDownTest = (row: LogRow) => boolean;
+
+export function toEntry(row: LogRow, writtenDown: WrittenDownTest): LogEntry | null {
   const raw = row.transaction_date;
   const date = typeof raw === 'string' && ISO_DATE.test(raw) ? raw.slice(0, 10) : null;
   // A row with no usable date cannot be filed under a month, and guessing at one would put his money
@@ -119,6 +144,9 @@ export function toEntry(row: LogRow): LogEntry | null {
     category: typeof row.category === 'string' && row.category ? row.category : null,
     amount,
     personal: row.is_personal === true,
+    // Money out only. A payment IN is never a capital purchase, and a row he has taken out of his
+    // books entirely has no relief to describe, so neither is ever labelled.
+    writtenDown: amount < 0 && row.is_personal !== true && writtenDown(row),
   };
 }
 
@@ -142,10 +170,10 @@ export function monthEnd(month: string): string {
   return `${stepMonth(month, 1)}-01`;
 }
 
-export function logFor(rows: LogRow[], month: string): MonthLog {
+export function logFor(rows: LogRow[], month: string, writtenDown: WrittenDownTest): MonthLog {
   const entries = rows
     .filter((r) => monthOf(r) === month)
-    .map(toEntry)
+    .map((r) => toEntry(r, writtenDown))
     .filter((e): e is LogEntry => e !== null)
     // Newest first, and the id breaks a tie so the same rows always come back in the same order.
     // Two payments on one day flipping places between loads reads as the page being unreliable.
@@ -153,10 +181,17 @@ export function logFor(rows: LogRow[], month: string): MonthLog {
 
   let income = 0;
   let expenses = 0;
+  let capitalCost = 0;
+  let capitalCount = 0;
   for (const e of entries) {
     if (e.personal) continue;          // shown, never counted. See the header.
-    if (e.amount >= 0) income += e.amount;
-    else expenses += Math.abs(e.amount);
+    if (e.amount >= 0) { income += e.amount; continue; }
+    // 🔴 A CAR DOES NOT COME OFF HIS PROFIT IN THE MONTH HE BOUGHT IT, SO IT IS NOT IN Out.
+    // On 4 August 2026 this line said June was a £52,557 loss because a £60,000 Audi was in it,
+    // while the tax engine, reading the same row, had already taken it out. The page prints
+    // capitalCost right beside the total so the money is named rather than merely missing.
+    if (e.writtenDown) { capitalCost += Math.abs(e.amount); capitalCount += 1; continue; }
+    expenses += Math.abs(e.amount);
   }
 
   return {
@@ -166,6 +201,8 @@ export function logFor(rows: LogRow[], month: string): MonthLog {
     expenses,
     profit: income - expenses,
     personalCount: entries.filter((e) => e.personal).length,
+    capitalCost,
+    capitalCount,
   };
 }
 

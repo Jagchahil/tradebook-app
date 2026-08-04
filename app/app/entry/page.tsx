@@ -232,14 +232,36 @@ export default async function EntryPage({
                 </select>
                 <button type="submit" className="lek-ghost">Next</button>
               </form>
-              {/* The one answer that needs no second step, and it is a real answer rather than a
-                  cancel: a van is plant and machinery and comes off in full, which is what the
-                  row is already doing. Recorded so the row carries what he SAID. */}
+              {/* ═══════════════════════════════════════════════════════════════════════════
+                  🔴 THIS BUTTON SAID "leave it as it is" WHILE MOVING £1,284 OF A MAN'S COSTS.
+                  Found on 4 August walking a real row: MEGGER LTD, £1,284 of electrical test
+                  equipment, answered at some point as "any other car". The screen correctly told
+                  him "£1,284 left your account and £58 of it comes off your profit this year",
+                  and the one button that fixes it read "It was not a car, leave it as it is".
+                  The comment that used to sit here said why: "a van comes off in full, WHICH IS
+                  WHAT THE ROW IS ALREADY DOING". True when nobody has been asked, and false in
+                  the only case where a man needs this button, because then the row is being
+                  written down at 6% a year and pressing it puts the whole cost back.
+                  ⚠️ A LABEL WRITTEN FOR THE UNANSWERED CASE, LEFT ON THE ANSWERED ONE. Nobody
+                  presses a button marked "leave it as it is" in order to change something, so
+                  the correction screen was hiding its own correction. It says what it does now,
+                  in pounds, and only where it does it.
+                  ═══════════════════════════════════════════════════════════════════════════ */}
               {storedKind !== 'not_a_car' ? (
                 <form action="/api/money/capital" method="post" style={S.form}>
                   <input type="hidden" name="ref" value={one('ref') ?? ''} />
                   <input type="hidden" name="capital_kind" value="not_a_car" />
-                  <button type="submit" className="lek-ghost">It was not a car, leave it as it is</button>
+                  <button type="submit" className="lek-ghost">
+                    {storedKind
+                      ? `It was not a car. Put the whole ${gbp0(cost)} in my costs`
+                      : 'It was not a car, leave it as it is'}
+                  </button>
+                  {storedKind ? (
+                    <p style={S.quiet}>
+                      A van, a digger or a tester is plant and machinery, so the whole cost comes
+                      off this year instead of a slice a year. Your figures update straight away.
+                    </p>
+                  ) : null}
                 </form>
               ) : null}
             </section>

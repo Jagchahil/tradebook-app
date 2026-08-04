@@ -229,6 +229,37 @@ ok('🔴 AND NO BAND LABEL IS EVER GLUED ONTO A SENTENCE ABOUT MONEY',
 // identifier. app/app/CarQuestion.tsx still uses the labels and should: there they are the options.
 ok('🔴 and the driving share is stated before the pound figure, not after it',
   !/gbp0\([^)]*\)[^`]{0,40}(three quarters|about half|a quarter|most of it)/i.test(pageEntry));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE BUTTON THAT UNDOES IT SAID "leave it as it is" WHILE MOVING £1,284 OF HIS COSTS.
+//
+// Found on 4 August walking a real row: MEGGER LTD, £1,284 of electrical test equipment, answered
+// at some point as "any other car". The screen said, correctly, "£1,284 left your account and £58
+// of it comes off your profit this year". The one button that fixes it read "It was not a car,
+// leave it as it is".
+//
+// That label was written for the UNANSWERED row, where it is exactly right: nobody has been asked,
+// the cost is already coming off in full, and saying so changes no arithmetic at all. On a row
+// already answered as a car it is the opposite of true, and that is the ONLY case where a man
+// needs the button. Nobody presses "leave it as it is" in order to change something, so the
+// correction screen was hiding its own correction behind a label that promised inaction.
+//
+// ⚠️ THE OLD COMMENT ABOVE IT SAID THE QUIET PART: "a van comes off in full, WHICH IS WHAT THE ROW
+// IS ALREADY DOING". The reasoning was written once, for one case, and then applied to both.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+ok('🔴 the not-a-car button says what it DOES when the row already says car, in pounds',
+  /storedKind\s*\n?\s*\? `It was not a car\. Put the whole \$\{gbp0\(cost\)\} in my costs`/.test(pageEntry));
+ok('...and keeps the honest wording for a row nobody has ever been asked about',
+  /: 'It was not a car, leave it as it is'/.test(pageEntry));
+// ⚠️ THE PROMISE OF INACTION MAY ONLY APPEAR ON THE BRANCH WHERE IT IS TRUE. A label claiming
+// nothing changes, offered on a row where something does, is the whole defect.
+{
+  const btn = (codeOnly(pageEntry).match(/name="capital_kind" value="not_a_car"[\s\S]{0,700}?<\/form>/) ?? [''])[0];
+  ok('🔴 and "leave it as it is" is never offered on a row that is being written down',
+    /storedKind\s*\n?\s*\?/.test(btn) && /leave it as it is/.test(btn));
+  ok('...with the consequence spelled out beside it, not left for him to work out',
+    /plant and machinery/.test(btn) && /instead of a slice a year/.test(btn));
+}
 ok('a failed read is told apart from a missing row',
   /rows !== null/.test(pageEntry) && /Nothing is lost/.test(pageEntry));
 ok('pounds are written by lib/money', pageEntry.includes("from '../../../lib/money'") && /gbp0\(entry\.amount\)/.test(pageEntry));

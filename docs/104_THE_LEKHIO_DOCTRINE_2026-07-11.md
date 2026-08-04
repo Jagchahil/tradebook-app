@@ -200,7 +200,13 @@ That last line is a promise a bank cannot make, an accountant cannot make, and a
 > Thinking about going out on your own? Ask us anything. It's free, and we'll tell you the truth.
 > Most people never start because nobody ever explained it to them.
 
-**Launch is built on angle 1 and angle 4.** The first changes what we are compared to. The second turns the thing everyone calls our weakness into the reason people trust us.
+**7. Control.** Added 4 August 2026. Section 12 holds the whole argument and the boundary that must travel with it. **Never say the costs half on its own.**
+
+> Nothing lands in your figures until you say so.
+> A bank connection puts every payment in your books the moment it leaves your account, and your evening goes on taking things back out.
+> Your employee does what you tell it. It does not go through your bank on its own.
+
+**Launch is built on angle 1 and angle 4.** The first changes what we are compared to. The second turns the thing everyone calls our weakness into the reason people trust us. **Angle 7 is the one that makes the missing bank feed an argument instead of an apology, so it carries launch week too.**
 
 ### What we never say
 
@@ -241,6 +247,56 @@ Ask these of anything anyone proposes, in this order.
 
 ---
 
+## 12. The control doctrine. Why there is no bank feed, and why that is a position rather than a gap.
+
+> Added 4 August 2026. It sat in a chat for two days and in `lib/control.ts` for one, which is exactly how the best line of a session gets lost. Numbered 12 rather than slotted in earlier because CLAUDE.md and this doc both cite sections by number, and renumbering to make a point look important is how a reference rots.
+
+Jag, 2 August: **"part of our philosophy is giving your employee the control that has been taken away from you by connecting the bank."**
+
+### The line
+
+> **Nothing enters your books that you did not put there.**
+
+That is a sentence no competitor in this category can say, because all of them are built the other way round, and it is worth more than the feature we do not have.
+
+### Both halves, and neither is safe alone
+
+**His costs are his.** Nobody is made to claim a deduction. A man who would rather leave a cost off may leave it off, and the only consequence is that he pays more tax. There is nothing to police there.
+
+**His income is not.** What he was paid is what HMRC checks. Leaving some out is not tidiness, it is an inaccurate return with his name on it, and Finance Act 2026 Sch 22 now reaches the people who help bring one about.
+
+**🔴 THE TWO SENTENCES SHIP TOGETHER, ALWAYS.** "You decide what goes in", alone, on a screen about a bank statement, reads as an offer to leave a few payments out. It is not one. This is not a style note: `lib/control.ts` does not export the costs string at all, and the only ways to reach it hand over the pair. **A rule written in a comment is a rule somebody follows until the afternoon they are in a hurry.**
+
+### Why this makes the absence of a bank feed a position
+
+We have no bank provider (doc 100, and the July pricing verdict). The honest options were to call that a gap and apologise for it, or to notice that **the thing we cannot ship is the thing his complaint is about.**
+
+A bank connection is sold as the end of admin. What it actually does is move every payment into his books the moment it leaves his account, and hand him an evening of taking things back out. He did not choose any of it. **He is doing data entry in reverse, for a machine, at eleven o'clock.**
+
+So the position, in full: **no bank feed at launch is not a missing feature, it is the only way a man keeps hold of his own books.** He hands over the statement. Every line waits for him. Keep it, drop it, or leave it for another day.
+
+**This is the same move as angle 4 in section 9.** There, the thing everyone calls our weakness (we do not file, HMRC holds him responsible) becomes the reason to trust us. Here, the thing everyone calls our weakness (no bank feed) becomes the reason he stays in charge. **We have now done this twice, and both times the honest version was also the stronger one. That is not a coincidence, it is what section 11 question 5 is for.**
+
+### What changes the day a feed does arrive, decided now so it cannot drift
+
+The position above must not quietly become a lie the moment we sign a provider. So:
+
+- **The line still holds.** A connected feed proposes. It never files. Every imported line still waits.
+- **Never take a number without a receipt** for proof of income, and for anything going to HMRC. A bank line says an amount moved. It does not say what it was for, and s34's wholly and exclusively test is a question about purpose.
+- **The bulk confirm rules do not loosen.** Money in always gets an individual yes, and a single payment over £1,000 never goes down the fast path. Both were bought with real findings (26 July and 2 August) and neither is negotiable in exchange for a feed.
+
+### ⚠️ One claim in this section is not yet sourced, and it must be before it reaches a customer
+
+The origin of this argument includes an observation that **pie.tax customers complain about control, and about not knowing what is in their accounts.** That came from reading competitor reviews in a working session. It is not cited, and **section 11 question 5 applies to our own documents first.**
+
+**Before any of angle 7 goes into paid copy, quote the reviews, date them, and keep them**, exactly as the testimonial rule in `app/_shared/site.tsx` demands of our own. The argument in this section stands on its own without that claim. The claim is the evidence that customers already feel it, and evidence has to be real.
+
+### Where it already lives
+
+`lib/control.ts` is the only place the words exist, and it is copy rather than a rule: nothing in it gates anything. The rules live in SQL (`confirm_pile` refuses a credit, `confirm_income` takes two categories and no others) and in the routes. **The file exists so that four screens saying the same thing cannot end up saying four things.** Live today on `/app/money/import` and `/app/money/add`.
+
+---
+
 ## The caveat
 
 The regulatory readings in section 5 are mine, not a lawyer's. Article 53, article 25, and the boundary of what counts as a personal recommendation all need a regulatory solicitor before a line of code touches an investment. The value of writing them down is that Jag walks into that room knowing which questions to ask.
@@ -250,6 +306,8 @@ The regulatory readings in section 5 are mine, not a lawyer's. Article 53, artic
 ## Related
 
 - **98** the group, the bank, the numbers, the licensing map.
+- **100** the bank feed, and the July pricing verdict that left us without a provider. **Section 12 is why that is a position and not an apology.**
+- **`lib/control.ts`** the words themselves, and the reason the costs sentence is not exported.
 - **103** design restraint, the tactical child of section 4.
 - **07** brand identity. Colours, logo, voice.
 - **87** the competitor audit and the moat decision.

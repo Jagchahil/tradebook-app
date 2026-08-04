@@ -151,6 +151,19 @@ Doc 104 is the doctrine and it sits above every other doc. It holds the position
 
 Two kinds of authorisation, and we need both. The user's is our moat. The FCA's is our gate. **The approval gate is NOT a regulatory shield.** Preparing an investment and having the user hit run is article 53 AND article 25. See doc 104 section 5 and doc 98.
 
+## The Control Doctrine. Doc 104 Section 12. Read It Before You Call The Missing Bank Feed A Gap.
+
+**Nothing enters your books that you did not put there.** No competitor in this category can say that, because all of them are built the other way round. **We have no bank provider, and that is a position rather than an apology:** a bank connection puts every payment in his books the moment it leaves his account, and hands him an evening of taking things back out. He did data entry in reverse, for a machine, at eleven o'clock, and he did not choose any of it.
+
+**🔴 THE TWO SENTENCES SHIP TOGETHER, ALWAYS, AND THE CODE ENFORCES IT RATHER THAN ASKING.**
+
+- **His costs are his.** Nobody is made to claim a deduction. Leaving one out only ever means he pays more tax.
+- **His income is not.** What he was paid is what HMRC checks, and Finance Act 2026 Sch 22 reaches the people who help bring an inaccurate return about.
+
+"You decide what goes in", on its own, on a screen about a bank statement, reads as an offer to leave a few payments out. So `lib/control.ts` **does not export the costs string at all**, and the only ways to reach it hand over the pair. `test/control.test.mjs` proves it and goes red if anyone exports it. **A rule written in a comment is a rule somebody follows until the afternoon they are in a hurry.**
+
+When a feed does arrive: it proposes, it never files, every line still waits, **never take a number without a receipt** for proof of income or anything going to HMRC, and the bulk confirm rules do not loosen in exchange for it.
+
 ## Design Restraint. Read `docs/103` Before Adding Anything To A Screen.
 
 **A feature is not free because it is small.** Every button is a decision handed to the user, and every row is a thing he has to read and reject before he reaches what he came for. Ten helpful additions make an unhelpful product, and nobody is ever blamed for adding just one.

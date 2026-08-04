@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { A11Y_CSS } from '../../lib/tokens';
+import { A11Y_CSS, APP_THEME_CSS } from '../../lib/tokens';
+import { INK, LINE, MUTED, PAPER, RIVER } from '../../lib/apptheme';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/terms' },
@@ -8,11 +9,6 @@ export const metadata: Metadata = {
   description: 'The terms for using Lekhio, including your free trial and billing.',
 };
 
-const INK = '#111111';
-const INDIGO = '#1B59A6';
-const MUTED = '#5B6470';
-const BORDER = '#ECECEC';
-const OFF_WHITE = '#FBFAF7';
 
 const FONT =
   "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
@@ -28,28 +24,32 @@ const heading: React.CSSProperties = {
 const para: React.CSSProperties = {
   fontSize: 16,
   lineHeight: 1.7,
-  color: '#5B6470',
+  color: MUTED,
   margin: '0 0 14px',
 };
 
 const li: React.CSSProperties = {
   fontSize: 16,
   lineHeight: 1.7,
-  color: '#5B6470',
+  color: MUTED,
   marginBottom: 8,
 };
 
 export default function TermsPage() {
   return (
-    <main style={{ backgroundColor: OFF_WHITE, color: INK, fontFamily: FONT, minHeight: '100vh' }}>
+    <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, minHeight: '100vh' }}>
       <style dangerouslySetInnerHTML={{ __html: `* { box-sizing: border-box; } body { margin: 0; } a { text-decoration: none; }` }} />
+      {/* 🔴 APP_THEME_CSS, NOT THEME_CSS, AND THE DIFFERENCE IS THE WHOLE BUG. This page imported A11Y_CSS and not
+          this one, so every palette variable resolved to nothing and it rendered light
+          whatever the device said. Found 4 August walking the public site in dark. */}
+      <style dangerouslySetInnerHTML={{ __html: APP_THEME_CSS }} />
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
 
       <nav style={{ maxWidth: 760, margin: '0 auto', padding: '22px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href="/" style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.4px', color: INK }}>
           Lekhio
         </Link>
-        <Link href="/" style={{ fontSize: 14, fontWeight: 500, color: INDIGO }}>
+        <Link href="/" style={{ fontSize: 14, fontWeight: 500, color: RIVER }}>
           Back to home
         </Link>
       </nav>
@@ -96,7 +96,7 @@ export default function TermsPage() {
         <h2 style={heading}>Your data</h2>
         <p style={para}>
           Your data stays yours. We handle it as described in our{' '}
-          <Link href="/privacy" style={{ color: INDIGO, fontWeight: 500 }}>Privacy Policy</Link>. You can
+          <Link href="/privacy" style={{ color: RIVER, fontWeight: 500 }}>Privacy Policy</Link>. You can
           export your records or ask us to delete your account at any time, subject to the record
           keeping rules that UK tax law places on both of us.
         </p>
@@ -144,8 +144,8 @@ export default function TermsPage() {
         <h2 style={heading}>Contact</h2>
         <p style={para}>Questions about these terms. Email info@lekhio.app.</p>
 
-        <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 40, paddingTop: 20 }}>
-          <Link href="/privacy" style={{ fontSize: 14, fontWeight: 500, color: INDIGO }}>
+        <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 40, paddingTop: 20 }}>
+          <Link href="/privacy" style={{ fontSize: 14, fontWeight: 500, color: RIVER }}>
             Read our Privacy Policy
           </Link>
         </div>

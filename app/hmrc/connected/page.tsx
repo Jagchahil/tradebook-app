@@ -1,16 +1,12 @@
 import type { Metadata } from 'next';
+import { GREEN, INK, LINE, MUTED, PANEL, PAPER, RED, RIVER } from '../../../lib/apptheme';
+import { A11Y_CSS, APP_THEME_CSS } from '../../../lib/tokens';
 
 export const metadata: Metadata = {
   title: 'HMRC connection | Lekhio',
   robots: { index: false, follow: false },
 };
 
-const INK = '#111111';
-const RIVER = '#1B59A6';
-const GREEN = '#15803D';
-const RED = '#C0392B';  // the brand red, not a second one
-const MUTED = '#5B6470';
-const OFF_WHITE = '#FBFAF7';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 // Landing page after the HMRC OAuth round-trip. The browser lands here; the user
@@ -24,13 +20,19 @@ export default async function Page({
   const ok = status === 'ok';
 
   return (
+    <>
+      {/* 🔴 THIS PAGE HAD NO THEME SHEET AT ALL, and it is where a customer lands
+          after the HMRC round trip. Found 4 August by a derived guard, not by the walk,
+          because the walk's page list was typed and left this one out. */}
+      <style dangerouslySetInnerHTML={{ __html: APP_THEME_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
     <main
       style={{
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: OFF_WHITE,
+        background: PAPER,
         fontFamily: FONT,
         padding: 24,
       }}
@@ -40,8 +42,8 @@ export default async function Page({
           maxWidth: 440,
           width: '100%',
           textAlign: 'center',
-          background: '#fff',
-          border: '1px solid #ECECEC',
+          background: PANEL,
+          border: `1px solid ${LINE}`,
           borderRadius: 16,
           padding: '40px 28px',
         }}
@@ -71,5 +73,6 @@ export default async function Page({
         <p style={{ color: RIVER, fontSize: 14, marginTop: 20 }}>Return to the Lekhio app</p>
       </div>
     </main>
+    </>
   );
 }

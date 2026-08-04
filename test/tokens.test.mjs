@@ -341,7 +341,7 @@ console.log('\n=== a surface that paints a raw colour cannot invert ===\n');
 //
 // The list is DERIVED by walking the tree, never typed. The version of this that named its files
 // would have listed the ones just edited and passed for ever.
-const SURFACE_CEILING = 29;
+const SURFACE_CEILING = 26;
 const surfaces = [
   ...walk(path.join(root, 'app')),
   ...walk(path.join(root, 'components')),
@@ -364,6 +364,100 @@ ok('components/LeadCapture.tsx paints with tokens, so it inverts on eleven publi
 // Three digit hex counts. The phonewidth rule matches six digits only, so '#fff' walked past it.
 ok("and '#fff' counts as a raw colour, because it is one",
   /#[0-9A-Fa-f]{3,6}\b/.test('background:#fff'));
+
+// 🔴 AND A SURFACE THAT NEVER RECEIVES A THEME SHEET CANNOT INVERT AT ALL, WHATEVER IT PAINTS WITH.
+//
+// Found 4 August by walking every public page in dark at 375px. FIVE of them came back light:
+// /start, /privacy, /terms, /early-access and /register-your-business. All five import A11Y_CSS
+// from lib/tokens and simply never import THEME_CSS, so the palette variables are undefined on
+// them and the device setting reaches nothing. /start is the SIGNUP FLOW.
+//
+// ⚠️ THE RATCHET ABOVE COULD NOT HAVE CAUGHT THIS, and neither could phonewidth. Both ask what a
+// file PAINTS WITH. This asks whether the page was ever handed a palette to paint from. A page can
+// be perfectly tokenised and still render light if `var(--tx)` resolves to nothing.
+//
+// ⚠️ AND THE OBVIOUS FIX IS THE WRONG ONE. Adding THEME_CSS to a page that still holds light hex
+// inline gives it a dark background under unchanged light text, which is the LeadCapture defect at
+// full page scale. Tokenise first, theme second.
+//
+// A page passes if it takes the shared marketing shell (which emits THEME_CSS inside SharedHead)
+// or names a theme sheet itself. Derived by walking the tree: app/ minus the signed in app, minus
+// the API, minus app/team, minus dynamic segments whose fixtures are not routes.
+const publicPages = walk(path.join(root, 'app'))
+  .filter((f) => path.basename(f) === 'page.tsx')
+  .map((f) => path.relative(root, f))
+  .filter((r) => !r.startsWith(path.join('app', 'app') + path.sep))
+  .filter((r) => !r.startsWith(path.join('app', 'api') + path.sep))
+  .filter((r) => !r.includes('['));
+// ⚠️ A PAGE THAT RENDERS NOTHING CANNOT BE UNTHEMED, and the first version of this check said
+// app/account/page.tsx was broken. It is four lines and a redirect(): no markup, no colours, and
+// the browser walk correctly showed it arriving on a themed app page. The browser caught the
+// guard's false positive; the guard caught /hmrc/connected, which the browser walk missed because
+// its page list was TYPED rather than derived. Two methods, each finding the other's mistake.
+const rendersNothing = (src) => /^\s*redirect\(/m.test(src) && !/<[a-z]/.test(src);
+
+// 🔴 THEME_CSS ON ITS OWN DOES NOT COUNT, AND THE FIRST VERSION OF THIS CHECK ACCEPTED IT.
+//
+// THEME_CSS declares `:root` and `[data-theme="dark"]`. Something has to SET that attribute, and
+// the only thing that does is the swap script inside SharedHead. A page with no shell that imports
+// THEME_CSS gets a stylesheet whose dark half can never match, and renders light for ever.
+//
+// That is exactly what happened here on 4 August: three pages were "fixed" by adding THEME_CSS,
+// this assertion went green, and the browser walk showed all three still light. The guard was
+// satisfied by an import rather than by an effect, twenty minutes after being written to catch
+// precisely that. APP_THEME_CSS is the sheet that hangs off prefers-color-scheme with no script,
+// which is how /in and the whole signed in app follow the device.
+//
+// So: the shared shell (script, sets data-theme) or APP_THEME_CSS (no script, follows the device).
+// ⚠️ ON CODE ONLY, IN BOTH DIRECTIONS. The first version of this ran on the raw source and the
+// sabotage sailed straight through, because the comment three lines above explaining the rule
+// contains the string APP_THEME_CSS. A negative assertion firing on the note written to explain
+// the removal is this repo's most repeated self inflicted wound; it is in the handover twice.
+const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+const themed = (raw) => {
+  const src = codeOnly(raw);
+  return /_shared\/site/.test(src) || /\bAPP_THEME_CSS\b/.test(src);
+};
+const unthemed = publicPages.filter((r) => {
+  const src = readFileSync(path.join(root, r), 'utf8');
+  if (rendersNothing(src)) return false;
+  return !themed(src);
+});
+// The control for the paragraph above, run as code rather than trusted as a comment.
+ok('🔴 a page holding ONLY THEME_CSS still counts as unthemed, because nothing sets data-theme',
+  !themed("import { THEME_CSS } from '../../lib/tokens';") && themed("import { APP_THEME_CSS } from '../../lib/tokens';"));
+// ⚠️ A RATCHET AT THE TRUE NUMBER, NOT A BAN, AND HERE IS WHY IT IS NOT A COP OUT.
+//
+// Six pages were found unthemed on 4 August. Three were fixed the same hour because they were
+// mechanical: their local consts already carried the palette's own values under the palette's own
+// names. THREE ARE NOT MECHANICAL and were deliberately left, because at least one of them holds
+// this, in app/register-your-business/Wizard.tsx:
+//
+//     <div style={{ background: INK, ... }}>          a deliberately DARK card on a LIGHT page
+//       <h3 style={{ color: '#fff' }}>                white heading on it
+//
+// `INK` is var(--tx). In dark that resolves to #F3F5F8, so tokenising this the obvious way turns a
+// dark card with white text into a WHITE card with white text. The right answer is the BAND pair,
+// and it has to be checked in both appearances rather than swapped by pattern.
+//
+// 🔴 SO THE CEILING IS 3 AND IT MAY ONLY EVER GO DOWN. A new page arriving without a theme sheet
+// fails this immediately, which is the thing that actually needed guarding. Lowering it is the
+// only permitted edit.
+const UNTHEMED_CEILING = 3;
+ok(`the public page sweep found something (${publicPages.length} pages)`, publicPages.length >= 20);
+if (unthemed.length) unthemed.forEach((r) => console.log(`        ${r}`));
+ok(`🔴 PUBLIC PAGES WITH NO THEME SHEET: ${unthemed.length}, at or under the ceiling of ${UNTHEMED_CEILING}`,
+  unthemed.length <= UNTHEMED_CEILING);
+// Named individually, so the three that are left cannot be swapped for three different ones.
+const STILL_UNTHEMED = ['early-access', 'register-your-business', 'start'];
+ok(`and they are the three known ones, no others: ${STILL_UNTHEMED.join(', ')}`,
+  unthemed.length === STILL_UNTHEMED.length
+  && unthemed.every((r) => STILL_UNTHEMED.some((k) => r.includes(k))));
+// The three that WERE fixed, named, so nobody can drop a theme sheet back off one of them and
+// stay under the ceiling by fixing a different page.
+for (const fixed of ['privacy', 'terms', path.join('hmrc', 'connected')]) {
+  ok(`${fixed} still receives a theme sheet`, !unthemed.some((r) => r.includes(fixed)));
+}
 
 console.log('\n=== no accent fill carries white text ===\n');
 // 🔴 THE ONE THAT CAUGHT THE DUPLICATE. Fixing .approvebtn in the shared marketing CSS left the

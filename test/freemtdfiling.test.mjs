@@ -98,6 +98,40 @@ ok('an FAQPage schema is present for SEO, same pattern as the other tool pages',
 // ⚠️ THE LIST IS DERIVED FROM CAPTURED_TOOLS, not typed out again, so a tool added there is
 // covered here on the same line and cannot be added to one list and forgotten in the other.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE LIST ITSELF WAS STILL A RECEIPT. DERIVED FROM freeTools NOW, NOT TYPED OUT.
+//
+// The first widening on 4 August took this sweep from one page to eight and immediately found
+// /invoice-generator had never had a schema. The eight were still hand typed, and pinned at eight,
+// which locks a coverage claim at the size it happened to be on the day it was written. The real
+// population is app/_shared/site.tsx's exported freeTools, the array that draws the footer column
+// and the /resources grid, and it has ELEVEN entries. Reading it here found /can-i-claim, the most
+// question shaped page on the site, with no structured data at all.
+//
+// ⚠️ THE POINT OF READING THE EXPORT IS THAT ADDING A TOOL CANNOT MISS THIS. A tool put in
+// freeTools appears in the footer, in /resources and in this sweep on the same line, which is the
+// difference between a list that describes the product and a list that describes one afternoon.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const toolHrefs = [...read('app/_shared/site.tsx')
+  .slice(read('app/_shared/site.tsx').indexOf('export const freeTools'))
+  .matchAll(/\{ href: '(\/[a-z0-9-]+)'/g)].map((m) => m[1]);
+ok(`🔴 the tool list is READ from freeTools, and it found ${toolHrefs.length} of them`,
+  toolHrefs.length >= 11 && toolHrefs.includes('/can-i-claim') && toolHrefs.includes('/how-mtd-works'));
+
+const beforeFamily = pass + fail;
+for (const href of toolHrefs) {
+  const page = `app${href}/page.tsx`;
+  const src = read(page);
+  ok(`${href} carries an FAQPage schema`, /'@type': 'FAQPage'/.test(src));
+  ok(`...and renders it, rather than declaring one nothing reads`,
+    /ld\+json/.test(src) && /JSON\.stringify\(faqSchema\)/.test(src));
+}
+ok(`🔴 and THAT sweep really ran, two checks on each of the ${toolHrefs.length} tools`,
+  pass + fail - beforeFamily === toolHrefs.length * 2);
+
+// ⚠️ THE LEAD CAPTURE SWEEP BELOW STAYS ON ITS OWN LIST, and that is not the same mistake. It
+// names the FILE the component is rendered from, which is a Calc.tsx for most tools and the page
+// itself for two, so it cannot be derived from an href. Its own count guard is below it.
 // ⚠️ AND THE LOOP IS PROVED BY WHAT IT DID, NOT BY WHAT IT WAS GIVEN.
 //
 // The first version of this asserted CAPTURED_TOOLS.length === 8, and a sabotage pass pointed the

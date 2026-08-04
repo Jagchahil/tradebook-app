@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { STUDENT_PLANS, studentLoanRepayment, type StudentPlan } from '../../lib/nistudentloan';
 import LeadCapture from '../../components/LeadCapture';
+import { gbp0 } from '../../lib/money';
 
 const INK = 'var(--tx)';
 const RIVER = 'var(--river)';
@@ -21,8 +22,15 @@ function parseNum(v: string): number {
   const n = Number(v.replace(/[^0-9.]/g, ''));
   return Number.isFinite(n) ? n : 0;
 }
-const gbp = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`;
-const gbpExact = (n: number) => `£${n.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+// 🔴 THIS WAS THE NINETEENTH MONEY FORMATTER, AND THERE WERE SIX IDENTICAL COPIES OF IT.
+// One per public calculator, all `£${Math.round(n)...}`, which puts the sign INSIDE the pound and
+// prints a negative as "£-33" rather than "-£33". lib/money.ts gbp0 has handled that, and the -0
+// case, since the 28 July sweep that existed to end exactly this. The free tools were outside that
+// sweep because it walked app/app, so six copies of the defect it removed sat on public pages.
+const gbp = (n: number) => gbp0(n);
+// 🔴 A SECOND FORMATTER IN THE SAME FILE AS THE ONE ABOVE, WITH THE SIGN INSIDE THE POUND AGAIN.
+// Zero decimal places is gbp0 exactly, so there was never a reason for it to exist.
+const gbpExact = (n: number) => gbp0(n);
 
 const UNDERGRAD: { key: StudentPlan | 'none'; label: string; hint: string }[] = [
   { key: 'plan1', label: 'Plan 1', hint: 'Started uni before Sep 2012 (England or Wales), or NI loans' },

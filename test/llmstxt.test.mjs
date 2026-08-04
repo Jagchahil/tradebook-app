@@ -38,10 +38,12 @@ import { PRICE_PENCE, TRIAL_DAYS } from '../lib/stripe.ts';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'llms-'));
-const fix = (t) => t
-  .replace("from '../../lib/taxengine'", "from './taxengine.ts'")
-  .replace("from '../../lib/stripe'", "from './stripe.ts'");
-for (const f of ['taxengine', 'stripe']) {
+// ⚠️ A GLOBAL PATTERN, NOT THREE FIXED STRINGS. The route grew a lib/money import on 4 August and
+// this staging did not know, so the suite died on a module resolution error rather than on
+// anything about llms.txt. Rewriting EVERY ../../lib/ specifier means the next one is free, and
+// the file list below is the only thing left to keep in step.
+const fix = (t) => t.replace(/from '\.\.\/\.\.\/lib\/([a-zA-Z0-9._-]+)'/g, "from './$1.ts'");
+for (const f of ['taxengine', 'stripe', 'money']) {
   writeFileSync(path.join(stage, `${f}.ts`), readFileSync(path.join(lib, `${f}.ts`), 'utf8'));
 }
 writeFileSync(

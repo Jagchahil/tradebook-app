@@ -17,7 +17,7 @@
 // survives somebody adding the twenty third free tool in six months.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 import { fileURLToPath } from 'node:url';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, lstatSync } from 'node:fs';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -58,11 +58,41 @@ ok('the trade landing pages set a canonical from the slug',
   /alternates:\s*\{\s*canonical:\s*`\/for\/\$\{t\.slug\}`/.test(trade));
 
 console.log('\n=== and pages we ask search engines to skip do not pretend otherwise ===\n');
+// ⚠️ DOT DIRECTORIES AND SYMLINKS SKIPPED. app/.node/bin/corepack is a broken symlink committed
+// into this repo and it takes down any walk that follows one. Same lesson as test/tokens.test.mjs.
+function walk(dir, out = []) {
+  let entries;
+  try { entries = readdirSync(dir); } catch { return out; }
+  for (const e of entries) {
+    if (e.startsWith('.') || e === 'node_modules') continue;
+    const full = path.join(dir, e);
+    let st;
+    try { st = lstatSync(full); } catch { continue; }
+    if (st.isSymbolicLink()) continue;
+    if (st.isDirectory()) walk(full, out);
+    else if (/\.tsx$/.test(e) && !e.includes('fuse_hidden')) out.push(full);
+  }
+  return out;
+}
+
 // ⚠️ A canonical on a noindex page is noise, and noise is where real signals go to hide.
-for (const p of ['app/in/page.tsx', 'app/hmrc/connected/page.tsx']) {
+//
+// 🔴 THIS WAS TWO PATHS TYPED BY HAND AND THIS FILE'S OWN BANNER SAYS NOT TO DO THAT. It opens
+// with "THE SITEMAP IS THE SOURCE OF TRUTH HERE, NOT A LIST TYPED INTO THIS FILE", which is true
+// of everything above and was not true of this. There are FIVE noindex surfaces, not two:
+// app/account, app/app/layout and app/share/[token] were all outside it. All three are clean, so
+// nothing was broken, but a rule enforced on two of the five it names is not enforced.
+//
+// The list is found the same way you would find it by hand, by looking for the thing itself.
+const noindex = walk(path.join(root, 'app'))
+  .filter((f) => /\/(page|layout)\.tsx$/.test(f))
+  .filter((f) => /robots:\s*\{\s*index:\s*false/.test(readFileSync(f, 'utf8')))
+  .map((f) => path.relative(root, f));
+ok(`🔴 every noindex surface is found, and there are ${noindex.length}`,
+  noindex.length >= 5 && noindex.includes('app/in/page.tsx') && noindex.includes('app/account/page.tsx'));
+for (const p of noindex) {
   const src = readFileSync(path.join(root, p), 'utf8');
-  ok(`${p} is noindex and carries no canonical`,
-    /robots:\s*\{\s*index:\s*false/.test(src) && !src.includes('canonical:'));
+  ok(`${p} is noindex and carries no canonical`, !src.includes('canonical:'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);

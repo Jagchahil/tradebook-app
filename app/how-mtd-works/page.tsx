@@ -8,6 +8,7 @@ import {
  MtdBanner,} from '../_shared/site';
 import { FACTS } from '../../lib/taxengine';
 import LeadCapture from '../../components/LeadCapture';
+import { gbp0 } from '../../lib/money';
 import { css } from '../../lib/tokens';
 
 export const metadata: Metadata = {
@@ -33,7 +34,10 @@ export const metadata: Metadata = {
 const T26 = FACTS.mtdThreshold2026; // first mandated from April 2026
 const T27 = FACTS.mtdThreshold2027; // April 2027
 const T28 = FACTS.mtdThreshold2028; // April 2028
-const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
+// One formatter, no exceptions. Thresholds are always positive so nothing was wrong today, and
+// "correct by luck" is what test/webauth.test.mjs calls that. See the slider script below for the
+// one place on this page that genuinely cannot ask lib/money, and why.
+const gbp = (n: number) => gbp0(n);
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // 🔴 THIS PAGE JOINS THE FREE TOOLS FAMILY, AND IT WAS THE ONLY CHECKER OUTSIDE IT.
@@ -156,6 +160,18 @@ const MTD_CSS = css`
 .credchip b{font-weight:900}
 `;
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ THE ONE POUND ON THIS SITE THAT CANNOT ASK lib/money.ts, AND THE REASON IS NOT LAZINESS.
+//
+// This is a STRING. It is injected as a script tag and runs in the browser as text, so it cannot
+// import anything, and the figure has to be rebuilt on every drag of the slider rather than
+// rendered once on the server. test/webauth.test.mjs names this file as its single exception and
+// says so out loud rather than loosening the pattern for everybody.
+//
+// ⚠️ IT IS SAFE BY CONSTRUCTION, WHICH IS THE ONLY REASON THE EXCEPTION IS ACCEPTABLE. k comes off
+// an input with min="0", so k*1000 can never be negative and the sign can never land in the wrong
+// place. If that input ever gains a negative range, this has to be rebuilt, not patched.
+// ═══════════════════════════════════════════════════════════════════════════════════════
 const MTD_JS = `
 (function(){  function money(k){return '£'+(k*1000).toLocaleString('en-GB')+(k>=100?'+':'');}
   function checkMTD(){

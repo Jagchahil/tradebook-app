@@ -6,6 +6,7 @@ import LeadCapture from '../../components/LeadCapture';
 // read would be false here and true on the server, and the same sentence would render two ways.
 import { nudgeClause } from '../../lib/features';
 import { css } from '../../lib/tokens';
+import { gbp2 } from '../../lib/money';
 
 // Fully client side. No AI, no server, no cost. The browser does the maths and
 // the "Save as PDF" is the browser's own print to PDF, so it never calls us.
@@ -153,7 +154,10 @@ const BLANK: Preset = {
 };
 
 function gbp(n: number): string {
-  return '£' + n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // 🔴 THE SAME HAND BUILT POUND, ON THE ONE DOCUMENT A CUSTOMER SENDS TO SOMEBODY ELSE. Pence
+  // matter on an invoice, so this is gbp2 rather than gbp0, and lib/money.ts puts a minus outside
+  // the pound. A credit note line reading "£-120.00" goes out under our user's own business name.
+  return gbp2(n);
 }
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);

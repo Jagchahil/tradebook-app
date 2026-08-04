@@ -13,6 +13,7 @@ import {
   getConfirmedTransactionsForUser,
 } from '../../../lib/supabase';
 import { A11Y_CSS } from '../../../lib/tokens';
+import { gbpAbs2 } from '../../../lib/money';
 
 // The shared books view. Public URL, no login, READ ONLY.
 //
@@ -48,7 +49,11 @@ const INK = 'var(--tx)';
 const MUTED = 'var(--muted)';
 
 function gbp(n: number): string {
-  return `£${Math.abs(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // 🔴 THIS ONE WAS ALREADY CORRECT, and that is the point: it takes the magnitude and lets the
+  // sentence around it carry the direction. lib/money.ts gbpAbs2 is that exact function, with the
+  // warning attached about never using it to make a loss look like a gain, which is a warning a
+  // local copy cannot carry.
+  return gbpAbs2(n);
 }
 
 function Shell({ children }: { children: React.ReactNode }) {

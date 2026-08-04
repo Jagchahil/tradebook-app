@@ -8,6 +8,65 @@ import { nudgeClause } from '../../lib/features';
 import { A11Y_CSS } from '../../lib/tokens';
 import { SharedHead, SiteNav, SiteFooter } from '../_shared/site';
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE MOST QUESTION SHAPED PAGE ON THE SITE, AND IT HAD NO STRUCTURED DATA AT ALL.
+//
+// Found on 4 August by widening a guard that had been asserting "same pattern as the other tool
+// pages" about exactly one page. Widened once, it found /invoice-generator. Widened again, to the
+// whole of the exported freeTools list rather than a hand typed eight, it found this one.
+//
+// Its own meta description is literally two questions: "Can I expense my work boots? Is a van tax
+// deductible?" It is in freeTools, in the /resources grid, in the sitemap, it carries a canonical
+// and it captures leads. Everything about it was built to win a question search except the one
+// piece of markup that tells a search engine it answers questions.
+//
+// ⚠️ THE ANSWERS ARE THE PAGE'S OWN, taken from lib/taxrules.ts which is the same source the
+// checker below answers from. A FAQ schema that says something the page does not say is a rich
+// result that misrepresents the page, and nobody would ever notice from inside the code.
+//
+// ⚠️ AND NOT ONE OF THEM STATES A VERDICT MORE CONFIDENTLY THAN THE PAGE DOES. The whole point of
+// this tool is that the grey areas are grey, so an answer that flattens one into a yes to win a
+// snippet would be the tool lying in a place its own reader cannot see.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'Can I claim my work boots as a self employed expense?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Protective boots and safety gear you need for the job are allowable, and so is a uniform carrying your business name. Ordinary clothing is not, even if you only ever wear it for work, because it is also capable of everyday use.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Is a van tax deductible if I am self employed?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'A van is plant and machinery, so its cost usually comes off your profit in the year you buy it under the annual investment allowance. A car is different: cars do not qualify for that allowance and instead earn a writing down allowance each year for as long as you own it. Only the business share of the use is claimable either way.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can I claim for working from home?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. The simplest route is HMRC\u2019s flat rate, which needs no receipts and no bills kept, and rises with the hours you work from home each month. You can instead work out the actual share of your household costs, which can be worth more and needs the records to back it.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can I claim a meal while I am out working?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'This is one of the grey ones. A meal on a genuine business journey away from your normal pattern of work can be allowable. Everyday lunches while working locally are not, because you would have had to eat regardless.',
+      },
+    },
+  ],
+};
+
 export const metadata: Metadata = {
   alternates: { canonical: '/can-i-claim' },
   title: 'Can I claim it? UK self employed expenses, answered straight | Lekhio',
@@ -135,6 +194,7 @@ export default function CanIClaimPage() {
   return (
     <main style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <SharedHead />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <style
         dangerouslySetInnerHTML={{
           __html: `

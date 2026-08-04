@@ -20,7 +20,7 @@
 // Run: node test/webauth.test.mjs   Pure, reads files, no network.
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, lstatSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -36,15 +36,22 @@ const ok = (name, cond) => {
   else { fail += 1; console.log(`  FAIL  ${name}`); }
 };
 
+// ⚠️ DOT DIRECTORIES AND SYMLINKS ARE SKIPPED, AND THAT IS NOT TIDINESS. app/.node/bin/corepack is
+// a BROKEN SYMLINK committed into this repo, so statSync on it throws and takes the whole suite
+// down with a stack trace about corepack. It only surfaced when this walk was widened past app/app
+// on 4 August, which is a fair warning about every other walk in test/. lstat, never stat, and
+// never follow a link out of the tree: test/tokens.test.mjs already learned this the same way.
 function walk(dir, out = []) {
   let entries;
   try { entries = readdirSync(dir); } catch { return out; }
   for (const e of entries) {
-    if (e === 'node_modules' || e === '.next' || e === '.git') continue;
+    if (e.startsWith('.') || e === 'node_modules') continue;
     const p = path.join(dir, e);
-    const st = statSync(p);
+    let st;
+    try { st = lstatSync(p); } catch { continue; }
+    if (st.isSymbolicLink()) continue;
     if (st.isDirectory()) walk(p, out);
-    else if (/\.(ts|tsx)$/.test(e)) out.push(p);
+    else if (/\.(ts|tsx)$/.test(e) && !e.includes('fuse_hidden')) out.push(p);
   }
   return out;
 }
@@ -357,6 +364,70 @@ ok(
   '🔴 NO SCREEN BUILDS A POUND ITSELF, IT ASKS lib/money.ts: ' + (ownFormatter.map(rel).join(', ') || 'none'),
   ownFormatter.length === 0,
 );
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE SWEEP STOPPED AT app/app, SO SEVEN MORE COPIES SAT ON PUBLIC PAGES.
+//
+// Found on 4 August. Every free calculator carried its own
+// `const gbp = (n) => \`£${Math.round(n).toLocaleString('en-GB')}\`` , six of them byte identical,
+// plus a seventh on /tax-calculator and an eighth in the invoice generator. Each puts the sign
+// INSIDE the pound, so a negative prints "£-33" instead of "-£33", which is the exact defect
+// lib/money.ts gbp0 was written to end on 28 July. The sweep that ended it walked the signed in
+// screens, and the free tools are the pages a STRANGER meets first.
+//
+// ⚠️ AND ONE OF THEM COULD REALLY GO NEGATIVE. /landlord-tax-calculator prints
+// gbp(now.incomeTax - now.taxCausedByProperty), a subtraction of two engine outputs, on a page
+// about somebody's rent.
+//
+// ⚠️ AND THE INVOICE GENERATOR IS WORSE THAN A SCREEN. Its output is a document our user sends to
+// HIS customer, under his own business name, so a malformed pound there is our defect on his
+// letterhead. It uses gbp2, because pence matter on an invoice.
+//
+// ⚠️ THE CALCULATORS ARE .tsx FILES OUTSIDE app/app, so this walks the public tree and excludes
+// the signed in one (already covered above) and app/team (internal).
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const publicFiles = [...walk(path.join(repo, 'app')), ...walk(path.join(repo, 'components'))]
+  .filter((f) => !rel(f).startsWith('app/app/'))
+  .filter((f) => !rel(f).startsWith('app/team/'))
+  .filter((f) => !rel(f).startsWith('app/api/'));
+ok('the public tree was actually walked, so this is not vacuous', publicFiles.length > 30);
+// ⚠️ ONE FILE IS EXCEPTED, BY NAME, WITH THE REASON WRITTEN DOWN. app/how-mtd-works/page.tsx holds
+// the slider's script as a STRING that runs in the browser, so it cannot import lib/money and has
+// to rebuild the figure on every drag. It is safe by construction: the input's min is 0, so the
+// value can never be negative and the sign can never land in the wrong place.
+//
+// 🔴 EXCEPTED BY NAME RATHER THAN BY LOOSENING THE PATTERN, on purpose. A regex relaxed to let one
+// honest case through lets every dishonest one through with it, silently, forever. A named list of
+// one is a thing somebody has to justify adding to.
+const POUND_IN_A_SCRIPT_STRING = ['app/how-mtd-works/page.tsx'];
+const publicFormatter = publicFiles
+  .filter((f) => !POUND_IN_A_SCRIPT_STRING.includes(rel(f)))
+  .filter((f) => buildsAPound.test(stripComments(read(f))));
+ok(
+  '🔴 AND NO PUBLIC PAGE OR SHARED COMPONENT BUILDS ONE EITHER: ' + (publicFormatter.map(rel).join(', ') || 'none'),
+  publicFormatter.length === 0,
+);
+// 🔴 AND THE EXCEPTION IS HELD TO ITS OWN REASON. The excepted file may build a pound INSIDE the
+// injected script string and nowhere else, so the exception cannot quietly become a licence.
+{
+  const mtd = read('app/how-mtd-works/page.tsx');
+  const outsideScript = stripComments(mtd).replace(/const MTD_JS = `[\s\S]*?`;/, '');
+  ok('the excepted page builds no pound outside the injected script it was excepted for',
+    !buildsAPound.test(outsideScript));
+  ok('...and it asks lib/money for the ones it renders itself',
+    /from '\.\.\/\.\.\/lib\/money'/.test(mtd) && /gbp0\(/.test(stripComments(mtd)));
+  ok('...and the slider input it relies on still cannot go negative',
+    /min="0"/.test(mtd));
+}
+// 🔴 AND THE TOOLS ACTUALLY ASK FOR IT, rather than merely not building one. A calculator that
+// prints no pound at all would pass the line above and be broken in a different way.
+for (const f of ['app/tax-calculator/Calc.tsx', 'app/cis-calculator/Calc.tsx', 'app/ni-checker/Calc.tsx',
+  'app/student-loan-checker/Calc.tsx', 'app/rent-a-room-checker/Calc.tsx',
+  'app/landlord-tax-calculator/Calc.tsx', 'app/sole-trader-vs-limited/Calc.tsx',
+  'app/invoice-generator/Generator.tsx']) {
+  ok(`${f.split('/')[1]} writes its pounds with lib/money`,
+    /from '\.\.\/\.\.\/lib\/money'/.test(read(f)) && /gbp0\(|gbp2\(/.test(stripComments(read(f))));
+}
 const printsMoney = appPages.filter((f) => /£/.test(stripComments(read(f))) || /gbp0|gbp2|gbpAbs/.test(read(f)));
 for (const f of printsMoney) {
   // ⚠️ DEPTH AGNOSTIC ON PURPOSE, SINCE 1 AUGUST 2026. This used to name the two relative depths

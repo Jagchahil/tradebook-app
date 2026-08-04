@@ -22,6 +22,7 @@
 
 import { FACTS } from '../../lib/taxengine';
 import { PRICE_PENCE, TRIAL_DAYS } from '../../lib/stripe';
+import { gbp0 } from '../../lib/money';
 
 export const dynamic = 'force-static';
 
@@ -29,7 +30,10 @@ const SITE = process.env.NEXT_PUBLIC_APP_URL || 'https://lekhio.app';
 
 // Built FROM the engine, so it cannot drift from what the product actually computes.
 const p = (rate: number) => `${Math.round(rate * 100)}p`;
-const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
+// One formatter, no exceptions. These are thresholds and always positive, so nothing would have
+// gone wrong today, and "correct by luck" is the phrase test/webauth.test.mjs uses about exactly
+// this shape. lib/money.ts owns every pound this product prints.
+const gbp = (n: number) => gbp0(n);
 const monthly = (PRICE_PENCE.monthly.standard / 100).toFixed(2);
 const annual = String(Math.round(PRICE_PENCE.annual.standard / 100));
 

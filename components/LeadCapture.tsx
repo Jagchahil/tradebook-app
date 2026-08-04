@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { leadConsentText, leadDoneLine, leadHeading, leadSub } from '../lib/features';
 
 // Reusable, PECR compliant email capture for the free tools. Design rules baked in:
 //  - The tool's value (the result) is shown for free above this, so giving an
@@ -20,14 +21,21 @@ const LINE = '#D4E4F4';
 const GREEN = '#15803D';
 const RED = '#C0392B';  // the brand red, not a second one
 
-const CONSENT_TEXT =
-  'Yes, email me my result plus occasional tax deadline reminders and money saving tips from Lekhio. I can unsubscribe at any time.';
-
+// 🔴 FOUR REMINDER PROMISES USED TO BE TYPED IN THIS FILE, AND IT RENDERS ON TWELVE PUBLIC PAGES.
+// The heading, the sub, the thank you, and the tick box a customer's consent is RECORDED from.
+// remindersLive() is false and no channel can send one. Every one of the four now comes from
+// lib/features.ts, where both wordings sit side by side, so the day the flag flips all twelve
+// pages upgrade themselves. See the header on leadHeading() there for how they survived the
+// 3 August sweep: it was a sweep of app/, and this file is not in app/.
+//
+// ⚠️ A CLIENT COMPONENT, so these must be NEXT_PUBLIC reads. remindersLive() is, deliberately: a
+// server only flag would be false here and true on the server, and the same sentence would render
+// two different ways on one page.
 export default function LeadCapture({
   source,
   resultNote = null,
-  heading = 'Want your result emailed, plus your MTD reminders?',
-  sub = 'Pop your email in and we will send this result, then the odd genuinely useful nudge about your tax deadlines and money you could claim back. No spam. Unsubscribe any time.',
+  heading = leadHeading(),
+  sub = leadSub(),
 }: {
   source: string;
   resultNote?: string | null;
@@ -60,7 +68,7 @@ export default function LeadCapture({
           source,
           result_note: resultNote,
           consent: true,
-          consent_text: CONSENT_TEXT,
+          consent_text: leadConsentText(),
         }),
       });
       if (!res.ok) {
@@ -81,7 +89,7 @@ export default function LeadCapture({
       <div style={{ background: '#E7F5EC', border: '1px solid #CFE9D8', borderRadius: 18, padding: '20px 24px', marginTop: 22 }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: GREEN, marginBottom: 4 }}>You are on the list.</div>
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
-          We will send your result and keep you right on the deadlines that matter. Check your inbox.
+          {leadDoneLine()}
         </p>
       </div>
     );
@@ -127,7 +135,7 @@ export default function LeadCapture({
           onChange={(ev) => setConsent(ev.target.checked)}
           style={{ marginTop: 3, width: 17, height: 17, flexShrink: 0, accentColor: RIVER }}
         />
-        <span style={{ fontSize: 13, color: MUTED, lineHeight: 1.5 }}>{CONSENT_TEXT}</span>
+        <span style={{ fontSize: 13, color: MUTED, lineHeight: 1.5 }}>{leadConsentText()}</span>
       </label>
 
       {error ? <p style={{ color: RED, fontSize: 13, margin: '10px 0 0' }}>{error}</p> : null}

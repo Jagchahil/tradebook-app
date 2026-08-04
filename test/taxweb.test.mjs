@@ -24,7 +24,7 @@
 // Run: node test/taxweb.test.mjs
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-import { readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -45,17 +45,43 @@ const ok = (name, cond) => {
 const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 const flat = (s) => s.replace(/\s+/g, ' ');
 
-const PAGES = {
-  hub: 'app/app/tax/page.tsx',
-  summary: 'app/app/tax/summary/page.tsx',
-  whatif: 'app/app/tax/what-if/page.tsx',
-  ways: 'app/app/tax/ways-to-save/page.tsx',
-  claim: 'app/app/tax/can-i-claim/page.tsx',
-  ni: 'app/app/tax/ni/page.tsx',
-  loan: 'app/app/tax/student-loan/page.tsx',
-  cis: 'app/app/tax/cis/page.tsx',
-};
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS WAS EIGHT PATHS TYPED BY HAND, AND app/app/tax HAS TEN PAGES IN IT.
+//
+// /app/tax/vat and /app/tax/vehicle were outside the suite that exists to police money screens,
+// and had been since they were written. Fourteen per page guards skipped both of them: the session
+// gate, force-dynamic, no client script, "never builds a pound", "carries no tax constant of its
+// own", "never claims HMRC approval", "never claims we file for him", and the rest.
+//
+// 🔴 AND ONE ASSERTION WAS FACTUALLY FALSE WHILE IT PASSED. "no other tax screen reads the query
+// string at all" was checked against the eight, and app/app/tax/vehicle/page.tsx reads four values
+// off searchParams. No leak, they are calculator inputs rather than ids, but the suite was stating
+// something about the tax screens that was not true of the tax screens.
+//
+// ⚠️ SO THE LIST IS WALKED, NOT TYPED. A new screen under app/app/tax is covered by every guard
+// below on the day it is created, which is the only version of this that stays true. The key is
+// the directory name, so the named references further down (src.summary, src.whatif) still work.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const taxPageFiles = readdirSync(path.join(root, 'app/app/tax'), { withFileTypes: true })
+  .filter((e) => e.isDirectory())
+  .map((e) => `app/app/tax/${e.name}/page.tsx`)
+  .filter((f) => existsSync(path.join(root, f)));
+const PAGES = Object.fromEntries([
+  ['hub', 'app/app/tax/page.tsx'],
+  ...taxPageFiles.map((f) => [
+    // what-if -> whatif, ways-to-save -> ways, can-i-claim -> claim, student-loan -> loan, so the
+    // keys the rest of this file already uses by name keep working.
+    ({ 'what-if': 'whatif', 'ways-to-save': 'ways', 'can-i-claim': 'claim', 'student-loan': 'loan' }[f.split('/')[3]]) ?? f.split('/')[3],
+    f,
+  ]),
+]);
 const src = Object.fromEntries(Object.entries(PAGES).map(([k, p]) => [k, read(p)]));
+// 🔴 THE WALK IS PROVED BEFORE ANY CLAIM IS MADE ON IT. A sweep over a short list passes every
+// assertion it never makes, which is exactly how this file said something false for weeks.
+ok(`🔴 every page under app/app/tax is covered, and there are ${Object.keys(PAGES).length}`,
+  Object.keys(PAGES).length === 10
+  && ['hub', 'summary', 'whatif', 'ways', 'claim', 'ni', 'loan', 'cis', 'vat', 'vehicle']
+    .every((k) => typeof src[k] === 'string' && src[k].length > 0));
 const nav = read('app/app/AppNav.tsx');
 
 console.log('\ntax on the web: the hub, the quarter, the levers, and the tools');
@@ -94,10 +120,18 @@ ok('🔴 the money shim is a pure re-export of lib/money and nothing else',
 for (const [k, s] of Object.entries(src)) {
   ok(`${k}: writes no id into any URL`, !/href=\{`[^`]*\$\{[^}]*\bid\b/.test(codeOnly(s)));
 }
+// ⚠️ TWO SCREENS READ IT, AND BOTH ARE CALCULATORS RATHER THAN RECORD READERS. what-if takes a
+// delta, vehicle takes a price, a mileage, a use band and a budget. None of them names a person, a
+// row or an account, which is the property this assertion actually exists to hold: nothing in a
+// web app URL may identify whose money is on the screen. The old wording claimed nobody but
+// what-if read the query string at all, which was simply not true of the tree it was describing.
+const READS_QUERY = ['whatif', 'vehicle'];
 ok('what-if reads only the delta off the query string',
   /one\('extra'\)/.test(src.whatif) && !/one\('(user|id|account|owner)/.test(src.whatif));
-ok('no other tax screen reads the query string at all',
-  Object.entries(src).filter(([k]) => k !== 'whatif').every(([, s]) => !s.includes('searchParams')));
+ok('🔴 and no tax screen takes anything off the URL that could name a person or a row',
+  Object.entries(src).every(([, s]) => !/searchParams[\s\S]{0,400}?\b(user_?id|account|owner|customer)\b/i.test(codeOnly(s))));
+ok('no OTHER tax screen reads the query string at all',
+  Object.entries(src).filter(([k]) => !READS_QUERY.includes(k)).every(([, s]) => !s.includes('searchParams')));
 
 // ---------------------------------------------------------------------------------------------
 // 2. ONE ENGINE. Every figure is asked for, never re-derived.

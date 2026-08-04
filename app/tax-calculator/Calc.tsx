@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 import LeadCapture from '../../components/LeadCapture';
 import { soleTraderTax, FACTS } from '../../lib/taxengine';
+import { gbp0 } from '../../lib/money';
 
 // The public tax calculator. 2026/27, England, Wales and Northern Ireland.
 //
@@ -64,7 +65,9 @@ function marginalRate(profit: number): number {
 }
 
 function gbp(n: number): string {
-  return '£' + Math.round(n).toLocaleString('en-GB');
+  // 🔴 WAS '£' + Math.round(n), the same nineteenth formatter the other six carried: the sign goes
+  // inside the pound and a negative prints "£-33". lib/money.ts owns this and has since 28 July.
+  return gbp0(n);
 }
 
 // A LABEL THAT IS NOT TIED TO ITS INPUT IS NOT A LABEL.

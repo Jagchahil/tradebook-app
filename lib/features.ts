@@ -113,6 +113,65 @@ export function nudgeClause(): string {
   return remindersLive() ? ' Then the odd genuinely useful nudge about deadlines and money you could claim back.' : '';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE NINTH, TENTH, ELEVENTH AND TWELFTH REMINDER PROMISES, ALL IN ONE COMPONENT, AND ONE OF
+// THEM IS THE CONSENT RECORD ITSELF.
+//
+// Found on 4 August by asking a much better question than "which pages promise a reminder": which
+// files does the sweep that asks that question never open. The answer was components/, and
+// components/LeadCapture.tsx renders on ELEVEN public tool pages, twelve after /how-mtd-works
+// joined the family the same morning.
+//
+// Four separate promises lived inside it, hard typed:
+//
+//   the heading      "Want your result emailed, plus your MTD reminders?"
+//   the sub          "...the odd genuinely useful nudge about your tax deadlines..."
+//   the done state   "We will send your result and keep you right on the deadlines that matter."
+//   THE TICK BOX     "...plus occasional tax deadline reminders and money saving tips..."
+//
+// ⚠️ THE 3 AUGUST FIX WENT INTO THE PAGES AND NOT INTO THE COMPONENT UNDER THEM. Four call sites
+// pass a sub built with nudgeClause() above, which is right and which is why they looked fixed.
+// The other seven ship the defaults, and the tick box and the done state ship on all twelve
+// whatever the page passes, because they are module constants nobody can override.
+//
+// 🔴 AND THE TICK BOX IS THE WORST OF THE FOUR, BY SOME DISTANCE. Its exact words are POSTed to
+// /api/lead as consent_text and stored, on purpose, as the provable record of what the customer
+// agreed to. So the one artefact whose entire job is to be an accurate record of a promise was
+// recording a promise no channel in this product can keep. remindersLive() is false and the cron
+// refuses to send.
+//
+// Both wordings sit side by side here, the same discipline as everything else in this file, so
+// the day the flag flips all twelve pages upgrade themselves and nobody has to remember.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export function leadHeading(): string {
+  return remindersLive()
+    ? 'Want your result emailed, plus your deadline reminders?'
+    : 'Want your result emailed?';
+}
+
+export function leadSub(): string {
+  return remindersLive()
+    ? 'Pop your email in and we will send this result, then the odd genuinely useful nudge about your tax deadlines and money you could claim back. No spam. Unsubscribe any time.'
+    : 'Pop your email in and we will send this result over. No spam, and you can unsubscribe any time.';
+}
+
+// 🔴 THE WORDS HE ACTUALLY AGREES TO, WHICH ARE STORED AND WHICH HAVE TO BE TRUE ON THE DAY HE
+// AGREES TO THEM. Not "what we might do later", and not softened: if it says reminders, reminders
+// have to be a thing this product does when he ticks it.
+export function leadConsentText(): string {
+  return remindersLive()
+    ? 'Yes, email me my result plus occasional tax deadline reminders and money saving tips from Lekhio. I can unsubscribe at any time.'
+    : 'Yes, email me my result plus occasional money saving tips from Lekhio. I can unsubscribe at any time.';
+}
+
+// ⚠️ THE THANK YOU IS A PROMISE TOO. "We will keep you right on the deadlines that matter" is made
+// AFTER he has handed the address over, which is the point at which a promise costs him something.
+export function leadDoneLine(): string {
+  return remindersLive()
+    ? 'We will send your result and keep you right on the deadlines that matter. Check your inbox.'
+    : 'We will send your result over. Check your inbox.';
+}
+
 // 🔴 THE ROW IN THE "REPLACES A WHOLE SHELF OF SUBSCRIPTIONS" TABLE. THE EIGHTH ONE.
 //
 // The table lists what a man pays for today and prints "All of it, in Lekhio, for £12.99 a month"

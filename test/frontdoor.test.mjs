@@ -24,7 +24,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 import { readFileSync, readdirSync, lstatSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -748,17 +748,84 @@ for (const f of BANNER_PAGES) {
   // lib/routing.ts, with the email arm verified by a real email arriving on 30 July. A guard
   // that refused a true sentence would teach the next person to widen the guard, not the copy.
   const TRUE_REMINDER = ['app/terms/page.tsx'];
-  const publicPages = pages
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THIS SWEPT app/ AND NOTHING ELSE, AND THE WORST PROMISE IN THE PRODUCT WAS IN components/.
+  //
+  // components/LeadCapture.tsx renders on TWELVE public tool pages and carried four reminder
+  // promises of its own, hard typed: the heading, the sub, the thank you, and the tick box whose
+  // exact words are POSTed to /api/lead as consent_text and STORED as the provable record of what
+  // the customer agreed to. The 3 August fix went into the four pages that pass a sub through
+  // nudgeClause(); the seven that pass nothing shipped the defaults, and the tick box shipped on
+  // all twelve because a module constant cannot be overridden by a prop.
+  //
+  // ⚠️ THE GUARD BELOW WAS THE SECOND HALF OF THE MISS. "the email capture clause is gated too"
+  // proved that lib/features.ts EXPORTS nudgeClause. It never checked that the email capture uses
+  // it. An assertion that the tool exists is not an assertion that the tool is held.
+  //
+  // ⚠️ AND components/ IS A SYSTEMATIC BLIND SPOT, not a one off: frontdoor, mtdclaims, hardening,
+  // proof and phonewidth all sweep app/ or app + lib and never open it. This one walks it now.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const shared = walk(path.join(root, 'components'));
+  ok('the components tree was actually walked, so this is not vacuous', shared.length >= 1);
+  const publicPages = [...pages, ...shared]
     .map(rel)
     .filter((f) => !f.startsWith('app/app/') && !f.startsWith('app/api/'))
     .filter((f) => !TRUE_REMINDER.includes(f));
   const offenders = publicPages.filter((f) => CLAIMS_A_REMINDER.test(codeOnly(read(f))));
-  ok(`🔴 NO PUBLIC PAGE PROMISES A REMINDER WE CANNOT SEND${offenders.length ? ': ' + offenders.join(', ') : ''}`,
+  ok(`🔴 NO PUBLIC PAGE OR SHARED COMPONENT PROMISES A REMINDER WE CANNOT SEND${offenders.length ? ': ' + offenders.join(', ') : ''}`,
     offenders.length === 0);
   ok('⚠️ and the one that DOES promise it still says so, because the trial reminder is real',
     /We will remind you before the trial ends/.test(read('app/terms/page.tsx')));
-  ok('the email capture clause is gated too, not just the page copy',
-    /export function nudgeClause/.test(read('lib/features.ts')));
+
+  // 🔴 AND THE EMAIL CAPTURE IS CHECKED BY WHAT IT DOES, NOT BY WHAT lib/features.ts OFFERS.
+  const lead = read('components/LeadCapture.tsx');
+  const leadCode = codeOnly(lead);
+  ok('the email capture asks lib/features for every word it promises with',
+    /from '\.\.\/lib\/features'/.test(leadCode)
+    && ['leadHeading', 'leadSub', 'leadConsentText', 'leadDoneLine'].every((f) => leadCode.includes(`${f}(`)));
+  ok('🔴 AND IT TYPES NONE OF THEM ITSELF, heading, sub, thank you or tick box',
+    !/MTD reminders|deadline reminders|deadlines that matter|nudge about your tax deadlines/i.test(leadCode));
+  // ⚠️ THE ONE THAT IS STORED. consent_text is the record of what he agreed to, so it must be the
+  // gated wording and never a constant sitting beside it.
+  ok('🔴 and the CONSENT it records is the gated wording, not a hard typed one',
+    /consent_text: leadConsentText\(\)/.test(leadCode) && !/const CONSENT_TEXT/.test(leadCode));
+  ok('both wordings still live side by side, so the flag flipping needs no copy rewrite',
+    ['leadHeading', 'leadSub', 'leadConsentText', 'leadDoneLine']
+      .every((f) => new RegExp(`export function ${f}\\(\\): string \\{\\s*return remindersLive\\(\\)`).test(read('lib/features.ts'))));
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THE WORDS THEMSELVES ARE RUN, NOT READ, BECAUSE MOVING THE LIE INTO lib/ HID IT.
+  //
+  // A sabotage pass on 4 August put "occasional tax deadline reminders" straight back into the OFF
+  // branch of leadConsentText, and every assertion above stayed green. The sweep walks app/ and
+  // components/, the promise had moved to lib/features.ts, and the shape check only proved the
+  // function BRANCHES on remindersLive, never what it says on the false side.
+  //
+  // ⚠️ SO THE FLAG IS SET OFF AND THE FOUR STRINGS ARE ACTUALLY CALLED. What ships is what a
+  // customer reads, and reading the source for the shape of a promise is how the last three of
+  // these survived. A control with the flag ON proves the test can tell the difference.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const asked = ['leadHeading', 'leadSub', 'leadConsentText', 'leadDoneLine'];
+  process.env.NEXT_PUBLIC_REMINDERS_LIVE = '';
+  const off = await import(pathToFileURL(path.join(root, 'lib/features.ts')).href + '?off');
+  const offWords = asked.map((f) => off[f]());
+  ok('🔴 WITH THE FLAG OFF, NOT ONE OF THE FOUR PROMISES A REMINDER',
+    offWords.every((w) => typeof w === 'string' && w.length > 0 && !CLAIMS_A_REMINDER.test(w)));
+  ok('🔴 and the words a customer CONSENTS to say nothing about deadlines either',
+    !/deadline|remind/i.test(off.leadConsentText()));
+
+    // 🔴 THE FLAG IS THE STRING 'true' AND NOTHING ELSE. lib/features on() is v === 'true', so '1'
+  // is OFF. A control set with '1' would have compared two identical off strings and passed by
+  // accident, which is the exact failure mode a control exists to rule out.
+  process.env.NEXT_PUBLIC_REMINDERS_LIVE = 'true';
+  const on = await import(pathToFileURL(path.join(root, 'lib/features.ts')).href + '?on');
+  // ⚠️ COMPARED AGAINST THE CAPTURED off WORDS, not against off.leadHeading() called again. These
+  // read process.env at CALL time rather than at import time, so calling the off module now would
+  // return the ON wording and the control would compare a string to itself. That mistake made this
+  // very control fail the first time it ran, which is the best possible advertisement for it.
+  ok('CONTROL: with the flag ON the promise really is there, so this test can tell them apart',
+    CLAIMS_A_REMINDER.test(on.leadConsentText()) && on.leadHeading() !== offWords[0]);
+  process.env.NEXT_PUBLIC_REMINDERS_LIVE = '';
 
   // ⚠️ BOTH WORDINGS MUST EXIST. The point of this file is that the launch copy is written NOW and
   // gated, so nobody has to remember to write it on the day. A gate with only the honest half is

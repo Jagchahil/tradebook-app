@@ -881,5 +881,71 @@ for (const f of BANNER_PAGES) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 ONE WEB LOGIN DOOR, AND IT IS THE ONE WITH THE LOCKS ON IT.
+//
+// /account was a SECOND web sign in, on SMS, posting from the customer's own browser with the anon
+// key straight to Supabase auth/v1/otp. Three faults, and the third stranded paying customers:
+//
+//   1. lib/logindoor.ts states "FROM 2 AUGUST 2026 THE WEB SCREEN OFFERS THE ADDRESS ONLY", on the
+//      175x cost of a text and because only the text is worth attacking. This offered the number.
+//   2. It bypassed /api/auth/start, and with it every rate limit, send cap, spend cap and origin
+//      check this product has. None of that is reachable from a browser fetch to Supabase.
+//   3. A web customer HAS NO PHONE on his auth user. Every admin/users write mints { email,
+//      email_confirm } and nothing else, so with create_user:false there was no user to match. The
+//      one page offering cancellation, a card change and invoices could never be got through.
+//
+// ⚠️ AND THE FOOTER POINTED AT IT, on every public page, under "Manage subscription". 31 July built
+// /app/you/billing to ride the web session and left this "for the phone era", but a page the footer
+// links to is live whatever a comment says. That is what these guards are really for.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+{
+  // Nowhere public may mint or verify an auth code by talking to Supabase from the browser.
+  for (const f of publicPages) {
+    const src = codeOnly(read(rel(f)));
+    ok(`${rel(f)} does not call Supabase auth from the browser`,
+      !/auth\/v1\/(otp|verify)/.test(src));
+    ok(`${rel(f)} sends no SMS login code`, !/type:\s*'sms'/.test(src));
+  }
+  const acct = read('app/account/page.tsx');
+  ok('🔴 /account NO LONGER ASKS FOR A PHONE NUMBER', !/toE164|Mobile number/.test(codeOnly(acct)));
+  ok('🔴 AND IT LANDS ON THE DOOR THAT ACTUALLY OPENS',
+    /redirect\('\/app\/you\/billing'\)/.test(acct));
+  ok('...and it is not indexable, which is what Search Console was complaining about',
+    /robots:\s*\{\s*index:\s*false/.test(acct));
+  ok('🔴 THE FOOTER SENDS "Manage subscription" TO THE WORKING DOOR, not the dead one',
+    /\['\/app\/you\/billing', 'Manage subscription'\]/.test(site));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 EVERY PUBLIC PAGE IS EITHER INDEXABLE WITH A CANONICAL, OR DELIBERATELY NOT INDEXABLE.
+//
+// Google reported "Duplicate without user-selected canonical" on 28 July. /account was the one page
+// with NEITHER a canonical NOR a noindex NOR a robots.txt disallow, so Google was free to index it
+// and had nothing to pick a canonical from. The class of bug is "a page nobody decided about", so
+// the guard is about the DECISION rather than about that one page: say index it and say which URL
+// is the real one, or say do not.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+{
+  const robotsSrc = read('app/robots.ts');
+  const disallowed = [...robotsSrc.matchAll(/'(\/[a-z0-9/-]*)'/g)].map((m) => m[1])
+    .filter((v) => v !== '/' && v.length > 1);
+  ok('the robots disallow list was parsed', disallowed.length >= 5);
+  for (const f of publicPages) {
+    const r = rel(f);
+    if (!r.endsWith('page.tsx')) continue;
+    const route = '/' + r.replace(/^app\//, '').replace(/\/page\.tsx$/, '').replace(/^page\.tsx$/, '');
+    const blocked = disallowed.some((d) => route === d || route.startsWith(d.endsWith('/') ? d : d + '/'));
+    if (blocked) continue;
+    const dir = r.replace(/\/page\.tsx$/, '');
+    const own = read(r);
+    let lay = '';
+    try { lay = read(`${dir}/layout.tsx`); } catch { lay = ''; }
+    const both = own + lay;
+    ok(`${route || '/'} either declares a canonical or refuses indexing`,
+      /canonical/.test(both) || /robots:\s*\{\s*index:\s*false/.test(both));
+  }
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

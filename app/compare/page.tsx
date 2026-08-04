@@ -8,6 +8,7 @@ import {
   Ic,
 } from '../_shared/site';
 import { FACTS } from '../../lib/taxengine';
+import { css } from '../../lib/tokens';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/compare' },
@@ -71,7 +72,7 @@ const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'e
 const say = (n: number) => WORDS[n] ?? String(n);
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-const COMPARE_CSS = `
+const COMPARE_CSS = css`
 .mkt .hero{padding:52px 0 14px}
 .mkt .final{background:var(--band)}
 .mkt .final p{color:rgba(255,255,255,.8)}

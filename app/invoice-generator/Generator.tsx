@@ -5,6 +5,7 @@ import LeadCapture from '../../components/LeadCapture';
 // ⚠️ A CLIENT COMPONENT, which is exactly why remindersLive() is a NEXT_PUBLIC flag: a server only
 // read would be false here and true on the server, and the same sentence would render two ways.
 import { nudgeClause } from '../../lib/features';
+import { css } from '../../lib/tokens';
 
 // Fully client side. No AI, no server, no cost. The browser does the maths and
 // the "Save as PDF" is the browser's own print to PDF, so it never calls us.
@@ -222,7 +223,7 @@ export default function Generator() {
 
   return (
     <div>
-      <style>{`
+      <style>{css`
         @media print {
           .no-print{display:none !important;}
           .paper{box-shadow:none !important;border:none !important;margin:0 !important;max-width:100% !important;}

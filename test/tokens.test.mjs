@@ -177,13 +177,76 @@ ok('...and never touches the // in a url, which is not a comment',
 ok('it accepts a plain string too, for callers that already built one',
   T.css('/* x */ .c{top:0}').trim() === '.c{top:0}');
 
-// 🔴 AND EVERY STYLESHEET IS BUILT WITH IT. A new one declared with a bare backtick would ship its
-// own comments and nothing would notice, which is exactly how the first 1,263 bytes got there.
-for (const f of ['app/_shared/site.tsx', 'app/page.tsx', 'app/how-mtd-works/page.tsx']) {
-  const src = readFileSync(path.join(root, f), 'utf8');
-  const bare = [...src.matchAll(/const\s+([A-Z][A-Z0-9_]*_CSS)\s*=\s*`/g)].map((m) => m[1]);
-  ok(`${f}: every _CSS constant is tagged with css\`\``, bare.length === 0
-    || bare.every((n) => new RegExp(`const\\s+${n}\\s*=\\s*css\``).test(src)));
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS GUARD USED TO NAME THREE FILES, AND THE THREE IT NAMED WERE THE THREE ALREADY FIXED.
+//
+// It read:  for (const f of ['app/_shared/site.tsx', 'app/page.tsx', 'app/how-mtd-works/page.tsx'])
+// It was green the moment it was written and it could never have gone red, because it tested the
+// work rather than the claim. 2,880 further bytes of CSS comment were shipping while it passed:
+// 1,135 in APP_CSS and 821 in AppNav, both on EVERY signed in page, and 180 inside the income
+// summary a customer hands to a lender. Measured on the live site the next morning.
+//
+// ⚠️ A GUARD THAT NAMES THE FILES YOU JUST EDITED IS NOT A GUARD, IT IS A RECEIPT.
+//
+// So it sweeps the whole of app/ and lib/ instead, and it asserts the OUTCOME rather than the
+// habit: no untagged template literal anywhere may contain a CSS comment. Tagging a stylesheet
+// that has no comments in it changes not one byte, so it is not required. The moment somebody
+// writes /* inside a bare backtick, wherever they do it, this goes red.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const CSS_SKIP = ['node_modules', '.git', '.next', '_to_delete', '_scale_review'];
+const cssWalk = (dir, out = []) => {
+  for (const e of readdirSync(dir)) {
+    if (e.startsWith('.')) continue;
+    const full = path.join(dir, e);
+    const rel = path.relative(root, full);
+    if (CSS_SKIP.some((s) => rel === s || rel.startsWith(s + path.sep))) continue;
+    const st = lstatSync(full);
+    if (st.isSymbolicLink()) continue;
+    if (st.isDirectory()) cssWalk(full, out);
+    else if (/\.(ts|tsx)$/.test(e) && !e.includes('fuse_hidden')) out.push(full);
+  }
+  return out;
+};
+// Find every template literal and note whether the identifier `css` sits immediately in front of
+// it. ${...} is tracked so a nested backtick inside an interpolation does not close the outer one.
+const literals = [];
+for (const f of [...cssWalk(path.join(root, 'app')), ...cssWalk(path.join(root, 'lib'))]) {
+  const src = readFileSync(f, 'utf8');
+  for (let i = 0; ;) {
+    const b = src.indexOf('`', i);
+    if (b === -1) break;
+    let j = b + 1;
+    let depth = 0;
+    for (; j < src.length; j++) {
+      const c = src[j];
+      if (c === '\\') { j++; continue; }
+      if (c === '$' && src[j + 1] === '{') { depth++; j++; continue; }
+      if (c === '}' && depth > 0) { depth--; continue; }
+      if (c === '`' && depth === 0) break;
+    }
+    const body = src.slice(b + 1, j);
+    if (/\/\*[\s\S]*?\*\//.test(body)) {
+      literals.push({
+        file: path.relative(root, f),
+        line: src.slice(0, b).split('\n').length,
+        tagged: /(^|[^A-Za-z0-9_$])css\s*$/.test(src.slice(Math.max(0, b - 40), b)),
+      });
+    }
+    i = j + 1;
+  }
+}
+const untagged = literals.filter((l) => !l.tagged);
+ok(untagged.length === 0
+  ? `no untagged template literal carries a CSS comment (${literals.length} carry one, all tagged)`
+  : `UNTAGGED CSS COMMENT, it ships to the browser: ${untagged.map((l) => `${l.file}:${l.line}`).join(', ')}`,
+untagged.length === 0);
+
+// ⚠️ AND THE SWEEP ITSELF IS PROVED, because one that found nothing at all would also pass the line
+// above. These four are known to carry comments inside a tagged stylesheet, so if the scanner ever
+// stops seeing template literals this goes red before the guard above goes quietly green.
+for (const f of ['lib/tokens.ts', 'app/_shared/site.tsx', 'app/page.tsx', 'app/app/AppNav.tsx']) {
+  ok(`the sweep can still see the tagged stylesheet in ${f}`,
+    literals.some((l) => l.file === f && l.tagged));
 }
 
 console.log('\n=== unnamed colours only ever go down ===\n');

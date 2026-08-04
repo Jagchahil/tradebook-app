@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import ClientScript from '../_shared/ClientScript';
 // alertChannels: the email half of this was never true. See lib/features.ts remindersLive().
 import { filingBadge, bankBadge, alertChannels } from '../../lib/features';
+import { css } from '../../lib/tokens';
 import Link from 'next/link';
 import OnboardingShow from './OnboardingShow';
 import {
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
     'Snap a receipt, say it out loud, or import your bank statement, and Lekhio reads it, sorts it, and keeps it tidy and ready. Receipts, mileage, invoices, CIS and quarterly tax, all in your browser. You approve before anything reaches HMRC.',
 };
 
-const PRODUCT_CSS = `
+const PRODUCT_CSS = css`
 .mkt .hero{padding:52px 0 20px}
 .mkt .hero .cta-row{justify-content:center}
 .mkt .hero .sub{font-size:20px;color:var(--tx-mut);max-width:560px;margin:20px auto 26px}

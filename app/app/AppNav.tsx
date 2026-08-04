@@ -1,4 +1,4 @@
-import { BREAK, FONT, MOTION, RADIUS, SHADOW, SIDEBAR, SPACE, TYPE } from '../../lib/tokens';
+import { BREAK, css, FONT, MOTION, RADIUS, SHADOW, SIDEBAR, SPACE, TYPE } from '../../lib/tokens';
 import {
   INK, LINE, MUTED, PANEL, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, SURFACE,
 } from '../../lib/apptheme';
@@ -255,7 +255,7 @@ export function AppNav({ current }: { current: string }) {
 // and now a media query, and none of those exist in a React style object. The bar's own styles
 // moved in here from inline for the same reason: an inline style cannot be switched off at desk
 // widths, and the rail needs the bar gone, not restyled.
-const CSS = `
+const CSS = css`
 .lek-shell{font-family:${FONT}}
 .lek-bar{color:${INK};border-bottom:1px solid ${LINE};background:${PAPER};padding:14px 16px 0;margin-bottom:20px}
 .lek-bar-row{display:flex;align-items:center;justify-content:space-between;max-width:960px;margin:0 auto}

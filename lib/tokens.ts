@@ -369,6 +369,27 @@ function(next){
 //
 // ⚠️ IT MATCHES CSS COMMENTS ONLY, /* to */, which cannot appear in a URL or a colour. It does not
 // touch // because that IS a protocol separator in a CSS url().
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE FIRST PASS ONLY FIXED THE PAGES I HAPPENED TO LOOK AT. 2,880 MORE BYTES WERE STILL
+// GOING DOWN THE WIRE THE NEXT MORNING, AND THE GUARD SAID GREEN.
+//
+// The guard in test/tokens.test.mjs checked three files by name, and the three it named were
+// exactly the three I had already fixed. It tested what I did rather than what was true, so it
+// could only ever pass. It has been replaced by a sweep of every .ts and .tsx under app/ and lib/.
+//
+// What that sweep found, measured live on 4 August:
+//
+//   APP_CSS, in this file           1,135 bytes, 40% of the sheet, EVERY SIGNED IN PAGE
+//   app/app/AppNav.tsx                821 bytes, EVERY SIGNED IN PAGE
+//   app/product/page.tsx              401 bytes
+//   app/compare/page.tsx              266 bytes
+//   lib/incomeproof.ts                180 bytes, INSIDE A DOCUMENT A CUSTOMER SENDS A LENDER
+//   app/invoice-generator             77 bytes
+//
+// So a paying customer downloaded 1,956 bytes of our engineering notes on every screen he opened,
+// and the one page a stranger reads about him carried a note explaining our own design reasoning.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 export function css(strings: TemplateStringsArray | string, ...values: unknown[]): string {
   const raw = typeof strings === 'string'
@@ -412,7 +433,7 @@ export const A11Y_CSS = [
 // their colours from lib/apptheme.ts, which maps the same names to the same variables. The site's
 // toggle and its localStorage choice belong to the marketing pages alone.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-export const APP_CSS = `
+export const APP_CSS = css`
 ${APP_THEME_CSS}
 @keyframes lek-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .lek-wrap{box-sizing:border-box;max-width:672px;margin:0 auto;padding:${SPACE.md}px ${SPACE.md}px ${SPACE.xxl}px}

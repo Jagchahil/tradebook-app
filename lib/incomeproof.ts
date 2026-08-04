@@ -232,15 +232,28 @@ function row(label: string, value: string, opts: { bold?: boolean; muted?: boole
   );
 }
 
-// A complete, self contained, print ready HTML document. No external assets.
-export function renderIncomeProofHtml(p: IncomeProof): string {
-  const generated = longDate(p.generatedAt.slice(0, 10));
-  return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="robots" content="noindex, nofollow" />
-<title>Income summary ${esc(p.taxYear)} ${esc(p.businessName)}</title>
-<style>
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS STYLESHEET SHIPPED 180 BYTES OF OUR OWN ENGINEERING NOTES TO A MORTGAGE LENDER.
+//
+// A CSS comment is not stripped by the compiler, it is characters inside a string, so the note
+// explaining why .whose is in full ink went out inside the document a customer hands to a broker
+// or a landlord. It is written as a TypeScript comment now, one line up, where the compiler
+// deletes it and the reasoning still sits beside the rule it explains.
+//
+// ⚠️ AND IT IS NOT TAGGED WITH css`` LIKE EVERY OTHER STYLESHEET, ON PURPOSE, TWICE OVER.
+//
+// First, lib/ledger.ts says it out loud: a lib module may not take a new lib import, because three
+// suites stage these files with a fixed dependency list and Node's type stripping cannot resolve
+// an extensionless one. Second, and worse, this file is not a stylesheet, it is a whole document,
+// and it interpolates a business name, a share note and transaction descriptions. A stripper that
+// deletes everything between /* and */ would eat a customer's own sentence if he ever typed /* in
+// his trading name. There is nothing to strip because there is nothing here to strip, and
+// test/tokens.test.mjs goes red the moment somebody writes one in.
+//
+// .whose: whose figures these are. In the document's own ink, not muted: it states what the
+// numbers ARE rather than footnoting them, and a lender must not be able to skim past it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const PROOF_CSS = `
   @media print { .noprint { display:none !important } @page { margin: 18mm } }
   body { font-family:${FONT}; color:${INK}; margin:0; background:${OFF_WHITE}; -webkit-print-color-adjust:exact; print-color-adjust:exact }
   .sheet { max-width:720px; margin:0 auto; padding:34px 30px 44px }
@@ -250,13 +263,21 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
   .muted { color:${MUTED} }
   .card { background:#fff; border:1px solid ${BORDER}; border-radius:16px; padding:22px 24px; margin-top:20px }
   table { width:100%; border-collapse:collapse }
-  /* Whose figures these are. In the document's own ink, not muted: it states what the numbers
-     ARE rather than footnoting them, and a lender must not be able to skim past it. */
   .whose { margin-top:16px; font-size:13.5px; line-height:1.6; color:${INK}; max-width:62ch }
   .stamp { display:inline-block; margin-top:18px; background:${OFF_WHITE}; border:1px solid ${BORDER}; border-radius:10px; padding:8px 12px; font-size:12px; font-weight:700; color:${INDIGO} }
   .note { font-size:12px; color:${MUTED}; line-height:1.6; margin-top:22px }
   .btn { display:inline-block; margin-top:24px; background:${INDIGO}; color:#fff; text-decoration:none; font-weight:700; padding:12px 20px; border-radius:11px; border:0; cursor:pointer; font-family:inherit; font-size:15px }
-</style></head>
+`;
+
+// A complete, self contained, print ready HTML document. No external assets.
+export function renderIncomeProofHtml(p: IncomeProof): string {
+  const generated = longDate(p.generatedAt.slice(0, 10));
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Income summary ${esc(p.taxYear)} ${esc(p.businessName)}</title>
+<style>${PROOF_CSS}</style></head>
 <body><div class="sheet">
   <div class="brand"><span class="l">L</span> Lekhio</div>
 

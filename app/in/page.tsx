@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../lib/webauth';
-import { SESSION_COOKIE, webSessionsConfigured } from '../../lib/websession';
+import { SESSION_COOKIE, webSessionsConfigured, safeNext } from '../../lib/websession';
 import { HOW_LONG } from '../../lib/onboarding';
 import { A11Y_CSS, APP_THEME_CSS, FONT, RADIUS } from '../../lib/tokens';
 import { INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RIVER, RIVER_DEEP, SURFACE } from '../../lib/apptheme';
@@ -69,8 +69,21 @@ export default async function SignInPage({
   // Already signed in, so do not make him prove it again. Anyone arriving here with a live session
   // wanted his money, not a form.
   const jar = await cookies();
+  // 🔴 WHERE HE WAS HEADING BEFORE WE ASKED HIM TO PROVE WHO HE IS.
+  //
+  // This page used to send everybody to /app, so a customer who clicked "Manage subscription" in
+  // the footer signed in and landed on the dashboard having forgotten what he came for. Small on
+  // its own, and it is the last step of a journey that was completely broken until today: see
+  // app/account/page.tsx for the SMS door that could never open.
+  //
+  // ⚠️ safeNext() IS AN ALLOWLIST OF /app AND BELOW, NOT A SANITISER, and it returns the dashboard
+  // for anything else. An unvalidated destination here would turn our own login into a redirector
+  // that sends a man to somebody else's page carrying the address bar he just typed his code into.
+  // The reasoning and the rejected shapes are written on the function in lib/websession.ts.
+  const next = safeNext(one('next'));
+
   const already = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
-  if (already) redirect('/app');
+  if (already) redirect(next);
 
   const step = one('step') === 'code' ? 'code' : 'phone';
   const err = message(one('e'));
@@ -114,6 +127,9 @@ export default async function SignInPage({
           </p>
         ) : step === 'code' ? (
           <form action="/api/auth/verify" method="post">
+            {/* Carried as a hidden field rather than on the action URL, so it survives the post
+                without the page ever re-reading it from its own address. */}
+            <input type="hidden" name="next" value={next} />
             <label htmlFor="code" style={S.label}>Your code</label>
             <input
               id="code"
@@ -178,6 +194,7 @@ export default async function SignInPage({
              button is for the phone era customer anyway, because a dead end with no way out is
              the one thing this screen must never be. */
           <form action="/api/auth/start" method="post">
+            <input type="hidden" name="next" value={next} />
             <label htmlFor="contact" style={S.label}>Your email address</label>
             <input
               id="contact"

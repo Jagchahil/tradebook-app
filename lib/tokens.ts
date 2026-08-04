@@ -353,6 +353,30 @@ function(next){
 // Shared accessibility CSS, injected into every page's style block. Visible keyboard focus on
 // every interactive element, and all animation disabled for people who ask the OS for reduced
 // motion.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A COMMENT INSIDE A CSS TEMPLATE LITERAL IS SHIPPED TO EVERY VISITOR. A TYPESCRIPT ONE IS NOT.
+//
+// Found on 3 August 2026 by measuring the live page rather than reading it: 1,263 bytes of CSS
+// comments, 4.1% of all the CSS on the front door, downloaded by everybody who has ever opened
+// lekhio.app. The compiler strips // and /* */ from TypeScript and from JSX, so the long
+// explanations this codebase writes everywhere else cost nothing. Inside a backtick block of CSS
+// they are just characters, and they go down the wire.
+//
+// ⚠️ THE FIX IS NOT TO STOP WRITING THEM. The reasoning beside a rule is why anybody can safely
+// change it later, and deleting it to save a kilobyte is the wrong trade twice over. They are
+// stripped at the point the stylesheet is BUILT, so the source keeps every word and the browser
+// gets none of them.
+//
+// ⚠️ IT MATCHES CSS COMMENTS ONLY, /* to */, which cannot appear in a URL or a colour. It does not
+// touch // because that IS a protocol separator in a CSS url().
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function css(strings: TemplateStringsArray | string, ...values: unknown[]): string {
+  const raw = typeof strings === 'string'
+    ? strings
+    : strings.reduce((out, part, i) => out + part + (i < values.length ? String(values[i]) : ''), '');
+  return raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\n{3,}/g, '\n\n');
+}
+
 export const A11Y_CSS = [
   `a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid ${RIVER};outline-offset:2px;border-radius:4px}`,
   '@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}}',

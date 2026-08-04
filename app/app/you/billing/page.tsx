@@ -50,7 +50,11 @@ export default async function BillingPage({
 }) {
   const jar = await cookies();
   const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
-  if (!user) redirect('/in');
+  // 🔴 CARRY HIM BACK HERE AFTER HE SIGNS IN. The footer's "Manage subscription" lands on this
+  // page, so a signed out customer used to prove who he is and then arrive at the dashboard, one
+  // click from the thing he actually came for. safeNext() on the other side allowlists /app and
+  // below, so this parameter cannot be turned into an open redirect.
+  if (!user) redirect('/in?next=%2Fapp%2Fyou%2Fbilling');
 
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;

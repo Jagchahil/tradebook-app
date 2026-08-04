@@ -342,3 +342,45 @@ export function verifyPendingCookie(value: string | null | undefined, now: Date 
 // place that reads what a man typed. Two copies of the number normaliser is the exact failure this
 // codebase keeps writing warnings about: the copy that drifts decides which account his WhatsApp
 // receipts land on.
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHERE TO SEND HIM AFTER HE SIGNS IN, AND WHY THIS IS AN ALLOWLIST RATHER THAN A CLEANER.
+//
+// /in used to send everybody to /app, so a customer who clicked "Manage subscription" in the
+// footer signed in and landed on the dashboard, having forgotten what he came for. Carrying a
+// destination through the sign in fixes that, and it is also the single most abused parameter
+// on the web: an unvalidated one turns our own login into a redirector that sends a man to
+// somebody else's page with our name in the address bar he just typed his code into.
+//
+// ⚠️ SO IT IS AN ALLOWLIST OF ONE PLACE, NOT A SANITISER. A sanitiser is a list of the attacks
+// somebody thought of. `/app` and paths beneath it are the only destinations a signed in
+// customer has, so anything else is not a near miss to be repaired, it is a request we did not
+// make and it goes to the default.
+//
+// The rejected shapes, and each is a real bypass rather than a hypothetical:
+//   //evil.com        protocol relative, the browser treats it as another host
+//   /app\@evil.com    a backslash, which several browsers normalise to a slash
+//   https://evil.com  an absolute URL, caught by the scheme colon
+//   /app/../../x      traversal, caught because it never matches the prefix after the checks
+//   whitespace, control characters and anything over the length a real route needs
+//
+// ⚠️ NO QUERY STRING AND NO FRAGMENT, deliberately. Nothing we need to reach carries one, and
+// every character allowed through here is a character somebody gets to put in front of a man
+// who is mid sign in. Widen it when something real needs it, with a reason written here.
+//
+// ⚠️ IT RETURNS THE DEFAULT RATHER THAN NULL. A caller cannot forget to handle a refusal, so
+// the failure mode of every mistake in every caller is "he lands on his dashboard", which is
+// exactly where he used to land anyway.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const AFTER_SIGN_IN = '/app';
+
+export function safeNext(raw: unknown): string {
+  if (typeof raw !== 'string') return AFTER_SIGN_IN;
+  const v = raw.trim();
+  if (v.length === 0 || v.length > 120) return AFTER_SIGN_IN;
+  if (v !== AFTER_SIGN_IN && !v.startsWith(`${AFTER_SIGN_IN}/`)) return AFTER_SIGN_IN;
+  // eslint-disable-next-line no-control-regex
+  if (/[\\:?#\s\u0000-\u001f]/.test(v)) return AFTER_SIGN_IN;
+  if (v.includes('//') || v.includes('..')) return AFTER_SIGN_IN;
+  return v;
+}

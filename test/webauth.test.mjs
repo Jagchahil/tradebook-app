@@ -19,12 +19,16 @@
 //
 // Run: node test/webauth.test.mjs   Pure, reads files, no network.
 
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..');
+
+// lib/websession.ts imports nothing but node:crypto, so it loads straight through Node's type
+// stripping with no staging. safeNext() is the allowlist every next= parameter has to survive.
+const W = await import(pathToFileURL(path.join(repo, 'lib/websession.ts')).href);
 
 let pass = 0, fail = 0;
 const ok = (name, cond) => {
@@ -81,8 +85,29 @@ ok('🔴 EVERY PAGE UNDER app/app RESOLVES THE USER FROM THE SESSION: ' + (ungua
 
 // And every one of them must send him away when there is no session, rather than rendering an
 // empty shell that looks like an account with no money in it.
-const noRedirect = pages.filter((f) => !/redirect\(['"]\/in['"]\)/.test(read(f)));
+// ⚠️ THE ANCHOR MOVED ON 3 AUGUST 2026 AND THE CLAIM DID NOT. /app/you/billing now redirects to
+// `/in?next=%2Fapp%2Fyou%2Fbilling`, because the footer's "Manage subscription" lands there and a
+// signed out customer used to prove who he is and then arrive at the dashboard, one click from the
+// thing he came for. So the pattern allows a query string, and gains a second assertion that the
+// destination is OUR sign in page and not somebody else's.
+const IN_REDIRECT = /redirect\(['"]\/in(\?[^'"]*)?['"]\)/;
+const noRedirect = pages.filter((f) => !IN_REDIRECT.test(read(f)));
 ok('every page sends a signed out visitor to /in: ' + (noRedirect.map(rel).join(', ') || 'none'), noRedirect.length === 0);
+
+// 🔴 AND NO PAGE MAY SEND HIM ANYWHERE BUT OUR OWN SIGN IN. A redirect target that leaves the site
+// from a page that has just decided he is signed out is an open redirect with extra steps.
+const offsite = pages.filter((f) => /redirect\(['"](https?:)?\/\//.test(read(f)));
+ok('🔴 NO SIGNED OUT REDIRECT LEAVES THE SITE: ' + (offsite.map(rel).join(', ') || 'none'), offsite.length === 0);
+
+// 🔴 AND EVERY DESTINATION IT CARRIES SURVIVES safeNext(), which allowlists /app and below. A page
+// that hand rolled a next parameter safeNext would refuse is a page quietly sending him elsewhere.
+{
+  const carried = pages.map((f) => [rel(f), (read(f).match(/redirect\(['"]\/in\?next=([^'"]*)['"]\)/) || [])[1]])
+    .filter(([, v]) => v);
+  for (const [name, raw] of carried) {
+    ok(`${name}: its next= is one safeNext would allow`, W.safeNext(decodeURIComponent(raw)) === decodeURIComponent(raw));
+  }
+}
 
 console.log('\n2. THE AUTH ROUTES NEVER TRUST WHAT THE CLIENT SENT');
 const startRoute = read(path.join(repo, 'app/api/auth/start/route.ts'));

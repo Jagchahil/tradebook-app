@@ -155,6 +155,37 @@ ok('...and the stale key in an early visitor\'s browser is cleared rather than l
 ok('site.tsx no longer hand types a palette',
   !/--river:#[0-9A-Fa-f]{6}/.test(site) && !/--tx-mut:#[0-9A-Fa-f]{6}/.test(site));
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A COMMENT INSIDE A CSS TEMPLATE LITERAL IS SHIPPED TO EVERY VISITOR.
+//
+// Found on 3 August 2026 by MEASURING THE LIVE PAGE, not by reading it: 1,263 bytes of CSS
+// comments, 4.1% of all the CSS on the front door, downloaded by everybody who has ever opened
+// lekhio.app. TypeScript and JSX comments are stripped by the compiler and cost nothing, which is
+// why this codebase can afford to explain itself everywhere. Inside a backtick block of CSS they
+// are just characters and they go down the wire.
+//
+// The fix is not to stop writing them: the reasoning beside a rule is why anybody can safely change
+// it later. They are stripped when the stylesheet is BUILT, by tagging the literal with css``.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== css comments never reach the browser ===\n');
+ok('css`` strips a comment', !T.css`/* gone */ .a{color:red}`.includes('gone'));
+ok('...and keeps the rule itself', /\.a\{color:red\}/.test(T.css`/* gone */ .a{color:red}`));
+ok('...across several, including multi line', 
+  !T.css`/* one */ .a{color:red} /* two\nlines */ .b{color:blue}`.includes('two'));
+ok('...and never touches the // in a url, which is not a comment',
+  T.css`.a{background:url(https://x.test/i.png)}`.includes('https://x.test/i.png'));
+ok('it accepts a plain string too, for callers that already built one',
+  T.css('/* x */ .c{top:0}').trim() === '.c{top:0}');
+
+// 🔴 AND EVERY STYLESHEET IS BUILT WITH IT. A new one declared with a bare backtick would ship its
+// own comments and nothing would notice, which is exactly how the first 1,263 bytes got there.
+for (const f of ['app/_shared/site.tsx', 'app/page.tsx', 'app/how-mtd-works/page.tsx']) {
+  const src = readFileSync(path.join(root, f), 'utf8');
+  const bare = [...src.matchAll(/const\s+([A-Z][A-Z0-9_]*_CSS)\s*=\s*`/g)].map((m) => m[1]);
+  ok(`${f}: every _CSS constant is tagged with css\`\``, bare.length === 0
+    || bare.every((n) => new RegExp(`const\\s+${n}\\s*=\\s*css\``).test(src)));
+}
+
 console.log('\n=== unnamed colours only ever go down ===\n');
 // A hex that is not in the palette is a colour nobody named. Some are legitimate: a one off tint,
 // a border, somebody else's brand inside a mock. They are not all worth a token. What is NOT

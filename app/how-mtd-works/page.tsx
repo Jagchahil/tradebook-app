@@ -7,6 +7,7 @@ import {
   Ic,
  MtdBanner,} from '../_shared/site';
 import { FACTS } from '../../lib/taxengine';
+import { css } from '../../lib/tokens';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/how-mtd-works' },
@@ -33,7 +34,7 @@ const T27 = FACTS.mtdThreshold2027; // April 2027
 const T28 = FACTS.mtdThreshold2028; // April 2028
 const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
 
-const MTD_CSS = `
+const MTD_CSS = css`
 .mkt .hero{padding:52px 0 12px}
 .mkt .final{background:var(--band)}
 .mkt .final p{color:rgba(255,255,255,.8)}

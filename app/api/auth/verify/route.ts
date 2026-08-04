@@ -11,6 +11,7 @@ import {
   PENDING_COOKIE, SESSION_COOKIE, SESSION_TTL_SECONDS, SESSION_TTL_UNREMEMBERED_SECONDS,
   browserSessionCookieAttributes, newSessionId, originAllowed, sessionCookieAttributes,
   sessionCookieValue, verifyPendingCookie, webSessionsConfigured,
+  safeNext, AFTER_SIGN_IN,
 } from '../../../../lib/websession';
 
 export const runtime = 'nodejs';
@@ -31,8 +32,11 @@ export const runtime = 'nodejs';
 // Only then is a session opened. If the session write fails he is told, rather than being handed a
 // cookie that means nothing and a page that will bounce him straight back here.
 
-function back(req: NextRequest, reason: string) {
-  return NextResponse.redirect(new URL(`/in?step=code&e=${reason}`, req.url), 303);
+// ⚠️ THE DESTINATION SURVIVES A WRONG CODE. He is one digit from where he was going, so losing it
+// here would be the second time we sent him back to the beginning.
+function back(req: NextRequest, reason: string, next: string = AFTER_SIGN_IN) {
+  const q = next === AFTER_SIGN_IN ? '' : `&next=${encodeURIComponent(next)}`;
+  return NextResponse.redirect(new URL(`/in?step=code&e=${reason}${q}`, req.url), 303);
 }
 
 export async function POST(req: NextRequest) {
@@ -50,18 +54,22 @@ export async function POST(req: NextRequest) {
   const pending = verifyPendingCookie(req.cookies.get(PENDING_COOKIE)?.value ?? null);
   if (!pending) return NextResponse.redirect(new URL('/in?e=expired', req.url), 303);
 
+  // Where he was heading. safeNext() allowlists /app and below, so this cannot be turned into an
+  // open redirect off our own sign in page. See lib/websession.ts.
+  const next = safeNext(form.get('next'));
+
   const code = String(form.get('code') ?? '').replace(/\D/g, '');
-  if (code.length < 4 || code.length > 8) return back(req, 'code');
+  if (code.length < 4 || code.length > 8) return back(req, 'code', next);
 
   // Guessing a six digit code is a five in a million shot per attempt, which is only safe while the
   // attempts are capped. Ten per number per fifteen minutes, and a wider net per source so one
   // machine cannot work through many numbers at once.
   const hash = targetHash(pending.value, process.env.WEB_SESSION_SECRET || '');
   if (await rateLimitedShared(`otpv:t:${hash}`, PER_TARGET_VERIFIES, PER_TARGET_WINDOW_SECONDS * 1000)) {
-    return back(req, 'toomany');
+    return back(req, 'toomany', next);
   }
   if (await rateLimitedShared(`otpv:ip:${clientIp(req)}`, PER_SOURCE_VERIFIES, PER_SOURCE_WINDOW_SECONDS * 1000)) {
-    return back(req, 'toomany');
+    return back(req, 'toomany', next);
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -80,19 +88,19 @@ export async function POST(req: NextRequest) {
           : { type: 'email', email: pending.value, token: code },
       ),
     });
-    if (!res.ok) return back(req, 'code');
+    if (!res.ok) return back(req, 'code', next);
     const json = (await res.json()) as { access_token?: string };
     accessToken = json.access_token || '';
   } catch {
-    return back(req, 'send');
+    return back(req, 'send', next);
   }
-  if (!accessToken) return back(req, 'code');
+  if (!accessToken) return back(req, 'code', next);
 
   // ⚠️ THE IDENTITY COMES FROM SUPABASE, NEVER FROM US. We hand the token straight back to GoTrue
   // and let it say who this is, exactly as every authed route already does. Then we throw the token
   // away: it never reaches the browser, so there is nothing on the page for a script to steal.
   const user = await verifyAccessToken(accessToken);
-  if (!user) return back(req, 'code');
+  if (!user) return back(req, 'code', next);
 
   // The phone is the account key, always. On the email door the verified user already has one, and
   // user.phone is what GoTrue holds for him; on the phone door it is the number we just proved.
@@ -116,12 +124,12 @@ export async function POST(req: NextRequest) {
   const sessionId = newSessionId();
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
   const opened = await createWebSession(user.id, sessionId, expiresAt, remembered);
-  if (!opened) return back(req, 'session');
+  if (!opened) return back(req, 'session', next);
 
   const cookie = sessionCookieValue(sessionId, new Date(), ttlSeconds);
-  if (!cookie) return back(req, 'unavailable');
+  if (!cookie) return back(req, 'unavailable', next);
 
-  const res = NextResponse.redirect(new URL('/app', req.url), 303);
+  const res = NextResponse.redirect(new URL(next, req.url), 303);
   res.cookies.set(
     SESSION_COOKIE,
     cookie,

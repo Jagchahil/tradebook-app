@@ -7,7 +7,7 @@ import {
 } from '../../../../lib/logindoor';
 import {
   PENDING_COOKIE, PENDING_TTL_SECONDS, pendingCookieValue, sessionCookieAttributes,
-  originAllowed, webSessionsConfigured,
+  originAllowed, webSessionsConfigured, safeNext, AFTER_SIGN_IN,
 } from '../../../../lib/websession';
 
 export const runtime = 'nodejs';
@@ -44,14 +44,18 @@ export const runtime = 'nodejs';
 // NO JAVASCRIPT ON THE PAGE THAT POSTS HERE. A plain form, a redirect back, and the whole sign in
 // works with scripting off on a five year old Android. See app/in/page.tsx.
 
-function back(req: NextRequest, reason: string) {
-  return NextResponse.redirect(new URL(`/in?e=${reason}`, req.url), 303);
+// ⚠️ THE DESTINATION SURVIVES AN ERROR TOO. A man who mistypes his address and then loses where he
+// was going has been sent back to the start twice, once by us.
+function back(req: NextRequest, reason: string, next: string) {
+  const q = next === AFTER_SIGN_IN ? '' : `&next=${encodeURIComponent(next)}`;
+  return NextResponse.redirect(new URL(`/in?e=${reason}${q}`, req.url), 303);
 }
 
 // The neutral outcome. Identical for a contact we know, a contact we do not, and a send that
 // failed at the provider. He is asked for the code either way.
-function onward(req: NextRequest, channel: 'sms' | 'email', value: string) {
-  const res = NextResponse.redirect(new URL('/in?step=code', req.url), 303);
+function onward(req: NextRequest, channel: 'sms' | 'email', value: string, next: string) {
+  const q = next === AFTER_SIGN_IN ? '' : `&next=${encodeURIComponent(next)}`;
+  const res = NextResponse.redirect(new URL(`/in?step=code${q}`, req.url), 303);
   res.cookies.set(
     PENDING_COOKIE,
     pendingCookieValue({ channel, value }),
@@ -62,16 +66,21 @@ function onward(req: NextRequest, channel: 'sms' | 'email', value: string) {
 
 export async function POST(req: NextRequest) {
   // SameSite=Lax already refuses a cross site post, but that is the browser's promise. This is ours.
-  if (!originAllowed(req.headers.get('origin'), req.headers.get('host'))) return back(req, 'origin');
-  if (!webSessionsConfigured()) return back(req, 'unavailable');
+  if (!originAllowed(req.headers.get('origin'), req.headers.get('host'))) return back(req, 'origin', AFTER_SIGN_IN);
+  if (!webSessionsConfigured()) return back(req, 'unavailable', AFTER_SIGN_IN);
 
   const form = await req.formData().catch(() => null);
-  if (!form) return back(req, 'bad');
+  if (!form) return back(req, 'bad', AFTER_SIGN_IN);
+
+  // Where he was heading before we asked him to prove who he is. safeNext() allowlists /app and
+  // below and returns the dashboard for everything else, so a hand typed parameter cannot turn our
+  // own login into a redirector. See lib/websession.ts.
+  const next = safeNext(form.get('next'));
 
   // One field, his email or his mobile. lib/logindoor.ts decides which, and refuses anything that
   // is neither before it can cost us a penny.
   const id = readIdentifier(String(form.get('contact') ?? ''));
-  if (!id) return back(req, 'contact');
+  if (!id) return back(req, 'contact', next);
 
   const secret = process.env.WEB_SESSION_SECRET || '';
   const hash = targetHash(id.value, secret);
@@ -80,11 +89,11 @@ export async function POST(req: NextRequest) {
   // whose number is being hammered by someone else must not get three texts a minute.
   if (await rateLimitedShared(`otp:t:${hash}`, PER_TARGET_SENDS, PER_TARGET_WINDOW_SECONDS * 1000)) {
     await logAuthSend(id.channel, hash, 'refused_rate');
-    return back(req, 'toomany');
+    return back(req, 'toomany', next);
   }
   if (await rateLimitedShared(`otp:ip:${clientIp(req)}`, PER_SOURCE_SENDS, PER_SOURCE_WINDOW_SECONDS * 1000)) {
     await logAuthSend(id.channel, hash, 'refused_rate');
-    return back(req, 'toomany');
+    return back(req, 'toomany', next);
   }
 
   // CONTROL 1. Is this contact even ours.
@@ -95,13 +104,13 @@ export async function POST(req: NextRequest) {
   try {
     account = await findContactAccount(id.channel, id.value);
   } catch {
-    return back(req, 'unavailable');
+    return back(req, 'unavailable', next);
   }
 
   if (!account) {
     // Not ours. Nothing is sent, and the screen is identical to a successful send.
     await logAuthSend(id.channel, hash, 'refused_unknown');
-    return onward(req, id.channel, id.value);
+    return onward(req, id.channel, id.value, next);
   }
 
   // 🔴 THE EMAIL DOOR ONLY OPENS ON AN ACCOUNT THAT ALREADY EXISTS, AND THIS IS A SECURITY RULE
@@ -114,7 +123,7 @@ export async function POST(req: NextRequest) {
   // so the phone gets proved first, at least once. After that the email door is open for ever.
   if (id.channel === 'email' && !account.userId) {
     await logAuthSend(id.channel, hash, 'refused_unknown');
-    return onward(req, id.channel, id.value);
+    return onward(req, id.channel, id.value, next);
   }
 
   // CONTROL 2. The daily cap, and this one FAILS CLOSED. See spendCapReached.
@@ -123,7 +132,7 @@ export async function POST(req: NextRequest) {
   // a real customer deserves better than a code that silently never arrives.
   if (await spendCapReached(`otp:daily:${id.channel}`, dailyCapFor(id.channel), SMS_DAILY_WINDOW_SECONDS)) {
     await logAuthSend(id.channel, hash, 'refused_capped');
-    return back(req, 'capped');
+    return back(req, 'capped', next);
   }
 
   // Bind the address to the account we already hold, so GoTrue resolves the email code to the SAME
@@ -135,7 +144,7 @@ export async function POST(req: NextRequest) {
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  if (!url || !anon) return back(req, 'unavailable');
+  if (!url || !anon) return back(req, 'unavailable', next);
 
   // create_user only where there is genuinely no auth user yet, which after the rule above can only
   // be the phone door for someone who finished the web signup. Those people are exactly who the web
@@ -161,5 +170,5 @@ export async function POST(req: NextRequest) {
 
   // Even a failed send goes onward, so a provider outage looks the same as a stranger's number and
   // neither leaks. He types a code that does not work and is told plainly to try again.
-  return onward(req, id.channel, id.value);
+  return onward(req, id.channel, id.value, next);
 }

@@ -8,7 +8,7 @@ import ClientScript from './ClientScript';
 import { filingFaqAnswer, filingMark, bankMark, hmrcFilingLive, bankFeedLive, diaryRowLabel } from '../../lib/features';
 import type { CSSProperties } from 'react';
 import { TRADES } from '../../lib/trades';
-import { A11Y_CSS, THEME_CSS, THEME_SWAP_JS } from '../../lib/tokens';
+import { A11Y_CSS, THEME_CSS, THEME_SWAP_JS, css } from '../../lib/tokens';
 import { FACTS } from '../../lib/taxengine';
 
 // Colours are CSS variables so the whole site themes light and dark from one place. The raw
@@ -129,7 +129,7 @@ export function Ic({ e, size = 24, color = 'currentColor', style }: { e: string;
 // className="mkt" and injects this once via <style>. One source so home,
 // product, and future pages never drift. Colours come from the shared theme
 // variables (SharedHead), aliased here to the extra names these sections use.
-export const MARKETING_CSS = `
+export const MARKETING_CSS = css`
 :root{--panel-2:var(--surface);--line:var(--bd);--teal:#0E8C6E;--teal-tint:#E2F4EF}
 [data-theme="dark"]{--teal:#3FC7A3;--teal-tint:#0F2A22}
 .mkt .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
@@ -868,7 +868,7 @@ export function HeroReport() {
 }
 
 // ---------- shared chrome ----------
-const SHARED_CSS = `${THEME_CSS}
+const SHARED_CSS = css`${THEME_CSS}
 html,body{background:var(--bg)}
 body{transition:background-color .35s ease,color .35s ease}
 *{box-sizing:border-box} body{margin:0}

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { bankFeedLive, filingBadge, alertChannels } from '../lib/features';
+import { css } from '../lib/tokens';
 import {
   INK, PAPER, FONT, SITE, faqs, reviews,
   SharedHead, SiteNav, SiteFooter, StickyCta, HeroReport, Ic,
@@ -45,7 +46,7 @@ export const metadata: Metadata = {
 // Home page bespoke styling. Aliases the shared palette to the extra variable
 // names these sections use, then defines every section class. Colours all come
 // from the shared theme variables, so light and dark just work.
-const HOME_CSS = `
+const HOME_CSS = css`
 :root{--panel-2:var(--surface);--line:var(--bd);--teal:#0E8C6E;--teal-tint:#E2F4EF}
 [data-theme="dark"]{--teal:#3FC7A3;--teal-tint:#0F2A22}
 .home .wrap{max-width:1180px;margin:0 auto;padding:0 24px}

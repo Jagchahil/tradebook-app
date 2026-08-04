@@ -81,8 +81,22 @@ console.log('\n2. Dark inverts by construction, because nothing is a raw colour'
   // lib/apptheme.ts exports INK, PANEL, RIVER and the rest as var(--x). A screen that imports those
   // is correct in both appearances without knowing dark exists. A screen that writes a hex is a
   // white card on a dark page, and no amount of walking would catch it on a light laptop.
-  const rawHex = src.filter((f) => /#[0-9a-fA-F]{6}\b/.test(f.s));
-  ok(`🔴 NO SCREEN WRITES A RAW COLOUR${rawHex.length ? `\n     ${rawHex.map((f) => f.p).join('\n     ')}` : ''}`,
+  // 🔴 THE NAME OF THIS ASSERTION USED TO BE "NO SCREEN WRITES A RAW COLOUR", AND src IS app/app.
+  //
+  // That is the guard-family defect of 4 August in its own suite: a name claiming every screen, a
+  // list holding one directory. It is why components/LeadCapture.tsx wrote the palette out longhand
+  // across eleven public tool pages and nothing said a word, while this line sat green because
+  // app/app happens to contain zero violations and always has.
+  //
+  // The ban stays exactly as strict here, because the signed in app IS held to zero. What changed
+  // is that it now says which screens it means. The wider question, "does any customer facing
+  // surface paint a raw colour", is a ratchet in test/tokens.test.mjs, because the public site has
+  // twenty nine and is not being rewritten this week.
+  //
+  // ⚠️ SIX DIGITS ONLY WAS A SECOND HOLE IN THE SAME LINE: '#fff' is a raw colour and walked past
+  // it. Matching three to six now, same as the appnav rule has always done.
+  const rawHex = src.filter((f) => /#[0-9a-fA-F]{3,6}\b/.test(f.s));
+  ok(`🔴 NO SCREEN UNDER app/app WRITES A RAW COLOUR${rawHex.length ? `\n     ${rawHex.map((f) => f.p).join('\n     ')}` : ''}`,
     rawHex.length === 0);
   const rawRgba = src.filter((f) => /rgba?\(\s*\d/.test(f.s));
   ok(`nor a raw rgb/rgba${rawRgba.length ? `\n     ${rawRgba.map((f) => f.p).join('\n     ')}` : ''}`,

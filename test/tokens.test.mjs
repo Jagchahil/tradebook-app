@@ -315,6 +315,56 @@ for (const [hex, what] of Object.entries(GONE)) {
   ok(`${hex} is gone (${what})`, !unnamed.has(hex.toUpperCase()));
 }
 
+console.log('\n=== a surface that paints a raw colour cannot invert ===\n');
+// 🔴 THE GAP NOTHING WAS ASKING ABOUT, FOUND 4 AUGUST 2026 BY WALKING THE SITE IN DARK.
+//
+// Two colour guards already existed and BOTH were true while the defect shipped:
+//   . the ratchet above counts DISTINCT unnamed colours. Every colour in components/LeadCapture.tsx
+//     is a palette colour, correctly named, so it had nothing to say.
+//   . test/phonewidth.test.mjs bans raw hex outright, but only under app/app, which has ZERO.
+// Neither of them asks the question that actually matters: DOES THIS SURFACE INVERT.
+//
+// components/LeadCapture.tsx renders on eleven public tool pages and wrote the palette's own values
+// out longhand: RIVER_TINT as '#E9F1FA', INK as '#111111', and so on. In light that is identical to
+// the token, to the byte, which is exactly why it survived review. In dark the page went to
+// --bg #0E1116 and the card stayed #E9F1FA: a pale island on a black page, legible but plainly not
+// part of the product. Proven by resolving the variables in a real browser at both settings.
+//
+// ⚠️ A RATCHET, NOT A BAN, AND THE CEILING IS THE HONEST NUMBER. Thirty surfaces paint a raw colour
+// today and twenty nine of them are public marketing pages that are not being rewritten this week.
+// Banning it outright would fail on all of them and be switched off within the day. Counting them
+// and refusing to let the number grow is the promise we can actually keep.
+//
+// ⚠️ RAISING THIS CEILING IS ALWAYS THE WRONG FIX, same rule as the ratchet above. Use a token from
+// lib/apptheme.ts, or edge(ACCENT, n) for a tinted panel's border, which derives from the accent and
+// therefore inverts by construction.
+//
+// The list is DERIVED by walking the tree, never typed. The version of this that named its files
+// would have listed the ones just edited and passed for ever.
+const SURFACE_CEILING = 29;
+const surfaces = [
+  ...walk(path.join(root, 'app')),
+  ...walk(path.join(root, 'components')),
+].filter((f) => f.endsWith('.tsx'));
+const painters = surfaces.filter((f) =>
+  readFileSync(f, 'utf8').split('\n')
+    .filter((l) => !l.trimStart().startsWith('//'))   // a hex in a comment is not painted
+    .some((l) => /#[0-9A-Fa-f]{3,6}\b/.test(l)));
+// ⚠️ COUNT THE SWEEP'S OWN OUTPUT. A walk that returns nothing passes every assertion it never
+// makes, and this one has been wrong about its own scope once already.
+ok(`the surface sweep actually walked something (${surfaces.length} files)`, surfaces.length >= 60);
+if (painters.length > SURFACE_CEILING) {
+  painters.slice(0, 12).forEach((f) => console.log(`        ${path.relative(root, f)}`));
+}
+ok(`surfaces painting a raw colour: ${painters.length}, at or under the ceiling of ${SURFACE_CEILING}`,
+  painters.length <= SURFACE_CEILING);
+// Named individually so it cannot come back while somebody else's file is tidied to stay under.
+ok('components/LeadCapture.tsx paints with tokens, so it inverts on eleven public pages',
+  !painters.some((f) => path.relative(root, f) === path.join('components', 'LeadCapture.tsx')));
+// Three digit hex counts. The phonewidth rule matches six digits only, so '#fff' walked past it.
+ok("and '#fff' counts as a raw colour, because it is one",
+  /#[0-9A-Fa-f]{3,6}\b/.test('background:#fff'));
+
 console.log('\n=== no accent fill carries white text ===\n');
 // 🔴 THE ONE THAT CAUGHT THE DUPLICATE. Fixing .approvebtn in the shared marketing CSS left the
 // home page's own copy of the same rule untouched, because app/page.tsx duplicates it wholesale,

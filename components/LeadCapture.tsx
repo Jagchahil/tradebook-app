@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { leadConsentText, leadDoneLine, leadHeading, leadSub } from '../lib/features';
+import {
+  RIVER, RIVER_DEEP, RIVER_TINT, INK, MUTED, GREEN, GREEN_TINT, RED, PANEL, ON_RIVER, edge,
+} from '../lib/apptheme';
 
 // Reusable, PECR compliant email capture for the free tools. Design rules baked in:
 //  - The tool's value (the result) is shown for free above this, so giving an
@@ -12,16 +15,27 @@ import { leadConsentText, leadDoneLine, leadHeading, leadSub } from '../lib/feat
 //    consent is provable (who, when, what they were told).
 // Drop it into any tool: <LeadCapture source="cis-calculator" resultNote="Refund est £6,400" />
 
-const RIVER = '#1B59A6';
-const RIVER_DEEP = '#134277';
-const RIVER_TINT = '#E9F1FA';
-const INK = '#111111';
-const MUTED = '#5B6470';
-const LINE = '#D4E4F4';
-const GREEN = '#15803D';
-const RED = '#C0392B';  // the brand red, not a second one
+// 🔴 THIS FILE WROTE THE PALETTE OUT LONGHAND AND THEREFORE COULD NOT INVERT. Found 4 August 2026
+// by walking the site in dark at 375px, not by reading it.
+//
+// It carried RIVER = '#1B59A6', RIVER_TINT = '#E9F1FA', INK = '#111111' and five more. Every one of
+// those is the palette's own value, correct to the byte, which is exactly why nobody caught it: in
+// light it renders identically to the token. In dark the page goes to --bg #0E1116 and the card
+// stays #E9F1FA, a pale island on a black page across eleven public tool pages. Legible, and
+// obviously not part of the product.
+//
+// ⚠️ THE TWO GUARDS THAT WERE BOTH TRUE WHILE IT SHIPPED. test/tokens.test.mjs ratchets DISTINCT
+// unnamed colours, and these were all named, so it had nothing to say. test/phonewidth.test.mjs
+// bans raw hex outright but walks app/app, which has none. Neither asked "does this invert". The
+// ratchet that does now lives beside the first one in test/tokens.test.mjs.
+//
+// ⚠️ SO NOTHING HERE IS A COLOUR ANY MORE. Every value below is var(--x) via lib/apptheme.ts and
+// flips with the theme. The two tinted borders use edge(), which derives from the accent, because
+// a fixed border on a flipping panel is the same bug one layer down.
+const LINE = edge(RIVER, 20);
+const LINE_GREEN = edge(GREEN, 20);
 
-// 🔴 FOUR REMINDER PROMISES USED TO BE TYPED IN THIS FILE, AND IT RENDERS ON TWELVE PUBLIC PAGES.
+// 🔴 FOUR REMINDER PROMISES USED TO BE TYPED IN THIS FILE, AND IT RENDERS ON ELEVEN PUBLIC PAGES.
 // The heading, the sub, the thank you, and the tick box a customer's consent is RECORDED from.
 // remindersLive() is false and no channel can send one. Every one of the four now comes from
 // lib/features.ts, where both wordings sit side by side, so the day the flag flips all twelve
@@ -86,7 +100,7 @@ export default function LeadCapture({
 
   if (state === 'done') {
     return (
-      <div style={{ background: '#E7F5EC', border: '1px solid #CFE9D8', borderRadius: 18, padding: '20px 24px', marginTop: 22 }}>
+      <div style={{ background: GREEN_TINT, border: `1px solid ${LINE_GREEN}`, borderRadius: 18, padding: '20px 24px', marginTop: 22 }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: GREEN, marginBottom: 4 }}>You are on the list.</div>
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
           {leadDoneLine()}
@@ -117,12 +131,12 @@ export default function LeadCapture({
           value={email}
           onChange={(ev) => setEmail(ev.target.value)}
           placeholder="you@yourtrade.co.uk"
-          style={{ flex: '1 1 220px', minWidth: 0, border: `1.5px solid ${LINE}`, borderRadius: 11, padding: '13px 14px', fontSize: 15, color: INK, background: '#fff' }}
+          style={{ flex: '1 1 220px', minWidth: 0, border: `1.5px solid ${LINE}`, borderRadius: 11, padding: '13px 14px', fontSize: 15, color: INK, background: PANEL }}
         />
         <button
           type="submit"
           disabled={state === 'sending'}
-          style={{ background: RIVER, color: '#fff', fontSize: 15, fontWeight: 700, padding: '13px 22px', borderRadius: 11, border: 'none', cursor: 'pointer', opacity: state === 'sending' ? 0.7 : 1 }}
+          style={{ background: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 700, padding: '13px 22px', borderRadius: 11, border: 'none', cursor: 'pointer', opacity: state === 'sending' ? 0.7 : 1 }}
         >
           {state === 'sending' ? 'Sending…' : 'Email me my result'}
         </button>

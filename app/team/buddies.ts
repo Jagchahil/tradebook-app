@@ -34,6 +34,7 @@ export const BUDDIES: BuddyDef[] = [
   { key: 'dakiya',    name: 'Dakiya',    role: 'Front Desk · Email',g1: '#2C7A7B', g2: '#48A9AA', status: 'live',   statusWord: 'at the desk',  emblem: 'people',    href: '/team/dakiya',    reportsToList: 'approve' },
   { key: 'khazanchi', name: 'Khazanchi', role: 'CFO · Finance',     g1: '#0E7C86', g2: '#1AA5B0', status: 'live',   statusWord: 'on the numbers',emblem: 'coin',     href: '/team/numbers',   reportsToList: 'none' },
   { key: 'saudagar',  name: 'Saudagar',  role: 'CGO · Growth',      g1: '#E8973A', g2: '#9E7BE0', status: 'live',   statusWord: 'working the funnel', emblem: 'megaphone', href: '/team/growth', reportsToList: 'needs' },
+  { key: 'hoka',      name: 'Hoka',      role: 'CMO · Marketing',   g1: '#B83280', g2: '#D65DB1', status: 'live',   statusWord: 'at the desk', emblem: 'tag',      href: '/team/hoka',    reportsToList: 'approve' },
 ];
 
 export function buddy(key: string): BuddyDef {
@@ -52,6 +53,7 @@ export const BUBBLE: Record<string, string> = {
   dakiya: 'Reads sales@, support@ and info@ three times a day, drafts replies for you to approve.',
   khazanchi: 'Unit economics and margin. Wakes when there’s money.',
   saudagar: 'The whole funnel in one desk: marketing brings people in, the CRM works them to paid.',
+  hoka: 'The accounts, the content calendar, and the testimonials that reach the front door.',
 };
 
 // EVERY social platform Hoka publishes to, once each is connected and approved. Jag: "run up all forms

@@ -348,22 +348,25 @@ ok('the amount is bounded and finite before it goes anywhere',
 // ---------------------------------------------------------------------------------------------
 ok('the capture page posts a plain multipart form',
   /action="\/api\/money\/receipt" method="post" encType="multipart\/form-data"/.test(pageCapture));
-// TWO INPUTS SINCE 5 AUGUST 2026: capture="environment" opens a phone's camera directly, and
-// on an iPhone it SUPPRESSES the photo library and the files chooser, so a plain picker input
-// stands beside it. Different names, because FormData.get returns the first field with a name
-// even when it is empty. Neither is required: the route enforces one of the two instead.
-ok('with a camera input, straight to a phone\'s back camera, and no script',
-  /name="receipt" type="file" accept="image\/\*" capture="environment"/.test(pageCapture)
+// ONE INPUT SINCE 5 AUGUST 2026 (afternoon). The morning shipped a camera input with
+// capture="environment" and a plain picker beside it, then the founder tried the plain
+// picker on an iPhone: it already offers Take a Photo beside the photo library and the
+// files chooser. So the dedicated camera input was a second control doing nothing the
+// first could not, and doc 103 took it off the screen. No capture attribute, and required
+// is back because one input carries the whole form again. The route keeps the receipt
+// then receipt_library fallback so an old open tab with the pair still lands.
+ok('🔴 exactly one file input: plain, named receipt, required, and no script',
+  (codeOnly(pageCapture).match(/type="file"/g) || []).length === 1
+  && /name="receipt" type="file" accept="image\/\*" required className/.test(pageCapture)
   && !/'use client'|onClick|onChange|useState|<script/.test(pageCapture));
-ok('🔴 and a plain picker input beside it, no capture, so photos and files stay offered',
-  /name="receipt_library" type="file" accept="image\/\*" className/.test(pageCapture));
-ok('🔴 neither input is required: the route refuses an empty submission instead',
-  !/required/.test(codeOnly(pageCapture)));
+ok('🔴 and no capture attribute, so the picker keeps every route open on an iPhone',
+  !/capture=/.test(codeOnly(pageCapture))
+  && !/receipt_library/.test(codeOnly(pageCapture)));
 ok('the page says the truth about what happens next',
   /never straight into your figures/.test(pageCapture)
   && /nothing a machine reads counts until you have said it is right/.test(pageCapture));
-ok('and the camera line promises only what every device does',
-  /On a phone, the camera opens itself/.test(pageCapture));
+ok('and the label names both doors the one picker offers',
+  /Photograph the receipt or choose one from your photos or files\./.test(pageCapture));
 ok('an unconfigured build explains itself and draws no button (doc 103 honesty test)',
   /hasClaudeConfig/.test(pageCapture) && /not switched on yet/.test(pageCapture));
 ok('a locked account sees the read only banner here too', /READONLY_TITLE/.test(pageCapture));

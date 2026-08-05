@@ -148,25 +148,26 @@ ok('the empty state speaks like an employee, in his words',
 ok('newest at the bottom: turns, then the #end anchor, then the one composer',
   chatCode.indexOf('messages.map') < chatCode.indexOf('id="end"')
   && chatCode.indexOf('id="end"') < chatCode.indexOf('action="/api/thread"'));
-ok('🔴 no raw id in any URL or field: the composer carries the words, the sealed reference and the two receipt inputs, nothing else',
-  (chatCode.match(/name="/g) || []).length === 4
+ok('🔴 no raw id in any URL or field: the composer carries the words, the sealed reference and the one receipt input, nothing else',
+  (chatCode.match(/name="/g) || []).length === 3
   && /name="q"/.test(chatCode) && /name="c" value=\{ref/.test(chatCode)
-  && /name="receipt"/.test(chatCode) && /name="receipt_library"/.test(chatCode)
+  && /name="receipt"/.test(chatCode)
   && !/[?&]c=\$\{claim\.id/.test(chatCode) && !/[?&]c=\$\{conv/.test(chatCode));
-// A message can be a receipt photograph as well as a question (5 August 2026), and the
-// photograph has two doors, mirroring the capture page's pair: the camera input keeps
-// capture="environment", the picker input drops it, because on an iPhone the attribute
-// suppresses the photo library and the files chooser. Different names, because FormData.get
-// returns the first field with a name even when it is empty. Neither is required, because
-// words alone must keep working exactly as before.
+// A message can be a receipt photograph as well as a question (5 August 2026), through ONE
+// plain file input with no capture attribute: on a phone the picker itself offers Take a
+// Photo beside the photo library and the files chooser, so the morning's dedicated camera
+// input was a second control doing nothing the first could not, and it went the same
+// afternoon. Not required, because words alone must keep working exactly as before. The
+// route keeps its receipt then receipt_library fallback for old open tabs.
 {
   const flat = chatCode.replace(/\s+/g, ' ');
-  ok('🔴 the composer takes a receipt photograph, multipart, with the camera input first',
+  ok('🔴 the composer takes a receipt photograph, multipart, through one plain file input',
     /encType="multipart\/form-data"/.test(chatCode)
-    && /name="receipt" type="file" accept="image\/\*" capture="environment"/.test(flat));
-  ok('🔴 and a plain picker input beside it, no capture, so photos and files stay offered',
-    /name="receipt_library" type="file" accept="image\/\*" className/.test(flat));
-  ok('🔴 and neither input is ever required', !/<input[^>]*required/.test(flat));
+    && (flat.match(/type="file"/g) || []).length === 1
+    && /name="receipt" type="file" accept="image\/\*" className/.test(flat));
+  ok('🔴 with no capture attribute and no second picker, every route stays open on an iPhone',
+    !/capture=/.test(flat) && !/receipt_library/.test(flat));
+  ok('🔴 and it is never required', !/<input[^>]*required/.test(flat));
 }
 ok('the shared app shell and tokens, no raw hex painted',
   /APP_CSS/.test(chatSrc) && /A11Y_CSS/.test(chatSrc) && !/#[0-9a-fA-F]{6}\b/.test(chatCode));

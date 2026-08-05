@@ -169,11 +169,15 @@ export default async function ChatPage({
               aria-label="Your message to Lekhio"
             />
             {/* A message can be a receipt photograph as well as a question, exactly as it can
-                on WhatsApp. The input mirrors the capture page's: capture="environment" sends
-                a phone straight to its back camera, a computer ignores it and offers files,
-                and /api/thread runs the SAME ingest walk the capture route runs, so the row
-                lands waiting for his yes either way. Not required: words alone still work,
-                and the route refuses a message with neither. */}
+                on WhatsApp, and the photograph has TWO doors, the capture page's pair. The
+                camera input keeps capture="environment", which sends a phone straight to its
+                back camera; on an iPhone that same attribute suppresses the photo library and
+                the files chooser, so a second plain input offers those routes. Different
+                names, because FormData.get returns the first field with a name even when it
+                is empty. /api/thread takes the camera field first, then the picker field, and
+                runs the SAME ingest walk the capture route runs, so the row lands waiting for
+                his yes either way. Neither is required: words alone still work, and the route
+                refuses a message with neither words nor photograph. */}
             <label htmlFor="receipt" className="lek-attach">Or photograph a receipt and I will read it</label>
             <input
               id="receipt"
@@ -182,7 +186,16 @@ export default async function ChatPage({
               accept="image/*"
               capture="environment"
               className="lek-field"
-              aria-label="A receipt photograph for Lekhio to read"
+              aria-label="Photograph a receipt with your camera for Lekhio to read"
+            />
+            <label htmlFor="receipt_library" className="lek-attach">Or choose one from your photos or files</label>
+            <input
+              id="receipt_library"
+              name="receipt_library"
+              type="file"
+              accept="image/*"
+              className="lek-field"
+              aria-label="A receipt photograph from your photos or files for Lekhio to read"
             />
             <button type="submit" className="lek-primary">Send</button>
           </form>

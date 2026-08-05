@@ -348,9 +348,17 @@ ok('the amount is bounded and finite before it goes anywhere',
 // ---------------------------------------------------------------------------------------------
 ok('the capture page posts a plain multipart form',
   /action="\/api\/money\/receipt" method="post" encType="multipart\/form-data"/.test(pageCapture));
-ok('with a plain file input, straight to a phone\'s camera, and no script',
-  /type="file" accept="image\/\*" capture="environment" required/.test(pageCapture)
+// TWO INPUTS SINCE 5 AUGUST 2026: capture="environment" opens a phone's camera directly, and
+// on an iPhone it SUPPRESSES the photo library and the files chooser, so a plain picker input
+// stands beside it. Different names, because FormData.get returns the first field with a name
+// even when it is empty. Neither is required: the route enforces one of the two instead.
+ok('with a camera input, straight to a phone\'s back camera, and no script',
+  /name="receipt" type="file" accept="image\/\*" capture="environment"/.test(pageCapture)
   && !/'use client'|onClick|onChange|useState|<script/.test(pageCapture));
+ok('🔴 and a plain picker input beside it, no capture, so photos and files stay offered',
+  /name="receipt_library" type="file" accept="image\/\*" className/.test(pageCapture));
+ok('🔴 neither input is required: the route refuses an empty submission instead',
+  !/required/.test(codeOnly(pageCapture)));
 ok('the page says the truth about what happens next',
   /never straight into your figures/.test(pageCapture)
   && /nothing a machine reads counts until you have said it is right/.test(pageCapture));
@@ -404,6 +412,9 @@ ok('there is a size ceiling and a type allowlist, and they are the walk\'s own',
   && /image\/jpeg/.test(ingest) && /problem=type/.test(routeReceipt) && /problem=big/.test(routeReceipt));
 ok('a multipart form caller gets a 303, never JSON',
   /multipart\/form-data/.test(routeReceipt) && /NextResponse\.redirect\([\s\S]{0,160}?,\s*303\)/.test(routeReceipt));
+ok('🔴 the route reads the camera field first and falls back to the picker field',
+  /form\.get\('receipt'\)/.test(routeReceipt) && /form\.get\('receipt_library'\)/.test(routeReceipt)
+  && /camera\.size > 0 \? camera : library/.test(codeOnly(routeReceipt)));
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 5b. THE WALK, STAGED AND RUN. Real dedupe, real vendor keys, recording storage.
@@ -522,6 +533,108 @@ export async function readVatProfile() { return null; }
     ok('the spoken day reads like a person: 5 August, not an ISO string',
       I.speakDay('2026-08-05') === '5 August' && I.speakDay('2026-12-25') === '25 December'
       && I.speakDay('garbage') === 'garbage');
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 5c. THE TWO FIELDS, STAGED AND RUN. The camera field first, the picker field when the
+// camera one is absent or empty, and nothing at all refused on the old error path. Asserted on
+// what the route DOES with a real FormData, not on the prose around the read.
+// ---------------------------------------------------------------------------------------------
+{
+  const rt = mkdtempSync(path.join(tmpdir(), 'receipt-route-'));
+  const w = (name, src) => writeFileSync(path.join(rt, name), src);
+  w('nextserver.ts', `
+export class NextRequest {}
+export const NextResponse = {
+  json(body, init) { return { kind: 'json', status: (init && init.status) || 200, body }; },
+  redirect(url, status) { return { kind: 'redirect', status, location: String(url) }; },
+};
+`);
+  w('webauth.ts', "export async function sessionUser() { return { id: 'u-1' }; }\n");
+  w('ratelimit.ts', 'export async function rateLimitedShared() { return false; }\n');
+  w('gateserver.ts', `
+export async function gateForUser() { return 'ok'; }
+export function refuseUnentitled() { return { kind: 'json', status: 402, body: { error: 'locked' } }; }
+`);
+  w('claude.ts', `
+export const state = { parsed: null };
+export function hasClaudeConfig() { return true; }
+export async function parseReceipt() { return state.parsed; }
+`);
+  w('aicost.ts', 'export function decideSpend() { return { allowed: true }; }\n');
+  w('margin.ts', 'export function aiCapsFor() { return { killed: false }; }\n');
+  w('waintents.ts', "export function clampReceiptDate(d) { return d || '2026-08-05'; }\n");
+  w('supabase.ts', `
+export const state = { rows: [], writes: [] };
+export async function bumpAiUsage() { return 1; }
+export async function countActiveSubscribers() { return 10; }
+export async function recentUnconfirmedForMatch() { return state.rows; }
+export async function insertTransaction(record) { state.writes.push({ fn: 'insert', record: { ...record } }); }
+export async function mergeIntoTransaction(userId, id, patch) { state.writes.push({ fn: 'merge', id, patch }); return true; }
+export async function storeReceiptImage() { return 'receipts/u-1/2026-08-05-x.jpg'; }
+export async function readVatProfile() { return null; }
+`);
+  // The REAL walk and its REAL matcher, wired to the stubs, exactly as test/thread.test.mjs
+  // stages the same walk for the chat's door.
+  w('dedupe.ts', read('lib/dedupe.ts'));
+  w('memory.ts', read('lib/memory.ts'));
+  w('receiptingest.ts', read('lib/receiptingest.ts').replace(/from '\.\/([a-zA-Z]+)'/g, "from './$1.ts'"));
+  w('route.ts', routeReceipt
+    .replace(/from 'next\/server'/g, "from './nextserver.ts'")
+    .replace(/from '(?:\.\.\/)+lib\/([a-zA-Z]+)'/g, "from './$1.ts'"));
+
+  const RR = await import(pathToFileURL(path.join(rt, 'route.ts')).href);
+  const RDB = await import(pathToFileURL(path.join(rt, 'supabase.ts')).href);
+  const RAI = await import(pathToFileURL(path.join(rt, 'claude.ts')).href);
+
+  const screwfix = {
+    merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
+    transaction_type: 'expense', transaction_date: '2026-08-05', vat: null,
+  };
+  const jpeg = () => new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' });
+  const post = async (fill) => {
+    RDB.state.rows = [];
+    RDB.state.writes.length = 0;
+    RAI.state.parsed = screwfix;
+    const fd = new FormData();
+    fill(fd);
+    const req = {
+      url: 'https://lekhio.app/api/money/receipt',
+      headers: { get: () => 'multipart/form-data' },
+      formData: async () => fd,
+    };
+    const res = await RR.POST(req);
+    return { res, writes: RDB.state.writes };
+  };
+
+  {
+    const { res, writes } = await post((fd) => { fd.append('receipt_library', jpeg(), 'r.jpg'); });
+    ok('🔴 A PHOTOGRAPH FROM THE PICKER FIELD ALONE, NO CAMERA FIELD AT ALL, IS READ AND LANDS WAITING',
+      res.kind === 'redirect' && res.status === 303 && res.location.includes('done=logged')
+      && writes.length === 1 && writes[0].fn === 'insert'
+      && writes[0].record.confirmed === false && writes[0].record.source_type === 'web_image');
+  }
+  {
+    const { res, writes } = await post((fd) => {
+      // What a browser actually posts when he picks from the library: BOTH fields, the camera
+      // one empty. FormData.get on one shared name would return the empty one, which is why
+      // the two inputs carry different names.
+      fd.append('receipt', new Blob([], { type: 'application/octet-stream' }), '');
+      fd.append('receipt_library', jpeg(), 'r.jpg');
+    });
+    ok('🔴 an empty camera field beside a filled picker field still reads the picker one',
+      res.kind === 'redirect' && res.location.includes('done=logged') && writes.length === 1);
+  }
+  {
+    const { res, writes } = await post((fd) => { fd.append('receipt', jpeg(), 'r.jpg'); });
+    ok('the camera field alone still works exactly as before',
+      res.kind === 'redirect' && res.location.includes('done=logged') && writes.length === 1);
+  }
+  {
+    const { res, writes } = await post(() => {});
+    ok('🔴 nothing in either field is refused on the old error path, and nothing is written',
+      res.kind === 'redirect' && res.location.includes('problem=bad') && writes.length === 0);
   }
 }
 

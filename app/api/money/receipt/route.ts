@@ -70,7 +70,15 @@ export async function POST(req: NextRequest) {
   // module's own, so no door can quietly accept what the reader cannot take.
   const form = await req.formData().catch(() => null);
   if (!form) return isForm ? back('problem=bad') : NextResponse.json({ error: 'bad_request' }, { status: 400 });
-  const part = form.get('receipt');
+  // TWO FIELDS, ONE PHOTOGRAPH (5 August 2026). The capture page offers a camera input named
+  // receipt and a plain picker named receipt_library, because capture="environment" suppresses
+  // the photo library and the files chooser on an iPhone, and both routes belong to him. The
+  // two carry DIFFERENT names because FormData.get returns the FIRST field with a name even
+  // when it is empty. The camera field wins when both carry a file, and a submission with
+  // neither is refused here, the same refusal the inputs' old required attribute gave.
+  const camera = form.get('receipt');
+  const library = form.get('receipt_library');
+  const part = camera && typeof camera !== 'string' && camera.size > 0 ? camera : library;
   if (!part || typeof part === 'string' || part.size === 0) {
     return isForm ? back('problem=bad') : NextResponse.json({ error: 'no_file' }, { status: 400 });
   }

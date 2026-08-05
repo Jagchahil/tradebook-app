@@ -148,19 +148,26 @@ ok('the empty state speaks like an employee, in his words',
 ok('newest at the bottom: turns, then the #end anchor, then the one composer',
   chatCode.indexOf('messages.map') < chatCode.indexOf('id="end"')
   && chatCode.indexOf('id="end"') < chatCode.indexOf('action="/api/thread"'));
-ok('🔴 no raw id in any URL or field: the composer carries the words, the sealed reference and the receipt photograph, nothing else',
-  (chatCode.match(/name="/g) || []).length === 3
+ok('🔴 no raw id in any URL or field: the composer carries the words, the sealed reference and the two receipt inputs, nothing else',
+  (chatCode.match(/name="/g) || []).length === 4
   && /name="q"/.test(chatCode) && /name="c" value=\{ref/.test(chatCode)
-  && /name="receipt"/.test(chatCode)
+  && /name="receipt"/.test(chatCode) && /name="receipt_library"/.test(chatCode)
   && !/[?&]c=\$\{claim\.id/.test(chatCode) && !/[?&]c=\$\{conv/.test(chatCode));
-// A message can be a receipt photograph as well as a question (5 August 2026). The input
-// mirrors the capture page's: image only, straight to a phone's back camera, posted multipart,
-// and NOT required, because words alone must keep working exactly as before.
-ok('🔴 the composer takes a receipt photograph, multipart, camera first, and never as a requirement',
-  /encType="multipart\/form-data"/.test(chatCode)
-  && /name="receipt"[\s\S]{0,120}?type="file"/.test(chatCode.replace(/\s+/g, ' '))
-  && /accept="image\/\*"/.test(chatCode) && /capture="environment"/.test(chatCode)
-  && !/name="receipt"[^>]*required/.test(chatCode.replace(/\s+/g, ' ')));
+// A message can be a receipt photograph as well as a question (5 August 2026), and the
+// photograph has two doors, mirroring the capture page's pair: the camera input keeps
+// capture="environment", the picker input drops it, because on an iPhone the attribute
+// suppresses the photo library and the files chooser. Different names, because FormData.get
+// returns the first field with a name even when it is empty. Neither is required, because
+// words alone must keep working exactly as before.
+{
+  const flat = chatCode.replace(/\s+/g, ' ');
+  ok('🔴 the composer takes a receipt photograph, multipart, with the camera input first',
+    /encType="multipart\/form-data"/.test(chatCode)
+    && /name="receipt" type="file" accept="image\/\*" capture="environment"/.test(flat));
+  ok('🔴 and a plain picker input beside it, no capture, so photos and files stay offered',
+    /name="receipt_library" type="file" accept="image\/\*" className/.test(flat));
+  ok('🔴 and neither input is ever required', !/<input[^>]*required/.test(flat));
+}
 ok('the shared app shell and tokens, no raw hex painted',
   /APP_CSS/.test(chatSrc) && /A11Y_CSS/.test(chatSrc) && !/#[0-9a-fA-F]{6}\b/.test(chatCode));
 ok('the nav knows the thread row now', /<AppNav current="\/app\/thread" \/>/.test(chatSrc));
@@ -447,12 +454,15 @@ ok('an empty message writes nothing at all',
   (await T.saveLekhioThreadMessage('alice', 'conv-1', 'user', '   ')) === false && calls.length === 0);
 
 // The route never lets a browser choose a chat by id: the ONLY form fields read are the words,
-// the sealed reference and the receipt photograph, and the id the save uses is the VERIFIED
-// claim's. Three fields since 5 August 2026, when a message became able to be a photograph.
-ok('🔴 the route reads exactly three form fields: q, the sealed reference c, and the receipt',
-  (routeCode.match(/f\.get\(/g) || []).length === 3
+// the sealed reference and the two receipt fields, and the id the save uses is the VERIFIED
+// claim's. Four fields since the evening of 5 August 2026, when the photograph gained its
+// picker door beside the camera one.
+ok('🔴 the route reads exactly four form fields: q, the sealed reference c, and the two receipt fields',
+  (routeCode.match(/f\.get\(/g) || []).length === 4
   && /f\.get\('q'\)/.test(routeCode) && /f\.get\('c'\)/.test(routeCode)
-  && /f\.get\('receipt'\)/.test(routeCode));
+  && /f\.get\('receipt'\)/.test(routeCode) && /f\.get\('receipt_library'\)/.test(routeCode));
+ok('🔴 and the camera field is taken first, the picker field only when the camera one is empty',
+  /asFile\(f\.get\('receipt'\)\) \?\? asFile\(f\.get\('receipt_library'\)\)/.test(routeCode));
 ok('🔴 the reference is verified, kind checked, and checked against the session before any work',
   /verifyChatRef\(ref\)/.test(routeCode)
   && /claim\.kind !== 'chat'/.test(routeCode)
@@ -552,7 +562,7 @@ export function chatRefBelongsTo() { return true; }
     merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
     transaction_type: 'expense', transaction_date: '2026-08-05', vat: null,
   };
-  const post = async ({ q, image, rows = [] }) => {
+  const post = async ({ q, image, library, rows = [] }) => {
     DB.state.rows = rows;
     DB.state.writes.length = 0;
     DB.state.turns.length = 0;
@@ -561,6 +571,7 @@ export function chatRefBelongsTo() { return true; }
     fd.append('c', 'sealed');
     if (q !== undefined) fd.append('q', q);
     if (image) fd.append('receipt', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }), 'r.jpg');
+    if (library) fd.append('receipt_library', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }), 'r.jpg');
     const res = await R.POST({ url: 'https://lekhio.app/api/thread', formData: async () => fd });
     return { res, turns: DB.state.turns, writes: DB.state.writes };
   };
@@ -579,6 +590,14 @@ export function chatRefBelongsTo() { return true; }
     ok('and the 303 lands back in the same chat, at the newest turn',
       res.kind === 'redirect' && res.status === 303 && res.location.includes('/app/thread/chat?c=sealed')
       && res.location.includes('#end'));
+  }
+  {
+    const { turns, writes } = await post({ library: true });
+    ok('🔴 A PHOTOGRAPH FROM THE PICKER FIELD, WITH NO CAMERA FIELD AT ALL, RUNS THE SAME INGEST',
+      writes.length === 1 && writes[0].fn === 'insert'
+      && writes[0].record.user_id === 'u-1' && writes[0].record.amount === -164.78
+      && writes[0].record.confirmed === false && writes[0].record.source_type === 'web_image'
+      && turns.length === 2 && turns[1].content.includes('waiting for your yes'));
   }
   {
     const dupRow = { id: 'r1', vendor: 'Screwfix', amount: -164.78, transaction_date: '2026-08-05', category: 'materials', source_type: 'whatsapp_image' };

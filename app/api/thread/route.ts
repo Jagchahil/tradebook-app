@@ -92,12 +92,17 @@ export async function POST(req: NextRequest) {
   const q = String(f.get('q') ?? '').trim().slice(0, 1000);
 
   // A message can be a RECEIPT PHOTOGRAPH as well as a question (5 August 2026), exactly as it
-  // can on WhatsApp. The photograph goes through the SAME ingest walk as the capture route and
+  // can on WhatsApp. The composer offers the photograph two ways under two names, the camera
+  // input (receipt) and the plain picker (receipt_library), because capture="environment"
+  // suppresses the photo library and the files chooser on an iPhone, and because FormData.get
+  // returns the FIRST field with a name even when it is empty. The camera field wins when both
+  // carry a file. The photograph goes through the SAME ingest walk as the capture route and
   // the webhook (lib/receiptingest.ts), never a copy of it, and the reply written into the chat
   // is what actually happened to it: read and waiting, folded into the bank line, refused as
   // the same receipt twice, or the honest refusal when it could not be read at all.
-  const part = f.get('receipt');
-  const receipt = part && typeof part !== 'string' && part.size > 0 ? part : null;
+  const asFile = (v: FormDataEntryValue | null): File | null =>
+    v && typeof v !== 'string' && v.size > 0 ? v : null;
+  const receipt = asFile(f.get('receipt')) ?? asFile(f.get('receipt_library'));
 
   if (!q && !receipt) return back('&problem=empty');
 

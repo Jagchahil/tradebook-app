@@ -154,15 +154,23 @@ export default async function CapturePage({
           ) : null}
 
           <form action="/api/money/receipt" method="post" encType="multipart/form-data">
-            {/* capture="environment" sends a phone straight to its back camera, because the
-                receipt is in his other hand and a picker he has to steer is a step he did not
-                ask for. A computer ignores the attribute and offers its files as before. The
-                label promises only what both do: the camera line is true on a phone, and on a
-                computer the input is plainly a file chooser. The route holds the real
-                allowlist and refuses anything the reader cannot take, because an accept
-                attribute is a suggestion the browser is free to ignore. */}
-            <label htmlFor="receipt" style={S.label}>The photograph. On a phone, the camera opens itself.</label>
-            <input id="receipt" name="receipt" type="file" accept="image/*" capture="environment" required className="lek-field" />
+            {/* TWO DOORS TO ONE PHOTOGRAPH (5 August 2026). capture="environment" sends a
+                phone straight to its back camera, because the receipt is in his other hand
+                and a picker he has to steer is a step he did not ask for. But on an iPhone
+                the same attribute SUPPRESSES the photo library and the files chooser, so a
+                second plain input offers those routes. The two carry DIFFERENT names because
+                FormData.get returns the first field with a name even when it is empty, and a
+                shared name would let an empty camera field mask a filled picker. Neither is
+                required: the route takes the camera field first, then the picker field, and
+                refuses a submission with neither, the same refusal the old required gave. A
+                computer ignores the capture attribute and both inputs are plainly file
+                choosers. The route holds the real allowlist and refuses anything the reader
+                cannot take, because an accept attribute is a suggestion the browser is free
+                to ignore. */}
+            <label htmlFor="receipt" style={S.label}>Take a photo. On a phone, the camera opens itself.</label>
+            <input id="receipt" name="receipt" type="file" accept="image/*" capture="environment" className="lek-field" />
+            <label htmlFor="receipt_library" style={S.labelGap}>Or choose from your photos or files.</label>
+            <input id="receipt_library" name="receipt_library" type="file" accept="image/*" className="lek-field" />
             <button type="submit" className="lek-primary">Read this receipt</button>
           </form>
 
@@ -204,5 +212,6 @@ const S: Record<string, React.CSSProperties> = {
   small: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '14px 0 0' },
 
   label: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, margin: '4px 0 6px' },
+  labelGap: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, margin: '14px 0 6px' },
   backLink: { display: 'inline-block', color: RIVER, fontWeight: 700, textDecoration: 'none' },
 };

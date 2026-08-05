@@ -19,6 +19,12 @@ const eslintConfig = defineConfig([
     // eslint was the only one of the three that still read it, so a deletion in progress failed the
     // lint over faults in files that are being deleted. The three lists now agree.
     "_to_delete/**",
+    // 🔴 ADDED 5 AUGUST, AFTER IT COST A BROKEN main. Tarball drops from Cowork extract to a
+    // scratch dir under the repo root, and `git add -A` swept 25 of those copies into a commit
+    // that reached origin. tsc then walked them, found 75 phantom errors (they are the same files
+    // one directory deeper, so every relative import misses), and the gate failed on code that
+    // ships correctly. The three lists agree again: .gitignore, tsconfig exclude, and this.
+    "_to_delete_scratch/**",
   ]),
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════

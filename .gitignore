@@ -67,3 +67,6 @@ XX*
 # the deletion and the very next `git add -A` put it straight back, in the same terminal, in the
 # same minute. A rule that only holds while somebody remembers is not a rule.
 app/.node/
+
+# Tarball drops from Cowork land here. Never committed, never type-checked.
+_to_delete_scratch/

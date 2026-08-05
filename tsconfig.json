@@ -27,5 +27,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "_to_delete"]
+  "exclude": ["node_modules", "_to_delete", "_to_delete_scratch"]
 }

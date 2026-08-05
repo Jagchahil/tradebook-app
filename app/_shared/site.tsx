@@ -251,9 +251,17 @@ export const MARKETING_CSS = css`
 .approvebtn{margin-top:4px;background:var(--green);color:var(--on-green);border-radius:12px;padding:11px;font-weight:800;text-align:center;font-size:14px}
 .diconrow{display:flex;align-items:center;gap:12px}
 .dicon{width:44px;height:44px;border-radius:999px;background:var(--river);color:var(--on-river);font-size:20px;display:grid;place-items:center}
-/* The review belt is gone. Reviews render as the static wrapping row at every count, each real
-   quote drawn exactly once. A quote that has to keep moving reads as one you hope nobody stops
-   to check. */
+/* The review belt, back by the founder's call now six real quotes clog the static grid. Four or
+   more quotes loop slowly leftward, pausing on hover; the second copy of the run is aria-hidden
+   so a screen reader hears each quote once, and reduced motion swaps the loop for a plain
+   scrollable row with the duplicate hidden. Under four the static row still renders each card
+   exactly once. Byte identical with HOME_CSS in app/page.tsx; test/sharedcss.test.mjs holds the
+   two copies together. */
+.rev-marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
+.rev-track{display:flex;gap:18px;width:max-content;animation:hslide 40s linear infinite}
+.rev-marquee:hover .rev-track{animation-play-state:paused}
+@keyframes hslide{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion: reduce){.rev-marquee{overflow-x:auto;-webkit-mask-image:none;mask-image:none}.rev-track{animation:none;padding:0 22px}.rev-track .quote[aria-hidden="true"]{display:none}}
 .rev-static{display:flex;flex-wrap:wrap;justify-content:center;gap:18px;padding:0 22px}
 .rev-static .quote{width:min(360px,100%)}
 .quote{width:360px;flex:0 0 auto;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:26px}

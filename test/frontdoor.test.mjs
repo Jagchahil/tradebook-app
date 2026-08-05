@@ -1068,15 +1068,27 @@ console.log('\n🔴 SIX PEOPLE WHO DO NOT EXIST, WITH FIVE STARS EACH, ON THE FR
     && /published=eq\.true/.test(supa));
   ok('the section still renders nothing when there are no reviews',
     /\{reviews\.length > 0 \? \(/.test(homeCode));
-  // ⚠️ ONE REAL QUOTE, RENDERED ONCE, AT EVERY COUNT. The belt duplicated the list so the loop
-  // was seamless, which put one real person on screen twice. The 5 August 2026 brand pass then
-  // deleted the belt outright rather than gating it on a count: reviews render as a static
-  // wrapping row whatever the number, so the duplicate can never come back with the fourth quote.
-  ok('🔴 every review count takes the static path, each quote rendered exactly once',
-    /rev-static/.test(homeCode) && /reviews\.map/.test(homeCode));
-  ok('🔴 and the duplicating belt is gone for good, not merely gated on a count',
-    !/\[\.\.\.reviews, \.\.\.reviews\]/.test(homeCode) && !/rev-marquee/.test(homeCode)
-    && !/reviews\.length >= 4/.test(homeCode));
+  // ⚠️ THE BELT IS BACK, AND IT IS GATED ON A COUNT. The 5 August 2026 brand pass deleted it
+  // because a seamless loop needs a second copy of the run, which at small counts put one real
+  // person visibly on screen twice. Six real quotes later the static grid clogs the page, so the
+  // founder called the belt back with the honesty rules pinned rather than argued: it runs only
+  // at four or more, so the duplicate is never beside its original; every duplicate card is
+  // aria-hidden, so a screen reader hears each quote exactly once; and a reader who asks for
+  // reduced motion gets no animation and no visible duplicate at all, just a plain row.
+  ok('🔴 the belt runs only when four or more quotes make the loop honest',
+    /const reviewBelt = reviews\.length >= 4/.test(homeCode) && /rev-marquee/.test(homeCode)
+    && /rev-track/.test(homeCode));
+  ok('🔴 below four, every quote takes the static path, each card rendered exactly once',
+    /rev-static/.test(homeCode)
+    && /\(reviewBelt \? \[\.\.\.reviews, \.\.\.reviews\] : reviews\)\.map/.test(homeCode));
+  ok('🔴 the duplicate half of the belt is aria-hidden, so no quote is READ twice',
+    /aria-hidden=\{i >= reviews\.length \? true : undefined\}/.test(homeCode));
+  ok('🔴 and reduced motion stops the belt and hides the duplicate, so no quote SHOWS twice',
+    /prefers-reduced-motion/.test(homeCode)
+    && /\.rev-track\{animation:none/.test(homeCode)
+    && /\.rev-track \.quote\[aria-hidden="true"\]\{display:none\}/.test(homeCode));
+  ok('...and the loop pauses under the mouse, so a quote can actually be read',
+    /\.rev-marquee:hover \.rev-track\{animation-play-state:paused\}/.test(homeCode));
   ok('🔴 AND NO STAR GLYPH OR .stars CLASS IS DRAWN ANYWHERE ON THE FRONT DOOR',
     !/★/.test(homeCode) && !/\.stars\{/.test(homeCode) && !/★/.test(codeOnly(site)) && !/\.stars\{/.test(codeOnly(site)));
   ok('...nor the four avatars that stood for nobody',
@@ -1151,6 +1163,62 @@ console.log('\n/product sells the job, not the buttons\n');
     /filingBadge\(\)/.test(code) && /bankBadge\(\)/.test(code));
   ok('and it still picks no fight with accountants',
     !/none of the bill|instead of an accountant|cheaper than an accountant/i.test(code));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nthe chase is a draft he sends, and the launch state is told straight\n');
+//
+// 🔴 "CHASES YOUR INVOICES" WAS ON THE FRONT DOOR AND IT IS NOT WHAT THE PRODUCT DOES. lib/agent.ts
+// is explicit: Rakha DRAFTS the chase and the customer sends it ("You send, never me"), so a hero
+// claiming the chasing is done for him sold an action we deliberately refuse to take. Written and
+// sent are true and stay. The chase is a draft, and the copy now says so everywhere it is sold.
+//
+// ⚠️ Negatives run on codeOnly(), because the comments explaining these removals quote the old
+// wording, which is this file's oldest trap.
+{
+  const home = read('app/page.tsx');
+  const homeCode = codeOnly(home);
+  ok('🔴 THE HERO NEVER CLAIMS IT CHASES THE INVOICES', !/chases? (your|the) invoices/i.test(homeCode));
+  ok('...and sells the draft instead, in the exact words', home.includes('sends your invoices and writes the chase when they run late'));
+  ok('🔴 THE JSON-LD CLAIMS ONLY THE PLATFORM THAT EXISTS: the web, because the apps are not in the stores',
+    /operatingSystem: 'Web'/.test(home) && !/iOS, Android/.test(homeCode));
+
+  const prod = read('app/product/page.tsx');
+  const prodCode = codeOnly(prod);
+  ok('🔴 /product never sells the chase as done for him', !/chases? (your|the) invoices/i.test(prodCode) && !/sent,? and chased/i.test(prodCode));
+  ok('...the invoice card hands him the send button', prod.includes('When one runs late it writes the chase and you press send'));
+  ok('...and the pricing column says drafted, not chased', prod.includes('the chase drafted when they run late'));
+  // 🔴 "One of these speaks first" is only true when a proactive channel can deliver, and today
+  // none can. The line is asked of remindersLive() like every other gated promise.
+  ok('🔴 the helpers lead line is asked of the flag, never typed on the page',
+    /\{helpersLead\(\)\}/.test(prodCode) && !/Software waits to be opened/.test(prodCode));
+  ok('...and lib/features holds BOTH wordings, so the flag flipping needs no rewrite',
+    /Software waits to be opened\. One of these speaks first\./.test(read('lib/features.ts'))
+    && /These two already know the job\./.test(read('lib/features.ts')));
+
+  // 🔴 /compare hardcoded 'soon' for filing and bank while site.tsx asked the flags, so the two
+  // tables could disagree the day either flag flipped. Both now ask the same helpers.
+  const cmp = read('app/compare/page.tsx');
+  ok('🔴 the compare rows ask the flags, never typed',
+    /lekhio: filingMark\(\)/.test(cmp) && /lekhio: bankMark\(\)/.test(cmp));
+  ok('...and the credibility chip flips with the filing flag too', /\{filingChip\(\)\}/.test(cmp));
+  ok('...and the unused FACTS import went with it', !/from '\.\.\/\.\.\/lib\/taxengine'/.test(cmp));
+
+  // 🔴 "MTD-ready today" read as a compliance stamp. What is true is the records half.
+  const mtd = read('app/how-mtd-works/page.tsx');
+  ok('🔴 /how-mtd-works claims the records, not a compliance stamp',
+    !/MTD-ready today/.test(codeOnly(mtd)) && mtd.includes('Digital records kept the MTD way, today'));
+  ok('...and its filing chip comes from the same flag as everywhere else', /\{filingChip\(\)\}/.test(mtd));
+
+  // 🔴 /early-access promised a text no channel sends: /api/waitlist stores the number and sends
+  // at most a welcome EMAIL. The promise is now channel neutral.
+  const early = codeOnly(read('app/early-access/page.tsx'));
+  ok('🔴 /early-access promises no SMS we cannot send', !/text you/i.test(early));
+  ok('...and still promises the thing we can keep', /let[\s\S]{0,20}you know the moment/i.test(early));
+
+  // ⚠️ The terms admitted only sole traders while /start sells to four audiences by name.
+  ok('the terms admit everyone the site sells to',
+    /as a sole trader, in a partnership, as a limited company director or as a landlord/.test(read('app/terms/page.tsx')));
 }
 
 console.log(`\n  ${pass} passed, ${fail} failed`);

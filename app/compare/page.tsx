@@ -7,7 +7,7 @@ import {
   SharedHead, SiteNav, SiteFooter, StickyCta,
   Ic,
 } from '../_shared/site';
-import { FACTS } from '../../lib/taxengine';
+import { filingMark, bankMark, filingChip } from '../../lib/features';
 import { css } from '../../lib/tokens';
 
 export const metadata: Metadata = {
@@ -29,11 +29,11 @@ const GROUPS: { cat: string; rows: Row[] }[] = [
   { cat: 'Tax and MTD', rows: [
     { label: 'CIS split and deduction done for you', lekhio: true, apps: 'higher', diy: false },
     { label: 'Quarterly MTD updates prepared for you', lekhio: true, apps: 'higher', diy: false },
-    { label: 'File straight to HMRC', lekhio: 'soon', apps: true, diy: false },
+    { label: 'File straight to HMRC', lekhio: filingMark(), apps: true, diy: false },
   ] },
   { cat: 'Invoicing and money', rows: [
     { label: 'Create and send an invoice from a text', lekhio: true, apps: 'extra', diy: false },
-    { label: 'Connect your bank, read only', lekhio: 'soon', apps: true, diy: false },
+    { label: 'Connect your bank, read only', lekhio: bankMark(), apps: true, diy: false },
   ] },
   { cat: 'Price and support', rows: [
     { label: 'Instant replies in the same chat', lekhio: true, apps: false, diy: 'maybe' },
@@ -248,7 +248,7 @@ export default function ComparePage() {
           <div className="credrow">
             <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b></span></div>
             <div className="credchip"><span>Built for a phone on site</span></div>
-            <div className="credchip"><span>HMRC recognition <b>in progress</b></span></div>
+            <div className="credchip"><span>{filingChip()}</span></div>
             <div className="credchip"><span>A real UK company</span></div>
           </div>
         </div></div>

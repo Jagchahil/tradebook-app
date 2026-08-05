@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import ClientScript from '../_shared/ClientScript';
 // alertChannels: the email half of this was never true. See lib/features.ts remindersLive().
-import { filingBadge, bankBadge, alertChannels } from '../../lib/features';
+import { filingBadge, bankBadge, alertChannels, helpersLead } from '../../lib/features';
 import { css } from '../../lib/tokens';
 import Link from 'next/link';
 import {
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   // ⚠️ THE SEARCH RESULT HAS TO MATCH THE PAGE. This said "Connect your bank" while the card
   // further down correctly badges that feature BUILT, SWITCHING ON SOON from bankBadge().
   description:
-    'Lekhio keeps the books, works out the tax, chases the invoices and finds what you are owed, then brings it to you to sign off. Receipts, mileage, invoices, CIS and quarterly tax. £12.99 a month, and you approve before anything reaches HMRC.',
+    'Lekhio keeps the books, works out the tax, writes the invoice chase for you and finds what you are owed, then brings it to you to sign off. Receipts, mileage, invoices, CIS and quarterly tax. £12.99 a month, and you approve before anything reaches HMRC.',
 };
 
 const PRODUCT_CSS = css`
@@ -159,7 +159,7 @@ export default function ProductPage() {
             <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📸" color="var(--river)" size={26} /></div><h3>Files your receipts</h3><p>Photograph it and forget it. It reads the shop, the total and the date, and puts it where it belongs.</p></div>
             <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="🎙️" color="var(--on-saffron-tint)" size={26} /></div><h3>Takes it down as you say it</h3><p>&quot;Spent 40 on diesel.&quot; Said out loud with your hands full, or typed. Either way it is logged.</p></div>
             <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}><Ic e="🚐" color="var(--on-green-tint)" size={26} /></div><h3>Claims your mileage</h3><p>&quot;Drove 24 miles.&quot; It knows the rate, does the sum, and puts the claim in for you.</p></div>
-            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><h3>Sends the invoices</h3><p>Written, sent, and chased when they run late, which is the part everybody puts off.</p></div>
+            <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><h3>Sends the invoices</h3><p>Written and sent. When one runs late it writes the chase and you press send, which is the part everybody puts off.</p></div>
             <div className="featcard"><div className="fe" style={{ background: 'var(--saffron-tint)' }}><Ic e="👷" color="var(--on-saffron-tint)" size={26} /></div><h3>Watches your CIS refund</h3><p>Every deduction tracked all year, so the money you are owed back is counted and not forgotten.</p></div>
             <div className="featcard"><div className="fe" style={{ background: 'var(--river-tint)' }}><Ic e="📊" color="var(--river)" size={26} /></div><h3>Tells you what to put by</h3><p>One number, honest, kept up to date as you earn, so January is not a shock.</p></div>
             <div className="featcard"><div className="fe" style={{ background: 'var(--green-tint)' }}><Ic e="📈" color="var(--on-green-tint)" size={26} /></div><h3>Goes looking for money</h3><p>Every legal relief you are entitled to, checked against your own figures, with the working shown.</p></div>
@@ -218,7 +218,10 @@ export default function ProductPage() {
           <div className="center reveal" style={{ marginBottom: 38 }}>
             <div className="eyebrow" style={{ color: 'var(--on-saffron-tint)' }}>Who you are hiring</div>
             <h2 className="h2">Two of them. One answers, one watches.</h2>
-            <p className="lead">Software waits to be opened. One of these speaks first.</p>
+            {/* The wording comes from lib/features.ts helpersLead(): "one of these speaks first"
+                is only true once a proactive channel can deliver, so the line is asked of the
+                remindersLive() flag rather than typed here. */}
+            <p className="lead">{helpersLead()}</p>
           </div>
           <div className="helpers reveal">
             <div className="helpercard ai">
@@ -271,7 +274,7 @@ export default function ProductPage() {
             </ul></div>
             <div className="new"><h3>What it does for it</h3><ul>
               <li><span className="m">&#10003;</span> Every receipt read and filed, all year.</li>
-              <li><span className="m">&#10003;</span> Your invoices written, sent and chased.</li>
+              <li><span className="m">&#10003;</span> Your invoices written and sent, and the chase drafted when they run late.</li>
               <li><span className="m">&#10003;</span> Your tax worked out as you go, not in January.</li>
               <li><span className="m">&#10003;</span> Every relief you are owed, looked for and shown with the working.</li>
             </ul></div>

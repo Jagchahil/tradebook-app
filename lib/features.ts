@@ -87,6 +87,17 @@ export function alertChannels(): string {
     : 'on your dashboard, the next time you open it';
 }
 
+// The lead line over the two helper cards on /product. "One of these speaks first" is only true
+// when a proactive channel can actually deliver an alert. Until then Rakha speaks on the
+// dashboard, the next time he opens it, so the honest contrast today is software you have to
+// learn against an employee that already knows the job. Both wordings side by side, the same
+// discipline as everything else in this file, so the page upgrades itself the day the flag flips.
+export function helpersLead(): string {
+  return remindersLive()
+    ? 'Software waits to be opened. One of these speaks first.'
+    : 'Software waits for you to learn it. These two already know the job.';
+}
+
 // The FAQ answer to "What if I miss the deadline?".
 export function missedDeadlineAnswer(): string {
   const base = 'You get an automatic £100 penalty the day after, even if you owe no tax. After 3 months daily penalties start, and interest is charged on tax paid late.';
@@ -225,6 +236,14 @@ export function filingBadge(): { text: string; live: boolean } {
   return hmrcFilingLive()
     ? { text: 'LIVE', live: true }
     : { text: 'HMRC RECOGNITION IN PROGRESS', live: false };
+}
+
+// The credibility chip on /compare and /how-mtd-works. One wording for both pages, so they
+// cannot drift apart, and it flips with the filing flag like everything else in this file.
+export function filingChip(): string {
+  return hmrcFilingLive()
+    ? 'Files straight to HMRC, live'
+    : 'HMRC recognition in progress';
 }
 
 // The badge on the "Connect your bank" card.

@@ -79,7 +79,7 @@ export default function TermsPage() {
 
         <h2 style={heading}>Your account</h2>
         <ul style={{ paddingLeft: 20, margin: '0 0 14px' }}>
-          <li style={li}>You must be 18 or over and trading as a UK sole trader to use Lekhio.</li>
+          <li style={li}>You must be 18 or over and running your own business or letting property in the UK to use Lekhio, whether as a sole trader, in a partnership, as a limited company director or as a landlord.</li>
           <li style={li}>Keep your account secure and let us know if you think someone else has access.</li>
           <li style={li}>The information you give us should be accurate and your own.</li>
         </ul>

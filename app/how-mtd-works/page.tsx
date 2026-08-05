@@ -7,6 +7,7 @@ import {
   Ic,
  MtdBanner,} from '../_shared/site';
 import { FACTS } from '../../lib/taxengine';
+import { filingChip } from '../../lib/features';
 import LeadCapture from '../../components/LeadCapture';
 import { gbp0 } from '../../lib/money';
 import { css } from '../../lib/tokens';
@@ -338,8 +339,11 @@ export default function HowMtdWorksPage() {
             <p style={{ color: 'rgba(255,255,255,.86)', fontSize: 17, maxWidth: 560, margin: '14px auto 0' }}>While others leave you to it, Lekhio keeps you ready and does the sums properly.</p>
             <div className="credrow">
               <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b></span></div>
-              <div className="credchip"><span>MTD-ready today</span></div>
-              <div className="credchip"><span>HMRC recognition <b>in progress</b></span></div>
+              {/* "MTD-ready today" overread as a compliance stamp. What is true today is the
+                  records half of MTD; the filing half is built and in testing, and the second
+                  chip says where that has got to, from the same flag as everywhere else. */}
+              <div className="credchip"><span>Digital records kept the MTD way, today</span></div>
+              <div className="credchip"><span>{filingChip()}</span></div>
               <div className="credchip"><span>A real UK company</span></div>
             </div>
           </div>

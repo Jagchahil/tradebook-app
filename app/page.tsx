@@ -48,10 +48,10 @@ export const metadata: Metadata = {
   alternates: { canonical: '/' },
   title: 'Lekhio. Your first employee. The one that saves you money.',
   description:
-    `Lekhio is the first employee your business hires. It sorts your receipts, chases your invoices, works out your tax and finds the reliefs you are owed. ${captureLine()}, and it brings you the lot to approve. You press one button. 7 days free.`,
+    `Lekhio is the first employee your business hires. It sorts your receipts, sends your invoices and writes the chase when they run late, works out your tax and finds the reliefs you are owed. ${captureLine()}, and it brings you the lot to approve. You press one button. 7 days free.`,
   openGraph: {
     title: 'Lekhio. Your first employee. The one that saves you money.',
-    description: 'Not software you buy. The first employee your business hires. It sorts the receipts, chases the invoices, works out the tax and finds the reliefs. You press one button. Approve.',
+    description: 'Not software you buy. The first employee your business hires. It sorts the receipts, sends the invoices and writes the chase for the late ones, works out the tax and finds the reliefs. You press one button. Approve.',
     type: 'website',
   },
 };
@@ -132,9 +132,18 @@ const HOME_CSS = css`
 .splitrow:last-child{border:0;font-weight:800}
 .approvebtn{margin-top:4px;background:var(--green);color:var(--on-green);border-radius:12px;padding:11px;font-weight:800;text-align:center;font-size:14px}
 
-/* Reviews render as a static wrapping row at every count, each real quote drawn exactly once.
-   The scrolling belt is gone: a quote that has to keep moving reads as one you hope nobody
-   stops to check. */
+/* The reviews row, in two shapes. Four or more published quotes run as the belt: a slow leftward
+   loop that pauses on hover, seamless because the track carries a second aria-hidden copy of the
+   run. A screen reader hears each quote once. Under four the belt would visibly roll the same
+   person past again, which reads as padding, so small counts keep the static centred row, each
+   card drawn exactly once. A reader who asks for reduced motion gets no animation at all: the
+   duplicate copy is hidden and the row simply scrolls. These rules live twice, here and in
+   MARKETING_CSS, byte identical; test/sharedcss.test.mjs holds the two copies together. */
+.rev-marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
+.rev-track{display:flex;gap:18px;width:max-content;animation:hslide 40s linear infinite}
+.rev-marquee:hover .rev-track{animation-play-state:paused}
+@keyframes hslide{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion: reduce){.rev-marquee{overflow-x:auto;-webkit-mask-image:none;mask-image:none}.rev-track{animation:none;padding:0 22px}.rev-track .quote[aria-hidden="true"]{display:none}}
 .rev-static{display:flex;flex-wrap:wrap;justify-content:center;gap:18px;padding:0 22px}
 .rev-static .quote{width:min(360px,100%)}
 .quote{width:360px;flex:0 0 auto;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:26px}
@@ -193,8 +202,13 @@ export default async function HomePage() {
   // sentence on its own, and test/control.test.mjs proves any screen using one renders both.
   const pair = controlChoice();
   // The reviews the founder has published on the /team desk. The section renders nothing while
-  // the array is empty, and each published quote is drawn exactly once, statically.
+  // the array is empty.
   const reviews = await readPublishedTestimonials();
+  // The belt runs only when there are enough cards to loop honestly. A seamless loop needs a
+  // second copy of the run, and with four or more cards the copy is never on screen beside its
+  // original. With fewer, the same person visibly rolls past again, which reads as padding on
+  // the one section whose entire point is honesty, so small counts keep the static centred row.
+  const reviewBelt = reviews.length >= 4;
   return (
     <main className="home" style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <script
@@ -203,8 +217,8 @@ export default async function HomePage() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@graph': [
-              { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: `The first employee for the UK self employed. It sorts your receipts, chases your invoices, works out your tax and finds the reliefs you are owed, then brings you the lot to approve. ${capture}, and Lekhio keeps you ready for Making Tax Digital. For trades, freelancers, drivers, carers, consultants, limited company directors and landlords.` },
-              { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'iOS, Android, Web', url: SITE, description: `${capture}, and Lekhio sorts every transaction, chases your invoices, finds every legal way to lower your tax, and keeps you ready for Making Tax Digital. Lekhio prepares your figures. You approve them, and nothing reaches HMRC without your yes.`, offers: [ { '@type': 'Offer', price: '12.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '129', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
+              { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: `The first employee for the UK self employed. It sorts your receipts, sends your invoices and writes the chase when they run late, works out your tax and finds the reliefs you are owed, then brings you the lot to approve. ${capture}, and Lekhio keeps you ready for Making Tax Digital. For trades, freelancers, drivers, carers, consultants, limited company directors and landlords.` },
+              { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'Web', url: SITE, description: `${capture}, and Lekhio sorts every transaction, writes the chase when an invoice runs late, finds every legal way to lower your tax, and keeps you ready for Making Tax Digital. Lekhio prepares your figures. You approve them, and nothing reaches HMRC without your yes.`, offers: [ { '@type': 'Offer', price: '12.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '129', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
               { '@type': 'FAQPage', mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
             ],
           }),
@@ -222,7 +236,7 @@ export default async function HomePage() {
         <div className="wrap grid">
           <div>
             <h1>Your first<br />employee.<br />The one that <strong className="hl">saves you money.</strong></h1>
-            <p className="sub">It sorts your receipts, chases your invoices, works out your tax and finds the reliefs you are owed. Then you press one button. Approve.</p>
+            <p className="sub">It sorts your receipts, sends your invoices and writes the chase when they run late, works out your tax and finds the reliefs you are owed. Then you press one button. Approve.</p>
             {/* 🔴 THE LINE THAT CHANGES WHAT WE ARE COMPARED TO, doc 104 section 9, angle 1. And
                 it names nobody, on Jag's call, 3 August 2026: the price does the work on its own,
                 because everybody already knows what the alternative costs. */}
@@ -343,19 +357,21 @@ export default async function HomePage() {
           result of readPublishedTestimonials, filled only by the founder on the auth gated /team
           desk. When he has published nothing this renders NOTHING. No review text lives in this
           file, which is what makes the ban on invented quotes impossible to break by a paste.
-          ⚠️ AND EVERY QUOTE RENDERS EXACTLY ONCE, AT EVERY COUNT. The scrolling belt needed a
-          second copy of the list to loop seamlessly, which put one real person on screen twice.
-          The belt is gone. A static wrapping row, one card per human being.
+          ⚠️ ONE REAL QUOTE IS NEVER READ TWICE. The belt needs a second copy of the run to loop
+          seamlessly, so every duplicate card carries aria-hidden and a screen reader hears each
+          person once. Reduced motion stops the loop and hides the duplicates outright. Under
+          four quotes the belt would visibly roll the same person past again, so small counts
+          keep the static row, each card drawn exactly once. See the note on reviewBelt above.
           ═══════════════════════════════════════════════════════════════════════════════════════ */}
       {reviews.length > 0 ? (
         <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
           <div className="wrap">
             <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">In their own words.</h2></div>
           </div>
-          <div className="reveal">
-            <div className="rev-static">
-              {reviews.map((r, i) => (
-                <div className="quote" key={i}>
+          <div className={reviewBelt ? 'rev-marquee reveal' : 'reveal'}>
+            <div className={reviewBelt ? 'rev-track' : 'rev-static'}>
+              {(reviewBelt ? [...reviews, ...reviews] : reviews).map((r, i) => (
+                <div className="quote" key={i} aria-hidden={i >= reviews.length ? true : undefined}>
                   <div className="rate" role="img" aria-label={`${r.rating} out of 5`}>
                     {Array.from({ length: 5 }).map((_, s) => (
                       <svg key={s} viewBox="0 0 20 20" aria-hidden="true" style={{ fill: s < r.rating ? 'var(--saffron)' : 'var(--line)' }}>

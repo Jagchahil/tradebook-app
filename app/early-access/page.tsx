@@ -61,7 +61,7 @@ export default function EarlyAccessPage() {
           <div style={styles.tick}>✓</div>
           <h1 style={styles.heading}>You&apos;re on the list.</h1>
           <p style={styles.sub}>
-            We&apos;ll text you when Lekhio is ready for you. Keep your phone nearby.
+            We&apos;ll let you know the moment Lekhio is ready for you.
           </p>
         </div>
       </main>
@@ -76,8 +76,8 @@ export default function EarlyAccessPage() {
 
         <h1 style={styles.heading}>Get early access.</h1>
         <p style={styles.sub}>
-          Lekhio opens in your browser, with nothing to install. Drop your number and we&apos;ll text
-          you the moment it&apos;s live. No app download. No forms. Just text it.
+          Lekhio opens in your browser, with nothing to install. Drop your number and we&apos;ll let
+          you know the moment it&apos;s live. No app download. No forms. Just text it.
         </p>
 
         <form onSubmit={handleSubmit} style={styles.form}>

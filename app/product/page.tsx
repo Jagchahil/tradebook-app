@@ -72,6 +72,18 @@ const PRODUCT_CSS = css`
 .helpercard .hname{font-size:12.5px;color:var(--tx-mut);font-style:italic}
 /* Content is visible by default; motion is an enhancement, never a gate. */
 .mkt .reveal{opacity:1;transform:none}
+/* The phone pass. This page's own rules outrank the shared mobile block (they come later in the
+   cascade), so the ones that need to compress at phone width are compressed here. */
+@media(max-width:640px){
+.mkt .hero{padding:34px 0 10px}
+.mkt .hero .sub{font-size:17px;margin:16px auto 22px}
+.helpercard{padding:20px}
+.helpercard p{font-size:14px}
+.fstage{min-height:0}
+.ftext h3{font-size:21px}
+.ftext p{font-size:15px}
+.compliance{padding:14px 16px;gap:10px 20px}
+}
 `;
 
 const PRODUCT_JS = `
@@ -124,7 +136,7 @@ export default function ProductPage() {
         <div className="wrap">
           <span className="pill"><span className="dot" /> Your first employee</span>
           <h1 style={{ marginTop: 20 }}>Somebody to do<br />the paperwork.</h1>
-          <p className="sub">Lekhio is the first person your business hires. It keeps the books, works out the tax, finds what you are owed, and brings you the answer. You say yes. It costs £12.99 a month.</p>
+          <p className="sub">Lekhio is the first person your business hires. It keeps the books, works out the tax and finds what you are owed. You say yes. £12.99 a month.</p>
           <div className="cta-row"><Link href="/start" className="btn primary">Start free</Link><Link href="/pricing" className="btn ghost">See pricing</Link></div>
           <div style={{ fontSize: 13.5, color: 'var(--tx-mut)', marginTop: 12 }}>7 days free, no card. Cancel in one tap.</div>
         </div>
@@ -206,14 +218,14 @@ export default function ProductPage() {
           <div className="center reveal" style={{ marginBottom: 38 }}>
             <div className="eyebrow" style={{ color: 'var(--on-saffron-tint)' }}>Who you are hiring</div>
             <h2 className="h2">Two of them. One answers, one watches.</h2>
-            <p className="lead">Software waits to be opened. One of these speaks first, which is the difference between a tool and somebody working for you.</p>
+            <p className="lead">Software waits to be opened. One of these speaks first.</p>
           </div>
           <div className="helpers reveal">
             <div className="helpercard ai">
               <div className="hic"><Ic e="📊" color="var(--river)" size={26} /></div>
               <h3>Puchio</h3>
               <div className="htag">Answers when you ask</div>
-              <p>Your AI tax helper, in the chat. Ask anything about your tax, expenses, CIS, VAT or your own numbers, and get a straight answer in plain English, in seconds. No jargon, no waiting days for a reply.</p>
+              <p>Ask anything about your tax, expenses, CIS, VAT or your own numbers. A straight answer in plain English, in seconds. No jargon, no queue.</p>
               <p className="hname">Puchio comes from puchh: ask. Go on, puchho.</p>
             </div>
             <div className="helpercard rakha">

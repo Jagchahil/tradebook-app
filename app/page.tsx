@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { bankFeedLive, filingBadge, alertChannels } from '../lib/features';
+import { bankFeedLive, filingBadge } from '../lib/features';
 import { css } from '../lib/tokens';
 import { controlChoice } from '../lib/control';
 import { readPublishedTestimonials } from '../lib/supabase';
@@ -101,12 +101,19 @@ const HOME_CSS = css`
 .hero .micro{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:13.5px;color:var(--tx-mut)}
 @media(max-width:900px){.hero .grid{grid-template-columns:1fr;gap:34px;text-align:center}.cta-row,.hero .micro{justify-content:center}.hero p.sub,.hero p.vs{margin-inline:auto}}
 
-/* The argument. One heading, the deal, the control pair, one ask. */
+/* The argument. One heading, one lead line, the deal as three rows he can look at rather than
+   read, the control pair, one ask. Same 2px border language and 16px radius as every card. */
 .argbody{font-size:17px;line-height:1.65;color:var(--tx);max-width:680px;margin:18px 0 0}
 .argquiet{font-size:15.5px;line-height:1.65;color:var(--tx-mut);max-width:680px;margin:14px 0 0}
-.argrule{margin-top:26px;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:22px 24px;max-width:680px}
-.argrule .t{font-size:17px;font-weight:800;margin:0 0 10px}
+.argdeal{margin-top:20px;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:6px 20px 16px;max-width:680px}
+.argdeal .dealrow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line);font-size:16px;font-weight:700}
+.argdeal .dealn{flex:0 0 26px;height:26px;border-radius:999px;background:var(--river-tint);color:var(--river-deep);display:grid;place-items:center;font-size:13px;font-weight:900}
+[data-theme="dark"] .argdeal .dealn{color:var(--river)}
+.argdeal .dealseal{font-size:15px;font-weight:800;color:var(--tx);margin:13px 0 0}
+.argrule{margin-top:20px;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:18px 20px;max-width:680px}
+.argrule .t{font-size:17px;font-weight:800;margin:0 0 8px}
 .argrule p{font-size:14.5px;line-height:1.6;color:var(--tx-mut);margin:8px 0 0}
+@media(max-width:640px){.argbody{font-size:15.5px;margin-top:14px}.argquiet{font-size:14px}.argdeal .dealrow{padding:11px 0;font-size:15px}.argrule{padding:16px 18px}.argrule p{font-size:14px}}
 
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
 @media(max-width:760px){.steps{grid-template-columns:1fr;gap:30px}}
@@ -153,6 +160,29 @@ const HOME_CSS = css`
 .final h2{font-size:clamp(28px,4.4vw,44px);color:#fff;margin:0}
 .final p{color:rgba(255,255,255,.86);font-size:18px;margin:14px auto 26px;max-width:460px}
 .final .micro-note{color:rgba(255,255,255,.8)}
+/* ── The phone pass, 5 August 2026. Jag: people do not want to spend time reading, they want to
+   look at things. Under 640px the page flows card to card: sections close up, the leads drop a
+   size, and under 480px every h2 lands as a punch rather than a wall. These rules live twice,
+   here and in MARKETING_CSS, byte identical apart from the scope; test/sharedcss.test.mjs holds
+   the two copies together. */
+@media(max-width:640px){
+.home section{padding:38px 0}
+.home .hero{padding:34px 0 12px}
+.home .lead{font-size:16px}
+.hero p.sub{font-size:17px}
+.dtext h3{font-size:21px}
+.dtext p{font-size:15px}
+.quote{padding:20px}
+.final{padding:40px 20px}
+.drow{gap:16px;margin:0 0 30px}
+.steps{gap:22px}
+}
+@media(max-width:480px){
+.home .h2{font-size:24px;line-height:1.15;letter-spacing:-.025em}
+.hero h1{font-size:clamp(34px,9.6vw,40px)}
+.final h2{font-size:24px}
+.pamt{font-size:44px}
+}
 `;
 
 export default async function HomePage() {
@@ -192,7 +222,7 @@ export default async function HomePage() {
         <div className="wrap grid">
           <div>
             <h1>Your first<br />employee.<br />The one that <strong className="hl">saves you money.</strong></h1>
-            <p className="sub">It sorts your receipts, chases your invoices, works out your tax and finds the reliefs you are owed. Then it brings you the lot and you press one button. Approve.</p>
+            <p className="sub">It sorts your receipts, chases your invoices, works out your tax and finds the reliefs you are owed. Then you press one button. Approve.</p>
             {/* 🔴 THE LINE THAT CHANGES WHAT WE ARE COMPARED TO, doc 104 section 9, angle 1. And
                 it names nobody, on Jag's call, 3 August 2026: the price does the work on its own,
                 because everybody already knows what the alternative costs. */}
@@ -215,11 +245,19 @@ export default async function HomePage() {
         <div className="wrap">
           <div className="reveal" style={{ maxWidth: 760, margin: '0 auto' }}>
             <h2 className="h2">Any app that says it will do your tax for you is lying to you.</h2>
-            <p className="argbody">HMRC holds you responsible. It always has. So Lekhio prepares it, shows you the working, and you press approve. That is the deal, and it never changes.</p>
+            <p className="argbody">HMRC holds you responsible. It always has.</p>
+            {/* The deal, as three rows a man can look at rather than a paragraph he has to read.
+                Jag, 5 August 2026: people do not want to spend time reading. The sentences are the
+                same deal the old paragraph carried, and the seal line under them is unchanged. */}
+            <div className="argdeal">
+              <div className="dealrow"><span className="dealn">1</span>Lekhio prepares it.</div>
+              <div className="dealrow"><span className="dealn">2</span>It shows you the working.</div>
+              <div className="dealrow"><span className="dealn">3</span>You press approve.</div>
+              <p className="dealseal">That is the deal, and it never changes.</p>
+            </div>
             <p className="argbody">You always know your number. What you made, what you spent, what to put by.</p>
-            {/* Puchio and Rakha in one line. Their full cards live on /product, and the channel
-                Rakha uses is chosen by lib/features.ts, never typed here. */}
-            <p className="argquiet">Two of them work at it all year. Puchio answers the second you ask, so you never guess at what you can claim, and Rakha watches your figures and flags what it finds {alertChannels()}. Meet them both on the <Link href="/product" style={{ color: 'var(--river)', fontWeight: 700 }}>product page</Link>.</p>
+            {/* Puchio and Rakha in one line. Their full cards live on /product. */}
+            <p className="argquiet">Two of them work at it all year. Puchio answers, Rakha watches. Meet them both on the <Link href="/product" style={{ color: 'var(--river)', fontWeight: 700 }}>product page</Link>.</p>
             <div className="argrule">
               <p className="t">Nothing enters your books that you did not put there.</p>
               <p>{pair.costs}</p>
@@ -244,8 +282,8 @@ export default async function HomePage() {
               which needs a provider we do not have. All three of these work the moment he signs
               up, and none of them waits on anybody else's approval. */}
           <div className="steps reveal">
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--river),var(--river-deep))', boxShadow: '0 12px 26px rgba(27,89,166,.32)' }}>1</div><h3>Snap it, say it, or import it</h3><p className="mut" style={{ fontSize: 15 }}>A photo of a receipt, a line of plain words, or a statement exported straight from your bank. Whatever is quickest with one hand on the ladder.</p></div>
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--saffron),var(--saffron-deep))', boxShadow: '0 12px 26px rgba(224,163,62,.32)' }}>2</div><h3>It finds your money</h3><p className="mut" style={{ fontSize: 15 }}>It reads the shop, the total and the date, files it in the right category, claims the reliefs you are owed, and keeps your tax ready as you go.</p></div>
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--river),var(--river-deep))', boxShadow: '0 12px 26px rgba(27,89,166,.32)' }}>1</div><h3>Snap it, say it, or import it</h3><p className="mut" style={{ fontSize: 15 }}>A photo of a receipt, a line of plain words, or a statement straight from your bank.</p></div>
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--saffron),var(--saffron-deep))', boxShadow: '0 12px 26px rgba(224,163,62,.32)' }}>2</div><h3>It finds your money</h3><p className="mut" style={{ fontSize: 15 }}>It reads it, files it, claims the reliefs you are owed, and keeps your tax ready as you go.</p></div>
             <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--green),#0F5C2E)', boxShadow: '0 12px 26px rgba(21,128,61,.32)' }}>3</div><h3>You approve</h3><p className="mut" style={{ fontSize: 15 }}>Your figures sit there ready. You check them and send them. Nothing reaches HMRC without your yes.</p></div>
           </div>
         </div>
@@ -264,7 +302,7 @@ export default async function HomePage() {
           <div className="drow reveal">
             <div className="dtext">
               <h3>It finds you legal ways to pay less.</h3>
-              <p>This is the job. Lekhio reads your own numbers and surfaces the real reliefs you are entitled to: use of home, mileage, kit timing, a pension to step out of the 40% band. The legitimate ones only, and always your call. Anyone can file a return. This finds the money inside it.</p>
+              <p>Lekhio reads your own numbers and surfaces the real reliefs you are entitled to: use of home, mileage, a pension to step out of the 40% band. The legitimate ones only, and always your call. Anyone can file a return. This finds the money inside it.</p>
             </div>
             <div className="dvis">
               <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>WAYS TO SAVE · AN EXAMPLE</div>
@@ -281,7 +319,7 @@ export default async function HomePage() {
           <div className="drow flip reveal">
             <div className="dtext">
               <h3>Prepared for you. Sent by you.</h3>
-              <p>Your quarterly figures sit there ready. You check them and you send them. Nothing reaches HMRC without your yes. That is the line we never cross.{filing.live ? '' : ' Filing straight from Lekhio is coming, and our HMRC recognition is in progress. Until it lands, Lekhio does all the preparation so filing takes minutes.'}</p>
+              <p>Your quarterly figures sit there ready. You check them and you send them. Nothing reaches HMRC without your yes. That is the line we never cross.{filing.live ? '' : ' Filing straight from Lekhio is coming, and our HMRC recognition is in progress. Until it lands, Lekhio prepares everything so filing takes minutes.'}</p>
             </div>
             <div className="dvis">
               <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>Q2 SUMMARY · READY TO APPROVE</div>

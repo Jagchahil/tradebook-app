@@ -70,6 +70,15 @@ details.faq summary::-webkit-details-marker{display:none}
 details.faq .fp{width:26px;height:26px;border-radius:999px;background:var(--river-tint);color:var(--river);display:grid;place-items:center;font-size:17px;transition:transform .25s}
 details.faq[open] .fp{transform:rotate(45deg)}
 details.faq .fa{font-size:14.5px;color:var(--tx-mut);margin-top:12px;line-height:1.6}
+/* The phone pass. This page's own rules outrank the shared mobile block (they come later in the
+   cascade), so the ones that need to compress at phone width are compressed here. */
+@media(max-width:640px){
+.mkt .hero{padding:34px 0 6px}
+.pricebig{padding:26px 20px}
+.pamt{font-size:46px}
+.cred{padding:32px 20px}
+.stack{padding:8px 16px 16px}
+}
 `;
 
 const PRICING_JS = `
@@ -106,7 +115,9 @@ export default function PricingPage() {
         <div className="wrap">
           <span className="pill"><span className="dot" /> One price, everything in</span>
           <h1 style={{ marginTop: 20 }}>£12.99 a month.<br />That is the whole conversation.</h1>
-          <p className="sub" style={{ maxWidth: 540, margin: '20px auto 0', fontSize: 20, color: 'var(--tx-mut)' }}>No receipt limits. No tiers. No hidden fees. Every plan starts with 7 days free, no card needed.</p>
+          {/* No inline font size: it outranked every stylesheet, so the phone pass could never
+              reach it. The size comes from .hero p.sub like every other subhead. */}
+          <p className="sub" style={{ maxWidth: 540, margin: '20px auto 0' }}>No receipt limits. No tiers. No hidden fees. Every plan starts with 7 days free, no card needed.</p>
         </div>
       </section>
 

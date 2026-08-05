@@ -329,6 +329,29 @@ export const MARKETING_CSS = css`
    on with self-triggering CSS animations, never gated behind the reveal script,
    so a page can never render blank. */
 .mkt .reveal{opacity:1;transform:none}
+/* ── The phone pass, 5 August 2026. Jag: people do not want to spend time reading, they want to
+   look at things. Under 640px the page flows card to card: sections close up, the leads drop a
+   size, and under 480px every h2 lands as a punch rather than a wall. These rules live twice,
+   here and in HOME_CSS, byte identical apart from the scope; test/sharedcss.test.mjs holds the
+   two copies together. */
+@media(max-width:640px){
+.mkt section{padding:38px 0}
+.mkt .hero{padding:34px 0 12px}
+.mkt .lead{font-size:16px}
+.hero p.sub{font-size:17px}
+.dtext h3{font-size:21px}
+.dtext p{font-size:15px}
+.quote{padding:20px}
+.final{padding:40px 20px}
+.drow{gap:16px;margin:0 0 30px}
+.steps{gap:22px}
+}
+@media(max-width:480px){
+.mkt .h2{font-size:24px;line-height:1.15;letter-spacing:-.025em}
+.hero h1{font-size:clamp(34px,9.6vw,40px)}
+.final h2{font-size:24px}
+.pamt{font-size:44px}
+}
 `;
 
 // ---------- content data ----------
@@ -857,10 +880,15 @@ export function AppInv() {
 // white; the --on-* variable already knows which ink each theme needs.
 // No .phone float any more: the report sits still, like a report. The border is the app shell's
 // GLASS weight, 2px, so the card on the front door matches the product it sells.
+// ⚠️ UNDER 900px THE CARD CENTRES ITSELF. Once the hero grid stacks, the copy above it is centred
+// and a fixed 320px card hugging the left edge reads as a layout mistake on a phone. The rule
+// lives in this component's own style block (no CSS comment in it: the literal is untagged), and
+// desktop keeps the card where the two column grid puts it.
 export function HeroReport() {
   return (
-    <div style={{ width: 320, maxWidth: '100%', backgroundColor: PANEL, borderRadius: 16, border: `2px solid ${LINE}`, boxShadow: '0 30px 70px rgba(17,17,17,.16)', overflow: 'hidden' }}>
+    <div className="hr-card" style={{ width: 320, maxWidth: '100%', backgroundColor: PANEL, borderRadius: 16, border: `2px solid ${LINE}`, boxShadow: '0 30px 70px rgba(17,17,17,.16)', overflow: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: reportCss + `
+@media(max-width:900px){.hr-card{margin-inline:auto}}
 .hr-top{border-bottom:1px solid var(--bd);padding:15px 18px}
 .hr-eye{font-size:10.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--tx-mut)}
 .hr-h{font-size:16px;font-weight:800;color:var(--tx);margin-top:3px}

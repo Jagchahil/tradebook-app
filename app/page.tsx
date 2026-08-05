@@ -188,6 +188,8 @@ const HOME_CSS = css`
 .rev-track{display:flex;gap:18px;width:max-content;animation:hslide 44s linear infinite}
 .rev-marquee:hover .rev-track{animation-play-state:paused}
 @keyframes hslide{to{transform:translateX(-50%)}}
+.rev-static{display:flex;flex-wrap:wrap;justify-content:center;gap:18px;padding:0 22px}
+.rev-static .quote{width:min(360px,100%)}
 .quote{width:360px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px}
 .rate{display:flex;gap:3px;margin-bottom:12px}
 .rate svg{width:15px;height:15px;display:block}
@@ -241,6 +243,13 @@ export default async function HomePage() {
   // The reviews the founder has published on the /team desk. Named `reviews` so the guard shape
   // below is unchanged: the section still renders nothing while the array is empty.
   const reviews = await readPublishedTestimonials();
+  // ⚠️ ONE REAL QUOTE MUST NEVER APPEAR TWICE. The scrolling belt duplicates the list because a
+  // seamless loop needs a second copy, and with four or more cards the copy is never on screen
+  // beside its original. With fewer, the same person visibly rolls past again, which reads as
+  // padding on the one section whose entire point is honesty. So small counts render each card
+  // exactly once, in a static centred row, and the belt only runs when there are enough cards
+  // to need it.
+  const reviewBelt = reviews.length >= 4;
   return (
     <main className="home" style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <script
@@ -578,9 +587,11 @@ export default async function HomePage() {
           <div className="wrap">
             <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">In their own words.</h2></div>
           </div>
-          <div className="rev-marquee reveal">
-            <div className="rev-track">
-              {[...reviews, ...reviews].map((r, i) => (
+          {/* The belt when there are enough cards to loop honestly, a static centred row when
+              there are not. See the note on `reviewBelt` above: one real quote, rendered once. */}
+          <div className={reviewBelt ? 'rev-marquee reveal' : 'reveal'}>
+            <div className={reviewBelt ? 'rev-track' : 'rev-static'}>
+              {(reviewBelt ? [...reviews, ...reviews] : reviews).map((r, i) => (
                 <div className="quote" key={i} aria-hidden={i >= reviews.length ? true : undefined}>
                   <div className="rate" role="img" aria-label={`${r.rating} out of 5`}>
                     {Array.from({ length: 5 }).map((_, s) => (

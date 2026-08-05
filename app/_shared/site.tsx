@@ -256,6 +256,8 @@ export const MARKETING_CSS = css`
 .rev-track{display:flex;gap:18px;width:max-content;animation:hslide 44s linear infinite}
 .rev-marquee:hover .rev-track{animation-play-state:paused}
 @keyframes hslide{to{transform:translateX(-50%)}}
+.rev-static{display:flex;flex-wrap:wrap;justify-content:center;gap:18px;padding:0 22px}
+.rev-static .quote{width:min(360px,100%)}
 .quote{width:360px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px}
 .rate{display:flex;gap:3px;margin-bottom:12px}
 .rate svg{width:15px;height:15px;display:block}

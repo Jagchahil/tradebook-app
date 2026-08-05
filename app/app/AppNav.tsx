@@ -50,6 +50,12 @@ export interface NavSection { href: string; label: string; items: NavItem[] }
 // do that: it has to be findable, and findable is not the same as visible.
 export const SECTIONS: ReadonlyArray<NavSection> = [
   { href: '/app', label: 'Overview', items: [] },
+  // THE FEED, 5 August 2026. The record of what Lekhio has been doing: receipts read, entries
+  // filed or waiting, questions answered, Rakha's nudges, newest first. It sits beside Overview
+  // as a primary surface because the two answer the two daily glances: what do I owe, and what
+  // has my employee done. What it replaced to earn the room: nothing was added to Overview,
+  // which is the point. The events used to have no surface at all.
+  { href: '/app/feed', label: 'Feed', items: [] },
   {
     href: '/app/money',
     label: 'Money',

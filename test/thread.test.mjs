@@ -148,10 +148,19 @@ ok('the empty state speaks like an employee, in his words',
 ok('newest at the bottom: turns, then the #end anchor, then the one composer',
   chatCode.indexOf('messages.map') < chatCode.indexOf('id="end"')
   && chatCode.indexOf('id="end"') < chatCode.indexOf('action="/api/thread"'));
-ok('🔴 no raw id in any URL or field: the composer carries the words and the sealed reference, nothing else',
-  (chatCode.match(/name="/g) || []).length === 2
+ok('🔴 no raw id in any URL or field: the composer carries the words, the sealed reference and the receipt photograph, nothing else',
+  (chatCode.match(/name="/g) || []).length === 3
   && /name="q"/.test(chatCode) && /name="c" value=\{ref/.test(chatCode)
+  && /name="receipt"/.test(chatCode)
   && !/[?&]c=\$\{claim\.id/.test(chatCode) && !/[?&]c=\$\{conv/.test(chatCode));
+// A message can be a receipt photograph as well as a question (5 August 2026). The input
+// mirrors the capture page's: image only, straight to a phone's back camera, posted multipart,
+// and NOT required, because words alone must keep working exactly as before.
+ok('🔴 the composer takes a receipt photograph, multipart, camera first, and never as a requirement',
+  /encType="multipart\/form-data"/.test(chatCode)
+  && /name="receipt"[\s\S]{0,120}?type="file"/.test(chatCode.replace(/\s+/g, ' '))
+  && /accept="image\/\*"/.test(chatCode) && /capture="environment"/.test(chatCode)
+  && !/name="receipt"[^>]*required/.test(chatCode.replace(/\s+/g, ' ')));
 ok('the shared app shell and tokens, no raw hex painted',
   /APP_CSS/.test(chatSrc) && /A11Y_CSS/.test(chatSrc) && !/#[0-9a-fA-F]{6}\b/.test(chatCode));
 ok('the nav knows the thread row now', /<AppNav current="\/app\/thread" \/>/.test(chatSrc));
@@ -437,11 +446,13 @@ reset([]);
 ok('an empty message writes nothing at all',
   (await T.saveLekhioThreadMessage('alice', 'conv-1', 'user', '   ')) === false && calls.length === 0);
 
-// The route never lets a browser choose a chat by id: the ONLY form fields read are the words
-// and the sealed reference, and the id the save uses is the VERIFIED claim's.
-ok('🔴 the route reads exactly two form fields, q and the sealed reference c',
-  (routeCode.match(/f\.get\(/g) || []).length === 2
-  && /f\.get\('q'\)/.test(routeCode) && /f\.get\('c'\)/.test(routeCode));
+// The route never lets a browser choose a chat by id: the ONLY form fields read are the words,
+// the sealed reference and the receipt photograph, and the id the save uses is the VERIFIED
+// claim's. Three fields since 5 August 2026, when a message became able to be a photograph.
+ok('🔴 the route reads exactly three form fields: q, the sealed reference c, and the receipt',
+  (routeCode.match(/f\.get\(/g) || []).length === 3
+  && /f\.get\('q'\)/.test(routeCode) && /f\.get\('c'\)/.test(routeCode)
+  && /f\.get\('receipt'\)/.test(routeCode));
 ok('🔴 the reference is verified, kind checked, and checked against the session before any work',
   /verifyChatRef\(ref\)/.test(routeCode)
   && /claim\.kind !== 'chat'/.test(routeCode)
@@ -451,6 +462,151 @@ ok('🔴 the reference is verified, kind checked, and checked against the sessio
   && routeCode.indexOf('chatRefBelongsTo(claim') < routeCode.indexOf('saveLekhioThreadMessage(user.id'));
 ok('...and the thread id is the verified claim\'s, never a raw form value',
   /const threadId = claim\.id/.test(routeCode));
+
+// ---------------------------------------------------------------------------------------------
+// 8. 🔴 A MESSAGE CAN BE A RECEIPT PHOTOGRAPH (5 August 2026). The route, staged and RUN.
+//
+// The photograph goes through the SAME walk as the capture route and the WhatsApp webhook,
+// lib/receiptingest.ts, which goes on the bench REAL (with real dedupe and real vendor keys)
+// so "an image message runs ingest" is asserted on what was written, not on prose. A text
+// message must still answer exactly as before, with the ingest never woken.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== a message can be a receipt photograph, and words still work ===\n');
+
+{
+  const rt = mkdtempSync(path.join(tmpdir(), 'thread-route-'));
+  const w = (name, src) => writeFileSync(path.join(rt, name), src);
+  w('nextserver.ts', `
+export class NextRequest {}
+export const NextResponse = {
+  json(body, init) { return { kind: 'json', status: (init && init.status) || 200, body }; },
+  redirect(url, status) { return { kind: 'redirect', status, location: String(url) }; },
+};
+`);
+  w('webauth.ts', "export async function sessionUser() { return { id: 'u-1' }; }\n");
+  w('ratelimit.ts', 'export async function userBurst() { return false; }\n');
+  w('gateserver.ts', `
+export async function gateForUser() { return 'ok'; }
+export function refuseUnentitled() { return { kind: 'json', status: 402, body: { error: 'locked' } }; }
+`);
+  w('claude.ts', `
+export const state = { parsed: null };
+export function hasClaudeConfig() { return true; }
+export async function parseReceipt() { return state.parsed; }
+export async function answerMoneyQuestion() { return 'the model answer'; }
+`);
+  w('banknudge.ts', "export function busyMessage() { return 'the busy line'; }\n");
+  w('aicost.ts', 'export function decideSpend() { return { allowed: true }; }\n');
+  w('margin.ts', 'export function aiCapsFor() { return { killed: false }; }\n');
+  w('waintents.ts', `
+export function matchTotalsQuestion() { return null; }
+export function formatGbp(n) { return '£' + n; }
+export function isDeadlineQuestion(q) { return /deadline/.test(q); }
+export function deadlineAnswer() { return 'The deadline answer.'; }
+export function clampReceiptDate(d) { return d || '2026-08-05'; }
+`);
+  w('taxrules.ts', 'export function checkExpense() { return null; }\nexport const VERDICT_ICON = {};\n');
+  w('taxoptimiser.ts', `
+export function taxPosition() { return { setAside: 0, projected: false }; }
+export function setAsideBasisLine() { return ''; }
+`);
+  w('supabase.ts', `
+export const state = { rows: [], writes: [], turns: [] };
+export async function bumpAiUsage() { return 1; }
+export async function countActiveSubscribers() { return 10; }
+export async function refreshFactsFromDb() {}
+export async function totalsForUser() { return null; }
+export async function pendingSummaryForUser() { return null; }
+export async function getOptimiserInput() { return {}; }
+export async function transactionSummaryForUser() { return ''; }
+export async function getRelevantKnowledge() { return []; }
+export async function saveLekhioThreadMessage(userId, threadId, role, content) {
+  state.turns.push({ userId, threadId, role, content });
+  return true;
+}
+export async function recentUnconfirmedForMatch() { return state.rows; }
+export async function insertTransaction(record) { state.writes.push({ fn: 'insert', record: { ...record } }); }
+export async function mergeIntoTransaction(userId, id, patch) { state.writes.push({ fn: 'merge', id, patch }); return true; }
+export async function storeReceiptImage() { return 'receipts/u-1/2026-08-05-x.jpg'; }
+export async function readVatProfile() { return null; }
+`);
+  w('chatref.ts', `
+export function verifyChatRef(ref) { return ref === 'sealed' ? { kind: 'chat', id: 'conv-1' } : null; }
+export function chatRefBelongsTo() { return true; }
+`);
+  // The REAL walk and its REAL matcher, wired to the stubs, exactly as production wires them.
+  w('dedupe.ts', read('lib/dedupe.ts'));
+  w('memory.ts', read('lib/memory.ts'));
+  w('receiptingest.ts', read('lib/receiptingest.ts').replace(/from '\.\/([a-zA-Z]+)'/g, "from './$1.ts'"));
+  w('route.ts', routeSrc
+    .replace(/from 'next\/server'/g, "from './nextserver.ts'")
+    .replace(/from '(?:\.\.\/)+lib\/([a-zA-Z]+)'/g, "from './$1.ts'")
+    .replace("from '../../app/chatref'", "from './chatref.ts'"));
+
+  const R = await import(pathToFileURL(path.join(rt, 'route.ts')).href);
+  const DB = await import(pathToFileURL(path.join(rt, 'supabase.ts')).href);
+  const AI = await import(pathToFileURL(path.join(rt, 'claude.ts')).href);
+  const RI = await import(pathToFileURL(path.join(rt, 'receiptingest.ts')).href);
+
+  const screwfix = {
+    merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
+    transaction_type: 'expense', transaction_date: '2026-08-05', vat: null,
+  };
+  const post = async ({ q, image, rows = [] }) => {
+    DB.state.rows = rows;
+    DB.state.writes.length = 0;
+    DB.state.turns.length = 0;
+    AI.state.parsed = screwfix;
+    const fd = new FormData();
+    fd.append('c', 'sealed');
+    if (q !== undefined) fd.append('q', q);
+    if (image) fd.append('receipt', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }), 'r.jpg');
+    const res = await R.POST({ url: 'https://lekhio.app/api/thread', formData: async () => fd });
+    return { res, turns: DB.state.turns, writes: DB.state.writes };
+  };
+
+  {
+    const { res, turns, writes } = await post({ image: true });
+    ok('🔴 AN IMAGE MESSAGE RUNS THE INGEST: one waiting row, negative, marked web_image, his',
+      writes.length === 1 && writes[0].fn === 'insert'
+      && writes[0].record.user_id === 'u-1' && writes[0].record.amount === -164.78
+      && writes[0].record.confirmed === false && writes[0].record.source_type === 'web_image');
+    ok('his turn says what he sent, and Lekhio\'s turn says what was read, in plain words',
+      turns.length === 2
+      && turns[0].role === 'user' && turns[0].content === 'A receipt photograph.'
+      && turns[1].role === 'lekhio'
+      && turns[1].content === 'Read your Screwfix receipt. £164.78, filed as materials, and it is waiting for your yes under Waiting on you.');
+    ok('and the 303 lands back in the same chat, at the newest turn',
+      res.kind === 'redirect' && res.status === 303 && res.location.includes('/app/thread/chat?c=sealed')
+      && res.location.includes('#end'));
+  }
+  {
+    const dupRow = { id: 'r1', vendor: 'Screwfix', amount: -164.78, transaction_date: '2026-08-05', category: 'materials', source_type: 'whatsapp_image' };
+    const { turns, writes } = await post({ image: true, rows: [dupRow] });
+    ok('🔴 THE SAME RECEIPT TWICE IS REFUSED IN THE CHAT TOO: nothing written, and the refusal is the shared sentence',
+      writes.length === 0
+      && turns[1].content === RI.duplicateReceiptLine('Screwfix', 164.78, '2026-08-05')
+      && turns[1].content.includes('I have not added it again'));
+  }
+  {
+    const { turns, writes } = await post({ q: 'can I claim my receipt for the deadline', image: true });
+    ok('words riding along with a photograph stay HIS words, and the reply is about the receipt',
+      turns[0].content === 'can I claim my receipt for the deadline'
+      && turns[1].content.includes('waiting for your yes') && writes.length === 1);
+  }
+  {
+    const { turns, writes } = await post({ q: 'when is the tax deadline' });
+    ok('🔴 A TEXT MESSAGE STILL ANSWERS EXACTLY AS BEFORE, and the ingest never wakes',
+      writes.length === 0 && turns.length === 2
+      && turns[0].content === 'when is the tax deadline'
+      && turns[1].content === 'The deadline answer.');
+  }
+  {
+    const { res, turns } = await post({});
+    ok('nothing at all is refused as empty, before any write',
+      res.kind === 'redirect' && res.location.includes('problem=empty') && turns.length === 0);
+  }
+}
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exit(fail === 0 ? 0 : 1);

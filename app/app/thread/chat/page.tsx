@@ -45,7 +45,7 @@ export const dynamic = 'force-dynamic';
 function notice(problem: string | undefined): string | null {
   switch (problem) {
     case 'empty':
-      return 'Say something first, then press Send.';
+      return 'Say something, or attach a receipt photograph, then press Send.';
     case 'bad':
       return 'Something in that did not read right. Nothing was saved, so have another go.';
     case 'slow':
@@ -155,7 +155,7 @@ export default async function ChatPage({
 
       {locked ? null : kind === 'lekhio' ? (
         <section className="lek-card">
-          <form action="/api/thread" method="post">
+          <form action="/api/thread" method="post" encType="multipart/form-data">
             {/* The same sealed reference the row was opened with, so the answer lands in THIS
                 chat. It grants nothing: /api/thread re-verifies it against the session and the
                 write proves ownership again in the database. */}
@@ -163,11 +163,26 @@ export default async function ChatPage({
             <textarea
               name="q"
               rows={3}
-              required
               maxLength={1000}
               className="lek-field"
               placeholder='Ask about your money or your tax, like "what do I owe so far"'
               aria-label="Your message to Lekhio"
+            />
+            {/* A message can be a receipt photograph as well as a question, exactly as it can
+                on WhatsApp. The input mirrors the capture page's: capture="environment" sends
+                a phone straight to its back camera, a computer ignores it and offers files,
+                and /api/thread runs the SAME ingest walk the capture route runs, so the row
+                lands waiting for his yes either way. Not required: words alone still work,
+                and the route refuses a message with neither. */}
+            <label htmlFor="receipt" className="lek-attach">Or photograph a receipt and I will read it</label>
+            <input
+              id="receipt"
+              name="receipt"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="lek-field"
+              aria-label="A receipt photograph for Lekhio to read"
             />
             <button type="submit" className="lek-primary">Send</button>
           </form>
@@ -247,6 +262,8 @@ const CSS = [
   `.lek-bubble-you{background:${RIVER_TINT};border-color:${LINE};border-color:${edge(RIVER, 20)};color:${RIVER_DEEP};border-radius:${RADIUS.lg}px ${RADIUS.lg}px ${RADIUS.sm}px ${RADIUS.lg}px}`,
   // 16px pinned on the field: under 16 iOS Safari zooms the page the moment it is focused.
   `.lek-field{box-sizing:border-box;padding:${SPACE.sm}px;font-size:16px;font-family:${FONT};border:1.5px solid ${LINE};border-radius:${RADIUS.md}px;color:${INK};background:${PANEL};width:100%;resize:vertical}`,
+  // The receipt line sits under the words, quiet, in the label voice the capture page uses.
+  `.lek-attach{display:block;font-size:${TYPE.label}px;font-weight:700;color:${MUTED};margin:${SPACE.sm}px 6px 4px}`,
   `.lek-primary{width:100%;margin-top:${SPACE.sm}px;padding:14px ${SPACE.md}px;font-size:${TYPE.body}px;font-weight:700;font-family:${FONT};color:${ON_RIVER};background:${RIVER};border:none;border-radius:${RADIUS.md}px;cursor:pointer;transition:background-color ${MOTION.quick} ${MOTION.ease}}`,
   `.lek-primary:hover{background:${RIVER_DEEP}}`,
   `@media(min-width:${BREAK.desk}px){.lek-primary{width:auto;min-width:200px}}`,

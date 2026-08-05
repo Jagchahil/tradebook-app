@@ -44,6 +44,8 @@ function notice(done: string | undefined, problem: string | undefined): string |
       return 'Read and written down. It is not in your figures yet: nothing a machine reads counts until you have said it is right.';
     case 'merged':
       return 'Your bank already sent me that payment, so the receipt has been put with it rather than counted twice.';
+    case 'already':
+      return 'That looks like a receipt you have already given me, same shop, same total, same date, so I have not added it again. The first one is under Waiting on you.';
   }
   switch (problem) {
     case 'unread':
@@ -152,11 +154,15 @@ export default async function CapturePage({
           ) : null}
 
           <form action="/api/money/receipt" method="post" encType="multipart/form-data">
-            {/* image/* rather than a list, so the phone offers its camera and its gallery both.
-                The route holds the real allowlist and refuses anything the reader cannot take,
-                because an accept attribute is a suggestion the browser is free to ignore. */}
-            <label htmlFor="receipt" style={S.label}>The photograph</label>
-            <input id="receipt" name="receipt" type="file" accept="image/*" required className="lek-field" />
+            {/* capture="environment" sends a phone straight to its back camera, because the
+                receipt is in his other hand and a picker he has to steer is a step he did not
+                ask for. A computer ignores the attribute and offers its files as before. The
+                label promises only what both do: the camera line is true on a phone, and on a
+                computer the input is plainly a file chooser. The route holds the real
+                allowlist and refuses anything the reader cannot take, because an accept
+                attribute is a suggestion the browser is free to ignore. */}
+            <label htmlFor="receipt" style={S.label}>The photograph. On a phone, the camera opens itself.</label>
+            <input id="receipt" name="receipt" type="file" accept="image/*" capture="environment" required className="lek-field" />
             <button type="submit" className="lek-primary">Read this receipt</button>
           </form>
 

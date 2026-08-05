@@ -9,7 +9,6 @@ import {
   sendImageUrl,
 } from '../../../lib/whatsapp';
 import {
-  parseReceipt,
   parseSpokenTransaction,
   draftInvoice,
   answerMoneyQuestion,
@@ -25,8 +24,9 @@ import { confirmationLine } from '../../../lib/voiceflow';
 import { isWorkerLive } from '../../../lib/bridge';
 import { sendInvoiceEmail, hasEmailConfig, looksLikeEmail } from '../../../lib/email';
 import { hasBankFeedConfig } from '../../../lib/bankfeed';
-import { findDuplicate } from '../../../lib/dedupe';
-import { normaliseVendor } from '../../../lib/memory';
+// The one receipt walk, shared with the web capture route and the chat composer, so the three
+// doors cannot drift apart. See the header of lib/receiptingest.ts.
+import { ingestReceiptImage, duplicateReceiptLine } from '../../../lib/receiptingest';
 import {
   busyMessage,
   receiptMilestoneNudge,
@@ -57,8 +57,6 @@ import {
   weeklyTotals,
   weeklyUpdateFactsFor,
   listBankConnectionsForUser,
-  recentUnconfirmedForMatch,
-  mergeIntoTransaction,
   touchLastInbound,
   confirmDigestEntries,
   lastDigestAt,
@@ -102,7 +100,6 @@ import {
   poundAmounts,
   moneyAmounts,
   entryDate,
-  clampReceiptDate,
   isThanks,
   matchAck,
   matchStopStart,
@@ -966,73 +963,53 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
     await sendBudgetRefusal(from, refused);
     return;
   }
-  const parsed = await parseReceipt(media.base64, media.mediaType);
-  if (!parsed) {
-    await sendText(from, 'I could not read that receipt. Try a clearer photo with the total showing.');
-    return;
-  }
 
-  const receiptDate = clampReceiptDate(parsed.transaction_date);
-
-  // IS THIS THE CARD PAYMENT WE ALREADY HAVE?
-  //
-  // The bank feed usually lands a purchase the SAME DAY. The photo of the receipt
-  // turns up that evening. That is one purchase, and before this it became two
-  // entries: costs inflated, profit understated, tax wrong.
-  //
-  // So before writing anything, look for the bank line this receipt belongs to. If
-  // we find it, fold the receipt INTO it rather than adding a second row. The bank
-  // keeps the amount and the date, because those are facts rather than a reading of
-  // a photograph. The receipt gives the shop name, the category and the image.
-  //
-  // Never fatal: if the lookup fails we simply insert as before, and the duplicate
-  // rule in Things to check remains as the safety net.
-  const dup = await findReceiptDuplicate(userId, {
-    vendor: parsed.merchant_name,
-    amount: -Math.abs(parsed.amount),
-    transaction_date: receiptDate,
+  // THE ONE RECEIPT WALK, in lib/receiptingest.ts, shared word for word with the web capture
+  // route and the chat composer: store the image, parse it with the one parser, fold it into
+  // the bank line it duplicates (one purchase, one row, the bank's figures win), REFUSE the
+  // same receipt sent twice (no second row, no silent merge), and otherwise insert as
+  // waiting, confirmed false, for his yes. The webhook keeps what is the webhook's: who this
+  // number belongs to, the budget rings above, and the sentence sent back. One send at the
+  // end rather than one per verdict, because a send is real money (see lib/margin.ts).
+  const result = await ingestReceiptImage({
+    userId,
+    bytes: new Uint8Array(Buffer.from(media.base64, 'base64')),
+    mediaType: media.mediaType,
+    sourceType: 'whatsapp_image',
+    whatsappMessageId: messageId,
   });
 
-  if (dup) {
-    await mergeIntoTransaction(userId, dup.id, {
-      vendor: parsed.merchant_name,
-      category: parsed.category,
-      raw_whatsapp_message_id: messageId,
-    });
-    await sendText(
-      from,
-      `Got it. That is the same £${parsed.amount.toFixed(2)} ${parsed.merchant_name} payment your bank already sent me, so I have put the receipt with it rather than counting it twice. Filed under ${parsed.category}.`,
-    );
-    return;
+  let reply: string;
+  switch (result.outcome) {
+    case 'unread':
+      reply = 'I could not read that receipt. Try a clearer photo with the total showing.';
+      break;
+    case 'failed':
+      // The write itself failed. Said plainly rather than swallowed: a receipt he believes is
+      // logged and is not would surface months later, in his figures, as our fault.
+      reply = 'That did not save. Nothing has changed, so send it again in a minute.';
+      break;
+    case 'merged':
+      reply = `Got it. That is the same £${result.amount.toFixed(2)} ${result.merchant} payment your bank already sent me, so I have put the receipt with it rather than counting it twice. Filed under ${result.category}.`;
+      break;
+    case 'duplicate':
+      // 🔴 The same receipt, twice. The refusal is the shared sentence, so this channel and
+      // the chat cannot drift into two versions of it.
+      reply = duplicateReceiptLine(result.merchant, result.amount, result.date);
+      break;
+    case 'logged': {
+      const confirmation = `Logged. ${result.merchant} for £${result.amount.toFixed(2)}. Filed under ${result.category}. It is in your Lekhio.`;
+      // Once a day, and only for someone clearly doing this the hard way, offer the
+      // easy way. receiptMilestoneNudge fires on exactly the nth receipt, so it cannot
+      // become nagging however many they send. Appended to the confirmation rather
+      // than sent separately: an extra WhatsApp message would cost us real money (see
+      // lib/margin.ts) to say something we can say for free right here.
+      const nudge = await bankNudgeAfterReceipt(from, userId);
+      reply = nudge ? `${confirmation}\n\n${nudge}` : confirmation;
+      break;
+    }
   }
-
-  await insertTransaction({
-    user_id: userId,
-    vendor: parsed.merchant_name,
-    // Receipts are an expense, so we store the amount as a negative number.
-    // The app reads income vs expense from this sign.
-    amount: -Math.abs(parsed.amount),
-    category: parsed.category,
-    // The date printed on the receipt, clamped to a sane range, so a back-dated
-    // receipt lands in the right tax quarter. Falls back to today.
-    transaction_date: receiptDate,
-    source_type: 'whatsapp_image',
-    // Captured but not yet confirmed by the user. They approve before it counts
-    // toward anything sent to HMRC.
-    confirmed: false,
-    raw_whatsapp_message_id: messageId,
-  });
-
-  const amountText = `£${parsed.amount.toFixed(2)}`;
-  const confirmation = `Logged. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. It is in your Lekhio.`;
-
-  // Once a day, and only for someone clearly doing this the hard way, offer the
-  // easy way. receiptMilestoneNudge fires on exactly the nth receipt, so it cannot
-  // become nagging however many they send. Appended to the confirmation rather
-  // than sent separately: an extra WhatsApp message would cost us real money (see
-  // lib/margin.ts) to say something we can say for free right here.
-  const nudge = await bankNudgeAfterReceipt(from, userId);
-  await sendText(from, nudge ? `${confirmation}\n\n${nudge}` : confirmation);
+  await sendText(from, reply);
 }
 
 // Counts today's receipts for this phone and returns the milestone nudge, or null.
@@ -3047,28 +3024,7 @@ function firstMessage(body: WebhookBody): IncomingMessage | null {
   return body.entry?.[0]?.changes?.[0]?.value?.messages?.[0] ?? null;
 }
 
-// The bank line this receipt is a duplicate of, if there is one.
-//
-// Only a CONFIDENT match merges automatically: same shop, same money, within a few
-// days. A 'maybe' (same money and time but an unreadable shop) is deliberately NOT
-// merged here, because merging two genuinely different purchases would quietly
-// delete one of the user's costs and RAISE his tax bill, and he would never know we
-// had done it. Those surface in Things to check instead, for him to judge.
-//
-// Never throws: a failed lookup must not cost someone their receipt.
-async function findReceiptDuplicate(
-  userId: string,
-  receipt: { vendor: string; amount: number; transaction_date: string },
-): Promise<{ id: string } | null> {
-  try {
-    const since = new Date(Date.now() - 10 * 86400_000).toISOString().slice(0, 10);
-    const recent = await recentUnconfirmedForMatch(userId, since);
-    // Only ever fold a receipt into a BANK line. Two photographs of the same receipt
-    // are a different problem, and the duplicate rule already catches those.
-    const bankRows = recent.filter((r) => r.source_type === 'bank_feed');
-    const hit = findDuplicate(receipt, bankRows, normaliseVendor);
-    return hit && hit.strength === 'same' ? { id: String(hit.match.id) } : null;
-  } catch {
-    return null;
-  }
-}
+// The duplicate hunting that stood here (findReceiptDuplicate, the bank-line pass) moved into
+// lib/receiptingest.ts on 5 August 2026, where the web capture route and the chat composer run
+// the SAME two passes: fold into the bank line, refuse the same receipt twice. One walk, three
+// doors, and none of them can drift on its own.

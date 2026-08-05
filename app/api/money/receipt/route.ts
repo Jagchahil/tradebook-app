@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sessionUser } from '../../../../lib/webauth';
-import { parseReceipt, hasClaudeConfig } from '../../../../lib/claude';
-import { clampReceiptDate } from '../../../../lib/waintents';
+import { hasClaudeConfig } from '../../../../lib/claude';
+import { bumpAiUsage, countActiveSubscribers } from '../../../../lib/supabase';
 import {
-  insertTransaction, recentUnconfirmedForMatch, mergeIntoTransaction, bumpAiUsage,
-  countActiveSubscribers, storeReceiptImage, readVatProfile,
-} from '../../../../lib/supabase';
-import type { NewTransaction } from '../../../../lib/supabase';
-import { findDuplicate } from '../../../../lib/dedupe';
-import { normaliseVendor } from '../../../../lib/memory';
+  ingestReceiptImage, MAX_RECEIPT_BYTES, RECEIPT_IMAGE_TYPES,
+} from '../../../../lib/receiptingest';
 import { aiCapsFor } from '../../../../lib/margin';
 import { decideSpend } from '../../../../lib/aicost';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
@@ -16,67 +12,26 @@ import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
 
 // A RECEIPT PHOTOGRAPH, UPLOADED FROM THE WEB. The WhatsApp reading, without the phone.
 //
-//   POST multipart { receipt: <image> }  ->  one UNCONFIRMED row, or a merge into a bank line
+//   POST multipart { receipt: <image> }  ->  one UNCONFIRMED row, a merge into a bank line,
+//                                            or a refusal to add the same receipt twice
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-// ⚠️ ONE PARSE PATH, AND THIS ROUTE IS ANOTHER CALLER OF IT, NOT ANOTHER COPY.
+// ⚠️ ONE INGEST PATH, AND THIS ROUTE IS A CALLER OF IT, NOT A COPY.
 //
-// parseReceipt in lib/claude.ts is the one function that turns a photograph into figures, and
-// the WhatsApp webhook already calls it. So does this. The date is clamped by the same
-// clampReceiptDate, the duplicate check is the same recentUnconfirmedForMatch plus findDuplicate
-// composition handleReceiptImage runs, and the row lands through the same insertTransaction in
-// the same shape: amount negative, confirmed false. Two readers over one photograph is the
-// two-formatters bug with a camera, and this route refuses to be the second reader.
+// ingestReceiptImage in lib/receiptingest.ts is the one walk that turns a photograph into a
+// waiting row: store the image, parse it with the one parser, fold it into the bank line it
+// duplicates, refuse the same receipt sent twice, insert as waiting. The WhatsApp webhook and
+// the chat composer call the SAME function, so the three doors cannot drift apart. This file
+// owns only what a door owns: the session, the gate, the burst limit, the upload's validity,
+// the budget rings, and the sentence said back.
 //
-// 🔴 confirmed: false, ALWAYS, AND THERE IS NO PATH IN THIS FILE THAT WRITES TRUE. A parse is a
-// machine's reading of a man's money. However good the model, a reading waits for his yes,
-// because the approval gate is the product and not a chore. The one insert below says false and
-// test/moneyweb.test.mjs fails the build if this file ever says otherwise.
-//
-// ⚠️ THE MERGE PATH EXISTS FOR THE SAME REASON IT EXISTS ON WHATSAPP. The bank usually lands a
-// card payment the same day; the photograph arrives that evening. One purchase must not become
-// two rows, so a CONFIDENT match folds the receipt into the bank line, keeps the bank's figures
-// (facts, not readings), and says so. A maybe is left alone: merging two genuinely different
-// purchases would quietly delete one of his costs and raise his tax bill.
-//
-// ⚠️ THE IMAGE IS KEPT, STORED FIRST AND PARSED SECOND (31 July 2026). storeReceiptImage in
-// lib/supabase.ts puts the photograph in the private receipts bucket under the user's own id
-// and the path lands in the row's raw_input_url, so the evidence HMRC would actually ask to
-// see survives alongside our reading of it. Storage is evidence, NEVER a dependency: a null
-// from the upload is carried on past, the parse still runs and the row still lands, because a
-// lost image must never lose the figures. The WhatsApp capture still reads and discards its
-// download; it is the remaining caller the helper was shaped for, and wiring it means
-// respecting the webhook's five second budget, a decision that path's owner makes.
-//
-// ═══════════════════════════════════════════════════════════════════════════════════════════
-// 🔴 THE VAT IS WRITTEN DOWN AND IT IS NOT CLAIMED. vat_confirmed STAYS FALSE HERE, FOR EVER.
-//
-// parseReceipt now reads the VAT off the paper. That is a READING, and a reading of a VAT figure
-// is not the same class of thing as a reading of a total: getting the total wrong shows up the
-// moment he looks at his own money, while a VAT figure wrong one time in seven goes quietly into
-// a reclaim he will be asked to stand behind. So it lands as vat_amount with vat_confirmed left
-// at its default of false, and the only thing in the product that flips that flag is
-// confirmTransactionVat, called from a form he filled in on /app/pile.
-//
-// 🔴 AND ONLY FOR A MAN WHO IS VAT REGISTERED. Most of this audience is not and never will be.
-// He has no input tax to reclaim, so a VAT figure against his rows is a number he can never use
-// and a question he would have to dismiss. readVatProfile returning null means the READ FAILED,
-// which is not the same answer as "not registered", so that stores nothing either: guessing in
-// either direction is worse than carrying on without it, and the figures do not depend on it.
+// 🔴 confirmed: false, ALWAYS. The one insert lives in lib/receiptingest.ts, says false, and
+// there is no path there that writes true. A parse is a machine's reading of a man's money.
+// However good the model, a reading waits for his yes, because the approval gate is the
+// product and not a chore.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 export const runtime = 'nodejs';
-
-// Vercel refuses request bodies a little above this anyway, so the honest ceiling is ours and
-// the message is ours, rather than a platform error page about a limit we never mentioned.
-const MAX_BYTES = 4 * 1024 * 1024;
-
-// What Claude vision actually accepts. The page's accept attribute is a courtesy to the phone's
-// camera picker; this list is the rule. An iPhone HEIC lands here and gets a plain answer
-// instead of a failed parse it would have paid an AI call for. (The wildcard form of that
-// attribute is deliberately not written in this comment: it contains the two characters that
-// open a block comment, and every comment stripping guard in test/ would swallow half this file.)
-const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get('content-type') || '';
@@ -111,18 +66,19 @@ export async function POST(req: NextRequest) {
 
   // ⚠️ THE UPLOAD IS VALIDATED BEFORE THE BUDGET IS SPENT. The counters below are the shared AI
   // rings, and burning one of a man's daily reads on a file that was never going to be readable
-  // would be charging him for our refusal.
+  // would be charging him for our refusal. The ceiling and the allowlist are the ingest
+  // module's own, so no door can quietly accept what the reader cannot take.
   const form = await req.formData().catch(() => null);
   if (!form) return isForm ? back('problem=bad') : NextResponse.json({ error: 'bad_request' }, { status: 400 });
   const part = form.get('receipt');
   if (!part || typeof part === 'string' || part.size === 0) {
     return isForm ? back('problem=bad') : NextResponse.json({ error: 'no_file' }, { status: 400 });
   }
-  if (part.size > MAX_BYTES) {
+  if (part.size > MAX_RECEIPT_BYTES) {
     return isForm ? back('problem=big') : NextResponse.json({ error: 'too_big' }, { status: 413 });
   }
   const mediaType = (part.type || '').toLowerCase();
-  if (!IMAGE_TYPES.includes(mediaType)) {
+  if (!RECEIPT_IMAGE_TYPES.includes(mediaType)) {
     return isForm ? back('problem=type') : NextResponse.json({ error: 'bad_type' }, { status: 415 });
   }
 
@@ -144,122 +100,30 @@ export async function POST(req: NextRequest) {
 
   const bytes = new Uint8Array(await part.arrayBuffer());
 
-  // STORE FIRST, PARSE SECOND. The image goes to the private receipts bucket before the model
-  // ever sees it, so a parse crash cannot cost him the evidence too. A null here means storage
-  // had a bad minute: the figures continue regardless, because a lost image must never lose the
-  // figures. The one cost of this order is an unread photograph leaving an unreferenced object
-  // behind, which is pennies of storage against a man's proof of spend.
-  const storedPath = await storeReceiptImage(user.id, bytes, mediaType);
+  // The one walk, for the session's user and nobody the request named. Everything that happens
+  // to the photograph from here, and the reasoning for it, lives in lib/receiptingest.ts.
+  const result = await ingestReceiptImage({
+    userId: user.id,
+    bytes,
+    mediaType,
+    sourceType: 'web_image',
+  });
 
-  const base64 = Buffer.from(bytes).toString('base64');
-  const parsed = await parseReceipt(base64, mediaType);
-  // parseReceipt answers amount 0 when it could not read the total. moneylog's own header says a
-  // £0 beside a real merchant is not a gap, it is a wrong figure a man acts on, so an unreadable
-  // total is treated as an unreadable receipt and he is asked for a clearer photograph.
-  if (!parsed || parsed.amount <= 0) {
-    return isForm ? back('problem=unread') : NextResponse.json({ error: 'unread' }, { status: 422 });
-  }
-
-  const receiptDate = clampReceiptDate(parsed.transaction_date);
-
-  // WHOSE VAT IS THIS, AND IS IT ANY USE TO HIM? See the header. The profile is only read when
-  // the paper actually printed a figure, so the man who is not registered, and the receipt that
-  // never showed the VAT, both cost nothing at all.
-  //
-  // ⚠️ null FROM readVatProfile IS A FAILED READ AND NOT AN ANSWER. Both it and a plain "no"
-  // land in the same place here, which is storing no VAT, because that is the state the row
-  // would have been in anyway and nothing about his figures depends on it.
-  const vatProfile = parsed.vat === null ? null : await readVatProfile(user.id);
-  const receiptVat = vatProfile !== null && vatProfile.registered ? parsed.vat : null;
-
-  // IS THIS THE CARD PAYMENT WE ALREADY HAVE? Same window, same filter, same matcher, same
-  // merge as handleReceiptImage. Never fatal: a failed lookup falls through to a plain insert
-  // and the duplicate rule in Things to check remains the safety net.
-  try {
-    const since = new Date(Date.now() - 10 * 86400_000).toISOString().slice(0, 10);
-    const recent = await recentUnconfirmedForMatch(user.id, since);
-    const bankRows = recent.filter((r) => r.source_type === 'bank_feed');
-    const hit = findDuplicate(
-      { vendor: parsed.merchant_name, amount: -Math.abs(parsed.amount), transaction_date: receiptDate },
-      bankRows,
-      normaliseVendor,
-    );
-    if (hit && hit.strength === 'same') {
-      // 🔴 THE MERGE CARRIES THE VAT NOW. The note that stood here said why it did not:
-      // mergeIntoTransaction copied a fixed list of fields and vat_amount was not on it, so a
-      // registered man whose receipt folded into a bank line lost the reading entirely. Closed on
-      // 2 August 2026 by adding it to that patch, which is where the "not this file's to change"
-      // pointed.
-      //
-      // ⚠️ receiptVat AND NOT parsed.vat. The gating above already asked whether this man is VAT
-      // registered at all, and writing a VAT figure onto the row of a man who is not is noise on
-      // a screen he should never see a VAT word on.
-      //
-      // ⚠️ IT ARRIVES UNCONFIRMED, exactly as on a fresh row. vat_confirmed is not on the patch,
-      // so the column keeps its false, and /app/pile asks him to agree the figure before a penny
-      // of it counts towards a reclaim he has to stand behind at an inspection.
-      await mergeIntoTransaction(user.id, String(hit.match.id), {
-        vendor: parsed.merchant_name,
-        category: parsed.category,
-        ...(receiptVat !== null ? { vat_amount: receiptVat } : {}),
-        // The bank line keeps the figures; the receipt gives it the shop name, the category,
-        // and now the photograph. Only passed when storage actually kept one.
-        ...(storedPath ? { raw_input_url: storedPath } : {}),
-      });
+  switch (result.outcome) {
+    case 'unread':
+      // parseReceipt answers amount 0 when it could not read the total. An unreadable total is
+      // an unreadable receipt, and he is asked for a clearer photograph.
+      return isForm ? back('problem=unread') : NextResponse.json({ error: 'unread' }, { status: 422 });
+    case 'merged':
       return isForm ? back('done=merged') : NextResponse.json({ ok: true, merged: true });
-    }
-  } catch {
-    /* the merge is a kindness, never a dependency */
+    case 'duplicate':
+      // 🔴 THE SAME RECEIPT, TWICE. Nothing was written, and that is said plainly rather than
+      // reported as a fresh capture. The page's sentence is static: a redirect cannot carry
+      // the figures without letting the URL speak for us.
+      return isForm ? back('done=already') : NextResponse.json({ ok: true, duplicate: true });
+    case 'failed':
+      return isForm ? back('problem=unavailable') : NextResponse.json({ error: 'unavailable' }, { status: 503 });
+    case 'logged':
+      return isForm ? back('done=logged') : NextResponse.json({ ok: true, toReview: true });
   }
-
-  // ⚠️ THE TWO VAT COLUMNS RIDE ON THE RECORD RATHER THAN BEING NAMED BY NewTransaction, which
-  // does not carry them yet. insertTransaction posts the record whole, so the columns land, and
-  // widening the shared type is a change to lib/supabase.ts that this file does not own.
-  const row: NewTransaction & { vat_amount?: number; vat_confirmed?: boolean } = {
-    user_id: user.id,
-    vendor: parsed.merchant_name,
-    // Receipts are an expense, stored negative, exactly as the webhook stores them.
-    amount: -Math.abs(parsed.amount),
-    category: parsed.category,
-    transaction_date: receiptDate,
-    source_type: 'web_image',
-    // Captured, read, and WAITING. Never confirmed here: see the header.
-    confirmed: false,
-    // The photograph's path in the private bucket, or null when storage failed. The figures
-    // above are already in hand either way: see the header, a lost image never loses them.
-    raw_input_url: storedPath,
-  };
-  if (receiptVat !== null) {
-    row.vat_amount = receiptVat;
-    // Said out loud rather than left to the column default, because this is the whole argument.
-    // What we have is what the paper said. It becomes a reclaim when HE says so, on /app/pile,
-    // and confirmTransactionVat is the only thing anywhere that flips it.
-    row.vat_confirmed = false;
-  }
-
-  const write = async (): Promise<boolean> => {
-    try {
-      await insertTransaction(row);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  let landed = await write();
-  // 🔴 A VAT READING MUST NEVER COST HIM THE ROW. supabase/APPLY_2026-08-01_vat.sql is what adds
-  // these two columns, and on a database where it has not been run yet, naming them is enough for
-  // the whole write to be refused. His receipt is the thing that matters, so the second attempt
-  // drops the reading and keeps the money. The same rule as the stored image above: evidence is
-  // never a dependency.
-  if (!landed && receiptVat !== null) {
-    delete row.vat_amount;
-    delete row.vat_confirmed;
-    landed = await write();
-  }
-  if (!landed) {
-    return isForm ? back('problem=unavailable') : NextResponse.json({ error: 'unavailable' }, { status: 503 });
-  }
-
-  return isForm ? back('done=logged') : NextResponse.json({ ok: true, toReview: true });
 }

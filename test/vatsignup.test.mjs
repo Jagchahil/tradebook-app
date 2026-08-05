@@ -209,8 +209,10 @@ ok('the invoice form asks the three reverse charge questions on the profile, so 
   /cisSubcontractor/.test(read('app/app/invoices/new/page.tsx'))
   && /vatProfile[\s\S]{0,80}registered/.test(read('app/app/invoices/new/page.tsx')));
 
+// The gating moved with the rest of the receipt walk into lib/receiptingest.ts on 5 August
+// 2026, where all three capture doors share it. Same rule, one home.
 ok('the receipt reader stores a VAT figure only for a registered man, so his receipts lost it',
-  /vatProfile !== null && vatProfile\.registered/.test(read('app/api/money/receipt/route.ts')));
+  /vatProfile !== null && vatProfile\.registered/.test(read('lib/receiptingest.ts')));
 
 console.log(`\n  ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);

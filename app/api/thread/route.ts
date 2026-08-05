@@ -22,6 +22,9 @@ import {
   getRelevantKnowledge,
   saveLekhioThreadMessage,
 } from '../../../lib/supabase';
+import {
+  ingestReceiptImage, duplicateReceiptLine, MAX_RECEIPT_BYTES, RECEIPT_IMAGE_TYPES,
+} from '../../../lib/receiptingest';
 import { verifyChatRef, chatRefBelongsTo } from '../../app/chatref';
 
 export const runtime = 'nodejs';
@@ -87,7 +90,16 @@ export async function POST(req: NextRequest) {
     NextResponse.redirect(new URL(`/app/thread/chat?c=${encodeURIComponent(ref)}${q}`, req.url), 303);
 
   const q = String(f.get('q') ?? '').trim().slice(0, 1000);
-  if (!q) return back('&problem=empty');
+
+  // A message can be a RECEIPT PHOTOGRAPH as well as a question (5 August 2026), exactly as it
+  // can on WhatsApp. The photograph goes through the SAME ingest walk as the capture route and
+  // the webhook (lib/receiptingest.ts), never a copy of it, and the reply written into the chat
+  // is what actually happened to it: read and waiting, folded into the bank line, refused as
+  // the same receipt twice, or the honest refusal when it could not be read at all.
+  const part = f.get('receipt');
+  const receipt = part && typeof part !== 'string' && part.size > 0 ? part : null;
+
+  if (!q && !receipt) return back('&problem=empty');
 
   // The durable shared burst limit, keyed on the user, the same atomic counter discipline as
   // /api/goals and /api/ask. Six posts a minute is chatty; more is a script, and a script must
@@ -106,6 +118,18 @@ export async function POST(req: NextRequest) {
   // The claim's id was minted for this session and shape checked twice; the save below still
   // proves against the database that the chat is HIS and is a Lekhio chat before any write.
   const threadId = claim.id;
+
+  // The receipt turn. His words (or a plain line naming what he sent) go in as his turn, the
+  // ingest walk runs, and what happened to the photograph is written back as Lekhio's turn.
+  // When a photograph is attached it IS the message: any words ride along as his turn, and the
+  // reply is about the receipt, because that is the thing he handed over.
+  if (receipt) {
+    const stored = await saveLekhioThreadMessage(user.id, threadId, 'user', q || 'A receipt photograph.');
+    if (!stored) return back('&problem=unavailable');
+    const reply = await receiptReply(user.id, receipt);
+    await saveLekhioThreadMessage(user.id, threadId, 'lekhio', reply);
+    return back('#end');
+  }
 
   const stored = await saveLekhioThreadMessage(user.id, threadId, 'user', q);
   if (!stored) return back('&problem=unavailable');
@@ -171,6 +195,49 @@ async function composeReply(userId: string, q: string): Promise<string> {
 
   const answer = await answerMoneyQuestion(q, summary, knowledge);
   return answer ?? 'I could not work that out. Try asking another way.';
+}
+
+// A receipt photograph, answered the way the capture page answers, in the chat's own voice.
+// Always returns a sentence, and the sentence is what actually happened: this surface stores
+// its reply in the chat, so silence or a fake would sit there for ever.
+//
+// The checks run in the capture route's order, translated from redirects into words: the size
+// ceiling and the allowlist first (both the ingest module's own, so no door can accept what the
+// reader cannot take), then the AI switch, then the SAME budget rings every thread question
+// walks, then the one shared walk in lib/receiptingest.ts. Nothing here parses, writes or
+// confirms anything itself: a reading always lands as waiting, and his yes lives on /app/pile.
+async function receiptReply(userId: string, part: File): Promise<string> {
+  if (part.size > MAX_RECEIPT_BYTES) {
+    return 'That file is too big for me. Anything under four megabytes is fine.';
+  }
+  const mediaType = (part.type || '').toLowerCase();
+  if (!RECEIPT_IMAGE_TYPES.includes(mediaType)) {
+    return 'I cannot read that kind of file. A JPEG or PNG photograph works.';
+  }
+  if (!hasClaudeConfig()) {
+    return 'Receipt reading is not switched on yet. Hang tight, it is coming very soon.';
+  }
+  const refused = await threadAiBlocked(userId);
+  if (refused) {
+    return busyMessage(refused, { available: false, connected: false });
+  }
+
+  const bytes = new Uint8Array(await part.arrayBuffer());
+  const result = await ingestReceiptImage({ userId, bytes, mediaType, sourceType: 'web_image' });
+
+  switch (result.outcome) {
+    case 'unread':
+      return 'I could not read that one. A clearer photograph with the total showing usually does it.';
+    case 'failed':
+      return 'That did not save. Nothing has changed, so try it again in a minute.';
+    case 'merged':
+      return `Your bank already sent me that £${result.amount.toFixed(2)} ${result.merchant} payment, so I have put the receipt with it rather than counting it twice. Filed under ${result.category}.`;
+    case 'duplicate':
+      // 🔴 The same receipt, twice: the shared refusal, word for word what WhatsApp says.
+      return duplicateReceiptLine(result.merchant, result.amount, result.date);
+    case 'logged':
+      return `Read your ${result.merchant} receipt. £${result.amount.toFixed(2)}, filed as ${result.category}, and it is waiting for your yes under Waiting on you.`;
+  }
 }
 
 // The AI spend gate, mirroring aiBudgetBlocked in the webhook ring for ring: the kill switch,

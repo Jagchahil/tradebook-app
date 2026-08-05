@@ -34,8 +34,9 @@ import { useOfHomeToDate } from './elections';
 import { capitalRelief, isCapitalKind, isWrittenDown } from './capital';
 import { fromLegacyKind, toLegacyKind, isGoalKind, type LegacyGoalKind } from './goals';
 import { weekTotals, windowStart, type WeekRow } from './weekchart';
-import { isMonthKey, monthStart, monthEnd } from './moneylog';
+import { isMonthKey, monthStart, monthEnd, labelFor } from './moneylog';
 import { incomeShapeOfSignup, toIncomeShape, type IncomeShape } from './persona';
+import { gbp2 } from './money';
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -9404,3 +9405,200 @@ export async function saveLekhioThreadMessage(
   }
 }
 // --- end of the Lekhio thread block -----------------------------------------------------------
+
+// --- The activity feed (5 August 2026) --------------------------------------------------------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE FEED. One list of everything that has happened to this man's money, newest first, so a
+// glance tells him what his employee has been doing: receipts read, entries filed or waiting
+// for his yes, questions asked and answered, Rakha's nudges. A record, not an entertainment
+// scroll, and the sentences are worded HERE so the page draws them and adds nothing.
+//
+// ⚠️ THREE READS, MERGED IN JS. Transactions, messages and agent_signals share no join worth
+// forcing on PostgREST, so each table is read on its own, every query scoped by user_id from
+// the session exactly as the rest of this file does, and the merge is a sort on the clock.
+// The Rakha rows come through rakhaFlagsForUser above rather than a fourth query shape.
+//
+// 🔴 NO RAW ID EVER LEAVES THIS FUNCTION. A chat or nudge row's ref is a link carrying a
+// SEALED reference from app/app/chatref.ts, and a transaction row's ref is the /app/entry link
+// on app/app/entryref.ts, both minted for the session's own user. A reference that cannot be
+// minted comes back as ref '' and the row renders as plain text, the thread list's fail closed
+// rule. The references grant nothing: the pages they open resolve the session first and read
+// through user_id scoped queries.
+//
+// ⚠️ THE MINTERS ARE HANDED IN, NOT IMPORTED, AND THAT IS THE moneylog LESSON. The reference
+// modules live under app/app because they are shapes of the web surface, and test/waout.test.mjs
+// and test/frontdoor.test.mjs stage the whole of lib/ flat into a temp directory, so an import
+// from app/app here breaks two suites and the layering at once. lib/moneylog.ts already solves
+// this exact problem for isWrittenDown: the caller hands the function in, and it is a REQUIRED
+// parameter so tsc names any call site that forgot, rather than a default quietly minting no
+// links for them.
+//
+// ⚠️ ANY FAILED READ IS NULL, NEVER A QUIETLY SHORTER LIST. A feed missing one source without
+// saying so teaches a man the record forgets things, and a record he cannot trust is worse
+// than none. So null means the page says so plainly and asks him to load it again; [] means
+// nothing has genuinely happened yet.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export type FeedKind = 'receipt' | 'filed' | 'waiting' | 'chat' | 'nudge';
+
+export interface FeedItem {
+  kind: FeedKind;
+  when: string;   // the ISO timestamp of the moment it happened, for ordering and day headings
+  title: string;  // one plain sentence, already worded
+  detail: string; // the quieter second line. '' when the sentence already says it all
+  ref: string;    // a safe href with a sealed reference inside, never a raw id. '' is unlinked
+}
+
+// The two sealed reference minters, handed in by the page (see the header above). Each returns
+// the sealed string or '', and '' means the row draws unlinked: fail closed, never a raw id.
+export interface FeedSeal {
+  chat(kind: 'chat' | 'rakha', id: string): string;
+  entry(id: string, month: string): string;
+}
+
+// One line for a snippet: whitespace collapsed, bounded, never a wall of words in a row.
+function feedSnippet(text: unknown, max = 140): string {
+  const s = typeof text === 'string' ? text.replace(/\s+/g, ' ').trim() : '';
+  return s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s;
+}
+
+interface FeedTxRow {
+  id?: string;
+  vendor?: string | null;
+  amount?: number | string | null;
+  category?: string | null;
+  confirmed?: boolean | null;
+  is_personal?: boolean | null;
+  source_type?: string | null;
+  created_at?: string | null;
+  transaction_date?: string | null;
+}
+
+// One transaction as a feed sentence. Wording rules:
+//   . unconfirmed from a WhatsApp photo: a receipt was read, and it waits for his yes
+//   . unconfirmed from anywhere else: it was logged, and it waits for his yes
+//   . confirmed and personal: set aside, outside the business books
+//   . confirmed money out: filed as its category
+//   . confirmed money in: filed as money in
+// Money is always lib/money.ts to the penny, never a hand built pound.
+function feedTxItem(seal: FeedSeal, r: FeedTxRow): FeedItem | null {
+  const when = typeof r.created_at === 'string' ? r.created_at : '';
+  const amount = typeof r.amount === 'number'
+    ? r.amount
+    : (typeof r.amount === 'string' && r.amount.trim() !== '' ? Number(r.amount) : Number.NaN);
+  if (!when || !Number.isFinite(amount)) return null;
+  const name = labelFor(r as Record<string, unknown>);
+  const money = gbp2(Math.abs(amount));
+  const month = typeof r.transaction_date === 'string' ? r.transaction_date.slice(0, 7) : '';
+  // The minter fails closed to '' on any bad shape, and '' means the row draws unlinked.
+  const sealed = typeof r.id === 'string' && month ? seal.entry(r.id, month) : '';
+  const ref = sealed ? `/app/entry?e=${encodeURIComponent(sealed)}` : '';
+  if (r.confirmed !== true) {
+    const fromPhoto = typeof r.source_type === 'string' && r.source_type.startsWith('whatsapp');
+    return fromPhoto
+      ? { kind: 'receipt', when, title: `Read your ${name} receipt.`, detail: `${money}, waiting for your yes.`, ref }
+      : { kind: 'waiting', when, title: `Logged ${name}.`, detail: `${money}, waiting for your yes.`, ref };
+  }
+  if (r.is_personal === true) {
+    return { kind: 'filed', when, title: `Set aside ${name} as personal.`, detail: `${money}, outside your business books.`, ref };
+  }
+  if (amount >= 0) {
+    return { kind: 'filed', when, title: `Filed ${money} in from ${name}.`, detail: '', ref };
+  }
+  const cat = typeof r.category === 'string' && r.category ? r.category : '';
+  return {
+    kind: 'filed',
+    when,
+    title: cat ? `Filed ${name} as ${cat}.` : `Filed ${name}.`,
+    detail: `${money} out.`,
+    ref,
+  };
+}
+
+// Everything that has happened to this man's money, newest first. Each source is read scoped
+// to the user and bounded by the same limit, merged and cut to the limit again, so the page
+// never pays for more rows than it can show. Null means a read failed and the page says so.
+export async function readActivityFeed(userId: string, limit: number, seal: FeedSeal): Promise<FeedItem[] | null> {
+  if (!userId || !Number.isFinite(limit) || limit < 1) return null;
+  const uid = encodeURIComponent(userId);
+  const cap = Math.min(Math.floor(limit), 200);
+
+  const readTx = async (): Promise<FeedTxRow[] | null> => {
+    try {
+      const { url } = config();
+      const res = await fetch(
+        `${url}/rest/v1/transactions?user_id=eq.${uid}` +
+          `&select=id,vendor,amount,category,confirmed,is_personal,source_type,created_at,transaction_date` +
+          `&order=created_at.desc&limit=${cap}`,
+        { headers: headers(), signal: AbortSignal.timeout(6000) },
+      );
+      if (!res.ok) return null;
+      const rows = (await res.json().catch(() => null)) as FeedTxRow[] | null;
+      return Array.isArray(rows) ? rows : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // The DM turns across every conversation in one read, filtered by user_id exactly as
+  // chatMessagesForUser is. The conversation id stays inside this module: it leaves only
+  // sealed inside the reference.
+  const readTurns = async (): Promise<Array<{ conversation_id?: string; role?: string; content?: string; created_at?: string }> | null> => {
+    try {
+      const { url } = config();
+      const res = await fetch(
+        `${url}/rest/v1/messages?user_id=eq.${uid}&select=conversation_id,role,content,created_at&order=created_at.desc&limit=${cap}`,
+        { headers: headers(), signal: AbortSignal.timeout(6000) },
+      );
+      if (!res.ok) return null;
+      const rows = (await res.json().catch(() => null)) as Array<{
+        conversation_id?: string; role?: string; content?: string; created_at?: string;
+      }> | null;
+      return Array.isArray(rows) ? rows : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const [tx, turns, flags] = await Promise.all([readTx(), readTurns(), rakhaFlagsForUser(userId, cap)]);
+  if (tx === null || turns === null || flags === null) return null;
+
+  const items: FeedItem[] = [];
+
+  for (const r of tx) {
+    const item = feedTxItem(seal, r);
+    if (item) items.push(item);
+  }
+
+  for (const m of turns) {
+    const when = typeof m.created_at === 'string' ? m.created_at : '';
+    const line = feedSnippet(m.content);
+    if (!when || !line) continue;
+    // The minter fails closed to '' when unconfigured or when the id fails its shape check.
+    const sealed = typeof m.conversation_id === 'string' ? seal.chat('chat', m.conversation_id) : '';
+    items.push({
+      kind: 'chat',
+      when,
+      title: m.role === 'user' ? 'You asked.' : m.role === 'puchio' ? 'Puchio answered.' : 'Lekhio answered.',
+      detail: line,
+      ref: sealed ? `/app/thread/chat?c=${encodeURIComponent(sealed)}` : '',
+    });
+  }
+
+  for (const f of flags) {
+    if (!f.created_at || !f.title) continue;
+    const sealed = seal.chat('rakha', f.id);
+    items.push({
+      kind: 'nudge',
+      when: f.created_at,
+      title: f.title,
+      detail: feedSnippet(f.body),
+      ref: sealed ? `/app/thread/chat?c=${encodeURIComponent(sealed)}` : '',
+    });
+  }
+
+  items.sort((a, b) => (Date.parse(b.when) || 0) - (Date.parse(a.when) || 0));
+  return items.slice(0, cap);
+}
+// --- end of the activity feed block -----------------------------------------------------------

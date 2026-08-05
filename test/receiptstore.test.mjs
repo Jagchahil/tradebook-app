@@ -40,6 +40,10 @@ const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n
 const sqlCodeOnly = (src) => src.replace(/--[^\n]*/g, '');
 
 const routeReceipt = read('app/api/money/receipt/route.ts');
+// The walk the route calls. Store-first moved with the rest of the pipeline into
+// lib/receiptingest.ts on 5 August 2026, so the WhatsApp webhook and the chat composer keep
+// the same rule without carrying copies. The pins on the walk's order moved with it.
+const ingestSrc = read('lib/receiptingest.ts');
 const migration = read('supabase/APPLY_2026-07-31_goals_consolidation.sql');
 const supa = read('lib/supabase.ts');
 
@@ -132,25 +136,31 @@ ok('🔴 an unknown type is refused, never guessed',
 }
 
 // ---------------------------------------------------------------------------------------------
-// 🔴 3. THE ROUTE. Store first, parse second, and the figures never depend on the image.
+// 🔴 3. THE WALK. Store first, parse second, and the figures never depend on the image.
+// The order pins sit on lib/receiptingest.ts, where the walk lives; the route pin is that the
+// walk only runs after the budget rings said yes, so a refused spend stores nothing.
 // ---------------------------------------------------------------------------------------------
 {
-  const code = codeOnly(routeReceipt);
+  const code = codeOnly(ingestSrc);
+  const routeCode = codeOnly(routeReceipt);
   ok('🔴 the image is stored BEFORE the parse: store first, parse second',
-    code.indexOf('storeReceiptImage(user.id, bytes, mediaType)') > -1
+    code.indexOf('storeReceiptImage(userId, bytes, mediaType)') > -1
     && code.indexOf('storeReceiptImage(') < code.indexOf('parseReceipt(base64, mediaType)'));
-  ok('🔴 and AFTER the budget rings: a refused spend stores nothing',
-    code.indexOf('decideSpend(') < code.indexOf('storeReceiptImage('));
+  ok('🔴 and AFTER the budget rings: a refused spend never reaches the walk, so it stores nothing',
+    routeCode.indexOf('decideSpend(') > -1
+    && routeCode.indexOf('decideSpend(') < routeCode.indexOf('ingestReceiptImage(')
+    && !/storeReceiptImage/.test(routeCode));
   ok('🔴 a null from storage stops NOTHING: no early return sits between the store and the insert',
     !/if \(!storedPath\)/.test(code) && !/storedPath ===? null\)\s*return/.test(code));
   ok('the stored path lands on the inserted row as raw_input_url',
     /raw_input_url: storedPath/.test(code));
   ok('a merged receipt hands the bank line its image too, only when one was kept',
     /\.\.\.\(storedPath \? \{ raw_input_url: storedPath \} : \{\}\)/.test(code));
-  ok('🔴 the route still writes through lib and nothing else: no inline storage call',
-    !/storage\/v1/.test(code) && !/\bfetch\s*\(/.test(code));
+  ok('🔴 the walk still writes through lib and nothing else: no inline storage call anywhere',
+    !/storage\/v1/.test(code) && !/\bfetch\s*\(/.test(code)
+    && !/storage\/v1/.test(routeCode) && !/\bfetch\s*\(/.test(routeCode));
   ok('the header says the rule in words: a lost image must never lose the figures',
-    /lost image must never lose the figures/i.test(routeReceipt));
+    /lost image must never lose the figures/i.test(ingestSrc));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -161,8 +171,9 @@ ok('the bucket is created idempotently in the consolidation SQL',
 {
   const bucketBlock = migration.slice(migration.indexOf('insert into storage.buckets'));
   ok('🔴 PRIVATE: public is false', /false/.test(sqlCodeOnly(bucketBlock).split('on conflict')[0]));
-  ok('🔴 with a size limit matching the route\'s own ceiling',
-    /4194304/.test(bucketBlock) && /MAX_BYTES = 4 \* 1024 \* 1024/.test(routeReceipt));
+  ok('🔴 with a size limit matching the walk\'s own ceiling, the one every door imports',
+    /4194304/.test(bucketBlock) && /MAX_RECEIPT_BYTES = 4 \* 1024 \* 1024/.test(ingestSrc)
+    && /MAX_RECEIPT_BYTES/.test(routeReceipt));
   ok('and the same mime allowlist the route enforces',
     ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].every((t) => bucketBlock.includes(t)));
   ok('🔴 no storage policy grants anyone anything: the service role only posture',

@@ -67,6 +67,7 @@ const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n
 
 const claudeSrc = read('lib/claude.ts');
 const receiptSrc = read('app/api/money/receipt/route.ts');
+const ingestSrc = read('lib/receiptingest.ts');
 const captureSrc = read('app/app/money/capture/page.tsx');
 const pileRouteSrc = read('app/api/pile/route.ts');
 const pilePageSrc = read('app/app/pile/page.tsx');
@@ -238,6 +239,12 @@ export async function bumpAiUsage() { return 1; }
 export async function countActiveSubscribers() { return 10; }
 export async function storeReceiptImage() { return 'u-1/abc.jpg'; }
 `);
+// The REAL walk goes on the bench, wired to the stubs above: the route calls it, and it is
+// where the VAT gating now lives, so a stub of it would be a test of the stub.
+writeFileSync(
+  path.join(rStage, 'receiptingest.ts'),
+  read('lib/receiptingest.ts').replace(/from '\.\/([a-zA-Z]+)'/g, "from './$1.ts'"),
+);
 writeFileSync(
   path.join(rStage, 'route.ts'),
   receiptSrc
@@ -307,12 +314,15 @@ const parsedWithVat = { merchant_name: 'Screwfix', amount: 28.99, category: 'mat
     rows.length === 2 && !('vat_amount' in rows[1]) && rows[1].amount === -28.99);
 }
 {
-  ok('🔴 NOTHING IN THE UPLOAD ROUTE EVER WRITES A CONFIRMED ANYTHING',
-    !/confirmed:\s*true/.test(codeOnly(receiptSrc)));
-  ok('and it still writes through insertTransaction alone, with no query of its own',
-    receiptSrc.includes('insertTransaction(') && !/\bfetch\s*\(|rest\/v1/.test(codeOnly(receiptSrc)));
+  // The walk moved to lib/receiptingest.ts on 5 August 2026 so all three doors share it; the
+  // no-confirm and one-writer rules hold on BOTH files, route and walk.
+  ok('🔴 NOTHING IN THE UPLOAD ROUTE OR THE WALK EVER WRITES A CONFIRMED ANYTHING',
+    !/confirmed:\s*true/.test(codeOnly(receiptSrc)) && !/confirmed:\s*true/.test(codeOnly(ingestSrc)));
+  ok('and the walk still writes through insertTransaction alone, with no query of its own',
+    ingestSrc.includes('insertTransaction(') && !/\bfetch\s*\(|rest\/v1/.test(codeOnly(ingestSrc))
+    && !/\bfetch\s*\(|rest\/v1/.test(codeOnly(receiptSrc)));
   ok('the profile it reads is the one in lib/supabase.ts, never a circumstance guessed at here',
-    receiptSrc.includes('readVatProfile'));
+    ingestSrc.includes('readVatProfile'));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -581,6 +591,7 @@ console.log('\n6. Nothing anywhere sets vat_confirmed without him');
     /vat_amount: v, vat_confirmed: true/.test(supabaseSrc));
   for (const [name, src] of [
     ['lib/claude.ts', claudeSrc],
+    ['lib/receiptingest.ts', ingestSrc],
     ['app/api/money/receipt/route.ts', receiptSrc],
     ['app/app/money/capture/page.tsx', captureSrc],
     ['app/api/pile/route.ts', pileRouteSrc],
@@ -602,6 +613,7 @@ console.log('\n6. Nothing anywhere sets vat_confirmed without him');
   // would teach the next person to stop reading the failure, which is how a rule dies.
   const FILES = {
     'lib/claude.ts': claudeSrc.slice(0, claudeSrc.indexOf('export interface ParsedEntry')),
+    'lib/receiptingest.ts': ingestSrc,
     'app/api/money/receipt/route.ts': receiptSrc,
     'app/app/money/capture/page.tsx': captureSrc,
     'app/api/pile/route.ts': pileRouteSrc,

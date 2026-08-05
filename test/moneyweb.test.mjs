@@ -67,6 +67,10 @@ const pageEntry = read('app/app/entry/page.tsx');
 const pageMoney = read('app/app/money/page.tsx');
 const routeManual = read('app/api/money/manual/route.ts');
 const routeReceipt = read('app/api/money/receipt/route.ts');
+// The receipt walk itself: store, parse, bank merge, duplicate refusal, insert as waiting.
+// It moved out of the route on 5 August 2026 so the WhatsApp webhook and the chat composer
+// could run the SAME walk instead of copies. The pins on what the walk does moved with it.
+const ingest = read('lib/receiptingest.ts');
 const nav = read('app/app/AppNav.tsx');
 const G = await import(pathToFileURL(path.join(root, 'lib/gate.ts')).href);
 
@@ -338,51 +342,188 @@ ok('the amount is bounded and finite before it goes anywhere',
   /Number\.isFinite\(magnitude\)/.test(routeManual) && /magnitude > 1_000_000/.test(routeManual));
 
 // ---------------------------------------------------------------------------------------------
-// 🔴 5. THE RECEIPT UPLOAD. One parse path, never auto confirmed.
+// 🔴 5. THE RECEIPT UPLOAD. One ingest walk, in lib/receiptingest.ts, never auto confirmed.
+// The route is a DOOR: session, gate, burst, upload validity, budget, and the sentence back.
+// Everything that happens to the photograph is the shared walk all three doors call.
 // ---------------------------------------------------------------------------------------------
 ok('the capture page posts a plain multipart form',
   /action="\/api\/money\/receipt" method="post" encType="multipart\/form-data"/.test(pageCapture));
-ok('with a plain file input and no script',
-  /type="file" accept="image\/\*" required/.test(pageCapture)
+ok('with a plain file input, straight to a phone\'s camera, and no script',
+  /type="file" accept="image\/\*" capture="environment" required/.test(pageCapture)
   && !/'use client'|onClick|onChange|useState|<script/.test(pageCapture));
 ok('the page says the truth about what happens next',
   /never straight into your figures/.test(pageCapture)
   && /nothing a machine reads counts until you have said it is right/.test(pageCapture));
+ok('and the camera line promises only what every device does',
+  /On a phone, the camera opens itself/.test(pageCapture));
 ok('an unconfigured build explains itself and draws no button (doc 103 honesty test)',
   /hasClaudeConfig/.test(pageCapture) && /not switched on yet/.test(pageCapture));
 ok('a locked account sees the read only banner here too', /READONLY_TITLE/.test(pageCapture));
 
-ok('🔴 THE ROUTE CALLS THE ONE PARSER, IN lib/claude.ts',
-  routeReceipt.includes("from '../../../../lib/claude'") && /parseReceipt\(base64, mediaType\)/.test(routeReceipt));
+ok('🔴 THE ROUTE RUNS THE ONE INGEST WALK, AND NO COPY OF ANY PART OF IT',
+  routeReceipt.includes("from '../../../../lib/receiptingest'")
+  && /await ingestReceiptImage\(\{/.test(routeReceipt)
+  && !/parseReceipt\(|insertTransaction\(|mergeIntoTransaction\(|findDuplicate\(/.test(codeOnly(routeReceipt)));
+ok('🔴 THE WALK CALLS THE ONE PARSER, IN lib/claude.ts',
+  ingest.includes("from './claude'") && /parseReceipt\(base64, mediaType\)/.test(ingest));
 ok('🔴 and the one date clamp, in lib/waintents.ts',
-  /clampReceiptDate\(parsed\.transaction_date\)/.test(routeReceipt));
-ok('🔴 NOTHING IN THIS FILE EVER CONFIRMS A ROW',
-  /confirmed: false/.test(routeReceipt) && !/confirmed:\s*true/.test(codeOnly(routeReceipt)));
-ok('🔴 a receipt is an expense, stored negative, exactly as the webhook stores it',
-  /amount: -Math\.abs\(parsed\.amount\)/.test(routeReceipt));
-ok('🔴 the duplicate check is the same lib composition the webhook runs',
-  /recentUnconfirmedForMatch\(user\.id/.test(routeReceipt)
-  && /findDuplicate\(/.test(routeReceipt)
-  && /source_type === 'bank_feed'/.test(routeReceipt)
-  && /hit\.strength === 'same'/.test(routeReceipt));
-ok('a confident duplicate merges instead of double counting',
-  /mergeIntoTransaction\(user\.id/.test(routeReceipt) && /done=merged/.test(routeReceipt));
-ok('🔴 the route writes through insertTransaction and nothing else',
-  routeReceipt.includes('insertTransaction(') && !/\bfetch\s*\(|rest\/v1/.test(codeOnly(routeReceipt)));
+  /clampReceiptDate\(parsed\.transaction_date\)/.test(ingest));
+ok('🔴 NOTHING IN THE WALK OR THE ROUTE EVER CONFIRMS A ROW',
+  /confirmed: false/.test(ingest) && !/confirmed:\s*true/.test(codeOnly(ingest))
+  && !/confirmed:\s*true/.test(codeOnly(routeReceipt)));
+ok('🔴 a receipt is an expense, stored negative, whichever door it came through',
+  /amount: -Math\.abs\(parsed\.amount\)/.test(ingest));
+ok('🔴 the bank duplicate check is the same lib composition the webhook now shares outright',
+  /recentUnconfirmedForMatch\(userId/.test(ingest)
+  && /findDuplicate\(/.test(ingest)
+  && /source_type === 'bank_feed'/.test(ingest)
+  && /strength === 'same'/.test(ingest));
+ok('a confident bank duplicate merges instead of double counting',
+  /mergeIntoTransaction\(userId/.test(ingest) && /done=merged/.test(routeReceipt));
+ok('🔴 THE SAME RECEIPT SENT TWICE IS REFUSED: no second row, and no silent merge either',
+  /r\.source_type === 'web_image' \|\| r\.source_type === 'whatsapp_image'/.test(ingest)
+  && /outcome: 'duplicate'/.test(ingest)
+  && /done=already/.test(routeReceipt)
+  && /I have not added it again/.test(ingest));
+ok('🔴 the walk writes through insertTransaction and nothing else, and the route writes nothing',
+  ingest.includes('insertTransaction(') && !/\bfetch\s*\(|rest\/v1/.test(codeOnly(ingest))
+  && !/\bfetch\s*\(|rest\/v1/.test(codeOnly(routeReceipt)));
 ok('the row is written for the session user and marked as what it is',
-  /user_id: user\.id/.test(routeReceipt) && /source_type: 'web_image'/.test(routeReceipt));
+  /userId: user\.id/.test(routeReceipt) && /sourceType: 'web_image'/.test(routeReceipt)
+  && /user_id: userId/.test(ingest));
 ok('🔴 AND NEVER FOR A USER THE REQUEST NAMED', !/body\.user|f\.get\(\s*['"]user/i.test(codeOnly(routeReceipt)));
 ok('an unreadable total is refused, not filed as a £0 he acts on',
-  /parsed\.amount <= 0/.test(routeReceipt) && /problem=unread/.test(routeReceipt));
+  /parsed\.amount <= 0/.test(ingest) && /problem=unread/.test(routeReceipt));
 ok('the AI spend walks the same rings as the webhook: caps, counters, judge',
   /aiCapsFor\(/.test(routeReceipt) && /bumpAiUsage\('global', 'all'\)/.test(routeReceipt) && /decideSpend\(/.test(routeReceipt));
 ok('the upload is validated before the budget is spent',
   // Compared on the CALL SITES, not the imports, which sit at the top of every file.
   codeOnly(routeReceipt).indexOf('req.formData()') < codeOnly(routeReceipt).indexOf('await countActiveSubscribers()'));
-ok('there is a size ceiling and a type allowlist',
-  /MAX_BYTES/.test(routeReceipt) && /image\/jpeg/.test(routeReceipt) && /problem=type/.test(routeReceipt));
+ok('there is a size ceiling and a type allowlist, and they are the walk\'s own',
+  /MAX_RECEIPT_BYTES/.test(routeReceipt) && /RECEIPT_IMAGE_TYPES/.test(routeReceipt)
+  && /image\/jpeg/.test(ingest) && /problem=type/.test(routeReceipt) && /problem=big/.test(routeReceipt));
 ok('a multipart form caller gets a 303, never JSON',
   /multipart\/form-data/.test(routeReceipt) && /NextResponse\.redirect\([\s\S]{0,160}?,\s*303\)/.test(routeReceipt));
+
+// ---------------------------------------------------------------------------------------------
+// 🔴 5b. THE WALK, STAGED AND RUN. Real dedupe, real vendor keys, recording storage.
+// The three verdicts that matter: fold into the bank line, REFUSE the same receipt twice,
+// and otherwise land one waiting row. Assertions on what was written, not on prose.
+// ---------------------------------------------------------------------------------------------
+{
+  const iStage = mkdtempSync(path.join(tmpdir(), 'ingest-'));
+  // The matcher and the vendor keys go in WHOLE: a stub of the thing under test would be a
+  // test of the stub. Both are import free on purpose, which is what makes this possible.
+  writeFileSync(path.join(iStage, 'dedupe.ts'), read('lib/dedupe.ts'));
+  writeFileSync(path.join(iStage, 'memory.ts'), read('lib/memory.ts'));
+  writeFileSync(path.join(iStage, 'waintents.ts'), 'export function clampReceiptDate(d) { return d || "2026-08-05"; }\n');
+  writeFileSync(path.join(iStage, 'claude.ts'), [
+    'export const state = { parsed: null };',
+    'export async function parseReceipt() { return state.parsed; }',
+  ].join('\n'));
+  writeFileSync(path.join(iStage, 'supabase.ts'), `
+export const state = { rows: [], calls: [], insertFails: false, storedPath: 'receipts/u-1/2026-08-05-x.jpg' };
+export async function recentUnconfirmedForMatch() { return state.rows; }
+export async function insertTransaction(record) {
+  state.calls.push({ fn: 'insert', record: { ...record } });
+  if (state.insertFails) throw new Error('down');
+}
+export async function mergeIntoTransaction(userId, id, patch) {
+  state.calls.push({ fn: 'merge', userId, id, patch: { ...patch } });
+  return true;
+}
+export async function storeReceiptImage() { return state.storedPath; }
+export async function readVatProfile() { return null; }
+`);
+  writeFileSync(
+    path.join(iStage, 'receiptingest.ts'),
+    read('lib/receiptingest.ts').replace(/from '\.\/([a-zA-Z]+)'/g, "from './$1.ts'"),
+  );
+  const I = await import(pathToFileURL(path.join(iStage, 'receiptingest.ts')).href);
+  const IDB = await import(pathToFileURL(path.join(iStage, 'supabase.ts')).href);
+  const IAI = await import(pathToFileURL(path.join(iStage, 'claude.ts')).href);
+
+  const screwfix = {
+    merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
+    transaction_type: 'expense', transaction_date: '2026-08-05', vat: null,
+  };
+  const bankLine = { id: 'b1', vendor: 'SCREWFIX 1234 LONDON', amount: -164.78, transaction_date: '2026-08-05', category: null, source_type: 'bank_feed' };
+  const earlierReceipt = { id: 'r1', vendor: 'Screwfix', amount: -164.78, transaction_date: '2026-08-05', category: 'materials', source_type: 'whatsapp_image' };
+  const run = async (rows, parsed = screwfix) => {
+    IDB.state.rows = rows;
+    IDB.state.calls.length = 0;
+    IDB.state.insertFails = false;
+    IAI.state.parsed = parsed;
+    return I.ingestReceiptImage({ userId: 'u-1', bytes: new Uint8Array([1, 2, 3]), mediaType: 'image/jpeg', sourceType: 'web_image' });
+  };
+  const writes = () => IDB.state.calls;
+
+  {
+    const r = await run([]);
+    const w = writes();
+    ok('a fresh receipt lands as ONE waiting row: negative, unconfirmed, marked, with its image',
+      r.outcome === 'logged' && w.length === 1 && w[0].fn === 'insert'
+      && w[0].record.amount === -164.78 && w[0].record.confirmed === false
+      && w[0].record.user_id === 'u-1' && w[0].record.source_type === 'web_image'
+      && w[0].record.raw_input_url === 'receipts/u-1/2026-08-05-x.jpg');
+    ok('and the caller is handed the figures for its sentence',
+      r.merchant === 'Screwfix' && r.amount === 164.78 && r.category === 'materials' && r.date === '2026-08-05');
+  }
+  {
+    const r = await run([bankLine]);
+    const w = writes();
+    ok('🔴 the bank line the card payment already made is MERGED into, never doubled',
+      r.outcome === 'merged' && w.length === 1 && w[0].fn === 'merge' && w[0].id === 'b1'
+      && w[0].patch.vendor === 'Screwfix' && w[0].patch.raw_input_url === 'receipts/u-1/2026-08-05-x.jpg');
+  }
+  {
+    const r = await run([earlierReceipt]);
+    const w = writes();
+    ok('🔴 THE SAME RECEIPT SENT TWICE WRITES NOTHING AT ALL: no insert, no merge, no second row',
+      r.outcome === 'duplicate' && w.length === 0);
+    ok('and the refusal carries the first row\'s own figures, so the sentence names the receipt he knows',
+      r.merchant === 'Screwfix' && r.amount === 164.78 && r.date === '2026-08-05');
+    ok('🔴 the refusal sentence itself: honest, specific, and shared by every door',
+      I.duplicateReceiptLine(r.merchant, r.amount, r.date)
+        === 'Looks like the Screwfix receipt for £164.78 on 5 August, which you already added. I have not added it again.');
+  }
+  {
+    const r = await run([bankLine, earlierReceipt]);
+    const w = writes();
+    ok('when both exist the BANK line wins: the bank pass runs first and the receipt folds into facts',
+      r.outcome === 'merged' && w.length === 1 && w[0].fn === 'merge' && w[0].id === 'b1');
+  }
+  {
+    const r = await run([{ ...earlierReceipt, amount: -84.3 }]);
+    ok('a different total at the same shop is a different purchase, and it lands',
+      r.outcome === 'logged' && writes().length === 1);
+  }
+  {
+    const r = await run([{ ...earlierReceipt, vendor: '' }]);
+    ok('🔴 a MAYBE never refuses: an unreadable shop still lands, because refusing a row we cannot vouch for deletes a real cost',
+      r.outcome === 'logged' && writes().length === 1);
+  }
+  {
+    const r = await run([], { ...screwfix, amount: 0 });
+    ok('an unreadable total is unread, and nothing is written',
+      r.outcome === 'unread' && writes().length === 0);
+  }
+  {
+    IDB.state.rows = [];
+    IDB.state.calls.length = 0;
+    IAI.state.parsed = screwfix;
+    IDB.state.insertFails = true;
+    const r = await I.ingestReceiptImage({ userId: 'u-1', bytes: new Uint8Array([1]), mediaType: 'image/jpeg', sourceType: 'web_image' });
+    IDB.state.insertFails = false;
+    ok('a failed write is admitted as failed, never reported as logged',
+      r.outcome === 'failed');
+  }
+  {
+    ok('the spoken day reads like a person: 5 August, not an ISO string',
+      I.speakDay('2026-08-05') === '5 August' && I.speakDay('2026-12-25') === '25 December'
+      && I.speakDay('garbage') === 'garbage');
+  }
+}
 
 // ---------------------------------------------------------------------------------------------
 // 🔴 6. THE GATE. Both routes have a row, both are the work, both enforce it.

@@ -255,6 +255,7 @@ export default function HowMtdWorksPage() {
             <b>Running a limited company?</b> Making Tax Digital for Income Tax covers self employment and rent on a personal return, and your company&apos;s trade is neither: the company files its own return. If you also have a sole trade or rent of your own, drag the slider for that income alone.
           </p>
           <p className="center mut" style={{ fontSize: 12.5, marginTop: 14 }}>A guide based on the announced thresholds, which are tested on gross qualifying income and never on profit. Your books stay ready with Lekhio either way.</p>
+          <p className="center mut" style={{ fontSize: 12.5, marginTop: 6 }}>General guidance, not tax advice for your exact situation. HMRC decides mandation from the tax return you have already filed, not from this page.</p>
 
           {/* ═══════════════════════════════════════════════════════════════════════════════
               🔴 THE ANSWER IS ABOVE THIS, FREE, AND IT ALWAYS WILL BE.
@@ -271,7 +272,7 @@ export default function HowMtdWorksPage() {
             <LeadCapture
               source="how-mtd-works"
               heading="Want to know when this changes?"
-              sub="The lines move, and the year HMRC tests moves with them. Leave your email and we will tell you when one does, in plain English. No spam, unsubscribe any time."
+              sub="The lines move, and the year HMRC tests moves with them. Leave your email to follow this as it firms up, in plain English. No spam, unsubscribe any time."
             />
           </div>
         </div>

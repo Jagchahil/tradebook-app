@@ -161,6 +161,21 @@ export default async function ProofOfIncomePage({
               </div>
             </dl>
 
+            {/* 🔴 A CAR IS NOT AN ALLOWABLE EXPENSE IN THE YEAR, AND SAYING SO KEEPS THIS DOCUMENT
+                HONEST. The engine holds it out of Out above (GOV.UK, business cars: cars do not
+                qualify for the annual investment allowance), so without this line a lender would see
+                the money leave the account in the books and never learn why it is not in expenses.
+                lib/incomeproof.ts decides the figure off the same writtenDown boolean lib/quarterpack
+                .ts uses, so the printed sheet and /app/tax/summary cannot drift. */}
+            {proof.capitalCost > 0 ? (
+              <p style={S.capital}>
+                {gbp2(proof.capitalCost)} more left the account on{' '}
+                {proof.capitalCount === 1 ? 'a car' : `${proof.capitalCount} cars`}, which is not an
+                allowable expense in one year. A car comes off over several years rather than all at
+                once, so it is not in the figures above.
+              </p>
+            ) : null}
+
             {/* The sentence that says whose figures these are. Null for a sole trader, whose figures
                 are simply his, so nothing is added to the one page he wants to keep short. */}
             {proof.shareNote ? <p style={S.shareNote}>{proof.shareNote}</p> : null}
@@ -180,7 +195,7 @@ export default async function ProofOfIncomePage({
               This is a summary prepared from the figures {proof.businessName} has recorded and
               confirmed in Lekhio, for income verification. It is not an HMRC document, an SA302,
               or a filed tax return, and it is only as complete as the records kept. The estimated
-              tax figure, where one is shown, is guidance based on the published {proof.taxYear}
+              tax figure, where one is shown, is guidance based on the published {proof.taxYear}{' '}
               rates and does not include any other income, reliefs or allowances the person may
               have. For an official
               SA302 or tax year overview, the person can log in to their HMRC account. Some
@@ -242,6 +257,9 @@ const S: Record<string, React.CSSProperties> = {
   // Sits under the table, above the stamp, in the document's own ink rather than muted: it is a
   // statement about what the figures ARE, not a footnote about them.
   shareNote: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, margin: `${SPACE.md}px 0 0`, maxWidth: '62ch' },
+  // The capital line sits under the table in muted ink: it explains where money that is not in
+  // expenses went, without competing with the figures a lender reads first.
+  capital: { fontSize: TYPE.label, lineHeight: 1.6, color: MUTED, margin: `${SPACE.sm}px 0 0`, maxWidth: '62ch' },
   stamp: { display: 'inline-block', marginTop: 18, background: SURFACE, borderRadius: RADIUS.sm, padding: '8px 12px', fontSize: TYPE.label, fontWeight: 700, color: RIVER_DEEP },
   note: { fontSize: TYPE.label, color: MUTED, lineHeight: 1.6, margin: '18px 0 0' },
 

@@ -122,5 +122,36 @@ ok('\ud83d\udd34 AND THE DIRECTOR\'S SHEET NAMES NO TAX HE DOES NOT OWE',
 ok('no em, en or minus dash reached either of the new sentences',
   !/[\u2013\u2014\u2212]/.test(halfHtml) && !/[\u2013\u2014\u2212]/.test(ltdHtml));
 
+console.log('\n=== incomeproof: A CAPITAL CAR NEVER FLOWS INTO ALLOWABLE EXPENSES ===\n');
+
+// 🔴 THE LIVE DEFECT, Vasey Electrical, 2026/27. This page summed every money out row into
+// expenses, a £60,000 capital car included, and drove net profit to a floored £0 and estimated tax
+// to £0 on a document handed to a mortgage lender, while /app/tax/summary read In £33,580, Out
+// £12,088, profit £21,492 off the same books. A car is not an allowable expense in the year: GOV.UK,
+// business cars, "Cars do not qualify for: annual investment allowance (AIA)". writtenDown arrives
+// already decided from lib/supabase.ts, which asks lib/capital.ts, the same way the quarter pack does.
+const vasey = [
+  { amount: 33580, transaction_date: '2026-05-10' },
+  { amount: -12088, transaction_date: '2026-06-01' },
+  { amount: -60000, transaction_date: '2026-06-20', writtenDown: true },
+];
+const vp = IP.buildIncomeProof(vasey, 'Vasey Electrical', 2026, now);
+ok('🔴 the £60,000 car is NOT in allowable expenses', vp.expenses === 12088);
+ok('🔴 net profit is the trade profit, never a floored zero', vp.profit === 21492 && vp.tradeProfit === 21492);
+ok('🔴 estimated tax is on the real profit, not zero', vp.estimatedTax === TE.soleTraderTax(21492).total && vp.estimatedTax > 0);
+ok('the capital car is reported apart, not silently dropped', vp.capitalCost === 60000 && vp.capitalCount === 1);
+
+const vhtml = IP.renderIncomeProofHtml(vp);
+ok('the printed sheet shows the real net profit', vhtml.includes('£21,492.00'));
+ok('the printed sheet never states the £72,088 car inclusive expense', !vhtml.includes('£72,088'));
+ok('the printed sheet names where the £60,000 went', vhtml.includes('£60,000.00') && /not an allowable expense/.test(vhtml));
+ok('no em, en or minus dash reached the capital sentence', !/[–—−]/.test(vhtml));
+
+// A row with no writtenDown flag is still an ordinary cost, so nothing written before anybody was
+// asked moves: the old arithmetic is preserved to the penny for an unflagged row.
+const vaseyFlat = vasey.map((r) => ({ ...r, writtenDown: undefined }));
+const vpFlat = IP.buildIncomeProof(vaseyFlat, 'Vasey Electrical', 2026, now);
+ok('undefined writtenDown reads as an ordinary cost, identical to before', vpFlat.expenses === 72088 && vpFlat.capitalCost === 0 && vpFlat.profit === 0);
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

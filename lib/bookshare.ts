@@ -145,6 +145,12 @@ export interface FullTransaction {
   user_id?: string;
   raw_input_url?: string | null;
   raw_whatsapp_message_id?: string | null;
+  // 🔴 A COST RELIEVED OVER YEARS, DECIDED UPSTREAM. True for a car, false for everything else.
+  // lib/supabase.ts's getConfirmedTransactionsForUser sets it from lib/capital.ts's isWrittenDown(),
+  // so this file never restates the rule that keeps a car out of profit. It only obeys the boolean,
+  // the same shape lib/quarterpack.ts's PackTxn takes. This module stays import free apart from node
+  // crypto, so the answer is handed in rather than worked out here.
+  writtenDown?: boolean | null;
   [k: string]: unknown;
 }
 
@@ -155,6 +161,9 @@ export interface SharedTransaction {
   description: string | null;
   amount: number;
   confirmed: boolean;
+  // Carried so shareTotals can keep a car out of profit and the view can mark the row. Not personal:
+  // it is a fact about how a cost is relieved, not about the person.
+  writtenDown: boolean;
 }
 
 // Strips every field an accountant has no business seeing. Note what is NOT here:
@@ -168,6 +177,7 @@ export function redactTransaction(t: FullTransaction): SharedTransaction {
     description: (t.description ?? null) as string | null,
     amount: Number(t.amount ?? 0),
     confirmed: t.confirmed === true,
+    writtenDown: t.writtenDown === true,
   };
 }
 
@@ -247,29 +257,49 @@ export interface ShareTotals {
   expenses: number;
   profit: number;
   count: number;
+  // 🔴 WHAT LEFT THE ACCOUNT ON A CAR, REPORTED APART FROM PROFIT. A car is not an allowable expense
+  // in one year (GOV.UK, business cars: no annual investment allowance), so folding it into expenses
+  // printed a loss on a page a mortgage broker reads. It leaves expenses and profit, and is counted
+  // here where the recipient can see where the money went. Mirrors StreamSummary in lib/quarterpack.ts.
+  capitalCost: number;
+  capitalCount: number;
 }
 
 export function shareTotals(rows: SharedTransaction[]): ShareTotals {
   let income = 0;
   let expenses = 0;
+  let capitalCost = 0;
+  let capitalCount = 0;
   for (const t of rows) {
-    if (t.amount > 0) income += t.amount;
-    else expenses += Math.abs(t.amount);
+    if (t.amount > 0) {
+      income += t.amount;
+    } else if (t.writtenDown === true) {
+      // A car leaves profit. It is still shown in the entry list as a real payment, and counted
+      // here so the two reconcile.
+      capitalCost += Math.abs(t.amount);
+      capitalCount += 1;
+    } else {
+      expenses += Math.abs(t.amount);
+    }
   }
   return {
     income: round2(income),
     expenses: round2(expenses),
     profit: round2(income - expenses),
     count: rows.length,
+    capitalCost: round2(capitalCost),
+    capitalCount,
   };
 }
 
 // Expenses grouped by category, biggest first. The one view every accountant
-// actually wants.
+// actually wants. A written down car is not a running cost, so it stays out of the
+// breakdown the same way it stays out of profit above.
 export function byCategory(rows: SharedTransaction[]): { category: string; total: number }[] {
   const map = new Map<string, number>();
   for (const t of rows) {
     if (t.amount >= 0) continue;
+    if (t.writtenDown === true) continue;
     const key = t.category || 'Uncategorised';
     map.set(key, (map.get(key) ?? 0) + Math.abs(t.amount));
   }

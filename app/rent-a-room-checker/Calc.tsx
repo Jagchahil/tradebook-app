@@ -117,7 +117,7 @@ export default function Calc() {
       <div style={{ background: RIVER_TINT, border: '1px solid #D4E4F4', borderRadius: 18, padding: '22px 24px', marginTop: 22 }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: RIVER_DEEP, marginBottom: 8 }}>The election most people never make</div>
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
-          Over the limit, HMRC lets you pick the smaller taxable amount every single year, but you have to know the choice exists. Lekhio watches your lodger income alongside everything else you earn, makes the election arithmetic automatic, and Rakha nudges you when the answer flips.
+          Over the limit, HMRC lets you pick the smaller taxable amount every single year, but you have to know the choice exists. Lekhio watches your lodger income alongside everything else you earn, makes the election arithmetic automatic, and works it out again every year, so the year the answer flips it is already done for you.
         </p>
         <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: 'var(--on-river)', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Let Lekhio make the call →</Link>
       </div>

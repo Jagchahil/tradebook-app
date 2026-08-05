@@ -199,7 +199,7 @@ export default function FreeMtdFilingPage() {
         <LeadCapture
           source="free-mtd-filing"
           heading="Be first when free filing opens"
-          sub="Pop your email in and we will tell you the moment you can file your basic return free, before anyone else, plus the odd genuinely useful nudge about deadlines. No spam, unsubscribe any time."
+          sub="Pop your email in and we will tell you the moment you can file your basic return free, before anyone else. No spam, unsubscribe any time."
         />
       </section>
 

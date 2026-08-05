@@ -81,7 +81,11 @@ const raw = {
 const red = A.redactTransaction(raw);
 const keys = Object.keys(red);
 
-ok('redacted shape is exactly the six fields we intend', keys.length === 6);
+// The seventh field is writtenDown, a non personal tax treatment boolean that keeps a car out of
+// profit. The count guard stays: it exists so a redesign cannot quietly leak a personal field, and
+// naming the exact number is what makes an accidental extra one fail the build here.
+ok('redacted shape is exactly the seven fields we intend', keys.length === 7);
+ok('the seventh field is writtenDown, and it defaults false for an ordinary cost', 'writtenDown' in red && red.writtenDown === false);
 ok('NEVER leaks the user id', !('user_id' in red) && !JSON.stringify(red).includes('SECRET-USER-ID'));
 ok('NEVER leaks the receipt image url', !JSON.stringify(red).includes('storage'));
 ok('NEVER leaks the WhatsApp message id', !JSON.stringify(red).includes('wamid'));
@@ -111,6 +115,30 @@ const cats = A.byCategory(shared);
 ok('groups expenses by category', cats.length === 1 && cats[0].category === 'Fuel');
 ok('sums a category', cats[0].total === 50);
 ok('income is not an expense category', !cats.some((c) => c.category === 'Income'));
+
+// --- A CAPITAL CAR MUST NOT PRINT A LOSS ON A PAGE A MORTGAGE BROKER READS ----
+//
+// 🔴 The shared books showed Income, Expenses and Profit to a lender, and summed every money out
+// row into expenses, a £60,000 car included, so profit read as a loss. A car is not an allowable
+// expense in one year (GOV.UK, business cars: no annual investment allowance). writtenDown is
+// decided upstream in lib/supabase.ts from lib/capital.ts, and this module obeys the boolean, the
+// same shape the quarter pack takes. The payment still shows in the entry list as a real payment.
+const withCar = A.shareTransactions([
+  { amount: 33580, confirmed: true, transaction_date: '2026-07-05', category: 'income' },
+  { amount: -12088, confirmed: true, transaction_date: '2026-07-04', category: 'materials' },
+  { amount: -60000, confirmed: true, transaction_date: '2026-07-03', category: 'vehicle', writtenDown: true },
+], ALL);
+const carTotals = A.shareTotals(withCar);
+ok('🔴 a written down car is kept out of expenses', carTotals.expenses === 12088);
+ok('🔴 profit is income minus running costs, never a car driven loss', carTotals.profit === 21492);
+ok('the car is reported apart, so the figures still reconcile', carTotals.capitalCost === 60000 && carTotals.capitalCount === 1);
+ok('the car still appears in the entry list as a real payment', withCar.some((t) => t.amount === -60000 && t.writtenDown === true));
+ok('a car is not a running cost in the category breakdown', !A.byCategory(withCar).some((c) => c.category === 'vehicle'));
+// An unflagged cost is unchanged, so nothing existing moves.
+const noFlag = A.shareTotals(A.shareTransactions([
+  { amount: -500, confirmed: true, transaction_date: '2026-07-01', category: 'materials' },
+], ALL));
+ok('an ordinary cost with no flag is still an expense', noFlag.expenses === 500 && noFlag.capitalCost === 0);
 
 // --- rounding ---------------------------------------------------------------
 const pennies = A.shareTotals([

@@ -206,6 +206,19 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
         ))}
       </section>
 
+      {/* 🔴 A CAR IS NOT IN PROFIT ABOVE, AND THIS SAYS SO. lib/bookshare.ts holds a written down
+          purchase out of expenses and profit (GOV.UK, business cars: cars do not qualify for the
+          annual investment allowance), and the entry list further down still shows the payment in
+          full. Without this line the two would not add up, on a page a lender reads. */}
+      {totals.capitalCost > 0 ? (
+        <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.6, marginTop: 18, maxWidth: 640 }}>
+          {gbp(totals.capitalCost)} of the spending below went on{' '}
+          {totals.capitalCount === 1 ? 'a car' : `${totals.capitalCount} cars`}, which is not an
+          allowable expense in one year. A car comes off over several years rather than all at once,
+          so it is not counted in Expenses or Profit above.
+        </p>
+      ) : null}
+
       {cats.length > 0 ? (
         <>
           <h2 style={{ fontSize: 19, fontWeight: 800, marginTop: 40 }}>Expenses by category</h2>
@@ -246,7 +259,12 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
               <tr key={i} style={{ borderBottom: `1px solid ${LINE}` }}>
                 <td style={{ padding: '11px 8px 11px 0', whiteSpace: 'nowrap', color: MUTED }}>{t.date ?? ''}</td>
                 <td style={{ padding: '11px 8px' }}>{t.vendor ?? ''}</td>
-                <td style={{ padding: '11px 8px', color: MUTED }}>{t.category ?? ''}</td>
+                <td style={{ padding: '11px 8px', color: MUTED }}>
+                  {t.category ?? ''}
+                  {/* The car is shown in full as a real payment, but marked so the reader knows why
+                      it is not in the Profit above. lib/bookshare.ts keeps the two reconciled. */}
+                  {t.writtenDown ? ' (a car, spread over several years, not in profit)' : ''}
+                </td>
                 <td
                   style={{
                     padding: '11px 0 11px 8px',

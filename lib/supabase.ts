@@ -5873,12 +5873,18 @@ export async function getConfirmedTransactionsForUser(userId: string): Promise<R
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
       `&confirmed=eq.true&is_personal=eq.false` +
-      `&select=amount,vendor,category,transaction_date,description,confirmed` +
+      // 🔴 capital_kind RIDES ALONG SO A SHARED BOOK CAN KEEP A CAR OUT OF PROFIT. Without it,
+      // lib/bookshare.ts's shareTotals summed a £60,000 car into expenses and printed a loss on a
+      // page a mortgage broker reads, the same defect the proof of income carried. The rule that
+      // turns a car into a boolean stays in lib/capital.ts: we decide it here with isWrittenDown()
+      // and hand bookshare the answer, exactly as getConfirmedTransactionsForRange does for the pack.
+      `&select=amount,vendor,category,transaction_date,description,confirmed,capital_kind` +
       `&order=transaction_date.desc&limit=5000`,
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return (await res.json()) as Record<string, unknown>[];
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows.map((r) => ({ ...r, writtenDown: isWrittenDown(r.capital_kind) }));
 }
 
 // --- "not business" -----------------------------------------------------------

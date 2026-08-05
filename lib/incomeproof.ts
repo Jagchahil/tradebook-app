@@ -23,6 +23,26 @@ export interface IncomeProofTxn {
   // rows straight through. This interface simply did not ask for it. Optional, and absent means
   // trade, so every existing trade only summary is identical to the penny.
   income_type?: string | null;
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A COST RELIEVED OVER YEARS RATHER THAN TAKEN OFF NOW. TRUE FOR A CAR, FALSE FOR EVERYTHING
+  // ELSE, AND IT KEEPS A £60,000 CAR OUT OF A DOCUMENT A MAN HANDS A MORTGAGE LENDER.
+  //
+  // This interface did not ask for it, so this file summed every money out row into expenses, the
+  // £60,000 car included. On a real account it drove net profit to a floored £0 and estimated tax
+  // to £0, while /app/tax/summary, built from lib/quarterpack.ts, correctly read In £33,580, Out
+  // £12,088, profit £21,492 off the same books. Three surfaces, one account, and the one that leaves
+  // the building was the wrong one. GOV.UK, claim capital allowances, business cars: "Cars do not
+  // qualify for: annual investment allowance (AIA)", so a car is not an allowable expense in the
+  // year. lib/quarterpack.ts holds it out of expenses and reports it apart, and this file now does
+  // the same off the same decided boolean.
+  //
+  // ⚠️ IT ARRIVES ALREADY DECIDED, exactly as lib/quarterpack.ts's PackTxn.writtenDown does.
+  // lib/supabase.ts asks lib/capital.ts's isWrittenDown() once and every caller obeys the answer, so
+  // the rule that turns a car into this boolean lives in one place and cannot drift. Undefined reads
+  // as false, which is every fixture and every row written before anybody was asked, so every
+  // existing summary is identical to the penny.
+  writtenDown?: boolean;
 }
 
 export interface IncomeProof {
@@ -35,6 +55,13 @@ export interface IncomeProof {
   /** The two streams behind `profit`, each floored at zero, because tax is charged on them apart. */
   tradeProfit: number;
   propertyProfit: number;
+  // 🔴 WHAT LEFT THE ACCOUNT ON THINGS RELIEVED OVER YEARS, REPORTED RATHER THAN DROPPED. A car is
+  // not in `expenses` above, so the document says where the rest of the money went instead of
+  // leaving a lender to wonder. Zero for a man who bought no car. Mirrors StreamSummary in
+  // lib/quarterpack.ts.
+  capitalCost: number;
+  /** How many payments make up capitalCost. Zero whenever capitalCost is zero. */
+  capitalCount: number;
   estimatedTax: number;
   /** The Class 4 inside estimatedTax. Zero for a pure landlord, which is the whole point. */
   nationalInsurance: number;
@@ -117,6 +144,8 @@ export function buildIncomeProof(
   const share = sharePct / 100;
   let income = 0;
   let expenses = 0;
+  let capitalCost = 0;
+  let capitalCount = 0;
   let tradeIncome = 0;
   let tradeExpenses = 0;
   let propertyIncome = 0;
@@ -128,8 +157,18 @@ export function buildIncomeProof(
       income += a;
       if (isProperty) propertyIncome += a; else tradeIncome += a;
     } else {
-      expenses += -a;
-      if (isProperty) propertyExpenses += -a; else tradeExpenses += -a;
+      const mag = -a;
+      // 🔴 A CAR LEAVES EXPENSES AND IS COUNTED APART. GOV.UK, business cars: "Cars do not qualify
+      // for: annual investment allowance (AIA)", so it does not come off in the year the way a van
+      // or ordinary kit does. Same test lib/quarterpack.ts's summariseStream uses, off the same
+      // decided boolean, so the document and /app/tax/summary cannot disagree.
+      if (t.writtenDown === true) {
+        capitalCost += mag;
+        capitalCount += 1;
+        continue;
+      }
+      expenses += mag;
+      if (isProperty) propertyExpenses += mag; else tradeExpenses += mag;
     }
   }
   const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -138,6 +177,7 @@ export function buildIncomeProof(
   // sole trader, an unknown structure and a company, so those three are untouched arithmetic.
   income = round2(income * share);
   expenses = round2(expenses * share);
+  capitalCost = round2(capitalCost * share);
   tradeIncome = round2(tradeIncome * share);
   tradeExpenses = round2(tradeExpenses * share);
   propertyIncome = round2(propertyIncome * share);
@@ -188,6 +228,8 @@ export function buildIncomeProof(
     profit,
     tradeProfit,
     propertyProfit,
+    capitalCost,
+    capitalCount,
     estimatedTax,
     nationalInsurance,
     // The words follow the figure. A man with no National Insurance in his number is not told there
@@ -264,6 +306,7 @@ const PROOF_CSS = `
   .card { background:#fff; border:1px solid ${BORDER}; border-radius:16px; padding:22px 24px; margin-top:20px }
   table { width:100%; border-collapse:collapse }
   .whose { margin-top:16px; font-size:13.5px; line-height:1.6; color:${INK}; max-width:62ch }
+  .capital { margin-top:14px; font-size:13px; line-height:1.6; color:${MUTED}; max-width:62ch }
   .stamp { display:inline-block; margin-top:18px; background:${OFF_WHITE}; border:1px solid ${BORDER}; border-radius:10px; padding:8px 12px; font-size:12px; font-weight:700; color:${INDIGO} }
   .note { font-size:12px; color:${MUTED}; line-height:1.6; margin-top:22px }
   .btn { display:inline-block; margin-top:24px; background:${INDIGO}; color:#fff; text-decoration:none; font-weight:700; padding:12px 20px; border-radius:11px; border:0; cursor:pointer; font-family:inherit; font-size:15px }
@@ -291,6 +334,7 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
       ${row('Net profit', gbp(p.profit), { bold: true })}
       ${p.companyExcluded ? '' : row(p.estimatedTaxLabel, gbp(p.estimatedTax), { muted: true })}
     </table>
+    ${p.capitalCost > 0 ? `<div class="capital">${gbp(p.capitalCost)} more left the account on ${p.capitalCount === 1 ? 'a car' : `${p.capitalCount} cars`}, which is not an allowable expense in one year. A car comes off over several years rather than all at once, so it is not in the figures above.</div>` : ''}
     ${p.shareNote ? `<div class="whose">${esc(p.shareNote)}</div>` : ''}
     ${p.companyExcluded ? `<div class="whose">These are the company's figures, not this person's personal income. A company pays Corporation Tax on its own return, and the director is paid in salary and dividends, which are not shown here.</div>` : ''}
     <div class="stamp">Prepared by Lekhio &middot; ${esc(generated)} &middot; ${p.txCount} entries</div>

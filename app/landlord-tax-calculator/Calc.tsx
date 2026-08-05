@@ -137,7 +137,7 @@ export default function Calc() {
       <div style={{ background: RIVER_TINT, border: '1px solid #D4E4F4', borderRadius: 18, padding: '22px 24px', marginTop: 22 }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: RIVER_DEEP, marginBottom: 8 }}>April 2027 is the biggest landlord tax change since Section 24</div>
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
-          Budget 2025 gave property income its own tax rates from April 2027, two points above the normal ones, and quietly changed how your personal allowance is used. Most landlords will find out when the bill arrives. Lekhio tracks your rents and costs all year, keeps the set aside number honest across your job, your trade and your property, and Rakha warns you about changes like this a year early, on your numbers, not in a headline.
+          Budget 2025 gave property income its own tax rates from April 2027, two points above the normal ones, and quietly changed how your personal allowance is used. Most landlords will find out when the bill arrives. Lekhio tracks your rents and costs all year, keeps the set aside number honest across your job, your trade and your property, and has the 2027 change already built into the figure you see, on your numbers, not in a headline.
         </p>
         <Link href="/start" style={{ display: 'inline-block', marginTop: 16, background: RIVER, color: 'var(--on-river)', fontSize: 15, fontWeight: 700, padding: '12px 22px', borderRadius: 11 }}>Never get surprised by a Budget →</Link>
       </div>

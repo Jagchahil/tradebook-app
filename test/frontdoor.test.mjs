@@ -1050,12 +1050,26 @@ console.log('\n🔴 SIX PEOPLE WHO DO NOT EXIST, WITH FIVE STARS EACH, ON THE FR
     ok(`the invented quote "${g.slice(0, 34)}..." is gone from the whole site`,
       !read('app/_shared/site.tsx').includes(g) && !home.includes(g));
   }
-  ok('🔴 and the array they lived in is EMPTY, not deleted, so a real one turns the section back on',
+  // 🔴 THE RULE GOT STRONGER ON 5 AUGUST, IT DID NOT GET WEAKER. A testimonial feature was added,
+  // and the correct fear is that a feature is exactly how a banned thing sneaks back. So the array
+  // that could once have held an invented quote no longer holds quotes AT ALL: no review text lives
+  // in the code, in either file. The front door reads published rows from the database, filled only
+  // by the founder on the auth gated /team desk, so a quote nobody said cannot ship in a source file.
+  const supa = read('lib/supabase.ts');
+  const reviewsRoute = read('app/api/team/reviews/route.ts');
+
+  ok('🔴 the hardcoded reviews array is still there as the type witness AND still empty of any quote',
     /export const reviews: Review\[\] = \[\];/.test(codeOnly(site)));
-  ok('the section renders nothing while it is empty',
+  ok('🔴 the front door sources its quotes from the DB helper, NOT a hardcoded array',
+    /readPublishedTestimonials/.test(homeCode)
+    && /const reviews = await readPublishedTestimonials\(\)/.test(homeCode));
+  ok('...and that helper only ever returns rows a HUMAN published, gated to published = true',
+    /export async function readPublishedTestimonials/.test(supa)
+    && /published=eq\.true/.test(supa));
+  ok('the section still renders nothing when there are no reviews',
     /\{reviews\.length > 0 \? \(/.test(homeCode));
-  ok('🔴 AND NO STAR IS DRAWN ANYWHERE ON THE FRONT DOOR',
-    !/★/.test(homeCode) && !/\.stars\{/.test(homeCode));
+  ok('🔴 AND NO STAR GLYPH OR .stars CLASS IS DRAWN ANYWHERE ON THE FRONT DOOR',
+    !/★/.test(homeCode) && !/\.stars\{/.test(homeCode) && !/★/.test(codeOnly(site)) && !/\.stars\{/.test(codeOnly(site)));
   ok('...nor the four avatars that stood for nobody',
     !/className="avs"/.test(homeCode) && !/\.avs\{/.test(homeCode));
   // ⚠️ BOTH OF THESE RUN ON codeOnly() AND THE FIRST DRAFT DID NOT, AND BOTH WENT RED ON MY OWN
@@ -1070,8 +1084,18 @@ console.log('\n🔴 SIX PEOPLE WHO DO NOT EXIST, WITH FIVE STARS EACH, ON THE FR
   ok('the star components that drew them are gone as well',
     !/export function Stars\(\)/.test(codeOnly(site)) && !/export function ReviewCard\(/.test(codeOnly(site)));
 
+  // 🔴 THE ONLY WAY IN IS AUTH GATED, THE SAME AS EVERY OTHER TEAM ROUTE. A route that lets an
+  // unauthenticated stranger write to the front door is the whole feature going wrong, so this pins
+  // the gate the same way test/review.test.mjs and test/marketinginsights.test.mjs pin theirs.
+  ok('🔴 the reviews route is team gated (verifyAccessToken + isTeam) before any write',
+    /verifyAccessToken/.test(reviewsRoute) && /readTeamMember\(user\.email\)/.test(reviewsRoute)
+    && /isTeam\(member\)/.test(reviewsRoute));
+  ok('...and it attributes every published quote to a named member, never "the system decided"',
+    /return \{ email: user\.email \}/.test(reviewsRoute) && /writeTestimonial\(/.test(reviewsRoute));
+
   // ⚠️ THE PRODUCT'S OWN PUBLISHED ANSWER AND ITS FRONT DOOR NOW AGREE. This is the assertion that
-  // would have caught it: llmstxt tests the STRING, and nothing tested whether it was true.
+  // would have caught it: llmstxt tests the STRING, and nothing tested whether it was true. It stays
+  // true: the code holds no invented quote, because it holds no quote.
   ok('🔴 and llms.txt\'s promise is now a fact about the site, not just a sentence in a file',
     /does not publish invented testimonials or user numbers/i.test(read('app/llms.txt/route.ts'))
     && !/★/.test(homeCode));

@@ -3,10 +3,17 @@ import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { bankFeedLive, filingBadge, alertChannels } from '../lib/features';
 import { css } from '../lib/tokens';
+import { readPublishedTestimonials } from '../lib/supabase';
 import {
-  INK, PAPER, FONT, SITE, faqs, reviews,
+  INK, PAPER, FONT, SITE, faqs,
   SharedHead, SiteNav, SiteFooter, StickyCta, HeroReport, Ic,
 } from './_shared/site';
+
+// The front door reads its testimonials from the database at render time. There is no hardcoded
+// review array any more, so a quote nobody said cannot ship in the code. A short revalidate keeps a
+// newly published quote appearing without a rebuild, while a build with no database still succeeds
+// because readPublishedTestimonials returns an empty array on any failure and the section hides.
+export const revalidate = 300;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // 🔴 THE FRONT DOOR ASKS lib/features.ts LIKE EVERY OTHER PUBLIC PAGE.
@@ -182,8 +189,8 @@ const HOME_CSS = css`
 .rev-marquee:hover .rev-track{animation-play-state:paused}
 @keyframes hslide{to{transform:translateX(-50%)}}
 .quote{width:360px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px}
-/* .quote .stars went too. A real quote is a real quote; a rating is a separate claim and
-   nobody has given us one. If a customer ever rates us in writing, it comes back then. */
+.rate{display:flex;gap:3px;margin-bottom:12px}
+.rate svg{width:15px;height:15px;display:block}
 .quote p{font-size:16px;margin:0 0 18px}
 .who{display:flex;align-items:center;gap:12px}
 .who .a{width:42px;height:42px;border-radius:999px;display:grid;place-items:center;font-weight:800;font-size:16px}
@@ -226,11 +233,14 @@ const CBARS = [
   { h: 64, c: 'var(--green)', o: 1 },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
   // Read once, at the top, so every sentence below answers to the same switch.
   const bankLive = bankFeedLive();
   const filing = filingBadge();
   const capture = captureLine();
+  // The reviews the founder has published on the /team desk. Named `reviews` so the guard shape
+  // below is unchanged: the section still renders nothing while the array is empty.
+  const reviews = await readPublishedTestimonials();
   return (
     <main className="home" style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <script
@@ -556,10 +566,12 @@ export default function HomePage() {
           not what CAP 3.47's "obviously fictitious" means and is not the permission CAP 3.50
           requires, because there was nobody to ask. The full reasoning, and the three tests a
           quote has to pass to go in, are on `reviews` in app/_shared/site.tsx.
-          ⚠️ THE SECTION IS NOT DELETED, IT IS EMPTY, and that is deliberate. Today reviews is []
-          so this renders NOTHING and the front door simply does not have this block. Put one real
-          quote in the array and the section comes back on its own, in place, already styled. No
-          page to rebuild and nothing for anybody to remember six months from now.
+          ⚠️ THE QUOTES NOW COME FROM THE DATABASE, NOT THE CODE. `reviews` above is the result of
+          readPublishedTestimonials, filled only by the founder on the auth gated /team desk. When
+          he has published nothing this renders NOTHING and the front door simply does not have this
+          block. Publish one real quote and the section comes back on its own, already styled. No
+          review text lives in this file, which is what makes the ban impossible to break by a copy
+          and paste.
           ═══════════════════════════════════════════════════════════════════════════════════════ */}
       {reviews.length > 0 ? (
         <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
@@ -570,6 +582,13 @@ export default function HomePage() {
             <div className="rev-track">
               {[...reviews, ...reviews].map((r, i) => (
                 <div className="quote" key={i} aria-hidden={i >= reviews.length ? true : undefined}>
+                  <div className="rate" role="img" aria-label={`${r.rating} out of 5`}>
+                    {Array.from({ length: 5 }).map((_, s) => (
+                      <svg key={s} viewBox="0 0 20 20" aria-hidden="true" style={{ fill: s < r.rating ? 'var(--saffron)' : 'var(--line)' }}>
+                        <path d="M10 15.27L16.18 19l-1.64-7.03L20 7.24l-7.19-.61L10 0 7.19 6.63 0 7.24l5.46 4.73L3.82 19z" />
+                      </svg>
+                    ))}
+                  </div>
                   <p>&quot;{r.quote}&quot;</p>
                   <div className="who"><span className="a" style={{ background: r.tint, color: r.fg }}>{r.name.charAt(0)}</span><div><b>{r.name}</b><small>{r.trade}</small></div></div>
                 </div>

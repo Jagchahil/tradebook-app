@@ -63,6 +63,40 @@ type NewPiece = { title: string; trade: string; format: Format; promise: Promise
 
 const BLANK: NewPiece = { title: '', trade: '', format: 'video', promise: 'money', caption: '', source_tag: '' };
 
+// A REAL customer testimonial, shown on the public homepage. Only a quote a customer actually said
+// and agreed to. The founder holds the evidence and the permission off system; this desk holds who
+// added it. See the header on /api/team/reviews and app/_shared/site.tsx for the rule and the law.
+interface TReview {
+  id: string;
+  quote: string;
+  name: string;
+  trade: string;
+  rating: number;
+  source: string | null;
+  published: boolean;
+  created_by: string | null;
+  created_at: string | null;
+}
+type NewReview = { quote: string; name: string; trade: string; rating: number; source: string };
+const BLANK_REVIEW: NewReview = { quote: '', name: '', trade: '', rating: 5, source: '' };
+
+// The route answers with a short code. Turn each into the thing to actually fix, the way the OAuth
+// reasons above are turned into an instruction rather than a code to google.
+function reviewError(code?: string): string {
+  switch (code) {
+    case 'no_quote': return 'Add the quote.';
+    case 'no_name': return 'Add the name.';
+    case 'no_trade': return 'Add the trade and place.';
+    case 'bad_rating': return 'The rating has to be a whole number, 1 to 5.';
+    case 'house_style': return 'No dashes. Use a full stop.';
+    case 'quote_too_long': return 'That quote is too long.';
+    case 'name_too_long': return 'That name is too long.';
+    case 'trade_too_long': return 'That descriptor is too long.';
+    case 'source_too_long': return 'That source note is too long.';
+    default: return 'That did not go through.';
+  }
+}
+
 // 🔴 WHAT THE CALLBACK IS TRYING TO TELL YOU.
 //
 // /api/connectors/[platform]/callback encodes a distinct reason for every way an OAuth can fail, and
@@ -107,6 +141,10 @@ export default function HokaPage() {
   const [connLoaded, setConnLoaded] = useState(false);
   const [flash, setFlash] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const [testimonials, setTestimonials] = useState<TReview[]>([]);
+  const [reviewsLoaded, setReviewsLoaded] = useState(false);
+  const [newReview, setNewReview] = useState<NewReview>(BLANK_REVIEW);
+
   const token = useCallback(async () => {
     const { data: s } = await browserSupabase.auth.getSession();
     return s.session?.access_token ?? null;
@@ -138,6 +176,85 @@ export default function HokaPage() {
     }
   }, [token]);
 
+  const pullReviews = useCallback(async () => {
+    const tok = await token();
+    if (!tok) return;
+    try {
+      const res = await fetch('/api/team/reviews', { headers: { Authorization: `Bearer ${tok}` } });
+      if (res.ok) { const j = (await res.json()) as { items?: TReview[] }; setTestimonials(j.items ?? []); }
+    } finally {
+      setReviewsLoaded(true);
+    }
+  }, [token]);
+
+  // Publishing a testimonial. A separate path from mutate() above, because it writes to the reviews
+  // route rather than the studio one, and because nothing about this may borrow the studio's copy.
+  async function addReview() {
+    if (busy.__review) return;
+    if (!newReview.quote.trim() || !newReview.name.trim() || !newReview.trade.trim()) return;
+    setBusy((b) => ({ ...b, __review: true }));
+    setErr(null); setNote(null);
+    const tok = await token();
+    if (!tok) { setBusy((b) => ({ ...b, __review: false })); return; }
+    try {
+      const res = await fetch('/api/team/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify(newReview),
+      });
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.ok) { setNote('Testimonial added. It is live on the homepage.'); setNewReview(BLANK_REVIEW); await pullReviews(); }
+      else setErr(reviewError(j.error));
+    } catch {
+      setErr('Could not reach the server. Try again.');
+    }
+    setBusy((b) => ({ ...b, __review: false }));
+  }
+
+  // Hide or show one, without destroying the record that it was said.
+  async function toggleReview(id: string, published: boolean) {
+    const key = `tp${id}`;
+    if (busy[key]) return;
+    setBusy((b) => ({ ...b, [key]: true }));
+    setErr(null); setNote(null);
+    const tok = await token();
+    if (!tok) { setBusy((b) => ({ ...b, [key]: false })); return; }
+    try {
+      const res = await fetch('/api/team/reviews', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ id, published }),
+      });
+      if (res.ok) { setNote(published ? 'Shown on the homepage.' : 'Hidden from the homepage.'); await pullReviews(); }
+      else setErr('That did not go through.');
+    } catch {
+      setErr('Could not reach the server. Try again.');
+    }
+    setBusy((b) => ({ ...b, [key]: false }));
+  }
+
+  // Remove one for good, e.g. when permission is withdrawn.
+  async function removeReview(id: string) {
+    const key = `td${id}`;
+    if (busy[key]) return;
+    setBusy((b) => ({ ...b, [key]: true }));
+    setErr(null); setNote(null);
+    const tok = await token();
+    if (!tok) { setBusy((b) => ({ ...b, [key]: false })); return; }
+    try {
+      const res = await fetch('/api/team/reviews', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) { setNote('Testimonial deleted.'); await pullReviews(); }
+      else setErr('That did not go through.');
+    } catch {
+      setErr('Could not reach the server. Try again.');
+    }
+    setBusy((b) => ({ ...b, [key]: false }));
+  }
+
   // Read the callback's verdict off the URL once, say it, and take it back out of the address bar so
   // a refresh does not re-announce a thing that happened ten minutes ago.
   //
@@ -167,10 +284,10 @@ export default function HokaPage() {
 
   useEffect(() => {
     let alive = true;
-    (async () => { if (alive) { await pull(); await pullConns(); } })();
+    (async () => { if (alive) { await pull(); await pullConns(); await pullReviews(); } })();
     const id = setInterval(pull, 20000);
     return () => { alive = false; clearInterval(id); };
-  }, [pull, pullConns]);
+  }, [pull, pullConns, pullReviews]);
 
   async function mutate(key: string, body: Record<string, unknown>, ok?: string) {
     if (busy[key]) return;
@@ -500,6 +617,84 @@ export default function HokaPage() {
             not broken.
           </p>
         ) : null}
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section style={U.section}>
+        <div style={U.sectionHead}>
+          <h2 style={T.h2}>Testimonials</h2>
+          <span style={U.sectionNote}>
+            {!reviewsLoaded ? 'reading…' : `${testimonials.filter((t) => t.published).length} live on the homepage`}
+          </span>
+        </div>
+        <p style={{ ...T.tiny, color: C.faint, marginTop: 0, marginBottom: 12 }}>
+          Only a quote a real customer said and agreed to see printed with their name. You hold the
+          evidence and the permission. Nothing here writes a word for you, and a quote nobody gave is
+          the one thing this section must never hold.
+        </p>
+        <div style={card}>
+          <textarea
+            value={newReview.quote}
+            onChange={(e) => setNewReview({ ...newReview, quote: e.target.value })}
+            placeholder="The quote, in their words"
+            aria-label="Quote"
+            style={{ ...input, minHeight: 74, resize: 'vertical', fontFamily: 'inherit' }}
+          />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            <input value={newReview.name} onChange={(e) => setNewReview({ ...newReview, name: e.target.value })} placeholder="Name" aria-label="Name" style={{ ...input, flex: '1 1 130px' }} />
+            <input value={newReview.trade} onChange={(e) => setNewReview({ ...newReview, trade: e.target.value })} placeholder="Trade and place, e.g. Electrician, Leeds" aria-label="Trade and place" style={{ ...input, flex: '1 1 200px' }} />
+            <input value={newReview.source} onChange={(e) => setNewReview({ ...newReview, source: e.target.value })} placeholder="Source, e.g. in person (optional)" aria-label="Source" style={{ ...input, flex: '1 1 150px' }} />
+            <select value={newReview.rating} onChange={(e) => setNewReview({ ...newReview, rating: Number(e.target.value) })} aria-label="Rating" style={sel}>
+              {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} out of 5</option>)}
+            </select>
+            <button
+              disabled={busy.__review || !newReview.quote.trim() || !newReview.name.trim() || !newReview.trade.trim()}
+              onClick={addReview}
+              style={{ ...btn, ...btnDark, opacity: busy.__review || !newReview.quote.trim() || !newReview.name.trim() || !newReview.trade.trim() ? 0.5 : 1 }}
+            >{busy.__review ? 'Adding…' : 'Add'}</button>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          {!reviewsLoaded ? (
+            <div style={U.honest}>Reading…</div>
+          ) : testimonials.length === 0 ? (
+            <div style={U.honest}>No testimonials yet. The homepage section stays hidden until you add one.</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {testimonials.map((t) => (
+                <div key={t.id} style={{ ...card, opacity: t.published ? 1 : 0.6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={chip}>{t.rating} out of 5</span>
+                    <span style={{ fontSize: 14.5, fontWeight: 750, color: C.ink }}>{t.name}</span>
+                    <span style={{ ...T.tiny, color: C.faint }}>{t.trade}</span>
+                    <span style={{ ...chip, marginLeft: 'auto', color: t.published ? C.green : C.faint }}>
+                      {t.published ? 'Live' : 'Hidden'}
+                    </span>
+                  </div>
+                  <p style={{ ...T.small, color: C.ink2, margin: '10px 0 0' }}>&ldquo;{t.quote}&rdquo;</p>
+                  <div style={{ ...T.tiny, color: C.faint, marginTop: 6 }}>
+                    {t.source ? `via ${t.source}` : 'source not noted'}
+                    {t.created_by ? ` · added by ${t.created_by}` : ''}
+                    {t.created_at ? ` · ${shortDate(t.created_at)}` : ''}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    <button
+                      disabled={busy[`tp${t.id}`]}
+                      onClick={() => toggleReview(t.id, !t.published)}
+                      style={{ ...btn, ...btnGhost }}
+                    >{busy[`tp${t.id}`] ? 'Working…' : t.published ? 'Hide' : 'Show'}</button>
+                    <button
+                      disabled={busy[`td${t.id}`]}
+                      onClick={() => removeReview(t.id)}
+                      style={{ ...btn, ...btnGhost, color: C.red, marginLeft: 'auto' }}
+                    >{busy[`td${t.id}`] ? 'Working…' : 'Delete'}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </TeamShell>
   );

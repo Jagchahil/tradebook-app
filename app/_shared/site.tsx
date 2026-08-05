@@ -257,7 +257,8 @@ export const MARKETING_CSS = css`
 .rev-marquee:hover .rev-track{animation-play-state:paused}
 @keyframes hslide{to{transform:translateX(-50%)}}
 .quote{width:360px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px}
-.quote .stars{color:var(--saffron);font-size:15px;margin-bottom:12px}
+.rate{display:flex;gap:3px;margin-bottom:12px}
+.rate svg{width:15px;height:15px;display:block}
 .quote p{font-size:16px;margin:0 0 18px}
 .who{display:flex;align-items:center;gap:12px}
 .who .a{width:42px;height:42px;border-radius:999px;display:grid;place-items:center;font-weight:800;font-size:16px}
@@ -425,10 +426,19 @@ export interface Review {
   quote: string;
   name: string;
   trade: string;
+  rating: number;
   tint: string;
   fg: string;
 }
 
+// ⚠️ NO REVIEW TEXT LIVES HERE ANY MORE, AND THAT IS THE WHOLE POINT.
+//
+// This array used to be the only home a testimonial had, kept empty by a comment and a test. As of
+// 5 August 2026 the front door reads published reviews from the database (readPublishedTestimonials
+// in lib/supabase.ts), and the ONLY way one gets in is the founder typing it on the auth gated /team
+// desk, which stamps who added it. A quote nobody said cannot reach the code, because the code no
+// longer holds quotes. The export stays, empty, as the type witness and so nothing that once
+// imported it breaks; the homepage no longer reads it.
 export const reviews: Review[] = [];
 
 export const claimExamples = [

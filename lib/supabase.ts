@@ -7914,6 +7914,153 @@ export async function readAnnouncementsForTeam(limit = 40): Promise<
   }
 }
 
+// --- TESTIMONIALS --------------------------------------------------------------------------------
+//
+// Real customer quotes, added by the founder on the /team marketing desk and shown on the public
+// homepage. NO review text ever lives in the code: the front door reads them from here at render
+// time. That is what makes the anti invention rule STRONGER than an empty array with a comment on
+// it. CAP 3.47 and 3.50 and the DMCC Act 2024 ban invented testimonials, so every row carries WHO
+// added it, exactly like writeAnnouncement above.
+
+export interface TestimonialRow {
+  id: string;
+  quote: string;
+  name: string;
+  trade: string;
+  rating: number;
+  source: string | null;
+  published: boolean;
+  created_by: string | null;
+  created_at: string | null;
+}
+
+// The shape the homepage renders. tint and fg are DERIVED per card from a fixed palette below,
+// because the database stores the words a customer said, never a colour of ours.
+export interface PublicReview {
+  quote: string;
+  name: string;
+  trade: string;
+  rating: number;
+  tint: string;
+  fg: string;
+}
+
+// Theme tokens, cycled per card so a run of quotes does not read as one block. Not stored, because a
+// colour is our decoration and has no business sitting in the same row as a customer's words.
+const TESTIMONIAL_TINTS: ReadonlyArray<{ tint: string; fg: string }> = [
+  { tint: 'var(--river-tint)', fg: 'var(--river-deep)' },
+  { tint: 'var(--saffron-tint)', fg: 'var(--on-saffron-tint)' },
+  { tint: 'var(--green-tint)', fg: 'var(--on-green-tint)' },
+];
+
+// PUBLISHING A TESTIMONIAL, FROM /team. Every visitor reads what this writes, so it carries a name
+// and a date for the same reason writeAnnouncement does. `createdBy` is required by the signature,
+// not defaulted: a testimonial we cannot attribute is "the system decided", which is the exact thing
+// the anti invention rule exists to prevent. The rating is pinned to 1 to 5 here as well as by the
+// column CHECK, so a bad value is refused before it reaches the network.
+export async function writeTestimonial(fields: {
+  quote: string;
+  name: string;
+  trade: string;
+  rating: number;
+  source?: string | null;
+}, createdBy: string): Promise<boolean> {
+  if (!fields.quote?.trim() || !fields.name?.trim() || !fields.trade?.trim() || !createdBy) return false;
+  if (!Number.isInteger(fields.rating) || fields.rating < 1 || fields.rating > 5) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/testimonials`, {
+      method: 'POST',
+      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        quote: fields.quote.trim(),
+        name: fields.name.trim(),
+        trade: fields.trade.trim(),
+        rating: fields.rating,
+        source: fields.source?.trim() || null,
+        created_by: createdBy,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// What the PUBLIC homepage shows: only published rows, newest first, mapped into the render shape
+// with a tint derived per card. An empty array covers both "nothing published yet" and "the read
+// failed", and for the front door that is the right conflation: the section simply hides, which is
+// what it did when the array was empty, and a quiet homepage is never a wrong one.
+export async function readPublishedTestimonials(): Promise<PublicReview[]> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/testimonials?published=eq.true&select=quote,name,trade,rating&order=created_at.desc`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return [];
+    const rows = (await res.json()) as Array<{ quote: string; name: string; trade: string; rating: number }>;
+    return rows.map((r, i) => ({
+      quote: r.quote,
+      name: r.name,
+      trade: r.trade,
+      rating: r.rating,
+      ...TESTIMONIAL_TINTS[i % TESTIMONIAL_TINTS.length],
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// What /team shows: EVERYTHING, published or not, newest first, with who added it. Null means the
+// read failed, which is not the same as "nothing added yet", so the desk can say which.
+export async function listTestimonialsForTeam(limit = 100): Promise<TestimonialRow[] | null> {
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/testimonials?select=id,quote,name,trade,rating,source,published,created_by,created_at&order=created_at.desc&limit=${limit}`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as TestimonialRow[];
+  } catch {
+    return null;
+  }
+}
+
+// Hiding or showing one from the desk. Unpublishing takes it off the front door without destroying
+// the record that it was said, the same instinct as retiring an announcement rather than deleting it.
+export async function setTestimonialPublished(id: string, published: boolean): Promise<boolean> {
+  if (!id) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/testimonials?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ published }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Removing one for good. Unlike an announcement, a testimonial that turns out to be mistaken or whose
+// permission is withdrawn should leave no trace, so this genuinely deletes rather than hides.
+export async function deleteTestimonial(id: string): Promise<boolean> {
+  if (!id) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/testimonials?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { ...headers(), Prefer: 'return=minimal' },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // --- ALLOWANCE ELECTIONS -------------------------------------------------------------------------
 //
 // The mechanism lib/taxoptimiser.ts rule 4 has been asking for since it was written. It emitted the

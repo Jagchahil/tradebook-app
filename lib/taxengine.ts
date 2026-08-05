@@ -541,7 +541,8 @@ export function capitalGainsTax(gain: number, opts: { higherRate?: boolean; badr
 // turnover. The percentage depends on the trade, with a 16.5% rate for limited
 // cost traders. The caller supplies the trade's rate.
 export function vatFlatRateDue(grossTurnover: number, ratePercent: number): number {
-  return round2(Math.max(0, grossTurnover) * (ratePercent / 100));
+  const rate = Math.min(0.165, Math.max(0, ratePercent || 0) / 100);
+  return round2(Math.max(0, grossTurnover) * rate);
 }
 
 // --- Allowable expense classification ---------------------------------------

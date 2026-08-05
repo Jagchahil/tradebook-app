@@ -211,6 +211,7 @@ function round(n: number): number {
 // which is what each pound of extra allowable deduction actually saves. Mirrors
 // lib/agent.ts so a saving quoted here matches a saving quoted there.
 export function marginalRate(projectedTotalIncome: number): number {
+  if (projectedTotalIncome >= FACTS.additionalRateThreshold) return 0.47; // 45 plus 2
   if (projectedTotalIncome >= FACTS.personalAllowanceTaperFloor) return 0.62; // taper: 40 + 2 + 20
   if (projectedTotalIncome >= FACTS.class4UpperLimit) return 0.42; // 40 + 2
   if (projectedTotalIncome > FACTS.personalAllowance) return 0.26; // 20 + 6

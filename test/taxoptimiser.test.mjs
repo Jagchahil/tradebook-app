@@ -47,6 +47,7 @@ ok('below personal allowance = 0', O.marginalRate(10000) === 0);
 ok('basic rate band = 0.26', O.marginalRate(30000) === 0.26);
 ok('higher rate band = 0.42', O.marginalRate(60000) === 0.42);
 ok('taper zone = 0.62', O.marginalRate(110000) === 0.62);
+ok('additional rate = 0.47', O.marginalRate(150000) === 0.47);
 
 console.log('\n=== optimiser: the tidy low earner used to get NOTHING ===\n');
 //

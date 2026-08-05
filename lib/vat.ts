@@ -577,7 +577,7 @@ export function vatPosition(input: VatPositionInput): VatPosition {
   const proofShare = inputVat > 0 ? Math.min(1, withProof / inputVat) : 1;
 
   if (input.profile.scheme === 'flat_rate') {
-    const base = Math.max(0, Number(input.profile.flatRatePercent) || 0) / 100;
+    const base = Math.min(0.165, Math.max(0, Number(input.profile.flatRatePercent) || 0) / 100);
     const rate = Math.max(0, base - (input.profile.flatRateFirstYear ? FLAT_RATE_FIRST_YEAR_DISCOUNT : 0));
     const due = money(pence(Math.max(0, input.grossTurnover)) * rate);
     notes.push('On the flat rate scheme you pay a percentage of your VAT inclusive turnover, and you do not reclaim the VAT on what you buy, apart from capital assets over £2,000.');

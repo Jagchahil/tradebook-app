@@ -333,6 +333,9 @@ ok('the first year discount is one percentage point off',
 ok('a flat rate customer with no percentage on file is told the figure is not right yet',
   /not right until you add it/.test(V.vatPosition({ ...P0, profile: { ...FLAT, flatRatePercent: null }, grossTurnover: 24000 }).notes.join(' ')));
 
+ok('an absurd flat rate percentage is clamped to the 16.5 percent limited cost trader ceiling',
+  V.vatPosition({ ...P0, profile: { ...FLAT, flatRatePercent: 200 }, grossTurnover: 24000 }).flatRateUsed === 0.165);
+
 ok('cash accounting says when the VAT falls due',
   /when your customer pays you/.test(V.vatPosition({ ...P0, profile: { ...REGISTERED, scheme: 'cash' } }).notes.join(' ')));
 

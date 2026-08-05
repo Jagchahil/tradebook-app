@@ -102,6 +102,10 @@ eq('stacked monthly', stack.monthlyTotal, Math.round(((40000 - 29385) * 0.09 + (
 
 // Duplicates collapse, selection rule
 eq('duplicate plans collapse', studentLoanRepayment(40000, ['plan2', 'plan2']).perPlan.length, 1);
+// Contradictory undergrad plans charge one only, the first, not both
+const contradictory = studentLoanRepayment(40000, ['plan1', 'plan2']);
+eq('contradictory undergrad charges one row', contradictory.perPlan.length, 1);
+eq('contradictory undergrad charges first plan', contradictory.annualTotal, (40000 - 26900) * 0.09);
 eq('two undergrad plans invalid', validPlanSelection(['plan1', 'plan2']), false);
 eq('plan plus postgrad valid', validPlanSelection(['plan2', 'postgrad']), true);
 eq('postgrad alone valid', validPlanSelection(['postgrad']), true);

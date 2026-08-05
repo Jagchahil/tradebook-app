@@ -137,6 +137,20 @@ export interface StudentLoanResult {
   monthlyTotal: number;
 }
 
+// Collapse a contradictory selection before a single pound is charged. Only one
+// of the undergraduate plans (1, 2, 4, 5) can run at a time, so if a list names
+// more than one we keep the first and drop the rest. The postgraduate loan always
+// survives, it stacks on top. validPlanSelection decides whether a list is already
+// legal, and only an illegal list is touched.
+function chargeablePlans(plans: StudentPlan[]): StudentPlan[] {
+  if (validPlanSelection(plans)) return plans;
+  const out: StudentPlan[] = [];
+  const firstUndergrad = plans.find((p) => p !== 'postgrad');
+  if (firstUndergrad) out.push(firstUndergrad);
+  if (plans.includes('postgrad')) out.push('postgrad');
+  return out;
+}
+
 // Annual repayment on a total income figure for one or more plans. This is the
 // same maths PAYE runs per pay period and Self Assessment runs on the year:
 // the rate applied to income above each plan's threshold. The self employed
@@ -145,7 +159,7 @@ export interface StudentLoanResult {
 export function studentLoanRepayment(income: number, plans: StudentPlan[]): StudentLoanResult {
   const y = Math.max(0, income);
   const seen = new Set<StudentPlan>();
-  const perPlan = plans
+  const perPlan = chargeablePlans(plans)
     .filter((p) => (seen.has(p) ? false : (seen.add(p), true)))
     .map((plan) => {
       const { label, threshold, rate } = STUDENT_PLANS[plan];

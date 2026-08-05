@@ -160,13 +160,17 @@ export const MARKETING_CSS = css`
 .mkt .h2{font-size:clamp(28px,4.4vw,44px);letter-spacing:-.035em;line-height:1.05;font-weight:800;margin:0}
 .mkt section{padding:64px 0}
 .mkt .pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:7px 14px;border-radius:999px;background:var(--river-tint);color:var(--river-deep)}
-.mkt .dot{width:8px;height:8px;border-radius:999px;background:#22C55E;animation:hpulse 2s infinite}
-@keyframes hpulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
-.mkt .btn{display:inline-block;text-align:center;font-weight:700;font-size:16px;padding:15px 30px;border-radius:13px;cursor:pointer;border:0;font-family:inherit;transition:transform .18s,box-shadow .25s}
-.mkt .btn.primary{background:var(--river);color:var(--on-river);box-shadow:0 10px 26px rgba(27,89,166,.32)}
-.mkt .btn.primary:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(27,89,166,.4)}
-.mkt .btn.ghost{background:transparent;color:var(--tx);border:1px solid var(--tx)}
-.mkt .btn.ghost:hover{transform:translateY(-2px);background:var(--panel-2)}
+/* The dot no longer pulses. The 5 August 2026 brand pass removed the AI tell animations: the
+   gradient sheen, the squiggle, the pulsing dot, the floating phone and the review belt. The
+   motion budget is the reveal fade and the hero report loop, nothing else. */
+.mkt .dot{width:8px;height:8px;border-radius:999px;background:#22C55E}
+/* Buttons wear the app shell's border weight (GLASS.border, 2px) and the two step radius: 12 for
+   buttons, 16 for cards. Hover is a 1px lift and a border shift to the river, never a glow. */
+.mkt .btn{display:inline-block;text-align:center;font-weight:700;font-size:16px;padding:15px 30px;border-radius:12px;cursor:pointer;border:2px solid transparent;font-family:inherit;transition:transform .18s,border-color .18s,background-color .18s}
+.mkt .btn.primary{background:var(--river);color:var(--on-river);border-color:var(--river-deep)}
+.mkt .btn.primary:hover{transform:translateY(-1px);border-color:var(--river)}
+.mkt .btn.ghost{background:transparent;color:var(--tx);border-color:var(--tx)}
+.mkt .btn.ghost:hover{transform:translateY(-1px);border-color:var(--river)}
 .mkt .btn.white{background:#fff;color:var(--on-white-river)}
 .mtdtop{background:var(--band);color:#fff}
 .mtdtop a{display:flex;align-items:center;justify-content:center;gap:11px;flex-wrap:wrap;padding:10px 16px;font-size:13px;font-weight:500;color:rgba(255,255,255,.85)}
@@ -182,10 +186,9 @@ export const MARKETING_CSS = css`
 .mkt .hero.center,.mkt section.center{text-align:center}
 .hero .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
 .hero h1{font-size:clamp(40px,6.4vw,72px);letter-spacing:-.045em;line-height:1.05;font-weight:800;margin:22px 0 0}
-.hero .gt{background:linear-gradient(100deg,var(--river),var(--saffron));-webkit-background-clip:text;background-clip:text;color:transparent;position:relative;display:inline-block}
-.squig{position:absolute;left:-2%;bottom:-14px;width:104%;height:16px;overflow:visible}
-.squig path{stroke:var(--saffron);stroke-width:6;fill:none;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:hdraw 1s ease forwards .6s}
-@keyframes hdraw{to{stroke-dashoffset:0}}
+/* .gt and .squig are gone. Gradient text with an animated underline is the costume every AI
+   landing page wears, and doc 104 says we are an employee, not a launch. A heading carries
+   itself in the ink it was set in. Pages that still write the class get plain text, on purpose. */
 /* 🔴 margin-inline IS auto, AND IT USED TO BE 0. Found by Jag looking at /how-mtd-works on a
    laptop on 1 August 2026: the paragraph under a centred h1 sat visibly left of centre.
    This rule was written for the HOMEPAGE, whose hero is a two column grid with left aligned
@@ -202,8 +205,8 @@ export const MARKETING_CSS = css`
 @media(max-width:900px){.hero .grid{grid-template-columns:1fr;gap:34px;text-align:center}.cta-row,.hero .micro{justify-content:center}.hero p.sub{margin-inline:auto}}
 .ba{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
 @media(max-width:760px){.ba{grid-template-columns:1fr}}
-.ba .old{background:var(--band);color:#fff;border-radius:20px;padding:30px}
-.ba .new{background:linear-gradient(150deg,var(--river-panel),var(--river-panel-deep));color:#fff;border-radius:20px;padding:30px}
+.ba .old{background:var(--band);color:#fff;border-radius:16px;padding:30px}
+.ba .new{background:linear-gradient(150deg,var(--river-panel),var(--river-panel-deep));color:#fff;border-radius:16px;padding:30px}
 .ba h3{font-size:21px;margin:0 0 16px}
 .ba li{list-style:none;display:flex;gap:11px;align-items:flex-start;padding:8px 0;font-size:15px}
 .ba .m{flex:0 0 22px;height:22px;border-radius:999px;display:grid;place-items:center;font-size:12px;font-weight:900;margin-top:1px}
@@ -215,18 +218,14 @@ export const MARKETING_CSS = css`
 .stepn{width:62px;height:62px;border-radius:999px;margin:0 auto 18px;color:#fff;font-weight:900;font-size:23px;display:grid;place-items:center}
 .numgrid{display:grid;grid-template-columns:.9fr 1.1fr;gap:48px;align-items:center}
 @media(max-width:900px){.numgrid{grid-template-columns:1fr;gap:32px}}
-.appmock{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:20px;max-width:360px;margin:0 auto;width:100%}
-.setaside{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:18px;padding:18px;color:#fff}
+.appmock{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:360px;margin:0 auto;width:100%}
+.setaside{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:16px;padding:18px;color:#fff}
 .setaside .l{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.85}
-.setaside .big{font-size:38px;font-weight:900;letter-spacing:-.03em;margin-top:2px}
+.setaside .big{font-size:38px;font-weight:900;letter-spacing:-.03em;margin-top:2px;font-variant-numeric:tabular-nums}
 .setaside .s{font-size:12px;opacity:.85}
-.mini3{display:flex;gap:8px;margin:12px 0}.mini3 div{flex:1;border-radius:13px;padding:11px}
-.mini3 .l{font-size:10px;font-weight:700}.mini3 .v{font-size:16px;font-weight:900;margin-top:3px}
-.chartbox{background:var(--panel-2);border-radius:14px;padding:12px 12px 10px;margin-bottom:10px}
-.chartrow{display:flex;align-items:flex-end;gap:7px;height:64px}
-.cbar{flex:1;border-radius:5px 5px 0 0;height:8px;transition:height .9s cubic-bezier(.2,.7,.3,1)}
-.reveal.in .cbar{height:var(--h)}
-.cisbar{background:var(--saffron-tint);border-radius:14px;padding:13px}
+.mini3{display:flex;gap:8px;margin:12px 0}.mini3 div{flex:1;border-radius:12px;padding:11px}
+.mini3 .l{font-size:10px;font-weight:700}.mini3 .v{font-size:16px;font-weight:900;margin-top:3px;font-variant-numeric:tabular-nums}
+.cisbar{background:var(--saffron-tint);border-radius:12px;padding:13px}
 .cisbar .top{display:flex;justify-content:space-between;font-size:12px;font-weight:800;color:var(--on-saffron-tint)}
 .track{height:9px;border-radius:999px;background:rgba(0,0,0,.08);margin-top:8px;overflow:hidden}
 .fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--saffron),var(--green));width:0;transition:width 1.3s cubic-bezier(.2,.7,.3,1)}
@@ -236,8 +235,8 @@ export const MARKETING_CSS = css`
 .drow.flip .dtext{order:2}
 @media(max-width:820px){.drow{grid-template-columns:1fr;gap:22px}.drow.flip .dtext{order:0}}
 .dtext h3{font-size:26px;letter-spacing:-.03em;margin:0 0 12px}.dtext p{font-size:16px;color:var(--tx-mut)}
-.dvis{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px;min-height:186px;display:flex;flex-direction:column;justify-content:center;gap:9px}
-.dbub{max-width:82%;padding:9px 13px;font-size:13.5px;border-radius:13px}
+.dvis{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;min-height:186px;display:flex;flex-direction:column;justify-content:center;gap:9px}
+.dbub{max-width:82%;padding:9px 13px;font-size:13.5px;border-radius:12px}
 /* 🔴 THE OUTGOING BUBBLE WAS WHATSAPP'S OWN #DCF8C6, AND SO WAS THE RECEIPT CHIP.
    Found by the hero guard sweeping for that palette, not by reading. The ILLUSTRATION is fine and
    stays: a man says what he spent and it comes back logged, which is the outcome and it is real.
@@ -247,18 +246,17 @@ export const MARKETING_CSS = css`
 .dbub.in{align-self:flex-start;background:var(--panel-2);border-bottom-left-radius:4px}
 .dbub .rc{background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:5px}
 .wf{display:flex;align-items:flex-end;gap:3px;height:30px;padding:2px 0}.wf i{width:4px;border-radius:2px;background:var(--river)}
-.splitrow{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.splitrow{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px;font-variant-numeric:tabular-nums}
 .splitrow:last-child{border:0;font-weight:800}
 .approvebtn{margin-top:4px;background:var(--green);color:var(--on-green);border-radius:12px;padding:11px;font-weight:800;text-align:center;font-size:14px}
 .diconrow{display:flex;align-items:center;gap:12px}
 .dicon{width:44px;height:44px;border-radius:999px;background:var(--river);color:var(--on-river);font-size:20px;display:grid;place-items:center}
-.rev-marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
-.rev-track{display:flex;gap:18px;width:max-content;animation:hslide 44s linear infinite}
-.rev-marquee:hover .rev-track{animation-play-state:paused}
-@keyframes hslide{to{transform:translateX(-50%)}}
+/* The review belt is gone. Reviews render as the static wrapping row at every count, each real
+   quote drawn exactly once. A quote that has to keep moving reads as one you hope nobody stops
+   to check. */
 .rev-static{display:flex;flex-wrap:wrap;justify-content:center;gap:18px;padding:0 22px}
 .rev-static .quote{width:min(360px,100%)}
-.quote{width:360px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px}
+.quote{width:360px;flex:0 0 auto;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:26px}
 .rate{display:flex;gap:3px;margin-bottom:12px}
 .rate svg{width:15px;height:15px;display:block}
 .quote p{font-size:16px;margin:0 0 18px}
@@ -268,32 +266,32 @@ export const MARKETING_CSS = css`
 .pricewrap{background:linear-gradient(180deg,var(--panel-2),var(--bg));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .prices{display:grid;grid-template-columns:1fr 1fr;gap:22px;max-width:800px;margin:0 auto;align-items:stretch}
 @media(max-width:760px){.prices{grid-template-columns:1fr}}
-.pcard{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:32px 30px;position:relative;display:flex;flex-direction:column;transition:transform .3s,box-shadow .3s}
-.pcard:hover{transform:translateY(-4px)}
-.pcard.best{border:1px solid transparent;box-shadow:0 24px 56px rgba(27,89,166,.22);overflow:hidden;background:linear-gradient(180deg,var(--river-tint),var(--panel))}
+.pcard{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:32px 30px;position:relative;display:flex;flex-direction:column;transition:transform .18s,border-color .18s}
+.pcard:hover{transform:translateY(-1px);border-color:var(--river)}
+.pcard.best{border-color:var(--river);overflow:hidden;background:linear-gradient(180deg,var(--river-tint),var(--panel))}
 .pcard.best::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--river),var(--saffron))}
 .pbadge{position:absolute;top:16px;right:16px;background:var(--saffron);color:#3a2a08;font-size:12px;font-weight:900;padding:5px 13px;border-radius:999px;white-space:nowrap}
 .pname{font-size:13px;font-weight:800;color:var(--tx-mut);text-transform:uppercase;letter-spacing:.06em}
-.pamt{font-size:52px;font-weight:900;letter-spacing:-.04em;margin:10px 0 2px;line-height:1}
+.pamt{font-size:52px;font-weight:900;letter-spacing:-.04em;margin:10px 0 2px;line-height:1;font-variant-numeric:tabular-nums}
 .pamt span{font-size:18px;font-weight:700;color:var(--tx-mut);letter-spacing:0}
 .pnote{font-size:13.5px;color:var(--tx-mut);margin:6px 0 0}
 .psave{display:inline-block;font-size:12.5px;font-weight:800;color:var(--on-green-tint);background:var(--green-tint);padding:5px 12px;border-radius:999px;margin-top:14px}
 .pcta{margin-top:auto;padding-top:24px}.pcta .btn{width:100%}
 .pmicro{font-size:12px;color:var(--tx-mut);text-align:center;margin-top:10px}
-.incl-panel{max-width:800px;margin:24px auto 0;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px 30px}
+.incl-panel{max-width:800px;margin:24px auto 0;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px 30px}
 .incl-panel h4{font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--tx-mut);text-align:center;margin:0 0 20px}
 .incl-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 30px;margin:0;padding:0}
 @media(max-width:640px){.incl-grid{grid-template-columns:1fr}}
 .incl-grid li{list-style:none;display:flex;gap:12px;align-items:center;font-size:14.5px;font-weight:600}
 .incl-grid .t{flex:0 0 24px;height:24px;border-radius:999px;background:var(--green-tint);color:var(--on-green-tint);display:grid;place-items:center;font-weight:900;font-size:12px}
-.final{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:26px;padding:56px 32px;text-align:center;color:#fff}
+.final{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:16px;padding:56px 32px;text-align:center;color:#fff}
 .final h2{font-size:clamp(28px,4.4vw,44px);color:#fff;margin:0}
 .final p{color:rgba(255,255,255,.86);font-size:18px;margin:14px auto 26px;max-width:460px}
 /* feature grid, for pages that list many features */
 .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 @media(max-width:900px){.fgrid{grid-template-columns:1fr}}
-.fcard{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;transition:transform .3s,border-color .3s}
-.fcard:hover{transform:translateY(-5px);border-color:var(--river)}
+.fcard{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:24px;transition:transform .18s,border-color .18s}
+.fcard:hover{transform:translateY(-1px);border-color:var(--river)}
 .fcard .fi{width:50px;height:50px;border-radius:14px;display:grid;place-items:center;font-size:24px;margin-bottom:14px;color:#fff}
 .fcard h3{font-size:17px;margin:0 0 8px}
 .fcard p{font-size:14.5px;color:var(--tx-mut);margin:0}
@@ -857,9 +855,11 @@ export function AppInv() {
 // lifted river drops to about 2.4:1. The rule is thirty lines up this same file and I broke it
 // anyway, in the one component every visitor sees. Never pair an accent background with a literal
 // white; the --on-* variable already knows which ink each theme needs.
+// No .phone float any more: the report sits still, like a report. The border is the app shell's
+// GLASS weight, 2px, so the card on the front door matches the product it sells.
 export function HeroReport() {
   return (
-    <div className="phone" style={{ width: 320, maxWidth: '100%', backgroundColor: PANEL, borderRadius: 24, border: `1px solid ${LINE}`, boxShadow: '0 30px 70px rgba(17,17,17,.16)', overflow: 'hidden' }}>
+    <div style={{ width: 320, maxWidth: '100%', backgroundColor: PANEL, borderRadius: 16, border: `2px solid ${LINE}`, boxShadow: '0 30px 70px rgba(17,17,17,.16)', overflow: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: reportCss + `
 .hr-top{border-bottom:1px solid var(--bd);padding:15px 18px}
 .hr-eye{font-size:10.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--tx-mut)}
@@ -927,24 +927,23 @@ a{text-decoration:none}
 .logo-word{font-size:23px;font-weight:900;letter-spacing:-1px;color:var(--tx)}
 @keyframes riseIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 @keyframes flow{to{stroke-dashoffset:0}}
-@keyframes sheen{0%{background-position:0% 50%}100%{background-position:200% 50%}}
 @keyframes bubbleIn{0%{opacity:0;transform:translateY(10px) scale(.98)}100%{opacity:1;transform:none}}
-@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-@keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
 @keyframes grow{to{transform:scaleX(1)}}
 @keyframes popIn{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:scale(1)}}
-@keyframes marquee{to{transform:translateX(-50%)}}
+/* sheen, floaty, pulseDot and marquee are deleted. They drew the gradient text shimmer, the
+   floating phone, the pulsing dot and the review belt, which are the four tics every AI product
+   page shares. The motion budget is the reveal fade and the hero report loop. */
 .reveal{opacity:1;transform:none;transition:opacity .4s ease,transform .4s cubic-bezier(.2,.7,.2,1)}
 .reveal.in{opacity:1;transform:none}
 .hero-h1,.hero-sub,.hero-cta,.hero-pill{opacity:0;animation:riseIn .5s cubic-bezier(.2,.7,.2,1) forwards}
 .hero-pill{animation-delay:.04s}.hero-h1{animation-delay:.1s}.hero-sub{animation-delay:.2s}.hero-cta{animation-delay:.3s}
-.btn-primary{transition:background-color .18s ease, transform .18s ease, box-shadow .18s ease}
-.btn-primary:hover{background-color:${RIVER_DEEP}!important;transform:translateY(-2px);box-shadow:0 12px 30px rgba(27,89,166,.30)}
+.btn-primary{transition:background-color .18s ease, transform .18s ease}
+.btn-primary:hover{background-color:${RIVER_DEEP}!important;transform:translateY(-1px)}
 .btn-primary:active{transform:translateY(0)}
 .btn-ghost{transition:background-color .18s ease, border-color .18s ease, transform .18s ease}
-.btn-ghost:hover{background-color:${SURFACE}!important;transform:translateY(-2px)}
-.btn-white{transition:transform .18s ease, box-shadow .18s ease}
-.btn-white:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.18)}
+.btn-ghost:hover{background-color:${SURFACE}!important;transform:translateY(-1px)}
+.btn-white{transition:transform .18s ease}
+.btn-white:hover{transform:translateY(-1px)}
 .card{transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;box-shadow:0 1px 2px rgba(17,17,17,.04),0 10px 30px rgba(17,17,17,.05)}
 .card:hover{transform:translateY(-5px);box-shadow:0 18px 44px rgba(17,17,17,.12);border-color:${RIVER}}
 [data-theme="dark"] .card{box-shadow:0 1px 2px rgba(0,0,0,.4),0 12px 34px rgba(0,0,0,.45)}
@@ -954,27 +953,21 @@ a{text-decoration:none}
 .chip{transition:transform .15s ease, background-color .15s ease, color .15s ease}
 .chip:hover{transform:translateY(-2px);background-color:${RIVER};color:var(--on-river);border-color:${RIVER}}
 .riverflow{stroke-dasharray:1600;stroke-dashoffset:1600;animation:flow 1.4s ease forwards .15s}
-.gradtext{background:linear-gradient(90deg,${RIVER},#2E7BBF,${SAFFRON},${RIVER});background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:sheen 5s linear infinite}
 .hero-h1-size{font-size:64px;line-height:1.05}
 .h2{font-size:38px;line-height:1.12}
 .grid3{grid-template-columns:repeat(3,1fr)}
 .grid4{grid-template-columns:repeat(4,1fr)}
 .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
 .hero-left{text-align:left}
-.phone{animation:floaty 6s ease-in-out infinite}
 .stepper{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
 .stepper-line{position:absolute;top:30px;left:16%;right:16%;height:3px;background:linear-gradient(90deg,${RIVER},#2E7BBF,${SAFFRON});border-radius:2px;transform:scaleX(0);transform-origin:left;animation:grow .8s ease forwards .2s}
 .step{text-align:center;position:relative}
 .step-num{width:60px;height:60px;border-radius:30px;background:linear-gradient(135deg,${RIVER},#2E7BBF);color:#fff;font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 10px 24px rgba(27,89,166,.3);position:relative;z-index:1;border:5px solid ${PAPER}}
-.stat-num{font-size:48px;font-weight:800;letter-spacing:-1.5px;line-height:1}
+.stat-num{font-size:48px;font-weight:800;letter-spacing:-1.5px;line-height:1;font-variant-numeric:tabular-nums}
 .timeline{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:10px}
 .tl-line{position:absolute;top:18px;left:10%;right:10%;height:3px;background:linear-gradient(90deg,${RIVER},${SAFFRON});border-radius:2px;transform:scaleX(0);transform-origin:left;animation:grow .8s ease forwards .15s}
 .tl-step{text-align:center;position:relative}
 .tl-dot{width:38px;height:38px;border-radius:19px;background:#fff;border:3px solid ${RIVER};color:var(--on-white-river);font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;position:relative;z-index:1;opacity:0;animation:popIn .5s ease forwards}
-.marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
-.marquee-track{display:flex;gap:20px;width:max-content;animation:marquee 48s linear infinite}
-.marquee:hover .marquee-track{animation-play-state:paused}
-.rev-card{width:340px;flex:0 0 auto}
 .appdemo-grid{display:grid;grid-template-columns:.95fr 1.05fr;gap:48px;align-items:center}
 .appphone{width:340px;max-width:100%;margin:0 auto;background:var(--panel);border-radius:40px;border:1px solid ${LINE};box-shadow:0 30px 70px rgba(17,17,17,.18);overflow:hidden}
 .appstatus{height:30px;display:flex;align-items:center;justify-content:center;background:var(--panel)}
@@ -1162,7 +1155,7 @@ export function TrustBar() {
         <span className="trustbar-dot">·</span>
         <span>You approve everything</span>
         <span className="trustbar-dot">·</span>
-        <span>🇬🇧 A real UK company, not HMRC</span>
+        <span>A real UK company, not HMRC</span>
       </div>
     </div>
   );
@@ -1201,7 +1194,9 @@ export function SiteNav() {
               to do, and a man who already has an account does not need persuading, only a door.
               ═══════════════════════════════════════════════════════════════════════════════ */}
           <Link href="/in" className="navtop">Sign in</Link>
-          <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 10 }}>Sign up now</Link>
+          {/* One primary CTA wording sitewide: Start free. "Sign up now" was the only button on
+              the site that asked for the signup rather than offering the trial. */}
+          <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 600, padding: '10px 18px', borderRadius: 12 }}>Start free</Link>
         </div>
         <label htmlFor="navtoggle" className="nav-burger" aria-label="Open menu">Menu <span className="nav-burger-lines"><i /><i /><i /></span></label>
       </div>
@@ -1225,7 +1220,7 @@ export function SiteNav() {
         <Link href="/rent-a-room-checker">Rent a Room checker</Link>
         <Link href="/sole-trader-vs-limited">Sole trader vs limited</Link>
         <Link href="/security">Security and trust</Link>
-        <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: ON_RIVER, fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Sign up now</Link>
+        <Link href="/start" className="btn-primary" style={{ display: 'block', textAlign: 'center', backgroundColor: RIVER, color: ON_RIVER, fontSize: 16, fontWeight: 600, padding: '14px 0', borderRadius: 12, marginTop: 16 }}>Start free</Link>
       </div>
     </nav>
   );
@@ -1235,7 +1230,7 @@ export function StickyCta() {
   return (
     <div className="stickycta">
       <span style={{ fontSize: 14, fontWeight: 700, color: INK }}>7 days free. No card.</span>
-      <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 700, padding: '11px 20px', borderRadius: 10 }}>Start free</Link>
+      <Link href="/start" className="btn-primary" style={{ backgroundColor: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 700, padding: '11px 20px', borderRadius: 12 }}>Start free</Link>
     </div>
   );
 }

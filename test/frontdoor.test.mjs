@@ -1068,14 +1068,15 @@ console.log('\n🔴 SIX PEOPLE WHO DO NOT EXIST, WITH FIVE STARS EACH, ON THE FR
     && /published=eq\.true/.test(supa));
   ok('the section still renders nothing when there are no reviews',
     /\{reviews\.length > 0 \? \(/.test(homeCode));
-  // ⚠️ ONE REAL QUOTE, RENDERED ONCE. Found live on 5 August: the belt duplicates the list so the
-  // loop is seamless, and with a single published review the same card visibly appeared twice,
-  // which is padding on the honesty section. Small counts now take a static path that renders
-  // each review exactly once, and the duplicated belt only runs at four cards or more.
-  ok('🔴 a small review count takes the single render path, the belt needs four or more',
-    /reviews\.length >= 4/.test(homeCode) && /rev-static/.test(homeCode));
-  ok('...and the duplicated belt survives for the day there are enough cards to loop',
-    /\[\.\.\.reviews, \.\.\.reviews\]/.test(homeCode));
+  // ⚠️ ONE REAL QUOTE, RENDERED ONCE, AT EVERY COUNT. The belt duplicated the list so the loop
+  // was seamless, which put one real person on screen twice. The 5 August 2026 brand pass then
+  // deleted the belt outright rather than gating it on a count: reviews render as a static
+  // wrapping row whatever the number, so the duplicate can never come back with the fourth quote.
+  ok('🔴 every review count takes the static path, each quote rendered exactly once',
+    /rev-static/.test(homeCode) && /reviews\.map/.test(homeCode));
+  ok('🔴 and the duplicating belt is gone for good, not merely gated on a count',
+    !/\[\.\.\.reviews, \.\.\.reviews\]/.test(homeCode) && !/rev-marquee/.test(homeCode)
+    && !/reviews\.length >= 4/.test(homeCode));
   ok('🔴 AND NO STAR GLYPH OR .stars CLASS IS DRAWN ANYWHERE ON THE FRONT DOOR',
     !/★/.test(homeCode) && !/\.stars\{/.test(homeCode) && !/★/.test(codeOnly(site)) && !/\.stars\{/.test(codeOnly(site)));
   ok('...nor the four avatars that stood for nobody',

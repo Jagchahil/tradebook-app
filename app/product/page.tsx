@@ -4,7 +4,6 @@ import ClientScript from '../_shared/ClientScript';
 import { filingBadge, bankBadge, alertChannels } from '../../lib/features';
 import { css } from '../../lib/tokens';
 import Link from 'next/link';
-import OnboardingShow from './OnboardingShow';
 import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta, Ic,
@@ -30,54 +29,23 @@ const PRODUCT_CSS = css`
 .featcard .fe{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:20px;margin-bottom:12px}
 .featcard h3{font-size:15.5px;margin:0 0 5px;letter-spacing:-.01em}
 .featcard p{font-size:13px;color:var(--tx-mut);margin:0;line-height:1.5}
-.compliance{margin:28px auto 0;max-width:880px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px 24px;display:flex;flex-wrap:wrap;gap:14px 34px;align-items:center;justify-content:center}
+.compliance{margin:28px auto 0;max-width:880px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 24px;display:flex;flex-wrap:wrap;gap:14px 34px;align-items:center;justify-content:center}
 .compliance .ci{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:var(--tx-mut)}
 .compliance b{color:var(--tx);font-weight:800}
-.wphone{width:290px;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:30px;overflow:hidden;box-shadow:0 30px 70px rgba(17,17,17,.2)}
-[data-theme="dark"] .wphone{box-shadow:0 30px 70px rgba(0,0,0,.6)}
-/* Own tokens, not Meta's. See the note on the hero in app/_shared/site.tsx: the illustration
-   is the outcome and stays, the borrowed brand palette is the technology and goes. Tokens also
-   delete the dark override that existed only to undo the borrowed green. */
-.wahead{background:var(--river-deep);color:var(--on-river);padding:12px 15px;display:flex;align-items:center;gap:9px}
-.wahead .a{width:32px;height:32px;border-radius:999px;background:var(--river);display:grid;place-items:center;font-size:15px}
-.wahead b{font-size:13px;display:block}.wahead small{font-size:10px;opacity:.85}
-.wchat{background:var(--panel-2);padding:14px 12px;min-height:250px;display:flex;flex-direction:column;gap:8px}
-.wb{max-width:84%;padding:8px 11px;font-size:13px;border-radius:12px;color:var(--tx)}
-.wb.out{align-self:flex-end;background:var(--river-tint);color:var(--river-deep);border-bottom-right-radius:4px}
-.wb.in{align-self:flex-start;background:var(--panel);border:1px solid var(--bd);border-bottom-left-radius:4px}
-.wb .rc{background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:4px}
-.journey{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:center;justify-items:center;max-width:820px;margin:0 auto}
-@media(max-width:820px){.journey{grid-template-columns:1fr;gap:30px}}
-.jarrow{font-size:34px;color:var(--saffron);font-weight:900;animation:jarrowmv 1.8s ease-in-out infinite}
-@keyframes jarrowmv{0%,100%{transform:translateX(0)}50%{transform:translateX(8px)}}
-@media(max-width:820px){.jarrow{transform:rotate(90deg)}}
-.jlabel{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--tx-mut);margin-bottom:12px;text-align:center}
-.jphone{width:270px;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:30px;overflow:hidden;box-shadow:0 30px 70px rgba(17,17,17,.2)}
-[data-theme="dark"] .jphone{box-shadow:0 30px 70px rgba(0,0,0,.6)}
-.appbar{padding:16px 16px 8px;display:flex;justify-content:space-between;align-items:center}
-.appbar b{font-size:16px}
-.appbody{padding:0 14px 16px;min-height:250px;background:var(--bg)}
-.feedcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px;margin:8px 0;display:flex;align-items:center;gap:10px}
-.feedcard .fi{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:15px;background:var(--panel-2)}
-.feedcard .fm{flex:1}.feedcard .fm b{font-size:12.5px;display:block}.feedcard .fm small{font-size:10.5px;color:var(--tx-mut)}
-.feedcard .fa{font-weight:900;font-size:13px}
-.jA{animation:jkA 6s infinite}
-@keyframes jkA{0%,4%{opacity:0;transform:translateY(-8px)}9%,90%{opacity:1;transform:none}97%,100%{opacity:0}}
-.jB{animation:jkB 6s infinite}
-@keyframes jkB{0%,16%{opacity:0;transform:translateY(-8px)}21%,90%{opacity:1;transform:none}97%,100%{opacity:0}}
-.jC{animation:jkC 6s infinite}
-@keyframes jkC{0%,32%{opacity:0;transform:translateY(-12px) scale(.96)}39%,90%{opacity:1;transform:none}97%,100%{opacity:0}}
+/* The journey demo and the app tour went in the 5 August cut. The tabs demo below already shows
+   the one thing both of them showed, which is that you send a line and the work comes back done.
+   Their phone bezels, feed cards and slide keyframes went with them. */
 .ftabs{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:28px}
-.ftab{display:flex;align-items:center;gap:8px;font-family:inherit;padding:11px 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;cursor:pointer;transition:.2s;color:var(--tx)}
-.ftab:hover{border-color:var(--river);transform:translateY(-2px)}
-.ftab.on{background:var(--river);color:var(--on-river);border-color:var(--river);box-shadow:0 8px 20px rgba(27,89,166,.3)}
+.ftab{display:flex;align-items:center;gap:8px;font-family:inherit;padding:11px 16px;border-radius:999px;border:2px solid var(--line);background:var(--panel);font-weight:700;font-size:14px;cursor:pointer;transition:.2s;color:var(--tx)}
+.ftab:hover{border-color:var(--river);transform:translateY(-1px)}
+.ftab.on{background:var(--river);color:var(--on-river);border-color:var(--river)}
 .fstage{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center;max-width:900px;margin:0 auto;min-height:280px}
 @media(max-width:820px){.fstage{grid-template-columns:1fr;gap:24px}}
 .ftext h3{font-size:26px;margin:0 0 10px}
 .ftext p{font-size:16px;color:var(--tx-mut)}
-.fdemo{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px;min-height:200px;display:flex;flex-direction:column;justify-content:center;gap:8px}
+.fdemo{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;min-height:200px;display:flex;flex-direction:column;justify-content:center;gap:8px}
 .db{max-width:86%;padding:9px 12px;font-size:13.5px;border-radius:12px;margin:6px 0;opacity:0;transform:translateY(8px);animation:dbin .45s forwards}
-/* Own tokens, not Meta's. Same reason as .wb.out above. */
+/* Own tokens, not Meta's. See the note on .dbub.out in app/_shared/site.tsx. */
 .db.out{align-self:flex-end;margin-left:auto;background:var(--river-tint);color:var(--river-deep);border-bottom-right-radius:4px}
 .db.in{align-self:flex-start;background:var(--panel-2);border-bottom-left-radius:4px}
 .db.d1{animation-delay:.15s}.db.d2{animation-delay:.7s}.db.d3{animation-delay:1.2s}
@@ -86,30 +54,13 @@ const PRODUCT_CSS = css`
 .wave i{width:4px;border-radius:2px;background:var(--river);animation:wv .8s ease infinite}
 .wave i:nth-child(2n){animation-delay:.15s}.wave i:nth-child(3n){animation-delay:.3s}
 @keyframes wv{0%,100%{height:6px}50%{height:24px}}
-.tourwrap{display:flex;flex-direction:column;align-items:center;gap:20px}
-.tourphone{width:290px;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:34px;padding:10px;box-shadow:0 30px 70px rgba(17,17,17,.2)}
-[data-theme="dark"] .tourphone{box-shadow:0 30px 70px rgba(0,0,0,.6)}
-.tourscreen{background:var(--bg);border-radius:24px;overflow:hidden;height:440px}
-.tslides{display:flex;height:100%;transition:transform .5s cubic-bezier(.2,.7,.3,1)}
-.tslide{min-width:100%;height:100%;padding:20px 16px;overflow:hidden}
-.ttabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-.ttab{padding:9px 15px;font-family:inherit;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:13px;cursor:pointer;transition:.2s;color:var(--tx)}
-.ttab.on{background:var(--river);color:var(--on-river);border-color:var(--river)}
-.bignum{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:16px;padding:16px;color:#fff}
-.bignum .l{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;opacity:.85}
-.bignum .v{font-size:30px;font-weight:900;letter-spacing:-.03em}
-.trow{display:flex;justify-content:space-between;padding:11px 4px;border-bottom:1px solid var(--line);font-size:13px}
-.trow:last-child{border:0}
-.mini2{display:flex;gap:8px;margin:10px 0}
-.mini2 div{flex:1;background:var(--panel-2);border-radius:12px;padding:10px}
-.mini2 .l{font-size:9.5px;color:var(--tx-mut);font-weight:700}.mini2 .v{font-size:15px;font-weight:900}
 .rbadge{font-size:10px;font-weight:900;letter-spacing:.05em;padding:4px 9px;border-radius:999px;display:inline-block}
 .rbadge.soon{color:var(--on-saffron-tint);background:var(--saffron-tint)}
 .rbadge.prog{color:var(--river);background:var(--river-tint)}
 .rbadge.live{color:var(--on-green-tint);background:var(--green-tint)}
 .helpers{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:940px;margin:0 auto}
 @media(max-width:820px){.helpers{grid-template-columns:1fr}}
-.helpercard{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px}
+.helpercard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px}
 .helpercard.rakha{border-top:3px solid var(--saffron)}
 .helpercard.ai{border-top:3px solid var(--river)}
 .helpercard .hic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px;margin-bottom:14px}
@@ -141,17 +92,8 @@ const PRODUCT_JS = `
     document.getElementById('ftext').innerHTML='<h3>'+FEAT[i].t+'</h3><p>'+FEAT[i].p+'</p>';
     document.getElementById('fdemo').innerHTML=FEAT[i].demo;
   }
-  function showTour(i){
-    document.querySelectorAll('#ttabs .ttab').forEach(function(t){
-      var on=+t.getAttribute('data-t')===i;
-      t.classList.toggle('on',on);
-      t.setAttribute('aria-selected',on?'true':'false');
-    });
-    var s=document.getElementById('tslides');if(s)s.style.transform='translateX(-'+(i*100)+'%)';
-  }
   function wire(){
     document.querySelectorAll('#ftabs .ftab').forEach(function(t){t.addEventListener('click',function(){showFeat(+t.getAttribute('data-f'));});});
-    document.querySelectorAll('#ttabs .ttab').forEach(function(t){t.addEventListener('click',function(){showTour(+t.getAttribute('data-t'));});});
     if(document.getElementById('ftext'))showFeat(0);
   }
   if(document.readyState!=='loading')wire();else document.addEventListener('DOMContentLoaded',wire);
@@ -181,9 +123,10 @@ export default function ProductPage() {
       <section className="hero center">
         <div className="wrap">
           <span className="pill"><span className="dot" /> Your first employee</span>
-          <h1 style={{ marginTop: 20 }}>Somebody to do<br /><span className="gt">the paperwork.</span></h1>
+          <h1 style={{ marginTop: 20 }}>Somebody to do<br />the paperwork.</h1>
           <p className="sub">Lekhio is the first person your business hires. It keeps the books, works out the tax, finds what you are owed, and brings you the answer. You say yes. It costs £12.99 a month.</p>
           <div className="cta-row"><Link href="/start" className="btn primary">Start free</Link><Link href="/pricing" className="btn ghost">See pricing</Link></div>
+          <div style={{ fontSize: 13.5, color: 'var(--tx-mut)', marginTop: 12 }}>7 days free, no card. Cancel in one tap.</div>
         </div>
       </section>
 
@@ -215,47 +158,18 @@ export default function ProductPage() {
             <div className="ci"><b>2026/27 rates</b>, every one a published figure</div>
             <div className="ci"><b>Nothing filed</b> without your yes</div>
           </div>
-        </div>
-      </section>
-
-      {/* Journey demo */}
-      <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
-        <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 40 }}>
-            {/* Showing beats telling, so the demo stays exactly as it was. Only the framing
-                moved: this is not "look how the messaging works", it is "look how little you do". */}
-            <div className="eyebrow">Your half of the work</div>
-            <h2 className="h2">You send one line. That is your job done.</h2>
-            <p className="lead">Seconds later it is read, sorted, filed and counted, without you opening anything.</p>
-          </div>
-          <div className="journey reveal">
-            <div>
-              <div className="jlabel">1 · What you do</div>
-              <div className="wphone">
-                <div className="wahead"><span className="a">✅</span><div><b>Lekhio</b><small>your first employee</small></div></div>
-                <div className="wchat">
-                  <div className="wb out jA"><div className="rc">🧾</div>Screwfix receipt</div>
-                  <div className="wb in jB">Logged. £42.60, materials ✅</div>
-                </div>
-              </div>
-            </div>
-            <div className="jarrow">→</div>
-            <div>
-              <div className="jlabel">2 · What it does</div>
-              <div className="jphone">
-                <div className="appbar"><b>Feed</b><Ic e="🔔" color="var(--tx-mut)" size={16} /></div>
-                <div className="appbody">
-                  <div className="feedcard jC" style={{ borderColor: 'var(--saffron)' }}><div className="fi" style={{ background: 'var(--saffron-tint)' }}><Ic e="🧾" color="var(--on-saffron-tint)" size={22} /></div><div className="fm"><b>Screwfix</b><small>Materials · just now</small></div><div className="fa">-£42.60</div></div>
-                  <div className="feedcard"><div className="fi"><Ic e="⛽" color="var(--river)" size={22} /></div><div className="fm"><b>BP</b><small>Fuel · today</small></div><div className="fa">-£62.00</div></div>
-                  <div className="feedcard"><div className="fi" style={{ background: 'var(--green-tint)' }}><Ic e="💷" color="var(--on-green-tint)" size={22} /></div><div className="fm"><b>Dave Wilson</b><small>Invoice · today</small></div><div className="fa" style={{ color: 'var(--on-green-tint)' }}>+£400</div></div>
-                </div>
-              </div>
-            </div>
+          {/* The one ask this page adds after the job description, same wording and micro line
+              as every other ask on the site. */}
+          <div className="center reveal" style={{ marginTop: 30 }}>
+            <Link href="/start" className="btn primary">Start free</Link>
+            <div style={{ fontSize: 13.5, color: 'var(--tx-mut)', marginTop: 12 }}>7 days free, no card. Cancel in one tap.</div>
           </div>
         </div>
       </section>
 
-      {/* Interactive feature tabs */}
+      {/* Interactive feature tabs. The journey demo and the app tour went in the 5 August cut:
+          both showed the same fact this demo shows, that you send one line and the work comes
+          back done, and doc 103 counts a duplicated section as weight, not reassurance. */}
       <section>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 8 }}>
@@ -281,55 +195,6 @@ export default function ProductPage() {
               <div className="db out d1"><div style={{ background: 'var(--surface)', border: '1px solid var(--bd)', borderRadius: 8, padding: 12, textAlign: 'center', fontSize: 20, marginBottom: 4 }}>🧾</div>Screwfix receipt</div>
               <div className="db in d2">Logged. £42.60, materials ✅</div>
               <div className="db in d3" style={{ background: 'transparent', fontSize: 12, color: 'var(--tx-mut)' }}>Screwfix · Materials · 3 Jul</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* App tour */}
-      <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
-        <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 34 }}>
-            <div className="eyebrow">Your back office, in your pocket</div>
-            <h2 className="h2">Everything, tidy and ready.</h2>
-            <p className="lead">Open the app whenever you want the full picture. Tap through it.</p>
-          </div>
-          <div className="tourwrap reveal">
-            <div className="ttabs" id="ttabs" role="tablist" aria-label="A tour of the app"><button type="button" className="ttab on" data-t="0" role="tab" aria-selected="true">Feed</button><button type="button" className="ttab" data-t="1" role="tab" aria-selected="false">Money</button><button type="button" className="ttab" data-t="2" role="tab" aria-selected="false">Invoices</button></div>
-            <div className="tourphone">
-              <div className="tourscreen">
-                <div className="tslides" id="tslides">
-                  <div className="tslide">
-                    <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Feed</b><Ic e="🔔" color="var(--tx-mut)" size={16} /></div>
-                    <div className="feedcard"><div className="fi" style={{ background: 'var(--saffron-tint)' }}><Ic e="🧾" color="var(--on-saffron-tint)" size={22} /></div><div className="fm"><b>Screwfix</b><small>Materials · 2m</small></div><div className="fa">-£42.60</div></div>
-                    <div className="feedcard"><div className="fi"><Ic e="⛽" color="var(--river)" size={22} /></div><div className="fm"><b>BP</b><small>Fuel · 1h</small></div><div className="fa">-£62.00</div></div>
-                    <div className="feedcard" style={{ borderColor: 'var(--green)' }}><div className="fi" style={{ background: 'var(--green-tint)' }}><Ic e="💷" color="var(--on-green-tint)" size={22} /></div><div className="fm"><b>Dave paid you</b><small>CIS £80 held · 3h</small></div><div className="fa" style={{ color: 'var(--on-green-tint)' }}>+£500</div></div>
-                    {/* 🔴 THIS WAS A "7-day streak! Keep it going" CARD, AND IT WAS THREE WRONGS AT
-                        ONCE. There is no streak anywhere in the code, so it advertised a feature we
-                        do not have. app/llms.txt/route.ts states publicly that there are no streaks,
-                        no badges and no gamification, so the site contradicted our own published
-                        answer. And docs/103's alignment test forbids rewarding him for the manual
-                        work the product exists to remove. What belongs on the feed instead is the
-                        review pile, which is real, is at /app/pile, and is the one thing on that
-                        screen actually waiting on him. */}
-                    <div className="feedcard" style={{ background: 'var(--river-tint)', borderColor: 'var(--river)' }}><div className="fi" style={{ background: '#fff' }}><Ic e="✅" color="var(--river)" size={22} /></div><div className="fm"><b>3 waiting on you</b><small>Grouped by shop. Answer once each.</small></div></div>
-                  </div>
-                  <div className="tslide">
-                    <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Money</b><span style={{ fontSize: 12 }}>2026/27 ▾</span></div>
-                    <div className="bignum"><div className="l">Tax set aside · this year</div><div className="v">£3,240</div><div style={{ fontSize: 11, opacity: 0.85 }}>81% ready for the quarter</div></div>
-                    <div className="mini2"><div><div className="l">Income</div><div className="v" style={{ color: 'var(--on-green-tint)' }}>£28.4k</div></div><div><div className="l">Profit</div><div className="v" style={{ color: 'var(--river)' }}>£19.3k</div></div></div>
-                    <div className="trow"><span>CIS refund building</span><span style={{ color: 'var(--on-saffron-tint)', fontWeight: 800 }}>£1,120</span></div>
-                    <div className="trow"><span>Next deadline</span><span style={{ fontWeight: 800 }}>31 Jan</span></div>
-                  </div>
-                  <div className="tslide">
-                    <div className="appbar" style={{ padding: '6px 4px 12px' }}><b>Invoices</b><span style={{ color: 'var(--river)', fontWeight: 800, fontSize: 13 }}>＋ New</span></div>
-                    <div className="mini2"><div><div className="l">Outstanding</div><div className="v" style={{ color: 'var(--on-saffron-tint)' }}>£1,450</div></div><div><div className="l">Paid this month</div><div className="v" style={{ color: 'var(--on-green-tint)' }}>£3,900</div></div></div>
-                    <div className="feedcard"><div className="fi" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><div className="fm"><b>Dave · rewire</b><small>#0042</small></div><div className="fa" style={{ color: 'var(--on-green-tint)' }}>Paid</div></div>
-                    <div className="feedcard"><div className="fi" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><div className="fm"><b>Miller Bros</b><small>#0041</small></div><div className="fa" style={{ color: 'var(--on-saffron-tint)' }}>Due 12d</div></div>
-                    <div className="feedcard"><div className="fi" style={{ background: 'var(--river-tint)' }}><Ic e="🧾" color="var(--river)" size={22} /></div><div className="fm"><b>J. Okafor</b><small>#0040</small></div><div className="fa" style={{ color: 'var(--red)' }}>Overdue</div></div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -362,50 +227,9 @@ export default function ProductPage() {
         </div>
       </section>
 
-      {/* The journey: signup to a system that runs itself, animated */}
-      <section>
-        <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 34 }}>
-            <h2 className="h2">From first click to running itself.</h2>
-            <p style={{ fontSize: 17, color: 'var(--tx-mut)', maxWidth: 620, margin: '12px auto 0', lineHeight: 1.6 }}>
-              Onboarding is one journey, and it happens in one place. Watch it play out: the website asks who you are, then you land in your Lekhio and it sets you up properly. Then it just runs.
-            </p>
-          </div>
-          <div className="reveal">
-            <OnboardingShow />
-          </div>
-        </div>
-      </section>
-
-      {/* 🔴 THIS BLOCK WAS COMMENTED "Beat the accountant" AND READ LIKE IT. Jag's steer, 3 August
-          2026: do not pick a fight with accountants. They are a referral channel and a future
-          partner, and a product that shames them on price invites the trouble they are well placed
-          to cause. The pains are all still here, because they are real. The villain is the old way
-          of doing it, not a profession. */}
-      <section>
-        <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 36 }}>
-            <div className="eyebrow">The expert in your pocket</div>
-            {/* The compliment stays and the jab goes. "The brains of an accountant" is a good thing
-                to be; "none of the bill" was the shot. */}
-            <h2 className="h2">The brains of an accountant, on call all year.</h2>
-          </div>
-          <div className="ba reveal" style={{ maxWidth: 900, margin: '0 auto' }}>
-            <div className="old"><h3>The old way</h3><ul>
-              <li><span className="m">✕</span> A bill you only find out about in January.</li>
-              <li><span className="m">✕</span> Looking at last year, when it is too late to plan.</li>
-              <li><span className="m">✕</span> A shoebox to dig out every January.</li>
-              <li><span className="m">✕</span> Waiting days for a simple answer.</li>
-            </ul></div>
-            <div className="new"><h3>The Lekhio way</h3><ul>
-              <li><span className="m">✓</span> One flat price, everything in.</li>
-              <li><span className="m">✓</span> With you every day, not once a year.</li>
-              <li><span className="m">✓</span> Snap as you go. Nothing to dig out.</li>
-              <li><span className="m">✓</span> Instant replies, right in the same chat.</li>
-            </ul></div>
-          </div>
-        </div>
-      </section>
+      {/* The onboarding show, the app tour and the second before and after grid went in the
+          5 August cut. The page now makes each argument once: the job, the demo, the two of
+          them, the price, and what is on the way. */}
 
       {/* ═══════════════════════════════════════════════════════════════════════════════════════
           🔴 THE PAGE NEVER SAID WHAT THE JOB COSTS, WHICH IS THE WHOLE ARGUMENT.
@@ -468,8 +292,9 @@ export default function ProductPage() {
         <div className="wrap">
           <div className="final reveal">
             <h2>Hire it for a week.</h2>
-            <p>7 days free, no card. If it has not earned its keep, walk away in one tap.</p>
+            <p>If it has not earned its keep, walk away in one tap.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
+            <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,.8)', marginTop: 12 }}>7 days free, no card. Cancel in one tap.</div>
           </div>
         </div>
       </section>

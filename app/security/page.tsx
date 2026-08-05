@@ -93,7 +93,7 @@ export default function SecurityPage() {
       <section className="hero center">
         <div className="wrap">
           <span className="sec-badge">SECURITY AND TRUST</span>
-          <h1 style={{ maxWidth: 720, margin: '0 auto' }}>Your money data, kept safe.<br /><span className="gt">Said plainly.</span></h1>
+          <h1 style={{ maxWidth: 720, margin: '0 auto' }}>Your money data, kept safe.<br />Said plainly.</h1>
           <p className="sub" style={{ maxWidth: 620, margin: '20px auto 0' }}>
             This is your livelihood and your tax, so you deserve to know exactly how it is protected and how the AI is used. No jargon, no hand-waving. Here is the truth.
           </p>

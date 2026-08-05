@@ -197,7 +197,7 @@ export default function ComparePage() {
       <section className="hero center">
         <div className="wrap">
           <span className="pill"><span className="dot" /> An honest look</span>
-          <h1 style={{ marginTop: 20 }}>Lekhio vs<br /><span className="gt">the other options.</span></h1>
+          <h1 style={{ marginTop: 20 }}>Lekhio vs<br />the other options.</h1>
           <p className="sub" style={{ maxWidth: 560, margin: '20px auto 26px', fontSize: 20, color: 'var(--tx-mut)' }}>Another app. Doing it all yourself. Here is a straight comparison, so you can decide for yourself.</p>
         </div>
       </section>
@@ -249,7 +249,7 @@ export default function ComparePage() {
             <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b></span></div>
             <div className="credchip"><span>Built for a phone on site</span></div>
             <div className="credchip"><span>HMRC recognition <b>in progress</b></span></div>
-            <div className="credchip">🇬🇧 <span>A real UK company</span></div>
+            <div className="credchip"><span>A real UK company</span></div>
           </div>
         </div></div>
       </section>

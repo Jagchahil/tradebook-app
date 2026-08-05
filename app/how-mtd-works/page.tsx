@@ -218,7 +218,7 @@ export default function HowMtdWorksPage() {
       <section className="hero center">
         <div className="wrap">
           <span className="pill"><span className="dot" /> Plain English, no jargon</span>
-          <h1 style={{ marginTop: 20 }}>Making Tax Digital,<br /><span className="gt">without the stress.</span></h1>
+          <h1 style={{ marginTop: 20 }}>Making Tax Digital,<br />without the stress.</h1>
           <p className="sub">HMRC is moving tax online. It sounds like more work. With Lekhio it is less, because your records build themselves.</p>
         </div>
       </section>
@@ -340,7 +340,7 @@ export default function HowMtdWorksPage() {
               <div className="credchip"><span>Checked against HMRC&apos;s <b>2026/27 rules</b></span></div>
               <div className="credchip"><span>MTD-ready today</span></div>
               <div className="credchip"><span>HMRC recognition <b>in progress</b></span></div>
-              <div className="credchip">🇬🇧 <span>A real UK company</span></div>
+              <div className="credchip"><span>A real UK company</span></div>
             </div>
           </div>
         </div>

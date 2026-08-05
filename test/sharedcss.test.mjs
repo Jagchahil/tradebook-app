@@ -73,13 +73,7 @@ if (mkt && hom) {
   console.log('\n=== rules the two copies share must not disagree ===\n');
   ok(`the two stylesheets still share rules (${shared.length} of ${A.size} and ${B.size})`, shared.length > 40);
 
-  // ⚠️ ONE DELIBERATE DIFFERENCE, NAMED. The home page lays the trust strip out as a four column
-  // grid because it has the width for it above the fold. Every other page wraps it as a flex row.
-  // Same selector, different layout, on purpose. This is the ONLY entry that belongs in here: if a
-  // second one turns up, the honest move is almost always to make the two copies agree, not to
-  // extend this list. Anything added here should say why, in a sentence, like this one.
-  //
-  // ⚠️ SECOND DELIBERATE DIFFERENCE, ADDED 1 AUGUST 2026, AND HERE IS THE SENTENCE.
+  // ⚠️ ONE DELIBERATE DIFFERENCE, NAMED, ADDED 1 AUGUST 2026, AND HERE IS THE SENTENCE.
   // Every hero on the site is centred EXCEPT the home page's, which is a two column grid with the
   // words left and the phone right. So the shared copy centres the subhead (margin-inline auto)
   // and the home copy pins it left (margin-inline 0). Making them agree would either shove the
@@ -87,7 +81,12 @@ if (mkt && hom) {
   // 520px paragraph off centre under a centred h1, which is the bug this fixed. The two layouts
   // are genuinely different, so the two rules genuinely differ, and it is said here rather than
   // left to whichever stylesheet the browser read last.
-  const ALLOWED_TO_DIFFER = new Set(['.truststrip .row', '.hero p.sub']);
+  //
+  // ⚠️ '.truststrip .row' USED TO BE THE OTHER ENTRY. The 5 August 2026 sales pass cut the trust
+  // strip from the homepage entirely, so the home sheet no longer carries the rule and there is
+  // nothing left to excuse. If a second entry turns up here again, the honest move is almost
+  // always to make the two copies agree, not to extend this list.
+  const ALLOWED_TO_DIFFER = new Set(['.hero p.sub']);
 
   const drift = shared.filter((k) => A.get(k) !== B.get(k) && !ALLOWED_TO_DIFFER.has(k));
   const excused = shared.filter((k) => A.get(k) !== B.get(k) && ALLOWED_TO_DIFFER.has(k));

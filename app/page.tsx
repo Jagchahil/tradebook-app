@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
 import { bankFeedLive, filingBadge, alertChannels } from '../lib/features';
 import { css } from '../lib/tokens';
+import { controlChoice } from '../lib/control';
 import { readPublishedTestimonials } from '../lib/supabase';
 import {
   INK, PAPER, FONT, SITE, faqs,
-  SharedHead, SiteNav, SiteFooter, StickyCta, HeroReport, Ic,
+  SharedHead, SiteNav, SiteFooter, StickyCta, HeroReport,
 } from './_shared/site';
 
 // The front door reads its testimonials from the database at render time. There is no hardcoded
@@ -21,13 +21,16 @@ export const revalidate = 300;
 // Until 31 July this was the one public page that did not, and it was the highest traffic page
 // we have. It promised a bank feed in twelve places, including the JSON-LD that Google reads,
 // while TrueLayer had declined production authorisation and bankFeedOffered() defaulted off.
-// It also drew "Approve and send to HMRC" as a live button while our HMRC production
-// recognition was still pending, which contradicts our own application to them.
 //
-// So the page now leads with what a customer can actually do on day one: photograph a receipt,
-// import a bank statement (/app/money/import is real and proven), say or type a line, work the
-// review pile, and let the tax build itself. The bank feed is described as coming, never as the
-// way it works today, and the day the flag flips the front door upgrades itself.
+// So the page leads with what a customer can actually do on day one, the bank feed is described
+// as coming, never as the way it works today, and the day the flag flips the page upgrades itself.
+//
+// ⚠️ RESHAPED 5 AUGUST 2026, THE SALES AND BRAND PASS. Twelve sections became seven: hero, the
+// argument, three steps, one demo section of two rows, reviews, one price card, one closing ask.
+// Four identical asks, one wording, one micro line. What went: the trust strip, the shoebox
+// grid, the app mock, three of five demo rows, the two helper cards (one line survives in the
+// argument, the full cards live on /product), the second compliance strip, and the second price
+// card. Doc 103: every row cut is a row he no longer has to read to reach what he came for.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 // The one phrase that describes how money gets in. Both wordings live side by side, the same
@@ -38,14 +41,17 @@ function captureLine(): string {
     : 'Snap a receipt, import your bank statement, or just say what you spent';
 }
 
+// The one ask, worded once, and the identical micro line that sits under every instance of it.
+const CTA_MICRO = '7 days free, no card. Cancel in one tap.';
+
 export const metadata: Metadata = {
   alternates: { canonical: '/' },
   title: 'Lekhio. Your first employee. The one that saves you money.',
   description:
-    `Lekhio is the first employee your business hires, and the first that pays for itself. ${captureLine()}, and it works in the background, finding every legal way to lower your tax and keeping you ready for Making Tax Digital. Filing is the easy part. Saving you money is the job. You approve. 7 days free.`,
+    `Lekhio is the first employee your business hires. It sorts your receipts, chases your invoices, works out your tax and finds the reliefs you are owed. ${captureLine()}, and it brings you the lot to approve. You press one button. 7 days free.`,
   openGraph: {
     title: 'Lekhio. Your first employee. The one that saves you money.',
-    description: 'Not software you buy. The first employee your business hires. It finds the money, you approve, it keeps you ready to file.',
+    description: 'Not software you buy. The first employee your business hires. It sorts the receipts, chases the invoices, works out the tax and finds the reliefs. You press one button. Approve.',
     type: 'website',
   },
 };
@@ -53,6 +59,10 @@ export const metadata: Metadata = {
 // Home page bespoke styling. Aliases the shared palette to the extra variable
 // names these sections use, then defines every section class. Colours all come
 // from the shared theme variables, so light and dark just work.
+//
+// ⚠️ EVERY RULE THIS SHEET SHARES WITH MARKETING_CSS IS BYTE IDENTICAL TO IT, scope aside.
+// test/sharedcss.test.mjs holds the two copies together; the one named exception left is the
+// hero subhead, explained on its own rule below.
 const HOME_CSS = css`
 :root{--panel-2:var(--surface);--line:var(--bd);--teal:#0E8C6E;--teal-tint:#E2F4EF;--on-teal-tint:#0A6E56}
 [data-theme="dark"]{--teal:#3FC7A3;--teal-tint:#0F2A22;--on-teal-tint:#3FC7A3}
@@ -61,54 +71,23 @@ const HOME_CSS = css`
 .home .center{text-align:center}
 .home .center .lead{margin-inline:auto}
 .home .lead{font-size:18px;color:var(--tx-mut);max-width:560px;margin-top:14px}
-.home .eyebrow{font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--river);margin-bottom:12px}
 .home .h2{font-size:clamp(28px,4.4vw,44px);letter-spacing:-.035em;line-height:1.05;font-weight:800;margin:0}
 .home section{padding:64px 0}
-.home .pill{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:7px 14px;border-radius:999px;background:var(--river-tint);color:var(--river-deep)}
-.home .dot{width:8px;height:8px;border-radius:999px;background:#22C55E;animation:hpulse 2s infinite}
-@keyframes hpulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
-.home .btn{display:inline-block;text-align:center;font-weight:700;font-size:16px;padding:15px 30px;border-radius:13px;cursor:pointer;border:0;font-family:inherit;transition:transform .18s,box-shadow .25s}
-.home .btn.primary{background:var(--river);color:var(--on-river);box-shadow:0 10px 26px rgba(27,89,166,.32)}
-.home .btn.primary:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(27,89,166,.4)}
-.home .btn.ghost{background:transparent;color:var(--tx);border:1px solid var(--tx)}
-.home .btn.ghost:hover{transform:translateY(-2px);background:var(--panel-2)}
+/* Buttons wear the app shell's border weight (GLASS.border, 2px) and the two step radius: 12 for
+   buttons, 16 for cards. Hover is a 1px lift and a border shift to the river, never a glow. */
+.home .btn{display:inline-block;text-align:center;font-weight:700;font-size:16px;padding:15px 30px;border-radius:12px;cursor:pointer;border:2px solid transparent;font-family:inherit;transition:transform .18s,border-color .18s,background-color .18s}
+.home .btn.primary{background:var(--river);color:var(--on-river);border-color:var(--river-deep)}
+.home .btn.primary:hover{transform:translateY(-1px);border-color:var(--river)}
+.home .btn.ghost{background:transparent;color:var(--tx);border-color:var(--tx)}
+.home .btn.ghost:hover{transform:translateY(-1px);border-color:var(--river)}
 .home .btn.white{background:#fff;color:var(--on-white-river)}
-
-.mtdtop{background:var(--band);color:#fff}
-.mtdtop a{display:flex;align-items:center;justify-content:center;gap:11px;flex-wrap:wrap;padding:10px 16px;font-size:13px;font-weight:500;color:rgba(255,255,255,.85)}
-.mtdtop .tag{font-size:10px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;background:var(--saffron);color:#2a1e06;padding:3px 8px;border-radius:5px}
-.mtdtop b{font-weight:700;color:#fff}
-.mtdtop .go{font-weight:800;color:#fff;text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,255,255,.4);transition:text-decoration-color .2s}
-.mtdtop a:hover .go{text-decoration-color:#fff}
-
-.truststrip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--panel)}
-.truststrip .row{display:grid;grid-template-columns:repeat(4,1fr);max-width:1040px;margin:0 auto;padding:0 24px}
-.truststrip .ti{display:flex;align-items:center;gap:12px;padding:18px 20px;font-size:13.5px;font-weight:600;color:var(--tx-mut);border-left:1px solid var(--line)}
-.truststrip .ti:first-child{border-left:0}
-.truststrip .tc{flex:0 0 36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:17px}
-.truststrip b{color:var(--tx);font-weight:800}
-@media(max-width:760px){.truststrip .row{grid-template-columns:1fr 1fr}.truststrip .ti{border-left:0}.truststrip .ti:nth-child(odd){border-right:1px solid var(--line)}.truststrip .ti:nth-child(n+3){border-top:1px solid var(--line)}}
-@media(max-width:420px){.truststrip .row{grid-template-columns:1fr}.truststrip .ti:nth-child(odd){border-right:0}.truststrip .ti:nth-child(n+2){border-top:1px solid var(--line)}}
-
-.helpers{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-@media(max-width:760px){.helpers{grid-template-columns:1fr}}
-.hcard{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px}
-.hcard .hicon{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;font-size:26px;margin-bottom:16px}
-.hcard .role{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tx-mut);margin-bottom:8px}
-.hcard h3{font-size:21px;margin:0 0 10px;letter-spacing:-.02em}
-.hcard>p{font-size:15px;color:var(--tx-mut);margin:0 0 18px;line-height:1.55}
-.hchat{display:flex;flex-direction:column;gap:7px}
-.compliance{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px 24px;display:flex;flex-wrap:wrap;gap:14px 34px;align-items:center;justify-content:center}
-.compliance .ci{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;color:var(--tx-mut)}
-.compliance b{color:var(--tx);font-weight:800}
+.home .micro-note{font-size:13.5px;color:var(--tx-mut);margin-top:12px}
 
 .home .hero{padding:56px 0 26px}
 .hero .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
 .hero h1{font-size:clamp(40px,6.4vw,72px);letter-spacing:-.045em;line-height:1.05;font-weight:800;margin:22px 0 0}
-.hero .gt{background:linear-gradient(100deg,var(--river),var(--saffron));-webkit-background-clip:text;background-clip:text;color:transparent;position:relative;display:inline-block}
-.squig{position:absolute;left:-2%;bottom:-14px;width:104%;height:16px;overflow:visible}
-.squig path{stroke:var(--saffron);stroke-width:6;fill:none;stroke-linecap:round;stroke-dasharray:340;stroke-dashoffset:340;animation:hdraw 1s ease forwards .6s}
-@keyframes hdraw{to{stroke-dashoffset:0}}
+/* The gradient text and the animated squiggle are gone. Plain strong text, same palette. */
+.hero h1 .hl{color:var(--river)}
 /* ⚠️ THE ONE HERO ON THE SITE THAT IS NOT CENTRED, so it opts out of the shared default
    explicitly rather than relying on which stylesheet the browser read last. This hero is a
    two column grid: the words sit left, the phone sits right. margin-inline:0 is correct here
@@ -120,19 +99,14 @@ const HOME_CSS = css`
 .hero p.vs{font-size:16px;line-height:1.55;color:var(--tx);font-weight:600;max-width:520px;margin:0 0 30px;margin-inline:0}
 .cta-row{display:flex;gap:14px;flex-wrap:wrap}
 .hero .micro{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:13.5px;color:var(--tx-mut)}
-/* .avs, the four avatar circles, went with the invented customers. Nothing draws them. */
 @media(max-width:900px){.hero .grid{grid-template-columns:1fr;gap:34px;text-align:center}.cta-row,.hero .micro{justify-content:center}.hero p.sub,.hero p.vs{margin-inline:auto}}
 
-.ba{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
-@media(max-width:760px){.ba{grid-template-columns:1fr}}
-.ba .old{background:var(--band);color:#fff;border-radius:20px;padding:30px}
-.ba .new{background:linear-gradient(150deg,var(--river-panel),var(--river-panel-deep));color:#fff;border-radius:20px;padding:30px}
-.ba h3{font-size:21px;margin:0 0 16px}
-.ba li{list-style:none;display:flex;gap:11px;align-items:flex-start;padding:8px 0;font-size:15px}
-.ba .m{flex:0 0 22px;height:22px;border-radius:999px;display:grid;place-items:center;font-size:12px;font-weight:900;margin-top:1px}
-.ba .old .m{background:rgba(224,121,107,.25);color:#ffb4a8}
-.ba .new .m{background:rgba(255,255,255,.22);color:#fff}
-.ba ul{padding:0;margin:0}
+/* The argument. One heading, the deal, the control pair, one ask. */
+.argbody{font-size:17px;line-height:1.65;color:var(--tx);max-width:680px;margin:18px 0 0}
+.argquiet{font-size:15.5px;line-height:1.65;color:var(--tx-mut);max-width:680px;margin:14px 0 0}
+.argrule{margin-top:26px;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:22px 24px;max-width:680px}
+.argrule .t{font-size:17px;font-weight:800;margin:0 0 10px}
+.argrule p{font-size:14.5px;line-height:1.6;color:var(--tx-mut);margin:8px 0 0}
 
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
 @media(max-width:760px){.steps{grid-template-columns:1fr;gap:30px}}
@@ -140,57 +114,23 @@ const HOME_CSS = css`
 .hstep h3{font-size:19px;margin:0 0 10px}
 .stepn{width:62px;height:62px;border-radius:999px;margin:0 auto 18px;color:#fff;font-weight:900;font-size:23px;display:grid;place-items:center}
 
-.numgrid{display:grid;grid-template-columns:.9fr 1.1fr;gap:48px;align-items:center}
-@media(max-width:900px){.numgrid{grid-template-columns:1fr;gap:32px}}
-.appmock{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:20px;max-width:360px;margin:0 auto;width:100%}
-.setaside{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:18px;padding:18px;color:#fff}
-.setaside .l{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;opacity:.85}
-.setaside .big{font-size:38px;font-weight:900;letter-spacing:-.03em;margin-top:2px}
-.setaside .s{font-size:12px;opacity:.85}
-.mini3{display:flex;gap:8px;margin:12px 0}
-.mini3 div{flex:1;border-radius:13px;padding:11px}
-.mini3 .l{font-size:10px;font-weight:700}.mini3 .v{font-size:16px;font-weight:900;margin-top:3px}
-.chartbox{background:var(--panel-2);border-radius:14px;padding:12px 12px 10px;margin-bottom:10px}
-.chartrow{display:flex;align-items:flex-end;gap:7px;height:64px}
-.cbar{flex:1;border-radius:5px 5px 0 0;height:8px;transition:height .9s cubic-bezier(.2,.7,.3,1)}
-.reveal.in .cbar{height:var(--h)}
-.cisbar{background:var(--saffron-tint);border-radius:14px;padding:13px}
-.cisbar .top{display:flex;justify-content:space-between;font-size:12px;font-weight:800;color:var(--on-saffron-tint)}
-.track{height:9px;border-radius:999px;background:rgba(0,0,0,.08);margin-top:8px;overflow:hidden}
-.fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--saffron),var(--green));width:0;transition:width 1.3s cubic-bezier(.2,.7,.3,1)}
-.reveal.in .fill{width:68%}
-
 .drow{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;margin:0 0 44px}
 .drow:last-of-type{margin-bottom:0}
 .drow.flip .dtext{order:2}
 @media(max-width:820px){.drow{grid-template-columns:1fr;gap:22px}.drow.flip .dtext{order:0}}
 .dtext h3{font-size:26px;letter-spacing:-.03em;margin:0 0 12px}
 .dtext p{font-size:16px;color:var(--tx-mut)}
-.dvis{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px;min-height:186px;display:flex;flex-direction:column;justify-content:center;gap:9px}
-.dbub{max-width:82%;padding:9px 13px;font-size:13.5px;border-radius:13px}
-/* 🔴 THE OUTGOING BUBBLE WAS WHATSAPP'S OWN #DCF8C6, AND SO WAS THE RECEIPT CHIP.
-   Found by the hero guard sweeping for that palette, not by reading. The ILLUSTRATION is fine and
-   stays: a man says what he spent and it comes back logged, which is the outcome and it is real.
-   Borrowing Meta's brand colours to draw it is the technology, and doc 104 sells the outcome.
-   Tokens also delete the dark override underneath, which existed only to undo the borrowed green. */
-.dbub.out{align-self:flex-end;background:var(--river-tint);color:var(--river-deep);border-bottom-right-radius:4px}
-.dbub.in{align-self:flex-start;background:var(--panel-2);border-bottom-left-radius:4px}
-.dbub .rc{background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:12px;text-align:center;font-size:20px;margin-bottom:5px}
-.wf{display:flex;align-items:flex-end;gap:3px;height:30px;padding:2px 0}
-.wf i{width:4px;border-radius:2px;background:var(--river)}
-.splitrow{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.dvis{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;min-height:186px;display:flex;flex-direction:column;justify-content:center;gap:9px}
+.splitrow{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid var(--line);font-size:14px;font-variant-numeric:tabular-nums}
 .splitrow:last-child{border:0;font-weight:800}
 .approvebtn{margin-top:4px;background:var(--green);color:var(--on-green);border-radius:12px;padding:11px;font-weight:800;text-align:center;font-size:14px}
-.diconrow{display:flex;align-items:center;gap:12px}
-.dicon{width:44px;height:44px;border-radius:999px;background:var(--river);color:var(--on-river);font-size:20px;display:grid;place-items:center}
 
-.rev-marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
-.rev-track{display:flex;gap:18px;width:max-content;animation:hslide 44s linear infinite}
-.rev-marquee:hover .rev-track{animation-play-state:paused}
-@keyframes hslide{to{transform:translateX(-50%)}}
+/* Reviews render as a static wrapping row at every count, each real quote drawn exactly once.
+   The scrolling belt is gone: a quote that has to keep moving reads as one you hope nobody
+   stops to check. */
 .rev-static{display:flex;flex-wrap:wrap;justify-content:center;gap:18px;padding:0 22px}
 .rev-static .quote{width:min(360px,100%)}
-.quote{width:360px;flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px}
+.quote{width:360px;flex:0 0 auto;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:26px}
 .rate{display:flex;gap:3px;margin-bottom:12px}
 .rate svg{width:15px;height:15px;display:block}
 .quote p{font-size:16px;margin:0 0 18px}
@@ -199,57 +139,32 @@ const HOME_CSS = css`
 .who b{font-size:14.5px;display:block}.who small{font-size:13px;color:var(--tx-mut)}
 
 .pricewrap{background:linear-gradient(180deg,var(--panel-2),var(--bg));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.prices{display:grid;grid-template-columns:1fr 1fr;gap:22px;max-width:800px;margin:0 auto;align-items:stretch}
-@media(max-width:760px){.prices{grid-template-columns:1fr}}
-.pcard{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:32px 30px;position:relative;display:flex;flex-direction:column;transition:transform .3s,box-shadow .3s}
-.pcard:hover{transform:translateY(-4px)}
-.pcard.best{border:1px solid transparent;box-shadow:0 24px 56px rgba(27,89,166,.22);overflow:hidden;background:linear-gradient(180deg,var(--river-tint),var(--panel))}
-.pcard.best::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--river),var(--saffron))}
-.pbadge{position:absolute;top:16px;right:16px;background:var(--saffron);color:#3a2a08;font-size:12px;font-weight:900;padding:5px 13px;border-radius:999px;white-space:nowrap}
+.pcard{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:32px 30px;position:relative;display:flex;flex-direction:column;transition:transform .18s,border-color .18s}
+.pcard:hover{transform:translateY(-1px);border-color:var(--river)}
 .pname{font-size:13px;font-weight:800;color:var(--tx-mut);text-transform:uppercase;letter-spacing:.06em}
-.pamt{font-size:52px;font-weight:900;letter-spacing:-.04em;margin:10px 0 2px;line-height:1}
+.pamt{font-size:52px;font-weight:900;letter-spacing:-.04em;margin:10px 0 2px;line-height:1;font-variant-numeric:tabular-nums}
 .pamt span{font-size:18px;font-weight:700;color:var(--tx-mut);letter-spacing:0}
 .pnote{font-size:13.5px;color:var(--tx-mut);margin:6px 0 0}
-.psave{display:inline-block;font-size:12.5px;font-weight:800;color:var(--on-green-tint);background:var(--green-tint);padding:5px 12px;border-radius:999px;margin-top:14px}
 .pcta{margin-top:auto;padding-top:24px}
 .pcta .btn{width:100%}
 .pmicro{font-size:12px;color:var(--tx-mut);text-align:center;margin-top:10px}
-.incl-panel{max-width:800px;margin:24px auto 0;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:26px 30px}
-.incl-panel h3{font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--tx-mut);text-align:center;margin:0 0 20px}
-.incl-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 30px;margin:0;padding:0}
-@media(max-width:640px){.incl-grid{grid-template-columns:1fr}}
-.incl-grid li{list-style:none;display:flex;gap:12px;align-items:center;font-size:14.5px;font-weight:600}
-.incl-grid .t{flex:0 0 24px;height:24px;border-radius:999px;background:var(--green-tint);color:var(--on-green-tint);display:grid;place-items:center;font-weight:900;font-size:12px}
 
-.final{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:26px;padding:56px 32px;text-align:center;color:#fff}
+.final{background:linear-gradient(135deg,var(--river-panel),var(--river-panel-deep));border-radius:16px;padding:56px 32px;text-align:center;color:#fff}
 .final h2{font-size:clamp(28px,4.4vw,44px);color:#fff;margin:0}
 .final p{color:rgba(255,255,255,.86);font-size:18px;margin:14px auto 26px;max-width:460px}
+.final .micro-note{color:rgba(255,255,255,.8)}
 `;
-
-const CBARS = [
-  { h: 34, c: 'var(--river)', o: 0.85 },
-  { h: 48, c: 'var(--river)', o: 0.85 },
-  { h: 40, c: 'var(--river)', o: 0.85 },
-  { h: 58, c: 'var(--green)', o: 1 },
-  { h: 50, c: 'var(--river)', o: 0.85 },
-  { h: 64, c: 'var(--green)', o: 1 },
-];
 
 export default async function HomePage() {
   // Read once, at the top, so every sentence below answers to the same switch.
-  const bankLive = bankFeedLive();
   const filing = filingBadge();
   const capture = captureLine();
-  // The reviews the founder has published on the /team desk. Named `reviews` so the guard shape
-  // below is unchanged: the section still renders nothing while the array is empty.
+  // 🔴 THE CONTROL PAIR SHIPS TOGETHER, ALWAYS. lib/control.ts refuses to hand over the costs
+  // sentence on its own, and test/control.test.mjs proves any screen using one renders both.
+  const pair = controlChoice();
+  // The reviews the founder has published on the /team desk. The section renders nothing while
+  // the array is empty, and each published quote is drawn exactly once, statically.
   const reviews = await readPublishedTestimonials();
-  // ⚠️ ONE REAL QUOTE MUST NEVER APPEAR TWICE. The scrolling belt duplicates the list because a
-  // seamless loop needs a second copy, and with four or more cards the copy is never on screen
-  // beside its original. With fewer, the same person visibly rolls past again, which reads as
-  // padding on the one section whose entire point is honesty. So small counts render each card
-  // exactly once, in a static centred row, and the belt only runs when there are enough cards
-  // to need it.
-  const reviewBelt = reviews.length >= 4;
   return (
     <main className="home" style={{ backgroundColor: PAPER, color: INK, fontFamily: FONT, overflowX: 'hidden' }}>
       <script
@@ -258,8 +173,8 @@ export default async function HomePage() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@graph': [
-              { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: `The first employee for the UK self employed. ${capture}, and Lekhio sorts every transaction, finds the reliefs you are owed, and keeps you ready for Making Tax Digital. For trades, freelancers, drivers, carers, consultants, limited company directors and landlords.` },
-              { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'iOS, Android, Web', url: SITE, description: `${capture}, and Lekhio sorts every transaction, finds every legal way to lower your tax, and keeps you ready for Making Tax Digital. Lekhio prepares your figures. You approve them, and nothing reaches HMRC without your yes.`, offers: [ { '@type': 'Offer', price: '12.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '129', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
+              { '@type': 'Organization', '@id': `${SITE}/#org`, name: 'Lekhio', url: SITE, logo: `${SITE}/lekhio-logo.svg`, description: `The first employee for the UK self employed. It sorts your receipts, chases your invoices, works out your tax and finds the reliefs you are owed, then brings you the lot to approve. ${capture}, and Lekhio keeps you ready for Making Tax Digital. For trades, freelancers, drivers, carers, consultants, limited company directors and landlords.` },
+              { '@type': 'SoftwareApplication', name: 'Lekhio', applicationCategory: 'FinanceApplication', operatingSystem: 'iOS, Android, Web', url: SITE, description: `${capture}, and Lekhio sorts every transaction, chases your invoices, finds every legal way to lower your tax, and keeps you ready for Making Tax Digital. Lekhio prepares your figures. You approve them, and nothing reaches HMRC without your yes.`, offers: [ { '@type': 'Offer', price: '12.99', priceCurrency: 'GBP', category: 'Monthly subscription' }, { '@type': 'Offer', price: '129', priceCurrency: 'GBP', category: 'Annual subscription' } ], publisher: { '@id': `${SITE}/#org` } },
               { '@type': 'FAQPage', mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
             ],
           }),
@@ -268,108 +183,57 @@ export default async function HomePage() {
       <SharedHead />
       <style dangerouslySetInnerHTML={{ __html: HOME_CSS }} />
 
-      {/* 🔴 THE MTD BANNER IS GONE FROM THE FRONT DOOR, AND FROM FOUR OTHER PAGES WITH IT.
-          It ran above the navigation on six public pages, so the first thing anybody read about
-          Lekhio, anywhere on the site, was an announcement about a filing regime. That is the
-          category doc 104 says we are not in: "as software, we are a £12.99 app next to a £7 Xero
-          and we lose that fight on price forever". It now lives on /how-mtd-works, which is the
-          page about Making Tax Digital, where a man who came for that answer will find it. */}
       <SiteNav />
 
-      {/* Hero */}
+      {/* 1. Hero. The pill, the gradient, the squiggle and the pulsing dot are gone: a heading
+          carries itself, and the report beside it is the proof. One primary ask, one secondary
+          link, one micro line. */}
       <section className="hero">
         <div className="wrap grid">
           <div>
-            <span className="pill"><span className="dot" /> Your first employee. The one that pays for itself.</span>
-            <h1>Your first<br />employee.<br />The one that <span className="gt">saves you money.<svg className="squig" viewBox="0 0 320 16" preserveAspectRatio="none"><path d="M4 11 C 60 3, 110 3, 150 9 S 260 15, 316 6" /></svg></span></h1>
-            <p className="sub">Snap a receipt or just say what you spent. Lekhio sorts it and finds the tax you never need to pay. Filing is the easy part. Saving you money is the job.</p>
-            {/* 🔴 THE LINE THAT CHANGES WHAT WE ARE COMPARED TO, doc 104 section 9, angle 1: as
-                software we are a £12.99 app next to a £7 Xero and we lose on price forever, and as
-                an employee £12.99 is remarkable. The headline had said "employee" for weeks without
-                ever making that argument, so the reframe was asserted and never earned.
-
-                🔴 AND IT NAMES NOBODY, ON JAG'S CALL, 3 AUGUST 2026. The first version read "An
-                accountant costs hundreds a year and answers on Tuesdays", which is doc 104's own
-                wording. His steer: do not pick a fight with accountants. They are a referral
-                channel and a future partner, not the enemy, and a shot fired from the front door
-                invites one back at a product they could make trouble for.
-
-                ⚠️ SO THE PRICE DOES THE WORK ON ITS OWN. Everybody already knows what the
-                alternative costs; we do not have to be the ones to say it, and saying it would put
-                a number on our front door that we cannot source per customer anyway.
-                ⚠️ DOC 104 SECTION 9 STILL CARRIES THE OLD LINE. It needs updating to match this,
-                or the next person to read the doctrine will "restore" the fight. */}
+            <h1>Your first<br />employee.<br />The one that <strong className="hl">saves you money.</strong></h1>
+            <p className="sub">It sorts your receipts, chases your invoices, works out your tax and finds the reliefs you are owed. Then it brings you the lot and you press one button. Approve.</p>
+            {/* 🔴 THE LINE THAT CHANGES WHAT WE ARE COMPARED TO, doc 104 section 9, angle 1. And
+                it names nobody, on Jag's call, 3 August 2026: the price does the work on its own,
+                because everybody already knows what the alternative costs. */}
             <p className="vs">Your first hire costs £12.99 a month, and it never clocks off.</p>
             <div className="cta-row">
               <Link href="/start" className="btn primary">Start free</Link>
               <Link href="/product" className="btn ghost">See how it works</Link>
             </div>
-            {/* 🔴 THIS LINE CARRIED FIVE STARS AND FOUR AVATARS, AND NEITHER STOOD FOR ANYBODY.
-                Four coloured circles and a ★★★★★ beside "Built with UK sole traders" is the
-                "hundreds of people already use this" pattern with the number left off, which is
-                how you make the claim without ever having to hold it up. There is no rating,
-                because nobody has given one. What is left is the only part that was ever true and
-                is the only part a man reads anyway: seven days free and no card. See the header on
-                `reviews` in app/_shared/site.tsx for the rule and for CAP 3.47 and 3.50. */}
             <div className="micro">
-              <span>7 days free, no card. Cancel in one tap.</span>
+              <span>{CTA_MICRO}</span>
             </div>
           </div>
           <div><HeroReport /></div>
         </div>
       </section>
 
-      {/* Trust strip */}
-      <div className="truststrip">
-        <div className="row">
-          <div className="ti"><span className="tc" style={{ background: 'var(--green-tint)' }}><Ic e="🔒" color="var(--on-green-tint)" size={18} /></span><span>Encrypted, <b>never sold</b></span></div>
-          <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}><Ic e="✅" color="var(--river)" size={18} /></span><span><b>You approve</b> everything</span></div>
-          {/* NOT "104 tests". Nothing in the repo produced or enforced that number, so it was a
-              figure we asserted publicly and could not check. What IS true, and checkable, is the
-              first line of lib/taxengine.ts: every rate is the published 2026/27 figure with its
-              source noted. */}
-          <div className="ti"><span className="tc" style={{ background: 'var(--saffron-tint)' }}><Ic e="📐" color="var(--on-saffron-tint)" size={18} /></span><span><b>2026/27 rates</b>, published figures</span></div>
-          <div className="ti"><span className="tc" style={{ background: 'var(--river-tint)' }}>🇬🇧</span><span>A <b>real UK company</b></span></div>
-        </div>
-      </div>
-
-      {/* Kill the shoebox */}
-      <section>
+      {/* 2. The argument. Why the approve button exists, said plainly, with the control pair
+          from lib/control.ts, which only ever ships as a pair. */}
+      <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 36 }}>
-            <div className="eyebrow">The end of the dread</div>
-            <h2 className="h2">The shoebox is dead.</h2>
-            <p className="lead">No more lost Sunday nights. No January panic. No box of faded receipts to dig through. Just ten seconds a day, as you work.</p>
-          </div>
-          <div className="ba reveal">
-            <div className="old">
-              <h3>The old way</h3>
-              <ul>
-                <li><span className="m">✕</span> A shoebox of receipts you dread opening.</li>
-                <li><span className="m">✕</span> A lost weekend every January.</li>
-                {/* Both of these used to name an accountant and his bill. The pain is real and it
-                    stays; the villain does not, per Jag's steer on 3 August. The old way is hard
-                    whoever you pay to help with it. */}
-                <li><span className="m">✕</span> Nobody to ask at the moment it matters.</li>
-                <li><span className="m">✕</span> A January bill you never saw coming.</li>
-                <li><span className="m">✕</span> Paying more tax than you needed to.</li>
-              </ul>
+          <div className="reveal" style={{ maxWidth: 760, margin: '0 auto' }}>
+            <h2 className="h2">Any app that says it will do your tax for you is lying to you.</h2>
+            <p className="argbody">HMRC holds you responsible. It always has. So Lekhio prepares it, shows you the working, and you press approve. That is the deal, and it never changes.</p>
+            <p className="argbody">You always know your number. What you made, what you spent, what to put by.</p>
+            {/* Puchio and Rakha in one line. Their full cards live on /product, and the channel
+                Rakha uses is chosen by lib/features.ts, never typed here. */}
+            <p className="argquiet">Two of them work at it all year. Puchio answers the second you ask, so you never guess at what you can claim, and Rakha watches your figures and flags what it finds {alertChannels()}. Meet them both on the <Link href="/product" style={{ color: 'var(--river)', fontWeight: 700 }}>product page</Link>.</p>
+            <div className="argrule">
+              <p className="t">Nothing enters your books that you did not put there.</p>
+              <p>{pair.costs}</p>
+              <p>{pair.income}</p>
             </div>
-            <div className="new">
-              <h3>The Lekhio way</h3>
-              <ul>
-                <li><span className="m">✓</span> Snap it, say it, or import the statement. Sorted for you.</li>
-                <li><span className="m">✓</span> It finds the reliefs you are owed, all year.</li>
-                <li><span className="m">✓</span> Your tax figures always sat there, ready.</li>
-                <li><span className="m">✓</span> One flat price, everything in.</li>
-                <li><span className="m">✓</span> Always know your number, and never overpay.</li>
-              </ul>
+            <div style={{ marginTop: 30 }}>
+              <Link href="/start" className="btn primary">Start free</Link>
+              <div className="micro-note">{CTA_MICRO}</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Three steps */}
+      {/* 3. Three steps */}
       <section style={{ background: 'var(--river-tint)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 44 }}>
@@ -387,115 +251,35 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Know your number */}
-      <section style={{ background: 'var(--green-tint)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
-        <div className="wrap numgrid">
-          <div className="reveal">
-            <div className="appmock">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 4px 12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg,var(--river),var(--saffron))', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 900, fontSize: 15 }}>L</span><b style={{ fontSize: 15 }}>Money</b></div>
-                <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--river)', background: 'var(--river-tint)', padding: '4px 9px', borderRadius: 999 }}>2026/27 ▾</span>
-              </div>
-              <div className="setaside"><div className="l">Tax set aside · this year</div><div className="big">£3,240</div><div className="s">On track · 81% ready for the quarter</div></div>
-              <div className="mini3">
-                <div style={{ background: 'var(--green-tint)' }}><div className="l" style={{ color: 'var(--tx-mut)' }}>Income</div><div className="v" style={{ color: 'var(--on-green-tint)' }}>£28.4k</div></div>
-                <div style={{ background: 'var(--red-tint)' }}><div className="l" style={{ color: 'var(--tx-mut)' }}>Expenses</div><div className="v" style={{ color: 'var(--red)' }}>£9.1k</div></div>
-                <div style={{ background: 'var(--river-tint)' }}><div className="l" style={{ color: 'var(--tx-mut)' }}>Profit</div><div className="v" style={{ color: 'var(--river)' }}>£19.3k</div></div>
-              </div>
-              <div className="chartbox">
-                <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 8 }}>PROFIT · LAST 6 MONTHS</div>
-                <div className="chartrow">
-                  {CBARS.map((b, i) => (<div key={i} className="cbar" style={{ background: b.c, opacity: b.o, '--h': `${b.h}px` } as CSSProperties & Record<'--h', string>} />))}
-                </div>
-              </div>
-              <div className="cisbar"><div className="top"><span>CIS refund building up</span><span>£1,120</span></div><div className="track"><div className="fill" /></div></div>
-            </div>
-          </div>
-          <div className="reveal">
-            <div className="eyebrow" style={{ color: 'var(--on-green-tint)' }}>Peace of mind, and money back</div>
-            <h2 className="h2">Always know your number.</h2>
-            <p className="lead" style={{ marginBottom: 16 }}>Your income, expenses, profit and tax set aside, updating as you work. No nasty surprises, ever.</p>
-            <p className="mut" style={{ fontSize: 16 }}>And if you are a CIS subcontractor, Lekhio tracks the refund building up all year. Most subbies are owed money back. You get to watch it grow.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Feature demos */}
+      {/* 4. The one demo section. Two rows: the job (finding money) and the button (approve).
+          The CIS row lives on /product and the trade pages; the voice and three ways rows said
+          what the steps above already say. */}
       <section>
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 44 }}>
-            {/* Doc 104's own framing, and it names nobody: "not software you buy, the first
-                employee a business ever hires". It used to read "More than an accountant". */}
             <h2 className="h2">Not another app. An employee.</h2>
             <p className="lead">It keeps the books, and then it does the bit that actually puts money back in your pocket.</p>
           </div>
 
           <div className="drow reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--river)' }}>The whole point</div>
               <h3>It finds you legal ways to pay less.</h3>
               <p>This is the job. Lekhio reads your own numbers and surfaces the real reliefs you are entitled to: use of home, mileage, kit timing, a pension to step out of the 40% band. The legitimate ones only, and always your call. Anyone can file a return. This finds the money inside it.</p>
             </div>
             <div className="dvis">
-              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>WAYS TO SAVE · ON YOUR NUMBERS</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>WAYS TO SAVE · AN EXAMPLE</div>
               <div className="splitrow"><span>Claim use of home</span><span style={{ color: 'var(--on-green-tint)' }}>save ~£190</span></div>
               <div className="splitrow"><span>Mileage instead of fuel</span><span style={{ color: 'var(--tx-mut)' }}>worth a look</span></div>
               <div className="splitrow"><span>Pension, step out of 40%</span><span style={{ color: 'var(--on-green-tint)' }}>save ~£1,200</span></div>
               <div className="splitrow"><span>On the table this year</span><span style={{ color: 'var(--on-green-tint)' }}>£1,390</span></div>
-            </div>
-          </div>
-
-          {/* ⚠️ THIS CARD USED TO BE "Bank connected", with a mock reading "34 payments this week,
-              all sorted". There is no provider behind that sentence. It now shows the three ways in
-              that genuinely work today, and the feed is named as coming, chosen by the flag. */}
-          <div className="drow flip reveal">
-            <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--river)' }}>Three ways in</div>
-              <h3>Whichever is quickest, it lands sorted.</h3>
-              <p>Photograph a receipt and Lekhio reads the shop, the total and the date. Paid cash, or nowhere near a receipt? Say it in a line. Months behind? Export your bank statement and it reads the lot in one go, without a single thing typed twice. {bankLive ? 'And your bank feed reads new card payments as they land.' : 'A read only bank feed is built and switching on soon.'}</p>
-            </div>
-            <div className="dvis">
-              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--tx-mut)', marginBottom: 2 }}>THIS WEEK · READ AND SORTED</div>
-              <div className="splitrow"><span>🧾 Screwfix receipt</span><span style={{ color: 'var(--tx-mut)' }}>Materials</span></div>
-              <div className="splitrow"><span>&quot;spent 40 on diesel&quot;</span><span style={{ color: 'var(--tx-mut)' }}>Fuel</span></div>
-              <div className="splitrow"><span>Statement, 62 lines</span><span style={{ color: 'var(--tx-mut)' }}>Sorted for you</span></div>
-              <div className="splitrow"><span>Waiting on your yes</span><span style={{ color: 'var(--on-green-tint)' }}>3 questions</span></div>
-            </div>
-          </div>
-
-          <div className="drow reveal">
-            <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--on-teal-tint)' }}>CIS done right</div>
-              <h3>Your refund, tracked all year.</h3>
-              <p>Lekhio splits labour and materials, applies your CIS deduction, and tracks the refund building up. Most subbies are owed money back. You get to watch it grow.</p>
-            </div>
-            <div className="dvis">
-              <div className="splitrow"><span>Labour</span><span>£320.00</span></div>
-              <div className="splitrow"><span>Materials</span><span>£80.00</span></div>
-              <div className="splitrow"><span style={{ color: 'var(--on-saffron-tint)', fontWeight: 700 }}>CIS held (20%)</span><span style={{ color: 'var(--on-saffron-tint)' }}>£64.00</span></div>
-              <div className="splitrow"><span>Refund building up</span><span style={{ color: 'var(--on-green-tint)' }}>£1,120 ↗</span></div>
+              {/* An example, said on the card. A panel of specific pounds with no owner reads as
+                  somebody's real month, and "is it true" is doc 104's fifth standing question. */}
+              <div style={{ fontSize: 11.5, color: 'var(--tx-mut)', textAlign: 'center', marginTop: 2 }}>An example month. Yours are worked out on your own figures.</div>
             </div>
           </div>
 
           <div className="drow flip reveal">
             <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--on-saffron-tint)' }}>Hands full</div>
-              <h3>On a job? Just say it.</h3>
-              <p>On a roof or under a sink, talking is the only input that works. Say what you spent and carry on. It is logged before you have put the phone down.</p>
-            </div>
-            <div className="dvis">
-              <div className="diconrow">
-                <div className="dicon"><Ic e="🎙️" color="var(--on-saffron-tint)" size={30} /></div>
-                <div className="wf">{[10, 22, 14, 28, 18, 24, 12, 20, 10].map((h, i) => (<i key={i} style={{ height: h }} />))}</div>
-              </div>
-              <div className="dbub out">&quot;spent forty on diesel&quot;</div>
-              <div className="dbub in">£40 fuel, logged ✅</div>
-            </div>
-          </div>
-
-          <div className="drow reveal">
-            <div className="dtext">
-              <div className="eyebrow" style={{ color: 'var(--on-green-tint)' }}>You approve</div>
               <h3>Prepared for you. Sent by you.</h3>
               <p>Your quarterly figures sit there ready. You check them and you send them. Nothing reaches HMRC without your yes. That is the line we never cross.{filing.live ? '' : ' Filing straight from Lekhio is coming, and our HMRC recognition is in progress. Until it lands, Lekhio does all the preparation so filing takes minutes.'}</p>
             </div>
@@ -512,87 +296,28 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="center reveal" style={{ marginTop: 44 }}><Link href="/product" className="btn primary">See everything Lekhio does →</Link></div>
-        </div>
-      </section>
-
-      {/* Two helpers + compliance */}
-      <section style={{ background: 'var(--river-tint)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
-        <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 40 }}>
-            {/* 🔴 REWRITTEN 3 AUGUST 2026 ON JAG'S STEER: "puchio and rakha need to be sold a lot
-                better, the point of this employee is to save them money."
-                They were sold as FEATURES. "Any tax question, straight answer" and "It watches your
-                numbers for you" describe what they do and never once say what it is worth, which on
-                a page whose own headline is "the one that saves you money" is the argument being
-                dropped exactly where it should land.
-                ⚠️ AND THE LEAD NAMED THE CHANNEL: "the brains of an accountant, IN THE CHAT YOU
-                ALREADY USE". Wave A took the messaging app out of the picture and this sentence
-                survived it, because a sweep for a palette cannot see prose. */}
-            <div className="eyebrow">Where the money comes from</div>
-            <h2 className="h2">Two of them. Both looking for money.</h2>
-            <p className="lead">One answers the second you ask, so you never guess at what you can claim. One watches your figures all year and speaks up when there is money in it.</p>
-          </div>
-          <div className="helpers reveal">
-            <div className="hcard">
-              <div className="hicon" style={{ background: 'var(--river-tint)' }}><Ic e="💬" color="var(--river)" size={26} /></div>
-              <div className="role">Puchio · answers the second you ask</div>
-              <h3>Never guess what you can claim.</h3>
-              <p>Most money is lost to a cost you were not sure counted, so you left it off. Ask in plain English and get a straight answer in seconds, worked on your own figures. Every answer says which rule it comes from.</p>
-              <div className="hchat">
-                <div className="dbub out">can I claim my work boots?</div>
-                <div className="dbub in">Yes, protective boots for work are an allowable expense. Snap the receipt and I will log it.</div>
-              </div>
-            </div>
-            <div className="hcard">
-              <div className="hicon" style={{ background: 'var(--saffron-tint)' }}><Ic e="🛡️" color="var(--on-saffron-tint)" size={26} /></div>
-              <div className="role">Rakha · looks while you are working</div>
-              <h3>It finds the money you would have missed.</h3>
-              {/* 🔴 alertChannels() ADDED HERE, AND IT WAS MISSING. /product has said "on your
-                  dashboard, the next time you open it" since 2 August, because remindersLive() is
-                  false and no channel can deliver a message that reaches him when he is not
-                  looking. This card said "Rakha spots it and tells you first" with no such gate, so
-                  the two pages promised different things about the same agent. */}
-              <p>A relief you have not claimed, a purchase that would save real tax before April, an invoice nobody has paid, a threshold you are about to cross. Rakha finds it and tells you {alertChannels()}, while there is still time to act on it. It suggests, never acts.</p>
-              <div className="hchat">
-                <div className="dbub in" style={{ background: 'var(--saffron-tint)', border: '1px solid var(--saffron)' }}>Heads up: you are about £900 from the VAT threshold. Worth planning before you cross it.</div>
-                <div className="dbub in" style={{ background: 'var(--saffron-tint)', border: '1px solid var(--saffron)' }}>Invoice 0012 is 18 days late. Want me to draft a chase in your voice?</div>
-              </div>
-            </div>
-          </div>
-          <div className="compliance reveal">
-            <div className="ci">Every figure <b>checked against HMRC&apos;s 2026/27 rules</b></div>
-            <div className="ci"><b>Every rate</b> the published figure, source recorded</div>
-            <div className="ci"><b>Nothing filed</b> without your yes</div>
-          </div>
+          <div className="center reveal" style={{ marginTop: 44 }}><Link href="/product" className="btn ghost">See everything Lekhio does →</Link></div>
         </div>
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════════════════════
-          🔴 SIX INVENTED CUSTOMERS SCROLLED PAST HERE, FOREVER, WITH FIVE STARS EACH.
-          "Jas, Electrician, Birmingham." Nobody said it. The hedge under the heading read
-          "Illustrative examples, based on real self employed people" at 13px in grey, which is
-          not what CAP 3.47's "obviously fictitious" means and is not the permission CAP 3.50
-          requires, because there was nobody to ask. The full reasoning, and the three tests a
-          quote has to pass to go in, are on `reviews` in app/_shared/site.tsx.
-          ⚠️ THE QUOTES NOW COME FROM THE DATABASE, NOT THE CODE. `reviews` above is the result of
-          readPublishedTestimonials, filled only by the founder on the auth gated /team desk. When
-          he has published nothing this renders NOTHING and the front door simply does not have this
-          block. Publish one real quote and the section comes back on its own, already styled. No
-          review text lives in this file, which is what makes the ban impossible to break by a copy
-          and paste.
+          5. Reviews. ⚠️ THE QUOTES COME FROM THE DATABASE, NOT THE CODE. `reviews` above is the
+          result of readPublishedTestimonials, filled only by the founder on the auth gated /team
+          desk. When he has published nothing this renders NOTHING. No review text lives in this
+          file, which is what makes the ban on invented quotes impossible to break by a paste.
+          ⚠️ AND EVERY QUOTE RENDERS EXACTLY ONCE, AT EVERY COUNT. The scrolling belt needed a
+          second copy of the list to loop seamlessly, which put one real person on screen twice.
+          The belt is gone. A static wrapping row, one card per human being.
           ═══════════════════════════════════════════════════════════════════════════════════════ */}
       {reviews.length > 0 ? (
         <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
           <div className="wrap">
             <div className="center reveal" style={{ marginBottom: 38 }}><h2 className="h2">In their own words.</h2></div>
           </div>
-          {/* The belt when there are enough cards to loop honestly, a static centred row when
-              there are not. See the note on `reviewBelt` above: one real quote, rendered once. */}
-          <div className={reviewBelt ? 'rev-marquee reveal' : 'reveal'}>
-            <div className={reviewBelt ? 'rev-track' : 'rev-static'}>
-              {(reviewBelt ? [...reviews, ...reviews] : reviews).map((r, i) => (
-                <div className="quote" key={i} aria-hidden={i >= reviews.length ? true : undefined}>
+          <div className="reveal">
+            <div className="rev-static">
+              {reviews.map((r, i) => (
+                <div className="quote" key={i}>
                   <div className="rate" role="img" aria-label={`${r.rating} out of 5`}>
                     {Array.from({ length: 5 }).map((_, s) => (
                       <svg key={s} viewBox="0 0 20 20" aria-hidden="true" style={{ fill: s < r.rating ? 'var(--saffron)' : 'var(--line)' }}>
@@ -609,47 +334,35 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      {/* Pricing */}
+      {/* 6. One price card. One price, one line, and the full breakdown lives on /pricing. */}
       <section className="pricewrap">
         <div className="wrap">
-          <div className="center reveal" style={{ marginBottom: 42 }}><h2 className="h2">One price. Everything in.</h2><p className="lead">No receipt limits, no tiers, no surprises. Both plans start with 7 days free, no card needed.</p></div>
-          <div className="prices reveal">
+          <div className="center reveal" style={{ marginBottom: 42 }}><h2 className="h2">One price. Everything in.</h2></div>
+          <div className="reveal" style={{ maxWidth: 440, margin: '0 auto' }}>
             <div className="pcard">
-              <div className="pname">Monthly</div>
+              <div className="pname">Your first employee</div>
               <div className="pamt">£12.99<span>/mo</span></div>
-              <div className="pnote">Billed monthly. Cancel any time.</div>
-              <div className="pcta"><Link href="/start" className="btn primary">Start 7 days free</Link><div className="pmicro">No card needed</div></div>
+              <div className="pnote">No receipt limits, no tiers, no surprises.</div>
+              <div className="pcta">
+                <Link href="/start" className="btn primary">Start free</Link>
+                <div className="pmicro">{CTA_MICRO}</div>
+              </div>
             </div>
-            <div className="pcard best">
-              <span className="pbadge">2 months free</span>
-              <div className="pname" style={{ color: 'var(--river)' }}>Yearly · best value</div>
-              <div className="pamt">£129<span>/yr</span></div>
-              <div className="pnote">Just £10.75 a month, billed once a year.</div>
-              <span className="psave">You save £27 a year</span>
-              <div className="pcta"><Link href="/start" className="btn primary">Start 7 days free</Link><div className="pmicro">No card needed</div></div>
-            </div>
-          </div>
-          <div className="incl-panel reveal">
-            <h3>Everything, in both plans</h3>
-            <ul className="incl-grid">
-              <li><span className="t">✓</span> {bankLive ? 'Bank connected, every payment sorted for you' : 'Receipts, statements and plain text, read and sorted for you'}</li>
-              <li><span className="t">✓</span> Reliefs found on your own numbers, all year</li>
-              <li><span className="t">✓</span> Unlimited receipts, voice notes and mileage</li>
-              <li><span className="t">✓</span> MTD ready summaries and invoices, you approve</li>
-              <li><span className="t">✓</span> CIS split, deduction and refund tracking</li>
-              <li><span className="t">✓</span> Cancel in one tap, export any time</li>
-            </ul>
+            <p className="center" style={{ fontSize: 14, marginTop: 16 }}>
+              <Link href="/pricing" style={{ color: 'var(--river)', fontWeight: 700 }}>The full breakdown, and the yearly plan, on pricing →</Link>
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Final CTA */}
+      {/* 7. The closing ask, in /product's framing. */}
       <section style={{ paddingTop: 20 }}>
         <div className="wrap">
           <div className="final reveal">
-            <h2>Your first employee starts today.</h2>
-            <p>Snap your first receipt and it goes to work, finding your money and keeping you ready to file. 7 days free, no card needed.</p>
+            <h2>Hire it for a week.</h2>
+            <p>If it has not earned its keep, walk away in one tap.</p>
             <Link href="/start" className="btn white" style={{ fontSize: 17 }}>Start free</Link>
+            <div className="micro-note">{CTA_MICRO}</div>
           </div>
         </div>
       </section>

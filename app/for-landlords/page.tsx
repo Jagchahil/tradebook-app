@@ -74,7 +74,7 @@ export default function ForLandlordsPage() {
             Text the rent as it lands and Lekhio keeps your property money in its own stream: Section 24 shown honestly, the £1,000 allowance elected automatically, Making Tax Digital handled, and the new April 2027 property rates priced on your numbers a full year before they bite.
           </p>
           <div style={{ display: 'flex', gap: 12, marginTop: 22, flexWrap: 'wrap' }}>
-            <Link href="/start" style={{ background: RIVER, color: 'var(--on-river)', fontSize: 15.5, fontWeight: 700, padding: '13px 24px', borderRadius: 12 }}>Get started →</Link>
+            <Link href="/start" style={{ background: RIVER, color: 'var(--on-river)', fontSize: 15.5, fontWeight: 700, padding: '13px 24px', borderRadius: 12 }}>Start free</Link>
             <Link href="/landlord-tax-calculator" style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, color: INK, fontSize: 15.5, fontWeight: 700, padding: '13px 24px', borderRadius: 12 }}>Try the free calculator</Link>
           </div>
         </div>

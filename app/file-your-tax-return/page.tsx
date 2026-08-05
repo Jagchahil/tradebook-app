@@ -638,7 +638,7 @@ export default function FileYourTaxReturnPage() {
           </p>
           <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
             <Link href="/" style={{ color: RIVER, fontWeight: 600, textDecoration: 'none' }}>Back to Lekhio</Link>
-            <Link href="/start" style={{ color: RIVER, fontWeight: 600, textDecoration: 'none' }}>Start free trial</Link>
+            <Link href="/start" style={{ color: RIVER, fontWeight: 600, textDecoration: 'none' }}>Start free</Link>
             <a href="https://www.gov.uk/log-in-file-self-assessment-tax-return" target="_blank" rel="noopener noreferrer" style={{ color: RIVER, fontWeight: 600, textDecoration: 'none' }}>The official HMRC service</a>
           </div>
         </div>

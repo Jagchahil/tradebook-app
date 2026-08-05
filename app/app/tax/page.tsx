@@ -335,6 +335,17 @@ export default async function TaxHubPage() {
             <span style={S.doorLabel}>Can I claim it</span>
             <span style={S.rowBody}>The expense rules in plain English, with HMRC&apos;s own pages behind them.</span>
           </a>
+          {/* These two rode the old sidebar; the bottom bar carries no menus, so the hub is their
+              door now. Vehicles keeps the argued exception to doc 103's once test recorded in
+              AppNav: the whole value of the screen is being seen BEFORE he signs at the dealer. */}
+          <a href="/app/tax/vehicle" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Vehicles</span>
+            <span style={S.rowBody}>Van or car, and the cheapest way to buy one, seen before you sign.</span>
+          </a>
+          <a href="/app/pay-yourself" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Pay yourself</span>
+            <span style={S.rowBody}>The most tax efficient way to take your money out.</span>
+          </a>
         </div>
       </section>
 

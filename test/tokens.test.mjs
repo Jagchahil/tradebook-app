@@ -114,8 +114,14 @@ ok('the two sheets carry identical dark values, not two lists maintained by hand
 // block would be a colour the dark theme cannot reach.
 ok('🔴 APP_CSS PAINTS WITH THE VARIABLES, NOT HEXES',
   !/#[0-9A-Fa-f]{6}/.test(T.APP_CSS.replace(T.APP_THEME_CSS, '')));
-ok('APP_CSS clears the desk rail from the shared constant, plus one rhythm step of air',
-  typeof T.SIDEBAR === 'number' && T.APP_CSS.includes(`margin-left:max(${T.SIDEBAR + T.SPACE.lg}px`));
+// The desk rail is gone, 5 August 2026: the shell is the floating bottom bar at every width. What
+// APP_CSS owes the shell now is the room under the bar, from the same DOCK constant the bar reads,
+// and the glass border width is a number in GLASS so the shell's controls cannot drift apart.
+ok('APP_CSS keeps the floating bar off the last row, from the shared DOCK constant',
+  typeof T.DOCK.clearance === 'number' && T.APP_CSS.includes(`${T.DOCK.clearance}px`)
+  && !T.APP_CSS.includes('margin-left:max('));
+ok('the glass constants exist for the shell: one border width, one blur',
+  typeof T.GLASS.border === 'number' && /blur\(\d+px\) saturate\([\d.]+\)/.test(T.GLASS.blur));
 
 console.log('\n=== the theme swap stays wired ===\n');
 const site = readFileSync(path.join(root, 'app/_shared/site.tsx'), 'utf8');

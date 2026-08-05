@@ -869,15 +869,20 @@ ok('an invoice with no VAT sends exactly the email it always sent',
 // ---------------------------------------------------------------------------------------------
 // 10. THE NAV, AND THE HOUSE RULES ACROSS THE WHOLE SURFACE.
 // ---------------------------------------------------------------------------------------------
-const sections = nav.slice(nav.indexOf('export const SECTIONS'), nav.indexOf('export function AppNav'));
-ok('the nav has an Invoices section with all four doors',
-  /label: 'Invoices'/.test(sections)
-  && /href: '\/app\/invoices'/.test(sections)
+// ⚠️ THE SIDEBAR'S INVOICES SECTION BECAME PART OF THE YOU SURFACE ON 5 AUGUST 2026, when the
+// shell became the floating bottom bar. The four doors did not close: they live in SECTIONS under
+// You (so the You tab lights for them), Make an invoice is on the plus sheet, and the You hub
+// draws the rows. test/appnav.test.mjs holds the full old-door-to-new-home mapping.
+const sections = nav.slice(nav.indexOf('export const SECTIONS'), nav.indexOf('function TabIcon'));
+ok('the shell still offers all four invoice doors',
+  /href: '\/app\/invoices'/.test(sections)
   && /href: '\/app\/invoices\/new'/.test(sections)
   && /href: '\/app\/proof-of-income'/.test(sections)
   && /href: '\/app\/share-books'/.test(sections));
+ok('and making an invoice is a primary act: it is on the plus sheet',
+  /PLUS_ACTIONS[\s\S]{0,200}href: '\/app\/invoices\/new', label: 'Make an invoice'/.test(nav));
 ok('the detail view is reached from a row, never from the menu', !/'\/app\/invoice'/.test(sections));
-ok('the detail page still lights up Invoices in the nav', /<AppNav current="\/app\/invoices" \/>/.test(pageDetail));
+ok('the detail page still lights up the invoices route in the shell', /<AppNav current="\/app\/invoices" \/>/.test(pageDetail));
 
 for (const [name, src] of [
   ['list', pageList], ['detail', pageDetail], ['new', pageNew], ['proof', pageProof],

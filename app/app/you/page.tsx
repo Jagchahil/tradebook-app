@@ -314,26 +314,6 @@ export default async function YouPage({
           </>
         )}
 
-        {/* ⚠️ THE WORD WHATSAPP IS DELIBERATELY NOT ON THIS SCREEN. test/frontdoor.test.mjs holds
-            every screen but the connect page to that, because screens used to instruct actions a
-            man with no bound number could not take. This card reports the binding as the connect
-            page's own copy does, "your phone", and the door leads where the word lives. */}
-        <div style={S.reachRow}>
-          {card?.phone ? (
-            <p style={S.fact}>
-              Your phone is connected. Messages from the number ending <b>{card.phone.slice(-4)}</b>{' '}
-              come straight into your books.
-            </p>
-          ) : (
-            <p style={S.fact}>
-              Your phone is not connected yet. Connect it and a photo of a receipt is all it takes
-              to log one.
-            </p>
-          )}
-          <a href="/app/connect" style={S.inlineLink}>
-            {card?.phone ? 'Manage your connected phone' : 'Connect your phone'}
-          </a>
-        </div>
       </section>
 
       {/* ── THE DOORS DOWN. Each answers one question well; this page repeats none of them. ─── */}
@@ -372,6 +352,61 @@ export default async function YouPage({
           </a>
         </div>
       </section>
+
+      {/* ── YOURS. The documents and doors that are his rather than about him: invoices, the
+          diary they are raised from, and the two papers he hands to somebody else. These rows
+          came off the old sidebar when the shell became the bottom bar, and this hub is their
+          home now, in the same shape as the rows above so the page reads as one system. ──────── */}
+      <section className="lek-card">
+        <h2 className="lek-h2">Yours</h2>
+        <div style={S.doors}>
+          <a href="/app/invoices" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Every invoice</span>
+            <span style={S.rowBody}>Who owes you, what is late, and the door to raising a new one.</span>
+          </a>
+          <a href="/app/diary" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Jobs diary</span>
+            <span style={S.rowBody}>What is booked, and one press to invoice it.</span>
+          </a>
+          <a href="/app/proof-of-income" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Proof of income</span>
+            <span style={S.rowBody}>The summary a landlord or lender asks for.</span>
+          </a>
+          <a href="/app/share-books" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Share your books</span>
+            <span style={S.rowBody}>A read only link you can take back whenever you like.</span>
+          </a>
+        </div>
+      </section>
+
+      {/* ── SIGNING OUT, AS A ROW ON THE PROFILE. It lived on the old sidebar, and a door that
+          disappears with a redesign is a door a man rattles. Still a form and never a link: a GET
+          that ends a session is a session any other site can end for him with an image tag. ──── */}
+      <form action="/api/auth/signout" method="post" style={S.outForm}>
+        <button type="submit" style={S.outBtn} className="lek-hit">Sign out</button>
+      </form>
+
+      {/* ── THE CONNECT BANNER, AT THE BOTTOM OF THE PROFILE, WHERE IT WAS ASKED TO LIVE. ───────
+          ⚠️ THE WORD WHATSAPP IS DELIBERATELY NOT ON THIS SCREEN. test/frontdoor.test.mjs holds
+          every screen but the connect page to that, because screens used to instruct actions a
+          man with no bound number could not take. This card reports the binding as the connect
+          page's own copy does, "your phone", and the door leads where the word lives. */}
+      <section className="lek-card">
+        {card?.phone ? (
+          <p style={S.fact}>
+            Your phone is connected. Messages from the number ending <b>{card.phone.slice(-4)}</b>{' '}
+            come straight into your books.
+          </p>
+        ) : (
+          <p style={S.fact}>
+            Your phone is not connected yet. Connect it and a photo of a receipt is all it takes
+            to log one.
+          </p>
+        )}
+        <a href="/app/connect" style={S.inlineLink}>
+          {card?.phone ? 'Manage your connected phone' : 'Connect your phone'}
+        </a>
+      </section>
     </main>
   );
 }
@@ -402,10 +437,13 @@ const S: Record<string, React.CSSProperties> = {
   codeInput: { flex: '0 1 160px', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: TYPE.stat, fontFamily: FONT, color: INK, letterSpacing: '0.2em', fontVariantNumeric: 'tabular-nums' },
   submit: { background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.sm, padding: '11px 18px', fontSize: TYPE.body, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
 
-  reachRow: { borderTop: `1px solid ${LINE}`, marginTop: SPACE.md, paddingTop: SPACE.md },
-
   doors: { display: 'grid', gridTemplateColumns: '1fr', gap: SPACE.xs },
   door: { display: 'block', textDecoration: 'none', background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px' },
   doorLabel: { display: 'block', fontSize: TYPE.body, fontWeight: 800, color: RIVER_DEEP, marginBottom: 3 },
   rowBody: { display: 'block', fontSize: TYPE.note, lineHeight: 1.5, color: MUTED },
+
+  // Signing out, shaped like the rows above it so the page stays one system, and quiet rather
+  // than red: leaving is not a warning.
+  outForm: { margin: `0 0 ${SPACE.md}px` },
+  outBtn: { display: 'block', width: '100%', textAlign: 'left', background: PANEL, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '14px', fontSize: TYPE.body, fontWeight: 800, fontFamily: FONT, color: MUTED, cursor: 'pointer' },
 };

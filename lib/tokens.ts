@@ -238,11 +238,23 @@ export const SPACE = { hair: 4, xs: 8, sm: 12, md: 16, lg: 24, xl: 32, xxl: 48 }
 // phone column with air around it, which is calmer than a layout that reflows at every size.
 export const BREAK = { stack: 420, desk: 1020 } as const;
 
-// The dashboard rail. From BREAK.desk up the app nav is a fixed left column of this width and the
-// content column clears it (see APP_CSS and app/app/AppNav.tsx); below desk it does not exist and
-// the phone's top bar draws instead. One number, named here, because the nav and the sheet that
-// makes room for it must never disagree about it.
-export const SIDEBAR = 260;
+// ---------- the floating shell ----------
+//
+// The signed in app wears one bar, fixed at the foot of every screen, floating clear of the
+// edges, translucent and blurred like glass. The shell moved from a sidebar to this bar on
+// 5 August 2026, and this web shell is the reference the native apps will copy, so the numbers
+// live here rather than in the component.
+//
+// GLASS.border is the ONE border width every shell control wears: the bar, the plus sheet, its
+// six buttons and the floating Ask Lekhio button. A glass surface cannot lean on a shadow for
+// definition, because every shadow in this file is ink on paper and vanishes in dark, so the
+// border carries it, thick on purpose, with a quiet inset highlight above it.
+//
+// DOCK.clearance is the room APP_CSS keeps under every page so the bar never covers the last row
+// a man came to read. The bar and the sheet that clears it must never disagree about it, which is
+// why both read it from here. DOCK.maxWidth keeps the pill a pill on a desk instead of a plank.
+export const GLASS = { border: 2, blur: 'blur(18px) saturate(1.6)' } as const;
+export const DOCK = { maxWidth: 440, clearance: 120 } as const;
 
 // ---------- movement ----------
 //
@@ -422,9 +434,10 @@ export const A11Y_CSS = [
 // the card padding, the tile figures and the headings take one step up the type scale. Cards sit
 // side by side only where they are true siblings, and each page declares that pairing itself.
 // The width in between gets the phone column with air around it, on purpose: a tablet held in a
-// kitchen is a big phone, not a small desk. From desk up the nav is a fixed rail of SIDEBAR
-// pixels on the left (app/app/AppNav.tsx), so the column centres itself in what remains rather
-// than in the viewport, or the rail would sit on top of the first card.
+// kitchen is a big phone, not a small desk. The nav is the floating bottom bar in
+// app/app/AppNav.tsx at every width, so the column simply centres in the viewport, the top
+// padding leaves air under the floating Ask Lekhio button, and the bottom padding is
+// DOCK.clearance so the bar never sits on the last row of a page.
 //
 // ⚠️ THE APP USED TO STAY LIGHT, AND FROM 31 JULY IT FOLLOWS THE DEVICE INSTEAD. The 30 July
 // compromise pinned the app to the light constants because switching theme took the swap script
@@ -439,7 +452,7 @@ export const A11Y_CSS = [
 export const APP_CSS = css`
 ${APP_THEME_CSS}
 @keyframes lek-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.lek-wrap{box-sizing:border-box;max-width:672px;margin:0 auto;padding:${SPACE.md}px ${SPACE.md}px ${SPACE.xxl}px}
+.lek-wrap{box-sizing:border-box;max-width:672px;margin:0 auto;padding:${SPACE.xxl + SPACE.md}px ${SPACE.md}px ${DOCK.clearance}px}
 /* ⚠️ THE GAP BETWEEN CARDS IS NOW THE SAME AS THE PADDING INSIDE THEM, AND IT USED TO BE SMALLER.
    12 between and 16 inside meant two cards sat closer to each other than a card's own contents sat
    to its edge, so the eye grouped across the join rather than down the page. Equal is the calm
@@ -462,7 +475,7 @@ ${APP_THEME_CSS}
 .lek-h2{font-size:${TYPE.body}px;font-weight:800;letter-spacing:-0.01em;margin:0 0 ${SPACE.sm}px}
 @media(max-width:${BREAK.stack}px){.lek-grid{grid-template-columns:1fr}}
 @media(min-width:${BREAK.desk}px){
-  .lek-wrap{max-width:992px;padding:${SPACE.xl}px ${SPACE.md}px ${SPACE.xxl * 2}px;margin-left:max(${SIDEBAR + SPACE.lg}px,calc((100vw + ${SIDEBAR}px - 992px)/2));margin-right:auto}
+  .lek-wrap{max-width:992px;padding:${SPACE.xxl + SPACE.md}px ${SPACE.md}px ${DOCK.clearance + SPACE.xxl}px}
   /* Same rule on a desk: the gap between two cards matches the air inside one. 24 became 32. */
   .lek-card{padding:${SPACE.xl}px;margin-bottom:${SPACE.xl}px}
   .lek-grid{gap:${SPACE.md}px}

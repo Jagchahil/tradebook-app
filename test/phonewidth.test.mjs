@@ -212,9 +212,13 @@ console.log('\n4. Nothing is wider than the narrowest phone');
   ok(`🔴 no base rule is wider than a ${NARROWEST}px phone${offenders.length ? `\n     ${offenders.join('\n     ')}` : ''}`,
     offenders.length === 0);
   // The reading column is capped, and the cap is comfortably under a phone's width plus padding.
-  ok('the page wrapper is fluid on a phone and only gains a sidebar offset on a desk',
-    /\.lek-wrap\{box-sizing:border-box;max-width:672px/.test(T.APP_CSS)
-    && /@media\(min-width:1020px\)[\s\S]*?margin-left:max\(284px/.test(T.APP_CSS));
+  // ⚠️ THE SIDEBAR OFFSET DIED WITH THE SIDEBAR, 5 August 2026. The shell is a floating bottom
+  // bar at every width, so the column simply centres, and what the phone needs guarded now is the
+  // room under the bar: DOCK.clearance of bottom padding, or the bar sits on the last row.
+  ok('the page wrapper is fluid on a phone, centres itself, and clears the floating bar',
+    /\.lek-wrap\{box-sizing:border-box;max-width:672px;margin:0 auto/.test(T.APP_CSS)
+    && !/margin-left:max\(/.test(T.APP_CSS)
+    && T.APP_CSS.includes(`${T.DOCK.clearance}px`));
 }
 
 console.log(`\n  ${pass} passed, ${fail} failed.`);

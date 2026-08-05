@@ -358,7 +358,7 @@ console.log('\nwave nine: MTD, payments on account and National Insurance belong
 // 🔴 4. THE RAIL. It advertised an MTD update to every customer on every page.
 // ---------------------------------------------------------------------------------------------
 {
-  const block = nav.slice(nav.indexOf('export const SECTIONS'), nav.indexOf('export function AppNav'));
+  const block = nav.slice(nav.indexOf('export const SECTIONS'), nav.indexOf('function TabIcon'));
   ok('🔴 THE NAV NO LONGER PROMISES AN MTD UPDATE TO A MAN WHO MAKES NONE',
     !/MTD update would report/.test(codeOnly(block)));
   ok('the row itself stays, because the figures behind it are his money added up',
@@ -366,12 +366,15 @@ console.log('\nwave nine: MTD, payments on account and National Insurance belong
   ok('and its hint names what the page shows, which is true for every structure',
     /hint: 'Your figures since 6 April, and the quarter on its own'/.test(block));
   // ⚠️ THE TRADE OFF, PINNED SO THE NEXT PERSON KNOWS IT WAS A CHOICE. SECTIONS is a static const,
-  // rendered twice from one list and read as source text by five other suites, and AppNav is given
-  // no customer to look up. Withholding a row from a director means rebuilding the nav, and the
-  // page behind this one now tells him the truth in full. So the hint was made honest instead.
-  ok('SECTIONS is still one static list rendered twice, which is why the row could not be withheld',
+  // read as source text by a dozen suites, and AppNav is given no customer to look up. Withholding
+  // a row from a director means rebuilding the nav, and the page behind this one now tells him the
+  // truth in full. So the hint was made honest instead. Since the 5 August shell change the bar
+  // renders the one list in two slices around the plus button, which changes nothing about the
+  // trade off: still one static list, still no per customer withholding.
+  ok('SECTIONS is still one static list rendered whole, which is why the row could not be withheld',
     /export const SECTIONS: ReadonlyArray<NavSection> = \[/.test(nav)
-    && (nav.match(/SECTIONS\.map/g) || []).length === 2
+    && nav.includes('SECTIONS.slice(0, 2).map(tab)')
+    && nav.includes('SECTIONS.slice(2).map(tab)')
     && !/AppNav\({ current, /.test(nav));
 }
 

@@ -45,6 +45,11 @@ const stripComments = (s) => s
 
 const pageSrc = read('app/app/feed/page.tsx');
 const pageCode = stripComments(pageSrc);
+// The rendering itself, one copy, worn by /app/feed AND by Home since the 5 August shell change.
+const compSrc = read('app/app/Feed.tsx');
+const compCode = stripComments(compSrc);
+const homeSrc = read('app/app/page.tsx');
+const homeCode = stripComments(homeSrc);
 const navSrc = read('app/app/AppNav.tsx');
 const dbSrc = read('lib/supabase.ts');
 
@@ -70,36 +75,62 @@ ok('🔴 the sealed reference minters are handed in, closed over the session use
   && pageCode.includes('entry: (id, month) => entryRef(user.id, id, month)'));
 ok('🔴 the page never builds a pound itself: the money arrives inside the reader\'s sentences',
   !/`£\$\{|['"]£['"]\s*\+|\+\s*['"]£['"]/.test(pageCode));
+
+// ---------------------------------------------------------------------------------------------
+// 1b. THE RENDERER. One copy, in app/app/Feed.tsx, since Home started carrying the feed too.
+// A second copy of this markup is the sharedcss lesson: one gets fixed, the other one ships.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== the renderer, written once ===\n');
+
+ok('the page draws through the shared renderer', pageCode.includes('<FeedDays items={items} now={now} />')
+  && pageSrc.includes("from '../Feed'"));
+ok('the renderer ships no client JavaScript either',
+  !/^'use client'/m.test(compSrc)
+  && !/onClick|onChange|onSubmit|useState|useEffect|<script/.test(compCode));
 ok('a failed read is said plainly, never drawn as an empty account',
-  pageCode.includes('We could not read your feed just now.'));
+  compCode.includes('We could not read your feed just now.'));
 // Doc 103's empty test: one quiet line, telling him how to make the first thing happen, and no
 // scaffold of day headings around nothing.
-const emptyBranch = pageCode.slice(pageCode.indexOf('items.length === 0'), pageCode.indexOf('days.map'));
+const emptyBranch = compCode.slice(compCode.indexOf('items.length === 0'), compCode.indexOf('const days'));
 ok('the empty state is ONE quiet line', (emptyBranch.match(/<p /g) || []).length === 1);
 ok('...and it says what will appear', emptyBranch.includes('The first receipt you send appears here'));
 // The frontdoor rule: no screen inside /app may instruct a WhatsApp action, because the man
 // reading may have no number bound yet. The feed's words stay channel neutral.
-ok('...without instructing a WhatsApp send', !/WhatsApp/.test(pageCode));
+ok('...without instructing a WhatsApp send', !/WhatsApp/.test(pageCode) && !/WhatsApp/.test(compCode));
 ok('the days are grouped under plain headings: Today, Yesterday, then the date',
-  pageCode.includes("return 'Today'") && pageCode.includes("return 'Yesterday'")
-  && pageCode.includes("weekday: 'long'"));
+  compCode.includes("return 'Today'") && compCode.includes("return 'Yesterday'")
+  && compCode.includes("weekday: 'long'"));
 ok('times and dates are read in the man\'s own clock, London',
-  (pageSrc.match(/Europe\/London/g) || []).length >= 3);
+  (compSrc.match(/Europe\/London/g) || []).length >= 3);
 ok('a row with no reference renders readable and unlinked, the fail closed rule',
-  /item\.ref \? \(/.test(pageCode) && pageCode.includes('<div key='));
+  /item\.ref \? \(/.test(compCode) && compCode.includes('<div key='));
 ok('links go through the ref the reader minted, never an id the page assembled',
-  pageCode.includes('href={item.ref}') && !/[?&](id|tx|conversation)=/.test(pageCode));
+  compCode.includes('href={item.ref}') && !/[?&](id|tx|conversation)=/.test(compCode));
+ok('the row markup lives ONLY in the renderer: neither page retypes it',
+  !pageCode.includes('lek-feed-row') && !homeCode.includes('lek-feed-row')
+  && compCode.includes('lek-feed-row'));
 
 // ---------------------------------------------------------------------------------------------
-// 2. THE NAV. Feed is a primary surface beside Overview, and the nav does not lie about it.
+// 2. THE SHELL. Since 5 August 2026 Home IS overview plus feed: the same record flows under the
+// figures, from the same reader, with the same sealed minters, and /app/feed keeps the record as
+// a page of its own, opened from the heading on Home. The shell lights the Home tab for it.
 // ---------------------------------------------------------------------------------------------
-console.log('\n=== the nav ===\n');
+console.log('\n=== the shell, and home carrying the feed ===\n');
 
-const sections = navSrc.slice(navSrc.indexOf('export const SECTIONS'), navSrc.indexOf('export function AppNav'));
-ok('the Feed is in SECTIONS', sections.includes("{ href: '/app/feed', label: 'Feed', items: [] }"));
-ok('...directly after Overview, a primary surface, not a drawer item',
-  sections.indexOf("label: 'Overview'") < sections.indexOf("label: 'Feed'")
+const sections = navSrc.slice(navSrc.indexOf('export const SECTIONS'), navSrc.indexOf('function TabIcon'));
+ok('the shell knows /app/feed and it lights the Home tab',
+  /href: '\/app\/feed', label: 'Feed'/.test(sections)
+  && sections.indexOf("label: 'Home'") < sections.indexOf("label: 'Feed'")
   && sections.indexOf("label: 'Feed'") < sections.indexOf("label: 'Money'"));
+ok('🔴 HOME RENDERS THE FEED UNDER ITS FIGURES, through the same renderer',
+  homeCode.includes('<FeedDays items={feedItems} now={now} />') && homeSrc.includes("from './Feed'"));
+ok('🔴 and home reads it with the same sealed minters, closed over the session user',
+  homeCode.includes('readActivityFeed(user.id')
+  && homeCode.includes('chat: (kind, id) => chatRef(user.id, kind, id)')
+  && homeCode.includes('entry: (id, month) => entryRef(user.id, id, month)'));
+ok('the figures come FIRST: the feed sits below the footer line, never above the tax card',
+  homeSrc.indexOf('<FeedDays') > homeSrc.indexOf('S.foot'));
+ok('home links the record as its own page', homeSrc.includes('href="/app/feed"'));
 
 // ---------------------------------------------------------------------------------------------
 // 3. 🔴 THE READER, ATTACKED AT RUNTIME. Staged with a recording fetch and stub minters.

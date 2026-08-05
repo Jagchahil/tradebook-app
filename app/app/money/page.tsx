@@ -19,7 +19,7 @@ import { gbp0 } from '../../../lib/money';
 import { entryRef } from '../entryref';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
-  GREEN, INK, LINE, MUTED, ON_GREEN_TINT, PANEL, PAPER, RIVER, RIVER_TINT, SURFACE,
+  GREEN, INK, LINE, MUTED, ON_GREEN_TINT, PANEL, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, SURFACE,
 } from '../../../lib/apptheme';
 import { AppNav } from '../AppNav';
 
@@ -288,6 +288,32 @@ export default async function MoneyPage({
         </section>
       )}
 
+      {/* ── THE DOORS OF THE MONEY SURFACE. The old sidebar listed these under Money; the bottom
+          bar does not, so the tab's own page holds them, in the same row shape the tax hub and
+          the You hub use. The three ways money arrives are also on the plus button in the bar,
+          which is the fast path; these rows are the findable one. ─────────────────────────────── */}
+      <section className="lek-card">
+        <h2 className="lek-h2">Add to your books</h2>
+        <div style={S.doors}>
+          <a href="/app/money/add" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Add an entry</span>
+            <span style={S.rowBody}>Cash in hand, typed straight in.</span>
+          </a>
+          <a href="/app/money/capture" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Upload a till slip</span>
+            <span style={S.rowBody}>We read it, and nothing counts until you say so.</span>
+          </a>
+          <a href="/app/money/import" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Upload a statement</span>
+            <span style={S.rowBody}>A CSV from your bank, read without connecting it.</span>
+          </a>
+          <a href="/app/goals" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Goals</span>
+            <span style={S.rowBody}>What you are saving for, written down.</span>
+          </a>
+        </div>
+      </section>
+
       <p style={S.foot}>
         Everything here is money you have confirmed, and it is what your tax figures are worked out
         from. If a line looks wrong, it is worth fixing: the figures follow it.
@@ -350,4 +376,10 @@ const S: Record<string, React.CSSProperties> = {
   empty: { fontSize: TYPE.strong, fontWeight: 700, margin: 0 },
   quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '10px 0 0' },
   foot: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
+
+  // The same door row the tax hub and the You hub draw, so every hub page reads as one system.
+  doors: { display: 'grid', gridTemplateColumns: '1fr', gap: SPACE.xs },
+  door: { display: 'block', textDecoration: 'none', background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px' },
+  doorLabel: { display: 'block', fontSize: TYPE.body, fontWeight: 800, color: RIVER_DEEP, marginBottom: 3 },
+  rowBody: { display: 'block', fontSize: TYPE.note, lineHeight: 1.5, color: MUTED },
 };

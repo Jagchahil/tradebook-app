@@ -5,8 +5,10 @@ import { SESSION_COOKIE } from '../../lib/websession';
 import {
   getOptimiserInput, weekRows, weeklyUpdateFactsFor, readAnnouncementSources,
   readOnboardingProgress, readProvedPhone, pileEntries, readOwnNames, readAccountUse,
-  getBusinessProfile,
+  getBusinessProfile, readActivityFeed,
 } from '../../lib/supabase';
+import { chatRef } from './chatref';
+import { entryRef } from './entryref';
 import { shareCaption, wholeFirmCaption } from '../../lib/position';
 import { toStep, isDone, stepTitle, stepNumber, stepCount } from '../../lib/onboarding';
 import { appStoreLive, APP_STORE_URL, PLAY_STORE_URL, WHATSAPP_NUMBER } from '../../lib/features';
@@ -31,6 +33,7 @@ import {
 import { AppNav } from './AppNav';
 import { Announcements } from './Announcements';
 import { WeekChart } from './WeekChart';
+import { FeedDays, FEED_CSS } from './Feed';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -93,6 +96,7 @@ export default async function OverviewPage() {
   // page is one bad-signal second, not eight.
   const [
     optimiser, rows, factsMap, sources, progress, proved, gate, pileRows, ownNames, accountUse, biz,
+    feedItems,
   ] = await Promise.all([
     getOptimiserInput(user.id),
     weekRows(user.id),
@@ -110,6 +114,13 @@ export default async function OverviewPage() {
     // no two screens can disagree about what his share is. A failed read draws no caption, which
     // is the safe direction: an unlabelled figure beats a wrong label.
     getBusinessProfile(user.id).catch(() => null),
+    // THE FEED, for the bottom half of the screen. The same reader /app/feed uses, with the
+    // sealed reference minters closed over the SESSION user, exactly as that page hands them in.
+    // The reader returns null on a failed read, and app/app/Feed.tsx says so plainly.
+    readActivityFeed(user.id, 40, {
+      chat: (kind, id) => chatRef(user.id, kind, id),
+      entry: (id, month) => entryRef(user.id, id, month),
+    }),
   ]);
 
   // ⚠️ THE RESUME LINE, AND DOC 103'S EMPTY TEST DECIDES WHEN IT IS ON SCREEN.
@@ -454,6 +465,19 @@ export default async function OverviewPage() {
             ? 'Everything here is money you have confirmed. Connect your bank and new spending lands here on its own, ready for you to check.'
             : 'Everything here is money you have confirmed. Add an entry, upload a till slip, or import a bank statement, and it lands here ready for you to check.'}
       </p>
+
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          THE FEED, FLOWING UNDER THE FIGURES. Since 5 August 2026 Home scrolls the way every feed
+          he owns does: the numbers he came for first, then everything that has happened, newest
+          first. The rendering lives once in app/app/Feed.tsx and /app/feed keeps the record as a
+          page of its own; the small heading here is the door to it. What was taken out to make
+          room: nothing above this line moved, which is the point. The record used to cost a tab.
+          ═══════════════════════════════════════════════════════════════════════════════════════ */}
+      <div style={S.feedHead}>
+        <h2 style={S.feedTitle}>What has happened</h2>
+        <a href="/app/feed" style={S.feedOpen}>Feed</a>
+      </div>
+      <FeedDays items={feedItems} now={now} />
     </main>
   );
 }
@@ -464,6 +488,7 @@ export default async function OverviewPage() {
 const CSS = [
   A11Y_CSS,
   APP_CSS,
+  FEED_CSS,
   `.lek-tax{background:${RIVER_TINT};border-color:${LINE};border-color:${edge(RIVER, 20)}}`,
   `.lek-eyebrow{font-size:${TYPE.label}px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:${RIVER_DEEP};margin:0 0 ${SPACE.xs}px}`,
   // The one number he came for. Tabular figures, because a money column that wobbles as its
@@ -528,4 +553,10 @@ const S: Record<string, React.CSSProperties> = {
   badge: { display: 'inline-block', background: INK, color: PANEL, fontSize: TYPE.note, fontWeight: 600, padding: '10px 16px', borderRadius: RADIUS.md, textDecoration: 'none' },
 
   foot: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
+
+  // The seam between the figures and the record. The heading matches the feed's own day eyebrows
+  // and the link is the door to the record as its own page.
+  feedHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: SPACE.xs, borderTop: `1px solid ${LINE}`, marginTop: SPACE.lg, paddingTop: SPACE.lg },
+  feedTitle: { fontSize: TYPE.body, fontWeight: 800, letterSpacing: '-0.01em', margin: 0 },
+  feedOpen: { color: RIVER, fontWeight: 700, fontSize: TYPE.note, textDecoration: 'none' },
 };

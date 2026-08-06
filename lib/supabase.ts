@@ -3136,16 +3136,149 @@ export async function getSubscriptionByPhone(phone: string): Promise<Subscriptio
 }
 
 // --- GDPR: data export and erasure (the user acting on their own account) ----
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 ONE LIST OF WHAT WE HOLD, READ BY BOTH DOORS, BECAUSE TWO LISTS IS THE FAULT ITSELF.
+//
+// The export and the erasure each carried their own hand written list of tables, and the two
+// drifted the moment anybody shipped a table. On 6 August 2026 the count was this: the export
+// returned SEVEN tables out of the twenty eight we hold, so a man who asked for his data got his
+// receipts and his invoices and NOT ONE LINE OF HIS CHAT HISTORY. The erasure walked past
+// allowance_elections, announcement_dismissals, signup_codes (which holds his address), wa_out
+// (which holds his number) and every receipt photograph in the storage bucket, while its own
+// comment above it promised it deleted "every row for this user across all tables".
+//
+// Neither of those was written on purpose. They are what a second list does over time: a table is
+// added to whichever list the author happened to be looking at, and the other one quietly becomes
+// a false statement. UK GDPR Article 15 and Article 17 are the SAME question asked twice, what do
+// you hold about me, so there is ONE CONSTANT here and both functions walk it. Adding a table to
+// USER_DATA_TABLES adds it to the export and to the erasure in the same edit, and there is no
+// edit that can add it to only one of them. test/datarights.test.mjs pins that.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// Which of his identities fills the key column. Most tables carry his user id and cascade from
+// public.users; the ones written before he had an account, or written by a channel that only
+// knows how to reach him, carry his address or his number instead and cascade from nothing.
+export type UserDataKeyKind = 'user_id' | 'email' | 'email_norm' | 'phone';
+
+export interface UserDataTable {
+  table: string;
+  // The column that holds the identity.
+  userKey: string;
+  keyKind: UserDataKeyKind;
+  // The columns the EXPORT may hand back. '*' everywhere except the few rows that hold something
+  // which is not his to have: a bank or HMRC token is not data about him, it is a key to somebody
+  // else's building, and an export file ends up in a downloads folder, an email, a WhatsApp. The
+  // HMAC of a login code is the same class of thing. He gets everything that is about him, and
+  // nothing that anyone could replay. The ERASURE ignores this field: it takes the whole row.
+  select: string;
+}
+
+// Every table keyed to one man, in the order the erasure walks them: children before parents, so
+// no delete is refused by a foreign key that is still pointing at the row.
+export const USER_DATA_TABLES: readonly UserDataTable[] = [
+  // ⚠️ HIS CHAT HISTORY, AND IT WAS THE WHOLE OF WHAT THE EXPORT USED TO MISS. Everything he ever
+  // typed to Puchio about his money is in here. Messages first: they hang off conversations.
+  { table: 'messages', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  { table: 'conversations', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+
+  // The books and the paperwork.
+  { table: 'transactions', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  { table: 'invoices', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  { table: 'events', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  { table: 'reminder_prefs', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+
+  // What he told us about his circumstances, in his own words in the case of circumstances.asked,
+  // and the tax facts derived from them. All of it is a statement he made about his own life.
+  { table: 'properties', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  { table: 'circumstances', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  { table: 'vat_profiles', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  // No foreign key at all (user_id is a bare uuid column), so nothing cascades here and the
+  // erasure used to leave his election standing after the account was gone.
+  { table: 'allowance_elections', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+
+  // What he is saving for and what he does for a living.
+  { table: 'goals', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  { table: 'diary_jobs', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  // ⚠️ THE OLD GOALS TABLE IS DELIBERATELY NOT LISTED HERE, AND THAT IS NOT AN OVERSIGHT.
+  // The founder consolidated it into public.goals on 31 July 2026: the rows were migrated, it
+  // is read only legacy until launch two, and test/goalstore.test.mjs walks the whole server
+  // codebase asserting that name appears in NO code, so that no writer can quietly come back
+  // and fork the two stores. Naming it in this manifest would be exactly that offence. His
+  // goals are exported above, out of the table they now live in, and on the erasure side the
+  // legacy rows carry a user_id foreign key that cascades, so they go with the delete of
+  // `users` at the end of deleteUserData rather than surviving it.
+  { table: 'user_rules', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  { table: 'onboarding_progress', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  { table: 'agent_signals', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  // Same shape as allowance_elections: user_id with no foreign key, so it never cascaded either.
+  // Which notices he has dismissed is a record of what he has been shown and when.
+  { table: 'announcement_dismissals', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  // Who he showed his books to, and their name and address.
+  { table: 'book_shares', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  // The figures he signed off to HMRC. Keyed by user_id with no foreign key.
+  { table: 'hmrc_approvals', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+
+  // 🔴 TOKEN TABLES. The row is deleted whole; the export gets the shape of the connection and
+  // never the credential. access_token, refresh_token and the _enc columns are absent from these
+  // selects on purpose, and the shape of the columns is deliberately the narrow set that exists
+  // in every environment (this table has been reshaped twice, see supabase/schema.sql).
+  { table: 'hmrc_connections', userKey: 'user_id', keyKind: 'user_id', select: 'user_id,nino,business_id,expires_at,created_at,updated_at' },
+  { table: 'bank_connections', userKey: 'user_id', keyKind: 'user_id', select: 'id,user_id,provider,status,created_at' },
+
+  // His own actions, with the ip address they came from. His to see, and his to have erased.
+  { table: 'audit_log', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  // The WhatsApp linking codes. code_hash is an HMAC, so it is withheld the same way a token is.
+  { table: 'wa_links', userKey: 'user_id', keyKind: 'user_id', select: 'id,user_id,expires_at,consumed_at,bound_phone,created_at' },
+
+  // Keyed by the address he typed, not by an account he may not have finished making.
+  { table: 'signups', userKey: 'email', keyKind: 'email', select: '*' },
+  // Marketing capture: email, ip and user agent, plus the consent wording UK PECR makes us keep.
+  { table: 'marketing_leads', userKey: 'email', keyKind: 'email', select: '*' },
+  // ⚠️ NORMALISED ADDRESS, because that is the key this table is written and read on: a plus tag
+  // or a gmail dot must not leave a live row behind holding the address he asked us to forget.
+  // See normaliseEmail in lib/trialidentity.ts.
+  { table: 'signup_codes', userKey: 'email_norm', keyKind: 'email_norm', select: 'id,email,email_norm,attempts,expires_at,consumed_at,created_at' },
+
+  // Keyed by his phone number, and neither of these cascades from users.
+  // In flight WhatsApp state, which may hold a draft invoice and a customer's details.
+  { table: 'wa_sessions', userKey: 'phone', keyKind: 'phone', select: '*' },
+  // ⚠️ wa_out.user_id is `on delete set null`, so deleting the users row does NOT delete these
+  // rows, it merely forgets whose they are and leaves HIS NUMBER sitting in the column next to
+  // it. Erasing by phone is the only key that still reaches them. See APPLY_2026-07-31_wa_out.sql.
+  { table: 'wa_out', userKey: 'phone', keyKind: 'phone', select: '*' },
+];
+
+// The four identities, resolved once, so both doors filter on exactly the same values. An empty
+// string is normalised to null: an unfiltered delete would be an unbounded delete, and a PostgREST
+// filter of `eq.` with nothing after it is not a query anybody should be writing by accident.
+function userDataIdentities(
+  userId: string,
+  email: string | null,
+  phone: string | null,
+): Record<UserDataKeyKind, string | null> {
+  return {
+    user_id: userId || null,
+    email: email || null,
+    email_norm: (email ? normaliseEmail(email) : '') || null,
+    phone: phone || null,
+  };
+}
 
 export interface AccountExport {
   exported_at: string;
+  // The profile row itself, singular, because there is only ever one of him.
   user: unknown;
-  transactions: unknown[];
-  invoices: unknown[];
-  events: unknown[];
-  reminder_prefs: unknown[];
+  // These two are kept by hand rather than in the manifest because each is keyed by BOTH his
+  // number and his address, so one row can answer to either and the two reads have to be merged.
+  // A manifest entry is one table and one key; forcing these into it would mean listing each
+  // table twice and exporting the same rows twice under two names.
   subscriptions: unknown[];
-  signups: unknown[];
+  waitlist: unknown[];
+  // Then one key per USER_DATA_TABLES entry, named for the table it came from. Declared as an
+  // index signature rather than thirty named fields for the reason this whole section exists: a
+  // named field is a second list, and a second list goes stale.
+  [table: string]: unknown;
 }
 
 // Gather everything held about one user, scoped to them. Service role only.
@@ -3156,13 +3289,20 @@ export async function exportUserData(userId: string, email: string | null): Prom
     return res.ok ? ((await res.json()) as unknown[]) : [];
   };
   const phone = await getPhoneForUser(userId);
-  const [user, transactions, invoices, events, reminder_prefs] = await Promise.all([
-    get(`users?id=eq.${encodeURIComponent(userId)}&select=*`),
-    get(`transactions?user_id=eq.${encodeURIComponent(userId)}&select=*`),
-    get(`invoices?user_id=eq.${encodeURIComponent(userId)}&select=*`),
-    get(`events?user_id=eq.${encodeURIComponent(userId)}&select=*`),
-    get(`reminder_prefs?user_id=eq.${encodeURIComponent(userId)}&select=*`),
-  ]);
+  const identities = userDataIdentities(userId, email, phone);
+
+  // One read per manifest table, all at once. A table whose identity we do not have (no address
+  // on file, no number on file) contributes an empty array rather than being left out, so the
+  // file he downloads always has the same shape and "nothing here" is stated rather than implied.
+  const rows = await Promise.all(
+    USER_DATA_TABLES.map((t) => {
+      const value = identities[t.keyKind];
+      if (!value) return Promise.resolve([] as unknown[]);
+      return get(`${t.table}?${t.userKey}=eq.${encodeURIComponent(value)}&select=${t.select}`);
+    }),
+  );
+
+  const user = await get(`users?id=eq.${encodeURIComponent(userId)}&select=*`);
   const subsByPhone = phone ? await get(`subscriptions?phone=eq.${encodeURIComponent(phone)}&select=*`) : [];
   const subsByEmail = email ? await get(`subscriptions?email=eq.${encodeURIComponent(email)}&select=*`) : [];
   const seen = new Set<string>();
@@ -3172,67 +3312,128 @@ export async function exportUserData(userId: string, email: string | null): Prom
     seen.add(id);
     return true;
   });
-  const signups = email ? await get(`signups?email=eq.${encodeURIComponent(email)}&select=*`) : [];
-  return {
+  // Same two key merge as subscriptions, and it is exported for the same reason it is deleted: a
+  // waitlist row is his number and his address sitting in a table he never signed into.
+  const waitByPhone = phone ? await get(`waitlist?phone=eq.${encodeURIComponent(phone)}&select=*`) : [];
+  const waitByEmail = email ? await get(`waitlist?email=eq.${encodeURIComponent(email)}&select=*`) : [];
+  const seenWait = new Set<string>();
+  const waitlist = [...waitByPhone, ...waitByEmail].filter((w) => {
+    const id = (w as { id?: string }).id || JSON.stringify(w);
+    if (seenWait.has(id)) return false;
+    seenWait.add(id);
+    return true;
+  });
+
+  const out: AccountExport = {
     exported_at: new Date().toISOString(),
     user: user[0] ?? null,
-    transactions,
-    invoices,
-    events,
-    reminder_prefs,
     subscriptions,
-    signups,
+    waitlist,
   };
+  USER_DATA_TABLES.forEach((t, i) => {
+    out[t.table] = rows[i];
+  });
+  return out;
+}
+
+// Every receipt photograph he ever sent us, out of the storage bucket.
+//
+// ⚠️ THESE ARE NOT ROWS AND NOTHING CASCADES TO THEM. storeReceiptImage puts the bytes at
+// `receipts/<user id>/<day>-<nonce>.<ext>` (see receiptStoragePath) and writes only that path onto
+// the transaction. So deleting his transactions deletes the ONLY POINTER TO THE IMAGE and leaves
+// the image itself in the bucket forever: unreferenced, unfindable, and impossible to erase on any
+// later request because nothing left in the database remembers it was his. Until 6 August 2026
+// that is exactly what an erasure did. It kept his pictures. Photographs of receipts carry his
+// name, his card digits, the shops he uses and the days he was there.
+//
+// The user id folder is the tenancy, so the wipe is one prefix. Storage has no "delete a prefix"
+// call, so it is list then delete, a page at a time, until the folder answers empty. A missing
+// bucket answers 404 and that is NOT a failure: a bucket that does not exist is holding nothing
+// of his. Anything else that goes wrong is a failure and the caller must not claim success.
+async function deleteReceiptImages(userId: string): Promise<boolean> {
+  const { url } = config();
+  const prefix = `${userId}/`;
+  try {
+    // A counted loop rather than a while, because deletes are being made underneath the listing:
+    // if a delete keeps answering ok while the objects stay put, we stop and report failure rather
+    // than spinning inside a web request. 100 pages of 100 is far more than any one man's shoebox.
+    for (let page = 0; page < 100; page++) {
+      const listRes = await fetch(`${url}/storage/v1/object/list/${RECEIPTS_BUCKET}`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ prefix, limit: 100, offset: 0 }),
+      });
+      if (listRes.status === 404) return true;
+      if (!listRes.ok) return false;
+      const objects = (await listRes.json().catch(() => null)) as Array<{ name?: string }> | null;
+      if (!Array.isArray(objects)) return false;
+      // Empty folder. Either he never sent one or the previous page took the last of them.
+      if (objects.length === 0) return true;
+      // The listing names objects relative to the prefix, so the folder goes back on the front.
+      const paths = objects
+        .map((o) => `${prefix}${o?.name ?? ''}`)
+        .filter((p) => p !== prefix);
+      if (paths.length === 0) return false;
+      const delRes = await fetch(`${url}/storage/v1/object/${RECEIPTS_BUCKET}`, {
+        method: 'DELETE',
+        headers: headers(),
+        body: JSON.stringify({ prefixes: paths }),
+      });
+      if (!delRes.ok) return false;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 // Right to erasure: delete every row for this user across all tables, including
-// the server-only ones that do not cascade from `users`, then the auth user.
+// the server-only ones that do not cascade from `users`, then his receipt images
+// out of the storage bucket, then the auth user.
 export async function deleteUserData(userId: string, email: string | null): Promise<boolean> {
   const { url, key } = config();
   const phone = await getPhoneForUser(userId);
+  const identities = userDataIdentities(userId, email, phone);
   // Track whether every delete actually succeeded, so a GDPR erasure never
   // reports success while leaving financial data behind on a failed sub-delete.
   let allOk = true;
   const del = async (path: string): Promise<void> => {
     const res = await fetch(`${url}/rest/v1/${path}`, { method: 'DELETE', headers: headers({ Prefer: 'return=minimal' }) });
     // PostgREST returns 200/204 on a successful delete (even if 0 rows matched).
-    if (!res.ok) allOk = false;
+    if (res.ok) return;
+    // ⚠️ A TABLE POSTGREST CANNOT FIND IS NOT A FAILED ERASURE. Several of these tables arrive by
+    // an APPLY_*.sql the founder pastes in by hand, and wa_out is documented as not existing in
+    // production until he does. A table that is not there holds no rows for anybody, so his data
+    // is gone either way, and failing on it would make every single erasure report failure the
+    // day the manifest gets ahead of the database. Only that one answer is forgiven; anything
+    // else, including a permission refusal, is a real failure and the caller is told so.
+    if (res.status === 404) {
+      const body = await res.text().catch(() => '');
+      if (body.includes('PGRST205') || /could not find the table/i.test(body)) return;
+    }
+    allOk = false;
   };
-  // User-owned rows (FKs cascade from users, but delete explicitly to be sure).
-  await del(`transactions?user_id=eq.${encodeURIComponent(userId)}`);
-  await del(`invoices?user_id=eq.${encodeURIComponent(userId)}`);
-  await del(`events?user_id=eq.${encodeURIComponent(userId)}`);
-  await del(`reminder_prefs?user_id=eq.${encodeURIComponent(userId)}`);
-  await del(`hmrc_connections?user_id=eq.${encodeURIComponent(userId)}`);
-  // The user's signed-off HMRC figures (their approval records). Keyed by user_id
-  // with no FK, so this does NOT cascade from users: erase it explicitly or the
-  // numbers a user approved would survive an account deletion (UK GDPR erasure).
-  await del(`hmrc_approvals?user_id=eq.${encodeURIComponent(userId)}`);
-  // Bank tokens + connection rows. These cascade when the users row goes, but
-  // delete first and explicitly so erasure never leaves a live banking token
-  // behind if the users delete were to fail.
-  await del(`bank_connections?user_id=eq.${encodeURIComponent(userId)}`);
-  // Audit trail holds user_id + ip_address (personal data under UK GDPR).
-  await del(`audit_log?user_id=eq.${encodeURIComponent(userId)}`);
-  // Puchio chat threads and their messages (chat content is personal data).
-  // These cascade from auth.users on the final delete, but remove explicitly so
-  // erasure never leaves chat history behind if that last delete were to fail.
-  await del(`messages?user_id=eq.${encodeURIComponent(userId)}`);
-  await del(`conversations?user_id=eq.${encodeURIComponent(userId)}`);
+  // The manifest, in its own order: children before parents, so nothing is refused by a foreign
+  // key, and everything keyed by phone or address goes before the users row that holds them.
+  for (const t of USER_DATA_TABLES) {
+    const value = identities[t.keyKind];
+    // No address on file means no address rows to delete, which is not a failure.
+    if (!value) continue;
+    await del(`${t.table}?${t.userKey}=eq.${encodeURIComponent(value)}`);
+  }
+  // His photographs. Folded into allOk exactly like a table: an erasure that could not empty the
+  // bucket has not erased him, and must not answer ok.
+  if (!(await deleteReceiptImages(userId))) allOk = false;
+  // The profile row last of the user_id keyed rows, since the others cascade from it.
   await del(`users?id=eq.${encodeURIComponent(userId)}`);
-  // Server-only rows keyed by phone/email (these do NOT cascade from users).
+  // The two tables that answer to either identity (see AccountExport for why they are by hand).
   if (phone) {
     await del(`subscriptions?phone=eq.${encodeURIComponent(phone)}`);
     await del(`waitlist?phone=eq.${encodeURIComponent(phone)}`);
-    // In-flight WhatsApp session state (may hold draft invoice/customer data).
-    await del(`wa_sessions?phone=eq.${encodeURIComponent(phone)}`);
   }
   if (email) {
     await del(`subscriptions?email=eq.${encodeURIComponent(email)}`);
-    await del(`signups?email=eq.${encodeURIComponent(email)}`);
     await del(`waitlist?email=eq.${encodeURIComponent(email)}`);
-    // Marketing capture holds email + ip + user agent (personal data).
-    await del(`marketing_leads?email=eq.${encodeURIComponent(email)}`);
   }
   // Finally remove the auth identity itself (admin API, service role).
   const authRes = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {

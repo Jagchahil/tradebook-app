@@ -551,6 +551,50 @@ export async function submitQuarterlyUpdate(args: SubmitArgs): Promise<{ ok: boo
   return { ok: res.ok, status: res.status, body };
 }
 
+// 🔴 RETRIEVE THE CUMULATIVE PERIOD SUMMARY. The read half of the pair above, and
+// until 6 August 2026 it did not exist: this file could WRITE a quarter to HMRC and
+// had no way to ASK HMRC what it currently holds. That is a gap in the product, not
+// just in the test coverage. Without it we cannot show a man what HMRC actually has
+// against his name, we can only show him what we believe we sent, and those are not
+// the same thing. If a submission half landed, or he filed from somewhere else, the
+// only honest way to know is to ask.
+//
+// Verified against the live OAS (Self Employment Business MTD v5.0, read from the
+// Developer Hub 6 August 2026): the path is IDENTICAL to the PUT, only the method
+// changes, and the endpoint exists only for tax years from 2025-26 onward.
+//   GET /individuals/business/self-employment/{nino}/{businessId}/cumulative/{taxYear}
+//
+// THE ERROR DISCIPLINE, the same as every other read in this file: a figure we could
+// not read is NOT a zero, and it is NOT an empty quarter. A 404 is HMRC positively
+// saying "nothing submitted for that year", which IS an answer ({ notFound: true }).
+// Any other non-2xx means we do not know, and the caller must never turn that into
+// "HMRC has nothing" on a screen a man makes decisions from.
+//
+// govTestScenario is sandbox only. HMRC's own docs list the scenarios for this
+// endpoint (CONSOLIDATED_EXPENSES and others); in production it is never set.
+export async function retrieveCumulativePeriodSummary(
+  nino: string,
+  businessId: string,
+  taxYear: string,
+  accessToken: string,
+  fraud: FraudContext,
+  govTestScenario = '',
+): Promise<{ status: number; body: unknown | null; notFound: boolean } | null> {
+  if (!isHmrcConfigured()) return null;
+  const url = `${BASE}/individuals/business/self-employment/${encodeURIComponent(nino)}/${encodeURIComponent(businessId)}/cumulative/${encodeURIComponent(taxYear)}`;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: 'application/vnd.hmrc.5.0+json',
+    ...fraudPreventionHeaders(fraud),
+  };
+  if (govTestScenario) headers['Gov-Test-Scenario'] = govTestScenario;
+  const res = await fetch(url, { headers });
+  if (res.status === 404) return { status: 404, body: null, notFound: true };
+  if (!res.ok) return null;
+  const body = await res.json().catch(() => null);
+  return { status: res.status, body, notFound: false };
+}
+
 // Retrieve the user's quarterly and final obligations (what is due, and when).
 export async function retrieveObligations(nino: string, accessToken: string, fraud: FraudContext): Promise<unknown | null> {
   if (!isHmrcConfigured()) return null;

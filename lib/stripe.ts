@@ -187,6 +187,94 @@ export function resolveTrialDays(repCode?: string | null): number {
   return isRepTrialCode(repCode) ? REP_TRIAL_DAYS : TRIAL_DAYS;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WEEK HE IS ALREADY IN. A MAN WHO ADDS A CARD MUST NOT BE HANDED A SECOND FREE WEEK.
+//
+// Every web customer is trialing from the moment he signs up: grantTrialWithIdentity writes a row
+// with no card, no Stripe ids, and current_period_end set to signup plus seven days. Days later he
+// reaches the card at the end of setting up, and until now this file asked Stripe for
+// trial_period_days = 7 with no reference to the trial already running. Stripe counts from the day
+// the card arrives, so his free time became up to fourteen days, and the first payment moved a week
+// out. The man who CONVERTS got more free than the man who did not, which is backwards, and it is
+// backwards in the direction that costs us the launch month's revenue.
+//
+// So the paid subscription inherits the ORIGINAL deadline: subscription_data[trial_end], in unix
+// seconds, taken off the row he already holds. Nothing is added and nothing is taken away. He was
+// promised seven days free from signup and he gets exactly those, whether or not he ever pays.
+//
+// ⚠️ THIS FILE STILL IMPORTS NOTHING LOCAL, and that is not an accident: it is the only reason
+// test/trial.test.mjs, test/stripe-catalogue.test.mjs and test/trialstacking.test.mjs can load it
+// straight into node. So the row is read the way the header of this file already describes, with
+// raw fetch against the Supabase REST API, rather than by importing lib/supabase.ts.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+
+// Stripe refuses a trial_end that is not at least 48 hours in the future. Ours, not theirs to move.
+export const MIN_TRIAL_END_HOURS = 48;
+
+// What this checkout should tell Stripe about the trial. Three answers, and 'none' is a real one:
+// it means bill him now, which is correct for a man whose free week is already over.
+export type TrialForCheckout =
+  | { field: 'trial_end'; unixSeconds: number }
+  | { field: 'trial_period_days'; days: number }
+  | { field: 'none' };
+
+// The decision, kept pure so it is tested without a network. `existingTrialEnd` is the
+// current_period_end of the no card trial row this account already holds, as an ISO timestamp, or
+// null when he holds none and null when we could not read.
+//
+// ⚠️ NULL FAILS SAFE FOR THE CUSTOMER, NOT FOR US. A read that could not be answered is treated
+// exactly like a first time buyer, so a wobble at Supabase can never charge a man on the day he
+// hands over his card. It costs us at most one extra week in a case that should never happen, and
+// the other way round takes money off somebody who was promised he would not be charged yet.
+export function resolveTrialForCheckout(
+  existingTrialEnd: string | null | undefined,
+  repCode?: string | null,
+  now: Date = new Date(),
+): TrialForCheckout {
+  const endMs = existingTrialEnd ? Date.parse(existingTrialEnd) : NaN;
+  // No prior trial, or nothing readable: the genuine first time path, which is the pre signup
+  // funnel and the rep code. This is the ONLY path that may still ask for a fresh trial length.
+  if (!Number.isFinite(endMs)) return { field: 'trial_period_days', days: resolveTrialDays(repCode) };
+
+  const remainingMs = endMs - now.getTime();
+  // His week is over. No trial at all, so the first invoice is due today. He is not being cut
+  // short: he had every day he was promised, and the card is what he came here to give us.
+  if (remainingMs <= 0) return { field: 'none' };
+  // Less than Stripe's floor left. We cannot send this date, and rounding it UP to 48 hours would
+  // hand him free time he was never promised, so the trial is simply omitted.
+  if (remainingMs < MIN_TRIAL_END_HOURS * 3_600_000) return { field: 'none' };
+
+  // Still validly running: the paid subscription ends its trial on the day the free one always did.
+  return { field: 'trial_end', unixSeconds: Math.floor(endMs / 1000) };
+}
+
+// The no card trial row for this account, if there is one. Filtered to the LOCAL grant only:
+// status trialing AND no stripe_subscription_id, which is the exact fingerprint of the row
+// grantTrialWithIdentity writes. Without both filters this would happily read the period end off a
+// man's ACTIVE PAID subscription and hand him that month for free.
+//
+// Returns null on anything at all going wrong, which resolveTrialForCheckout reads as a first time
+// buyer. See its header for why that is the safe direction.
+async function readLocalTrialEnd(userId: string): Promise<string | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!userId || !url || !key) return null;
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(userId)}`
+      + '&stripe_subscription_id=is.null&status=eq.trialing'
+      + '&select=current_period_end&order=updated_at.desc&limit=1',
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ current_period_end?: string | null }> | null;
+    if (!Array.isArray(rows)) return null;
+    return rows[0]?.current_period_end ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function isFounderOffer(offer?: string | null): boolean {
   return (offer ?? '').trim().toLowerCase() === 'setup20';
 }
@@ -226,9 +314,10 @@ export interface SubscriptionCheckoutInput {
 }
 
 // Create a hosted Stripe Checkout session in subscription mode, with the trial
-// (7 days by default, 30 for a valid rep code) and the right recurring price.
-// Returns the URL to send the user to, or null if Stripe is not configured or
-// the call fails.
+// and the right recurring price. A buyer who already holds a no card trial keeps
+// ITS end date; a first time buyer gets a fresh length (TRIAL_DAYS, or the rep
+// code's). Returns the URL to send the user to, or null if Stripe is not
+// configured or the call fails.
 export async function createSubscriptionCheckout(input: SubscriptionCheckoutInput): Promise<string | null> {
   if (!KEY) return null;
 
@@ -254,7 +343,25 @@ export async function createSubscriptionCheckout(input: SubscriptionCheckoutInpu
     form.set('line_items[0][price_data][recurring][interval]', meta.interval);
     form.set('line_items[0][price_data][product_data][name]', meta.label);
   }
-  form.set('subscription_data[trial_period_days]', String(resolveTrialDays(input.repCode)));
+  // 🔴 THE TRIAL HE IS ALREADY IN COMES FIRST. See resolveTrialForCheckout above: a signed in buyer
+  // who holds a no card trial row inherits ITS deadline, so adding a card never buys a second free
+  // week. Only a buyer with no such row, which is the pre signup funnel and the rep code, is still
+  // asked for a fresh trial length. The read is skipped entirely when there is no account to read
+  // for, so the pre signup funnel makes exactly one request, to Stripe, as it always did.
+  //
+  // ⚠️ A REP CODE DOES NOT REOPEN THIS. A rep hands his 30 day code to a stranger, before there is
+  // an account, so in practice he has no row and the code works as it always has. If he somehow has
+  // one, the running trial wins: one man, one trial, and lengthening a trial by adding a card is
+  // the exact fault this block exists to close.
+  const trial = resolveTrialForCheckout(
+    input.userId ? await readLocalTrialEnd(input.userId) : null,
+    input.repCode,
+  );
+  if (trial.field === 'trial_end') {
+    form.set('subscription_data[trial_end]', String(trial.unixSeconds));
+  } else if (trial.field === 'trial_period_days') {
+    form.set('subscription_data[trial_period_days]', String(trial.days));
+  }
   // Carry the plan and offer on the subscription so later webhook events keep them.
   form.set('subscription_data[metadata][plan]', input.plan);
   form.set('subscription_data[metadata][offer]', offer);

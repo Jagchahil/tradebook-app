@@ -357,6 +357,10 @@ export interface BuildInput {
   // returns unstated_over or unstated_under for it, and both of those say so out loud.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   mtdStated: 'yes' | 'no' | null;
+  // The written down capital allowance for the year (a car's yearly relief). Deducted from the tax
+  // ESTIMATE only, never from the submission block or the mandation test: capital allowances are a
+  // year end adjustment, not part of a quarterly MTD update. Zero for everyone with no car.
+  capitalAllowance?: number;
 }
 
 // Build the pack. Quarter figures cover the selected quarter only, for a human reading it. The
@@ -425,7 +429,11 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
   // The running tax estimate is on trade net profit only. Property profit is
   // taxed on its own schedule (and from April 2027 its own rates), so folding it
   // into soleTraderTax would misstate the number. We show it separately instead.
-  const tradeProfit = Math.max(0, ytdTrade.net);
+  // 🔴 THE CAR'S ALLOWANCE COMES OFF THE TAX ESTIMATE, so the summary's tax matches the Overview and
+  // the lender documents. It does NOT touch ytdTrade.net above (the MTD submission figure, which is
+  // rightly before capital allowances) or the mandation test. Zero for everyone with no car.
+  const capitalAllowance = Math.max(0, input.capitalAllowance ?? 0);
+  const tradeProfit = Math.max(0, ytdTrade.net - capitalAllowance);
   // 🔴 AND FOR A COMPANY THERE IS NO PERSONAL ESTIMATE TO GIVE. soleTraderTax over a company's
   // profit charges the director income tax and Class 4 National Insurance on money that is taxable
   // in the company, and prints the words "Estimated Class 4 National Insurance" on a document he
@@ -448,7 +456,8 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
       ? 'These are your company\'s figures, so there is no personal tax estimate on them here. A company pays Corporation Tax on its own return, for its own accounting period, and you pay tax on what you take out as salary or dividends. Your accountant works both out from the figures above.'
       : 'A running estimate on your trade profit so far this tax year, using the published ' +
         taxYearLabel(startYear) +
-        ' figures. It is for guidance, not a filing. Property profit, where present, is taxed separately and is not included here.',
+        ' figures. It is for guidance, not a filing. Property profit, where present, is taxed separately and is not included here.' +
+        (capitalAllowance > 0 ? ` It is worked out on your taxable profit after this year's £${Math.round(capitalAllowance).toLocaleString('en-GB')} car allowance, which is why it is lower than the tax on the figures above.` : ''),
     companyProfitExcluded: isCompany,
   };
 

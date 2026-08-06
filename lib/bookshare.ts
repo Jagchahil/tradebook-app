@@ -265,7 +265,7 @@ export interface ShareTotals {
   capitalCount: number;
 }
 
-export function shareTotals(rows: SharedTransaction[]): ShareTotals {
+export function shareTotals(rows: SharedTransaction[], capitalAllowance = 0): ShareTotals {
   let income = 0;
   let expenses = 0;
   let capitalCost = 0;
@@ -285,7 +285,7 @@ export function shareTotals(rows: SharedTransaction[]): ShareTotals {
   return {
     income: round2(income),
     expenses: round2(expenses),
-    profit: round2(income - expenses),
+    profit: round2(income - expenses - Math.max(0, capitalAllowance)),
     count: rows.length,
     capitalCost: round2(capitalCost),
     capitalCount,

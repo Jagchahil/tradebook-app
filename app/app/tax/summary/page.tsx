@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getBusinessProfile, getConfirmedTransactionsForRange, readCircumstances } from '../../../../lib/supabase';
+import { getBusinessProfile, getConfirmedTransactionsForRange, readCircumstances, capitalAllowanceForYear } from '../../../../lib/supabase';
 import { buildQuarterPack, quarterBounds, quarterForDate, taxYearLabel } from '../../../../lib/quarterpack';
 import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { wholeFirmCaption } from '../../../../lib/position';
@@ -81,7 +81,7 @@ export default async function TaxSummaryPage() {
   const taxYearStart = quarterBounds(startYear, 1).start;
   const bounds = quarterBounds(startYear, index);
 
-  const [txns, biz, circ] = await Promise.all([
+  const [txns, biz, circ, capAllow] = await Promise.all([
     getConfirmedTransactionsForRange(user.id, taxYearStart, bounds.end).catch(() => []),
     // Who he is, from the same source every other structure aware screen reads. Null is unknown,
     // and unknown reads exactly as it did before wave nine.
@@ -90,6 +90,9 @@ export default async function TaxSummaryPage() {
     // because HMRC reads a return already filed and this page holds only this year. A failed read
     // is unknown and never a no. See mtdPosition() in lib/taxengine.ts.
     readCircumstances(user.id).catch(() => null),
+    // The car's writing down allowance for the year, so this page's tax estimate matches the
+    // Overview and the lender documents. It comes off the ESTIMATE only, never the submission figure.
+    capitalAllowanceForYear(user.id, startYear).catch(() => 0),
   ]);
   const pack = buildQuarterPack({
     transactions: txns, startYear, quarter: index, truncated: txns.length >= 20000,
@@ -97,6 +100,7 @@ export default async function TaxSummaryPage() {
     // turnover) from the mandation test. See the calendar card below and lib/quarterpack.ts.
     structure: biz?.businessType ?? null,
     mtdStated: mtdStatedFrom(Object.fromEntries((circ ?? []).map((a) => [a.key, a.answer]))),
+    capitalAllowance: capAllow,
   });
 
   const isCompany = biz?.businessType === 'limited_company';

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile, readCircumstances, refreshFactsFromDb, preFilingAssurance } from '../../../lib/supabase';
+import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile, readCircumstances, refreshFactsFromDb, preFilingAssurance, capitalAllowanceForYear } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
 import { buildQuarterPack, quarterBounds, quarterForDate, renderQuarterPackHtml } from '../../../lib/quarterpack';
 import { mtdStatedFrom } from '../../../lib/circumstances';
@@ -105,10 +105,12 @@ export async function GET(req: NextRequest) {
   // approved figures, then compose the one-line assurance that says we just did (naming any overrides).
   await refreshFactsFromDb();
   const finalCheck = await preFilingAssurance();
+  const capAllow = await capitalAllowanceForYear(userId, startYear).catch(() => 0);
   const pack = buildQuarterPack({
     transactions, startYear, quarter, businessName, truncated, finalCheck,
     structure: biz?.businessType ?? null,
     mtdStated: mtdStatedFrom(circAnswers),
+    capitalAllowance: capAllow,
   });
 
   if (sp.get('format') === 'json') {

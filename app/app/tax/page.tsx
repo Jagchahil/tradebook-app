@@ -120,6 +120,9 @@ export default async function TaxHubPage() {
     transactions: txns, startYear, quarter: index, truncated: txns.length >= 20000,
     structure: biz?.businessType ?? null,
     mtdStated: mtdStatedFrom(optimiser.circumstances),
+    // The car's allowance is already inside getOptimiserInput, so the tax hub reads it straight off
+    // rather than fetching again, and its estimate matches the Overview and the lender documents.
+    capitalAllowance: optimiser.ytdCapitalAllowances ?? 0,
   });
   // ⚠️ FOUR STATES, NOT A BOOLEAN, AND THE ROW BELOW SAYS SOMETHING DIFFERENT IN EACH. The old
   // `pack.ytd.mtdApplies && !isCompany` collapsed "his figures are over the line" into "the law

@@ -11,7 +11,9 @@ import {
   getBookShare,
   touchBookShare,
   getConfirmedTransactionsForUser,
+  capitalAllowanceForYear,
 } from '../../../lib/supabase';
+import { quarterForDate } from '../../../lib/quarterpack';
 import { A11Y_CSS, APP_THEME_CSS } from '../../../lib/tokens';
 import { gbpAbs2 } from '../../../lib/money';
 
@@ -159,7 +161,12 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
   // a share with no date range shows nothing at all.
   const scope = normaliseScope(grant);
   const rows = shareTransactions(raw, scope);
-  const totals = shareTotals(rows);
+  // The car's writing down allowance for the year, so a shared set of books reads the same taxable
+  // profit as the Overview and the lender documents. A book share is the whole tax year by default;
+  // a failed read is zero, which shows profit before the allowance rather than blocking the page.
+  const shareYear = quarterForDate(new Date()).startYear;
+  const capAllow = await capitalAllowanceForYear(grant.user_id, shareYear).catch(() => 0);
+  const totals = shareTotals(rows, capAllow);
   const cats = byCategory(rows);
 
   return (

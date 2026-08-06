@@ -62,6 +62,8 @@ export interface IncomeProof {
   capitalCost: number;
   /** How many payments make up capitalCost. Zero whenever capitalCost is zero. */
   capitalCount: number;
+  /** The car's writing down allowance claimed this year, already deducted from profit above. */
+  capitalAllowance: number;
   estimatedTax: number;
   /** The Class 4 inside estimatedTax. Zero for a pure landlord, which is the whole point. */
   nationalInsurance: number;
@@ -110,6 +112,10 @@ export function buildIncomeProof(
   startYear: number,
   now: Date = new Date(),
   structure?: ProofStructure | null,
+  // The written down capital allowance for the year (a car's yearly relief). Deducted from the
+  // taxable profit so this document reads the same taxable figure as the Overview and the tax
+  // summary. Zero for everyone with no car, so every existing summary is identical to the penny.
+  capitalAllowance = 0,
 ): IncomeProof {
   // ═════════════════════════════════════════════════════════════════════════════════════════════
   // \U0001F534 THIS DOCUMENT WAS HANDING A PARTNER THE WHOLE FIRM'S INCOME AS HIS OWN.
@@ -183,11 +189,14 @@ export function buildIncomeProof(
   propertyIncome = round2(propertyIncome * share);
   propertyExpenses = round2(propertyExpenses * share);
   // The headline the lender reads: everything in, everything out. Unchanged.
-  const profit = Math.max(0, round2(income - expenses));
+  // The car's yearly allowance, scaled to his share like everything else, taken off BEFORE profit
+  // so the taxable figure this lender document shows matches the Overview to the penny.
+  const capAllow = round2(Math.max(0, capitalAllowance) * share);
+  const profit = Math.max(0, round2(income - expenses - capAllow));
   // The two streams, each floored at zero, because the tax below is charged on them apart, and what
   // a loss in one of them does to the other is a relief he CLAIMS rather than something a summary
   // may assume for him. For a trade only summary tradeProfit IS profit, to the penny.
-  const tradeProfit = Math.max(0, round2(tradeIncome - tradeExpenses));
+  const tradeProfit = Math.max(0, round2(tradeIncome - tradeExpenses - capAllow));
   const propertyProfit = Math.max(0, round2(propertyIncome - propertyExpenses));
 
   // ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -229,6 +238,7 @@ export function buildIncomeProof(
     tradeProfit,
     propertyProfit,
     capitalCost,
+    capitalAllowance: capAllow,
     capitalCount,
     estimatedTax,
     nationalInsurance,

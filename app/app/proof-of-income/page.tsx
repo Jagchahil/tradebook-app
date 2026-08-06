@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile } from '../../../lib/supabase';
+import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile, capitalAllowanceForYear } from '../../../lib/supabase';
 import { buildIncomeProof } from '../../../lib/incomeproof';
 import { gbp2 } from '../../../lib/money';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
@@ -73,7 +73,7 @@ export default async function ProofOfIncomePage({
   const todayISO = now.toISOString().slice(0, 10);
   const endISO = todayISO < yearEndISO ? todayISO : yearEndISO;
 
-  const [rows, businessName, biz] = await Promise.all([
+  const [rows, businessName, biz, capAllow] = await Promise.all([
     getConfirmedTransactionsForRange(user.id, startISO, endISO),
     getBusinessName(user.id),
     // \U0001F534 THIS PAGE NEVER ASKED WHO HE WAS, and it is the one sheet that leaves the building.
@@ -81,10 +81,14 @@ export default async function ProofOfIncomePage({
     // headed "for income verification". A failed read is null, which is unknown, which gets exactly
     // the proof this page drew before. See lib/incomeproof.ts for the argument.
     getBusinessProfile(user.id).catch(() => null),
+    // The car's writing down allowance for the year, so this document's taxable profit matches the
+    // Overview and the tax summary. Zero for a man with no car; a failed read is zero, which shows
+    // profit before the allowance rather than blocking the sheet.
+    capitalAllowanceForYear(user.id, year).catch(() => 0),
   ]);
   const proof = buildIncomeProof(rows, businessName, year, now, biz
     ? { type: biz.businessType, sharePercent: biz.partnershipShare }
-    : null);
+    : null, capAllow);
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -173,6 +177,9 @@ export default async function ProofOfIncomePage({
                 {proof.capitalCount === 1 ? 'a car' : `${proof.capitalCount} cars`}, which is not an
                 allowable expense in one year. A car comes off over several years rather than all at
                 once, so it is not in the figures above.
+                {proof.capitalAllowance > 0
+                  ? ` This year's writing down allowance of ${gbp2(proof.capitalAllowance)} is already taken off the profit above.`
+                  : ''}
               </p>
             ) : null}
 

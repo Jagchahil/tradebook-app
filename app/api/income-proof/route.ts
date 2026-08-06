@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile } from '../../../lib/supabase';
+import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile, capitalAllowanceForYear } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
 import { buildIncomeProof, renderIncomeProofHtml } from '../../../lib/incomeproof';
 import { packToken, verifyPackToken, siteBase } from '../../../lib/packtoken';
@@ -64,9 +64,10 @@ export async function GET(req: NextRequest) {
     // correctly shown him his share. See lib/incomeproof.ts.
     getBusinessProfile(userId).catch(() => null),
   ]);
+  const capAllow = await capitalAllowanceForYear(userId, year).catch(() => 0);
   const proof = buildIncomeProof(rows, businessName, year, now, biz
     ? { type: biz.businessType, sharePercent: biz.partnershipShare }
-    : null);
+    : null, capAllow);
 
   if (sp.get('format') === 'json') {
     return NextResponse.json(proof);

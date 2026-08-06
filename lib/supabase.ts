@@ -4006,6 +4006,38 @@ export function isHomeOfficeRow(r: { vendor?: unknown; category?: unknown }): bo
   return vendor === 'use of home' || category === 'use of home' || category === 'use_of_home';
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WRITTEN DOWN CAPITAL ALLOWANCE FOR A TAX YEAR, IN ONE PLACE SO IT CANNOT DRIFT.
+//
+// A car does not come off in the year like a van; it earns a writing down allowance every year it
+// is held (lib/capital.ts). getOptimiserInput deducts this from the set aside, and until 6 August
+// the tax summary and the lender documents did NOT, so a car owner read £3,232 of tax on one screen
+// and £2,686 on another off the same books. This is the single sum all three now share: give it the
+// assets and the year and it returns the same figure, so no surface can print a different one.
+// Pure, so it is unit testable; the async wrapper reads the rows.
+export function sumCapitalAllowances(
+  assets: Array<{ capital_kind: string | null; transaction_date: string; amount: number | string; business_use_pct: number | null }>,
+  startYear: number,
+): number {
+  let total = 0;
+  for (const a of assets) {
+    const kind = isCapitalKind(a.capital_kind) ? a.capital_kind : null;
+    if (!kind || !isWrittenDown(kind)) continue;
+    const boughtYear = quarterForDate(new Date(`${a.transaction_date}T00:00:00Z`)).startYear;
+    const yearsHeld = Math.max(0, startYear - boughtYear);
+    const use = a.business_use_pct == null ? 100 : a.business_use_pct;
+    total += capitalRelief(Math.abs(Number(a.amount)), kind, use, yearsHeld).thisYear;
+  }
+  return Math.round(total * 100) / 100;
+}
+
+// The same figure getOptimiserInput uses, for the surfaces built from raw transactions (the tax
+// summary and the lender documents) that hold rows but never ran the optimiser.
+export async function capitalAllowanceForYear(userId: string, startYear: number): Promise<number> {
+  const assets = await getCapitalAssets(userId);
+  return sumCapitalAllowances(assets, startYear);
+}
+
 export async function getOptimiserInput(userId: string): Promise<OptimiserInput> {
   const now = new Date();
   const { startYear } = quarterForDate(now);
@@ -4115,19 +4147,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   // capitalRelief returns zero for it from year two. It is in the list so that the row still
   // carries what he SAID, and so that the mileage lock-in below can see it.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
-  for (const a of assets) {
-    const kind = isCapitalKind(a.capital_kind) ? a.capital_kind : null;
-    if (!kind) continue;
-    const boughtYear = quarterForDate(new Date(`${a.transaction_date}T00:00:00Z`)).startYear;
-    const yearsHeld = Math.max(0, startYear - boughtYear);
-    // A purchase in the current year is already out of ytdTradeExpenses by the loop above; one
-    // from an earlier year was never in it. Either way this is the whole of its relief.
-    // ⚠️ THE SAME isWrittenDown() THE LOOP ABOVE USES, AND IT WAS SPELLED OUT HERE TOO. One rule,
-    // three hand written copies, and a screen with none of them. See lib/capital.ts.
-    if (!isWrittenDown(kind)) continue;
-    const use = a.business_use_pct == null ? 100 : a.business_use_pct;
-    ytdCapitalAllowances += capitalRelief(Math.abs(a.amount), kind, use, yearsHeld).thisYear;
-  }
+  ytdCapitalAllowances = sumCapitalAllowances(assets, startYear);
 
   // 🔴 HAS HE PUT A VEHICLE THROUGH HIS BOOKS AT ALL. GOV.UK, simplified expenses, vehicles:
   // "You cannot claim simplified expenses for a vehicle you've already claimed capital allowances

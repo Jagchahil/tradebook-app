@@ -210,7 +210,7 @@ export default async function SignInPage({
             />
             <button type="submit" style={S.btn}>Send me a code</button>
             <p style={S.hint}>
-              We send a 6 digit code to that address. If you only ever signed in with your mobile,
+              We send a sign in code to that address. If you only ever signed in with your mobile,
               email info@lekhio.app and we will put your address on the account.
             </p>
           </form>

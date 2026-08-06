@@ -5,10 +5,22 @@
 // (team auth + NEWSLETTER_SEND_ENABLED + explicit confirm) and bounded per run; those gates are asserted
 // by reading the route source here so a future edit cannot quietly remove a lock.
 
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { NEWSLETTERS, getNewsletter, renderNewsletterInner } from '../lib/newsletter.ts';
+
+// lib/newsletter.ts reads the mileage rate off lib/taxengine.ts's FACTS (6 August 2026: a typed
+// "45p" survived in an issue four months after HMRC moved the rate, so the rate is the engine's
+// now). Node's type stripping cannot follow the extensionless relative import, so the two files
+// are staged with the same rewrite every engine suite uses.
+const hereEarly = path.dirname(fileURLToPath(import.meta.url));
+const fixImports = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
+const nlStage = mkdtempSync(path.join(tmpdir(), 'newsletter-'));
+for (const f of ['newsletter', 'taxengine']) {
+  writeFileSync(path.join(nlStage, f + '.ts'), fixImports(readFileSync(path.resolve(hereEarly, '../lib/' + f + '.ts'), 'utf8')));
+}
+const { NEWSLETTERS, getNewsletter, renderNewsletterInner } = await import(pathToFileURL(path.join(nlStage, 'newsletter.ts')).href);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoWeb = path.resolve(here, '..');

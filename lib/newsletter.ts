@@ -14,6 +14,12 @@ const MUTED = '#5B6470';
 const LINE = '#ECE9E2';
 const APP = 'https://lekhio.app';
 
+// The mileage rate comes from the engine's facts, never typed here: a typed rate is a second
+// copy, and this file was caught on 6 August 2026 still saying 45p four months after HMRC moved
+// it to 55p.
+import { FACTS } from './taxengine';
+const penceMile = () => `${Math.round(FACTS.mileageCarFirst10k * 100)}p`;
+
 function esc(s: string): string {
   return String(s ?? '')
     .replace(/&/g, '&amp;')
@@ -89,7 +95,7 @@ export const NEWSLETTERS: Newsletter[] = [
         html: `Every genuine business cost comes off your taxable profit, so a claimed cost is money you keep instead of handing to HMRC. Here are five that go missing most often.`,
       },
       { type: 'h', text: '1. Mileage' },
-      { type: 'p', html: `45p a mile for the first 10,000 business miles. A few trips a week adds up to hundreds a year, and it is easy to forget by January.` },
+      { type: 'p', html: `${penceMile()} a mile for the first 10,000 business miles. A few trips a week adds up to hundreds a year, and it is easy to forget by January.` },
       { type: 'h', text: '2. Use of home' },
       { type: 'p', html: `If you do your admin, quotes or invoicing from home, a share of your household costs is a legitimate expense.` },
       { type: 'h', text: '3. Phone and broadband' },

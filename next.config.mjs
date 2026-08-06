@@ -110,6 +110,10 @@ const nextConfig = {
       { source: '/:path*', headers: baseSecurityHeaders },
       { source: '/invoice/:path*', headers: capabilityUrlHeaders },
       { source: '/api/pay/:path*', headers: capabilityUrlHeaders },
+      // The shared books link is a capability URL exactly like an invoice link: anyone with it
+      // can read the figures, so the token must never ride out in a Referer header and the page
+      // must never be indexed. Found missing on the 6 August launch walk.
+      { source: '/share/:path*', headers: capabilityUrlHeaders },
     ];
   },
 };

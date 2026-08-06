@@ -133,11 +133,32 @@ export async function POST(req: NextRequest) {
   }
 
   // Pull a compact summary of their figures so money questions get real numbers.
+  //
+  // 🔴 BUT NEVER WHEN THE ANSWER IS CACHEABLE, AND THIS IS THE WHOLE REASON.
+  // A question carrying no first person word is classed GENERAL, and a general
+  // answer is written to qa_cache, which is keyed on the QUESTION ALONE with no
+  // user id, then served to every other customer who asks the same thing. If the
+  // model is handed this customer's books while composing that answer, it can
+  // put his figures into it, and the next man to ask the question reads them.
+  // The old gate was a pronoun test on the QUESTION, and a pronoun test cannot
+  // know what the model chose to write in the ANSWER.
+  //
+  // So the guarantee is structural rather than hopeful: an answer that can be
+  // cached is composed with NO personal input at all, and then it cannot carry
+  // anybody's figures whatever the model writes.
+  //
+  // The phrasings this closes are the ordinary ones, not exotic attacks: "how
+  // close is the business to the vat threshold", "what tax is owed this year",
+  // "how much has been spent on fuel this year". Each now gets a general answer
+  // until the customer says "my", and that is the honest price of a cache that
+  // every customer shares.
   let context = '';
-  try {
-    context = await transactionSummaryForUser(userId, 120);
-  } catch {
-    context = '';
+  if (!general) {
+    try {
+      context = await transactionSummaryForUser(userId, 120);
+    } catch {
+      context = '';
+    }
   }
 
   // Fold in any verified GOV.UK / HMRC updates Khoji has distilled and a human
@@ -239,23 +260,32 @@ export async function POST(req: NextRequest) {
 
   // The user's structure and income mix, so a company director gets company answers, not sole-trader
   // ones by default. A cheap read; on any failure Puchio answers structure-agnostic exactly as before.
+  //
+  // 🔴 PERSONAL INPUT, SO IT OBEYS THE SAME CACHE RULE AS THE FIGURES ABOVE.
+  // This block is not merely a structure label. It states his partnership share
+  // and his actual salary, dividend and savings income in pounds, which is as
+  // identifying as the transaction summary and in some ways worse. A cacheable
+  // answer is composed with no personal input, so it is skipped for a general
+  // question exactly as the books are.
   let profile = '';
-  try {
-    const [bp, inc] = await Promise.all([getBusinessProfile(userId), getStudentLoanSettings(userId)]);
-    if (bp) {
-      const parts = [`Business structure: ${bp.businessType.replace('_', ' ')}`];
-      if (bp.businessType === 'partnership' && bp.partnershipShare < 100) {
-        parts.push(`their share of the partnership profit is about ${bp.partnershipShare}%`);
+  if (!general) {
+    try {
+      const [bp, inc] = await Promise.all([getBusinessProfile(userId), getStudentLoanSettings(userId)]);
+      if (bp) {
+        const parts = [`Business structure: ${bp.businessType.replace('_', ' ')}`];
+        if (bp.businessType === 'partnership' && bp.partnershipShare < 100) {
+          parts.push(`their share of the partnership profit is about ${bp.partnershipShare}%`);
+        }
+        if (inc) {
+          if (inc.employmentIncome > 0) parts.push(`salary or PAYE income about £${inc.employmentIncome.toLocaleString('en-GB')}`);
+          if (inc.dividendIncome > 0) parts.push(`dividends about £${inc.dividendIncome.toLocaleString('en-GB')}`);
+          if (inc.savingsIncome > 0) parts.push(`savings interest about £${inc.savingsIncome.toLocaleString('en-GB')}`);
+        }
+        profile = parts.join('; ') + '.';
       }
-      if (inc) {
-        if (inc.employmentIncome > 0) parts.push(`salary or PAYE income about £${inc.employmentIncome.toLocaleString('en-GB')}`);
-        if (inc.dividendIncome > 0) parts.push(`dividends about £${inc.dividendIncome.toLocaleString('en-GB')}`);
-        if (inc.savingsIncome > 0) parts.push(`savings interest about £${inc.savingsIncome.toLocaleString('en-GB')}`);
-      }
-      profile = parts.join('; ') + '.';
+    } catch {
+      profile = '';
     }
-  } catch {
-    profile = '';
   }
 
   // Khoji's memory (the pocket), but ONLY when the question is about a past or changed figure, so an

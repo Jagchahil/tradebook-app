@@ -151,6 +151,9 @@ export interface OptimiserInput {
   // Property stream this year, for the property levers. Default 0.
   ytdPropertyIncome?: number;
   ytdPropertyExpenses?: number;
+  // Mortgage interest and other finance costs. NOT a deductible expense: it earns the Section 24
+  // basic-rate tax credit instead (taxPosition applies it). Absent means zero.
+  ytdPropertyFinance?: number;
 
   // THE REST OF HIS INCOME, so the tax we show is his WHOLE tax and not just his trade. Default 0,
   // which means a caller that has not captured these behaves exactly as before: no savings, no
@@ -422,7 +425,21 @@ export function taxPosition(
   // exactly as HMRC would. When the salary is zero this term is zero and the SA figure equals the
   // whole bill, so nothing moves for a pure sole trader.
   const employmentTax = employment > 0 ? combinedIncomeTax({ employment }).incomeTax.total : 0;
-  const selfAssessmentTax = Math.max(0, round(result.totalTax - employmentTax));
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 SECTION 24. A landlord's mortgage interest is NOT deducted above: it is out of propertyNet
+  // (getOptimiserInput keeps finance costs apart). Instead it earns a basic-rate tax credit on the
+  // LOWEST of the finance costs, the property profit, and his taxable income above the allowance,
+  // and the credit cannot take the income tax below zero. Without this the Overview deducted a
+  // higher-rate landlord's interest in full and understated his set aside, disagreeing with the
+  // landlord tools. This mirrors lib/propertyengine.ts combinedBill to the pound; basic-rate
+  // landlords are unaffected because a 20% deduction and a 20% credit come to the same thing.
+  const propertyFinance = Math.max(0, input.ytdPropertyFinance ?? 0) * factor;
+  const totalPersonalIncome =
+    employment + personalTradeNet + propertyNet + Math.max(0, input.savingsIncome ?? 0) + Math.max(0, input.dividendIncome ?? 0);
+  const s24Base = Math.min(propertyFinance, propertyNet, Math.max(0, totalPersonalIncome - result.personalAllowance));
+  const s24Credit = Math.min(FACTS.basicRate * Math.max(0, s24Base), result.incomeTax.total);
+  const selfAssessmentTax = Math.max(0, round(result.totalTax - s24Credit - employmentTax));
 
   // ═════════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 THE STUDENT LOAN, WHICH THIS FUNCTION USED TO LEAVE OUT OF A NUMBER CALLED "WHAT SELF

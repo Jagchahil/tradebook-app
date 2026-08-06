@@ -4027,6 +4027,9 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   let ytdCisSuffered = 0;
   let ytdPropertyIncome = 0;
   let ytdPropertyExpenses = 0;
+  // Finance costs (mortgage interest) kept apart from ordinary expenses: they get the Section 24
+  // credit, not a deduction. Same split propertyYtdTotals uses, so the Overview matches the tools.
+  let ytdPropertyFinance = 0;
   const cats = new Set<string>();
   // 🔴 THE MILEAGE, COUNTED SEPARATELY BUT NOT COUNTED TWICE. See the note on OptimiserInput.ytdMileage.
   // This is a SLICE of ytdTradeExpenses, never an addition to it.
@@ -4041,7 +4044,13 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     const amt = Number(r.amount) || 0;
     if ((r.income_type ?? '').toLowerCase() === 'property') {
       if (amt > 0) ytdPropertyIncome += amt;
-      else if (amt < 0) ytdPropertyExpenses += -amt;
+      else if (amt < 0) {
+        // Mortgage interest is not a deductible property expense; it earns the Section 24 basic
+        // rate credit instead. Everything else is an ordinary property cost. taxPosition applies it.
+        const hay = `${r.category ?? ''} ${r.vendor ?? ''}`.toLowerCase();
+        if (hay.includes('mortgage') || hay.includes('interest')) ytdPropertyFinance += -amt;
+        else ytdPropertyExpenses += -amt;
+      }
       continue;
     }
     if (amt > 0) ytdTradeIncome += amt;
@@ -4231,6 +4240,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     purchaseGoal: purchase ? { title: purchase.title, amount: purchase.amount } : null,
     ytdPropertyIncome: Math.round(ytdPropertyIncome * 100) / 100,
     ytdPropertyExpenses: Math.round(ytdPropertyExpenses * 100) / 100,
+    ytdPropertyFinance: Math.round(ytdPropertyFinance * 100) / 100,
 
     // The rest of his income, so taxPosition() shows his WHOLE tax. Entered on the NI hub next to the
     // salary, 0 until he does, which is the sole-trader case.

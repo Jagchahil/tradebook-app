@@ -533,5 +533,14 @@ ok('⚠️ THE CAPITAL ALLOWANCE IS STILL ANNUAL, it is not multiplied up by the
 ok('⚠️ THE CONFIDENCE GATE HOLDS. under three months nothing is projected',
   at(2, 60).projected === false);
 
+console.log('\n=== 🔴 SECTION 24: the Overview equals the landlord tools (A2) ===\n');
+ok('a higher-rate landlord\'s mortgage interest is a 20% credit, not a full deduction',
+  // rents 70,000, expenses 8,000, mortgage interest 15,000. Deducting the interest in full read
+  // 6,886 and wrongly dropped him below higher rate; the correct Section 24 figure is 9,232, and
+  // it now matches lib/propertyengine.ts combinedBill to the pound.
+  Math.abs(O.taxPosition({ ...base, ytdPropertyIncome: 70000, ytdPropertyExpenses: 8000, ytdPropertyFinance: 15000 }).setAside - 9232) < 2);
+ok('...and a basic-rate landlord is unchanged, because a 20% deduction and a 20% credit are equal',
+  Math.abs(O.taxPosition({ ...base, ytdPropertyIncome: 28000, ytdPropertyExpenses: 4000, ytdPropertyFinance: 6000 }).setAside - 1086) < 2);
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

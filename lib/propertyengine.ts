@@ -63,6 +63,27 @@ export const PROPERTY_FACTS: Record<PropertyTaxYear, PropertyYearFacts> = {
 
 export const PROPERTY_YEARS: PropertyTaxYear[] = ['2026-27', '2027-28'];
 
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// \U0001F534 THE ONE TEST FOR "THIS ROW IS RESIDENTIAL FINANCE COST", AND WHY IT LIVES HERE.
+//
+// Section 24 turns a residential landlord's mortgage interest into a basic rate tax CREDIT rather
+// than an expense, so every surface that totals property costs has to hold these rows apart. The
+// test was written out by hand in lib/supabase.ts TWICE, in getOptimiserInput and in
+// propertyYtdTotals, and lib/incomeproof.ts never had it at all.
+//
+// 6 August 2026, found by walking the live app on a seeded higher rate landlord: /app/tax applied
+// the credit correctly, and /app/proof-of-income, the sheet a customer hands a mortgage lender,
+// deducted the same £15,000 of interest IN FULL inside "Allowable expenses". It printed a profit
+// £15,000 too high and an estimated tax £3,000 too LOW, in the direction that flatters a borrower.
+// Lekhio's own free landlord calculator said £20,212 on the identical figures; the document said
+// £17,211.80.
+//
+// A rule copied is a rule that drifts. It lives here now, once, beside the credit it belongs to.
+export function isResidentialFinanceCost(category?: string | null, vendor?: string | null): boolean {
+  const hay = `${category ?? ''} ${vendor ?? ''}`.toLowerCase();
+  return hay.includes('mortgage') || hay.includes('interest');
+}
+
 // Which schedule applies on a given date. The 2027/28 entry starts 6 Apr 2027;
 // dates beyond the table clamp to the latest year we know (and the tools show
 // the year label, so a stale table is visible, same discipline as taxengine).

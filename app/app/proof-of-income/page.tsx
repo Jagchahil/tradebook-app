@@ -183,6 +183,23 @@ export default async function ProofOfIncomePage({
               </p>
             ) : null}
 
+            {/* \u{1F534} MORTGAGE INTEREST, SAID OUT LOUD, BECAUSE THE NUMBER MOVED WITHOUT IT. Section 24
+                relieves a residential landlord's interest as a basic rate credit, so it is not in
+                Allowable expenses and has not reduced the profit. Without this line a lender sees a
+                profit that does not match the bank and never learns why. The figure and the credit
+                both come from lib/incomeproof.ts, off the same predicate the Overview uses. */}
+            {proof.financeCost > 0 ? (
+              <p style={S.capital}>
+                {gbp2(proof.financeCost)} of residential mortgage interest is not an allowable
+                expense either, so it is not in the figures above. Since Section 24 it is relieved as
+                a basic rate tax credit instead
+                {proof.financeCredit > 0
+                  ? `, and the credit of ${gbp2(proof.financeCredit)} is already taken off the estimated tax`
+                  : ''}
+                .
+              </p>
+            ) : null}
+
             {/* The sentence that says whose figures these are. Null for a sole trader, whose figures
                 are simply his, so nothing is added to the one page he wants to keep short. */}
             {proof.shareNote ? <p style={S.shareNote}>{proof.shareNote}</p> : null}

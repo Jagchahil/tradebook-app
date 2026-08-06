@@ -10,8 +10,12 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'ip-'));
-const fix = (s) => s.replace("from './taxengine'", "from './taxengine.ts'");
+const fix = (s) =>
+  s.replace(/from '\.\/taxengine'/g, "from './taxengine.ts'")
+   .replace(/from '\.\/propertyengine'/g, "from './propertyengine.ts'");
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
+// Section 24 lives in lib/propertyengine.ts and this document now obeys it, so it is staged too.
+writeFileSync(path.join(stage, 'propertyengine.ts'), fix(readFileSync(path.join(lib, 'propertyengine.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'incomeproof.ts'), fix(readFileSync(path.join(lib, 'incomeproof.ts'), 'utf8')));
 const IP = await import(pathToFileURL(path.join(stage, 'incomeproof.ts')).href);
 const TE = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);
@@ -152,6 +156,67 @@ ok('no em, en or minus dash reached the capital sentence', !/[–—−]/.test(v
 const vaseyFlat = vasey.map((r) => ({ ...r, writtenDown: undefined }));
 const vpFlat = IP.buildIncomeProof(vaseyFlat, 'Vasey Electrical', 2026, now);
 ok('undefined writtenDown reads as an ordinary cost, identical to before', vpFlat.expenses === 72088 && vpFlat.capitalCost === 0 && vpFlat.profit === 0);
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 SECTION 24 ON THE ONE SHEET A CUSTOMER HANDS A MORTGAGE LENDER.
+//
+// 6 August 2026, live walk, seeded higher rate landlord. /app/tax applied the credit correctly and
+// THIS document deducted the same £15,000 of mortgage interest in full inside "Allowable expenses",
+// printing a profit £15,000 too high and an estimated tax £3,000 too LOW, in the direction that
+// flatters a borrower. Lekhio's own free landlord calculator said £20,212 on the identical numbers;
+// the document said £17,211.80. These figures are that live account, to the penny.
+console.log('\n=== incomeproof: Section 24, the mortgaged landlord ===\n');
+const landlord = [
+  { amount: 33000, transaction_date: '2026-06-15', category: 'income' },
+  { amount: -8000, transaction_date: '2026-06-15', category: 'materials' },
+  { amount: -35000, transaction_date: '2026-05-10', category: 'van', writtenDown: true },
+  { amount: 70000, transaction_date: '2026-06-20', category: 'rent', income_type: 'property' },
+  { amount: -5000, transaction_date: '2026-06-20', category: 'insurance', income_type: 'property' },
+  { amount: -15000, transaction_date: '2026-06-20', category: 'mortgage interest', vendor: 'Lender', income_type: 'property' },
+];
+const lp = IP.buildIncomeProof(landlord, 'Sunny Chahil', 2026, now, null, 2100);
+ok('🔴 mortgage interest is NOT in allowable expenses', lp.expenses === 13000);
+ok('🔴 the old, wrong expense total is gone', lp.expenses !== 28000);
+ok('the interest is reported apart rather than dropped', lp.financeCost === 15000);
+ok('the Section 24 credit is basic rate on the interest', lp.financeCredit === 3000);
+ok('profit is income less real expenses less the car allowance', lp.profit === 87900);
+ok('the two streams are kept apart', lp.tradeProfit === 22900 && lp.propertyProfit === 65000);
+ok('Class 4 is on the trade alone, never on rent', lp.nationalInsurance === TE.class4NIC(22900));
+ok('🔴 estimated tax carries the credit and matches the landlord tool', lp.estimatedTax === 20211.8);
+ok('🔴 it is no longer the understated £17,211.80', lp.estimatedTax !== 17211.8);
+
+const lhtml = IP.renderIncomeProofHtml(lp);
+ok('the printed sheet names the interest', lhtml.includes('£15,000.00'));
+ok('the printed sheet names the credit', lhtml.includes('£3,000.00'));
+ok('the printed sheet says why it is not an expense', /Section 24/.test(lhtml));
+ok('no em, en or minus dash reached the Section 24 sentence', !/[–—−]/.test(lhtml));
+
+// The predicate is what decides, not the stream. The same £15,000 filed as repairs is an ordinary
+// property cost, deducted in full, with no credit: that is the control that proves the test above
+// is testing the rule and not the row's position in the list.
+const asRepairs = landlord.map((r) =>
+  r.category === 'mortgage interest' ? { ...r, category: 'repairs', vendor: 'Builder' } : r);
+const rp = IP.buildIncomeProof(asRepairs, 'Sunny Chahil', 2026, now, null, 2100);
+ok('an ordinary property cost is still deducted in full', rp.expenses === 28000 && rp.financeCost === 0);
+ok('and earns no Section 24 credit', rp.financeCredit === 0);
+
+// A basic rate landlord is unaffected either way, because a 20% deduction and a 20% credit come to
+// the same thing. This is the row that proves the change cannot quietly move a small landlord.
+const smallLandlord = [
+  { amount: 18000, transaction_date: '2026-06-20', category: 'rent', income_type: 'property' },
+  { amount: -2000, transaction_date: '2026-06-20', category: 'insurance', income_type: 'property' },
+  { amount: -4000, transaction_date: '2026-06-20', category: 'mortgage interest', income_type: 'property' },
+];
+const sp2 = IP.buildIncomeProof(smallLandlord, 'Small Landlord', 2026, now);
+const asExpense = TE.incomeTaxOnProfit(18000 - 2000 - 4000);
+ok('a basic rate landlord pays the same either way', sp2.estimatedTax === Math.round(asExpense * 100) / 100);
+ok('and carries no Class 4 on rent', sp2.nationalInsurance === 0);
+
+// Nothing written before this existed moves. A trade only summary has no property rows at all, so
+// the predicate never fires and every figure is the one the file produced yesterday.
+const tradeOnly = IP.buildIncomeProof(txns, 'A. Sparky Ltd', 2026, now);
+ok('a trade only summary is identical to the penny', tradeOnly.estimatedTax === TE.soleTraderTax(19260).total && tradeOnly.financeCost === 0);
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

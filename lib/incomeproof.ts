@@ -7,7 +7,9 @@
 // the user already keeps. No software rival offers this, and every self employed
 // person needs one eventually. Unit tested in test/incomeproof.test.mjs.
 
-import { incomeTaxOnProfit, class4NIC } from './taxengine';
+import { incomeTaxOnProfit, class4NIC, FACTS, personalAllowance } from './taxengine';
+// Section 24 lives in one file and this document obeys it rather than keeping its own copy.
+import { isResidentialFinanceCost } from './propertyengine';
 
 export interface IncomeProofTxn {
   amount: number; // signed: positive income, negative expense
@@ -43,6 +45,14 @@ export interface IncomeProofTxn {
   // as false, which is every fixture and every row written before anybody was asked, so every
   // existing summary is identical to the penny.
   writtenDown?: boolean;
+
+  // What the row was filed as and who it was paid to. Present on every row lib/supabase.ts hands
+  // this file already; the interface simply did not ask for them. They are here so the Section 24
+  // test can run on the same two fields getOptimiserInput and propertyYtdTotals test, using the
+  // same exported predicate, so the three cannot answer differently. Absent reads as trade cost,
+  // which is every existing fixture, so every trade only summary is identical to the penny.
+  category?: string | null;
+  vendor?: string | null;
 }
 
 export interface IncomeProof {
@@ -64,6 +74,13 @@ export interface IncomeProof {
   capitalCount: number;
   /** The car's writing down allowance claimed this year, already deducted from profit above. */
   capitalAllowance: number;
+  // \U0001F534 RESIDENTIAL MORTGAGE INTEREST, REPORTED APART AND NOT DEDUCTED. Section 24 makes it a
+  // basic rate tax credit rather than an allowable expense, so it is NOT inside `expenses` and it
+  // has NOT reduced `profit`. Zero for everyone who is not a mortgaged landlord, so every existing
+  // summary is identical to the penny.
+  financeCost: number;
+  /** The Section 24 credit already taken off inside estimatedTax. Zero when financeCost is zero. */
+  financeCredit: number;
   estimatedTax: number;
   /** The Class 4 inside estimatedTax. Zero for a pure landlord, which is the whole point. */
   nationalInsurance: number;
@@ -156,6 +173,7 @@ export function buildIncomeProof(
   let tradeExpenses = 0;
   let propertyIncome = 0;
   let propertyExpenses = 0;
+  let financeCost = 0;
   for (const t of txns) {
     const a = Number(t.amount) || 0;
     const isProperty = String(t.income_type ?? '').toLowerCase() === 'property';
@@ -173,6 +191,16 @@ export function buildIncomeProof(
         capitalCount += 1;
         continue;
       }
+      // \U0001F534 MORTGAGE INTEREST IS NOT AN ALLOWABLE PROPERTY EXPENSE, AND THIS DOCUMENT SAID IT WAS.
+      // Section 24 gives it a basic rate credit instead, which lib/taxoptimiser.ts already does for
+      // the Overview and lib/propertyengine.ts already does for the free landlord tool. Found live
+      // on 6 August 2026: £15,000 of interest sat inside "Allowable expenses" on the one sheet a
+      // customer hands a lender, inflating the profit and cutting the tax estimate by £3,000. Same
+      // predicate as the other two readers, so the three cannot drift apart again.
+      if (isProperty && isResidentialFinanceCost(t.category, t.vendor)) {
+        financeCost += mag;
+        continue;
+      }
       expenses += mag;
       if (isProperty) propertyExpenses += mag; else tradeExpenses += mag;
     }
@@ -188,6 +216,7 @@ export function buildIncomeProof(
   tradeExpenses = round2(tradeExpenses * share);
   propertyIncome = round2(propertyIncome * share);
   propertyExpenses = round2(propertyExpenses * share);
+  financeCost = round2(financeCost * share);
   // The headline the lender reads: everything in, everything out. Unchanged.
   // The car's yearly allowance, scaled to his share like everything else, taken off BEFORE profit
   // so the taxable figure this lender document shows matches the Overview to the penny.
@@ -224,9 +253,25 @@ export function buildIncomeProof(
   // the words on a document he hands a lender. A plain sentence saying where the answer lives beats
   // a plausible number on the wrong money.
   const nationalInsurance = isCompany ? 0 : round2(class4NIC(tradeProfit));
+  // \u26a0\ufe0f THE SECTION 24 CREDIT, WORKED THE WAY lib/taxoptimiser.ts WORKS IT, DELIBERATELY.
+  // Relief at the basic rate on the LOWEST of the finance costs, the property profit, and taxable
+  // income above the personal allowance, and it can never take the income tax below zero. That is
+  // lib/propertyengine.ts combinedBill's reliefBase and taxoptimiser's s24Base, in the same order,
+  // so the document, the Overview and the free landlord tool land on one number. A basic rate
+  // landlord is unaffected either way, because a 20% deduction and a 20% credit come to the same.
+  const taxableBeforeCredit = tradeProfit + propertyProfit;
+  const incomeTaxBeforeCredit = isCompany ? 0 : incomeTaxOnProfit(taxableBeforeCredit);
+  const s24Base = Math.min(
+    financeCost,
+    propertyProfit,
+    Math.max(0, taxableBeforeCredit - personalAllowance(taxableBeforeCredit)),
+  );
+  const financeCredit = isCompany
+    ? 0
+    : round2(Math.min(FACTS.basicRate * Math.max(0, s24Base), incomeTaxBeforeCredit));
   const estimatedTax = isCompany
     ? 0
-    : round2(incomeTaxOnProfit(tradeProfit + propertyProfit) + nationalInsurance);
+    : round2(Math.max(0, incomeTaxBeforeCredit - financeCredit) + nationalInsurance);
 
   return {
     businessName: (businessName ?? '').trim() || 'Your business',
@@ -240,6 +285,8 @@ export function buildIncomeProof(
     capitalCost,
     capitalAllowance: capAllow,
     capitalCount,
+    financeCost,
+    financeCredit,
     estimatedTax,
     nationalInsurance,
     // The words follow the figure. A man with no National Insurance in his number is not told there
@@ -345,6 +392,7 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
       ${p.companyExcluded ? '' : row(p.estimatedTaxLabel, gbp(p.estimatedTax), { muted: true })}
     </table>
     ${p.capitalCost > 0 ? `<div class="capital">${gbp(p.capitalCost)} more left the account on ${p.capitalCount === 1 ? 'a car' : `${p.capitalCount} cars`}, which is not an allowable expense in one year. A car comes off over several years rather than all at once, so it is not in the figures above.</div>` : ''}
+    ${p.financeCost > 0 ? `<div class="capital">${gbp(p.financeCost)} of residential mortgage interest is not an allowable expense either, so it is not in the figures above. Since Section 24 it is relieved as a basic rate tax credit instead${p.financeCredit > 0 ? `, and the credit of ${gbp(p.financeCredit)} is already taken off the estimated tax` : ''}.</div>` : ''}
     ${p.shareNote ? `<div class="whose">${esc(p.shareNote)}</div>` : ''}
     ${p.companyExcluded ? `<div class="whose">These are the company's figures, not this person's personal income. A company pays Corporation Tax on its own return, and the director is paid in salary and dividends, which are not shown here.</div>` : ''}
     <div class="stamp">Prepared by Lekhio &middot; ${esc(generated)} &middot; ${p.txCount} entries</div>

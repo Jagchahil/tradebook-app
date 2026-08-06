@@ -21,6 +21,9 @@ import type { TeamCustomer, TeamMember } from './team';
 import type { Snapshot } from './metrics';
 import { parseLevel, type AutonomyLevel } from './autonomy';
 import { quarterForDate, quarterBounds } from './quarterpack';
+// The ONE test for a residential finance cost. Both copies of it below used to be written out by
+// hand here; see the note on isResidentialFinanceCost for the document that drifted because of it.
+import { isResidentialFinanceCost } from './propertyengine';
 import type { OptimiserInput } from './taxoptimiser';
 import { qaDedupeKey, qaPrunePaths } from './qaretention';
 import type { KnowledgeState } from './knowledgewatch';
@@ -4079,8 +4082,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
       else if (amt < 0) {
         // Mortgage interest is not a deductible property expense; it earns the Section 24 basic
         // rate credit instead. Everything else is an ordinary property cost. taxPosition applies it.
-        const hay = `${r.category ?? ''} ${r.vendor ?? ''}`.toLowerCase();
-        if (hay.includes('mortgage') || hay.includes('interest')) ytdPropertyFinance += -amt;
+        if (isResidentialFinanceCost(r.category, r.vendor)) ytdPropertyFinance += -amt;
         else ytdPropertyExpenses += -amt;
       }
       continue;
@@ -5740,8 +5742,7 @@ export async function propertyYtdTotals(
     const a = Number(r.amount) || 0;
     if (a > 0) rents += a;
     else {
-      const hay = `${r.category ?? ''} ${r.vendor ?? ''}`.toLowerCase();
-      if (hay.includes('mortgage') || hay.includes('interest')) finance += Math.abs(a);
+      if (isResidentialFinanceCost(r.category, r.vendor)) finance += Math.abs(a);
       else expenses += Math.abs(a);
     }
   }

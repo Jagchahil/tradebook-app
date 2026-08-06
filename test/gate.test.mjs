@@ -129,6 +129,7 @@ const NEVER_GATE = [
   ['app/api/auth/verify', 'paying to sign in'],
   ['app/api/auth/signout', 'paying to sign out'],
   ['app/api/signup/verify', 'paying to create the account that gets the trial'],
+  ['app/api/pay/[id]', 'his customer paying his invoice, not him using Lekhio: gating it stops a stranger paying a tradesman money he is owed'],
 ];
 for (const [route, why] of NEVER_GATE) {
   ok(`🔴 ${route} is never gated (${why})`, ruleFor(route) === 'always');

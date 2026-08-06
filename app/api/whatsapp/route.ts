@@ -70,6 +70,7 @@ import {
   setSession,
   clearSession,
   createInvoice,
+  readVatProfile,
   getLastIncomeTransaction,
   createEvent,
   bumpAiUsage,
@@ -2849,7 +2850,16 @@ async function handleInvoiceFlow(from: string, body: string): Promise<boolean> {
     return true;
   }
 
-  const data = (session.data ?? {}) as { customer_name?: string; customer_contact?: string | null };
+  // The last four are carried only between the items step and the confirm step, so the invoice he
+  // approves is the one that gets sent, and the send needs no second parse of his words.
+  const data = (session.data ?? {}) as {
+    customer_name?: string;
+    customer_contact?: string | null;
+    invoice_id?: string;
+    invoice_number?: string;
+    invoice_total?: number;
+    invoice_link?: string;
+  };
 
   if (session.step === 'customer') {
     data.customer_name = body.trim().slice(0, 120);
@@ -2867,51 +2877,124 @@ async function handleInvoiceFlow(from: string, body: string): Promise<boolean> {
   }
 
   if (session.step === 'items') {
+    // ONE VERDICT, ONE SEND. Every branch below works out what to say, and the single sendText at
+    // the bottom says it. This step used to hold four separate sends; concentrating them is the
+    // house rule for outbound WhatsApp, and it is what made room for the approval step below
+    // without spreading the send back out.
+    let reply = '';
+    let stay = false; // his words were unreadable, so keep him on this step
+    let keep = false; // we have moved him on ourselves, so do not clear
+
     if (!hasClaudeConfig()) {
+      reply = 'Invoice building is not switched on yet. Hang tight.';
+    } else {
+      const refused = await aiBudgetBlocked(from);
+      if (refused) {
+        await sendBudgetRefusal(from, refused);
+        return true;
+      }
+      const drafted = await draftInvoice(body);
+      if (!drafted || drafted.line_items.length === 0) {
+        reply = "I could not pick out the amounts. Try like: 'bathroom rewire 450, materials 80'.";
+        stay = true;
+      } else {
+        // 🔴 A VAT REGISTERED TRADER IS NOT INVOICED FOR ON THIS SURFACE, AND IS NEVER GUESSED AT.
+        //
+        // createInvoice with no vat object produces tax 0, total = subtotal, treatment null. For
+        // the commonest customer here, a CIS subcontractor billing a main contractor, that is
+        // accidentally right, because the reverse charge means he charges none. For a VAT
+        // registered trader doing standard rated work for an end user it understates the VAT he
+        // must account for, on a document his customer receives and books.
+        //
+        // The web form does not guess. It reads his VAT profile and asks four questions: is the
+        // job within CIS, is the customer VAT registered, are they CIS registered, are they the
+        // end user. Those four decide whether the reverse charge applies, and they cannot be
+        // invented from one line of WhatsApp text. So we say so, and hand him the form that asks.
+        const vatProfile = await readVatProfile(userId);
+        if (!vatProfile) {
+          reply = `I could not check your VAT position just now, and I will not guess it on an invoice. Please make this one in the app: ${APP_URL}/app/invoices/new`;
+        } else if (vatProfile.registered) {
+          reply =
+            'Because you are VAT registered I need a few answers before this invoice is right, including whether the job falls under CIS and whether your customer is the end user. Those decide whether you charge VAT or the reverse charge applies, and I am not going to guess them on a document your customer keeps.\n\n' +
+            `Make this one here and it takes a minute: ${APP_URL}/app/invoices/new`;
+        } else {
+          const inv = await createInvoice(userId, {
+            customer_name: data.customer_name || 'Customer',
+            customer_contact: data.customer_contact ?? null,
+            line_items: drafted.line_items,
+          });
+          if (!inv) {
+            reply = 'Something went wrong saving that. Please try again.';
+          } else {
+            const link = `${APP_URL}/invoice/${inv.id}`;
+            const lines = drafted.line_items
+              .map((li) => `- ${li.description}: £${Number(li.amount ?? 0).toFixed(2)}`)
+              .join('\n');
+            const head = `Invoice ${inv.number} for ${data.customer_name || 'your customer'}, total £${inv.total.toFixed(2)}.`;
+
+            // 🔴 NOTHING GOES TO HIS CUSTOMER UNTIL HE HAS SEEN THE FIGURES AND SAID SO.
+            //
+            // This used to email the customer in the same turn it parsed his text, so the first
+            // time the man saw what the AI had read was AFTER his customer already had it. Giving
+            // an address is consent to a send; it is not approval of THESE figures. A misread
+            // amount reached a third party with no chance to catch it, and an invoice cannot be
+            // unsent. The web surface has always refused to send for him and says why: a message
+            // to another human being always asks. This is the same rule on the surface people
+            // actually use. The gate comes before the automation it guards.
+            if (looksLikeEmail(data.customer_contact) && hasEmailConfig()) {
+              await setSession(from, 'invoice', 'confirm', {
+                ...data,
+                invoice_id: inv.id,
+                invoice_number: inv.number,
+                invoice_total: inv.total,
+                invoice_link: link,
+              });
+              keep = true;
+              reply = `${head}\n\n${lines}\n\nCheck those figures. Reply SEND and I will email it to ${data.customer_contact}, or reply CHANGE to write the work out again.\n\nEither way it is saved in your app as a draft: ${link}`;
+            } else {
+              reply = `${head}\n\n${lines}\n\nSend it to them: ${link}\n\nIt is saved in your app as a draft. Mark it paid when the money lands and it goes into your income.`;
+            }
+          }
+        }
+      }
+    }
+
+    if (!stay && !keep) await clearSession(from);
+    await sendText(from, reply);
+    return true;
+  }
+
+  // His approval, or his correction. Nothing reached his customer before this step, and one send
+  // carries whichever answer he earned.
+  if (session.step === 'confirm') {
+    const said = body.trim().toLowerCase();
+    const link = (data.invoice_link as string) || `${APP_URL}/app/invoices`;
+    let reply = '';
+
+    if (/^(change|redo|again|no|edit|wrong)\b/.test(said)) {
+      await setSession(from, 'invoice', 'items', {
+        customer_name: data.customer_name ?? null,
+        customer_contact: data.customer_contact ?? null,
+      });
+      reply = 'No problem, nothing has been sent. Write the work and the amounts again, for example: bathroom rewire 450, materials 80.';
+    } else if (!/^(send|yes|yep|yeah|ok|okay|go|do it|confirm|approve|approved)\b/.test(said)) {
+      // Silence, a shrug or a thumbs up is not approval to write to another human being.
+      reply = `Reply SEND to email it to ${data.customer_contact}, or CHANGE to write the work out again. Nothing has gone to them yet.`;
+    } else {
       await clearSession(from);
-      await sendText(from, 'Invoice building is not switched on yet. Hang tight.');
-      return true;
-    }
-    const refused = await aiBudgetBlocked(from);
-    if (refused) {
-      await sendBudgetRefusal(from, refused);
-      return true;
-    }
-    const drafted = await draftInvoice(body);
-    if (!drafted || drafted.line_items.length === 0) {
-      await sendText(from, "I could not pick out the amounts. Try like: 'bathroom rewire 450, materials 80'.");
-      return true; // stay on this step
-    }
-    const inv = await createInvoice(userId, {
-      customer_name: data.customer_name || 'Customer',
-      customer_contact: data.customer_contact ?? null,
-      line_items: drafted.line_items,
-    });
-    await clearSession(from);
-    if (!inv) {
-      await sendText(from, 'Something went wrong saving that. Please try again.');
-      return true;
-    }
-    const link = `${APP_URL}/invoice/${inv.id}`;
-    let emailedTo: string | null = null;
-    if (looksLikeEmail(data.customer_contact) && hasEmailConfig()) {
       const sent = await sendInvoiceEmail({
         to: data.customer_contact as string,
-        number: inv.number,
-        total: inv.total,
+        number: (data.invoice_number as string) || '',
+        total: Number(data.invoice_total ?? 0),
         link,
-        customerName: data.customer_name,
+        customerName: (data.customer_name as string) || undefined,
       });
-      if (sent) emailedTo = data.customer_contact as string;
+      reply = sent
+        ? `Sent to ${data.customer_contact}. Track it here: ${link}\n\nMark it paid when the money lands and it goes into your income.`
+        : `I could not email that just now, and it has NOT gone to them. Send it yourself with this link: ${link}`;
     }
-    const head = `Done. Invoice ${inv.number} for ${data.customer_name || 'your customer'}, total £${inv.total.toFixed(2)}.`;
-    const deliver = emailedTo
-      ? `I have emailed it straight to ${emailedTo}. Track it here: ${link}`
-      : `Send it to them: ${link}`;
-    await sendText(
-      from,
-      `${head}\n\n${deliver}\n\nIt is saved in your app as a draft. Mark it paid when the money lands and it goes into your income.`,
-    );
+
+    await sendText(from, reply);
     return true;
   }
 

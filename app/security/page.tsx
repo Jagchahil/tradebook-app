@@ -130,7 +130,7 @@ export default function SecurityPage() {
           Payments are handled by Stripe, so we never see or store your full card number. Messages that come in are checked with a cryptographic signature before we act on them, so nobody can fake a request. Access inside the company follows least privilege, meaning systems only get the keys they actually need. We do not log the content of your WhatsApp messages to any outside service.
         </p>
         <p className="sec-p">
-          We follow UK GDPR, and we are completing our registration with the Information Commissioner&apos;s Office. If you ever have a question about your data, email <a href="mailto:info@lekhio.app">info@lekhio.app</a>.
+          We follow UK GDPR, and Lekhio Ltd is registered with the Information Commissioner&apos;s Office as a data controller, reference ZC198977, which you can check on the public register at ico.org.uk. If you ever have a question about your data, email <a href="mailto:info@lekhio.app">info@lekhio.app</a>.
         </p>
 
         <div className="sec-line">

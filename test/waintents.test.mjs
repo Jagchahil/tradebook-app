@@ -551,6 +551,21 @@ const refusal = W.productTruthAnswer('concealment', { filingLive: false });
 ok('the refusal opens with No, never helps, and points at the legal savings',
   refusal.startsWith('No') && /never help hide/.test(refusal) && /Ways to save/.test(refusal) && !/[\u2014\u2013]/.test(refusal));
 
+// A request for investment advice is refused, not answered with a tax figure. The live
+// reproduction: "Should I put my tax refund into Bitcoin? Which stock should I buy?" carried the
+// word tax and was answered by the totals lane with the set aside block (6 August 2026).
+eq('"Should I put my tax refund into Bitcoin? Which stock should I buy?" is refused',
+  W.matchProductTruth('Should I put my tax refund into Bitcoin? Which stock should I buy?'), 'investment');
+eq('"is bitcoin a good investment" is refused', W.matchProductTruth('is bitcoin a good investment'), 'investment');
+eq('"should i sell my shares" is refused', W.matchProductTruth('should i sell my shares'), 'investment');
+eq('"do i pay tax on savings interest" is a real tax question and stays answerable',
+  W.matchProductTruth('do i pay tax on savings interest'), null);
+eq('"should I buy a new van for the business" is a business question, not portfolio advice',
+  W.matchProductTruth('should I buy a new van for the business'), null);
+const invRefusal = W.productTruthAnswer('investment', { filingLive: false });
+ok('the investment refusal names what Lekhio is not and offers the tax side only',
+  /not a financial adviser/.test(invRefusal) && /regulated adviser/.test(invRefusal) && !/[\u2014\u2013]/.test(invRefusal));
+
 // The wiring: the thread and the webhook both ask the product question FIRST.
 const threadSrc = readFileSync(path.resolve(here, '../app/api/thread/route.ts'), 'utf8');
 ok('the thread asks matchProductTruth before the totals lane',

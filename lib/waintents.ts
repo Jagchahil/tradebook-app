@@ -261,7 +261,7 @@ export function isIdentity(body: string): boolean {
 // saving. The matcher requires the product to be the subject ("you", "lekhio", "this app"), so
 // "can I claim software" still reaches the claim rulebook and "what do I owe" still reaches the
 // totals lane. Timing questions ("when is it due") are left for deadlineAnswer, which knows.
-export type ProductTruthKind = 'approved' | 'files' | 'savings' | 'concealment';
+export type ProductTruthKind = 'approved' | 'files' | 'savings' | 'concealment' | 'investment';
 
 const PRODUCT_SUBJECT = /\b(you|your|lekhio|this app|this software|the app)\b/;
 
@@ -274,6 +274,15 @@ export function matchProductTruth(body: string): ProductTruthKind | null {
   // dave" carry no concealment verb and stay in their own lanes.
   const concealing = /\b(hide|hiding|conceal)\b[^.?!]{0,40}\b(income|cash|money|earnings|job|jobs|it|this|that)\b|\b(keep|leave|leaving)\b[^.?!]{0,30}\b(out of|off)\b[^.?!]{0,20}\b(books|records|return|figures)\b|\boff the books\b|\bunder the table\b|\b(not|don'?t|never)\s+(declare|report|tell)\b[^.?!]{0,30}\b(hmrc|income|cash|taxman|tax man)\b/;
   if (concealing.test(b)) return 'concealment';
+
+  // A request to be told what to invest in. Lekhio is not a financial adviser, and until 6 August
+  // 2026 "should I put my refund into Bitcoin, which stock should I buy" carried the word tax, hit
+  // the totals lane, and was answered with the set aside figure. An asset word plus a buy or a
+  // "should I" is the ask; a plain "how is my tax refund worked out" carries neither and stays a
+  // real question.
+  const assetWord = /\b(bitcoin|crypto|cryptocurrency|ethereum|shares?|stocks?|equit(y|ies)|forex|gold|an? isa|premium bonds?|invest\w*|portfolio)\b/;
+  const adviceShape = /\b(should i|shall i|which|worth (it|buying|holding)|good (idea|investment|buy|bet|time)|is \w+ (a )?good|buy|sell|invest\w*|put (my|the|it|some)|move (my|it|the)|recommend)\b/;
+  if (assetWord.test(b) && adviceShape.test(b)) return 'investment';
 
   if (!PRODUCT_SUBJECT.test(b)) return null;
   // A timing question is a deadline question, and deadlineAnswer knows the actual dates.
@@ -332,6 +341,9 @@ export function productTruthAnswer(kind: ProductTruthKind, opts: { filingLive: b
   }
   if (kind === 'concealment') {
     return 'No. Lekhio will never help hide income, and it would not be doing you a favour if it did: leaving income out of your return is evasion, and the penalties come on top of the tax and the interest. Every pound belongs in your books, cash jobs included. What Lekhio will do is make sure you never pay more than the law asks: log every cost, and every legal saving is worked out for you under Ways to save.';
+  }
+  if (kind === 'investment') {
+    return 'That is not something I can advise on. Lekhio is your bookkeeping and tax, not a financial adviser, so what to do with your money, shares, crypto, a pension or anything else, is a question for a regulated adviser who knows your whole position. What I can tell you is the tax side of a decision once you have made it.';
   }
   return 'I cannot promise you a number, and it is worth doubting anyone who does: what you save depends on what you spend and what the rules let you claim. What Lekhio does is capture every cost you send it and prepare every claim you are entitled to. Your Tax screen shows what that has added up to so far, worked out from your own confirmed figures.';
 }

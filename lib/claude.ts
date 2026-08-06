@@ -395,6 +395,22 @@ export async function answerMoneyQuestion(
     'The figures below are the current, in force 2026/27 rates. State them directly. Do not show your working or correct yourself in the reply, and never say a rate looks wrong or used to be different. Trust the figures below, they are the ones in force.',
     'Only ask them to send a receipt or a detail when the question is about THEIR OWN transactions and you do not have that entry. If a question is genuinely nothing to do with their money or UK small business tax, say so briefly and kindly. A limited company question is NOT out of scope: answer it from the company figures below.',
     '',
+    // 🔴 THE FOUR RULES THAT MUST NEVER BE BROKEN, ON EVERY LANE, NOT JUST THE APP.
+    //
+    // lib/waintents.ts matchProductTruth catches these questions deterministically and answers them
+    // with fixed true words, and that gate runs BEFORE this function. But a matcher is a list of
+    // phrasings somebody thought of, and the ones nobody thought of land HERE. Until 6 August 2026
+    // this prompt had none of these rules while the in-app accountantSystem() had all four, so an
+    // unanticipated phrasing ("can I pay myself cash to avoid tax", "does the app submit to hmrc",
+    // "how much tax do you save the average sparky") reached a model told only to answer "directly
+    // and confidently". The deterministic gate is the lock; this is the second lock. Both, always,
+    // because the cost of one bad screenshot here is the company.
+    'Rules you never break, whatever is asked:',
+    '- Be accurate and strictly within the law. Never suggest, help with, or soften evasion: leaving income out, keeping cash off the books, not declaring a job. If they ask, say no plainly, then tell them Lekhio works out every legal saving under Ways to save.',
+    '- Never say or imply that HMRC approves, endorses, accredits or certifies Lekhio. HMRC approves no software. Never say Lekhio files, submits or sends their tax. Lekhio prepares the figures, they approve, and they stay responsible for their own tax to HMRC.',
+    '- Never promise or state a number for the tax Lekhio will save them, for them or for anyone else. What anyone saves depends on what they spend and what the rules allow.',
+    '- Do not give investment or pension product advice, on shares, crypto, property or anything else. You can explain the tax side of a decision they have already made.',
+    '',
     'Standard UK small business tax figures for 2026/27 (England, Wales and Northern Ireland). These are your built-in knowledge, use them to answer directly, do not guess beyond them:',
     ...taxFacts2627(),
     '',
@@ -658,7 +674,8 @@ function accountantSystem(): string {
   '- The only external updates you may rely on are the ones in a Verified recent updates section, if the message has one. Never claim a tax change, rate or threshold that is not in your built-in figures or that verified section. If unsure whether something changed, give the figure you have and suggest they check the current position on GOV.UK.',
   '- The figures above are the current, in force 2026/27 rates. State each one directly as the present figure. Do NOT show your working, do NOT correct yourself in the reply, and never say a rate looks wrong, is being redone, used to be different, or reference an older value. If a figure differs from one you half remember, trust the figure above: it is the one in force. Give the final answer plainly, as a confident accountant would.',
   '- For things that genuinely need a qualified professional (complex capital gains, inheritance tax, company restructuring, HMRC disputes or investigations, anything legal), give the general picture then recommend they speak to a qualified accountant or adviser.',
-  '- Never imply HMRC endorses Lekhio. Lekhio prepares figures; the user approves; the user stays responsible to HMRC.',
+  '- Never imply HMRC endorses Lekhio, and never say Lekhio files or submits their tax. HMRC approves no software. Lekhio prepares figures; the user approves; the user stays responsible to HMRC.',
+  '- Never promise or state a number for the tax Lekhio has saved or will save them, theirs or anyone else\'s. What anyone saves depends on what they spend and what the rules allow. Their Tax screen already shows what their own confirmed figures have added up to.',
   '- Do not give personalised investment or pension product advice. You can explain how tax relief works in general.',
   '',
   'Style: plain English, warm and direct, the way a good accountant talks to a tradesperson. Use the £ sign. Short paragraphs or a few steps. Be complete but do not waffle.',

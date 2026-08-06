@@ -8,6 +8,8 @@ import { rateLimitedShared } from '../../../lib/ratelimit';
 import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
 import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
+import { matchProductTruth, productTruthAnswer } from '../../../lib/waintents';
+import { hmrcFilingLive } from '../../../lib/features';
 
 // The in-app accountant endpoint. The app posts a question with the user's
 // Supabase access token. We verify the user, meter usage so costs stay bounded
@@ -67,6 +69,33 @@ export async function POST(req: NextRequest) {
   }
   // Optional: continue an existing thread. Absent means start a new one.
   const conversationIdIn = str(body.conversationId, 100).trim();
+
+  // 🔴 PRODUCT TRUTH BEFORE ANYTHING ELSE, ON THIS LANE TOO.
+  //
+  // "Are you HMRC approved", "do you file my return", "how much will you save me", an ask to hide
+  // income, an ask for investment advice. The WhatsApp router has gated these deterministically
+  // since 6 August 2026 and answers them with fixed, true words. This route never did, so the same
+  // question typed into the app reached the model and was answered in whatever words it chose. A
+  // screenshot of Lekhio claiming HMRC approval is the same problem whichever box it was typed in.
+  //
+  // It runs before the cache, before the daily cap and before the model, because the answer is
+  // deterministic and true: it costs nothing, and it must never be served from a shared cache or
+  // withheld because a man has used up his paid questions.
+  const productKind = matchProductTruth(question);
+  if (productKind) {
+    const truth = productTruthAnswer(productKind, { filingLive: hmrcFilingLive() });
+    let conversationId = '';
+    if (conversationIdIn && (await conversationOwnedBy(userId, conversationIdIn))) {
+      conversationId = conversationIdIn;
+    } else {
+      conversationId = (await createConversation(userId, question)) || '';
+    }
+    after(async () => {
+      if (conversationId) await saveConversationTurn(userId, conversationId, question, truth, []);
+    });
+    // remaining is null so a free, deterministic answer never decrements his visible counter.
+    return NextResponse.json({ answer: truth, remaining: null, limit: DAILY_LIMIT, conversationId, sources: [] });
+  }
 
   // Cache first (doc 95 Feature B). A GENERAL question that was answered before
   // from recognised sources is served for FREE: it does not call the paid model

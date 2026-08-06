@@ -58,7 +58,7 @@ export default function WorkforceTodo({
     setDone((s) => {
       const n = new Set(s);
       const nowDone = !n.has(item.id);
-      nowDone ? n.add(item.id) : n.delete(item.id);
+      if (nowDone) n.add(item.id); else n.delete(item.id);
       onDoneToggle?.(item.id, nowDone);
       return n;
     });

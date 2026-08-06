@@ -7,7 +7,7 @@
 // Update ritual at a Budget: change BOTH files, run the parity test, ship on
 // green. The sole trader side imports the one taxengine, never re hardcoded.
 
-import { soleTraderTax, personalAllowance } from './taxengine';
+import { soleTraderTax, personalAllowance, FACTS } from './taxengine';
 import { NI_FACTS } from './nistudentloan';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -191,7 +191,7 @@ export function salaryIncomeTax(salary: number, totalIncome: number): number {
   // Every salary rung we offer sits far below the higher rate threshold, so the taxable slice can
   // only ever be basic rate. Asserting it rather than assuming it: if a future rung breaks that,
   // this is wrong, and the test says so.
-  return r2(taxable * 0.20);
+  return r2(taxable * FACTS.basicRate);
 }
 
 export interface LtdPlan {

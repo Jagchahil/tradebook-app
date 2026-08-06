@@ -38,7 +38,6 @@
 // nobody has a token. It is run deliberately, and it says so out loud when it cannot run.
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));

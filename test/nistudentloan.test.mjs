@@ -21,7 +21,7 @@ writeFileSync(
   )
 );
 const mod = await import(pathToFileURL(path.join(stage, 'nistudentloan.ts')).href);
-const { NI_FACTS, class1NIC, niPosition, STUDENT_PLANS, studentLoanRepayment, validPlanSelection, studentLoanForSA } = mod;
+const { class1NIC, niPosition, STUDENT_PLANS, studentLoanRepayment, validPlanSelection, studentLoanForSA } = mod;
 
 let pass = 0;
 let fail = 0;

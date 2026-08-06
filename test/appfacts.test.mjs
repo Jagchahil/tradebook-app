@@ -128,7 +128,7 @@ ok('...so when a Budget decouples them, the app follows income tax and not Natio
 // National Insurance threshold from last, producing a number that is wrong in a way nobody can trace
 // back to anything. All of it, or none of it.
 ok('one missing key -> the WHOLE payload is refused, and we keep the bundled figures', (() => {
-  const { class4UpperLimit, ...missing } = facts;
+  const missing = { ...facts }; delete missing.class4UpperLimit;
   return validate({ taxYear: '2026/27', facts: missing }) === null;
 })());
 ok('a key that is not a number -> refused', (() => {

@@ -72,7 +72,6 @@ function gates(src, names, scope) {
       return `const ${n} = ${m[1]};`;
     });
     const args = Object.keys(scope);
-    // eslint-disable-next-line no-new-func
     const fn = new Function(...args, `${decls.join('\n')}\nreturn { ${names.join(', ')} };`);
     return fn(...args.map((a) => scope[a]));
   } catch {

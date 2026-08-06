@@ -331,7 +331,7 @@ export default function HokaPage() {
     if (j.url) window.location.href = j.url;
   }
 
-  const assets = data?.assets ?? [];
+  const assets = useMemo(() => data?.assets ?? [], [data]);
   const writing = useMemo(() => assets.filter((a) => a.state === 'scripting'), [assets]);
   const awaiting = useMemo(() => assets.filter((a) => a.state === 'awaiting_approval'), [assets]);
   const booked = data?.calendar ?? [];

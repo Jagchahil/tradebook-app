@@ -22,8 +22,6 @@ const RIVER_TINT = 'var(--river-tint)';
 // 🔴 ON a saffron tint, and on paper, the ink is ON_SAFFRON_TINT. Deep reads 2.70:1 and 3.08:1.
 const ON_SAFFRON_TINT = 'var(--on-saffron-tint)';
 const SAFFRON_TINT = 'var(--saffron-tint)';
-const GREEN = 'var(--green)';
-const GREEN_TINT = 'var(--green-tint)';
 const PAPER = 'var(--bg)';
 const LINE = 'var(--bd)';
 const MUTED = 'var(--tx-mut)';

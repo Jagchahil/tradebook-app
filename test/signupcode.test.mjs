@@ -52,7 +52,7 @@ ok('the secret is required at all', signupCodesConfigured() === true);
 // ---------------------------------------------------------------------------------------------
 // The code itself.
 // ---------------------------------------------------------------------------------------------
-let allSix = true, sawLeadingZeroPossible = true;
+let allSix = true;
 for (let i = 0; i < 500; i++) if (!/^\d{6}$/.test(newCode())) allSix = false;
 ok('every generated code is exactly six digits', allSix);
 ok('a five digit string is not a code', isCodeShape('12345') === false);

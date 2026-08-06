@@ -10,7 +10,6 @@
 
 const INK = '#111111';
 const RIVER = '#1B59A6';
-const GOLD = '#C9842A';  // SAFFRON_DEEP. This was two ticks off it.
 const MUTED = '#5B6470';
 const LINE = '#ECE9E2';
 const APP = 'https://lekhio.app';

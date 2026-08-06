@@ -225,7 +225,7 @@ const TRADE_ONLY = ['prior_employment', 'low_profit_year', 'start_date', 'premis
   ok('🔴 reconcile writes it from the trade word through lib/persona.ts, not from a local rule',
     /incomeShapeOfSignup\(\{ trade: s\.trade/.test(sb));
   ok('🔴 and a profile patch that PostgREST rejects retries WITHOUT the new column, so his name and address still land',
-    /income_shape: _dropped/.test(sb));
+    /delete withoutShape\.income_shape/.test(sb));
   ok('the other_job exhibit no longer asserts self employed work at a landlord',
     !sb.includes('alongside your self-employed work.'));
 }

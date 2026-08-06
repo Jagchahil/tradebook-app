@@ -19,7 +19,6 @@ export const metadata: Metadata = {
 const INK = 'var(--tx)';
 const RIVER = 'var(--river)';
 const RIVER_DEEP = 'var(--river-deep)';
-const RIVER_TINT = 'var(--river-tint)';
 const GREEN_TINT = 'var(--green-tint)';
 const PAPER = 'var(--bg)';
 const LINE = 'var(--bd)';

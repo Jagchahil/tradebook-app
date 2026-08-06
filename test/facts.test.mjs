@@ -17,8 +17,8 @@ const F = await import(pathToFileURL(path.join(stage, 'facts.ts')).href);
 const { FACTS } = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);
 
 let pass = 0, fail = 0;
-const ok = (n, c) => { c ? pass++ : (fail++, console.error('FAIL ' + n)); };
-const eq = (n, g, w) => { (Math.abs(g - w) < 1e-9 || g === w) ? pass++ : (fail++, console.error(`FAIL ${n}: got ${g} want ${w}`)); };
+const ok = (n, c) => { if (c) pass++; else { fail++; console.error('FAIL ' + n); } };
+const eq = (n, g, w) => { if (Math.abs(g - w) < 1e-9 || g === w) pass++; else { fail++; console.error(`FAIL ${n}: got ${g} want ${w}`); } };
 const now = new Date('2026-09-01T00:00:00Z');
 
 // --- resolveOverrides: the guardrails --------------------------------------------------------

@@ -552,7 +552,7 @@ ok('...routed BEFORE the generic question handler, so a model never gets the cha
 
 ok('the intent catches the real ways he would ask it',
   ['what have you saved me', 'how much have you saved me this year', 'saved me anything', 'is it worth it']
-    .every((q) => intents.includes('isSavingsQuestion')));
+    .every(() => intents.includes('isSavingsQuestion')));
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 console.log('\n🔴 A MAN WITH A JOB WAS BEING GIVEN HIS PERSONAL ALLOWANCE TWICE.');

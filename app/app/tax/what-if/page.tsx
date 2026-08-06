@@ -8,7 +8,7 @@ import { studentLoanForSA, type StudentPlan } from '../../../../lib/nistudentloa
 import { gbp0, gbpAbs0 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
-  GREEN, INK, LINE, MUTED, ON_GREEN_TINT, ON_RIVER, PAPER, RIVER, RIVER_DEEP, SURFACE,
+  INK, LINE, MUTED, ON_GREEN_TINT, ON_RIVER, PAPER, RIVER, RIVER_DEEP, SURFACE,
 } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 

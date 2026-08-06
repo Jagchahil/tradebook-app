@@ -525,7 +525,6 @@ export function encodeQr(text: string): QrMatrix {
   // code we choose the alphabet of, both of which are ASCII by construction. So rather than carry
   // ECI for a case that cannot arise, this refuses the case. If a caller ever needs a pound sign in
   // a QR code, that is the day to add ECI properly, not the day to hope.
-  // eslint-disable-next-line no-control-regex
   if (/[^\x20-\x7e]/.test(text)) throw new Error('qr: payload must be printable ASCII');
 
   const bytes = new TextEncoder().encode(text);

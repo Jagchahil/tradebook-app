@@ -139,7 +139,6 @@ ok('an unanswered question stays in the queue',
 // ---------------------------------------------------------------------------------------------
 const hKeys = household().map((c) => c.key);
 const nKeys = notHousehold().map((c) => c.key);
-const askable = CIRCUMSTANCES.filter((c) => !c.specialCategory).map((c) => c.key);
 // The two MONEY screens partition the money questions. The compliance ones are a third group with
 // its own screen and are checked in their own section, so they are not expected here.
 const moneyAskable = CIRCUMSTANCES.filter((c) => !c.specialCategory && !c.mtd).map((c) => c.key);

@@ -379,7 +379,6 @@ export function safeNext(raw: unknown): string {
   const v = raw.trim();
   if (v.length === 0 || v.length > 120) return AFTER_SIGN_IN;
   if (v !== AFTER_SIGN_IN && !v.startsWith(`${AFTER_SIGN_IN}/`)) return AFTER_SIGN_IN;
-  // eslint-disable-next-line no-control-regex
   if (/[\\:?#\s\u0000-\u001f]/.test(v)) return AFTER_SIGN_IN;
   if (v.includes('//') || v.includes('..')) return AFTER_SIGN_IN;
   return v;

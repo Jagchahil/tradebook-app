@@ -15,7 +15,6 @@ const INK = 'var(--tx)';
 const RIVER = 'var(--river)';
 const RIVER_DEEP = 'var(--river-deep)';
 const RIVER_TINT = 'var(--river-tint)';
-const GREEN = 'var(--green)';
 const MUTED = 'var(--tx-mut)';
 const LINE = 'var(--bd)';
 const SURFACE = 'var(--surface)';

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   INK, PAPER, FONT, MARKETING_CSS,
   SharedHead, SiteNav, SiteFooter, StickyCta,
-  Ic,
 } from '../_shared/site';
 import { filingMark, bankMark, filingChip } from '../../lib/features';
 import { css } from '../../lib/tokens';

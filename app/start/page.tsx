@@ -118,43 +118,11 @@ export default function StartPage() {
   // A referral code carried in on ?ref= (doc 82). Attribution only; passed to the
   // onboard save, sanitised server side. Never shown, never rewards automatically.
   const [ref] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') ?? '' : ''));
-  // A field sales rep's code on ?rep=. Only a valid one unlocks the longer 30 day
-  // trial at checkout; the server decides, this just carries it through.
-  const [rep] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('rep') ?? '' : ''));
-
-  // Billing: the chosen period drives the price shown and charged. One simple price for everyone.
-  const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly');
-  const [billingBusy, setBillingBusy] = useState(false);
-  const priceNow = plan === 'annual' ? '£129 a year' : '£12.99 a month';
-
-  async function startCheckout() {
-    setBillingBusy(true);
-    try {
-      const res = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, offer, email: email.trim(), phone, rep }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { url?: string };
-      if (data?.url) {
-        window.location.href = data.url;
-        return;
-      }
-    } catch {
-      // fall through
-    }
-    // Billing not switched on yet, or a hiccup. The free trial is already running,
-    // so we simply let the user carry on rather than block them.
-    setBillingBusy(false);
-  }
-
   const phoneReady = digitsOnly(phone).length >= 10;
   // Email is required. One account, tied to a name, a mobile and an email, so nothing about a
   // person is ever split across two records. It must be present and valid to move on.
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const nameLabel = tradeType === 'ltd' ? 'Company name' : tradeType === 'business' ? 'Trading name' : tradeType === 'partnership' ? "The partnership's name" : 'Your full name';
-  // A limited company and a trading name are not the person. A sole trader trades under his own
-  // name, so his one answer is both.
   // A limited company, a trading name and a partnership are all not the person. A sole trader
   // trades under his own name, so his one answer is both.
   const needsPersonName = tradeType === 'ltd' || tradeType === 'business' || tradeType === 'partnership';

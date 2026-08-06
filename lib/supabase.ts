@@ -1646,7 +1646,7 @@ export async function reconcileSignupToUser(
     // exists, and losing them because a new column is not there yet would be a far worse bug than
     // the one wave nine set out to fix. So the column is dropped and the rest is written.
     if (!pr.ok && patch.income_shape !== undefined) {
-      const { income_shape: _dropped, ...withoutShape } = patch;
+      const withoutShape = { ...patch }; delete withoutShape.income_shape;
       if (Object.keys(withoutShape).length > 0) pr = await writeProfile(withoutShape);
     }
     if (pr.ok) applied.push('profile');

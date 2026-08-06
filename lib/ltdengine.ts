@@ -142,18 +142,29 @@ export function dividendTax(salary: number, dividends: number): number {
   let pos = Math.max(salary, PA);
   let tax = 0;
 
+  // 🔴 THE BAND CEILINGS MOVE WITH THE TAPERED ALLOWANCE, THEY ARE NOT FIXED.
+  // The basic rate band is a fixed £37,700 of TAXABLE income, so the income at which higher rate
+  // begins is (personal allowance + £37,700). Once the allowance tapers above £100,000 that point
+  // falls BELOW £50,270, and a fixed £50,270 ceiling here taxed dividends at 10.75% that belong at
+  // 35.75%: the same "bill quietly too low" the header warns about, and the exact shape
+  // salaryIncomeTax already fixed on the salary side. The additional threshold is a true income
+  // figure and stays put. basicBand is derived from the constants so it cannot drift.
+  const basicBand = LTD.higherThreshold - LTD.personalAllowance;
+  const higherThreshold = PA + basicBand;
+  const additionalThreshold = LTD.additionalThreshold;
+
   const allow = Math.min(LTD.dividendAllowance, taxable);
   pos += allow;
   taxable -= allow;
 
-  if (taxable > 0 && pos < LTD.higherThreshold) {
-    const amt = Math.min(taxable, LTD.higherThreshold - pos);
+  if (taxable > 0 && pos < higherThreshold) {
+    const amt = Math.min(taxable, higherThreshold - pos);
     tax += amt * LTD.dividendBasic;
     pos += amt;
     taxable -= amt;
   }
-  if (taxable > 0 && pos < LTD.additionalThreshold) {
-    const amt = Math.min(taxable, LTD.additionalThreshold - pos);
+  if (taxable > 0 && pos < additionalThreshold) {
+    const amt = Math.min(taxable, additionalThreshold - pos);
     tax += amt * LTD.dividendHigher;
     pos += amt;
     taxable -= amt;

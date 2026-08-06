@@ -247,5 +247,15 @@ ok('the best one on take-home is identified, but the others are still shown, wit
 ok('the wall comes with the plan, because the plan is useless without the price of the next pound',
   answer.wall && typeof answer.wall.says === 'string' && answer.wall.says.length > 20);
 
+ok('🔴 A DIRECTOR IN THE TAPER PAYS THE HIGHER DIVIDEND RATE ON THE RIGHT SLICE (A0 fix)',
+  // salary 12,570 + dividends 120,000: PA tapers to 6,285, so higher rate starts at 6,285 + 37,700
+  // = 43,985, NOT 50,270. The 6,285 slice between them is 35.75% dividend tax, not 10.75%. Before
+  // the fix this returned 33,688.73, understating by 3,142.50. See lib/ltdengine.ts.
+  Math.abs(L.dividendTax(12570, 120000) - 36831.23) < 1);
+
+ok('...and NOTHING moves at a full personal allowance, which is why every earlier test still passes',
+  Math.abs(L.dividendTax(12570, 40000) - 4821.25) < 1
+  && Math.abs(L.dividendTax(9000, 60000) - 10694.97) < 1);
+
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

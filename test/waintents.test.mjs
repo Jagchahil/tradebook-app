@@ -486,5 +486,66 @@ for (const phrase of ['claim use of home', 'claim use of home, 30 hours a month'
 ok('🔴 the owe answer renders setAsideBasisLine, so WhatsApp cannot show a smaller figure bare',
   /setAsideBasisLine/.test(wroute) && /oweAnswer\(tax\.setAside, tax\.projected\)/.test(wroute));
 
+// ---------------------------------------------------------------------------------------------
+// QUESTIONS ABOUT LEKHIO ITSELF NEVER REACH THE CLAIM RULEBOOK OR THE TOTALS LANE. (6 Aug 2026.)
+// The three live reproductions first, word for word as a customer typed them.
+// ---------------------------------------------------------------------------------------------
+eq('"Are you HMRC approved software or not?" is the approval question, not a claim check',
+  W.matchProductTruth('Are you HMRC approved software or not?'), 'approved');
+eq('"Do you file my tax return for me?" is the filing question, not a totals question',
+  W.matchProductTruth('Do you file my tax return for me?'), 'files');
+eq('"How much tax will you save me? Give me a number." is a promise hunt',
+  W.matchProductTruth('How much tax will you save me? Give me a number.'), 'savings');
+
+eq('"are you government software" is the approval question without the word approved',
+  W.matchProductTruth('are you government software'), 'approved');
+eq('"is lekhio endorsed by hmrc" matches', W.matchProductTruth('is lekhio endorsed by hmrc'), 'approved');
+eq('"will you submit my vat to hmrc" matches', W.matchProductTruth('will you submit my vat to hmrc'), 'files');
+eq('"will you do my tax return" matches', W.matchProductTruth('will you do my tax return'), 'files');
+eq('"can you save me money" matches', W.matchProductTruth('can you save me money'), 'savings');
+eq('"do you guarantee the savings" matches', W.matchProductTruth('do you guarantee the savings'), 'savings');
+
+// The near misses stay where they belong.
+eq('"can I claim software for the business" stays a claim check',
+  W.matchProductTruth('can I claim software for the business'), null);
+eq('"what do I owe so far" stays a totals question', W.matchProductTruth('what do I owe so far'), null);
+eq('"how much tax do you reckon I owe" stays a totals question',
+  W.matchProductTruth('how much tax do you reckon I owe'), null);
+eq('"what have you saved me" stays the real saved figure', W.matchProductTruth('what have you saved me'), null);
+ok('...and isSavingsQuestion still owns it', W.isSavingsQuestion('what have you saved me'));
+eq('"can you save this receipt" is not a savings promise', W.matchProductTruth('can you save this receipt'), null);
+eq('"when do you file my updates" is a deadline question and deadlineAnswer knows',
+  W.matchProductTruth('when do you file my updates'), null);
+eq('"can you check if hmrc approved my refund" is about his refund, not us',
+  W.matchProductTruth('can you check if hmrc approved my refund'), null);
+
+// The fixed words keep every promise the compliance docs make, live or not.
+for (const live of [false, true]) {
+  for (const kind of ['approved', 'files', 'savings']) {
+    const a = W.productTruthAnswer(kind, { filingLive: live });
+    ok(`${kind} (filingLive ${live}) has no digits, no approval claim, and prepares`,
+      !/\d/.test(a) && !/approved by hmrc|hmrc approved/i.test(a) && /prepare/i.test(a));
+    ok(`${kind} (filingLive ${live}) has no dashes`, !/[\u2014\u2013]/.test(a) && !/ - /.test(a));
+  }
+}
+ok('the approval answer opens with No', W.productTruthAnswer('approved', { filingLive: false }).startsWith('No'));
+ok('the filing answer opens with No', W.productTruthAnswer('files', { filingLive: false }).startsWith('No'));
+ok('before the grant, the filing answer says the switch is not on yet',
+  /not switched on yet/.test(W.productTruthAnswer('files', { filingLive: false })));
+ok('behind the flag, the filing answer still approves first',
+  /reviewed and approved|approve first/i.test(W.productTruthAnswer('files', { filingLive: true })));
+
+// The wiring: the thread and the webhook both ask the product question FIRST.
+const threadSrc = readFileSync(path.resolve(here, '../app/api/thread/route.ts'), 'utf8');
+ok('the thread asks matchProductTruth before the totals lane',
+  threadSrc.indexOf('matchProductTruth(q)') > -1
+  && threadSrc.indexOf('matchProductTruth(q)') < threadSrc.indexOf('matchTotalsQuestion(q)'));
+ok('the webhook asks matchProductTruth before the claim rulebook and the totals lane',
+  wroute.indexOf('matchProductTruth(text)') > -1
+  && wroute.indexOf('matchProductTruth(text)') < wroute.indexOf('isExpenseCheck(text)')
+  && wroute.indexOf('matchProductTruth(text)') < wroute.indexOf('matchTotalsQuestion(text)'));
+ok('a product truth question is answered even in read only',
+  /\|\| matchProductTruth\(text\) !== null/.test(wroute));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

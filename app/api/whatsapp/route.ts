@@ -107,6 +107,8 @@ import {
   matchEditLast,
   isPricing,
   isIdentity,
+  matchProductTruth,
+  productTruthAnswer,
   isDeadlineQuestion,
   deadlineAnswer,
   matchTotalsQuestion,
@@ -137,6 +139,7 @@ import {
   isSupportRequest,
   supportReason,
 } from '../../../lib/waintents';
+import { hmrcFilingLive } from '../../../lib/features';
 import { weeklySummaryText } from '../../../lib/weeklyupdate';
 import {
   bandForHours, bandOptions, electionConfirmation, electionRefusal, type Electing,
@@ -462,6 +465,8 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handleTaxTips(from);
           } else if (isIdentity(text)) {
             await handleIdentity(from);
+          } else if (matchProductTruth(text) !== null) {
+            await handleProductTruth(from, text);
           } else if (isPricing(text)) {
             await handlePricing(from);
           } else if (isDeadlineQuestion(text)) {
@@ -915,6 +920,7 @@ function alwaysAnswered(text: string): boolean {
     || isSupportRequest(text)
     || isHelp(text)
     || isIdentity(text)
+    || matchProductTruth(text) !== null
     || isPricing(text)
     || isThanks(text),
   );
@@ -1359,6 +1365,15 @@ async function handleEditLast(from: string, amount: number): Promise<void> {
     return;
   }
   await sendText(from, `Changed. ${last.vendor ?? 'The last entry'} is now ${formatGbp(amount)}. Check it in the app and confirm.`);
+}
+
+// Questions about Lekhio itself: filing, approval, promised savings. Deterministic and early,
+// so the claim rulebook and the totals lane can never answer them again (found live, 6 August
+// 2026: "Are you HMRC approved software or not?" was answered by the accountant fees claim rule).
+async function handleProductTruth(from: string, text: string): Promise<void> {
+  const kind = matchProductTruth(text);
+  if (!kind) return;
+  await sendText(from, productTruthAnswer(kind, { filingLive: hmrcFilingLive() }));
 }
 
 async function handleIdentity(from: string): Promise<void> {

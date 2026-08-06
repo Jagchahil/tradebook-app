@@ -246,6 +246,85 @@ export function isIdentity(body: string): boolean {
   return /^(who are you|who is this|what are you|what is this|are you a (bot|robot|person|human)|is this a bot|am i talking to a (bot|robot|human|person)|what is lekhio|who('?s| is) lekhio)$/.test(t);
 }
 
+
+// --- Questions about Lekhio itself: filing, approval, promised savings --------------------------
+//
+// Found live on 6 August 2026, the final launch walk. "Are you HMRC approved software or not?"
+// hit the claim rulebook on the word "software" and came back "\u2705 ... Yes", which reads, in a
+// screenshot, like a yes to the approval question. "Do you file my tax return for me?" carried
+// "tax" and "my", hit the totals lane, and was answered with the set aside figure. "How much tax
+// will you save me?" did the same. Three questions about LEKHIO answered as questions about HIS
+// BOOKS, and two of them are questions the compliance docs oblige us to answer plainly.
+//
+// So questions about the product are matched FIRST, deterministically, and answered with fixed
+// words that are true: we prepare, he approves, HMRC approves nobody, and nobody can promise a
+// saving. The matcher requires the product to be the subject ("you", "lekhio", "this app"), so
+// "can I claim software" still reaches the claim rulebook and "what do I owe" still reaches the
+// totals lane. Timing questions ("when is it due") are left for deadlineAnswer, which knows.
+export type ProductTruthKind = 'approved' | 'files' | 'savings';
+
+const PRODUCT_SUBJECT = /\b(you|your|lekhio|this app|this software|the app)\b/;
+
+export function matchProductTruth(body: string): ProductTruthKind | null {
+  const b = (body || '').toLowerCase().trim();
+  if (!b || b.length > 220) return null;
+  if (!PRODUCT_SUBJECT.test(b)) return null;
+  // A timing question is a deadline question, and deadlineAnswer knows the actual dates.
+  if (/\b(when|deadline|due|by what date)\b/.test(b)) return null;
+
+  // "are you hmrc approved", "is lekhio endorsed by the government", "are you government
+  // software". Not "hmrc approved my refund": that is his refund, not us.
+  const officialdom = /\b(hmrc|government|govuk|gov uk|taxman|tax man|tax office)\b/;
+  const blessing = /\b(approved|approval|approves|endorsed|endorses|endorsement|accredited|accreditation|certified|certification|recognised|recognized|recognition|authorised|authorized|licensed|licenced|vetted|official)\b/;
+  const hisOwn = /\b(approv|endors|recognis|recogniz|authoris|authoriz)\w*\s+(my|our)\b/;
+  if (officialdom.test(b) && !hisOwn.test(b)) {
+    if (blessing.test(b)) return 'approved';
+    if (/\b(government|official|hmrc('s)?)\b[^.?!]{0,30}\b(software|app|tool|service|scheme|system)\b/.test(b)) return 'approved';
+  }
+
+  // "do you file my tax return", "will lekhio submit my vat", "will you do my tax return".
+  // Not "how much tax do you reckon I owe": no filing verb, so the totals lane keeps it.
+  const asksTheProduct = /\b(do|does|will|would|can|could|are)\s+(you|lekhio|it|this)\b/;
+  if (asksTheProduct.test(b)) {
+    const filingVerb = /\b(file|files|filed|filing|submit|submits|submitted|submitting|send|sends|sending|lodge|lodges|lodging)\b/;
+    const filingObject = /\b(tax|return|returns|self assessment|assessment|mtd|vat|update|updates|hmrc)\b/;
+    if (filingVerb.test(b) && filingObject.test(b)) return 'files';
+    if (/\b(do|doing|sort|sorts|handle|handles)\b[^.?!]{0,20}\b(my|our)\b[^.?!]{0,20}\b(tax|return|self assessment|vat)\b/.test(b)) return 'files';
+  }
+
+  // "how much will you save me", "can you save me money", "guarantee me a saving". Never the
+  // past: "what have you saved me" is arithmetic on his own figures and isSavingsQuestion owns
+  // it. And never "save this receipt", which is a man asking us to keep a record.
+  const promising = /\b(will|would|can|could|gonna|going to)\b[^.?!]{0,40}\b(you|lekhio)\b[^.?!]{0,40}\bsav(e|ing)\b[^.?!]{0,12}\b(me|us|money|tax)\b|\b(you|lekhio)\b[^.?!]{0,20}\b(will|would|can|could|gonna|going to)\b[^.?!]{0,40}\bsav(e|ing)\b[^.?!]{0,12}\b(me|us|money|tax)\b/;
+  const guaranteeing = /\b(guarantee|guaranteed|promise|promised)\b[^.?!]{0,40}\bsav\w*\b|\bsav\w*\b[^.?!]{0,40}\b(guarantee|guaranteed|promise|promised)\b/;
+  if (promising.test(b) || guaranteeing.test(b)) return 'savings';
+
+  return null;
+}
+
+// The fixed, true words. No number is ever promised, no approval is ever claimed, and the
+// prepare then approve order is stated every time. filingLive is lib/features.ts
+// hmrcFilingLive(): the same sentence must never claim a live pipe before HMRC grants
+// production access.
+export function productTruthAnswer(kind: ProductTruthKind, opts: { filingLive: boolean }): string {
+  if (kind === 'approved') {
+    const recognition = opts.filingLive
+      ? 'What exists is HMRC recognition for Making Tax Digital, and Lekhio is recognised.'
+      : 'What exists is HMRC recognition for Making Tax Digital, and Lekhio is going through that process now.';
+    return [
+      'No, and no bookkeeping software is. HMRC does not approve or endorse software, and we will never claim it.',
+      recognition,
+      'The way it works: Lekhio prepares your figures, you approve anything before it goes to HMRC, and you stay responsible for your own tax.',
+    ].join(' ');
+  }
+  if (kind === 'files') {
+    return opts.filingLive
+      ? 'No. Your tax return is yours, and Lekhio never sends anything without you. Lekhio prepares your figures and gets your updates ready, and once you have reviewed and approved them it sends them to HMRC through the recognised route. You approve first, every time, and you stay responsible for your own tax.'
+      : 'No. Your tax return is yours, and Lekhio never sends anything without you. Lekhio prepares your figures and keeps your updates ready for Making Tax Digital. Sending to HMRC from Lekhio is not switched on yet. When it is, you will see the figures first and approve them before anything goes, and you stay responsible for your own tax.';
+  }
+  return 'I cannot promise you a number, and it is worth doubting anyone who does: what you save depends on what you spend and what the rules let you claim. What Lekhio does is capture every cost you send it and prepare every claim you are entitled to. Your Tax screen shows what that has added up to so far, worked out from your own confirmed figures.';
+}
+
 // --- Deadline questions -----------------------------------------------------------
 export function isDeadlineQuestion(body: string): boolean {
   const b = body.trim().toLowerCase();

@@ -507,9 +507,12 @@ export async function parseReceipt() { return state.parsed; }
 export async function answerMoneyQuestion() { return 'the model answer'; }
 `);
   w('banknudge.ts', "export function busyMessage() { return 'the busy line'; }\n");
+  w('features.ts', 'export function hmrcFilingLive() { return false; }\n');
   w('aicost.ts', 'export function decideSpend() { return { allowed: true }; }\n');
   w('margin.ts', 'export function aiCapsFor() { return { killed: false }; }\n');
   w('waintents.ts', `
+export function matchProductTruth() { return null; }
+export function productTruthAnswer() { return ''; }
 export function matchTotalsQuestion() { return null; }
 export function formatGbp(n) { return '£' + n; }
 export function isDeadlineQuestion(q) { return /deadline/.test(q); }

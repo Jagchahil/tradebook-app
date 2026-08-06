@@ -8,7 +8,9 @@ import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
 import {
   matchTotalsQuestion, formatGbp, isDeadlineQuestion, deadlineAnswer, type TotalsQuestion,
+  matchProductTruth, productTruthAnswer,
 } from '../../../lib/waintents';
+import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, VERDICT_ICON } from '../../../lib/taxrules';
 import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
 import {
@@ -148,6 +150,13 @@ export async function POST(req: NextRequest) {
 // The WhatsApp answering order, without the WhatsApp only lanes (capture, sessions, buttons).
 // Always returns a sentence: honesty when it cannot answer is part of the contract.
 async function composeReply(userId: string, q: string): Promise<string> {
+  // 0. Questions about Lekhio itself: filing, approval, promised savings. First, because the
+  // totals lane and the claim rulebook both answered these with the right answer to the wrong
+  // question (found live, 6 August 2026), and a screenshot of a green tick under "are you HMRC
+  // approved" is a claim nobody here ever made on purpose.
+  const truth = matchProductTruth(q);
+  if (truth) return productTruthAnswer(truth, { filingLive: hmrcFilingLive() });
+
   // 1. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
   const totals = matchTotalsQuestion(q);
   if (totals) return totalsAnswer(userId, totals);

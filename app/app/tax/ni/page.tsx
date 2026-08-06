@@ -2,12 +2,12 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getBusinessProfile, getOptimiserInput } from '../../../../lib/supabase';
+import { getBusinessProfile, getOptimiserInput, getStudentLoanSettings } from '../../../../lib/supabase';
 import { niPosition, NI_FACTS } from '../../../../lib/nistudentloan';
 import { FACTS, asPercent } from '../../../../lib/taxengine';
 import { gbp0, gbp2 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
-import { GREEN_TINT, INK, MUTED, ON_GREEN_TINT, PAPER } from '../../../../lib/apptheme';
+import { GREEN_TINT, INK, MUTED, ON_GREEN_TINT, ON_RIVER, PAPER, RIVER_DEEP } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';
@@ -59,18 +59,33 @@ export const dynamic = 'force-dynamic';
 // cost him a year of State Pension, which is the one failure here that cannot be undone later.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-export default async function NiPage() {
+export default async function NiPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const jar = await cookies();
   const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
   if (!user) redirect('/in');
 
-  const [optimiser, biz] = await Promise.all([
+  const sp = await searchParams;
+  const savedIncome = (Array.isArray(sp.done) ? sp.done[0] : sp.done) === 'saved';
+  const failedIncome = (Array.isArray(sp.e) ? sp.e[0] : sp.e) !== undefined;
+
+  const [optimiser, biz, fin] = await Promise.all([
     getOptimiserInput(user.id),
     getBusinessProfile(user.id).catch(() => null),
+    getStudentLoanSettings(user.id),
   ]);
   const profit = Math.max(0, optimiser.ytdTradeIncome - optimiser.ytdTradeExpenses);
   const salary = Math.max(0, optimiser.employmentIncome);
   const ni = niPosition(salary, profit);
+
+  // Prefill the "other income" form from what he has already told us. Computed here, not inline in
+  // the tag, because a `>` inside the JSX breaks the phone-width guard's tag matcher.
+  const empDefault = fin && fin.employmentIncome > 0 ? String(fin.employmentIncome) : '';
+  const savDefault = fin && fin.savingsIncome > 0 ? String(fin.savingsIncome) : '';
+  const divDefault = fin && fin.dividendIncome > 0 ? String(fin.dividendIncome) : '';
 
   // The two axes, each biting only on an explicit answer, and the trade test written as two
   // inequalities so that undefined and null both fall through to the old behaviour. This is the
@@ -206,6 +221,31 @@ export default async function NiPage() {
           ) : null}
         </section>
       ) : null}
+
+      {/* ── YOUR OTHER INCOME. The set aside and the marginal rate need a PAYE salary, savings
+          interest and dividends, and until this form existed only the WhatsApp flow could set them,
+          so a web only customer had them stuck at zero and his figure was too low. Posts to
+          /api/you/financials, his own facts, ungated. ─────────────────────────────────────────── */}
+      <section className="lek-card">
+        <h2 className="lek-h2">Your other income</h2>
+        <p style={S.quiet}>
+          If you also take a wage from a job, or earn savings interest or dividends, tell us here so
+          your set aside and your rate are worked out on your whole income, not just the trade. Leave
+          a box empty if it does not apply.
+        </p>
+        {savedIncome ? <p style={S.saved}>Saved. Your figures now include it.</p> : null}
+        {failedIncome ? <p style={S.quiet}>That did not save. Give it a moment and try again.</p> : null}
+        <form method="post" action="/api/you/financials" style={S.form}>
+          <input type="hidden" name="section" value="income" />
+          <label style={S.label} htmlFor="ni-emp">PAYE salary from a job, per year</label>
+          <input id="ni-emp" name="employment_income" inputMode="numeric" placeholder="0" defaultValue={empDefault} style={S.input} />
+          <label style={S.label} htmlFor="ni-sav">Savings interest, per year</label>
+          <input id="ni-sav" name="savings_income" inputMode="numeric" placeholder="0" defaultValue={savDefault} style={S.input} />
+          <label style={S.label} htmlFor="ni-div">Dividends, per year</label>
+          <input id="ni-div" name="dividend_income" inputMode="numeric" placeholder="0" defaultValue={divDefault} style={S.input} />
+          <button type="submit" style={S.button}>Save</button>
+        </form>
+      </section>
     </main>
   );
 }
@@ -225,4 +265,10 @@ const S: Record<string, React.CSSProperties> = {
   good: { fontSize: TYPE.body, lineHeight: 1.6, color: ON_GREEN_TINT, background: GREEN_TINT, borderRadius: RADIUS.md, padding: '12px 14px', margin: 0 },
 
   figRow: { display: 'flex', gap: SPACE.lg, flexWrap: 'wrap' },
+
+  saved: { fontSize: TYPE.note, color: RIVER_DEEP, fontWeight: 700, margin: '12px 0 0' },
+  form: { display: 'flex', flexDirection: 'column', gap: `${SPACE.sm}px`, margin: `${SPACE.md}px 0 0`, maxWidth: '28rem' },
+  label: { fontSize: TYPE.note, fontWeight: 700, color: INK, margin: '0 0 -6px' },
+  input: { fontSize: 16, padding: '12px 14px', borderRadius: RADIUS.md, border: `1.5px solid ${MUTED}`, background: PAPER, color: INK, fontFamily: FONT, width: '100%' },
+  button: { fontSize: 16, fontWeight: 700, padding: '13px 20px', borderRadius: RADIUS.md, border: 'none', background: RIVER_DEEP, color: ON_RIVER, fontFamily: FONT, cursor: 'pointer', marginTop: `${SPACE.hair}px` },
 };

@@ -125,7 +125,12 @@ for (const [k, s] of Object.entries(src)) {
 // row or an account, which is the property this assertion actually exists to hold: nothing in a
 // web app URL may identify whose money is on the screen. The old wording claimed nobody but
 // what-if read the query string at all, which was simply not true of the tree it was describing.
-const READS_QUERY = ['whatif', 'vehicle'];
+// ⚠️ ni AND loan JOINED whatif AND vehicle ON 6 AUGUST. Both now read searchParams, but ONLY for a
+// benign saved/error banner off ?done / ?e after a form POST to /api/you/financials (the student
+// loan plan, the PAYE salary, savings and dividends, settable from the web at last). They read no
+// id, account, owner or customer off the string, which the assertion below still pins, so this is a
+// banner after a save, not a record read.
+const READS_QUERY = ['whatif', 'vehicle', 'ni', 'loan'];
 ok('what-if reads only the delta off the query string',
   /one\('extra'\)/.test(src.whatif) && !/one\('(user|id|account|owner)/.test(src.whatif));
 ok('🔴 and no tax screen takes anything off the URL that could name a person or a row',

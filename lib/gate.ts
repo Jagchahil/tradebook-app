@@ -263,6 +263,7 @@ export const GATED_ROUTES: GatedRoute[] = [
   { route: 'app/api/you/email/start', rule: 'always', why: 'Sending himself a code to prove a new email. His contact point, and the address his sign in codes arrive at, so gating it can gate him out of his own account.' },
   { route: 'app/api/you/email/verify', rule: 'always', why: 'Typing the code back and binding the proved address. The other half of the same door. Binding never creates an account and never moves a contact, so there is no work here to stop.' },
   { route: 'app/api/you/settings', rule: 'always', why: 'The reminder and weekly summary switches. Turning messages OFF is an opt out and may never sit behind a paywall (PECR), and turning them on costs us nothing.' },
+  { route: 'app/api/you/financials', rule: 'always', why: 'His student loan plan, PAYE salary, savings and dividends. Facts about himself the set aside needs, not work we do for him. Until this route existed only the WhatsApp flow could write them, so a web customer could not correct his own record, and storing a man his own facts never sits behind the paywall.' },
 
   // ── The Lekhio thread, 31 July 2026. The conversation, on our own turf. ───────────────────
   //

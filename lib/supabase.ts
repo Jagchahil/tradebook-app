@@ -5040,6 +5040,37 @@ export async function setEmploymentIncome(userId: string, amount: number): Promi
   return res.ok;
 }
 
+// 🔴 THE WHOLE-PERSON INCOME PICTURE, SETTABLE FROM THE WEB AT LAST. The student loan plan, the PAYE
+// salary, savings interest and dividends all feed the set aside, and until this only the WhatsApp
+// flow could write them, so a web only customer had every one of them stuck at zero and his set
+// aside understated. This writes all five in one PATCH; the route reads the current values and
+// overlays whichever section the man just edited, so one form can never wipe another's field.
+export async function setUserFinancials(
+  userId: string,
+  f: {
+    plan: 'plan1' | 'plan2' | 'plan4' | 'plan5' | null;
+    postgrad: boolean;
+    employmentIncome: number;
+    savingsIncome: number;
+    dividendIncome: number;
+  },
+): Promise<boolean> {
+  const { url } = config();
+  const clamp = (n: number): number => Math.min(100_000_000, Math.max(0, Math.round(Number(n) || 0)));
+  const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      student_loan_plan: f.plan,
+      student_loan_postgrad: Boolean(f.postgrad),
+      employment_income: clamp(f.employmentIncome),
+      savings_income: clamp(f.savingsIncome),
+      dividend_income: clamp(f.dividendIncome),
+    }),
+  });
+  return res.ok;
+}
+
 // 🔴 THE BUSINESS STRUCTURE. It changes which tax engine applies, so it is stored, not guessed.
 //
 // sole_trader     -> soleTraderTax on the whole profit (the default the engine always assumed).

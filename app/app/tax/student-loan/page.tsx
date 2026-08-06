@@ -2,13 +2,13 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getOptimiserInput } from '../../../../lib/supabase';
+import { getOptimiserInput, getStudentLoanSettings } from '../../../../lib/supabase';
 import { taxPosition } from '../../../../lib/taxoptimiser';
 import { STUDENT_PLANS, type StudentPlan } from '../../../../lib/nistudentloan';
 import { asPercent } from '../../../../lib/taxengine';
 import { gbp0 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, FONT, SPACE, TYPE } from '../../../../lib/tokens';
-import { INK, MUTED, PAPER, RIVER_DEEP } from '../../../../lib/apptheme';
+import { INK, MUTED, ON_RIVER, PAPER, RIVER_DEEP } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';
@@ -25,15 +25,41 @@ export const dynamic = 'force-dynamic';
 // ⚠️ THE SHOCK THIS SCREEN EXISTS TO PREVENT: the self employed do not repay as they go. The
 // whole year's repayment lands in one lump with the January bill, and most tax apps forget the
 // loan exists until it does.
+//
+// 🔴 AND NOW HE CAN TELL US HIS PLAN FROM THE WEB. Until this form existed the plan could only be
+// set over WhatsApp, so a web only customer read "we do not count it" with no way to fix it, and
+// his set aside was quietly too low. The form writes to /api/you/financials, his own fact, ungated.
 
-export default async function StudentLoanPage() {
+const PLAN_LABELS: Record<StudentPlan, string> = {
+  plan1: 'Plan 1',
+  plan2: 'Plan 2',
+  plan4: 'Plan 4 (Scotland)',
+  plan5: 'Plan 5',
+  postgrad: 'Postgraduate loan',
+};
+
+export default async function StudentLoanPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const jar = await cookies();
   const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
   if (!user) redirect('/in');
 
-  const optimiser = await getOptimiserInput(user.id);
+  const sp = await searchParams;
+  const one = (k: string): string | undefined => {
+    const v = sp[k];
+    return Array.isArray(v) ? v[0] : v;
+  };
+  const saved = one('done') === 'saved';
+  const failed = one('e') !== undefined;
+
+  const [optimiser, fin] = await Promise.all([getOptimiserInput(user.id), getStudentLoanSettings(user.id)]);
   const plans = (optimiser.studentPlans ?? []) as StudentPlan[];
   const tax = taxPosition(optimiser);
+  const currentPlan = fin?.plan ?? '';
+  const currentPostgrad = fin?.postgrad ?? false;
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -46,7 +72,7 @@ export default async function StudentLoanPage() {
           <h1 className="lek-h2">Student loan</h1>
           <p style={S.body}>You have not told us about a student loan, so nothing is counted for one.</p>
           <p style={S.quiet}>
-            If you do have one, it matters: Self Assessment collects the whole year&apos;s
+            If you do have one, set your plan below. Self Assessment collects the whole year&apos;s
             repayment in one lump with the January bill, and until we know your plan, the set aside
             figure on your Overview does not include it.
           </p>
@@ -71,7 +97,7 @@ export default async function StudentLoanPage() {
             const plan = STUDENT_PLANS[p];
             return (
               <section key={p} className="lek-card">
-                <h2 className="lek-h2">{plan.label}</h2>
+                <h2 className="lek-h2">{PLAN_LABELS[p]}</h2>
                 <p style={S.body}>
                   {asPercent(plan.rate)}% of income above {gbp0(plan.threshold)} a year. Below the
                   threshold, nothing is repaid at all.
@@ -82,11 +108,40 @@ export default async function StudentLoanPage() {
           })}
         </>
       )}
+
+      {/* The setter. No client script: a plain form POST that the route turns into a 303, so a
+          refresh cannot save twice. */}
+      <section className="lek-card">
+        <h2 className="lek-h2">Your student loan plan</h2>
+        <p style={S.quiet}>
+          Tell us your plan and Lekhio counts the repayment inside your set aside, so January is not
+          a surprise. Not sure which you are on? It is on your original student finance letters, or
+          in your online student loan account.
+        </p>
+        {saved ? <p style={S.good}>Saved. Your set aside now reflects it.</p> : null}
+        {failed ? <p style={S.warn}>That did not save. Give it a moment and try again.</p> : null}
+        <form method="post" action="/api/you/financials" style={S.form}>
+          <input type="hidden" name="section" value="studentloan" />
+          <label style={S.label} htmlFor="sl-plan">Plan</label>
+          <select id="sl-plan" name="plan" defaultValue={currentPlan} style={S.input}>
+            <option value="none">No student loan</option>
+            <option value="plan1">Plan 1</option>
+            <option value="plan2">Plan 2</option>
+            <option value="plan4">Plan 4 (Scotland)</option>
+            <option value="plan5">Plan 5</option>
+          </select>
+          <label style={S.check}>
+            <input type="checkbox" name="postgrad" defaultChecked={currentPostgrad} style={S.checkbox} />
+            <span>I also have a postgraduate loan</span>
+          </label>
+          <button type="submit" style={S.button}>Save my plan</button>
+        </form>
+      </section>
     </main>
   );
 }
 
-// The column and the card come whole from APP_CSS. This screen owns only the one figure.
+// The column and the card come whole from APP_CSS. This screen owns the one figure and the form.
 const CSS = [
   A11Y_CSS,
   APP_CSS,
@@ -99,4 +154,19 @@ const S: Record<string, React.CSSProperties> = {
   body: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: 0, maxWidth: '62ch' },
   quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '10px 0 0', maxWidth: '62ch' },
   figure: { color: RIVER_DEEP, margin: `${SPACE.hair}px 0 0` },
+
+  good: { fontSize: TYPE.note, color: RIVER_DEEP, fontWeight: 700, margin: '12px 0 0' },
+  warn: { fontSize: TYPE.note, color: INK, fontWeight: 700, margin: '12px 0 0' },
+  form: { display: 'flex', flexDirection: 'column', gap: `${SPACE.sm}px`, margin: `${SPACE.md}px 0 0`, maxWidth: '28rem' },
+  label: { fontSize: TYPE.note, fontWeight: 700, color: INK, margin: '0 0 -6px' },
+  input: {
+    fontSize: 16, padding: '12px 14px', borderRadius: 10, border: `1.5px solid ${MUTED}`,
+    background: PAPER, color: INK, fontFamily: FONT, width: '100%',
+  },
+  check: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: TYPE.body, color: INK, margin: '4px 0' },
+  checkbox: { fontSize: 16, width: 20, height: 20 },
+  button: {
+    fontSize: 16, fontWeight: 700, padding: '13px 20px', borderRadius: 10, border: 'none',
+    background: RIVER_DEEP, color: ON_RIVER, fontFamily: FONT, cursor: 'pointer', marginTop: `${SPACE.hair}px`,
+  },
 };

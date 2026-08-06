@@ -12,10 +12,11 @@ import {
   touchBookShare,
   getConfirmedTransactionsForUser,
   capitalAllowanceForYear,
+  getBusinessProfile,
 } from '../../../lib/supabase';
 import { quarterForDate } from '../../../lib/quarterpack';
 import { A11Y_CSS, APP_THEME_CSS } from '../../../lib/tokens';
-import { gbpAbs2 } from '../../../lib/money';
+import { gbpAbs2, gbp2 } from '../../../lib/money';
 
 // The shared books view. Public URL, no login, READ ONLY.
 //
@@ -166,6 +167,7 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
   // a failed read is zero, which shows profit before the allowance rather than blocking the page.
   const shareYear = quarterForDate(new Date()).startYear;
   const capAllow = await capitalAllowanceForYear(grant.user_id, shareYear).catch(() => 0);
+  const biz = await getBusinessProfile(grant.user_id).catch(() => null);
   const totals = shareTotals(rows, capAllow);
   const cats = byCategory(rows);
 
@@ -193,7 +195,7 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
         {[
           { label: 'Income', value: gbp(totals.income) },
           { label: 'Expenses', value: gbp(totals.expenses) },
-          { label: 'Profit', value: gbp(totals.profit) },
+          { label: 'Profit', value: gbp2(totals.profit) },
           { label: 'Entries', value: String(totals.count) },
         ].map((c) => (
           <div
@@ -212,6 +214,32 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
           </div>
         ))}
       </section>
+
+      {totals.profit < 0 ? (
+        <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.6, marginTop: 18, maxWidth: 640 }}>
+          A loss so far in this period: the spending shared here has exceeded the income. The
+          figure above says so rather than showing a zero, because the entries below add up to it.
+        </p>
+      ) : null}
+
+      {/* 🔴 WHOSE MONEY THE TOTALS ARE. The proof of income learned on 3 August 2026 that a
+          partner's books are not all his; this page never did, so a 50% partner's link showed the
+          whole firm's profit with nothing saying so, to a lender. Same doctrine as
+          lib/incomeproof.ts: the trade is shared, the rent is personal and stays whole. Null for
+          a sole trader, so nothing existing changes. */}
+      {biz?.businessType === 'partnership' ? (
+        <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.6, marginTop: 18, maxWidth: 640 }}>
+          These are the whole firm&apos;s books. The person who shared them is a partner with a{' '}
+          {Math.round(biz.partnershipShare)}% share, so their personal slice of the trade figures
+          is {Math.round(biz.partnershipShare)}%. Rent, where present, is their own in full.
+        </p>
+      ) : null}
+      {biz?.businessType === 'limited_company' ? (
+        <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.6, marginTop: 18, maxWidth: 640 }}>
+          These are the company&apos;s books. A company&apos;s turnover is not its director&apos;s personal
+          income: what reaches them personally is salary and dividends, which are not shown here.
+        </p>
+      ) : null}
 
       {/* 🔴 A CAR IS NOT IN PROFIT ABOVE, AND THIS SAYS SO. lib/bookshare.ts holds a written down
           purchase out of expenses and profit (GOV.UK, business cars: cars do not qualify for the

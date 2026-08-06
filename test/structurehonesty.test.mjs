@@ -103,7 +103,12 @@ const POS = await import(pathToFileURL(path.join(stage, 'position.ts')).href);
   ok('pay yourself still reads the share from getBusinessProfile, the one source',
     payPage.includes('getBusinessProfile') && payPage.includes('partnershipShare'));
   ok('🔴 NOTHING COUNTED CHANGED: getOptimiserInput still scales by the partner factor',
-    /partnerFactor/.test(read('lib/supabase.ts')) && /ytdTradeIncome \*= partnerFactor/.test(read('lib/supabase.ts')));
+    // The scaling moved into lib/yeartodate.ts with the row loop (6 August 2026). The pin now
+    // holds the whole chain: supabase computes the factor and hands it to the aggregation, and
+    // the aggregation applies it to the trade figures.
+    /partnerFactor/.test(read('lib/supabase.ts'))
+    && /aggregateRowsYtd\(rows, assets, startYear, partnerFactor\)/.test(read('lib/supabase.ts'))
+    && /ytdTradeIncome \*= partnerFactor/.test(read('lib/yeartodate.ts')));
 }
 
 // ---------------------------------------------------------------------------------------------

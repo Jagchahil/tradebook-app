@@ -155,7 +155,13 @@ ok('no em, en or minus dash reached the capital sentence', !/[–—−]/.test(v
 // asked moves: the old arithmetic is preserved to the penny for an unflagged row.
 const vaseyFlat = vasey.map((r) => ({ ...r, writtenDown: undefined }));
 const vpFlat = IP.buildIncomeProof(vaseyFlat, 'Vasey Electrical', 2026, now);
-ok('undefined writtenDown reads as an ordinary cost, identical to before', vpFlat.expenses === 72088 && vpFlat.capitalCost === 0 && vpFlat.profit === 0);
+// Since 6 August 2026 a loss is shown as a loss (Jag's call, made when the money spine guard
+// showed the proof flooring at zero while the shared books page printed the true negative for the
+// same rows). The unflagged fixture is a £38,508 loss and the document now says so.
+ok('undefined writtenDown reads as an ordinary cost, and a loss is shown as the loss it is',
+  vpFlat.expenses === 72088 && vpFlat.capitalCost === 0 && vpFlat.profit === -38508);
+ok('...and the printed sheet writes the sign in front of the symbol',
+  IP.renderIncomeProofHtml(vpFlat).includes('-£38,508.00'));
 
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

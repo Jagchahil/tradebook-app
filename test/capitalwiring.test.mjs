@@ -698,6 +698,10 @@ ok('and every kind the product knows is covered by that answer either way',
   // it. A comment stripper first: this asserts what the code does, not what it says about itself.
   const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   const supa = codeOnly(read('lib/supabase.ts'));
+  // The row loop moved whole into lib/yeartodate.ts on 6 August 2026 so the guard suite can
+  // drive the exact function production runs. The pins on the loop move with it; the pins on
+  // the row mapping stay on lib/supabase.ts, which still owns the database read.
+  const ytd = codeOnly(read('lib/yeartodate.ts'));
   const pack = codeOnly(read('lib/quarterpack.ts'));
   const summary = read('app/app/tax/summary/page.tsx');
 
@@ -707,9 +711,11 @@ ok('and every kind the product knows is covered by that answer either way',
   // and lib/supabase.ts holds no hand written copy of the rule at all. The one place the string
   // still appears is a comment explaining what the answer means, which codeOnly strips.
   ok('🔴 the ledger loop calls it rather than spelling it out',
-    /if \(isWrittenDown\(r\.capital_kind\)\) continue;/.test(supa));
+    /if \(isWrittenDown\(r\.capital_kind\)\) continue;/.test(ytd));
   ok('🔴 AND NO PART OF lib/supabase.ts DECIDES IT BY HAND ANY MORE',
     !/not_a_car/.test(supa));
+  ok('🔴 ...AND NEITHER DOES lib/yeartodate.ts, WHERE THE LOOP LIVES NOW',
+    !/not_a_car/.test(ytd));
   ok('🔴 and every row handed to the pack carries the decided answer',
     /writtenDown: isWrittenDown\(r\.capital_kind\)/.test(supa));
   ok('lib/quarterpack.ts obeys it and never re-decides it',

@@ -531,6 +531,7 @@ ok('...but he can now actually SEE the mileage, which was the entire point',
 // "logging fuel but no mileage". The Maximiser is the differentiator; one that cannot see what he
 // already claimed tells him nobody is looking.
 const db = rf(path.join(root, 'lib/supabase.ts'), 'utf8');
+const ytdb = rf(path.join(root, 'lib/yeartodate.ts'), 'utf8');
 
 ok('🔴 mileageClaimed is no longer decided by a category string that can never match',
   !/mileageClaimed:\s*categoriesLogged\.some/.test(db));
@@ -539,7 +540,9 @@ ok('...it is decided by the mileage actually found on his rows',
   /mileageClaimed:\s*ytdMileage\s*>\s*0/.test(db));
 
 ok('...and isMileageRow reads the VENDOR the inserter really writes, not a category that does not exist',
-  /export function isMileageRow/.test(db) && /vendor === 'mileage'/.test(db));
+  // The predicate moved whole into lib/yeartodate.ts with the row loop (6 August 2026); the pin
+  // follows the definition.
+  /export function isMileageRow/.test(ytdb) && /vendor === 'mileage'/.test(ytdb));
 
 ok('WHATSAPP can answer "what have you saved me", which is where he actually is',
   wa.includes('isSavingsQuestion') && wa.includes('handleSavingsQuestion'));

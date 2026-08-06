@@ -206,22 +206,34 @@ export function buildIncomeProof(
     }
   }
   const round2 = (n: number) => Math.round(n * 100) / 100;
-  // \U0001F534 THE SLICE IS TAKEN HERE, before profit or any tax is derived, so every figure below and
-  // every figure on the page is his and none of them can disagree with another. share is 1 for a
-  // sole trader, an unknown structure and a company, so those three are untouched arithmetic.
-  income = round2(income * share);
-  expenses = round2(expenses * share);
-  capitalCost = round2(capitalCost * share);
+  // 🔴 THE SLICE IS TAKEN HERE, before profit or any tax is derived, and IT IS THE FIRM'S
+  // SLICE ONLY. share is 1 for a sole trader, an unknown structure and a company, so those three
+  // are untouched arithmetic.
+  //
+  // 🔴 AND HIS RENT IS NOT THE FIRM'S. Found 6 August 2026 by the money spine guard
+  // (test/moneyspine.test.mjs): this block scaled the PROPERTY stream by the partnership share
+  // too, so a 35% partner with £70,000 of personal rent handed a lender a document showing
+  // £24,500 of it. The partnership share he told us about at signup is his share of the TRADE.
+  // Rent is his own income on his own return: lib/quarterpack.ts holds the same position in the
+  // mandation test ("his rent stays in the test for the same reason a director's does") and
+  // lib/taxoptimiser.ts taxes a partner's property stream in full. One doctrine, three files.
   tradeIncome = round2(tradeIncome * share);
   tradeExpenses = round2(tradeExpenses * share);
-  propertyIncome = round2(propertyIncome * share);
-  propertyExpenses = round2(propertyExpenses * share);
-  financeCost = round2(financeCost * share);
+  capitalCost = round2(capitalCost * share);
+  propertyIncome = round2(propertyIncome);
+  propertyExpenses = round2(propertyExpenses);
+  financeCost = round2(financeCost);
+  income = round2(tradeIncome + propertyIncome);
+  expenses = round2(tradeExpenses + propertyExpenses);
   // The headline the lender reads: everything in, everything out. Unchanged.
   // The car's yearly allowance, scaled to his share like everything else, taken off BEFORE profit
   // so the taxable figure this lender document shows matches the Overview to the penny.
   const capAllow = round2(Math.max(0, capitalAllowance) * share);
-  const profit = Math.max(0, round2(income - expenses - capAllow));
+  // 🔴 A LOSS IS SHOWN AS A LOSS (6 August 2026, Jag's call). This floored at zero, while the
+  // shared books page showed the true negative for the same books: two lender documents, two
+  // stories. A lender reads the income and the costs anyway, so a zero here is a figure the rest
+  // of the page contradicts. The tax lines below keep their floors, because tax is never negative.
+  const profit = round2(income - expenses - capAllow);
   // The two streams, each floored at zero, because the tax below is charged on them apart, and what
   // a loss in one of them does to the other is a relief he CLAIMS rather than something a summary
   // may assume for him. For a trade only summary tradeProfit IS profit, to the penny.
@@ -298,7 +310,9 @@ export function buildIncomeProof(
     // The sentence a reader needs to understand what he is looking at. A sole trader gets null,
     // because a caption explaining a share he does not have is a line he reads and rejects.
     shareNote: isPartnership
-      ? `These figures are ${sharePct}% of the firm's books, this person's share of the partnership.`
+      ? (propertyIncome > 0 || propertyExpenses > 0 || financeCost > 0
+        ? `The trade figures are ${sharePct}% of the firm's books, this person's share of the partnership. The property figures are their own, in full: rent is personal income, not the firm's.`
+        : `These figures are ${sharePct}% of the firm's books, this person's share of the partnership.`)
       : null,
     companyExcluded: isCompany,
   };
@@ -319,7 +333,10 @@ function esc(s: string): string {
 
 function gbp(n: number): string {
   const v = Number.isFinite(n) ? n : 0;
-  return `£${v.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const abs = Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // The sign in front of the symbol, the way lib/money.ts gbp2 writes it, so a loss year's
+  // document reads -£1,200.00 rather than £-1,200.00.
+  return v < 0 ? `-£${abs}` : `£${abs}`;
 }
 
 function row(label: string, value: string, opts: { bold?: boolean; muted?: boolean } = {}): string {

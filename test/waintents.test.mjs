@@ -535,6 +535,22 @@ ok('before the grant, the filing answer says the switch is not on yet',
 ok('behind the flag, the filing answer still approves first',
   /reviewed and approved|approve first/i.test(W.productTruthAnswer('files', { filingLive: true })));
 
+// An ask to conceal income is refused before any lane can answer it with a figure. The live
+// reproduction first, word for word: it carried "tax" and "you" and was answered by the totals
+// lane with the set aside block (6 August 2026).
+eq('"...cash in hand. Can you keep that income out of the books so I pay less tax?" is refused',
+  W.matchProductTruth('Some of my jobs are cash in hand. Can you keep that income out of the books so I pay less tax?'), 'concealment');
+eq('"hide my income from hmrc" is refused with no product subject needed',
+  W.matchProductTruth('hide my income from hmrc'), 'concealment');
+eq('"dont declare the cash to hmrc" is refused', W.matchProductTruth('dont declare the cash to hmrc'), 'concealment');
+eq('"off the books" is refused', W.matchProductTruth('can we do this job off the books'), 'concealment');
+eq('"how do I declare cash in hand jobs" is an honest question and stays answerable',
+  W.matchProductTruth('how do I declare cash in hand jobs'), null);
+eq('"cash in hand £200 from dave" is an entry, not an ask', W.matchProductTruth('cash in hand £200 from dave'), null);
+const refusal = W.productTruthAnswer('concealment', { filingLive: false });
+ok('the refusal opens with No, never helps, and points at the legal savings',
+  refusal.startsWith('No') && /never help hide/.test(refusal) && /Ways to save/.test(refusal) && !/[\u2014\u2013]/.test(refusal));
+
 // The wiring: the thread and the webhook both ask the product question FIRST.
 const threadSrc = readFileSync(path.resolve(here, '../app/api/thread/route.ts'), 'utf8');
 ok('the thread asks matchProductTruth before the totals lane',

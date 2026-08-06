@@ -261,13 +261,20 @@ export function isIdentity(body: string): boolean {
 // saving. The matcher requires the product to be the subject ("you", "lekhio", "this app"), so
 // "can I claim software" still reaches the claim rulebook and "what do I owe" still reaches the
 // totals lane. Timing questions ("when is it due") are left for deadlineAnswer, which knows.
-export type ProductTruthKind = 'approved' | 'files' | 'savings';
+export type ProductTruthKind = 'approved' | 'files' | 'savings' | 'concealment';
 
 const PRODUCT_SUBJECT = /\b(you|your|lekhio|this app|this software|the app)\b/;
 
 export function matchProductTruth(body: string): ProductTruthKind | null {
   const b = (body || '').toLowerCase().trim();
   if (!b || b.length > 220) return null;
+  // "can you keep that income out of the books", "hide this from hmrc", "don't declare the cash
+  // job". An ask to CONCEAL, refused before the totals lane can answer it with a figure (found
+  // live, 6 August 2026). "how do I declare cash in hand" and a logged "cash in hand £200 from
+  // dave" carry no concealment verb and stay in their own lanes.
+  const concealing = /\b(hide|hiding|conceal)\b[^.?!]{0,40}\b(income|cash|money|earnings|job|jobs|it|this|that)\b|\b(keep|leave|leaving)\b[^.?!]{0,30}\b(out of|off)\b[^.?!]{0,20}\b(books|records|return|figures)\b|\boff the books\b|\bunder the table\b|\b(not|don'?t|never)\s+(declare|report|tell)\b[^.?!]{0,30}\b(hmrc|income|cash|taxman|tax man)\b/;
+  if (concealing.test(b)) return 'concealment';
+
   if (!PRODUCT_SUBJECT.test(b)) return null;
   // A timing question is a deadline question, and deadlineAnswer knows the actual dates.
   if (/\b(when|deadline|due|by what date)\b/.test(b)) return null;
@@ -295,6 +302,7 @@ export function matchProductTruth(body: string): ProductTruthKind | null {
   // "how much will you save me", "can you save me money", "guarantee me a saving". Never the
   // past: "what have you saved me" is arithmetic on his own figures and isSavingsQuestion owns
   // it. And never "save this receipt", which is a man asking us to keep a record.
+
   const promising = /\b(will|would|can|could|gonna|going to)\b[^.?!]{0,40}\b(you|lekhio)\b[^.?!]{0,40}\bsav(e|ing)\b[^.?!]{0,12}\b(me|us|money|tax)\b|\b(you|lekhio)\b[^.?!]{0,20}\b(will|would|can|could|gonna|going to)\b[^.?!]{0,40}\bsav(e|ing)\b[^.?!]{0,12}\b(me|us|money|tax)\b/;
   const guaranteeing = /\b(guarantee|guaranteed|promise|promised)\b[^.?!]{0,40}\bsav\w*\b|\bsav\w*\b[^.?!]{0,40}\b(guarantee|guaranteed|promise|promised)\b/;
   if (promising.test(b) || guaranteeing.test(b)) return 'savings';
@@ -321,6 +329,9 @@ export function productTruthAnswer(kind: ProductTruthKind, opts: { filingLive: b
     return opts.filingLive
       ? 'No. Your tax return is yours, and Lekhio never sends anything without you. Lekhio prepares your figures and gets your updates ready, and once you have reviewed and approved them it sends them to HMRC through the recognised route. You approve first, every time, and you stay responsible for your own tax.'
       : 'No. Your tax return is yours, and Lekhio never sends anything without you. Lekhio prepares your figures and keeps your updates ready for Making Tax Digital. Sending to HMRC from Lekhio is not switched on yet. When it is, you will see the figures first and approve them before anything goes, and you stay responsible for your own tax.';
+  }
+  if (kind === 'concealment') {
+    return 'No. Lekhio will never help hide income, and it would not be doing you a favour if it did: leaving income out of your return is evasion, and the penalties come on top of the tax and the interest. Every pound belongs in your books, cash jobs included. What Lekhio will do is make sure you never pay more than the law asks: log every cost, and every legal saving is worked out for you under Ways to save.';
   }
   return 'I cannot promise you a number, and it is worth doubting anyone who does: what you save depends on what you spend and what the rules let you claim. What Lekhio does is capture every cost you send it and prepare every claim you are entitled to. Your Tax screen shows what that has added up to so far, worked out from your own confirmed figures.';
 }

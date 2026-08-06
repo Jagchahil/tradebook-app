@@ -9,7 +9,7 @@
 
 import { incomeTaxOnProfit, class4NIC, FACTS, personalAllowance } from './taxengine';
 // Section 24 lives in one file and this document obeys it rather than keeping its own copy.
-import { isResidentialFinanceCost } from './propertyengine';
+import { isResidentialFinanceCost, PROPERTY_FACTS } from './propertyengine';
 
 export interface IncomeProofTxn {
   amount: number; // signed: positive income, negative expense
@@ -238,7 +238,21 @@ export function buildIncomeProof(
   // a loss in one of them does to the other is a relief he CLAIMS rather than something a summary
   // may assume for him. For a trade only summary tradeProfit IS profit, to the penny.
   const tradeProfit = Math.max(0, round2(tradeIncome - tradeExpenses - capAllow));
-  const propertyProfit = Math.max(0, round2(propertyIncome - propertyExpenses));
+  // 🔴 THE £1,000 PROPERTY ALLOWANCE, THE SAME RULE AS lib/taxoptimiser.ts taxPosition.
+  // This deducted actual expenses only, so a landlord whose property costs came to less than
+  // £1,000 was shown MORE tax on this document than the law asks, while the Overview, the public
+  // landlord calculator and the Ways to save note on his own screen all applied the allowance.
+  // The comparison is against expenses PLUS finance costs, because partial relief replaces ALL
+  // property deductions and forfeits finance cost relief. financeForS24 is therefore zeroed when
+  // the allowance wins, or the same money would be relieved twice. Comparing against expenses
+  // alone would hand a mortgaged landlord the allowance and quietly kill his Section 24 credit.
+  const propertyAllowance = PROPERTY_FACTS[startYear >= 2027 ? '2027-28' : '2026-27'].propertyAllowance;
+  const usesPropertyAllowance = propertyIncome > 0 && propertyExpenses + financeCost < propertyAllowance;
+  const propertyProfit = Math.max(
+    0,
+    round2(propertyIncome - (usesPropertyAllowance ? propertyAllowance : propertyExpenses)),
+  );
+  const financeForS24 = usesPropertyAllowance ? 0 : financeCost;
 
   // ═════════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 NATIONAL INSURANCE ON THE TRADE ONLY. THE LINE UNDER THIS USED TO SAY IT ON RENT.
@@ -274,7 +288,7 @@ export function buildIncomeProof(
   const taxableBeforeCredit = tradeProfit + propertyProfit;
   const incomeTaxBeforeCredit = isCompany ? 0 : incomeTaxOnProfit(taxableBeforeCredit);
   const s24Base = Math.min(
-    financeCost,
+    financeForS24,
     propertyProfit,
     Math.max(0, taxableBeforeCredit - personalAllowance(taxableBeforeCredit)),
   );

@@ -357,7 +357,37 @@ export function taxPosition(
   // OptimiserInput.ytdCapitalAllowances: the car's COST has already been taken out of
   // ytdTradeExpenses upstream, so this line is what replaces it, once, on the annual figure.
   const projTradeNet = projectedTradeNetOf(input, factor);
-  const propertyNet = Math.max(0, (input.ytdPropertyIncome ?? 0) - (input.ytdPropertyExpenses ?? 0)) * factor;
+
+  // 🔴 THE £1,000 PROPERTY ALLOWANCE, WHICH THIS LINE USED TO IGNORE.
+  //
+  // This read rents minus actual expenses and stopped, so a landlord whose property costs came to
+  // less than £1,000 was taxed on more rent than the law asks. It overstated, which is the safe
+  // direction, but it was wrong, and worse it contradicted Lekhio itself: propertyengine applies
+  // the allowance, the public landlord calculator applies it, and the Ways to save note on this
+  // very screen tells him in words that "the £1,000 property allowance beats your £X of expenses,
+  // so it is used instead" while the figure beside it did not use it. Up to £600 out at the taper,
+  // where the un-allowanced £1,000 also tapers away another £500 of personal allowance.
+  //
+  // ⚠️ AND IT IS NOT AS SIMPLE AS CALLING propertyProfit(). That function compares the allowance
+  // against actualExpenses ALONE, and mortgage interest is deliberately NOT in ytdPropertyExpenses
+  // (it is held out in ytdPropertyFinance for the Section 24 credit below). Handing it the
+  // expenses figure on its own would tell a mortgaged landlord with £15,000 of interest and £500
+  // of other costs that the allowance beats him, and silently destroy his Section 24 credit. That
+  // would be a far bigger error than the one being fixed, and in the DANGEROUS direction.
+  //
+  // The law: partial relief deducts £1,000 INSTEAD OF ALL property deductions, expenses and
+  // finance costs alike, and a man claiming it gets no finance cost relief at all. So the
+  // comparison is against expenses PLUS finance, and when the allowance wins, finance relief is
+  // zero. In practice the allowance can only win when finance is tiny, which is exactly right.
+  const propIncomeYtd = Math.max(0, input.ytdPropertyIncome ?? 0);
+  const propExpensesYtd = Math.max(0, input.ytdPropertyExpenses ?? 0);
+  const propFinanceYtd = Math.max(0, input.ytdPropertyFinance ?? 0);
+  // Same schedule resolution as the Ways to save note below, so the words and the figure agree.
+  const propertyAllowance =
+    PROPERTY_FACTS[input.startYear >= 2027 ? '2027-28' : '2026-27'].propertyAllowance;
+  const usesPropertyAllowance = propIncomeYtd > 0 && propExpensesYtd + propFinanceYtd < propertyAllowance;
+  const propertyDeduction = usesPropertyAllowance ? propertyAllowance : propExpensesYtd;
+  const propertyNet = Math.max(0, propIncomeYtd - propertyDeduction) * factor;
   const employment = Math.max(0, input.employmentIncome);
 
   // ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -434,7 +464,9 @@ export function taxPosition(
   // higher-rate landlord's interest in full and understated his set aside, disagreeing with the
   // landlord tools. This mirrors lib/propertyengine.ts combinedBill to the pound; basic-rate
   // landlords are unaffected because a 20% deduction and a 20% credit come to the same thing.
-  const propertyFinance = Math.max(0, input.ytdPropertyFinance ?? 0) * factor;
+  // Zero when the £1,000 allowance is in use: claiming it forfeits finance cost relief entirely,
+  // so a credit here as well would relieve the same money twice.
+  const propertyFinance = usesPropertyAllowance ? 0 : propFinanceYtd * factor;
   const totalPersonalIncome =
     employment + personalTradeNet + propertyNet + Math.max(0, input.savingsIncome ?? 0) + Math.max(0, input.dividendIncome ?? 0);
   const s24Base = Math.min(propertyFinance, propertyNet, Math.max(0, totalPersonalIncome - result.personalAllowance));

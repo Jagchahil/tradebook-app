@@ -246,7 +246,37 @@ function billFor(input: CombinedInput, includeProperty: boolean): {
   const expenses = includeProperty ? Math.max(0, input.propertyExpenses || 0) * share : 0;
   const finance = includeProperty ? Math.max(0, input.financeCosts || 0) * share : 0;
 
-  const property = propertyProfit(rents, expenses, input.taxYear);
+  // 🔴 THE ALLOWANCE AND THE FINANCE COST TAX REDUCER ARE MUTUALLY EXCLUSIVE. THIS GAVE BOTH.
+  //
+  // propertyProfit() weighs the £1,000 allowance against actual EXPENSES alone, and rightly so,
+  // because under Section 24 mortgage interest is not an expense: it is held apart and relieved as
+  // a basic rate tax reducer further down. The two facts together produced a wrong answer. A
+  // mortgaged landlord with, say, £500 of other costs and £15,000 of interest was handed the
+  // £1,000 allowance AND the credit on the full £15,000, relieving the same money twice and
+  // UNDERSTATING his tax on a free public calculator. That is the dangerous direction.
+  //
+  // GOV.UK, Tax-free allowances on property and trading income, is explicit: "you cannot use the
+  // property allowance if you claim the tax reducer for finance costs such as mortgage interest
+  // for a residential property." It is a choice, never both. So the allowance can only win when
+  // expenses and finance TOGETHER come to less than it, and where it wins, finance relief is
+  // forfeited, which is what financeForRelief carries into reliefBase below.
+  //
+  // Full relief (rents at or under the allowance) is left exactly as it was: there is no tax to
+  // understate on it either way.
+  const allowanceWeighed = propertyProfit(rents, expenses, input.taxYear);
+  const allowanceStillWins = rents > 0 && expenses + finance < f.propertyAllowance;
+  const property =
+    allowanceWeighed.usedAllowance && !allowanceStillWins && rents > f.propertyAllowance
+      ? {
+          rents,
+          deduction: expenses,
+          usedAllowance: false,
+          profit: Math.max(0, rents - expenses),
+          loss: Math.max(0, expenses - rents),
+          note: 'Your actual expenses are deducted rather than the £1,000 property allowance, because claiming the allowance would give up the relief on your mortgage interest, which is worth more.',
+        }
+      : allowanceWeighed;
+  const financeForRelief = property.usedAllowance ? 0 : finance;
   const earned = Math.max(0, input.employmentIncome || 0) + Math.max(0, input.tradeProfit || 0);
   const totalIncome = earned + property.profit;
 
@@ -272,7 +302,7 @@ function billFor(input: CombinedInput, includeProperty: boolean): {
   // costs, property profits, and adjusted total income above the allowance.
   // The reduction cannot take the bill below zero; unrelieved finance costs
   // carry forward.
-  const reliefBase = Math.min(finance, property.profit, Math.max(0, totalIncome - pa));
+  const reliefBase = Math.min(financeForRelief, property.profit, Math.max(0, totalIncome - pa));
   const s24Relief = Math.min(f.s24CreditRate * Math.max(0, reliefBase), earnedTax + propertyTax);
   const s24Unrelieved = Math.max(0, finance - Math.max(0, reliefBase));
 

@@ -135,11 +135,17 @@ const bill = (over) =>
 
 // --- Exam 7: the Section 24 cap -------------------------------------------------------
 // Finance costs above property profit: relief capped at the profit.
-// Rents 6,000, expenses 400 (allowance wins, profit 5,000), finance 9,000.
+// Rents 6,000, expenses 400, finance 9,000.
+// 🔴 CORRECTED 6 August 2026. This case used to assume the £1,000 allowance wins here
+// (profit 5,000, relief 1,000, unrelieved 4,000). It cannot. GOV.UK: "you cannot use the property
+// allowance if you claim the tax reducer for finance costs such as mortgage interest for a
+// residential property." With £9,000 of finance costs, taking the allowance would forfeit all of
+// that relief to gain £600 of extra deduction, so actual expenses win: profit 5,600, relief 20%
+// of 5,600 = 1,120, unrelieved 3,400. The old expectation relieved the same money twice.
 {
   const r = bill({ employmentIncome: 30000, rents: 6000, propertyExpenses: 400, financeCosts: 9000 });
-  eq('S24 capped at the property profit', r.s24Relief, 1000); // 20% x 5,000
-  eq('unrelieved finance carries forward', r.s24UnrelievedFinance, 4000);
+  eq('S24 capped at the property profit', r.s24Relief, 1120); // 20% x 5,600
+  eq('unrelieved finance carries forward', r.s24UnrelievedFinance, 3400);
 }
 
 // --- Exam 8: the taper still bites across streams -------------------------------------

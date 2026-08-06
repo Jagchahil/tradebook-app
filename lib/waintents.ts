@@ -272,8 +272,33 @@ export function matchProductTruth(body: string): ProductTruthKind | null {
   // job". An ask to CONCEAL, refused before the totals lane can answer it with a figure (found
   // live, 6 August 2026). "how do I declare cash in hand" and a logged "cash in hand £200 from
   // dave" carry no concealment verb and stay in their own lanes.
-  const concealing = /\b(hide|hiding|conceal)\b[^.?!]{0,40}\b(income|cash|money|earnings|job|jobs|it|this|that)\b|\b(keep|leave|leaving)\b[^.?!]{0,30}\b(out of|off)\b[^.?!]{0,20}\b(books|records|return|figures)\b|\boff the books\b|\bunder the table\b|\b(not|don'?t|never)\s+(declare|report|tell)\b[^.?!]{0,30}\b(hmrc|income|cash|taxman|tax man)\b/;
-  if (concealing.test(b)) return 'concealment';
+  //
+  // ⚠️ AND THE STRONG SIGNAL IS NOT HOW A REAL CUSTOMER ASKS. Widened 6 August 2026, on the launch
+  // walk. Nobody types "conceal my income". A man testing the water types "can I just not put the
+  // cash jobs through", "can I pay myself cash to avoid tax", "do I really need to declare cash
+  // jobs", "is it ok to leave a small job off". All four are the same question wearing a polite
+  // face, all four returned null, and null meant the totals lane answered a question about evasion
+  // with his set aside figure. So the shy phrasings are matched too, each one kept tight enough that
+  // the honest neighbour it sits next to still reaches its own lane: "how do I declare cash in hand"
+  // is a how, not a whether, and "do I need to declare my rental income" names income rather than a
+  // cash job, so neither is caught here.
+  const CONCEALING: RegExp[] = [
+    /\b(hide|hiding|conceal)\b[^.?!]{0,40}\b(income|cash|money|earnings|job|jobs|it|this|that)\b/,
+    /\b(keep|leave|leaving)\b[^.?!]{0,30}\b(out of|off)\b[^.?!]{0,20}\b(books|records|return|figures)\b/,
+    /\boff the books\b/,
+    /\bunder the table\b/,
+    /\b(not|don'?t|never)\s+(declare|report|tell)\b[^.?!]{0,30}\b(hmrc|income|cash|taxman|tax man)\b/,
+    // "can I just not put the cash jobs through", "don't run it through the books".
+    /\b(not|never|avoid|without)\b[^.?!]{0,15}\b(put|putting|run|running|push|pushing)\b[^.?!]{0,30}\b(through|in the books|on the books)\b/,
+    // "can I pay myself cash to avoid tax", "how do I get around the vat".
+    /\b(avoid|avoiding|dodge|dodging|get out of|get around|getting around|skip|skipping|duck)\b[^.?!]{0,20}\b(tax|taxes|vat|the taxman|the tax man|hmrc)\b/,
+    // "do I really need to declare cash jobs". A whether, not a how, and about a cash job rather
+    // than a named source of income, so the ordinary "how do I declare cash in hand" stays put.
+    /\bi\s+(really\s+|actually\s+|even\s+)?(need|have)\s+to\s+(declare|report|put|include|show)\b[^.?!]{0,30}\b(cash|job|jobs|it|that|this|everything|small|little)\b/,
+    // "is it ok to leave a small job off", where the thing left off is named but the books are not.
+    /\b(keep|keeping|leave|leaving)\b[^.?!]{0,25}\b(job|jobs|income|cash|money|earnings|takings|invoice|payment|it|that|this|one|some)\b[^.?!]{0,15}\b(off|out)\b/,
+  ];
+  if (CONCEALING.some((re) => re.test(b))) return 'concealment';
 
   // A request to be told what to invest in. Lekhio is not a financial adviser, and until 6 August
   // 2026 "should I put my refund into Bitcoin, which stock should I buy" carried the word tax, hit
@@ -291,7 +316,12 @@ export function matchProductTruth(body: string): ProductTruthKind | null {
   // "are you hmrc approved", "is lekhio endorsed by the government", "are you government
   // software". Not "hmrc approved my refund": that is his refund, not us.
   const officialdom = /\b(hmrc|government|govuk|gov uk|taxman|tax man|tax office)\b/;
-  const blessing = /\b(approved|approval|approves|endorsed|endorses|endorsement|accredited|accreditation|certified|certification|recognised|recognized|recognition|authorised|authorized|licensed|licenced|vetted|official)\b/;
+  // ⚠️ THE BARE VERB WAS MISSING. "did hmrc approve you" is the shortest way anybody asks this and
+  // it returned null, because the list held approved, approval and approves but not "approve"
+  // itself. Adding it is safe: hisOwn below still keeps "hmrc approved my refund" out, and the
+  // PRODUCT_SUBJECT gate above means the word only counts when the product is who is being asked
+  // about.
+  const blessing = /\b(approve|approved|approval|approves|endorse|endorsed|endorses|endorsement|accredited|accreditation|certified|certification|recognised|recognized|recognition|authorised|authorized|licensed|licenced|vetted|official)\b/;
   const hisOwn = /\b(approv|endors|recognis|recogniz|authoris|authoriz)\w*\s+(my|our)\b/;
   if (officialdom.test(b) && !hisOwn.test(b)) {
     if (blessing.test(b)) return 'approved';
@@ -300,8 +330,17 @@ export function matchProductTruth(body: string): ProductTruthKind | null {
 
   // "do you file my tax return", "will lekhio submit my vat", "will you do my tax return".
   // Not "how much tax do you reckon I owe": no filing verb, so the totals lane keeps it.
-  const asksTheProduct = /\b(do|does|will|would|can|could|are)\s+(you|lekhio|it|this)\b/;
-  if (asksTheProduct.test(b)) {
+  // ⚠️ TWO WAYS OF ASKING WERE MISSING, AND BOTH ARE ORDINARY ENGLISH.
+  //
+  // The subject list read you|lekhio|it|this while PRODUCT_SUBJECT above already counted "the app",
+  // so "does the app submit to hmrc" and "will the app do my tax return" passed the subject gate and
+  // then failed the question gate. And a man who thinks he already knows the answer does not ask a
+  // question at all: "so you file everything with hmrc for me right" has no head verb, so the whole
+  // shape missed it. Both now match, and the answer is the same fixed No either way.
+  const asksTheProduct = /\b(do|does|will|would|can|could|are|is)\s+(you|lekhio|it|this|the app|this app|the software|this software)\b/;
+  // The declarative form: subject then verb, no question word in front of it.
+  const productDoes = /\b(you|lekhio|it|the app|this app|the software|this software)\s+(file|files|submit|submits|send|sends|lodge|lodges|do|does|sort|sorts|handle|handles)\b/;
+  if (asksTheProduct.test(b) || productDoes.test(b)) {
     const filingVerb = /\b(file|files|filed|filing|submit|submits|submitted|submitting|send|sends|sending|lodge|lodges|lodging)\b/;
     const filingObject = /\b(tax|return|returns|self assessment|assessment|mtd|vat|update|updates|hmrc)\b/;
     if (filingVerb.test(b) && filingObject.test(b)) return 'files';
@@ -314,7 +353,15 @@ export function matchProductTruth(body: string): ProductTruthKind | null {
 
   const promising = /\b(will|would|can|could|gonna|going to)\b[^.?!]{0,40}\b(you|lekhio)\b[^.?!]{0,40}\bsav(e|ing)\b[^.?!]{0,12}\b(me|us|money|tax)\b|\b(you|lekhio)\b[^.?!]{0,20}\b(will|would|can|could|gonna|going to)\b[^.?!]{0,40}\bsav(e|ing)\b[^.?!]{0,12}\b(me|us|money|tax)\b/;
   const guaranteeing = /\b(guarantee|guaranteed|promise|promised)\b[^.?!]{0,40}\bsav\w*\b|\bsav\w*\b[^.?!]{0,40}\b(guarantee|guaranteed|promise|promised)\b/;
-  if (promising.test(b) || guaranteeing.test(b)) return 'savings';
+  // ⚠️ THE SAVING DOES NOT HAVE TO BE HIS. "how much tax do you save the average sparky" asks for
+  // exactly the number we are never allowed to state, and it slipped through because the promise
+  // was only read when the person saved was me, us, my money or my tax. A quoted figure is a
+  // promise whoever it is quoted about, so the "how much do you save" shape is matched on its own.
+  // It stays clear of the two neighbours on purpose: the past tense ("what have you saved me") is
+  // arithmetic on his own figures and isSavingsQuestion owns it, and "can you save this receipt"
+  // carries no how much at all.
+  const quantifying = /\bhow much\b[^.?!]{0,25}\b(do|does|can|will|would)\s+(you|lekhio|it|the app|this app)\s+sav(e|ing)\b/;
+  if (promising.test(b) || guaranteeing.test(b) || quantifying.test(b)) return 'savings';
 
   return null;
 }

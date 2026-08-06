@@ -690,7 +690,35 @@ function accountantSystem(): string {
 export async function answerAccountantQuestion(question: string, context?: string, knowledge?: string, profile?: string, history?: string): Promise<string | null> {
   if (!ready() || !KEY) return null;
 
-  const userContent = [
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE QUESTION WAS THE FIRST THING THE CAP THREW AWAY. Fixed 6 August 2026.
+  //
+  // The turn used to be assembled knowledge, then figures, then profile, then history, and only
+  // then "My question: ...", and the whole thing was sent as userContent.slice(0, 4000). slice
+  // cuts from the END. So the last section was the one that went, and the last section was the
+  // customer's actual question.
+  //
+  // It held while accounts were small. At roughly ninety transactions the figures block alone
+  // spends the budget, and past that the model receives a wall of numbers with nothing asked of
+  // it. It does the only thing it can and reads the numbers back. On screen that is not an error
+  // anybody can see: he asked what mileage he can claim, he got a list of his own spending, and
+  // there is nothing to tell him his question was never delivered.
+  //
+  // So the question goes FIRST and is never trimmed. The context sections are then fitted into
+  // what is left, in priority order, and the figures block is put LAST because it is the only one
+  // that grows without limit, so it is the one that should absorb the shortfall. Putting it back
+  // where it used to sit would starve the profile block, which is three lines long and decides
+  // whether he is answered as a company director or a sole trader. It is cut on whole lines so the
+  // model never reads half a number. The total stays bounded exactly as before.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const MAX_USER_CHARS = 4000;
+  // The question is capped too, so the bound holds even if somebody pastes an essay, but the cap
+  // is generous enough that every real question survives whole and there is always room left for
+  // the figures underneath it.
+  const MAX_QUESTION_CHARS = 2000;
+  const questionBlock = `My question: ${String(question || '').slice(0, MAX_QUESTION_CHARS)}`;
+
+  const sections = [
     knowledge
       // ⚠️ THE OLD INSTRUCTION READ: "Treat these as the latest confirmed position, PREFER them where
       // they are relevant." Over a list that could contain a Budget change not yet in force.
@@ -705,15 +733,41 @@ export async function answerAccountantQuestion(question: string, context?: strin
       // must never invite it to prefer whichever item looks newest.
       ? `Verified updates from official sources (GOV.UK and HMRC), reviewed and carrying a primary source link. They are already split for you into what is IN FORCE and what is only ANNOUNCED. Answer his question using ONLY the in-force block. NEVER quote a figure from the announced block as if it were the law today. Name the change and cite the source. Ignore this section if none are relevant:\n${knowledge}\n`
       : '',
-    context ? `My recent figures (newest first, pounds):\n${context}\n` : '',
     // Their structure and income mix, so a company director gets company answers, not sole-trader ones.
     profile ? `About me (answer for THIS structure, not sole-trader rules by default):\n${profile}\n` : '',
     // The pocket: how key tax figures have changed over time, so "what was the rate before / when did
     // it change" is answered from Khoji's memory rather than guessed. Each line is old value, new value,
     // and the date it took effect.
     history ? `How key figures have changed over time (only use if the question is about a past or changed figure):\n${history}\n` : '',
-    `My question: ${question}`,
-  ].filter(Boolean).join('\n');
+    // Last on purpose: see the note above. This is the block that has no ceiling, so this is the
+    // block that gives way when an account has years of rows behind it.
+    context ? `My recent figures (newest first, pounds):\n${context}\n` : '',
+  ].filter((s): s is string => Boolean(s));
+
+  // Fit what is left. A section that does not fit whole is cut back to whole lines, and once the
+  // room is gone the rest is dropped rather than half sent.
+  const parts = [questionBlock];
+  let room = MAX_USER_CHARS - questionBlock.length;
+  for (const section of sections) {
+    if (section.length + 1 <= room) {
+      parts.push(section);
+      room -= section.length + 1;
+      continue;
+    }
+    const kept: string[] = [];
+    let used = 1; // the newline that joins this section to the one before it
+    for (const line of section.split('\n')) {
+      if (used + line.length + 1 > room) break;
+      kept.push(line);
+      used += line.length + 1;
+    }
+    if (kept.length > 0) {
+      parts.push(kept.join('\n'));
+      room -= used;
+    }
+    break;
+  }
+  const userContent = parts.join('\n');
 
   // Timeout aborts with an AbortError, so the fetch is wrapped to degrade to null.
   let res: Response;
@@ -737,7 +791,9 @@ export async function answerAccountantQuestion(question: string, context?: strin
         // The system prompt is long and stable, so cache it. Repeat questions then
         // pay a tenth of the input price for it.
         system: [{ type: 'text', text: accountantSystem(), cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: userContent.slice(0, 4000) }],
+        // Already bounded by construction above, with the question at the front. The slice stays
+        // as a belt and braces on the total and must never be the thing that decides what is cut.
+        messages: [{ role: 'user', content: userContent.slice(0, MAX_USER_CHARS) }],
       }),
     });
   } catch (err) {

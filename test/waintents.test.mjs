@@ -566,6 +566,60 @@ const invRefusal = W.productTruthAnswer('investment', { filingLive: false });
 ok('the investment refusal names what Lekhio is not and offers the tax side only',
   /not a financial adviser/.test(invRefusal) && /regulated adviser/.test(invRefusal) && !/[\u2014\u2013]/.test(invRefusal));
 
+// ---------------------------------------------------------------------------------------------
+// THE NINE PHRASINGS THAT WALKED STRAIGHT PAST THE GATE. (6 August 2026, launch walk.)
+//
+// Every one of these was run against the real matcher and every one came back null, which meant
+// the question went to whichever lane caught it next: the totals lane answered an evasion question
+// with a set aside figure, and the claim rulebook answered an approval question with a tick.
+//
+// They are here as a block because they are one lesson, not nine. The gate was written against the
+// phrasings somebody sat down and imagined, and real customers do not phrase things that way. They
+// use the bare verb ("approve"), they call it "the app" rather than "you", they do not ask a
+// question at all ("so you file everything for me right"), they test the water politely instead of
+// saying the word hide, and they ask what we save somebody else rather than what we save them.
+// ---------------------------------------------------------------------------------------------
+eq('"did hmrc approve you?" is the approval question, in the bare verb people actually use',
+  W.matchProductTruth('did hmrc approve you?'), 'approved');
+eq('"does the app submit to hmrc?" calls it the app, and the app is still us',
+  W.matchProductTruth('does the app submit to hmrc?'), 'files');
+eq('"will the app do my tax return?" is the filing question about the app',
+  W.matchProductTruth('will the app do my tax return?'), 'files');
+eq('"so you file everything with hmrc for me right?" is a man assuming, not asking',
+  W.matchProductTruth('so you file everything with hmrc for me right?'), 'files');
+eq('"can I just not put the cash jobs through?" is evasion asked politely',
+  W.matchProductTruth('can I just not put the cash jobs through?'), 'concealment');
+eq('"can I pay myself cash to avoid tax?" is evasion asked politely',
+  W.matchProductTruth('can I pay myself cash to avoid tax?'), 'concealment');
+eq('"do I really need to declare cash jobs?" is a whether, and the answer is yes, always',
+  W.matchProductTruth('do I really need to declare cash jobs?'), 'concealment');
+eq('"is it ok to leave a small job off?" is the same ask with the books left unnamed',
+  W.matchProductTruth('is it ok to leave a small job off?'), 'concealment');
+eq('"how much tax do you save the average sparky?" is a promise hunt about somebody else',
+  W.matchProductTruth('how much tax do you save the average sparky?'), 'savings');
+
+// ---------------------------------------------------------------------------------------------
+// AND THE NINE NEIGHBOURS THAT MUST STAY IN THEIR OWN LANES.
+//
+// This half of the block is the one that matters. Widening a gate is easy; widening it without
+// swallowing the honest question standing next to it is the whole job. Each of these sits one word
+// away from something above: a how instead of a whether, his refund instead of ours, the past
+// tense instead of the future, a van instead of a share.
+// ---------------------------------------------------------------------------------------------
+for (const [phrase, why] of [
+  ['can I claim software', 'a claim check, and the claim rulebook owns it'],
+  ['what do I owe', 'a totals question about his own figures'],
+  ['what have you saved me', 'arithmetic on his own figures, and isSavingsQuestion owns it'],
+  ['how do I declare cash in hand', 'a how, not a whether, and it deserves a real answer'],
+  ['should I buy a new van', 'a business decision, not portfolio advice'],
+  ['do I pay tax on savings interest', 'a real tax question that happens to carry the word savings'],
+  ['when is my tax return due', 'a deadline question, and deadlineAnswer knows the dates'],
+  ['hmrc approved my refund', 'his refund, not us'],
+  ['save this receipt', 'a man asking us to keep a record'],
+]) {
+  eq(`"${phrase}" stays null: ${why}`, W.matchProductTruth(phrase), null);
+}
+
 // The wiring: the thread and the webhook both ask the product question FIRST.
 const threadSrc = readFileSync(path.resolve(here, '../app/api/thread/route.ts'), 'utf8');
 ok('the thread asks matchProductTruth before the totals lane',

@@ -59,7 +59,7 @@
 //
 // If anyone ever proposes pricing on this figure, the answer is no, and the reason is a statute.
 
-import { FACTS, asPence } from './taxengine';
+import { FACTS, asPence, personalAllowance } from './taxengine';
 import { combinedIncomeTax } from './personalincome';
 
 // Below this, a "saved" figure is noise dressed as a fact. Three months is when the projection in
@@ -95,6 +95,13 @@ export interface LedgerInput {
   // existed, to the penny.
   propertyIncome?: number;
   propertyExpenses?: number;
+  // 🔴 HIS MORTGAGE INTEREST, WHICH IS NOT A PROPERTY EXPENSE AND MUST NOT BE ONE HERE EITHER.
+  // Section 24 relieves it as a basic rate tax CREDIT. It is NOT inside propertyExpenses (both
+  // getOptimiserInput and propertyYtdTotals keep it apart), and until 6 August 2026 this file did
+  // nothing with it at all, so a higher rate landlord's "With Lekhio" figure carried NO relief for
+  // it: on a live account the panel said £23,212 where the truth was £20,211.80, exactly £3,000 of
+  // missing credit. Default 0, so a caller without property behaves as it did, to the penny.
+  propertyFinance?: number;
 
   // 🔴 THE TRADING ALLOWANCE HE HAS ELECTED, IF HE HAS. ITTOIA 2005 Part 6A.
   //
@@ -171,6 +178,7 @@ export function ledger(input: LedgerInput): Ledger {
   // that line a share of a saving it did not produce, which is failure mode 4 in this file's header
   // (the parts exceeding the whole) arriving through a new door.
   const propertyCosts = Math.min(propertyGross, Math.max(0, input.propertyExpenses ?? 0));
+  const propertyFinance = Math.max(0, input.propertyFinance ?? 0);
 
   // Everything he has taken in, both streams. The "nothing confirmed yet" gate further down runs on
   // this figure, and it used to run on the trade alone, which is exactly why a landlord could confirm
@@ -302,9 +310,40 @@ export function ledger(input: LedgerInput): Ledger {
   // money costs him.
   const withoutTrade = wholeTaxWith(0, 0);
   const withoutLekhio = round(wholeTaxWith(tradeGross, propertyGross) - withoutTrade);
-  const withLekhio = round(
-    wholeTaxWith(Math.max(0, tradeGross - tradeDeducted), propertyGross - propertyCosts) - withoutTrade,
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 SECTION 24, WHICH THIS FILE DID NOT KNOW ABOUT AND THE TAX POSITION DID.
+  //
+  // 6 August 2026, read off the live Overview on a seeded higher rate landlord: the headline said
+  // £100,161, which lib/taxoptimiser.ts had worked out correctly WITH the credit, and eight lines
+  // below it this panel said "With Lekhio £23,212" where the truth was £20,211.80. Exactly £3,000,
+  // which is 20% of his £15,000 of interest. Two readers over one man's tax again, the failure this
+  // file's own header was written about.
+  //
+  // The rule is taxoptimiser's rule, character for character, so the two cannot drift: basic rate
+  // on the LOWEST of the finance costs, the property profit, and taxable income above the personal
+  // allowance, and it can never take the figure below zero. lib/propertyengine.ts combinedBill
+  // works the same base for the free landlord tool, which is what says £20,212 on these numbers.
+  //
+  // ⚠️ AND IT IS ON THE "WITH" SIDE ONLY, WHICH IS NOT AN ACCIDENT. The baseline is a man who
+  // confirmed NOTHING. He would not have logged the interest either, and interest nobody logged
+  // earns no credit, so the counterfactual correctly carries none. That makes the saving larger,
+  // and this file's header is right to be suspicious of that direction, so: the credit is real,
+  // statutory, and only reachable because he logged the payment. It is his, and it is ours to show.
+  //
+  // ⚠️ A BASIC RATE LANDLORD DOES NOT MOVE, because a 20% deduction and a 20% credit come to the
+  // same thing, and a man with no property does not move at all.
+  const propertyNet = Math.max(0, propertyGross - propertyCosts);
+  const tradeNet = Math.max(0, tradeGross - tradeDeducted);
+  const wholeIncome = tradeNet + propertyNet + Math.max(0, other?.employment ?? 0) + Math.max(0, other?.otherNonSavings ?? 0);
+  const s24Base = Math.min(
+    propertyFinance,
+    propertyNet,
+    Math.max(0, wholeIncome - personalAllowance(wholeIncome)),
   );
+  const grossWithTax = wholeTaxWith(tradeNet, propertyNet);
+  const s24Credit = Math.min(FACTS.basicRate * Math.max(0, s24Base), grossWithTax);
+  const withLekhio = round(grossWithTax - s24Credit - withoutTrade);
   const saved = Math.max(0, withoutLekhio - withLekhio);
 
   // ⚠️ NOT ENOUGH IS NOT ZERO.
@@ -402,6 +441,10 @@ export interface LedgerSource {
   dividendIncome?: number;
   ytdPropertyIncome?: number;
   ytdPropertyExpenses?: number;
+  // Mortgage interest, which getOptimiserInput keeps OUT of ytdPropertyExpenses because Section 24
+  // relieves it as a basic rate credit rather than a deduction. Passed through so the panel applies
+  // that credit; without it a higher rate landlord's "With Lekhio" figure was £3,000 too high.
+  ytdPropertyFinance?: number;
 
   // Has he elected the trading allowance for this year. Optional and false by default, so every
   // caller written before it existed produces the identical ledger to the penny. See LedgerInput
@@ -503,6 +546,9 @@ export function ledgerFor(input: LedgerSource): Ledger {
     // they now show as one.
     propertyIncome: Math.max(0, input.ytdPropertyIncome ?? 0),
     propertyExpenses: Math.max(0, input.ytdPropertyExpenses ?? 0),
+    // Kept apart from propertyExpenses by getOptimiserInput because Section 24 makes it a credit,
+    // not a deduction. Passed through so the panel can apply that credit rather than ignore it.
+    propertyFinance: Math.max(0, input.ytdPropertyFinance ?? 0),
 
     // HIS OWN MONEY, HELD BY HMRC. Its own number on the screen, never added to "saved".
     cisSuffered: input.ytdCisSuffered,

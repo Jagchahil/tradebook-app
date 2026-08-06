@@ -875,5 +875,52 @@ console.log('\n🔴 THE CHECK THAT KNOWS WHO HE IS WAS NEVER RUN. lib/personal.t
     /looksPersonal\(r\.vendor, r\.description, ownNames\)/.test(rf(path.join(root, 'lib/personal.ts'), 'utf8')));
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 SECTION 24 IN THE PANEL, BECAUSE THE HEADLINE AND THE PANEL DISAGREED ON THE SAME SCREEN.
+//
+// 6 August 2026, live Overview, seeded higher rate landlord: the headline said £100,161, which
+// taxoptimiser had worked out correctly WITH the credit, and eight lines below it this panel said
+// "With Lekhio £23,212" where the truth was £20,211.80. Exactly £3,000, 20% of £15,000 of interest.
+// Trade profit 22,900 after the car allowance, property profit 65,000, interest 15,000.
+const s24 = ledger({
+  ...base,
+  monthsElapsed: 4,
+  grossIncome: 33_000,
+  expenses: 8_000,
+  mileage: 0,
+  homeOffice: 0,
+  capitalAllowances: 2_100,
+  pension: 0,
+  cisSuffered: 0,
+  propertyIncome: 70_000,
+  propertyExpenses: 5_000,
+  propertyFinance: 15_000,
+});
+ok('🔴 the panel carries the Section 24 credit', s24.withLekhio === 20_212);
+ok('🔴 it is no longer the £23,212 with no relief at all', s24.withLekhio !== 23_212);
+
+// The baseline is a man who confirmed nothing, so he logged no interest and earns no credit.
+ok('the no claim baseline is unchanged', s24.withoutLekhio === 30_458);
+ok('and the saving is the difference between the two', s24.saved === s24.withoutLekhio - s24.withLekhio);
+
+// A basic rate landlord does not move: a 20% deduction and a 20% credit come to the same thing.
+const smallWith = ledger({
+  ...base, monthsElapsed: 4, grossIncome: 0, expenses: 0, mileage: 0, homeOffice: 0,
+  capitalAllowances: 0, pension: 0, cisSuffered: 0,
+  propertyIncome: 18_000, propertyExpenses: 2_000, propertyFinance: 4_000,
+});
+const smallAsDeduction = ledger({
+  ...base, monthsElapsed: 4, grossIncome: 0, expenses: 0, mileage: 0, homeOffice: 0,
+  capitalAllowances: 0, pension: 0, cisSuffered: 0,
+  propertyIncome: 18_000, propertyExpenses: 6_000, propertyFinance: 0,
+});
+ok('a basic rate landlord pays the same either way', smallWith.withLekhio === smallAsDeduction.withLekhio);
+
+// And a man with no property at all is untouched, so nothing anybody saw yesterday moves.
+const noProp = ledger({ ...base });
+const noPropExplicit = ledger({ ...base, propertyFinance: 0 });
+ok('no property means no change, to the penny', noProp.withLekhio === noPropExplicit.withLekhio);
+
 console.log(`\n  ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

@@ -223,6 +223,22 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
           {totals.capitalCount === 1 ? 'a car' : `${totals.capitalCount} cars`}, which is not an
           allowable expense in one year. A car comes off over several years rather than all at once,
           so it is not counted in Expenses or Profit above.
+          {totals.capitalAllowance > 0
+            ? ` This year's writing down allowance of ${gbp(totals.capitalAllowance)} is already taken off the Profit above, which is why it is not simply Income less Expenses.`
+            : ''}
+        </p>
+      ) : null}
+
+      {/* \u{1F534} AND MORTGAGE INTEREST IS NOT IN PROFIT EITHER. Section 24 relieves a residential
+          landlord's interest as a basic rate tax credit rather than an expense, so lib/bookshare.ts
+          holds it out. Before 6 August 2026 this page counted it as a running cost and printed a
+          profit £15,000 below the proof of income document for the same account, and the two are
+          the two documents a customer hands the same lender. */}
+      {totals.financeCost > 0 ? (
+        <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.6, marginTop: 18, maxWidth: 640 }}>
+          {gbp(totals.financeCost)} of the spending below went on residential mortgage interest,
+          which is not an allowable expense. Since Section 24 it is relieved as a basic rate tax
+          credit instead, so it is not counted in Expenses or Profit above.
         </p>
       ) : null}
 

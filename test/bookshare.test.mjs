@@ -81,10 +81,14 @@ const raw = {
 const red = A.redactTransaction(raw);
 const keys = Object.keys(red);
 
-// The seventh field is writtenDown, a non personal tax treatment boolean that keeps a car out of
-// profit. The count guard stays: it exists so a redesign cannot quietly leak a personal field, and
-// naming the exact number is what makes an accidental extra one fail the build here.
-ok('redacted shape is exactly the seven fields we intend', keys.length === 7);
+// The seventh field is writtenDown and the eighth is financeCost, both non personal tax treatment
+// booleans: one keeps a car out of profit, the other keeps a residential landlord's mortgage
+// interest out of running costs because Section 24 relieves it as a credit. Each is a fact about
+// how a cost is relieved, never about the person, and the stream that decided it does not come
+// with them. The count guard stays: it exists so a redesign cannot quietly leak a personal field,
+// and naming the exact number is what makes an accidental extra one fail the build here.
+ok('redacted shape is exactly the eight fields we intend', keys.length === 8);
+ok('and the eighth is the finance cost boolean, nothing personal', Object.keys(red).includes('financeCost'));
 ok('the seventh field is writtenDown, and it defaults false for an ordinary cost', 'writtenDown' in red && red.writtenDown === false);
 ok('NEVER leaks the user id', !('user_id' in red) && !JSON.stringify(red).includes('SECRET-USER-ID'));
 ok('NEVER leaks the receipt image url', !JSON.stringify(red).includes('storage'));
@@ -209,6 +213,50 @@ const cats2 = A.categoriesIn(REAL_BOOKS);
 ok('lists the real categories in the books', cats2.includes('other') && cats2.includes('travel') && cats2.includes('income'));
 ok('does not invent categories', cats2.length === 4);
 ok('ignores unconfirmed entries', !A.categoriesIn([{ category: 'ghost', confirmed: false }]).includes('ghost'));
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 SECTION 24 ON THE SHARED BOOK, THE SECOND DOCUMENT A LENDER READS.
+//
+// 6 August 2026, live: /app/proof-of-income was fixed to hold a residential landlord's mortgage
+// interest out of allowable expenses, and this page still folded it in. Same account, same day,
+// two documents a customer hands the same broker, and they disagreed by £15,000 of profit.
+// The share view said EXPENSES £28,000 PROFIT £72,900; the proof said £13,000 and £87,900.
+console.log('\n=== shared book: mortgage interest is not a running cost ===\n');
+const landlordRows = [
+  { amount: 70000, category: 'rent', confirmed: true },
+  { amount: -5000, category: 'insurance', confirmed: true },
+  { amount: -15000, category: 'mortgage interest', confirmed: true, financeCost: true },
+  { amount: 33000, category: 'income', confirmed: true },
+  { amount: -8000, category: 'materials', confirmed: true },
+  { amount: -35000, category: 'van', confirmed: true, writtenDown: true },
+];
+const lt = A.shareTotals(landlordRows, 2100);
+ok('🔴 mortgage interest is out of expenses', lt.expenses === 13000);
+ok('🔴 the old, wrong expense total is gone', lt.expenses !== 28000);
+ok('🔴 profit matches the proof of income document', lt.profit === 87900);
+ok('the interest is reported apart rather than dropped', lt.financeCost === 15000 && lt.financeCount === 1);
+ok('the car is still held out and reported', lt.capitalCost === 35000 && lt.capitalCount === 1);
+ok('the allowance the page deducts is now published so it can be named', lt.capitalAllowance === 2100);
+ok('income is untouched', lt.income === 103000);
+
+// The entry list still shows the payment in full, so the reader can reconcile it to the bank.
+ok('the payment is still one of the shared entries', landlordRows.some((r) => r.amount === -15000));
+
+// It is not in the category breakdown either: it is not a running cost, and it gets its own line.
+const lcats = A.byCategory(landlordRows).map((c) => c.category);
+ok('🔴 mortgage interest is not in the expense breakdown', !lcats.includes('mortgage interest'));
+ok('ordinary property costs still are', lcats.includes('insurance') && lcats.includes('materials'));
+
+// A row without the flag is an ordinary cost, so nothing shared before today moves.
+const flat = landlordRows.map((r) => ({ ...r, financeCost: undefined }));
+ok('an unflagged row is still an ordinary cost, identical to before', A.shareTotals(flat, 2100).expenses === 28000);
+
+// redactTransaction carries the decided boolean and still leaks nothing about the stream.
+const s24Red = A.redactTransaction({ amount: -15000, category: 'mortgage interest', confirmed: true, financeCost: true, income_type: 'property', user_id: 'u1' });
+ok('the decided boolean survives redaction', s24Red.financeCost === true);
+ok('🔴 the stream itself never reaches the shared payload', s24Red.income_type === undefined);
+ok('and neither does the account it belongs to', s24Red.user_id === undefined);
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

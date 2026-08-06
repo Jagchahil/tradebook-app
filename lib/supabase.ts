@@ -5941,13 +5941,26 @@ export async function getConfirmedTransactionsForUser(userId: string): Promise<R
       // page a mortgage broker reads, the same defect the proof of income carried. The rule that
       // turns a car into a boolean stays in lib/capital.ts: we decide it here with isWrittenDown()
       // and hand bookshare the answer, exactly as getConfirmedTransactionsForRange does for the pack.
-      `&select=amount,vendor,category,transaction_date,description,confirmed,capital_kind` +
+      // income_type RIDES ALONG FOR THE SAME REASON capital_kind DOES. A residential landlord's
+      // mortgage interest is not an allowable expense: Section 24 relieves it as a basic rate
+      // credit. Without the stream this file cannot tell it apart from a trade's loan interest,
+      // which IS deductible, so shareTotals counted it as a running cost and the shared book
+      // printed a profit £15,000 lower than the proof of income document for the same account.
+      // Found live 6 August 2026. lib/bookshare.ts stays import free, so the answer is decided
+      // here and handed over as a boolean, exactly as writtenDown is.
+      `&select=amount,vendor,category,transaction_date,description,confirmed,capital_kind,income_type` +
       `&order=transaction_date.desc&limit=5000`,
     { headers: headers() },
   );
   if (!res.ok) return [];
   const rows = (await res.json()) as Record<string, unknown>[];
-  return rows.map((r) => ({ ...r, writtenDown: isWrittenDown(r.capital_kind) }));
+  return rows.map((r) => ({
+    ...r,
+    writtenDown: isWrittenDown(r.capital_kind),
+    financeCost:
+      String(r.income_type ?? '').toLowerCase() === 'property' &&
+      isResidentialFinanceCost(r.category as string | null, r.vendor as string | null),
+  }));
 }
 
 // --- "not business" -----------------------------------------------------------

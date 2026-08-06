@@ -151,6 +151,11 @@ export interface FullTransaction {
   // the same shape lib/quarterpack.ts's PackTxn takes. This module stays import free apart from node
   // crypto, so the answer is handed in rather than worked out here.
   writtenDown?: boolean | null;
+  // 🔴 RESIDENTIAL MORTGAGE INTEREST, ALSO DECIDED UPSTREAM. Section 24 relieves it as a basic rate
+  // tax credit, so it is not an allowable expense and must not sit in a shared book's running costs.
+  // lib/supabase.ts decides it from the stream and lib/propertyengine.ts's isResidentialFinanceCost,
+  // so this file never restates the rule, the same shape writtenDown takes above.
+  financeCost?: boolean | null;
   [k: string]: unknown;
 }
 
@@ -164,6 +169,9 @@ export interface SharedTransaction {
   // Carried so shareTotals can keep a car out of profit and the view can mark the row. Not personal:
   // it is a fact about how a cost is relieved, not about the person.
   writtenDown: boolean;
+  // The same shape, for mortgage interest. A fact about how a cost is relieved, not about the
+  // person, and the stream itself never reaches the shared payload.
+  financeCost: boolean;
 }
 
 // Strips every field an accountant has no business seeing. Note what is NOT here:
@@ -178,6 +186,7 @@ export function redactTransaction(t: FullTransaction): SharedTransaction {
     amount: Number(t.amount ?? 0),
     confirmed: t.confirmed === true,
     writtenDown: t.writtenDown === true,
+    financeCost: t.financeCost === true,
   };
 }
 
@@ -263,6 +272,16 @@ export interface ShareTotals {
   // here where the recipient can see where the money went. Mirrors StreamSummary in lib/quarterpack.ts.
   capitalCost: number;
   capitalCount: number;
+  // 🔴 MORTGAGE INTEREST, OUT OF EXPENSES AND REPORTED APART. Section 24 makes it a basic rate tax
+  // credit, not a deduction, so a shared book that folded it into running costs both overstated the
+  // costs and disagreed with the proof of income document, which holds it out. Same account, two
+  // lender documents, two profits. Found live 6 August 2026.
+  financeCost: number;
+  financeCount: number;
+  // 🔴 THE CAR ALLOWANCE THIS PAGE DEDUCTED WITHOUT EVER NAMING IT. profit is income less expenses
+  // less this, so a reader who subtracts the two figures above lands £2,100 out and is given nothing
+  // to explain it. The view now says the number. Zero for everyone with no car.
+  capitalAllowance: number;
 }
 
 export function shareTotals(rows: SharedTransaction[], capitalAllowance = 0): ShareTotals {
@@ -270,9 +289,16 @@ export function shareTotals(rows: SharedTransaction[], capitalAllowance = 0): Sh
   let expenses = 0;
   let capitalCost = 0;
   let capitalCount = 0;
+  let financeCost = 0;
+  let financeCount = 0;
   for (const t of rows) {
     if (t.amount > 0) {
       income += t.amount;
+    } else if (t.financeCost === true) {
+      // Not a running cost. It is still listed as a real payment below, and counted here so the
+      // page can say where the money went and why it is not in the figures above.
+      financeCost += Math.abs(t.amount);
+      financeCount += 1;
     } else if (t.writtenDown === true) {
       // A car leaves profit. It is still shown in the entry list as a real payment, and counted
       // here so the two reconcile.
@@ -289,6 +315,9 @@ export function shareTotals(rows: SharedTransaction[], capitalAllowance = 0): Sh
     count: rows.length,
     capitalCost: round2(capitalCost),
     capitalCount,
+    financeCost: round2(financeCost),
+    financeCount,
+    capitalAllowance: round2(Math.max(0, capitalAllowance)),
   };
 }
 
@@ -300,6 +329,9 @@ export function byCategory(rows: SharedTransaction[]): { category: string; total
   for (const t of rows) {
     if (t.amount >= 0) continue;
     if (t.writtenDown === true) continue;
+    // Mortgage interest is not a running cost, so it stays out of the breakdown the same way a car
+    // does. It is named in its own sentence instead.
+    if (t.financeCost === true) continue;
     const key = t.category || 'Uncategorised';
     map.set(key, (map.get(key) ?? 0) + Math.abs(t.amount));
   }

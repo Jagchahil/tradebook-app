@@ -89,19 +89,46 @@ export interface Route {
 // so it is the single largest line of the 1 October bill.
 //
 // Decided by Jag on 28 July 2026: he gets an app notification if he has the app, and he gets an
-// email either way. No WhatsApp reply at all. So the receipt loop costs nothing in either
-// direction, and the acknowledgement still reaches a man with no app.
+// email either way. No WhatsApp reply at all. So the receipt loop would cost nothing in either
+// direction, and the acknowledgement would still reach a man with no app.
+//
+// 🔴 AND THAT DECISION IS NOT LIVE. THIS ROW RECORDS IT, IT DOES NOT DESCRIBE THE PRODUCT.
+// CORRECTED 7 AUGUST 2026, BECAUSE THE PARAGRAPH THAT SAT HERE WAS SIMPLY UNTRUE.
+//
+// It promised that an email went out on every capture, so there was always something. No email
+// went out. lib/email.ts has no capture sender and never has had one, and lib/push.ts is only ever
+// called by the weekly cron and the agent cron, so neither channel on this row has anything behind
+// it for a receipt. Nothing in app/ or lib/ asks routeFor('capture_ack') or channelsFor
+// ('capture_ack') either. This row governs nothing today, and a sentence in a comment is how the
+// next person inherits that mistake. test/routing.test.mjs section 9b now holds the retired wording
+// and fails the build if any version of that promise comes back without a sender behind it.
+//
+// WHAT ACTUALLY HAPPENS, and it is the opposite of what the row says: the WhatsApp webhook answers
+// every receipt inline, on WhatsApp, inside his own free window. Nine paths and nine replies, and
+// since 7 August a throw between the photograph and the send cannot swallow the sentence either.
+// See handleReceiptImage in app/api/whatsapp/route.ts. So a man who photographs a receipt IS
+// answered, in the channel he used. He is simply not answered by this table.
+//
+// WHY THE ROW STAYS. It is Jag's decision of record, and captureRoutesToWhatsApp() at the foot of
+// this file is what stops anybody routing capture at a paid channel on the day it does go live.
+// Deleting the row deletes that guard.
+//
+// 🔴 WHAT HAS TO HAPPEN BEFORE THE INLINE REPLY IS TOUCHED. The email has to exist first. Taking
+// the WhatsApp reply out on the strength of this row as it was written would have removed the only
+// acknowledgement a man gets and put nothing in its place, which is exactly the failure the risk
+// paragraph below was worried about. Whether we build that email at all is Jag's call and not a
+// tidy up: doc 103 says the best button is no button, and an email he did not ask for is a message
+// in his inbox for something he already watched happen on his phone.
 //
 // The risk was named at the time and is not pretended away: silence in the channel he just used
-// can read as failure. Two things bound it. The email always goes, so there is always something.
-// And the bank connection is the real answer to volume: a connected account captures spending
-// with no message at all, which makes every receipt photo only what the feed could not see.
+// reads as failure. The bank connection is the real answer to volume: a connected account captures
+// spending with no message at all, which makes every receipt photo only what the feed could not see.
 export const ROUTES: Route[] = [
   {
     type: 'capture_ack',
     channels: ['push', 'email'],
     template: null,
-    why: 'A receipt or voice note landed and needs confirming. Jag, 28 July 2026: notification if he has the app, email for everybody. Never a WhatsApp reply, because this is the highest volume message in the product and 1 October makes every one of them billable.',
+    why: 'A receipt or voice note landed and needs confirming. Jag, 28 July 2026: notification if he has the app, email for everybody. Never a WhatsApp reply, because this is the highest volume message in the product and 1 October makes every one of them billable. NOT LIVE: nothing reads this row and no capture email exists, so the webhook still answers inline on WhatsApp. See the block above.',
   },
   {
     // ⚠️ THE ONE ROW THAT KEEPS ITS WHATSAPP REPLY, AND IT IS DELIBERATE.

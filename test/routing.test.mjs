@@ -400,5 +400,235 @@ ok(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n9. 🔴 NO ROW GOES DECORATIVE UNNOTICED, AND THE CAPTURE WALK ANSWERS ON EVERY PATH');
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// WHY THIS EXISTS: SECTION 8 CLOSED THE HOLE FOR FIVE ROWS AND LEFT IT OPEN FOR THE OTHER EIGHT.
+//
+// Section 8 was written because the table had been decorative for two days and nobody could tell.
+// It closed that by NAMING the routes that read it. Naming is not a rule. The rows it did not name
+// went on governing nothing, and nothing failed, which is the same gap in a smaller font.
+//
+// capture_ack is the row that cost us a launch week. On 7 August 2026 it was raised as a Tier One
+// defect, "a WhatsApp receipt capture is acknowledged NOWHERE", on two true facts and one false
+// sentence:
+//
+//   TRUE   nothing in app/ or lib/ reads this row. It governs nothing.
+//   TRUE   lib/email.ts has no capture sender, so the email half of the row does not exist.
+//   FALSE  the comment above the row said "the email always goes, so there is always something".
+//
+// The conclusion was wrong. app/api/whatsapp/route.ts answers every receipt inline on WhatsApp, in
+// his own free window, so no customer was ever left silent. But the reading was a fair one, because
+// the source said something untrue and no test in this repo could tell. THAT is the defect, and the
+// next person to reach it might reach it by DELETING the inline reply on the strength of a row that
+// promises an email nobody wrote. Then the Tier One item becomes true.
+//
+// So three rules, all computed rather than believed:
+//
+//   9a. Every row is either READ by shipping code or listed below as not wired. Moving a row
+//       between those two lists is a line somebody has to type.
+//   9b. The claim that a capture email always goes may only appear in lib/routing.ts on a day when
+//       lib/email.ts really has a capture sender.
+//   9c. The receipt walk in the webhook answers on EVERY path, including the ones where something
+//       throws. It is executed here, not read.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The arguments of a named call, with the brackets WALKED rather than matched by a regex. The
+// trial cron passes a ternary over two message types across four lines, so anything that stops at
+// the first quote or the first newline reads it as unwired. Same reasoning as
+// test/wave9_asking.test.mjs, which walks brackets for the same class of argument.
+function callArgs(body, fn) {
+  const out = [];
+  const needle = `${fn}(`;
+  let i = 0;
+  while ((i = body.indexOf(needle, i)) !== -1) {
+    let depth = 0;
+    let j = i + needle.length - 1;
+    for (; j < body.length; j += 1) {
+      const c = body[j];
+      if ('([{'.includes(c)) depth += 1;
+      else if (')]}'.includes(c)) { depth -= 1; if (depth === 0) break; }
+    }
+    out.push(body.slice(i + needle.length, j));
+    i = j + 1;
+  }
+  return out;
+}
+
+// Who actually asks the table, computed from the shipping tree. A file counts as a reader only if
+// it imports this module AND names the type inside a channelsFor or routeFor call, so a row is
+// never credited to a file that merely happens to contain the same word.
+const readers = new Map();
+for (const f of [...walk(path.join(repo, 'app')), ...walk(lib)]) {
+  if (f === path.join(lib, 'routing.ts')) continue; // the table is not a reader of itself
+  const body = stripComments(readFileSync(f, 'utf8'));
+  if (!/from '[^']*\/routing'/.test(body)) continue;
+  const args = [...callArgs(body, 'channelsFor'), ...callArgs(body, 'routeFor')];
+  for (const t of DECLARED_TYPES) {
+    if (args.some((a) => a.includes(`'${t}'`))) {
+      readers.set(t, [...(readers.get(t) ?? []), path.relative(repo, f)]);
+    }
+  }
+}
+
+// ⚠️ WRITTEN OUT BY HAND, LIKE EXPECTED_BILLABLE, AND FOR THE SAME REASON. A row that starts or
+// stops governing the product is a decision, and a decision should cost somebody a line in a test
+// rather than happen quietly inside a helpful edit.
+const WIRED = ['connect_result', 'trial_ended', 'trial_ending', 'weekly_ready', 'work_paused'];
+
+// 🔴 EVERY ROW HERE GOVERNS NOTHING TODAY. The table still describes where these messages SHOULD
+// go, and the code still decides for itself where they DO go. That gap is the point of this list:
+// it is not a bug list and it is not a to do list, it is the honest reach of the table, and it is
+// the thing anybody reading a row needs to know before they act on it.
+const NOT_WIRED = [
+  'alert_deadline', 'alert_opportunity', 'alert_threshold',
+  // 🔴 The one that was raised as Tier One. Jag's 28 July decision, recorded and not built: no
+  // capture email exists, no push is sent for a receipt, and the webhook still answers on WhatsApp.
+  'capture_ack',
+  'capture_unreadable', 'conversation_answer', 'nudge', 'reminder_due',
+];
+
+const wiredNow = DECLARED_TYPES.filter((t) => readers.has(t)).sort();
+const unwiredNow = DECLARED_TYPES.filter((t) => !readers.has(t)).sort();
+const sameList = (a, b) => a.length === b.length && a.every((x, n) => x === b[n]);
+
+ok(
+  sameList(wiredNow, [...WIRED].sort())
+    ? `the rows that govern the product are the five pinned here (${wiredNow.join(', ')})`
+    : `🔴 which rows the product READS has changed. Pinned: ${[...WIRED].sort().join(', ')}. Found: ${wiredNow.join(', ')}.\n`
+      + '     A row that has gained a reader is a row that now governs something: move it from\n'
+      + '     NOT_WIRED to WIRED here, and check every sender its channels name actually exists.\n'
+      + '     A row that has LOST its reader has gone decorative, which is what section 8 is about.',
+  sameList(wiredNow, [...WIRED].sort()),
+);
+ok(
+  sameList(unwiredNow, [...NOT_WIRED].sort())
+    ? `the rows that govern nothing yet are the eight pinned here (${unwiredNow.length})`
+    : `🔴 the not wired list is out of date. Pinned: ${[...NOT_WIRED].sort().join(', ')}. Found: ${unwiredNow.join(', ')}.`,
+  sameList(unwiredNow, [...NOT_WIRED].sort()),
+);
+ok('every declared type is in exactly one of the two lists',
+  WIRED.length + NOT_WIRED.length === DECLARED_TYPES.length
+  && WIRED.every((t) => !NOT_WIRED.includes(t)));
+
+// 🔴 9b. A LIE IN A COMMENT IS A DEFECT, EVEN WHEN NO CUSTOMER IS HARMED BY IT TODAY.
+//
+// The sentence "the email always goes, so there is always something" was the entire basis of the
+// Tier One reading, and it was false the day it was written. This is the smallest rule that stops
+// it or anything like it coming back: routing.ts may promise a capture email only when a sender
+// for one exists. Not a style rule. It is section 3's "no row points at a template this repo
+// cannot send", applied to the prose, because the prose is what people act on.
+const routingSrc = src('lib/routing.ts');
+const emailSrc = src('lib/email.ts');
+const hasCaptureEmailSender = /export async function send\w*(Capture|Receipt)\w*Email/.test(emailSrc);
+const promisesTheEmail = /the email always goes/i.test(routingSrc);
+ok(
+  !promisesTheEmail || hasCaptureEmailSender
+    ? 'routing.ts promises no capture email that lib/email.ts cannot send'
+    : '🔴 lib/routing.ts says the capture email "always goes" and lib/email.ts has no sender for it.\n'
+      + '     Either build the sender, or delete the promise. A comment that describes a product we\n'
+      + '     do not have is how 7 August happened: it reads as a defect to whoever finds it next,\n'
+      + '     and as permission to delete the WhatsApp reply to whoever finds it after that.',
+  !promisesTheEmail || hasCaptureEmailSender,
+);
+
+// 🔴 9c. THE RECEIPT WALK IS EXECUTED, NOT READ.
+//
+// Photographing a receipt is the ONE thing this product asks a man to do, so it is the one message
+// that may never go unanswered. handleReceiptImage and replyNotLinked are sliced VERBATIM out of
+// the shipping webhook into a staged module whose dependencies are stubs, then driven down every
+// path the walk has: the four refusals before the reading, the five outcomes of it, and the three
+// places a throw can escape (findUserIdByPhone, downloadMedia and parseReceipt all read a response
+// body outside their own guards, and none of the three is this repo's webhook to fix).
+//
+// Until 7 August 2026 the throws produced NOTHING: processMessage caught them, logged a line, and
+// the man who photographed a receipt heard nothing whatsoever.
+//
+// EXACTLY ONE send per path is asserted in both directions. Zero is the silence this is about. Two
+// would be a second billable message on the highest volume walk in the product, which is section 7.
+const waSrc = readFileSync(path.join(repo, WA_ROUTE), 'utf8');
+const sliceFrom = waSrc.indexOf('async function replyNotLinked');
+const sliceTo = waSrc.indexOf("// Counts today's receipts for this phone");
+ok('the receipt walk was found in the webhook, so the checks below are not vacuous',
+  sliceFrom > 0 && sliceTo > sliceFrom
+  && waSrc.slice(sliceFrom, sliceTo).includes('async function handleReceiptImage'));
+
+if (sliceFrom > 0 && sliceTo > sliceFrom) {
+  const STUBS = `
+export const sent: string[] = [];
+export const ctl: Record<string, unknown> = {};
+const APP_URL = 'https://lekhio.app';
+const TRIAL_DAYS = 7;
+async function sendText(_to: string, body: string): Promise<void> { sent.push(body); }
+async function findUserIdByPhone(_p: string): Promise<string | null> {
+  if (ctl.userIdThrows) throw new Error('x');
+  return (ctl.userId ?? null) as string | null;
+}
+function hasClaudeConfig(): boolean { return ctl.claude !== false; }
+async function downloadMedia(_id: string): Promise<{ base64: string; mediaType: string } | null> {
+  if (ctl.mediaThrows) throw new Error('x');
+  return ctl.media === null ? null : { base64: 'AAAA', mediaType: 'image/jpeg' };
+}
+async function aiBudgetBlocked(_f: string): Promise<string | null> { return (ctl.refused ?? null) as string | null; }
+async function sendBudgetRefusal(_f: string, reason: string): Promise<void> { sent.push('refusal:' + reason); }
+async function ingestReceiptImage(_a: unknown): Promise<Record<string, unknown>> {
+  if (ctl.ingestThrows) throw new Error('x');
+  return ctl.result as Record<string, unknown>;
+}
+function duplicateReceiptLine(m: string, a: number, d: string): string { return \`dup \${m} \${a} \${d}\`; }
+async function bankNudgeAfterReceipt(_f: string, _u: string): Promise<string | null> { return null; }
+export { handleReceiptImage };
+`;
+  const walkStage = mkdtempSync(path.join(tmpdir(), 'wareceipt-'));
+  const walkFile = path.join(walkStage, 'receiptwalk.ts');
+  writeFileSync(walkFile, STUBS + waSrc.slice(sliceFrom, sliceTo));
+  const H = await import(pathToFileURL(walkFile).href);
+
+  const PATHS = [
+    ['not linked to an account', { userId: null }],
+    ['receipt reading not configured', { claude: false }],
+    ['the media would not download', { media: null }],
+    ['the AI budget refused him', { refused: 'user_daily_cap' }],
+    ['unreadable photograph', { result: { outcome: 'unread' } }],
+    ['the write failed', { result: { outcome: 'failed' } }],
+    ['merged into the bank line', { result: { outcome: 'merged', merchant: 'Screwfix', amount: 12.4, category: 'materials' } }],
+    ['the same receipt twice', { result: { outcome: 'duplicate', merchant: 'Screwfix', amount: 12.4, date: '2026-08-05' } }],
+    ['logged and waiting for his yes', { result: { outcome: 'logged', merchant: 'Screwfix', amount: 12.4, category: 'materials', date: '2026-08-05' } }],
+    ['🔴 the account lookup THREW', { userIdThrows: true }],
+    ['🔴 the media download THREW', { mediaThrows: true }],
+    ['🔴 the reading THREW', { ingestThrows: true }],
+  ];
+
+  // The handler logs the error NAME on a throw, which is deliberate and is not this suite's output.
+  const realError = console.error;
+  console.error = () => {};
+  for (const [label, setup] of PATHS) {
+    H.sent.length = 0;
+    for (const k of Object.keys(H.ctl)) delete H.ctl[k];
+    H.ctl.userId = 'u1';
+    Object.assign(H.ctl, setup);
+    let threw = null;
+    try {
+      await H.handleReceiptImage('447700900000', 'wamid.TEST', 'media1');
+    } catch (e) {
+      threw = e instanceof Error ? e.name : 'unknown';
+    }
+    const n = H.sent.length;
+    ok(
+      n === 1 && !threw
+        ? `he is answered, exactly once: ${label}`
+        : `🔴 a receipt photograph went unanswered: ${label}. Sends: ${n}${threw ? `, and the walk threw ${threw}` : ''}.\n`
+          + '     Photographing a receipt is the one thing this product asks him to do. Every path\n'
+          + '     through handleReceiptImage must end in one sentence, including the ones where a\n'
+          + '     dependency throws: he cannot tell a crash from being ignored, and a man who thinks\n'
+          + '     we have his receipt does not send it again.',
+      n === 1 && !threw,
+    );
+    ok(`and the sentence is a real one: ${label}`, typeof H.sent[0] === 'string' && H.sent[0].trim().length > 10);
+  }
+  console.error = realError;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

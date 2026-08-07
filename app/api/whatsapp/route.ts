@@ -945,30 +945,79 @@ async function replyNotLinked(from: string): Promise<void> {
   );
 }
 
+// The write did not happen, said the same way wherever it did not happen. One string because a
+// throw and a refused insert leave a man in exactly the same place: nothing saved, nothing changed,
+// send it again. Two spellings of that would drift, and the one he read would be the one that did.
+const RECEIPT_NOT_SAVED = 'That did not save. Nothing has changed, so send it again in a minute.';
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A THROW BETWEEN HIM AND THE SEND USED TO LEAVE HIM WITH NOTHING AT ALL. FOUND 7 AUGUST 2026.
+//
+// Photographing a receipt is the ONE thing this product asks a man to do, so it is the one message
+// that must never go unanswered. Every branch of the reading already decided a sentence and this
+// function sent it: five outcomes and four refusals, nine paths, nine replies. That part was right
+// and it stays exactly as it was.
+//
+// What was NOT right is the tenth path. If any call BETWEEN the photograph and the send threw,
+// processMessage's catch logged one line and stopped, and the man heard nothing whatsoever. Three
+// real surfaces can throw and not one of them is this file's to fix:
+//
+//   findUserIdByPhone   posts to PostgREST with no try and no timeout, and reads res.json().
+//   downloadMedia       guards both fetches and then reads metaRes.json() and arrayBuffer() outside
+//                       the guards.
+//   parseReceipt        guards its fetch and then reads res.json() outside it.
+//
+// One 200 carrying a gateway's HTML instead of JSON is enough for any of the three, and a receipt
+// he believes we have is worse than a receipt he knows we refused: he will not send it again.
+//
+// So the reading now RETURNS its sentence and the throw is caught HERE, which is where a sentence
+// is still owed. Nothing was written on any of those paths, so he gets the line the failed write
+// already uses, which is true of all of them.
+//
+// ⚠️ NO NEW SEND. There is still exactly one sendText in this walk, which is what
+// test/routing.test.mjs counts and what lib/margin.ts prices. The fix is where the send is reached
+// from, never how often it happens.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 async function handleReceiptImage(from: string, messageId: string, mediaId: string): Promise<void> {
+  let reply: string | null;
+  try {
+    reply = await receiptSentence(from, messageId, mediaId);
+  } catch (err) {
+    // THE NAME ONLY, NEVER THE MESSAGE. A JSON parse failure quotes the body it choked on, and
+    // these bodies are Graph's and Anthropic's: Meta's reflects the recipient's wa_id and can echo
+    // what he sent. lib/whatsapp.ts refuses those bodies for the same reason. The name alone still
+    // separates a timeout from a bad payload from a dead socket, which is all this line is for.
+    console.error('[whatsapp] Receipt read threw:', err instanceof Error ? err.name : 'unknown');
+    reply = RECEIPT_NOT_SAVED;
+  }
+  // null means this walk has already answered him by another route, so nothing is owed.
+  if (reply !== null) await sendText(from, reply);
+}
+
+// The whole reading of one photograph, as the sentence he should get back. null ONLY when he has
+// already been answered, which is the two paths that hand off to a shared reply.
+async function receiptSentence(from: string, messageId: string, mediaId: string): Promise<string | null> {
   // Find the Lekhio account for this number first. No point parsing if there
   // is nobody to attach it to.
   const userId = await findUserIdByPhone(from);
   if (!userId) {
     await replyNotLinked(from);
-    return;
+    return null;
   }
 
   if (!hasClaudeConfig()) {
-    await sendText(from, 'Receipt reading is not switched on yet. Hang tight, it is coming very soon.');
-    return;
+    return 'Receipt reading is not switched on yet. Hang tight, it is coming very soon.';
   }
 
   const media = await downloadMedia(mediaId);
   if (!media) {
-    await sendText(from, 'I could not open that image. Try sending the photo again.');
-    return;
+    return 'I could not open that image. Try sending the photo again.';
   }
 
   const refused = await aiBudgetBlocked(from);
   if (refused) {
     await sendBudgetRefusal(from, refused);
-    return;
+    return null;
   }
 
   // THE ONE RECEIPT WALK, in lib/receiptingest.ts, shared word for word with the web capture
@@ -986,24 +1035,19 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
     whatsappMessageId: messageId,
   });
 
-  let reply: string;
   switch (result.outcome) {
     case 'unread':
-      reply = 'I could not read that receipt. Try a clearer photo with the total showing.';
-      break;
+      return 'I could not read that receipt. Try a clearer photo with the total showing.';
     case 'failed':
       // The write itself failed. Said plainly rather than swallowed: a receipt he believes is
       // logged and is not would surface months later, in his figures, as our fault.
-      reply = 'That did not save. Nothing has changed, so send it again in a minute.';
-      break;
+      return RECEIPT_NOT_SAVED;
     case 'merged':
-      reply = `Got it. That is the same £${result.amount.toFixed(2)} ${result.merchant} payment your bank already sent me, so I have put the receipt with it rather than counting it twice. Filed under ${result.category}.`;
-      break;
+      return `Got it. That is the same £${result.amount.toFixed(2)} ${result.merchant} payment your bank already sent me, so I have put the receipt with it rather than counting it twice. Filed under ${result.category}.`;
     case 'duplicate':
       // 🔴 The same receipt, twice. The refusal is the shared sentence, so this channel and
       // the chat cannot drift into two versions of it.
-      reply = duplicateReceiptLine(result.merchant, result.amount, result.date);
-      break;
+      return duplicateReceiptLine(result.merchant, result.amount, result.date);
     case 'logged': {
       const confirmation = `Logged. ${result.merchant} for £${result.amount.toFixed(2)}. Filed under ${result.category}. It is in your Lekhio.`;
       // Once a day, and only for someone clearly doing this the hard way, offer the
@@ -1012,11 +1056,9 @@ async function handleReceiptImage(from: string, messageId: string, mediaId: stri
       // than sent separately: an extra WhatsApp message would cost us real money (see
       // lib/margin.ts) to say something we can say for free right here.
       const nudge = await bankNudgeAfterReceipt(from, userId);
-      reply = nudge ? `${confirmation}\n\n${nudge}` : confirmation;
-      break;
+      return nudge ? `${confirmation}\n\n${nudge}` : confirmation;
     }
   }
-  await sendText(from, reply);
 }
 
 // Counts today's receipts for this phone and returns the milestone nudge, or null.

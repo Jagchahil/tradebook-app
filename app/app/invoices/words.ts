@@ -260,3 +260,97 @@ export function chaserDraft(tone: ChaserTone, c: ChaserContext): string {
   }
   return `Hi ${name}, this is a final reminder for invoice ${c.number} for ${total}, now ${lateWords(c.daysLate)}. I need it settled within seven days. The invoice is here: ${c.link}. If there is a problem with it, call me today and we will sort it out.`;
 }
+
+// ── The three views, and the near horizon ────────────────────────────────────────────────────
+//
+// ⚠️ FILTERS OVER ONE ORDER, NOT FOUR SEPARATE LISTS, AND THAT IS THE WHOLE DESIGN CHOICE.
+//
+// The obvious build is four tabs each with their own sort. It is also how the one useful thing
+// this screen does gets lost. sortInvoices puts the longest overdue at the top because that is
+// the invoice to chase this morning, and a Paid tab sorted by date does not tell him anything he
+// needs before nine o'clock. So every view is the SAME order with rows removed, which means a
+// man who taps Overdue sees exactly the rows he already saw at the top of All, in the same
+// sequence, and learns the screen once rather than four times.
+//
+// ⚠️ 'unpaid' INCLUDES THE LATE ONES ON PURPOSE. Overdue is a subset of unpaid, not a sibling of
+// it. "What am I owed" is one question and "what is late" is a harder question inside it, and a
+// man who taps Unpaid expecting his total and gets only the ones that are not yet late has been
+// handed a smaller number than the truth, on a screen about money he is owed.
+export type InvoiceFilter = 'all' | 'overdue' | 'unpaid' | 'paid';
+
+export function isInvoiceFilter(x: unknown): x is InvoiceFilter {
+  return x === 'all' || x === 'overdue' || x === 'unpaid' || x === 'paid';
+}
+
+export const INVOICE_FILTERS: ReadonlyArray<{ filter: InvoiceFilter; label: string }> = [
+  { filter: 'all', label: 'All' },
+  { filter: 'overdue', label: 'Overdue' },
+  { filter: 'unpaid', label: 'Unpaid' },
+  { filter: 'paid', label: 'Paid' },
+];
+
+// Rows for one view, in the one order. Never re-sorted.
+export function filterInvoices(
+  rows: InvoiceListRow[],
+  todayISO: string,
+  filter: InvoiceFilter,
+): InvoiceListRow[] {
+  const ordered = sortInvoices(rows, todayISO);
+  if (filter === 'all') return ordered;
+  return ordered.filter((r) => {
+    const state = invoiceState(r, todayISO);
+    if (filter === 'paid') return state === 'paid';
+    if (filter === 'overdue') return state === 'late';
+    return state !== 'paid'; // unpaid: waiting AND late
+  });
+}
+
+// What each chip says beside its label. A count is a fact, so an empty one shows a zero rather
+// than hiding: "Overdue 0" is the sentence he wants to see and a missing chip is not.
+export function filterCounts(rows: InvoiceListRow[], todayISO: string): Record<InvoiceFilter, number> {
+  const out: Record<InvoiceFilter, number> = { all: rows.length, overdue: 0, unpaid: 0, paid: 0 };
+  for (const r of rows) {
+    const state = invoiceState(r, todayISO);
+    if (state === 'paid') out.paid += 1;
+    else {
+      out.unpaid += 1;
+      if (state === 'late') out.overdue += 1;
+    }
+  }
+  return out;
+}
+
+// ⚠️ THE NEAR HORIZON, AND IT DELIBERATELY EXCLUDES ANYTHING ALREADY LATE.
+//
+// owedLine answers "what am I owed and how much of it has gone bad". This answers a different
+// question: what is about to land. An invoice that is already late is not about to land, it has
+// already failed to, and counting it here would inflate a figure a man might plan a week around.
+//
+// ⚠️ AND IT IS NOT A PROMISE. Money due is not money arriving, and nothing in this sentence
+// reaches a tax figure, an income figure or the set aside. An invoice becomes income when it is
+// PAID. Whole pounds for the same reason owedLine uses them: nobody pays against this sentence.
+export function dueSoonLine(
+  rows: InvoiceListRow[],
+  todayISO: string,
+  withinDays = 7,
+): string | null {
+  let soon = 0;
+  for (const r of rows) {
+    if (invoiceState(r, todayISO) !== 'waiting') continue;
+    const ref = referenceDate(r);
+    if (!ref) continue;
+    const days = daysBetween(todayISO, ref);
+    if (days >= 0 && days <= withinDays) soon += r.total;
+  }
+  if (soon <= 0) return null;
+  return `${gbp0(soon)} of it falls due in the next seven days.`;
+}
+
+// The honest empty state for a view that has rows behind it but none in this one. The list's own
+// "You have not made an invoice yet" would be a lie under every filter but All.
+export function emptyViewWords(filter: InvoiceFilter): string {
+  if (filter === 'overdue') return 'Nothing is overdue. That is the way to keep it.';
+  if (filter === 'unpaid') return 'Nothing is waiting to be paid. Everything you have sent is settled.';
+  if (filter === 'paid') return 'Nothing is marked paid yet.';
+  return 'You have not made an invoice yet.';
+}

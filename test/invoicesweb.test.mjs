@@ -893,5 +893,90 @@ for (const [name, src] of [
   ok(`${name}: never writes the rival domain`, !/lekhio\.com/.test(src));
 }
 
+
+// ── THE THREE VIEWS AND THE NEAR HORIZON (7 August 2026) ────────────────────────────────────
+//
+// Added when the list grew filter chips. The failures worth guarding are all quiet ones: a view
+// that re-sorts and loses the chase order, an Unpaid tab that forgets the late ones and hands a
+// man a smaller number than he is owed, a summary that shrinks when he taps a chip, and a near
+// horizon figure that counts money that has ALREADY failed to arrive.
+{
+  const LATE = mk({ id: '11111111-1111-4111-8111-111111111111', total: 1450, due: '2026-07-16' });
+  const LATER = mk({ id: '22222222-2222-4222-8222-222222222222', total: 100, due: '2026-07-02' });
+  const SOON = mk({ id: '33333333-3333-4333-8333-333333333333', total: 620, due: '2026-08-04' });
+  const FAR = mk({ id: '44444444-4444-4444-8444-444444444444', total: 900, due: '2026-09-30' });
+  const PAID = mk({ id: '55555555-5555-4555-8555-555555555555', total: 380, status: 'paid', due: '2026-07-19' });
+  const ALL = [SOON, PAID, LATE, FAR, LATER];
+
+  ok('every filter is recognised, and nothing else is',
+    W.isInvoiceFilter('all') && W.isInvoiceFilter('overdue') && W.isInvoiceFilter('unpaid')
+    && W.isInvoiceFilter('paid') && !W.isInvoiceFilter('late') && !W.isInvoiceFilter('') && !W.isInvoiceFilter(null));
+
+  const all = W.filterInvoices(ALL, TODAY, 'all').map((r) => r.id[0]);
+  ok('All is the whole list in the chase order, longest overdue first',
+    all.join('') === '21345');
+
+  const overdue = W.filterInvoices(ALL, TODAY, 'overdue');
+  ok('Overdue holds only the late ones', overdue.length === 2);
+  ok('and keeps the chase order inside the view', overdue.map((r) => r.id[0]).join('') === '21');
+  ok('🔴 and every view is a SUBSEQUENCE of All, so no chip re-sorts',
+    ['overdue', 'unpaid', 'paid'].every((f) => {
+      const ids = W.filterInvoices(ALL, TODAY, f).map((r) => r.id[0]);
+      let i = 0;
+      for (const c of all) if (ids[i] === c) i += 1;
+      return i === ids.length;
+    }));
+
+  const unpaid = W.filterInvoices(ALL, TODAY, 'unpaid');
+  ok('🔴 Unpaid INCLUDES the late ones, because overdue is inside owed, not beside it',
+    unpaid.length === 4 && unpaid.some((r) => r.id === LATE.id) && unpaid.some((r) => r.id === SOON.id));
+  ok('and Unpaid holds nothing paid', !unpaid.some((r) => r.status === 'paid'));
+  ok('Paid holds only the paid one', W.filterInvoices(ALL, TODAY, 'paid').map((r) => r.id[0]).join('') === '5');
+
+  const counts = W.filterCounts(ALL, TODAY);
+  ok('the counts add up the way the views do',
+    counts.all === 5 && counts.overdue === 2 && counts.unpaid === 4 && counts.paid === 1);
+  ok('and every count matches the length of its own view',
+    ['all', 'overdue', 'unpaid', 'paid'].every((f) => counts[f] === W.filterInvoices(ALL, TODAY, f).length));
+  ok('an empty book counts zero rather than going missing',
+    JSON.stringify(W.filterCounts([], TODAY)) === JSON.stringify({ all: 0, overdue: 0, unpaid: 0, paid: 0 }));
+
+  // The near horizon.
+  ok('the near horizon names only what is about to land',
+    W.dueSoonLine(ALL, TODAY) === '£620 of it falls due in the next seven days.');
+  ok('🔴 and it EXCLUDES anything already late, which has not landed and will not this week',
+    W.dueSoonLine([LATE, LATER], TODAY) === null);
+  ok('and excludes paid, which has landed already', W.dueSoonLine([PAID], TODAY) === null);
+  ok('and excludes what is further out than the horizon', W.dueSoonLine([FAR], TODAY) === null);
+  ok('a due date exactly on the horizon counts, one day past it does not',
+    W.dueSoonLine([mk({ due: '2026-08-06', total: 10 })], TODAY) === '£10 of it falls due in the next seven days.'
+    && W.dueSoonLine([mk({ due: '2026-08-07', total: 10 })], TODAY) === null);
+  ok('nothing due soon says nothing at all', W.dueSoonLine([], TODAY) === null);
+
+  // The summary must describe his business, not the chip he is looking at.
+  ok('🔴 the owed line is computed from ALL rows, so it cannot shrink when a chip is tapped',
+    W.owedLine(ALL, TODAY) === W.owedLine(W.filterInvoices(ALL, TODAY, 'all'), TODAY)
+    && W.owedLine(ALL, TODAY) === '£3,070 is owed to you, and £1,550 of it is late.');
+
+  // The empty states have to stop claiming he has never made one.
+  ok('🔴 an empty view never says "you have not made an invoice yet" unless that is true',
+    ['overdue', 'unpaid', 'paid'].every((f) => !/have not made an invoice/.test(W.emptyViewWords(f))));
+  ok('and each empty view says something true about that view',
+    /overdue/i.test(W.emptyViewWords('overdue')) && /paid/i.test(W.emptyViewWords('paid')));
+  ok('All still says the honest thing when there is genuinely nothing',
+    /have not made an invoice/.test(W.emptyViewWords('all')));
+
+  // The page has to actually use them.
+  const listSrc = read('app/app/invoices/page.tsx');
+  ok('the list renders the chips', /INVOICE_FILTERS/.test(listSrc) && /filterInvoices/.test(listSrc));
+  ok('and the near horizon', /dueSoonLine/.test(listSrc));
+  ok('🔴 and the chips are LINKS, because this page ships no client script',
+    /href=\{f\.filter === 'all'/.test(listSrc) && !/onClick/.test(listSrc));
+  ok('and the summary lines are built from rows, never from the filtered view',
+    /owedLine\(rows, todayISO\)/.test(listSrc) && /dueSoonLine\(rows, todayISO\)/.test(listSrc));
+  ok('and an unknown ?show= falls back to All rather than an empty screen',
+    /isInvoiceFilter\(one\('show'\)\)/.test(listSrc));
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

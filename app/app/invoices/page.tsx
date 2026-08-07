@@ -6,7 +6,9 @@ import { readInvoices } from '../../../lib/supabase';
 import { gbp2 } from '../../../lib/money';
 import { invoiceRef } from '../invoiceref';
 import {
-  normaliseInvoiceRow, sortInvoices, invoiceState, statusWords, owedLine,
+  normaliseInvoiceRow, invoiceState, statusWords, owedLine,
+  filterInvoices, filterCounts, isInvoiceFilter, INVOICE_FILTERS, dueSoonLine, emptyViewWords,
+  type InvoiceFilter,
 } from './words';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
@@ -61,8 +63,17 @@ export default async function InvoicesPage({
     : [];
 
   const todayISO = new Date().toISOString().slice(0, 10);
-  const sorted = sortInvoices(rows, todayISO);
+  // ⚠️ THE VIEW IS A LINK, NOT A TAB WIDGET. This page ships no client script, the same as every
+  // screen under /app, so the chips are anchors carrying ?show= and the server renders the view.
+  // A man with scripting off, or on a five year old Android, gets the whole feature.
+  const filter: InvoiceFilter = isInvoiceFilter(one('show')) ? (one('show') as InvoiceFilter) : 'all';
+  const shown = filterInvoices(rows, todayISO, filter);
+  const counts = filterCounts(rows, todayISO);
+  // ⚠️ BOTH SUMMARY LINES ARE COMPUTED FROM ALL ROWS, NEVER FROM THE VIEW. "£2,070 is owed to
+  // you" is a fact about his business, not about which chip he happens to be looking at, and a
+  // total that shrank when he tapped Paid would be a different and much worse screen.
   const owed = owedLine(rows, todayISO);
+  const dueSoon = dueSoonLine(rows, todayISO);
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -77,7 +88,7 @@ export default async function InvoicesPage({
           <p style={S.empty}>We could not read your invoices just now.</p>
           <p style={S.quiet}>Nothing is lost and nothing has changed. Load the page again in a minute.</p>
         </section>
-      ) : sorted.length === 0 ? (
+      ) : rows.length === 0 ? (
         <section className="lek-card">
           <p style={S.empty}>You have not made an invoice yet.</p>
           {/* The pay wording returns with payouts. See hasInvoicePayoutRoute in lib/stripe.ts. */}
@@ -92,9 +103,25 @@ export default async function InvoicesPage({
           {/* The one sentence he came for, and only when there is money it applies to. All paid
               means nothing owed, and a "£0 owed" banner would be a row that says nothing. */}
           {owed ? <p style={S.owed}>{owed}</p> : null}
+          {dueSoon ? <p style={S.dueSoon}>{dueSoon}</p> : null}
+
+          <nav style={S.chips} aria-label="Which invoices to show">
+            {INVOICE_FILTERS.map((f) => (
+              <a
+                key={f.filter}
+                href={f.filter === 'all' ? '/app/invoices' : `/app/invoices?show=${f.filter}`}
+                style={f.filter === filter ? S.chipOn : S.chipOff}
+                aria-current={f.filter === filter ? 'true' : undefined}
+              >
+                {f.label} {counts[f.filter]}
+              </a>
+            ))}
+          </nav>
+
+          {shown.length === 0 ? <p style={S.emptyView}>{emptyViewWords(filter)}</p> : null}
 
           <ul style={S.list}>
-            {sorted.map((inv) => {
+            {shown.map((inv) => {
               const state = invoiceState(inv, todayISO);
               // ⚠️ THE ROW'S ID NEVER REACHES THE URL. Same shape as /app/money: a sealed
               // reference or plain text, never a dead link and never an id.
@@ -153,6 +180,22 @@ const S: Record<string, React.CSSProperties> = {
   said: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px', margin: '0 0 14px' },
 
   owed: { fontSize: TYPE.lead, fontWeight: 800, letterSpacing: '-0.01em', lineHeight: 1.4, margin: '0 0 6px' },
+  dueSoon: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '0 0 12px' },
+
+  // The chips wrap rather than scroll: four of them fit a 375px phone, and a horizontal scroller
+  // hides the last one behind an edge on the exact device most of these men hold.
+  chips: { display: 'flex', flexWrap: 'wrap', gap: 6, margin: '0 0 14px' },
+  chipOn: {
+    fontSize: TYPE.note, fontWeight: 700, textDecoration: 'none',
+    background: RIVER, color: ON_RIVER, borderRadius: RADIUS.pill,
+    padding: '7px 12px', minHeight: 40, display: 'inline-flex', alignItems: 'center',
+  },
+  chipOff: {
+    fontSize: TYPE.note, fontWeight: 700, textDecoration: 'none',
+    background: SURFACE, color: INK, borderRadius: RADIUS.pill,
+    padding: '7px 12px', minHeight: 40, display: 'inline-flex', alignItems: 'center',
+  },
+  emptyView: { fontSize: TYPE.body, lineHeight: 1.55, color: MUTED, margin: '0 0 4px' },
 
   list: { listStyle: 'none', margin: 0, padding: 0 },
   rowMain: { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' },

@@ -350,7 +350,7 @@ export async function POST(req: NextRequest) {
     if (conversationId) {
       await saveConversationTurn(userId, conversationId, question, answer, sourceUrls);
     }
-    await logQaCandidate(question, answer, sourceUrls, sourceUrls.length > 0);
+    await logQaCandidate(userId, question, answer, sourceUrls, sourceUrls.length > 0);
     // Populate the free cache only when BOTH gates pass: the question carried no
     // personal context, and every source was recognised. So a served answer can
     // never contain another user's figures and is always source backed.

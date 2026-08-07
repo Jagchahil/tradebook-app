@@ -4,7 +4,7 @@ import { targetHash } from '../../../../lib/logindoor';
 import {
   createWebSession, ensureUserRow, reconcileSignupToUser, latestSignupIdentity,
   grantTrialWithIdentity, readLatestSignupCode, bumpSignupCodeAttempt, consumeSignupCode,
-  findAuthUserIdForEmail, createConfirmedAuthUser, setSignupUserId,
+  findAuthUserIdForEmail, createConfirmedAuthUser, setSignupUserId, ensureSignupBridge,
 } from '../../../../lib/supabase';
 import {
   SESSION_COOKIE, SESSION_TTL_SECONDS, newSessionId, originAllowed,
@@ -144,6 +144,19 @@ export async function POST(req: NextRequest) {
   // The bridge from this address to this account, so the sign in door can find him tomorrow without
   // going through a phone number he has deliberately never proved.
   await setSignupUserId(verifiedEmail, userId);
+
+  // 🔴 AND THE BRIDGE IS CONFIRMED, NOT ASSUMED. THIS IS NOT BELT AND BRACES.
+  //
+  // setSignupUserId patches a row. When /api/onboard did not save one, and it does not save one
+  // whenever the database wobbled or its bot trap fired, there is nothing to patch and the patch
+  // succeeds silently. The email sign in door then cannot find him for ever, because
+  // findContactAccount resolves an address only through signups.user_id. He keeps the session he
+  // is holding, so nothing looks wrong tonight, and he is locked out tomorrow morning with the
+  // same neutral screen a stranger gets. Found on a real signup, 6 August 2026.
+  //
+  // ensureSignupBridge lays the row down only when NOBODY holds this address. It refuses when
+  // another account holds it and when the check cannot be read, so it can never move a link.
+  await ensureSignupBridge(userId, verifiedEmail);
 
   // His /start answers, carried onto the account so nothing is asked twice. Best effort on purpose.
   await reconcileSignupToUser(userId, verifiedEmail).catch(() => null);

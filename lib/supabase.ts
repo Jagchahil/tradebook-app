@@ -569,10 +569,12 @@ export async function saveConversationTurn(
   }
 }
 
-// Strip the obvious personal bits from a question before it enters the shared
-// review pool: emails, UK postcodes, currency amounts, and long digit runs. The
-// general tax question survives, the identifying detail does not. This keeps the
-// learning corpus from becoming a store of users' personal figures and names.
+// Strip the obvious personal bits from a piece of text before it enters a
+// shared pool: emails, UK postcodes, currency amounts, and long digit runs. The
+// general tax content survives, the identifying detail does not. Applied to the
+// question AND the answer on their way into qa_candidates, and to the question
+// sample on its way into the metrics, so no shared store becomes a record of
+// users' personal figures and names.
 function redactPii(s: string): string {
   return (s || '')
     .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]')
@@ -581,9 +583,37 @@ function redactPii(s: string): string {
     .replace(/\b\d{7,}\b/g, '[number]');
 }
 
-// Log a Puchio answer as a learning candidate for the brain. The question is PII
-// redacted first. Records whether the sources are all recognised so a later
-// governed step can auto approve the clean ones. Never auto approves here.
+// Log a Puchio answer as a learning candidate for the brain. The question AND
+// the answer are PII redacted first. Records whether the sources are all
+// recognised so a later governed step can auto approve the clean ones. Never
+// auto approves here.
+//
+// WHY THE ANSWER IS REDACTED TOO. Until 6 August 2026 only the question was,
+// which was a door locked next to an open window: a personal answer is composed
+// FROM the man's own books, so the figure he asked about, his email and his
+// address echo straight back in the answer text, and the pool stored them raw.
+// Redacting the answer costs this table nothing it actually uses. A statutory
+// figure in a clean general answer does come out as [amount], but the raw text
+// of exactly those answers is already kept, safely, in qa_cache: /api/ask
+// writes it there for the same turns (general, all sources recognised) the
+// governed step would want raw. Every other answer was composed with personal
+// input and has no business in a shared pool unredacted.
+//
+// WHY THE ROW CARRIES user_id. A row that cannot be found for a man cannot be
+// exported for him or erased for him, and UK GDPR Articles 15 and 17 do not
+// stop applying because the store is an internal review queue. qa_candidates is
+// in USER_DATA_TABLES, so both doors walk it. The pool dedupes across users, so
+// the id kept is THE ASKER WHOSE ANSWER TEXT IS STORED: the insert takes the
+// first asker, and the RPC refreshes user_id in step with the answer while the
+// row is still unreviewed, never after a human has acted on it. Erasing that
+// man deletes the whole row even if others asked the same question, which is
+// the right direction to fail in: the corpus can relearn a question, he cannot
+// unshare his figures.
+//
+// ⚠️ DEPLOY ORDER. The user_id column and the eight parameter log_qa_candidate
+// RPC must exist in the database BEFORE this code ships (see supabase/schema.sql
+// and supabase/APPLY_2026-08-07_qa_candidates.sql). Until they do, both writes here fail and are
+// swallowed as best effort, which loses learning rows, never answers.
 //
 // Deduped: the same question asked again bumps a seen_count on the one row
 // instead of adding a new one, so the pool stays bounded at scale (doc 96). The
@@ -592,6 +622,7 @@ function redactPii(s: string): string {
 // short to normalise) we fall back to a plain insert so nothing is dropped.
 // Best effort throughout.
 export async function logQaCandidate(
+  userId: string,
   question: string,
   answer: string,
   sources: string[],
@@ -600,13 +631,20 @@ export async function logQaCandidate(
 ): Promise<void> {
   try {
     const redacted = redactPii(question).slice(0, 1000);
+    // Redact before the cap, so a figure straddling the cut cannot slip through
+    // as a recognisable fragment.
+    const redactedAnswer = redactPii(answer).slice(0, 8000);
+    // An empty user id must become null, not an empty string: uuid columns
+    // reject '' and the whole best effort write would be lost with it.
+    const owner = userId || null;
     const norm = qaDedupeKey(redacted);
     if (!norm) {
       await rest('qa_candidates', {
         method: 'POST',
         body: JSON.stringify({
+          user_id: owner,
           question: redacted,
-          answer: answer.slice(0, 8000),
+          answer: redactedAnswer,
           sources: sources.length ? sources : null,
           used_knowledge: usedKnowledge,
           all_sources_recognised: allSourcesRecognised(sources),
@@ -620,11 +658,12 @@ export async function logQaCandidate(
       body: JSON.stringify({
         p_question_norm: norm,
         p_question: redacted,
-        p_answer: answer.slice(0, 8000),
+        p_answer: redactedAnswer,
         p_sources: sources.length ? sources : null,
         p_used_knowledge: usedKnowledge,
         p_all_recognised: allSourcesRecognised(sources),
         p_engine_impact: engineImpact,
+        p_user_id: owner,
       }),
     });
   } catch {
@@ -1715,6 +1754,30 @@ export async function reconcileSignupToUser(
     )) applied.push('rental');
   }
 
+  // 🔴 6. A STUDENT LOAN, WHICH WAS THE ONE TICK OF THE THREE THAT LANDED NOWHERE AT ALL.
+  //
+  // Found by walking a real signup on 6 August 2026. He ticks "A student loan" at /start step 4,
+  // where the form promises, in those words, that the repayment "lands in one lump with the January
+  // bill" and that "Lekhio includes it in your set aside figure". The tick reached the signups row
+  // and stopped there: the job tick wrote a circumstance, the property tick wrote a circumstance,
+  // and the loan tick was read into `prompts` and returned to a caller that discards the result.
+  //
+  // So /app/tax/student-loan told him "You have not told us about a student loan", which is a
+  // sentence about a thing he had told us, and his set aside quietly missed 9% of everything above
+  // his threshold until he found a page under Tools and set the plan himself. That is money he does
+  // not put by, and he finds out in January.
+  //
+  // ⚠️ THE PLAN IS NOT GUESSED HERE, AND THAT IS THE WHOLE CARE OF IT. The thresholds differ by
+  // thousands between plans, so a wrong plan is a wrong figure with our name on it, and /start never
+  // asks which one he is on. This writes the FACT and nothing else. The plan is his to give on
+  // /app/tax/student-loan, and the page now says so instead of telling him we never heard.
+  if (streams.includes('loan')) {
+    if (await saveCircumstance(
+      userId, 'student_loan', 'yes',
+      'You told us at signup that you have a student loan.', 'web',
+    )) applied.push('student_loan');
+  }
+
   // Mark reconciled, so a second sign in never re-applies any of the above. Same key we read on,
   // or we would mark a row we did not use and leave the one we did unmarked for ever.
   await fetch(
@@ -2753,6 +2816,72 @@ export async function setSignupUserId(email: string, userId: string): Promise<vo
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE ROW HAS TO EXIST FOR THAT PATCH TO LAND ON. FOUND 6 AUGUST 2026, BY WALKING IT.
+//
+// setSignupUserId above patches `signups where email = his and user_id is null`. If there is no
+// row for the address, it matches nothing, succeeds, and says nothing, because a PATCH that
+// updates zero rows is not an error.
+//
+// THAT IS A LOCKED DOOR, NOT A NUISANCE, AND IT ONLY BECAME ONE IN JULY.
+//
+// findContactAccount's email branch resolves an address ONLY through a signups row carrying a
+// user_id (`user_id=not.is.null`), and it is right to: that link is the sole proof the address was
+// ever proved into the account, and the 29 July takeover happened because the old code resolved
+// through the typed phone instead. So no row means no link, no link means the sign in door never
+// sends him a code, and the screen tells him the same neutral sentence it tells a stranger. He
+// concludes he mistyped his own address. Every retry does exactly the same thing.
+//
+// He is not locked out today: he is holding a live session from the signup he just finished. He is
+// locked out the moment it ends, which for most people is the next morning, and no amount of
+// trying gets him back in without a human touching the database.
+//
+// WHEN THERE IS NO ROW. /start posts his answers to /api/onboard and then asks for the code
+// WITHOUT WAITING TO SEE WHETHER THE ANSWERS SAVED, on the reasoning, written in that file, that a
+// failed save costs him nothing worse than being asked a few questions twice. That reasoning was
+// true when it was written and the July hardening quietly made it false. Any 500 from a database
+// wobble, and the bot trap in /api/onboard (which returns ok and deliberately saves nothing, so an
+// automated submission gets no signal), both land here.
+//
+// So the account minting path lays the bridge down itself rather than trusting that one is there.
+// It is the same three steps bindProvedEmailToUser already uses at the /app/you email door, for
+// the same reason, and it grants nothing that has not just been proved: the caller is on the far
+// side of a code we emailed to this address and he typed back minutes ago.
+//
+// ⚠️ AND IT REFUSES TO MOVE A LINK THAT ALREADY EXISTS. provedEmailOwner answers 'another' when
+// somebody else's account already holds this address, and an unreadable answer is NOT 'nobody'.
+// Both refuse, silently, leaving what is there alone. Writing a second row on a guess is how the
+// takeover this rule exists to stop would come back.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export async function ensureSignupBridge(userId: string, email: string): Promise<boolean> {
+  const addr = (email ?? '').trim().toLowerCase();
+  if (!userId || !addr) return false;
+
+  const owner = await provedEmailOwner(userId, addr);
+  // Already linked to this account, by the patch above or by a row that was always his.
+  if (owner === 'his') return true;
+  // 'another' is somebody else's proved address, and null is a read we could not trust. Neither is
+  // an invitation to write. He keeps the session he just proved, and nothing is moved.
+  if (owner !== 'nobody') return false;
+
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/signups`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      // reconciled_at is stamped because this row carries no answers to carry over. An empty row
+      // left unreconciled would be picked up by reconcileSignupToUser and mark itself done against
+      // a real signup he makes later. Same reason bindProvedEmailToUser stamps it.
+      body: JSON.stringify({
+        phone: '', email: addr, user_id: userId, reconciled_at: new Date().toISOString(),
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // ── The web trial: granted against an ACCOUNT, not a phone ───────────────────────────────────────
 //
 // 🔴 WHY THERE IS A SECOND GRANT FUNCTION AND grantTrialIfNone WAS NOT SIMPLY CHANGED.
@@ -3228,6 +3357,13 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
 
   // His own actions, with the ip address they came from. His to see, and his to have erased.
   { table: 'audit_log', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  // The learning pool. Question and answer are both PII redacted on the way in
+  // (see logQaCandidate), but redaction is a filter, not a guarantee, and the
+  // row is keyed to the asker whose answer text is stored. Same shape as
+  // allowance_elections: a bare user_id with no foreign key, so nothing
+  // cascades and this walk is the only door. Legacy rows written before the
+  // column existed carry null and age out via lib/qaretention.ts.
+  { table: 'qa_candidates', userKey: 'user_id', keyKind: 'user_id', select: '*' },
   // The WhatsApp linking codes. code_hash is an HMAC, so it is withheld the same way a token is.
   { table: 'wa_links', userKey: 'user_id', keyKind: 'user_id', select: 'id,user_id,expires_at,consumed_at,bound_phone,created_at' },
 

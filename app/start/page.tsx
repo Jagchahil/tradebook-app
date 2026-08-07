@@ -204,9 +204,14 @@ export default function StartPage() {
         }),
       });
     } catch {
-      // A failed save must not trap him on the form. He still gets his code and his account; the
-      // worst case is that a few answers are asked again inside onboarding, which is a nuisance
-      // rather than a wall.
+      // A failed save must not trap him on the form. He still gets his code and his account, and
+      // the answers are simply asked again inside onboarding.
+      //
+      // ⚠️ THIS USED TO SAY THE WORST CASE WAS A NUISANCE RATHER THAN A WALL, AND THAT STOPPED
+      // BEING TRUE IN JULY. The email sign in door resolves an address only through a signups row
+      // carrying a user_id (findContactAccount), so a signup that saved nothing left a man able to
+      // finish tonight and unable to sign in ever again. The account minting path now lays that
+      // bridge down itself, in ensureSignupBridge, so this is only the answers now.
     }
   }
 

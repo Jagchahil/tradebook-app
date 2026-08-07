@@ -1246,3 +1246,82 @@ notify pgrst, 'reload schema';
 -- ---------------------------------------------------------------------------
 drop index if exists public.conversations_one_lekhio_thread;
 notify pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------------
+-- qa_candidates grows an owner, and the write path stops storing raw answers
+-- (6 August 2026, scratch-qa-candidates.sql). Two defects, one section.
+--
+-- First, the pool redacted the QUESTION and stored the ANSWER raw. A personal
+-- answer is composed from the man's own books, so his figures echoed straight
+-- into a shared review table. The redaction fix lives in lib/supabase.ts's
+-- logQaCandidate; the schema's part is the second defect: no user_id column,
+-- so a row holding a customer's figures could never be found again for a UK
+-- GDPR Article 15 export or Article 17 erasure.
+--
+-- The column is NULLABLE and BARE (no foreign key), the same shape as
+-- allowance_elections: legacy rows have no owner to name and age out via the
+-- retention sweep (lib/qaretention.ts), and erasure walks USER_DATA_TABLES
+-- rather than relying on a cascade. The pool dedupes across users, so the id
+-- kept is the asker whose answer text is stored: the RPC below refreshes
+-- user_id in step with the answer while the row is unreviewed, never after a
+-- human has acted. RLS is unchanged: service role only, no user policy, the
+-- app never reads this table directly.
+--
+-- The old seven parameter log_qa_candidate is DROPPED, not kept alongside. It
+-- is the path that writes unredacted answers with no owner, and any deploy
+-- still calling it should lose its best effort learning row rather than keep
+-- that path alive. The write is wrapped in try/catch and never blocks or
+-- fails an answer, so the cost during the deploy window is a few unlogged
+-- candidates, and the gain is that nothing can write a raw answer from the
+-- moment this file runs.
+-- ---------------------------------------------------------------------------
+alter table public.qa_candidates
+  add column if not exists user_id uuid;
+
+-- The GDPR doors filter on user_id; without an index each export or erasure
+-- walks the whole pool.
+create index if not exists qa_candidates_user
+  on public.qa_candidates(user_id);
+
+drop function if exists public.log_qa_candidate(text, text, text, jsonb, boolean, boolean, boolean);
+
+create or replace function public.log_qa_candidate(
+  p_question_norm  text,
+  p_question       text,
+  p_answer         text,
+  p_sources        jsonb,
+  p_used_knowledge boolean,
+  p_all_recognised boolean,
+  p_engine_impact  boolean,
+  p_user_id        uuid
+) returns void
+language sql
+set search_path = public
+as $$
+  insert into public.qa_candidates
+    (question_norm, question, answer, sources, used_knowledge,
+     all_sources_recognised, engine_impact, user_id, seen_count, last_seen_at)
+  values
+    (p_question_norm, p_question, p_answer, p_sources, coalesce(p_used_knowledge, false),
+     coalesce(p_all_recognised, false), coalesce(p_engine_impact, false), p_user_id, 1, now())
+  on conflict (question_norm) do update set
+    seen_count             = public.qa_candidates.seen_count + 1,
+    last_seen_at           = now(),
+    answer                 = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.answer else public.qa_candidates.answer end,
+    -- The owner travels with the answer: whoever's answer text the row holds is
+    -- whose data it is. Frozen together the moment a human reviews or dismisses.
+    user_id                = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.user_id else public.qa_candidates.user_id end,
+    sources                = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.sources else public.qa_candidates.sources end,
+    used_knowledge         = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.used_knowledge else public.qa_candidates.used_knowledge end,
+    all_sources_recognised = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.all_sources_recognised else public.qa_candidates.all_sources_recognised end,
+    engine_impact          = case when public.qa_candidates.status = 'unreviewed'
+                                  then excluded.engine_impact else public.qa_candidates.engine_impact end;
+$$;
+revoke execute on function public.log_qa_candidate(text, text, text, jsonb, boolean, boolean, boolean, uuid) from anon, authenticated, public;
+grant execute on function public.log_qa_candidate(text, text, text, jsonb, boolean, boolean, boolean, uuid) to service_role;
+notify pgrst, 'reload schema';

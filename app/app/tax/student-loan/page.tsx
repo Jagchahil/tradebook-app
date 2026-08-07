@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getOptimiserInput, getStudentLoanSettings } from '../../../../lib/supabase';
+import { getOptimiserInput, getStudentLoanSettings, readCircumstances } from '../../../../lib/supabase';
 import { taxPosition } from '../../../../lib/taxoptimiser';
 import { STUDENT_PLANS, type StudentPlan } from '../../../../lib/nistudentloan';
 import { asPercent } from '../../../../lib/taxengine';
@@ -55,7 +55,23 @@ export default async function StudentLoanPage({
   const saved = one('done') === 'saved';
   const failed = one('e') !== undefined;
 
-  const [optimiser, fin] = await Promise.all([getOptimiserInput(user.id), getStudentLoanSettings(user.id)]);
+  // 🔴 WHETHER HE ALREADY TOLD US, WHICH IS NOT THE SAME QUESTION AS WHICH PLAN HE IS ON.
+  //
+  // He can tick "A student loan" at /start, and until 7 August 2026 that tick was dropped on the
+  // floor: this page then told a man who had told us that he had not told us, and his set aside
+  // silently missed the repayment until he found this screen himself. The tick now writes a
+  // circumstance (reconcileSignupToUser) and this page reads it, so the sentence below is true
+  // either way. The PLAN is still only ever his to give: the thresholds differ by thousands between
+  // plans, so guessing one would put a wrong figure on his Overview under our name.
+  const [optimiser, fin, circumstances] = await Promise.all([
+    getOptimiserInput(user.id),
+    getStudentLoanSettings(user.id),
+    readCircumstances(user.id).catch(() => []),
+  ]);
+  // ⚠️ null IS "WE COULD NOT READ", NEVER "HE ANSWERED NOTHING", and the sentence below has to
+  // respect that or a database wobble turns into us telling a man he never mentioned his loan.
+  const answersKnown = Array.isArray(circumstances);
+  const toldUsAtSignup = (circumstances ?? []).some((c) => c.key === 'student_loan' && c.answer === 'yes');
   const plans = (optimiser.studentPlans ?? []) as StudentPlan[];
   const tax = taxPosition(optimiser);
   const currentPlan = fin?.plan ?? '';
@@ -70,11 +86,18 @@ export default async function StudentLoanPage({
       {plans.length === 0 ? (
         <section className="lek-card">
           <h1 className="lek-h2">Student loan</h1>
-          <p style={S.body}>You have not told us about a student loan, so nothing is counted for one.</p>
+          <p style={S.body}>
+            {!answersKnown
+              ? 'We could not check what you have already told us just now, so nothing is counted for a student loan yet.'
+              : toldUsAtSignup
+                ? 'You told us when you signed up that you have a student loan. We still need to know which plan you are on before we can count it.'
+                : 'You have not told us about a student loan, so nothing is counted for one.'}
+          </p>
           <p style={S.quiet}>
-            If you do have one, set your plan below. Self Assessment collects the whole year&apos;s
-            repayment in one lump with the January bill, and until we know your plan, the set aside
-            figure on your Overview does not include it.
+            {answersKnown && toldUsAtSignup ? 'Set your plan below. ' : 'If you do have one, set your plan below. '}
+            Self Assessment collects the whole year&apos;s repayment in one lump with the January
+            bill, and until we know your plan, the set aside figure on your Overview does not
+            include it.
           </p>
         </section>
       ) : (

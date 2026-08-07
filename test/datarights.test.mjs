@@ -153,6 +153,10 @@ const MUST_BE_HELD = [
   'messages', 'conversations', 'goals', 'diary_jobs', 'properties', 'circumstances',
   'vat_profiles', 'book_shares', 'hmrc_approvals', 'hmrc_connections', 'bank_connections',
   'user_rules', 'onboarding_progress', 'agent_signals', 'wa_links',
+  // The learning pool, ownerless until 6 August 2026: rows now carry the asker
+  // whose answer text is stored, so both doors must walk it. See
+  // test/qacandidates.test.mjs for the write path itself.
+  'qa_candidates',
   // And what was already right, which must stay right.
   'transactions', 'invoices', 'events', 'reminder_prefs', 'signups',
 ];

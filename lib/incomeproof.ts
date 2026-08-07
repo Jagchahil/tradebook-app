@@ -401,6 +401,34 @@ const PROOF_CSS = `
 `;
 
 // A complete, self contained, print ready HTML document. No external assets.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS DOCUMENT DID NOT ADD UP, AND THE SCREEN SHOWING THE SAME FIGURES DID.
+//
+// Found 7 August 2026 by rendering both surfaces for one account rather than reading them. The
+// car business reads, on the sheet a mortgage lender receives:
+//
+//     Gross income        £33,000.00
+//     Allowable expenses   £8,000.00
+//     Net profit          £22,900.00
+//
+// £33,000 less £8,000 is £25,000. The missing £2,100 is the car's writing down allowance, taken
+// off inside buildIncomeProof so the taxable figure matches the Overview. app/app/proof-of-income
+// says so in a sentence, and app/share/[token] says so in a sentence. THIS DOCUMENT, the only one
+// of the three that leaves the building, said nothing, so a lender was handed three figures that
+// contradict each other and no way to reconcile them. That is the same defect the shared books
+// page was fixed for on 6 August ("a reader who subtracts the two figures above lands £2,100 out
+// and is given nothing to explain it"), surviving on the surface it matters most on.
+//
+// ⚠️ AND THE SECOND LINE IS FOR A CAR BOUGHT IN AN EARLIER YEAR. capitalCost is what left the
+// account INSIDE this tax year, so a van bought two Aprils ago is still earning an allowance with
+// no purchase row anywhere in range: capitalCost is 0, capitalAllowance is not, and the old guard
+// on capitalCost alone printed nothing at all. The allowance is named whenever there IS one.
+//
+// ⚠️ NO FIGURE MOVES. Both additions are sentences. Every income, expense, profit and tax figure
+// on this document is byte identical to what it printed before, which test/lenderdirector.test.mjs
+// asserts against the rendered output of the screen.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export function renderIncomeProofHtml(p: IncomeProof): string {
   const generated = longDate(p.generatedAt.slice(0, 10));
   return `<!doctype html>
@@ -422,7 +450,8 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
       ${row('Net profit', gbp(p.profit), { bold: true })}
       ${p.companyExcluded ? '' : row(p.estimatedTaxLabel, gbp(p.estimatedTax), { muted: true })}
     </table>
-    ${p.capitalCost > 0 ? `<div class="capital">${gbp(p.capitalCost)} more left the account on ${p.capitalCount === 1 ? 'a car' : `${p.capitalCount} cars`}, which is not an allowable expense in one year. A car comes off over several years rather than all at once, so it is not in the figures above.</div>` : ''}
+    ${p.capitalCost > 0 ? `<div class="capital">${gbp(p.capitalCost)} more left the account on ${p.capitalCount === 1 ? 'a car' : `${p.capitalCount} cars`}, which is not an allowable expense in one year. A car comes off over several years rather than all at once, so it is not in the figures above.${p.capitalAllowance > 0 ? ` This year's writing down allowance of ${gbp(p.capitalAllowance)} is already taken off the profit above.` : ''}</div>` : ''}
+    ${p.capitalCost === 0 && p.capitalAllowance > 0 ? `<div class="capital">This year's writing down allowance of ${gbp(p.capitalAllowance)} on a vehicle is already taken off the profit above, which is why it is not simply the gross income less the allowable expenses.</div>` : ''}
     ${p.financeCost > 0 ? `<div class="capital">${gbp(p.financeCost)} of residential mortgage interest is not an allowable expense either, so it is not in the figures above. Since Section 24 it is relieved as a basic rate tax credit instead${p.financeCredit > 0 ? `, and the credit of ${gbp(p.financeCredit)} is already taken off the estimated tax` : ''}.</div>` : ''}
     ${p.shareNote ? `<div class="whose">${esc(p.shareNote)}</div>` : ''}
     ${p.companyExcluded ? `<div class="whose">These are the company's figures, not this person's personal income. A company pays Corporation Tax on its own return, and the director is paid in salary and dividends, which are not shown here.</div>` : ''}

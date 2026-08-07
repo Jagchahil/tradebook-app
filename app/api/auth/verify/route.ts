@@ -105,12 +105,30 @@ export async function POST(req: NextRequest) {
   // The phone is the account key, always. On the email door the verified user already has one, and
   // user.phone is what GoTrue holds for him; on the phone door it is the number we just proved.
   // Never the form, never the cookie's value when that value is an address.
-  await ensureUserRow(user.id, pending.channel === 'sms' ? pending.value : (user.phone || ''));
+  //
+  // 🔴 THE RESULT IS CHECKED, AND IT USED NOT TO BE, WHILE THE SIGNUP DOOR ALWAYS CHECKED IT.
+  // ensureUserRow returns false on a write that did not land. /api/signup/verify treats that as a
+  // 502 and refuses to open a session. This door carried on and minted one anyway, so a man was
+  // handed a cookie pointing at a user id with no public.users row behind it and dropped on /app,
+  // where every read is empty and nothing says why. Same function, same failure, and the door that
+  // ignored it is the one he uses every day.
+  const rowOk = await ensureUserRow(
+    user.id, pending.channel === 'sms' ? pending.value : (user.phone || ''),
+  );
+  if (!rowOk) return back(req, 'session', next);
 
   // The six questions he answered at /start, carried onto the account. Idempotent and guarded by
   // reconciled_at, so signing in again does not re-apply anything. Best effort on purpose: a man
   // must never be locked out of his own books because a profile field would not save.
-  await reconcileSignupToUser(user.id).catch(() => null);
+  //
+  // ⚠️ THE ADDRESS MUST BE PASSED OR THIS IS A GUARANTEED NO OP FOR EVERY WEB CUSTOMER.
+  // reconcileSignupToUser matches on the account's phone, and falls back to the verified address
+  // only when it is given one. A web minted account has an EMPTY phone_number by design, so with no
+  // second argument the match string is empty and the function returns before reading anything.
+  // /api/signup/verify passes it. This door did not, which is exactly the case it matters in: a man
+  // whose /start answers landed after his signup verify ran has an unreconciled row, and signing in
+  // is the natural place to pick it up.
+  await reconcileSignupToUser(user.id, user.email || null).catch(() => null);
 
   // ⚠️ THE "REMEMBER MY BROWSER" BOX, AND THE ABSENT VALUE IS THE SAFE ONE. An unticked checkbox
   // simply does not post its field, so anything other than the tick reads as not remembered,

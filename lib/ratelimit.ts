@@ -106,11 +106,11 @@ export async function userBurst(
   return rateLimitedShared(`u:${route}:${userId}`, limit, PER_USER_WINDOW_MS);
 }
 
-// ⚠️ A CAP THAT FAILS CLOSED. The opposite posture to everything else in this file, on purpose.
+// ⚠️ A CAP WHOSE FAILURE POSTURE IS THE CALLER'S DECISION, AND THE DEFAULT IS CLOSED.
 //
 // Every limiter above fails OPEN: they are abuse control, and a database wobble must never lock a
 // man out of his own books. This one guards a thing that costs REAL MONEY per call, a Twilio SMS at
-// roughly 7p to 10p, and the failure modes are not symmetric:
+// roughly 7p to 10p, and there the failure modes are not symmetric:
 //
 //   fail open  on a database wobble, an attacker who is already hammering the login gets an
 //              unlimited run at our card until someone notices from a bill.
@@ -120,8 +120,35 @@ export async function userBurst(
 // So a null from the shared counter, which means "we could not count", is treated as "we cannot
 // safely spend". The same reasoning as add_ai_usage, whose callers treat null as blocked for AI
 // spend and as allowed for plain message counting.
-export async function spendCapReached(key: string, limit: number, windowSeconds: number): Promise<boolean> {
+//
+// 🔴 7 AUGUST 2026: THAT LAST CLAUSE WAS NOT TRUE, AND ON THE WEB IT HAD BECOME THE WHOLE DOOR.
+//
+// "the email door, which costs nothing, keeps working" was written when the web door offered a
+// number as well as an address. Since 2 August the web door is EMAIL ONLY, and every email door in
+// the product called this same function, so a failing rate_hit RPC did not slow anything down: it
+// shut sign in, the email bind and signup at once, and told every customer "we have sent as many
+// codes as we can for the moment", which is a false statement of cause. We did not hit a limit. We
+// could not count. Nothing else in the product notices a dead rate_hit, because everything else
+// fails open, so the only symptom would be the front door.
+//
+// The posture now belongs to the caller, because the honest answer differs by door:
+//
+//   SMS               closed. It spends money and the attack has a name.
+//   EMAIL SIGN IN     open. Control 1 already proved the address belongs to an existing customer,
+//                     so the flood is bounded by our own customer list, and a paying customer
+//                     locked out of his books on a Monday is the worse outcome by far.
+//   EMAIL BIND        open. Behind a session, bounded to one account.
+//   SIGNUP CODE       closed, and deliberately different. That form takes any address on earth, so
+//                     a wobble there would put our sending reputation in a stranger's hands. A new
+//                     customer who has to come back in ten minutes has lost ten minutes. A
+//                     returning customer who cannot get in has lost his books.
+export async function spendCapReached(
+  key: string,
+  limit: number,
+  windowSeconds: number,
+  failClosed = true,
+): Promise<boolean> {
   const shared = await rateHit(key, limit, windowSeconds);
-  if (shared === null) return true;
+  if (shared === null) return failClosed;
   return shared;
 }

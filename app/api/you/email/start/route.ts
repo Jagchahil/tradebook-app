@@ -107,7 +107,12 @@ export async function POST(req: NextRequest) {
 
   // The ceiling, atomic and shared, and honest when it fires: a real customer deserves better
   // than a code that silently never arrives.
-  if (await spendCapReached('bem:daily', DAILY_CAP, DAILY_WINDOW_SECONDS)) {
+  //
+  // ⚠️ FAILS OPEN, because this door is already behind a session and bounded to one account. A
+  // failing rate_hit RPC means we could not count, not that a limit was reached, and telling a
+  // signed in customer he has spent a ceiling he never touched is a lie that also blocks the one
+  // action that gives him a working email door. See spendCapReached for the split by door.
+  if (await spendCapReached('bem:daily', DAILY_CAP, DAILY_WINDOW_SECONDS, false)) {
     await logAuthSend('email', hash, 'refused_capped');
     return back(req, 'capped');
   }

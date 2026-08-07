@@ -126,11 +126,24 @@ export async function POST(req: NextRequest) {
     return onward(req, id.channel, id.value, next);
   }
 
-  // CONTROL 2. The daily cap, and this one FAILS CLOSED. See spendCapReached.
+  // CONTROL 2. The daily cap. IT FAILS CLOSED ON THE TEXT DOOR AND OPEN ON THE EMAIL DOOR.
   //
   // Being honest when it fires costs nothing: an attacker who has spent the cap already knows, and
   // a real customer deserves better than a code that silently never arrives.
-  if (await spendCapReached(`otp:daily:${id.channel}`, dailyCapFor(id.channel), SMS_DAILY_WINDOW_SECONDS)) {
+  //
+  // 🔴 THE SPLIT IS NOT A SOFTENING, IT IS THE ORIGINAL REASONING FINALLY APPLIED. spendCapReached
+  // was written to protect MONEY, and its own comment promised that "the email door, which costs
+  // nothing, keeps working". Since 2 August the email door is the ONLY web door, so a failing
+  // rate_hit RPC did not slow sign in down, it shut it, and told every customer we had hit a limit
+  // when the truth was that we could not count. Control 1 above has already proved this address
+  // belongs to an existing customer, so an email flood here is bounded by our own customer list.
+  // The text door keeps the closed posture, because that one spends money on any number typed.
+  if (await spendCapReached(
+    `otp:daily:${id.channel}`,
+    dailyCapFor(id.channel),
+    SMS_DAILY_WINDOW_SECONDS,
+    id.channel === 'sms',
+  )) {
     await logAuthSend(id.channel, hash, 'refused_capped');
     return back(req, 'capped', next);
   }
@@ -138,8 +151,30 @@ export async function POST(req: NextRequest) {
   // Bind the address to the account we already hold, so GoTrue resolves the email code to the SAME
   // auth user his phone resolves to. Without this he gets a second account, his receipts land on
   // one and his session shows the other, and both look like they are working.
+  //
+  // 🔴 THE RESULT IS CHECKED, AND IT USED NOT TO BE. THAT WAS TWO DIFFERENT DISASTERS.
+  //
+  // This PUT is the only thing that makes GoTrue's answer to "who owns this address" agree with
+  // ours. The OTP below is then requested BY ADDRESS, so GoTrue, not us, picks the account. With
+  // the result thrown away, the request went out anyway:
+  //
+  //   404, no such auth user   GoTrue has never seen the address, create_user:false matches
+  //                            nothing, and NOTHING IS SENT. He is told a code is on its way, on
+  //                            every attempt, for ever. The same wall as the 6 August signup
+  //                            lockout, reached through a different door.
+  //   422 or 409, taken        the address belongs to a DIFFERENT auth user, so the code goes out
+  //                            on that account, lands in the same inbox he is sitting in front of,
+  //                            works, and SIGNS HIM INTO SOMEBODY ELSE'S BOOKS. Nothing downstream
+  //                            compares GoTrue's answer with account.userId, and the audit row for
+  //                            it reads a clean 'sent'.
+  //
+  // ⚠️ THE NEUTRALITY RULE AT THE TOP OF THIS FILE DOES NOT COVER THIS LINE. A stranger and an
+  // unbridged signup were both turned away above and both got the neutral screen. By here the
+  // address is already known to be ours. A false is not a fact about a stranger, it is a fact about
+  // our own infrastructure, so saying so leaks nothing and costs him only a minute.
   if (id.channel === 'email' && account.userId) {
-    await attachEmailToAuthUser(account.userId, id.value);
+    const attached = await attachEmailToAuthUser(account.userId, id.value);
+    if (!attached) return back(req, 'unavailable', next);
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';

@@ -131,6 +131,32 @@ ok('🔴 VERIFY READS THE CONTACT FROM THE SIGNED COOKIE', verifyRoute.includes(
 ok('🔴 VERIFY NEVER READS A PHONE OR EMAIL OUT OF THE FORM', !/form\.get\(\s*['"](phone|email|contact)['"]/.test(verifyRoute));
 ok('the identity comes from Supabase, not from us', verifyRoute.includes('verifyAccessToken'));
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 7 AUGUST 2026. TWO RESULTS THIS DOOR THREW AWAY, AND THE SIGNUP DOOR NEVER DID.
+//
+// ensureUserRow returns false on a write that did not land. /api/signup/verify treats that as a
+// 502 and refuses to open a session. This door carried on and minted one anyway, handing a man a
+// cookie pointing at a user id with NO public.users row behind it and dropping him on /app, where
+// every read is empty and nothing says why. Same function, same failure, two different answers,
+// and the door that ignored it is the one he uses every day.
+ok('🔴 A FAILED USERS ROW STOPS THE SESSION, IT DOES NOT MINT ONE ANYWAY',
+  /const rowOk = await ensureUserRow\([\s\S]{0,160}?\);\s*\n\s*if \(!rowOk\) return back\(req, 'session', next\);/
+    .test(verifyRoute));
+ok('🔴 THE USERS ROW RESULT IS NEVER DISCARDED',
+  !/^\s*await ensureUserRow\(/m.test(verifyRoute));
+// And the signup door's posture is the one being matched, so neither can drift alone.
+ok('the signup door still refuses a session when the row will not write',
+  /const rowOk = await ensureUserRow/.test(read(path.join(repo, 'app/api/signup/verify/route.ts'))));
+
+// ⚠️ reconcileSignupToUser MATCHES ON THE PHONE, AND A WEB MINTED ACCOUNT HAS NONE.
+// It falls back to the verified address only when it is given one, so with no second argument the
+// match string is empty and it returns before reading anything. Called bare here, it was a
+// guaranteed no op for exactly the customers the web app exists for: a man whose /start answers
+// landed after his signup verify ran has an unreconciled row, and signing in is where it gets
+// picked up. /api/signup/verify has always passed the address. This door now does too.
+ok('🔴 THE VERIFIED ADDRESS IS PASSED TO THE RECONCILE, OR IT IS A NO OP',
+  /reconcileSignupToUser\(user\.id, user\.email \|\| null\)/.test(verifyRoute));
+
 // ── REMEMBER MY BROWSER, THREADED HONESTLY THROUGH THE ONE DOOR THAT ASKS ──
 //
 // The box on /in is the user's statement about whose machine this is, and the only honest
@@ -189,6 +215,52 @@ ok('there is a per source limit', startRoute.includes('PER_SOURCE_SENDS'));
 ok('every outcome is logged', startRoute.includes('logAuthSend'));
 ok('an unknown contact is logged as such', startRoute.includes("'refused_unknown'"));
 ok('the shape check happens before anything is spent', startRoute.includes('readIdentifier'));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 7 AUGUST 2026. THE DAILY CAP FAILS CLOSED ON MONEY AND OPEN ON THE ONLY WEB DOOR.
+//
+// spendCapReached exists to protect a Twilio bill, and its own comment promised that "the email
+// door, which costs nothing, keeps working". Since 2 August the email door is the ONLY web door,
+// and it called the same function, so a failing rate_hit RPC did not slow sign in down, it SHUT
+// it, for every customer at once, with the words "we have sent as many codes as we can for the
+// moment". We had not hit a limit. We could not count. Nothing else in the product would notice a
+// dead rate_hit, because everything else fails open, so the only symptom would be the front door.
+const capCall = startRoute.slice(startRoute.indexOf('spendCapReached('));
+ok('🔴 THE TEXT DOOR STILL FAILS CLOSED, BECAUSE IT SPENDS MONEY',
+  /id\.channel === 'sms',\s*\)\)/.test(capCall.slice(0, 400)));
+ok('🔴 A COUNTING FAILURE CANNOT SHUT THE EMAIL DOOR',
+  /spendCapReached\(\s*`otp:daily:\$\{id\.channel\}`[\s\S]{0,200}id\.channel === 'sms',/.test(startRoute));
+// And the posture is the CALLER's to choose, so a future door cannot inherit the wrong one by
+// accident. Default closed: a new call site that says nothing gets the safe answer.
+const rateLimit = read(path.join(repo, 'lib/ratelimit.ts'));
+ok('the failure posture is a parameter, and it defaults to closed',
+  /failClosed = true/.test(rateLimit) && /if \(shared === null\) return failClosed;/.test(rateLimit));
+// The signup code door takes any address on earth, so it keeps the closed posture on purpose.
+ok('🔴 THE PUBLIC SIGNUP CODE DOOR KEEPS THE CLOSED POSTURE',
+  /spendCapReached\('sup:daily:email', DAILY_CAP, DAILY_WINDOW_SECONDS\)/.test(
+    read(path.join(repo, 'app/api/signup/code/route.ts'))));
+// The bind door is behind a session and bounded to one account, so it fails open like sign in.
+ok('the email bind door fails open, it is behind a session',
+  /spendCapReached\('bem:daily', DAILY_CAP, DAILY_WINDOW_SECONDS, false\)/.test(
+    read(path.join(repo, 'app/api/you/email/start/route.ts'))));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 7 AUGUST 2026. THE ATTACH RESULT IS CHECKED, AND IT USED NOT TO BE.
+//
+// attachEmailToAuthUser PUTs the address onto the auth user, and it is the only thing that makes
+// GoTrue's answer to "who owns this address" agree with ours. The OTP is then requested BY
+// ADDRESS, so GoTrue picks the account, not us. Thrown away, the failures were:
+//   404  GoTrue has never seen the address, create_user:false matches nothing, NOTHING IS SENT,
+//        and he is told a code is on its way on every attempt for ever.
+//   422  the address belongs to a DIFFERENT auth user, so a working code arrives in his own inbox
+//        and SIGNS HIM INTO SOMEBODY ELSE'S BOOKS, with a clean 'sent' in the audit table.
+// The neutrality rule does not cover this line: the stranger and the unbridged signup were both
+// turned away above, so by here the address is already known to be ours.
+ok('🔴 A FAILED EMAIL ATTACH STOPS THE SEND, IT DOES NOT CARRY ON',
+  /const attached = await attachEmailToAuthUser\(account\.userId, id\.value\);\s*\n\s*if \(!attached\) return back\(req, 'unavailable', next\);/
+    .test(startRoute));
+ok('🔴 THE ATTACH RESULT IS NEVER DISCARDED',
+  !/^\s*await attachEmailToAuthUser\(/m.test(startRoute));
 
 // A stranger's contact and a customer's contact must produce the same next screen, or the login
 // page is a customer list with a search box on it.

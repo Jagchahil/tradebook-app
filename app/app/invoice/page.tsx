@@ -228,6 +228,13 @@ export default async function InvoiceDetailPage({
             <section className="lek-card">
               <p style={S.lead}>Paid. Nothing to chase.</p>
               <p style={S.quiet}>It stays here for your records, and it is in your income figures.</p>
+              {/* A paid invoice is still a document somebody may ask him for, so the file stays
+                  reachable. Nothing on this branch sends anything to anybody. */}
+              <div style={S.shareRow}>
+                <a className="lek-ghostlink" href={`/invoice/${row}/pdf`}>
+                  Get it as a file
+                </a>
+              </div>
             </section>
           ) : (
             <section className="lek-card">
@@ -255,6 +262,15 @@ export default async function InvoiceDetailPage({
                   href={`mailto:?subject=${encodeURIComponent(`Invoice ${inv.number}`)}&body=${encodeURIComponent(shareText)}`}
                 >
                   Send by email
+                </a>
+                {/* THE THIRD DOOR, AND THE ONE THAT SENDS NOTHING. The two above hand the link to
+                    somebody. This one hands him the document, as a file, and what he does with it
+                    after that is his business and no traffic of ours. It is a plain anchor to
+                    app/invoice/[id]/pdf/route.ts, which builds the same figures the page above
+                    shows from the same row, and comes back as an attachment so it lands in his
+                    downloads and his share sheet rather than in a viewer he then has to escape. */}
+                <a className="lek-ghostlink" href={`/invoice/${row}/pdf`}>
+                  Get it as a file
                 </a>
               </div>
             </section>

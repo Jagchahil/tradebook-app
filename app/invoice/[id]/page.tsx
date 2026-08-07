@@ -63,6 +63,33 @@ function prettyDate(value: string | null): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 PRINTING IS NOT STYLING. THIS DOCUMENT IS THE ONE A MAN SAVES AS A PDF AND ATTACHES.
+//
+// The header above already says this page is paper rather than a screen, and until now it was
+// paper that printed badly: a shadow and a rounded border that a printer renders as a grey smear,
+// a page background that wastes a cartridge, and no page size at all, so a long invoice broke
+// wherever the browser felt like breaking it.
+//
+// ⚠️ THE ONE RULE THAT MATTERS HERE: A PAGE BREAK MUST NEVER LAND INSIDE A ROW OR ACROSS THE
+// TOTAL. An invoice whose total is orphaned on a second sheet, or whose line splits in half, is a
+// document an accounts payable clerk queries rather than pays, and the tradesman never learns why
+// he was not paid. `break-inside: avoid` on the rows and the totals block is the whole defence.
+//
+// ⚠️ AND THE SAVE BUTTON REMOVES ITSELF. `.lek-noprint` is display:none in print, so the button a
+// man presses to make the PDF never appears in the PDF he made. His customer receives a document,
+// not a screenshot of our interface.
+const PRINT_CSS = `
+@media print {
+  @page { size: A4; margin: 14mm; }
+  html, body { background: #FFFFFF !important; }
+  main { background: #FFFFFF !important; padding: 0 !important; min-height: 0 !important; }
+  .lek-doc { box-shadow: none !important; border: 0 !important; border-radius: 0 !important; max-width: none !important; }
+  .lek-noprint { display: none !important; }
+  .lek-line, .lek-totals { break-inside: avoid; page-break-inside: avoid; }
+  a { text-decoration: none !important; color: inherit !important; }
+}`;
+
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const invoice = await getPublicInvoice(id).catch(() => null);
@@ -96,7 +123,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     <main style={{ backgroundColor: OFF_WHITE, color: INK, fontFamily: FONT, minHeight: '100vh', padding: '32px 16px' }}>
       <style dangerouslySetInnerHTML={{ __html: `*{box-sizing:border-box}body{margin:0}` }} />
       <style dangerouslySetInnerHTML={{ __html: A11Y_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
       <div
+        className="lek-doc"
         style={{
           maxWidth: 640,
           margin: '0 auto',
@@ -147,7 +176,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         {/* Lines */}
         <div style={{ padding: '8px 32px 0' }}>
           {invoice.line_items.map((li, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: `1px solid ${BORDER}` }}>
+            <div key={i} className="lek-line" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: `1px solid ${BORDER}` }}>
               <span style={{ fontSize: 15, color: INK, marginRight: 16 }}>{li.description}</span>
               <span style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
                 {/* The rate on each line, which reg 14 asks for by name. Absent on a legacy row,
@@ -172,7 +201,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               </div>
             </>
           ) : null}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 0' }}>
+          <div className="lek-totals" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 0' }}>
             <span style={{ fontSize: 17, fontWeight: 700 }}>Total</span>
             <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.5px' }}>{gbp(invoice.total)}</span>
           </div>

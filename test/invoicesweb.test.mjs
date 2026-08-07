@@ -978,5 +978,21 @@ for (const [name, src] of [
     /isInvoiceFilter\(one\('show'\)\)/.test(listSrc));
 }
 
+// ── THE THIRD DOOR: THE INVOICE AS A FILE ──────────────────────────────────────────────────
+// A route nobody can reach is not a feature. app/invoice/[id]/pdf/route.ts is real and gated by
+// nothing, and this checks the man is actually offered it, on both the branch where he still has
+// to send the invoice and the branch where it is already paid and he just wants the paper.
+{
+  const detail = read('app/app/invoice/page.tsx');
+  ok('the trader is offered the invoice as a file',
+    /href=\{`\/invoice\/\$\{row\}\/pdf`\}/.test(detail));
+  ok('and on a paid invoice too, because a paid one is still a document somebody asks for',
+    (detail.match(/\/pdf`\}/g) || []).length >= 2);
+  ok('🔴 and the file door names no channel, because words about a channel age into instructions',
+    !/whatsapp/i.test(detail.slice(detail.indexOf('Get it as a file') - 400, detail.indexOf('Get it as a file') + 40)));
+  ok('and it is a plain anchor, so the page still ships no client script',
+    !/onClick/.test(detail));
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

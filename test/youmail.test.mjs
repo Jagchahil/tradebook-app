@@ -310,7 +310,9 @@ for (const [name, src, route] of [
   ['/app/you/settings', pageSet, '/app/you/settings'],
 ]) {
   ok(`${name} resolves the user from the session`, src.includes('userFromSessionCookie'));
-  ok(`${name} sends a stranger to the door`, src.includes("redirect('/in')"));
+  // 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+  // destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
+  ok(`${name} sends a stranger to the door`, /redirect\('\/in(\?[^']*)?'\)/.test(src));
   ok(`${name} carries the shell and names itself`, src.includes(`<AppNav current="${route}"`));
   ok(`${name} ships no client script`, !src.includes("'use client'"));
 }

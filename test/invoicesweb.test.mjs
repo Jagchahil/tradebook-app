@@ -293,8 +293,10 @@ const WA = await stageWaintents();
 // ---------------------------------------------------------------------------------------------
 // 🔴 4. THE LIST. Session first, sealed links, an honest empty state.
 // ---------------------------------------------------------------------------------------------
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('the list resolves the session and sends a stranger to the door',
-  pageList.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(pageList));
+  pageList.includes('userFromSessionCookie') && /redirect\('\/in(\?[^']*)?'\)/.test(pageList));
 ok('🔴 the read is scoped to the session user and only the session user',
   /readInvoices\(user\.id\)/.test(pageList));
 ok('🔴 and the GDPR export is out of the page: the recorded compromise is paid off',
@@ -320,8 +322,10 @@ ok('the list ships no client script', !/'use client'|onClick|onChange|useState|<
 // ---------------------------------------------------------------------------------------------
 // 🔴 5. THE DETAIL VIEW. Reference checked for owner AND purpose, and nothing is ever sent.
 // ---------------------------------------------------------------------------------------------
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('the detail page resolves the session and sends a stranger to the door',
-  pageDetail.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(pageDetail));
+  pageDetail.includes('userFromSessionCookie') && /redirect\('\/in(\?[^']*)?'\)/.test(pageDetail));
 ok('🔴 the reference is verified, owner checked AND purpose checked, before anything is read',
   /verifyInvoiceRef\(one\('ref'\)/.test(pageDetail)
   && /if \(!claim \|\| !invoiceRefUsable\(claim, user\.id, 'invoice'\)\) redirect\('\/app\/invoices'\)/.test(pageDetail));
@@ -531,8 +535,10 @@ ok('🔴 a failed mark is admitted, never reported as done', /problem=save/.test
 // ---------------------------------------------------------------------------------------------
 // 🔴 7. PROOF OF INCOME. lib/incomeproof's figures, printable, honest about what it is not.
 // ---------------------------------------------------------------------------------------------
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('the proof resolves the session and sends a stranger to the door',
-  pageProof.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(pageProof));
+  pageProof.includes('userFromSessionCookie') && /redirect\('\/in(\?[^']*)?'\)/.test(pageProof));
 ok('🔴 every figure comes from buildIncomeProof over the session user\'s confirmed rows',
   /getConfirmedTransactionsForRange\(user\.id, startISO, endISO\)/.test(pageProof)
   && /buildIncomeProof\(rows, businessName, year, now, biz/.test(pageProof));
@@ -582,8 +588,10 @@ ok('the year switch offers this year and last, nothing to explore', /thisYear, t
 // ---------------------------------------------------------------------------------------------
 // 🔴 8. SHARE YOUR BOOKS. Prepared here, approved and sent by him, revocable in one press.
 // ---------------------------------------------------------------------------------------------
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('the share page resolves the session and sends a stranger to the door',
-  pageShare.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(pageShare));
+  pageShare.includes('userFromSessionCookie') && /redirect\('\/in(\?[^']*)?'\)/.test(pageShare));
 ok('the shares and the categories are read for the session user',
   /listBookShares\(user\.id\)/.test(pageShare) && /getConfirmedTransactionsForUser\(user\.id\)/.test(pageShare));
 ok('🔴 the exclude list is his own real categories via lib/bookshare, never a guessed list',

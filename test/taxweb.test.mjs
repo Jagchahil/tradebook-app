@@ -90,8 +90,13 @@ console.log('\ntax on the web: the hub, the quarter, the levers, and the tools')
 // 1. EVERY SCREEN IS BEHIND THE SESSION AND SHIPS NO SCRIPT.
 // ---------------------------------------------------------------------------------------------
 for (const [k, s] of Object.entries(src)) {
+  // 🔴 7 AUGUST 2026: WIDENED TO ALLOW next=. A bare redirect('/in') sent a signed out man to
+  // the dashboard, never back to the tax page he actually asked for. Every page under app/app/tax
+  // now carries its own destination through the door (lib/websession.ts's safeNext allowlists
+  // /app and below), so this checks that he is sent to the door at all; test/signinnext.test.mjs
+  // is the ratchet that checks next= is present and is HIS OWN page, for every page under app/app.
   ok(`${k}: resolves the user from the session and sends a stranger to the door`,
-    s.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(s));
+    s.includes('userFromSessionCookie') && /redirect\('\/in(\?[^']*)?'\)/.test(s));
   ok(`${k}: server rendered, no client script`,
     !/'use client'|onClick|onChange|useState|<script/.test(s));
   ok(`${k}: wears the shared shell (APP_CSS and the nav)`,

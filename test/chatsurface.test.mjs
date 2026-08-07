@@ -169,8 +169,10 @@ console.log('\n=== the chat list ===\n');
 ok('no client JavaScript: not a client component, no handlers, no hooks, no script tag',
   !/^'use client'/m.test(listSrc)
   && !/onClick|onChange|onSubmit|useState|useEffect|<script/.test(listCode));
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('session first: the cookie names the man, or he goes to /in',
-  /userFromSessionCookie/.test(listCode) && /redirect\('\/in'\)/.test(listCode));
+  /userFromSessionCookie/.test(listCode) && /redirect\('\/in(\?[^']*)?'\)/.test(listCode));
 ok('the chats and the flags are read through lib/supabase.ts, never an inline query',
   /listChatsForUser\(user\.id\)/.test(listCode) && /rakhaFlagsForUser\(user\.id\)/.test(listCode)
   && !/rest\/v1/.test(listCode));

@@ -53,8 +53,10 @@ console.log('\npay yourself on the web: one engine, three structures, no moved m
 // ---------------------------------------------------------------------------------------------
 // 1. THE SHELL. Behind the session, server rendered, no script, shared shell.
 // ---------------------------------------------------------------------------------------------
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('resolves the user from the session and sends a stranger to the door',
-  page.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(page));
+  page.includes('userFromSessionCookie') && /redirect\('\/in(\?[^']*)?'\)/.test(page));
 ok('server rendered, no client script',
   !/'use client'|onClick|onChange|useState|<script/.test(page));
 ok('wears the shared shell (APP_CSS and the nav)',

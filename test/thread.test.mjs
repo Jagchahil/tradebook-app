@@ -118,8 +118,10 @@ console.log('\n=== the chat view ===\n');
 ok('no client JavaScript: not a client component, no handlers, no hooks, no script tag',
   !/^'use client'/m.test(chatSrc)
   && !/onClick|onChange|onSubmit|useState|useEffect|<script/.test(chatCode));
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('session first: the cookie names the man, or he goes to /in',
-  /userFromSessionCookie/.test(chatCode) && /redirect\('\/in'\)/.test(chatCode));
+  /userFromSessionCookie/.test(chatCode) && /redirect\('\/in(\?[^']*)?'\)/.test(chatCode));
 ok('🔴 the sealed reference is verified AND checked against the session before anything is read',
   chatCode.indexOf('verifyChatRef(ref)') > -1
   && chatCode.indexOf('chatRefBelongsTo(claim') > -1

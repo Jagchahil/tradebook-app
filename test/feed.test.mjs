@@ -63,8 +63,10 @@ console.log('\n=== the page ===\n');
 ok('no client JavaScript: not a client component, no handlers, no hooks, no script tag',
   !/^'use client'/m.test(pageSrc)
   && !/onClick|onChange|onSubmit|useState|useEffect|<script/.test(pageCode));
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('the session is resolved first and a signed out visitor is sent to /in',
-  pageCode.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(pageCode));
+  pageCode.includes('userFromSessionCookie') && /redirect\('\/in(\?[^']*)?'\)/.test(pageCode));
 ok('the shell is carried and names this route', pageSrc.includes('<AppNav current="/app/feed"'));
 ok('the rows come from readActivityFeed in lib/supabase.ts, already worded',
   pageCode.includes('readActivityFeed(user.id'));

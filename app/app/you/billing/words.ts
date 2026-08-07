@@ -75,12 +75,30 @@ export function standingFor(row: BillingRow | null, gate: BillingGate, now: Date
   }
 
   if (status === 'trialing') {
+    // 🔴 THE DATE ITSELF, NOT JUST A COUNTDOWN. Found 7 August 2026: nowhere told a man, or Jag
+    // debugging a support message, the actual day a trial ends, only how many days were left of
+    // it. A count is enough for "how long have I got" but useless for settling a specific account
+    // against Stripe's own record of it, which is exactly the barber5 case, a trial reading
+    // trialing to 13 August with no screen able to say so.
+    //
+    // ⚠️ left AND end COME OFF THE SAME FIELD, row.current_period_end, so they cannot disagree:
+    // daysLeft and dateWords both run Date.parse on the identical string, and one is null only
+    // when the other is too. Nothing here is computed from anything but the row the gate itself
+    // reads (see the header above and lib/gateserver.ts), so this screen cannot disagree with the
+    // paywall.
     const left = daysLeft(row.current_period_end, now);
-    const line = left === null || left <= 0
-      ? 'You are on the free trial.'
-      : left === 1
-        ? 'You are on the free trial, with a day left.'
-        : `You are on the free trial, with ${left} days left.`;
+    const end = dateWords(row.current_period_end);
+    // 🔴 HONESTY: a trial with no readable end date says so plainly rather than staying silent
+    // about it or, worse, guessing one from when the account was created. grantTrial always sets
+    // one and Stripe always sends one (lib/entitlement.ts), so this should be unreachable, but an
+    // unreachable case is exactly where a guess is most tempting and least excusable.
+    const line = left === null
+      ? 'You are on the free trial. We cannot show the date it ends.'
+      : left <= 0
+        ? `You are on the free trial. It ends ${end}.`
+        : left === 1
+          ? `You are on the free trial, with a day left. It ends ${end}.`
+          : `You are on the free trial, with ${left} days left. It ends ${end}.`;
     return { kind: 'trial', lines: [line] };
   }
 

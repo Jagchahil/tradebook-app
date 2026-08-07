@@ -49,7 +49,9 @@ export const dynamic = 'force-dynamic';
 export default async function PayYourselfPage() {
   const jar = await cookies();
   const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
-  if (!user) redirect('/in');
+  // Carries him back here after he signs in, the /app/you/billing pattern: safeNext() in
+  // lib/websession.ts allowlists /app and below, so this cannot become an open redirect.
+  if (!user) redirect('/in?next=%2Fapp%2Fpay-yourself');
 
   const [optimiser, biz] = await Promise.all([
     getOptimiserInput(user.id),

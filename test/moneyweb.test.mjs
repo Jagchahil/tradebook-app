@@ -161,8 +161,10 @@ ok('with no secret the row stays plain text rather than becoming a dead link',
 // ---------------------------------------------------------------------------------------------
 // 🔴 3. THE DETAIL VIEW. Session first, ownership second, scoped read third.
 // ---------------------------------------------------------------------------------------------
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('the detail page resolves the session and sends a stranger to the door',
-  pageEntry.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(pageEntry));
+  pageEntry.includes('userFromSessionCookie') && /redirect\('\/in(\?[^']*)?'\)/.test(pageEntry));
 ok('🔴 a reference is verified AND checked against the session before anything is read',
   /verifyEntryRef\(one\('ref'\)/.test(pageEntry)
   && /if \(!claim \|\| !refBelongsTo\(claim, user\.id\)\) redirect\('\/app\/money'\)/.test(pageEntry));

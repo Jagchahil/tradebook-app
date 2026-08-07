@@ -218,8 +218,10 @@ ok('🔴 IT WRITES NOTHING: a GET form, no route, no database call that stores a
 ok('🔴 ZERO CLIENT JAVASCRIPT, like every other screen under app/app',
   !/'use client'/.test(PAGE) && !/onClick|onChange|useState|useEffect/.test(PAGE));
 
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('it resolves the user from the session and sends a stranger away',
-  /userFromSessionCookie/.test(PAGE) && /redirect\('\/in'\)/.test(PAGE));
+  /userFromSessionCookie/.test(PAGE) && /redirect\('\/in(\?[^']*)?'\)/.test(PAGE));
 
 ok('it asks the charging question, which is the one that changes the answer most',
   /chargingLabel/.test(PAGE) && /Could you live with an electric one/.test(PAGE));

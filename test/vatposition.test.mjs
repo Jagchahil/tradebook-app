@@ -70,8 +70,10 @@ ok('🔴 THE PAGE SHIPS NO CLIENT JAVASCRIPT AT ALL',
   && !/\son[A-Z][A-Za-z]*\s*=/.test(page)
   && !/<script/i.test(page));
 ok('🔴 AND THAT HANDLER CHECK STILL BITES', /\son[A-Z][A-Za-z]*\s*=/.test('<button onClick={go}>'));
+// 🔴 7 AUGUST 2026: widened to allow next=. Every page under app/app now carries its own
+// destination through the sign in door (see test/signinnext.test.mjs), not just a bare '/in'.
 ok('it resolves the user from the session and sends a stranger to the door',
-  page.includes('userFromSessionCookie') && /redirect\('\/in'\)/.test(page));
+  page.includes('userFromSessionCookie') && /redirect\('\/in(\?[^']*)?'\)/.test(page));
 ok('forced dynamic, so his figures are never cached into somebody else\'s page',
   page.includes("dynamic = 'force-dynamic'"));
 ok('it wears the shared shell and lights up the Tax tab',

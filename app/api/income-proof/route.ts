@@ -27,8 +27,10 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const now = new Date();
 
+  // This route accepts only tokens minted FOR the proof of income: a quarter
+  // pack link names a different audience and must not open this document.
   const capToken = sp.get('t');
-  const claim = capToken ? verifyPackToken(capToken) : null;
+  const claim = capToken ? verifyPackToken(capToken, 'income-proof') : null;
 
   let userId: string;
   let year: number;
@@ -43,9 +45,11 @@ export async function GET(req: NextRequest) {
     const q = Number(sp.get('year'));
     year = Number.isInteger(q) ? q : currentTaxYear(now);
 
-    // The app asks for a signed browser link it can open to Save as PDF.
+    // The app asks for a signed browser link it can open to Save as PDF. The
+    // token names this document as its audience, so the link opens the proof of
+    // income and nothing else.
     if (sp.get('mode') === 'link') {
-      const t = packToken({ userId, year, quarter: 1 }, now);
+      const t = packToken({ userId, year, quarter: 1 }, 'income-proof', now);
       if (!t) return NextResponse.json({ error: 'links unavailable' }, { status: 503 });
       return NextResponse.json({ url: `${siteBase()}/api/income-proof?t=${encodeURIComponent(t)}` });
     }

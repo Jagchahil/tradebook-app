@@ -31,8 +31,10 @@ export async function GET(req: NextRequest) {
 
   // Two auth paths. A signed ?t= token fixes the account and quarter itself; a
   // Bearer token identifies the account and reads year and q from the query.
+  // This route accepts only tokens minted FOR the quarter pack: a proof of
+  // income link names a different audience and must not open this document.
   const capToken = sp.get('t');
-  const claim = capToken ? verifyPackToken(capToken) : null;
+  const claim = capToken ? verifyPackToken(capToken, 'quarter-pack') : null;
 
   let userId: string;
   let startYear: number;

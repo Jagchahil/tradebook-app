@@ -1205,7 +1205,11 @@ async function handleSupportRequest(from: string, text: string): Promise<void> {
   if (!userId) {
     await sendText(
       from,
-      'For a hand from the team, email support@lekhio.app and a person will help. If you are not set up yet, you can start at lekhio.app.',
+      // ⚠️ info@, NOT support@. There is no support@ mailbox: test/llmstxt.test.mjs already asserts
+      // "the support@ mailbox we do not have", and every other route to a human in the product,
+      // /in, privacy, terms, security, the trade pages and llms.txt, offers info@. This line sent
+      // the one population that CANNOT use the web door to the one address nobody reads.
+      'For a hand from the team, email info@lekhio.app and a person will help. If you are not set up yet, you can start at lekhio.app.',
     );
     return;
   }

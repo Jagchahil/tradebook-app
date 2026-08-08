@@ -99,6 +99,136 @@ function shell(inner: string, opts: { preheader?: string; unsubscribeLink?: stri
 </body></html>`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SUBJECT RULE. AN EMAIL A PERSON CAN RECEIVE MORE THAN ONCE MUST VARY ITS SUBJECT.
+//
+// 7 August 2026, and it cost us a week. Every sign in code WAS delivered and the customer still
+// could not find one. The Supabase magic link subject was the fixed string "Your Lekhio Code", and
+// GMAIL THREADS BY SENDER PLUS SUBJECT, so every code a man had ever been sent collapsed into ONE
+// conversation headed by its OLDEST message. Nothing new ever appeared at the top of his inbox.
+// Eight codes in one thread and two of them dragged to Trash, because tidying away a spent code
+// bins the new one that arrived under the same heading. It was fixed by putting the token IN the
+// subject, and then seven of our own emails turned out to have the same shape.
+//
+// So this is a RULE, not seven edits. Every email in this file declares itself as one of three
+// things and there is no fourth, because send() takes this union and nothing else. A bare string
+// does not compile.
+//
+//   repeats   He can get another one. The subject carries a MARK that changes every time: the day,
+//             an invoice number, the code itself. Two of them can never land in one thread.
+//   once      One per customer for life, so there is never a second one to collapse it with. The
+//             reason lives in ONCE_PER_CUSTOMER and it IS the exemption. When the reason stops
+//             being true the email moves to `repeats`.
+//   caller    The subject belongs to the caller. A campaign writes its own. A front desk reply MUST
+//             keep the subject it came in on or it stops threading, and that is the one place in
+//             the product where collapsing into one conversation is the point.
+//
+// ⚠️ test/subjectrule.test.mjs calls every repeating subject twice with two different marks and
+// goes RED when the two come back the same, so an email added in six months cannot get this wrong
+// by default. It either carries a mark or the build stops.
+//
+// ⚠️ AND THE MARK IS NEVER MONEY HE EARNED. A subject line is readable on a locked phone lying face
+// up on a dashboard, with a customer or a mate in the passenger seat. "£4,120 in this week" is his
+// turnover announced to whoever is sitting next to him. The day tells one week from the next, which
+// is all a thread needs, and it costs him nothing to have on show.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The day a repeating email is about, in the form a man in Britain reads it. Never an ISO string.
+// Same rule and same timezone as humanDate() in lib/trialnudge.ts.
+export function subjectDay(when: Date = new Date()): string {
+  const d = when instanceof Date && !Number.isNaN(when.getTime()) ? when : new Date();
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'Europe/London' });
+}
+
+// The Sunday the weekly summary is ABOUT, which is not the day it is sent.
+//
+// ⚠️ THE JOB FIRES AT 23:00 UTC ON SUNDAY (vercel.json, then jobsFor() in /api/cron/daily). In
+// British Summer Time that instant is already MONDAY in London, so formatting "now" would date his
+// week to the day after it ended. This lands on noon UTC, where every timezone agrees which
+// calendar day it is, then rolls back to Sunday, so it stays right if the job ever moves.
+export function weekEndingDay(now: Date = new Date()): string {
+  const base = now instanceof Date && !Number.isNaN(now.getTime()) ? now : new Date();
+  const d = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), 12, 0, 0));
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay()); // getUTCDay: 0 is Sunday
+  return subjectDay(d);
+}
+
+export type RepeatKey =
+  | 'invoice'
+  | 'signup-code'
+  | 'weekly-ready'
+  | 'payment-ok'
+  | 'payment-fail'
+  | 'lead-confirm'
+  | 'lead-result'
+  | 'waitlist';
+
+// THE ONE PLACE A REPEATABLE SUBJECT IS COMPOSED. Each takes the mark and puts it where a man
+// reading his inbox will actually use it.
+export const REPEATING_SUBJECTS: Record<RepeatKey, (mark: string) => string> = {
+  // The invoice number, and the trader's name when there is one. This was already right. It is
+  // registered so it stays right: drop the number and every invoice a tradesman ever sends one
+  // customer lands in a single thread headed by the first one.
+  invoice: (mark) => `Invoice ${mark}`,
+
+  // The code itself. The fix that taught us all of this.
+  'signup-code': (mark) => `${mark} is your Lekhio code`,
+
+  // 🔴 THE WORST ONE. Every Sunday for the life of the customer, so by week three his whole
+  // relationship with Lekhio was one collapsed conversation with an old date at the top of it.
+  'weekly-ready': (mark) => `Your week to ${mark} is ready`,
+
+  // Every renewal, for as long as he pays us.
+  'payment-ok': (mark) => `Payment received on ${mark}, thanks from Lekhio`,
+
+  // Every dunning retry. Stripe tries again on a different day, so the day is also the thing that
+  // tells him this is a NEW attempt and not the email he read on Tuesday.
+  'payment-fail': (mark) => `We could not take your Lekhio payment on ${mark}`,
+
+  // Every use of a free tool. Two uses a month apart used to collapse, and he would tap the older
+  // link, which is now the expired one. See lib/leadtoken.ts.
+  'lead-confirm': (mark) => `Confirm your email to get your result, ${mark}`,
+
+  // Every confirm.
+  'lead-result': (mark) => `Your result from Lekhio, ${mark}`,
+
+  // A double submit. supabase/APPLY_2026-08-08_waitlist_unique.sql stops the second row. This stops
+  // a second email hiding underneath the first.
+  waitlist: (mark) => `You are on the Lekhio list, ${mark}`,
+};
+
+export type OnceKey = 'welcome' | 'trial-week' | 'trial-ended';
+
+// One per customer for life. A constant subject is honest here, because there is never a second one
+// to collapse it with. The value is the REASON, and the reason is the whole exemption.
+export const ONCE_PER_CUSTOMER: Record<OnceKey, string> = {
+  welcome:
+    'Fires from /api/signup/verify, on the far side of proving the email address, and an account is verified once. A second one needs a second account.',
+  'trial-week':
+    'decideTrialNudge() in lib/trialnudge.ts only returns warn while trial_warn_sent_at is null, and an account gets one trial.',
+  'trial-ended':
+    'The same guard in the same function, on trial_end_sent_at.',
+};
+
+export type CallerKey = 'marketing' | 'reply';
+
+// The subject is not ours to compose. Both of these have a reason that is not laziness.
+export const CALLER_OWNS_SUBJECT: Record<CallerKey, string> = {
+  marketing:
+    'A campaign writes its own subject and every issue is a different one. test/subjectrule.test.mjs holds lib/newsletter.ts, lib/nurture.ts and lib/presale.ts to subjects that are unique inside their own registry, which is where a copy and paste would collide.',
+  reply:
+    'A one to one reply MUST keep the subject it came in on, alongside the In-Reply-To header, or it stops threading. This is the one place in the product where landing in the same conversation is the point.',
+};
+
+export type EmailSubject =
+  | { repeats: RepeatKey; mark: string }
+  | { once: OnceKey; subject: string }
+  | { caller: CallerKey; subject: string };
+
+export function resolveSubject(s: EmailSubject): string {
+  return 'repeats' in s ? REPEATING_SUBJECTS[s.repeats](s.mark) : s.subject;
+}
+
 // A branded primary button.
 function button(href: string, label: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 6px"><tr><td style="background:${RIVER};border-radius:10px">
@@ -111,7 +241,9 @@ const p = (t: string) => `<p style="font-size:15px;line-height:1.65;color:${INK}
 const pMuted = (t: string) => `<p style="font-size:14px;line-height:1.6;color:${MUTED};margin:14px 0 0">${t}</p>`;
 
 // --- one place that actually calls Resend ---------------------------------
-async function send(opts: { from?: string; to: string; subject: string; html: string; listUnsub?: string; tag?: string }): Promise<boolean> {
+// ⚠️ `subject` IS THE UNION AND NOT A STRING, ON PURPOSE. It is the whole of the subject rule: an
+// email added later cannot reach Resend without saying whether a person can receive it twice.
+async function send(opts: { from?: string; to: string; subject: EmailSubject; html: string; listUnsub?: string; tag?: string }): Promise<boolean> {
   if (!KEY) return false;
   if (!looksLikeEmail(opts.to)) return false;
   const headers: Record<string, string> = {};
@@ -126,7 +258,7 @@ async function send(opts: { from?: string; to: string; subject: string; html: st
       body: JSON.stringify({
         from: opts.from || `Lekhio <${fromAddr()}>`,
         to: [opts.to],
-        subject: opts.subject,
+        subject: resolveSubject(opts.subject),
         html: opts.html,
         ...(Object.keys(headers).length ? { headers } : {}),
       }),
@@ -182,7 +314,9 @@ export interface InvoiceEmail {
 }
 
 export async function sendInvoiceEmail(opts: InvoiceEmail): Promise<boolean> {
-  const subject = `Invoice ${opts.number}${opts.businessName ? ` from ${opts.businessName}` : ''}`;
+  // The mark is the invoice number, plus the trader's name when there is one, so the customer's
+  // inbox holds one thread per invoice and not one thread per tradesman.
+  const mark = `${opts.number}${opts.businessName ? ` from ${opts.businessName}` : ''}`;
   const total = poundsFromNumber(opts.total);
   const link = safeUrl(opts.link);
   const senderName = opts.businessName ? esc(opts.businessName) : 'the sender';
@@ -212,7 +346,7 @@ export async function sendInvoiceEmail(opts: InvoiceEmail): Promise<boolean> {
     ${pMuted(`Or open this link: <a href="${link}" style="color:${RIVER}">${esc(link)}</a>`)}`;
   // Invoices are branded as the trader "via Lekhio" so the customer recognises who it is from.
   const from = opts.businessName ? `${opts.businessName} via Lekhio <${fromAddr()}>` : `Lekhio <${fromAddr()}>`;
-  return send({ from, to: opts.to, subject, html: shell(inner, { preheader: `Invoice ${opts.number} for ${total}` }), tag: 'invoice' });
+  return send({ from, to: opts.to, subject: { repeats: 'invoice', mark }, html: shell(inner, { preheader: `Invoice ${opts.number} for ${total}` }), tag: 'invoice' });
 }
 
 // --- the signup code (fires from /api/signup/code) -------------------------
@@ -231,7 +365,7 @@ export async function sendSignupCodeEmail(to: string, code: string): Promise<boo
     ${pMuted('If you did not ask for this, you can ignore this email. Nothing has been created and nothing will happen.')}`;
   return send({
     to,
-    subject: `${safe} is your Lekhio code`,
+    subject: { repeats: 'signup-code', mark: safe },
     // The code in the preview line, so he can often read it from the notification without opening
     // anything. He is on a ladder.
     html: shell(inner, { preheader: `${safe} is your code. It lasts ten minutes.` }),
@@ -272,11 +406,21 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
     ${button(`${APP}/app/setup`, 'Finish setting up')}
     ${p('Everything lives in your browser, on any phone or laptop. Sign in with this email address whenever you want to see where you stand.')}
     ${pMuted('A real person is on the other end. Just reply if you need anything.')}`;
-  return send({ to, subject: 'You are in. Let us finish setting you up.', html: shell(inner, { preheader: `Your ${TRIAL_DAYS} day free trial has started.` }), tag: 'welcome' });
+  return send({
+    to,
+    subject: { once: 'welcome', subject: 'You are in. Let us finish setting you up.' },
+    html: shell(inner, { preheader: `Your ${TRIAL_DAYS} day free trial has started.` }),
+    tag: 'welcome',
+  });
 }
 
 // --- waitlist welcome (fires from /api/waitlist) --------------------------
-export async function sendWaitlistWelcomeEmail(to: string, name?: string | null): Promise<boolean> {
+//
+// ⚠️ HE CAN GET TWO. A double tap on the join button used to make two rows and two of these, and
+// the second one landed underneath the first with the first one's date on it, so the only signal
+// that his second attempt worked was invisible. supabase/APPLY_2026-08-08_waitlist_unique.sql stops
+// the second row; the day in the subject stops the second email hiding.
+export async function sendWaitlistWelcomeEmail(to: string, name?: string | null, when: Date = new Date()): Promise<boolean> {
   const hi = name ? `You're on the list, ${esc(name)}.` : "You're on the list.";
   const inner = `
     ${h1(hi)}
@@ -285,7 +429,12 @@ export async function sendWaitlistWelcomeEmail(to: string, name?: string | null)
     ${p('<strong>What happens next:</strong> we’ll message you the moment your spot is ready. Your first 7 days are free, and there’s no card to enter to start.')}
     ${button(APP, 'See how it works')}
     ${pMuted('If you didn’t sign up, just reply and we’ll take you off.')}`;
-  return send({ to, subject: 'You are on the Lekhio list.', html: shell(inner, { preheader: "We'll let you in soon, here's what's coming." }), tag: 'waitlist' });
+  return send({
+    to,
+    subject: { repeats: 'waitlist', mark: subjectDay(when) },
+    html: shell(inner, { preheader: "We'll let you in soon, here's what's coming." }),
+    tag: 'waitlist',
+  });
 }
 
 // --- the trial, and the week (fires from /api/cron/trial and /api/cron/reminders) ---------
@@ -330,7 +479,8 @@ export async function sendTrialWeekEmail(
     ${pMuted('A real person is on the other end. Just reply if you need anything.')}`;
   return send({
     to,
-    subject: msg.subject,
+    // Once per customer. The guard is trial_warn_sent_at, and the words are lib/trialnudge.ts's.
+    subject: { once: 'trial-week', subject: msg.subject },
     html: shell(inner, { preheader: 'Your first week, and what happens tomorrow.' }),
     tag: 'trial-week',
   });
@@ -348,7 +498,8 @@ export async function sendTrialEndedEmail(
     ${pMuted('Nothing has been deleted, and it will not be. Reply here any time.')}`;
   return send({
     to,
-    subject: msg.subject,
+    // Once per customer. The guard is trial_end_sent_at.
+    subject: { once: 'trial-ended', subject: msg.subject },
     html: shell(inner, { preheader: 'Your books are safe. Here is how to carry on.' }),
     tag: 'trial-ended',
   });
@@ -359,36 +510,65 @@ export async function sendTrialEndedEmail(
 // ⚠️ IT CARRIES NO FIGURES, ON PURPOSE, and that is the 27 July decision holding. The summary is a
 // PULL: computed when he opens it, for the few who do, rather than for everybody every week whether
 // they look or not. This says the numbers are in and gets out of the way.
-export async function sendWeeklyReadyEmail(to: string): Promise<boolean> {
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WORST CONSTANT SUBJECT WE HAD, AND IT WAS THE ONE THAT ARRIVED MOST OFTEN.
+//
+// "Your week is ready", every Sunday, for the life of the customer. Gmail threads by sender plus
+// subject and heads a thread with its OLDEST message, so by week three his entire relationship with
+// Lekhio was ONE conversation, dated three weeks ago, sitting wherever three weeks ago sits. Fifty
+// two of these a year, and not one of them ever appeared at the top of his inbox as a new thing.
+//
+// The mark is the SUNDAY the week ended on, not the day we sent it and not the figures. See the
+// subject rule above for why money never goes in a subject line, and weekEndingDay() for why the
+// date is computed rather than read off the clock.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function sendWeeklyReadyEmail(to: string, now: Date = new Date()): Promise<boolean> {
+  const mark = weekEndingDay(now);
   const inner = `
-    ${h1('Your week is ready')}
+    ${h1(esc(`Your week to ${mark} is ready`))}
     ${p('Your figures for the week are in. What you made, what you spent, and what Lekhio has found you.')}
     ${button(`${APP}/app`, 'See your week')}
     ${pMuted('You can turn these off in Settings whenever you like.')}`;
   return send({
     to,
-    subject: 'Your week is ready',
+    subject: { repeats: 'weekly-ready', mark },
     html: shell(inner, { preheader: 'What you made, what you spent, and what we found you.' }),
     tag: 'weekly-ready',
   });
 }
 
 // --- consent engine: double opt-in confirm --------------------------------
-export async function sendLeadConfirmEmail(to: string, confirmLink: string, unsubscribeLink: string): Promise<boolean> {
+//
+// ⚠️ HE CAN USE A FREE TOOL AGAIN. Two of these a month apart used to collapse into one thread, and
+// the one he could see was the OLDER one, whose link is the one that has now expired. See
+// LEAD_CONFIRM_TTL_SECONDS in lib/leadtoken.ts.
+export async function sendLeadConfirmEmail(
+  to: string,
+  confirmLink: string,
+  unsubscribeLink: string,
+  when: Date = new Date(),
+): Promise<boolean> {
   const inner = `
     ${h1('One quick tap to confirm.')}
     ${p('You asked us to send you your result. Tap below to confirm and you’re all set.')}
     ${button(confirmLink, 'Confirm my email')}
+    ${pMuted('This link works for a week. After that, run the tool again and we will send you a fresh one.')}
     ${pMuted('If you didn’t request this, ignore this email and nothing will happen.')}`;
   return send({
-    to, subject: 'Confirm your email to get your result',
+    to, subject: { repeats: 'lead-confirm', mark: subjectDay(when) },
     html: shell(inner, { preheader: 'One tap and your result is on its way.', unsubscribeLink }),
     listUnsub: unsubscribeLink, tag: 'lead-confirm',
   });
 }
 
 // --- consent engine: the result we promised (fires on confirm) ------------
-export async function sendLeadResultEmail(to: string, resultNote: string, unsubscribeLink: string): Promise<boolean> {
+export async function sendLeadResultEmail(
+  to: string,
+  resultNote: string,
+  unsubscribeLink: string,
+  when: Date = new Date(),
+): Promise<boolean> {
   const note = esc(resultNote).replace(/\r?\n/g, '<br>');
   const inner = `
     ${h1('Here is your result.')}
@@ -397,7 +577,7 @@ export async function sendLeadResultEmail(to: string, resultNote: string, unsubs
     ${p('These are estimates to give you the shape of it. The number that really moves is your expenses: every business cost you claim comes off your tax, and most people lose hundreds because a receipt goes missing. That is the whole job Lekhio does, from a text, all year.')}
     ${button(APP, 'Start free, no card')}`;
   return send({
-    to, subject: 'Your result from Lekhio',
+    to, subject: { repeats: 'lead-result', mark: subjectDay(when) },
     html: shell(inner, { preheader: 'The figures you worked out, saved for you.', unsubscribeLink }),
     listUnsub: unsubscribeLink, tag: 'result',
   });
@@ -409,6 +589,10 @@ export interface PaymentEmail {
   amountPence: number;
   plan?: string | null;
   nextDate?: string | null; // human date, optional
+  // The day this payment was taken. Defaults to now, which is when the Stripe webhook fires.
+  // ⚠️ IT IS THE MARK THAT KEEPS EVERY RENEWAL OUT OF ONE THREAD. A man who pays us for two years
+  // used to get twenty four of these stacked under the first one, dated the day he joined.
+  when?: Date;
 }
 
 export async function sendPaymentConfirmedEmail(opts: PaymentEmail): Promise<boolean> {
@@ -422,7 +606,12 @@ export async function sendPaymentConfirmedEmail(opts: PaymentEmail): Promise<boo
     ${next}
     ${button(APP, 'Open Lekhio')}
     ${pMuted('Any questions about your billing, just reply to this email.')}`;
-  return send({ to: opts.to, subject: 'Payment received, thanks from Lekhio', html: shell(inner, { preheader: `We've received your ${amt} payment.` }), tag: 'payment-ok' });
+  return send({
+    to: opts.to,
+    subject: { repeats: 'payment-ok', mark: subjectDay(opts.when) },
+    html: shell(inner, { preheader: `We've received your ${amt} payment.` }),
+    tag: 'payment-ok',
+  });
 }
 
 // --- payment failed (Stripe invoice.payment_failed) -----------------------
@@ -430,6 +619,11 @@ export interface PaymentFailedEmail {
   to: string;
   amountPence: number;
   updateUrl: string;
+  // The day the attempt failed. Defaults to now.
+  // ⚠️ STRIPE RETRIES THE SAME AMOUNT ON DIFFERENT DAYS, so the amount cannot tell one dunning
+  // email from the next and the day is the only honest mark there is. Four retries used to arrive
+  // as four copies of one thread, and the one he could see was the first, already dealt with.
+  when?: Date;
 }
 
 export async function sendPaymentFailedEmail(opts: PaymentFailedEmail): Promise<boolean> {
@@ -440,15 +634,23 @@ export async function sendPaymentFailedEmail(opts: PaymentFailedEmail): Promise<
     ${p('Update your card and we’ll sort it automatically. Your account stays active in the meantime.')}
     ${button(opts.updateUrl, 'Update payment')}
     ${pMuted('If you think this is a mistake, or need a hand, just reply and we’ll help.')}`;
-  return send({ to: opts.to, subject: "Your Lekhio payment didn’t go through", html: shell(inner, { preheader: 'A quick fix and you’re sorted.' }), tag: 'payment-fail' });
+  return send({
+    to: opts.to,
+    subject: { repeats: 'payment-fail', mark: subjectDay(opts.when) },
+    html: shell(inner, { preheader: 'A quick fix and you’re sorted.' }),
+    tag: 'payment-fail',
+  });
 }
 
 // --- marketing / newsletter to a consented contact ------------------------
 // bodyHtml is the inner content; the shell adds the header, footer and unsubscribe. Always carries the
 // List-Unsubscribe headers inboxes expect.
+// ⚠️ THE SUBJECT IS THE CAMPAIGN'S, and CALLER_OWNS_SUBJECT says why. Every issue, nurture stage and
+// presale step has its own, and test/subjectrule.test.mjs holds each registry to subjects that are
+// unique inside it, which is where a copied issue would collide.
 export async function sendMarketingEmail(to: string, subject: string, bodyHtml: string, unsubscribeLink: string): Promise<boolean> {
   return send({
-    to, subject,
+    to, subject: { caller: 'marketing', subject },
     html: shell(bodyHtml, { preheader: subject, unsubscribeLink }),
     listUnsub: unsubscribeLink, tag: 'marketing',
   });
@@ -458,6 +660,11 @@ export async function sendMarketingEmail(to: string, subject: string, bodyHtml: 
 // A one-to-one reply from the lane address the enquiry came in on. This is correspondence, not
 // marketing: kept plain and personal (no big branded shell), with threading headers so it stays in the
 // same conversation. Only ever sends from an @lekhio.app address.
+//
+// ⚠️ THE ONE EMAIL THAT MUST NOT VARY ITS SUBJECT. See CALLER_OWNS_SUBJECT.reply: a reply keeps the
+// subject it came in on, beside the In-Reply-To header, or it stops threading. It has its own fetch
+// rather than send() because it wears no branded shell, so the subject rule reaches it through that
+// entry rather than through the union.
 export interface ReplyEmail {
   fromAddress: string;
   fromName?: string;

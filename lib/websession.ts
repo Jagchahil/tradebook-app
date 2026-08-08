@@ -371,15 +371,112 @@ export function verifyPendingCookie(value: string | null | undefined, now: Date 
 // ⚠️ IT RETURNS THE DEFAULT RATHER THAN NULL. A caller cannot forget to handle a refusal, so
 // the failure mode of every mistake in every caller is "he lands on his dashboard", which is
 // exactly where he used to land anyway.
+//
+// ⚠️ AND IT NEVER THROWS, HOWEVER IT IS ABUSED. It sits on the sign in path, so an exception
+// here is not a refused destination, it is a locked door for every customer at once. That is
+// the 7 August failure, where a daily cap failed closed and shut the door. Every line below
+// either returns the default or returns a path that has been allowlisted.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 7 AUGUST 2026. WHY THIS NOW VALIDATES THE RESOLVED PATH AND NOT THE STRING IT WAS HANDED.
+//
+// The checks above were all made against the RAW string, and the raw string is not the thing
+// that decides where a man lands. Every caller hands the value to a URL parser afterwards:
+// app/api/auth/verify/route.ts builds `new URL(next, req.url)`, and app/in/page.tsx puts it in
+// a Location header where the browser's own parser does the same job. Those parsers collapse
+// dot segments, and they treat a PERCENT ENCODED dot as a dot while doing it.
+//
+// So `/app/%2e%2e/team` held no `..` for `v.includes('..')` to find, started with `/app/`, and
+// carried none of the screened characters. It came back unchanged, and the parser then turned
+// it into `/team`. The upper case `%2E%2E` did the same.
+//
+// ⚠️ SAY THE SIZE OF IT HONESTLY. That is a SAME ORIGIN escape from the allowlist, not an open
+// redirect. The `//` and scheme guards held, so it could never be pointed at another website.
+// It landed a signed in customer on an internal path instead of his dashboard, and every such
+// path has its own authorisation in front of it, so this was defence in depth failing and not
+// books being read. It was also not new. It was found on the day 36 more pages began feeding
+// this function, and a guard one encoding away from useless is not a guard.
+//
+// ⚠️ THE FIX IS NOT ANOTHER FORBIDDEN STRING. Adding `%2e` to the screen would have left
+// `%252e`, `%c0%ae`, a unicode dot lookalike and whatever gets written next, because a list of
+// encodings is a list of the attacks somebody thought of, which is the exact thing the
+// paragraph above says this function must not be. A URL parser is going to read this value
+// downstream whatever we do, so this function now reads it FIRST, with the same parser, and
+// judges what comes out:
+//
+//   1. the raw screen stays, and it runs first, because the parser SILENTLY REPAIRS several of
+//      these. It strips tab and newline, it folds a backslash to a slash. A value that only
+//      becomes acceptable after repair is a value we never wanted to accept.
+//   2. the value is resolved, and the RESOLVED PATHNAME is what is measured against `/app`. An
+//      encoding that collapses on resolution has already collapsed by the time we look at it.
+//   3. the resolved pathname must be made of ordinary path segments: letters, digits, the
+//      underscore and the hyphen our route names use. That is an allowlist of characters rather
+//      than a blocklist of encodings, and it refuses a percent sign outright, which is double
+//      encoding, overlong UTF8, `%00` and the rest of that family gone in one line.
+//   4. what is RETURNED is the resolved pathname, so the value a caller redirects with is the
+//      exact value that was validated, with nothing left in it for a second parser to change.
+//
+// The 37 pages under app/app send plain paths such as `/app/tax/vat` and `/app/you/settings`,
+// and every one resolves to itself and comes back byte identical. test/signinnext.test.mjs
+// walks app/app on disk and holds that down for whatever ships next, and
+// test/nextallowlist.test.mjs carries the table of attacks with their required answers.
+//
+// ⚠️ WHAT THIS DOES NOT COVER, SAID PLAINLY. It decides one thing: that a destination is a path
+// under /app. It is not authorisation and it never was. Whether this particular customer may
+// see the page he asked for is decided by the page, from his session, and stays there.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 export const AFTER_SIGN_IN = '/app';
+
+// The base the value is resolved against, and it is DELIBERATELY A FIXED CONSTANT rather than
+// NEXT_PUBLIC_APP_URL or the request. Only the pathname is ever read off the result, so the host
+// makes no difference to the answer, and a guard whose verdict moves with an environment variable
+// is a guard that can be misconfigured open. Nothing built from it is ever sent anywhere: it
+// exists so that this function parses the value with the same parser its callers will.
+const NEXT_BASE = new URL('https://lekhio.app/');
+
+// A resolved path made only of ordinary segments. No empty segment, so `//` cannot survive. No
+// dot, so a literal `..` cannot survive. No percent sign, so nothing still encoded can. Widen it
+// when a real route needs a character it has not got, and name that route here when you do.
+const NEXT_SEGMENTS = /^(?:\/[A-Za-z0-9_-]+)+$/;
 
 export function safeNext(raw: unknown): string {
   if (typeof raw !== 'string') return AFTER_SIGN_IN;
   const v = raw.trim();
   if (v.length === 0 || v.length > 120) return AFTER_SIGN_IN;
+
+  // ── 1. THE RAW SCREEN, RUN BEFORE ANYTHING IS RESOLVED.
+  //
+  // The prefix check is also what makes the fixed base above sound. It forces the value to be an
+  // absolute path, so the base's own path can never contribute to the result and one string
+  // cannot mean two destinations at two call sites.
   if (v !== AFTER_SIGN_IN && !v.startsWith(`${AFTER_SIGN_IN}/`)) return AFTER_SIGN_IN;
   if (/[\\:?#\s\u0000-\u001f]/.test(v)) return AFTER_SIGN_IN;
   if (v.includes('//') || v.includes('..')) return AFTER_SIGN_IN;
-  return v;
+
+  // ── 2. RESOLVE IT, THEN JUDGE WHAT CAME OUT RATHER THAN WHAT WENT IN.
+  let u: URL;
+  try {
+    u = new URL(v, NEXT_BASE);
+  } catch {
+    // Unreachable for a value that has passed the screen above, and caught regardless. A throw
+    // on the sign in path costs every customer the door, not merely this one his destination.
+    return AFTER_SIGN_IN;
+  }
+  // Invariants rather than expected refusals: the screen above should already have made a
+  // foreign origin, a query and a fragment impossible. They are checked on the RESOLVED value
+  // because that is the value that gets used, and an invariant nobody checks is an assumption.
+  if (u.origin !== NEXT_BASE.origin) return AFTER_SIGN_IN;
+  if (u.search !== '' || u.hash !== '') return AFTER_SIGN_IN;
+
+  const p = u.pathname;
+  if (p !== AFTER_SIGN_IN && !p.startsWith(`${AFTER_SIGN_IN}/`)) return AFTER_SIGN_IN;
+  if (!NEXT_SEGMENTS.test(p)) return AFTER_SIGN_IN;
+  // ⚠️ AND THE PARSER MUST NOT HAVE CHANGED ANYTHING. `/app/%2e/team` resolves to `/app/team`,
+  // which is inside the allowlist and would have been let through as its repaired form. That is
+  // sanitising, and the paragraph at the top of this block says this function does not sanitise.
+  // Requiring the resolved path to equal what was handed in reduces the whole guard to one
+  // sentence a reader can hold: WHAT COMES BACK IS EITHER THE DASHBOARD OR THE EXACT VALUE THAT
+  // WAS SENT, already in the form the browser will use, with nothing left to normalise.
+  if (p !== v) return AFTER_SIGN_IN;
+  return p;
 }

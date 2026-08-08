@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { A11Y_CSS, APP_THEME_CSS } from '../../lib/tokens';
 // 🔴 THE SIGNUP FLOW HAD NO THEME SHEET. Thirteen palette values were typed out by hand here, so
 // this page was byte identical to the palette in LIGHT and could not invert at all in DARK.
 // ⚠️ APP_THEME_CSS, not THEME_CSS: nothing on this page sets data-theme, so THEME_CSS's dark half
 // could never match and adding it would have looked like a fix while changing nothing.
-import { GREEN, GREEN_TINT, INK, LINE, MUTED, ON_GREEN_TINT, ON_RIVER, PANEL, PAPER, RED, RIVER, RIVER_DEEP,
-  RIVER_TINT, SAFFRON, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge } from '../../lib/apptheme';
+import { GREEN, GREEN_TINT, INK, LINE, MUTED, ON_GREEN_TINT, ON_RIVER, ON_SAFFRON_TINT, PANEL, PAPER, RED,
+  RIVER, RIVER_DEEP, RIVER_TINT, SAFFRON, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge } from '../../lib/apptheme';
 import { findSic } from '../../lib/siccodes';
 import { HOW_LONG, registeredShape } from '../../lib/onboarding';
+import { TOTAL, type StartDraft, readDraft, writeDraft, clearDraft } from './draft';
 
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
@@ -19,22 +20,18 @@ const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sa
 //
 // The web signup offered three answers and a partnership was not one of them, so two people
 // running a business together picked "A business name", and tradeTypeToBusinessType in
-// lib/supabase.ts folded that to sole_trader. lib/supabase.ts said so out loud: "Partnership is
-// not offered on the web, so it never arrives here." The setup screen's own header records what
-// that costs: "a coffee shop run by two people who chose 'A business name' is sitting in the
-// database as a SOLE TRADER, silently, and lib/partnership.ts has been ready for him since 17
-// July with nowhere to say so."
+// lib/supabase.ts folded that to sole_trader. The consequences are not cosmetic: he is taxed on
+// his share of the firm's profit, not all of it, and stored as a sole trader every figure the
+// product shows him is the WHOLE firm's, including the income summary a mortgage lender reads.
+// Step 2 below is where the share itself is asked, not left for later, because
+// getBusinessProfile reads an unanswered share as 100%, which is right for everyone except the
+// one man it is wrong for.
 //
-// The consequences are not cosmetic. He is taxed on his share of the firm's profit, not all of
-// it, and stored as a sole trader every figure the product shows him is the WHOLE firm's: his
-// set aside, his bill, and the income summary a mortgage lender reads.
-//
-// ⚠️ AND THE SHARE IS ASKED HERE, NOT LEFT FOR LATER. getBusinessProfile reads an unanswered
-// share as 100%, deliberately, so a half answered setup can never quietly halve a sole trader's
-// tax. That default is right for everyone except the one man it is wrong for: a partner with no
-// share on file is shown his partners' money as his own, which is exactly the defect commit
-// 0e9175e2 fixed on the proof of income document. One number, asked once, at the only point
-// every web customer passes through.
+// ⚠️ DECLARED HERE, NOT ONLY IMPORTED. ./draft carries its own identical copy for StartDraft's
+// own shape, because that module has to type check on its own with no JSX and no dependency on
+// this file. TypeScript treats two identically shaped literal unions as the same type wherever
+// they meet, so this is not the kind of duplication that can quietly drift apart unnoticed: it
+// would fail to compile the day the two disagreed, wherever a value crossed between them.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 type TradeType = 'sole' | 'business' | 'ltd' | 'partnership' | null;
 
@@ -49,8 +46,6 @@ const trades = [
   'Landlord',
   'Photographer', 'Tutor', 'Carer', 'Cafe', 'Market trader', 'Freelancer', 'Something else',
 ];
-
-const TOTAL = 6;
 
 function digitsOnly(v: string) {
   return v.replace(/\D/g, '');
@@ -74,6 +69,15 @@ function codeMessage(code: string | undefined): string {
 }
 
 export default function StartPage() {
+  // 🔴 NOT A LAZY useState INITIALISER, AND THAT WAS THE FIRST DRAFT OF THIS. readDraft() depends
+  // on sessionStorage, which only exists in the browser, so a lazy initialiser would give the
+  // server render step 1 and blank fields (window is undefined there) and could hand the CLIENT'S
+  // first render a completely different step with completely different fields the moment a draft
+  // exists. app/invoice-generator/Generator.tsx already carries the fix for exactly this shape of
+  // bug, for a smaller case (today's date): seed it AFTER MOUNT, in an effect, so the server and
+  // the client's first render agree, and pay for correctness with a second render instead of a
+  // hydration mismatch. This page's case is the same fault with a much larger blast radius, since
+  // step gates which of six entirely different screens draws, so it gets the same fix.
   const [step, setStep] = useState(1);
   const [done, setDone] = useState(false);
 
@@ -97,6 +101,8 @@ export default function StartPage() {
   const [customTrade, setCustomTrade] = useState('');
   // Which of the SIC suggestions is on screen, 0 = the best match. "Not quite?" steps through the
   // rest rather than us guessing again; never sent anywhere until he sees and keeps this one.
+  // Not part of the draft: it is derived fresh from trade/customTrade either way, and restoring
+  // an index into a list that has not been recomputed yet is not an answer worth protecting.
   const [sicPick, setSicPick] = useState(0);
   const [postcode, setPostcode] = useState('');
   const [address, setAddress] = useState('');
@@ -111,13 +117,109 @@ export default function StartPage() {
   const [codeErr, setCodeErr] = useState('');
   const [codeBusy, setCodeBusy] = useState(false);
   const [resendBusy, setResendBusy] = useState(false);
-  const [hp, setHp] = useState(''); // honeypot, must stay empty for a real person
-  const [t0] = useState(() => Date.now());
+  // Honeypot, must stay empty for a real person. NEVER drawn from the draft: a bot trap that could
+  // be pre-filled by whatever the tab remembered would stop being a trap.
+  const [hp, setHp] = useState('');
+  // The real start of THIS signup attempt, not of this page load. A draft restore carries the
+  // original value back in, so a man who is interrupted and returns nine minutes later still
+  // reads as nine minutes to the bot trap in /api/onboard, rather than as a suspiciously fast
+  // few hundred milliseconds because every field was already filled in when the page redrew.
+  const [t0, setT0] = useState(() => Date.now());
+  // True once the draft (or the absence of one) has been read and applied. The save effect below
+  // waits for this: without it, the save effect's OWN first run (mount fires every effect once)
+  // would see this render's still blank fields and write them straight over a draft the restore
+  // effect has only just queued, not yet applied.
+  const [hydrated, setHydrated] = useState(false);
+  // Worth a word only when there was real progress to protect: a half typed phone number on step
+  // one is not the interrupted-between-jobs case this exists for, so this only goes true past it.
+  const [restoredNotice, setRestoredNotice] = useState(false);
   const [offer] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('offer') ?? '' : ''));
   const [billingResult] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('billing') ?? '' : ''));
   // A referral code carried in on ?ref= (doc 82). Attribution only; passed to the
   // onboard save, sanitised server side. Never shown, never rewards automatically.
   const [ref] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') ?? '' : ''));
+
+  // Applies a restored draft to every field. Kept out of the effect below on purpose, and not
+  // only for tidiness: test/structurehonesty.test.mjs bans an effect that sets tradeType near its
+  // own braces, because that is exactly the shape a name-derived auto-coercion would take (see
+  // the doctrine above `shape`, a few hundred lines up, on why tradeType may only ever change from
+  // a press). This is a different thing wearing a similar shape, carrying back a choice he already
+  // pressed a button for earlier in this same session, not inferring a new one from typed text,
+  // and giving it its own named function keeps that true structurally, not just by argument.
+  function applyDraft(found: StartDraft): void {
+    setT0(found.t0);
+    setStep(found.step);
+    setPhone(found.phone);
+    setEmail(found.email);
+    setTradeType(found.tradeType);
+    setShare(found.share);
+    setName(found.name);
+    setPersonName(found.personName);
+    setTrade(found.trade);
+    setCustomTrade(found.customTrade);
+    setPostcode(found.postcode);
+    setAddress(found.address);
+    setVat(found.vat);
+    setStreams(found.streams);
+    if (found.step > 1) setRestoredNotice(true);
+  }
+
+  // Restore, once, after mount. This only ever fills fields back in: it never calls next(), never
+  // calls submitSignup or sendCode, and never touches the honeypot, so restoring a draft can never
+  // itself cause a submit. A restored draft sitting on the final step still needs its own tap of
+  // "Start free trial" before anything is posted anywhere.
+  //
+  // Seeded after mount on purpose, matching `step`'s own comment above: applying a browser-only
+  // draft during the render itself would make the server's markup and the client's first render
+  // disagree on which of six screens to draw. Paying with a second render is the same trade
+  // Generator.tsx already makes for a date. Mount only, deliberately: a one time read of whatever
+  // the tab was holding, not a subscription to it, hence the empty dependency list.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const found = readDraft();
+    if (found) applyDraft(found);
+    setHydrated(true);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Save on every change, once hydrated. Gated on hydrated so this cannot fire on the very first
+  // render and write the blank starting fields straight over a draft the effect above is still in
+  // the middle of restoring: mount runs every effect once, so this effect's own first pass would
+  // otherwise see this render's pre-restore closure, not the values the restore effect only just
+  // queued. Gated on done so the draft is never resurrected once it has served its purpose and
+  // been cleared: after that point, nothing here is left for a reload to lose. writeDraft() itself
+  // swallows a full or unavailable store, so nothing here needs its own try/catch.
+  useEffect(() => {
+    if (!hydrated || done) return;
+    writeDraft({
+      v: 1, t0, step, phone, email, tradeType, share, name, personName, trade, customTrade,
+      postcode, address, vat, streams,
+    });
+  }, [hydrated, done, t0, step, phone, email, tradeType, share, name, personName, trade,
+    customTrade, postcode, address, vat, streams]);
+
+  // The low key way out, for a shared machine or simply a wrong guess. Wipes the draft and every
+  // field rather than just hiding the notice, so "start over" is never a lie.
+  function startOver(): void {
+    clearDraft();
+    setRestoredNotice(false);
+    setStep(1);
+    setPhone('');
+    setEmail('');
+    setTradeType(null);
+    setShare('');
+    setName('');
+    setPersonName('');
+    setTrade('');
+    setCustomTrade('');
+    setSicPick(0);
+    setPostcode('');
+    setAddress('');
+    setVat(false);
+    setStreams([]);
+    setT0(Date.now());
+  }
+
   const phoneReady = digitsOnly(phone).length >= 10;
   // Email is required. One account, tied to a name, a mobile and an email, so nothing about a
   // person is ever split across two records. It must be present and valid to move on.
@@ -277,6 +379,10 @@ export default function StartPage() {
     // the verify step reconciles against the row this writes.
     await submitSignup();
     await sendCode();
+    // The six answers have been posted. Whatever the draft was protecting is either saved now or
+    // was lost the way it always could be if the save itself failed, but either way there is
+    // nothing left on this screen for a reload to lose, so the tab stops holding a copy.
+    clearDraft();
     setDone(true);
   }
   function back() {
@@ -352,6 +458,16 @@ export default function StartPage() {
             onChange={(e) => setHp(e.target.value)}
             style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
           />
+          {/* 🔴 THE BEST BUTTON IS NO BUTTON, doc 103. We do not ask "carry on where you left off?"
+              because yes is the only sensible answer almost every time, and a question with one
+              sensible answer is the thing that doctrine forbids. We just do it, and say so, with
+              one low key way out for the rare case it is not him. */}
+          {restoredNotice && !done && !billingResult ? (
+            <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, backgroundColor: SURFACE, borderRadius: 12, padding: '12px 14px' }}>
+              <span style={{ fontSize: 13, color: MUTED }}>We kept your answers from before.</span>
+              <button type="button" onClick={startOver} style={{ cursor: 'pointer', background: 'none', border: 'none', color: RIVER, fontSize: 13, fontWeight: 700, padding: 4, flexShrink: 0, fontFamily: 'inherit' }}>Not you? Start over</button>
+            </div>
+          ) : null}
           {offer ? (
             <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, backgroundColor: GREEN_TINT, border: `1px solid ${edge(GREEN, 25)}`, borderRadius: 12, padding: '12px 14px' }}>
               
@@ -522,8 +638,21 @@ export default function StartPage() {
                           a director would swap one wrong structure for another.
                           ═══════════════════════════════════════════════════════════════════ */}
                       {shape ? (
-                        <div style={{ marginTop: 12, backgroundColor: SAFFRON_TINT, border: `1px solid ${SAFFRON_DEEP}33`, borderRadius: 12, padding: '13px 14px' }}>
-                          <p style={{ fontSize: 13.5, color: INK, lineHeight: 1.55, margin: 0 }}>
+                        // 🔴 THE BORDER WAS ${SAFFRON_DEEP}33, A HEX ALPHA SUFFIX GLUED ONTO A
+                        // var(). lib/apptheme.ts says why that never works: a var() reference
+                        // cannot take one, so the browser reads an extra stray token, the whole
+                        // border shorthand is invalid at computed value time, and every browser
+                        // drew this box with NO border at all. edge() is the real fix, same as
+                        // the offer banner's border a few dozen lines up on this same page, and
+                        // 20 is the documented percentage for what a 33 hex suffix meant.
+                        //
+                        // ⚠️ AND THE TEXT NOW USES THE TOKEN BUILT FOR IT. INK read at 16.6:1 on
+                        // this tint, so it was never actually the 2.70:1 failure the SAFFRON_DEEP
+                        // pattern produces elsewhere. ON_SAFFRON_TINT is still the right ink to
+                        // hold this to, because it is the one lib/tokens.ts's guard recomputes if
+                        // SAFFRON_TINT is ever retuned, and INK is not.
+                        <div style={{ marginTop: 12, backgroundColor: SAFFRON_TINT, border: `1px solid ${edge(SAFFRON_DEEP, 20)}`, borderRadius: 12, padding: '13px 14px' }}>
+                          <p style={{ fontSize: 13.5, color: ON_SAFFRON_TINT, lineHeight: 1.55, margin: 0 }}>
                             {shape === 'llp'
                               ? <>That name ends in LLP, so the business is registered and you are taxed on your <b>share</b> of its profit rather than all of it. Is that right?</>
                               : <>That name ends in {name.trim().split(/\s+/).slice(-1)[0]}, which usually means a company registered at Companies House. If it is, your tax works differently and we can look the details up for you.</>}

@@ -20,7 +20,8 @@
 // Run: node test/webauth.test.mjs   Pure, reads files, no network.
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readFileSync, readdirSync, lstatSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, lstatSync, existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -645,6 +646,372 @@ ok('🔴 ONLY MONEY OUT CAN BE STRUCK OUT FROM THIS SCREEN',
 // He lands back on the month he was looking at. Returning him to today after he corrects a line in
 // March loses his place, on the page whose whole job is finding one payment.
 ok('the month travels with the correction', /name="m"/.test(log) && personalRoute.includes("f.get('m')"));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n9. THE SIGN IN SCREEN WHEN THE CODE DOES NOT COME');
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// 🔴 7 AUGUST 2026. FIVE FAULTS ON ONE SCREEN, AND ALL FIVE MET THE SAME MAN: THE ONE WHO IS
+// ALREADY LOCKED OUT AND ALREADY ANNOYED.
+//
+//   1. There was NO RESEND. A man whose code never arrived could only clear the field, retype the
+//      same address and press send, and that retype spends one of the three sends lib/logindoor.ts
+//      allows per contact per fifteen minutes. The only control on the screen charged him for
+//      using it.
+//   2. "Use a different email address" was THE ONLY WAY OUT, and it empties the box. That is the
+//      wrong default action for a man who typed the right address and is waiting.
+//   3. "Too many tries" was shown on the SEND path, where he has tried nothing. He asked. He reads
+//      an accusation and a lockout, and he stops.
+//   4. A failed session write handed him back a SPENT code and told him to try again. The code had
+//      already been given to GoTrue, so the one action offered was the one that could never work.
+//   5. The unavailable branch told him to "get in touch" and showed NO ADDRESS, because the only
+//      address on the page lived inside the form branch that this branch replaces. Same gap on the
+//      code step, where the man who is actually stuck is standing.
+//
+// This section holds all five down twice: by walking the page's braces, and by running both auth
+// routes with the branch forced open. A grep can tell you a string is somewhere in the file. Only
+// the walk can tell you WHICH BRANCH it is in, which was the whole of fault five, and only running
+// the route can tell you what a man is actually redirected into.
+
+// ── A comment aware bracket walk, so a branch can be read on its own ────────────────────────────
+// An apostrophe in "GoTrue's" opens a string that never closes, which is why this skips comments
+// rather than only quotes. It throws rather than returning nothing: a walk that silently finds an
+// empty branch would make every assertion below vacuously true, which is the one failure a guard
+// must never have.
+function matchFrom(s, i) {
+  const open = '([{';
+  const close = ')]}';
+  const stack = [];
+  let quote = null;
+  for (; i < s.length; i += 1) {
+    const c = s[i];
+    if (!quote && c === '/' && s[i + 1] === '/') { i = s.indexOf('\n', i); if (i < 0) throw new Error('unclosed'); continue; }
+    if (!quote && c === '/' && s[i + 1] === '*') { i = s.indexOf('*/', i) + 1; if (i < 1) throw new Error('unclosed'); continue; }
+    if (quote) {
+      if (c === '\\') { i += 1; continue; }
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
+    if (open.includes(c)) { stack.push(close[open.indexOf(c)]); continue; }
+    if (close.includes(c)) {
+      if (!stack.length) return i;
+      if (stack.pop() !== c) throw new Error('unbalanced');
+      if (!stack.length) return i + 1;
+    }
+  }
+  throw new Error('ran off the end of app/in/page.tsx');
+}
+
+// The one ternary that decides what a man is shown:
+//   {!configured ? ( unavailable ) : step === 'code' ? ( codeStep ) : ( emailStep )}
+const IN_BRANCHES = (() => {
+  const at = inPage.indexOf('{!configured ? (');
+  if (at < 0) throw new Error('the configured ternary on app/in/page.tsx moved, so this walk is blind');
+  const whole = inPage.slice(at, matchFrom(inPage, at));
+  const cut = (s) => { const o = s.indexOf('('); const c = matchFrom(s, o); return [s.slice(o + 1, c - 1), s.slice(c)]; };
+  const [unavailable, r1] = cut(whole);
+  const [codeStep, r2] = cut(r1);
+  const [emailStep] = cut(r2);
+  return { unavailable, codeStep, emailStep };
+})();
+ok('the branch walk is not vacuous: it found all three screens',
+  IN_BRANCHES.unavailable.length > 40 && IN_BRANCHES.codeStep.length > 400 && IN_BRANCHES.emailStep.length > 200);
+ok('...and it really did split them, rather than handing back one blob',
+  IN_BRANCHES.emailStep.includes('name="contact"') && !IN_BRANCHES.codeStep.includes('name="contact"')
+  && IN_BRANCHES.codeStep.includes('name="code"') && !IN_BRANCHES.unavailable.includes('<form'));
+
+// Every sentence a customer can be shown, read out of the switch by its code. Comments stripped:
+// the switch now carries an argument that QUOTES the old wording, and reading an explanation as
+// the thing it explains is the fourth time this suite has had to learn that.
+const SAYS = Object.fromEntries(
+  [...stripComments(inPage).matchAll(/case '([a-z]+)': return '((?:[^'\\]|\\.)*)';/g)]
+    .map((m) => [m[1], m[2].replace(/\\'/g, "'")]),
+);
+ok('the sentences were actually read off the page', Object.keys(SAYS).length >= 10);
+
+// ── FAULT 1. THERE IS A WAY TO ASK FOR ANOTHER CODE ─────────────────────────────────────────────
+const startForms = (b) => [...b.matchAll(/<form\b[^>]*action="([^"]+)"/g)].map((m) => m[1]);
+ok('🔴 THE CODE STEP CAN ASK FOR ANOTHER CODE WITHOUT RETYPING AN ADDRESS',
+  startForms(IN_BRANCHES.codeStep).includes('/api/auth/start'));
+// A GET that sends a code is a GET any other site can make his browser send with an image tag, and
+// every code that goes out is a row in auth_sends and a step towards his own cap.
+ok('...and it is a POST, never a link',
+  /<form action="\/api\/auth\/start" method="post">/.test(IN_BRANCHES.codeStep)
+  && !/href="\/api\/auth\/start/.test(IN_BRANCHES.codeStep));
+ok('...with a button he can actually see, not a bare word',
+  /<button type="submit"[^>]*>Send the code again<\/button>/.test(IN_BRANCHES.codeStep));
+// The resend carries no address field, because the code step has nowhere to type one. The contact
+// comes back out of the signed pending cookie, so a resend can only ever repeat a send this door
+// has already made.
+ok('🔴 THE RESEND CARRIES NO CONTACT, SO NOTHING NEW CAN BE INTRODUCED FROM THAT SCREEN',
+  !/name="contact"/.test(IN_BRANCHES.codeStep));
+ok('🔴 AND THE SEND ROUTE READS IT BACK OUT OF THE SIGNED COOKIE',
+  startRoute.includes('verifyPendingCookie') && /verifyPendingCookie\(req\.cookies\.get\(PENDING_COOKIE\)/.test(startRoute));
+// GoTrue will not mint a second code inside sixty seconds. A button that fires inside that window
+// must say so, not silently fail and not claim one is on its way.
+ok('🔴 THERE IS AN HONEST MINUTE, AND IT IS THE BROWSER THAT KEEPS IT',
+  /RESEND_WAIT_SECONDS = 60/.test(startRoute)
+  && /res\.cookies\.set\(RESEND_COOKIE, '1', sessionCookieAttributes\(RESEND_WAIT_SECONDS\)\)/.test(startRoute));
+ok('🔴 AND THE WAIT IS CHECKED BEFORE ANYTHING IS COUNTED, so a press inside it costs him nothing',
+  stripComments(startRoute).indexOf("backToCode(req, 'wait', next)") < stripComments(startRoute).indexOf('otp:t:'));
+ok('the man is told plainly, in a sentence about a minute',
+  /less than a minute ago/.test(SAYS.wait) && !/on its way|have sent/.test(SAYS.wait));
+// A press that really sent one has to say so, or the screen he lands back on is the screen he left
+// and the button looks broken.
+ok('🔴 A RESEND THAT REALLY WENT SAYS SO', /sent=1/.test(startRoute) && /one\('sent'\) === '1'/.test(inPage));
+ok('...in words, on the page', /We have sent another code/.test(stripComments(inPage)));
+
+// ── FAULT 2. THE LINK THAT CLEARS THE FIELD IS NO LONGER THE ONLY WAY OUT ────────────────────────
+ok('🔴 "USE A DIFFERENT EMAIL ADDRESS" IS NO LONGER THE ONLY CONTROL ON THE CODE STEP',
+  startForms(IN_BRANCHES.codeStep).length >= 2);
+// It stays, because a man who really did mistype needs it. It just stops being the default action.
+ok('...but it is still there for the man who did mistype',
+  /<a href="\/in"[^>]*>Use a different email address<\/a>/.test(IN_BRANCHES.codeStep));
+// ⚠️ COMMENTS STRIPPED, OR THIS READS THE ARGUMENT INSTEAD OF THE SCREEN. The branch carries a long
+// note quoting the old link's words, and that quotation sits above the resend it explains.
+{
+  const rendered = stripComments(IN_BRANCHES.codeStep);
+  ok('🔴 AND THE RESEND COMES FIRST, because he is far more likely to have typed it right',
+    rendered.indexOf('/api/auth/start') < rendered.indexOf('Use a different email address'));
+}
+
+// ── FAULT 3. THE SEND DOOR STOPS ACCUSING HIM OF TRYING ─────────────────────────────────────────
+ok('🔴 THE SEND DOOR NEVER SAYS "TOO MANY TRIES", BECAUSE HE HAS TRIED NOTHING',
+  !/'toomany'/.test(stripComments(startRoute)));
+ok('...it has its own word for asking too often', /'toosoon'/.test(stripComments(startRoute)));
+ok('🔴 AND THE VERIFY DOOR KEEPS IT, because there he really has tried',
+  /'toomany'/.test(stripComments(verifyRoute)));
+ok('the two sentences are different, and each names what he actually did',
+  SAYS.toomany !== SAYS.toosoon && /tries/.test(SAYS.toomany) && /asked for a few codes/.test(SAYS.toosoon));
+ok('🔴 AND THE SEND SENTENCE ACCUSES HIM OF NOTHING', !/tries|too many/i.test(SAYS.toosoon));
+// A refusal to send another must leave him on the step where his live code still works, not on an
+// empty address field.
+ok('🔴 A REFUSED RESEND LEAVES HIM ON THE CODE STEP',
+  /function backToCode\(/.test(startRoute) && /step=code&e=\$\{reason\}/.test(startRoute));
+
+// ── FAULT 4. NOTHING PAST THE EXCHANGE EVER OFFERS HIM A SPENT CODE ─────────────────────────────
+//
+// GoTrue's /auth/v1/verify is where the code is handed in. A non ok answer means it was refused and
+// the code is untouched, so 'code' is honest there and only there. Everything after that line is
+// holding a code that has already been accepted, and a one time code that has been accepted is gone.
+{
+  const anchor = "if (!res.ok) return back(req, 'code', next);";
+  const src = stripComments(verifyRoute);
+  const at = src.indexOf(anchor);
+  ok('the exchange anchor is still in the verify route, so this slice is not vacuous', at > 0);
+  const afterExchange = src.slice(at + anchor.length);
+  const reasons = [...new Set([...afterExchange.matchAll(/back\(req, '([a-z]+)'/g)].map((m) => m[1]))];
+  ok('the slice really did find the failures past the exchange', reasons.length >= 1);
+  ok(`🔴 NO FAILURE PAST THE CODE EXCHANGE INVITES HIM TO TYPE THAT CODE AGAIN: ${reasons.join(', ')}`,
+    reasons.every((r) => r === 'session'));
+  ok("...and 'code' survives on the one line where the code really was refused",
+    /if \(!res\.ok\) return back\(req, 'code', next\);/.test(src));
+}
+ok('🔴 AND THE SENTENCE TELLS HIM THE CODE IS GONE AND WHAT TO DO INSTEAD',
+  /used up/.test(SAYS.session) && /fresh one/.test(SAYS.session));
+ok('🔴 IT NEVER INVITES THE ONE ACTION THAT CANNOT WORK', !/try again/i.test(SAYS.session));
+// The thing it tells him to do has to be on the screen he is sent to, or it is advice he cannot
+// follow, which this door has been corrected for once already.
+ok('🔴 AND THE SCREEN HE LANDS ON REALLY HAS THAT BUTTON ON IT',
+  /step=code&e=\$\{reason\}/.test(verifyRoute) && startForms(IN_BRANCHES.codeStep).includes('/api/auth/start'));
+
+// ── FAULT 5. EVERY "GET IN TOUCH" SHOWS HIM WHERE ───────────────────────────────────────────────
+const hasAddress = (b) => /\{SUPPORT\}/.test(stripComments(b));
+ok('🔴 THE UNAVAILABLE BRANCH SHOWS AN ADDRESS, having told him to write to us with none',
+  hasAddress(IN_BRANCHES.unavailable));
+ok('🔴 SO DOES THE CODE STEP, where the man who is actually stuck is standing',
+  hasAddress(IN_BRANCHES.codeStep));
+ok('...and the email step still does', hasAddress(IN_BRANCHES.emailStep));
+// ⚠️ IT IS info@, NOT support@. test/llmstxt.test.mjs calls support@ "the mailbox we do not have",
+// and offering one was itself a fault fixed on 7 August: an address nobody reads is worse than no
+// address, because he writes to it and waits.
+ok('🔴 THE ADDRESS IS info@lekhio.app AND THERE IS ONE HOME FOR IT',
+  /const SUPPORT = 'info@lekhio\.app';/.test(inPage)
+  && (stripComments(inPage).match(/info@lekhio\.app/g) || []).length === 1);
+// Comments stripped again: the constant carries the argument for why it is info@ and not support@,
+// and a guard that cannot tell the reason from the mistake is a guard somebody deletes.
+ok('🔴 AND IT IS NEVER THE SUPPORT MAILBOX WE DO NOT HAVE', !/support@/.test(stripComments(inPage)));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n10. AND THE TWO AUTH ROUTES, RUN FOR REAL WITH THE BRANCH FORCED OPEN');
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// Everything above reads the source. Reading the source is how you find out what a file says; it is
+// not how you find out what a man is redirected into. These stage both routes with the real
+// lib/logindoor.ts and the real lib/websession.ts, replace only the two modules that reach the
+// world, and force each failure open one at a time.
+//
+// ⚠️ NOTHING LEAVES THE MACHINE. fetch is replaced by a fake GoTrue whose 200 means "the code was
+// accepted", which is the fact fault four turns on: a code GoTrue has accepted is spent, and every
+// branch below that point is holding one.
+const AUTH = await (async () => {
+  process.env.WEB_SESSION_SECRET = 'a-test-secret-long-enough-to-clear-the-32-byte-bar';
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.invalid';
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key-for-this-suite';
+  const stage = mkdtempSync(path.join(tmpdir(), 'webauth-routes-'));
+  const put = (n, s) => writeFileSync(path.join(stage, n), s);
+  put('logindoor.ts', read(path.join(repo, 'lib/logindoor.ts')));
+  put('websession.ts', read(path.join(repo, 'lib/websession.ts')));
+  put('nextserver.ts', `
+export class NextRequest {}
+export const NextResponse = {
+  redirect(url, status) {
+    const jar = [];
+    return { status, location: String(url), cookies: { set: (n, v, a) => jar.push({ n, v, a }) }, jar };
+  },
+};
+`);
+  put('ratelimit.ts', `
+export const rl = { target: false, source: false, cap: false, calls: [] };
+export function clientIp() { return '203.0.113.9'; }
+export async function rateLimitedShared(key) {
+  rl.calls.push(key);
+  return /^otpv?:t:/.test(key) ? rl.target : /^otpv?:ip:/.test(key) ? rl.source : false;
+}
+export async function spendCapReached() { rl.calls.push('cap'); return rl.cap; }
+`);
+  put('supabase.ts', `
+export const db = { account: { userId: 'u-1' }, attachOk: true, rowOk: true, sessionOk: true,
+  user: { id: 'u-1', phone: '+447700900999', email: 'dave@example.com' }, calls: [] };
+export async function findContactAccount(channel, value) { db.calls.push({ fn: 'find', value }); return db.account; }
+export async function attachEmailToAuthUser() { db.calls.push({ fn: 'attach' }); return db.attachOk; }
+export async function logAuthSend(channel, hash, outcome) { db.calls.push({ fn: 'log', outcome }); }
+export async function verifyAccessToken() { db.calls.push({ fn: 'token' }); return db.user; }
+export async function ensureUserRow() { db.calls.push({ fn: 'row' }); return db.rowOk; }
+export async function createWebSession() { db.calls.push({ fn: 'session' }); return db.sessionOk; }
+export async function reconcileSignupToUser() { return true; }
+`);
+  const fix = (s) => s.replace(/from 'next\/server'/g, "from './nextserver.ts'")
+    .replace(/from '(?:\.\.\/)+lib\/([a-zA-Z]+)'/g, "from './$1.ts'");
+  put('start.ts', fix(startRoute));
+  put('verify.ts', fix(verifyRoute));
+  const u = (f) => pathToFileURL(path.join(stage, f)).href;
+  return {
+    start: await import(u('start.ts')), verify: await import(u('verify.ts')),
+    RL: await import(u('ratelimit.ts')), DB: await import(u('supabase.ts')), WS: await import(u('websession.ts')),
+  };
+})();
+
+const authPost = (fields, cookies = {}, at = '/api/auth/start') => ({
+  url: `https://lekhio.app${at}`,
+  headers: new Headers({ origin: 'https://lekhio.app', host: 'lekhio.app' }),
+  formData: async () => { const fd = new FormData(); for (const [k, v] of Object.entries(fields)) fd.append(k, String(v)); return fd; },
+  cookies: { get: (n) => (n in cookies ? { value: cookies[n] } : undefined) },
+});
+
+// The fake GoTrue. `sent` counts codes that really went out, `burned` counts codes it accepted.
+let gotrue;
+function fakeGoTrue(plan = {}) {
+  gotrue = { sent: 0, burned: 0 };
+  globalThis.fetch = async (u) => {
+    if (String(u).endsWith('/auth/v1/otp')) {
+      if (plan.otpFails) return { ok: false, status: 429, json: async () => ({}) };
+      gotrue.sent += 1;
+      return { ok: true, status: 200, json: async () => ({}) };
+    }
+    if (plan.codeRefused) return { ok: false, status: 403, json: async () => ({}) };
+    gotrue.burned += 1;
+    return { ok: true, status: 200, json: async () => ({ access_token: 'a-token' }) };
+  };
+}
+const reason = (res) => new URL(res.location).searchParams.get('e');
+const cookieOn = (res, n) => res.jar.find((c) => c.n === n);
+
+const PENDING = AUTH.WS.pendingCookieValue({ channel: 'email', value: 'dave@example.com' });
+ok('the harness really can mint a pending contact, so websession is configured here', PENDING.length > 20);
+
+// ── FAULT 1, RUN ────────────────────────────────────────────────────────────────────────────────
+{
+  fakeGoTrue();
+  const first = await AUTH.start.POST(authPost({ contact: 'dave@example.com' }));
+  ok('🔴 A RESEND IS POSSIBLE AT ALL: the first send arms the code step', gotrue.sent === 1 && first.location.includes('step=code'));
+  ok('🔴 AND THE MINUTE IS ARMED WITH IT', !!cookieOn(first, 'lek_w') && cookieOn(first, 'lek_w').a.maxAge === 60);
+  ok('...httpOnly and same site, like every other cookie this door sets',
+    cookieOn(first, 'lek_w').a.httpOnly === true && cookieOn(first, 'lek_w').a.sameSite === 'lax');
+
+  // Inside the minute. This is the press that used to be impossible to make honest.
+  fakeGoTrue();
+  AUTH.RL.rl.calls.length = 0;
+  AUTH.DB.db.calls.length = 0;
+  const early = await AUTH.start.POST(authPost({}, { lek_p: PENDING, lek_w: '1' }));
+  ok('🔴 A PRESS INSIDE THE MINUTE IS TOLD THE TRUTH, NOT THAT ONE IS ON ITS WAY', reason(early) === 'wait');
+  ok('🔴 AND NO CODE WENT OUT BEHIND THAT SENTENCE', gotrue.sent === 0);
+  ok('🔴 AND IT COST HIM NOTHING: not one send was counted against him', AUTH.RL.rl.calls.length === 0);
+  ok('...nothing was looked up and nothing was logged either', AUTH.DB.db.calls.length === 0);
+
+  // After the minute.
+  fakeGoTrue();
+  const again = await AUTH.start.POST(authPost({}, { lek_p: PENDING }));
+  ok('🔴 AFTER THE MINUTE A FRESH CODE REALLY GOES OUT, with nothing retyped', gotrue.sent === 1);
+  ok('🔴 TO THE ADDRESS IN THE SIGNED COOKIE, never one posted from that screen',
+    AUTH.DB.db.calls.some((c) => c.fn === 'find' && c.value === 'dave@example.com'));
+  ok('🔴 AND HE IS TOLD IT WENT', again.location.includes('sent=1'));
+  ok('where he was heading survives a resend',
+    (await AUTH.start.POST(authPost({ next: '/app/you/billing' }, { lek_p: PENDING }))).location.includes('next=%2Fapp%2Fyou%2Fbilling'));
+
+  // ⚠️ AND THE NEUTRALITY RULE SURVIVES THE NEW BUTTON. A stranger's address and a customer's must
+  // still produce the same screen, or the resend is a customer list with a button on it.
+  fakeGoTrue();
+  const known = await AUTH.start.POST(authPost({}, { lek_p: PENDING }));
+  AUTH.DB.db.account = null;
+  const stranger = await AUTH.start.POST(authPost({}, { lek_p: AUTH.WS.pendingCookieValue({ channel: 'email', value: 'nobody@example.com' }) }));
+  ok('🔴 A STRANGER PRESSING RESEND GETS A BYTE IDENTICAL SCREEN', known.location === stranger.location);
+  AUTH.DB.db.account = { userId: 'u-1' };
+
+  // A resend after the pending cookie has run out is about an address, so it says so.
+  fakeGoTrue();
+  const stale = await AUTH.start.POST(authPost({}));
+  ok('a resend with no live contact asks for the address again', reason(stale) === 'expired' && !stale.location.includes('step=code'));
+}
+
+// ── FAULT 3, RUN ────────────────────────────────────────────────────────────────────────────────
+{
+  fakeGoTrue();
+  AUTH.RL.rl.target = true;
+  AUTH.DB.db.calls.length = 0;
+  const typed = await AUTH.start.POST(authPost({ contact: 'dave@example.com' }));
+  ok('🔴 ASKING FOR A CODE IS NEVER CALLED A TRY', reason(typed) === 'toosoon');
+  ok('...and he really had tried nothing: no code was verified in that request',
+    !AUTH.DB.db.calls.some((c) => c.fn === 'token'));
+  const pressed = await AUTH.start.POST(authPost({}, { lek_p: PENDING }));
+  ok('🔴 AND A REFUSED RESEND LEAVES HIM STANDING ON THE CODE STEP',
+    reason(pressed) === 'toosoon' && pressed.location.includes('step=code'));
+  AUTH.RL.rl.target = false;
+
+  // The verify door keeps 'toomany', because there every attempt really was a try.
+  fakeGoTrue();
+  AUTH.RL.rl.target = true;
+  const guessed = await AUTH.verify.POST(authPost({ code: '12345678' }, { lek_p: PENDING }, '/api/auth/verify'));
+  ok('🔴 THE VERIFY DOOR STILL SAYS "TOO MANY TRIES", because there he really has tried', reason(guessed) === 'toomany');
+  AUTH.RL.rl.target = false;
+}
+
+// ── FAULT 4, RUN ────────────────────────────────────────────────────────────────────────────────
+//
+// Each of these hands GoTrue a code, gets a 200 back, and then breaks the step after it. The code
+// is gone in every one of them, so the only honest answer is the one that tells him so.
+for (const [what, set, unset] of [
+  ['the users row will not write', () => { AUTH.DB.db.rowOk = false; }, () => { AUTH.DB.db.rowOk = true; }],
+  ['the session row will not write', () => { AUTH.DB.db.sessionOk = false; }, () => { AUTH.DB.db.sessionOk = true; }],
+  ['our own token check comes back empty', () => { AUTH.DB.db.user = null; }, () => { AUTH.DB.db.user = { id: 'u-1', phone: '+447700900999', email: 'dave@example.com' }; }],
+]) {
+  fakeGoTrue();
+  set();
+  const res = await AUTH.verify.POST(authPost({ code: '12345678' }, { lek_p: PENDING }, '/api/auth/verify'));
+  unset();
+  ok(`${what}: GoTrue took the code, so it is spent`, gotrue.burned === 1);
+  ok(`🔴 ${what}: HE IS NOT INVITED TO TYPE IT AGAIN`, reason(res) === 'session' && !/try again/i.test(SAYS[reason(res)]));
+  ok(`${what}: and he is left on the step that carries the resend`, res.location.includes('step=code'));
+}
+// The one case where the code really was refused keeps its own honest answer, or this whole fix
+// would have turned a wrong code into a lecture about used up codes.
+{
+  fakeGoTrue({ codeRefused: true });
+  const wrong = await AUTH.verify.POST(authPost({ code: '00000000' }, { lek_p: PENDING }, '/api/auth/verify'));
+  ok('🔴 A GENUINELY WRONG CODE IS STILL TOLD IT IS WRONG, AND STILL INVITED TO TRY AGAIN',
+    reason(wrong) === 'code' && gotrue.burned === 0 && /try again/.test(SAYS.code));
+}
 
 console.log(`\n${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

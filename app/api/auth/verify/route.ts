@@ -31,6 +31,28 @@ export const runtime = 'nodejs';
 //
 // Only then is a session opened. If the session write fails he is told, rather than being handed a
 // cookie that means nothing and a page that will bounce him straight back here.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 7 AUGUST 2026. THE LINE THAT DIVIDES THIS FILE, AND EVERY BRANCH BELOW IT USED TO LIE.
+//
+// GoTrue's /auth/v1/verify is where the code is handed in. A NON ok response means it was refused
+// and the code is untouched, so 'code' is the honest answer and "try again" is honest advice.
+//
+// EVERYTHING AFTER THAT POINT IS HOLDING A SPENT CODE. A one time code that has been accepted is
+// gone: the users row failing to write, the session row failing to write, the cookie failing to
+// sign, our own token check failing, none of them un-spend it. Every one of those branches used to
+// put him back on the code step in front of the box he had just typed into, under a sentence
+// ending "Try again in a minute". The only action offered was the one action that could never work
+// again, and after two goes he reads "That code did not work" and concludes he is locked out.
+//
+// So every failure past the exchange returns 'session', whose sentence on app/in/page.tsx tells him
+// plainly that the code may be used up and to ask for a fresh one, and the code step now carries a
+// "Send the code again" button so that asking costs him one press and no retyping.
+//
+// ⚠️ NEVER INVITE AN ACTION THAT CANNOT WORK. That is the whole rule, and the reason 'code' and
+// 'unavailable' must not appear below the exchange even though both are perfectly good sentences
+// somewhere else in this door.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 
 // ⚠️ THE DESTINATION SURVIVES A WRONG CODE. He is one digit from where he was going, so losing it
 // here would be the second time we sent him back to the beginning.
@@ -88,19 +110,29 @@ export async function POST(req: NextRequest) {
           : { type: 'email', email: pending.value, token: code },
       ),
     });
+    // ⚠️ THE ONE HONEST 'code' IN THE FILE, AND THE LAST LINE ON WHICH THE CODE IS STILL HIS.
+    // GoTrue refused it, so it was never handed in, so typing another one really is the fix.
     if (!res.ok) return back(req, 'code', next);
     const json = (await res.json()) as { access_token?: string };
     accessToken = json.access_token || '';
   } catch {
-    return back(req, 'send', next);
+    // A throw covers the fetch failing before GoTrue saw the code AND the body failing to read
+    // after a 200, which is a code already handed in. We cannot tell which, and 'send' was in any
+    // case the wrong word here: nothing was being sent. The one action that works whichever
+    // happened is asking for a fresh code, so that is what he is told.
+    return back(req, 'session', next);
   }
-  if (!accessToken) return back(req, 'code', next);
+  // A 200 with no token in it. The code was accepted to get that 200, so it is spent.
+  if (!accessToken) return back(req, 'session', next);
 
   // ⚠️ THE IDENTITY COMES FROM SUPABASE, NEVER FROM US. We hand the token straight back to GoTrue
   // and let it say who this is, exactly as every authed route already does. Then we throw the token
   // away: it never reaches the browser, so there is nothing on the page for a script to steal.
   const user = await verifyAccessToken(accessToken);
-  if (!user) return back(req, 'code', next);
+  // 🔴 'session', NOT 'code'. GoTrue took the code and gave us a token, so the code is gone. A
+  // failure here is OUR second call not answering, and "That code did not work. Check the email and
+  // try again." sends him back to the one code that is guaranteed to be refused from now on.
+  if (!user) return back(req, 'session', next);
 
   // The phone is the account key, always. On the email door the verified user already has one, and
   // user.phone is what GoTrue holds for him; on the phone door it is the number we just proved.
@@ -145,7 +177,10 @@ export async function POST(req: NextRequest) {
   if (!opened) return back(req, 'session', next);
 
   const cookie = sessionCookieValue(sessionId, new Date(), ttlSeconds);
-  if (!cookie) return back(req, 'unavailable', next);
+  // 🔴 'session', NOT 'unavailable'. "Signing in is not available right now. Try again shortly." is
+  // the right sentence at the top of this file, where the code has not been spent yet. Here it is
+  // an invitation to retype a dead code, and it also strands a session row nobody can now use.
+  if (!cookie) return back(req, 'session', next);
 
   const res = NextResponse.redirect(new URL(next, req.url), 303);
   res.cookies.set(

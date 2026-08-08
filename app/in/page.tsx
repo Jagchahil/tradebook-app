@@ -36,6 +36,17 @@ export const dynamic = 'force-dynamic';
 // product and a URL is written into browser history, into Referer headers, and into every error
 // report that ever records one.
 
+// ⚠️ THE ONE ADDRESS A LOCKED OUT MAN CAN REACH US AT, WRITTEN ONCE.
+//
+// It is info@, and it is NOT support@. We do not own a support@ mailbox, test/llmstxt.test.mjs
+// says so out loud, and offering one was itself a fault fixed on 7 August: an address nobody reads
+// is worse than no address, because he writes to it and waits.
+//
+// It is a constant rather than three sentences carrying the same string, because the fault below
+// was exactly that the string lived in ONE branch. A branch that grows an address by hand is a
+// branch that grows the wrong one.
+const SUPPORT = 'info@lekhio.app';
+
 // A failure code from the routes, turned into something a person can act on. Never a stack trace,
 // never "an error occurred", and never blame.
 function message(code: string | undefined): string | null {
@@ -48,9 +59,38 @@ function message(code: string | undefined): string | null {
     case 'capped': return 'We have sent as many codes as we can for the moment. Give it a little while and try again.';
     case 'code': return 'That code did not work. Check the email and try again.';
     case 'expired': return 'That took a little too long. Put your address in again and we will send a fresh code.';
+
+    // 🔴 'toomany' NOW BELONGS TO THE VERIFY DOOR ALONE, AND THAT IS THE WHOLE FIX.
+    //
+    // Both halves of signing in used to return it. On /api/auth/verify it is true: he has typed ten
+    // codes in a quarter of an hour and every one of them was a try. On /api/auth/start he has
+    // typed NOTHING. He asked for a code, four times in fifteen minutes, because the first three
+    // never arrived, and we answered a man who is already worried with "Too many tries", which
+    // reads as an accusation and as a lockout. He stops.
+    //
+    // So the send door has its own two sentences below. They name the thing he actually did, which
+    // is ask, and they tell him how long to wait for. Same limits, same numbers, no accusation.
     case 'toomany': return 'Too many tries. Give it a few minutes and try again.';
+    case 'toosoon': return 'You have asked for a few codes already. Give it a few minutes, then ask for another.';
+    case 'wait': return 'We sent that one less than a minute ago. Give it a minute, then ask again.';
+
     case 'send': return 'We could not send the code just now. Try again in a minute.';
-    case 'session': return 'We could not sign you in just now. Try again in a minute.';
+
+    // 🔴 THIS SENTENCE USED TO SAY "Try again in a minute", AND IT WAS THE ONE ACTION THAT COULD
+    // NOT WORK.
+    //
+    // Every path that reaches 'session' is past GoTrue's /auth/v1/verify, so his code has already
+    // been handed in. A one time code that has been accepted is gone. We put him back on the code
+    // step, in front of the box he just typed into, and told him to try again with the only code he
+    // has, which will now be refused for ever. He types it, it fails, he reads "That code did not
+    // work", and concludes he is locked out of his own books.
+    //
+    // ⚠️ "may already be used up" IS THE HEDGE AND IT IS DELIBERATE. One of the paths here is a
+    // thrown fetch, which can fail before GoTrue ever saw the code or after it read it. We do not
+    // know which, and a sentence that asserts the wrong one is the same fault in a new coat. What
+    // we DO know is that asking for a fresh code always works, so that is the action we name.
+    case 'session': return 'We could not finish signing you in, and that code may already be used up. Ask for a fresh one below rather than typing that one again.';
+
     case 'origin': return 'That request did not come from Lekhio, so we stopped it.';
     case 'unavailable': return 'Signing in is not available right now. Try again shortly.';
     case 'bad': return 'Something went wrong with that. Try again.';
@@ -88,6 +128,10 @@ export default async function SignInPage({
   const step = one('step') === 'code' ? 'code' : 'phone';
   const err = message(one('e'));
   const signedOut = one('out') === '1';
+  // He pressed "Send the code again" and one really went. Without this the press looks like
+  // nothing happened, because the screen he lands back on is the screen he was already on, and a
+  // button that appears to do nothing is the thing doc 103 calls dishonest.
+  const resent = one('sent') === '1';
   const configured = webSessionsConfigured();
 
   return (
@@ -117,15 +161,51 @@ export default async function SignInPage({
         </p>
 
         {signedOut && <p style={S.note}>You are signed out.</p>}
+        {resent && <p style={S.note}>We have sent another code. It can take a minute to arrive.</p>}
         {err && <p style={S.err} role="alert">{err}</p>}
 
         {/* Signing in is not possible without the signing secret, and saying so beats a form that
-            silently goes nowhere. Doc 103's honesty test applied to an error state. */}
+            silently goes nowhere. Doc 103's honesty test applied to an error state.
+
+            🔴 AND IT USED TO SAY "get in touch" WITH NOTHING TO GET IN TOUCH AT. The only address
+            on this page lived inside the email form below, which is the one branch this branch
+            replaces, so the man who was told to contact us was the one man who could not see how.
+            "Get in touch" with no address is not an instruction, it is a shrug. */}
         {!configured ? (
           <p style={S.note}>
-            Signing in is not switched on just now. Try again shortly, and get in touch if it stays that way.
+            Signing in is not switched on just now. Try again shortly. If it stays that way, email
+            {' '}{SUPPORT} and we will sort it out.
           </p>
         ) : step === 'code' ? (
+          // ═══════════════════════════════════════════════════════════════════════════════════
+          // 🔴 THE SCREEN A MAN LOOKS AT WHEN THE CODE HAS NOT COME. UNTIL 7 AUGUST IT OFFERED HIM
+          // ONE WAY OUT, AND THAT WAY OUT CHARGED HIM FOR IT.
+          //
+          // The only link said "Use a different email address". It goes to /in, which renders an
+          // empty field. So the man who typed the RIGHT address and is simply waiting had to clear
+          // it, type it again, and press send, and that retype spends one of the three sends
+          // lib/logindoor.ts allows per contact per fifteen minutes. Three of those and the send
+          // door refuses him. The one control on the screen was a trap with a meter running.
+          //
+          // ⚠️ SO THE RESEND IS A FORM POST AND NOT A LINK, and that is not fussiness. A GET that
+          // sends a code is a GET any other site can make his browser send with an image tag, and
+          // every code that goes out is a row in auth_sends and a step towards his own cap. The
+          // same argument /app/money and /app/pile already lost once each.
+          //
+          // ⚠️ AND IT CARRIES NO ADDRESS. There is no field here to put one in. /api/auth/start
+          // reads the contact out of the signed pending cookie when the form has none, which is
+          // the same address we already sent to and therefore the only address a resend could
+          // honestly mean. Nothing new can be introduced from this screen.
+          //
+          // WHAT WAS CONSIDERED AND LEFT OUT:
+          //   a live countdown        needs script, and this page ships none, on purpose, for the
+          //                           man on a five year old Android. See the header.
+          //   hiding it for a minute  with no script it could never come back, so he would see no
+          //                           resend at all at the exact moment he needs one.
+          //   a "contact us" row      the empty test. The address belongs inside the sentence that
+          //                           tells him to use it, and nowhere else.
+          // ═══════════════════════════════════════════════════════════════════════════════════
+          <>
           <form action="/api/auth/verify" method="post">
             {/* Carried as a hidden field rather than on the action URL, so it survives the post
                 without the page ever re-reading it from its own address. */}
@@ -159,17 +239,36 @@ export default async function SignInPage({
               </span>
             </label>
             <button type="submit" style={S.btn}>Sign in</button>
-            {/* ⚠️ "or number" survived the 2 Aug pass because the sweep looked at the FORM, not at the
-                code step. Found by walking the live sign in on 3 August. */}
-            <a href="/in" style={S.link}>Use a different email address</a>
-            {/* ⚠️ WE NEVER SAY "NO ACCOUNT WITH THAT ADDRESS", AND WE ARE NOT GOING TO. Telling a
-                stranger which addresses are registered hands him a list of our customers, so this
-                screen looks identical whether the code went out or there was nobody to send it to.
-                The cost of that is a man who mistyped his email waiting for something that is never
-                coming, which feels like a broken product rather than a typo. So we say the true
-                thing that helps him without saying the one that helps an attacker. */}
-            <p style={S.hint}>Nothing after a minute? Check the address you typed.</p>
           </form>
+
+          {/* THE SECOND CONTROL, AND THE ONE HE CAME BACK TO THIS SCREEN FOR.
+              Quieter than "Sign in", because typing the code he already has is still the thing we
+              want him to do. Loud enough to find without hunting, because a man who cannot find it
+              retypes his address instead and pays a send for the privilege. */}
+          <form action="/api/auth/start" method="post">
+            <input type="hidden" name="next" value={next} />
+            <button type="submit" style={S.btnQuiet}>Send the code again</button>
+          </form>
+
+          {/* ⚠️ "or number" survived the 2 Aug pass because the sweep looked at the FORM, not at the
+              code step. Found by walking the live sign in on 3 August.
+              🔴 AND IT IS NO LONGER THE ONLY WAY OUT. It sits under the resend now, because a man
+              who typed the right address needs another code, not an empty box. */}
+          <a href="/in" style={S.link}>Use a different email address</a>
+          {/* ⚠️ WE NEVER SAY "NO ACCOUNT WITH THAT ADDRESS", AND WE ARE NOT GOING TO. Telling a
+              stranger which addresses are registered hands him a list of our customers, so this
+              screen looks identical whether the code went out or there was nobody to send it to.
+              The cost of that is a man who mistyped his email waiting for something that is never
+              coming, which feels like a broken product rather than a typo. So we say the true
+              thing that helps him without saying the one that helps an attacker.
+
+              🔴 AND THE ADDRESS TO WRITE TO IS HERE, because it was nowhere on this step. The one
+              man in the product who is definitely stuck had no way of telling us so. */}
+          <p style={S.hint}>
+            Nothing after a minute? Check your spam folder and the address you typed. If it still
+            has not arrived, email {SUPPORT}.
+          </p>
+          </>
         ) : (
           /* 🔴 THE WEB DOOR IS EMAIL ONLY FROM 2 AUGUST 2026. THE APP DOOR IS NOT.
              This was one field taking either. lib/logindoor.ts STILL reads a mobile and
@@ -211,7 +310,7 @@ export default async function SignInPage({
             <button type="submit" style={S.btn}>Send me a code</button>
             <p style={S.hint}>
               We send a sign in code to that address. If you only ever signed in with your mobile,
-              email info@lekhio.app and we will put your address on the account.
+              email {SUPPORT} and we will put your address on the account.
             </p>
           </form>
         )}
@@ -249,6 +348,9 @@ const S: Record<string, React.CSSProperties> = {
   label: { display: 'block', fontSize: 12.5, fontWeight: 700, color: MUTED, marginBottom: 8 },
   input: { width: '100%', boxSizing: 'border-box', padding: '14px', fontSize: 16, fontFamily: FONT, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, color: INK, background: PANEL },
   btn: { width: '100%', marginTop: 16, padding: '15px 16px', fontSize: 15.5, fontWeight: 700, fontFamily: FONT, color: ON_RIVER, background: RIVER, border: 'none', borderRadius: RADIUS.md, cursor: 'pointer' },
+  // The resend. Same size and same shape as the primary, so it is plainly a control and not a
+  // decoration, and hollow, so the eye still lands on "Sign in" first.
+  btnQuiet: { width: '100%', marginTop: 12, padding: '14px 16px', fontSize: 15, fontWeight: 700, fontFamily: FONT, color: RIVER, background: 'transparent', border: `1.5px solid ${LINE}`, borderRadius: RADIUS.md, cursor: 'pointer' },
   link: { display: 'block', textAlign: 'center', marginTop: 14, fontSize: 14, fontWeight: 600, color: MUTED, textDecoration: 'none' },
   remember: { display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 16, fontSize: 14.5, fontWeight: 600, cursor: 'pointer' },
   rememberBox: { width: 18, height: 18, marginTop: 1, flex: '0 0 auto', cursor: 'pointer' },

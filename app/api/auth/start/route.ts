@@ -7,7 +7,7 @@ import {
 } from '../../../../lib/logindoor';
 import {
   PENDING_COOKIE, PENDING_TTL_SECONDS, pendingCookieValue, sessionCookieAttributes,
-  originAllowed, webSessionsConfigured, safeNext, AFTER_SIGN_IN,
+  originAllowed, webSessionsConfigured, safeNext, AFTER_SIGN_IN, verifyPendingCookie,
 } from '../../../../lib/websession';
 
 export const runtime = 'nodejs';
@@ -44,6 +44,25 @@ export const runtime = 'nodejs';
 // NO JAVASCRIPT ON THE PAGE THAT POSTS HERE. A plain form, a redirect back, and the whole sign in
 // works with scripting off on a five year old Android. See app/in/page.tsx.
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE MINUTE BETWEEN ONE CODE AND THE NEXT, KEPT BY THE BROWSER RATHER THAN BY US.
+//
+// GoTrue will not mint a second code for the same user inside sixty seconds. That is its rule, not
+// ours, and it is not negotiable from here. So a "Send the code again" button that simply posted
+// would, inside that minute, get a 429, fall through the neutral path below, and tell him another
+// code was on its way when none was. A button that lies is worse than no button.
+//
+// This cookie is the countdown, and it has no contents worth signing: its mere PRESENCE means we
+// sent something less than a minute ago, and the browser deletes it on the sixtieth second without
+// being asked. That is the only clock a page shipping zero JavaScript can keep.
+//
+// ⚠️ IT IS A KINDNESS, NOT A CONTROL. Anyone can delete his own cookie, and then the request lands
+// on the per contact and per source limits below exactly as it does today. Nothing here is load
+// bearing for abuse, and it is deliberately checked BEFORE those limits so that a press inside the
+// minute costs him nothing: the whole complaint was that asking again spent one of his three.
+const RESEND_COOKIE = 'lek_w';
+const RESEND_WAIT_SECONDS = 60;
+
 // ⚠️ THE DESTINATION SURVIVES AN ERROR TOO. A man who mistypes his address and then loses where he
 // was going has been sent back to the start twice, once by us.
 function back(req: NextRequest, reason: string, next: string) {
@@ -51,16 +70,36 @@ function back(req: NextRequest, reason: string, next: string) {
   return NextResponse.redirect(new URL(`/in?e=${reason}${q}`, req.url), 303);
 }
 
+// 🔴 AND THE TWO REFUSALS THAT MUST LEAVE HIM STANDING WHERE HE IS.
+//
+// back() drops him on the address form, which is right for every failure that means the door
+// itself is not working: starting again begins there. It is wrong for a refusal to send ANOTHER
+// code, because he already has one in his inbox and the code step is where he uses it. Bouncing
+// him to an empty address field for asking twice would be the same fault the resend was added to
+// end, reached from the other side.
+function backToCode(req: NextRequest, reason: string, next: string) {
+  const q = next === AFTER_SIGN_IN ? '' : `&next=${encodeURIComponent(next)}`;
+  return NextResponse.redirect(new URL(`/in?step=code&e=${reason}${q}`, req.url), 303);
+}
+
 // The neutral outcome. Identical for a contact we know, a contact we do not, and a send that
 // failed at the provider. He is asked for the code either way.
-function onward(req: NextRequest, channel: 'sms' | 'email', value: string, next: string) {
+//
+// ⚠️ resent ONLY CHANGES WHAT HE IS TOLD, NEVER WHO GETS TOLD IT. A stranger's address and a
+// customer's address both reach this function on a resend and both come back with the same
+// sentence, so the neutrality rule at the top of this file survives the new button intact.
+function onward(req: NextRequest, channel: 'sms' | 'email', value: string, next: string, resent = false) {
   const q = next === AFTER_SIGN_IN ? '' : `&next=${encodeURIComponent(next)}`;
-  const res = NextResponse.redirect(new URL(`/in?step=code${q}`, req.url), 303);
+  const said = resent ? '&sent=1' : '';
+  const res = NextResponse.redirect(new URL(`/in?step=code${said}${q}`, req.url), 303);
   res.cookies.set(
     PENDING_COOKIE,
     pendingCookieValue({ channel, value }),
     sessionCookieAttributes(PENDING_TTL_SECONDS),
   );
+  // The minute starts now, on the first send as much as on a resend. Same attributes as every
+  // other cookie this door sets, so it is httpOnly and same site and cannot be read by a script.
+  res.cookies.set(RESEND_COOKIE, '1', sessionCookieAttributes(RESEND_WAIT_SECONDS));
   return res;
 }
 
@@ -77,23 +116,69 @@ export async function POST(req: NextRequest) {
   // own login into a redirector. See lib/websession.ts.
   const next = safeNext(form.get('next'));
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // WHO WE ARE SENDING TO, AND WHETHER HE HAS ALREADY ASKED ONCE.
+  //
   // One field, his email or his mobile. lib/logindoor.ts decides which, and refuses anything that
   // is neither before it can cost us a penny.
-  const id = readIdentifier(String(form.get('contact') ?? ''));
-  if (!id) return back(req, 'contact', next);
+  //
+  // 🔴 AND WITH NO FIELD AT ALL, THIS IS THE RESEND. The code step has nowhere to type an address,
+  // by design: the contact rides in the signed pending cookie precisely so it never appears in a
+  // URL or in browser history. So a post with no contact means "the one you already sent to", read
+  // back out of that cookie, verified, and shape checked on the way out by lib/websession.ts.
+  //
+  // ⚠️ NOTHING NEW CAN BE INTRODUCED THIS WAY. The cookie is signed with WEB_SESSION_SECRET and we
+  // minted it ourselves after this same route had already accepted the address. A resend can only
+  // ever repeat a send this door has already made.
+  //
+  // ⚠️ A RESEND WITH NO COOKIE IS 'expired', NOT 'contact'. Fifteen minutes is longer than it takes
+  // to read an email and it does run out. Telling a man who pressed a button "that does not look
+  // like an email address" when he typed nothing is a sentence about a field he cannot see.
+  const typed = String(form.get('contact') ?? '').trim();
+  let id: { channel: 'sms' | 'email'; value: string } | null = null;
+  let resend = false;
+  if (typed) {
+    id = readIdentifier(typed);
+    if (!id) return back(req, 'contact', next);
+  } else {
+    const pending = verifyPendingCookie(req.cookies.get(PENDING_COOKIE)?.value ?? null);
+    if (!pending) return back(req, 'expired', next);
+    id = { channel: pending.channel, value: pending.value };
+    resend = true;
+  }
+
+  // The two SEND LIMIT refusals, aimed at wherever he actually is. See backToCode above.
+  //
+  // ⚠️ DELIBERATELY NOT USED BY THE 'unavailable' AND 'capped' RETURNS BELOW. Those four mean the
+  // door itself is not working, and the address form is where starting again begins, so they keep
+  // back() and the assertions that pin them stay exactly as they were.
+  const refuse = (reason: string) => (resend ? backToCode(req, reason, next) : back(req, reason, next));
+
+  // 🔴 THE HONEST MINUTE, AND IT COSTS HIM NOTHING. Checked before the limits below on purpose: a
+  // press inside GoTrue's own sixty second interval must not spend one of his three sends, because
+  // spending them on presses that could never have sent anything is exactly how a man ran out.
+  if (resend && req.cookies.get(RESEND_COOKIE)) return backToCode(req, 'wait', next);
 
   const secret = process.env.WEB_SESSION_SECRET || '';
   const hash = targetHash(id.value, secret);
 
   // Per contact first, because that is the thing being billed and the thing being pestered. A man
   // whose number is being hammered by someone else must not get three texts a minute.
+  //
+  // 🔴 'toosoon', NOT 'toomany', AND THAT IS A FIX RATHER THAN A RENAME.
+  //
+  // These two limits count SENDS. The ones in /api/auth/verify count TRIES. Both used to end on the
+  // same sentence, "Too many tries. Give it a few minutes and try again.", so a man who had typed
+  // nothing at all, and had only asked for the code that never arrived, was told he had tried too
+  // often. He reads that as an accusation and as a lockout and he stops. Same limit, same wait,
+  // different sentence, and the sentence now names the thing he actually did.
   if (await rateLimitedShared(`otp:t:${hash}`, PER_TARGET_SENDS, PER_TARGET_WINDOW_SECONDS * 1000)) {
     await logAuthSend(id.channel, hash, 'refused_rate');
-    return back(req, 'toomany', next);
+    return refuse('toosoon');
   }
   if (await rateLimitedShared(`otp:ip:${clientIp(req)}`, PER_SOURCE_SENDS, PER_SOURCE_WINDOW_SECONDS * 1000)) {
     await logAuthSend(id.channel, hash, 'refused_rate');
-    return back(req, 'toomany', next);
+    return refuse('toosoon');
   }
 
   // CONTROL 1. Is this contact even ours.
@@ -110,7 +195,7 @@ export async function POST(req: NextRequest) {
   if (!account) {
     // Not ours. Nothing is sent, and the screen is identical to a successful send.
     await logAuthSend(id.channel, hash, 'refused_unknown');
-    return onward(req, id.channel, id.value, next);
+    return onward(req, id.channel, id.value, next, resend);
   }
 
   // 🔴 THE EMAIL DOOR ONLY OPENS ON AN ACCOUNT THAT ALREADY EXISTS, AND THIS IS A SECURITY RULE
@@ -123,7 +208,7 @@ export async function POST(req: NextRequest) {
   // so the phone gets proved first, at least once. After that the email door is open for ever.
   if (id.channel === 'email' && !account.userId) {
     await logAuthSend(id.channel, hash, 'refused_unknown');
-    return onward(req, id.channel, id.value, next);
+    return onward(req, id.channel, id.value, next, resend);
   }
 
   // CONTROL 2. The daily cap. IT FAILS CLOSED ON THE TEXT DOOR AND OPEN ON THE EMAIL DOOR.
@@ -205,5 +290,5 @@ export async function POST(req: NextRequest) {
 
   // Even a failed send goes onward, so a provider outage looks the same as a stranger's number and
   // neither leaks. He types a code that does not work and is told plainly to try again.
-  return onward(req, id.channel, id.value, next);
+  return onward(req, id.channel, id.value, next, resend);
 }

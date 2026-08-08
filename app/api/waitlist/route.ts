@@ -50,8 +50,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'That email does not look right.' }, { status: 400 });
     }
 
+    // 🔴 'already_listed' IS A SUCCESS. He tapped join twice, or came back a week later, and the
+    // unique index on waitlist.email refused the second row. He is on the list. Telling him "could
+    // not save" made him tap again, and the tap after that, and every one of them said the same
+    // thing while nothing at all was wrong. Only a genuine failure is still a failure.
+    let outcome;
     try {
-      await insertWaitlistSignup({ phone, email });
+      outcome = await insertWaitlistSignup({ phone, email });
     } catch (dbErr) {
       const detail = dbErr instanceof Error ? dbErr.message : 'unknown';
       console.error('[waitlist] Save error:', detail);
@@ -60,7 +65,13 @@ export async function POST(req: NextRequest) {
 
     // A warm "you are on the list" email, sent after the response so it never slows the signup or
     // fails it. Only if they gave an email. Dormant until Resend is configured.
-    if (email) {
+    //
+    // ⚠️ ONLY ON A NEW ROW, AND THAT CONDITION IS DOING REAL WORK. Until now the second submit
+    // threw above and never reached this line, so the duplicate welcome email was prevented by the
+    // failure, not on purpose. Take the failure away without this and the man who tapped twice gets
+    // a second copy of the same email, which is half of the fault the unique index was added to
+    // stop, back again through the front door.
+    if (email && outcome === 'inserted') {
       after(async () => {
         try {
           await sendWaitlistWelcomeEmail(email);

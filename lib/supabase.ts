@@ -1103,7 +1103,13 @@ export interface WaitlistSignup {
   email?: string | null;
 }
 
-export async function insertWaitlistSignup(signup: WaitlistSignup): Promise<void> {
+// What the insert actually did, because the two outcomes are different sentences to the man and
+// different decisions for the caller. 'inserted' is a new row. 'already_listed' is the unique index
+// on waitlist.email refusing a second row for an address that is already down, which from where he
+// is standing is not a failure at all: he is on the list, which is the only thing he asked for.
+export type WaitlistOutcome = 'inserted' | 'already_listed';
+
+export async function insertWaitlistSignup(signup: WaitlistSignup): Promise<WaitlistOutcome> {
   const { url } = config();
   const record: Record<string, string> = { phone: normalizeUkPhone(signup.phone) };
   if (signup.email) record.email = signup.email;
@@ -1113,10 +1119,37 @@ export async function insertWaitlistSignup(signup: WaitlistSignup): Promise<void
     headers: headers({ Prefer: 'return=minimal' }),
     body: JSON.stringify(record),
   });
-  if (!res.ok) {
-    // No response body in the error: it can contain the submitted phone/email.
-    throw new Error(`Waitlist insert failed: ${res.status}`);
-  }
+  if (res.ok) return 'inserted';
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A DOUBLE SUBMIT IS NOT A FAILURE, AND IT MUST NOT BE ON_CONFLICT EITHER.
+  //
+  // Since APPLY_2026-08-08_waitlist_unique.sql there is a unique index on waitlist.email, so the
+  // second tap on the join button gets 409 from PostgREST. Before this, the throw here became a
+  // 500 and the front door told a man who WAS on the list that he was not, so he tapped again, and
+  // again, and every one of them said the same thing.
+  //
+  // ⚠️ THE OBVIOUS FIX DOES NOT WORK ON THIS INDEX, AND WOULD LOOK LIKE IT DID IN REVIEW. Adding
+  // `?on_conflict=email` with `resolution=merge-duplicates` makes PostgREST emit ON CONFLICT
+  // (email), and Postgres infers a conflict target by matching the index's OWN expression. The
+  // index is on `lower(trim(email))`, which (email) does not match, so it raises 42P10, "no unique
+  // or exclusion constraint matching the ON CONFLICT specification". The `on_conflict` parameter
+  // takes bare column names and cannot spell `lower(trim(email))`, so there is no version of that
+  // fix that works here: it would only swap a 500 for a 400 and read as fixed.
+  //
+  // So the 409 is READ instead, and only the 409. Nothing else is forgiven: a 500, a refusal, a
+  // dropped connection are all still a real failure and the caller must still tell him so. On this
+  // table the only unique things are the primary key (a gen_random_uuid default, which does not
+  // collide) and that email index, so a 409 here means the address is already down.
+  //
+  // The row that stays is the OLDEST one, which is the same rule the migration used when it
+  // deduped, and it is the right one: joining order is the only thing a waitlist is for. His phone
+  // number is not carried onto it here. The migration does that for the rows it collapsed, and
+  // doing it on every repeat submit would let anybody who knows an address overwrite the number we
+  // reach that man on.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (res.status === 409) return 'already_listed';
+  // No response body in the error: it can contain the submitted phone/email.
+  throw new Error(`Waitlist insert failed: ${res.status}`);
 }
 
 // --- Marketing leads (the consent engine) ---------------------------------
@@ -3367,18 +3400,77 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
   // The WhatsApp linking codes. code_hash is an HMAC, so it is withheld the same way a token is.
   { table: 'wa_links', userKey: 'user_id', keyKind: 'user_id', select: 'id,user_id,expires_at,consumed_at,bound_phone,created_at' },
 
+  // 🔴 HIS VOICE. The sharpest row in this file and it had no door at all until 8 August 2026.
+  //
+  // docs/voice_jobs.sql declares `user_id uuid not null` with NO foreign key, so nothing cascades
+  // here, exactly like allowance_elections. A note that was never transcribed still holds
+  // audio_base64: the customer's own recorded voice, sitting next to from_phone, HIS NUMBER, which
+  // is personal data on its own. lib/voicejobs.ts wipes the audio when the mini finishes and reaps
+  // stale rows, but a reap is a retention policy, not an answer to an erasure request, and it only
+  // runs when something polls. An account deleted while a note is in flight kept the recording.
+  //
+  // ⚠️ audio_base64 IS NOT IN THE EXPORT SELECT, AND THAT IS NOT A WITHHOLDING. The erasure ignores
+  // this field and takes the whole row, audio included. The export leaves it out because Meta
+  // allows a voice note up to 16MB, whose base64 is about 21MB, and one in flight note would push
+  // the export response past the serverless body limit and fail the whole download. A subject
+  // access request that 500s hands him nothing at all. He already holds the note itself, in his own
+  // WhatsApp thread, which is where he sent it from.
+  { table: 'voice_jobs', userKey: 'user_id', keyKind: 'user_id', select: 'id,user_id,from_phone,wa_message_id,mime_type,status,created_at' },
+
+  // The owners of his limited company, seeded from the Companies House register against the paying
+  // account. owner_user_id carries no foreign key (see APPLY_2026-07-19_company_members.sql), so
+  // nothing cascades, and the row holds a named director and the address an invite was sent to.
+  //
+  // ⚠️ KEYED ON owner_user_id ONLY. member_user_id is a SECOND person's own login, linked once they
+  // accept, and a manifest entry is one table and one key. Erasing an invited co owner therefore
+  // leaves the owner's row standing with member_user_id still pointing at a user id that no longer
+  // resolves to anybody. That is the right shape for the OWNER's record of his own register, but it
+  // wants an `on delete set null` on that column rather than being left to a comment. Named in the
+  // packet as a live check, not silently skipped.
+  { table: 'company_members', userKey: 'owner_user_id', keyKind: 'user_id', select: '*' },
+
   // Keyed by the address he typed, not by an account he may not have finished making.
   { table: 'signups', userKey: 'email', keyKind: 'email', select: '*' },
   // Marketing capture: email, ip and user agent, plus the consent wording UK PECR makes us keep.
   { table: 'marketing_leads', userKey: 'email', keyKind: 'email', select: '*' },
+  // The timeline that hangs off marketing_leads: every touch on the contact, keyed on the same
+  // lowercased address (see logContactEvent and docs/crm_contacts.sql). There is no foreign key
+  // between them, so erasing the lead and leaving its history behind is exactly the drift this
+  // manifest exists to stop: the record of what he did and when, under the address he asked us to
+  // forget.
+  { table: 'contact_events', userKey: 'email', keyKind: 'email', select: '*' },
+  // Email he sent to a Lekhio mailbox, with his address, his name, his subject and a two thousand
+  // character extract of what he wrote, plus the reply we drafted (docs/dakiya_drafts.sql). No
+  // cascade and NO RETENTION SWEEP AT ALL, so a support email from a man who later asked to be
+  // erased sits there for ever. Keyed on the address he sent it from, which is the only key the
+  // table has; a message sent from some other address of his is out of reach here, the same
+  // limitation marketing_leads already carries.
+  { table: 'dakiya_drafts', userKey: 'from_email', keyKind: 'email', select: '*' },
   // ⚠️ NORMALISED ADDRESS, because that is the key this table is written and read on: a plus tag
   // or a gmail dot must not leave a live row behind holding the address he asked us to forget.
   // See normaliseEmail in lib/trialidentity.ts.
   { table: 'signup_codes', userKey: 'email_norm', keyKind: 'email_norm', select: 'id,email,email_norm,attempts,expires_at,consumed_at,created_at' },
 
-  // Keyed by his phone number, and neither of these cascades from users.
+  // Keyed by his phone number, and none of these cascades from users.
   // In flight WhatsApp state, which may hold a draft invoice and a customer's details.
   { table: 'wa_sessions', userKey: 'phone', keyKind: 'phone', select: '*' },
+  // When he asked for a human. phone is the thread key and is NOT NULL; user_id is nullable,
+  // because a ticket can be opened before we resolve one, so the number is the only key that
+  // reaches every row of his (docs/support_tickets.sql). The row holds his name and the message he
+  // wrote asking for help, and there is no sweep on this table either.
+  { table: 'support_tickets', userKey: 'phone', keyKind: 'phone', select: '*' },
+  // ⚠️ THE PER DAY AI COUNTERS, AND THE KEY COLUMN IS THE POINT. ai_usage is (day, scope, key,
+  // count), and for scope 'phone' and 'wamsg' that key IS his WhatsApp number in plain text, which
+  // is personal data on its own, the same argument as wa_out. pruneOldRows drops rows past sixty
+  // days, but sixty days is a retention ceiling, not "without undue delay".
+  //
+  // Keyed on phone and NOT on user_id, deliberately. The user_id scoped rows ('ask', 'thread',
+  // 'receiptweb') hold a bare uuid, and once the users row and the auth identity are gone at the
+  // end of this erasure there is nothing left anywhere that resolves it to a person, so they age
+  // out anonymous. The number does not. A phone number will never collide with the other keys this
+  // column holds ('all', a year and month, an ip from the anonymous draft tool), so an exact match
+  // on it takes his rows and nobody else's.
+  { table: 'ai_usage', userKey: 'key', keyKind: 'phone', select: '*' },
   // ⚠️ wa_out.user_id is `on delete set null`, so deleting the users row does NOT delete these
   // rows, it merely forgets whose they are and leaves HIS NUMBER sitting in the column next to
   // it. Erasing by phone is the only key that still reaches them. See APPLY_2026-07-31_wa_out.sql.
@@ -5284,6 +5376,30 @@ export type BusinessType = 'sole_trader' | 'limited_company' | 'partnership';
 
 export interface BusinessProfile {
   businessType: BusinessType;
+  /**
+   * 🔴 WHETHER businessType ABOVE IS A FACT OR A FALLBACK. False means users.business_type was
+   * null, blank or a value we do not recognise, and the sole_trader above is this file's default
+   * rather than anything the man ever said.
+   *
+   * WHY IT IS A SEPARATE FLAG AND NOT A FOURTH businessType. Every engine and every screen reads
+   * businessType as one of three known values; widening that union would make twenty five call
+   * sites in files this lane does not own take a branch nobody has written yet, and a screen that
+   * refuses to render is worse for a real sole trader than a default that has always been right
+   * for him. So the default STAYS, byte for byte, and the fact that it is a default stops being
+   * thrown away. Nothing changes behaviour today. What changes is that it CAN be read.
+   *
+   * WHO SHOULD READ IT, AND WHAT THEY SHOULD DO. Not the screens that already degrade safely: a
+   * sole trader page shown to an unrecorded man is a nuisance, and /app/tax/ni says so in its own
+   * header (refusing a real sole trader his Class 2 sentence would cost him a year of State
+   * Pension). It is for the three places where the wrong arm costs him money or credibility:
+   *   . the lender document and the tax summary, where isCompany is the FIRST condition and a
+   *     director defaulted to sole trader is charged income tax and Class 4 National Insurance
+   *     personally on profit that belongs to his company,
+   *   . the MTD mandation arithmetic, which should not run at all for a company,
+   *   . and anything that ASKS him, which is the only real repair: a false here is precisely the
+   *     signal that the question was never answered.
+   */
+  structureRecorded: boolean;
   /** For a partnership only: the individual's percentage share of profit. 100 for everyone else. */
   partnershipShare: number;
   /**
@@ -5299,6 +5415,14 @@ export interface BusinessProfile {
    * and supabase/APPLY_2026-07-31_income_shape.sql for the column.
    */
   incomeShape: IncomeShape | null;
+}
+
+// Did the man ever actually tell us his structure? ONE function, called by both reads, because the
+// whole defect this answers is two copies of a judgement drifting apart. A value we do not
+// recognise counts as not recorded: a column holding 'ltd' or 'Sole Trader' is a write nobody
+// validated, and treating it as an answer would be the same silent assumption in a new coat.
+export function isRecordedBusinessType(value: unknown): boolean {
+  return value === 'sole_trader' || value === 'limited_company' || value === 'partnership';
 }
 
 export async function getBusinessProfile(userId: string): Promise<BusinessProfile | null> {
@@ -5327,12 +5451,15 @@ export async function getBusinessProfile(userId: string): Promise<BusinessProfil
   // product and the one that is hardest for him to spot, because it looks like a big tax bill
   // rather than like a bug.
   //
-  // 🔴 IT IS LEFT COERCED ON PURPOSE, FOR NOW. incomeShape below models the honest shape (null
-  // means we do not know, and every gate that reads it asks him everything). businessType cannot
-  // follow it without changing the type every engine reads, and a half-migrated nullable would be
-  // worse than a documented default. The right fix is to ASK him, which is exactly what the
-  // business-understanding work is for. Until then this comment is the record that it is a choice
-  // and not an oversight, and which customer pays for it.
+  // 🔴 THE COERCION STAYS. WHAT STOPS IS THROWING THE FACT OF IT AWAY.
+  //
+  // incomeShape below models the honest shape (null means we do not know, and every gate that
+  // reads it asks him everything). businessType cannot follow it without changing the union every
+  // engine reads, and a half migrated nullable would be worse than a documented default. The right
+  // fix is still to ASK him, which is what the business understanding work is for. Until then the
+  // value is unchanged, byte for byte, and structureRecorded carries the truth alongside it, so
+  // the branches where the wrong arm costs him money can tell a fact from a fallback. See the
+  // field's own documentation on BusinessProfile.
   const bt: BusinessType =
     r.business_type === 'limited_company' || r.business_type === 'partnership' ? r.business_type : 'sole_trader';
   // A share is only meaningful for a partnership, and defaults to the whole thing until told
@@ -5340,6 +5467,7 @@ export async function getBusinessProfile(userId: string): Promise<BusinessProfil
   const share = Number(r.partnership_share);
   return {
     businessType: bt,
+    structureRecorded: isRecordedBusinessType(r.business_type),
     partnershipShare: bt === 'partnership' && Number.isFinite(share) && share > 0 && share <= 100 ? share : 100,
     incomeShape: toIncomeShape(r.income_shape),
   };
@@ -5370,17 +5498,16 @@ async function getBusinessProfileLegacy(userId: string): Promise<BusinessProfile
   // product and the one that is hardest for him to spot, because it looks like a big tax bill
   // rather than like a bug.
   //
-  // 🔴 IT IS LEFT COERCED ON PURPOSE, FOR NOW. incomeShape below models the honest shape (null
-  // means we do not know, and every gate that reads it asks him everything). businessType cannot
-  // follow it without changing the type every engine reads, and a half-migrated nullable would be
-  // worse than a documented default. The right fix is to ASK him, which is exactly what the
-  // business-understanding work is for. Until then this comment is the record that it is a choice
-  // and not an oversight, and which customer pays for it.
+  // 🔴 THE SECOND COERCION SITE, AND IT MUST ANSWER THE SAME WAY AS THE FIRST. A profile that
+  // arrived through the fallback is not a different kind of profile, so structureRecorded is
+  // computed by the SAME function here rather than restated, because two copies of this judgement
+  // is how the two doors in this file drifted apart in the first place.
   const bt: BusinessType =
     r.business_type === 'limited_company' || r.business_type === 'partnership' ? r.business_type : 'sole_trader';
   const share = Number(r.partnership_share);
   return {
     businessType: bt,
+    structureRecorded: isRecordedBusinessType(r.business_type),
     partnershipShare: bt === 'partnership' && Number.isFinite(share) && share > 0 && share <= 100 ? share : 100,
     incomeShape: null,
   };

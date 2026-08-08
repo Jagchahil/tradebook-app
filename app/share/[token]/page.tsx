@@ -257,6 +257,22 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
         </p>
       ) : null}
 
+      {/* 🔴 A VAN BOUGHT LAST YEAR, OR THE YEAR BEFORE, STILL EARNS AN ALLOWANCE THIS YEAR, AND THE
+          BLOCK ABOVE NEVER FIRES FOR HIM. capitalCost is what left the account INSIDE this tax year,
+          so a man with no purchase row in range reads capitalCost 0 for ever after the year he
+          bought the vehicle, while capitalAllowance keeps reducing Profit every year the allowance is
+          still being claimed. Guarding on capitalCost alone printed Income, Expenses and Profit that
+          do not add up and said nothing, silently, every year after the first. Same fact as the block
+          above and the same fact lib/incomeproof.ts's renderIncomeProofHtml states for this exact
+          case; the closing clause is repeated word for word from this page's own sentence above
+          rather than reworded, so a lender comparing this page against the proof of income document
+          finds the same reconciliation, not a third form of words. */}
+      {totals.capitalCost === 0 && totals.capitalAllowance > 0 ? (
+        <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.6, marginTop: 18, maxWidth: 640 }}>
+          {`This year's writing down allowance of ${gbp(totals.capitalAllowance)} on a vehicle is already taken off the Profit above, which is why it is not simply Income less Expenses.`}
+        </p>
+      ) : null}
+
       {/* \u{1F534} AND MORTGAGE INTEREST IS NOT IN PROFIT EITHER. Section 24 relieves a residential
           landlord's interest as a basic rate tax credit rather than an expense, so lib/bookshare.ts
           holds it out. Before 6 August 2026 this page counted it as a running cost and printed a

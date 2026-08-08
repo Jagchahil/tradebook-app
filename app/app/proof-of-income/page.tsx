@@ -185,6 +185,21 @@ export default async function ProofOfIncomePage({
               </p>
             ) : null}
 
+            {/* 🔴 A VAN BOUGHT LAST YEAR, OR THE YEAR BEFORE, STILL EARNS AN ALLOWANCE THIS YEAR, AND
+                THE LINE ABOVE NEVER FIRES FOR HIM. capitalCost is what left the account INSIDE this
+                tax year, so a man with no purchase row in range reads capitalCost 0 for ever after
+                the year he bought the vehicle, while capitalAllowance keeps reducing his profit every
+                year the allowance is still being claimed. Guarding on capitalCost alone printed three
+                figures that do not add up and said nothing, silently, every year after the first.
+                lib/incomeproof.ts's renderIncomeProofHtml carries this exact sentence for exactly
+                this case; it is repeated here word for word rather than reworded, because a lender
+                comparing this screen against that document must never be able to find a difference. */}
+            {proof.capitalCost === 0 && proof.capitalAllowance > 0 ? (
+              <p style={S.capital}>
+                {`This year's writing down allowance of ${gbp2(proof.capitalAllowance)} on a vehicle is already taken off the profit above, which is why it is not simply the gross income less the allowable expenses.`}
+              </p>
+            ) : null}
+
             {/* \u{1F534} MORTGAGE INTEREST, SAID OUT LOUD, BECAUSE THE NUMBER MOVED WITHOUT IT. Section 24
                 relieves a residential landlord's interest as a basic rate credit, so it is not in
                 Allowable expenses and has not reduced the profit. Without this line a lender sees a

@@ -10,10 +10,13 @@ const INK = 'var(--tx)';
 const RIVER = 'var(--river)';
 const RIVER_DEEP = 'var(--river-deep)';
 const RIVER_TINT = 'var(--river-tint)';
-const GREEN = 'var(--green)';
 const GREEN_TINT = 'var(--green-tint)';
-const AMBER = 'var(--saffron-deep)';
 const AMBER_TINT = 'var(--saffron-tint)';
+// 🔴 ON a tint, the ink is the ON token, not the raw accent. SAFFRON_DEEP (AMBER) on its own tint
+// reads 2.70:1 and GREEN on its own tint reads 4.46:1, both under 4.5:1. Both ON tokens are themed
+// for dark too. See lib/tokens.ts.
+const ON_GREEN_TINT = 'var(--on-green-tint)';
+const ON_AMBER_TINT = 'var(--on-saffron-tint)';
 const SURFACE = 'var(--surface)';
 const LINE = 'var(--bd)';
 const MUTED = 'var(--tx-mut)';
@@ -60,7 +63,7 @@ export default function Calc() {
         <div style={{ position: 'sticky', top: 20 }}>
           {hasInput ? (
             <div className="lc-anim" style={{ background: even ? AMBER_TINT : GREEN_TINT, border: `1px solid ${even ? '#F1DBAE' : '#CFE9D8'}`, borderRadius: 18, padding: 24, textAlign: 'center' }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: even ? AMBER : GREEN, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: even ? ON_AMBER_TINT : ON_GREEN_TINT, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
                 {even ? 'Too close to call' : ltdWins ? 'Limited company keeps more' : 'Sole trader keeps more'}
               </div>
               <div style={{ fontSize: 46, fontWeight: 800, color: INK, letterSpacing: '-1.5px', lineHeight: 1 }}>

@@ -119,7 +119,13 @@ const HOME_CSS = css`
 @media(max-width:760px){.steps{grid-template-columns:1fr;gap:30px}}
 .hstep{text-align:center}
 .hstep h3{font-size:19px;margin:0 0 10px}
-.stepn{width:62px;height:62px;border-radius:999px;margin:0 auto 18px;color:#fff;font-weight:900;font-size:23px;display:grid;place-items:center}
+/* 🔴 WAS color:#fff HERE, ONE COLOUR FOR ALL THREE CIRCLES, WHILE THE FILL BEHIND IT CHANGES PER
+   STEP. White on the saffron gradient reads 2.22:1 in light and 1.88:1 in dark; white on the green
+   gradient's dark-mode end reads 2.37:1. lib/tokens.ts already says why: "white is not a safe
+   default on a coloured fill". Each step's own ON token is correct for both its fill and both
+   themes, so the ink now travels with the background at the call site instead of living once here
+   for all three. See the three .stepn instances below. */
+.stepn{width:62px;height:62px;border-radius:999px;margin:0 auto 18px;font-weight:900;font-size:23px;display:grid;place-items:center}
 
 .drow{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;margin:0 0 44px}
 .drow:last-of-type{margin-bottom:0}
@@ -296,9 +302,19 @@ export default async function HomePage() {
               which needs a provider we do not have. All three of these work the moment he signs
               up, and none of them waits on anybody else's approval. */}
           <div className="steps reveal">
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--river),var(--river-deep))', boxShadow: '0 12px 26px rgba(27,89,166,.32)' }}>1</div><h3>Snap it, say it, or import it</h3><p className="mut" style={{ fontSize: 15 }}>A photo of a receipt, a line of plain words, or a statement straight from your bank.</p></div>
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--saffron),var(--saffron-deep))', boxShadow: '0 12px 26px rgba(224,163,62,.32)' }}>2</div><h3>It finds your money</h3><p className="mut" style={{ fontSize: 15 }}>It reads it, files it, claims the reliefs you are owed, and keeps your tax ready as you go.</p></div>
-            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--green),#0F5C2E)', boxShadow: '0 12px 26px rgba(21,128,61,.32)' }}>3</div><h3>You approve</h3><p className="mut" style={{ fontSize: 15 }}>Your figures sit there ready. You check them and send them. Nothing reaches HMRC without your yes.</p></div>
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--river),var(--river-deep))', color: 'var(--on-river)', boxShadow: '0 12px 26px rgba(27,89,166,.32)' }}>1</div><h3>Snap it, say it, or import it</h3><p className="mut" style={{ fontSize: 15 }}>A photo of a receipt, a line of plain words, or a statement straight from your bank.</p></div>
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--saffron),var(--saffron-deep))', color: 'var(--on-saffron)', boxShadow: '0 12px 26px rgba(224,163,62,.32)' }}>2</div><h3>It finds your money</h3><p className="mut" style={{ fontSize: 15 }}>It reads it, files it, claims the reliefs you are owed, and keeps your tax ready as you go.</p></div>
+            {/* 🔴 THE GREEN GRADIENT'S SECOND STOP, #0F5C2E, IS A ONE OFF LITERAL, NOT A TOKEN. It
+                does not move with the theme, so in dark mode the fill runs from DARK_GREEN (light,
+                minty) down to this same fixed dark green. var(--on-green) reads 7.11:1 against the
+                DARK_GREEN end and only 2.08:1 against the #0F5C2E end: no single ink threads both
+                ends of THAT particular dark mode gradient. Flagged for Jag rather than fixed
+                silently, because the honest fix is either a new dark aware green-deep token or a
+                flat fill for this one circle, and both are look decisions, not mine to make. What
+                is fixed here is the worse fault: white text, which failed both ends in both
+                themes (2.22:1 and 1.88:1 on the light end alone). var(--on-green) is right
+                everywhere except that one sliver, which it was not before. */}
+            <div className="hstep"><div className="stepn" style={{ background: 'linear-gradient(135deg,var(--green),#0F5C2E)', color: 'var(--on-green)', boxShadow: '0 12px 26px rgba(21,128,61,.32)' }}>3</div><h3>You approve</h3><p className="mut" style={{ fontSize: 15 }}>Your figures sit there ready. You check them and send them. Nothing reaches HMRC without your yes.</p></div>
           </div>
         </div>
       </section>

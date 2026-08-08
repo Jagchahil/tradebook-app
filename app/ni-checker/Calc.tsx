@@ -11,10 +11,13 @@ const INK = 'var(--tx)';
 const RIVER = 'var(--river)';
 const RIVER_DEEP = 'var(--river-deep)';
 const RIVER_TINT = 'var(--river-tint)';
-const GREEN = 'var(--green)';
 const GREEN_TINT = 'var(--green-tint)';
-const AMBER = 'var(--saffron-deep)';
 const AMBER_TINT = 'var(--saffron-tint)';
+// 🔴 ON a tint, the ink is the ON token, not the raw accent. SAFFRON_DEEP (AMBER) on its own tint
+// reads 2.70:1 and GREEN on its own tint reads 4.46:1, both under 4.5:1. Both ON tokens are themed
+// for dark too. See lib/tokens.ts.
+const ON_GREEN_TINT = 'var(--on-green-tint)';
+const ON_AMBER_TINT = 'var(--on-saffron-tint)';
 const SURFACE = 'var(--surface)';
 const LINE = 'var(--bd)';
 const MUTED = 'var(--tx-mut)';
@@ -93,7 +96,7 @@ export default function Calc() {
 
           {hasInput ? (
             <div className="ni-anim" style={{ background: pensionSafe ? GREEN_TINT : AMBER_TINT, border: `1px solid ${pensionSafe ? '#CFE9D8' : '#F1DBAE'}`, borderRadius: 18, padding: 18, marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: pensionSafe ? GREEN : AMBER, marginBottom: 6 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: pensionSafe ? ON_GREEN_TINT : ON_AMBER_TINT, marginBottom: 6 }}>
                 {pensionSafe ? '✓ Your State Pension year looks covered' : '△ Your State Pension year may not count'}
               </div>
               <p style={{ fontSize: 13.5, color: INK, lineHeight: 1.55, margin: 0 }}>

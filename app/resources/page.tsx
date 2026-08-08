@@ -23,10 +23,13 @@ const INK = 'var(--tx)';
 const RIVER = 'var(--river)';
 const RIVER_DEEP = 'var(--river-deep)';
 const RIVER_TINT = 'var(--river-tint)';
-const SAFFRON_DEEP = 'var(--saffron-deep)';
 const SAFFRON_TINT = 'var(--saffron-tint)';
-const GREEN = 'var(--green)';
 const GREEN_TINT = 'var(--green-tint)';
+// 🔴 ON a tint, the ink is the ON token, not the raw accent. SAFFRON_DEEP on SAFFRON_TINT reads
+// 2.70:1 and GREEN on GREEN_TINT reads 4.46:1, both under the 4.5:1 this product holds every pair
+// to. Both ON tokens are themed for dark too, so this is correct in both. See lib/tokens.ts.
+const ON_SAFFRON_TINT = 'var(--on-saffron-tint)';
+const ON_GREEN_TINT = 'var(--on-green-tint)';
 const PAPER = 'var(--bg)';
 const SURFACE = 'var(--surface)';
 const LINE = 'var(--bd)';
@@ -34,18 +37,18 @@ const MUTED = 'var(--tx-mut)';
 const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 const tools = [
-  { href: '/tax-calculator', icon: '🧮', title: 'Tax calculator', body: 'Your tax, National Insurance, take home and what to set aside. See how much your expenses save you.', tint: GREEN_TINT, fg: GREEN, tag: 'Calculator' },
-  { href: '/cis-calculator', icon: '🧱', title: 'CIS tax refund estimator', body: 'Subcontractor? CIS is taken off your pay before you see it, and most subbies are owed money back. See your likely refund in seconds.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Calculator' },
+  { href: '/tax-calculator', icon: '🧮', title: 'Tax calculator', body: 'Your tax, National Insurance, take home and what to set aside. See how much your expenses save you.', tint: GREEN_TINT, fg: ON_GREEN_TINT, tag: 'Calculator' },
+  { href: '/cis-calculator', icon: '🧱', title: 'CIS tax refund estimator', body: 'Subcontractor? CIS is taken off your pay before you see it, and most subbies are owed money back. See your likely refund in seconds.', tint: SAFFRON_TINT, fg: ON_SAFFRON_TINT, tag: 'Calculator' },
   { href: '/invoice-generator', icon: '🧾', title: 'Invoice & quote generator', body: 'A clean, professional invoice or quote in two minutes. Ready made templates by trade. Save as PDF.', tint: RIVER_TINT, fg: RIVER, tag: 'Generator' },
-  { href: '/can-i-claim', icon: '💡', title: 'Can I claim it?', body: 'The real rules on what you can and cannot claim, the grey areas included. All within the law.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Checker' },
-  { href: '/ni-checker', icon: '🛡️', title: 'National Insurance checker', body: 'Class 1, 2 and 4 explained with your numbers, and whether your State Pension year is safe. The £190 decision nobody tells you about.', tint: GREEN_TINT, fg: GREEN, tag: 'Checker' },
+  { href: '/can-i-claim', icon: '💡', title: 'Can I claim it?', body: 'The real rules on what you can and cannot claim, the grey areas included. All within the law.', tint: SAFFRON_TINT, fg: ON_SAFFRON_TINT, tag: 'Checker' },
+  { href: '/ni-checker', icon: '🛡️', title: 'National Insurance checker', body: 'Class 1, 2 and 4 explained with your numbers, and whether your State Pension year is safe. The £190 decision nobody tells you about.', tint: GREEN_TINT, fg: ON_GREEN_TINT, tag: 'Checker' },
   { href: '/student-loan-checker', icon: '🎓', title: 'Student loan checker', body: 'Every plan, the real thresholds, and the January lump the self employed never see coming. Know it before it lands.', tint: RIVER_TINT, fg: RIVER, tag: 'Checker' },
-  { href: '/landlord-tax-calculator', icon: '🏠', title: 'Landlord tax calculator', body: 'Rent out property? Your bill under the current rules and under the new 22/42/47 property rates from April 2027, a year before they bite. Section 24 included.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Calculator' },
-  { href: '/rent-a-room-checker', icon: '🛏️', title: 'Rent a Room checker', body: 'A lodger in your own home can earn you £7,500 tax free. Over the limit there is an election most people never make. Check yours in seconds.', tint: GREEN_TINT, fg: GREEN, tag: 'Checker' },
+  { href: '/landlord-tax-calculator', icon: '🏠', title: 'Landlord tax calculator', body: 'Rent out property? Your bill under the current rules and under the new 22/42/47 property rates from April 2027, a year before they bite. Section 24 included.', tint: SAFFRON_TINT, fg: ON_SAFFRON_TINT, tag: 'Calculator' },
+  { href: '/rent-a-room-checker', icon: '🛏️', title: 'Rent a Room checker', body: 'A lodger in your own home can earn you £7,500 tax free. Over the limit there is an election most people never make. Check yours in seconds.', tint: GREEN_TINT, fg: ON_GREEN_TINT, tag: 'Checker' },
   { href: '/sole-trader-vs-limited', icon: '⚖️', title: 'Sole trader vs limited', body: 'The honest 2026/27 comparison: corporation tax, the new dividend rates, employer NI, and the costs the folklore forgets. Your number decides.', tint: RIVER_TINT, fg: RIVER, tag: 'Calculator' },
   { href: '/file-your-tax-return', icon: '📋', title: 'File your own return', body: 'A step by step walkthrough by trade, so you can do your Self Assessment yourself and stop paying for a short job.', tint: RIVER_TINT, fg: RIVER, tag: 'Guide' },
-  { href: '/free-mtd-filing', icon: '🆓', title: 'Free MTD filing', body: 'For a straightforward return, profits, losses and the essentials, we will prepare and file it free, forever. Join the list.', tint: GREEN_TINT, fg: GREEN, tag: 'Coming soon' },
-  { href: '/register-your-business', icon: '🏁', title: 'Register your business', body: 'Sole trader, limited, VAT, PAYE and CIS, explained simply with the real 2026 costs and deadlines.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP, tag: 'Guide' },
+  { href: '/free-mtd-filing', icon: '🆓', title: 'Free MTD filing', body: 'For a straightforward return, profits, losses and the essentials, we will prepare and file it free, forever. Join the list.', tint: GREEN_TINT, fg: ON_GREEN_TINT, tag: 'Coming soon' },
+  { href: '/register-your-business', icon: '🏁', title: 'Register your business', body: 'Sole trader, limited, VAT, PAYE and CIS, explained simply with the real 2026 costs and deadlines.', tint: SAFFRON_TINT, fg: ON_SAFFRON_TINT, tag: 'Guide' },
 ];
 
 // 🔴 THESE LABELS SAID "covering August to October", AND THAT WAS WRONG TWICE OVER.

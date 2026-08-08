@@ -210,12 +210,30 @@ export const MARKETING_CSS = css`
 .ba h3{font-size:21px;margin:0 0 16px}
 .ba li{list-style:none;display:flex;gap:11px;align-items:flex-start;padding:8px 0;font-size:15px}
 .ba .m{flex:0 0 22px;height:22px;border-radius:999px;display:grid;place-items:center;font-size:12px;font-weight:900;margin-top:1px}
-.ba .old .m{background:rgba(224,121,107,.25);color:#ffb4a8}.ba .new .m{background:rgba(255,255,255,.22);color:#fff}
+/* 🔴 THE CHECKMARK BADGE ON /product READ AS LOW AS 4.22:1, NOT FROM A NAMED TOKEN, FROM ITS OWN
+   TRANSLUCENCY. .ba .new sits on a fixed river gradient (--river-panel to --river-panel-deep, the
+   same non-theme-reactive fill .setaside and .ba .new use, so #fff text is correct on the gradient
+   itself in both themes: 6.94:1 to 10.13:1, checked independently). But .m lays rgba(255,255,255,.16)
+   over whichever part of that gradient it sits on, which LIGHTENS it, and near the lighter end
+   (--river-panel, #1B59A6) the composited circle plus its own #fff checkmark lands at 4.22:1, under
+   the 4.5:1 minimum. This is eight badges on the one live page that renders .ba .new (app/product),
+   four per card. Nothing here is a shared token, so nothing else moves: the overlay itself is turned
+   down from .22 to .16, which composites to 4.82:1 at that same worst case with room to spare, and
+   is not a visible change to a highlight circle behind a tick. .ba .old .m is unreached by any live
+   page (app/product used to draw an .old comparison card and no longer does) and was already fine
+   at .25, left as is. */
+.ba .old .m{background:rgba(224,121,107,.25);color:#ffb4a8}.ba .new .m{background:rgba(255,255,255,.16);color:#fff}
 .ba ul{padding:0;margin:0}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
 @media(max-width:760px){.steps{grid-template-columns:1fr;gap:30px}}
 .hstep{text-align:center}.hstep h3{font-size:19px;margin:0 0 10px}
-.stepn{width:62px;height:62px;border-radius:999px;margin:0 auto 18px;color:#fff;font-weight:900;font-size:23px;display:grid;place-items:center}
+/* 🔴 WAS color:#fff HERE TOO, THE SAME BUG AS THE HOME_CSS COPY OF THIS RULE IN app/page.tsx, and
+   test/sharedcss.test.mjs holds the two copies to matching text so fixing one and forgetting the
+   other fails loudly. No page renders className="stepn" through this stylesheet (only the homepage
+   uses the class, and it renders its own separate HOME_CSS, not this one), so this line paints
+   nothing live either way. It is fixed to keep the two copies in agreement, per the rule this same
+   test states: a second difference should make the copies agree, not grow the exception list. */
+.stepn{width:62px;height:62px;border-radius:999px;margin:0 auto 18px;font-weight:900;font-size:23px;display:grid;place-items:center}
 .numgrid{display:grid;grid-template-columns:.9fr 1.1fr;gap:48px;align-items:center}
 @media(max-width:900px){.numgrid{grid-template-columns:1fr;gap:32px}}
 .appmock{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:360px;margin:0 auto;width:100%}
@@ -385,22 +403,27 @@ export const audience = [
   'Photographers', 'Tutors', 'Carers', 'Decorators', 'Gardeners', 'Freelancers',
 ];
 
+// 🔴 NEITHER features NOR mtdMeans BELOW IS IMPORTED ANYWHERE. Checked across the whole tree: no
+// page reads either export, so nothing today renders the fg: SAFFRON_DEEP / fg: GREEN pairs this
+// comment used to sit above. Fixed anyway, to the same ON_SAFFRON_TINT / ON_GREEN_TINT tokens used
+// two screens up in Mark(), because dead code that still fails AA is a landmine for whoever wires
+// this back up, and the fix costs one identifier per row.
 export const features = [
   { icon: '📸', title: 'Receipt capture', body: 'Photograph a receipt and it is logged in seconds. No typing, no app to open.', tint: RIVER_TINT, fg: RIVER },
-  { icon: '🎙️', title: 'Voice notes', body: 'Hands full on the job. Say the expense out loud and carry on.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
+  { icon: '🎙️', title: 'Voice notes', body: 'Hands full on the job. Say the expense out loud and carry on.', tint: SAFFRON_TINT, fg: ON_SAFFRON_TINT },
   { icon: '🚗', title: 'Mileage in a text', body: 'Text "drove 24 miles to the job" and Lekhio logs the claim at the HMRC rate. No fiddly logbook.', tint: RIVER_TINT, fg: RIVER },
-  { icon: '🧾', title: 'Invoices in a minute', body: 'Say who it is for and what it is for. Lekhio asks what it needs and sends a clean invoice, with a pay button on it.', tint: GREEN_TINT, fg: GREEN },
-  { icon: '👷', title: 'CIS done right', body: 'Subcontractor? Lekhio splits labour and materials, applies your CIS deduction, and tracks the refund building up. Other apps charge extra or get it wrong.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
+  { icon: '🧾', title: 'Invoices in a minute', body: 'Say who it is for and what it is for. Lekhio asks what it needs and sends a clean invoice, with a pay button on it.', tint: GREEN_TINT, fg: ON_GREEN_TINT },
+  { icon: '👷', title: 'CIS done right', body: 'Subcontractor? Lekhio splits labour and materials, applies your CIS deduction, and tracks the refund building up. Other apps charge extra or get it wrong.', tint: SAFFRON_TINT, fg: ON_SAFFRON_TINT },
   { icon: '✅', title: 'You approve everything', body: 'See every entry. Fix anything that looks off. Nothing counts toward your tax until you confirm it.', tint: RIVER_TINT, fg: RIVER },
-  { icon: '📊', title: 'Tax prepared for you', body: 'Quarterly figures, ready. You check them, you send them. We never imply HMRC backs us.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
+  { icon: '📊', title: 'Tax prepared for you', body: 'Quarterly figures, ready. You check them, you send them. We never imply HMRC backs us.', tint: SAFFRON_TINT, fg: ON_SAFFRON_TINT },
   { icon: '💡', title: 'Can I claim it?', body: 'Not sure if something counts? Text "can I claim my work boots?" and Lekhio answers straight, the grey areas included.', tint: RIVER_TINT, fg: RIVER },
-  { icon: '💬', title: 'Ask it anything', body: 'Stuck on something? Ask Lekhio and get a straight answer about your own figures. No hold music, no queue.', tint: GREEN_TINT, fg: GREEN },
+  { icon: '💬', title: 'Ask it anything', body: 'Stuck on something? Ask Lekhio and get a straight answer about your own figures. No hold music, no queue.', tint: GREEN_TINT, fg: ON_GREEN_TINT },
 ];
 
 export const mtdMeans = [
   { icon: '🗂️', title: 'Keep digital records', body: 'HMRC wants your income and costs kept digitally. Lekhio logs every receipt and payment as you go, so this is already done.', tint: RIVER_TINT, fg: RIVER },
-  { icon: '📨', title: 'Send four short updates', body: 'Instead of one big return in January, you send four quick summaries across the year. Lekhio prepares each one for you.', tint: SAFFRON_TINT, fg: SAFFRON_DEEP },
-  { icon: '🤝', title: 'You stay in control', body: 'Nothing goes to HMRC until you say yes. HMRC keeps you responsible for your tax. Lekhio just keeps you ready for it.', tint: GREEN_TINT, fg: GREEN },
+  { icon: '📨', title: 'Send four short updates', body: 'Instead of one big return in January, you send four quick summaries across the year. Lekhio prepares each one for you.', tint: SAFFRON_TINT, fg: ON_SAFFRON_TINT },
+  { icon: '🤝', title: 'You stay in control', body: 'Nothing goes to HMRC until you say yes. HMRC keeps you responsible for your tax. Lekhio just keeps you ready for it.', tint: GREEN_TINT, fg: ON_GREEN_TINT },
 ];
 
 export const compareRows = [
@@ -719,12 +742,17 @@ export const reportCss =
 // app/page.tsx renders them, and a rating only goes back on the page if a customer actually gave
 // one and we hold it in writing.
 
+// 🔴 NOT IMPORTED ANYWHERE: /compare defines and uses its own Mark instead (app/compare/page.tsx
+// .mk/.mk.yes/.mk.no). Fixed anyway, same reason as features and mtdMeans above: the false branch
+// painted two literal hexes, '#F3F1EC' and '#B8B2A6', which is both a contrast fail (1.87:1) and a
+// colour that cannot invert. SURFACE and MUTED are the tokens the equivalent live mark on /compare
+// now uses for the same "not available" grey (5.26:1 light, 6.31:1 dark), so this matches it.
 export function Mark({ value }: { value: boolean | string }) {
   if (value === true) {
     return <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 13, backgroundColor: GREEN_TINT, color: ON_GREEN_TINT, fontSize: 14, fontWeight: 800 }}>✓</span>;
   }
   if (value === false) {
-    return <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 13, backgroundColor: '#F3F1EC', color: '#B8B2A6', fontSize: 14, fontWeight: 700 }}>✕</span>;
+    return <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: 13, backgroundColor: SURFACE, color: MUTED, fontSize: 14, fontWeight: 700 }}>✕</span>;
   }
   if (value === 'soon') {
     return <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.3px', color: ON_SAFFRON_TINT, background: SAFFRON_TINT, padding: '4px 9px', borderRadius: 12 }}>Soon</span>;
@@ -806,6 +834,14 @@ export function AppDash() {
   );
 }
 
+// 🔴 NOT IMPORTED ANYWHERE, fixed anyway, same reason as features, mtdMeans and Mark above. The
+// current quarter circle painted a literal '#fff' behind its RIVER ring. In light mode that reads
+// the same as PANEL, which is exactly '#FFFFFF', so it looked correct and nobody caught it. In dark
+// mode PANEL flips to near black and RIVER lifts to stay visible on it; the literal stayed white and
+// sat there with RIVER text at 3.36:1, under the 4.5:1 minimum. PANEL/RIVER is already a proven pair
+// in both themes (see panel-river in lib/tokens.ts ON_PAIRS), so this only had to stop being a
+// literal. Same rule the comment fifty lines down this file already states: never pair an accent
+// with a literal white, the token already knows which ink each theme needs.
 export function AppTax() {
   return (
     <div className="appscreen">
@@ -816,7 +852,7 @@ export function AppTax() {
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12 }}>
           {['1', '2', '3', '4'].map((q, i) => (
             <div key={q} style={{ textAlign: 'center' }}>
-              <div style={{ width: 26, height: 26, borderRadius: 13, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: i === 1 ? '#fff' : i < 1 ? RIVER_TINT : SURFACE, border: i === 1 ? `2px solid ${RIVER}` : '2px solid transparent', color: i <= 1 ? RIVER : MUTED }}>{q}</div>
+              <div style={{ width: 26, height: 26, borderRadius: 13, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: i === 1 ? PANEL : i < 1 ? RIVER_TINT : SURFACE, border: i === 1 ? `2px solid ${RIVER}` : '2px solid transparent', color: i <= 1 ? RIVER : MUTED }}>{q}</div>
               <div style={{ fontSize: 9, color: i === 1 ? INK : MUTED, marginTop: 4, fontWeight: 600 }}>Q{q}</div>
             </div>
           ))}

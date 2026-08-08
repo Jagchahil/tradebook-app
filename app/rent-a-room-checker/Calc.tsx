@@ -10,10 +10,13 @@ const INK = 'var(--tx)';
 const RIVER = 'var(--river)';
 const RIVER_DEEP = 'var(--river-deep)';
 const RIVER_TINT = 'var(--river-tint)';
-const GREEN = 'var(--green)';
 const GREEN_TINT = 'var(--green-tint)';
-const AMBER = 'var(--saffron-deep)';
 const AMBER_TINT = 'var(--saffron-tint)';
+// 🔴 ON a tint, the ink is the ON token, not the raw accent. SAFFRON_DEEP (AMBER) on its own tint
+// reads 2.70:1 and GREEN on its own tint reads 4.46:1, both under 4.5:1. Both ON tokens are themed
+// for dark too. See lib/tokens.ts.
+const ON_GREEN_TINT = 'var(--on-green-tint)';
+const ON_AMBER_TINT = 'var(--on-saffron-tint)';
 const SURFACE = 'var(--surface)';
 const LINE = 'var(--bd)';
 const MUTED = 'var(--tx-mut)';
@@ -81,7 +84,7 @@ export default function Calc() {
         <div style={{ position: 'sticky', top: 20 }}>
           {hasInput ? (
             <div className="rr-anim" style={{ background: free ? GREEN_TINT : AMBER_TINT, border: `1px solid ${free ? '#CFE9D8' : '#F1DBAE'}`, borderRadius: 18, padding: 24, textAlign: 'center' }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: free ? GREEN : AMBER, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: free ? ON_GREEN_TINT : ON_AMBER_TINT, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
                 {free ? 'Tax free under Rent a Room' : 'Over the limit: you have a choice'}
               </div>
               <div style={{ fontSize: 46, fontWeight: 800, color: INK, letterSpacing: '-1.5px', lineHeight: 1 }}>

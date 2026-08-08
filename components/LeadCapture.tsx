@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { leadConsentText, leadDoneLine, leadHeading, leadSub } from '../lib/features';
 import {
-  RIVER, RIVER_DEEP, RIVER_TINT, INK, MUTED, GREEN, GREEN_TINT, RED, PANEL, ON_RIVER, edge,
+  RIVER, RIVER_DEEP, RIVER_TINT, INK, MUTED, GREEN, GREEN_TINT, ON_GREEN_TINT, RED, PANEL, ON_RIVER, edge,
 } from '../lib/apptheme';
 
 // Reusable, PECR compliant email capture for the free tools. Design rules baked in:
@@ -101,7 +101,11 @@ export default function LeadCapture({
   if (state === 'done') {
     return (
       <div style={{ background: GREEN_TINT, border: `1px solid ${LINE_GREEN}`, borderRadius: 18, padding: '20px 24px', marginTop: 22 }}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: GREEN, marginBottom: 4 }}>You are on the list.</div>
+        {/* 🔴 ON the tint, the ink is ON_GREEN_TINT, not GREEN. GREEN on GREEN_TINT reads 4.46:1,
+            under the 4.5:1 minimum this product holds every pair to. ON_GREEN_TINT is themed for
+            dark too. This card renders on eleven public tool pages, so the fix reaches all of
+            them from one place. See lib/tokens.ts. */}
+        <div style={{ fontSize: 16, fontWeight: 800, color: ON_GREEN_TINT, marginBottom: 4 }}>You are on the list.</div>
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
           {leadDoneLine()}
         </p>

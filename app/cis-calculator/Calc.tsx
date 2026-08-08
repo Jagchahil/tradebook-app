@@ -12,6 +12,11 @@ const RIVER_DEEP = 'var(--river-deep)';
 const RIVER_TINT = 'var(--river-tint)';
 const GREEN = 'var(--green)';
 const GREEN_TINT = 'var(--green-tint)';
+// 🔴 ON the tint, the ink is the ON token, not the raw accent: GREEN on GREEN_TINT reads 4.46:1,
+// under the 4.5:1 minimum. GREEN itself stays correct where it sits on PANEL/white instead (the
+// Row accent below), so only the badge that paints straight onto GREEN_TINT changes. Themed for
+// dark too. See lib/tokens.ts.
+const ON_GREEN_TINT = 'var(--on-green-tint)';
 const RED = 'var(--red)';
 const RED_TINT = 'var(--red-tint)';
 const SURFACE = 'var(--surface)';
@@ -72,7 +77,7 @@ export default function Calc() {
         <div style={{ position: 'sticky', top: 20 }}>
           {hasInput ? (
             <div className="cis-anim" style={{ background: refund ? GREEN_TINT : RED_TINT, border: `1px solid ${refund ? '#CFE9D8' : '#F3C7C2'}`, borderRadius: 18, padding: 24, textAlign: 'center' }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: refund ? GREEN : RED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: refund ? ON_GREEN_TINT : RED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
                 {refund ? 'Estimated refund owed to you' : 'Estimated still to pay'}
               </div>
               <div style={{ fontSize: 46, fontWeight: 800, color: INK, letterSpacing: '-1.5px', lineHeight: 1 }}>{gbp(Math.abs(r.balance))}</div>

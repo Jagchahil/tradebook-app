@@ -124,8 +124,14 @@ table.cmp{width:100%;border-collapse:collapse;font-size:14.5px;min-width:640px}
 @keyframes tickpop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
 .mk{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:999px;font-size:14px;font-weight:900}
 .mk.yes{background:var(--green);color:var(--on-green)}
-.mk.no{background:var(--panel-2);color:#B8B2A6}
-[data-theme="dark"] .mk.no{background:#242b35;color:#5b6470}
+/* 🔴 WAS background:var(--panel-2);color:#B8B2A6, PLUS A SEPARATE [data-theme="dark"] OVERRIDE
+   THAT HARDCODED BOTH SIDES AGAIN (#242b35 / #5b6470). Neither pair was ever named in
+   lib/tokens.ts, so neither could invert by construction, and both measured under AA anyway:
+   1.85:1 in light, 2.38:1 in the dark override. var(--tx-mut) is the ink this exact page already
+   uses on var(--panel-2) two rules up (.grouphdr td), at 5.26:1 light and 6.31:1 dark, so this
+   was simply never wired to it. One rule, no dark override needed, because the tokens invert on
+   their own. */
+.mk.no{background:var(--panel-2);color:var(--tx-mut)}
 .mk.soon{width:auto;height:auto;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:800;background:var(--saffron-tint);color:var(--on-saffron-tint)}
 .lbl{font-size:12px;font-weight:600;color:var(--tx-mut)}
 tr.hide{display:none}

@@ -10,10 +10,13 @@ const INK = 'var(--tx)';
 const RIVER = 'var(--river)';
 const RIVER_DEEP = 'var(--river-deep)';
 const RIVER_TINT = 'var(--river-tint)';
-const GREEN = 'var(--green)';
 const GREEN_TINT = 'var(--green-tint)';
-const AMBER = 'var(--saffron-deep)';
 const AMBER_TINT = 'var(--saffron-tint)';
+// 🔴 ON a tint, the ink is the ON token, not the raw accent. SAFFRON_DEEP (AMBER) on its own tint
+// reads 2.70:1 and GREEN on its own tint reads 4.46:1, both under 4.5:1. Both ON tokens are themed
+// for dark too. See lib/tokens.ts.
+const ON_GREEN_TINT = 'var(--on-green-tint)';
+const ON_AMBER_TINT = 'var(--on-saffron-tint)';
 const SURFACE = 'var(--surface)';
 const LINE = 'var(--bd)';
 const MUTED = 'var(--tx-mut)';
@@ -105,7 +108,7 @@ export default function Calc() {
         <div style={{ position: 'sticky', top: 20 }}>
           {hasInput ? (
             <div className="sl-anim" style={{ background: repaying ? RIVER_TINT : GREEN_TINT, border: `1px solid ${repaying ? '#D4E4F4' : '#CFE9D8'}`, borderRadius: 18, padding: 24, textAlign: 'center' }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: repaying ? RIVER_DEEP : GREEN, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: repaying ? RIVER_DEEP : ON_GREEN_TINT, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 8 }}>
                 {repaying ? (selfEmployed ? 'Set aside for your January bill' : 'Your repayment this year') : 'Nothing to repay this year'}
               </div>
               <div style={{ fontSize: 46, fontWeight: 800, color: INK, letterSpacing: '-1.5px', lineHeight: 1 }}>{gbp(r.annualTotal)}</div>
@@ -142,7 +145,7 @@ export default function Calc() {
 
           {hasInput && selfEmployed && repaying ? (
             <div className="sl-anim" style={{ background: AMBER_TINT, border: '1px solid #F1DBAE', borderRadius: 18, padding: 18, marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: AMBER, marginBottom: 6 }}>△ The January shock, explained</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: ON_AMBER_TINT, marginBottom: 6 }}>△ The January shock, explained</div>
               <p style={{ fontSize: 13.5, color: INK, lineHeight: 1.55, margin: 0 }}>
                 Employed people repay a little every payday. Self employed people repay nothing all year, then the whole {gbp(r.annualTotal)} lands on the January tax bill on top of income tax and National Insurance. Put it aside monthly and January is boring, which is the goal.
               </p>

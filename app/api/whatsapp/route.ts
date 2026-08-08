@@ -33,7 +33,10 @@ import {
   NUDGE_AFTER_RECEIPTS,
   type AiBlockReason,
 } from '../../../lib/banknudge';
-import { CIRCUMSTANCES, unanswered, buttonId, parseButtonId } from '../../../lib/circumstances';
+import { CIRCUMSTANCES, unanswered, buttonId, parseButtonId, mtdStatedFrom } from '../../../lib/circumstances';
+// WHERE HE STANDS ON MAKING TAX DIGITAL, from the ONE definition. Never re-derived in this file:
+// see handleDeadlineQuestion below and mtdPosition() in lib/taxengine.ts.
+import { mtdPosition, type MtdPosition } from '../../../lib/taxengine';
 import {
   findLinkCodeIn, hashLinkCode, verifyStoredLink, bindingVerdict, linkMessage, welcomeAfterBinding,
   waLinksConfigured, isUkMobile, type LinkVerdict,
@@ -471,7 +474,7 @@ async function processMessage(message: IncomingMessage): Promise<void> {
           } else if (isPricing(text)) {
             await handlePricing(from);
           } else if (isDeadlineQuestion(text)) {
-            await sendText(from, deadlineAnswer());
+            await handleDeadlineQuestion(from);
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);
           } else if (isSetupRequest(text)) {
@@ -1092,42 +1095,112 @@ async function bankNudgeAfterReceipt(from: string, userId: string): Promise<stri
 // The Mac mini claims the note, transcribes it LOCALLY with Whisper, and posts the words back to
 // /api/voice/complete, which logs the entry and confirms. The audio never leaves our own hardware, and is
 // wiped the instant it is transcribed.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SAME HOLE AS THE RECEIPT WALK, ONE ORDERING WORSE. FOUND AND CLOSED 7 AUGUST 2026.
+//
+// The acknowledgement used to be the LAST statement in this function and nothing above it was
+// caught, so a throw anywhere in the walk left a man who had just spoken into his phone with
+// nothing at all: processMessage logged one line and stopped. He cannot tell a crash from being
+// ignored, and voice is the input he chose BECAUSE his hands were full, so he is the customer least
+// able to check, retype it, or open the app and look.
+//
+// TWO SURFACES THROW, and both were proven by running the shipping functions against a real 200
+// carrying a gateway's HTML page rather than assumed from the receipt finding. Neither is this
+// file's to fix:
+//
+//   findUserIdByPhone   lib/supabase.ts, posts to PostgREST with no try and no timeout, then reads
+//                       res.json() with nothing around it.
+//   downloadMedia       lib/whatsapp.ts, guards both fetches and then reads metaRes.json() and
+//                       arrayBuffer() outside the guards.
+//
+// isWorkerLive (lib/bridge.ts) and createVoiceJob (lib/voicejobs.ts) are the two calls the receipt
+// walk has not got, so both were read rather than waved through: each wraps its whole body, its own
+// body read included, and reports failure by returning false or null. Neither can reach the catch.
+//
+// 🔴 AND HERE IS WHY THE RECEIPT FIX DOES NOT SIMPLY TRANSPLANT.
+//
+// handleReceiptImage can say ONE thing on every throw, because on every path that throws nothing
+// had been written. That is not true here. The instant createVoiceJob returns an id the audio IS in
+// the queue, the mini WILL claim it, and /api/voice/complete WILL write the entry and confirm it.
+// Telling him at that moment that we could not take it is not merely wrong, it is the sentence that
+// makes him record it again: two jobs, two transcriptions, two rows in his books for one spend.
+//
+// So the fix is not the catch. THE FIX IS THE ORDER, and the catch is only safe because of it:
+//
+//   1. THE QUEUE WRITE IS THE LAST THING IN voiceSentence THAT CAN FAIL. Nothing can throw between
+//      createVoiceJob returning an id and the promise being returned, so the apology below can
+//      never contradict a row that exists. test/routing.test.mjs section 9d pins BOTH halves: every
+//      throwing path is executed and asserted to have parked nothing, and no await may be added
+//      between the write and the return.
+//   2. THE WRITE STAYS BEFORE THE ACKNOWLEDGEMENT, never the other way round. Parked but not
+//      promised is a puzzled man whose books are right and whose confirmation is already on its
+//      way. Promised but not parked is a man who believes it is in hand, will not send it again,
+//      and has nobody coming: reapStaleVoiceJobs only knows about ROWS, so a promise with no row
+//      has nobody to keep it, and the spend is simply gone out of his year.
+//   3. isWorkerLive STAYS ABOVE downloadMedia, and that is data minimisation, not tidiness. With no
+//      fresh heartbeat we never fetch the audio at all, so a customer's recording cannot come to
+//      rest in our queue at the one moment there is nobody to transcribe it and wipe it.
+//
+// ⚠️ NO NEW SEND. Five inline sends became one. See test/routing.test.mjs section 7.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The promise and the apology, one string each. Said two ways they would drift, and the one he read
+// would be the one that did.
+const VOICE_ON_IT = 'Got your voice note. Writing it up now, one sec.';
+const VOICE_NOT_TAKEN = 'I could not take that voice note just now. Try again, or send a photo of the receipt.';
+
 async function handleVoiceNote(from: string, messageId: string, mediaId: string): Promise<void> {
+  let reply: string | null;
+  try {
+    reply = await voiceSentence(from, messageId, mediaId);
+  } catch (err) {
+    // THE NAME ONLY, NEVER THE MESSAGE, for the reason handleReceiptImage gives: a JSON parse
+    // failure quotes the body it choked on, and these bodies are PostgREST's and Graph's. Graph's
+    // reflects the recipient's wa_id. Vercel logs are an external service.
+    console.error('[whatsapp] Voice note threw:', err instanceof Error ? err.name : 'unknown');
+    // HONEST ONLY BECAUSE OF RULE 1 ABOVE: a throw can only ever happen before the queue write, so
+    // nothing is parked, and telling him to send it again cannot double count him.
+    reply = VOICE_NOT_TAKEN;
+  }
+  // null means this walk has already answered him by another route, so nothing is owed.
+  if (reply !== null) await sendText(from, reply);
+}
+
+// The whole parking of one voice note, as the sentence he should get back. null ONLY when he has
+// already been answered, which is the two paths that hand off to a shared reply.
+async function voiceSentence(from: string, messageId: string, mediaId: string): Promise<string | null> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
     await replyNotLinked(from);
-    return;
+    return null;
   }
 
   // Parsing the spoken amount still needs Claude; if that is off, voice cannot work, so say so plainly.
   if (!hasClaudeConfig()) {
-    await sendText(from, 'Voice notes are not switched on yet. Send a photo of the receipt for now.');
-    return;
+    return 'Voice notes are not switched on yet. Send a photo of the receipt for now.';
   }
 
   // The transcriber runs on the mini. If it is not beating right now (mini down, or restarting), do NOT
-  // promise "writing it up now" for a note nobody will pick up. Tell the customer plainly and let them
-  // send a photo or type it instead. Fails closed: no fresh heartbeat, no promise.
+  // promise "writing it up now" for a note nobody will pick up, and do not pull his audio down either.
+  // Tell the customer plainly and let them send a photo or type it instead. Fails closed: no fresh
+  // heartbeat, no download and no promise.
   if (!(await isWorkerLive('voice'))) {
-    await sendText(
-      from,
-      'Voice notes are briefly unavailable. Send a photo of the receipt or just type it, and I will log it now.',
-    );
-    return;
+    return 'Voice notes are briefly unavailable. Send a photo of the receipt or just type it, and I will log it now.';
   }
 
   const media = await downloadMedia(mediaId);
   if (!media) {
-    await sendText(from, 'I could not open that voice note. Try sending it again.');
-    return;
+    return 'I could not open that voice note. Try sending it again.';
   }
 
   const refused = await aiBudgetBlocked(from);
   if (refused) {
     await sendBudgetRefusal(from, refused);
-    return;
+    return null;
   }
 
+  // 🔴 THE QUEUE WRITE IS LAST, AND NOTHING AWAITED MAY BE ADDED AFTER IT. See rule 1 above.
   const jobId = await createVoiceJob({
     userId,
     fromPhone: from,
@@ -1135,12 +1208,8 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
     audioBase64: media.base64,
     mimeType: media.mediaType,
   });
-  if (!jobId) {
-    await sendText(from, 'I could not take that voice note just now. Try again, or send a photo of the receipt.');
-    return;
-  }
-
-  await sendText(from, 'Got your voice note. Writing it up now, one sec.');
+  if (!jobId) return VOICE_NOT_TAKEN;
+  return VOICE_ON_IT;
 }
 
 // The deterministic money-entry parser now lives in lib/waintents.ts with unit
@@ -1443,6 +1512,56 @@ async function handlePricing(from: string): Promise<void> {
       `That covers receipt capture, bookkeeping, invoicing, CIS, mileage, and your quarterly tax prep. Get started at ${APP_URL.replace('https://', '')}.`,
     ].join('\n'),
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 "WHEN IS MY TAX DUE", ANSWERED FOR THE MAN WHO ASKED IT RATHER THAN FOR EVERYBODY.
+//
+// This branch used to be one line: `await sendText(from, deadlineAnswer())`. It passed nothing, so
+// every asker got "Your next quarterly update is due by 7 November 2026", including a limited
+// company director whose company files its own return and a sole trader HMRC has never written to.
+//
+// ⚠️ THE POSITION IS RESOLVED HERE AND THE WORDS STAY IN lib/waintents.ts, so this channel and the
+// chat cannot drift apart in wording, and the mandation rule stays in mtdPosition() where it is
+// tested. Read the header on deadlineAnswer() before touching either.
+//
+// ⚠️ STILL EXACTLY ONE sendText. The verdict is worked out first and sent once, which is the shape
+// test/routing.test.mjs's ratchet asks for. A man we cannot identify reaches the same one send with
+// nothing known about him, and gets the honest conditional answer rather than silence: he asked a
+// question that has a true answer for everybody, and "you are not linked" is not it.
+//
+// ⚠️ A FAILED READ IS UNKNOWN, NEVER A NO. Every catch below lands on null, which mtdPosition()
+// turns into an unstated position, which asks him. Reading a timeout as "he is not mandated" would
+// be an all clear nobody gave.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+async function handleDeadlineQuestion(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  let structure: 'sole_trader' | 'partnership' | 'limited_company' | null = null;
+  let position: MtdPosition | null = null;
+
+  if (userId) {
+    const [optimiser, circ] = await Promise.all([
+      getOptimiserInput(userId).catch(() => null),
+      readCircumstances(userId).catch(() => null),
+    ]);
+    structure = optimiser?.businessType ?? null;
+    if (optimiser) {
+      // The Making Tax Digital test is on GROSS qualifying income, trade plus rent, before a
+      // single expense comes off. mtdPosition() decides what that figure is worth, which for an
+      // unstated man is "not much": see lib/taxengine.ts.
+      const gross = Math.max(0, optimiser.ytdTradeIncome) + Math.max(0, optimiser.ytdPropertyIncome ?? 0);
+      position = mtdPosition({
+        excluded: structure === 'limited_company' || structure === 'partnership',
+        // mtdStatedFrom() maps a skip, a missing key and a failed read all to null, which means
+        // "we have not been told" and never "no".
+        stated: mtdStatedFrom(Object.fromEntries((circ ?? []).map((a) => [a.key, a.answer]))),
+        grossQualifyingIncome: gross,
+        startYear: optimiser.startYear,
+      });
+    }
+  }
+
+  await sendText(from, deadlineAnswer(new Date(), { structure, mtdPosition: position }));
 }
 
 // WHO IS ELECTING, read once, in one place, for lib/elections.ts to answer about. The same helper
@@ -2542,29 +2661,59 @@ function formatWhen(iso: string): string {
   return `on ${d.toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })}`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE THIRD WALK WITH THE SAME HOLE, AND THE ONLY OTHER ONE THAT MAKES A PROMISE. 7 AUGUST 2026.
+//
+// Neither the receipt pass nor the voice pass looked at this one. It has the same two ingredients:
+//
+//   findUserIdByPhone   lib/supabase.ts, res.json() with nothing around it.
+//   parseSchedule       lib/claude.ts, guards its fetch and then reads res.json() outside the
+//                       guard, exactly like parseReceipt. Every entry point in that module does.
+//
+// Either one throwing left him with silence, and a reminder is the ONE thing he will never chase:
+// he asked us to remember it so that he could stop. He finds out it was never set on the morning it
+// mattered, which is the day it is no longer worth setting.
+//
+// And it is the voice ordering again, so the same rule applies: createEvent writes a row that texts
+// him LATER, so the write stays before the acknowledgement and the acknowledgement is the only
+// send. Unlike the voice queue, createEvent throws only when the row was NOT created (a non ok
+// status), so the apology below can never contradict a diary entry that exists.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 async function handleSchedule(from: string, body: string): Promise<void> {
+  let reply: string | null;
+  try {
+    reply = await scheduleSentence(from, body);
+  } catch (err) {
+    // The name only, never the message. Same reasoning as handleReceiptImage and handleVoiceNote.
+    console.error('[whatsapp] Schedule read threw:', err instanceof Error ? err.name : 'unknown');
+    reply = 'I could not set that reminder just now. Nothing is in your diary, so send it again in a minute.';
+  }
+  if (reply !== null) await sendText(from, reply);
+}
+
+// One reminder, read and written, as the sentence he should get back. null ONLY when he has already
+// been answered by a shared reply.
+async function scheduleSentence(from: string, body: string): Promise<string | null> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
-    await sendText(from, 'Open the app and add your number first, then I can keep your diary.');
-    return;
+    return 'Open the app and add your number first, then I can keep your diary.';
   }
   if (!hasClaudeConfig()) {
-    await sendText(from, 'Reminders are not switched on yet. Hang tight, they are coming very soon.');
-    return;
+    return 'Reminders are not switched on yet. Hang tight, they are coming very soon.';
   }
   const refused = await aiBudgetBlocked(from);
   if (refused) {
     await sendBudgetRefusal(from, refused);
-    return;
+    return null;
   }
   const parsed = await parseSchedule(body, new Date().toISOString());
   if (!parsed) {
-    await sendText(from, 'I could not work out a time for that. Try, for example, "remind me to price up Dave\'s job tomorrow at 8am".');
-    return;
+    return 'I could not work out a time for that. Try, for example, "remind me to price up Dave\'s job tomorrow at 8am".';
   }
+  // 🔴 THE DIARY WRITE IS LAST, AND NOTHING AWAITED MAY BE ADDED AFTER IT.
   await createEvent(userId, { title: parsed.title, kind: parsed.kind, starts_at: parsed.starts_at, remind_at: parsed.remind_at });
   const when = parsed.remind_at ? formatWhen(parsed.remind_at) : 'when it is due';
-  await sendText(from, `Got it. "${parsed.title}". I will remind you ${when}. 👍`);
+  return `Got it. "${parsed.title}". I will remind you ${when}. 👍`;
 }
 
 // A money question, but only if it actually reads like a question, not a log

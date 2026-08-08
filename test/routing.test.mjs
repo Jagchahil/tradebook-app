@@ -431,6 +431,10 @@ console.log('\n9. 🔴 NO ROW GOES DECORATIVE UNNOTICED, AND THE CAPTURE WALK AN
 //       lib/email.ts really has a capture sender.
 //   9c. The receipt walk in the webhook answers on EVERY path, including the ones where something
 //       throws. It is executed here, not read.
+//   9d. The VOICE walk does the same, and additionally never apologises for a note it has already
+//       parked. Executed, not read.
+//   9e. The REMINDER walk does the same. It is the third walk with this shape and the second that
+//       makes a promise.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 // The arguments of a named call, with the brackets WALKED rather than matched by a regex. The
@@ -627,6 +631,283 @@ export { handleReceiptImage };
     ok(`and the sentence is a real one: ${label}`, typeof H.sent[0] === 'string' && H.sent[0].trim().length > 10);
   }
   console.error = realError;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n9d. 🔴 THE VOICE WALK IS EXECUTED, AND IT NEVER APOLOGISES FOR A NOTE IT HAS PARKED');
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 9c CLOSED THE PHOTOGRAPH AND LEFT THE VOICE NOTE OPEN, AND THE VOICE NOTE IS THE WORSE ONE.
+//
+// It was flagged in the same pass and not fixed. Its acknowledgement was the LAST statement in the
+// function, so a throw in findUserIdByPhone or downloadMedia left a man who had just SPOKEN into
+// his phone with nothing at all. He chose voice because his hands were full, which makes him the
+// customer least able to check, retype it, or open the app and look.
+//
+// 🔴 AND THE ORDERING IS DIFFERENT FROM THE RECEIPT'S, WHICH IS WHY THE FIX IS NOT THE SAME FIX.
+//
+// A voice note is PARKED, not answered: it goes into voice_jobs, the mini claims it, transcribes it
+// locally and posts back to /api/voice/complete, which writes the entry and confirms. So there are
+// two promises, "I am on it" and the later confirmation, and the walk has a point in the middle
+// after which SOMETHING HAS BEEN WRITTEN. handleReceiptImage can say one thing on every throw
+// because nothing was ever written on a throwing path. Say the same thing here after the queue
+// write and you have told a man to record it again for a note the mini is already transcribing:
+// two jobs, two entries, one spend counted twice.
+//
+// So this section asserts THREE things, not one:
+//
+//   1. Exactly one send on every path, including the two that throw. Zero is the silence. Two is a
+//      second billable message on a capture walk, which is section 7.
+//   2. 🔴 NO PATH THAT THROWS HAS PARKED ANYTHING. The apology is only honest while that holds.
+//   3. 🔴 NOTHING AWAITED SITS BETWEEN THE QUEUE WRITE AND THE PROMISE. That is what keeps (2)
+//      true tomorrow, and it is a single line somebody could undo without noticing.
+//
+// And one more, which is about the audio rather than the sentence: with no fresh heartbeat from the
+// mini the walk must not DOWNLOAD the note at all, because a recording parked when there is nobody
+// to transcribe it is a customer's voice resting on our disk for no purpose.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const vFrom = waSrc.indexOf('async function replyNotLinked');
+const vTo = waSrc.indexOf('// The write did not happen, said the same way');
+const vjFrom = waSrc.indexOf('// A voice note cannot be transcribed by Claude');
+const vjTo = waSrc.indexOf('// The deterministic money-entry parser now lives');
+const voiceBody = vjFrom > 0 && vjTo > vjFrom ? waSrc.slice(vjFrom, vjTo) : '';
+ok('the voice walk was found in the webhook, so the checks below are not vacuous',
+  vFrom > 0 && vTo > vFrom && vjFrom > 0 && vjTo > vjFrom
+  && voiceBody.includes('async function handleVoiceNote')
+  && voiceBody.includes('async function voiceSentence'));
+
+if (voiceBody) {
+  // 🔴 RULE 3, READ OFF THE SOURCE. Between createVoiceJob( and the sentence it returns there may be
+  // no await, because an await there is a place a throw can land AFTER the audio is in the queue,
+  // and the catch would then apologise for a note that is already being transcribed.
+  const writeAt = voiceBody.indexOf('await createVoiceJob(');
+  const promiseAt = voiceBody.indexOf('return VOICE_ON_IT');
+  // Both landmarks have to exist, or the count below is measured over the wrong text. A walk that
+  // no longer parks and then RETURNS its promise is not a walk this rule can reason about, so it
+  // fails here rather than quietly reporting zero.
+  const landmarks = writeAt > 0 && promiseAt > writeAt;
+  const untilPromise = landmarks ? voiceBody.slice(writeAt, promiseAt) : '';
+  const extraAwaits = landmarks
+    ? (stripComments(untilPromise).match(/\bawait\b/g) || []).length - 1 // the write itself
+    : -1;
+  ok(
+    extraAwaits === 0
+      ? 'nothing awaited sits between parking the audio and promising to write it up'
+      : !landmarks
+        ? '🔴 the queue write and the promise are no longer a write followed by a return.\n'
+          + '     This rule reads the text between "await createVoiceJob(" and "return VOICE_ON_IT",\n'
+          + '     and one of them is gone. If the walk now sends from inside itself, the throw it was\n'
+          + '     given a catch for has somewhere to hide again: see the block above handleVoiceNote.'
+        : `🔴 ${extraAwaits} awaited call(s) now sit between createVoiceJob and the promise.\n`
+        + '     That is a place a throw can land AFTER the audio is in voice_jobs. handleVoiceNote\n'
+        + '     would then tell him we could not take it, he would record it again, and the mini\n'
+        + '     would transcribe both: one spend, two rows in his books. Either move the call above\n'
+        + '     the queue write, or make the catch choose its sentence on whether a row exists.',
+    extraAwaits === 0,
+  );
+
+  const VSTUBS = `
+export const sent: string[] = [];
+export const jobs: string[] = [];
+export const downloads: string[] = [];
+export const ctl: Record<string, unknown> = {};
+const APP_URL = 'https://lekhio.app';
+const TRIAL_DAYS = 7;
+async function sendText(_to: string, body: string): Promise<void> { sent.push(body); }
+async function findUserIdByPhone(_p: string): Promise<string | null> {
+  if (ctl.userIdThrows) throw new SyntaxError('Unexpected token < in JSON at position 0');
+  return (ctl.userId ?? null) as string | null;
+}
+function hasClaudeConfig(): boolean { return ctl.claude !== false; }
+async function isWorkerLive(_k: string): Promise<boolean> { return ctl.live !== false; }
+async function downloadMedia(_id: string): Promise<{ base64: string; mediaType: string } | null> {
+  downloads.push('hit');
+  if (ctl.mediaThrows) throw new SyntaxError('Unexpected token < in JSON at position 0');
+  return ctl.media === null ? null : { base64: 'AAAA', mediaType: 'audio/ogg' };
+}
+async function aiBudgetBlocked(_f: string): Promise<string | null> { return (ctl.refused ?? null) as string | null; }
+async function sendBudgetRefusal(_f: string, reason: string): Promise<void> { sent.push('refusal:' + reason); }
+async function createVoiceJob(_j: unknown): Promise<string | null> {
+  if (ctl.job === null) return null;
+  jobs.push('job1');
+  return 'job1';
+}
+export { handleVoiceNote };
+`;
+  const vStage = mkdtempSync(path.join(tmpdir(), 'wavoice-'));
+  const vFile = path.join(vStage, 'voicewalk.ts');
+  writeFileSync(vFile, VSTUBS + waSrc.slice(vFrom, vTo) + '\n' + voiceBody);
+  const V = await import(pathToFileURL(vFile).href);
+
+  // [label, setup, parks a job]
+  const VPATHS = [
+    ['not linked to an account', { userId: null }, false],
+    ['voice reading not configured', { claude: false }, false],
+    ['the mini is not beating', { live: false }, false],
+    ['the audio would not download', { media: null }, false],
+    ['the AI budget refused him', { refused: 'user_daily_cap' }, false],
+    ['the queue refused the note', { job: null }, false],
+    ['parked, and promised', {}, true],
+    ['🔴 the account lookup THREW', { userIdThrows: true }, false],
+    ['🔴 the audio download THREW', { mediaThrows: true }, false],
+  ];
+
+  const realVError = console.error;
+  console.error = () => {};
+  for (const [label, setup, parks] of VPATHS) {
+    V.sent.length = 0;
+    V.jobs.length = 0;
+    V.downloads.length = 0;
+    for (const k of Object.keys(V.ctl)) delete V.ctl[k];
+    V.ctl.userId = 'u1';
+    Object.assign(V.ctl, setup);
+    let threw = null;
+    try {
+      await V.handleVoiceNote('447700900000', 'wamid.TEST', 'media1');
+    } catch (e) {
+      threw = e instanceof Error ? e.name : 'unknown';
+    }
+    const n = V.sent.length;
+    ok(
+      n === 1 && !threw
+        ? `he is answered, exactly once: ${label}`
+        : `🔴 a voice note went unanswered: ${label}. Sends: ${n}${threw ? `, and the walk threw ${threw}` : ''}.\n`
+          + '     He spoke into his phone because his hands were full, so he is the least able of\n'
+          + '     anyone to notice nothing came back. Every path through handleVoiceNote must end in\n'
+          + '     one sentence, including the ones where a dependency throws.',
+      n === 1 && !threw,
+    );
+    ok(`and the sentence is a real one: ${label}`, typeof V.sent[0] === 'string' && V.sent[0].trim().length > 10);
+    ok(`the queue row and the sentence agree: ${label}`, V.jobs.length === (parks ? 1 : 0));
+    if (parks) {
+      ok('a parked note is promised, and promised only once',
+        V.sent[0] === 'Got your voice note. Writing it up now, one sec.');
+    } else {
+      ok(
+        !/Writing it up now/.test(V.sent[0] ?? '')
+          ? `nothing was parked, so nothing was promised: ${label}`
+          : `🔴 "writing it up now" was said for a note that never reached the queue: ${label}.\n`
+            + '     Nobody is coming. reapStaleVoiceJobs only knows about ROWS, so a promise with no\n'
+            + '     row has nobody to keep it and no apology will ever follow it.',
+        !/Writing it up now/.test(V.sent[0] ?? ''),
+      );
+    }
+  }
+
+  // 🔴 THE AUDIO, NOT THE SENTENCE. No fresh heartbeat means the recording is never even fetched.
+  V.sent.length = 0; V.jobs.length = 0; V.downloads.length = 0;
+  for (const k of Object.keys(V.ctl)) delete V.ctl[k];
+  V.ctl.userId = 'u1';
+  V.ctl.live = false;
+  await V.handleVoiceNote('447700900000', 'wamid.TEST', 'media1');
+  ok(
+    V.downloads.length === 0
+      ? '🔴 with the mini not beating, his audio is never downloaded at all'
+      : '🔴 the walk pulled a customer\'s recording down with no transcriber running.\n'
+        + '     isWorkerLive must stay ABOVE downloadMedia. Audio fetched when there is nobody to\n'
+        + '     transcribe it is a voice recording resting in our hands for no purpose, and the only\n'
+        + '     thing that wipes a parked note is the mini polling, which by definition it is not.',
+    V.downloads.length === 0,
+  );
+  console.error = realVError;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+console.log('\n9e. 🔴 THE REMINDER WALK, WHICH IS THE THIRD ONE WITH THIS SHAPE');
+//
+// Found while checking whether the voice fix transplanted. handleSchedule has both ingredients:
+// findUserIdByPhone, and parseSchedule (lib/claude.ts), which guards its fetch and then reads
+// res.json() outside the guard exactly as parseReceipt does. Every entry point in that module does.
+//
+// A reminder is the one thing he will never chase, because he asked us to remember it so that he
+// could stop. Silence here is discovered on the morning it mattered, which is the day it has
+// stopped being worth setting. And createEvent writes a row that texts him LATER, so this is the
+// voice ordering again and the write stays before the acknowledgement.
+// Anchored on formatWhen rather than on the comment above the handler, so this slice survives the
+// handler being rewritten. formatWhen is real here, not stubbed: the "I will remind you ..." line
+// is the promise, and a promise with the wrong time in it is not a promise kept.
+const sFrom = waSrc.indexOf('function formatWhen(iso: string)');
+const sTo = waSrc.indexOf('// A money question, but only if it actually reads');
+const schedBody = sFrom > 0 && sTo > sFrom ? waSrc.slice(sFrom, sTo) : '';
+ok('the reminder walk was found in the webhook, so the checks below are not vacuous',
+  schedBody.includes('async function handleSchedule') && schedBody.includes('async function scheduleSentence'));
+
+if (schedBody.includes('async function handleSchedule')) {
+  const SSTUBS = `
+export const sent: string[] = [];
+export const events: string[] = [];
+export const ctl: Record<string, unknown> = {};
+async function sendText(_to: string, body: string): Promise<void> { sent.push(body); }
+async function findUserIdByPhone(_p: string): Promise<string | null> {
+  if (ctl.userIdThrows) throw new SyntaxError('Unexpected token < in JSON at position 0');
+  return (ctl.userId ?? null) as string | null;
+}
+function hasClaudeConfig(): boolean { return ctl.claude !== false; }
+async function aiBudgetBlocked(_f: string): Promise<string | null> { return (ctl.refused ?? null) as string | null; }
+async function sendBudgetRefusal(_f: string, reason: string): Promise<void> { sent.push('refusal:' + reason); }
+async function parseSchedule(_b: string, _n: string): Promise<Record<string, unknown> | null> {
+  if (ctl.parseThrows) throw new SyntaxError('Unexpected token < in JSON at position 0');
+  return (ctl.parsed ?? null) as Record<string, unknown> | null;
+}
+async function createEvent(_u: string, _e: unknown): Promise<void> {
+  if (ctl.eventThrows) throw new Error('Event insert failed: 500');
+  events.push('e1');
+}
+export { handleSchedule };
+`;
+  const sStage = mkdtempSync(path.join(tmpdir(), 'waschedule-'));
+  const sFile = path.join(sStage, 'schedulewalk.ts');
+  writeFileSync(sFile, SSTUBS + schedBody);
+  const S = await import(pathToFileURL(sFile).href);
+
+  const GOOD = { title: 'Price up Dave\'s job', kind: 'reminder', starts_at: null, remind_at: '2026-08-08T07:00:00.000Z' };
+  const SPATHS = [
+    ['not linked to an account', { userId: null }, false],
+    ['reminders not configured', { claude: false }, false],
+    ['the AI budget refused him', { refused: 'user_daily_cap' }, false],
+    ['no time could be read out of it', { parsed: null }, false],
+    ['set, and he is told when', { parsed: GOOD }, true],
+    ['🔴 the account lookup THREW', { userIdThrows: true }, false],
+    ['🔴 the schedule read THREW', { parseThrows: true }, false],
+    ['🔴 the diary write THREW', { parsed: GOOD, eventThrows: true }, false],
+  ];
+
+  const realSError = console.error;
+  console.error = () => {};
+  for (const [label, setup, booked] of SPATHS) {
+    S.sent.length = 0;
+    S.events.length = 0;
+    for (const k of Object.keys(S.ctl)) delete S.ctl[k];
+    S.ctl.userId = 'u1';
+    Object.assign(S.ctl, setup);
+    let threw = null;
+    try {
+      await S.handleSchedule('447700900000', 'remind me to price up Dave\'s job tomorrow at 8am');
+    } catch (e) {
+      threw = e instanceof Error ? e.name : 'unknown';
+    }
+    const n = S.sent.length;
+    ok(
+      n === 1 && !threw
+        ? `he is answered, exactly once: ${label}`
+        : `🔴 a reminder request went unanswered: ${label}. Sends: ${n}${threw ? `, and the walk threw ${threw}` : ''}.\n`
+          + '     He asked us to remember something so that he could stop carrying it. Silence means\n'
+          + '     he finds out on the morning it mattered, which is the day it stopped being worth\n'
+          + '     setting. Every path through handleSchedule must end in one sentence.',
+      n === 1 && !threw,
+    );
+    ok(`and the sentence is a real one: ${label}`, typeof S.sent[0] === 'string' && S.sent[0].trim().length > 10);
+    ok(`the diary row and the sentence agree: ${label}`, S.events.length === (booked ? 1 : 0));
+    if (!booked) {
+      ok(
+        !/I will remind you/.test(S.sent[0] ?? '')
+          ? `nothing was written, so nothing was promised: ${label}`
+          : `🔴 "I will remind you" was said with no diary row behind it: ${label}.`,
+        !/I will remind you/.test(S.sent[0] ?? ''),
+      );
+    }
+  }
+  console.error = realSError;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────

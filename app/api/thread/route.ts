@@ -162,7 +162,30 @@ async function composeReply(userId: string, q: string): Promise<string> {
   if (totals) return totalsAnswer(userId, totals);
 
   // 2. Tax deadline questions: computed, no AI.
-  if (isDeadlineQuestion(q)) return deadlineAnswer();
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 IT USED TO BE `return deadlineAnswer()`, WITH HIS ID IN SCOPE ON THE LINE ABOVE.
+  //
+  // Nothing was passed, so a limited company director asking "when is my tax due" was handed a
+  // quarterly update deadline for a return his company does not file. Who he is now goes in.
+  //
+  // ⚠️ AND THE POSITION IS null HERE ON PURPOSE, WHICH IS NOT A SHORTCUT. Making Tax Digital
+  // mandation is a fact only HE holds (HMRC decides it from a return already filed and writes to
+  // him), and the only place we keep his answer is the circumstances chain, which article 9 keeps
+  // off this surface entirely: nothing from that chain may reach the chat, and test/thread.test.mjs
+  // pins it in both files. So this route says plainly what it cannot know, and deadlineAnswer()
+  // words it conditionally and asks him. The WhatsApp channel, which runs that chain, answers the
+  // sharper way. Weaker, never contradictory, and the difference is article 9 doing its job.
+  //
+  // ⚠️ A FAILED READ IS UNKNOWN, NEVER A NO. Both facts fall back to null, which asks him.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (isDeadlineQuestion(q)) {
+    const optimiser = await getOptimiserInput(userId).catch(() => null);
+    return deadlineAnswer(new Date(), {
+      structure: optimiser?.businessType ?? null,
+      mtdPosition: null,
+    });
+  }
 
   // 3. "Can I claim it" questions: the deterministic claim rules, no AI. Guarded the same way
   // the WhatsApp checker guards itself: a message carrying a money amount is probably telling

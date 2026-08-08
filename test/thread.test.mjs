@@ -227,7 +227,12 @@ ok('a projection is called a projection, the hub\'s own honesty',
 ok('deterministic intents run BEFORE the AI path, the WhatsApp order',
   routeCode.indexOf('matchTotalsQuestion(q)') > -1
   && routeCode.indexOf('matchTotalsQuestion(q)') < routeCode.indexOf('hasClaudeConfig()')
-  && routeCode.indexOf('deadlineAnswer()') < routeCode.indexOf('answerMoneyQuestion(q')
+  // 🔴 WAS `deadlineAnswer()`, WHICH WENT VACUOUS THE DAY THE CALL GAINED ITS ASKER.
+  // indexOf returned -1 for a literal that no longer existed and -1 is less than everything, so
+  // this clause passed for the wrong reason and guarded nothing. Assert the call site EXISTS first,
+  // then assert the ordering, so the guard can never again be satisfied by its own absence.
+  && routeCode.indexOf('deadlineAnswer(new Date()') > -1
+  && routeCode.indexOf('deadlineAnswer(new Date()') < routeCode.indexOf('answerMoneyQuestion(q')
   && routeCode.indexOf('checkExpense(q)') < routeCode.indexOf('answerMoneyQuestion(q'));
 ok('🔴 the spend rings are the SHARED ones, so total AI spend is bounded once',
   /bumpAiUsage\('global', 'all'\)/.test(routeCode) && /bumpAiUsage\('globalmonth'/.test(routeCode)

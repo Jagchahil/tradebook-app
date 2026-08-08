@@ -391,5 +391,128 @@ for (const [name, src] of [['hub', hub], ['summary', summary], ['ni', ni], ['nav
     !/(?<![\d.])(12570|50270|37700|125140)(?![\d.])/.test(codeOnly(src)));
 }
 
+// ---------------------------------------------------------------------------------------------
+// 🔴 6. A DEADLINE IS A MANDATION CLAIM, AND THE SURFACE THAT MAKES IT BLIND IS THE ONE NOBODY
+//       LOOKED AT, BECAUSE IT NEVER SAYS THE WORD.
+//
+// Everything above this section polices a screen that READS THE POSITION. That is why every audit
+// of this area has found those screens correct: they were the ones grep could find. The 3 August
+// sweep was framed by searching for "mandat", and the position itself lives behind mtdPosition,
+// mtdPos and mandated, so the sweep found the eleven places that talk about mandation and pinned
+// them. It could not find a place that makes the claim WITHOUT USING ANY OF THOSE WORDS.
+//
+// "Your next quarterly update is due by 7 November 2026" is a mandation claim. It asserts he has a
+// quarterly update, and it asserts a date for it. It contains neither "mandat" nor "Making Tax
+// Digital", so no grep for either reaches it, and it comes from a module holding no customer facts
+// at all, so no position based test could reach it either. It fell through both nets.
+//
+// ⚠️ SO THIS GUARD IS NOT ANOTHER BRANCH CHECK. It classifies a MODULE, and it asks the only
+// question that catches this shape: does this file make a personal claim about the customer's own
+// quarterly update, and if it does, has it any way of knowing whether he has one?
+//
+// A claim is allowed on exactly two grounds, and both are real fixes rather than wordings:
+//
+//   POSITION AWARE   the module reads mtdPosition, mtdPos, mtdStated, mandated, makesUpdates or
+//                    mtdExcluded, so a branch can withhold the sentence from the man it is false
+//                    for. lib/quarterpack.ts, app/app/tax/page.tsx and lib/agent.ts pass here.
+//   CONDITIONAL      the sentence opens "If HMRC has written...", so it is true for every reader
+//                    without the module ever learning his answer. lib/weeklyupdate.ts passes here,
+//                    and its own header says that was chosen deliberately over a new input field.
+//
+// ⚠️ WHICH MEANS THIS GUARD IS AGNOSTIC ABOUT HOW THE OFFENDER BELOW GETS FIXED. Gate it on the
+// position, or make the sentence conditional the way lib/weeklyupdate.ts already does. Either
+// clears it. That is on purpose: a guard that demands one particular fix is a guard that gets
+// argued with rather than satisfied.
+// ---------------------------------------------------------------------------------------------
+{
+  // The modules that can put a sentence about a quarterly update in front of a customer, plus the
+  // two routes that carry the WhatsApp and in app replies. Read as source, like the rest of this
+  // suite, because the point is what the file is CAPABLE of saying.
+  const POLICED = [
+    'lib/waintents.ts',
+    'lib/weeklyupdate.ts',
+    'lib/quarterpack.ts',
+    'lib/agent.ts',
+    'app/app/tax/page.tsx',
+    'app/app/tax/summary/page.tsx',
+    'app/app/setup/page.tsx',
+    'app/api/thread/route.ts',
+    'app/api/whatsapp/route.ts',
+  ];
+
+  // "Your ... quarterly update ... is due", plus the two flat assertions the 3 August rewrite
+  // pushed behind stated_in. All three are claims about HIM, never about the regime: /resources
+  // and /free-mtd-filing name the same dates as the calendar's and are rightly untouched, because
+  // "the next quarterly update deadline" is a fact about the rule and "your next quarterly update"
+  // is a fact about the man.
+  const CLAIM = /(\byour\b[^\n]{0,60}\bquarterly update\b[^\n]{0,80}\bis due\b)|(Making Tax Digital applies to you)|(quarterly updates apply)/i;
+  const AWARE = /mtdPosition|mtdPos\b|mtdStated|\bmandated\b|makesUpdates|mtdExcluded/;
+  const CONDITIONAL = /\bIf HMRC has written\b/i;
+
+  const claimsIn = (src) => codeOnly(src).split('\n').filter((l) => CLAIM.test(l));
+  const blind = [];
+  let totalClaims = 0;
+  for (const f of POLICED) {
+    const src = read(f);
+    const lines = claimsIn(src);
+    totalClaims += lines.length;
+    const aware = AWARE.test(codeOnly(src));
+    const unconditional = lines.filter((l) => !CONDITIONAL.test(l));
+    if (!aware && unconditional.length > 0) blind.push(f);
+  }
+
+  // ⚠️ THE REGEX HAS TO STAY ALIVE. A sweep whose pattern stops matching passes perfectly and
+  // guards nothing, which is this directory's oldest way of going quietly green. The honest
+  // surfaces genuinely do make these claims, behind their gates, so the pattern must keep finding
+  // them: lib/quarterpack.ts makes three and app/app/tax/page.tsx makes two.
+  ok('the claim pattern still finds the real sentences, so this sweep is not passing on a dead regex',
+    totalClaims >= 5);
+  ok('and every policed file was actually read, so a rename cannot empty the sweep',
+    POLICED.every((f) => read(f).length > 0));
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE INVENTORY, AND IT IS A LIST OF THINGS THAT ARE WRONG TODAY, NOT A LIST OF EXCEPTIONS.
+  //
+  // lib/waintents.ts deadlineAnswer() replies "Your next quarterly update is due by 7 November
+  // 2026. The quarterly dates are 7 August, 7 November, 7 February and 7 May." to ANY customer who
+  // asks when something is due. It takes a clock and nothing else. The module holds no reference to
+  // mtdPosition, to a structure, or to a business profile, so it cannot know:
+  //
+  //   - a limited company director gets a quarterly update deadline for a return his company does
+  //     not file, which is wave nine's own defect arriving by WhatsApp,
+  //   - a partner gets one for a regime GOV.UK has announced no date for,
+  //   - a sole trader HMRC has never written to gets one for an update he does not have to make.
+  //
+  // And isDeadlineQuestion() matches "when is my tax due", so a plain Self Assessment question is
+  // answered with a quarterly update deadline first. Both call sites pass nothing:
+  // app/api/whatsapp/route.ts sendText(from, deadlineAnswer()) and app/api/thread/route.ts
+  // return deadlineAnswer(), the second of which has the customer's id in scope on the line above.
+  //
+  // ⚠️ THE ASSERTION IS EQUALITY, NOT SUBSET, AND THAT IS THE POINT. A subset check would let this
+  // entry sit here for ever after the sentence was fixed, which is how a known bad list turns into
+  // a permanent excuse. Equality means the day somebody gates or conditions that sentence, THIS
+  // TEST GOES RED and whoever fixed it deletes the line below. The inventory cannot outlive the bug.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // ✅ CLOSED 7 AUGUST 2026, AND THE LIST EMPTIED THE SAME DAY, WHICH IS THE MECHANISM WORKING.
+  // deadlineAnswer() now takes the asker's MtdPosition as a required argument, so tsc named both
+  // call sites and neither can call it blind again. A director and a partner get no quarterly date
+  // at all, and an unstated sole trader is ASKED rather than told. See test/wave9_deadlineasker.mjs.
+  // The list is empty and the equality assertion below now holds it empty for ever: the next module
+  // that makes a personal claim it cannot support has to be argued for here, in writing.
+  const KNOWN_BLIND = [];
+
+  ok('🔴 NO NEW SURFACE TELLS A CUSTOMER HE HAS AN UPDATE DUE WITHOUT BEING ABLE TO KNOW IT',
+    blind.every((f) => KNOWN_BLIND.includes(f)));
+  ok('🔴 AND THE KNOWN BLIND LIST IS EXACTLY THE ONE STILL OPEN: fix it and delete it from here',
+    blind.length === KNOWN_BLIND.length && KNOWN_BLIND.every((f) => blind.includes(f)));
+
+  // 🔴 THE CONDITIONAL OPENER IS LOAD BEARING, NOT PADDING. lib/weeklyupdate.ts is position blind
+  // by design (its header forbids adding circumstances to WeeklyUpdateInput) and is honest only
+  // because its sentence begins "If HMRC has written to tell you". Delete those six words as
+  // tidying and that module joins the list above, on a line pushed to a man's phone.
+  ok('the weekly line stays conditional, which is the only thing making a blind module honest',
+    CONDITIONAL.test(codeOnly(read('lib/weeklyupdate.ts'))));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

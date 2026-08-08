@@ -129,9 +129,22 @@ ok('identity who', W.isIdentity('who are you'));
 ok('deadline question', W.isDeadlineQuestion('when is my tax due?'));
 ok('deadline quarterly', W.isDeadlineQuestion('when is the next quarterly update due'));
 ok('non deadline when', !W.isDeadlineQuestion('when did Dave pay me'));
-ok('deadline answer names the cycle', /7 August/.test(W.deadlineAnswer(new Date('2026-07-02T10:00:00Z'))));
-ok('deadline answer picks next date', /7 August 2026/.test(W.deadlineAnswer(new Date('2026-07-02T10:00:00Z'))));
-ok('deadline rolls to Nov after Aug', /7 November 2026/.test(W.deadlineAnswer(new Date('2026-08-08T10:00:00Z'))));
+// 🔴 THE ASKER GOES IN NOW, AND THESE THREE ARE THE ONE MAN WHO GENUINELY HAS A QUARTERLY UPDATE.
+// stated_in is the only position that means mandated, and mtdPosition() makes it reachable from
+// his own answer and never from arithmetic. Every other asker is held in
+// test/wave9_deadlineasker.test.mjs, which proves a director, a partner and an unstated sole
+// trader are each answered honestly instead of being handed his date.
+const STATED_IN = { structure: 'sole_trader', mtdPosition: 'stated_in' };
+ok('deadline answer names the cycle', /7 August/.test(W.deadlineAnswer(new Date('2026-07-02T10:00:00Z'), STATED_IN)));
+ok('deadline answer picks next date', /7 August 2026/.test(W.deadlineAnswer(new Date('2026-07-02T10:00:00Z'), STATED_IN)));
+ok('deadline rolls to Nov after Aug', /7 November 2026/.test(W.deadlineAnswer(new Date('2026-08-08T10:00:00Z'), STATED_IN)));
+// 🔴 AND THE DAY ITSELF IS NOT LATE. It compared instants with `>`, so from midnight on 7 August
+// 2026 it skipped to 7 November and told a man his update was three months away on the morning it
+// was due. app/app/tax/due.ts reports it still open that day and app/free-mtd-filing compares whole
+// days for the same reason. Two surfaces, one fact, and this was the one that disagreed.
+ok('🔴 the deadline due TODAY is the answer today, not the next one',
+  /7 August 2026/.test(W.deadlineAnswer(new Date('2026-08-07T00:05:00+01:00'), STATED_IN))
+  && /7 August 2026/.test(W.deadlineAnswer(new Date('2026-08-07T23:30:00+01:00'), STATED_IN)));
 
 console.log('\n=== waintents: totals questions ===\n');
 const t1 = W.matchTotalsQuestion('how much have I spent this month?', now);

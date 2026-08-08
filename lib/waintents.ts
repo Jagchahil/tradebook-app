@@ -22,6 +22,13 @@
 //
 // Writing rule: no em dashes, no en dashes anywhere, including replies.
 
+// ⚠️ THE ONLY IMPORT IN THIS FILE IS A TYPE, AND IT HAS TO STAY THAT WAY. Node strips it before
+// resolution, so the module still loads on its own: test/invoicesweb.test.mjs stages this file
+// alone in a temp directory to put the REAL chaser voice on the bench, and test/numbers.test.mjs
+// sweeps every answer it renders. A value import would break both. See deadlineAnswer below for
+// why the mandation DECISION stays in lib/taxengine.ts while the type comes here.
+import type { MtdPosition } from './taxengine';
+
 // --- Amounts ----------------------------------------------------------------
 // Accepts "£1,200.50", "1200", "£1.2k", "2k". Rejects zero, negatives and
 // anything over a million (fat finger guard).
@@ -402,23 +409,162 @@ export function isDeadlineQuestion(body: string): boolean {
   return /\b(tax|return|quarter|quarterly|update|mtd|self assessment|file|filing|submit|payment on account)\b/.test(b);
 }
 
-// The MTD quarterly update deadlines: 7 Aug, 7 Nov, 7 Feb, 7 May. Returns the
-// next one after `now` plus the standard Self Assessment date, as reply text.
-export function deadlineAnswer(now: Date = new Date()): string {
-  const y = now.getFullYear();
-  const candidates = [
-    new Date(Date.UTC(y, 1, 7)), // 7 Feb
-    new Date(Date.UTC(y, 4, 7)), // 7 May
-    new Date(Date.UTC(y, 7, 7)), // 7 Aug
-    new Date(Date.UTC(y, 10, 7)), // 7 Nov
-    new Date(Date.UTC(y + 1, 1, 7)),
-  ];
-  const next = candidates.find((d) => d.getTime() > now.getTime()) ?? candidates[candidates.length - 1];
-  const nextStr = next.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/London' });
-  return [
-    `Your next quarterly update is due by ${nextStr}. The quarterly dates are 7 August, 7 November, 7 February and 7 May.`,
-    'Keep sending me your receipts and income as you go and the summary prepares itself. You approve everything before anything is sent to HMRC.',
-  ].join('\n\n');
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHO IS ASKING, BECAUSE THIS FUNCTION USED TO ANSWER EVERYONE THE SAME WAY AND IT WAS WRONG.
+//
+// Until 7 August 2026 deadlineAnswer() took a clock and nothing else. Whoever asked "when is my
+// tax due", it replied "Your next quarterly update is due by 7 November 2026". That sentence is a
+// claim about the man, not about the rule, and this module held no fact about the man at all, so:
+//
+//   . a LIMITED COMPANY DIRECTOR was handed a quarterly update deadline for a return his company
+//     does not file, which is wave nine's own defect arriving by WhatsApp,
+//   . a PARTNER was handed one for a regime GOV.UK has announced no date for,
+//   . a SOLE TRADER HMRC HAS NEVER WRITTEN TO was handed one for an update he does not have to
+//     make, and isDeadlineQuestion() also matches "when is my tax due" and "when do I have to
+//     file", so a plain Self Assessment question was answered with a quarterly deadline first.
+//
+// ⚠️ THE DOCTRINE, WHICH EVERY BRANCH BELOW OBEYS. HMRC decides Making Tax Digital from a Self
+// Assessment return ALREADY FILED and writes to the people it has assessed. We hold this year's
+// running figures, which is a PROXY and never the test. So this module states a quarterly deadline
+// as HIS only when HE has told us the letter came (stated_in, which mtdPosition() makes reachable
+// from his answer alone and never from arithmetic). Everywhere else it names the date CONDITIONALLY
+// and asks him, the way lib/weeklyupdate.ts words a surface that cannot know and lib/agent.ts's
+// mtd signals ask rather than conclude.
+//
+// ⚠️ THE POSITION IS COMPUTED BY THE CALLER, NOT HERE, AND THAT IS NOT LAZINESS. This module is
+// pure and import free (test/invoicesweb.test.mjs stages it alone to put the real voice on the
+// bench, and test/numbers.test.mjs sweeps it for dashes), so it cannot reach mtdPosition() at
+// runtime. Re-deriving the threshold test here would be a SECOND COPY of the one rule, which is
+// the failure lib/quarterpack.ts already removed once. The type comes across, the decision does
+// not.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export interface DeadlineAsker {
+  // What his business IS, from getBusinessProfile()/getOptimiserInput(). A director and a partner
+  // are both outside Making Tax Digital for Income Tax, for two different reasons, and one
+  // sentence cannot serve both. null means we do not know, which is answered as unknown.
+  structure: 'sole_trader' | 'partnership' | 'limited_company' | null;
+  // Where he stands, from mtdPosition() in lib/taxengine.ts, which is the ONE definition.
+  //
+  // ⚠️ REQUIRED, NOT OPTIONAL WITH A FALLBACK, for the reason MtdPositionInput.stated gives: an
+  // optional field keeps the old behaviour alive for every caller that did not get the memo, and
+  // the old behaviour here is the bug. Required means tsc names every call site.
+  //
+  // ⚠️ null IS A REAL VALUE AND MEANS "THIS CALLER COULD NOT WORK IT OUT". It is never a no, and
+  // it is never a yes. app/api/thread/route.ts passes null on purpose: test/thread.test.mjs pins
+  // that nothing from the circumstances chain may reach the chat (article 9), so that route cannot
+  // read whether HMRC's letter came and must not pretend to.
+  mtdPosition: MtdPosition | null;
+}
+
+const DEADLINE_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+// "2026-08-07" as a man writes it. ISO in, prose out, no second calendar.
+function prettyDay(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} ${DEADLINE_MONTHS[m - 1]} ${y}`;
+}
+
+// The day it is where he is standing. ISO day strings compare correctly with < and >, which is how
+// app/app/tax/due.ts does its own bounds checks, and comparing DAYS rather than instants is the
+// whole point: see nextQuarterlyDeadline below.
+function londonDay(now: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now);
+}
+
+// ⚠️ THE DEADLINE DUE TODAY IS STILL DUE TODAY. The old code compared instants with `>`, so from
+// midnight on 7 August 2026 it skipped straight to 7 November and told a man his update was three
+// months away on the morning it was due. app/app/tax/due.ts's outstandingUpdate() correctly
+// reports it still open on the day (`todayIso > dueISO`), and app/free-mtd-filing compares whole
+// days for the same stated reason: a man reading it on the morning of 7 August is not late yet.
+// Two surfaces, one fact, two answers. This one now agrees with those.
+function nextQuarterlyDeadline(todayIso: string): string {
+  const y = Number(todayIso.slice(0, 4));
+  const dates = [`${y}-02-07`, `${y}-05-07`, `${y}-08-07`, `${y}-11-07`, `${y + 1}-02-07`];
+  return dates.find((d) => d >= todayIso) ?? dates[dates.length - 1];
+}
+
+// The next 31 January, which is when a Self Assessment return (or a Making Tax Digital final
+// declaration) is due online. Same whole day rule: on 31 January itself it is today.
+function nextJanuaryDeadline(todayIso: string): string {
+  const y = Number(todayIso.slice(0, 4));
+  return todayIso <= `${y}-01-31` ? `${y}-01-31` : `${y + 1}-01-31`;
+}
+
+export function deadlineAnswer(now: Date, asker: DeadlineAsker): string {
+  const todayIso = londonDay(now);
+  const update = prettyDay(nextQuarterlyDeadline(todayIso));
+  const january = prettyDay(nextJanuaryDeadline(todayIso));
+  // A caller that hands us nothing knows nothing, so it gets the answer for a man we cannot
+  // place. The types are required above; this is the runtime floor under a bad call, and it lands
+  // on the honest branch rather than on the old confident one.
+  const structure = asker?.structure ?? null;
+  const position = asker?.mtdPosition ?? null;
+
+  const readyLine = 'Keep sending me your receipts and income as you go. You approve everything before anything goes to HMRC.';
+  // The conditional pair, true for every reader without this module ever learning his answer.
+  // lib/weeklyupdate.ts's shape, and its opening six words are load bearing: delete them and the
+  // sentence becomes a claim we have no standing to make.
+  const ifWritten = `Your Self Assessment return is due online by ${january}. If HMRC has written to tell you Making Tax Digital applies to you, your next quarterly update is due by ${update}, and the four dates each year are 7 August, 7 November, 7 February and 7 May.`;
+  const hmrcDecides = 'HMRC decides it from a tax return you have already filed, not from this year, and writes to you to say so. Has that letter come?';
+
+  if (structure === 'limited_company') {
+    return [
+      `Your company files its own return, so there is no quarterly update here for you to make. Making Tax Digital for Income Tax covers self employment and rent on a personal return, and a company's trade is neither.`,
+      `If you file a Self Assessment return of your own, that one is due online by ${january}. Your company's Corporation Tax runs on its own dates, counted from your accounting year end.`,
+      'Keep sending me what you spend and what you take and your figures stay ready. Nothing goes to HMRC unless you approve it first.',
+    ].join('\n\n');
+  }
+
+  if (structure === 'partnership') {
+    return [
+      'Making Tax Digital for Income Tax has not reached partnerships yet. GOV.UK says it will in the future and that the timeline comes at a later date, so there is nothing quarterly for you to send and no date to keep.',
+      `Your share goes on your own Self Assessment return, due online by ${january}, and the partnership files its own alongside it.`,
+      'Keep sending me what you spend and what you take and your figures stay ready. Nothing goes to HMRC unless you approve it first.',
+    ].join('\n\n');
+  }
+
+  if (position === 'stated_in') {
+    return [
+      `You have told me HMRC has confirmed you for Making Tax Digital, so your next quarterly update is due by ${update}. The four dates each year are 7 August, 7 November, 7 February and 7 May. Your final declaration for the year is due online by ${january}.`,
+      'Keep sending me your receipts and income as you go and the update prepares itself. You approve everything before anything goes to HMRC.',
+    ].join('\n\n');
+  }
+
+  if (position === 'stated_out') {
+    return [
+      `You have told me HMRC has not confirmed you for Making Tax Digital, so there is nothing quarterly for you to send. Your Self Assessment return is due online by ${january}.`,
+      'HMRC decides it from a tax return you have already filed, not from this year, and writes to you to say so. If that letter has come since you told me, say so and I will change it.',
+      'Keep sending me your receipts and income as you go and the return prepares itself. You approve everything before anything goes to HMRC.',
+    ].join('\n\n');
+  }
+
+  // ⚠️ BOTH UNSTATED BRANCHES ASK, AND NEITHER GIVES AN ALL CLEAR. Over the line is not the test,
+  // and under the line does not settle it either: the man whose 2024/25 was big and whose deadlines
+  // are passing now is sitting in unstated_under, which is why that branch names the same date.
+  if (position === 'unstated_over') {
+    return [
+      `Your figures so far this year are over the Making Tax Digital line, and that is not the test, so I am not going to call it for you. ${hmrcDecides}`,
+      ifWritten,
+      readyLine,
+    ].join('\n\n');
+  }
+
+  if (position === 'unstated_under') {
+    return [
+      `Your figures so far this year are under the Making Tax Digital line, and that does not settle it either way. ${hmrcDecides}`,
+      ifWritten,
+      readyLine,
+    ].join('\n\n');
+  }
+
+  // We could not place him, or he is excluded for a reason we were not told. Name both dates,
+  // claim neither as his, and ask.
+  return [ifWritten, hmrcDecides, readyLine].join('\n\n');
 }
 
 // --- Balance and totals questions ---------------------------------------------------

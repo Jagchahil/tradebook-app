@@ -70,7 +70,7 @@ const steps = [
     tip: 'With Lekhio, your income and expense totals are already added up and split by category.',
   },
   {
-    n: '3', key: 'login', tint: GREEN_TINT, fg: GREEN,
+    n: '3', key: 'login', tint: GREEN_TINT, fg: ON_GREEN_TINT,
     title: 'Log in and open the return',
     lead: 'Everything happens on the official HMRC website.',
     does: [
@@ -106,7 +106,7 @@ const steps = [
     tip: 'Class 2 NI changed recently. Most people no longer pay it separately but still build their state pension.',
   },
   {
-    n: '6', key: 'submit', tint: GREEN_TINT, fg: GREEN,
+    n: '6', key: 'submit', tint: GREEN_TINT, fg: ON_GREEN_TINT,
     title: 'Check, submit, save the proof',
     lead: 'Slow down here for one minute.',
     does: [
@@ -220,7 +220,10 @@ const faqs = [
   { q: 'What if I miss the deadline?', a: missedDeadlineAnswer() },
   { q: 'I am in construction and tax is taken off my pay. What then?', a: 'That is the Construction Industry Scheme, CIS. Contractors deduct tax from your pay at source. You still file a return, and that deducted tax comes off your final bill or is refunded to you. Keep your CIS statements.' },
   { q: 'Can I claim my van and fuel?', a: 'Yes. Either claim a share of your actual running costs, or use the flat mileage rate. For the 2026/27 tax year that rate is 55p a mile for the first 10,000 business miles, then 25p after that. HMRC raised it from 45p to 55p from 6 April 2026.' },
-  { q: 'What is Making Tax Digital and does it affect me?', a: 'It is the biggest change to Self Assessment in years. From April 2026, if your turnover is over £50,000 you must keep digital records and send four short updates a year instead of one return. It reaches £30,000 turnover in 2027 and £20,000 in 2028, so it is coming for nearly everyone. Lekhio keeps the digital records both routes now expect.' },
+  // 🔴 THE SAME THREE FAULTS AS THE BRANCH PANEL, TWO SCREENS FURTHER DOWN. "Turnover" is not the
+  // test (qualifying income is trade plus gross rent), and "you must" is HMRC's call off a return
+  // already filed, never ours off a current year figure. One fact, one voice.
+  { q: 'What is Making Tax Digital and does it affect me?', a: 'It is the biggest change to Self Assessment in years. HMRC decides who is in it from a tax return you have already filed, not from the year you are in, and writes to you to say so. April 2026 was decided by your 2024 to 2025 return, and the line is more than £50,000 of qualifying income, which is your trade plus any gross rent added together. Once that letter has come you keep digital records and send four short updates a year instead of one return. The line falls to £30,000 for 2027 and £20,000 for 2028, so it is coming for nearly everyone. Lekhio keeps the digital records both routes now expect.' },
 ];
 
 // Build the CSS that powers the trade selector and the route branch, no JavaScript needed.
@@ -443,25 +446,52 @@ export default function FileYourTaxReturnPage() {
       <section style={{ maxWidth: 820, margin: '0 auto', padding: '34px 24px' }}>
         <h2 style={{ fontSize: 24, fontWeight: 700, textAlign: 'center', margin: '0 0 6px' }}>First, which applies to you?</h2>
         <p style={{ fontSize: 16, color: MUTED, textAlign: 'center', maxWidth: 560, margin: '0 auto 22px' }}>
-          The way you file depends on your turnover, the total you take before expenses.
+          The way you file depends on your qualifying income: your turnover plus any gross rent, added together, before a single expense comes off. It is not your profit, which is the number most people reach for.
         </p>
         <div style={{ position: 'relative' }}>
           <input type="radio" name="route" id="route-under" className="vh" defaultChecked />
           <input type="radio" name="route" id="route-over" className="vh" />
           <div className="branch-tabs" style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 18, flexWrap: 'wrap' }}>
-            <label htmlFor="route-under" className="branch-tab">Under £50k turnover</label>
-            <label htmlFor="route-over" className="branch-tab">£50k or more</label>
+            <label htmlFor="route-under" className="branch-tab">£50,000 or under</label>
+            <label htmlFor="route-over" className="branch-tab">Over £50,000</label>
           </div>
           <div className="branch-panel panel-under" style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: 24 }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 18, color: RIVER_DEEP }}>You file the normal Self Assessment return, once a year</h3>
             <p style={{ margin: 0, color: MUTED, fontSize: 15.5, lineHeight: 1.6 }}>
               This is most sole traders today. One return, due online by 31 January, covering the tax year that ran 6 April to 5 April. Follow the seven steps below and you are done. Keep your records tidy through the year and it is quick.
             </p>
+            {/*
+              🔴 THE SILENT FAILURE THIS PANEL USED TO BE. It told a man under the line that he
+              files one return a year, full stop, and said nothing about the letter. HMRC decides
+              Making Tax Digital from a return ALREADY FILED, so the year he is standing in does not
+              settle it: a man whose 2024 to 2025 was big and whose trade is quiet now is on the
+              quarterly route with deadlines passing, reading a page that told him he was fine.
+            */}
+            <p style={{ margin: '10px 0 0', color: MUTED, fontSize: 15.5, lineHeight: 1.6 }}>
+              A quiet year does not settle it on its own. HMRC decides Making Tax Digital from a tax return you have already filed, not from the year you are in, and writes to you to say so. April 2026 was decided by your 2024 to 2025 return. If that letter has come, you are on the quarterly route however this year is going.
+            </p>
           </div>
           <div className="branch-panel panel-over" style={{ background: 'var(--panel)', border: `1px solid ${LINE}`, borderRadius: 16, padding: 24 }}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 18, color: RIVER_DEEP }}>From April 2026 you use Making Tax Digital</h3>
+            {/*
+              🔴 THREE FAULTS FIXED HERE ON 7 AUGUST 2026, ALL OF THEM ON A FREE PUBLIC GUIDE.
+              1. It said fifty thousand "or more", spelled with the figure. The statutory test is
+                 MORE THAN £50,000, which is what
+                 mtdForIncomeTaxRequired() does with a strict `>`, and app/how-mtd-works carries the
+                 same note. A man on exactly £50,000 was told he had to send quarterly updates.
+              2. "your turnover". The test is QUALIFYING INCOME, trade plus gross rent, added
+                 together. A man with £30k of trade and £25k of rent read "turnover" and concluded
+                 he was out. lib/agent.ts carries a whole signal for that exact trap.
+              3. "From April 2026 you use Making Tax Digital" and "you must", stated off a current
+                 year figure. HMRC decides it from a return already filed and writes to you. We
+                 have no standing to state the conclusion, so the panel names the test and the
+                 letter instead.
+            */}
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, color: RIVER_DEEP }}>From April 2026, Making Tax Digital, once HMRC writes to you</h3>
             <p style={{ margin: '0 0 10px', color: MUTED, fontSize: 15.5, lineHeight: 1.6 }}>
-              If your turnover is £50,000 or more, you must keep digital records and send four short quarterly updates plus a final declaration, instead of one return. The first quarter, 6 April to 5 July 2026, is due by 7 August 2026.
+              HMRC decides this from a tax return you have already filed, not from the year you are in, and writes to you to say so. April 2026 was decided by your 2024 to 2025 return, and the line is more than £50,000 of qualifying income. Exactly £50,000 is under it.
+            </p>
+            <p style={{ margin: '0 0 10px', color: MUTED, fontSize: 15.5, lineHeight: 1.6 }}>
+              Once that letter has come, you keep digital records and send four short quarterly updates plus a final declaration, instead of one return. The first quarter, 6 April to 5 July 2026, is due by 7 August 2026.
             </p>
             <p style={{ margin: 0, color: MUTED, fontSize: 15.5, lineHeight: 1.6 }}>
               This is exactly what Lekhio is built for. It keeps the digital records and prepares each update, so the change is no extra work for you. The seven steps below still help you understand the whole picture.
@@ -589,7 +619,7 @@ export default function FileYourTaxReturnPage() {
         <div style={{ maxWidth: 760, margin: '0 auto', padding: '54px 24px', textAlign: 'center' }}>
           <h2 style={{ fontSize: 25, fontWeight: 700, margin: '0 0 14px' }}>The once a year return is changing</h2>
           <p style={{ fontSize: 16.5, color: '#CFE0F2', lineHeight: 1.65, margin: '0 0 14px' }}>
-            Making Tax Digital is the biggest shake up to Self Assessment in years. From April 2026, if you turn over more than £50,000 you keep digital records and send four short updates a year instead of one return. It reaches £30,000 in 2027 and £20,000 in 2028, so it is coming for nearly every sole trader.
+            Making Tax Digital is the biggest shake up to Self Assessment in years. From April 2026, once HMRC has written to tell you it applies to you, you keep digital records and send four short updates a year instead of one return. HMRC decides that from a tax return you have already filed, and the line is more than £50,000 of qualifying income, your trade plus any gross rent. It falls to £30,000 for 2027 and £20,000 for 2028, so it is coming for nearly every sole trader.
           </p>
           <p style={{ fontSize: 16.5, color: '#fff', lineHeight: 1.65, margin: 0 }}>
             You do not need to panic. If your records build themselves as you go, the quarterly bit is already done. That is the whole point of Lekhio.

@@ -171,7 +171,23 @@ export default async function VatPage() {
         <section className="lek-card">
           <h1 className="lek-h2">VAT</h1>
           {notes.map((n) => <p key={n} style={S.body}>{n}</p>)}
-          {overThreshold ? (
+          {/* 🔴 AND THE FAILED READ SAYS SO, WHICH ON THIS ARM IT DID NOT. 9 August 2026.
+              getOutputVat returns null when the READ failed, and this branch only ever asked
+              `overThreshold`, which is false for a null. So a man over the threshold whose read
+              failed was shown NOTHING AT ALL and told nothing: no figure, and no reason there is
+              no figure. The registered arm two branches down has said "We could not read your
+              invoices just now" since it was written, and the block at the top of this file states
+              the rule in the page's own words: on a failed read this screen shows him nothing AND
+              SAYS WHY. This arm was the one place that did the first half only.
+
+              It matters more here than anywhere else on the page: registering late is a penalty,
+              and silence reads exactly like being safely under the line. */}
+          {year === null ? (
+            <p style={S.empty}>
+              We could not read your invoices just now, so there is no turnover figure here rather
+              than a figure with a hole in it. Give it a moment and load the page again.
+            </p>
+          ) : overThreshold ? (
             <p style={S.warn}>
               The invoices you have raised in the last twelve months come to {gbp0(yearTurnover)},
               which is over the {gbp0(VAT_REGISTRATION_THRESHOLD)} line. Registering becomes

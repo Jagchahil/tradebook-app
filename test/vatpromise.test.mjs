@@ -195,6 +195,28 @@ ok('🔴 AND /app/setup STILL LISTS THE PROMISE ONLY FOR A QUESTION HE ANSWERED 
   setupSaid && setupOpened && setupDraws
   && /\{opened\.map\(\(c\) => \(/.test(setupPage));
 
+// ── /app/tax/vat's unregistered arm: a failed read says so, like every other arm on the page. ─
+// ⚠️ THE MARKERS ARE PROVED PRESENT BEFORE ANYTHING IS ASSERTED ABOUT THEM, and the registered
+// arm is asserted alongside, because "the page says why" passing on a page that says why in only
+// one of its branches is exactly the defect this closes.
+const taxVat = readFileSync(path.join(root, 'app/app/tax/vat/page.tsx'), 'utf8');
+ok('the VAT screen still has the unregistered arm and the registered failed read arm',
+  /!profile\.registered \? \(/.test(taxVat)
+  && /We could not read \{out === null \? 'your invoices' : 'what you have confirmed'\} just now\./.test(taxVat));
+ok('🔴 A FAILED TURNOVER READ IS SAID OUT LOUD, not left as an empty screen a man reads as safe',
+  /\{year === null \? \(/.test(taxVat)
+  && /We could not read your invoices just now, so there is no turnover figure here/.test(taxVat));
+// ⚠️ BOTH MARKERS PROVED PRESENT BEFORE THE ORDER IS ASSERTED. indexOf returns -1 for a marker
+// that is not there, and -1 is less than everything, so `a < b` on a missing `a` passes for free.
+const iNull = taxVat.indexOf('{year === null ? (');
+const iOver = taxVat.indexOf(') : overThreshold ? (');
+ok('both arms of the unregistered ternary exist, so the order below can actually fail',
+  iNull >= 0 && iOver >= 0);
+ok('🔴 AND THE FAILED READ IS CHECKED FIRST, because a null is falsy and falsy reads as "under"',
+  iNull >= 0 && iOver >= 0 && iNull < iOver);
+ok('the warning still discloses what it counted, which is the only one of the three channels that does',
+  /This\s+counts only what you have invoiced here/.test(taxVat));
+
 // ── House rules. ─────────────────────────────────────────────────────────────────────────────
 ok('no en dash or em dash in the replacement or in the new page logic',
   !/[–—]/.test(vat?.untrueOn?.instead ?? '')

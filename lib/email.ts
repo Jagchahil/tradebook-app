@@ -114,8 +114,10 @@ function shell(inner: string, opts: { preheader?: string; unsubscribeLink?: stri
 // things and there is no fourth, because send() takes this union and nothing else. A bare string
 // does not compile.
 //
-//   repeats   He can get another one. The subject carries a MARK that changes every time: the day,
-//             an invoice number, the code itself. Two of them can never land in one thread.
+//   repeats   He can get another one. The subject carries a MARK that changes every time: the
+//             moment it was sent, an invoice number, the code itself. Two of them can never land in
+//             one thread. SUBJECT_MARKS says which mark each key uses and argues for it, because a
+//             mark that only changes once a day is a fixed subject for the next twenty four hours.
 //   once      One per customer for life, so there is never a second one to collapse it with. The
 //             reason lives in ONCE_PER_CUSTOMER and it IS the exemption. When the reason stops
 //             being true the email moves to `repeats`.
@@ -125,7 +127,9 @@ function shell(inner: string, opts: { preheader?: string; unsubscribeLink?: stri
 //
 // ⚠️ test/subjectrule.test.mjs calls every repeating subject twice with two different marks and
 // goes RED when the two come back the same, so an email added in six months cannot get this wrong
-// by default. It either carries a mark or the build stops.
+// by default. It either carries a mark or the build stops. It then does it AGAIN with two marks
+// that differ only by the time of day inside ONE calendar day, which is the 9 August defect, and
+// the only way past that assertion is a written exemption in SAME_DAY_EXEMPT.
 //
 // ⚠️ AND THE MARK IS NEVER MONEY HE EARNED. A subject line is readable on a locked phone lying face
 // up on a dashboard, with a customer or a mate in the passenger seat. "£4,120 in this week" is his
@@ -135,9 +139,65 @@ function shell(inner: string, opts: { preheader?: string; unsubscribeLink?: stri
 
 // The day a repeating email is about, in the form a man in Britain reads it. Never an ISO string.
 // Same rule and same timezone as humanDate() in lib/trialnudge.ts.
+//
+// ⚠️ THIS IS A DAY AND NOTHING SMALLER, so it is CONSTANT FOR TWENTY FOUR HOURS. Two emails sent on
+// one day carry the same mark and therefore the same subject. That is fine for an email a man can
+// only get once a day and it is a bug for every other one, so a key using this must argue for it in
+// SAME_DAY_EXEMPT below. Everything else takes subjectMoment().
 export function subjectDay(when: Date = new Date()): string {
   const d = when instanceof Date && !Number.isNaN(when.getTime()) ? when : new Date();
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'Europe/London' });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 9 AUGUST 2026. THE SAME DAY COLLISION, SEEN IN A REAL GMAIL INBOX.
+//
+// Two lead confirm emails went to ONE address FIFTY THREE SECONDS apart, because a man ran two of
+// the free calculators one after the other. Both subjects were the byte identical string
+// "Confirm your email to get your result, 9 August", and Gmail put them in ONE conversation, id
+// 19fe3c19bd3f15ce, headed by the OLDER of the two. The Gmail search returned them as a single
+// result, not two.
+//
+// 8f0e640 killed the FIXED subject. It did not kill this. Day and month, with no year and no clock,
+// is the same string for twenty four hours, and FIVE of the eight repeating subjects were using it.
+//
+// It has not cost anybody anything YET, and only by luck: each confirm carries its own signed token
+// and every one lasts seven days (LEAD_CONFIRM_TTL_SECONDS in lib/leadtoken.ts), so the older link
+// he taps still works. The day a link becomes single use, or expires in an hour, the message on top
+// of that thread is a dead link and it is the only one he can see.
+//
+// So the mark for an email he can get twice in a day is the day AND the time of day.
+//
+// ⚠️ WHY A CLOCK AND NOT A RANDOM STRING. The rule this file already keeps is that the DATE goes in
+// the subject and MONEY never does, because a subject line is read on a locked phone by a man on a
+// ladder with a customer beside him. A random tag on the end would thread correctly and tell him
+// nothing. The time he was sent it is honest, it is readable, it is naturally different on every
+// send, and it answers the only question two near identical emails raise: which one is the new one.
+//
+// ⚠️ AND IT IS SECONDS, NOT MINUTES, ON PURPOSE. Fifty three seconds apart falls inside ONE minute
+// roughly one time in nine, and a double tap on a submit button falls inside one minute every time.
+// A mark that is nearly always unique is the same class of defect as a mark that is never unique.
+// It only waits longer to be seen, and this one has now been shipped twice.
+//
+// ⚠️ IT IS STILL NOT MONEY, AND IT NEVER BECOMES MONEY. See the subject rule above.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function subjectMoment(when: Date = new Date()): string {
+  const d = when instanceof Date && !Number.isNaN(when.getTime()) ? when : new Date();
+  // hourCycle h23 rather than hour12, so midnight is 00 on every ICU build and never 24, and the
+  // am/pm a person reads is composed here rather than left to a locale that may write "pm", "p.m."
+  // or a narrow no break space depending on which ICU the runtime was built with.
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+    timeZone: 'Europe/London',
+  }).formatToParts(d);
+  const part = (type: string) => parts.find((x) => x.type === type)?.value ?? '00';
+  const h24 = Number(part('hour'));
+  const clock = h24 < 12 ? 'am' : 'pm';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${subjectDay(d)} at ${h12}:${part('minute')}:${part('second')}${clock}`;
 }
 
 // The Sunday the weekly summary is ABOUT, which is not the day it is sent.
@@ -193,8 +253,85 @@ export const REPEATING_SUBJECTS: Record<RepeatKey, (mark: string) => string> = {
   'lead-result': (mark) => `Your result from Lekhio, ${mark}`,
 
   // A double submit. supabase/APPLY_2026-08-08_waitlist_unique.sql stops the second row. This stops
-  // a second email hiding underneath the first.
+  // a second email hiding underneath the first, and a double submit is SECONDS apart, which is why
+  // the mark here is a moment and not a day.
   waitlist: (mark) => `You are on the Lekhio list, ${mark}`,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHERE EACH REPEATING SUBJECT GETS ITS MARK, AND WHY. ONE DECISION PER KEY, NOT ONE RULE.
+//
+// The eight do not repeat at the same speed. Two sign in codes arrive a minute apart; two renewal
+// receipts arrive a month apart. A blanket "put the clock on everything" would put a timestamp on a
+// receipt that reads better with a plain date, and a blanket "put the day on everything" is the
+// defect of 9 August. So every key declares what its mark is made of and argues for it here.
+//
+// ⚠️ THE RECORD IS OVER RepeatKey, so tsc refuses a ninth email that does not make this decision,
+// and test/subjectrule.test.mjs holds these keys to the SAME SET as REPEATING_SUBJECTS by equality,
+// so it cannot be satisfied by adding a key here and forgetting one there.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export type MarkSource =
+  // subjectMoment(): the day and the time of day. Two sends one second apart are two threads.
+  | 'moment'
+  // subjectDay(): the calendar day only, so two sends in one day COLLIDE. A key using this MUST
+  // appear in SAME_DAY_EXEMPT with the argument for why that is acceptable.
+  | 'day'
+  // weekEndingDay(): the Sunday the week ended on. Same collision, same requirement.
+  | 'week'
+  // Something the caller already holds that differs on every send: an invoice number, a sign in
+  // code. The uniqueness is real but it is not ours, so it is named rather than assumed.
+  | 'caller';
+
+export const SUBJECT_MARKS: Record<RepeatKey, { source: MarkSource; why: string }> = {
+  invoice: {
+    source: 'caller',
+    why: 'The invoice number, plus the trader name when there is one. A tradesman does not send one customer two invoices under one number, and if he does that is a numbering problem in his books long before it is a threading problem in Gmail.',
+  },
+  'signup-code': {
+    source: 'caller',
+    why: 'The six digit code itself, minted fresh by /api/signup/code on every request and expiring in ten minutes. It is also the thing he opened the email for, so it belongs at the front of the subject whether it threads or not.',
+  },
+  'weekly-ready': {
+    source: 'week',
+    why: 'The Sunday the week ended on. One per week by construction, so see SAME_DAY_EXEMPT for the same day argument.',
+  },
+  'payment-ok': {
+    source: 'day',
+    why: 'The day the payment was taken. One per invoice per billing cycle, so see SAME_DAY_EXEMPT for the same day argument.',
+  },
+  'payment-fail': {
+    source: 'moment',
+    why: 'A same day repeat is REAL and it is the common one: he reads the first email, taps Update payment, puts in a second card that also fails, and Stripe raises invoice.payment_failed again within the minute. That second email is the one carrying the live call to action, and if it files itself under the first he sees a message he has already dealt with and stops. Stripe smart retries can also land twice inside twenty four hours.',
+  },
+  'lead-confirm': {
+    source: 'moment',
+    why: 'THE ONE OBSERVED IN THE INBOX ON 9 AUGUST 2026: two confirms 53 seconds apart, one thread, headed by the older message. Running two calculators back to back is exactly what the free tools are built to invite, each confirm is a separate signed token, and the link he can see is the older one. It works today only because the window is seven days.',
+  },
+  'lead-result': {
+    source: 'moment',
+    why: 'It follows lead-confirm, so it inherits its shape: confirm two tools in one afternoon and two results land the same day. This one is worse than a hidden receipt because the body IS his figures. A man reading the wrong tool answer under the newer heading acts on a number that was never his.',
+  },
+  waitlist: {
+    source: 'moment',
+    why: 'The email this key exists to protect is the second half of a DOUBLE SUBMIT, which is a second or two apart and therefore always the same calendar day. A day mark did nothing whatsoever for the case its own comment claimed to cover.',
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE KEYS THAT ARE ALLOWED TO COLLIDE WITHIN ONE DAY, AND THE ARGUMENT FOR EACH.
+//
+// Same shape and same discipline as ONCE_PER_CUSTOMER: the value IS the exemption. A key whose mark
+// cannot change inside a day is either on this list with a reason a person can disagree with, or it
+// is a bug. test/subjectrule.test.mjs derives this set from SUBJECT_MARKS and holds it to this one
+// by equality, so an exemption can never be taken by silently leaving a key out.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export type SameDayExemptKey = Extract<RepeatKey, 'payment-ok' | 'weekly-ready'>;
+
+export const SAME_DAY_EXEMPT: Record<SameDayExemptKey, string> = {
+  'payment-ok':
+    'Stripe raises invoice.payment_succeeded once per invoice, and Lekhio bills one subscription on one cycle, so a second receipt in one calendar day needs a second subscription. And if two ever did land in one thread, nothing is lost: a receipt asks him for nothing, carries no link that expires, and the amount lives in the body because a subject line is not allowed to carry it. A plain date reads better on a locked phone than a date and a clock, and a receipt is the one repeating email whose job is to be unremarkable.',
+  'weekly-ready':
+    'The mark is the Sunday the week ended on, not the day it was sent, and /api/cron/daily raises it once a week. Two in one calendar day means the cron fired twice, and the fix for that is the cron, not the subject line. The Sunday is also the only part he wants to read: a time of day would tell him when a machine ran, which says nothing about which week he is looking at.',
 };
 
 export type OnceKey = 'welcome' | 'trial-week' | 'trial-ended';
@@ -419,7 +556,12 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
 // ⚠️ HE CAN GET TWO. A double tap on the join button used to make two rows and two of these, and
 // the second one landed underneath the first with the first one's date on it, so the only signal
 // that his second attempt worked was invisible. supabase/APPLY_2026-08-08_waitlist_unique.sql stops
-// the second row; the day in the subject stops the second email hiding.
+// the second row; the moment in the subject stops the second email hiding.
+//
+// 🔴 AND IT USED TO BE subjectDay(), WHICH DID NOT COVER THIS AT ALL. A double tap is a second or
+// two apart, so both emails carried the identical day and collapsed into one thread anyway. The
+// comment claimed a fix the mark could not deliver. It is subjectMoment() now, and it is the case
+// this email exists for.
 export async function sendWaitlistWelcomeEmail(to: string, name?: string | null, when: Date = new Date()): Promise<boolean> {
   const hi = name ? `You're on the list, ${esc(name)}.` : "You're on the list.";
   const inner = `
@@ -431,7 +573,7 @@ export async function sendWaitlistWelcomeEmail(to: string, name?: string | null,
     ${pMuted('If you didn’t sign up, just reply and we’ll take you off.')}`;
   return send({
     to,
-    subject: { repeats: 'waitlist', mark: subjectDay(when) },
+    subject: { repeats: 'waitlist', mark: subjectMoment(when) },
     html: shell(inner, { preheader: "We'll let you in soon, here's what's coming." }),
     tag: 'waitlist',
   });
@@ -543,6 +685,11 @@ export async function sendWeeklyReadyEmail(to: string, now: Date = new Date()): 
 // ⚠️ HE CAN USE A FREE TOOL AGAIN. Two of these a month apart used to collapse into one thread, and
 // the one he could see was the OLDER one, whose link is the one that has now expired. See
 // LEAD_CONFIRM_TTL_SECONDS in lib/leadtoken.ts.
+//
+// 🔴 AND ON 9 AUGUST 2026 IT TURNED OUT NOT TO BE A MONTH APART. Two of these went to one address
+// 53 SECONDS apart, both reading "Confirm your email to get your result, 9 August", and Gmail put
+// them in one conversation, id 19fe3c19bd3f15ce, headed by the older one. Two calculators back to
+// back is a normal afternoon, not an edge case. The mark is subjectMoment() now.
 export async function sendLeadConfirmEmail(
   to: string,
   confirmLink: string,
@@ -556,13 +703,18 @@ export async function sendLeadConfirmEmail(
     ${pMuted('This link works for a week. After that, run the tool again and we will send you a fresh one.')}
     ${pMuted('If you didn’t request this, ignore this email and nothing will happen.')}`;
   return send({
-    to, subject: { repeats: 'lead-confirm', mark: subjectDay(when) },
+    to, subject: { repeats: 'lead-confirm', mark: subjectMoment(when) },
     html: shell(inner, { preheader: 'One tap and your result is on its way.', unsubscribeLink }),
     listUnsub: unsubscribeLink, tag: 'lead-confirm',
   });
 }
 
 // --- consent engine: the result we promised (fires on confirm) ------------
+//
+// ⚠️ IT INHERITS lead-confirm's SHAPE. Confirm two tools in one afternoon and two of these land the
+// same day. This one is worse than a duplicate receipt, because the body IS his figures: reading
+// the wrong tool's answer under a heading that looks like the new one is acting on a number that
+// was never his. subjectMoment(), for the same reason and by the same argument.
 export async function sendLeadResultEmail(
   to: string,
   resultNote: string,
@@ -577,7 +729,7 @@ export async function sendLeadResultEmail(
     ${p('These are estimates to give you the shape of it. The number that really moves is your expenses: every business cost you claim comes off your tax, and most people lose hundreds because a receipt goes missing. That is the whole job Lekhio does, from a text, all year.')}
     ${button(APP, 'Start free, no card')}`;
   return send({
-    to, subject: { repeats: 'lead-result', mark: subjectDay(when) },
+    to, subject: { repeats: 'lead-result', mark: subjectMoment(when) },
     html: shell(inner, { preheader: 'The figures you worked out, saved for you.', unsubscribeLink }),
     listUnsub: unsubscribeLink, tag: 'result',
   });
@@ -592,6 +744,8 @@ export interface PaymentEmail {
   // The day this payment was taken. Defaults to now, which is when the Stripe webhook fires.
   // ⚠️ IT IS THE MARK THAT KEEPS EVERY RENEWAL OUT OF ONE THREAD. A man who pays us for two years
   // used to get twenty four of these stacked under the first one, dated the day he joined.
+  // ⚠️ AND IT IS A DAY, NOT A MOMENT, WHICH IS A DECISION AND NOT AN OVERSIGHT. The argument is
+  // written out in SAME_DAY_EXEMPT['payment-ok'] and the ratchet holds it to that list by equality.
   when?: Date;
 }
 
@@ -619,10 +773,15 @@ export interface PaymentFailedEmail {
   to: string;
   amountPence: number;
   updateUrl: string;
-  // The day the attempt failed. Defaults to now.
-  // ⚠️ STRIPE RETRIES THE SAME AMOUNT ON DIFFERENT DAYS, so the amount cannot tell one dunning
-  // email from the next and the day is the only honest mark there is. Four retries used to arrive
-  // as four copies of one thread, and the one he could see was the first, already dealt with.
+  // The moment the attempt failed. Defaults to now.
+  // ⚠️ STRIPE RETRIES THE SAME AMOUNT, so the amount cannot tell one dunning email from the next
+  // and the clock is the only honest mark there is. Four retries used to arrive as four copies of
+  // one thread, and the one he could see was the first, already dealt with.
+  // 🔴 AND THE RETRY IS OFTEN THE SAME DAY, WHICH THE DAY MARK MISSED. He reads the first email,
+  // taps Update payment, enters a second card that also fails, and Stripe raises
+  // invoice.payment_failed again within the minute. That second email carries the live call to
+  // action, so it is the one that must not file itself underneath a message he has already dealt
+  // with. subjectMoment(), and SUBJECT_MARKS['payment-fail'] carries the argument.
   when?: Date;
 }
 
@@ -636,7 +795,7 @@ export async function sendPaymentFailedEmail(opts: PaymentFailedEmail): Promise<
     ${pMuted('If you think this is a mistake, or need a hand, just reply and we’ll help.')}`;
   return send({
     to: opts.to,
-    subject: { repeats: 'payment-fail', mark: subjectDay(opts.when) },
+    subject: { repeats: 'payment-fail', mark: subjectMoment(opts.when) },
     html: shell(inner, { preheader: 'A quick fix and you’re sorted.' }),
     tag: 'payment-fail',
   });

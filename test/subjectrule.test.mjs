@@ -24,6 +24,33 @@
 // is no way to write the bug and stay green, which is the only kind of test worth having for a
 // defect that has now been shipped twice.
 //
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 9 AUGUST 2026. IT WAS SHIPPED A THIRD TIME, AND THE ORIGINAL RATCHET WATCHED IT HAPPEN.
+//
+// Two lead confirm emails reached one real Gmail inbox FIFTY THREE SECONDS apart. Both subjects
+// read "Confirm your email to get your result, 9 August", byte for byte, and Gmail collapsed them
+// into ONE conversation, id 19fe3c19bd3f15ce, headed by the OLDER message. The Gmail search
+// returned the pair as a single result.
+//
+// The suite was green throughout, and it was right to be: it asked whether TWO DIFFERENT MARKS
+// give two different subjects, and they do. What it never asked is whether the mark itself can
+// change twice in one day. subjectDay() is day and month with no year and no clock, so it is a
+// constant for twenty four hours, and FIVE of the eight keys were built on it.
+//
+// So the ratchet has a second half now, and it is the half that would have caught this:
+//
+//     every subject an email can produce TWICE IN ONE DAY must differ between those two sends.
+//
+// The two instants it uses are the two from that inbox: 53 seconds apart, and deliberately placed
+// inside ONE minute, because a mark that resolves to the minute would still collapse them about one
+// time in nine and would collapse a double tapped submit button every time.
+//
+// A key may be let off, and two are. It costs a named entry in SAME_DAY_EXEMPT carrying an argument
+// a person can read and disagree with. The exempt set is DERIVED from SUBJECT_MARKS and held to
+// that list by equality, in both directions, so an exemption can never be taken by leaving a key
+// quietly out of a loop.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+//
 // The second half is the honesty half. It sends the REAL emails through a stubbed Resend, reads
 // what would have gone on the wire, and models Gmail's threading on it. That is the assertion in
 // the customer's own terms: three Sundays in a row must produce three threads.
@@ -99,6 +126,103 @@ for (const key of keys) {
 const sameMark = keys.map((k) => REPEATING_SUBJECTS[k](MARK_A));
 ok('no two repeating emails compose the same subject from the same mark', new Set(sameMark).size === sameMark.length);
 
+// ═══ 1b. THE SAME DAY RATCHET ═════════════════════════════════════════════
+// The half that was missing on 9 August. Everything above is satisfied by a mark that changes once
+// a day; this is satisfied only by a mark that changes on every send.
+console.log('\n-- the same day ratchet: two sends on ONE day must be two threads --');
+
+// Missing exports are reported rather than thrown, so reverting the fix prints a readable red
+// instead of a stack trace nobody reads.
+ok('🔴 lib/email.ts exports subjectMoment, the mark that can tell two sends in one day apart',
+  typeof email.subjectMoment === 'function');
+const subjectMoment = typeof email.subjectMoment === 'function' ? email.subjectMoment : () => 'NO MOMENT MARK';
+const MARKS = email.SUBJECT_MARKS ?? {};
+const EXEMPT = email.SAME_DAY_EXEMPT ?? {};
+
+// 🔴 THE TWO INSTANTS FROM THE INBOX. 53 seconds apart, same London day, and same London MINUTE,
+// which is the half of that gap a minute resolution mark would still lose.
+const T1 = new Date('2026-08-09T13:00:03Z');
+const T2 = new Date('2026-08-09T13:00:56Z');
+const londonMinute = (d) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Europe/London' });
+ok('the two instants are the 53 seconds seen in the inbox', T2 - T1 === 53_000);
+ok('...on one calendar day in London', subjectDay(T1) === subjectDay(T2));
+ok('...inside one minute of it, so a minute resolution mark would not save us', londonMinute(T1) === londonMinute(T2));
+
+// The mark each key really uses, built by the real producer, so this tests what ships rather than a
+// hand made string that happens to differ.
+const KNOWN_SOURCES = ['moment', 'day', 'week', 'caller'];
+const sameDayMarks = (source) => {
+  if (source === 'moment') return [subjectMoment(T1), subjectMoment(T2)];
+  if (source === 'day') return [subjectDay(T1), subjectDay(T2)];
+  if (source === 'week') return [weekEndingDay(T1), weekEndingDay(T2)];
+  // 'caller': the uniqueness is real but it is not ours. Two sends, two caller values.
+  if (source === 'caller') return ['INV-001', 'INV-002'];
+  // ⚠️ AN UNDECLARED SOURCE IS NOT A PASS. Two identical marks, so a key with no decision on file
+  // goes red on the assertion below rather than quietly borrowing the caller arm's uniqueness. The
+  // default case of a ratchet has to be the failure, or the ratchet is a formality.
+  return ['NO MARK SOURCE DECLARED', 'NO MARK SOURCE DECLARED'];
+};
+
+const markKeys = Object.keys(MARKS);
+const exemptKeys = Object.keys(EXEMPT);
+const sameSet = (a, b) => a.length === b.length && a.every((k) => b.includes(k)) && b.every((k) => a.includes(k));
+
+// 🔴 KEY NUMBER NINE CANNOT BE ADDED WITHOUT A DECISION. Equality, not containment: a registry that
+// is merely a subset is satisfied by forgetting the new key, which is exactly how this got shipped.
+ok('🔴 EVERY REPEATING KEY DECLARES WHERE ITS MARK COMES FROM, AND THE TWO KEY LISTS ARE EQUAL',
+  sameSet(keys, markKeys));
+ok('every same day exemption names a repeating email that exists', exemptKeys.every((k) => keys.includes(k)));
+// And the exemption list is EXACTLY the set of keys whose mark cannot change inside a day. Not a
+// superset (an exemption nobody needs) and not a subset (a silent omission, which is the bug).
+const cannotChangeInADay = keys.filter((k) => MARKS[k]?.source === 'day' || MARKS[k]?.source === 'week');
+ok('🔴 A KEY WHOSE MARK CANNOT CHANGE WITHIN A DAY IS ON THE EXEMPTION LIST, AND NOTHING ELSE IS',
+  sameSet(cannotChangeInADay, exemptKeys));
+for (const k of exemptKeys) {
+  // Same discipline as ONCE_PER_CUSTOMER: the value IS the exemption, so a word is not enough.
+  ok(`${k}: the same day exemption carries an argument a person can disagree with`,
+    typeof EXEMPT[k] === 'string' && EXEMPT[k].length > 80);
+}
+
+for (const key of keys) {
+  const source = MARKS[key]?.source;
+  ok(`${key}: names a mark source we know how to build`, KNOWN_SOURCES.includes(source));
+  ok(`${key}: the choice of mark is argued in writing`, typeof MARKS[key]?.why === 'string' && MARKS[key].why.length > 40);
+  const [m1, m2] = sameDayMarks(source);
+  const s1 = REPEATING_SUBJECTS[key](m1);
+  const s2 = REPEATING_SUBJECTS[key](m2);
+  if (exemptKeys.includes(key)) {
+    // Let off, out loud. The day still has to tell one day from the next, which is the property the
+    // exemption does NOT get to give up.
+    ok(`${key}: exempt by a written decision, not by omission`, typeof EXEMPT[key] === 'string' && EXEMPT[key].length > 80);
+    const across = REPEATING_SUBJECTS[key](source === 'week' ? weekEndingDay(new Date('2026-08-16T23:00:00Z')) : subjectDay(new Date('2026-08-10T13:00:00Z')));
+    ok(`${key}: and it still tells one day from the next`, across !== s1);
+  } else {
+    // 🔴 THE ASSERTION THE 9 AUGUST INBOX DEMANDS.
+    ok(`🔴 ${key}: TWO SENDS 53 SECONDS APART ON ONE DAY MUST GIVE TWO DIFFERENT SUBJECTS`, s1 !== s2);
+    ok(`${key}: and both marks are visible to the man reading them`, s1.includes(m1) && s2.includes(m2));
+  }
+}
+
+// ═══ 1c. THE MOMENT MARK ITSELF ═══════════════════════════════════════════
+console.log('\n-- the moment mark --');
+
+const MOMENT = /^\d{1,2} [A-Z][a-z]+ at \d{1,2}:\d{2}:\d{2}(?:am|pm)$/;
+ok('a moment reads like a British date and a British clock', MOMENT.test(subjectMoment(T1)));
+ok('it leads with the day, written exactly as subjectDay writes it', subjectMoment(T1).startsWith(subjectDay(T1)));
+ok('🔴 TWO SENDS INSIDE ONE MINUTE ARE TWO DIFFERENT MARKS', subjectMoment(T1) !== subjectMoment(T2));
+ok('it is London time and not UTC, so British Summer Time is the hour he saw',
+  subjectMoment(T1) === '9 August at 2:00:03pm');
+ok('winter is GMT, and the clock does not drift an hour',
+  subjectMoment(new Date('2026-01-15T09:05:06Z')) === '15 January at 9:05:06am');
+ok('midnight is 12am, never 0am and never 24', subjectMoment(new Date('2026-01-15T00:00:00Z')) === '15 January at 12:00:00am');
+ok('noon is 12pm', subjectMoment(new Date('2026-01-15T12:00:00Z')) === '15 January at 12:00:00pm');
+ok('late on a summer Sunday it rolls the DAY too, not just the clock',
+  subjectMoment(new Date('2026-08-09T23:30:00Z')) === '10 August at 12:30:00am');
+ok('subjectMoment survives a bad date rather than printing Invalid Date', MOMENT.test(subjectMoment(new Date('not a date'))));
+ok('subjectMoment defaults to now rather than throwing', MOMENT.test(subjectMoment()));
+// ⚠️ AND IT IS STILL NOT MONEY. The clock is his business; his turnover is not.
+ok('🔴 A MOMENT CARRIES NO FIGURE HE EARNED', !/£/.test(subjectMoment(T1)));
+
 // ═══ 2. THE DAY IS A REAL DAY, AND THE WEEKLY ONE IS THE RIGHT DAY ════════
 console.log('\n-- the marks themselves --');
 
@@ -159,6 +283,38 @@ ok('🔴 no subject is handed to send() as a bare string literal', bareSubject.l
 for (const [, k] of emailSrc.matchAll(/\{\s*once:\s*'([^']*)'/g)) ok(`the once key ${k} has a reason on file`, onceKeys.includes(k));
 for (const [, k] of emailSrc.matchAll(/\{\s*caller:\s*'([^']*)'/g)) ok(`the caller key ${k} has a reason on file`, callerKeys.includes(k));
 for (const [, k] of emailSrc.matchAll(/\{\s*repeats:\s*'([^']*)'/g)) ok(`the repeat key ${k} is in the registry`, keys.includes(k));
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND SUBJECT_MARKS MUST NOT BE ABLE TO LIE ABOUT ITS SENDER.
+//
+// This is the seam the 9 August defect actually lived in. The builders were correct, the registry
+// would have been correct, and the BUG was in between: five senders composing a correct subject out
+// of a mark that is constant for twenty four hours. Part 7b catches that behaviourally for the six
+// senders it drives, but it cannot see a NINTH email whose sender it has never heard of.
+//
+// So the claim is checked against the code. For every key, the body of the function that sends it
+// must reach for exactly the mark producer the registry declares, and no other.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+const PRODUCER = { moment: 'subjectMoment(', day: 'subjectDay(', week: 'weekEndingDay(' };
+const CLOCKS = Object.values(PRODUCER);
+for (const key of keys) {
+  const at = emailSrc.indexOf(`repeats: '${key}'`);
+  ok(`${key}: has exactly one send site in lib/email.ts`,
+    at > -1 && emailSrc.indexOf(`repeats: '${key}'`, at + 1) === -1);
+  const fnStart = emailSrc.lastIndexOf('export async function', at);
+  const fnEnd = emailSrc.indexOf('\nexport ', at);
+  const body = at > -1 && fnStart > -1 ? codeOnly(emailSrc.slice(fnStart, fnEnd === -1 ? emailSrc.length : fnEnd)) : '';
+  const used = CLOCKS.filter((c) => body.includes(c));
+  const source = MARKS[key]?.source;
+  if (source === 'caller') {
+    ok(`${key}: the caller really does supply the mark, with no clock anywhere near it`,
+      body.length > 0 && used.length === 0);
+  } else {
+    ok(`🔴 ${key}: THE SENDER HANDS IT THE MARK ITS REGISTRY ENTRY DECLARES (${source}), AND ONLY THAT ONE`,
+      used.length === 1 && used[0] === PRODUCER[source]);
+  }
+}
+
 ok("send() takes the union and not a string", /subject:\s*EmailSubject/.test(emailSrc));
 ok('send() resolves the union rather than passing it on', /subject:\s*resolveSubject\(opts\.subject\)/.test(emailSrc));
 // Exactly one fetch to Resend outside send(), and it is the front desk reply, which is allowed to
@@ -194,6 +350,9 @@ console.log('\n-- house style --');
 
 const everySubject = [
   ...keys.map((k) => REPEATING_SUBJECTS[k]('7 August')),
+  // The same eight again wearing the new mark, because the house style rule applies to the shape
+  // that actually ships and not only to the one that used to.
+  ...keys.map((k) => REPEATING_SUBJECTS[k](subjectMoment(T1))),
   ...onceKeys.map((k) => ONCE_PER_CUSTOMER[k]),
   ...nlSubjects, ...nuSubjects, ...psSubjects, trialWeek, trialEnded,
 ];
@@ -274,6 +433,68 @@ ok('two invoices to one customer are two threads', new Set(invoiceSubjects).size
 // The signup code, the original defect, still in the subject.
 const codeSubjects = wire.filter((m) => /is your Lekhio code$/.test(m.subject)).map((m) => m.subject);
 ok('🔴 the sign in code is still IN the subject', codeSubjects.includes('481920 is your Lekhio code') && codeSubjects.includes('773311 is your Lekhio code'));
+
+// ═══ 7b. THE 9 AUGUST INBOX, REPLAYED THROUGH THE REAL SENDERS ════════════
+//
+// 🔴 THIS IS THE ONE THAT GOES RED IF THE FIX IS TAKEN OUT OF lib/email.ts.
+//
+// Part 1b tests the BUILDERS, which is where a template can lose its mark. It cannot see a sender
+// that composes the right subject from the wrong mark, and that is precisely what shipped: the
+// builders were fine and five callers handed them a mark that is constant for a day. So this half
+// drives the exported senders, reads what would have gone on the wire, and models Gmail on it.
+console.log('\n-- 53 seconds apart, through the real senders --');
+
+wire.length = 0;
+// The pair from the inbox, then every other email a man can plausibly receive twice in an afternoon.
+await email.sendLeadConfirmEmail(TO, 'https://lekhio.app/c', 'https://lekhio.app/u', T1);
+await email.sendLeadConfirmEmail(TO, 'https://lekhio.app/c', 'https://lekhio.app/u', T2);
+await email.sendLeadResultEmail(TO, 'A note', 'https://lekhio.app/u', T1);
+await email.sendLeadResultEmail(TO, 'A note', 'https://lekhio.app/u', T2);
+// A double tapped join button, which is the case the waitlist email exists for.
+await email.sendWaitlistWelcomeEmail(TO, null, T1);
+await email.sendWaitlistWelcomeEmail(TO, null, T2);
+// He reads the dunning email, taps Update payment, and the second card fails too.
+await email.sendPaymentFailedEmail({ to: TO, amountPence: 1200, updateUrl: 'https://lekhio.app/billing', when: T1 });
+await email.sendPaymentFailedEmail({ to: TO, amountPence: 1200, updateUrl: 'https://lekhio.app/billing', when: T2 });
+// Two codes and two invoices on one day, which were already right and must stay right.
+await email.sendSignupCodeEmail(TO, '481920');
+await email.sendSignupCodeEmail(TO, '773311');
+await email.sendInvoiceEmail({ to: TO, number: 'INV-001', total: 450, link: 'https://lekhio.app/invoice/1', businessName: 'Dave Sparks' });
+await email.sendInvoiceEmail({ to: TO, number: 'INV-002', total: 900, link: 'https://lekhio.app/invoice/2', businessName: 'Dave Sparks' });
+
+ok('every same day send reached the wire', wire.length === 12);
+
+const sameDayThreads = new Map();
+for (const m of wire) {
+  const k = `${m.from} ${m.subject}`;
+  sameDayThreads.set(k, (sameDayThreads.get(k) ?? 0) + 1);
+}
+for (const [k, n] of sameDayThreads) {
+  if (n > 1) console.log(`       COLLAPSED x${n}  ${JSON.stringify(k.slice(k.indexOf('> ') + 2))}`);
+}
+ok('🔴 12 SENDS ON ONE AFTERNOON LAND IN 12 GMAIL THREADS, NOT ONE OF THEM UNDER AN OLDER ONE',
+  sameDayThreads.size === wire.length);
+
+// And the pair that was actually observed, named, because a count is not a story.
+const confirms = wire.filter((m) => /^Confirm your email to get your result/.test(m.subject)).map((m) => m.subject);
+ok('both confirms went out', confirms.length === 2);
+ok('🔴 THE TWO CONFIRMS 53 SECONDS APART ARE TWO SUBJECTS, SO HE CANNOT TAP THE OLDER LINK',
+  confirms.length === 2 && confirms[0] !== confirms[1]);
+ok('the confirm still says what it is before it says when',
+  confirms.every((s) => s.startsWith('Confirm your email to get your result, ')));
+ok('and it says when in words he reads off a clock', confirms.every((s) => / at \d{1,2}:\d{2}:\d{2}(?:am|pm)$/.test(s)));
+
+// The exempt one, stated rather than left to be discovered. Two receipts on one day DO share a
+// subject, and SAME_DAY_EXEMPT['payment-ok'] is the argument for why that is acceptable.
+wire.length = 0;
+await email.sendPaymentConfirmedEmail({ to: TO, amountPence: 1200, when: T1 });
+await email.sendPaymentConfirmedEmail({ to: TO, amountPence: 1200, when: T2 });
+console.log(`       EXEMPT       ${JSON.stringify(wire[0]?.subject ?? '')}  x${wire.length}`);
+ok('the receipt pair is exempt by a written argument, not by accident',
+  typeof EXEMPT['payment-ok'] === 'string' && EXEMPT['payment-ok'].length > 80);
+ok('a receipt still tells one billing day from the next, which the exemption does not give up',
+  wire[0]?.subject !== resolveSubject({ repeats: 'payment-ok', mark: subjectDay(new Date('2026-09-09T13:00:00Z')) }));
+ok('and a receipt still carries no figure', !/£/.test(wire[0]?.subject ?? '£'));
 
 // ═══ 8. THE LEAD CONFIRM LINK: AN EXPIRY, AND A GET THAT DOES NOTHING ═════
 console.log('\n-- the lead confirm link --');

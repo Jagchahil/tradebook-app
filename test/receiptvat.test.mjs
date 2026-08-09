@@ -125,12 +125,18 @@ delete process.env.AI_KILL_SWITCH;
 const C = await import(pathToFileURL(path.join(stage, 'claude.ts')).href);
 
 // One canned model reply, shaped exactly as the API returns it.
+//
+// ⚠️ IT ANSWERS text() NOW, NOT json(). lib/claude.ts stopped calling res.json() on 9 August 2026,
+// because a 200 carrying an HTML gateway page made it THROW straight past the caller and the
+// customer was silently ignored. Every reply is read as text and parsed here, so a stub that only
+// offers json() is a stub of an API this codebase no longer talks to. test/claudebody.test.mjs
+// owns that rule; this one only has to speak the same protocol.
 function modelSays(json) {
+  const body = JSON.stringify({ model: 'test', usage: {}, content: [{ type: 'text', text: JSON.stringify(json) }] });
   globalThis.fetch = async () => ({
     ok: true,
-    async json() {
-      return { model: 'test', usage: {}, content: [{ type: 'text', text: JSON.stringify(json) }] };
-    },
+    status: 200,
+    async text() { return body; },
   });
 }
 

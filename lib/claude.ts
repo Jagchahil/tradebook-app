@@ -115,6 +115,58 @@ function logUsage(feature: string, data: { model?: string; usage?: { input_token
   );
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A 200 IS NOT A PROMISE OF JSON, AND NINE ENTRY POINTS IN THIS FILE BELIEVED IT WAS.
+//
+// Every one of them read
+//
+//     if (!res.ok) { ...return null; }
+//     const data = (await res.json()) as { content?: ... };
+//
+// That guard is correct and it is not the guard that was missing. It catches a 500, a 429 and a
+// 401. It does nothing whatever about a TWO HUNDRED CARRYING HTML, which is exactly what an edge,
+// a proxy or a captive network hands back when it decides to answer on the origin's behalf:
+// status 200, Content-Type text/html, a courteous apology in a <body>. res.json() then THROWS,
+// and because none of these calls sat inside a try that expected it, the exception left the
+// function, left the caller, and the customer was silently ignored. He asked a question and
+// nothing came back. No reply, no apology, no log line naming the cause.
+//
+// It is the same defect class as a474eb8a, which is why it is worth fixing all nine at once rather
+// than the one that happens to be reported.
+//
+// ⚠️ NEVER THE BODY IN THE LOG. This file's own rule, and lib/email.ts's, and CLAUDE.md's: a
+// third party's error body can carry the request it wrapped. What is logged is the LENGTH and one
+// word saying whether it opened with a tag. That is enough to tell "somebody's gateway answered
+// for Anthropic" from "the stream was cut off half way", and it is not content.
+//
+// ⚠️ AND IT RETURNS NULL RATHER THAN THROWING. Every caller in this file already handles null as
+// "the AI could not help this time", and every one of those paths has an honest sentence ready.
+// A thrown error has no sentence.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+type ClaudeReply = {
+  content?: Array<{ type: string; text?: string }>;
+  model?: string;
+  usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number };
+};
+
+async function readClaudeReply(res: Response, feature: string): Promise<ClaudeReply | null> {
+  let raw: string;
+  try {
+    raw = await res.text();
+  } catch (err) {
+    console.error(`[claude] ${feature}: the body could not be read:`, err instanceof Error ? err.message : 'unknown');
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as ClaudeReply;
+  } catch {
+    console.error(
+      `[claude] ${feature}: a 200 whose body is not JSON (${/^\s*</.test(raw) ? 'html' : 'other'}, ${raw.length} bytes)`,
+    );
+    return null;
+  }
+}
+
 export async function parseReceipt(base64: string, mediaType: string): Promise<ParsedReceipt | null> {
   if (!ready() || !KEY) return null;
 
@@ -159,7 +211,8 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
     return null;
   }
 
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  const data = await readClaudeReply(res, 'receipt_vision');
+  if (!data) return null;
   logUsage('receipt_vision', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
@@ -260,7 +313,8 @@ export async function parseSpokenTransaction(text: string): Promise<ParsedEntry 
     return null;
   }
 
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  const data = await readClaudeReply(res, 'entry_parse');
+  if (!data) return null;
   logUsage('entry_parse', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
@@ -342,7 +396,8 @@ export async function draftInvoice(description: string): Promise<DraftedInvoice 
     return null;
   }
 
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  const data = await readClaudeReply(res, 'invoice_draft');
+  if (!data) return null;
   logUsage('invoice_draft', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
@@ -460,7 +515,8 @@ export async function answerMoneyQuestion(
     console.error('[claude] Money question failed:', res.status, errText);
     return null;
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  const data = await readClaudeReply(res, 'money_question');
+  if (!data) return null;
   logUsage('money_question', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   return houseCopy(textBlock);
@@ -504,7 +560,8 @@ export async function answerExpenseQuestion(question: string): Promise<string | 
     console.error('[claude] Expense question failed:', res.status, errText);
     return null;
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  const data = await readClaudeReply(res, 'expense_check');
+  if (!data) return null;
   logUsage('expense_check', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   return houseCopy(textBlock);
@@ -560,7 +617,8 @@ export async function draftSupportReply(
     console.error('[claude] Support draft failed:', res.status, errText);
     return null;
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  const data = await readClaudeReply(res, 'support_draft');
+  if (!data) return null;
   logUsage('support_draft', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   return houseCopy(textBlock);
@@ -599,7 +657,8 @@ export async function improveSupportAnswer(question: string, draft: string): Pro
     console.error('[claude] Improve answer failed:', res.status);
     return null;
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  const data = await readClaudeReply(res, 'support_improve');
+  if (!data) return null;
   logUsage('support_improve', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   return houseCopy(textBlock);
@@ -806,7 +865,8 @@ export async function answerAccountantQuestion(question: string, context?: strin
     console.error('[claude] Accountant question failed:', res.status, errText);
     return null;
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  const data = await readClaudeReply(res, 'accountant');
+  if (!data) return null;
   logUsage('accountant', data);
   // Join every text block, not just the first. A reasoning model can return a
   // thinking block before the text, so find-first could miss the answer. Ignore
@@ -868,7 +928,8 @@ export async function parseSchedule(text: string, nowIso: string): Promise<Parse
     console.error('[claude] Schedule parse failed:', res.status);
     return null;
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number } };
+  const data = await readClaudeReply(res, 'schedule_parse');
+  if (!data) return null;
   logUsage('schedule_parse', data);
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;

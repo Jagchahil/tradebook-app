@@ -1,5 +1,8 @@
 # 02: Product
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 ## The Product Model
 
 **App = the shell.** Onboarding, WhatsApp linking, clean dashboard. Users open it when they want to *see* something. spending this month, tax estimate, a specific transaction. It is the filing cabinet.
@@ -42,7 +45,7 @@ User sends WhatsApp voice note: "Just spent forty quid on petrol, B&Q run."
 
 Lekhio:
 1. Receives audio file URL
-2. Transcribes via Whisper (or Claude's audio capability)
+2. Transcribes via Whisper, **running locally on our own Mac mini**. The audio never leaves our systems and is wiped as soon as the words come back.
 3. Extracts: £40, fuel/travel, today
 4. Stores and replies: `✓ £40. fuel, today. Got it.`
 

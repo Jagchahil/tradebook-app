@@ -253,7 +253,35 @@ ok('🔴 AND THE UNDER THE LINE CASE IS SAID TOO, which it never used to be',
   iUnder > iOver && /under the \{gbp0\(VAT_REGISTRATION_THRESHOLD\)\} line/.test(taxVat));
 ok('the failed read and the young account say different things, because they are different things',
   /We could not read your figures just now/.test(taxVat)
-  && /not been with us twelve months yet/.test(taxVat));
+  && /Your account is under three\s+months old/.test(taxVat));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE YOUNG ACCOUNT ARM IS THE ONE EVERY CUSTOMER LANDS ON AT LAUNCH, so it has to answer.
+//
+// The RPC nulls the rolling figure under THREE months of account history, which on day one is
+// every customer there is. This arm used to say only "you have not been with us twelve months
+// yet", which was two failures at once: it gave him NONE of what the hub door had just promised
+// him, and it quoted the wrong number, sending a man away for a year over a gate that lifts in a
+// quarter.
+//
+// The figure genuinely cannot be given, and inventing one is the undercount this whole push
+// existed to end. The LINE and the CONSEQUENCE can be: they are facts about VAT that do not depend
+// on his history at all, and they are exactly what the door offered.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const newArm = iNew >= 0 && iOver > iNew ? taxVat.slice(iNew, iOver) : '';
+ok('the young account arm is where this file thinks it is, so the assertions below are real',
+  newArm.length > 400);
+ok('🔴 IT STILL GIVES HIM THE LINE, off the constant rather than typed onto the screen',
+  /\{gbp0\(VAT_REGISTRATION_THRESHOLD\)\}/.test(newArm));
+ok('🔴 AND THE CONSEQUENCE, which is the half that makes the line worth knowing',
+  /compulsory/.test(newArm) && /rolling twelve\s+months/.test(newArm));
+ok('🔴 AND IT NO LONGER SAYS TWELVE MONTHS WHERE THE GATE IS THREE',
+  !/not been with us twelve months yet/.test(taxVat)
+  && /under three\s+months old/.test(newArm));
+ok('it still refuses to invent a figure, which is the whole reason the arm exists',
+  !/gbp0\(yearTurnover\)/.test(newArm));
+ok('and it warns the newest accounts about money they have not logged, who need that most',
+  /do not log still counts/.test(newArm));
 
 // ── One sentence about what was counted, in one place, on both figure arms. ──────────────────
 ok('🔴 THE BASIS SENTENCE IS SHARED, not written out on the surface that prints it',

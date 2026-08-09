@@ -194,7 +194,27 @@ export default async function TaxHubPage() {
   //
   // ⚠️ AND NOT TO A DIRECTOR. His company registers, not him, and every sentence behind that door
   // says "your trade income". A director keeps exactly the hub he had.
-  const vatThresholdDoor = vat !== null && !vat.registered && !isCompany;
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 `biz !== null` IS LOAD BEARING, AND IT WAS MISSING. Found in a walkthrough audit, 9 Aug.
+  //
+  // The VAT read was made failure safe on the line above and the BUSINESS read sitting beside it in
+  // the same Promise.all was not. getBusinessProfile answers null on a failed read, `isCompany` is
+  // `biz?.businessType === 'limited_company'`, and `null?.businessType` is undefined, so a director
+  // whose profile read timed out was drawn the door the two lines above swear he must never see.
+  //
+  // ⚠️ AND THE OPPOSITE DEFAULT, A HUNDRED LINES UP, IS ALSO RIGHT. The MTD branch deliberately
+  // lets a failed read fall through to sole trader treatment, and its comment says why: hiding a
+  // real obligation from a sole trader because a read timed out is by far the worse failure.
+  //
+  // The two are not in disagreement. They turn on what the row IS.
+  //   An OBLIGATION he may already be breaking -> unknown means SHOW it. Silence can cost him money.
+  //   An OFFER to go and look at something     -> unknown means WITHHOLD it. A door drawn at the
+  //                                               wrong man is a product that does not know him.
+  // Getting that backwards in either direction is a real defect, so the rule is written down rather
+  // than left as two adjacent lines that read like they contradict each other.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const vatThresholdDoor = vat !== null && !vat.registered && biz !== null && !isCompany;
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -336,12 +356,19 @@ export default async function TaxHubPage() {
             </a>
           ) : vatThresholdDoor ? (
             /* See vatThresholdDoor above. Different words because it is a different question: he
-               has no VAT to report, he has a line to watch. */
+               has no VAT to report, he has a line to watch.
+
+               ⚠️ THE LINE LEADS AND THE POSITION FOLLOWS, and that ordering is the fix rather than
+               a preference. This read "Where your last twelve months put you against the line",
+               which puts the one thing we cannot always give him first. Under three months of
+               history there is no honest rolling figure, and on launch day that is EVERY account,
+               so the door led every customer we had to a screen that could not answer it. The line
+               and the consequence are true for everybody from the first minute. */
             <a href="/app/tax/vat" style={S.door} className="lek-hit">
               <span style={S.doorLabel}>VAT threshold</span>
               <span style={S.rowBody}>
-                Where your last twelve months put you against the line, and what happens if you
-                cross it.
+                The line you have to register at, what happens if you cross it, and where your own
+                twelve months put you once we have them.
               </span>
             </a>
           ) : null}

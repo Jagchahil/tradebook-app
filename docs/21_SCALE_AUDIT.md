@@ -1,5 +1,8 @@
 # 21: Scale Audit. Will it hold at 1000 users and a year of use?
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > We cannot fast forward a year, so instead we stress tested the heaviest server paths at 1000 user volume, found the one place it would fall over, and fixed it. Done 2026-06-25.
 
 ---

@@ -149,8 +149,42 @@ ok('the hub links to the VAT screen twice, once for each kind of man',
   ok('the two doors say different things, because they answer different questions',
     /VAT this quarter/.test(hubCode) && /VAT threshold/.test(hubCode));
 }
-ok('🔴 A FAILED PROFILE READ GETS NEITHER DOOR, which is the same rule the row above already keeps',
-  /const vatThresholdDoor = vat !== null && !vat\.registered && !isCompany;/.test(hubCode));
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS ASSERTION PASSED FOR A DAY WHILE THE RULE IT NAMES WAS BROKEN. Rewritten 9 Aug 2026.
+//
+// It pinned the literal source line `vat !== null && !vat.registered && !isCompany`, and its own
+// name says "a failed PROFILE read gets neither door". TWO profiles are read into that decision and
+// only one of them was being checked. getBusinessProfile answers null on a failed read, isCompany
+// is `biz?.businessType === 'limited_company'`, and `null?.businessType` is undefined, so a
+// director whose business profile read timed out was drawn the door the next assertion swears he
+// can never see.
+//
+// The old form could not have caught it. Pinning a line proves the line has not CHANGED; it proves
+// nothing about whether the line is RIGHT, and it agrees with whatever the line happens to say on
+// the day it is written. So the property is asserted in terms of the READS now, not the text.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const decl = /const vatThresholdDoor = ([^;]+);/.exec(hubCode);
+  ok('the door decision is where this file thinks it is', decl !== null);
+  const expr = decl ? decl[1] : '';
+  ok('🔴 EVERY READ THE DECISION LEANS ON IS CHECKED FOR FAILURE, not only the VAT one',
+    /\bvat !== null\b/.test(expr) && /\bbiz !== null\b/.test(expr));
+  ok('🔴 AND THE DIRECTOR TEST IS THE PRODUCT OF A SUCCESSFUL READ, never of an absent one',
+    /\bbiz !== null\b/.test(expr) && /!isCompany/.test(expr)
+    && expr.indexOf('biz !== null') < expr.indexOf('!isCompany'));
+  // ⚠️ AND THE OPPOSITE DEFAULT IS RIGHT FOR THE MTD ROW ABOVE IT. An OBLIGATION he may already be
+  // breaking must survive an unknown; an OFFER must not. Two adjacent lines defaulting opposite
+  // ways looks like a bug to every reader who has not been told it is not one, so the hub records
+  // the rule at the decision and this holds it there.
+  //
+  // ⚠️ ASSERTED AGAINST `hub` AND NOT `hubCode`, and the difference is the point. codeOnly() strips
+  // comments precisely so that no assertion about BEHAVIOUR can be satisfied by prose describing
+  // it. This is the one assertion here that is deliberately about the prose, so it is the one that
+  // has to read the raw file. Written against hubCode first, where it could never pass.
+  ok('and the reasoning for the opposite default on the MTD row is recorded beside it',
+    /An OBLIGATION he may already be breaking/.test(hub)
+    && /An OFFER to go and look at something/.test(hub));
+}
 ok('🔴 AND NEITHER DOES A DIRECTOR: his company registers, not him, and the copy behind it says "your"',
   /&& !isCompany;/.test(hubCode));
 ok('the door is a plain anchor, no script, like every other door on the hub',

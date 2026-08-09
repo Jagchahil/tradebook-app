@@ -1,5 +1,8 @@
 # 94: Scale, security and cost audit (7 July 2026, evening)
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > A three-agent audit run the evening of 7 July, after the day's launch-prep changes (domain moved to lekhio.app, support emails wired to info@lekhio.app, the redundant users index dropped, AI credit funded and capped). Purpose: confirm nothing broke, re-confirm the backend holds at 100,000 users, and produce a real cost projection now that the AI caps and provider pricing are known. This is an analytical/architectural review plus a cost model, not a live load test (we do not hammer production). Read alongside doc 88 (the morning's pre-launch audit) and doc 93 (launch runbook). Writing rule holds: no em dashes, no en dashes, no hyphens as dashes.
 
 ## Verdict
@@ -41,11 +44,11 @@ Grounded in the actual code (`lib/claude.ts`, `lib/aicost.ts`, `lib/transcribe.t
 
 Assumed usage for an active sole trader per month: 25 receipt photos, 15 text or voice expense parses, 10 voice notes, 6 accountant chat questions, 4 invoice or schedule drafts, 4 out-of-window proactive WhatsApp templates, and roughly half a login. Well under the hard cap.
 
-Per active user per month (EXPECTED): Anthropic about 9p, Whisper about 1.6p, WhatsApp templates about 10p (service replies within the 24 hour window are free and unlimited), Twilio Verify OTP about 4p, platform allocation about 1.5p. Variable cost per user about 26p. Stripe takes 1.5 percent plus 20p, about 39.5p on £12.99.
+Per active user per month (EXPECTED): Anthropic about 9p, Whisper £0 (local, see below), WhatsApp templates about 10p (service replies within the 24 hour window are free and unlimited), Twilio Verify OTP about 4p, platform allocation about 1.5p. Variable cost per user about 26p. Stripe takes 1.5 percent plus 20p, about 39.5p on £12.99.
 
 Per-provider monthly cost at 100k (EXPECTED):
 - Anthropic (Claude): about £9,000
-- OpenAI Whisper: about £1,600
+- ~~OpenAI Whisper: about £1,600~~ 🛑 **£0.** This projected spend on an API we do not call. Transcription is local to our Mac mini, so this line comes out of the model entirely and the total below overstates cost by roughly this amount.
 - WhatsApp templates (Meta): about £10,000
 - Twilio Verify (OTP): about £4,000
 - Supabase Pro (scaled): about £500

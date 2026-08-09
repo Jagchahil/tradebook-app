@@ -1,5 +1,8 @@
 # 08: Build Progress
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > This document is the handoff for every new Claude session. Read it before touching any code.
 > Always build with Claude's recommendation. When Claude suggests an approach, go with it unless there is a clear reason not to. This saves time and keeps the build coherent.
 

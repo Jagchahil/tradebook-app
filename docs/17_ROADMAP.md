@@ -1,5 +1,8 @@
 # 17: Roadmap
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > **PRICE CORRECTED 12 JUL 2026.** This doc carried £29 a month. The real launch price is **£12.99 a month / £129 a year**, 14-day trial, no card. `lib/stripe.ts` is the source of truth; `public/llms.txt` is tested against it.
 
 > Where Lekhio is today and what it takes to launch. A snapshot in time, written 2026-06-25. The build is in strong shape. What remains is mostly founder setup, wiring the live keys, and publishing. Work top to bottom.
@@ -54,7 +57,7 @@ Vision, product, build plan, marketing, compliance, stack, brand, progress, audi
 - [ ] Pay the ICO data protection fee, so "registered with the ICO" is true. See doc 14.
 - [ ] Set up support@lekhio.app with a real person behind it.
 - [ ] Register as a sole trader with HMRC.
-- [ ] Open the accounts and create the keys: Anthropic, Meta WhatsApp Cloud API, OpenAI Whisper, Stripe. See doc 13.
+- [ ] Open the accounts and create the keys: Anthropic, Meta WhatsApp Cloud API, Stripe. See doc 13. ~~OpenAI Whisper~~ 🛑 **not needed and must not be opened**: transcription runs on our own Mac mini.
 - [ ] Confirm the Supabase schema is fully run in the production project.
 
 ### Phase B. Switch on the core loop (the wedge)

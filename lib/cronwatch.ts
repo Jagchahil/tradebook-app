@@ -65,6 +65,35 @@ export const MAX_QUIET_HOURS: Record<string, number> = {
   // moment he had decided we were worth paying for. Registering it here is what makes /api/health
   // go red instead of staying green while nothing happens.
   trial: 26,
+
+  // The voice note reaper (app/api/cron/voicereap). Kicked in BOTH daily slots, so 26 hours is
+  // already generous: it should be seen twice a day.
+  //
+  // 🔴 THIS ONE'S SILENCE BREAKS A WRITTEN PROMISE, NOT JUST A FEATURE. Every other job in this map
+  // fails by not DOING something. This one fails by LEAVING SOMETHING BEHIND: a stale voice_jobs row
+  // keeps its audio_base64 for ever, while the privacy policy says "the audio is deleted the moment
+  // it has been read" and the data inventory says it is "wiped as soon as it is transcribed". Both
+  // sentences quietly stop being true, and the customer is still waiting on a note we told him we
+  // were writing up.
+  //
+  // It shipped on 9 August wired into both slots and registered in neither this map nor the cron
+  // runs table, which is precisely the hole the heading above warns about, left by the same hand
+  // that wrote the warning. Found in a walkthrough audit that evening, not by anything going wrong.
+  voicereap: 26,
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT IS DELIBERATELY NOT IN THIS MAP, SO THE NEXT READER CAN TELL A DECISION FROM A HOLE.
+  //
+  // "A cron that is not in this map is a cron nobody is watching" cuts both ways: an absence has to
+  // be readable as a choice, or every audit re-litigates it and one of them eventually guesses wrong.
+  //
+  //   nurture  (app/api/cron/nurture) SHIPS DARK. It returns immediately unless NURTURE_ENABLED is
+  //            'true', and it is not. An alarm on a job that is deliberately switched off is a red
+  //            /api/health that means nothing, and a health check people learn to ignore is worse
+  //            than no health check. ⚠️ IT WRITES cronStarted/cronFinished ANYWAY, so the run
+  //            history is there the day it is switched on, and turning it on is then one line here.
+  //            Whoever flips NURTURE_ENABLED adds `nurture: 26` in the same commit.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
 };
 
 export interface CronAlarm {

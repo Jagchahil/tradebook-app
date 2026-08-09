@@ -30,7 +30,13 @@ insert into public.team_todos (kind, buddy_key, text, from_label, where_hint, pr
   ('approve','gyani','GOV.UK renamed the VAT registration page overnight. I found the new address and prepared the fix.','from Gyani · will publish it',null,'md','Published by Gyani',10),
   ('approve','munshi','Approve me to start, and your morning brief lands here from tomorrow.','from Munshi · runs itself once on',null,'hi','Munshi is on it',20),
   ('needs','hoka','Redo the App Store screenshots: real wordmark, one WhatsApp frame, benchmark vs Xero, QuickBooks, Monzo.','from Hoka · yours until I''m hired',null,'md',null,30),
-  ('needs','mistri','Paste the OpenAI key into Vercel and redeploy, to switch voice notes on.','from Mistri','needs your Mac','md',null,40),
+  -- 🛑 THIS ROW READ: 'Paste the OpenAI key into Vercel and redeploy, to switch voice notes on.'
+  -- It was a live item on the team console telling the founder to do a thing that does nothing.
+  -- lib/transcribe.ts was deleted on 26 July 2026 and nothing has read OPENAI_API_KEY since;
+  -- test/hardening.test.mjs fails the build if anything starts. Voice notes need the Mac mini awake
+  -- and polling /api/voice/pending, not a key. Following it would have bought credit for a variable
+  -- no code reads, and opened a contract with a company that processes none of our data.
+  ('needs','mistri','Check the Mac mini is awake and polling, so voice notes get transcribed. No keys involved: it runs Whisper locally.','from Mistri','needs your Mac','md',null,40),
   ('needs','mistri','Turn on the Stripe customer portal in the dashboard so people can manage their own billing.','from Mistri','needs your Mac','lo',null,50);
 
 notify pgrst, 'reload schema';

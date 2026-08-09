@@ -1,5 +1,8 @@
 # 26: Tax Efficiency Playbook, paying yourself and what you can claim
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > Written for you as a director and shareholder of a UK limited company, 2026/27 figures. This is how a good accountant would set you up to take money out with the least tax and claim every cost you are genuinely entitled to. I am not your filing accountant. Use this to understand the levers and to brief the person who signs off your accounts. Get them to confirm the numbers for your exact situation before you act.
 
 ---
@@ -60,7 +63,7 @@ Each of these, where it is genuinely for the business, is an allowable cost that
 
 **Equipment, computers, tools.** Laptops, monitors, phones, cameras, tools, office furniture. These usually qualify for the **Annual Investment Allowance**, which gives 100% tax relief in the year you buy them. Buy what the business needs and the full cost comes off profit.
 
-**Software and subscriptions.** Your whole stack. Hosting and Vercel, Supabase, the Anthropic and OpenAI API spend, design tools, accounting software, domain and email, anything the business runs on. All allowable.
+**Software and subscriptions.** Your whole stack. Hosting and Vercel, Supabase, the Anthropic API spend, design tools, accounting software, domain and email, anything the business runs on. All allowable.
 
 **Travel and mileage.** Business travel, not your normal commute. If you use your own car for business journeys, claim the HMRC mileage rate, which **rose to 55p a mile for the first 10,000 business miles from April 2026**, then 25p after that. Train, parking, and business trip accommodation are allowable too.
 

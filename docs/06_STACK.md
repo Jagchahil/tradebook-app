@@ -1,5 +1,8 @@
 # 06: Stack
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 ## Guiding Principle
 
 Use the simplest stack that Claude Code can move fastest on. No premature optimisation. No over-engineering. Add complexity only when a simpler approach provably breaks.
@@ -28,7 +31,7 @@ Use the simplest stack that Claude Code can move fastest on. No premature optimi
 **Anthropic API**
 - `claude-sonnet-4-6` for all conversation, Q&A, summaries
 - Claude Vision for receipt/image parsing (pass image URL directly)
-- Claude for voice note transcription (or use Whisper if cheaper at scale)
+- Voice note transcription: **Whisper, locally, on our own Mac mini.** Claude has no speech to text. Not an API call and not a third party: MIT licensed open weights on hardware we own. The privacy policy is written on this fact.
 - Receipt parsing: structured JSON output, low temperature for consistency
 
 ### WhatsApp

@@ -1,5 +1,8 @@
 # 24: Master Action Checklist, everything that needs doing
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > The single prioritised list of everything parked, from setting up the business to going live. The product is built. This is the human and money work that turns it on. Tick top to bottom. Costs confirmed June 2026 (after the February and April 2026 UK fee rises). Detail for the technical steps is in doc 23.
 
 ---
@@ -43,7 +46,7 @@ Everything else hangs off these.
 - [ ] Run all of `supabase/schema.sql` in Supabase.
 - [ ] Anthropic: add credit (5 to 10 dollars), create key, add `ANTHROPIC_API_KEY`.
 - [ ] Meta WhatsApp: create the app, add the product, set the webhook to https://lekhio.app/api/whatsapp, add the four WhatsApp env vars.
-- [ ] OpenAI Whisper (optional, for voice): add credit and the key.
+- [x] ~~OpenAI Whisper (optional, for voice): add credit and the key.~~  🛑 **Do not do this.** Nothing reads an OpenAI key. Voice is transcribed by Whisper on our own Mac mini. Nothing to buy, nothing to set. Done by deletion on 26 July 2026.
 - [ ] Set `CRON_SECRET` and point a free external cron (cron-job.org) at the reminder URLs.
 - [ ] Run the end to end test script in doc 23. Receipt, voice, text, income, reminder, invoice, tax summary, Stripe test card.
 

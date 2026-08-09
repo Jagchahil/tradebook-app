@@ -1,5 +1,8 @@
 # 77: Pre Launch Game Plan. Bank Feeds, Pricing, Reviews (2 July 2026)
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > The plan for the three competitive gaps that are ours to close before or at launch, agreed with Jag on 2 July. Nothing here is built yet; this doc is the plan to execute against. HMRC recognition is deliberately parked until the other founder tasks (domain, company, ICO, accounts) are sorted, per Jag. Doc 74 has the competitor matrix this responds to.
 
 ## The sequencing, one view
@@ -113,7 +116,7 @@ Added 2 July evening. Every item that costs money to launch and operate Lekhio, 
 | Service | Rough cost | Notes |
 |---|---|---|
 | Anthropic (Claude) | ~20p to 60p per heavy user/mo (~2% of price) | See doc 10. Set a hard monthly spend cap plus a budget alert in the Anthropic console. The webhook idempotency already guards runaway loops. |
-| OpenAI Whisper (voice notes) | pennies per user/mo (~$0.006/audio min) | Needs OPENAI_API_KEY. NOT currently set in Vercel, so voice notes will not work until it is added. |
+| Voice notes (Whisper, on our own Mac mini) | **£0.** Hardware we already own. | 🛑 The old row said "Needs OPENAI_API_KEY, not set in Vercel, voice notes will not work until it is added." Both halves are wrong now: no code reads that variable, and voice works when the mini is awake and polling `/api/voice/pending`. |
 | Twilio Verify (login OTP by SMS) | ~£0.07 to £0.10 per login | ~$0.05/verification plus one UK SMS segment. Scales with logins, not users. Keep the per number rate limit to cap abuse. |
 | Meta WhatsApp Cloud API | ~£0.01 to £0.04 per message, small free allowance | 2025 per message pricing. Small per active user. Confirm current UK utility and service rates. |
 | TrueLayer (bank feeds) | Sandbox free and unlimited. Production is a commercial deal | Per connection or volume pricing agreed at launch. Gated behind ICO registration anyway. Confirm at the commercial conversation. |

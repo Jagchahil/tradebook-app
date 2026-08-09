@@ -1,5 +1,8 @@
 # 61: Zero-Budget Launch Prep. What You Can Do Today for Free
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > You have a spare phone number and a personal email, and money is coming but not here yet. Good news: you can get Lekhio to a fully working, testable, even soft-launchable state for almost nothing. This is the order to do it, what is free, and the few things that genuinely wait for money.
 
 ---

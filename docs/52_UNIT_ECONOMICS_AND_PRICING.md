@@ -1,5 +1,8 @@
 # 52: Unit Economics and Pricing
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > What it actually costs to run Lekhio per user and per month, the margin at the chosen price, a rough acquisition cost, and the decision. Built on current 2026 pricing. Figures are estimates to size the business, not accounts. USD converted at about £1 = $1.27.
 
 ---
@@ -20,7 +23,7 @@ The only things that cost money per user are the AI, voice transcription, the Wh
 - A typical active sole trader: about 40 logs, 15 questions or invoices, 10 voice notes a month.
 - AI total: about **$0.33, roughly £0.26 a month**. A heavy user, near the daily cap, maybe £0.60 to £0.80.
 
-**Voice transcription (OpenAI Whisper at $0.006 a minute).** A 20 second note is about $0.002. Folded into the figure above.
+**Voice transcription: £0.** 🛑 This line used to bill Whisper at $0.006 a minute through the OpenAI API. That API was removed on 26 July 2026. Transcription runs on our own Mac mini, on hardware already bought, so the marginal cost of a voice note is nothing but electricity. The figure above is therefore slightly conservative, which is the safe direction for a pricing model.
 
 **WhatsApp (Meta).** Service replies, and utility templates sent inside the 24 hour window after the user messages, are **free**. Out of window utility templates (a proactive reminder when the user has not messaged in a day) cost about £0.02 to £0.03 each. Twice daily nudges could in theory be 60 a month, but for an active user who messages daily, most land inside the free window. Conservatively assume **£0.50 to £1.00 a month**. This is the single biggest variable cost and the one lever to watch, see below.
 

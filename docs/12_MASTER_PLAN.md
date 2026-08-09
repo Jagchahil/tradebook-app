@@ -1,5 +1,8 @@
 # 12: Master Plan
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > Written 24 June 2026. This is the path from where Lekhio is today to a live, legal, paying product. It is ordered exactly as asked: free things first, then things that cost money, then the legal side. Costs are current as of mid 2026 and sourced. Figures drift, so confirm anything before you spend on it.
 
 ---
@@ -69,7 +72,7 @@ Rough costs, current mid 2026. Sources at the end.
 
 **Switch the product on**
 1. Anthropic API credits. A small top up, around five to ten dollars, switches on receipt reading. At the volumes in doc 10 this lasts a long time.
-2. OpenAI API key for voice transcription. Tiny per note, around two tenths of a penny. Only needed if you want voice live at launch. Text and photo work without it.
+2. ~~OpenAI API key for voice transcription.~~ 🛑 **Not needed and must not be created.** Voice transcription runs on our own Mac mini using open weights Whisper. Cost per note: nothing. What it needs is the mini awake and polling, not a key.
 
 **The brand and the storefront**
 3. A domain. A .co.uk is roughly £5 to £15 a year, a .com roughly £8 to £20, a .app roughly £12 to £20. Availability must be checked live, and watch renewal prices. See the naming warning in the legal section before you buy.
@@ -120,7 +123,7 @@ A search of Companies House shows Bloomberg Lekhio Europe Limited, an active com
 2. Register as a sole trader with HMRC. Free.
 3. Pay the ICO data protection fee, £52. This is the one legal box you must tick early.
 4. Set up the free Meta WhatsApp Business account and connect the webhook.
-5. Add a few pounds of Anthropic credit and, if you want voice, an OpenAI key. Test a real receipt end to end.
+5. Add a few pounds of Anthropic credit. Test a real receipt end to end. ~~and, if you want voice, an OpenAI key~~ 🛑 voice needs no key, only the mini running.
 6. Run the trademark clearance search on the name. Decide to keep Lekhio or pick a variant.
 7. Buy the domain for the chosen name. Open a free business bank account.
 8. Wire up Stripe and turn on real subscriptions.

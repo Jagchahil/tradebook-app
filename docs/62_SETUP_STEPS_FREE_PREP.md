@@ -1,5 +1,8 @@
 # 62: Setup Steps for the Free Prep (Click by Click)
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > Exact steps for the things you can tick off now, for free, with a personal email and your spare phone. Do them in this order. Each one ends with where the value goes in Lekhio. Verified against the current Supabase, Twilio, Stripe, HMRC and Meta flows, June 2026.
 
 ---
@@ -65,7 +68,7 @@ Note: the trial only texts your verified number, which is perfect for testing an
 ## 5. The AI brain (small cost, when you are paid)
 
 1. console.anthropic.com, add a few pounds of credit, create an API key. In Vercel set `ANTHROPIC_API_KEY`.
-2. platform.openai.com, add a little credit (voice notes only, pennies), create a key. In Vercel set `OPENAI_API_KEY`.
+2. ~~platform.openai.com, add a little credit (voice notes only, pennies), create a key. In Vercel set `OPENAI_API_KEY`.~~  🛑 **Skip this entirely.** There is no OpenAI account to open. Voice notes are transcribed by Whisper running on our own Mac mini: MIT licensed open weights on hardware we own, so OpenAI is not a processor of ours and there is no key, no credit and no contract.
 3. Redeploy. The receipt reading, the accountant chat and voice notes now work. Until then they show a friendly "not switched on".
 
 ---

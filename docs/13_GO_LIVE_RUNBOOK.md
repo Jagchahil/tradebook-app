@@ -64,13 +64,27 @@ Checklist for the spare number:
 
 ---
 
-## 3. Switch on voice notes (OpenAI Whisper)
+## 3. Switch on voice notes
 
-1. Go to platform.openai.com, add a little credit, create an API key.
-2. In Vercel, add `OPENAI_API_KEY`.
-3. Redeploy.
+> 🛑 **This step used to read: go to platform.openai.com, add credit, create an API key, set `OPENAI_API_KEY` in Vercel, redeploy. Do not do that. There is nothing to buy and no account to open.**
+>
+> It described an architecture removed on 26 July 2026. `lib/transcribe.ts`, which uploaded customer audio to the OpenAI Whisper API, was deleted. Transcription moved onto **our own Mac mini**, and `test/hardening.test.mjs` now fails the build if anything in `app/` or `lib/` so much as reads `OPENAI_API_KEY` or names `api.openai.com`.
+>
+> Following the old step would have bought credit for a key nothing reads and opened a contract with a company that processes none of our data. Worse, it points at the one architecture that would make the privacy policy false: it promises **"your voice notes never leave our systems"** and **"no third party ever hears your voice note."**
 
-Test: send the test number a voice note saying "forty quid of diesel at the BP." You should get a confirmation and an entry to review. Photo and text already work without this, so this step is optional at launch.
+**Whisper is not OpenAI-the-processor, and this distinction is the whole answer.** Whisper is an open weights speech to text model published under an MIT licence. Running it on hardware we own is using a piece of open source software, exactly like running Postgres. No account, no API call, no data leaving the building, and therefore no controller to processor relationship: no DPA, no transfer mechanism, nothing owed in the data inventory. **Anthropic is our only AI processor.**
+
+**⚠️ And Wispr Flow is not a substitute.** Different company, different product. It is cloud only and cannot transcribe a word offline: the audio leaves the device for their servers. Putting customer voice notes through it would break both privacy sentences above and add a processor we would need a DPA with. It is a fine dictation tool on a personal machine. It must never become the product's transcription path.
+
+**What actually switches voice notes on:**
+
+1. The Mac mini is powered on, awake, and running the workforce worker.
+2. It is polling `/api/voice/pending` with a valid `CRON_SECRET`.
+3. `WHATSAPP_TOKEN` is set, so the reply can be sent.
+
+Test: send the test number a voice note saying "forty quid of diesel at the BP." You should get a confirmation and an entry to review. Photo and text already work without this.
+
+**If the mini is off, nothing is silently lost.** `/api/cron/voicereap` runs in both daily slots, apologises to anyone left waiting, and wipes the audio. It is watched in `lib/cronwatch.ts` (`voicereap: 26`), because its failure mode is an unkept privacy promise rather than a missing feature.
 
 ---
 

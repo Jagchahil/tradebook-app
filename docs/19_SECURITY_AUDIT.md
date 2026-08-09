@@ -1,5 +1,8 @@
 # 19: Security Audit
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > A sweep of the website and app for leaks, exposed secrets, and anything that calls out. Done 2026-06-25. Overall: clean. One open-endpoint cost risk was hardened. Recommendations for go-live are at the end.
 
 ---

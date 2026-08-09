@@ -1,12 +1,15 @@
 # 51: API Limits and Abuse Protection
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > Every endpoint, what it can cost us, and the exact limits that protect it. The goal is simple: no one can ever run up an insane bill, and bots cannot farm the funnel. Updated June 2026.
 
 ---
 
 ## The cost surfaces
 
-Only two things cost us money per request: the AI (Claude for vision and text, OpenAI Whisper for voice) and outbound messages and emails. Everything else is database reads and writes, which are effectively free at our scale.
+Only two things cost us money per request: the AI (Claude for vision and text; **voice transcription is local to our Mac mini and costs nothing per request**) and outbound messages and emails. Everything else is database reads and writes, which are effectively free at our scale.
 
 Two layers protect the AI spend:
 1. **In-memory burst limit.** Fast, per serverless instance. Stops rapid floods.

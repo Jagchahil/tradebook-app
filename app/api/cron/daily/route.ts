@@ -29,9 +29,16 @@ import crypto from 'crypto';
 //
 // 🔴 EACH KICK IS INDEPENDENT, AND THE DISPATCHER GATES ON NOTHING. metrics is the reason: the daily
 // revenue snapshot cannot be backfilled and must run even on a day WhatsApp is down, so it is never
-// placed behind a messaging config or another job's health. Every kicked endpoint still writes its
-// own cronStarted/cronFinished, so the watchdog (lib/cronwatch.ts) and /api/health keep watching all
-// six jobs BY NAME, exactly as before. Nothing about the alarm changed; only what pulls the trigger.
+// placed behind a messaging config or another job's health. Every kicked endpoint writes its own
+// cronStarted/cronFinished, so the watchdog (lib/cronwatch.ts) and /api/health keep watching the
+// jobs BY NAME. Nothing about the alarm changed; only what pulls the trigger.
+//
+// ⚠️ THIS SAID "ALL SIX JOBS" AND THE LIST HAS GROWN SINCE. voicereap was added to both slots on
+// 9 August writing neither call, and appearing in neither cronwatch's map nor the runs table, so
+// the sentence above was quietly false about the newest job in the list, which is the one nobody
+// has ever watched run. A count written into a comment goes stale the first time somebody adds a
+// line below it, so there is no count in it now. lib/cronwatch.ts is the register, and its foot
+// records what is deliberately NOT watched, so an absence there reads as a decision, not a hole.
 //
 // WHY THIS AND NOT PRO. Pro ($20/mo, 40 crons at the exact minute) is the clean answer and we may
 // still take it. This keeps us free today, at the cost of the six jobs sharing two run times instead

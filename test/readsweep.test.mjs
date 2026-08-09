@@ -68,10 +68,45 @@ function walk(dir) {
   }
   return out;
 }
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SCOPE, AND WHAT IS KNOWINGLY OUTSIDE IT. Written 9 August 2026, after a walkthrough audit
+// found the gap by reading, which is the slow way to find it.
+//
+// lib/ and app/api are the customer's money paths and they are swept in full. app/team is the
+// internal staff console, and it holds roughly thirty of the SAME shape: a client side
+// `await res.json()` after an `if (res.ok)`, which throws on a 200 carrying HTML exactly like every
+// site fixed in pushes 15 and 16.
+//
+// ⚠️ IT IS NOT SWEPT YET, AND A SILENT CAP IS A LIE. This codebase's rule is that a guard which
+// bounds its own coverage says so out loud, because a green suite reads as "there are none of these
+// anywhere" whether or not that is what it checked. So the number is PRINTED on every run.
+//
+// Why it is not simply fixed tonight: those are React handlers where a throw shows a stuck button
+// to a member of staff who can press it again, not a wrong figure to a customer who cannot. Same
+// defect, different blast radius. And a thirty file sweep on launch eve is how a launch acquires a
+// new defect. It is on the list rather than in the dark.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 const files = [...walk(path.join(root, 'lib')), ...walk(path.join(root, 'app/api'))];
 
 ok('🔴 THE SWEEP FOUND FILES TO SWEEP, without which a clean result means nothing',
   files.length > 60);
+
+// ⚠️ PRINTED, NOT ASSERTED. An assertion here would go red as the console grows and be switched off
+// the first time that was inconvenient, which is how a known gap becomes an unknown one. This has
+// to stay VISIBLE rather than enforced.
+{
+  const team = walk(path.join(root, 'app/team'));
+  let unguarded = 0;
+  for (const f of team) {
+    for (const line of readFileSync(f, 'utf8').split('\n')) {
+      if (/await\s+\w+\.json\(\)/.test(line) && !/\.catch\(/.test(line)) unguarded += 1;
+    }
+  }
+  process.stdout.write(
+    `\n  NOTE  app/team is OUTSIDE this sweep: ${unguarded} unguarded parse${unguarded === 1 ? '' : 's'}`
+    + ` across ${team.length} staff console files. Internal only, tracked, not swept.\n`,
+  );
+}
 
 // ═══ THE JUSTIFIED LIST. Anything added here must carry its reason. ═════════════════════════
 const ALLOWED = [

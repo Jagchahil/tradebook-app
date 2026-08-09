@@ -1,5 +1,8 @@
 # 63: Launch Readiness, Where We Are and the Order to Go Live
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > NOTE (7 Jul 2026): doc 81 is now THE current master picture and launch checklist. Keep this as the 30 June readiness snapshot only. Doc 60, which this once superseded, has been deleted. Read doc 81 first.
 
 > Snapshot taken 30 June 2026, after a full build + five-front deep audit + fixes. The honest one-line: the product is built, tested, and the WhatsApp loop is live end to end. What stands between here and paying customers is now almost entirely **external accounts and money**, not code.
@@ -35,7 +38,7 @@ These are working in production right now, verified today.
 Each step is independent unless noted. Costs are approximate.
 
 1. **Vercel Pro** (~£16/mo). Unlocks the 15-minute reminder cron cadence and headroom. (On Hobby today the cron falls back to ~daily, fine for testing.)
-2. **AI credit.** `ANTHROPIC_API_KEY` already in Vercel, add a few pounds of Anthropic credit. Add `OPENAI_API_KEY` + a little credit for voice notes. Redeploy. Photos, voice, and the accountant bot come alive.
+2. **AI credit.** `ANTHROPIC_API_KEY` already in Vercel, add a few pounds of Anthropic credit. ~~Add `OPENAI_API_KEY` + a little credit for voice notes.~~ 🛑 **Obsolete.** Voice runs on the Mac mini; no key exists. Redeploy. Photos, voice, and the accountant bot come alive.
 3. **Stripe live.** Swap the test `STRIPE_SECRET_KEY` for the **live** key, add a **live** webhook endpoint → `STRIPE_WEBHOOK_SECRET`. Add the Lekhio logo + brand colour in Stripe → Settings → Branding. Run one real-card test, then you can charge.
 4. **Meta Business Verification.** Needed to message beyond a handful of test recipients. Wants the company registered (step 6). Until verified, you can soft-launch to a small number.
 5. **Domain + email** (~£10/yr + a few £/mo). Buy lekhio.app, set up email, point the apps at it. Optional to operate (the Vercel URL works) but needed to look the part.

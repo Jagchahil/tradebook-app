@@ -1,5 +1,8 @@
 # 93: Launch gates runbook (7 July 2026)
 
+> ⚠️ **Corrected 9 August 2026.** Any instruction below to create an OpenAI account, add OpenAI credit, or set `OPENAI_API_KEY` is **obsolete and must not be followed**. `lib/transcribe.ts` was deleted on 26 July 2026; voice notes are transcribed by Whisper running locally on our own Mac mini, no key and no API call. Whisper is MIT licensed open weights, so running it on our own hardware makes OpenAI no processor of ours. Anthropic is our only AI processor. See `docs/13_GO_LIVE_RUNBOOK.md` section 3.
+
+
 > The ordered, click by click runbook to take Lekhio from code-ready to live. Everything here is external config or paperwork, not code (doc 88 confirmed no code security vulnerabilities). Pairs with doc 92 (incorporation pack). Nothing in this runbook moves money, files tax, or messages a third party without Jag doing it himself. Writing rule holds: no em dashes, no en dashes, no hyphens used as dashes.
 
 ## Reality check for a Friday (10 July) soft launch
@@ -54,7 +57,7 @@ Verify: visit https://lekhio.app, confirm it serves the site with a valid certif
 
 1. console.anthropic.com, Plans and Billing. Set a hard monthly spend cap and a budget alert first.
 2. Add credit. The durable per phone and global caps in code already backstop runaway loops (doc 88 scale note), the account cap is the outer belt.
-3. Set `OPENAI_API_KEY` in Vercel with a little credit, for Whisper voice transcription.
+3. ~~Set `OPENAI_API_KEY` in Vercel with a little credit, for Whisper voice transcription.~~  🛑 **Obsolete, do not do this.** No code reads that variable and `test/hardening.test.mjs` fails the build if any does. Voice transcription runs on our own Mac mini. What actually turns voice on: the mini awake and polling `/api/voice/pending`.
 
 Verify: send a receipt photo over WhatsApp and confirm it parses, and open Lekhio AI in the app and confirm it answers rather than showing the "not switched on" state. The prior blocker was "credit balance too low" in the Vercel logs, so a successful parse confirms the fix.
 

@@ -98,8 +98,10 @@ export default async function VatPage() {
   // tradesman who takes cash and does not invoice every job through Lekhio has a bigger turnover
   // than that, and the smaller figure is the one that tells him he is under a line he has already
   // crossed. lib/weeklyupdate.ts and lib/agent.ts have always counted confirmed trade income, so
-  // this screen was the odd one out AND the quiet one, because nothing links to it for a man who
-  // is not registered.
+  // this screen was the odd one out AND the quiet one, because until push 19 that same afternoon
+  // nothing linked to it for a man who is not registered. The Tax hub draws a "VAT threshold" door
+  // now, and the order mattered: the figure was made right FIRST and the door opened after, because
+  // linking an undercounting number from the hub would have been worse than leaving it unreachable.
   //
   // taxableTurnoverFor asks the very RPC the weekly asks, so the two now agree to the penny by
   // construction. It answers THREE ways: a figure, "not twelve months of him yet", and "could not
@@ -178,8 +180,13 @@ export default async function VatPage() {
           </p>
         </section>
       ) : !profile.registered ? (
-        /* ── NOT REGISTERED. He has no row on the Tax hub, so he typed the address to be here.
-              One sentence, and the one fact that could cost him money. ──────────────────────── */
+        /* ── NOT REGISTERED. He reaches this from the "VAT threshold" door on the Tax hub, which
+              has existed since push 19 on 9 August. This comment used to say he had no row on the
+              hub and must have typed the address, and it stayed that way for the rest of the day
+              AFTER the door was built: the hub's own comment quotes this sentence as the reason it
+              was building the door. A note that describes the world before the fix, sitting in the
+              file the fix landed in, is how the next reader concludes the screen is dead and stops
+              maintaining it. ──────────────────────────────────────────────────────────────────── */
         <section className="lek-card">
           <h1 className="lek-h2">VAT</h1>
           {notes.map((n) => <p key={n} style={S.body}>{n}</p>)}
@@ -200,13 +207,50 @@ export default async function VatPage() {
               turnover with a hole in it. Give it a moment and load the page again.
             </p>
           ) : turnover?.kind === 'tooNew' ? (
-            /* The RPC's own rule, said in his words. Under three months of account history there is
-               no honest rolling twelve month figure to give him, and inventing one from six weeks
-               would be worse than saying so. */
-            <p style={S.empty}>
-              You have not been with us twelve months yet, so there is no rolling twelve month
-              turnover to show you. Keep confirming what comes in and it fills in by itself.
-            </p>
+            /* ═══════════════════════════════════════════════════════════════════════════════
+               🔴 THIS IS THE ARM EVERY ACCOUNT LANDS ON AT LAUNCH, AND IT ANSWERED NOTHING.
+               9 August 2026, found in a walkthrough audit rather than by anybody using it.
+
+               The RPC nulls the rolling figure while an account is under THREE months old
+               (APPLY_2026-07-27_weekly_update_facts.sql), which on launch day is every customer we
+               have. The door on the Tax hub promises "where your last twelve months put you against
+               the line, and what happens if you cross it". What was here said NEITHER: no line, no
+               consequence, just a wait he had not asked about. A door that opens onto nothing is
+               the empty screen this codebase spent the whole day removing from everywhere else.
+
+               ⚠️ AND IT SAID "TWELVE MONTHS", WHICH IS THE WRONG NUMBER. The gate is three. He was
+               told to wait a year for something that arrives in a quarter, which is long enough to
+               decide the screen is not worth coming back to. The comment three lines above it said
+               three months, so the copy and its own note disagreed.
+
+               🔴 THE FIX IS NOT TO INVENT A FIGURE. We genuinely cannot build a rolling twelve
+               month turnover out of six weeks, and a made up one is the undercount this page was
+               rewritten to stop. But THE LINE and THE CONSEQUENCE are facts about VAT that do not
+               depend on his history at all, and they are exactly the two things the door promised.
+               He gets those, plus the honest reason the figure is not here yet.
+               ═══════════════════════════════════════════════════════════════════════════════ */
+            <>
+              <p style={S.body}>
+                Registering for VAT becomes compulsory once your taxable turnover in any rolling
+                twelve months goes over {gbp0(VAT_REGISTRATION_THRESHOLD)}. It is the rolling twelve
+                months that counts rather than your tax year, so it can happen in any month, and
+                registering late is a penalty.
+              </p>
+              {/* ⚠️ NOT TURNOVER_BASIS_NOTE HERE, THOUGH IT NEARLY WENT IN. That constant opens
+                  "This counts the trade income you have confirmed", which describes A FIGURE, and
+                  on this arm there is no figure to describe. A shared sentence that means one thing
+                  on two screens and something slightly different on a third is the drift the shared
+                  constant exists to prevent. So the forward looking version is written here, and it
+                  keeps the half that actually matters most to a brand new account: money he takes
+                  and does not log still counts. He is the likeliest of anyone to under log. */}
+              <p style={S.empty}>
+                We cannot show you where you stand against it yet. Your account is under three
+                months old, and a rolling twelve month figure built out of a few weeks would be a
+                number you could act on and should not. Keep confirming what comes in and it fills
+                itself in. It will count the trade income you confirm here and not your rent, which
+                is exempt, so anything you take and do not log still counts towards your own line.
+              </p>
+            </>
           ) : overThreshold ? (
             <p style={S.warn}>
               Your trade income over the last twelve months comes to {gbp0(yearTurnover)}, which is

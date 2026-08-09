@@ -534,11 +534,45 @@ export async function sendSignupCodeEmail(to: string, code: string): Promise<boo
 // The trial length and the promise both come from their owners rather than being typed again. This
 // file had "7 day" as a literal in two places, which is exactly how the store listings ended up
 // still advertising fourteen.
-export async function sendWelcomeEmail(to: string, name?: string | null): Promise<boolean> {
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND IT HAS TO BE TOLD WHETHER THE TRIAL ACTUALLY STARTED. Found 9 August 2026.
+//
+// This email said "your 7 day free trial has started" to everybody, in the body and again in the
+// preheader, because its only gate was `if (!existingId)`: a NEW account, never a trial that began.
+//
+// Three lines above that call, /api/signup/verify already knew better. grantTrialWithIdentity can
+// REFUSE, when the same man has had a trial on this email, this number or this account before, and
+// when it refuses the route builds an honest refusalNote and puts it on his screen. So a man who
+// had already had one read "You have had a free trial on this email already. Sign in and pick up
+// where you left off, or add a card to carry on" on the screen, and in the same minute read "your
+// 7 day free trial has started" in his inbox. Two surfaces, one fact, opposite answers, which is
+// the failure this codebase keeps ending.
+//
+// ⚠️ THE PARAMETER IS REQUIRED, NOT OPTIONAL WITH A CHEERFUL DEFAULT. A caller who does not know
+// has to say so out loud. An optional flag defaulting to 'started' would put the lie straight back
+// the first time somebody adds a second door, and tsc would not say a word.
+//
+// ⚠️ AND 'not started' COVERS "WE COULD NOT TELL", deliberately. If grantTrialWithIdentity throws,
+// the route knows nothing, and an email that claims nothing is the only thing that cannot be wrong.
+// Under-promising a man whose trial did start costs him one surprise in his favour, and his billing
+// page corrects it within the hour. Over-promising costs him the card he was told he would not
+// need. So the second arm asserts NO trial state at all and sends him to the one screen that always
+// knows, rather than guessing at a reason we may not have.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function sendWelcomeEmail(
+  to: string,
+  name: string | null,
+  trial: 'started' | 'not started',
+): Promise<boolean> {
   const hi = name ? `You are in, ${esc(name)}.` : 'You are in.';
+  const started = trial === 'started';
+  const opening = started
+    ? `Your account is open and your ${TRIAL_DAYS} day free trial has started. No card, and nothing to install.`
+    : 'Your account is open, and there is nothing to install. Whether you have a free trial running, and what happens next, is always on your billing page under You.';
   const inner = `
     ${h1(hi)}
-    ${p(`Your account is open and your ${TRIAL_DAYS} day free trial has started. No card, and nothing to install.`)}
+    ${p(opening)}
     ${p(`The next bit is where the money is: ${HOW_LONG} of questions about you, not about your paperwork. Most of what you can claim has nothing to do with receipts, and nobody ever asks. Stop whenever you like and pick up where you left off.`)}
     ${button(`${APP}/app/setup`, 'Finish setting up')}
     ${p('Everything lives in your browser, on any phone or laptop. Sign in with this email address whenever you want to see where you stand.')}
@@ -546,7 +580,11 @@ export async function sendWelcomeEmail(to: string, name?: string | null): Promis
   return send({
     to,
     subject: { once: 'welcome', subject: 'You are in. Let us finish setting you up.' },
-    html: shell(inner, { preheader: `Your ${TRIAL_DAYS} day free trial has started.` }),
+    html: shell(inner, {
+      preheader: started
+        ? `Your ${TRIAL_DAYS} day free trial has started.`
+        : 'Your account is open. Here is how to finish setting up.',
+    }),
     tag: 'welcome',
   });
 }

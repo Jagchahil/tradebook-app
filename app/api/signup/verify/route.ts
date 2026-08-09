@@ -164,6 +164,11 @@ export async function POST(req: NextRequest) {
   // The trial. The identity is read off his own signup row rather than the request body, so a
   // crafted post cannot hand us a clean name and number to get past the duplicate check.
   let trialNote: string | null = null;
+  // 🔴 AND WHETHER IT ACTUALLY STARTED, WHICH THE WELCOME EMAIL WAS NEVER TOLD. Found 9 August
+  // 2026. Every branch below that does not set this to true leaves it FALSE, and false is the arm
+  // that promises nothing. That is the whole design: the lie was only possible because the email
+  // was reached by a path that could not fail.
+  let trialStarted = false;
   const ident = await latestSignupIdentity(verifiedEmail);
   try {
     const grant = await grantTrialWithIdentity({
@@ -173,6 +178,7 @@ export async function POST(req: NextRequest) {
       personName: ident?.personName ?? null,
       businessName: ident?.businessName ?? null,
     });
+    trialStarted = grant.granted;
     // He is IN either way. A refused trial is not a refused account: he still has his books, and
     // the only difference is that he is asked for a card sooner. Telling him plainly beats letting
     // him discover it when something stops working.
@@ -180,12 +186,23 @@ export async function POST(req: NextRequest) {
       trialNote = refusalNote(grant.refusedOn);
     }
   } catch {
-    // A billing row that would not write must never cost a man his account.
+    // A billing row that would not write must never cost a man his account. It must not put a
+    // trial in his inbox either: trialStarted stays false, and the email claims nothing.
   }
 
   // Welcome him, now that there is something to welcome him to. Only on a NEW account: a man
   // signing back in after forgetting does not need telling he has joined.
-  if (!existingId) void sendWelcomeEmail(verifiedEmail, ident?.personName ?? null).catch(() => {});
+  //
+  // ⚠️ AND ONLY THE TRIAL HE ACTUALLY GOT. This used to be gated on `!existingId` alone, so a man
+  // refused a second trial read refusalNote on his screen and "your 7 day free trial has started"
+  // in his inbox, in the same minute. See the block above sendWelcomeEmail in lib/email.ts.
+  if (!existingId) {
+    void sendWelcomeEmail(
+      verifiedEmail,
+      ident?.personName ?? null,
+      trialStarted ? 'started' : 'not started',
+    ).catch(() => {});
+  }
 
   const sessionId = newSessionId();
   const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000);

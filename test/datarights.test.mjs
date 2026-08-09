@@ -201,8 +201,24 @@ console.log('\nNothing is deleted that is not also handed back, and the other wa
   ok('every table the erasure deletes is also in the export', missingFromExport.length === 0);
   ok('the profile row itself is exported, under `user`', Object.prototype.hasOwnProperty.call(exported, 'user'));
 
+  // ⚠️ receipt_images IS EXPORTED AND IS NOT A TABLE, so it cannot appear in deletedTables. It is
+  // the storage bucket, handed back as signed links rather than as rows, and it is erased by
+  // deleteReceiptImages against /storage/v1/object/receipts.
+  //
+  // 🔴 THE EXEMPTION IS EARNED PER RUN, NOT ASSERTED ONCE. A bare `k !== 'receipt_images'` in this
+  // filter would be a permanent hole exactly where the property matters most: his photographs are
+  // the one thing here that no foreign key cascades to, so the export handing them back while the
+  // erasure quietly stopped deleting them is the shape of the original defect this suite exists
+  // for. So the key is only forgiven if THIS RUN actually issued the bucket delete.
+  const bucketWiped = deletes.some((c) => c.url.endsWith('/storage/v1/object/receipts'))
+    || deleteCalls.some((c) => c.method === 'DELETE' && c.url.endsWith('/storage/v1/object/receipts'));
+  ok('🔴 THE EXPORT HANDS BACK RECEIPT IMAGES AND THE ERASURE EMPTIES THE BUCKET IN THE SAME RUN',
+    !Object.prototype.hasOwnProperty.call(exported, 'receipt_images') || bucketWiped);
+
   const exportedTables = Object.keys(exported).filter(
-    (k) => k !== 'exported_at' && k !== 'user' && Array.isArray(exported[k]),
+    (k) => k !== 'exported_at' && k !== 'user' && k !== 'receipt_images_note'
+      && !(k === 'receipt_images' && bucketWiped)
+      && Array.isArray(exported[k]),
   );
   const missingFromDelete = exportedTables.filter((t) => !deletedTables.has(t));
   missingFromDelete.forEach((t) => console.log(`        exported but never deleted: ${t}`));
@@ -324,6 +340,97 @@ console.log('\nAn erasure that did not finish must not answer ok.\n');
     () => SB.deleteUserData(USER_ID, EMAIL),
   );
   ok('a table PostgREST cannot find is not counted as a failed erasure', result === true);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE INVARIANT THE ERASURE RESTS ON, AND THE COMMIT THAT WOULD BREAK IT.
+//
+// Two tables in the manifest are keyed by the customer's PHONE rather than his user id:
+// support_tickets.phone, and ai_usage.key, WHICH HOLDS HIS NUMBER IN PLAIN TEXT. deleteUserData
+// reads the number off his users row first and skips a table whose key is empty, which is right
+// for a man with no address on file, and right for the number too, TODAY AND ONLY TODAY, because
+// a phone number once set on users is never unset anywhere in the product. The bank has
+// /api/bank/disconnect. The phone has no equivalent.
+//
+// ⚠️ THE DAY SOMEBODY ADDS ONE, THIS BECOMES A LIVE GDPR HOLE WITH NO SYMPTOM. The erasure would
+// skip both tables in silence, answer ok, and leave his number sitting in ai_usage.key. Nothing
+// throws. Nothing looks wrong. The only person who could notice is the customer, who cannot see
+// the table.
+//
+// So this guard does not test behaviour, it tests that the WORLD the behaviour assumes still
+// holds: it walks the server tree and goes red on any code writing a null phone_number onto users.
+// It fires on the commit that breaks the invariant rather than on the complaint six months later.
+//
+// ⚠️ SCOPED TO THE users TABLE ON PURPOSE. A null phone_number written to any other table is not
+// this defect, and a guard that shouts about things that are fine is a guard somebody switches off.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nThe phone a man can never unset, which two of these deletes are keyed by.\n');
+{
+  const files = [];
+  const walk = (dir) => {
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (/\.(ts|tsx|mjs)$/.test(e.name)) files.push(full);
+    }
+  };
+  for (const r of ['lib', 'app', 'scripts']) walk(path.join(repoRoot, r));
+
+  ok('🔴 THE SWEEP FOUND FILES, without which every assertion below is vacuous',
+    files.length > 50);
+
+  // A write of a null number, in the shapes a tree of raw fetch calls actually produces:
+  //   phone_number: null        an object literal in a PATCH or POST body
+  //   phone_number: undefined   the same thing once JSON.stringify has dropped it
+  //   phone_number: ''          the empty string, which `if (!value) continue` treats alike
+  //   "phone_number": null      a hand written JSON body
+  //
+  // ⚠️ THE LOOKBEHIND IS THE WHOLE OF THE CORRECTNESS. Without `(?<![.\w])` this matches
+  //     const phone = Array.isArray(urows) ? urows[0]?.phone_number : null;
+  // which is a TERNARY reading the number, not a write of a null one, and lib/supabase.ts has one.
+  // The first version of this guard reported that line and would have been switched off within a
+  // week. Third detector today to ship a false positive; see test/readsweep.test.mjs for the other
+  // two. A property access is never a property definition, so anything preceded by a dot or a word
+  // character is not this.
+  const NULLING = /(?<![.\w])(["']?)phone_number\1\s*:\s*(null|undefined|''|""|``)/;
+
+  const offenders = [];
+  for (const f of files) {
+    const src = readFileSync(f, 'utf8');
+    if (!NULLING.test(src)) continue;
+    // Only a write that lands on the users table is this defect, and in this tree the URL and the
+    // body sit in the same function, so the same file naming both is the signal.
+    if (/\/rest\/v1\/users\b/.test(src) || /from\(\s*['"]users['"]\s*\)/.test(src)) {
+      offenders.push(path.relative(repoRoot, f));
+    }
+  }
+  ok(`🔴 NOTHING WRITES A NULL phone_number ONTO users${offenders.length ? ` (found: ${offenders.join(', ')})` : ''}`,
+    offenders.length === 0);
+
+  // ⚠️ AND THE DETECTOR IS PROVED AGAINST STRINGS IT MUST CATCH AND ONE IT MUST NOT.
+  // A regex that matches nothing passes this file for ever, and would pass the real tree too.
+  // Written after the readsweep detector shipped two rounds of false positives: a guard that
+  // cannot see itself is not a guard.
+  ok('the detector matches every shape it exists to catch',
+    NULLING.test('body: JSON.stringify({ phone_number: null })')
+    && NULLING.test('{ "phone_number": null }')
+    && NULLING.test("{ phone_number: '' }")
+    && NULLING.test('{ phone_number: undefined }'));
+  ok('🔴 AND IT REJECTS THE TWO SHAPES THAT ARE NOT A WRITE, one of which is live in the tree',
+    !NULLING.test('{ phone_number: e164 }')
+    && !NULLING.test('const phone = Array.isArray(urows) ? urows[0]?.phone_number : null;')
+    && !NULLING.test('as Array<{ id: string; phone_number: string | null }>'));
+
+  // The landmine comment is the other half of this. A reader who deletes the note and keeps the
+  // `continue` has removed the only warning standing at the site itself.
+  const sb = readFileSync(path.join(repoRoot, 'lib/supabase.ts'), 'utf8');
+  ok('🔴 THE NOTE AT THE SKIP STILL SAYS WHY THE SKIP IS SAFE',
+    /never unset/.test(sb) && /ai_usage/.test(sb));
+  ok('and it names this file, so the guard can be found from the code it guards',
+    /test\/datarights\.test\.mjs/.test(sb));
 }
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);

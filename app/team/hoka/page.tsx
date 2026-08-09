@@ -80,6 +80,33 @@ interface TReview {
 type NewReview = { quote: string; name: string; trade: string; rating: number; source: string };
 const BLANK_REVIEW: NewReview = { quote: '', name: '', trade: '', rating: 5, source: '' };
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHAT A CUSTOMER WROTE HIMSELF, AND WHY IT MUST NOT LOOK LIKE WHAT WE TYPED IN.
+//
+// Since 9 August a customer writes his own review from /app/you/testimonial. It arrives here
+// UNPUBLISHED, carrying source 'customer', and somebody at this desk turns it on. Nothing else in
+// the product writes that word, so this is the whole of the signal.
+//
+// The old list drew published and unpublished the same way with a grey "Hidden" chip, which was
+// right when the only unpublished rows were ones WE had typed and not switched on yet. It is wrong
+// now: an unpublished row can be a man who took the trouble to write us something and is waiting.
+// Buried in a list of our own drafts it reads as a draft, and it would sit there for weeks.
+//
+// ⚠️ THE LITERAL IS COPIED RATHER THAN IMPORTED, ON PURPOSE. This is a 'use client' file, and
+// importing out of lib/supabase would pull the service role path into a browser bundle. The source
+// of truth is TESTIMONIAL_FROM_CUSTOMER in lib/supabase.ts, and test/owntestimonial.test.mjs goes
+// red the moment the two stop agreeing, because a filter on a literal that has drifted shows
+// NOTHING WAITING, which reads exactly like nobody having written one.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const FROM_CUSTOMER = 'customer';
+
+// Where a quote came from, in words. 'customer' is not a note somebody typed, it is the system
+// saying he wrote it himself, so it gets a sentence rather than being printed raw as "via customer".
+function sourceLine(source: string | null): string {
+  if (source === FROM_CUSTOMER) return 'written by them, in their own account';
+  return source ? `via ${source}` : 'source not noted';
+}
+
 // The route answers with a short code. Turn each into the thing to actually fix, the way the OAuth
 // reasons above are turned into an instruction rather than a code to google.
 function reviewError(code?: string): string {
@@ -144,6 +171,19 @@ export default function HokaPage() {
   const [testimonials, setTestimonials] = useState<TReview[]>([]);
   const [reviewsLoaded, setReviewsLoaded] = useState(false);
   const [newReview, setNewReview] = useState<NewReview>(BLANK_REVIEW);
+
+  // What a customer wrote himself and nobody here has looked at yet. See the header on
+  // FROM_CUSTOMER: these are the only rows with a person waiting on the other end.
+  const waiting = useMemo(
+    () => testimonials.filter((t) => t.source === FROM_CUSTOMER && !t.published),
+    [testimonials],
+  );
+  // Those first, then everything else in the order the route already sorted it (newest first).
+  // A stable partition rather than a sort, so nothing else about the list moves.
+  const ordered = useMemo(
+    () => [...waiting, ...testimonials.filter((t) => !(t.source === FROM_CUSTOMER && !t.published))],
+    [testimonials, waiting],
+  );
 
   const token = useCallback(async () => {
     const { data: s } = await browserSupabase.auth.getSession();
@@ -624,7 +664,11 @@ export default function HokaPage() {
         <div style={U.sectionHead}>
           <h2 style={T.h2}>Testimonials</h2>
           <span style={U.sectionNote}>
-            {!reviewsLoaded ? 'reading…' : `${testimonials.filter((t) => t.published).length} live on the homepage`}
+            {!reviewsLoaded
+              ? 'reading…'
+              : waiting.length > 0
+                ? `${waiting.length} waiting for you · ${testimonials.filter((t) => t.published).length} live on the homepage`
+                : `${testimonials.filter((t) => t.published).length} live on the homepage`}
           </span>
         </div>
         <p style={{ ...T.tiny, color: C.faint, marginTop: 0, marginBottom: 12 }}>
@@ -632,6 +676,18 @@ export default function HokaPage() {
           evidence and the permission. Nothing here writes a word for you, and a quote nobody gave is
           the one thing this section must never hold.
         </p>
+        {/* ⚠️ THE COUNT IS REPEATED AS A LINE BECAUSE THE HEADER NOTE IS EASY TO WALK PAST, and a
+            review sitting unread is a man who did us a favour and heard nothing back. It draws only
+            when there is something waiting: a permanent "0 waiting" row is a row nobody reads, and
+            then the one that matters looks like it too. */}
+        {reviewsLoaded && waiting.length > 0 ? (
+          <div style={waitingBanner}>
+            {waiting.length === 1
+              ? 'One customer has written a review from inside their account. Nobody has seen it but them.'
+              : `${waiting.length} customers have written reviews from inside their accounts. Nobody has seen them but them.`}
+            {' '}Read it, and put it live if it is one we want.
+          </div>
+        ) : null}
         <div style={card}>
           <textarea
             value={newReview.quote}
@@ -661,29 +717,55 @@ export default function HokaPage() {
           ) : testimonials.length === 0 ? (
             <div style={U.honest}>No testimonials yet. The homepage section stays hidden until you add one.</div>
           ) : (
+            /* ⚠️ WAITING FIRST, AND THAT IS THE WHOLE POINT OF THE SPLIT. The list is newest first,
+               so a review written today is at the top today and four rows down by the weekend. The
+               only rows with a person on the other end waiting for an answer are these. */
             <div style={{ display: 'grid', gap: 10 }}>
-              {testimonials.map((t) => (
-                <div key={t.id} style={{ ...card, opacity: t.published ? 1 : 0.6 }}>
+              {ordered.map((t) => {
+                const isWaiting = t.source === FROM_CUSTOMER && !t.published;
+                return (
+                <div
+                  key={t.id}
+                  style={{
+                    ...card,
+                    opacity: t.published || isWaiting ? 1 : 0.6,
+                    ...(isWaiting ? { borderColor: C.saffron, background: C.saffronTint } : null),
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={chip}>{t.rating} out of 5</span>
                     <span style={{ fontSize: 14.5, fontWeight: 750, color: C.ink }}>{t.name}</span>
                     <span style={{ ...T.tiny, color: C.faint }}>{t.trade}</span>
-                    <span style={{ ...chip, marginLeft: 'auto', color: t.published ? C.green : C.faint }}>
-                      {t.published ? 'Live' : 'Hidden'}
+                    <span
+                      style={{
+                        ...chip,
+                        marginLeft: 'auto',
+                        color: t.published ? C.green : isWaiting ? C.amber : C.faint,
+                        ...(isWaiting ? { borderColor: C.amber, fontWeight: 800 } : null),
+                      }}
+                    >
+                      {t.published ? 'Live' : isWaiting ? 'Waiting for you' : 'Hidden'}
                     </span>
                   </div>
                   <p style={{ ...T.small, color: C.ink2, margin: '10px 0 0' }}>&ldquo;{t.quote}&rdquo;</p>
                   <div style={{ ...T.tiny, color: C.faint, marginTop: 6 }}>
-                    {t.source ? `via ${t.source}` : 'source not noted'}
-                    {t.created_by ? ` · added by ${t.created_by}` : ''}
+                    {sourceLine(t.source)}
+                    {/* ⚠️ NOT "added by" FOR A CUSTOMER'S OWN. created_by is HIM on those rows, and
+                        "added by <a customer's id>" reads as one of us having typed it in, which is
+                        the exact confusion the anti invention rule cares about. */}
+                    {t.created_by && t.source !== FROM_CUSTOMER ? ` · added by ${t.created_by}` : ''}
                     {t.created_at ? ` · ${shortDate(t.created_at)}` : ''}
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                     <button
                       disabled={busy[`tp${t.id}`]}
                       onClick={() => toggleReview(t.id, !t.published)}
-                      style={{ ...btn, ...btnGhost }}
-                    >{busy[`tp${t.id}`] ? 'Working…' : t.published ? 'Hide' : 'Show'}</button>
+                      style={{ ...btn, ...(isWaiting ? btnDark : btnGhost) }}
+                    >
+                      {busy[`tp${t.id}`]
+                        ? 'Working…'
+                        : t.published ? 'Hide' : isWaiting ? 'Approve and put it live' : 'Show'}
+                    </button>
                     <button
                       disabled={busy[`td${t.id}`]}
                       onClick={() => removeReview(t.id)}
@@ -691,7 +773,8 @@ export default function HokaPage() {
                     >{busy[`td${t.id}`] ? 'Working…' : 'Delete'}</button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -701,6 +784,7 @@ export default function HokaPage() {
 }
 
 const card: React.CSSProperties = { background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(17,17,17,.03)' };
+const waitingBanner: React.CSSProperties = { fontSize: 13, lineHeight: 1.55, fontWeight: 650, color: C.ink, background: C.amberTint, border: `1px solid ${C.amber}`, borderRadius: 12, padding: '11px 13px', marginBottom: 12 };
 const chip: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: C.muted, border: `1px solid ${C.line}`, borderRadius: 999, padding: '3px 9px' };
 const frame: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'baseline' };
 const input: React.CSSProperties = { width: '100%', boxSizing: 'border-box', fontSize: 14, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 8, padding: '9px 11px', background: '#fff' };

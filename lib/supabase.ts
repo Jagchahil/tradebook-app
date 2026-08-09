@@ -3520,6 +3520,24 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
 
   // His own actions, with the ip address they came from. His to see, and his to have erased.
   { table: 'audit_log', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HIS TESTIMONIAL, WHICH UNTIL 9 AUGUST 2026 COULD NOT BE ERASED AT ALL.
+  //
+  // The table had no identity column: only created_by, which is the TEAM MEMBER who typed it in.
+  // So a customer's name and his words sat on the PUBLIC HOMEPAGE and this walk went straight past
+  // them. There was no request he could make that would take them down, because nothing left in
+  // the database remembered they were his.
+  //
+  // The fix was Jag's and it is better than the one that was proposed to him: the customer writes
+  // it HIMSELF, from inside his own account, so the user id is on the row BY CONSTRUCTION rather
+  // than because somebody remembered to paste an address. Consent is given by the person, in his
+  // words, at a moment he chose, and withdrawal is a button on the same screen.
+  //
+  // ⚠️ A NULL user_id IS A REAL ANSWER, not a gap. It is a quote from somebody with no Lekhio
+  // account, and no account means no erasure request to serve. The rows that predate this column
+  // are also null and are swept by hand once.
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  { table: 'testimonials', userKey: 'user_id', keyKind: 'user_id', select: '*' },
   // The learning pool. Question and answer are both PII redacted on the way in
   // (see logQaCandidate), but redaction is a filter, not a guarantee, and the
   // row is keyed to the asker whose answer text is stored. Same shape as
@@ -3633,6 +3651,9 @@ export interface AccountExport {
   // table twice and exporting the same rows twice under two names.
   subscriptions: unknown[];
   waitlist: unknown[];
+  // Article 15(3) wants a COPY. These are links, not bytes, and the note says how long they live.
+  receipt_images: ExportedReceipt[];
+  receipt_images_note: string;
   // Then one key per USER_DATA_TABLES entry, named for the table it came from. Declared as an
   // index signature rather than thirty named fields for the reason this whole section exists: a
   // named field is a second list, and a second list goes stale.
@@ -3682,11 +3703,21 @@ export async function exportUserData(userId: string, email: string | null): Prom
     return true;
   });
 
+  // His photographs, as links rather than bytes. See the block above signedReceiptLinks.
+  const receipts = await signedReceiptLinks(userId);
+
   const out: AccountExport = {
     exported_at: new Date().toISOString(),
     user: user[0] ?? null,
     subscriptions,
     waitlist,
+    receipt_images: receipts.items,
+    // 🔴 SAID IN HIS OWN FILE, not left for him to discover. A link that has quietly expired reads
+    // like a product that lost his receipts, and an empty list he cannot tell from a failed read is
+    // the same lie in the other direction.
+    receipt_images_note: receipts.readable
+      ? `Each link above works for ${EXPORT_LINK_DAYS} days from the date at the top of this file. Save the pictures somewhere of your own before then. Ask for another export whenever you like and you will get fresh links.`
+      : 'We could not read your receipt pictures just now, so this list is empty because the read failed and not because you have none. Ask for the export again in a few minutes.',
   };
   USER_DATA_TABLES.forEach((t, i) => {
     out[t.table] = rows[i];
@@ -3745,6 +3776,80 @@ async function deleteReceiptImages(userId: string): Promise<boolean> {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 HIS RECEIPT PHOTOGRAPHS, IN THE EXPORT. Article 15(3), 9 August 2026.
+//
+// The erasure has taken his pictures out of the bucket since 6 August. The EXPORT never gave him a
+// copy of them, and Article 15(3) is explicit: the controller shall provide A COPY of the personal
+// data undergoing processing. A photograph he took of his own receipt is his personal data, and it
+// is the only thing we hold that he cannot reconstruct from his own records: the shop, the day, the
+// card digits, his handwriting on the back of it.
+//
+// ⚠️ THE BYTES DO NOT GO IN THE FILE. An export is JSON that lands in a downloads folder, an email,
+// a WhatsApp to his accountant. Base64 of a year of receipts would make it enormous and would put
+// the images themselves into every copy of it forever. Signed links are the mechanism, and the
+// mechanism has a decision in it: how long they live.
+//
+// ⚠️ SEVEN DAYS, DECIDED BY JAG ON 9 AUGUST 2026. Long enough that he can ask on a Friday and open
+// it at the weekend. Short enough that an export file leaked out of a downloads folder or a
+// forwarded email is stale before it is much use to anyone. The number is stated IN THE FILE, next
+// to the links, because a link that has quietly expired reads to him like a product that lost his
+// receipts.
+//
+// ⚠️ AND A FAILED LISTING IS SAID, NOT DRAWN AS "he has none". An empty array where the truth is
+// "we could not look" is the oldest bug in this codebase wearing a storage bucket.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const EXPORT_LINK_DAYS = 7;
+
+export interface ExportedReceipt {
+  path: string;
+  url: string | null;
+  expires_at: string;
+}
+
+async function signedReceiptLinks(userId: string): Promise<{ items: ExportedReceipt[]; readable: boolean }> {
+  const { url } = config();
+  const prefix = `${userId}/`;
+  const expiresIn = EXPORT_LINK_DAYS * 24 * 60 * 60;
+  try {
+    const listRes = await fetch(`${url}/storage/v1/object/list/${RECEIPTS_BUCKET}`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ prefix, limit: 1000, offset: 0 }),
+    });
+    // A bucket that does not exist is holding nothing of his, which is a real answer and not a
+    // failure. Same reading as deleteReceiptImages.
+    if (listRes.status === 404) return { items: [], readable: true };
+    if (!listRes.ok) return { items: [], readable: false };
+    const objects = (await listRes.json().catch(() => null)) as Array<{ name?: string }> | null;
+    if (!Array.isArray(objects)) return { items: [], readable: false };
+    const paths = objects.map((o) => `${prefix}${o?.name ?? ''}`).filter((x) => x !== prefix);
+    if (paths.length === 0) return { items: [], readable: true };
+
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+    const signRes = await fetch(`${url}/storage/v1/object/sign/${RECEIPTS_BUCKET}`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ expiresIn, paths }),
+    });
+    if (!signRes.ok) return { items: [], readable: false };
+    const signed = (await signRes.json().catch(() => null)) as Array<{ path?: string; signedURL?: string }> | null;
+    if (!Array.isArray(signed)) return { items: [], readable: false };
+    return {
+      items: signed.map((r) => ({
+        path: String(r?.path ?? ''),
+        // The API returns a path relative to /storage/v1. Absolute, so the link in his file works
+        // when he opens it, rather than only from inside our own origin.
+        url: r?.signedURL ? `${url}/storage/v1${r.signedURL}` : null,
+        expires_at: expiresAt,
+      })),
+      readable: true,
+    };
+  } catch {
+    return { items: [], readable: false };
+  }
+}
+
 // Right to erasure: delete every row for this user across all tables, including
 // the server-only ones that do not cascade from `users`, then his receipt images
 // out of the storage bucket, then the auth user.
@@ -3775,7 +3880,26 @@ export async function deleteUserData(userId: string, email: string | null): Prom
   // key, and everything keyed by phone or address goes before the users row that holds them.
   for (const t of USER_DATA_TABLES) {
     const value = identities[t.keyKind];
-    // No address on file means no address rows to delete, which is not a failure.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THIS `continue` IS SAFE ONLY BECAUSE OF AN INVARIANT HELD SOMEWHERE ELSE. READ THIS
+    // BEFORE YOU ADD A WAY FOR A CUSTOMER TO UNLINK HIS PHONE.
+    //
+    // No address on file means no address rows to delete, which is not a failure. The same is true
+    // of the number, TODAY, and only today. Two tables in the manifest are keyed by phone rather
+    // than by user id: support_tickets.phone, and ai_usage.key, WHICH HOLDS HIS NUMBER IN PLAIN
+    // TEXT. If we reach here with no phone, both are skipped in silence and the erasure still
+    // answers ok.
+    //
+    // That is correct right now because a phone number, once set on users, is never unset: the
+    // bank has /api/bank/disconnect, the phone has no equivalent anywhere in the tree. So an
+    // account with no number never had one, and there is nothing to skip.
+    //
+    // ⚠️ THE DAY SOMEBODY ADDS A PHONE DISCONNECT, THIS BECOMES A LIVE GDPR HOLE. His number would
+    // sit in ai_usage.key through an erasure that reported success, and nothing would say so.
+    // test/datarights.test.mjs walks the server tree and goes RED if any code writes a null
+    // phone_number onto users, so this note cannot rot quietly: the guard fires on the commit that
+    // breaks the invariant, not on the support ticket six months later.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
     if (!value) continue;
     await del(`${t.table}?${t.userKey}=eq.${encodeURIComponent(value)}`);
   }
@@ -8574,7 +8698,7 @@ export async function writeTestimonial(fields: {
   trade: string;
   rating: number;
   source?: string | null;
-}, createdBy: string): Promise<boolean> {
+}, createdBy: string, userId: string | null = null): Promise<boolean> {
   if (!fields.quote?.trim() || !fields.name?.trim() || !fields.trade?.trim() || !createdBy) return false;
   if (!Number.isInteger(fields.rating) || fields.rating < 1 || fields.rating > 5) return false;
   try {
@@ -8589,7 +8713,171 @@ export async function writeTestimonial(fields: {
         rating: fields.rating,
         source: fields.source?.trim() || null,
         created_by: createdBy,
+        // 🔴 WHOSE IT IS, so an erasure can find it. Null for a quote from somebody who is not a
+        // Lekhio customer (a review site, a chat at a merchant's counter), which is honest: there
+        // is no account to key it to and the console says so. Every testimonial a CUSTOMER writes
+        // comes through /api/testimonial, where the id is the session's and cannot be null.
+        user_id: userId,
       }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE CUSTOMER'S OWN TESTIMONIAL. HIS TO WRITE, HIS TO READ BACK, HIS TO TAKE DOWN.
+//
+// One per account, replaced rather than accumulated: a wall of quotes from one man is not a
+// testimonial, it is a comments section, and it gives an erasure more to miss.
+//
+// ⚠️ IT IS NEVER PUBLISHED BY THE PERSON WHO WROTE IT. writeOwnTestimonial forces published false,
+// so what he types is stored and shown back to him and reaches the public homepage only when
+// somebody at Lekhio publishes it from the console. Any other arrangement is a text box on the
+// front page of lekhio.app that anyone with an account can type into.
+//
+// ⚠️ AND EVERY ONE OF THESE IS SCOPED BY user_id IN THE QUERY, not by an id handed in. He can read,
+// replace and delete HIS, and there is no id he could learn that would reach anyone else's.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export interface OwnTestimonial {
+  id: string;
+  quote: string;
+  name: string;
+  trade: string;
+  rating: number;
+  published: boolean;
+  created_at: string;
+}
+
+export async function readOwnTestimonial(userId: string): Promise<OwnTestimonial | null | 'unreadable'> {
+  if (!userId) return null;
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/testimonials?user_id=eq.${encodeURIComponent(userId)}` +
+      '&select=id,quote,name,trade,rating,published,created_at&order=created_at.desc&limit=1',
+      { headers: headers() },
+    );
+    if (!res.ok) return 'unreadable';
+    const rows = (await res.json().catch(() => null)) as OwnTestimonial[] | null;
+    if (rows === null) return 'unreadable';
+    return rows[0] ?? null;
+  } catch {
+    return 'unreadable';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE NAME AND THE TRADE ARE READ FROM HIS ACCOUNT HERE, NEVER TAKEN FROM THE FORM.
+//
+// Two reasons, and the second one is the one that matters.
+//
+//   1. We already know both. Making a man retype his own name and his own trade into a box, on a
+//      product whose whole promise is that it already holds his details, is the product forgetting
+//      what it is for.
+//
+//   2. 🔴 A NAME THAT ARRIVES IN A REQUEST BODY IS A NAME HE CHOSE, NOT A NAME HE HAS. A form that
+//      posts `name` lets anyone with an account publish a quote signed as somebody else, and the
+//      whole worth of a testimonial is that a real person actually said it. CAP 3.47 and the DMCC
+//      Act 2024 ban invented testimonials, and a field the client controls is an invitation to
+//      invent one. So the client sends what he WANTS SHOWN, as two booleans, and the server decides
+//      what those booleans mean by reading his own row.
+//
+// ⚠️ SHOWING THE NAME IS A CHOICE AND HIDING IT IS THE SAFE DEFAULT OF THE TWO. Off gives
+// "Lekhio user", which is true of everybody who can reach this function and identifies nobody.
+// If he asks for his name and we do not hold one, he gets "Lekhio user" as well: an empty by-line
+// or an invented one are both worse than an honest anonymous one.
+//
+// ⚠️ AN EMPTY TRADE RENDERS AS AN EMPTY <small> ON THE HOMEPAGE, which is why hiding it needs no
+// change to the front door and produces no stray comma. See app/page.tsx.
+//
+// 🔴 AND A FAILED CARD READ REFUSES THE SAVE RATHER THAN QUIETLY ANONYMISING HIM.
+//
+// readIdentityCard answers null for a read that FAILED and an all null card for a row holding
+// nothing, which is the distinction its own header exists to protect. Treating the failed read as
+// "we hold no name" would take a man who ticked his name ON, showed him his name in the preview,
+// and then file a quote signed "Lekhio user" on our own database wobble. Same discipline as
+// readNudgePrefs: an unreadable answer refuses the write rather than guessing. If he asked for
+// NEITHER we never needed the card, and that save goes through: nothing about him was being read.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The by-line for a man who would rather not be named. True of everybody who can reach this
+// function and identifies nobody. Exported because the page shows him this exact word in the
+// preview before he saves, and two spellings of it is the preview lying about the result.
+export const TESTIMONIAL_ANON = 'Lekhio user';
+
+// What marks a row as HIS WORDS rather than a quote a team member typed in. Exported for the same
+// reason: the console filters on it, and a filter on a literal that has drifted shows nothing
+// waiting, which looks exactly like nobody having written one.
+export const TESTIMONIAL_FROM_CUSTOMER = 'customer';
+
+// 🔴 THE PREVIEW AND THE ROW ARE THE SAME FUNCTION, WHICH IS THE POINT OF IT BEING A FUNCTION.
+//
+// The page shows him the by-line his two switches will produce before he presses save. If the page
+// worked it out and this file worked it out separately, the two would agree today and drift the
+// first time either changed, and the failure has a shape: a preview reading his own name over a
+// row filed as "Lekhio user", or worse the other way round. Neither is a thing he can see until
+// it is on the homepage. So there is one rule and both callers run it.
+export function testimonialByline(
+  card: IdentityCard | null,
+  showName: boolean,
+  showTrade: boolean,
+): { name: string; trade: string } {
+  return {
+    name: showName && card?.name?.trim() ? card.name.trim() : TESTIMONIAL_ANON,
+    trade: showTrade ? (card?.trade?.trim() || card?.businessName?.trim() || '') : '',
+  };
+}
+
+export async function writeOwnTestimonial(userId: string, fields: {
+  quote: string; rating: number; showName: boolean; showTrade: boolean;
+}): Promise<boolean> {
+  if (!userId) return false;
+  const { url } = config();
+  const needsCard = fields.showName || fields.showTrade;
+  const card = needsCard ? await readIdentityCard(userId).catch(() => null) : null;
+  if (needsCard && card === null) return false;
+  const { name, trade } = testimonialByline(card, fields.showName, fields.showTrade);
+  try {
+    // Replace, not accumulate. His previous one goes first so there is only ever one of him.
+    const cleared = await fetch(`${url}/rest/v1/testimonials?user_id=eq.${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: headers({ Prefer: 'return=minimal' }),
+    });
+    if (!cleared.ok) return false;
+    const res = await fetch(`${url}/rest/v1/testimonials`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        quote: fields.quote,
+        name,
+        trade,
+        rating: fields.rating,
+        // 🔴 HOW THE CONSOLE KNOWS ONE IS WAITING. Everything a team member types carries the
+        // source THEY chose or null; only this path writes 'customer', so /team can show the ones
+        // a real customer sent and has not been approved yet apart from the ones we typed in.
+        source: TESTIMONIAL_FROM_CUSTOMER,
+        // Who added it. It is him, and saying so is what makes the row honest under CAP 3.47.
+        created_by: userId,
+        user_id: userId,
+        // See the block above. He cannot put himself on the homepage.
+        published: false,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteOwnTestimonial(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  const { url } = config();
+  try {
+    const res = await fetch(`${url}/rest/v1/testimonials?user_id=eq.${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: headers({ Prefer: 'return=minimal' }),
     });
     return res.ok;
   } catch {

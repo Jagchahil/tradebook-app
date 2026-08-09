@@ -219,10 +219,14 @@ const EXEMPT = {
   team_todos:
     'The internal work list the console shows the team. from_label names a member of staff, never '
     + 'a customer, and there is no user id, email or phone column.',
-  testimonials:
-    'A customer\'s quote, name and trade, published with permission. It has NO user id, email or '
-    + 'phone column, so an erasure cannot reach it from any identity we hold: withdrawal of that '
-    + 'permission is a manual unpublish today. Named in the packet as a live check, not skipped.',
+  // ⚠️ testimonials WAS EXEMPT UNTIL 9 AUGUST 2026 AND IS NOT ANY MORE. The reason it carried,
+  // verbatim: "It has NO user id, email or phone column, so an erasure cannot reach it from any
+  // identity we hold: withdrawal of that permission is a manual unpublish today." That was an
+  // honest description of a live GDPR hole, written down in the exemption list and then left there.
+  // The column exists now, the customer writes his own from /app/you/testimonial, and the table has
+  // joined the manifest both doors walk. An exemption whose stated reason has since been FIXED is
+  // the most dangerous entry this file can hold, because it reads as a decision rather than as a
+  // debt: the entry that says why a thing is fine outlives the day it stopped being true.
   cron_runs: 'Which scheduled job last ran, and whether it finished.',
   rakha_runs: 'How many users a nudge sweep considered. Counts only.',
   worker_activity: 'What the Mac mini workers did. Keyed by worker_key.',

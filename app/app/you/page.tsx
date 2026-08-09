@@ -352,6 +352,20 @@ export default async function YouPage({
             <span style={S.doorLabel}>Billing</span>
             <span style={S.rowBody}>Your card, your invoices from us, and cancelling.</span>
           </a>
+          {/* ⚠️ IT IS ON THIS SHELF AND NOT INSIDE SETTINGS, and the Settings row above is why:
+              every switch on that page is a promise that a message exists behind it, and it holds
+              the line at two rows. A review is not a switch, it is something only he can say, which
+              puts it beside his circumstances and his allowances. And the row promises nothing
+              about publishing, because the page behind it cannot publish and says so in its first
+              paragraph: a door that oversold what was through it would be the thing that made him
+              feel tricked, on the one screen where he is doing us a favour. */}
+          <a href="/app/you/testimonial" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Your review</span>
+            <span style={S.rowBody}>
+              If Lekhio has been worth having, say so in your own words. Yours to take back whenever
+              you like, and nothing goes on our site until we publish it.
+            </span>
+          </a>
         </div>
       </section>
 

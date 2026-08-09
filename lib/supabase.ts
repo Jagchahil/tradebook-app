@@ -570,16 +570,86 @@ export async function saveConversationTurn(
 }
 
 // Strip the obvious personal bits from a piece of text before it enters a
-// shared pool: emails, UK postcodes, currency amounts, and long digit runs. The
-// general tax content survives, the identifying detail does not. Applied to the
-// question AND the answer on their way into qa_candidates, and to the question
-// sample on its way into the metrics, so no shared store becomes a record of
-// users' personal figures and names.
+// shared pool: emails, national insurance numbers, UK IBANs, postcodes, payment
+// cards, phone numbers, sort codes, account numbers, currency amounts, and long
+// digit runs. The general tax content survives, the identifying detail does not.
+// Applied to the question AND the answer on their way into qa_candidates, and to
+// the question sample on its way into qa_cache, so no shared store becomes a
+// record of users' personal figures and names.
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔴 WIDENED 9 AUGUST 2026, AND THE CORPUS IS THE REASON, NOT THE REGEXES.
+//
+// It was four rules: email, postcode, pound amount, and any run of seven or
+// more digits. Against 43 synthetic leak strings written to look like real Ask
+// screen traffic, THIRTY ONE WALKED STRAIGHT THROUGH. Every national insurance
+// number in every legal format. Every sort code. Both IBANs. Every phone number
+// that had a space or a hyphen in it, because the seven digit rule only ever
+// caught the run together forms. Every card number printed in its normal four
+// four four four grouping.
+//
+// The corpus is test/fixtures/redactcorpus.mjs and it has two halves, because
+// the second one is the one that bites. MUST_REDACT is the leak list.
+// MUST_KEEP is forty ordinary numbers a tradesman actually texts: dates in
+// every British style, mileage, invoice numbers, job references, van
+// registrations, times, percentages, VAT numbers, a company number. A regex
+// that eats a date or a price corrupts the learning pool silently, and a pool
+// that has been quietly corrupted teaches the product nonsense. Every pattern
+// below is justified by a leak row AND checked against the keep rows.
+// test/redactcorpus.test.mjs runs both halves against THIS function, through
+// its real call path, and holds both lists by equality.
+//
+// WHAT WAS DELIBERATELY LEFT OUT, because a named gap beats a silent corruption:
+//
+//   . AN UNCUED SORT CODE. 12-34-56 and 12/34/56 with no "sort" in front of
+//     them are 31-07-26 and 31/07/26, which are dates. The cued form below
+//     catches how people actually write it. The account number beside it is
+//     still taken by the seven digit rule, and a sort code alone names a bank
+//     branch, not a man.
+//   . A PHONE NUMBER WITH THE LEADING ZERO DROPPED AND NO +44. Bare
+//     "7700 900159" is two ordinary numbers.
+//   . A NON GB IBAN. The generic two letter form eats long mixed references.
+//   . A NATIONAL INSURANCE NUMBER WITH NO SUFFIX LETTER. Requiring the trailing
+//     A to D is the only thing standing between this pattern and SC123456, a
+//     Scottish company number, which is also two letters and six digits.
+//   . A BARE COMMA GROUPED AMOUNT WITH NO DECIMALS AND NO CURRENCY WORD.
+//     "paid 2,450 in" leaks and survives. So do "12,000 miles" and "2,400
+//     bricks", which are not money. One pattern cannot tell them apart, and
+//     eating a mileage figure costs a real tax input for nothing.
+//   . A BARE NINE DIGIT VAT NUMBER. The seven digit rule already ate it before
+//     this change and still does. Narrowing that rule to spare nine digit runs
+//     would reopen the account number and phone number holes it exists to
+//     close, so it stays, measured and named rather than quietly tolerated.
+//
+// THE FOUR ORIGINAL RULES ARE UNTOUCHED, in their original order relative to
+// each other, so nothing that was redacted yesterday stops being redacted
+// today. test/qacandidates.test.mjs and test/qa-retention.test.mjs pin the
+// [email], [amount] and [number] tokens and both still pass.
+//
+// ORDER IS SPECIFIC BEFORE GENERAL, and the seven digit rule stays LAST. That
+// is what gets "account number [account]" instead of "account number [number]",
+// so a human reading the pool can tell what was taken out. It is not a
+// correctness requirement: every pattern is anchored tightly enough that
+// reordering changes the token, not the outcome. I did check the one ordering I
+// assumed was load bearing and I was wrong about it: the postcode pattern does
+// NOT eat GB33BU off the front of a UK IBAN, because it ends in \b and the next
+// character is K. IBAN goes first for specificity, not repair.
+// ═══════════════════════════════════════════════════════════════════════════
 function redactPii(s: string): string {
   return (s || '')
     .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]')
+    .replace(/\bGB\d{2}\s?[A-Z]{4}(?:\s?\d{4}){3}\s?\d{2}\b/gi, '[iban]')
+    .replace(/\b[A-Z]{2}[\s-]?\d{2}[\s-]?\d{2}[\s-]?\d{2}[\s-]?[A-D]\b/gi, '[nino]')
     .replace(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/gi, '[postcode]')
+    .replace(/\b\d{4}[\s-]\d{4}[\s-]\d{4}[\s-]\d{4}\b/g, '[card]')
+    .replace(/\b\d{4}[\s-]\d{6}[\s-]\d{5}\b/g, '[card]')
+    .replace(/(?:\+44\s?\(?0?\)?\s?|\(?\b0)\d{1,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4}\b/g, '[phone]')
+    .replace(/\b(sort\s*(?:code)?)((?:\s+(?:is|no\.?|number))?[:\s]*)\d{2}[\s.\-/]?\d{2}[\s.\-/]?\d{2}\b/gi, '$1$2[sortcode]')
+    .replace(/\b(a\/c|acc(?:ount)?)((?:\s+(?:no\.?|number|is))?[:\s]*)\d{4}[\s.-]?\d{4}\b/gi, '$1$2[account]')
     .replace(/£\s?\d[\d,]*(\.\d+)?/g, '[amount]')
+    .replace(/\b\d{1,3}(?:,\d{3})+\.\d{2}\b/g, '[amount]')
+    .replace(/\b\d[\d,]*(?:\.\d{1,2})?\s?(?:quid|gbp|pounds?)\b/gi, '[amount]')
+    .replace(/\bGBP\s?\d[\d,]*(?:\.\d{1,2})?\b/gi, '[amount]')
     .replace(/\b\d{7,}\b/g, '[number]');
 }
 

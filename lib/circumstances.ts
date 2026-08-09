@@ -235,6 +235,40 @@ export interface Circumstance {
   // trade) is the reminder that letting and trading are not opposites.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   incomes?: IncomeShape[];
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THE THIRD AXIS, WHICH IS NOT ABOUT WHO HE IS AT ALL. IT IS WHAT HE ANSWERED.
+  //
+  // Found by walking the live product as a sole trader who is NOT VAT registered on 9 August 2026,
+  // which is the most common customer this product has.
+  //
+  // The two axes above are both about the man: how he trades, and whether he trades. /app/you/
+  // circumstances withholds a `why` on either of them and says something true in its place, under
+  // a rule written on that page in capitals: THE `why` IS A PROMISE, AND A PROMISE THAT IS NOT
+  // TRUE OF HIM MAY NOT BE PUT IN FRONT OF HIM.
+  //
+  // ⚠️ BUT appliesTo() READS THE PERSONA AND NEVER THE ANSWER, so a promise can be perfectly
+  // applicable to a man's business and still be flatly untrue of him because of what he told us.
+  // vat_registered is the case. Its `why` opens "When you registered you could have reclaimed the
+  // VAT on the kit you already owned", which is an invitation before he answers, true after a yes,
+  // and FALSE the moment he taps No. It sat directly above his own "You said no.", with
+  // worthOrder 'huge' putting it near the top of what he can claim, telling a man with no
+  // registration that four years of reclaim were waiting for him and sending him off to enter a
+  // registration date he does not have. Reg 111 has no application to a man who never registered,
+  // the same way payments on account have none to a director.
+  //
+  // ⚠️ ONE FIELD, NOT TWO, AND THAT IS THE POINT. Declaring the promise false and forgetting the
+  // replacement would leave him a bare question with no reason on earth to answer it, which is the
+  // silent half of this same bug. The answer and the sentence that stands in its place cannot be
+  // set apart, so that state cannot be written.
+  //
+  // Absent means the `why` is true of anyone the persona lets through, which is nearly every
+  // question in this file: a pension, a marriage and the kids do not stop being worth money
+  // because he said no this time, and he can change his mind. Set it only where the promise names
+  // a mechanism his OWN ANSWER puts out of reach, and write the replacement as something true
+  // rather than as an apology.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  untrueOn?: { answer: Answer; instead: string };
 }
 
 // Declared here rather than imported from lib/position.ts, deliberately: this module has no imports
@@ -359,6 +393,16 @@ export const CIRCUMSTANCES: Circumstance[] = [
     backYears: 4,
     evidence: 'The original VAT invoices, and that the goods were still on hand at registration.',
     source: 'Reg 111, VAT Regulations 1995; VIT32000. Goods 4 years, services 6 months.',
+    // 🔴 AND NOT ONE WORD OF THAT RECLAIM TO A MAN WHO HAS JUST SAID HE IS NOT REGISTERED. See the
+    // note on untrueOn. The replacement tells him the truth of his own position rather than
+    // apologising for it: not being registered is the ordinary place for a sole trader to be, most
+    // of this audience is there, and it is not a thing he has failed to do. It still tells him what
+    // changes if the day comes, because that is a real reason to come back and change this answer,
+    // and the receipts line stays true whether he has logged a thousand or none.
+    untrueOn: {
+      answer: 'no',
+      instead: 'Not being registered is the ordinary position for a sole trader, and while you are not there is no VAT to reclaim and none to charge. If that ever changes, say so here and put the date on your VAT page under You: the reclaim runs from that day, and the receipts already in your Lekhio go to work on your first return.',
+    },
   },
   {
     // The basic rate is added automatically. THE HIGHER RATE SLICE IS NOT. He has to claim it, and

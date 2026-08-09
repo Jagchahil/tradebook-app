@@ -278,13 +278,21 @@ const TRADE_ONLY = ['prior_employment', 'low_profit_year', 'start_date', 'premis
 
   // AND THE PROMISE IS WITHHELD, on the surface the brief named.
   ok('🔴 the page asks the module whether the question is even his', /appliesTo\(q, who\)/.test(pageSrc));
-  ok('🔴 and prints the `why` ONLY when it is', /mine \? <p style=\{S\.why\}>\{q\.why\}<\/p> : <p style=\{S\.notHis\}>/.test(pageSrc));
+  // ⚠️ THE SHAPE OF THESE TWO LINES CHANGED ON 9 AUGUST 2026 AND THEIR MEANING DID NOT. Walking the
+  // product as a non VAT registered sole trader found a promise that is untrue on a THIRD axis: not
+  // how he trades and not whether he trades, but WHAT HE ANSWERED. appliesTo() cannot see that, so
+  // the rule went on the row (lib/circumstances.ts, untrueOn) and the page now resolves both axes
+  // into one `withheld`. test/vatpromise.test.mjs owns the new axis. These two assertions still own
+  // OURS, and are written so that deleting `mine` from the page turns them red exactly as before.
+  ok('🔴 and prints the `why` ONLY when it is',
+    /const withheld = mine \? untrue : NOT_HIS;/.test(pageSrc)
+    && /\{withheld \? <p style=\{S\.notHis\}>\{withheld\}<\/p> : <p style=\{S\.why\}>\{q\.why\}<\/p>\}/.test(pageSrc));
   ok('the plain sentence that stands in its place promises nothing and names no figure',
     /does not apply to a business like yours/.test(pageSrc) && !/£/.test(pageSrc.split('const NOT_HIS')[1].split(';')[0]));
   ok('the answer stays drawn and changeable, and the sentence says so',
     /Your answer stays on your record/.test(pageSrc));
   ok('the claimant line goes with the promise: it is the other half of a claim he cannot make',
-    /mine && whose \?/.test(pageSrc));
+    /\{!withheld && whose \?/.test(pageSrc));
 
   ok('🔴 THE RESOLUTION IS WRITTEN DOWN ON THE PAGE, not just implemented',
     pageSrc.includes('THE ROW STAYS, DRAWN AND CHANGEABLE AND COUNTED. THE PROMISE IS WITHHELD'));

@@ -121,11 +121,32 @@ function QuestionCard({ q, current, asked, mine }: {
   mine: boolean;
 }) {
   const whose = claimantLine(q);
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A PROMISE CAN BE UNTRUE OF HIM IN TWO WAYS, AND ONLY ONE OF THEM IS ABOUT HIS BUSINESS.
+  //
+  // NOT_HIS above is decided by appliesTo(), which reads how he trades and whether he trades. It
+  // cannot see what he ANSWERED, and vat_registered's `why` is false on exactly that axis: it
+  // promises a four year Reg 111 reclaim "when you registered", and it sat above his own "You said
+  // no." Found walking the product as a non VAT registered sole trader, 9 August 2026. The rule
+  // lives on the row (lib/circumstances.ts, untrueOn) so this surface holds no copy of it.
+  //
+  // Same doctrine as NOT_HIS, one axis further in, and deliberately the SAME style on the page:
+  // the row stays, drawn and changeable and counted, and one true sentence stands where the
+  // promise stood. Nothing is added to the screen.
+  //
+  // ⚠️ ONLY ON AN ANSWER HE HAS GIVEN. `current` is null until he taps, and before he taps the
+  // promise is the whole reason to answer at all. Withholding it from a man who has not yet said
+  // anything would delete the question's point.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const untrue = q.untrueOn && current === q.untrueOn.answer ? q.untrueOn.instead : null;
+  const withheld = mine ? untrue : NOT_HIS;
+
   return (
     <div style={S.q}>
       <p style={S.ask}>{q.ask}</p>
-      {mine ? <p style={S.why}>{q.why}</p> : <p style={S.notHis}>{NOT_HIS}</p>}
-      {mine && whose ? <p style={S.whose}>{whose}</p> : null}
+      {withheld ? <p style={S.notHis}>{withheld}</p> : <p style={S.why}>{q.why}</p>}
+      {!withheld && whose ? <p style={S.whose}>{whose}</p> : null}
       {current !== null ? <p style={S.said}>{saidLine(current, asked)}</p> : null}
       <div style={S.answers}>
         {(['yes', 'no'] as const).map((a) => {

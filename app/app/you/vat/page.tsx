@@ -366,9 +366,22 @@ export default async function VatPage({
         <p style={S.lede}>
           {profile.registered ? 'You are VAT registered.' : 'One question, and it is worth answering.'}
         </p>
+        {/* 🔴 THE SECOND HALF OF THIS WAS SAID TO EVERYBODY, AND IT IS A PROMISE. "How much of what
+            you have already spent can come back to you" is Reg 111, which reaches a man from the day
+            he registered and reaches a man who never did not at all. It sat one line under "One
+            question, and it is worth answering", and on the redraw after he presses No it sat
+            directly above "Noted. You are down as not VAT registered, so your invoices carry no
+            VAT." Found walking the product as a non VAT registered sole trader, 9 August 2026, the
+            same walk that found the promise on /app/you/circumstances.
+
+            The lede immediately above already branches on exactly this. This line was simply missed,
+            so it branches in the same shape rather than in a new one. Nothing is added to the
+            screen: the unregistered sentence stops where the truth stops, and the reclaim is
+            described to him conditionally by RegisteredQuestion's own `why` a few lines down. */}
         <p style={S.blurb}>
-          What you tell us here decides whether your invoices carry VAT, and how much of what you
-          have already spent can come back to you.
+          {profile.registered
+            ? 'What you tell us here decides whether your invoices carry VAT, and how much of what you have already spent can come back to you.'
+            : 'What you tell us here decides whether your invoices carry VAT. While you are not registered, they carry none.'}
         </p>
       </section>
 

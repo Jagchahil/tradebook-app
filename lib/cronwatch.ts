@@ -98,7 +98,7 @@ export const MAX_QUIET_HOURS: Record<string, number> = {
 
 export interface CronAlarm {
   job: string;
-  reason: 'never_finished' | 'stale' | 'failed';
+  reason: 'never_run' | 'never_finished' | 'stale' | 'failed';
   hoursQuiet: number | null;
   detail: string | null;
 }
@@ -108,14 +108,54 @@ export function cronAlarms(runs: CronRun[], now: Date = new Date()): CronAlarm[]
   const out: CronAlarm[] = [];
   const byJob = new Map(runs.map((r) => [r.job, r]));
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 IS THE SCHEDULER DEMONSTRABLY ALIVE? Everything below about never-run jobs turns on this.
+  //
+  // If NOTHING in this map has ever finished, this is a fresh environment rather than a broken
+  // one, and firing an alarm for every job in the list helps nobody and teaches whoever sees it
+  // that the alarms are noise. If something HAS finished, the dispatcher demonstrably works, and
+  // a job in this map with no history at all is a wiring fault rather than a waiting one.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const schedulerAlive = runs.some((r) => r.last_finished);
+
   for (const [job, maxHours] of Object.entries(MAX_QUIET_HOURS)) {
     const run = byJob.get(job);
 
-    // A job we have NEVER seen finish. On a fresh deploy this is simply true and it is not
-    // an emergency, so it is only an alarm once the job has actually started at some point
-    // and never come back. A job that has never even started has never been scheduled, and
-    // that is a different problem with a different fix.
-    if (!run || (!run.last_finished && !run.last_started)) continue;
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 A JOB THAT HAS NEVER RUN WAS SKIPPED FOR EVER, AND THE SKIP WAS THE WHOLE HOLE.
+    // Closed 9 August 2026, the same evening a job walked straight into it.
+    //
+    // The line here read `if (!run || (!run.last_finished && !run.last_started)) continue;` and
+    // its comment said, in as many words: "a job that has never even started has never been
+    // scheduled, and that is a different problem with a different fix." That fix was never
+    // written. So the state this file exists to catch, A CRON THAT DOES NOTHING, was the one
+    // state it structurally could not report, and /api/health stayed green through it.
+    //
+    // ⚠️ IT WAS NOT HYPOTHETICAL FOR LONG. voicereap was added to this map earlier the same
+    // evening, with a note saying its failure mode is a customer's audio never being wiped and a
+    // written privacy promise quietly going untrue. Registering it bought exactly nothing while
+    // this line stood: if the wiring were wrong, it would never write a row, never be seen here,
+    // and never be mentioned by anything. The registration LOOKED like coverage, which is worse
+    // than no registration, because somebody had then ticked it off.
+    //
+    // ⚠️ THE FALSE ALARM IS BOUNDED AND THE MISS IS NOT, and that asymmetry decides it. Adding a
+    // cron can now show one alarm until the next dispatch, at most half a day, and it clears
+    // itself. The other way round, a cron that never runs is never mentioned by anything, for
+    // ever. So this alarms, and the sentence says the benign case out loud so that whoever reads
+    // it at two in the morning is not hunting a bug that is about to fix itself.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    if (!run || (!run.last_finished && !run.last_started)) {
+      if (!schedulerAlive) continue;
+      out.push({
+        job,
+        reason: 'never_run',
+        hoursQuiet: null,
+        detail: 'in the watch list and has never run once, while other jobs are running normally. '
+          + 'If it was added within the last day this clears itself on the next dispatch. If it '
+          + 'does not, it is not wired into app/api/cron/daily.',
+      });
+      continue;
+    }
 
     if (!run.last_finished) {
       out.push({

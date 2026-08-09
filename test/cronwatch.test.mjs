@@ -38,44 +38,64 @@ const run = (job, finishedHoursAgo, ok_ = true, error = null) => ({
   last_error: error,
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 EVERY CASE BELOW MODELS THE WHOLE TABLE, NOT ONE ROW OF IT. Added 9 August 2026.
+//
+// These cases used to call cronAlarms([run('nudge', 50)]) and assert silence. What each MEANS is
+// "the nudge staleness rule is right". What the argument SAYS is something else: cron_runs holds a
+// row for every job that has ever run, so a list of one is a table asserting that seven other jobs
+// have never run in their lives, and cronAlarms now reports exactly that, correctly.
+//
+// So only() keeps each case focused on its one job while handing the function a table a real
+// database could actually produce.
+//
+// ⚠️ IT READS MAX_QUIET_HOURS RATHER THAN LISTING THE JOBS BY HAND. A hand written list here goes
+// stale the first time somebody adds a cron, and the failure then looks like the new cron being
+// broken rather than the fixture being old.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const only = (...rows) => {
+  const named = new Set(rows.map((r) => r.job));
+  return [...rows, ...Object.keys(MAX_QUIET_HOURS).filter((j) => !named.has(j)).map((j) => run(j, 1))];
+};
+
 console.log('\nThe cron watchdog\n');
 
 // --- everything is fine -----------------------------------------------------------
-const healthy = [run('due', 5), run('digest', 2), run('nudge', 20), run('weekly', 40)];
+const healthy = only(run('due', 5), run('digest', 2), run('nudge', 20), run('weekly', 40));
 ok('all four ran recently: silence, which is the point', cronAlarms(healthy, NOW).length === 0);
 
 // --- THE FALSE ALARM TEST. This is the one that matters most. ----------------------
 //
 // The weekly brief goes out on Sundays. On a Friday it has legitimately not finished for
 // four and a half days. If that is an alarm, the alarm is useless.
-const friday = [run('due', 5), run('digest', 2), run('nudge', 50), run('weekly', 110)];
+const friday = only(run('due', 5), run('digest', 2), run('nudge', 50), run('weekly', 110));
 ok('the WEEKLY job, quiet for 110h on a Friday, is NOT an alarm', cronAlarms(friday, NOW).length === 0);
 ok('the NUDGE job, quiet 50h over a weekend, is NOT an alarm',
-  cronAlarms([run('nudge', 50)], NOW).length === 0);
-ok('nudge Friday to Monday is 72h and still fine', cronAlarms([run('nudge', 76)], NOW).length === 0);
+  cronAlarms(only(run('nudge', 50)), NOW).length === 0);
+ok('nudge Friday to Monday is 72h and still fine', cronAlarms(only(run('nudge', 76)), NOW).length === 0);
 
 // --- the real thing: a job that has stopped ---------------------------------------
-const stopped = cronAlarms([run('digest', 30)], NOW);
+const stopped = cronAlarms(only(run('digest', 30)), NOW);
 ok('the DAILY digest, quiet for 30h, IS an alarm', stopped.length === 1);
 ok('and it names the job', stopped[0].job === 'digest');
 ok('and says it is stale', stopped[0].reason === 'stale');
 ok('and says how long', stopped[0].hoursQuiet === 30);
 
-ok('the daily due job, quiet 30h, is an alarm', cronAlarms([run('due', 30)], NOW)[0].reason === 'stale');
+ok('the daily due job, quiet 30h, is an alarm', cronAlarms(only(run('due', 30)), NOW)[0].reason === 'stale');
 ok('the weekly job, quiet for NINE DAYS, is finally an alarm',
-  cronAlarms([run('weekly', 220)], NOW)[0].reason === 'stale');
+  cronAlarms(only(run('weekly', 220)), NOW)[0].reason === 'stale');
 
 // A day and an hour is fine. Cron runs are not to the second and a late run is not a fault.
 ok('25h quiet on a daily job is still fine (a late run is not a fault)',
-  cronAlarms([run('digest', 25)], NOW).length === 0);
-ok('27h quiet on a daily job is not', cronAlarms([run('digest', 27)], NOW).length === 1);
+  cronAlarms(only(run('digest', 25)), NOW).length === 0);
+ok('27h quiet on a daily job is not', cronAlarms(only(run('digest', 27)), NOW).length === 1);
 
 // --- finished, recently, and BADLY ------------------------------------------------
 //
 // The hop cap. The walk stopped before the end, so somebody past the cursor got nothing.
 // It "finished" ten minutes ago, so no staleness check will ever catch it. This is the
 // exact shape of the digest bug: a job that reports success while quietly serving nobody.
-const capped = cronAlarms([run('digest', 1, false, 'hop cap reached at hop 20')], NOW);
+const capped = cronAlarms(only(run('digest', 1, false, 'hop cap reached at hop 20')), NOW);
 ok('a job that finished RECENTLY but BADLY is still an alarm', capped.length === 1);
 ok('and the reason is failure, not staleness', capped[0].reason === 'failed');
 ok('and it carries the error through', capped[0].detail === 'hop cap reached at hop 20');
@@ -92,9 +112,47 @@ ok('and it says so plainly', neverDone[0].reason === 'never_finished');
 //
 // On day one nothing has run yet. That is not an outage, it is a Tuesday. A watchdog that
 // is red out of the box teaches you to ignore it before it has ever told you anything true.
+// ⚠️ THE BARE [] IS THE POINT HERE, not an oversight: only() would fill the table in and this
+// case is precisely about the table being empty.
 ok('no rows at all (fresh deploy): NOT an alarm', cronAlarms([], NOW).length === 0);
-ok('a job absent from the table is not an alarm',
-  cronAlarms([run('digest', 1)], NOW).length === 0);
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A JOB THAT HAS NEVER RUN, WHILE THE OTHERS ARE RUNNING. Rewritten 9 August 2026.
+//
+// This pair used to read "a job absent from the table is not an alarm" and asserted silence. That
+// was the hole, stated as a promise and pinned by a test, which is how it survived: lib/cronwatch's
+// own comment called it "a different problem with a different fix" and the fix was never written.
+//
+// So the state this whole file exists to catch, A CRON THAT DOES NOTHING AT ALL, was the one state
+// it could not report. voicereap was added to the watch map on 9 August and walked straight into
+// it: registered, watched by nothing, and /api/health green throughout. A registration that looks
+// like coverage is worse than none, because somebody has ticked it off.
+//
+// The two arms are not symmetrical and both matter:
+//   nothing has ever finished  -> fresh environment. Silence. Six alarms on a new deploy is noise.
+//   others are finishing fine  -> the dispatcher works, so this one is MIS-WIRED. Alarm.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  // Everything healthy except voicereap, which has no row at all.
+  const missing = only().filter((r) => r.job !== 'voicereap');
+  const alarms = cronAlarms(missing, NOW);
+  ok('🔴 A JOB THAT HAS NEVER RUN IS AN ALARM WHEN THE OTHERS ARE RUNNING', alarms.length === 1);
+  ok('and it names the job that is missing, not one that is fine', alarms[0].job === 'voicereap');
+  ok('and it says never_run, which is a different fault from stale', alarms[0].reason === 'never_run');
+  ok('and the sentence tells whoever reads it at 2am what the benign case looks like',
+    /clears itself on the next dispatch/.test(alarms[0].detail ?? ''));
+  ok('🔴 AND IT SAYS WHERE TO LOOK IF IT DOES NOT CLEAR',
+    /cron\/daily/.test(alarms[0].detail ?? ''));
+
+  // ⚠️ THE OTHER ARM. Nothing has ever finished, so this is a fresh environment and not a broken
+  // one. Without this gate a new deploy shows one alarm per registered job, which is exactly the
+  // crying wolf this file's own header says is worse than no alarm at all.
+  const nothingEver = Object.keys(MAX_QUIET_HOURS).map((j) => ({
+    job: j, last_started: null, last_finished: null, last_ok: null, last_error: null,
+  }));
+  ok('🔴 BUT A WHOLE TABLE THAT HAS NEVER RUN IS A FRESH DEPLOY, AND STAYS SILENT',
+    cronAlarms(nothingEver, NOW).length === 0);
+}
 
 // --- the ceilings match vercel.json ------------------------------------------------
 ok('due is daily', MAX_QUIET_HOURS.due === 26);
@@ -103,9 +161,9 @@ ok('due is daily', MAX_QUIET_HOURS.due === 26);
 // endpoint kept answering 200 and the dashboard stayed green.
 ok('the AGENT walk is watched too', MAX_QUIET_HOURS.agent === 26);
 ok('an agent that has gone quiet for 30h is an alarm',
-  cronAlarms([run('agent', 30)], NOW)[0].reason === 'stale');
+  cronAlarms(only(run('agent', 30)), NOW)[0].reason === 'stale');
 ok('and an agent that hit its hop cap is an alarm even though it just "finished"',
-  cronAlarms([run('agent', 1, false, 'hop cap reached at hop 100')], NOW)[0].reason === 'failed');
+  cronAlarms(only(run('agent', 1, false, 'hop cap reached at hop 100')), NOW)[0].reason === 'failed');
 ok('digest is daily', MAX_QUIET_HOURS.digest === 26);
 ok('nudge clears the 72h Friday-to-Monday gap', MAX_QUIET_HOURS.nudge > 72);
 ok('weekly clears the 168h week', MAX_QUIET_HOURS.weekly > 168);

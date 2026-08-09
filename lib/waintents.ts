@@ -410,6 +410,47 @@ export function isDeadlineQuestion(body: string): boolean {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE TIE BREAK BETWEEN "WHEN" AND "HOW MUCH", BECAUSE BOTH MATCHERS CLAIM THE SAME WORDS.
+//
+// isDeadlineQuestion() and matchTotalsQuestion() overlap, and the overlap is not small. A message
+// only has to carry a money word plus one of "how much", "what" or "my" for the totals matcher to
+// take it, and "when is my tax due" supplies a money word ("tax") and the bare possessive ("my").
+// Whichever matcher a router runs FIRST therefore decides the answer, which is how one sentence
+// came to get a date on WhatsApp and a figure in the chat. Found live on /app/thread, 8 August
+// 2026: a sole trader typed "when is my tax due" and was told "Put by £0.00 for tax", with no date
+// anywhere in the reply. He asked WHEN and was told HOW MUCH.
+//
+// ⚠️ SO WHY NOT SIMPLY PUT THE DEADLINE LANE FIRST EVERYWHERE. Because the overlap runs BOTH ways
+// and the other direction is just as wrong. "how much tax is due", "how much tax is due on 31
+// January", "how much did I make before the tax return deadline" and "how much profit before the
+// tax deadline" are every one of them deadline questions by isDeadlineQuestion(), and every one of
+// them is a man asking for a NUMBER. Handing him 31 January 2027 is the same defect wearing the
+// other hat, and on WhatsApp, where the deadline lane already runs first, it is what he gets today.
+//
+// ⚠️ THE RULE, AND IT IS THE ONE A READER WOULD USE. "how much" and "how many" name a quantity, so
+// they are money questions whatever date words ride along. A "what" is a quantity ask too, EXCEPT
+// in the shapes where it is plainly after a date: "what date", "what day", "what time", "what
+// month", and any "what" leading into the word deadline. A bare "my" names nothing at all, and
+// never decides this on its own again, because being the only evidence there was IS the bug.
+//
+// ⚠️ IT LIVES HERE, IN THE PURE MODULE, BECAUSE BOTH CHANNELS GATE ON IT. app/api/whatsapp/route.ts
+// and app/api/thread/route.ts both read `isDeadlineQuestion(x) && !asksAmount(x)`, immediately
+// above their totals lane, so the two surfaces cannot drift into two answers again. A copy of this
+// regex in a route, or in a test, would be the second definition this codebase keeps deleting.
+// test/laneparity.test.mjs walks both routers over the same phrases and requires one lane each.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function asksAmount(body: string): boolean {
+  const b = body.trim().toLowerCase();
+  // A named quantity settles it, whatever else is in the sentence.
+  if (/\b(how much|how many)\b/.test(b)) return true;
+  if (!/\bwhat\b/.test(b)) return false;
+  // The "what" shapes that are after a date rather than a figure.
+  if (/\bwhat\s+(date|day|time|month)\b/.test(b)) return false;
+  if (/\bwhat\b.{0,30}\bdeadline\b/.test(b)) return false;
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 // 🔴 WHO IS ASKING, BECAUSE THIS FUNCTION USED TO ANSWER EVERYONE THE SAME WAY AND IT WAS WRONG.
 //
 // Until 7 August 2026 deadlineAnswer() took a clock and nothing else. Whoever asked "when is my

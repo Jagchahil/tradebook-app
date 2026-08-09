@@ -7,7 +7,7 @@ import { busyMessage, type AiBlockReason } from '../../../lib/banknudge';
 import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
 import {
-  matchTotalsQuestion, formatGbp, isDeadlineQuestion, deadlineAnswer, type TotalsQuestion,
+  matchTotalsQuestion, formatGbp, isDeadlineQuestion, asksAmount, deadlineAnswer, type TotalsQuestion,
   matchProductTruth, productTruthAnswer,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
@@ -40,9 +40,10 @@ export const maxDuration = 60;
 // 🔴 THIS ROUTE ANSWERS THE WAY WHATSAPP ANSWERS, WITH THE SAME MACHINERY, OR NOT AT ALL.
 //
 // The order is app/api/whatsapp/route.ts's order, and every function is the same function by
-// name: deterministic intents first (totals via matchTotalsQuestion and totalsForUser; what he
-// owes via taxPosition on getOptimiserInput, the tax hub's own figure; claims via checkExpense;
-// deadlines via deadlineAnswer), then the guarded AI path (answerMoneyQuestion on
+// name: deterministic intents first (deadlines via isDeadlineQuestion and deadlineAnswer, ahead of
+// the totals lane exactly as the webhook runs them; totals via matchTotalsQuestion and
+// totalsForUser; what he owes via taxPosition on getOptimiserInput, the tax hub's own figure;
+// claims via checkExpense), then the guarded AI path (answerMoneyQuestion on
 // transactionSummaryForUser plus the approved knowledge), behind the SAME derived caps and the
 // SAME durable spend rings (aiCapsFor on the live paying base, decideSpend, bumpAiUsage on the
 // shared 'global' and 'globalmonth' counters). Nothing here computes a money figure of its own:
@@ -157,11 +158,33 @@ async function composeReply(userId: string, q: string): Promise<string> {
   const truth = matchProductTruth(q);
   if (truth) return productTruthAnswer(truth, { filingLive: hmrcFilingLive() });
 
-  // 1. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
-  const totals = matchTotalsQuestion(q);
-  if (totals) return totalsAnswer(userId, totals);
-
-  // 2. Tax deadline questions: computed, no AI.
+  // 1. Tax deadline questions: computed, no AI.
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THIS LANE MOVED ABOVE THE TOTALS LANE ON 9 AUGUST 2026, AND THE MOVE IS THE WHOLE FIX.
+  //
+  // Found live on this route: signed in as a sole trader, typed "when is my tax due", and got
+  // "Put by £0.00 for tax. That is what the year is heading for..." with no date anywhere in it.
+  // He asked WHEN and was told HOW MUCH. One minute later in the same chat, "when is the self
+  // assessment deadline" returned the full answer with 31 January 2027 and 7 November 2026, so the
+  // deadline lane was wired in and working the entire time. Only the ORDER was wrong.
+  //
+  // matchTotalsQuestion() wants a money word plus one of "how much", "what" or "my", and "my tax"
+  // hands it both, so running it first ate the sentence before isDeadlineQuestion() was ever
+  // called. app/api/whatsapp/route.ts had these two the other way round all along. Same words, two
+  // channels, two different answers, which is exactly what the banner at the top of this file
+  // says must never happen.
+  //
+  // ⚠️ AND IT IS NOT A SWAP OF TWO LINES, BECAUSE THE OVERLAP RUNS BOTH WAYS. "how much tax is
+  // due", "how much tax is due on 31 January", "how much did I make before the tax return
+  // deadline" and "how much profit before the tax deadline" all satisfy isDeadlineQuestion(), and
+  // all four are a man asking for a NUMBER. A blind swap answers them with a date, which is the
+  // same defect with the hands changed over. So the gate is `isDeadlineQuestion(q) && !asksAmount(q)`:
+  // a named quantity ("how much", "how many", most "what" shapes) keeps the message in the totals
+  // lane below, and everything that is only asking a time word comes here. asksAmount() is the ONE
+  // definition, in lib/waintents.ts, and app/api/whatsapp/route.ts gates on the same call, so the
+  // two channels route a phrase the same way or the ratchet in test/laneparity.test.mjs is red.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   //
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 IT USED TO BE `return deadlineAnswer()`, WITH HIS ID IN SCOPE ON THE LINE ABOVE.
@@ -179,13 +202,17 @@ async function composeReply(userId: string, q: string): Promise<string> {
   //
   // ⚠️ A FAILED READ IS UNKNOWN, NEVER A NO. Both facts fall back to null, which asks him.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
-  if (isDeadlineQuestion(q)) {
+  if (isDeadlineQuestion(q) && !asksAmount(q)) {
     const optimiser = await getOptimiserInput(userId).catch(() => null);
     return deadlineAnswer(new Date(), {
       structure: optimiser?.businessType ?? null,
       mtdPosition: null,
     });
   }
+
+  // 2. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
+  const totals = matchTotalsQuestion(q);
+  if (totals) return totalsAnswer(userId, totals);
 
   // 3. "Can I claim it" questions: the deterministic claim rules, no AI. Guarded the same way
   // the WhatsApp checker guards itself: a message carrying a money amount is probably telling

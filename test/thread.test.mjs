@@ -196,7 +196,7 @@ ok('the refusal is the shared one, back to the page that draws the banner',
 // The machinery, by name. Every one of these is the function the WhatsApp handler calls.
 const MACHINERY = [
   'matchTotalsQuestion', 'totalsForUser', 'pendingSummaryForUser', 'formatGbp',
-  'isDeadlineQuestion', 'deadlineAnswer', 'checkExpense',
+  'isDeadlineQuestion', 'asksAmount', 'deadlineAnswer', 'checkExpense',
   'VERDICT_ICON', 'hasClaudeConfig', 'answerMoneyQuestion', 'transactionSummaryForUser',
   'getRelevantKnowledge', 'aiCapsFor', 'decideSpend', 'bumpAiUsage', 'countActiveSubscribers',
   'busyMessage', 'refreshFactsFromDb',
@@ -234,6 +234,23 @@ ok('deterministic intents run BEFORE the AI path, the WhatsApp order',
   && routeCode.indexOf('deadlineAnswer(new Date()') > -1
   && routeCode.indexOf('deadlineAnswer(new Date()') < routeCode.indexOf('answerMoneyQuestion(q')
   && routeCode.indexOf('checkExpense(q)') < routeCode.indexOf('answerMoneyQuestion(q'));
+
+// 🔴 AND THE ORDER *WITHIN* THE DETERMINISTIC INTENTS, WHICH NOTHING HELD UNTIL 9 AUGUST 2026.
+//
+// The clause above proves both lanes beat the model. It never said which of the two came first,
+// and for as long as it did not, this route ran matchTotalsQuestion() above isDeadlineQuestion()
+// while the webhook ran them the other way round. A sole trader typed "when is my tax due" on
+// /app/thread and was told "Put by £0.00 for tax", a figure, with no date in the sentence, because
+// matchTotalsQuestion() takes a money word plus "how much", "what" OR "my", and "my tax" is both.
+//
+// Existence first, position second, for the reason written four lines above this.
+ok('🔴 the deadline lane is reached BEFORE the totals lane, the webhook order, so WHEN gets a date',
+  routeCode.indexOf('isDeadlineQuestion(q)') > -1
+  && routeCode.indexOf('matchTotalsQuestion(q)') > -1
+  && routeCode.indexOf('isDeadlineQuestion(q)') < routeCode.indexOf('matchTotalsQuestion(q)'));
+ok('...behind the asksAmount tie break, so "how much tax is due" still gets his figure',
+  /isDeadlineQuestion\(q\) && !asksAmount\(q\)/.test(routeCode));
+
 ok('🔴 the spend rings are the SHARED ones, so total AI spend is bounded once',
   /bumpAiUsage\('global', 'all'\)/.test(routeCode) && /bumpAiUsage\('globalmonth'/.test(routeCode)
   && /bumpAiUsage\('thread', userId\)/.test(routeCode));
@@ -523,6 +540,10 @@ export function productTruthAnswer() { return ''; }
 export function matchTotalsQuestion() { return null; }
 export function formatGbp(n) { return '£' + n; }
 export function isDeadlineQuestion(q) { return /deadline/.test(q); }
+// The tie break the deadline lane now runs behind, stubbed to its first and strongest clause: a
+// named quantity is a money question whatever date words ride along. The real rule, and the reason
+// there is one, is in lib/waintents.ts; test/laneparity.test.mjs walks BOTH routers through it.
+export function asksAmount(q) { return /how much|how many/.test(q); }
 export function deadlineAnswer() { return 'The deadline answer.'; }
 export function clampReceiptDate(d) { return d || '2026-08-05'; }
 `);

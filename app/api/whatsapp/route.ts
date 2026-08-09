@@ -114,6 +114,7 @@ import {
   matchProductTruth,
   productTruthAnswer,
   isDeadlineQuestion,
+  asksAmount,
   deadlineAnswer,
   matchTotalsQuestion,
   oweAnswer,
@@ -473,7 +474,15 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handleProductTruth(from, text);
           } else if (isPricing(text)) {
             await handlePricing(from);
-          } else if (isDeadlineQuestion(text)) {
+          // 🔴 asksAmount IS THE TIE BREAK WITH THE TOTALS LANE THIRTY LINES DOWN, ADDED 9 AUGUST
+          // 2026 WITH THE CHAT'S ORDER FIX. This gate has always run before matchTotalsQuestion,
+          // which is the right way round for "when is my tax due" and the wrong way round for
+          // "how much tax is due on 31 January": both are deadline questions by
+          // isDeadlineQuestion(), and the second is a man asking for a figure who was handed a
+          // date. Naming a quantity now keeps the message going down to handleTotals. The chat
+          // route gates on the SAME call in the same place, so one phrase gets one lane on both
+          // channels; test/laneparity.test.mjs walks both routers and holds it.
+          } else if (isDeadlineQuestion(text) && !asksAmount(text)) {
             await handleDeadlineQuestion(from);
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);

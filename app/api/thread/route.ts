@@ -13,6 +13,9 @@ import {
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, VERDICT_ICON } from '../../../lib/taxrules';
 import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
+import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
+import { quarterForDate } from '../../../lib/quarterpack';
+import { gbp0 } from '../../../lib/money';
 import {
   bumpAiUsage,
   countActiveSubscribers,
@@ -386,5 +389,47 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
   const note = tax.projected
     ? 'That is what the year is heading for, on everything you have confirmed so far.'
     : 'That is what the year so far has built up, too early to call the whole year yet.';
-  return `Put by ${formatGbp(tax.setAside)} for tax. ${note}${basis ? ` ${basis}` : ''} It is the same figure your Tax screen leads with, and Self Assessment collects it in one bill.`;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE COLLECTION SENTENCE IS A SELF ASSESSMENT SENTENCE, SO IT IS NOT SAID TO A DIRECTOR.
+  //
+  // This line used to end, for every reader without exception:
+  //
+  //   "It is the same figure your Tax screen leads with, and Self Assessment collects it in one
+  //    bill."
+  //
+  // Two things were wrong with that, and the same file already knew both of them.
+  //
+  //   1. A DIRECTOR IS NOT IN SELF ASSESSMENT FOR HIS COMPANY'S PROFIT. app/app/tax/page.tsx has
+  //      gated this exact sentence on isCompany since wave 9, and test/wave9_mtdstructure.test.mjs
+  //      pins it there with `{isCompany ? null : <>{' '}Self Assessment collects it`. THIS surface
+  //      was missed. It is the same defect deadlineAnswer() had, in the money answer instead of
+  //      the deadline answer: a Self Assessment mechanism asserted at a man whose company files
+  //      its own return.
+  //
+  //   2. IT CLAIMED TO MIRROR A SCREEN IT DID NOT MIRROR. The sentence promises "the same figure
+  //      your Tax screen leads with" and then says something the Tax screen does not say. The hub
+  //      prints the January date, and over the threshold it prints the two payments on account as
+  //      well. Here there was no date at all, so a man who asked WHEN his tax was due got a figure
+  //      and no day, and a man over the threshold was told "one bill" for a year that asks him for
+  //      three payments.
+  //
+  // Payments on account are TMA 1970 s59A, a Self Assessment mechanism with no counterpart in
+  // Corporation Tax, so there is nothing true to put in their place for a director and nothing is
+  // put. The year is derived exactly as the hub derives it, through quarterForDate, so the two
+  // surfaces cannot drift to different Januaries.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const sameFigure = 'It is the same figure your Tax screen leads with';
+  let collection: string;
+  if (optimiser.businessType === 'limited_company') {
+    collection = `${sameFigure}.`;
+  } else {
+    const { startYear } = quarterForDate(new Date());
+    const poa = paymentsOnAccount(tax.selfAssessmentTax, startYear + 1);
+    collection = `${sameFigure}, and Self Assessment collects it in one bill, due by ${poa.firstDue}.`;
+    if (poa.required) {
+      collection += ` Because the bill is over ${gbp0(FACTS.poaThreshold)}, HMRC also asks for two payments on account towards the following year, about ${gbp0(poa.eachPayment)} each, due ${poa.firstDue} and ${poa.secondDue}.`;
+    }
+  }
+  return `Put by ${formatGbp(tax.setAside)} for tax. ${note}${basis ? ` ${basis}` : ''} ${collection}`;
 }

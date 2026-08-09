@@ -580,6 +580,16 @@ export function chatRefBelongsTo() { return true; }
   w('dedupe.ts', read('lib/dedupe.ts'));
   w('memory.ts', read('lib/memory.ts'));
   w('receiptingest.ts', read('lib/receiptingest.ts').replace(/from '\.\/([a-zA-Z]+)'/g, "from './$1.ts'"));
+  // 🔴 AND THE REAL ENGINES BEHIND THE COLLECTION SENTENCE, 9 AUGUST 2026. The owed answer now
+  // names the January date and, over the threshold, the two payments on account, all of it read
+  // off paymentsOnAccount() with the year resolved through quarterForDate() exactly as the tax
+  // hub resolves it. Those are dates and money in a sentence a customer acts on, so the real
+  // arithmetic runs here rather than a stub's opinion of it. money and taxengine import nothing
+  // at all; quarterpack imports only taxengine and scotland, so the graph stays shallow.
+  w('money.ts', read('lib/money.ts'));
+  w('taxengine.ts', read('lib/taxengine.ts'));
+  w('scotland.ts', read('lib/scotland.ts'));
+  w('quarterpack.ts', read('lib/quarterpack.ts').replace(/from '\.\/([a-zA-Z]+)'/g, "from './$1.ts'"));
   w('route.ts', routeSrc
     .replace(/from 'next\/server'/g, "from './nextserver.ts'")
     .replace(/from '(?:\.\.\/)+lib\/([a-zA-Z]+)'/g, "from './$1.ts'")

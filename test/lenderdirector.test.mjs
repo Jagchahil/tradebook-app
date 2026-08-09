@@ -408,8 +408,25 @@ for (let i = 0; i < 60; i++) {
   })), capAllow);
   const label = `#${i} turnover ${turnover} costs ${cost}${rent ? ` rent ${rent}` : ''}${capAllow ? ' car' : ''}`;
 
-  // 🔴 NOT ONE PENNY OF PERSONAL TAX ON A COMPANY'S PROFIT, on any reader.
-  ok(`${label}: the proof of income offers no personal tax`, proof.estimatedTax === 0 && proof.nationalInsurance === 0);
+  // 🔴 NOT ONE PENNY OF PERSONAL TAX ON A COMPANY'S TRADE PROFIT, on any reader.
+  //
+  // \u26a0\ufe0f THIS USED TO ASSERT estimatedTax === 0 FULL STOP, AND THAT ENCODED A BUG. A director
+  // who ALSO LETS A FLAT owes real personal tax on the rent: it is his own income on his own
+  // return, and this document already folds it into the totals it prints. So "he owes nothing" was
+  // being asserted over a page showing his rent.
+  //
+  // 🔴 THE GUARANTEE IS KEPT AND MADE STRONGER. The expected figure is not typed here and not taken
+  // from an engine: the SAME document is built from the RENT ROW ALONE, and the two must agree. Any
+  // turnover or trade cost leaking into his personal estimate makes the two differ and turns this
+  // red, which is a sharper test than comparing against zero ever was.
+  const rentOnly = rent
+    ? IP.buildIncomeProof(
+      [{ amount: rent, transaction_date: '2026-06-20', category: 'rent', vendor: 'Tenants', income_type: 'property' }],
+      'A. Sparky Ltd', 2026, new Date('2027-04-05'), { type: 'limited_company' }, 0)
+    : null;
+  ok(`${label}: no National Insurance at all, on the trade or the rent`, proof.nationalInsurance === 0);
+  ok(`${label}: personal tax is the rent's alone, with no trace of the company's trade in it`,
+    proof.estimatedTax === (rentOnly ? rentOnly.estimatedTax : 0));
   ok(`${label}: the quarter pack offers no personal tax`, pack.ytd.estimatedTax.total === 0 && pack.ytd.estimatedTax.class4 === 0);
   ok(`${label}: the proof says whose figures they are`, proof.companyExcluded === true && proof.shareNote === null);
   // The company's turnover is not his Making Tax Digital qualifying income; his rent is.

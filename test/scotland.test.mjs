@@ -260,12 +260,17 @@ for (const rel of ['app/app/proof-of-income/page.tsx', 'lib/incomeproof.ts', 'li
   ok(`🔴 STOP ITEM: ${rel} still says it`, saysIt.includes(rel));
 }
 // And on the document the estimate is the only reason the sentence is there, so it draws with the
-// figure. A director gets no personal estimate on either artefact and must not be handed a caveat
-// about a number that is not on the page.
+// figure. A man with no personal estimate on either artefact must not be handed a caveat about a
+// number that is not on the page.
+//
+// \u26a0\ufe0f THE TEST IS personalTaxShown, NOT companyExcluded, since 9 August 2026. They came
+// apart for the director who ALSO LETS A FLAT: his rent is his own income, on his own return, at
+// these very rates, so he does get an estimate and he does need the sentence. lib/incomeproof.ts
+// decides it once and all three surfaces read the one field.
 ok('the printed lender document guards the sentence on there being an estimate at all',
-  /companyExcluded \? '' : esc\(SCOTLAND_LINE\)/.test(read('lib/incomeproof.ts')));
+  /personalTaxShown \? esc\(SCOTLAND_LINE\) : ''/.test(read('lib/incomeproof.ts')));
 ok('and the lender screen guards it the same way',
-  /companyExcluded \? null : <>\{' '\}\{SCOTLAND_LINE\}<\/>/.test(read('app/app/proof-of-income/page.tsx')));
+  /personalTaxShown \? <>\{' '\}\{SCOTLAND_LINE\}<\/> : null/.test(read('app/app/proof-of-income/page.tsx')));
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // 4. THE RATCHET ITSELF. THIS IS THE ASSERTION THAT IS MEANT TO FAIL ONE DAY.

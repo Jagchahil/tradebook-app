@@ -106,6 +106,35 @@ export interface IncomeProof {
   // ═════════════════════════════════════════════════════════════════════════════════════════════
   shareNote: string | null;
   companyExcluded: boolean;
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A DIRECTOR WHO ALSO LETS A FLAT. Found 9 August 2026, on the one page a stranger lends
+  // against.
+  //
+  // companyExcluded put ONE sentence on the document, written out as a literal in two places:
+  // "These are the company's figures, not this person's personal income." True of his trade. FLATLY
+  // FALSE of his rent, which is his own income on his own return, and which this document folds
+  // into the same `income` and `profit` totals directly above that sentence. So a mortgage broker
+  // read a page that handed the director's personal rental income to his company and, one row up,
+  // showed no personal tax on it at all, because every rate was gated on isCompany.
+  //
+  // ⚠️ THE PARTNERSHIP CASE WAS ALREADY DECIDED THIS WAY AND THE COMPANY CASE WAS MISSED. shareNote
+  // above already says "The property figures are their own, in full: rent is personal income, not
+  // the firm's." A firm and a company are different things and the reasoning is word for word the
+  // same one.
+  //
+  // So the sentence becomes a FIELD rather than a literal on two surfaces, and it has two forms. A
+  // director with no rent reads exactly what he read before, to the character. A director with rent
+  // is told which half of the page is his.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  companyNote: string | null;
+
+  /**
+   * Does this document offer a personal tax estimate at all. False only for a director with no
+   * rent, whose figures really are entirely the company's. Derived once here rather than three
+   * times on three surfaces, because two copies of a rule is how two surfaces come to disagree.
+   */
+  personalTaxShown: boolean;
 }
 
 // How he trades, for the one document a lender reads. Optional, and undefined is UNKNOWN, which
@@ -282,6 +311,20 @@ export function buildIncomeProof(
   // turnover charges him income tax and Class 4 on money that is taxable IN THE COMPANY, and prints
   // the words on a document he hands a lender. A plain sentence saying where the answer lives beats
   // a plausible number on the wrong money.
+  //
+  // 🔴 AND ON 9 AUGUST 2026 THAT WENT ONE STEP TOO FAR FOR A DIRECTOR WHO ALSO LETS A FLAT.
+  //
+  // Holding the trade out was right. Holding the RENT out with it was not: rent is his own income,
+  // on his own return, taxable whatever his trade is wrapped in, and this document already folds it
+  // into `income` and `profit`. So he was shown his rent and told the tax on it was nothing.
+  //
+  // What changes: the personal base is the property stream ALONE for a director, and the whole
+  // stream for everybody else. Class 4 stays at zero for him, because there is no Class 4 on rent
+  // and none on a company's profit either, which is the same answer for two reasons.
+  //
+  // ⚠️ A DIRECTOR WITH NO RENT IS IDENTICAL TO THE PENNY. His propertyProfit is zero, so the base
+  // is zero, incomeTaxOnProfit(0) is zero, and every figure on his page is what it was.
+  const personalBase = isCompany ? propertyProfit : tradeProfit + propertyProfit;
   const nationalInsurance = isCompany ? 0 : round2(class4NIC(tradeProfit));
   // \u26a0\ufe0f THE SECTION 24 CREDIT, WORKED THE WAY lib/taxoptimiser.ts WORKS IT, DELIBERATELY.
   // Relief at the basic rate on the LOWEST of the finance costs, the property profit, and taxable
@@ -289,19 +332,15 @@ export function buildIncomeProof(
   // lib/propertyengine.ts combinedBill's reliefBase and taxoptimiser's s24Base, in the same order,
   // so the document, the Overview and the free landlord tool land on one number. A basic rate
   // landlord is unaffected either way, because a 20% deduction and a 20% credit come to the same.
-  const taxableBeforeCredit = tradeProfit + propertyProfit;
-  const incomeTaxBeforeCredit = isCompany ? 0 : incomeTaxOnProfit(taxableBeforeCredit);
+  const taxableBeforeCredit = personalBase;
+  const incomeTaxBeforeCredit = incomeTaxOnProfit(taxableBeforeCredit);
   const s24Base = Math.min(
     financeForS24,
     propertyProfit,
     Math.max(0, taxableBeforeCredit - personalAllowance(taxableBeforeCredit)),
   );
-  const financeCredit = isCompany
-    ? 0
-    : round2(Math.min(FACTS.basicRate * Math.max(0, s24Base), incomeTaxBeforeCredit));
-  const estimatedTax = isCompany
-    ? 0
-    : round2(Math.max(0, incomeTaxBeforeCredit - financeCredit) + nationalInsurance);
+  const financeCredit = round2(Math.min(FACTS.basicRate * Math.max(0, s24Base), incomeTaxBeforeCredit));
+  const estimatedTax = round2(Math.max(0, incomeTaxBeforeCredit - financeCredit) + nationalInsurance);
 
   return {
     businessName: (businessName ?? '').trim() || 'Your business',
@@ -333,6 +372,15 @@ export function buildIncomeProof(
         : `These figures are ${sharePct}% of the firm's books, this person's share of the partnership.`)
       : null,
     companyExcluded: isCompany,
+    // The company sentence, in one place instead of two literals, and in the form that is true of
+    // the man reading it. See the note on companyNote in the interface above.
+    companyNote: isCompany
+      ? (propertyProfit > 0 || propertyIncome > 0 || propertyExpenses > 0 || financeCost > 0
+        ? "The trade figures are the company's, not this person's personal income: a company pays Corporation Tax on its own return, and the director is paid in salary and dividends, which are not shown here. The rent is different. It is this person's own income on their own return, and the estimated tax below is on the rent alone."
+        : "These are the company's figures, not this person's personal income. A company pays Corporation Tax on its own return, and the director is paid in salary and dividends, which are not shown here.")
+      : null,
+    // False only for a director with nothing personal on the page. See the note in the interface.
+    personalTaxShown: !isCompany || propertyProfit > 0 || propertyIncome > 0 || propertyExpenses > 0 || financeCost > 0,
   };
 }
 
@@ -452,13 +500,13 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
       ${row('Gross income', gbp(p.income))}
       ${row('Allowable expenses', gbp(p.expenses), { muted: true })}
       ${row('Net profit', gbp(p.profit), { bold: true })}
-      ${p.companyExcluded ? '' : row(p.estimatedTaxLabel, gbp(p.estimatedTax), { muted: true })}
+      ${p.personalTaxShown ? row(p.estimatedTaxLabel, gbp(p.estimatedTax), { muted: true }) : ''}
     </table>
     ${p.capitalCost > 0 ? `<div class="capital">${gbp(p.capitalCost)} more left the account on ${p.capitalCount === 1 ? 'a car' : `${p.capitalCount} cars`}, which is not an allowable expense in one year. A car comes off over several years rather than all at once, so it is not in the figures above.${p.capitalAllowance > 0 ? ` This year's writing down allowance of ${gbp(p.capitalAllowance)} is already taken off the profit above.` : ''}</div>` : ''}
     ${p.capitalCost === 0 && p.capitalAllowance > 0 ? `<div class="capital">This year's writing down allowance of ${gbp(p.capitalAllowance)} on a vehicle is already taken off the profit above, which is why it is not simply the gross income less the allowable expenses.</div>` : ''}
     ${p.financeCost > 0 ? `<div class="capital">${gbp(p.financeCost)} of residential mortgage interest is not an allowable expense either, so it is not in the figures above. Since Section 24 it is relieved as a basic rate tax credit instead${p.financeCredit > 0 ? `, and the credit of ${gbp(p.financeCredit)} is already taken off the estimated tax` : ''}.</div>` : ''}
     ${p.shareNote ? `<div class="whose">${esc(p.shareNote)}</div>` : ''}
-    ${p.companyExcluded ? `<div class="whose">These are the company's figures, not this person's personal income. A company pays Corporation Tax on its own return, and the director is paid in salary and dividends, which are not shown here.</div>` : ''}
+    ${p.companyNote ? `<div class="whose">${esc(p.companyNote)}</div>` : ''}
     <div class="stamp">Prepared by Lekhio &middot; ${esc(generated)} &middot; ${p.txCount} entries</div>
   </div>
 
@@ -468,7 +516,7 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
     This is a summary prepared from the figures ${esc(p.businessName)} has recorded and confirmed in Lekhio, for income verification.
     It is not an HMRC document, an SA302, or a filed tax return, and it is only as complete as the records kept.
     The estimated tax figure, where one is shown, is guidance based on the published ${esc(p.taxYear)} rates and does not include any other income, reliefs or allowances the person may have.
-    ${p.companyExcluded ? '' : esc(SCOTLAND_LINE)}
+    ${p.personalTaxShown ? esc(SCOTLAND_LINE) : ''}
     For an official SA302 or tax year overview, the person can log in to their HMRC account. Some lenders ask for HMRC documents as well as a summary like this.
   </p>
 </div></body></html>`;

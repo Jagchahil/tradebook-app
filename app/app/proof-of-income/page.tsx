@@ -159,12 +159,17 @@ export default async function ProofOfIncomePage({
                     money that is taxable IN THE COMPANY, and prints the words on a page he hands a
                     lender. The row goes rather than being reworded, and the note below says where
                     the answer actually lives. */}
-                {proof.companyExcluded ? null : (
+                {/* 🔴 AND ON 9 AUGUST 2026 THE ROW CAME BACK FOR ONE MAN: THE DIRECTOR WHO ALSO
+                    LETS A FLAT. His rent is his own income on his own return, this page already
+                    folds it into the totals above, and gating on isCompany told him the tax on it
+                    was nothing. personalTaxShown is decided once in lib/incomeproof.ts, so this
+                    screen, the printed document and the share link cannot answer differently. */}
+                {proof.personalTaxShown ? (
                   <>
                     <dt style={S.thMut}>{proof.estimatedTaxLabel}</dt>
                     <dd style={S.tdMut}>{gbp2(proof.estimatedTax)}</dd>
                   </>
-                )}
+                ) : null}
               </div>
             </dl>
 
@@ -221,13 +226,11 @@ export default async function ProofOfIncomePage({
             {/* The sentence that says whose figures these are. Null for a sole trader, whose figures
                 are simply his, so nothing is added to the one page he wants to keep short. */}
             {proof.shareNote ? <p style={S.shareNote}>{proof.shareNote}</p> : null}
-            {proof.companyExcluded ? (
-              <p style={S.shareNote}>
-                These are the company&apos;s figures, not this person&apos;s personal income. A
-                company pays Corporation Tax on its own return, and the director is paid in salary
-                and dividends, which are not shown here.
-              </p>
-            ) : null}
+            {/* 🔴 THE SENTENCE IS NOW A FIELD, NOT A LITERAL, and it was a literal in TWO places:
+                here and in renderIncomeProofHtml. For a director who also lets a flat both copies
+                said "These are the company's figures" over a total containing his own rent. One
+                source, two forms, and lib/incomeproof.ts decides which. */}
+            {proof.companyNote ? <p style={S.shareNote}>{proof.companyNote}</p> : null}
 
             <p style={S.stamp}>
               Prepared by Lekhio {'·'} {longDate(proof.generatedAt.slice(0, 10))} {'·'} {proof.txCount} entries
@@ -246,7 +249,7 @@ export default async function ProofOfIncomePage({
                   that from a number. The sentence draws with the figure it is about: a director has
                   no estimate on this page, so a caveat about one would be a line explaining nothing.
                   lib/scotland.ts owns the words, and the printed document says the same. */}
-              {proof.companyExcluded ? null : <>{' '}{SCOTLAND_LINE}</>} For an official
+              {proof.personalTaxShown ? <>{' '}{SCOTLAND_LINE}</> : null} For an official
               SA302 or tax year overview, the person can log in to their HMRC account. Some
               lenders ask for HMRC documents as well as a summary like this.
             </p>

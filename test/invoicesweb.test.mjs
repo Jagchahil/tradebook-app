@@ -565,9 +565,14 @@ ok('🔴 every figure comes from buildIncomeProof over the session user\'s confi
     && (routeProof.match(/type: biz\.businessType, sharePercent: biz\.partnershipShare/g) || []).length === 1);
   ok('\ud83d\udd34 THE SHARE SENTENCE IS ON THE SHEET, so a lender cannot read the figure without it',
     /proof\.shareNote/.test(pageProof) && /p\.shareNote/.test(read('lib/incomeproof.ts')));
+  // \u26a0\ufe0f THE GATE IS personalTaxShown SINCE 9 AUGUST 2026, and the guarantee is unchanged:
+  // not a penny of personal tax over a company's TRADE profit. What came apart is the director who
+  // ALSO LETS A FLAT, whose rent this document already prints in his totals and who was told the
+  // tax on it was nothing. lib/incomeproof.ts decides it once; test/lenderdirector.test.mjs proves
+  // the arithmetic, sweeping every turnover against a rent only build of the same document.
   ok('\ud83d\udd34 AND NO PERSONAL TAX ESTIMATE IS PRINTED OVER A COMPANY\'S PROFIT',
-    /proof\.companyExcluded \? null : \(/.test(pageProof)
-    && /p\.companyExcluded \? '' : row\(p\.estimatedTaxLabel/.test(read('lib/incomeproof.ts')));
+    /proof\.personalTaxShown \? \(/.test(pageProof)
+    && /p\.personalTaxShown \? row\(p\.estimatedTaxLabel/.test(read('lib/incomeproof.ts')));
 }
 ok('🔴 the page computes no figure of its own',
   !/income\s*\+|expenses\s*\+|\+=|profit\s*=/.test(codeOnly(pageProof)));

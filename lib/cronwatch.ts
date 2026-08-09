@@ -103,6 +103,39 @@ export interface CronAlarm {
   detail: string | null;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 NOT EVERY ALARM IS AN OUTAGE, AND CONFLATING THE TWO PAGED THE FOUNDER ON LAUNCH EVE.
+//
+// never_run was added to cronAlarms at 21:00 on 9 August. /api/health answers 503 on any alarm and
+// UptimeRobot watches it, so within two minutes the site was reporting itself DOWN, on the evening
+// before launch, because a cron added ninety minutes earlier had not reached its first dispatch
+// slot yet (pm is 23:00 UTC). Nothing was wrong. Nobody was affected. The pager went off anyway.
+//
+// That is exactly the crying wolf this file's own header calls worse than no alarm at all, and it
+// was committed by the person who wrote that header, in the commit that quoted it.
+//
+// THE DISTINCTION THAT WAS MISSING. The severity is not the same and never was:
+//
+//   stale / failed / never_finished  Something that WAS working has stopped, or is finishing
+//                                    badly. Users are being missed right now. That is an outage
+//                                    and a 503 is correct.
+//   never_run                        A job is registered and has not been seen yet. It may be
+//                                    mis-wired, or it may simply be new. It is worth SEEING and it
+//                                    is not worth waking somebody for, because nothing that was
+//                                    working has stopped.
+//
+// Visibility and severity are different questions, and push 23 answered the first one correctly by
+// getting the second one wrong. So the alarm still exists, still names the job, and is split out
+// here so that a caller can surface it without calling the site down.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function blockingAlarms(alarms: CronAlarm[]): CronAlarm[] {
+  return alarms.filter((a) => a.reason !== 'never_run');
+}
+
+export function unseenAlarms(alarms: CronAlarm[]): CronAlarm[] {
+  return alarms.filter((a) => a.reason === 'never_run');
+}
+
 // Which jobs should be shouting? Empty array means all is well.
 export function cronAlarms(runs: CronRun[], now: Date = new Date()): CronAlarm[] {
   const out: CronAlarm[] = [];

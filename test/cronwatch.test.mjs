@@ -13,7 +13,10 @@
 // The weekly job finishes ONCE A WEEK. A naive "quiet for more than a day" check would
 // scream about it every Tuesday until somebody turned it off. That test is below.
 
-import { cronAlarms, MAX_QUIET_HOURS } from '../lib/cronwatch.ts';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { cronAlarms, blockingAlarms, unseenAlarms, MAX_QUIET_HOURS } from '../lib/cronwatch.ts';
 
 let pass = 0;
 let fail = 0;
@@ -167,6 +170,68 @@ ok('and an agent that hit its hop cap is an alarm even though it just "finished"
 ok('digest is daily', MAX_QUIET_HOURS.digest === 26);
 ok('nudge clears the 72h Friday-to-Monday gap', MAX_QUIET_HOURS.nudge > 72);
 ok('weekly clears the 168h week', MAX_QUIET_HOURS.weekly > 168);
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AN ALARM IS NOT AUTOMATICALLY AN OUTAGE, AND GETTING THAT WRONG PAGED THE FOUNDER.
+//
+// never_run shipped at 21:00 on 9 August. /api/health answers 503 on any alarm and UptimeRobot
+// polls it, so the site reported itself DOWN two minutes later, on launch eve, because a cron
+// added ninety minutes earlier had not reached its first dispatch slot (pm is 23:00 UTC). Nothing
+// was wrong. Nobody was affected. The pager went off anyway, which is the precise crying wolf this
+// file's header calls worse than no alarm, committed by the hand that wrote the header.
+//
+// Visibility and severity are DIFFERENT QUESTIONS. The alarm was right; the 503 was not.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nAn alarm worth seeing is not always an alarm worth waking somebody for.\n');
+{
+  const missing = only().filter((r) => r.job !== 'voicereap');
+  const a = cronAlarms(missing, NOW);
+  ok('the never-run job is still reported, because it is still worth seeing', a.length === 1);
+  ok('🔴 BUT IT DOES NOT BLOCK, so /api/health does not answer 503 for it',
+    blockingAlarms(a).length === 0);
+  ok('🔴 AND IT IS STILL RETRIEVABLE BY NAME, or splitting it out would just be hiding it',
+    unseenAlarms(a).length === 1 && unseenAlarms(a)[0].job === 'voicereap');
+
+  // ⚠️ THE REAL OUTAGE MUST STILL TAKE THE SITE DOWN. That is the half this split could break, and
+  // breaking it would be far worse than the false page it exists to stop.
+  const stopped = cronAlarms(only(run('digest', 30)), NOW);
+  ok('🔴 A STALE CRON STILL BLOCKS, which is the whole reason this endpoint answers 503',
+    blockingAlarms(stopped).length === 1 && blockingAlarms(stopped)[0].reason === 'stale');
+  const bad = cronAlarms(only(run('digest', 1, false, 'hop cap reached')), NOW);
+  ok('and so does one that finished badly', blockingAlarms(bad).length === 1);
+  const never = cronAlarms(
+    [{ job: 'digest', last_started: hoursAgo(3), last_finished: null, last_ok: null, last_error: null }],
+    NOW,
+  );
+  ok('and so does one that started and never came back', blockingAlarms(never).length === 1);
+  ok('the two splits are exhaustive: nothing falls between them',
+    blockingAlarms(stopped).length + unseenAlarms(stopped).length === stopped.length);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE ONE CALLER THAT DECIDES 503 ACTUALLY USES THE SPLIT.
+//
+// Everything above proves the LIBRARY tells an outage from an unseen job. None of it proves the
+// endpoint listens: /api/health could go on calling `alarms.length === 0` and every assertion in
+// this file would stay green while the site kept reporting itself down. That was caught by
+// deliberately reverting the route and watching this suite pass, which is the whole argument for
+// revert-proving a guard rather than trusting it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const health = readFileSync(path.join(repo, 'app/api/health/route.ts'), 'utf8');
+  ok('the health route imports the split rather than re-deciding severity itself',
+    /import \{[^}]*blockingAlarms[^}]*\} from '\.\.\/\.\.\/\.\.\/lib\/cronwatch'/.test(health));
+  ok('🔴 THE PUBLIC 503 IS DECIDED ON BLOCKING ALARMS ONLY, never on the raw list',
+    /const cronsOk = blocking\.length === 0;/.test(health)
+    && !/const cronsOk = alarms\.length === 0;/.test(health));
+  ok('🔴 AND THE UNSEEN COUNT IS STILL SURFACED, or splitting it out is just hiding it',
+    /cronsUnseen/.test(health));
+  ok('the count is public and the names are not, the same rule staleness already follows',
+    /cronsUnseen: unseen\.length/.test(health) && !/cronsUnseen: unseen\b(?!\.)/.test(health));
+  ok('and the operator view behind the bearer still names them',
+    /unseen: unseenAlarms\(alarms\)/.test(health));
+}
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

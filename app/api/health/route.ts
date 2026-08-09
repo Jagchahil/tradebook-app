@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { listCronRuns, readKnowledgeState } from '../../../lib/supabase';
-import { cronAlarms } from '../../../lib/cronwatch';
+import { cronAlarms, blockingAlarms, unseenAlarms } from '../../../lib/cronwatch';
 import { knowledgeAlarms, knowledgeStatus } from '../../../lib/knowledgewatch';
 
 // A tiny health check for uptime monitoring. Reports whether the app is up and
@@ -69,6 +69,12 @@ export async function GET(req: NextRequest) {
     const alarms = runs ? cronAlarms(runs) : [];
     const brain = await readKnowledgeState();
     const brainAlarms = brain ? knowledgeAlarms(brain) : [];
+    // ⚠️ THE OPERATOR VIEW IS STRICT ON PURPOSE, and differs from the public one. This body is a
+    // to-do list for whoever is holding the pager, so a cron that has never run belongs in its
+    // `ok: false`. The PUBLIC body answers a different question, "is the site serving", and a job
+    // nobody has seen yet is not an answer of no to that. Both are right; they are asked by
+    // different people. unseen is broken out below so the difference is readable rather than
+    // something to work out from two numbers.
     const ok = missing.length === 0 && alarms.length === 0 && brain !== null && brainAlarms.length === 0;
     return NextResponse.json(
       {
@@ -88,7 +94,10 @@ export async function GET(req: NextRequest) {
           bankTokenKey: Boolean(process.env.BANK_TOKEN_KEY),
         },
         crons: runs ?? 'unreadable',
-        alarms,
+        alarms: blockingAlarms(alarms),
+        // Registered, never seen. Not an outage; a wiring question. Named here because this side
+        // is behind the bearer and naming it is the entire use of the row.
+        unseen: unseenAlarms(alarms),
         // The detail on WHICH of our tax constants is currently wrong, and what GOV.UK says it
         // should be. Behind the bearer, because it is a to-do list for anyone who wants to file a
         // return against a number we have not fixed yet.
@@ -151,7 +160,23 @@ export async function GET(req: NextRequest) {
   // bearer, above.
   const runs = await listCronRuns();
   const alarms = runs ? cronAlarms(runs) : [];
-  const cronsOk = alarms.length === 0;
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A NEVER-RUN CRON IS VISIBLE HERE AND IT DOES NOT TAKE THE SITE DOWN. lib/cronwatch.ts has
+  // the full account. Short version: this endpoint answers 503 on any alarm and UptimeRobot polls
+  // it, so when never_run was added at 21:00 on 9 August the site reported itself DOWN within two
+  // minutes, on launch eve, because a cron added ninety minutes earlier had not yet reached its
+  // first dispatch slot. Nothing was wrong and nobody was affected.
+  //
+  // Something that WAS working and has stopped is an outage. Something never seen is a question.
+  // Only the first is a 503.
+  //
+  // ⚠️ THE COUNT IS PUBLIC AND THE NAMES ARE NOT, the same rule the block above sets for staleness:
+  // which job is late is useful to a stranger and no use to you. A bare count leaks nothing and
+  // stops `crons: "ok"` from being a flat lie while one is genuinely pending.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const blocking = blockingAlarms(alarms);
+  const unseen = unseenAlarms(alarms);
+  const cronsOk = blocking.length === 0;
 
   // THE BRAIN (docs/105). Three ways this goes red, and the first one is why Khoji exists at all.
   //
@@ -186,6 +211,9 @@ export async function GET(req: NextRequest) {
       // database being down, and used to be indistinguishable from perfect health.
       key: privileged ? 'ok' : 'not-privileged',
       crons: runs === null ? 'unknown' : cronsOk ? 'ok' : 'stale',
+      // A count, never a name. Zero is omitted rather than printed, so this row appears only when
+      // there is genuinely something not yet seen. See the block above.
+      ...(unseen.length ? { cronsUnseen: unseen.length } : {}),
       // One word. Never which constant is wrong: that is a map for someone who wants to file
       // against a figure we have not corrected yet. The detail is behind the bearer, above.
       knowledge: brain === null ? 'unknown' : knowledgeStatus(brainAlarms),

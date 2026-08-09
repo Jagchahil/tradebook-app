@@ -188,7 +188,11 @@ export async function exchangeCodeForToken(code: string): Promise<TokenSet | nul
     console.error('[hmrc] token exchange failed:', res.status);
     return null;
   }
-  return (await res.json()) as TokenSet;
+  // A 200 whose body is not JSON used to THROW out of here, past /api/hmrc/callback's own
+  // `if (!tokens) return done('error')`, and land the customer on a raw 500 as he came back from
+  // HMRC's consent screen. The auth code is single use, so he had to start the whole journey
+  // again with no idea why. 9 August 2026.
+  return (await res.json().catch(() => null)) as TokenSet | null;
 }
 
 export async function refreshAccessToken(refreshToken: string): Promise<TokenSet | null> {
@@ -205,7 +209,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<TokenSet
     body: body.toString(),
   });
   if (!res.ok) return null;
-  return (await res.json()) as TokenSet;
+  // Same as exchangeCodeForToken above: a 200 whose body is not JSON is not a token set.
+  return (await res.json().catch(() => null)) as TokenSet | null;
 }
 
 // --- Fraud prevention headers (mandatory on every MTD call) -----------------

@@ -85,8 +85,11 @@ export async function downloadMedia(mediaId: string): Promise<MediaPayload | nul
     return null;
   }
   if (!metaRes.ok) return null;
-  const meta = (await metaRes.json()) as { url?: string; mime_type?: string };
-  if (!meta.url) return null;
+  // A 200 whose body is not JSON is the same answer as a failed lookup: we did not get a media
+  // URL. It used to THROW, out of downloadMedia, out of the handler, into processMessage's catch,
+  // and the customer who sent the photograph or the voice note got SILENCE. 9 August 2026.
+  const meta = (await metaRes.json().catch(() => null)) as { url?: string; mime_type?: string } | null;
+  if (!meta?.url) return null;
 
   // Only ever follow the media URL if it is a Meta host, and only then send our
   // bearer token. If Graph ever returned an unexpected URL, this stops the token

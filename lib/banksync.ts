@@ -285,7 +285,9 @@ export async function listLinkedConnectionsPage(
     { headers: sbHeaders() },
   );
   if (!res.ok) return [];
-  const rows = (await res.json()) as BankConnection[];
+  // A body we cannot read is not "no connections". Same fallback as the failed status above.
+  const rows = (await res.json().catch(() => null)) as BankConnection[] | null;
+  if (rows === null) return [];
   return rows.map((row) => ({
     ...row,
     access_token: decryptSecret(row.access_token),

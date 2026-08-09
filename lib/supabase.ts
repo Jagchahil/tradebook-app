@@ -78,7 +78,8 @@ export async function bumpAiUsage(scope: string, key: string): Promise<number | 
       body: JSON.stringify({ p_scope: scope, p_key: key }),
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const data = await res.json().catch(() => null);
+    if (data === null) return null;
     const n = typeof data === 'number' ? data : Array.isArray(data) ? Number(data[0]) : Number(data);
     return Number.isFinite(n) ? n : null;
   } catch {
@@ -123,7 +124,8 @@ export async function addWaSend(n: number): Promise<number | null> {
       body: JSON.stringify({ p_scope: 'wa_send', p_key: 'global', p_n: n }),
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const data = await res.json().catch(() => null);
+    if (data === null) return null;
     const c = typeof data === 'number' ? data : Array.isArray(data) ? Number(data[0]) : Number(data);
     return Number.isFinite(c) ? c : null;
   } catch {
@@ -462,7 +464,8 @@ export async function createConversation(userId: string, title: string): Promise
       body: JSON.stringify({ user_id: userId, title: (title || 'New chat').slice(0, 80) }),
     });
     if (!res.ok) return null;
-    const rows = await res.json();
+    const rows = await res.json().catch(() => null);
+    if (rows === null) return null;
     return Array.isArray(rows) && rows[0]?.id ? String(rows[0].id) : null;
   } catch {
     return null;
@@ -478,7 +481,8 @@ export async function conversationOwnedBy(userId: string, conversationId: string
       `conversations?id=eq.${encodeURIComponent(conversationId)}&user_id=eq.${encodeURIComponent(userId)}&select=id&limit=1`,
     );
     if (!res.ok) return false;
-    const rows = await res.json();
+    const rows = await res.json().catch(() => null);
+    if (rows === null) return false;
     return Array.isArray(rows) && rows.length > 0;
   } catch {
     return false;
@@ -492,7 +496,8 @@ export async function listConversations(userId: string, limit = 50): Promise<Con
       `conversations?user_id=eq.${encodeURIComponent(userId)}&select=id,title,last_message_at,created_at&order=last_message_at.desc&limit=${limit}`,
     );
     if (!res.ok) return [];
-    const rows = await res.json();
+    const rows = await res.json().catch(() => null);
+    if (rows === null) return [];
     return Array.isArray(rows) ? rows : [];
   } catch {
     return [];
@@ -506,7 +511,8 @@ export async function getConversationMessages(userId: string, conversationId: st
       `messages?user_id=eq.${encodeURIComponent(userId)}&conversation_id=eq.${encodeURIComponent(conversationId)}&select=id,role,content,sources,created_at&order=created_at.asc&limit=${limit}`,
     );
     if (!res.ok) return [];
-    const rows = await res.json();
+    const rows = await res.json().catch(() => null);
+    if (rows === null) return [];
     return Array.isArray(rows) ? rows : [];
   } catch {
     return [];
@@ -760,7 +766,8 @@ export async function getSession(phone: string): Promise<WaSession | null> {
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as WaSession[];
+  const rows = (await res.json().catch(() => null)) as (WaSession[]) | null;
+  if (rows === null) return null;
   if (rows.length === 0) return null;
   const s = rows[0];
   if (Date.now() - new Date(s.updated_at).getTime() > SESSION_TTL_MS) {
@@ -1002,6 +1009,42 @@ export interface ServerInvoiceInput {
   };
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE INSERT SUCCEEDED AND WE COULD NOT READ OUR OWN ANSWER. THE ROW IS THERE.
+//
+// Found 9 August 2026, sweeping this file for the shape lib/claude.ts and lib/stripe.ts were fixed
+// for the same day. Everywhere else in this file a body we cannot parse is answered with the same
+// fallback the !res.ok branch gives, because a failed read and a failed status mean the same thing:
+// we do not know. THESE TWO ARE DIFFERENT, AND RETURNING null WOULD BE A LIE.
+//
+// PostgREST answered 2xx. The write HAPPENED. Returning null tells the route nothing was saved, the
+// route says so to the customer in good faith, and he does the only sensible thing: he presses the
+// button again. Now there are two rows.
+//
+//   createInvoice    a SECOND invoice, with a DIFFERENT NUMBER, for the same job. Invoice numbers
+//                    must run in an unbroken sequence (VAT Regulations 1995 reg 14), and there is
+//                    now a number in his sequence for an invoice nobody ever sent.
+//   createBookShare  a SECOND LIVE GRANT to his entire books. The link is returned once at
+//                    creation and never listed back, so he cannot see the first one and cannot
+//                    revoke what he was never shown.
+//
+// So instead of guessing, ASK. Both rows are identifiable from what we already hold, and one extra
+// read on a path that would otherwise duplicate is cheap. Only if the recovery read ALSO fails do
+// we return null, and by then null is honest: we genuinely do not know.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+async function recoverInsertedId(query: string, where: string): Promise<string | null> {
+  try {
+    const res = await fetch(query, { headers: headers() });
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ id?: string }> | null;
+    const id = rows?.[0]?.id;
+    if (id) console.error(`[${where}] the reply was unreadable; recovered the row that was written.`);
+    return id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function createInvoice(
   userId: string,
   input: ServerInvoiceInput,
@@ -1052,10 +1095,19 @@ export async function createInvoice(
     console.error('[createInvoice] failed:', res.status);
     return null;
   }
-  const created = (await res.json()) as Array<{ id: string }>;
-  const row = Array.isArray(created) ? created[0] : (created as { id: string });
-  if (!row?.id) return null;
-  return { id: row.id, number, total: input.vat ? input.vat.total : subtotal };
+  const created = (await res.json().catch(() => null)) as Array<{ id: string }> | null;
+  const row = created === null ? null : (Array.isArray(created) ? created[0] : (created as { id: string }));
+  if (row?.id) return { id: row.id, number, total: input.vat ? input.vat.total : subtotal };
+
+  // See the block above recoverInsertedId. The invoice EXISTS, and the number we just minted
+  // identifies it. Only a failed recovery read is honestly null.
+  const recovered = await recoverInsertedId(
+    `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}`
+      + `&number=eq.${encodeURIComponent(number)}&select=id&order=created_at.desc&limit=1`,
+    'createInvoice',
+  );
+  if (!recovered) return null;
+  return { id: recovered, number, total: input.vat ? input.vat.total : subtotal };
 }
 
 // The most recent income entry (positive amount), for turning a just logged sale
@@ -1073,7 +1125,8 @@ export async function getLastIncomeTransaction(
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ vendor: string | null; amount: number; category: string | null }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ vendor: string | null; amount: number; category: string | null }>) | null;
+  if (rows === null) return null;
   const r = Array.isArray(rows) ? rows[0] : null;
   if (!r) return null;
   return { vendor: r.vendor ?? null, amount: Number(r.amount) || 0, category: r.category ?? null };
@@ -1112,7 +1165,8 @@ export async function findUserIdByPhone(senderDigits: string): Promise<string | 
   const query = `${url}/rest/v1/users?phone_number=eq.${encodeURIComponent(e164)}&select=id&limit=2`;
   const res = await fetch(query, { headers: headers() });
   if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ id: string }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ id: string }>) | null;
+  if (rows === null) return null;
   return rows.length === 1 ? rows[0].id : null;
 }
 
@@ -1127,7 +1181,8 @@ export async function transactionExists(messageId: string): Promise<boolean> {
   )}&select=id&limit=1`;
   const res = await fetch(query, { headers: headers() });
   if (!res.ok) return false;
-  const rows = (await res.json()) as Array<{ id: string }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ id: string }>) | null;
+  if (rows === null) return false;
   return rows.length > 0;
 }
 
@@ -1302,7 +1357,8 @@ export async function listMarketableLeads(
   q += `&order=email.asc&limit=${n}`;
   const res = await fetch(q, { headers: headers() });
   if (!res.ok) return [];
-  const rows = (await res.json()) as Array<{ email: string }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ email: string }>) | null;
+  if (rows === null) return [];
   const emails = rows.map((r) => r.email).filter(Boolean);
   if (emails.length === n) {
     // Say it out loud. A capped list that nobody knows is capped is how a mailing quietly reaches
@@ -2327,7 +2383,8 @@ export async function getStripeCustomerByEmail(email: string): Promise<string | 
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ stripe_customer_id?: string | null }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ stripe_customer_id?: string | null }>) | null;
+  if (rows === null) return null;
   return rows[0]?.stripe_customer_id ?? null;
 }
 
@@ -2344,7 +2401,8 @@ export async function getStripeCustomerByPhone(phone: string): Promise<string | 
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ stripe_customer_id?: string | null }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ stripe_customer_id?: string | null }>) | null;
+  if (rows === null) return null;
   return rows[0]?.stripe_customer_id ?? null;
 }
 
@@ -2364,7 +2422,8 @@ export async function getStripeCustomerByUser(userId: string): Promise<string | 
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ stripe_customer_id?: string | null }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ stripe_customer_id?: string | null }>) | null;
+  if (rows === null) return null;
   return rows[0]?.stripe_customer_id ?? null;
 }
 
@@ -3363,7 +3422,8 @@ export async function getSubscriptionByPhone(phone: string): Promise<Subscriptio
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as SubscriptionStatus[];
+  const rows = (await res.json().catch(() => null)) as (SubscriptionStatus[]) | null;
+  if (rows === null) return null;
   return rows[0] ?? null;
 }
 
@@ -3584,7 +3644,7 @@ export async function exportUserData(userId: string, email: string | null): Prom
   const { url } = config();
   const get = async (path: string): Promise<unknown[]> => {
     const res = await fetch(`${url}/rest/v1/${path}`, { headers: headers() });
-    return res.ok ? ((await res.json()) as unknown[]) : [];
+    return res.ok ? (((await res.json().catch(() => null)) as unknown[] | null) ?? []) : [];
   };
   const phone = await getPhoneForUser(userId);
   const identities = userDataIdentities(userId, email, phone);
@@ -3784,7 +3844,8 @@ export async function getHmrcConnection(userId: string): Promise<HmrcConnection 
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as HmrcConnection[];
+  const rows = (await res.json().catch(() => null)) as (HmrcConnection[]) | null;
+  if (rows === null) return null;
   const row = rows[0] ?? null;
   if (!row) return null;
   // Decrypt the OAuth tokens so callers see plaintext. Legacy plaintext rows
@@ -3830,7 +3891,8 @@ export async function getHmrcFraud(userId: string): Promise<Record<string, unkno
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as { fraud_client?: Record<string, unknown> | null }[];
+  const rows = (await res.json().catch(() => null)) as ({ fraud_client?: Record<string, unknown> | null }[]) | null;
+  if (rows === null) return null;
   return rows[0]?.fraud_client ?? null;
 }
 
@@ -3874,7 +3936,9 @@ export async function getDueReminders(nowIso: string, limit = 100): Promise<DueR
   const q = `${url}/rest/v1/events?select=id,user_id,title,kind,remind_at&reminded=eq.false&remind_at=not.is.null&remind_at=lte.${encodeURIComponent(nowIso)}&order=remind_at.asc&limit=${limit}`;
   const res = await fetch(q, { headers: headers() });
   if (!res.ok) return [];
-  return (await res.json()) as DueReminder[];
+  const parsed = (await res.json().catch(() => null)) as (DueReminder[]) | null;
+  if (parsed === null) return [];
+  return parsed;
 }
 
 export async function markReminded(id: string): Promise<void> {
@@ -3905,7 +3969,8 @@ export async function getPhoneForUser(userId: string): Promise<string | null> {
   const { url } = config();
   const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=phone_number&limit=1`, { headers: headers() });
   if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ phone_number?: string | null }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ phone_number?: string | null }>) | null;
+  if (rows === null) return null;
   return rows[0]?.phone_number ?? null;
 }
 
@@ -3955,7 +4020,8 @@ export async function listWeeklyTargetsPage(
     { headers: headers() },
   );
   if (!res.ok) return { targets: [], last: null };
-  const batch = (await res.json()) as Array<{ id: string; expo_push_token: string | null }>;
+  const batch = (await res.json().catch(() => null)) as (Array<{ id: string; expo_push_token: string | null }>) | null;
+  if (batch === null) return { targets: [], last: null };
   if (!Array.isArray(batch)) return { targets: [], last: null };
   return {
     targets: batch.map((u) => ({ user_id: u.id, expo_push_token: u.expo_push_token ?? null })),
@@ -4043,7 +4109,8 @@ export async function listNudgeTargetsPage(
     { headers: headers() },
   );
   if (!res.ok) return { targets: [], last: null };
-  const batch = (await res.json()) as Array<{ id: string; phone_number: string; expo_push_token: string | null }>;
+  const batch = (await res.json().catch(() => null)) as (Array<{ id: string; phone_number: string; expo_push_token: string | null }>) | null;
+  if (batch === null) return { targets: [], last: null };
   return {
     targets: batch.map((u) => ({ user_id: u.id, phone: u.phone_number, expo_push_token: u.expo_push_token ?? null })),
     last: batch.length === limit ? batch[batch.length - 1].id : null,
@@ -4056,7 +4123,8 @@ export async function listAllNudgePrefs(): Promise<Map<string, { daily_nudges: b
   const { url } = config();
   const res = await fetch(`${url}/rest/v1/reminder_prefs?select=user_id,daily_nudges,weekly_summary&limit=100000`, { headers: headers() });
   if (!res.ok) return new Map();
-  const prefs = (await res.json()) as Array<{ user_id: string; daily_nudges: boolean; weekly_summary: boolean }>;
+  const prefs = (await res.json().catch(() => null)) as (Array<{ user_id: string; daily_nudges: boolean; weekly_summary: boolean }>) | null;
+  if (prefs === null) return new Map();
   return new Map(prefs.map((p) => [p.user_id, { daily_nudges: p.daily_nudges, weekly_summary: p.weekly_summary }]));
 }
 
@@ -4074,7 +4142,8 @@ export async function getNudgePrefsForUsers(
     { headers: headers() },
   );
   if (!res.ok) return new Map();
-  const prefs = (await res.json()) as Array<{ user_id: string; daily_nudges: boolean; weekly_summary: boolean }>;
+  const prefs = (await res.json().catch(() => null)) as (Array<{ user_id: string; daily_nudges: boolean; weekly_summary: boolean }>) | null;
+  if (prefs === null) return new Map();
   return new Map(prefs.map((p) => [p.user_id, { daily_nudges: p.daily_nudges, weekly_summary: p.weekly_summary }]));
 }
 
@@ -4318,13 +4387,14 @@ export async function transactionSummaryForUser(userId: string, limit = 60): Pro
     { headers: headers() },
   );
   if (!res.ok) return '';
-  const rows = (await res.json()) as Array<{
+  const rows = (await res.json().catch(() => null)) as Array<{
     amount: number;
     category: string | null;
     vendor: string | null;
     transaction_date: string | null;
     confirmed: boolean | null;
-  }>;
+  }> | null;
+  if (rows === null) return '';
   return rows
     .map((r) => {
       const amt = Number(r.amount) || 0;
@@ -4431,7 +4501,8 @@ export async function getConfirmedTransactionsForRange(
     { headers: headers() },
   );
   if (!res.ok) return [];
-  const rows = (await res.json()) as Array<Record<string, unknown>>;
+  const rows = (await res.json().catch(() => null)) as (Array<Record<string, unknown>>) | null;
+  if (rows === null) return [];
   return rows
     .filter((r) => typeof r.transaction_date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(r.transaction_date as string))
     .map((r) => ({
@@ -4456,7 +4527,8 @@ export async function getBusinessName(userId: string): Promise<string | null> {
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ name?: string | null; business_name?: string | null }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ name?: string | null; business_name?: string | null }>) | null;
+  if (rows === null) return null;
   return rows[0]?.business_name || rows[0]?.name || null;
 }
 
@@ -4653,7 +4725,8 @@ export async function getAutonomyLevel(userId: string): Promise<AutonomyLevel> {
     { headers: headers() },
   );
   if (!res.ok) return 'suggest';
-  const rows = (await res.json()) as Array<{ autonomy_level?: string | null }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ autonomy_level?: string | null }>) | null;
+  if (rows === null) return 'suggest';
   return parseLevel(rows[0]?.autonomy_level);
 }
 
@@ -4680,8 +4753,8 @@ export async function getOrCreateReferralCode(userId: string): Promise<string | 
     { headers: headers() },
   );
   if (res.ok) {
-    const rows = (await res.json()) as Array<{ referral_code?: string | null }>;
-    const existing = rows[0]?.referral_code;
+    const rows = (await res.json().catch(() => null)) as Array<{ referral_code?: string | null }> | null;
+    const existing = rows?.[0]?.referral_code;
     if (existing) return existing;
   }
   const code = referralCode(userId);
@@ -4723,14 +4796,14 @@ export async function markInvoicePaidServer(
     { headers: headers() },
   );
   if (!invRes.ok) return;
-  const rows = (await invRes.json()) as Array<{
+  const rows = (await invRes.json().catch(() => null)) as Array<{
     user_id: string;
     number: string;
     customer_name: string;
     total: number;
     status: string;
-  }>;
-  if (rows.length === 0) return;
+  }> | null;
+  if (rows === null || rows.length === 0) return;
   const inv = rows[0];
   if (inv.status === 'paid') return; // already done, fast path
 
@@ -4866,7 +4939,8 @@ export async function latestUnconfirmed(userId: string): Promise<LastEntry | nul
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as LastEntry[];
+  const rows = (await res.json().catch(() => null)) as (LastEntry[]) | null;
+  if (rows === null) return null;
   return rows[0] ?? null;
 }
 
@@ -4965,7 +5039,8 @@ export async function getBankConnectionByReference(reference: string): Promise<B
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as BankConnection[];
+  const rows = (await res.json().catch(() => null)) as (BankConnection[]) | null;
+  if (rows === null) return null;
   const row = rows[0] ?? null;
   return row ? decryptBankTokens(row) : null;
 }
@@ -5031,7 +5106,9 @@ export async function listBankConnectionsForUser(
     res = await fetch(`${base}&select=id,status,created_at,last_synced_date`, { headers: headers() });
   }
   if (!res.ok) return [];
-  return (await res.json()) as Array<{ id: string; status: string; created_at?: string; bank_name?: string | null; last_synced_date: string | null }>;
+  const parsed = (await res.json().catch(() => null)) as (Array<{ id: string; status: string; created_at?: string; bank_name?: string | null; last_synced_date: string | null }>) | null;
+  if (parsed === null) return [];
+  return parsed;
 }
 
 // Disconnect: revoke every linked connection for the user and destroy our copy
@@ -5064,7 +5141,8 @@ export async function listLinkedBankConnections(limit = 500): Promise<BankConnec
     { headers: headers() },
   );
   if (!res.ok) return [];
-  const rows = (await res.json()) as BankConnection[];
+  const rows = (await res.json().catch(() => null)) as (BankConnection[]) | null;
+  if (rows === null) return [];
   // Decrypt each row's tokens so the sync path sees plaintext.
   return rows.map(decryptBankTokens);
 }
@@ -5081,7 +5159,9 @@ export async function recentUnconfirmedCaptures(
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return await res.json();
+  const parsed = await res.json().catch(() => null);
+  if (parsed === null) return [];
+  return parsed;
 }
 
 // The receipt came first, and now the bank has sent us the card payment for it.
@@ -5271,8 +5351,8 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
     { headers: headers() },
   );
   if (!invRes.ok) return null;
-  const rows = (await invRes.json()) as Array<Record<string, unknown>>;
-  if (rows.length === 0) return null;
+  const rows = (await invRes.json().catch(() => null)) as Array<Record<string, unknown>> | null;
+  if (rows === null || rows.length === 0) return null;
   const inv = rows[0];
 
   let businessName: string | null = null;
@@ -5286,8 +5366,8 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
       { headers: headers() },
     );
     if (userRes.ok) {
-      const urows = (await userRes.json()) as Array<{ name?: string; business_name?: string; phone_number?: string; address?: string }>;
-      if (urows.length > 0) {
+      const urows = (await userRes.json().catch(() => null)) as Array<{ name?: string; business_name?: string; phone_number?: string; address?: string }> | null;
+      if (urows !== null && urows.length > 0) {
         businessName = urows[0].business_name || urows[0].name || null;
         // Do not expose the trader's personal mobile on a shareable public link. His ADDRESS is a
         // different matter: a VAT invoice must carry it, and it is his business address, printed on
@@ -6246,8 +6326,21 @@ export async function createBookShare(
     }),
   });
   if (!res.ok) return null;
-  const rows = (await res.json()) as BookShare[];
-  return rows[0] ?? null;
+  const rows = (await res.json().catch(() => null)) as (BookShare[]) | null;
+  if (rows !== null && rows[0]) return rows[0];
+
+  // See the block above recoverInsertedId. The grant EXISTS and it is live. Reading it back beats
+  // handing him a failure that makes him mint a second one he can never see and never revoke.
+  const back = await fetch(
+    `${url}/rest/v1/book_shares?user_id=eq.${encodeURIComponent(userId)}`
+      + `&expires_at=eq.${encodeURIComponent(expiresAtISO)}&revoked_at=is.null`
+      + `&select=${SHARE_COLS}&order=created_at.desc&limit=1`,
+    { headers: headers() },
+  ).catch(() => null);
+  if (!back || !back.ok) return null;
+  const found = (await back.json().catch(() => null)) as (BookShare[]) | null;
+  if (found?.[0]) console.error('[createBookShare] the reply was unreadable; recovered the grant that was written.');
+  return found?.[0] ?? null;
 }
 
 export async function listBookShares(userId: string): Promise<BookShare[]> {
@@ -6258,7 +6351,9 @@ export async function listBookShares(userId: string): Promise<BookShare[]> {
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return (await res.json()) as BookShare[];
+  const parsed = (await res.json().catch(() => null)) as (BookShare[]) | null;
+  if (parsed === null) return [];
+  return parsed;
 }
 
 // Scoped by user_id as well as id, so a caller can only ever revoke their OWN
@@ -6286,7 +6381,8 @@ export async function getBookShare(shareId: string): Promise<BookShare | null> {
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as BookShare[];
+  const rows = (await res.json().catch(() => null)) as (BookShare[]) | null;
+  if (rows === null) return null;
   return rows[0] ?? null;
 }
 
@@ -6329,7 +6425,8 @@ export async function getConfirmedTransactionsForUser(userId: string): Promise<R
     { headers: headers() },
   );
   if (!res.ok) return [];
-  const rows = (await res.json()) as Record<string, unknown>[];
+  const rows = (await res.json().catch(() => null)) as (Record<string, unknown>[]) | null;
+  if (rows === null) return [];
   return rows.map((r) => ({
     ...r,
     writtenDown: isWrittenDown(r.capital_kind),
@@ -6519,7 +6616,9 @@ export async function getAllConfirmedForReview(userId: string): Promise<Record<s
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return (await res.json()) as Record<string, unknown>[];
+  const parsed = (await res.json().catch(() => null)) as (Record<string, unknown>[]) | null;
+  if (parsed === null) return [];
+  return parsed;
 }
 
 // --- the brain ---------------------------------------------------------------
@@ -6534,7 +6633,9 @@ export async function getUserRules(userId: string): Promise<Array<{ vendor_key: 
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return await res.json();
+  const parsed = await res.json().catch(() => null);
+  if (parsed === null) return [];
+  return parsed;
 }
 
 // The crowd's answers for a specific set of vendors. Scoped to the keys we are
@@ -6549,7 +6650,9 @@ export async function getVendorPatterns(keys: string[]): Promise<Array<{ vendor_
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return await res.json();
+  const parsed = await res.json().catch(() => null);
+  if (parsed === null) return [];
+  return parsed;
 }
 
 // Write a lesson. Never throws: failing to learn must never break the thing the
@@ -6587,7 +6690,8 @@ export async function getTransactionVendor(userId: string, id: string): Promise<
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ vendor: string | null }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ vendor: string | null }>) | null;
+  if (rows === null) return null;
   return rows[0]?.vendor ?? null;
 }
 
@@ -6603,7 +6707,8 @@ export async function getTransactionForLearning(
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = await res.json();
+  const rows = await res.json().catch(() => null);
+  if (rows === null) return null;
   return rows[0] ?? null;
 }
 
@@ -6638,7 +6743,9 @@ export async function recentUnconfirmedForMatch(
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return await res.json();
+  const parsed = await res.json().catch(() => null);
+  if (parsed === null) return [];
+  return parsed;
 }
 
 // Fold a receipt into the bank line it duplicates, so ONE entry is left holding the
@@ -6751,7 +6858,8 @@ export async function usersDueDigest(afterId: string | null, limit: number): Pro
   );
   if (!res.ok) return { users: [], lastId: afterId, more: false };
 
-  const page = (await res.json()) as DigestCandidate[];
+  const page = (await res.json().catch(() => null)) as DigestCandidate[] | null;
+  if (page === null) return { users: [], lastId: afterId, more: false };
   // The cursor and the "keep going" flag come from the RAW page, before any filtering.
   const lastId = page.length > 0 ? page[page.length - 1].id : afterId;
   const more = page.length === limit;
@@ -6779,8 +6887,13 @@ export async function usersDueDigest(afterId: string | null, limit: number): Pro
   // number. But `more` still stands, so one bad lookup does not end the whole run.
   if (!prefsRes.ok) return { users: [], lastId, more };
 
+  // A body we cannot read is not "nobody opted out". Treating it as an empty set would send the
+  // digest to every person who has switched it off, so an unreadable preferences page stops the
+  // page instead: the cron's own resumable walk brings them back on the next kick.
+  const prefs = (await prefsRes.json().catch(() => null)) as Array<{ user_id: string; daily_nudges: boolean }> | null;
+  if (prefs === null) return { users: [], lastId: afterId, more: false };
   const optedOut = new Set(
-    ((await prefsRes.json()) as Array<{ user_id: string; daily_nudges: boolean }>)
+    prefs
       .filter((p) => p.daily_nudges === false)
       .map((p) => p.user_id),
   );
@@ -6832,7 +6945,9 @@ export async function bankEntriesForDigestMany(userIds: string[]): Promise<Map<s
       { headers: headers() },
     );
     if (!res.ok) return [];
-    return await res.json();
+    const parsed = await res.json().catch(() => null);
+    if (parsed === null) return [];
+    return parsed;
   }
 
   const [filed, asking] = await Promise.all([q(true), q(false)]);
@@ -6907,7 +7022,8 @@ export async function confirmDigestEntries(userId: string, sinceISO: string): Pr
     },
   );
   if (!res.ok) return 0;
-  const rows = (await res.json()) as unknown[];
+  const rows = (await res.json().catch(() => null)) as (unknown[]) | null;
+  if (rows === null) return 0;
   return Array.isArray(rows) ? rows.length : 0;
 }
 
@@ -6919,7 +7035,8 @@ export async function lastDigestAt(userId: string): Promise<string | null> {
     { headers: headers() },
   );
   if (!res.ok) return null;
-  const rows = (await res.json()) as Array<{ last_digest_at: string | null }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ last_digest_at: string | null }>) | null;
+  if (rows === null) return null;
   return rows[0]?.last_digest_at ?? null;
 }
 
@@ -7017,7 +7134,8 @@ export async function readRakhaRuns(limit = 30): Promise<RakhaRun[] | null> {
       { headers: headers(), signal: AbortSignal.timeout(4000) },
     );
     if (!res.ok) return null;
-    const rows = await res.json();
+    const rows = await res.json().catch(() => null);
+    if (rows === null) return null;
     return Array.isArray(rows) ? rows : null;
   } catch {
     return null;
@@ -7041,7 +7159,8 @@ export async function listCronRuns(): Promise<CronRun[] | null> {
       signal: AbortSignal.timeout(4000),
     });
     if (!res.ok) return null;
-    const rows = await res.json();
+    const rows = await res.json().catch(() => null);
+    if (rows === null) return null;
     return Array.isArray(rows) ? rows : null;
   } catch {
     return null;
@@ -7057,7 +7176,8 @@ export async function cronOverdue(maxAgeHours: number): Promise<OverdueCron[] | 
       body: JSON.stringify({ p_max_age_hours: maxAgeHours }),
     });
     if (!res.ok) return null;
-    const rows = await res.json();
+    const rows = await res.json().catch(() => null);
+    if (rows === null) return null;
     return Array.isArray(rows) ? rows : null;
   } catch {
     return null;
@@ -7150,7 +7270,9 @@ export async function pileEntries(userId: string): Promise<Array<{
     { headers: headers() },
   );
   if (!res.ok) return [];
-  return await res.json();
+  const parsed = await res.json().catch(() => null);
+  if (parsed === null) return [];
+  return parsed;
 }
 
 // One decision, many rows, one statement.
@@ -7170,7 +7292,8 @@ export async function confirmPile(userId: string, ids: string[], category: strin
       body: JSON.stringify({ p_user: userId, p_ids: clean, p_category: category }),
     });
     if (!res.ok) return 0;
-    const n = await res.json();
+    const n = await res.json().catch(() => null);
+    if (n === null) return 0;
     return typeof n === 'number' ? n : 0;
   } catch {
     return 0;
@@ -7207,7 +7330,8 @@ export async function confirmIncome(
       body: JSON.stringify({ p_user: userId, p_ids: clean, p_category: kind }),
     });
     if (!res.ok) return 0;
-    const n = await res.json();
+    const n = await res.json().catch(() => null);
+    if (n === null) return 0;
     return typeof n === 'number' ? n : 0;
   } catch {
     return 0;
@@ -8054,7 +8178,8 @@ export async function listNurtureCandidates(limit = 200): Promise<NurtureCandida
     { headers: headers() },
   );
   if (!res.ok) return [];
-  const rows = (await res.json()) as Array<{ email: string; nurture_stage: number | null; confirmed_at: string | null; nurture_last_at: string | null }>;
+  const rows = (await res.json().catch(() => null)) as (Array<{ email: string; nurture_stage: number | null; confirmed_at: string | null; nurture_last_at: string | null }>) | null;
+  if (rows === null) return [];
   return rows.map((r) => ({ email: r.email, stage: r.nurture_stage ?? 0, confirmedAt: r.confirmed_at, lastAt: r.nurture_last_at }));
 }
 
@@ -8084,7 +8209,8 @@ export async function listPresaleCandidates(limit = 300): Promise<PresaleCandida
     { headers: headers() },
   );
   if (!res.ok) return [];
-  const rows = (await res.json()) as Array<Record<string, unknown>>;
+  const rows = (await res.json().catch(() => null)) as (Array<Record<string, unknown>>) | null;
+  if (rows === null) return [];
   return rows.map((r) => ({
     email: String(r.email), name: (r.name as string) ?? null, whatsapp: (r.whatsapp as string) ?? null,
     wa_consent: r.wa_consent === true, presale_stage: Number(r.presale_stage ?? 0),

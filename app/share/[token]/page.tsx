@@ -171,6 +171,53 @@ export default async function AccountantView({ params }: { params: Promise<{ tok
   const totals = shareTotals(rows, capAllow);
   const cats = byCategory(rows);
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A SHEET OF ZEROS WITH OUR NAME ON IT, IN FRONT OF A LENDER. Closed 9 August 2026, found by
+  // an empty state audit on the eve of launch.
+  //
+  // /app/proof-of-income has refused exactly this since it was written, in these words:
+  //
+  //     "Nothing is confirmed for the 2026/27 tax year yet. A summary of zeros with our name on it
+  //      would tell a lender something false about you, so we do not draw one."
+  //
+  // Its sibling had no such guard. A customer on his first day could open Share your books, take
+  // the default range of this tax year, and hand a broker a Lekhio branded page reading
+  // Income £0.00, Expenses £0.00, Profit £0.00, Entries 0, under the heading "Shared books" and
+  // the sentence "Every figure below was reviewed and confirmed by the person who shared it."
+  //
+  // ⚠️ THE SENTENCE IS WHAT MAKES IT DANGEROUS, NOT THE ZEROS. Zeros with no claim attached are an
+  // empty page. Zeros under a promise that a person reviewed and confirmed them read as a
+  // statement that this man earned nothing, from his bookkeeper, about a customer applying for
+  // credit. It is more likely to refuse him than help him, and neither he nor the person reading
+  // it has any way to tell it apart from a real answer.
+  //
+  // Two documents, one set of books, opposite answers, and the one that was wrong is the one that
+  // LEAVES THE BUILDING. So it now says what its sibling says, addressed to the RECIPIENT, because
+  // the recipient is the person reading it and the one who would otherwise draw the conclusion.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (totals.count === 0) {
+    return (
+      <Shell>
+        <p style={{ fontWeight: 800, fontSize: 22, letterSpacing: '-0.5px' }}>Lekhio</p>
+        <h1 style={{ fontSize: 30, fontWeight: 800, marginTop: 26, letterSpacing: '-0.8px' }}>
+          Shared books
+        </h1>
+        <p style={{ color: MUTED, fontSize: 15.5, lineHeight: 1.6, marginTop: 14, maxWidth: 640 }}>
+          {grant.recipient_name ? `Shared with ${grant.recipient_name}. ` : ''}
+          There are no confirmed entries in the period that was shared with you, so there is nothing
+          for us to show.
+        </p>
+        <p style={{ color: MUTED, fontSize: 15.5, lineHeight: 1.6, marginTop: 14, maxWidth: 640 }}>
+          <strong>This is not a statement that they earned nothing.</strong> It means their Lekhio
+          books hold no confirmed entries for these dates, which is also what a brand new account
+          looks like. A page of zeros with our name on it would tell you something we do not know to
+          be true, so we do not draw one. Ask them for a different period, or for the figures another
+          way.
+        </p>
+      </Shell>
+    );
+  }
+
   return (
     <Shell>
       <p style={{ fontWeight: 800, fontSize: 22, letterSpacing: '-0.5px' }}>Lekhio</p>

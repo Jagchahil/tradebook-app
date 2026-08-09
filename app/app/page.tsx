@@ -281,25 +281,52 @@ export default async function OverviewPage() {
           Three figures, no cleverness. The sum he would do on the back of an envelope, done. */}
       <section className="lek-card">
         <h2 className="lek-h2">Your business this year</h2>
-        <div className="lek-grid">
-          <div className="lek-tile">
-            <div className="lek-tile-label">In</div>
-            {/* ON_GREEN_TINT, not GREEN: brand green on a surface tile reads at 4.40, just under
-                the ratchet. The deeper green ink is what the guard holds against both surfaces. */}
-            <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp0(moneyIn)}</div>
-          </div>
-          <div className="lek-tile">
-            <div className="lek-tile-label">Out</div>
-            <div className="lek-tile-value" style={{ color: RIVER }}>{gbp0(moneyOut)}</div>
-          </div>
-          <div className="lek-tile">
-            <div className="lek-tile-label">Profit</div>
-            <div className="lek-tile-value">{gbp0(profit)}</div>
-          </div>
-        </div>
-        <p style={S.quiet}>
-          Since 6 April, on everything you have confirmed.{shareCap ? ` ${shareCap}` : ''}
-        </p>
+        {/* ═══════════════════════════════════════════════════════════════════════════════════
+            🔴 NOT THREE ZEROS ON THE FIRST SCREEN A NEW CUSTOMER EVER SEES. 9 August 2026.
+
+            The tax card directly above this one is withheld on `showTax = moneyIn > 0`, and its
+            comment says exactly why: "A proud £0 to put by on the first screen a new customer ever
+            sees is doc 103's empty test failing on day one." The grid immediately beneath it then
+            drew In £0, Out £0, Profit £0 with no branch at all, under the sentence "on everything
+            you have confirmed", which he has not.
+
+            /app/tax/summary handles the identical data correctly and has done for weeks: it
+            suppresses the grid and prints "Nothing confirmed since 6 April yet" plus the one thing
+            to do about it. /app/money prints the grid but backs it with "Nothing logged in
+            August 2026" in the very next card. Home did neither, and Home is the screen everybody
+            opens first and most often.
+            ═══════════════════════════════════════════════════════════════════════════════════ */}
+        {moneyIn === 0 && moneyOut === 0 ? (
+          <>
+            <p style={S.leadQuiet}>Nothing confirmed since 6 April yet.</p>
+            <p style={S.quiet}>
+              This fills itself in as you go. Photograph a receipt or tell Lekhio what came in, and
+              your figures start here.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="lek-grid">
+              <div className="lek-tile">
+                <div className="lek-tile-label">In</div>
+                {/* ON_GREEN_TINT, not GREEN: brand green on a surface tile reads at 4.40, just under
+                    the ratchet. The deeper green ink is what the guard holds against both surfaces. */}
+                <div className="lek-tile-value" style={{ color: ON_GREEN_TINT }}>{gbp0(moneyIn)}</div>
+              </div>
+              <div className="lek-tile">
+                <div className="lek-tile-label">Out</div>
+                <div className="lek-tile-value" style={{ color: RIVER }}>{gbp0(moneyOut)}</div>
+              </div>
+              <div className="lek-tile">
+                <div className="lek-tile-label">Profit</div>
+                <div className="lek-tile-value">{gbp0(profit)}</div>
+              </div>
+            </div>
+            <p style={S.quiet}>
+              Since 6 April, on everything you have confirmed.{shareCap ? ` ${shareCap}` : ''}
+            </p>
+          </>
+        )}
       </section>
 
       {/* ── 3. WHAT IS WAITING ─────────────────────────────────────────────────────────────────
@@ -336,13 +363,47 @@ export default async function OverviewPage() {
         <h2 className="lek-h2">Your week</h2>
         {weekRead ? (
           <>
-            <p className="lek-week-line">
-              {gbp0(week.income)} in, {gbp0(week.expenses)} out.{' '}
-              {weekProfit >= 0
-                ? `That leaves ${gbp0(weekProfit)}.`
-                : `That is ${gbpAbs0(weekProfit)} more out than in.`}
-            </p>
-            <p style={S.quiet}>{weeklyLine(weekSaid)}</p>
+            {/* ═══════════════════════════════════════════════════════════════════════════════
+                🔴 AN EMPTY WEEK SAYS SO. IT DOES NOT PRINT THREE ZEROS AND CALL THEM A RESULT.
+                9 August 2026, found by an empty state audit the night before launch.
+
+                This card composed its own sentence, so on a new account it read:
+
+                    £0 in, £0 out. That leaves £0.
+                    All logged. Nothing new needs your attention this week.
+
+                Every other surface already refuses that. lib/weeklyupdate.ts, whose figures this
+                card is built from, has the honest branch in weeklySummaryText: both zero prints
+                "Your week: nothing logged." and no profit line at all, and
+                test/weeklyupdate.test.mjs pins it. The day six trial email carries the same guard
+                for the same reason, and test/trialnudge.test.mjs asserts its body contains no "£0"
+                anywhere. WhatsApp will not send this sentence. The most looked at screen we have
+                was printing it, because it was the one place that built the words itself.
+
+                ⚠️ AND THE SECOND LINE WAS WORSE THAN THE ZEROS. weeklyLine finds no verified fact
+                for a new account and falls through to QUIET_LINE: "All logged. Nothing new needs
+                your attention this week." Said to a man who has logged nothing, that is the product
+                telling him his books are up to date on the day he opened them. He can see through a
+                zero. He cannot see through a reassurance.
+                ═══════════════════════════════════════════════════════════════════════════════ */}
+            {week.income === 0 && week.expenses === 0 ? (
+              <>
+                <p className="lek-week-line">Nothing logged this week.</p>
+                <p style={S.quiet}>
+                  Send a photo of a receipt, or tell Lekhio what came in, and this fills itself in.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="lek-week-line">
+                  {gbp0(week.income)} in, {gbp0(week.expenses)} out.{' '}
+                  {weekProfit >= 0
+                    ? `That leaves ${gbp0(weekProfit)}.`
+                    : `That is ${gbpAbs0(weekProfit)} more out than in.`}
+                </p>
+                <p style={S.quiet}>{weeklyLine(weekSaid)}</p>
+              </>
+            )}
             {/* The week is drawn from the raw rows, so for a partnership it is the whole firm's
                 money, unlike the share figures above. Said out loud, or the two contradict. */}
             {firmCap ? <p style={S.quiet}>{firmCap}</p> : null}
@@ -544,6 +605,9 @@ const S: Record<string, React.CSSProperties> = {
   basis: { fontSize: TYPE.note, lineHeight: 1.5, color: MUTED, margin: '4px 0 0' },
 
   quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '10px 0 0' },
+  // The honest nothing, in the ink an answer is set in rather than the ink a footnote is. It is
+  // this card's answer for a new account, not an apology attached to one.
+  leadQuiet: { fontSize: TYPE.lead, lineHeight: 1.45, color: INK, fontWeight: 700, margin: '4px 0 0' },
   refund: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: 14, margin: '18px 0 0' },
 
   waiting: { display: 'flex', gap: 14, alignItems: 'center', textDecoration: 'none', background: PANEL, border: `1px solid ${LINE}`, borderLeft: `3px solid ${SAFFRON_DEEP}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },

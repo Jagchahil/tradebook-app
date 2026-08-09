@@ -113,7 +113,29 @@ export default async function Page({
     // What the business has actually generated on confirmed figures, less what is already owed.
     // NOT a bank balance and it never claims to be: see the sentence printed under it.
     const generated = Math.max(0, optimiser.ytdTradeIncome - optimiser.ytdTradeExpenses);
-    confirmedSpare = Math.round(Math.max(0, generated - setAside));
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 AN EMPTY BOOK IS NOT "£0 SPARE", IT IS AN UNKNOWN. 9 August 2026, empty state audit.
+    //
+    // A man on his first day, nothing logged, was told this under "What I would do":
+    //
+    //     "About £0 is genuinely free once your tax is put by, and you are looking at £40,000.
+    //      That is £40,000 short."
+    //
+    // Confident, specific, and computed entirely out of the absence of data. He has not told us
+    // what is in his account and we have never seen his books, so we have no idea whether he is
+    // forty thousand short or sitting on the cash. It reads as a finding because every other
+    // number on the page is one.
+    //
+    // ⚠️ `spendable: number | null` ALREADY MEANS "WE DO NOT KNOW", and lib/capital.ts already
+    // handles the null: it is what a FAILED optimiser read produces. A read that succeeded and
+    // found nothing tells us exactly as much about his bank as a read that failed, and it was the
+    // one case taking the confident branch. Same shape as the tax half of this page, which grew
+    // noTaxToSaveYet for the same reason after somebody walked a real account and watched it print
+    // £0, £0, £0.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    confirmedSpare = optimiser.ytdTradeIncome === 0 && optimiser.ytdTradeExpenses === 0
+      ? null
+      : Math.round(Math.max(0, generated - setAside));
   }
 
   // What he typed beats what we inferred, every time. He knows what is in his account and we do

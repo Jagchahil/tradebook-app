@@ -290,6 +290,30 @@ export default async function Page({
               // ⚠️ NO BUTTON AT ALL. Full relief is automatic below the allowance and there is no
               // election to make, so doc 103 says do not invent a decision for him.
               <p style={S.quiet}>There is nothing to elect here, and nothing for you to do.</p>
+            ) : choice?.better === 'too_early' ? (
+              // ═══════════════════════════════════════════════════════════════════════════════
+              // 🔴 AND NO BUTTON ON AN EMPTY BOOK EITHER. 9 August 2026, empty state audit.
+              //
+              // A day one account drew the comparison as "Your costs so far £0.00" against "The
+              // allowance £1,000.00" and, under it, a primary button reading "Claim the allowance
+              // instead of my costs". fullRelief is false when gross income is zero, so the branch
+              // directly above did not catch this and the press was one tap away.
+              //
+              // That tap writes an election giving up his costs, his mileage and his use of home
+              // for the whole year, in exchange for beating a figure that is zero only because he
+              // has not started yet. The prose above it was already honest, and prose beside a
+              // primary button is not what a man in a hurry reads.
+              //
+              // Doc 103: never ask a question with only one sensible answer, or none. On an empty
+              // book there is nothing here he could answer, so nothing is asked. The choice comes
+              // back by itself the moment there are two real totals to set against each other.
+              // ═══════════════════════════════════════════════════════════════════════════════
+              <p style={S.quiet}>
+                There is nothing to weigh up yet, so there is no button here. Once you have logged a
+                little of what comes in and what you spend, the two figures sit side by side above
+                and the choice is worth making. Nothing is lost by waiting: it is claimed on the
+                return for the year, not today.
+              </p>
             ) : (
               <form action="/api/elections" method="post" style={{ marginTop: SPACE.sm }}>
                 <input type="hidden" name="key" value="trading_allowance" />

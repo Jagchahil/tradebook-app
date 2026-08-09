@@ -408,13 +408,36 @@ export default async function TaxSummaryPage() {
            ═══════════════════════════════════════════════════════════════════════════════════ */
         <section className="lek-card">
           <h2 className="lek-h2">One question settles this</h2>
-          <p style={S.body}>
-            Your income since 6 April is {gbp0(pack.ytd.grossQualifyingIncome)}, which is{' '}
-            {mtdPos === 'unstated_over' ? 'over' : 'under'} the {gbp0(pack.ytd.mtdThreshold)} Making
-            Tax Digital for Income Tax line for {pack.taxYear}. That is this year, and this year is
-            not the test: HMRC decides it from your {taxYearLabel(startYear - 2)} tax return, and
-            writes to you to say so.
-          </p>
+          {/* ═══════════════════════════════════════════════════════════════════════════════════
+              🔴 A ZERO WE WERE NEVER GIVEN IS NOT "YOUR INCOME". 9 August 2026, empty state audit.
+
+              On a new account this card sat directly beneath one that had just said "Nothing
+              confirmed since 6 April yet", and then read: "Your income since 6 April is £0, which
+              is under the £50,000 Making Tax Digital for Income Tax line." Two cards on one screen:
+              the first admitting we know nothing about his money, the second treating that nothing
+              as his income and reaching a conclusion about a legal obligation from it.
+
+              The branch is right to draw for both unstated positions, and the note above says why.
+              It was wrong to have only two. An account with no figures at all is a THIRD case, and
+              stating a figure we were never given is how a man comes to believe we have checked
+              something we have not.
+              ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {pack.ytd.grossQualifyingIncome <= 0 ? (
+            <p style={S.body}>
+              You have not confirmed any income since 6 April, so we cannot say where you sit against
+              the {gbp0(pack.ytd.mtdThreshold)} Making Tax Digital for Income Tax line for{' '}
+              {pack.taxYear}. This year is not the test in any case: HMRC decides it from your{' '}
+              {taxYearLabel(startYear - 2)} tax return, and writes to you to say so.
+            </p>
+          ) : (
+            <p style={S.body}>
+              Your income since 6 April is {gbp0(pack.ytd.grossQualifyingIncome)}, which is{' '}
+              {mtdPos === 'unstated_over' ? 'over' : 'under'} the {gbp0(pack.ytd.mtdThreshold)} Making
+              Tax Digital for Income Tax line for {pack.taxYear}. That is this year, and this year is
+              not the test: HMRC decides it from your {taxYearLabel(startYear - 2)} tax return, and
+              writes to you to say so.
+            </p>
+          )}
           <p style={S.quiet}>
             So the one thing we cannot work out from your figures is whether that letter arrived.{' '}
             <a href="/app/you/circumstances" style={S.link}>Tell us</a> and this page will say plainly

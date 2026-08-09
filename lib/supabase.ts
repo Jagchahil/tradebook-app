@@ -4743,7 +4743,64 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     categoriesLogged, vehicleBoughtThroughBooks,
   } = aggregateRowsYtd(rows, assets, startYear, partnerFactor);
 
-  const start = new Date(`${taxYearStart}T00:00:00Z`);
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE WINDOW IS HOW LONG WE HAVE BEEN WATCHING, NOT HOW LONG THE TAX YEAR HAS BEEN RUNNING.
+  // 9 August 2026, found by an empty state audit on the eve of launch.
+  //
+  // Both of these were measured from 6 April. On a product launching in August that means every
+  // brand new account arrives already reading "125 days elapsed, 4 months in", so EVERY GUARD BUILT
+  // TO STOP A CONFIDENT NUMBER COMING OUT OF THIN DATA WAS ALREADY OPEN BEFORE HIS FIRST ENTRY.
+  //
+  // What that did, concretely. A man signs up today, logs one £300 job, and:
+  //
+  //   his real rate      £300 over 1 day
+  //   what we printed    £300 x (365 / 125) = £876 for the year
+  //
+  // Not a small error and not in the safe direction either way. The FIGURE is 15x under his actual
+  // run rate, and the ADVICE built on it is worse than the figure: at £876 projected,
+  // marriageAllowance() decides he is on course to earn under the personal allowance and
+  // /app/tax/ways-to-save invites him to give away part of it. lib/ledger.ts's ENOUGH_MONTHS gate
+  // reads the same field, so "Lekhio has kept £X out of the taxman's hands" also unlocked on day
+  // one, which its own comment exists to prevent: "two weeks in, a man has logged one receipt and
+  // the ledger would proudly report that Lekhio has saved him £14. He would laugh at us."
+  //
+  // And the product argued with itself about it. /app/tax/vat told the same man, on the same
+  // evening, that his account was under three months old and "a rolling twelve month figure built
+  // out of a few weeks would be a number you could act on and should not", because THAT gate is on
+  // users.created_at (APPLY_2026-07-27_weekly_update_facts.sql). Two definitions of enough history,
+  // one screen apart.
+  //
+  // 🔴 THE FIX IS THE EARLIEST ROW HE HAS GIVEN US, NOT users.created_at, and that is deliberate.
+  //
+  // The account date is the obvious answer and it is wrong for the man who joins in August and
+  // imports his statements back to April. His figures DO cover the year, so dividing them by a
+  // fortnight would over project him just as badly in the other direction. What we can honestly
+  // annualise is the span our evidence actually covers, and the rows in hand say what that is.
+  // Nothing extra is read, so this adds no failure mode of its own.
+  //
+  //   established account, rows from April  -> observedFrom = 6 April.  Nothing changes.
+  //   joined in August, imported to April   -> observedFrom = 6 April.  Nothing changes, correctly.
+  //   joined in August, one job this week   -> observedFrom = that day. Projection WITHHELD.
+  //
+  // ⚠️ THE EARLIEST ROW OF ANY KIND, income or cost. A man whose only April row is an expense and
+  // whose income starts in August still gets the wide window, and his income is under projected for
+  // as long as that stays true. That is the safe direction (it never invents money he has not
+  // earned) and splitting the window per stream would give the two halves of one document two
+  // different years, which is worse than a conservative number.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const yearStart = new Date(`${taxYearStart}T00:00:00Z`);
+  const earliestRow = rows.reduce<string | null>(
+    (min, r) => (r.transaction_date && (min === null || r.transaction_date < min) ? r.transaction_date : min),
+    null,
+  );
+  const earliestSeen = earliestRow ? new Date(`${earliestRow}T00:00:00Z`) : null;
+  // Never earlier than the tax year start: a row dated before 6 April is out of this year's window
+  // and must not widen it. Never later than today either, so a mistyped future date cannot shrink
+  // the window to nothing and silently switch a real customer's projection off.
+  const start = earliestSeen && earliestSeen.getTime() > yearStart.getTime() && earliestSeen.getTime() <= now.getTime()
+    ? earliestSeen
+    : yearStart;
+
   const monthsElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (30.44 * 86400000)));
 
   // 🔴 DAYS, AND IT IS THE DIVISOR. monthsElapsed above is floor(days / 30.44) and is now ONLY the

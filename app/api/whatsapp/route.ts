@@ -1158,6 +1158,17 @@ async function bankNudgeAfterReceipt(from: string, userId: string): Promise<stri
 // would be the one that did.
 const VOICE_ON_IT = 'Got your voice note. Writing it up now, one sec.';
 const VOICE_NOT_TAKEN = 'I could not take that voice note just now. Try again, or send a photo of the receipt.';
+// 🔴 AND THE THIRD SENTENCE, FOR THE CASE WE CANNOT HONESTLY SAY EITHER. 9 August 2026.
+//
+// createVoiceJob used to return null both when the insert was REFUSED and when it SUCCEEDED and
+// reading the answer threw. In the second case the row exists and the audio is parked, and we sent
+// VOICE_NOT_TAKEN anyway: "Try again". He records it a second time, the mini transcribes both, and
+// the same expense lands in his books twice. A duplicate in a man's tax records is worse than a
+// wait, so the ambiguous case gets its own sentence and it does NOT invite a resend.
+//
+// He is never left on it: if the note really was lost, reapStaleVoiceJobs apologises, from the mini's
+// poll or from /api/cron/voicereap, whichever comes first.
+const VOICE_MAYBE = 'Got your voice note, but something went slow at my end. Give me a minute rather than sending it again, and I will come back to you either way.';
 
 async function handleVoiceNote(from: string, messageId: string, mediaId: string): Promise<void> {
   let reply: string | null;
@@ -1170,6 +1181,11 @@ async function handleVoiceNote(from: string, messageId: string, mediaId: string)
     console.error('[whatsapp] Voice note threw:', err instanceof Error ? err.name : 'unknown');
     // HONEST ONLY BECAUSE OF RULE 1 ABOVE: a throw can only ever happen before the queue write, so
     // nothing is parked, and telling him to send it again cannot double count him.
+    //
+    // \u26a0\ufe0f AND THAT WAS NOT TRUE UNTIL 9 AUGUST 2026, because createVoiceJob caught its own
+    // post-write throw and returned the same null as a refusal, so a note that WAS parked reached
+    // this same apology. It returns a three way result now and never throws, which is what makes
+    // the sentence above true of every line rather than of all but one.
     reply = VOICE_NOT_TAKEN;
   }
   // null means this walk has already answered him by another route, so nothing is owed.
@@ -1210,15 +1226,18 @@ async function voiceSentence(from: string, messageId: string, mediaId: string): 
   }
 
   // 🔴 THE QUEUE WRITE IS LAST, AND NOTHING AWAITED MAY BE ADDED AFTER IT. See rule 1 above.
-  const jobId = await createVoiceJob({
+  const parked = await createVoiceJob({
     userId,
     fromPhone: from,
     messageId,
     audioBase64: media.base64,
     mimeType: media.mediaType,
   });
-  if (!jobId) return VOICE_NOT_TAKEN;
-  return VOICE_ON_IT;
+  // 🔴 THREE ANSWERS, NOT TWO. 'refused' is the only one that may ask him to send it again, because
+  // it is the only one where we know nothing was written. See VOICE_MAYBE and lib/voicejobs.ts.
+  if (parked.kind === 'created') return VOICE_ON_IT;
+  if (parked.kind === 'refused') return VOICE_NOT_TAKEN;
+  return VOICE_MAYBE;
 }
 
 // The deterministic money-entry parser now lives in lib/waintents.ts with unit

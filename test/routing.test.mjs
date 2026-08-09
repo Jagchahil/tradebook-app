@@ -727,10 +727,15 @@ async function downloadMedia(_id: string): Promise<{ base64: string; mediaType: 
 }
 async function aiBudgetBlocked(_f: string): Promise<string | null> { return (ctl.refused ?? null) as string | null; }
 async function sendBudgetRefusal(_f: string, reason: string): Promise<void> { sent.push('refusal:' + reason); }
-async function createVoiceJob(_j: unknown): Promise<string | null> {
-  if (ctl.job === null) return null;
+async function createVoiceJob(_j: unknown): Promise<{ kind: string; id?: string }> {
+  // Three answers since 9 August 2026, because null used to mean both "refused" and "the row is
+  // there and we could not read our own answer". See lib/voicejobs.ts and test/voicejob.test.mjs.
+  if (ctl.job === null) return { kind: 'refused' };
+  // 'unsure' PARKS THE ROW. That is the entire point of it: the audio is in voice_jobs and the
+  // customer must not be told to send it again.
   jobs.push('job1');
-  return 'job1';
+  if (ctl.job === 'unsure') return { kind: 'unsure' };
+  return { kind: 'created', id: 'job1' };
 }
 export { handleVoiceNote };
 `;
@@ -747,14 +752,17 @@ export { handleVoiceNote };
     ['the audio would not download', { media: null }, false],
     ['the AI budget refused him', { refused: 'user_daily_cap' }, false],
     ['the queue refused the note', { job: null }, false],
-    ['parked, and promised', {}, true],
+    ['parked, and promised', {}, true, 'on it'],
+    // 🔴 THE ROW EXISTS AND WE COULD NOT READ OUR OWN ANSWER. He must be told to WAIT, never to
+    // send it again: the mini has his audio, and a resend puts one spend in his books twice.
+    ['🔴 parked, but the answer could not be read', { job: 'unsure' }, true, 'maybe'],
     ['🔴 the account lookup THREW', { userIdThrows: true }, false],
     ['🔴 the audio download THREW', { mediaThrows: true }, false],
   ];
 
   const realVError = console.error;
   console.error = () => {};
-  for (const [label, setup, parks] of VPATHS) {
+  for (const [label, setup, parks, promise] of VPATHS) {
     V.sent.length = 0;
     V.jobs.length = 0;
     V.downloads.length = 0;
@@ -780,8 +788,15 @@ export { handleVoiceNote };
     ok(`and the sentence is a real one: ${label}`, typeof V.sent[0] === 'string' && V.sent[0].trim().length > 10);
     ok(`the queue row and the sentence agree: ${label}`, V.jobs.length === (parks ? 1 : 0));
     if (parks) {
-      ok('a parked note is promised, and promised only once',
-        V.sent[0] === 'Got your voice note. Writing it up now, one sec.');
+      if (promise === 'maybe') {
+        // 🔴 THE SENTENCE THAT COST A MAN A DUPLICATE ENTRY. Never "try again" on a note we parked.
+        ok(`a parked note we could not confirm is NOT asked for twice: ${label}`,
+          !/Try again|send it again|Writing it up now/i.test(V.sent[0] ?? '')
+          && /rather than sending it again/i.test(V.sent[0] ?? ''));
+      } else {
+        ok(`a parked note is promised, and promised only once: ${label}`,
+          V.sent[0] === 'Got your voice note. Writing it up now, one sec.');
+      }
     } else {
       ok(
         !/Writing it up now/.test(V.sent[0] ?? '')

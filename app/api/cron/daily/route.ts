@@ -64,13 +64,15 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
 function jobsFor(slot: string, day: number): string[] {
   if (slot === 'am') {
     // The morning messages. `due` also kicks agent + bankfeed on its own first hop, unchanged.
-    const jobs = ['/api/cron/reminders?job=due', '/api/cron/trial'];
+    // voicereap on BOTH slots: it is the only thing that apologises for a voice note the Mac mini
+    // never got to, and it used to live behind a door only the mini opens. See that route's header.
+    const jobs = ['/api/cron/reminders?job=due', '/api/cron/trial', '/api/cron/voicereap'];
     if (day === 1 || day === 3 || day === 5) jobs.push('/api/cron/reminders?job=nudge'); // Mon/Wed/Fri
     return jobs;
   }
   if (slot === 'pm') {
     // The end-of-day work. metrics first: it is the one that must never be skipped.
-    const jobs = ['/api/cron/metrics', '/api/cron/digest', '/api/cron/nurture'];
+    const jobs = ['/api/cron/metrics', '/api/cron/digest', '/api/cron/nurture', '/api/cron/voicereap'];
     if (day === 0) jobs.push('/api/cron/reminders?job=weekly'); // Sunday
     return jobs;
   }

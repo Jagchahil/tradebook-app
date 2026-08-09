@@ -695,7 +695,29 @@ export function formatGbp(n: number): string {
 // replies short, and the standing redirect shape ("Full picture in the app under...") is the same
 // one studentLoanAnswer already uses. Deterministic, never an AI paraphrase: a paraphrased money
 // figure is a different money figure.
-export function oweAnswer(setAside: number, projected: boolean): string {
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND WHETHER THERE IS A POSITION TO SPEAK AT ALL, WHICH THIS SENTENCE DID NOT ASK. 9 Aug 2026.
+//
+// The webhook's "nothing logged yet" check catches a man with an empty account. It does not catch
+// the man with COSTS CONFIRMED AND NO INCOME: he has logged something, so he falls through to here,
+// taxPosition() correctly returns nothing owed on nothing earned, and WhatsApp announced
+//
+//   "Put by £0.00 for tax. That is what the year so far has built up..."
+//
+// A proud zero teaches him this product says nothing. app/app/tax/page.tsx has hidden its whole
+// position block on exactly this test since doc 103, and the web chat at /api/thread was caught
+// with the same hole on the same day, wearing a January date on top of the zero.
+//
+// ⚠️ THE RULE IS NOT DECIDED HERE. hasTaxPosition() in lib/taxoptimiser.ts owns it and the caller
+// passes the answer in, for the same reason the FIGURE is passed in rather than worked out here:
+// this module writes the sentence, never the sum. Both lanes ask the one function, so they cannot
+// come to different views about whether the same man has a position at all.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function oweAnswer(setAside: number, projected: boolean, hasPosition: boolean): string {
+  if (!hasPosition) {
+    return 'Nothing to work out yet. Tax is worked out on what you bring in, and this tax year has no confirmed income on it. Send me what you have earned and your position builds itself. Full picture in the app under Tax.';
+  }
   const note = projected
     ? 'That is what the year is heading for, on everything you have confirmed so far.'
     : 'That is what the year so far has built up, too early to call the whole year yet.';

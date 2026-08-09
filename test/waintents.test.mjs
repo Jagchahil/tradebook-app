@@ -164,8 +164,13 @@ eq('gbp formatting', W.formatGbp(1250.5), '£1,250.50');
 
 
 console.log('\n=== waintents: what do I owe, one figure on every channel ===\n');
-const oweP = W.oweAnswer(2450.5, true);
-const oweE = W.oweAnswer(320, false);
+// ⚠️ THE THIRD ARGUMENT IS "IS THERE A POSITION AT ALL", added 9 August 2026 after both chat
+// lanes were caught announcing "Put by £0.00 for tax" to a man with costs logged and no income
+// confirmed. hasTaxPosition() in lib/taxoptimiser.ts owns the rule and the caller passes the
+// answer in; test/emptyposition.test.mjs owns both arms of it. These two stay on the arm that has
+// a figure, because that is what the assertions below are about.
+const oweP = W.oweAnswer(2450.5, true, true);
+const oweE = W.oweAnswer(320, false, true);
 ok('the owe answer leads with the figure', oweP.startsWith('Put by £2,450.50 for tax.'));
 ok('a projection is called a projection', /heading for/.test(oweP) && /confirmed so far/.test(oweP));
 ok('an early year says it is too early to call', /too early to call the whole year yet/.test(oweE));
@@ -186,7 +191,7 @@ ok('no forbidden dashes in either', [oweP, oweE].every((s) => !/[–—]/.test(s
     /taxPosition\(optimiser\)/.test(waSrc) && /taxPosition\(optimiser\)/.test(threadSrc)
     && /getOptimiserInput\(userId\)/.test(waSrc) && /getOptimiserInput\(userId\)/.test(threadSrc));
   ok('🔴 the figure WhatsApp speaks is setAside itself, through oweAnswer',
-    /oweAnswer\(tax\.setAside, tax\.projected\)/.test(waSrc));
+    /oweAnswer\(tax\.setAside, tax\.projected, hasPosition\)/.test(waSrc));
   ok('🔴 the little January is gone from the webhook: no second engine on this question',
     !/studentLoanForSA/.test(waSrc) && !/corporationTax\(/.test(waSrc) && !/rough bill/.test(waSrc));
   ok('the projection notes are the thread\'s own sentences word for word',
@@ -497,7 +502,7 @@ for (const phrase of ['claim use of home', 'claim use of home, 30 hours a month'
 // A DIRECTOR'S "WHAT DO I OWE" CARRIES THE SENTENCE THAT EXPLAINS THE SMALLER NUMBER.
 // ---------------------------------------------------------------------------------------------
 ok('🔴 the owe answer renders setAsideBasisLine, so WhatsApp cannot show a smaller figure bare',
-  /setAsideBasisLine/.test(wroute) && /oweAnswer\(tax\.setAside, tax\.projected\)/.test(wroute));
+  /setAsideBasisLine/.test(wroute) && /oweAnswer\(tax\.setAside, tax\.projected, hasPosition\)/.test(wroute));
 
 // ---------------------------------------------------------------------------------------------
 // QUESTIONS ABOUT LEKHIO ITSELF NEVER REACH THE CLAIM RULEBOOK OR THE TOTALS LANE. (6 Aug 2026.)

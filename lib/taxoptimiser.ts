@@ -569,6 +569,32 @@ export function inPlainList(parts: string[]): string {
   return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 IS THERE A POSITION TO SHOW HIM AT ALL. ONE RULE, BECAUSE THREE SURFACES ASK IT.
+//
+// app/app/tax/page.tsx has had this test since doc 103 and hides its whole position block on it: a
+// proud £0 for a brand new account teaches him the screen says nothing. The two chat lanes never
+// had it, and on 9 August 2026 both were caught announcing "Put by £0.00 for tax" to a man with
+// costs logged and no income confirmed. He is not caught by the "nothing logged yet" check above
+// them, because he HAS logged something. He has just not logged the half tax is worked out on.
+//
+// ⚠️ AND THE COLLECTION SENTENCE MADE THE CHAT VERSION WORSE THE SAME MORNING. It added "Self
+// Assessment collects it in one bill, due by 31 January 2028" to that £0.00. A deadline on an empty
+// figure is worse than the empty figure: it is a date in his calendar for a bill that does not
+// exist.
+//
+// ⚠️ THE OR IS NOT A CONVENIENCE. A man can owe real tax with no trade and no property income at
+// all, on salary, dividends or savings, and taxPosition() knows it. A set aside above zero is a
+// position whatever moneyIn says.
+//
+// It lives here, beside setAsideBasisLine, because both lanes already import from this module and a
+// rule copied into two chat handlers is a rule that will end up meaning two things.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+export function hasTaxPosition(input: OptimiserInput, setAside: number): boolean {
+  const moneyIn = Math.max(0, input.ytdTradeIncome) + Math.max(0, input.ytdPropertyIncome ?? 0);
+  return moneyIn > 0 || setAside > 0;
+}
+
 // The sentence under the big number. Null when there is nothing worth explaining, which is a pure
 // sole trader with no job and no dividends: for him the figure is simply his business's tax and
 // saying so adds a line without adding a fact.

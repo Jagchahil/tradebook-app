@@ -153,7 +153,7 @@ import { quarterForDate } from '../../../lib/quarterpack';
 import { openTicket } from '../../../lib/support';
 import { matchKb } from '../../../lib/supportkb';
 import { soleTraderTax, homeOfficeFlatRateMonthly, FACTS } from '../../../lib/taxengine';
-import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
+import { taxPosition, setAsideBasisLine, hasTaxPosition } from '../../../lib/taxoptimiser';
 import { aprilDelta } from '../../../lib/propertyengine';
 import { niPosition, studentLoanRepayment, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
@@ -1789,7 +1789,12 @@ async function handleTotals(from: string, body: string): Promise<void> {
   // from a van would have handed him a smaller number and no reason for it, which is the single way
   // that fix could do harm. Same function, same sentence, both channels, so they cannot drift.
   const basis = setAsideBasisLine(optimiser, tax);
-  await sendText(from, basis ? `${oweAnswer(tax.setAside, tax.projected)} ${basis}` : oweAnswer(tax.setAside, tax.projected));
+  // 🔴 AND WHETHER THERE IS A FIGURE AT ALL, from the one function the Tax hub's own test is
+  // written as. A man with costs logged and no income confirmed was told "Put by £0.00 for tax",
+  // and the basis line went underneath it explaining the make up of nothing. See oweAnswer.
+  const hasPosition = hasTaxPosition(optimiser, tax.setAside);
+  const owed = oweAnswer(tax.setAside, tax.projected, hasPosition);
+  await sendText(from, hasPosition && basis ? `${owed} ${basis}` : owed);
 }
 
 // The UK tax year starts 6 April. Same rule as matchTotalsQuestion.

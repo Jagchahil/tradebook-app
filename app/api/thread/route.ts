@@ -12,7 +12,7 @@ import {
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, VERDICT_ICON } from '../../../lib/taxrules';
-import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
+import { taxPosition, setAsideBasisLine, hasTaxPosition } from '../../../lib/taxoptimiser';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { quarterForDate } from '../../../lib/quarterpack';
 import { gbp0 } from '../../../lib/money';
@@ -385,6 +385,34 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
   // the figure lives here.
   const optimiser = await getOptimiserInput(userId);
   const tax = taxPosition(optimiser);
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE EMPTY TEST, WHICH THIS BRANCH DID NOT HAVE, AND WHICH THE COLLECTION SENTENCE MADE
+  // WORSE.
+  //
+  // The check above catches a man with NOTHING confirmed. It does not catch the man this misses:
+  // costs confirmed and no income. His `totals.count` is not zero, so he falls straight through to
+  // here, where taxPosition() correctly returns nothing owed on nothing earned, and the sentence
+  // announced "Put by £0.00 for tax." A proud zero teaches him this product says nothing.
+  //
+  // ⚠️ AND SINCE THE COLLECTION SENTENCE LANDED IT ALSO GAVE HIM A DATE. "Self Assessment collects
+  // it in one bill, due by 31 January 2028", for a bill of nothing. A deadline on an empty figure
+  // is worse than the empty figure: it is a thing in his calendar that does not exist.
+  //
+  // app/app/tax/page.tsx has had this test since doc 103 and hides its whole position block on it.
+  // 🔴 IT IS COMPUTED HERE THE WAY THE HUB COMPUTES IT, FIELD FOR FIELD, because the claim two
+  // paragraphs down is "It is the same figure your Tax screen leads with", and a screen that leads
+  // with nothing is not led with by a chat that leads with £0.00.
+  //
+  // ⚠️ THE RULE IS NOT WRITTEN HERE. hasTaxPosition() lives in lib/taxoptimiser.ts beside
+  // setAsideBasisLine, and WhatsApp asks the same function, because the claim two paragraphs down
+  // is "It is the same figure your Tax screen leads with", and a screen that leads with nothing is
+  // not led with by a chat that leads with £0.00.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (!hasTaxPosition(optimiser, tax.setAside)) {
+    return 'Nothing to work out yet. Tax is worked out on what you bring in, and this tax year has no confirmed income on it. Add what you have earned from the Money pages and your position builds itself, from the same figures every screen under Tax uses.';
+  }
+
   const basis = setAsideBasisLine(optimiser, tax);
   const note = tax.projected
     ? 'That is what the year is heading for, on everything you have confirmed so far.'

@@ -548,9 +548,15 @@ export function deadlineAnswer() { return 'The deadline answer.'; }
 export function clampReceiptDate(d) { return d || '2026-08-05'; }
 `);
   w('taxrules.ts', 'export function checkExpense() { return null; }\nexport const VERDICT_ICON = {};\n');
+  // ⚠️ hasTaxPosition IS STUBBED TRUE ON PURPOSE. This sandbox exists to walk the ROUTING, and its
+  // getOptimiserInput returns {}, so the real rule would answer false and short circuit every owed
+  // assertion here into the empty state. The rule itself, both of its arms, and the fact that both
+  // chat lanes ask the one function, are owned by test/emptyposition.test.mjs against the real
+  // lib/taxoptimiser.ts.
   w('taxoptimiser.ts', `
 export function taxPosition() { return { setAside: 0, projected: false }; }
 export function setAsideBasisLine() { return ''; }
+export function hasTaxPosition() { return true; }
 `);
   w('supabase.ts', `
 export const state = { rows: [], writes: [], turns: [] };

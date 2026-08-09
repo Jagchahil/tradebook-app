@@ -5,7 +5,7 @@ import { SESSION_COOKIE } from '../../../../lib/websession';
 import { readCircumstances, getBusinessProfile } from '../../../../lib/supabase';
 import {
   household, notHousehold, mtdQuestions, unanswered, unansweredMtd, progressIn, appliesTo,
-  writtenInFromSignup, type Circumstance, type Persona,
+  writtenInFromSignup, heldStudentLoan, type Circumstance, type Persona,
 } from '../../../../lib/circumstances';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
@@ -199,6 +199,89 @@ function Group({
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE ONE THING HE TOLD US THAT THIS PAGE COULD NOT SHOW HIM.
+//
+// He ticks "A student loan" at /start and the signup reconcile writes it into his circumstances.
+// Every group above is drawn from CIRCUMSTANCES, and `student_loan` is not in CIRCUMSTANCES and
+// must not be (see the block above heldStudentLoan in lib/circumstances.ts: a key in that array is
+// a question, and a new question moves the wizard's step count for everybody). So the answer was
+// held and never rendered, on the page whose whole job is to be the record of what he told us.
+//
+// ⚠️ IT IS A RECORD, NOT A QUESTION, SO IT DRAWS NO BUTTONS AND SITS BELOW THE GROUPS.
+//
+// doc 103's honesty test: a control that cannot control is not a control. /api/circumstances
+// refuses any key it cannot find in CIRCUMSTANCES, so a Yes and a No here would 400 every time a
+// man pressed them. Worse, they would look exactly like the buttons ten rows above that do work.
+// Putting it among the questions would read as one more thing waiting on him, which it is not.
+//
+// ⚠️ SO IT SAYS WHERE IT CAME FROM AND WHERE THE FIX LIVES, WHICH IS THE HONEST SUBSTITUTE.
+//
+// The fact is only half of it, and it is the half that is worth nothing on its own: the money
+// hangs off the PLAN, which is on his users row and set at /app/tax/student-loan. That page is
+// named and linked, because sending him to hunt for it is the same failure as no link at all.
+//
+// ⚠️ AND A MAN WHO NEVER TOLD US ANYTHING GETS NOTHING HERE. doc 103's empty test. A line saying
+// "you have not told us about a student loan" would be true, useless, and on nearly every page on
+// the product for ever, and a section that is usually empty is a section he stops reading. The
+// man who does have one and never said so is already met on /app/tax/student-loan, in front of the
+// plan setter, which is the screen that can actually do something about it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const SL_SAID: Record<'yes' | 'no', string> = {
+  yes: 'You told us you have a student loan.',
+  no: 'You told us you do not have a student loan.',
+};
+
+// Where it came from, read off the exhibit stored beside his answer rather than assumed. The
+// signup reconcile is the only writer today, but a sentence that says "at signup" about a row that
+// came from somewhere else would be this page inventing provenance, which is the one thing the log
+// exists to stop.
+//
+// ⚠️ THE TICK SENTENCE IS FOR A YES ONLY, AND THAT IS NOT FUSSINESS. What he did at signup was TICK
+// a box, and the reconcile writes a row only when he ticked it, so there is no such thing as a no
+// that came from a tick. If a no ever arrives carrying a signup exhibit, naming a tick would be us
+// describing an act he never performed, on the page that exists to be the record of what he did.
+const SL_FROM_SIGNUP = 'That came from the tick you put on the form when you signed up on the website.';
+const SL_FROM_RECORD = 'That is what is on your record.';
+
+// Said once, for both provenances, because it is the honesty of the whole card: there are no
+// buttons on this one and he should be told why rather than left to wonder where they went.
+const SL_NOT_ASKED_HERE = 'You have not been asked it here.';
+
+// The plan is the half that pays, so a yes is sent to the screen that collects it. A no is sent
+// nowhere except back, if it ever changes.
+const SL_YES_PRE =
+  'What we count is the plan you are on, because the thresholds differ by thousands between plans. '
+  + 'Your ';
+const SL_YES_POST = ' under Tax is where to set it, and where to put us right if this is wrong.';
+const SL_NO_PRE = 'If that has changed, your ';
+const SL_NO_POST = ' under Tax is where to tell us.';
+const SL_LINK = 'student loan page';
+
+function StudentLoanHeld({ rows }: {
+  rows: Array<{ key: string; answer: string; asked?: string | null }>;
+}) {
+  const { state, asked } = heldStudentLoan(rows);
+  // NOTHING AT ALL WHEN HE NEVER TOLD US. The empty test, and it is deliberate, not an oversight.
+  if (state === 'untold') return null;
+  const yes = state === 'yes';
+  return (
+    <section className="lek-card">
+      <h2 className="lek-h2">Your student loan</h2>
+      <p style={S.slSaid}>{SL_SAID[state]}</p>
+      <p style={S.slNote}>
+        {yes && writtenInFromSignup(asked) ? SL_FROM_SIGNUP : SL_FROM_RECORD}
+        {' '}
+        {SL_NOT_ASKED_HERE}
+        {' '}
+        {yes ? SL_YES_PRE : SL_NO_PRE}
+        <a href="/app/tax/student-loan" style={S.slLink}>{SL_LINK}</a>
+        {yes ? SL_YES_POST : SL_NO_POST}
+      </p>
+    </section>
+  );
+}
+
 export default async function CircumstancesPage() {
   const jar = await cookies();
   const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
@@ -294,6 +377,10 @@ export default async function CircumstancesPage() {
         who={who}
       />
 
+      {/* A RECORD, NOT A QUESTION, SO IT SITS AFTER THE QUESTIONS. Above the foot, because the foot
+          is about answers he pressed and this is the one he never was asked. See StudentLoanHeld. */}
+      <StudentLoanHeld rows={rows} />
+
       <p style={S.foot}>
         Every answer is saved the moment you press it, with the exact wording you read, so what we
         claim for you can always be shown to come from what you told us.
@@ -328,6 +415,13 @@ const S: Record<string, React.CSSProperties> = {
   notHis: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: 0 },
   whose: { fontSize: TYPE.note, lineHeight: 1.5, color: RIVER_DEEP, background: RIVER_TINT, borderRadius: RADIUS.sm, padding: '9px 11px', margin: '10px 0 0' },
   said: { fontSize: TYPE.note, fontWeight: 700, color: INK, margin: '10px 0 0' },
+
+  // The held answer. INK and MUTED on the card's own PANEL, and the link is RIVER on PANEL, never
+  // an accent on its own tint. All three clear AA in both themes: see test/contrastapplication.
+  slSaid: { fontSize: TYPE.body, lineHeight: 1.5, fontWeight: 700, color: INK, margin: 0, maxWidth: '62ch' },
+  slNote: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '8px 0 0', maxWidth: '62ch' },
+  slLink: { color: RIVER, fontWeight: 700, textDecoration: 'underline' },
+
   answers: { display: 'flex', gap: SPACE.xs, marginTop: 13 },
   aForm: { flex: 1, margin: 0 },
   yes: { width: '100%', background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.sm, padding: '13px 0', fontSize: TYPE.body, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },

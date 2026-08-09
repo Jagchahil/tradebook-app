@@ -951,6 +951,70 @@ export function writtenInFromSignup(asked: string | null | undefined): boolean {
   return typeof asked === 'string' && asked.trimStart().startsWith(TOLD_AT_SIGNUP);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AN ANSWER WE HOLD AND NEVER ASK. THE FIRST OF ITS KIND, AND IT IS DELIBERATELY NOT IN THE
+// LIST ABOVE.
+//
+// A man ticks "A student loan" at /start step 4, and reconcileSignupToUser in lib/supabase.ts
+// writes it into the circumstances table as key `student_loan`, answer 'yes', with the exhibit
+// "You told us at signup that you have a student loan." The row is real and it is his. Until
+// 8 August 2026 the only screen that read it was /app/tax/student-loan, a tools page he reaches
+// once a year, and /app/you/circumstances, the page whose entire job is to be the record of what
+// he has told us, drew every group from CIRCUMSTANCES. So the one thing he told us that is not a
+// Circumstance was held and never shown. He could not see it, and he could not correct it.
+//
+// ⚠️ AND THE FIX IS NOT A ROW IN THE LIST ABOVE. THAT IS THE WHOLE POINT OF THIS BLOCK.
+//
+// EVERYTHING IN CIRCUMSTANCES IS A QUESTION, AND THE MOMENT A KEY IS IN THAT ARRAY IT IS ASKED.
+// askingOrder() sorts it, notHousehold() puts it on /app/setup's relief screen, unanswered() feeds
+// the WhatsApp chain and the phone app's list, and progressIn() puts it in a denominator. Adding
+// it would grow the wizard by a question and move the "3 of 11 answered" line for every customer
+// on the product, including the ones who finished setup months ago. Jag's decision on 8 August
+// 2026 was DISPLAY ONLY: show him what he already told us, add no question, move nobody's count.
+//
+// ⚠️ AND IT COULD NOT BE ADDED HONESTLY EVEN IF WE WANTED THE QUESTION. /start asks whether he has
+// a loan. It never asks WHICH PLAN, and the thresholds differ by thousands between plans, so the
+// fact on its own buys him nothing: the money hangs entirely off users.student_loan_plan, which is
+// set on /app/tax/student-loan and nowhere else. A question here would collect the half we already
+// have and leave the half that pays, which is the compound question ban read from the other end.
+//
+// THREE STATES, AND THE THIRD ONE IS MEANT TO DRAW NOTHING. 'yes' and 'no' are things he told us
+// and are worth showing back to him. 'untold' is doc 103's empty test exactly: a row reading "you
+// have not told us about a student loan" would sit on the page of nearly every customer for ever,
+// say nothing, and teach him that this section is not worth reading, which is the one thing this
+// page cannot afford. The surface draws nothing for it, and the surface says so on itself.
+//
+// ⚠️ A FAILED READ IS NOT 'untold'. /app/you/circumstances refuses to render at all when
+// readCircumstances returns null, because a database wobble must never be printed as a fact about
+// him. null and undefined resolve to 'untold' here only so that no caller can crash on them. The
+// surface's own guard is what keeps a read failure off his screen.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const STUDENT_LOAN_KEY = 'student_loan';
+
+export type HeldState = 'yes' | 'no' | 'untold';
+
+export interface HeldAnswer {
+  state: HeldState;
+  // The verbatim sentence stored beside his answer, so a surface can say where it came from rather
+  // than guess. Null when there is no row, or when the row carries no exhibit.
+  asked: string | null;
+}
+
+export function heldStudentLoan(
+  rows: Array<{ key: string; answer: string; asked?: string | null }> | null | undefined,
+): HeldAnswer {
+  if (!Array.isArray(rows)) return { state: 'untold', asked: null };
+  const row = rows.find((r) => r.key === STUDENT_LOAN_KEY);
+  if (!row) return { state: 'untold', asked: null };
+  // ⚠️ ONLY 'yes' AND 'no' ARE STATEMENTS. A 'skip', or anything else that ever lands in that
+  // column, is not a man telling us he has no loan, and reading it as one would put a false
+  // sentence on his page. Same rule as mtdStatedFrom below: everything that is not an answer is
+  // "we have not been told", never "no".
+  if (row.answer === 'yes') return { state: 'yes', asked: row.asked ?? null };
+  if (row.answer === 'no') return { state: 'no', asked: row.asked ?? null };
+  return { state: 'untold', asked: null };
+}
+
 function openIn(
   list: Circumstance[],
   answered: Array<{ key: string; answer: string }>,

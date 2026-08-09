@@ -370,13 +370,45 @@ export async function POST(req: NextRequest) {
 
 // The full message dispatch, run after the 200 is sent. Any error is caught and
 // logged so it can never surface to Meta (we have already acknowledged).
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SAFETY NET UNDER EVERY HANDLER, BECAUSE A THROW USED TO MEAN SILENCE. 9 August 2026.
+//
+// The catch at the bottom of this function logged a line and returned. Meta already had its 200,
+// so nothing was retried and nothing was said, and the customer who had just sent us a message got
+// NOTHING BACK. Not an error, not an apology. Silence, which he cannot tell from us being slow.
+//
+// Three handlers were hardened against this one at a time (handleReceiptImage, handleVoiceNote and
+// handleSchedule each catch and send a sentence), and roughly thirty five were not: handleTotals,
+// handleMoneyQuestion, handleButtonReply, handleStopStart, handleDeleteLast, handleWelcome,
+// handleSetupStart and the rest. Fixing them one at a time is how the first three took a fortnight
+// and the other thirty five never happened. THE NET GOES UNDER ALL OF THEM AT ONCE.
+//
+// ⚠️ IT SENDS WITHOUT ASKING WHETHER ANYTHING WAS SENT ALREADY, and that is a decision rather than
+// an oversight. Counting sends would need state shared across concurrent invocations of one
+// instance, and under load that count would sometimes say "already answered" when THIS message was
+// not, which puts the silence straight back. The cost the other way is a man who got a correct
+// answer also getting "something went wrong at my end" when a line after the send threw. Something
+// DID go wrong, he is not being misled, and the handlers that reply do it last, so it is rare.
+// Silence is the failure this codebase already documents as the worst one on this channel: he
+// spoke into his phone because his hands were full, so he is the least able of anyone to notice
+// nothing came back.
+//
+// ⚠️ AND NEVER BEFORE THE CAP. messageCapExceeded exists so a runaway sender cannot generate a
+// reply storm. If the cap check itself throws we must not answer either, or the net becomes the
+// storm it was built to prevent, so the apology is gated on having got past it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const WENT_WRONG = 'Something went wrong at my end just then, and I have not logged that. Send it again in a minute and I will get it.';
+
 async function processMessage(message: IncomingMessage): Promise<void> {
   const from = message.from;
   const messageId = message.id;
+  // Gates the safety net below. See the block above: a throw in the cap check must never reply.
+  let pastCap = false;
   try {
     // Durable daily cap first. Over the cap we stop replying entirely, so a
     // runaway sender cannot generate a reply storm across instances.
     if (await messageCapExceeded(from)) return;
+    pastCap = true;
 
     if (message.type === 'image' && message.image?.id) {
       // Capture is the work. Nothing is stored and no AI is spent, and he is told why in one line.
@@ -531,9 +563,22 @@ async function processMessage(message: IncomingMessage): Promise<void> {
       );
     }
   } catch (err) {
-    // Already acknowledged to Meta. Log and stop; never rethrow.
-    const messageText = err instanceof Error ? err.message : 'unknown error';
-    console.error('[whatsapp] Handler error:', messageText);
+    // Already acknowledged to Meta, so nothing is retried. Log and answer him; never rethrow.
+    //
+    // ⚠️ THE NAME ONLY, NEVER THE MESSAGE. A JSON parse failure quotes the body it choked on, and
+    // these bodies are PostgREST's and Graph's. Graph's reflects the recipient's wa_id. Vercel
+    // logs are an external service.
+    console.error('[whatsapp] Handler error:', err instanceof Error ? err.name : 'unknown');
+    // 🔴 AND HE IS TOLD. See the block above processMessage for why this is unconditional, and why
+    // it may not fire when the cap check is what threw.
+    if (pastCap) {
+      try {
+        await sendText(from, WENT_WRONG);
+      } catch {
+        // The apology itself failing is the one case with nothing left to try. Do not rethrow: a
+        // throw out of processMessage is an unhandled rejection inside after(), which helps nobody.
+      }
+    }
   }
 }
 

@@ -80,6 +80,73 @@ export function noRowGrace(accountAgeDays: number | null, trialDays: number): Ga
   return accountAgeDays <= trialDays ? 'open' : 'readonly';
 }
 
+// WHEN THAT GRACE RUNS OUT, AS A MOMENT, FOR THE ONE SCREEN THAT HAS TO SAY IT.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 FOUND 8 AUGUST 2026 ON A REAL SIGNUP, TWO DAYS BEFORE LAUNCH. A man who signs up on the web
+// gets NO subscription row at all. His free trial IS the grace above, granted on the age of his
+// account, so /app/you/billing resolved a null row and told him "There is no subscription on this
+// account yet", with no date, no day count, and no word that he was on a trial. The trial end date
+// shipped the day before reads current_period_end off a row that, for every real web signup, does
+// not exist: only an account handed a trialing row by scripts/demo-account.mjs could ever show it.
+//
+// ⚠️ THIS IS noRowGrace's OWN THRESHOLD SOLVED FOR THE DAY INSTEAD OF THE VERDICT, and that is the
+// only reason it is allowed to exist. noRowGrace holds the door open while the age is at or under
+// the trial length, so the last moment it holds is one trial length after the account was made,
+// which from here is (trialDays less the age) away. It is not a second definition of a trial and
+// it must never become one: test/trialstanding.test.mjs walks the two together, hour by hour,
+// across the boundary, and fails the build on the day they part.
+//
+// ⚠️ AND IT DECIDES NOTHING. Nothing gates on this. It answers "which day is that" so a screen can
+// print it, and it answers null whenever the age is unreadable, which is the same unknown
+// noRowGrace itself fails open on. A screen with no date must say it has no date. A guessed one,
+// on a page about a man's money, teaches him the page lies, and he only has to learn that once.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function noRowGraceEndsAt(
+  accountAgeDays: number | null,
+  trialDays: number,
+  now: Date,
+): Date | null {
+  if (accountAgeDays === null || !Number.isFinite(accountAgeDays)) return null;
+  const at = now.getTime() + (trialDays - accountAgeDays) * 86_400_000;
+  // A bad clock or a bad trial length is an unknown, not a date. Same refusal as an unreadable age.
+  if (!Number.isFinite(at)) return null;
+  return new Date(at);
+}
+
+// WHAT A SCREEN MAY SAY ABOUT A MAN WITH NO SUBSCRIPTION ROW, from the gate's own two inputs.
+//
+// ⚠️ THE THREE ANSWERS ARE THE THREE THINGS WE CAN ACTUALLY ESTABLISH, and keeping them apart is
+// the same discipline SubscriptionRead exists for: 'none' and 'unreadable' are different facts and
+// conflating them is how a page ends up telling a man something we never knew.
+//
+//   'grace'    the gate is holding his door open on the age of his account, which IS the free
+//              trial a web signup gets. endsIso is the moment that stops, or null when his age is
+//              unreadable and there is therefore no day to name.
+//   'unknown'  we could not read his subscription at all. The gate opened on that failure, so
+//              nothing of his is locked, and we may not say he has no subscription: we do not know.
+//   'off'      he has a row, so the row does the talking and this says nothing.
+//
+// ⚠️ 'grace' IS RETURNED ONLY WHERE noRowGrace ITSELF SAYS OPEN, by calling it, so a screen cannot
+// count down a trial the gate has already ended, and the day it prints is the day the gate acts.
+export type NoRowTrial =
+  | { kind: 'grace'; endsIso: string | null }
+  | { kind: 'unknown' }
+  | { kind: 'off' };
+
+export function noRowTrial(
+  read: SubscriptionRead,
+  accountAgeDays: number | null,
+  trialDays: number,
+  now: Date,
+): NoRowTrial {
+  if (read.kind === 'unreadable') return { kind: 'unknown' };
+  if (read.kind !== 'none') return { kind: 'off' };
+  if (noRowGrace(accountAgeDays, trialDays) !== 'open') return { kind: 'off' };
+  const end = noRowGraceEndsAt(accountAgeDays, trialDays, now);
+  return { kind: 'grace', endsIso: end ? end.toISOString() : null };
+}
+
 export function gateFor(
   read: SubscriptionRead,
   entitled: boolean,

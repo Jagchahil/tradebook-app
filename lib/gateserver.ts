@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readGateInputs } from './supabase';
 import { isEntitled, TRIAL_DAYS } from './entitlement';
-import { gateFor, readonlyPayload, type Gate } from './gate';
+import { gateFor, noRowTrial, readonlyPayload, type Gate, type NoRowTrial } from './gate';
 
 // The gate for one account, right now.
 //
@@ -31,6 +31,34 @@ export async function gateForUser(userId: string): Promise<Gate> {
     // Our failure, not his entitlement. lib/entitlement.ts's asymmetry: locking a man out of his
     // own records is worse than letting him have another fortnight free.
     return 'open';
+  }
+}
+
+// WHAT HIS TRIAL IS, WHEN THERE IS NO ROW TO READ IT OFF. For screens, and for nothing else.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ THE SAME INPUTS, THE SAME RULE FILE, AND NOT ONE DECISION OF ITS OWN. It reads exactly what
+// gateForUser reads, hands it to lib/gate.ts's noRowTrial, and returns what a page may say. The
+// arithmetic that turns an account age into a day lives there, beside noRowGrace, whose threshold
+// it is. Nothing gates on the answer: gateForUser above is still the only law, and this function
+// could return rubbish without any man losing or gaining a thing he may do.
+//
+// ⚠️ IT IS A SECOND READ, DELIBERATELY, RATHER THAN A WIDER gateForUser. Forty callers depend on
+// that function answering one small question and never throwing; widening its return to serve one
+// page would put a page's needs inside the paywall's own call. The cost is two more parallel
+// SELECTs on /app/you/billing, which a man opens less than weekly, and both read the same
+// unchanging fact (when his account was made), so the two calls cannot disagree.
+//
+// 🔴 AND IT NEVER THROWS EITHER. An exception here would be our failure, and the honest answer to
+// our own failure is 'unknown', which the page prints as not knowing rather than as bad news.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function noRowTrialForUser(userId: string, now: Date): Promise<NoRowTrial> {
+  if (!userId) return { kind: 'unknown' };
+  try {
+    const { read, accountAgeDays } = await readGateInputs(userId);
+    return noRowTrial(read, accountAgeDays, TRIAL_DAYS, now);
+  } catch {
+    return { kind: 'unknown' };
   }
 }
 

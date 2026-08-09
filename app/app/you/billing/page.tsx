@@ -5,7 +5,7 @@ import { SESSION_COOKIE } from '../../../../lib/websession';
 import {
   getPhoneForUser, getStripeCustomerForAccount, getSubscriptionByPhone, getSubscriptionByUser,
 } from '../../../../lib/supabase';
-import { gateForUser } from '../../../../lib/gateserver';
+import { gateForUser, noRowTrialForUser } from '../../../../lib/gateserver';
 import { hasStripeConfig, PRICE_PENCE } from '../../../../lib/stripe';
 import { gbp0, gbp2 } from '../../lib/money';
 import {
@@ -60,10 +60,21 @@ export default async function BillingPage({
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
   const notice = portalNotice(one('problem'));
 
-  const [gate, byAccount, identity] = await Promise.all([
+  // ONE CLOCK FOR THE WHOLE PAGE. The day the trial ends is worked out from this instant and the
+  // days left are counted back to it, so the two halves of one sentence cannot be a tick apart.
+  const now = new Date();
+
+  // 🔴 AND WHAT HIS TRIAL IS WHEN THERE IS NO ROW TO READ IT OFF, which is every real web signup.
+  // A man who signs up on the web gets NO subscription row: the gate grants his trial on the age
+  // of his account (lib/gate.ts noRowGrace), so the row below is null for him and the row is where
+  // the trial end date used to come from. noRowTrialForUser reads the gate's own two inputs and
+  // hands back the same day the gate will act on, or nothing at all when it could not read them.
+  // It decides nothing: gateForUser on the line above is still the only thing that gates anybody.
+  const [gate, byAccount, identity, trial] = await Promise.all([
     gateForUser(user.id),
     getSubscriptionByUser(user.id),
     identityForUser(user),
+    noRowTrialForUser(user.id, now),
   ]);
 
   // Account first, then phone: the same order as /api/billing/status, because most rows written
@@ -82,7 +93,7 @@ export default async function BillingPage({
     (identity.phone ?? '').trim() || null,
   );
 
-  const standing = standingFor(row, gate, new Date());
+  const standing = standingFor(row, gate, now, trial);
 
   return (
     <main className="lek-wrap" style={S.wrap}>

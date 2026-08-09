@@ -31,6 +31,28 @@ export interface Standing {
   lines: string[];
 }
 
+// WHAT THE GATE IS DOING ABOUT A MAN WITH NO SUBSCRIPTION ROW AT ALL, handed in by the page.
+//
+// ⚠️ WORKED OUT IN lib/gate.ts, NEVER HERE. This file may not reach for the age of an account or
+// the length of a trial: that is the paywall's own arithmetic, it lives beside the rule it is the
+// threshold of, and a second copy of it on a screen is the one way a screen and a paywall can come
+// to disagree. This module only chooses sentences for an answer it is given.
+//
+// ⚠️ DECLARED AGAIN RATHER THAN IMPORTED, the BillingRow discipline above: no imports, so
+// test/billingweb.test.mjs and test/trialstanding.test.mjs can stage this file under bare node.
+// TypeScript checks it structurally against lib/gate.ts's NoRowTrial at the call site.
+//
+//   'grace'    the gate is holding his door open on the age of his account, which IS the free
+//              trial a web signup gets. endsIso is the moment that stops, or null when we could
+//              not read how old his account is.
+//   'unknown'  we could not read his subscription. Nothing is locked, and we may not say he has
+//              none, because we do not know that.
+//   'off'      he has a row, or the caller has nothing to tell us. The row does the talking.
+export type TrialWindow =
+  | { kind: 'grace'; endsIso: string | null }
+  | { kind: 'unknown' }
+  | { kind: 'off' };
+
 // "12 August 2026", or nothing at all. An unreadable date is never echoed and never guessed.
 export function dateWords(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -50,12 +72,33 @@ export function daysLeft(iso: string | null | undefined, now: Date): number | nu
   return Math.ceil((t - now.getTime()) / 86400000);
 }
 
+// THE ONE SENTENCE A MAN ON A FREE TRIAL READS, wherever his end date was established.
+//
+// ⚠️ ONE BUILDER, TWO POPULATIONS, WHICH IS THE POINT OF IT. A man handed a trialing row and a man
+// let through on the age of his account are on the same free trial, in the same position, and are
+// told the same thing in the same words. Neither branch below may grow sentences of its own.
+//
+// left and end are always read off ONE instant at each call site, so they cannot disagree; the
+// null guard is belt and braces, and it says plainly that there is no date rather than printing
+// the word null at a man who came here to find out where he stands.
+export function trialLine(left: number | null, end: string | null): string {
+  if (left === null || end === null) return 'You are on the free trial. We cannot show the date it ends.';
+  if (left <= 0) return `You are on the free trial. It ends ${end}.`;
+  if (left === 1) return `You are on the free trial, with a day left. It ends ${end}.`;
+  return `You are on the free trial, with ${left} days left. It ends ${end}.`;
+}
+
 // The one honest paragraph at the top of the billing page.
 //
 // The GATE decides lapsed, not this file's own reading of the row: lib/gateserver.ts reads both
 // keys and fails open, and a second opinion computed here is the two readers mistake this
 // codebase keeps paying for. The row only chooses the WORDS once the gate has chosen the state.
-export function standingFor(row: BillingRow | null, gate: BillingGate, now: Date): Standing {
+export function standingFor(
+  row: BillingRow | null,
+  gate: BillingGate,
+  now: Date,
+  trial: TrialWindow = { kind: 'off' },
+): Standing {
   if (gate === 'readonly') {
     const first = (row?.status ?? '').toLowerCase() === 'canceled'
       ? 'Your subscription is cancelled, so Lekhio is reading only just now.'
@@ -68,6 +111,41 @@ export function standingFor(row: BillingRow | null, gate: BillingGate, now: Date
 
   const status = (row?.status ?? '').toLowerCase();
   if (!row || !status || status === 'none') {
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 NO ROW IS NOT NO TRIAL, AND UNTIL 8 AUGUST 2026 THIS BRANCH SAID IT WAS.
+    //
+    // A real web signup gets no subscription row at all: his trial is granted on the age of his
+    // account by the gate itself. Every one of them landed here and read "There is no subscription
+    // on this account yet", two days into a trial he had just started, on the one screen that
+    // exists to tell him where he stands. Technically true. Practically it reads as a signup that
+    // went wrong, and it never once said when his trial ends, because the row it would have read
+    // that off does not exist for him.
+    //
+    // ⚠️ SO THE FIRST QUESTION IS NOT "IS THERE A ROW" BUT "IS HE ON A TRIAL", and the only honest
+    // answer to that comes from the gate, which is what TrialWindow carries in. On 'grace' he is
+    // on a trial by the paywall's own reckoning, so he is told so in the same words as a man with
+    // a granted row, and the day he is given is the day the paywall will act on.
+    // ═════════════════════════════════════════════════════════════════════════════════════════
+    if (trial.kind === 'grace') {
+      // The SAME two readers the trialing branch below uses, over one instant, so the count and
+      // the date cannot disagree, and neither can be shown when the other cannot.
+      return {
+        kind: 'trial',
+        lines: [trialLine(daysLeft(trial.endsIso, now), dateWords(trial.endsIso))],
+      };
+    }
+
+    // 🔴 WE COULD NOT SEE, WHICH IS NOT THE SAME AS HIM HAVING NOTHING. The gate opened his door
+    // on exactly this failure of ours, so nothing of his is locked, and saying "there is no
+    // subscription" here would state as fact the one thing we just failed to establish.
+    if (trial.kind === 'unknown') {
+      return {
+        kind: 'none',
+        lines: ['We cannot show your subscription just now, and nothing is locked while we cannot.'],
+      };
+    }
+
+    // What is left: no row, and no trial running on the age of his account either. Said plainly.
     return {
       kind: 'none',
       lines: ['There is no subscription on this account yet, and nothing has been charged.'],
@@ -89,17 +167,11 @@ export function standingFor(row: BillingRow | null, gate: BillingGate, now: Date
     const left = daysLeft(row.current_period_end, now);
     const end = dateWords(row.current_period_end);
     // 🔴 HONESTY: a trial with no readable end date says so plainly rather than staying silent
-    // about it or, worse, guessing one from when the account was created. grantTrial always sets
-    // one and Stripe always sends one (lib/entitlement.ts), so this should be unreachable, but an
-    // unreachable case is exactly where a guess is most tempting and least excusable.
-    const line = left === null
-      ? 'You are on the free trial. We cannot show the date it ends.'
-      : left <= 0
-        ? `You are on the free trial. It ends ${end}.`
-        : left === 1
-          ? `You are on the free trial, with a day left. It ends ${end}.`
-          : `You are on the free trial, with ${left} days left. It ends ${end}.`;
-    return { kind: 'trial', lines: [line] };
+    // about it or, worse, guessing one from anything else on hand. grantTrial always sets one and
+    // Stripe always sends one (lib/entitlement.ts), so this should be unreachable, but an
+    // unreachable case is exactly where a guess is most tempting and least excusable. trialLine
+    // holds that refusal for this branch and for the no row trial above, in one place.
+    return { kind: 'trial', lines: [trialLine(left, end)] };
   }
 
   if (status === 'active' || status === 'past_due') {

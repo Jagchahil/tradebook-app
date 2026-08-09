@@ -40,6 +40,9 @@ const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 for (const f of [
   'taxengine', 'nistudentloan', 'ltdengine', 'personalincome', 'propertyengine', 'autonomy',
   'taxoptimiser', 'ledger', 'incomeproof', 'quarterpack', 'personal',
+  // lib/scotland.ts, one exported sentence with no imports of its own. Both money documents
+  // above print it, so the fixed dependency list this suite stages has to carry it too.
+  'scotland',
 ]) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }

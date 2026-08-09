@@ -42,9 +42,13 @@ const lib = path.join(root, 'lib');
 // approach as test/quarterpack.test.mjs and test/agent.test.mjs.
 const stage = mkdtempSync(path.join(tmpdir(), 'cumul-'));
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
+// lib/scotland.ts, the pack's second import. One exported sentence, nothing imported into it.
+writeFileSync(path.join(stage, 'scotland.ts'), readFileSync(path.join(lib, 'scotland.ts'), 'utf8'));
 writeFileSync(
   path.join(stage, 'quarterpack.ts'),
-  readFileSync(path.join(lib, 'quarterpack.ts'), 'utf8').replace("from './taxengine'", "from './taxengine.ts'"),
+  readFileSync(path.join(lib, 'quarterpack.ts'), 'utf8')
+    .replace("from './taxengine'", "from './taxengine.ts'")
+    .replace("from './scotland'", "from './scotland.ts'"),
 );
 const H = await import(pathToFileURL(path.join(lib, 'hmrc.ts')).href);
 const Q = await import(pathToFileURL(path.join(stage, 'quarterpack.ts')).href);

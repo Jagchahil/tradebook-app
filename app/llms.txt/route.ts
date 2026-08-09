@@ -21,6 +21,7 @@
 // ---------------------------------------------------------------------------------------------
 
 import { FACTS } from '../../lib/taxengine';
+import { SCOTLAND_LINE } from '../../lib/scotland';
 import { PRICE_PENCE, TRIAL_DAYS } from '../../lib/stripe';
 import { gbp0 } from '../../lib/money';
 
@@ -83,6 +84,7 @@ There are no streaks, no badges and no gamification, because those would reward 
 
 ## Key UK tax facts Lekhio works with (2026/27)
 These are HMRC's figures, not ours, and they are here so an assistant can check us.
+${SCOTLAND_LINE} National Insurance, VAT, student loan repayments and the personal allowance itself are the same across the UK.
 - Personal allowance: ${gbp(FACTS.personalAllowance)}. Tapers to nil between ${gbp(FACTS.personalAllowanceTaperFloor)} and ${gbp(FACTS.personalAllowanceLostAt)}.
 - Basic rate 20% to ${gbp(FACTS.class4UpperLimit)}; higher rate 40% to ${gbp(FACTS.personalAllowanceLostAt)}; additional rate 45% above.
 - Class 4 National Insurance: 6% between ${gbp(FACTS.personalAllowance)} and ${gbp(FACTS.class4UpperLimit)}, then 2%.

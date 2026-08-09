@@ -30,6 +30,9 @@ const stage = mkdtempSync(path.join(tmpdir(), 'lender-'));
 for (const f of [
   'taxengine', 'money', 'capital', 'nistudentloan', 'ltdengine', 'personalincome',
   'propertyengine', 'autonomy', 'taxoptimiser', 'quarterpack', 'incomeproof', 'bookshare',
+  // lib/scotland.ts, one exported sentence with no imports of its own, printed by both lender
+  // documents staged above.
+  'scotland',
 ]) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }

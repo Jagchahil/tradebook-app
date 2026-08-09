@@ -17,6 +17,7 @@ import { gateForUser } from '../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../lib/gate';
 import { ledgerFor, headline } from '../../lib/ledger';
 import { taxPosition, setAsideBasisLine } from '../../lib/taxoptimiser';
+import { SCOTLAND_LINE } from '../../lib/scotland';
 import { weeklyInput, weeklyLine } from '../../lib/weeklyupdate';
 import { weekOf } from '../../lib/weekchart';
 import { buildPile, partitionPile, waitingCount } from '../../lib/reviewpile';
@@ -265,6 +266,14 @@ export default async function OverviewPage() {
           {/* Whose money the figure is worked out on. For a partner the set aside is on his slice,
               and saying so here is what stops it contradicting the whole firm week below. */}
           {shareCap ? <p style={S.heroBasis}>{shareCap}</p> : null}
+          {/* ⚠️ WHICH COUNTRY'S RATES THE NUMBER ABOVE IS WORKED AT. Income tax rates and bands over
+              the personal allowance are devolved to Scotland and lib/taxengine.ts holds the England,
+              Wales and Northern Ireland ones only, so a Scottish sole trader has been putting by a
+              figure that is not his and nothing has said so. This is the number he actually moves
+              money against, which is why the sentence is here and not on every screen that mentions
+              tax. It is set quieter than the basis line above it: that one describes HIS money, this
+              one describes OUR working. lib/scotland.ts owns the words. */}
+          <p style={S.heroCaveat}>{SCOTLAND_LINE}</p>
         </section>
       ) : null}
 
@@ -520,6 +529,9 @@ const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
 
   heroBasis: { fontSize: TYPE.note, lineHeight: 1.55, color: RIVER_DEEP, margin: '8px 0 0' },
+  // The Scotland line. Same size as the basis line and a step quieter in colour, because it is a
+  // note about our working rather than a statement about his money. Same shape on /app/tax.
+  heroCaveat: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '8px 0 0', maxWidth: '62ch' },
   scope: { fontSize: TYPE.note, lineHeight: 1.5, color: MUTED, margin: '0 0 14px' },
 
   headline: { fontSize: TYPE.lead, lineHeight: 1.35, fontWeight: 800, letterSpacing: '-0.02em', margin: '0 0 16px' },

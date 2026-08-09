@@ -16,8 +16,13 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'qpack-'));
-const fix = (s) => s.replace("from './taxengine'", "from './taxengine.ts'");
+// lib/scotland.ts is the second file quarterpack imports: one exported sentence, no imports of its
+// own, staged here so the pack loads. See test/scotland.test.mjs for what it is and why.
+const fix = (s) => s
+  .replace("from './taxengine'", "from './taxengine.ts'")
+  .replace("from './scotland'", "from './scotland.ts'");
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
+writeFileSync(path.join(stage, 'scotland.ts'), readFileSync(path.join(lib, 'scotland.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'quarterpack.ts'), fix(readFileSync(path.join(lib, 'quarterpack.ts'), 'utf8')));
 const Q = await import(pathToFileURL(path.join(stage, 'quarterpack.ts')).href);
 const E = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);

@@ -30,6 +30,9 @@
 // import untouched: a file that loads under tsc and dies in six suites, explained by a comment
 // that reads as if it prevents the problem. Say what the line is, never quote it.
 import { soleTraderTax, class2Voluntary, mtdPosition, mtdThresholdFor, mtdTestBaseReturn, type MtdPosition } from './taxengine';
+// The one sentence saying which country's income tax rates the estimate below is worked at. See
+// lib/scotland.ts for why it is a constant rather than a string typed into each surface.
+import { SCOTLAND_LINE } from './scotland';
 
 // A confirmed transaction, in the engine's sign convention: a positive amount is
 // income, a negative amount is an expense. Everything is optional and read
@@ -456,7 +459,14 @@ export function buildQuarterPack(input: BuildInput): QuarterPack {
       ? 'These are your company\'s figures, so there is no personal tax estimate on them here. A company pays Corporation Tax on its own return, for its own accounting period, and you pay tax on what you take out as salary or dividends. Your accountant works both out from the figures above.'
       : 'A running estimate on your trade profit so far this tax year, using the published ' +
         taxYearLabel(startYear) +
-        ' figures. It is for guidance, not a filing. Property profit, where present, is taxed separately and is not included here.' +
+        ' figures. It is for guidance, not a filing. Property profit, where present, is taxed separately and is not included here. ' +
+        // WHICH COUNTRY'S RATES. Income tax above the personal allowance is devolved and this engine
+        // holds the England, Wales and Northern Ireland bands only. The note is the one place on the
+        // pack that already explains what the estimate IS, so the sentence joins it rather than
+        // taking a row of its own on a document a man hands his accountant. The company branch above
+        // offers no personal estimate at all, so it gets no caveat about one. lib/scotland.ts owns
+        // the words, so this pack, the lender document and the free tools cannot drift apart.
+        SCOTLAND_LINE +
         (capitalAllowance > 0 ? ` It is worked out on your taxable profit after this year's £${Math.round(capitalAllowance).toLocaleString('en-GB')} car allowance, which is why it is lower than the tax on the figures above.` : ''),
     companyProfitExcluded: isCompany,
   };

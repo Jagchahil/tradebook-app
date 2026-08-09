@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { compare } from '../../lib/ltdengine';
+import { SCOTLAND_LINE } from '../../lib/scotland';
 import LeadCapture from '../../components/LeadCapture';
 import { gbp0 } from '../../lib/money';
 
@@ -91,6 +92,14 @@ export default function Calc() {
               <div style={{ height: 1, background: LINE, margin: '12px 0' }} />
               <Row label={`Company: salary ${gbp(c.ltd.salary)} + dividends`} value={gbp(c.ltd.totalTax)} sub={`Corporation tax ${gbp(c.ltd.corpTax)}, dividend tax ${gbp(c.ltd.divTax)}${c.ltd.employerNI > 0 ? `, employer NI ${gbp(c.ltd.employerNI)}` : ''}`} />
               <Row label="Company: you keep" value={gbp(c.ltd.takeHome)} bold />
+              {/* WHICH COUNTRY'S RATES. The sole trader half of this comparison is income tax, and
+                  the whole point of the screen is that a stranger decides how to structure his
+                  business on the gap between the two columns. Corporation tax, dividend tax and
+                  National Insurance are the same UK wide; the sole trader income tax is not. See
+                  the note on the same sentence in /cis-calculator, and lib/scotland.ts. */}
+              <p style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, margin: '14px 0 0' }}>
+                {SCOTLAND_LINE}
+              </p>
             </div>
           ) : null}
         </div>

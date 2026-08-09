@@ -10,6 +10,10 @@
 import { incomeTaxOnProfit, class4NIC, FACTS, personalAllowance } from './taxengine';
 // Section 24 lives in one file and this document obeys it rather than keeping its own copy.
 import { isResidentialFinanceCost, PROPERTY_FACTS } from './propertyengine';
+// Which country's income tax rates the estimate below is worked at. One sentence, one file, and
+// app/app/proof-of-income/page.tsx renders the identical constant so the screen and the paper
+// cannot say different things to the same broker. See lib/scotland.ts.
+import { SCOTLAND_LINE } from './scotland';
 
 export interface IncomeProofTxn {
   amount: number; // signed: positive income, negative expense
@@ -464,6 +468,7 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
     This is a summary prepared from the figures ${esc(p.businessName)} has recorded and confirmed in Lekhio, for income verification.
     It is not an HMRC document, an SA302, or a filed tax return, and it is only as complete as the records kept.
     The estimated tax figure, where one is shown, is guidance based on the published ${esc(p.taxYear)} rates and does not include any other income, reliefs or allowances the person may have.
+    ${p.companyExcluded ? '' : esc(SCOTLAND_LINE)}
     For an official SA302 or tax year overview, the person can log in to their HMRC account. Some lenders ask for HMRC documents as well as a summary like this.
   </p>
 </div></body></html>`;

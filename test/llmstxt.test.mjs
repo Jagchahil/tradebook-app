@@ -43,7 +43,7 @@ const stage = mkdtempSync(path.join(tmpdir(), 'llms-'));
 // anything about llms.txt. Rewriting EVERY ../../lib/ specifier means the next one is free, and
 // the file list below is the only thing left to keep in step.
 const fix = (t) => t.replace(/from '\.\.\/\.\.\/lib\/([a-zA-Z0-9._-]+)'/g, "from './$1.ts'");
-for (const f of ['taxengine', 'stripe', 'money']) {
+for (const f of ['taxengine', 'stripe', 'money', 'scotland']) {
   writeFileSync(path.join(stage, `${f}.ts`), readFileSync(path.join(lib, `${f}.ts`), 'utf8'));
 }
 writeFileSync(

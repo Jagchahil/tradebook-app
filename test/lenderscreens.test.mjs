@@ -69,7 +69,9 @@ try { symlinkSync(path.join(root, 'node_modules'), path.join(stage, 'node_module
 for (const f of [
   'taxengine', 'money', 'capital', 'nistudentloan', 'ltdengine', 'personalincome',
   'propertyengine', 'autonomy', 'taxoptimiser', 'quarterpack', 'incomeproof', 'bookshare',
-  'tokens', 'apptheme',
+  // lib/scotland.ts, one exported sentence with no imports of its own, printed by both lender
+  // documents staged above.
+  'tokens', 'apptheme', 'scotland',
   // Which tax year the document is about. Staged as the REAL file and never stubbed, because it
   // is the thing that decides whether this handler prints 2026/27 or prints tax year zero.
   'proofyear',
@@ -107,6 +109,9 @@ const proofPageJs = canRender ? tsx(readFileSync(path.join(root, 'app/app/proof-
   .replace("'../../../lib/websession'", "'./websessionstub.ts'")
   .replace("'../../../lib/supabase'", "'./supabasestub.ts'")
   .replace("'../../../lib/incomeproof'", "'./incomeproof.ts'")
+  // The Scotland sentence the screen prints beside the estimated tax figure, from the same constant
+  // the document prints. See lib/scotland.ts and test/scotland.test.mjs.
+  .replace("'../../../lib/scotland'", "'./scotland.ts'")
   .replace("'../../../lib/money'", "'./money.ts'")
   .replace("'../../../lib/tokens'", "'./tokens.ts'")
   .replace("'../../../lib/apptheme'", "'./apptheme.ts'")

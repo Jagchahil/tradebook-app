@@ -301,9 +301,13 @@ ok('the payments on account card is drawn only when they apply', /poa\.required 
 // type stripping does not. Same fix as test/moneyweb.test.mjs, same reason.
 const stage = mkdtempSync(path.join(tmpdir(), 'taxdue-'));
 writeFileSync(path.join(stage, 'taxengine.ts'), read('lib/taxengine.ts'));
+// lib/scotland.ts, the pack's second import. One exported sentence, nothing imported into it.
+writeFileSync(path.join(stage, 'scotland.ts'), read('lib/scotland.ts'));
 writeFileSync(
   path.join(stage, 'quarterpack.ts'),
-  read('lib/quarterpack.ts').replace("from './taxengine'", "from './taxengine.ts'"),
+  read('lib/quarterpack.ts')
+    .replace("from './taxengine'", "from './taxengine.ts'")
+    .replace("from './scotland'", "from './scotland.ts'"),
 );
 writeFileSync(
   path.join(stage, 'due.ts'),

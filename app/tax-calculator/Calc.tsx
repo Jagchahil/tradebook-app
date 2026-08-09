@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 import LeadCapture from '../../components/LeadCapture';
 import { soleTraderTax, FACTS } from '../../lib/taxengine';
+import { SCOTLAND_LINE } from '../../lib/scotland';
 import { gbp0 } from '../../lib/money';
 
 // The public tax calculator. 2026/27, England, Wales and Northern Ireland.
@@ -167,8 +168,15 @@ export default function Calc() {
           </div>
         ) : null}
 
+        {/* 🔴 THE JURISDICTION SENTENCE WAS TYPED HERE BY HAND, AND ONLY HERE. It read "England,
+            Wales and Northern Ireland. Scotland has different income tax bands", which was true,
+            while the CIS refund tool, the landlord tool and the sole trader against limited tool
+            next door quoted band derived figures to the same stranger and said nothing at all. One
+            hand written caveat on one of four sibling tools is how the other three go missing. It
+            now reads lib/scotland.ts, which every disclosing surface reads, so there is one sentence
+            to change on the day the Scottish bands are actually modelled. */}
         <p style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, marginTop: 16 }}>
-          An estimate for 2026/27, England, Wales and Northern Ireland. Scotland has different income tax bands. It assumes self employment income only and the standard personal allowance. Not tax advice for your exact situation.
+          An estimate for 2026/27. {SCOTLAND_LINE} It assumes self employment income only and the standard personal allowance. Not tax advice for your exact situation.
         </p>
       </div>
 

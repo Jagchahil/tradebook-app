@@ -12,10 +12,14 @@ const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'ip-'));
 const fix = (s) =>
   s.replace(/from '\.\/taxengine'/g, "from './taxengine.ts'")
-   .replace(/from '\.\/propertyengine'/g, "from './propertyengine.ts'");
+   .replace(/from '\.\/propertyengine'/g, "from './propertyengine.ts'")
+   .replace(/from '\.\/scotland'/g, "from './scotland.ts'");
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
 // Section 24 lives in lib/propertyengine.ts and this document now obeys it, so it is staged too.
 writeFileSync(path.join(stage, 'propertyengine.ts'), fix(readFileSync(path.join(lib, 'propertyengine.ts'), 'utf8')));
+// The one sentence saying which country's income tax rates the estimate is worked at. It is printed
+// on the document, so it is staged with the document. See test/scotland.test.mjs.
+writeFileSync(path.join(stage, 'scotland.ts'), readFileSync(path.join(lib, 'scotland.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'incomeproof.ts'), fix(readFileSync(path.join(lib, 'incomeproof.ts'), 'utf8')));
 const IP = await import(pathToFileURL(path.join(stage, 'incomeproof.ts')).href);
 const TE = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);

@@ -39,6 +39,8 @@ const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 writeFileSync(path.join(stage, 'taxengine.ts'), readFileSync(path.join(lib, 'taxengine.ts'), 'utf8'));
 // lib/money.ts is staged too: the one money formatter every conversational surface now uses.
 writeFileSync(path.join(stage, 'money.ts'), readFileSync(path.join(lib, 'money.ts'), 'utf8'));
+// lib/scotland.ts, the pack's second import. One exported sentence, nothing imported into it.
+writeFileSync(path.join(stage, 'scotland.ts'), readFileSync(path.join(lib, 'scotland.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'quarterpack.ts'), fix(readFileSync(path.join(lib, 'quarterpack.ts'), 'utf8')));
 writeFileSync(path.join(stage, 'circumstances.ts'), readFileSync(path.join(lib, 'circumstances.ts'), 'utf8'));
 writeFileSync(path.join(stage, 'housestyle.ts'), readFileSync(path.join(lib, 'housestyle.ts'), 'utf8'));

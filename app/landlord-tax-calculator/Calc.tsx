@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { aprilDelta } from '../../lib/propertyengine';
+import { SCOTLAND_LINE } from '../../lib/scotland';
 import LeadCapture from '../../components/LeadCapture';
 import { gbp0 } from '../../lib/money';
 
@@ -131,6 +132,12 @@ export default function Calc() {
               <div style={{ height: 1, background: LINE, margin: '12px 0' }} />
               <Row label={`Whole bill, ${now.yearLabel}`} value={gbp(now.totalWithClass4)} bold sub={now.class4 > 0 ? 'Including Class 4 NI on your self employed profit' : undefined} />
               <Row label={`Whole bill, ${then.yearLabel}`} value={gbp(then.totalWithClass4)} bold />
+              {/* WHICH COUNTRY'S RATES. Every figure in this box is a whole income tax bill, and a
+                  landlord in Fife reading it has no account with us and no second screen. See the
+                  note on the same sentence in /cis-calculator, and lib/scotland.ts for the words. */}
+              <p style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, margin: '14px 0 0' }}>
+                {SCOTLAND_LINE}
+              </p>
             </div>
           ) : null}
         </div>

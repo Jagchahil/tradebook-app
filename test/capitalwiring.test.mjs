@@ -720,8 +720,17 @@ ok('and every kind the product knows is covered by that answer either way',
     /writtenDown: isWrittenDown\(r\.capital_kind\)/.test(supa));
   ok('lib/quarterpack.ts obeys it and never re-decides it',
     /t\.writtenDown === true/.test(pack) && !/not_a_car/.test(pack));
-  ok('🔴 and quarterpack still holds exactly ONE relative import, which six suites depend on',
-    (pack.match(/from '\.\/[a-zA-Z0-9._-]+'/g) ?? []).length === 1);
+  // 🔴 TWO, AND THE SECOND ONE WAS PAID FOR. This pin is not a ban on imports, it is a tripwire:
+  // six suites stage lib/quarterpack.ts with a fixed dependency list, and an unnoticed new import
+  // kills all six on a module resolution error rather than on anything they are about. It went from
+  // one to two on 8 August 2026 when the pack started printing lib/scotland.ts's sentence, which
+  // says which country's income tax rates the estimate is worked at. Every one of those suites now
+  // stages scotland.ts alongside. The names are asserted, not just the count, so swapping an import
+  // for a different one still fails here.
+  const packImports = (pack.match(/from '\.\/([a-zA-Z0-9._-]+)'/g) ?? []).sort();
+  ok('🔴 and quarterpack holds exactly its two known relative imports, which six suites depend on',
+    packImports.length === 2
+    && packImports.join('|') === "from './scotland'|from './taxengine'");
 
   ok('🔴 the summary page names the money it is no longer counting',
     /sub\.trade\.capitalCost > 0/.test(codeOnly(summary))

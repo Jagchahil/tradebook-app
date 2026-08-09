@@ -3,6 +3,7 @@
 import { useId, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { soleTraderTax, FACTS } from '../../lib/taxengine';
+import { SCOTLAND_LINE } from '../../lib/scotland';
 import LeadCapture from '../../components/LeadCapture';
 import { gbp0 } from '../../lib/money';
 
@@ -103,6 +104,15 @@ export default function Calc() {
             <div style={{ height: 1, background: LINE, margin: '12px 0' }} />
             <Row label={refund ? 'Refund owed' : 'Still to pay'} value={gbp(Math.abs(r.balance))} bold accent={refund ? GREEN : RED} />
           </div>
+
+          {/* WHICH COUNTRY'S RATES. A subbie in Glasgow lands here from a search, reads a refund he
+              expects to actually receive, and leaves. There is no second screen for him and no
+              account to read it on later, which is why a free tool carries this and the app screens
+              one tap behind a figure do not. /tax-calculator has said it since launch; its three
+              sibling tools did not. Same constant on all four now. See lib/scotland.ts. */}
+          <p style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5, marginTop: 14 }}>
+            {SCOTLAND_LINE}
+          </p>
         </div>
       </div>
 

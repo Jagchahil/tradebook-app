@@ -6,6 +6,7 @@ import {
   getOptimiserInput, getConfirmedTransactionsForRange, getBusinessProfile, readVatProfile,
 } from '../../../lib/supabase';
 import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
+import { SCOTLAND_LINE } from '../../../lib/scotland';
 import { shareCaption } from '../../../lib/position';
 import { bankFeedOffered } from '../../../lib/bankfeed';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
@@ -212,6 +213,13 @@ export default async function TaxHubPage() {
           {shareCap ? <p style={S.heroBasis}>{shareCap}</p> : null}
           {/* The rental stream, for a landlord only. See rentLine above for why it exists. */}
           {rentLine ? <p style={S.heroBasis}>{rentLine}</p> : null}
+          {/* ⚠️ WHICH COUNTRY'S RATES. Same figure as the Overview, same sentence, and it is said
+              here too because this screen is a nav destination in its own right: a man can arrive
+              from the tab bar or a WhatsApp link and never load the Overview at all. Quieter than
+              the lines above it, which describe HIS money. This one describes our working, and it
+              is the only screen under Tax that carries it: the levers, the what if and the CIS
+              refund are all one tap behind this figure. lib/scotland.ts owns the words. */}
+          <p style={S.heroCaveat}>{SCOTLAND_LINE}</p>
         </section>
       ) : (
         <section className="lek-card">
@@ -412,6 +420,9 @@ const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
 
   heroBasis: { fontSize: TYPE.note, lineHeight: 1.55, color: RIVER_DEEP, margin: '8px 0 0' },
+  // The Scotland line, the same shape it has on the Overview. A note about our working, so it is a
+  // step quieter than the lines above it, which are statements about his money.
+  heroCaveat: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '8px 0 0', maxWidth: '62ch' },
 
   body: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: 0, maxWidth: '62ch' },
   empty: { fontSize: TYPE.strong, fontWeight: 700, margin: 0 },

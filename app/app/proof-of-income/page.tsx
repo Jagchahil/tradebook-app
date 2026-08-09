@@ -4,6 +4,7 @@ import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import { getConfirmedTransactionsForRange, getBusinessName, getBusinessProfile, capitalAllowanceForYear } from '../../../lib/supabase';
 import { buildIncomeProof } from '../../../lib/incomeproof';
+import { SCOTLAND_LINE } from '../../../lib/scotland';
 import { gbp2 } from '../../../lib/money';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
@@ -238,7 +239,14 @@ export default async function ProofOfIncomePage({
               or a filed tax return, and it is only as complete as the records kept. The estimated
               tax figure, where one is shown, is guidance based on the published {proof.taxYear}{' '}
               rates and does not include any other income, reliefs or allowances the person may
-              have. For an official
+              have.
+              {/* WHICH COUNTRY'S RATES, on the one page in the product a stranger reads and lends
+                  against. Income tax above the personal allowance is devolved, lib/taxengine.ts
+                  holds the England, Wales and Northern Ireland bands only, and a broker cannot tell
+                  that from a number. The sentence draws with the figure it is about: a director has
+                  no estimate on this page, so a caveat about one would be a line explaining nothing.
+                  lib/scotland.ts owns the words, and the printed document says the same. */}
+              {proof.companyExcluded ? null : <>{' '}{SCOTLAND_LINE}</>} For an official
               SA302 or tax year overview, the person can log in to their HMRC account. Some
               lenders ask for HMRC documents as well as a summary like this.
             </p>

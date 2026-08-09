@@ -620,6 +620,29 @@ export function vatPosition(input: VatPositionInput): VatPosition {
 
 // ── Registration, and what it is worth ─────────────────────────────────────────────────────────
 
+// ═════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHAT THE THRESHOLD FIGURE ACTUALLY COUNTED, IN ONE SENTENCE, FOR EVERY SURFACE THAT SAYS IT.
+//
+// Three channels warn a man about the VAT threshold, and until 9 August 2026 they did not all
+// count the same money. /app/tax/vat totted up his INVOICES; lib/agent.ts and lib/weeklyupdate.ts
+// tot up his CONFIRMED TRADE INCOME. For a tradesman who takes cash and does not invoice every
+// job through Lekhio those are different numbers, and the invoice one is SMALLER.
+//
+// Smaller is the dangerous direction. Registering late is a penalty, so a figure that undercounts
+// tells a man he is comfortably under a line he has already crossed. All three now count the same
+// thing, and this is the sentence that says so, in one place, so no surface can describe a
+// different sum from the one it printed.
+//
+// ⚠️ IT IS NOT A DISCLAIMER, IT IS THE WORKING. HMRC's taxable turnover is the total value of
+// everything you sell that is not exempt, which is more than anything we can see: cash he never
+// told us about is still his turnover. So the sentence names what we counted AND tells him to
+// check it against his own figures, because ours can only ever be a floor.
+// ═════════════════════════════════════════════════════════════════════════════════════════
+export const TURNOVER_BASIS_NOTE =
+  'This counts the trade income you have confirmed in Lekhio over the last twelve months, and not '
+  + 'your rent, which is exempt. Anything you have taken and not logged is still your turnover, so '
+  + 'check it against your own figures before you act on it.';
+
 export function mustRegister(rolling12mTaxableTurnover: number): boolean {
   return (Number(rolling12mTaxableTurnover) || 0) > VAT_REGISTRATION_THRESHOLD;
 }

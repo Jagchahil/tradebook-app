@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getConfirmedInputVat, getOutputVat, readVatProfile } from '../../../../lib/supabase';
+import { getConfirmedInputVat, getOutputVat, readVatProfile, taxableTurnoverFor } from '../../../../lib/supabase';
 import {
-  VAT_REGISTRATION_THRESHOLD, formatVrn, inputVatNote, mustRegister, reg111Window, vatPosition,
+  VAT_REGISTRATION_THRESHOLD, TURNOVER_BASIS_NOTE, formatVrn, inputVatNote, mustRegister, reg111Window, vatPosition,
 } from '../../../../lib/vat';
 import type { VatPositionInput } from '../../../../lib/vat';
 import { asPercent } from '../../../../lib/taxengine';
@@ -92,11 +92,23 @@ export default async function VatPage() {
   const out = quarter ? quarter[0] : null;
   const inp = quarter ? quarter[1] : null;
 
-  const year = profile !== null && !profile.registered
-    ? await getOutputVat(user.id, twelveMonthsBackISO(now), to)
+  // 🔴 THE THRESHOLD FIGURE IS HIS CONFIRMED TRADE INCOME, NOT HIS INVOICES. 9 August 2026.
+  //
+  // This used to be getOutputVat over twelve months, which sums the invoices raised HERE. A
+  // tradesman who takes cash and does not invoice every job through Lekhio has a bigger turnover
+  // than that, and the smaller figure is the one that tells him he is under a line he has already
+  // crossed. lib/weeklyupdate.ts and lib/agent.ts have always counted confirmed trade income, so
+  // this screen was the odd one out AND the quiet one, because nothing links to it for a man who
+  // is not registered.
+  //
+  // taxableTurnoverFor asks the very RPC the weekly asks, so the two now agree to the penny by
+  // construction. It answers THREE ways: a figure, "not twelve months of him yet", and "could not
+  // read", and all three are said out loud below rather than collapsed into a blank.
+  const turnover = profile !== null && !profile.registered
+    ? await taxableTurnoverFor(user.id)
     : null;
-  const overThreshold = year !== null && mustRegister(year.grossTurnover);
-  const yearTurnover = year !== null ? year.grossTurnover : 0;
+  const overThreshold = turnover?.kind === 'known' && mustRegister(turnover.rolling12m);
+  const yearTurnover = turnover?.kind === 'known' ? turnover.rolling12m : 0;
 
   // The whole position, asked for rather than worked out. Zeroes for a man who is not registered,
   // because vatPosition answers that case with a sentence and no table, which is the right answer
@@ -182,18 +194,33 @@ export default async function VatPage() {
 
               It matters more here than anywhere else on the page: registering late is a penalty,
               and silence reads exactly like being safely under the line. */}
-          {year === null ? (
+          {turnover?.kind === 'unreadable' ? (
             <p style={S.empty}>
-              We could not read your invoices just now, so there is no turnover figure here rather
-              than a figure with a hole in it. Give it a moment and load the page again.
+              We could not read your figures just now, so there is no turnover here rather than a
+              turnover with a hole in it. Give it a moment and load the page again.
+            </p>
+          ) : turnover?.kind === 'tooNew' ? (
+            /* The RPC's own rule, said in his words. Under three months of account history there is
+               no honest rolling twelve month figure to give him, and inventing one from six weeks
+               would be worse than saying so. */
+            <p style={S.empty}>
+              You have not been with us twelve months yet, so there is no rolling twelve month
+              turnover to show you. Keep confirming what comes in and it fills in by itself.
             </p>
           ) : overThreshold ? (
             <p style={S.warn}>
-              The invoices you have raised in the last twelve months come to {gbp0(yearTurnover)},
-              which is over the {gbp0(VAT_REGISTRATION_THRESHOLD)} line. Registering becomes
-              compulsory once your taxable turnover in any rolling twelve months goes over it. This
-              counts only what you have invoiced here, so check it against your own figures before
-              you act on it.
+              Your trade income over the last twelve months comes to {gbp0(yearTurnover)}, which is
+              over the {gbp0(VAT_REGISTRATION_THRESHOLD)} line. Registering becomes compulsory once
+              your taxable turnover in any rolling twelve months goes over it. {TURNOVER_BASIS_NOTE}
+            </p>
+          ) : turnover?.kind === 'known' ? (
+            /* 🔴 AND THE UNDER THE LINE CASE IS SAID TOO, which it never was. A blank screen for a
+               man on eighty nine thousand pounds is the same silence as a failed read, and he has
+               more reason than anyone to want the number. */
+            <p style={S.body}>
+              Your trade income over the last twelve months comes to {gbp0(yearTurnover)}, which is
+              under the {gbp0(VAT_REGISTRATION_THRESHOLD)} line, so registering is not compulsory
+              yet. {TURNOVER_BASIS_NOTE}
             </p>
           ) : null}
         </section>
@@ -339,10 +366,6 @@ function isoDay(d: Date): string {
 function quarterStartISO(now: Date): string {
   const month = now.getUTCMonth();
   return isoDay(new Date(Date.UTC(now.getUTCFullYear(), month - (month % 3), 1)));
-}
-
-function twelveMonthsBackISO(now: Date): string {
-  return isoDay(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 12, now.getUTCDate())));
 }
 
 // "1 July 2026". The quarterly summary keeps its own copy of this for the same reason: it is

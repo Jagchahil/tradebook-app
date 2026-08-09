@@ -195,27 +195,81 @@ ok('🔴 AND /app/setup STILL LISTS THE PROMISE ONLY FOR A QUESTION HE ANSWERED 
   setupSaid && setupOpened && setupDraws
   && /\{opened\.map\(\(c\) => \(/.test(setupPage));
 
-// ── /app/tax/vat's unregistered arm: a failed read says so, like every other arm on the page. ─
-// ⚠️ THE MARKERS ARE PROVED PRESENT BEFORE ANYTHING IS ASSERTED ABOUT THEM, and the registered
-// arm is asserted alongside, because "the page says why" passing on a page that says why in only
-// one of its branches is exactly the defect this closes.
+// ── /app/tax/vat's threshold arm: the same money the other two channels count. ────────────────
+// ⚠️ THE MARKERS ARE PROVED PRESENT BEFORE ANY ORDER OR ABSENCE IS ASSERTED. indexOf returns -1
+// for a marker that is not there, and -1 is less than everything, so `a < b` on a missing `a`
+// passes for free.
 const taxVat = readFileSync(path.join(root, 'app/app/tax/vat/page.tsx'), 'utf8');
-ok('the VAT screen still has the unregistered arm and the registered failed read arm',
-  /!profile\.registered \? \(/.test(taxVat)
-  && /We could not read \{out === null \? 'your invoices' : 'what you have confirmed'\} just now\./.test(taxVat));
-ok('🔴 A FAILED TURNOVER READ IS SAID OUT LOUD, not left as an empty screen a man reads as safe',
-  /\{year === null \? \(/.test(taxVat)
-  && /We could not read your invoices just now, so there is no turnover figure here/.test(taxVat));
-// ⚠️ BOTH MARKERS PROVED PRESENT BEFORE THE ORDER IS ASSERTED. indexOf returns -1 for a marker
-// that is not there, and -1 is less than everything, so `a < b` on a missing `a` passes for free.
-const iNull = taxVat.indexOf('{year === null ? (');
+const vatLib = readFileSync(path.join(root, 'lib/vat.ts'), 'utf8');
+const supaSrc = readFileSync(path.join(root, 'lib/supabase.ts'), 'utf8');
+
+ok('the VAT screen still has its unregistered arm',
+  /!profile\.registered \? \(/.test(taxVat));
+
+// 🔴 THE BASIS. This is the whole fix: the screen used to sum his INVOICES while the weekly and the
+// agent summed his CONFIRMED TRADE INCOME, and the invoice figure is the SMALLER one, which is the
+// direction that tells a man he is under a line he has already crossed.
+ok('🔴 THE THRESHOLD FIGURE COMES FROM taxableTurnoverFor, THE ONE READER',
+  /await taxableTurnoverFor\(user\.id\)/.test(taxVat)
+  && /mustRegister\(turnover\.rolling12m\)/.test(taxVat));
+ok('🔴 AND IT IS NO LONGER SUMMED OFF HIS INVOICES OVER TWELVE MONTHS',
+  !/getOutputVat\(user\.id, twelveMonthsBackISO/.test(taxVat)
+  && !/twelveMonthsBackISO/.test(taxVat));
+ok('the quarter figures still come from getOutputVat, which is the right source for a VAT return',
+  /getOutputVat\(user\.id, from, to\)/.test(taxVat));
+
+// 🔴 THE READER AGREES WITH THE WEEKLY BY CONSTRUCTION, not by intention: it asks the same RPC.
+ok('🔴 taxableTurnoverFor ASKS THE RPC THE WEEKLY ASKS',
+  /export async function taxableTurnoverFor\(userId: string\): Promise<TaxableTurnover>/.test(supaSrc)
+  && /await weeklyUpdateFactsFor\(\[userId\]\)/.test(supaSrc));
+ok('🔴 AND IT ANSWERS THREE WAYS, so "not twelve months of him yet" is never drawn as "could not read"',
+  /kind: 'known'; rolling12m: number/.test(supaSrc)
+  && /\{ kind: 'tooNew' \}/.test(supaSrc)
+  && /\{ kind: 'unreadable' \}/.test(supaSrc));
+ok('a missing row is unreadable rather than a zero, because the RPC answers for every id it is given',
+  /if \(!row\) return \{ kind: 'unreadable' \};/.test(supaSrc));
+// 🔴 THE MAPPING ITSELF, NOT JUST THE THREE NAMES. A first version of this file asserted only that
+// the type declared three kinds, and collapsing tooNew into unreadable stayed GREEN: the shape was
+// intact and the meaning was gone. That is the shape of every bug this codebase has spent the day
+// on, produced by a test written to catch it.
+ok('🔴 A NULL FROM THE RPC IS "not twelve months of him yet", NEVER "could not read"',
+  /if \(row\.rolling12mTaxableTurnover === null\) return \{ kind: 'tooNew' \};/.test(supaSrc));
+ok('🔴 AND A FIGURE IS RETURNED AS A FIGURE, so a real turnover cannot be reported as a non answer',
+  /return \{ kind: 'known', rolling12m: row\.rolling12mTaxableTurnover \};/.test(supaSrc));
+ok('a failed read of the RPC is unreadable, and the catch cannot turn it into a number',
+  /const facts = await weeklyUpdateFactsFor\(\[userId\]\)\.catch\(\(\) => null\);/.test(supaSrc)
+  && /if \(facts === null\) return \{ kind: 'unreadable' \};/.test(supaSrc));
+
+// ── All four arms, and the order they are checked in. ────────────────────────────────────────
+const iBad = taxVat.indexOf("{turnover?.kind === 'unreadable' ? (");
+const iNew = taxVat.indexOf(") : turnover?.kind === 'tooNew' ? (");
 const iOver = taxVat.indexOf(') : overThreshold ? (');
-ok('both arms of the unregistered ternary exist, so the order below can actually fail',
-  iNull >= 0 && iOver >= 0);
-ok('🔴 AND THE FAILED READ IS CHECKED FIRST, because a null is falsy and falsy reads as "under"',
-  iNull >= 0 && iOver >= 0 && iNull < iOver);
-ok('the warning still discloses what it counted, which is the only one of the three channels that does',
-  /This\s+counts only what you have invoiced here/.test(taxVat));
+const iUnder = taxVat.indexOf(") : turnover?.kind === 'known' ? (");
+ok('all four arms exist, so the ordering below can actually fail',
+  iBad >= 0 && iNew >= 0 && iOver >= 0 && iUnder >= 0);
+ok('🔴 THE TWO NON ANSWERS ARE CHECKED FIRST, because both are falsy and falsy reads as "under"',
+  iBad >= 0 && iNew >= 0 && iOver >= 0 && iBad < iOver && iNew < iOver);
+ok('🔴 AND THE UNDER THE LINE CASE IS SAID TOO, which it never used to be',
+  iUnder > iOver && /under the \{gbp0\(VAT_REGISTRATION_THRESHOLD\)\} line/.test(taxVat));
+ok('the failed read and the young account say different things, because they are different things',
+  /We could not read your figures just now/.test(taxVat)
+  && /not been with us twelve months yet/.test(taxVat));
+
+// ── One sentence about what was counted, in one place, on both figure arms. ──────────────────
+ok('🔴 THE BASIS SENTENCE IS SHARED, not written out on the surface that prints it',
+  /export const TURNOVER_BASIS_NOTE =/.test(vatLib)
+  && (taxVat.match(/\{TURNOVER_BASIS_NOTE\}/g) || []).length === 2);
+// ⚠️ THE JOINS ARE CLOSED UP FIRST. The constant is written across four source lines as
+// `'...and not ' + 'your rent...'`, so a regex for "not your rent" tests the SOURCE and fails on a
+// string that reads perfectly. What a man sees is the concatenation, so that is what is asserted.
+const note = vatLib.slice(vatLib.indexOf('export const TURNOVER_BASIS_NOTE'))
+  .slice(0, 600).replace(/'\s*\+\s*'/g, '');
+ok('🔴 AND IT NAMES WHAT WE COUNTED AND WHAT WE CANNOT SEE',
+  /trade income you have confirmed in Lekhio over the last twelve months/.test(note)
+  && /and not your rent, which is exempt/.test(note)
+  && /taken and not logged is still your turnover/.test(note));
+ok('it does not claim to be his HMRC figure, because ours can only ever be a floor',
+  /check it against your own figures/.test(vatLib));
 
 // ── House rules. ─────────────────────────────────────────────────────────────────────────────
 ok('no en dash or em dash in the replacement or in the new page logic',

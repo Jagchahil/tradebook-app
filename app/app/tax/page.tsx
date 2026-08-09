@@ -176,6 +176,25 @@ export default async function TaxHubPage() {
   // tell him we could not read his profile.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   const vatRegistered = vat !== null && vat.registered;
+  // 🔴 AND THE DOOR FOR THE MAN WHO IS NOT REGISTERED, which did not exist. 9 August 2026.
+  //
+  // /app/tax/vat has always had an arm for him, and its own comment admitted nobody could get to
+  // it: "He has no row on the Tax hub, so he typed the address to be here." So the one screen that
+  // tells a sole trader where he stands against the ninety thousand pound line was unreachable, and
+  // crossing that line late is a penalty.
+  //
+  // ⚠️ IT WAITED FOR THE FIGURE TO BE RIGHT. Until today that screen summed his INVOICES, which
+  // undercounts anyone taking money he does not invoice here, and linking an undercounting figure
+  // from the hub would have been worse than leaving it unreachable. It counts his confirmed trade
+  // income now, the same money the weekly and the agent count, so the door can open.
+  //
+  // ⚠️ NOT ON A FAILED READ. `vat === null` means we could not read his profile, and drawing "check
+  // where you stand on VAT" at a man who registered years ago is the same defect as the reclaim
+  // promise this morning: a mechanism put in front of someone it does not apply to.
+  //
+  // ⚠️ AND NOT TO A DIRECTOR. His company registers, not him, and every sentence behind that door
+  // says "your trade income". A director keeps exactly the hub he had.
+  const vatThresholdDoor = vat !== null && !vat.registered && !isCompany;
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -313,6 +332,16 @@ export default async function TaxHubPage() {
               <span style={S.doorLabel}>VAT this quarter</span>
               <span style={S.rowBody}>
                 What you have charged, what you can reclaim, and where that leaves you.
+              </span>
+            </a>
+          ) : vatThresholdDoor ? (
+            /* See vatThresholdDoor above. Different words because it is a different question: he
+               has no VAT to report, he has a line to watch. */
+            <a href="/app/tax/vat" style={S.door} className="lek-hit">
+              <span style={S.doorLabel}>VAT threshold</span>
+              <span style={S.rowBody}>
+                Where your last twelve months put you against the line, and what happens if you
+                cross it.
               </span>
             </a>
           ) : null}

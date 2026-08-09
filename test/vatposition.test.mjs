@@ -118,23 +118,41 @@ ok('it never claims HMRC approval, endorsement or recognition',
   !/HMRC[\s-]*(approved|accredited|certified|endorsed|recognised)/i.test(copy));
 
 // ---------------------------------------------------------------------------------------------
-console.log('\n3. A MAN WHO IS NOT VAT REGISTERED GETS NO VAT ROW ON THE TAX HUB');
+console.log('\n3. THE HUB GIVES HIM THE DOOR THAT IS HIS, AND A FAILED READ GIVES HIM NEITHER');
 // ---------------------------------------------------------------------------------------------
 const hubCode = codeOnly(hub);
 ok('the hub reads the VAT profile from lib/supabase.ts, the one source',
   hubCode.includes('readVatProfile(user.id)'));
 ok('🔴 THE ROW IS GATED ON REGISTRATION, AND A FAILED READ IS NOT REGISTRATION',
   /const vatRegistered = vat !== null && vat\.registered;/.test(hubCode));
-ok('the hub links to the VAT screen exactly once',
-  (hubCode.match(/href="\/app\/tax\/vat"/g) || []).length === 1);
+// ⚠️ TWO DOORS SINCE 9 AUGUST 2026, AND THE GUARANTEE IS UNCHANGED. Until today /app/tax/vat had
+// an arm written for the unregistered man that nothing linked to, and its own comment said so:
+// "He has no row on the Tax hub, so he typed the address to be here." The door waited for the
+// figure behind it to stop being summed off his invoices, which undercounts. It is his confirmed
+// trade income now, so the door opens, WITH DIFFERENT WORDS, because it is a different question.
+// What has not changed: an unregistered man never sees "VAT this quarter", and a failed profile
+// read gets him NEITHER door.
+ok('the hub links to the VAT screen twice, once for each kind of man',
+  (hubCode.match(/href="\/app\/tax\/vat"/g) || []).length === 2);
 {
-  // The link must sit INSIDE the gate, not merely somewhere in a file that also has a gate.
+  // Each link must sit INSIDE its own gate, not merely somewhere in a file that also has gates.
   const gate = hubCode.indexOf('{vatRegistered ? (');
-  const shut = hubCode.indexOf(') : null}', gate);
+  const second = hubCode.indexOf(') : vatThresholdDoor ? (');
+  const shut = hubCode.indexOf(') : null}', second);
   const href = hubCode.indexOf('href="/app/tax/vat"');
-  ok('🔴 AND IT IS DRAWN INSIDE THAT GATE, so an unregistered customer never sees the row',
-    gate > 0 && href > gate && shut > href);
+  ok('all four markers exist, so the ordering assertions below can actually fail',
+    gate > 0 && second > 0 && shut > 0 && href > 0);
+  ok('🔴 THE QUARTER DOOR IS DRAWN INSIDE THE REGISTERED GATE, so an unregistered man never sees it',
+    gate > 0 && href > gate && second > href);
+  ok('🔴 AND THE THRESHOLD DOOR IS DRAWN INSIDE ITS OWN, after it',
+    second > 0 && shut > second && hubCode.indexOf('VAT threshold') > second);
+  ok('the two doors say different things, because they answer different questions',
+    /VAT this quarter/.test(hubCode) && /VAT threshold/.test(hubCode));
 }
+ok('🔴 A FAILED PROFILE READ GETS NEITHER DOOR, which is the same rule the row above already keeps',
+  /const vatThresholdDoor = vat !== null && !vat\.registered && !isCompany;/.test(hubCode));
+ok('🔴 AND NEITHER DOES A DIRECTOR: his company registers, not him, and the copy behind it says "your"',
+  /&& !isCompany;/.test(hubCode));
 ok('the door is a plain anchor, no script, like every other door on the hub',
   /<a href="\/app\/tax\/vat" style=\{S\.door\} className="lek-hit">/.test(hubCode));
 // And the screen itself, if he reaches it by typing the address, answers with the engine's own

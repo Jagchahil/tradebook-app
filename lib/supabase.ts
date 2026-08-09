@@ -4297,6 +4297,38 @@ export async function weeklyUpdateFactsFor(userIds: string[]): Promise<Map<strin
   }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 ONE MAN'S ROLLING TWELVE MONTH TAXABLE TURNOVER, FROM THE SAME PLACE THE WEEKLY GETS IT.
+//
+// /app/tax/vat used to answer the threshold question from getOutputVat, which sums his INVOICES.
+// lib/weeklyupdate.ts and lib/agent.ts answer it from his CONFIRMED TRADE INCOME. Those are
+// different numbers for anyone who takes money without invoicing it here, and the invoice one is
+// the smaller, which is the direction that tells a man he is under a line he has crossed.
+//
+// So the screen now asks the RPC the weekly asks, with one user id instead of a page of them, and
+// the two agree to the penny by construction rather than by intention.
+//
+// ⚠️ THREE ANSWERS, NOT A NUMBER AND A NULL. The RPC itself returns null for an account younger
+// than three months, which means "we do not have twelve months of you yet" and is a completely
+// different thing from "we could not read it". Collapsing them would put one of this codebase's
+// oldest bugs back: a failed read drawn as a fact.
+// ═════════════════════════════════════════════════════════════════════════════════════════
+export type TaxableTurnover =
+  | { kind: 'known'; rolling12m: number }
+  | { kind: 'tooNew' }
+  | { kind: 'unreadable' };
+
+export async function taxableTurnoverFor(userId: string): Promise<TaxableTurnover> {
+  const facts = await weeklyUpdateFactsFor([userId]).catch(() => null);
+  if (facts === null) return { kind: 'unreadable' };
+  const row = facts.get(userId);
+  // No row at all is not "he has none": the RPC returns one row per id it was given, so a missing
+  // row means it did not answer for him, which we do not know how to interpret.
+  if (!row) return { kind: 'unreadable' };
+  if (row.rolling12mTaxableTurnover === null) return { kind: 'tooNew' };
+  return { kind: 'known', rolling12m: row.rolling12mTaxableTurnover };
+}
+
 // HIS WEEK, AS ROWS. One query, read two ways.
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════

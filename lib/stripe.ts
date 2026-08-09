@@ -61,6 +61,60 @@ export interface CheckoutInput {
 
 // Create a hosted Stripe Checkout session for one invoice. Returns the URL to
 // send the customer to, or null if Stripe is not configured or the call fails.
+// ═════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A 200 IS NOT A PROMISE OF JSON, AND ON THIS FILE THE CONSEQUENCE IS A PAYMENT PAGE.
+//
+// Found 9 August 2026 by sweeping for the defect lib/claude.ts shipped a fix for the same day.
+// Four call sites here read
+//
+//     if (!res.ok) { ...return null; }
+//     const data = (await res.json()) as { url?: string };
+//
+// That guard is right and it is not the guard that was missing. It catches a 402, a 429 and a 500.
+// It does nothing whatever about a TWO HUNDRED CARRYING HTML, which is exactly what an edge, a
+// proxy or a captive network hands back when it decides to answer on the origin's behalf.
+// res.json() then THROWS.
+//
+// ⚠️ AND HERE THE THROW JUMPS STRAIGHT OVER AN APOLOGY SOMEBODY WROTE ON PURPOSE. Every one of
+// these functions returns null on failure, and every route that calls them has a graceful branch
+// waiting for that null:
+//
+//   /api/pay/[id]           redirect(url ?? invoiceUrl) sends a tradesman's OWN CUSTOMER back to
+//                           the invoice rather than nowhere.
+//   /api/billing/checkout   redirects to a step that says the card could not be started AND that
+//                           his trial is running either way.
+//   /api/billing/portal     hands a paying customer back to his billing page.
+//
+// None of those routes wraps the call in a try, so a throw leaves the handler and Next answers a
+// raw 500. The man clicking Pay, or Subscribe, or Manage billing, gets an error page instead of
+// the sentence that was written for him. On the payment path that is a lost invoice and a lost
+// sale, and neither leaves a trace anyone would recognise.
+//
+// ⚠️ NEVER THE BODY IN THE LOG. Stripe's error bodies quote the request they wrapped, and on
+// this file that carries a customer's email address. The length and one word, exactly as
+// lib/claude.ts logs it.
+//
+// ⚠️ AND IT RETURNS NULL RATHER THAN THROWING, because null is the answer every caller here
+// already knows how to say something honest about.
+// ═════════════════════════════════════════════════════════════════════════════════════════
+async function readStripeJson<T>(res: Response, where: string): Promise<T | null> {
+  let raw: string;
+  try {
+    raw = await res.text();
+  } catch (err) {
+    console.error(`[stripe] ${where}: the body could not be read:`, err instanceof Error ? err.message : 'unknown');
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    console.error(
+      `[stripe] ${where}: a 200 whose body is not JSON (${/^\s*</.test(raw) ? 'html' : 'other'}, ${raw.length} bytes)`,
+    );
+    return null;
+  }
+}
+
 export async function createInvoiceCheckout(input: CheckoutInput): Promise<string | null> {
   // 🔴 NO PAYOUT ROUTE, NO SESSION, BEFORE ANYTHING ELSE IS EVEN READ. Without a route to the
   // invoice's owner this session would collect his customer's money into OUR balance, which is
@@ -98,8 +152,8 @@ export async function createInvoiceCheckout(input: CheckoutInput): Promise<strin
     console.error('[stripe] Checkout create failed:', res.status, text);
     return null;
   }
-  const data = (await res.json()) as { url?: string };
-  return data.url ?? null;
+  const data = await readStripeJson<{ url?: string }>(res, 'invoice checkout');
+  return data?.url ?? null;
 }
 
 // --- Subscription billing (the Lekhio subscription itself) -----------------
@@ -399,8 +453,8 @@ export async function createSubscriptionCheckout(input: SubscriptionCheckoutInpu
     console.error('[stripe] Subscription checkout create failed:', res.status, text);
     return null;
   }
-  const data = (await res.json()) as { url?: string };
-  return data.url ?? null;
+  const data = await readStripeJson<{ url?: string }>(res, 'subscription checkout');
+  return data?.url ?? null;
 }
 
 // Fetch a subscription so the webhook can read its current price and period end.
@@ -410,7 +464,7 @@ export async function getStripeSubscription(id: string): Promise<Record<string, 
     headers: { Authorization: `Bearer ${KEY}` },
   });
   if (!res.ok) return null;
-  return (await res.json()) as Record<string, unknown>;
+  return readStripeJson<Record<string, unknown>>(res, 'subscription read');
 }
 
 // Open the Stripe customer billing portal so a user can update their card, switch
@@ -433,8 +487,8 @@ export async function createBillingPortal(customerId: string, returnUrl: string)
     console.error('[stripe] Billing portal create failed:', res.status, text);
     return null;
   }
-  const data = (await res.json()) as { url?: string };
-  return data.url ?? null;
+  const data = await readStripeJson<{ url?: string }>(res, 'billing portal');
+  return data?.url ?? null;
 }
 
 export function webhookConfigured(): boolean {

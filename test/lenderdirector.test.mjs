@@ -57,6 +57,9 @@ for (const f of [
   'taxengine', 'money', 'capital', 'nistudentloan', 'ltdengine', 'personalincome',
   'propertyengine', 'autonomy', 'taxoptimiser', 'quarterpack', 'incomeproof', 'bookshare',
   'tokens', 'apptheme',
+  // Which tax year the document is about. Staged as the REAL file and never stubbed, because it
+  // is the thing that decides whether this handler prints 2026/27 or prints tax year zero.
+  'proofyear',
 ]) {
   writeFileSync(path.join(stage, f + '.ts'), fixTs(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
@@ -119,6 +122,7 @@ const routeSrc = canRender ? readFileSync(path.join(root, 'app/api/income-proof/
   .replace("'../../../lib/supabase'", "'./supabasestub.ts'")
   .replace("'../../../lib/webauth'", "'./webauthstub.ts'")
   .replace("'../../../lib/incomeproof'", "'./incomeproof.ts'")
+  .replace("'../../../lib/proofyear'", "'./proofyear.ts'")
   .replace("'../../../lib/packtoken'", "'./packtokenstub.ts'") : '';
 
 const tsx = (src, name) => ts.transpileModule(src, {

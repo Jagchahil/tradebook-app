@@ -106,7 +106,9 @@ const PROFILE = {
     + 'just say what came in, and it keeps your books, works out your tax and finds the money you '
     + 'are owed. You approve everything. Nothing reaches HMRC without your yes.',
   websites: ['https://lekhio.app'],
-  vertical: 'PROFESSIONAL_SERVICES',
+  // ⚠️ Meta's enum, not English. The API accepts PROF_SERVICES, refuses PROFESSIONAL_SERVICES,
+  // and the full allowed list is in the 400 it returns. Proved on the live write, 10 August 2026.
+  vertical: 'PROF_SERVICES',
   address: '',
 };
 

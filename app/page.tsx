@@ -44,6 +44,18 @@ function captureLine(): string {
 // The one ask, worded once, and the identical micro line that sits under every instance of it.
 const CTA_MICRO = '7 days free, no card. Cancel in one tap.';
 
+// 🔴 THE SAME SENTENCE, SPLIT INTO THE THINGS IT ACTUALLY PROMISES. Hero only.
+//
+// The line was already there and already correct. It rendered as one grey sentence under the
+// button and it landed ELEVEN PIXELS BELOW THE FOLD on a 775px viewport, so the three objections
+// it answers were answered where nobody was looking. Broken into ticks it is read at a glance
+// rather than parsed, and the padding above it was cut so it clears the fold.
+//
+// ⚠️ DERIVED, NOT RETYPED. A second hand written array is a second thing to keep in step, and the
+// two would drift the first time the trial length or the cancel wording changed. This splits the
+// one string, so there is still exactly one place the promise is written.
+const CTA_POINTS = CTA_MICRO.replace(/\.\s*$/, '').split(/[.,]\s+/);
+
 export const metadata: Metadata = {
   alternates: { canonical: '/' },
   title: 'Lekhio. Your first employee. The one that saves you money.',
@@ -83,9 +95,13 @@ const HOME_CSS = css`
 .home .btn.white{background:#fff;color:var(--on-white-river)}
 .home .micro-note{font-size:13.5px;color:var(--tx-mut);margin-top:12px}
 
-.home .hero{padding:56px 0 26px}
+/* ⚠️ 46px OF PADDING CAME OUT OF THIS COLUMN AND NOTHING WAS RESIZED. The micro line sat 11px
+   under the fold at 775px, which is the commonest laptop viewport we see. 56→40 here, 22→8 on the
+   h1, 30→22 on the comparison line and 24→16 on the ticks. No type got smaller and no copy was
+   cut: the promise simply arrived on the first screen instead of the second. */
+.home .hero{padding:40px 0 26px}
 .hero .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
-.hero h1{font-size:clamp(40px,6.4vw,72px);letter-spacing:-.045em;line-height:1.05;font-weight:800;margin:22px 0 0}
+.hero h1{font-size:clamp(40px,6.4vw,72px);letter-spacing:-.045em;line-height:1.05;font-weight:800;margin:8px 0 0}
 /* The gradient text and the animated squiggle are gone. Plain strong text, same palette. */
 .hero h1 .hl{color:var(--river)}
 /* ⚠️ THE ONE HERO ON THE SITE THAT IS NOT CENTRED, so it opts out of the shared default
@@ -96,9 +112,13 @@ const HOME_CSS = css`
 /* The comparison line. Quieter than the sub and set on the ink colour rather than the muted
    one, because it is the argument rather than the description. Doc 103: it earns its place by
    changing what he compares us to, which nothing else above the fold did. */
-.hero p.vs{font-size:16px;line-height:1.55;color:var(--tx);font-weight:600;max-width:520px;margin:0 0 30px;margin-inline:0}
+.hero p.vs{font-size:16px;line-height:1.55;color:var(--tx);font-weight:600;max-width:520px;margin:0 0 22px;margin-inline:0}
 .cta-row{display:flex;gap:14px;flex-wrap:wrap}
-.hero .micro{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:13.5px;color:var(--tx-mut)}
+/* The three promises as ticks rather than a sentence. list-style is removed on purpose: the tick
+   is the marker, and a browser bullet beside it would read as two. */
+.hero .micro{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px;margin:16px 0 0;padding:0;list-style:none;font-size:13.5px;color:var(--tx-mut)}
+.hero .micro li{display:flex;align-items:center;gap:6px}
+.hero .micro .tick{color:var(--river);font-weight:800;font-size:12px;line-height:1}
 @media(max-width:900px){.hero .grid{grid-template-columns:1fr;gap:34px;text-align:center}.cta-row,.hero .micro{justify-content:center}.hero p.sub,.hero p.vs{margin-inline:auto}}
 
 /* The argument. One heading, one lead line, the deal as three rows he can look at rather than
@@ -247,13 +267,18 @@ export default async function HomePage() {
                 it names nobody, on Jag's call, 3 August 2026: the price does the work on its own,
                 because everybody already knows what the alternative costs. */}
             <p className="vs">Your first hire costs £12.99 a month, and it never clocks off.</p>
+            {/* 🔴 ONE ASK. "See how it works" stood beside Start free as an equal sized button and
+                its whole job was to send a man who had decided somewhere else. The route is not
+                lost: Product is in the nav on every page and in the footer. A second button next
+                to the primary one is not a helpful option, it is a door out of the ask. */}
             <div className="cta-row">
               <Link href="/start" className="btn primary">Start free</Link>
-              <Link href="/product" className="btn ghost">See how it works</Link>
             </div>
-            <div className="micro">
-              <span>{CTA_MICRO}</span>
-            </div>
+            <ul className="micro" aria-label="What the trial costs you">
+              {CTA_POINTS.map((point) => (
+                <li key={point}><span aria-hidden="true" className="tick">✓</span>{point}</li>
+              ))}
+            </ul>
           </div>
           <div><HeroReport /></div>
         </div>

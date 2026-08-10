@@ -182,10 +182,12 @@ export const MARKETING_CSS = css`
 .truststrip .row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px 28px;padding:16px 24px;font-size:13px;font-weight:600;color:var(--tx-mut)}
 .truststrip .row span{display:inline-flex;align-items:center;gap:8px}
 .truststrip b{color:var(--tx);font-weight:800}
-.mkt .hero{padding:56px 0 26px}
+/* 40, not 56. Sixteen pixels came off every marketing hero on the site so the homepage's trial
+   promise clears the fold on a 775px laptop. It is padding, not type, so nothing got smaller. */
+.mkt .hero{padding:40px 0 26px}
 .mkt .hero.center,.mkt section.center{text-align:center}
 .hero .grid{display:grid;grid-template-columns:1.05fr .95fr;gap:54px;align-items:center}
-.hero h1{font-size:clamp(40px,6.4vw,72px);letter-spacing:-.045em;line-height:1.05;font-weight:800;margin:22px 0 0}
+.hero h1{font-size:clamp(40px,6.4vw,72px);letter-spacing:-.045em;line-height:1.05;font-weight:800;margin:8px 0 0}
 /* .gt and .squig are gone. Gradient text with an animated underline is the costume every AI
    landing page wears, and doc 104 says we are an employee, not a launch. A heading carries
    itself in the ink it was set in. Pages that still write the class get plain text, on purpose. */
@@ -200,7 +202,13 @@ export const MARKETING_CSS = css`
    explicit margin-inline:0 and says why, so it opts out on purpose rather than by cascade. */
 .hero p.sub{font-size:20px;color:var(--tx-mut);max-width:520px;margin:22px auto 30px}
 .cta-row{display:flex;gap:14px;flex-wrap:wrap}
-.hero .micro{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:13.5px;color:var(--tx-mut)}
+/* ⚠️ THE HOMEPAGE'S TICK LIST INHERITS THIS, so it carries the list reset even though only the
+   homepage renders a <ul> here today. sharedcss.test.mjs compares this rule against page.tsx's
+   copy character for character, and it went red the moment they drifted, which is the only reason
+   this one was not left behind. */
+.hero .micro{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px;margin:16px 0 0;padding:0;list-style:none;font-size:13.5px;color:var(--tx-mut)}
+.hero .micro li{display:flex;align-items:center;gap:6px}
+.hero .micro .tick{color:var(--river);font-weight:800;font-size:12px;line-height:1}
 .avs{display:flex}.avs span{width:30px;height:30px;border-radius:999px;border:2px solid var(--bg);margin-left:-8px}.avs span:first-child{margin-left:0}
 @media(max-width:900px){.hero .grid{grid-template-columns:1fr;gap:34px;text-align:center}.cta-row,.hero .micro{justify-content:center}.hero p.sub{margin-inline:auto}}
 .ba{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
@@ -1262,11 +1270,21 @@ export function TrustBar() {
 
 const NAV_LINKS: [string, string][] = [
   ['/product', 'Product'],
-  ['/how-mtd-works', 'How MTD works'],
   ['/resources', 'Free tools'],
-  ['/compare', 'Compare'],
   ['/pricing', 'Pricing'],
 ];
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   🔴 THE TOP BAR HAD SEVEN THINGS TO PRESS AND ONE OF THEM WAS THE ASK.
+   Product, How MTD works, Free tools, Compare, Pricing, Sign in, Start free. Every one of them
+   was a reason to go somewhere other than /start, and the ask was competing with six of them.
+
+   ⚠️ HOW MTD WORKS AND COMPARE WERE MOVED, NOT DELETED, and that distinction is the whole reason
+   this was safe to do. Both still ship a sitewide internal link from the footer's Product column,
+   both are still linked from /product, and both keep their own canonical URL, so nothing is
+   orphaned and no crawl path is lost. What changed is what a stranger is offered in the first
+   two seconds. If either page's traffic drops, put it back: it is one line.
+   ═══════════════════════════════════════════════════════════════════════════════════════════ */
 
 export function SiteNav() {
   return (

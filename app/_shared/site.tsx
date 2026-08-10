@@ -995,7 +995,34 @@ a{text-decoration:none}
 /* brand mark: gradient L chip + wordmark. The L is the primary logo (Jag's
    call, 17 Jul): the same gradient mark the app uses, one logo everywhere. */
 .brandrow{display:inline-flex;align-items:center;gap:10px}
-.logo-chip{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--river),var(--saffron));display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:19px;box-shadow:0 6px 16px rgba(27,89,166,.35)}
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   🔴 THE MARK IS A FILE NOW, NOT A CSS RECIPE. 10 AUGUST 2026.
+
+   This was width:34;height:34;border-radius:10;background:linear-gradient(135deg,--river,--saffron)
+   with a letter L inside it, and the comment above it said "one logo everywhere". It was not.
+   A CSS recipe cannot be uploaded to Instagram, so every other surface got a PNG somebody made
+   separately, and by this morning there were THREE marks in this repo, all different:
+
+     app/icon.png + apple-icon.png   dark navy, square corners, a river under the L
+     public/lekhio-icon-1024.png     brighter blue, rounder, no river
+     this chip                       a third gradient again
+
+   None of them matched. The Instagram avatar was set from the middle one and was simply wrong.
+
+   ⚠️ AND THE TWO STOP GRADIENT WAS A DEFECT, NOT A STYLE. Blue to amber corner to corner averages
+   to olive across the middle. You get away with it at 34px because that band is three pixels wide.
+   On an avatar it is a third of the picture. public/lekhio-logo.svg, the wordmark, had ALREADY
+   solved this with a three stop gradient through #2E7BBF. The chip never got the fix.
+
+   So the mark is public/lekhio-mark.svg: a superellipse, the wordmark's three stop gradient, and
+   the L AS A VECTOR PATH rather than live text, so it cannot reflow if Inter fails to load. Every
+   PNG in the repo is rendered from that one file, and so is every social avatar. The site loads
+   the same file it ships, which is the only arrangement where "one logo everywhere" is a fact
+   rather than a comment.
+
+   ⚠️ drop-shadow, NOT box-shadow: box-shadow would draw the old rectangle's shadow around a shape
+   that is no longer a rectangle. */
+.logo-chip{width:34px;height:34px;display:block;filter:drop-shadow(0 6px 16px rgba(27,89,166,.35))}
 .logo-word{font-size:23px;font-weight:900;letter-spacing:-1px;color:var(--tx)}
 @keyframes riseIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 @keyframes flow{to{stroke-dashoffset:0}}
@@ -1245,7 +1272,11 @@ export function SiteNav() {
   return (
     <nav style={{ position: 'relative', maxWidth: 1320, margin: '0 auto', padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <Link href="/" aria-label="Lekhio home" className="brandrow">
-        <span className="logo-chip">L</span>
+        {/* The same file the PNGs, the favicon and every social avatar are rendered from.
+            alt is empty on purpose: the Link already carries aria-label="Lekhio home", so a
+            second label here would read the brand twice to a screen reader. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/lekhio-mark.svg" alt="" width={34} height={34} className="logo-chip" />
         <span className="logo-word">Lekhio</span>
       </Link>
 

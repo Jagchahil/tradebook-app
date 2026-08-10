@@ -144,11 +144,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const phone = cleanPhone(b.phone);
-    const email = cleanEmail(b.email); // required: one account tied to a name, a mobile AND an email
-    if (!phone) {
-      return NextResponse.json({ error: 'A valid mobile number is required.' }, { status: 400 });
-    }
+    // 🔴 THE MOBILE IS OPTIONAL. The account is created from the proved EMAIL alone, and a number
+    // typed here lands on signups.phone, which nothing that signs a man in or runs his books reads
+    // (WhatsApp binds a fresh number from the handset). This door used to reject a signup with no
+    // phone while /start told the customer the number was "only used to link WhatsApp when you are
+    // ready", which cannot both be true. cleanPhone returns null for a missing or malformed number;
+    // an empty string is stored, which normalizeUkPhone leaves empty and every reader treats as
+    // absent (guarded by `if (phone)`), so no schema change is needed. The EMAIL stays required: it
+    // is the account.
+    const phone = cleanPhone(b.phone) ?? '';
+    const email = cleanEmail(b.email);
     if (!email) {
       return NextResponse.json({ error: 'A valid email is required.' }, { status: 400 });
     }

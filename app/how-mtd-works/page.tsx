@@ -153,7 +153,7 @@ const MTD_CSS = css`
 @media(max-width:820px){.flow{grid-template-columns:1fr;gap:12px}.farrow{transform:rotate(90deg);margin:0 auto}}
 .fbox{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;text-align:center}
 .fbox .fe{font-size:30px;margin-bottom:8px}.fbox b{font-size:15px;display:block;margin-bottom:4px}.fbox small{font-size:13px;color:var(--tx-mut)}
-.farrow{font-size:24px;color:var(--saffron);font-weight:900;text-align:center}
+.farrow{font-size:24px;color:var(--tx-mut);font-weight:900;text-align:center}/* 🔴 NOT var(--saffron). It read 2.12:1 on --bg in light, measured on the live page on 10 August 2026, where this product holds every pair to 4.5:1. var(--saffron-deep) is NOT the fix either: it reads 2.95:1 on --bg, and the 3.08:1 in the record was measured against pure white rather than the page. A connector arrow is chrome, so it takes the muted ink, which clears in both. See test/contrastapplication.test.mjs section 'ink on the page background'. */
 .cred{background:linear-gradient(135deg,var(--river-panel-deep),var(--river-panel));border-radius:24px;padding:44px 32px;color:#fff;text-align:center}
 .cred h2{color:#fff;font-size:clamp(24px,3.6vw,36px)}
 .credrow{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:24px}
@@ -323,9 +323,9 @@ export default function HowMtdWorksPage() {
           <div className="center reveal" style={{ marginBottom: 40 }}><div className="eyebrow">Effortless</div><h2 className="h2">You barely lift a finger.</h2></div>
           <div className="flow reveal">
             <div className="fbox"><div className="fe"><Ic e="💬" color="var(--river)" size={26} /></div><b>You text as you go</b><small>Receipts, voice notes, payments</small></div>
-            <div className="farrow">→</div>
+            <div className="farrow" aria-hidden="true">→</div>
             <div className="fbox"><div className="fe"><Ic e="📊" color="var(--on-saffron-tint)" size={26} /></div><b>Your summary builds itself</b><small>Sorted and ready, all year</small></div>
-            <div className="farrow">→</div>
+            <div className="farrow" aria-hidden="true">→</div>
             <div className="fbox"><div className="fe"><Ic e="✅" color="var(--on-green-tint)" size={26} /></div><b>You approve and send</b><small>Nothing goes without your yes</small></div>
           </div>
         </div>

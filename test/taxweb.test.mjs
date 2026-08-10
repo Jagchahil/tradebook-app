@@ -173,8 +173,18 @@ ok('the quarter on its own is labelled as context, not as the update',
 ok('a capped fetch is flagged, never handed over as complete',
   /truncated/.test(src.summary) && /not all of them could be counted/.test(flat(src.summary)));
 
-ok('🔴 WHAT-IF ROUTES THROUGH computePosition BY HIS ACTUAL STRUCTURE',
-  src.whatif.includes('computePosition') && src.whatif.includes('getBusinessProfile'));
+// 🔴 THE WHAT-IF COMPUTATION MOVED TO lib/whatif.ts ON 10 AUGUST, because it was a FIFTH money
+// spine surface computing its own way (lib/position.ts, which knows nothing of the vehicle
+// allowance or Section 24) and disagreeing with the Overview by about £1,560. The page now owns no
+// arithmetic: it reads whatIf(), which routes an individual through taxPosition with the projection
+// off (the SAME engine every other surface uses) and a company through its own Corporation Tax. So
+// the assertions read lib/whatif.ts for the routing and the page for the delegation.
+const whatifLib = read('lib/whatif.ts');
+ok('🔴 WHAT-IF DELEGATES TO lib/whatif.ts, one source, and reads the structure to route by',
+  src.whatif.includes('whatIf(') && src.whatif.includes('getBusinessProfile')
+  && !src.whatif.includes('computePosition('));
+ok('🔴 AND lib/whatif.ts ROUTES BY STRUCTURE: taxPosition confirmed for an individual, the company return for a company',
+  whatifLib.includes("taxPosition(opt, { project: false })") && whatifLib.includes('computePosition('));
 ok('the delta is bounded and unreadable input asks no question',
   /1_000_000/.test(src.whatif) && /Number\.isFinite/.test(src.whatif));
 ok('🔴 THE FORM IS A GET: a pure question, no state, no new API route',
@@ -183,8 +193,8 @@ ok('the base is confirmed figures and the copy says so',
   /confirmed profit since 6 April/i.test(flat(src.whatif)) && /nothing projected/i.test(flat(src.whatif)));
 ok('the input has a name a screen reader can say',
   /htmlFor="extra"/.test(src.whatif) && /id="extra"/.test(src.whatif));
-ok('the student loan moves with the bill, through the one engine function',
-  src.whatif.includes('studentLoanForSA'));
+ok('🔴 the student loan moves with the bill through taxPosition, not a second copy in the page',
+  whatifLib.includes('studentLoan') && !src.whatif.includes('studentLoanForSA'));
 
 ok('🔴 WAYS TO SAVE RENDERS findOptimisations AND NOTHING OF ITS OWN',
   src.ways.includes('findOptimisations'));

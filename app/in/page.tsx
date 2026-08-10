@@ -334,7 +334,10 @@ const CSS = [
   // device the same way the app does, with not one byte of script. See APP_THEME_CSS in tokens.
   APP_THEME_CSS,
   A11Y_CSS,
-  `.lek-in{width:100%;max-width:420px;background:${PANEL};border:1px solid ${LINE};border-radius:${RADIUS.lg}px;padding:32px 28px}`,
+  // box-sizing:border-box, so width:100% INCLUDES the padding. Without it the card was content-box:
+  // 100% of the 339px content area PLUS 40px of phone padding came to 379px in a 375px viewport, and
+  // the sign in card overflowed 2px each side. The true 375px walk on 10 August caught it.
+  `.lek-in{box-sizing:border-box;width:100%;max-width:420px;background:${PANEL};border:1px solid ${LINE};border-radius:${RADIUS.lg}px;padding:32px 28px}`,
   `@media(max-width:460px){.lek-in{border:none;border-radius:0;padding:26px 20px;background:transparent}}`,
 ].join('');
 

@@ -23,12 +23,22 @@ export interface CronRun {
 
 // How long a job may be quiet before it is a problem.
 //
-// Since 16 July these jobs are no longer six separate cron entries. Vercel Hobby permits only TWO
+// Since 16 July these jobs are no longer six separate cron entries. Vercel HOBBY permits only two
 // crons, and running six on it silently stopped half of them (this file's whole reason to exist).
-// So vercel.json now holds two DISPATCHERS (app/api/cron/daily) that kick the real jobs, and the
-// ceilings below are the windows those jobs still run within. A ceiling too tight cries wolf, and an
-// alarm that cries wolf gets muted, and a muted alarm is worse than no alarm because it looks like
-// cover. The two dispatch slots, and what each still triggers:
+// So vercel.json holds DISPATCHERS (app/api/cron/daily) that kick the real jobs, and the ceilings
+// below are the windows those jobs still run within. A ceiling too tight cries wolf, and an alarm
+// that cries wolf gets muted, and a muted alarm is worse than no alarm because it looks like cover.
+//
+// ⚠️ THERE ARE THREE DISPATCH SLOTS, NOT TWO, AND THIS PARAGRAPH SAID TWO UNTIL 10 AUGUST 2026.
+// Push 27 added the hourly slot that morning and the prose was never carried across, so the file
+// read "two DISPATCHERS" and "the two dispatch slots" directly above a list of three. The Hobby
+// limit sentence above is kept because it is why the dispatcher shape exists at all, but it no
+// longer constrains us: Vercel and Supabase both moved to Pro on 4 August, which is what made a
+// third entry possible. A reader who takes the count from the prose rather than from vercel.json
+// ends up asking whether Vercel really registered all three, which is a question this file should
+// answer rather than raise.
+//
+// The three dispatch slots, and what each still triggers:
 //
 //   hourly 0 *  * * *   -> due
 //   am     0 7  * * *   -> due, cleanup, bankfeed, agent, trial, and (Mon/Wed/Fri) nudge
@@ -151,6 +161,15 @@ export interface CronAlarm {
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 export function blockingAlarms(alarms: CronAlarm[]): CronAlarm[] {
   return alarms.filter((a) => a.reason !== 'never_run');
+}
+
+// 🔴 IS THE CRON SIDE SERVING? null IN, false OUT, ON PURPOSE. listCronRuns() returns null on any
+// failed read, and /api/health used to answer that with an empty alarm list, so a history it could
+// NOT READ scored as healthy: the house disease, a signal that cannot tell "no" from "nothing".
+// This is the one place that decides it, so a null read is a false here and the route cannot get it
+// wrong again. A never_run job is a question, not an outage, so it does not block the public view.
+export function cronsServing(runs: CronRun[] | null, now: Date = new Date()): boolean {
+  return runs !== null && blockingAlarms(cronAlarms(runs, now)).length === 0;
 }
 
 export function unseenAlarms(alarms: CronAlarm[]): CronAlarm[] {

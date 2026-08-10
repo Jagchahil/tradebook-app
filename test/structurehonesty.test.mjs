@@ -102,6 +102,24 @@ const POS = await import(pathToFileURL(path.join(stage, 'position.ts')).href);
     !/your \d+% share/.test(codeOnly(overview)) && !/everything through the business/.test(codeOnly(money)));
   ok('pay yourself still reads the share from getBusinessProfile, the one source',
     payPage.includes('getBusinessProfile') && payPage.includes('partnershipShare'));
+
+  // 🔴 THE DOCUMENT THAT LEAVES THE BUILDING. Share your books shows a partner the WHOLE firm's
+  // books (shareTotals does no scaling), so a 50% partner's link hands a lender the firm's full
+  // profit. The page carries a caption saying exactly that, addressed to the stranger reading it,
+  // and NOTHING PINNED IT until now: the internal-screen assertions above never read this file, so
+  // the one caption that keeps a lender from reading a partner's income at twice its size could be
+  // deleted with the suite green. This holds it there, for a partnership and for a company.
+  const sharePage = read('app/share/[token]/page.tsx');
+  ok('🔴 the shared books page names the WHOLE FIRM and the partner share, for the lender reading it',
+    /businessType === 'partnership'/.test(sharePage)
+    && /whole firm/i.test(sharePage)
+    && /partnershipShare/.test(sharePage)
+    && /% share/.test(sharePage));
+  ok('🔴 and it names that a company’s turnover is not the director’s income',
+    /businessType === 'limited_company'/.test(sharePage)
+    && /salary and dividends/.test(sharePage));
+  ok('the shared page reads the structure from getBusinessProfile, not the URL',
+    /getBusinessProfile\(grant\.user_id\)/.test(sharePage));
   ok('🔴 NOTHING COUNTED CHANGED: getOptimiserInput still scales by the partner factor',
     // The scaling moved into lib/yeartodate.ts with the row loop (6 August 2026). The pin now
     // holds the whole chain: supabase computes the factor and hands it to the aggregation, and

@@ -228,8 +228,8 @@ const NOT_DISCLOSED = {
     'A lever priced at a marginal rate, one tap behind /app/tax. It answers what a van would save, not what he owes.',
   'app/app/tax/ways-to-save/page.tsx':
     'The lever list. A caveat under every "about £340" chip is exactly the ten helpful additions that make an unhelpful product, and it is one tap behind /app/tax.',
-  'app/app/tax/what-if/page.tsx':
-    'A difference between two figures that move together, one tap behind /app/tax.',
+  'lib/whatif.ts':
+    'It computes the what-if figures and renders nothing itself; the page that reads it, /app/tax/what-if, shows a difference between two figures that move together, one tap behind /app/tax, which carries the line. The band producers moved here from the page on 10 August so the what-if reads the same taxPosition every other surface does.',
   'app/app/tax/student-loan/page.tsx':
     'It renders the student loan only. Plans, thresholds and rates are the same across the UK, and Plan 4 is already labelled Scotland on the screen.',
   'app/app/tax/summary/page.tsx':

@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { cronAlarms, blockingAlarms, unseenAlarms, MAX_QUIET_HOURS } from '../lib/cronwatch.ts';
+import { cronAlarms, blockingAlarms, unseenAlarms, cronsServing, MAX_QUIET_HOURS } from '../lib/cronwatch.ts';
 
 let pass = 0;
 let fail = 0;
@@ -118,6 +118,18 @@ ok('and it says so plainly', neverDone[0].reason === 'never_finished');
 // ⚠️ THE BARE [] IS THE POINT HERE, not an oversight: only() would fill the table in and this
 // case is precisely about the table being empty.
 ok('no rows at all (fresh deploy): NOT an alarm', cronAlarms([], NOW).length === 0);
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 cronsServing: THE /api/health BLIND SPOT, PINNED. 10 August 2026. listCronRuns() returns null
+// on a failed read, and the route used to answer that null with an empty alarm list, so a history
+// it COULD NOT READ scored as healthy. The distinction this pins is exactly no versus nothing: an
+// empty table (readable, a fresh deploy) is serving; a null (unreadable) is not.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+ok('🔴 an UNREADABLE cron history (null) is NOT serving', cronsServing(null, NOW) === false);
+ok('an EMPTY but readable table (fresh deploy) IS serving', cronsServing([], NOW) === true);
+ok('a healthy set of runs IS serving',
+  cronsServing(only(run('due', 1), run('digest', 2), run('nudge', 20), run('weekly', 40)), NOW) === true);
+ok('a stale daily job makes it NOT serving', cronsServing(only(run('digest', 30)), NOW) === false);
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // 🔴 A JOB THAT HAS NEVER RUN, WHILE THE OTHERS ARE RUNNING. Rewritten 9 August 2026.
@@ -240,8 +252,13 @@ console.log('\nAn alarm worth seeing is not always an alarm worth waking somebod
   const health = readFileSync(path.join(repo, 'app/api/health/route.ts'), 'utf8');
   ok('the health route imports the split rather than re-deciding severity itself',
     /import \{[^}]*blockingAlarms[^}]*\} from '\.\.\/\.\.\/\.\.\/lib\/cronwatch'/.test(health));
-  ok('🔴 THE PUBLIC 503 IS DECIDED ON BLOCKING ALARMS ONLY, never on the raw list',
-    /const cronsOk = blocking\.length === 0;/.test(health)
+  // 🔴 The verdict now goes through cronsServing(runs), which is blocking-only AND null-safe, and
+  // whose behaviour is pinned above (null is not serving, [] is). The route must DELEGATE to it, or
+  // those behavioural tests govern nothing the endpoint actually runs. The old inline
+  // `blocking.length === 0` is the null-UNSAFE shape this replaced, so it must not come back either.
+  ok('🔴 THE PUBLIC 503 IS DECIDED BY cronsServing (blocking-only AND null-safe), not inline',
+    /const cronsOk = cronsServing\(runs\);/.test(health)
+    && !/const cronsOk = blocking\.length === 0;/.test(health)
     && !/const cronsOk = alarms\.length === 0;/.test(health));
   ok('🔴 AND THE UNSEEN COUNT IS STILL SURFACED, or splitting it out is just hiding it',
     /cronsUnseen/.test(health));
@@ -249,6 +266,62 @@ console.log('\nAn alarm worth seeing is not always an alarm worth waking somebod
     /cronsUnseen: unseen\.length/.test(health) && !/cronsUnseen: unseen\b(?!\.)/.test(health));
   ok('and the operator view behind the bearer still names them',
     /unseen: unseenAlarms\(alarms\)/.test(health));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n9. The header describes the crons that actually exist.\n');
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  // 🔴 THE FILE SAID "two DISPATCHERS" AND "the two dispatch slots" DIRECTLY ABOVE A LIST OF
+  // THREE, FROM 11:35 ON 10 AUGUST UNTIL THAT AFTERNOON. Push 27 added the hourly slot and the
+  // prose was not carried across.
+  //
+  // Nobody was hurt by it, and that is the reason it is worth a test rather than a correction.
+  // lib/cronwatch.ts exists so the next reader can tell a decision from a hole, and its header is
+  // the map of what dispatches what. A map that disagrees with vercel.json sends whoever is
+  // holding the pager to look for a cron that is not there, or worse, stops them looking for one
+  // that should be. Correcting the sentence fixes today; reading the count off vercel.json is
+  // what stops the fourth slot doing this again.
+  //
+  // ⚠️ DERIVED FROM vercel.json, NEVER TYPED. A guard that hard codes three is the same defect
+  // one layer up: it would have to be edited by the same person who forgot to edit the comment.
+  const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const vercel = JSON.parse(readFileSync(path.join(repo, 'vercel.json'), 'utf8'));
+  const entries = vercel.crons ?? [];
+  ok(`vercel.json declares crons (${entries.length}), so the assertions below are not vacuous`,
+    entries.length > 0);
+
+  const src = readFileSync(path.join(repo, 'lib/cronwatch.ts'), 'utf8');
+  const header = src.slice(0, src.indexOf('export const MAX_QUIET_HOURS'));
+
+  // The slot table in the header: lines of the shape "//   name  <cron expression>   -> jobs".
+  const slots = [...header.matchAll(/^\/\/\s{3}(\w+)\s+([\d*]\s[\d*]+\s+\*\s\*\s\*)\s+->/gm)]
+    .map((m) => ({ name: m[1], schedule: m[2].replace(/\s+/g, ' ').trim() }));
+  ok(`the header's slot table was parsed (${slots.length} rows), so the comparison below is real`,
+    slots.length > 0);
+
+  ok(`🔴 THE HEADER LISTS ONE SLOT PER CRON IN vercel.json (${slots.length} vs ${entries.length})`,
+    slots.length === entries.length);
+
+  // Every entry in vercel.json has a row in the header, matched on the slot name in its query
+  // string and on the schedule, so a slot renamed or re-timed in one place fails here.
+  const missing = [];
+  for (const e of entries) {
+    const slot = /slot=(\w+)/.exec(e.path)?.[1] ?? null;
+    const row = slots.find((r) => r.name === slot);
+    if (!row) { missing.push(`${e.path} has no row in the header`); continue; }
+    if (row.schedule !== e.schedule.replace(/\s+/g, ' ').trim()) {
+      missing.push(`${slot}: header says "${row.schedule}", vercel.json says "${e.schedule}"`);
+    }
+  }
+  ok(`🔴 AND EACH ONE AGREES ON NAME AND SCHEDULE${missing.length ? ` (${missing.join('; ')})` : ''}`,
+    missing.length === 0);
+
+  // The sentence that was wrong. It is written out in words, so a fourth slot has to change the
+  // word as well as the table.
+  const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six'];
+  ok(`🔴 THE PROSE SAYS "${WORDS[entries.length]} dispatch slots" IN WORDS, MATCHING THE TABLE`,
+    new RegExp(`[Tt]he ${WORDS[entries.length]} dispatch slots`).test(header));
 }
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);

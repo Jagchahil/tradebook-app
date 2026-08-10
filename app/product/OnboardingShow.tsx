@@ -132,8 +132,15 @@ function Stage({ stage }: { stage: number }) {
       <BubbleOut i={2}>who owes me</BubbleOut>
       <BubbleIn i={3}>Invoice 0012 (£850, Dave Wilson) is 18 days over. Here is a chase in your voice, forward it as it is:</BubbleIn>
       <Reveal i={4}>
+        {/* 🔴 saffron-deep INK on a saffron-tint card is 2.70:1, an AA text failure, and the guards
+            never saw it because this whole component is ORPHANED (nothing imports it) so no page
+            renders it for the sweep to measure. The ink is now the palette's own on-saffron-tint,
+            which reads 5.86:1 on this tint, so a revival is safe. ⚠️ THIS FILE SHOULD BE DELETED: it
+            is dead, and it also carries a "saves you £2,100" tax-saved figure of exactly the class
+            removed from seven surfaces on 10 August. Fixed here so it cannot ship an AA failure if
+            revived, and flagged for git rm in the push notes. */}
         <div style={{ border: `1px solid ${AMBER}`, background: AMBER_TINT, borderRadius: 12, padding: 10 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 800, color: AMBER, letterSpacing: '0.05em' }}>🛡️ RAKHA SPOTTED</div>
+          <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--on-saffron-tint)', letterSpacing: '0.05em' }}>🛡️ RAKHA SPOTTED</div>
           <div style={{ fontSize: 12, color: INK, marginTop: 3, lineHeight: 1.45 }}>Your goal &ldquo;the new van&rdquo; is 43% covered. Buying before 5 April saves you £2,100 at your rate.</div>
         </div>
       </Reveal>

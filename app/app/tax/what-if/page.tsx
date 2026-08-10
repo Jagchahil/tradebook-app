@@ -3,8 +3,8 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { getOptimiserInput, getBusinessProfile } from '../../../../lib/supabase';
-import { computePosition, type BusinessType, type OwnerInput } from '../../../../lib/position';
-import { studentLoanForSA, type StudentPlan } from '../../../../lib/nistudentloan';
+import { type BusinessType } from '../../../../lib/position';
+import { whatIf } from '../../../../lib/whatif';
 import { gbp0, gbpAbs0 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
@@ -39,31 +39,6 @@ export const dynamic = 'force-dynamic';
 // top of what is real".
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-// The account holder as a position.ts owner, the same mapping lib/agent.ts's soloOwners makes: in
-// a company, the salary and dividends he takes are the COMPANY'S; anywhere else they are outside
-// income stacking on top. Property profit rides as other non savings income so a landlord's trade
-// is taxed at the margin his rent has already set, exactly as lib/ledger.ts argues it must be.
-function ownersFor(structure: BusinessType, opt: {
-  employmentIncome: number; dividendIncome?: number; savingsIncome?: number;
-  ytdPropertyIncome?: number; ytdPropertyExpenses?: number;
-}): OwnerInput[] {
-  const salary = Math.max(0, opt.employmentIncome);
-  const dividends = Math.max(0, opt.dividendIncome ?? 0);
-  const savings = Math.max(0, opt.savingsIncome ?? 0);
-  const property = Math.max(0, (opt.ytdPropertyIncome ?? 0) - (opt.ytdPropertyExpenses ?? 0));
-  return [{
-    name: 'You',
-    salary: structure === 'limited_company' ? salary : undefined,
-    dividends: structure === 'limited_company' ? dividends : undefined,
-    other: {
-      employment: structure === 'limited_company' ? 0 : salary,
-      otherNonSavings: property,
-      savings,
-      dividends: structure === 'limited_company' ? 0 : dividends,
-    },
-  }];
-}
-
 // The change he asked about, read defensively off the query string. Whole pounds, bounded, and
 // anything unreadable is simply no question asked, never an error page about his own money.
 function readDelta(raw: string | undefined): number | null {
@@ -94,30 +69,16 @@ export default async function WhatIfPage({
   ]);
   const structure: BusinessType = biz?.businessType ?? 'sole_trader';
 
-  // The base: confirmed trade profit since 6 April. For a partner this is already HIS slice,
-  // because getOptimiserInput scales the shared books by his share before anything is taxed.
-  const base = Math.max(0, optimiser.ytdTradeIncome - optimiser.ytdTradeExpenses);
-  const owners = ownersFor(structure, optimiser);
-
-  const now = computePosition({ type: structure, profit: base, owners });
-  const then = delta !== null
-    ? computePosition({ type: structure, profit: Math.max(0, base + delta), owners })
-    : null;
-  const taxDiff = then ? Math.round(then.combinedTax - now.combinedTax) : 0;
-
-  // The student loan moves with profit too, for a sole trader or a partner: Self Assessment
-  // collects it with the same bill, so a what if that forgot it would understate the January
-  // difference. Company profit is not the director's income, so his loan does not move with it.
-  const plans = (optimiser.studentPlans ?? []) as StudentPlan[];
-  const loanApplies = structure !== 'limited_company' && plans.length > 0;
-  const loanNow = loanApplies ? studentLoanForSA(base, optimiser.employmentIncome, plans) : 0;
-  const loanThen = then && loanApplies
-    ? studentLoanForSA(Math.max(0, base + (delta ?? 0)), optimiser.employmentIncome, plans)
-    : 0;
-  const loanDiff = Math.round(loanThen - loanNow);
-
-  const wholeDiff = taxDiff + loanDiff;
-  const kept = delta !== null && delta > 0 ? Math.max(0, delta - wholeDiff) : 0;
+  // ⚠️ ONE SOURCE. The figures come from lib/whatif.ts, which routes an individual through
+  // taxPosition with the projection off (the SAME engine the Overview and the lender documents use)
+  // and a company through its own Corporation Tax return. The base is confirmed taxable profit
+  // AFTER the vehicle writing down allowance, which is the figure the rest of the money spine
+  // shows. This page owns none of the arithmetic, so it cannot disagree with the other surfaces.
+  const r = whatIf(optimiser, structure, delta);
+  const base = r.base;
+  const hasThen = delta !== null && r.taxThen !== null;
+  const wholeDiff = r.diff;
+  const kept = r.kept;
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -156,7 +117,7 @@ export default async function WhatIfPage({
         </form>
       </section>
 
-      {then && delta !== null ? (
+      {hasThen && delta !== null ? (
         <section className="lek-card">
           <h2 className="lek-h2">
             {delta > 0 ? `Another ${gbpAbs0(delta)} of profit` : `${gbpAbs0(delta)} less profit`}
@@ -164,11 +125,11 @@ export default async function WhatIfPage({
           <div className="lek-grid">
             <div className="lek-tile">
               <div className="lek-tile-label">Tax on the base</div>
-              <div className="lek-tile-value">{gbp0(Math.round(now.combinedTax) + Math.round(loanNow))}</div>
+              <div className="lek-tile-value">{gbp0(r.taxNow)}</div>
             </div>
             <div className="lek-tile">
               <div className="lek-tile-label">Tax after the change</div>
-              <div className="lek-tile-value">{gbp0(Math.round(then.combinedTax) + Math.round(loanThen))}</div>
+              <div className="lek-tile-value">{gbp0(r.taxThen ?? 0)}</div>
             </div>
             <div className="lek-tile">
               <div className="lek-tile-label">Difference</div>
@@ -189,10 +150,9 @@ export default async function WhatIfPage({
           {structure === 'limited_company' ? (
             <p style={S.quiet}>
               As a limited company, the change lands on the company&apos;s own Corporation Tax
-              return first: {gbp0(then.business.corporationTax)} of Corporation Tax after the
-              change, against {gbp0(now.business.corporationTax)} now. Your personal tax only moves
-              when what you draw out moves, and this comparison holds your salary and dividends
-              still.
+              return first: {gbp0(r.corpThen)} of Corporation Tax after the change, against{' '}
+              {gbp0(r.corpNow)} now. Your personal tax only moves when what you draw out moves, and
+              this comparison holds your salary and dividends still.
             </p>
           ) : null}
           {structure === 'partnership' ? (
@@ -201,9 +161,9 @@ export default async function WhatIfPage({
               are taxed on. The firm&apos;s other partners carry their own shares.
             </p>
           ) : null}
-          {loanApplies && loanDiff !== 0 ? (
+          {r.loanDiff !== 0 ? (
             <p style={S.quiet}>
-              {gbpAbs0(loanDiff)} of the difference is your student loan, which Self Assessment
+              {gbpAbs0(r.loanDiff)} of the difference is your student loan, which Self Assessment
               collects with the same bill.
             </p>
           ) : null}

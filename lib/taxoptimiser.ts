@@ -320,6 +320,7 @@ export function projectedTradeNetOf(input: OptimiserInput, factor: number): numb
 // only income is a trade it equals soleTraderTax, so nothing an existing user sees moves.
 export function taxPosition(
   input: OptimiserInput,
+  opts?: { project?: boolean },
 ): PersonalIncomeResult & {
   projected: boolean;
   employmentTax: number;
@@ -333,7 +334,20 @@ export function taxPosition(
   // number the app prints in its largest type. tradeNetOf() applies it, once, by the rule above.
   // His set aside FALLS, which is the correct direction: it is a deduction he is entitled to and
   // was already being shown on his ledger.
-  const { canProject, factor } = projectionFactor(input);
+  //
+  // ⚠️ project: false IS THE CONFIRMED FIGURES DOOR, AND IT EXISTS FOR THE MONEY SPINE, NOT AS A
+  // CONVENIENCE. /app/tax/what-if answers a question on what a man has ACTUALLY confirmed since 6
+  // April, not on a projection of the year, because a what if on top of a projection is a guess on
+  // a guess. It used to compute that with a second engine (lib/position.ts), which knew nothing of
+  // the vehicle writing down allowance or the Section 24 credit, so its "confirmed profit" read
+  // £37,000 where every other surface read £36,217.45 and its tax ran about £1,560 high. The fix is
+  // not to teach a second engine those rules, it is to let this one answer with the projection
+  // switched off: factor 1, everything else identical, so the allowance, the property allowance,
+  // Section 24 and the student loan all still land exactly as they do on the Overview and the
+  // lender documents. Default is unchanged, so all 31 existing callers and the mobile parity suite
+  // are byte identical. test/moneyspine.test.mjs holds the what if to the same figures as the rest.
+  const { canProject, factor } =
+    opts?.project === false ? { canProject: false, factor: 1 } : projectionFactor(input);
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 THE TRADING ALLOWANCE LANDS AFTER THE PROJECTION, AND GETTING THAT BACKWARDS WOULD HAVE

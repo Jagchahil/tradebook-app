@@ -242,7 +242,15 @@ export default function StartPage() {
   const greetName = (needsPersonName ? personName : name).trim();
 
   const canContinue = useMemo(() => {
-    if (step === 1) return phoneReady && emailValid;
+    // 🔴 THE MOBILE IS OPTIONAL, AND THE SCREEN NOW SAYS SO. The account is created from the proved
+    // EMAIL alone: /api/signup/code takes only an email, the session is email, and WhatsApp binds a
+    // fresh number from the handset itself, so the number typed here lands on signups.phone and
+    // nothing that signs a man in or runs his books depends on it. It used to be mandatory here and
+    // at /api/onboard while the copy directly above promised it was "only used to link WhatsApp when
+    // you are ready", which cannot both be true on the front door of a product whose whole pitch is
+    // that it does not say one thing and do another. So the gate asks for the email, and for the
+    // phone only that IF one is typed it is a real one, which catches a typo without demanding it.
+    if (step === 1) return emailValid && (phone.trim().length === 0 || phoneReady);
     if (step === 2) return tradeType !== null && name.trim().length > 1 && (!needsPersonName || personName.trim().length > 1) && (tradeType !== 'partnership' || shareValid);
     if (step === 3) return trade !== '' && (trade !== 'Something else' || customTrade.trim().length > 1);
     if (step === 4) return true; // streams optional, none is a fine answer
@@ -253,7 +261,7 @@ export default function StartPage() {
     // memo does not recompute when he types his percentage, so a partner fills the box in and
     // Continue stays dead until some other answer on the screen happens to change. He would read
     // that as the page being broken, on the one step nobody else has to do.
-  }, [step, phoneReady, emailValid, tradeType, name, personName, needsPersonName, shareValid, trade, customTrade, vat]);
+  }, [step, phone, phoneReady, emailValid, tradeType, name, personName, needsPersonName, shareValid, trade, customTrade, vat]);
 
   // What they actually typed or picked, for the SIC matcher. Only a limited company needs a SIC
   // code at all (Companies House asks for it; a sole trader never does, see lib/siccodes), so this
@@ -557,15 +565,15 @@ export default function StartPage() {
           ) : (
             <div key={step} className="step-anim">
               {step === 1 && (
-                <Step title="Let's set up your account" sub="Your email is your account, and we will send you a code at the end to prove it. Your mobile is what links your WhatsApp later, once you want to send receipts by text.">
-                  <label htmlFor="signup-phone" style={fieldLabel}>Mobile number</label>
+                <Step title="Let's set up your account" sub="Your email is your account, and we will send you a code at the end to prove it. That is all we need to start.">
+                  <label htmlFor="signup-email" style={fieldLabel}>Email</label>
+                  <input id="signup-email" className="field" inputMode="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={fieldStyle} />
+                  <label htmlFor="signup-phone" style={{ ...fieldLabel, marginTop: 18 }}>Mobile number (optional)</label>
                   <div style={{ display: 'flex', alignItems: 'center', backgroundColor: PANEL, border: `1.5px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '15px 14px', backgroundColor: RIVER_TINT, color: RIVER, fontWeight: 700, fontSize: 16, borderRight: `1.5px solid ${LINE}` }}>🇬🇧 +44</span>
                     <input id="signup-phone" className="field" inputMode="tel" placeholder="7700 900 000" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={14} style={{ flex: 1, border: 'none', padding: '15px 14px', fontSize: 17, color: INK, letterSpacing: '0.5px', background: 'transparent' }} />
                   </div>
-                  <label htmlFor="signup-email" style={{ ...fieldLabel, marginTop: 18 }}>Email</label>
-                  <input id="signup-email" className="field" inputMode="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={fieldStyle} />
-                  <p style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>We send your code here, and everything about your account lives here. Your number is only used to link WhatsApp when you are ready.</p>
+                  <p style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>Add your mobile now if you would like to link WhatsApp later, so you can send receipts by text. You can also add it any time from your account. Your email is all we need to start.</p>
                   <p style={{ fontSize: 12.5, color: MUTED, marginTop: 12 }}>We never share your details. We only ever message you in reply to you.</p>
                 </Step>
               )}

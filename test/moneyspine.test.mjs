@@ -57,8 +57,9 @@ for (const f of [
   'taxengine', 'money', 'capital', 'nistudentloan', 'ltdengine', 'personalincome',
   'propertyengine', 'autonomy', 'taxoptimiser', 'quarterpack', 'incomeproof', 'bookshare',
   // lib/scotland.ts, one exported sentence with no imports of its own, printed by both money
-  // documents staged above.
-  'yeartodate', 'scotland',
+  // documents staged above. position + whatif are the FIFTH surface: /app/tax/what-if computes
+  // through lib/whatif.ts, which the guard used to leave out entirely.
+  'yeartodate', 'scotland', 'position', 'partnership', 'whatif',
 ]) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
@@ -69,6 +70,7 @@ const BS = await import(pathToFileURL(path.join(stage, 'bookshare.ts')).href);
 const YTD = await import(pathToFileURL(path.join(stage, 'yeartodate.ts')).href);
 const CAP = await import(pathToFileURL(path.join(stage, 'capital.ts')).href);
 const PROP = await import(pathToFileURL(path.join(stage, 'propertyengine.ts')).href);
+const WI = await import(pathToFileURL(path.join(stage, 'whatif.ts')).href);
 
 let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; } else { fail++; console.log(`  FAIL ${name}`); } };
@@ -195,7 +197,12 @@ function readAll(acct) {
     amount: r.amount, writtenDown: r.writtenDown === true,
     financeCost: String(r.income_type ?? '') === 'property' && PROP.isResidentialFinanceCost(r.category, r.vendor),
   })), rawAllow);
-  return { ytd, tp, proof, pack, totals };
+  // THE FIFTH SURFACE. /app/tax/what-if computes through lib/whatif.ts. Its base is the confirmed
+  // taxable profit the documents show, and for an individual its tax is taxPosition with the
+  // projection off. These accounts are a full year elapsed, so that confirmed figure equals the
+  // projected setAside above, which is what lets the guard hold the two together.
+  const wi = WI.whatIf(input, input.businessType, null);
+  return { ytd, tp, proof, pack, totals, wi };
 }
 
 console.log('\nThe fixed control: the car business the 6 August fix was verified on');
@@ -209,13 +216,17 @@ console.log('\nThe fixed control: the car business the 6 August fix was verified
     assets: [{ capital_kind: 'car_other', transaction_date: '2026-05-10', amount: -35000, business_use_pct: 100 }],
     isPartnership: false, sharePercent: 100, hasTrade: true, hasProperty: false,
   };
-  const { tp, proof, pack, totals } = readAll(acct);
+  const { tp, proof, pack, totals, wi } = readAll(acct);
   ok('the Overview set aside is £2,686', near(tp.setAside, 2686, 1));
   ok('the proof of income says the same £2,686', near(proof.estimatedTax, 2686, 1));
   ok('the proof profit is the taxable £22,900', proof.profit === 22900);
   ok('the pack estimate says the same £2,686', near(pack.ytd.estimatedTax.total, 2686, 1));
   ok('🔴 the MTD submission stays £25,000, before allowances (exception 1)', pack.submission.trade.net === 25000);
   ok('the shared books say the same £22,900', totals.profit === 22900);
+  // 🔴 THE FIFTH SURFACE, THE ONE THAT USED TO READ £25,000 HERE. what-if's base is the taxable
+  // £22,900 the documents show, not the £25,000 before allowances, and its tax is the same £2,686.
+  ok('🔴 the what-if base is the taxable £22,900, not £25,000 before allowances', wi.base === 22900);
+  ok('the what-if tax on the base says the same £2,686', near(wi.taxNow, 2686, 1));
 }
 
 console.log('\nThe sweep: seeded random accounts, every reader, one truth');
@@ -224,12 +235,25 @@ let sweepFailures = 0;
 for (let i = 0; i < N; i++) {
   const acct = buildAccount(i);
   if (acct.rows.length === 0) continue;
-  const { ytd, tp, proof, pack, totals } = readAll(acct);
+  const { ytd, tp, proof, pack, totals, wi } = readAll(acct);
   const label = `#${i}${acct.isPartnership ? ` partner ${acct.sharePercent}%` : ''}${acct.hasProperty ? ' property' : ''}`;
   const before = fail;
 
   // The spine: the Overview and the proof of income are the same tax, always.
   ok(`${label}: proof tax ${proof.estimatedTax} = setAside ${tp.setAside}`, near(proof.estimatedTax, tp.setAside));
+
+  // 🔴 THE FIFTH SURFACE, ON EVERY SHAPE. what-if's tax on the base is the same as the Overview: a
+  // partner's slice, a landlord's Section 24 credit, a car bought in an earlier year, all of it,
+  // because it now reads through the same taxPosition the Overview does. This holds it here rather
+  // than in front of a customer.
+  ok(`${label}: what-if tax ${wi.taxNow} = setAside ${tp.setAside}`, near(wi.taxNow, tp.setAside, 1));
+  // And on a plain trade account its BASE is the taxable trade profit the documents show, AFTER the
+  // vehicle allowance, which is the exact figure it used to get wrong (£37,000 for £36,217.45).
+  // Property adds a second stream and a partnership scales, so proof.profit is not the trade base
+  // there; the tax check above carries those, and a loss floors the base at zero.
+  if (!acct.hasProperty && !acct.isPartnership && proof.profit >= 0) {
+    ok(`${label}: what-if base ${wi.base} = proof profit ${proof.profit}`, near(wi.base, proof.profit, 0.02));
+  }
 
   if (!acct.isPartnership) {
     // The shared books and the proof state one taxable profit, a loss included: both documents

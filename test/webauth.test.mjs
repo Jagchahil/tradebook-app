@@ -37,6 +37,10 @@ const ok = (name, cond) => {
   else { fail += 1; console.log(`  FAIL  ${name}`); }
 };
 
+// 🔴 PRESENCE BEFORE ORDER. indexOf('gone()') is -1 and less than everything, so a bare
+// `indexOf(a) < indexOf(b)` passes the day the a it guards is deleted. before() asserts both exist.
+const before = (src, a, b) => src.includes(a) && src.includes(b) && src.indexOf(a) < src.indexOf(b);
+
 // ⚠️ DOT DIRECTORIES AND SYMLINKS ARE SKIPPED, AND THAT IS NOT TIDINESS. app/.node/bin/corepack is
 // a BROKEN SYMLINK committed into this repo, so statSync on it throws and takes the whole suite
 // down with a stack trace about corepack. It only surfaced when this walk was widened past app/app
@@ -358,7 +362,7 @@ ok(
 );
 ok(
   'the origin check sits on the cookie path, AFTER the Bearer path has returned',
-  webauth.indexOf("via: 'bearer'") < webauth.indexOf('originAllowed('),
+  before(webauth, "via: 'bearer'", 'originAllowed('),
 );
 
 // The email is the one thing the two doors do not agree on: GoTrue hands it over with the identity,

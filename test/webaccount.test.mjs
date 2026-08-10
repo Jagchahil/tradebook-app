@@ -48,6 +48,13 @@ const codeRoute = read('app/api/signup/code/route.ts');
 const authStart = read('app/api/auth/start/route.ts');
 const startPage = read('app/start/page.tsx');
 
+// 🔴 PRESENCE BEFORE ORDER, OR THE ORDER MEANS NOTHING. indexOf('gone()') is -1, and -1 is less
+// than every real offset, so a bare `indexOf(a) < indexOf(b)` passes the day someone DELETES the
+// call it was guarding. These are the signup code's replay and brute force protections, so a
+// vacuous pass here is a security check that reports green while the security is gone. before()
+// asserts BOTH calls still exist and only then that a comes first, the same helper youmail uses.
+const before = (src, a, b) => src.includes(a) && src.includes(b) && src.indexOf(a) < src.indexOf(b);
+
 // ---------------------------------------------------------------------------------------------
 // 🔴 THE RULE. The typed number goes in signup_phone and nowhere else.
 // ---------------------------------------------------------------------------------------------
@@ -95,15 +102,16 @@ ok('🔴 the code door creates no users row', !codeRoute.includes('ensureUserRow
 ok('🔴 the code door grants no trial', !codeRoute.includes('grantTrial'));
 ok('🔴 the code door opens no session', !codeRoute.includes('createWebSession'));
 ok('the code door writes down the code before it emails it, never after',
-  codeRoute.indexOf('createSignupCode(') < codeRoute.indexOf('sendSignupCodeEmail('));
+  before(codeRoute, 'createSignupCode(', 'sendSignupCodeEmail('));
 
-// 🔴 THE ORDER INSIDE VERIFY. Each of these is a hole if it reverses.
+// 🔴 THE ORDER INSIDE VERIFY. Each of these is a hole if it reverses, AND a hole if the guarding
+// call is deleted, which is why before() insists the call is still there.
 ok('🔴 the guess is COUNTED before it is compared, so a dropped request is not a free guess',
-  verify.indexOf('bumpSignupCodeAttempt(') < verify.indexOf('verifyStoredCode('));
+  before(verify, 'bumpSignupCodeAttempt(', 'verifyStoredCode('));
 ok('🔴 the code is SPENT before an account is created, so one proof cannot mint two',
-  verify.indexOf('consumeSignupCode(') < verify.indexOf('createConfirmedAuthUser('));
+  before(verify, 'consumeSignupCode(', 'createConfirmedAuthUser('));
 ok('🔴 the session is opened LAST, after the code is spent',
-  verify.indexOf('consumeSignupCode(') < verify.indexOf('createWebSession('));
+  before(verify, 'consumeSignupCode(', 'createWebSession('));
 
 // The sign in door is a different door and must stay one.
 ok('the sign in door still refuses to create an account from an email',

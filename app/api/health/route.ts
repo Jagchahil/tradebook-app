@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { listCronRuns, readKnowledgeState } from '../../../lib/supabase';
-import { cronAlarms, blockingAlarms, unseenAlarms } from '../../../lib/cronwatch';
+import { cronAlarms, blockingAlarms, unseenAlarms, cronsServing } from '../../../lib/cronwatch';
 import { knowledgeAlarms, knowledgeStatus } from '../../../lib/knowledgewatch';
 
 // A tiny health check for uptime monitoring. Reports whether the app is up and
@@ -75,7 +75,12 @@ export async function GET(req: NextRequest) {
     // nobody has seen yet is not an answer of no to that. Both are right; they are asked by
     // different people. unseen is broken out below so the difference is readable rather than
     // something to work out from two numbers.
-    const ok = missing.length === 0 && alarms.length === 0 && brain !== null && brainAlarms.length === 0;
+    //
+    // 🔴 AND runs !== null IS PART OF THAT STRICTNESS. Without it a null read gives alarms = [] and
+    // this ok stayed true when the cron history was UNREADABLE, the same "no is not nothing" blind
+    // spot the public path had. brain !== null was already here; the crons half was missing it. An
+    // operator who cannot read the history has a problem, and the strict view is where it belongs.
+    const ok = missing.length === 0 && runs !== null && alarms.length === 0 && brain !== null && brainAlarms.length === 0;
     return NextResponse.json(
       {
         ok,
@@ -174,9 +179,16 @@ export async function GET(req: NextRequest) {
   // which job is late is useful to a stranger and no use to you. A bare count leaks nothing and
   // stops `crons: "ok"` from being a flat lie while one is genuinely pending.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
-  const blocking = blockingAlarms(alarms);
   const unseen = unseenAlarms(alarms);
-  const cronsOk = blocking.length === 0;
+  // 🔴 A NULL READ IS NOT A PASS HERE EITHER, AND FOR A WHILE IT WAS. listCronRuns() returns null
+  // on any failed read (a non-ok response, a timeout, a shape that is not an array). runs ? ... : []
+  // above then handed a null read an EMPTY alarm list, blocking came back empty, and cronsOk was
+  // true: the watchdog reported the crons healthy precisely when it could not see them. That is the
+  // house disease, a signal that cannot tell "no" from "nothing", four lines from the brain check
+  // below that gets it right (brain !== null). The db probe answers on its own, so this only bit
+  // when cron_runs was unreadable in isolation, but that is exactly the silent blind spot a launch
+  // pager must not have. An unreadable history is a question: `crons: "unknown"` in the body, not ok.
+  const cronsOk = cronsServing(runs);
 
   // THE BRAIN (docs/105). Three ways this goes red, and the first one is why Khoji exists at all.
   //

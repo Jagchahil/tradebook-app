@@ -26,6 +26,7 @@
 
 import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
 const TOKEN = process.env.WHATSAPP_TOKEN;
@@ -38,6 +39,53 @@ if (!TOKEN || !PHONE_NUMBER_ID) {
   console.error('  Then:  set -a && . ./.env.local && set +a && node scripts/wa-profile.mjs\n');
   process.exit(1);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE EMAIL IS READ OFF THE PRODUCT, NOT TYPED HERE. IT SAID hello@lekhio.app, WHICH IS THE
+// WRONG ADDRESS FOR THIS CARD, THOUGH NOT FOR THE REASON THE FIRST VERSION OF THIS NOTE GAVE.
+//
+// ⚠️ CORRECTION, 10 August 2026. This note used to say "there is no such mailbox". That is wrong,
+// and it was proved wrong by walking the live product: hello@lekhio.app is the FROM address on
+// every transactional email Lekhio sends. lib/email.ts defaults EMAIL_FROM to invoices@ and
+// production overrides it to hello@, and three real codes, two signup and one sign in, all arrived
+// from hello@lekhio.app during the 10 August walk. So it is a live SEND FROM identity, not a dead
+// address, and the earlier claim would send the next reader hunting for a mailbox to create that
+// already exists as a sender.
+//
+// The reason it is still WRONG on this card is a different one, and the distinction is the point.
+// This card is where a customer WRITES TO when something has gone wrong with his money, and hello@
+// is send only. The address a customer writes to is the published CONTACT mailbox, and every
+// customer facing surface in this repo publishes info@lekhio.app for exactly that: the terms, the
+// privacy policy, the security page, llms.txt, and app/in/page.tsx, which holds the one constant
+// (const SUPPORT) the others defer to. So the fix is unchanged and still right: read info@ from the
+// file that owns it. What changed is the reasoning, from "hello@ does not exist" to "hello@ is a
+// sender, and a contact card needs the address we publish for people to reach us".
+//
+// ⚠️ THE GUARD STILL REFUSES hello@ IN A SCRIPT, AND THAT IS CORRECT. test/waprofile.test.mjs walks
+// app/ and lib/ for addresses the product PUBLISHES on a page. A send only identity is not on that
+// list, so typing it into a script under scripts/ still goes red. The guard is about what a script
+// may publish to customers as a place to write to, which a sender is not.
+//
+// So it is not typed here. It is READ, from the one file that owns it.
+//
+// ⚠️ AND A MISS IS FATAL RATHER THAN A FALLBACK. A default would be the exact thing that hid this:
+// an address we cannot prove we own must STOP the write, not quietly ship to every customer. This
+// throws inside the try below, so nothing is sent and the reason is printed.
+const SUPPORT_SOURCE = 'app/in/page.tsx';
+
+function supportEmail() {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const src = readFileSync(path.join(root, SUPPORT_SOURCE), 'utf8');
+  const found = /const SUPPORT = '([^']+)';/.exec(src);
+  if (!found) {
+    throw new Error(
+      `Could not read SUPPORT out of ${SUPPORT_SOURCE}, so the profile was NOT written. `
+      + 'Publishing an address we cannot prove we own is the defect this read exists to stop.',
+    );
+  }
+  return found[1];
+}
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 // THE PROFILE. This is the copy, and it is the only place it should ever be written.
@@ -57,7 +105,6 @@ const PROFILE = {
     'Lekhio is the first employee for a UK business. Send a photo of a receipt, a voice note, or '
     + 'just say what came in, and it keeps your books, works out your tax and finds the money you '
     + 'are owed. You approve everything. Nothing reaches HMRC without your yes.',
-  email: 'hello@lekhio.app',
   websites: ['https://lekhio.app'],
   vertical: 'PROFESSIONAL_SERVICES',
   address: '',
@@ -133,7 +180,8 @@ try {
     }
   }
 
-  const patch = args.includes('--write') ? { ...PROFILE } : {};
+  // The email is read here, at the point of sending, so a failure stops the write. See supportEmail().
+  const patch = args.includes('--write') ? { ...PROFILE, email: supportEmail() } : {};
   if (photo) {
     console.log(`\n  Uploading ${photo} ...`);
     patch.profile_picture_handle = await uploadPhoto(photo);

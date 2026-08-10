@@ -308,5 +308,65 @@ ok('🔴 no page pairs the raw accent with its own tint again (the exact 7 Augus
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 INK ON THE PAGE BACKGROUND. THE HALF OF THIS FAMILY THIS FILE WAS NOT CHECKING.
+//
+// Everything above pairs an ink with a background the SAME RULE declares. That is why it found
+// nine pages reaching for SAFFRON_DEEP on SAFFRON_TINT. It could never find the other half:
+// a rule that sets a colour and NO background, so the thing behind it is the page itself.
+//
+// Found on 10 August 2026 by measuring the deployed page rather than reading it.
+// app/how-mtd-works/page.tsx had `.farrow{font-size:24px;color:var(--saffron)}`, two 24px arrows
+// connecting the steps of the flow, sitting straight on --bg. In light that is 2.12:1. It had been
+// live since the interactive redesign, through the 5 August walk that reported 3,008 text elements
+// and 0 below AA in both appearances, because no pair existed for anything to resolve.
+//
+// ⚠️ AND THE OBVIOUS FIX WAS ALSO WRONG, WHICH IS WHY THE NUMBER IS COMPUTED HERE AND NOT TYPED.
+// var(--saffron-deep) is the palette's answer for saffron-as-ink and it reads 2.95:1 on --bg. The
+// record carried "SAFFRON_DEEP on white at 3.08:1" from 5 August, and that was measured against
+// pure white; the page is --bg (#FBFAF7), not white. Swapping to it would have looked like a fix,
+// passed review, and still failed. A ratio is only ever true of a PAIR.
+//
+// ⚠️ WHAT THIS DELIBERATELY DOES NOT PROVE. A rule with no background of its own may still be
+// rendered inside a tinted card, in which case --bg is the wrong backdrop and this check is
+// merely conservative rather than exact. It is a ratchet, not a renderer: it was run across all
+// public files before being adopted and flagged nothing else, so it cries wolf at nobody today.
+// If a legitimate rule ever trips it, give that rule its own background rather than loosening it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const BG_LIGHT = LIGHT_VAR_MAP['--bg'];
+  const BG_DARK = DARK_VAR_MAP['--bg'];
+  ok('the page background resolved in both themes, so the assertions below are real',
+    Boolean(BG_LIGHT) && Boolean(BG_DARK) && BG_LIGHT !== BG_DARK);
+
+  let checked = 0;
+  const offenders = [];
+  for (const rel of files) {
+    const src = readFileSync(path.join(root, rel), 'utf8');
+    // CSS rules written inside template literals: selector { ...declarations... }
+    for (const m of src.matchAll(/([.#][A-Za-z][\w .>:()[\]="'-]*)\{([^{}]*)\}/g)) {
+      const body = m[2];
+      // A rule that paints its own background is somebody else's pair, handled above.
+      if (/background/.test(body)) continue;
+      const decl = /(?:^|;)\s*color:\s*var\((--[a-z0-9-]+)\)/.exec(body);
+      if (!decl) continue;
+      const v = decl[1];
+      if (!(v in LIGHT_VAR_MAP)) continue;
+      checked += 1;
+      const cl = T.contrast(LIGHT_VAR_MAP[v], BG_LIGHT);
+      const cd = T.contrast(DARK_VAR_MAP[v], BG_DARK);
+      if (cl < T.MIN_CONTRAST || cd < T.MIN_CONTRAST) {
+        offenders.push(`${rel} ${m[1].trim().slice(0, 30)} color:var(${v}) light=${cl.toFixed(2)} dark=${cd.toFixed(2)}`);
+      }
+    }
+  }
+
+  // COUNT YOUR OWN OUTPUT. A loop pointed at nothing passes every assertion it never makes.
+  ok(`the sweep resolved rules to check (${checked}), so the assertion below is not vacuous`,
+    checked >= 40);
+  ok(`🔴 EVERY INK SITTING ON THE PAGE BACKGROUND CLEARS ${T.MIN_CONTRAST}:1 IN BOTH THEMES${offenders.length ? ` (${offenders.join('; ')})` : ''}`,
+    offenders.length === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

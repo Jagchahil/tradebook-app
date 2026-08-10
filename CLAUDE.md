@@ -66,13 +66,13 @@ A WhatsApp-first bookkeeping and tax-prep tool for UK sole traders in trade and 
 
 ---
 
-## Phase 0: What You Are Building Now
+## Status: LAUNCHED. 10 August 2026.
 
-The single goal of Phase 0: **prove the core WhatsApp loop works end-to-end.**
+Lekhio is live at lekhio.app and taking real signups. Phase 0 and the whole of Pillar one, the back office, are shipped: capture on web and WhatsApp with the approval loop, one money spine held to the penny across five surfaces, the full tax engine, lender documents with share links, GDPR export and erasure proven by read back, billing with a 7 day no card trial, and a paywall that is read only, never dark. The gate stands at 208 suites, 15,956 assertions, tsc 0, eslint 0, and launch day was proved by walking production, not by reading this file.
 
-Done = a user can send a WhatsApp photo of a receipt, Lekhio parses it with Claude Vision, stores it in Supabase, replies to the user on WhatsApp with a confirmation, and the transaction appears in a simple web dashboard.
+For the current state read `118_LAUNCHED_THE_STATE_OF_LEKHIO_2026-08-10.md` in the strategy docs corpus first, then doc 81 for deep history. Per the pillar order the Phase 2 gate (Marketing Engine) is now open, but nothing in Phase 2 or 3 gets built until Jag says start.
 
-See `docs/03_BUILD_PLAN.md` for the exact spec.
+`docs/03_BUILD_PLAN.md` holds the original Phase 0 spec, kept for the record.
 
 ---
 

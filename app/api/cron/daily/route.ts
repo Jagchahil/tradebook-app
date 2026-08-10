@@ -69,11 +69,46 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
 // Which endpoints a slot fans out to. Weekday-gated jobs are decided at call time in UTC, because
 // UTC is the clock Vercel's scheduler runs on. getUTCDay: 0 = Sunday ... 5 = Friday.
 function jobsFor(slot: string, day: number): string[] {
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE HOURLY SLOT, AND WHY IT HAD TO EXIST. 10 AUGUST 2026.
+  //
+  // `due` ran in the am slot and nowhere else, so THE REMINDER ENGINE COULD ONLY EVER DELIVER AT
+  // ABOUT 08:00. A man who said "remind me at 3pm" got a row that fell due at 3pm and a text the
+  // NEXT MORNING. Up to twenty four hours late, silently, every single time, on the one feature
+  // whose entire promise is that he can stop carrying the thing himself.
+  //
+  // It hid behind the 10 August gate fault: that reminder happened to be set for 08:00, so the
+  // schedule looked innocent while the gate took the blame. Fixing the gate alone would have left
+  // every 3pm reminder still arriving the following morning, and it would have looked FIXED.
+  //
+  // ⚠️ ONE JOB IN THIS SLOT, DELIBERATELY. Everything else here is genuinely daily work, and the
+  // cheapest way to turn an hourly tick into a bill is to let jobs drift into it because they
+  // happen to be nearby.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (slot === 'hourly') return ['/api/cron/reminders?job=due'];
+
   if (slot === 'am') {
-    // The morning messages. `due` also kicks agent + bankfeed on its own first hop, unchanged.
+    // ⚠️ THE HOUSEKEEPING IS DISPATCHED HERE NOW, NOT RIDDEN ALONG INSIDE `due`.
+    //
+    // pruneOldRows, the bank feed walk and the agent walk used to be kicked by `due` on its first
+    // hop, which meant "once a day" only because `due` ran once a day. The moment `due` went
+    // hourly that became twenty four agent walks and twenty four prunes a day, which is a bill and
+    // an AI spend nobody chose. "hop === 1" was never a way of saying "once a day"; it only looked
+    // like one. The slot that IS once a day says so itself.
+    //
+    // bankfeed is dispatched unconditionally because bankFeedFanOut opens with
+    // `if (!hasBankFeedConfig()) return`, so it is dormant without the keys exactly as before.
+    //
     // voicereap on BOTH slots: it is the only thing that apologises for a voice note the Mac mini
     // never got to, and it used to live behind a door only the mini opens. See that route's header.
-    const jobs = ['/api/cron/reminders?job=due', '/api/cron/trial', '/api/cron/voicereap'];
+    const jobs = [
+      '/api/cron/reminders?job=due',
+      '/api/cron/reminders?job=cleanup',
+      '/api/cron/reminders?job=bankfeed',
+      '/api/cron/agent',
+      '/api/cron/trial',
+      '/api/cron/voicereap',
+    ];
     if (day === 1 || day === 3 || day === 5) jobs.push('/api/cron/reminders?job=nudge'); // Mon/Wed/Fri
     return jobs;
   }

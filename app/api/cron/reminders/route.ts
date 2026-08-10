@@ -449,27 +449,23 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
   try {
     if (job === 'due') {
       if (hop === 1) await cronStarted('due');
-      // One-time side jobs run ONLY on the first invocation (hop 1), before the
-      // resumable send loop, so they always happen exactly once even when the
-      // send loop hands over to a continuation. Housekeeping rides along with the
-      // daily run so no extra cron entry is needed (the Hobby plan caps cron
-      // jobs, and a bad cron config once silently blocked every deploy).
-      if (hop === 1) {
-        const { pruned } = await pruneOldRows();
-        // Kick the bank feed walk and the agent walk as their OWN resumable
-        // chains. Fire and forget: each acks immediately, so the due job never
-        // waits on them. No-ops until those features are switched on.
-        if (hasBankFeedConfig()) await triggerContinuation('bankfeed', null, 1);
-        const cronSecret = process.env.CRON_SECRET;
-        if (cronSecret) {
-          try {
-            await fetch(`${APP_URL}/api/cron/agent`, { headers: { Authorization: `Bearer ${cronSecret}` } });
-          } catch (err) {
-            console.error('[cron] agent kick failed:', err instanceof Error ? err.message : err);
-          }
-        }
-        console.log(`[cron] job=due hop=1 pruned=${pruned} bankfeed=${hasBankFeedConfig() ? 'kicked' : 'dormant'} agent=kicked`);
-      }
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // 🔴 THE HOUSEKEEPING LEFT THIS JOB ON 10 AUGUST 2026, AND IT HAD TO.
+      //
+      // pruneOldRows, the bank feed walk and the agent walk were kicked from here on hop 1, with a
+      // comment saying housekeeping "rides along with the daily run so no extra cron entry is
+      // needed". That was true while `due` ran once a day.
+      //
+      // `due` now runs HOURLY, because a reminder engine dispatched once a day can only ever
+      // deliver at 08:00 and every 3pm reminder arrived the following morning. The instant that
+      // changed, "hop === 1" would have meant TWENTY FOUR agent walks and twenty four prunes a
+      // day: an AI spend and a database load nobody chose, arriving as a bill rather than an error.
+      //
+      // ⚠️ THE LESSON, WHICH IS THE SAME ONE AS THE GATE ABOVE. "hop === 1" was never a way of
+      // saying "once a day". It only behaved like one because of a schedule written somewhere
+      // else, and nothing connected the two. The slot that IS once a day now says so out loud, in
+      // app/api/cron/daily. This job does one thing: it sends reminders that are due.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
 
       // Resumable send. Every returned reminder is atomically claimed
       // (reminded=true) before sending, so the next getDueReminders page never

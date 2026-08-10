@@ -64,14 +64,14 @@ const only = (...rows) => {
 console.log('\nThe cron watchdog\n');
 
 // --- everything is fine -----------------------------------------------------------
-const healthy = only(run('due', 5), run('digest', 2), run('nudge', 20), run('weekly', 40));
+const healthy = only(run('due', 1), run('digest', 2), run('nudge', 20), run('weekly', 40));
 ok('all four ran recently: silence, which is the point', cronAlarms(healthy, NOW).length === 0);
 
 // --- THE FALSE ALARM TEST. This is the one that matters most. ----------------------
 //
 // The weekly brief goes out on Sundays. On a Friday it has legitimately not finished for
 // four and a half days. If that is an alarm, the alarm is useless.
-const friday = only(run('due', 5), run('digest', 2), run('nudge', 50), run('weekly', 110));
+const friday = only(run('due', 1), run('digest', 2), run('nudge', 50), run('weekly', 110));
 ok('the WEEKLY job, quiet for 110h on a Friday, is NOT an alarm', cronAlarms(friday, NOW).length === 0);
 ok('the NUDGE job, quiet 50h over a weekend, is NOT an alarm',
   cronAlarms(only(run('nudge', 50)), NOW).length === 0);
@@ -158,7 +158,25 @@ ok('no rows at all (fresh deploy): NOT an alarm', cronAlarms([], NOW).length ===
 }
 
 // --- the ceilings match vercel.json ------------------------------------------------
-ok('due is daily', MAX_QUIET_HOURS.due === 26);
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 `due` IS HOURLY SINCE 10 AUGUST 2026, AND THE CEILING HAD TO FOLLOW IT.
+//
+// It ran once a day, in the am slot, so a 26h ceiling was CORRECT and the engine could still only
+// ever deliver at about 08:00. A reminder set for 3pm arrived the next morning, every time, and
+// the watchdog had nothing to say because the job was running exactly as scheduled. A ceiling that
+// matches a schedule nobody questioned will happily watch a broken feature for ever.
+//
+// Four hours, not one: three consecutive missed dispatches is a real stoppage, scheduler drift is
+// not, and this file's header is emphatic that a ceiling too tight cries wolf. A too eager alarm
+// paged Jag on launch eve over a perfectly healthy job.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+ok('🔴 due IS HOURLY, NOT DAILY', MAX_QUIET_HOURS.due === 4);
+ok('🔴 AND A REMINDER ENGINE QUIET FOR 5 HOURS IS NOW AN ALARM, which 26h would have called fine',
+  cronAlarms(only(run('due', 5)), NOW).some((a) => a.job === 'due' && a.reason === 'stale'));
+ok('but an hour of quiet is not, so a single missed tick does not cry wolf',
+  cronAlarms(only(run('due', 1)), NOW).length === 0);
+ok('and three missed dispatches are tolerated, which is the drift allowance',
+  cronAlarms(only(run('due', 3)), NOW).length === 0);
 // The agent walk is kicked by the daily `due` job. It was the ONLY cron with no watchdog: it
 // could die mid-chain and every user past the cursor silently stopped getting signals, while the
 // endpoint kept answering 200 and the dashboard stayed green.

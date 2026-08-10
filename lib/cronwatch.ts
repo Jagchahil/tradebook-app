@@ -30,22 +30,43 @@ export interface CronRun {
 // alarm that cries wolf gets muted, and a muted alarm is worse than no alarm because it looks like
 // cover. The two dispatch slots, and what each still triggers:
 //
-//   am   0 7  * * *   -> due, trial, and (Mon/Wed/Fri) nudge
-//   pm   0 23 * * *   -> metrics, digest, and (Sunday) weekly
+//   hourly 0 *  * * *   -> due
+//   am     0 7  * * *   -> due, cleanup, bankfeed, agent, trial, and (Mon/Wed/Fri) nudge
+//   pm     0 23 * * *   -> metrics, digest, and (Sunday) weekly
 //
-//   due     kicked am, daily            -> 26h  (a day, plus room for a late run)
+//   due     kicked hourly              -> 4h   (three missed runs; see below)
 //   digest  kicked pm, daily            -> 26h
-//   agent   kicked by `due`, daily      -> 26h
+//   agent   kicked am, daily            -> 26h
 //   nudge   kicked am, Mon/Wed/Fri      -> 80h  (the real gap is Fri to Mon, 72h)
 //   weekly  kicked pm, Sunday           -> 180h (a week, 168h, plus room)
 //   trial   kicked am, daily            -> 26h
 //   metrics kicked pm, daily            -> 26h  (and it CANNOT be backfilled. See below.)
 export const MAX_QUIET_HOURS: Record<string, number> = {
-  due: 26,
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 26h WAS RIGHT AND IT WAS ALSO WHY NOBODY SAW THE REAL FAULT. TIGHTENED 10 AUGUST 2026.
+  //
+  // `due` ran once a day in the am slot, so a 26 hour ceiling was correct AND it meant the engine
+  // could stop for most of a day without a word. Worse, a job that only ever runs at 08:00 can
+  // only ever deliver at 08:00: a reminder set for 3pm arrived the following morning, every time,
+  // and the watchdog had nothing to say because the job was running exactly as scheduled.
+  //
+  // It is hourly now, so the ceiling has to mean something again.
+  //
+  // ⚠️ FOUR HOURS, NOT ONE, AND THAT NUMBER IS DELIBERATE. This file's own header says a ceiling
+  // too tight cries wolf, and an alarm that cries wolf gets muted, and a muted alarm is worse than
+  // no alarm because it looks like cover. On 9 August a too eager alarm put /api/health at 503 and
+  // paged the founder on launch eve over a job that was perfectly healthy. Four hours tolerates
+  // three consecutive missed dispatches, which is a real stoppage rather than scheduler drift, and
+  // it still catches a dead reminder engine inside a morning instead of inside a day.
+  due: 4,
   digest: 26,
-  // The agent walk. It has no cron entry of its own: the daily `due` job kicks it. It was the one
+  // The agent walk. It has no cron entry of its own: the am dispatcher kicks it. It was the one
   // walk with no watchdog at all, so it could die mid-chain and every user past the cursor would
   // silently stop getting signals while /api/health stayed green.
+  //
+  // ⚠️ IT USED TO BE KICKED BY `due`, WHICH IS EXACTLY WHY IT MOVED. When `due` went hourly, a kick
+  // living inside it would have become twenty four agent walks a day. It is daily work and it is
+  // now dispatched by the slot that is actually daily.
   agent: 26,
   nudge: 80,
   weekly: 180,

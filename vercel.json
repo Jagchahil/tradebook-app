@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/daily?slot=hourly",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/daily?slot=am",
       "schedule": "0 7 * * *"
     },

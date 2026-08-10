@@ -16,7 +16,7 @@ import { sendTemplate } from '../../../../lib/whatsapp';
 import {
   decideTrialNudge, templateFor, paramsFor, trialWeekMessage, trialEndedMessage, type TrialRow,
 } from '../../../../lib/trialnudge';
-import { channelsFor } from '../../../../lib/routing';
+import { channelsFor, templateLegBlock } from '../../../../lib/routing';
 import { templateSendable } from '../../../../lib/watemplates';
 import { sendTrialWeekEmail, sendTrialEndedEmail, hasEmailConfig } from '../../../../lib/email';
 import { weeklyInput, weeklyFigures } from '../../../../lib/weeklyupdate';
@@ -82,7 +82,13 @@ export const maxDuration = 60;
 //
 // Email needs no approval from anybody. lib/routing.ts drops whatsapp_template from the channel
 // list when templateSendable says no, and the email channel stands on its own.
-const TEMPLATES_ON = () => process.env.TRIAL_TEMPLATES_APPROVED === 'true';
+//
+// ⚠️ AND SINCE 10 AUGUST 2026 IT DOES NOT READ THE ENV VAR ITSELF. It was
+// `process.env.TRIAL_TEMPLATES_APPROVED === 'true'`, a hand copy of a rule lib/watemplates.ts owns.
+// The reminder engine held the same hand copy, and that is how a gate stayed shut for two weeks
+// after Meta approved the template, while a customer waited for a text he had been promised.
+// templateLegBlock also picks up the cost kill switch, which this route never consulted at all.
+const TEMPLATES_ON = () => templateLegBlock('trial_ending') === null;
 
 const PAGE_SIZE = 200;
 const BUDGET_MS = 40_000; // leaves room inside maxDuration to finish and hand off cleanly
@@ -198,12 +204,19 @@ export async function GET(req: NextRequest) {
         // 🔴 THE TABLE DECIDES, PER MAN, AT THE MOMENT OF SENDING. A channel we cannot reach him on
         // simply drops out, and lib/routing.ts drops whatsapp_template on its own when the template
         // is not sendable. Nothing here substitutes one channel for another.
+        //
+        // ⚠️ hasWhatsApp MEANS "WE CAN REACH HIM THERE", NOTHING ELSE. It used to read
+        // `Boolean(job.row.phone) && TEMPLATES_ON()`, which folded the gate into the reachability
+        // question and used trial_ending's gate for BOTH nudges. Harmless only because the two
+        // templates happen to share a switch today. channelsFor is given the actual type on the
+        // line above and already asks the gate for THAT type, so the answer stays right the day
+        // they stop sharing.
         const channels = channelsFor(
           job.nudge === 'warn' ? 'trial_ending' : 'trial_ended',
           {
             hasPush: false,
             hasEmail: Boolean(email) && hasEmailConfig(),
-            hasWhatsApp: Boolean(job.row.phone) && TEMPLATES_ON(),
+            hasWhatsApp: Boolean(job.row.phone),
           },
         );
 

@@ -243,8 +243,14 @@ export function globalDailyCapFor(activeSubscribers: number, now: Date = new Dat
 
 // The emergency brake. Only the exact string "false" disables, so a typo never
 // silently mutes real reminders.
-export function waSendsEnabled(): boolean {
-  return (process.env.WHATSAPP_SENDS_ENABLED ?? '') !== 'false';
+//
+// ⚠️ THE env PARAMETER EXISTS SO THERE IS ONLY EVER ONE READ OF THIS VARIABLE. lib/routing.ts asks
+// this question on behalf of BOTH the reminder cron and the WhatsApp agent's promise. A second
+// hand rolled read of WHATSAPP_SENDS_ENABLED somewhere else is precisely how a promise and a send
+// drift apart, which is the 10 August fault. Injectable so routing's test can exercise the real
+// function rather than a copy of it.
+export function waSendsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.WHATSAPP_SENDS_ENABLED ?? '') !== 'false';
 }
 
 // Have we reached today's send budget? The caller stops the run when true, so a

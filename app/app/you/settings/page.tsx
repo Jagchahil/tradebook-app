@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { readNudgePrefs, readIdentityCard } from '../../../../lib/supabase';
-import { T_NUDGE, templateSendable } from '../../../../lib/watemplates';
+import { templateLegBlock } from '../../../../lib/routing';
 import { settingsNotice } from '../identity';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
@@ -84,8 +84,8 @@ export default async function SettingsPage({
   //
   // The page opens with "These are the only messages Lekhio ever sends without you asking first",
   // then described a nudge at the end of a working day and showed it switched ON. It has never
-  // gone out: app/api/cron/reminders bails at templateSendable(T_NUDGE) because Meta has not
-  // approved the template, and it says so in its own skip reason.
+  // gone out: app/api/cron/reminders bails at templateLegBlock('nudge') because the nudge's gate is
+  // shut, and the cron says exactly that in its own skip reason.
   //
   // 🔴 AND EVEN APPROVED IT ONLY REACHES A CONNECTED PHONE. The nudge is sendTemplate(t.phone,
   // T_NUDGE), WhatsApp and nothing else, so a man who signed up on the web and never connected a
@@ -104,7 +104,13 @@ export default async function SettingsPage({
     readIdentityCard(user.id).catch(() => null),
   ]);
   // Unknown is not a promise. A failed read draws no daily row rather than claiming one.
-  const dailyCanFire = templateSendable(T_NUDGE) && Boolean(card?.phone);
+  //
+  // ⚠️ templateLegBlock, NOT templateSendable, SINCE 10 AUGUST 2026. This asked half the question:
+  // it saw the Meta gate but not the WHATSAPP_SENDS_ENABLED kill switch, so with proactive sends
+  // switched off this page still offered a switch for a message that could not leave the building.
+  // The cron, the WhatsApp promise and this page now all read the one function, so a row here can
+  // never again advertise something the sender has already decided not to do.
+  const dailyCanFire = templateLegBlock('nudge') === null && Boolean(card?.phone);
   const current = prefs === null || prefs === 'none'
     ? { daily_nudges: true, weekly_summary: true }
     : prefs;

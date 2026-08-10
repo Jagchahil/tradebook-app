@@ -29,7 +29,12 @@
 // PURE. No I/O, no database, no network, no clock. It decides, it never sends. The sending stays
 // where it already lives: lib/whatsapp.ts, lib/email.ts, lib/push.ts, per CLAUDE.md rules 3 and 4.
 
-import { findTemplate, templateSendable, T_NUDGE, T_REMINDER, T_TRIAL_ENDING, T_TRIAL_ENDED, T_AGENT_THRESHOLD, T_AGENT_DEADLINE, T_AGENT_OPPORTUNITY } from './watemplates';
+import { findTemplate, templateSendable, gateFor, T_NUDGE, T_REMINDER, T_TRIAL_ENDING, T_TRIAL_ENDED, T_AGENT_THRESHOLD, T_AGENT_DEADLINE, T_AGENT_OPPORTUNITY } from './watemplates';
+// ⚠️ THE ONLY IMPORT THIS FILE HAS BEYOND THE REGISTRY, AND IT IS DELIBERATE. templateLegBlock
+// below has to answer "can this actually go out", and the kill switch is half that answer. Reading
+// WHATSAPP_SENDS_ENABLED here by hand would be a second copy of a rule margin.ts already owns.
+// margin.ts itself stays import free, so nothing about that constraint changes.
+import { waSendsEnabled } from './margin';
 
 // ── The channels ─────────────────────────────────────────────────────────────────────────
 //
@@ -283,6 +288,65 @@ export function channelsFor(
     // templateSendable rather than reading an env var keeps one answer to "can we send this".
     return to.hasWhatsApp && !!route.template && templateSendable(route.template, env);
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHY THE TEMPLATE LEG OF A MESSAGE TYPE CANNOT GO OUT, IN WORDS, OR null IF IT CAN.
+//
+// THE FAULT THIS EXISTS TO MAKE IMPOSSIBLE, 10 AUGUST 2026.
+//
+// A man asked the WhatsApp agent to remind him about a job at 08:00. It wrote his row and
+// replied "Got it. I will remind you on Mon 10 Aug, 08:00." At 08:00 the cron ran exactly on time
+// and sent nothing, because its own line reads:
+//
+//     const dueSendsOn = waSendsEnabled() && templateSendable(T_REMINDER);
+//
+// and the gate was shut. The reply had never asked that question. TWO PLACES DECIDED THE SAME
+// THING AND ONLY ONE OF THEM KNEW IT: the half that promises had no idea what the half that
+// delivers was going to do, and there was no moment at which anybody had to notice.
+//
+// So the question now has ONE implementation and both halves call it. A promise cannot outrun a
+// send, because the sentence and the send are reading the same answer.
+//
+// ⚠️ IT RETURNS A REASON RATHER THAN A BOOLEAN, and that is not decoration. A boolean forces the
+// caller to invent its own explanation, which is how the nudge's skip message ended up hardcoding
+// the wrong env var name, and how `sent=0` ended up meaning both "switched off" and "nothing was
+// due". The reason travels with the refusal to the log, the watchdog row and the customer.
+//
+// ⚠️ THIS IS THE TEMPLATE LEG ONLY. A type routed to push or email as well can still reach him by
+// those; this answers the narrower question the paid channel actually asks. Free channels are
+// never gated, so a type with no billable leg is never blocked here.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// Which message type carries this template. The reverse of route.template, so a caller holding a
+// template name (app/api/cron/agent picks one per signal) can ask templateLegBlock without keeping
+// its own second map of names to types. A name the table does not carry is null, never a guess.
+export function typeForTemplate(name: string): MessageType | null {
+  return ROUTES.find((r) => r.template === name)?.type ?? null;
+}
+
+export function templateLegBlock(
+  type: MessageType,
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  const route = routeFor(type);
+  if (!route) return `no route is declared for ${type}`;
+  if (!route.channels.includes('whatsapp_template')) return null;
+  // The cost kill switch first, because it outranks everything and says something different: the
+  // template may be perfectly fine and we have simply stopped spending.
+  if (!waSendsEnabled(env)) {
+    return 'proactive WhatsApp sends are switched off (WHATSAPP_SENDS_ENABLED=false)';
+  }
+  const name = route.template;
+  // routesWithBadTemplateWiring() already makes this unreachable and the test pins it. Answered
+  // rather than assumed, because a refusal with no reason is the thing this function exists to end.
+  if (!name) return `${type} says whatsapp_template but names no template`;
+  if (!templateSendable(name, env)) {
+    const gate = gateFor(name);
+    return gate
+      ? `${name} is not switched on yet (set ${gate}=true once it is Active in WhatsApp Manager)`
+      : `${name} is not approved in Meta yet`;
+  }
+  return null;
 }
 
 // ── The cost side ────────────────────────────────────────────────────────────────────────────

@@ -30,12 +30,26 @@ const repo = path.resolve(here, '..');
 const lib = path.join(repo, 'lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'routing-'));
 
-// routing.ts imports watemplates.ts, so both are staged together. The extensionless import has to
-// gain a .ts on the way in: Next resolves it, bare Node under type stripping does not. Same fix as
-// test/announcements.test.mjs, which stages lib/housestyle.ts the same way.
-const fix = (s) => s.replace("from './watemplates'", "from './watemplates.ts'");
-writeFileSync(path.join(stage, 'watemplates.ts'), readFileSync(path.join(lib, 'watemplates.ts'), 'utf8'));
-writeFileSync(path.join(stage, 'routing.ts'), fix(readFileSync(path.join(lib, 'routing.ts'), 'utf8')));
+// routing.ts imports watemplates.ts, and since 10 August margin.ts as well, which in turn imports
+// aicost.ts. The extensionless import has to gain a .ts on the way in: Next resolves it, bare Node
+// under type stripping does not. Same fix as test/announcements.test.mjs, which stages
+// lib/housestyle.ts the same way.
+//
+// ⚠️ THE WHOLE OF lib/ IS STAGED RATHER THAN A NAMED LIST, AND THAT IS THE 10 AUGUST LESSON IN
+// MINIATURE. The list used to be two files. templateLegBlock started asking waSendsEnabled(), so it
+// became three, and margin.ts's own import made it four. A hand maintained list of transitive
+// dependencies is a thing that goes stale silently and fails as a module resolution error nobody
+// expected, which is a small cousin of the fault this whole push is about. Staging every lib file
+// costs milliseconds and cannot go out of date. Only what routing actually imports gets executed.
+//
+// ⚠️ AND margin.ts IS STAGED RATHER THAN STUBBED, ON PURPOSE. The entire point of templateLegBlock
+// is that the kill switch has ONE implementation. A test that stubbed it would be exercising a
+// second copy of the rule while claiming to test the first.
+const fix = (s) => s.replace(/from '\.\/([A-Za-z0-9_-]+)'/g, "from './$1.ts'");
+for (const f of readdirSync(lib)) {
+  if (!f.endsWith('.ts')) continue;
+  writeFileSync(path.join(stage, f), fix(readFileSync(path.join(lib, f), 'utf8')));
+}
 const R = await import(pathToFileURL(path.join(stage, 'routing.ts')).href);
 const W = await import(pathToFileURL(path.join(stage, 'watemplates.ts')).href);
 
@@ -273,10 +287,23 @@ ok('🔴 the Sunday walk leaves a man mid trial alone', /trialingUserIds/.test(s
 // 🔴 THE TRIAL GATE STOPS THE TEMPLATE, NOT THE MESSAGE. TRIAL_TEMPLATES_APPROVED used to wrap the
 // whole cron, so an unset flag (it is unset today) meant silence by every route including email.
 const trialSrc = src(TRIAL_ROUTE);
+// ⚠️ REWRITTEN 10 AUGUST 2026, AND THE INTENT IS UNCHANGED. This used to pin the literal
+// `hasWhatsApp: Boolean(job.row.phone) && TEMPLATES_ON()`, which folded the gate into the
+// REACHABILITY question and, worse, used trial_ending's gate for both nudges. Harmless only while
+// the two templates happen to share a switch. hasWhatsApp now means what its name says, and the
+// gate lives where the comment above always claimed it did: inside channelsFor, per type, touching
+// the template leg and nothing else.
+ok('🔴 hasWhatsApp IS REACHABILITY ONLY: no gate folded into "can we reach him"',
+  /hasWhatsApp: Boolean\(job\.row\.phone\),/.test(trialSrc));
+ok('🔴 AND THE GATE IS ASKED PER TYPE, by the table, at the moment of sending',
+  /channelsFor\(\s*\n?\s*job\.nudge === 'warn' \? 'trial_ending' : 'trial_ended'/.test(trialSrc));
 ok('🔴 the template gate no longer decides whether he hears anything at all',
-  /hasWhatsApp: Boolean\(job\.row\.phone\) && TEMPLATES_ON\(\)/.test(trialSrc));
+  /channels\.includes\('email'\)/.test(trialSrc));
 ok('and the email send is not behind that gate',
   !/TEMPLATES_ON\(\)[\s\S]{0,200}sendTrialWeekEmail/.test(trialSrc));
+// The WhatsApp leg is still gated, and still asks the registry rather than an env var of its own.
+ok('the WhatsApp leg is still refused when the template cannot be sent',
+  /templateSendable\(templateFor\(job\.nudge\)\)/.test(trialSrc));
 
 // Reaching nobody is COUNTED. The difference between a quiet week and a broken channel is whether
 // that number is on the page.

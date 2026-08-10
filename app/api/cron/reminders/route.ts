@@ -14,15 +14,15 @@ import {
   addWaSend,
   countActiveSubscribers,
 } from '../../../../lib/supabase';
-import { waSendsEnabled, waBudgetExceeded, globalDailyCapFor } from '../../../../lib/margin';
+import { waBudgetExceeded, globalDailyCapFor } from '../../../../lib/margin';
 import { sendTemplate, hasSendConfig } from '../../../../lib/whatsapp';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
-import { T_NUDGE, T_REMINDER, templateSendable } from '../../../../lib/watemplates';
+import { T_NUDGE, T_REMINDER } from '../../../../lib/watemplates';
 import { hasBankFeedConfig } from '../../../../lib/bankfeed';
 import {
   listWeeklyTargetsPage, emailsForUsers, trialingUserIds,
 } from '../../../../lib/supabase';
-import { channelsFor } from '../../../../lib/routing';
+import { channelsFor, templateLegBlock } from '../../../../lib/routing';
 import { sendWeeklyReadyEmail, hasEmailConfig } from '../../../../lib/email';
 import { syncPageResumable } from '../../../../lib/banksync';
 
@@ -169,18 +169,14 @@ async function fanOut(startAfter: string | null, hop: number): Promise<void> {
   // not to it. Gating a free send on a cost brake would mean a man stops hearing that his numbers
   // are ready because we are watching a bill he is not on.
 
-  // Emergency brake: if proactive sends are switched off, do nothing. This is the
-  // cost kill switch (scale audit); inbound service replies are unaffected.
-  if (!waSendsEnabled()) {
-    await skippedOnPurpose(job, startAfter, 'proactive WhatsApp sends are switched off (WHATSAPP_SENDS_ENABLED=false)');
-    return;
-  }
-
-  // A nudge cannot go out until Meta has approved the template. This is the gate the reminder
-  // engine never had, and its absence is exactly why four bad template names sat here unnoticed:
-  // there was nothing that had to be switched on, so there was nothing anybody had to check.
-  if (!templateSendable(T_NUDGE)) {
-    await skippedOnPurpose(job, startAfter, `${T_NUDGE} is not approved in Meta yet (set REMINDER_TEMPLATES_APPROVED=true once it is)`);
+  // ⚠️ ONE CALL WHERE THERE WERE TWO, AND THE MESSAGE IS DERIVED RATHER THAN TYPED. This was a
+  // kill switch check and a template check with a hand written reason, and that reason hardcoded
+  // "set REMINDER_TEMPLATES_APPROVED=true". On 10 August the nudge moved to its own gate,
+  // NUDGE_TEMPLATES_APPROVED, and a hardcoded string would have carried on confidently naming the
+  // wrong switch at whoever was trying to fix it. templateLegBlock reads the gate off the registry.
+  const nudgeBlock = templateLegBlock(job);
+  if (nudgeBlock) {
+    await skippedOnPurpose(job, startAfter, nudgeBlock);
     return;
   }
   // The day's send ceiling, DERIVED from the live paying base and the margin
@@ -482,13 +478,30 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
       // the budget is spent mid set, hand over to a continuation of the due job.
       const started = Date.now();
       let sent = 0;
-      // Respect the proactive-send kill switch. Due reminders are not claimed
-      // when sends are off, so they stay due and go out once sending resumes.
-      // Same two gates as the nudge: the cost kill switch, and Meta having actually approved the
-      // template. A due reminder is not claimed when either is off, so it stays due and goes out
-      // once sending resumes, rather than being burned on a send that cannot land.
-      const dueSendsOn = waSendsEnabled() && templateSendable(T_REMINDER);
-      for (; dueSendsOn; ) {
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // 🔴 THE REFUSAL IS ASKED FOR BY NAME AND CARRIES A REASON. 10 AUGUST 2026.
+      //
+      // This used to read `waSendsEnabled() && templateSendable(T_REMINDER)`, a bare boolean, and
+      // when it was false the loop below simply never ran and the job logged
+      //
+      //     [cron] job=due hop=1 sent=0 complete
+      //
+      // which is the EXACT line it logs on a quiet morning when nothing happened to be due. On 10
+      // August that line was printed while a man's reminder sat unsent, and it looked like a
+      // healthy no-op. Sixth instance of the house disease: a signal that cannot tell "no" from
+      // "nothing".
+      //
+      // templateLegBlock is the same call the WhatsApp agent makes before it PROMISES a reminder
+      // (app/api/whatsapp/route.ts, scheduleSentence), so the sentence and the send can no longer
+      // disagree. Its answer is a reason, and the reason goes to the log AND the watchdog row.
+      //
+      // ⚠️ NOTHING IS CLAIMED WHEN BLOCKED, which is unchanged and is why 10 August is recoverable:
+      // a due reminder that could not be sent is still due, and goes out on the first run after the
+      // gate opens rather than being burned on a send that cannot land.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      const dueBlock = templateLegBlock('reminder_due');
+      if (dueBlock) console.log(`[cron] job=due not sending: ${dueBlock}`);
+      for (; !dueBlock; ) {
         const due = await getDueReminders(new Date().toISOString(), PAGE_SIZE);
         if (due.length === 0) break;
         await mapLimit(due, 20, async (r) => {
@@ -510,8 +523,10 @@ async function runJob(job: string, afterId: string | null, hop: number): Promise
           return;
         }
       }
-      console.log(`[cron] job=due hop=${hop} sent=${sent} complete`);
-      await cronFinished('due', true, hop);
+      // The reason rides all the way out. `sent=0 complete` on its own was the whole fault, so it
+      // is no longer a sentence this job is capable of printing when it has been switched off.
+      console.log(`[cron] job=due hop=${hop} sent=${sent} ${dueBlock ? `blocked: ${dueBlock}` : 'complete'}`);
+      await cronFinished('due', true, hop, dueBlock ? `sending blocked: ${dueBlock}` : undefined);
     } else if (job === 'nudge' || job === 'weekly') {
       if (job === 'weekly') await weeklyFanOut(afterId, hop);
       else await fanOut(afterId, hop);

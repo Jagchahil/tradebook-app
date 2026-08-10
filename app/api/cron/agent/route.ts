@@ -40,6 +40,7 @@ import {
 } from '../../../../lib/supabase';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
 import { T_AGENT_THRESHOLD, T_AGENT_DEADLINE, T_AGENT_OPPORTUNITY } from '../../../../lib/watemplates';
+import { templateLegBlock, typeForTemplate } from '../../../../lib/routing';
 import { computeSignalsForStructure, applyPingCaps, type AgentInput, type AgentSignal } from '../../../../lib/agent';
 import { mtdStatedFrom } from '../../../../lib/circumstances';
 
@@ -192,14 +193,41 @@ async function processUser(user: {
   );
 
   let pinged = 0;
-  const sendEnabled = process.env.AGENT_TEMPLATES_APPROVED === 'true' && hasSendConfig();
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 TWO FAULTS FIXED HERE ON 10 AUGUST 2026, AND THE SECOND ONE IS A COST HOLE.
+  //
+  // This line read `process.env.AGENT_TEMPLATES_APPROVED === 'true' && hasSendConfig()`.
+  //
+  //   1. IT READ THE ENV VAR DIRECTLY, going round lib/watemplates.ts, which is the one place that
+  //      knows which switch belongs to which template. The reminder engine did the same thing and
+  //      it is what let a gate go stale for two weeks while a customer waited for a text. A hand
+  //      copied gate is a gate that stops being true the day a template moves.
+  //
+  //   2. 🔴 IT DID NOT RESPECT WHATSAPP_SENDS_ENABLED. Every other proactive sender in this
+  //      codebase checks the cost kill switch. This one never did, so pulling the emergency brake
+  //      stopped the reminders and the digest and left Rakha's paid pings going out. A brake that
+  //      stops most of the wheels is not a brake, and nobody would have found that out until the
+  //      day it was pulled in anger.
+  //
+  // templateLegBlock asks both questions, per template, off the routing table.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   const newPings = inserted.filter((r) => r.priority === 'ping');
-  if (sendEnabled && newPings.length > 0 && user.phone_number) {
+  if (hasSendConfig() && newPings.length > 0 && user.phone_number) {
     if (await agentPingPref(user.id)) {
       for (const row of newPings) {
         const s = bySignal.get(row.signal_key);
         const template = TEMPLATE_FOR[row.signal_key];
         if (!s || !template) continue;
+        // Asked per row rather than once, because the three agent templates are three separate
+        // routing rows and nothing guarantees for ever that they share one switch.
+        const type = typeForTemplate(template);
+        const block = type ? templateLegBlock(type) : `${template} is not in the routing table`;
+        if (block) {
+          // ⚠️ NOT MARKED DELIVERED. A ping we did not send is still owed, exactly like a due
+          // reminder that could not go out, and it goes on the first run after the gate opens.
+          console.log(`[cron] agent ping held: ${block}`);
+          continue;
+        }
         await sendTemplate(user.phone_number, template, 'en_GB', [s.waText]);
         await markAgentSignalDelivered(row.id);
         await logAgentDelivery(user.id, row.signal_key);

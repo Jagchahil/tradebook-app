@@ -31,14 +31,30 @@
 //   not_submitted nobody has created it yet. A send WILL FAIL.
 export type MetaStatus = 'approved' | 'in_review' | 'not_submitted';
 
-// ✅ OBSERVED IN WHATSAPP MANAGER ON 27 JULY 2026, not inferred. Every status below was read off
-// Meta's own console that evening. Meta shows an approved template as "Active", sometimes as
-// "Active, quality pending", which means approved and sendable with no quality data accumulated yet.
+// ✅ RE-OBSERVED IN WHATSAPP MANAGER ON 10 AUGUST 2026, not inferred. Every status below was read
+// off Meta's own console. Meta shows an approved template as "Active", sometimes as "Active,
+// quality pending", which means approved and sendable with no quality data accumulated yet.
+//
+// ⚠️ AND THE RE-READ IS THE POINT. THIS FILE WENT STALE AND IT COST A CUSTOMER A REMINDER.
+//
+// The statuses were last read on 27 July, when lekhio_reminder and lekhio_nudge were genuinely
+// in_review. Meta approved them at some point after that, and nothing in this repo could ever have
+// noticed: the status is the one field here that no test can verify, because only Meta knows it.
+//
+// So on 10 August a man asked for a reminder, was told "I will remind you on Mon 10 Aug, 08:00",
+// and got nothing, because the gate that existed for a template that WAS unapproved was still shut
+// two weeks after the template went live. Nobody was wrong. The file simply stopped being true and
+// there was no moment at which anybody had to look.
+//
+// 🔴 SO RE-READ THIS CONSOLE WHENEVER A GATE IS ABOUT TO BE FLIPPED, and write the date above. A
+// status that carries a date somebody has to update is the closest a repo can get to knowing a
+// thing it cannot see.
 //
 // One leftover worth knowing about: a SECOND lekhio_reminder exists in plain "English" as well as
 // English (UK), from a mis-set language on a first attempt. It was deliberately NOT deleted, because
 // Meta blocks reuse of a deleted template name for up to 30 days and that would have left reminders
 // dead until late August. The code sends en_GB and finds the right one. Tidy it up after that.
+// Still present on 10 August, both showing Active.
 
 export interface WaTemplate {
   name: string;
@@ -73,7 +89,32 @@ export const T_AGENT_OPPORTUNITY = 'agent_opportunity';
 
 // The gates. Named here so the registry and the routes cannot disagree about the spelling of an
 // env var, which is its own species of silent failure.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE REMINDER AND THE NUDGE HAVE SEPARATE GATES, AND THEY MUST STAY SEPARATE.
+//
+// Until 10 August 2026 one switch, REMINDER_TEMPLATES_APPROVED, controlled both. They are not the
+// same kind of message and they do not deserve the same decision:
+//
+//   lekhio_reminder  ONE message, to ONE man, at a time HE chose, because he ASKED us to remember
+//                    something. He is expecting it. Two to six a month. Not sending it is a broken
+//                    promise, and on 10 August that is exactly what happened.
+//   lekhio_nudge     A daily "do not forget your expenses" to EVERY customer with a number, that
+//                    nobody asked for, on a metered channel. lib/routing.ts already records this
+//                    row as a candidate to move off WhatsApp entirely: it is the weekly summary
+//                    problem thirty times over.
+//
+// One switch meant the only way to keep a promise to one man was to start a daily paid broadcast
+// to everybody. Nobody would ever choose that trade, so the switch stayed off and the promise
+// stayed broken. Splitting them is what makes the safe move actually available.
+//
+// ⚠️ THE EXISTING VAR NARROWS TO THE REMINDER RATHER THAN THE NUDGE, ON PURPOSE. Anyone acting on
+// old notes and setting REMINDER_TEMPLATES_APPROVED=true now switches on strictly less than it
+// used to: the message a customer asked for, and not the broadcast. A rename that made a familiar
+// switch do MORE than it did is how you get an accident on a Friday.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export const GATE_REMINDERS = 'REMINDER_TEMPLATES_APPROVED';
+export const GATE_NUDGE = 'NUDGE_TEMPLATES_APPROVED';
 export const GATE_TRIAL = 'TRIAL_TEMPLATES_APPROVED';
 export const GATE_AGENT = 'AGENT_TEMPLATES_APPROVED';
 
@@ -81,16 +122,19 @@ export const WA_TEMPLATES: WaTemplate[] = [
   {
     name: T_NUDGE,
     language: 'en_GB',
+    // Active in WhatsApp Manager, read 10 August 2026. Approved is NOT the same as wanted: the
+    // gate below stays off because a daily paid broadcast is a business decision, not a status.
+    meta: 'approved',
     params: 0,
-    meta: 'in_review',
-    gate: GATE_REMINDERS,
+    gate: GATE_NUDGE,
     purpose: 'The daily "do not forget your expenses" nudge.',
   },
   {
     name: T_REMINDER,
     language: 'en_GB',
     params: 1,
-    meta: 'in_review',
+    // Active in WhatsApp Manager, read 10 August 2026.
+    meta: 'approved',
     gate: GATE_REMINDERS,
     purpose: 'A reminder the customer asked us to set, {{1}} is its title.',
   },
@@ -185,6 +229,15 @@ export function findTemplate(name: string): WaTemplate | undefined {
 // you have seen it approved in WhatsApp Manager, and you are allowed to drop its gate.
 export function ungatedAndUnapproved(): WaTemplate[] {
   return WA_TEMPLATES.filter((t) => t.meta !== 'approved' && !t.gate);
+}
+
+// The env var that would have to be set to 'true' for this template to go out, or null when it is
+// ungated. Exists so a log line or an operator message can NAME the switch instead of hardcoding
+// it: the nudge's skip message said "set REMINDER_TEMPLATES_APPROVED=true" and stayed saying it
+// after the nudge moved to its own gate, which is a wrong instruction printed with total
+// confidence. Derive it, never retype it.
+export function gateFor(name: string): string | null {
+  return findTemplate(name)?.gate ?? null;
 }
 
 // True when this template may actually be sent right now: approved in Meta, or its gate is on.

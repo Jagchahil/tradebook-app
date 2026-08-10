@@ -43,7 +43,7 @@ import {
 } from '../../../lib/walink';
 // 🔴 THE TABLE'S FIRST REAL CALLER. Until item 4 it described where every message should go and
 // governed nothing, which is a document with a type annotation on it. handleConnectCode asks it.
-import { channelsFor } from '../../../lib/routing';
+import { channelsFor, templateLegBlock } from '../../../lib/routing';
 import { gateForUser } from '../../../lib/gateserver';
 import { READONLY_LINE } from '../../../lib/gate';
 import {
@@ -2788,9 +2788,35 @@ async function scheduleSentence(from: string, body: string): Promise<string | nu
   if (!parsed) {
     return 'I could not work out a time for that. Try, for example, "remind me to price up Dave\'s job tomorrow at 8am".';
   }
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE PROMISE ASKS THE SENDER WHETHER IT CAN BE KEPT. 10 AUGUST 2026, AND THIS ONE HURT.
+  //
+  // At 13:23 on 9 August this function replied "Got it. I will remind you on Mon 10 Aug, 08:00."
+  // At 08:00 the cron ran perfectly, on time, and sent nothing, because ITS line was
+  // `waSendsEnabled() && templateSendable(T_REMINDER)` and the gate was shut. Two halves of one
+  // feature, each correct on its own, and only one of them had ever been asked the question.
+  //
+  // The diary row is real and it is in the app. What was not real was the sentence about a text.
+  // That is worse than a missing feature: he asked us to remember so that HE could stop, and he
+  // finds out on the morning it mattered, which is the morning it is no longer worth knowing.
+  //
+  // templateLegBlock is the SAME call the cron makes before it sends. Not a copy of the rule, the
+  // rule. A promise here cannot outrun a send there, because there is only one answer to read.
+  //
+  // ⚠️ THE ROW IS STILL WRITTEN WHEN THE TEXT CANNOT GO. The diary is the product, the message is
+  // the delivery, and losing his entry because we cannot text him about it would be the wrong half
+  // to drop. It also means nothing is lost: a reminder that could not be sent stays due and goes
+  // out on the first run after the gate opens.
+  //
+  // ⚠️ AND THE HONEST BRANCH NAMES THE PLACE HE CAN SEE IT. "I cannot text you" on its own leaves
+  // him with a diary entry he does not know exists.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 THE DIARY WRITE IS LAST, AND NOTHING AWAITED MAY BE ADDED AFTER IT.
   await createEvent(userId, { title: parsed.title, kind: parsed.kind, starts_at: parsed.starts_at, remind_at: parsed.remind_at });
   const when = parsed.remind_at ? formatWhen(parsed.remind_at) : 'when it is due';
+  if (templateLegBlock('reminder_due') !== null) {
+    return `Saved. "${parsed.title}" is in your diary for ${when}. I cannot text you reminders yet, so keep an eye on it in the app.`;
+  }
   return `Got it. "${parsed.title}". I will remind you ${when}. 👍`;
 }
 

@@ -391,9 +391,14 @@ for (const href of ['/app/you', '/app/you/circumstances', '/app/connect', '/app/
 
   ok('\ud83d\udd34 THE DAILY REMINDER ROW IS DRAWN ONLY WHEN IT COULD ACTUALLY BE SENT',
     /\{dailyCanFire \? \(/.test(setCode) && /which="daily_nudges"/.test(setCode));
+  // \u26a0\ufe0f STRENGTHENED 10 AUGUST 2026. This used to pin the literal templateSendable(T_NUDGE)
+  // in both files, which proved they read the same FUNCTION but not the same QUESTION: the page
+  // asked only about the Meta gate and never about the WHATSAPP_SENDS_ENABLED kill switch, so with
+  // sends switched off it still offered a switch for a message that could not leave the building.
+  // templateLegBlock('nudge') is the whole question, and all three callers now ask it.
   ok('\ud83d\udd34 AND IT ASKS THE GATE THE CRON ITSELF ASKS, never a second copy of the answer',
-    /templateSendable\(T_NUDGE\)/.test(setCode)
-    && /templateSendable\(T_NUDGE\)/.test(codeOnly(read('app/api/cron/reminders/route.ts'))));
+    /templateLegBlock\('nudge'\)/.test(setCode)
+    && /templateLegBlock\(job\)/.test(codeOnly(read('app/api/cron/reminders/route.ts'))));
   ok('\ud83d\udd34 AND IT ASKS FOR A PHONE TOO, because the nudge is WhatsApp and nothing else',
     /Boolean\(card\?\.phone\)/.test(setCode)
     && /sendTemplate\(t\.phone, T_NUDGE/.test(codeOnly(read('app/api/cron/reminders/route.ts'))));

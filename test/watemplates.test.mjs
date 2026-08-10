@@ -119,8 +119,36 @@ for (const g of gates) {
 // template and obey the flag for a gated one.
 ok('templateSendable refuses an unknown template', R.templateSendable('lekhio_nope', {}) === false);
 ok('templateSendable refuses a gated template when the flag is off', R.templateSendable(R.T_NUDGE, {}) === false);
-ok('templateSendable allows a gated template when the flag is on', R.templateSendable(R.T_NUDGE, { [R.GATE_REMINDERS]: 'true' }) === true);
-ok('templateSendable is not fooled by a truthy non true value', R.templateSendable(R.T_NUDGE, { [R.GATE_REMINDERS]: '1' }) === false);
+ok('templateSendable allows a gated template when the flag is on', R.templateSendable(R.T_NUDGE, { [R.GATE_NUDGE]: 'true' }) === true);
+ok('templateSendable is not fooled by a truthy non true value', R.templateSendable(R.T_NUDGE, { [R.GATE_NUDGE]: '1' }) === false);
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE REMINDER AND THE NUDGE ARE ON SEPARATE SWITCHES. 10 AUGUST 2026.
+//
+// One switch used to control both, which meant the only way to keep a promise to ONE man who
+// asked for ONE reminder was to also start a daily paid broadcast to EVERYBODY. Nobody would ever
+// make that trade, so nobody flipped it, so the promise stayed broken for two weeks after Meta had
+// already approved the template.
+//
+// Asserted by BEHAVIOUR rather than by reading the gate field, because what matters is that
+// turning one on leaves the other off. Comparing the strings would still pass if templateSendable
+// consulted the wrong one.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+ok('🔴 THE TWO GATES ARE DIFFERENT ENV VARS', R.GATE_REMINDERS !== R.GATE_NUDGE);
+ok('🔴 SWITCHING REMINDERS ON DOES NOT START THE DAILY BROADCAST',
+  R.templateSendable(R.T_REMINDER, { [R.GATE_REMINDERS]: 'true' }) === true
+  && R.templateSendable(R.T_NUDGE, { [R.GATE_REMINDERS]: 'true' }) === false);
+ok('and switching the broadcast on does not silently enable reminders either',
+  R.templateSendable(R.T_NUDGE, { [R.GATE_NUDGE]: 'true' }) === true
+  && R.templateSendable(R.T_REMINDER, { [R.GATE_NUDGE]: 'true' }) === false);
+
+// gateFor exists so a log line or an operator message NAMES the switch rather than hardcoding it.
+// The nudge's skip message hardcoded "set REMINDER_TEMPLATES_APPROVED=true" and would have carried
+// on saying exactly that after the nudge moved gates, pointing at the wrong lever with total
+// confidence at whoever was trying to fix it.
+ok('gateFor names the reminder switch', R.gateFor(R.T_REMINDER) === R.GATE_REMINDERS);
+ok('gateFor names the nudge switch', R.gateFor(R.T_NUDGE) === R.GATE_NUDGE);
+ok('gateFor is null for a template nobody declared', R.gateFor('lekhio_nope') === null);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 console.log('\n3. NO TEMPLATE NAME LITERAL ESCAPES THE REGISTRY');

@@ -45,7 +45,7 @@
 // never the row.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-import { parseReceipt } from './claude';
+import { parseReceipt, type ReceiptLine } from './claude';
 import { clampReceiptDate } from './waintents';
 import {
   insertTransaction, recentUnconfirmedForMatch, mergeIntoTransaction,
@@ -173,7 +173,11 @@ export async function ingestReceiptImage(args: {
   // ⚠️ THE TWO VAT COLUMNS RIDE ON THE RECORD RATHER THAN BEING NAMED BY NewTransaction, which
   // does not carry them yet. insertTransaction posts the record whole, so the columns land, and
   // widening the shared type is a change to lib/supabase.ts that this file does not own.
-  const row: NewTransaction & { vat_amount?: number; vat_confirmed?: boolean } = {
+  const row: NewTransaction & {
+    vat_amount?: number;
+    vat_confirmed?: boolean;
+    line_items?: ReceiptLine[];
+  } = {
     user_id: userId,
     vendor: parsed.merchant_name,
     // Receipts are an expense, stored negative. The app reads income vs expense from this sign.
@@ -197,6 +201,21 @@ export async function ingestReceiptImage(args: {
     // and confirmTransactionVat is the only thing anywhere that flips it.
     row.vat_confirmed = false;
   }
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT WAS IN THE BASKET, KEPT BECAUSE THE PHOTOGRAPH IS NOT. See the block in lib/claude.ts.
+  //
+  // Only written when there is something to write: an un-itemised receipt stores no column at all
+  // rather than an empty array, so "the paper was not itemised" and "we have not looked" stay
+  // distinguishable in the data, which is the same rule the VAT column above follows.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // ⚠️ OPTIONAL CHAINING ON A FIELD THE TYPE SAYS IS REQUIRED, deliberately. ParsedReceipt
+  // guarantees it for every real caller, and three test suites stub parseReceipt and returned an
+  // object without it, which threw INSIDE the receipt walk and lost the row. A type is a promise
+  // between this file and lib/claude.ts; it is not a promise about every object that ever reaches
+  // here. On the one path where a throw costs a man his evidence, defend the boundary.
+  if (parsed.line_items?.length) {
+    row.line_items = parsed.line_items;
+  }
 
   const write = async (): Promise<boolean> => {
     try {
@@ -207,14 +226,38 @@ export async function ingestReceiptImage(args: {
     }
   };
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 NEITHER OPTIONAL COLUMN MAY EVER COST HIM THE ROW.
+  //
+  // Both vat_amount/vat_confirmed and line_items arrive by an APPLY_*.sql the founder pastes in by
+  // hand. On a database where one has not been run, NAMING the column is enough for PostgREST to
+  // refuse the entire insert, and the man loses his receipt over a field he never asked for.
+  //
+  // ⚠️ THE ORDER IS THE PRIORITY ORDER OF THE EVIDENCE, AND IT IS DELIBERATE. The basket is given
+  // up FIRST: nothing reads it today and it is for a product that does not exist yet. VAT is given
+  // up SECOND: it is money he can actually reclaim. The receipt itself is never given up at all.
+  //
+  // Written as a loop over the droppable fields so a third optional column cannot be added later
+  // by somebody who forgets to widen the retry, which is exactly how the VAT retry came to be the
+  // only one when this file already had two optional fields on it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   let landed = await write();
-  // 🔴 A VAT READING MUST NEVER COST HIM THE ROW. supabase/APPLY_2026-08-01_vat.sql is what adds
-  // these two columns, and on a database where it has not been run yet, naming them is enough
-  // for the whole write to be refused. His receipt is the thing that matters, so the second
-  // attempt drops the reading and keeps the money. Evidence is never a dependency.
-  if (!landed && receiptVat !== null) {
-    delete row.vat_amount;
-    delete row.vat_confirmed;
+  const giveUpInOrder: Array<() => boolean> = [
+    () => {
+      if (!row.line_items) return false;
+      delete row.line_items;
+      return true;
+    },
+    () => {
+      if (row.vat_amount === undefined) return false;
+      delete row.vat_amount;
+      delete row.vat_confirmed;
+      return true;
+    },
+  ];
+  for (const giveUp of giveUpInOrder) {
+    if (landed) break;
+    if (!giveUp()) continue;
     landed = await write();
   }
   if (!landed) return { outcome: 'failed' };

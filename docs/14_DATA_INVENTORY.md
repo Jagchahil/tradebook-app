@@ -17,6 +17,7 @@ Lekhio (Jag, trading as a sole trader, or the limited company once incorporated)
 | Mobile number | The user, at sign up | Links their WhatsApp to their account, the core of the product | Performance of the contract |
 | Email (optional) | The user | Contact and the early access list | Consent for marketing, contract for service email |
 | Receipt photos | The user, via WhatsApp | Read by AI to log the expense | Performance of the contract |
+| **What was on the receipt (itemised lines)** | Read off the user's own receipt photo | Correct categorisation and capital allowances, which a total cannot support | Performance of the contract. See below |
 | Voice notes | The user, via WhatsApp | Transcribed to log the expense | Performance of the contract |
 | Typed messages | The user, via WhatsApp | Parsed to log income or expense | Performance of the contract |
 | Financial records | Built from the above | Bookkeeping and tax preparation | Performance of the contract, and legal duty for record keeping |
@@ -37,6 +38,18 @@ One row is written every time somebody asks us to send a login code. Recorded pe
 - **The balance, and why it comes out in our favour.** A plain list of every number and address that ever asked to sign in would be a list of who our customers are and when they were at their desk, which is more than the interest needs. So the destination is stored as an HMAC keyed off `WEB_SESSION_SECRET` with its own domain prefix. It answers "same target again" and nothing else, and it is useless to anyone who reads the table. Rotating that secret makes historic rows permanently unlinkable. Retention is **90 days**, swept nightly by `auth_sends_sweep()`: long enough to investigate an incident, short enough that we are not keeping a record of every sign in for ever. Row level security is on with **no policies at all**, so only the service role can read it.
 - **What a data subject gets.** Because the destination is a keyed hash and not the address, these rows are pseudonymised rather than anonymous: we could confirm whether a given address appears. An access request that asks for it is answered by hashing the address and reporting the outcomes and times, which is exactly the same limited answer we hold ourselves.
 - **Recital 49** treats processing strictly necessary for network and information security as a legitimate interest of the controller. Watching a login door for abuse is the case that recital describes.
+
+### Receipt line items: why we hold what was bought, not just what was spent
+
+From 10 August 2026 the vision model records the **itemised lines** printed on a receipt, alongside the merchant and the total, in `transactions.line_items`.
+
+**Be clear that this is more of a person than a total was.** "Spent £47.20 at Screwfix" and "bought 100m of twin and earth, a box of grommets and a sandwich" are different facts about someone's day. It is recorded here rather than treated as an implementation detail for that reason.
+
+- **Why it is necessary rather than merely useful.** Two things in this product cannot be done from a total. **Capital allowances**: a £340 receipt containing a £280 drill is a capital purchase hiding inside a consumables total, and losing those is the documented blind spot of simplified MTD software. **Correct categorisation**: one receipt is very often two categories, and one-category-per-receipt was an error we tolerated only because the lines were being discarded.
+- **Why it is captured before anything reads it.** The source is perishable. Receipt images are handed back as 7-day signed links, they are deleted on erasure, and nobody re-processes hundreds of thousands of photographs. A receipt taken without this is permanently reduced to a merchant and a number.
+- **It is a column on `transactions`**, which is already in the manifest both the export and the erasure walk. So a subject access request returns it and a deletion removes it, with no separate handling and no new way for the manifest to go stale.
+- **Nothing is inferred and nothing is enriched.** The model copies the line as printed and is explicitly instructed not to expand abbreviations or split a total into lines. The lines are never reconciled against the total, so no figure a customer relies on is ever changed by this reading.
+- **Null and empty mean different things.** Null is "not itemised, or we did not look". An empty array would mean "itemised, and nothing on it", which never occurs.
 
 ### Testimonials: consent, and how it is withdrawn
 

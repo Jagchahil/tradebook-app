@@ -608,7 +608,10 @@ export function chatRefBelongsTo() { return true; }
 
   const screwfix = {
     merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
-    transaction_type: 'expense', transaction_date: '2026-08-05', vat: null,
+    transaction_type: 'expense',
+      // Stubbing a typed function means honouring its type: parseReceipt always
+      // returns an array here, empty when the paper was not itemised.
+      line_items: [], transaction_date: '2026-08-05', vat: null,
   };
   const post = async ({ q, image, library, rows = [] }) => {
     DB.state.rows = rows;

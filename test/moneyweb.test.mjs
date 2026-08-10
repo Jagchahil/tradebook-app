@@ -461,7 +461,10 @@ export async function readVatProfile() { return null; }
 
   const screwfix = {
     merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
-    transaction_type: 'expense', transaction_date: '2026-08-05', vat: null,
+    transaction_type: 'expense',
+      // Stubbing a typed function means honouring its type: parseReceipt always
+      // returns an array here, empty when the paper was not itemised.
+      line_items: [], transaction_date: '2026-08-05', vat: null,
   };
   const bankLine = { id: 'b1', vendor: 'SCREWFIX 1234 LONDON', amount: -164.78, transaction_date: '2026-08-05', category: null, source_type: 'bank_feed' };
   const earlierReceipt = { id: 'r1', vendor: 'Screwfix', amount: -164.78, transaction_date: '2026-08-05', category: 'materials', source_type: 'whatsapp_image' };
@@ -595,7 +598,10 @@ export async function readVatProfile() { return null; }
 
   const screwfix = {
     merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
-    transaction_type: 'expense', transaction_date: '2026-08-05', vat: null,
+    transaction_type: 'expense',
+      // Stubbing a typed function means honouring its type: parseReceipt always
+      // returns an array here, empty when the paper was not itemised.
+      line_items: [], transaction_date: '2026-08-05', vat: null,
   };
   const jpeg = () => new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' });
   const post = async (fill) => {

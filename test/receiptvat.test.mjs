@@ -140,7 +140,10 @@ function modelSays(json) {
   });
 }
 
-const base = { merchant_name: 'Screwfix', amount: 28.99, category: 'materials', transaction_type: 'expense', transaction_date: '2026-07-20' };
+const base = { merchant_name: 'Screwfix', amount: 28.99, category: 'materials', transaction_type: 'expense',
+      // Stubbing a typed function means honouring its type: parseReceipt always
+      // returns an array here, empty when the paper was not itemised.
+      line_items: [], transaction_date: '2026-07-20' };
 
 {
   modelSays({ ...base, vat: 4.83 });
@@ -157,7 +160,10 @@ const base = { merchant_name: 'Screwfix', amount: 28.99, category: 'materials', 
     r.vat === null);
 }
 {
-  modelSays({ merchant_name: 'Screwfix', amount: 28.99, category: 'materials', transaction_type: 'expense', transaction_date: null });
+  modelSays({ merchant_name: 'Screwfix', amount: 28.99, category: 'materials', transaction_type: 'expense',
+      // Stubbing a typed function means honouring its type: parseReceipt always
+      // returns an array here, empty when the paper was not itemised.
+      line_items: [], transaction_date: null });
   const r = await C.parseReceipt('x', 'image/jpeg');
   ok('a model that omitted the field entirely is also null, not zero', r.vat === null);
 }
@@ -282,7 +288,10 @@ async function upload({ profile, parsed, refuseVatColumns = false }) {
   return { res, calls: RDB.state.calls };
 }
 const written = (calls) => calls.filter((c) => c.fn === 'insertTransaction').map((c) => c.record);
-const parsedWithVat = { merchant_name: 'Screwfix', amount: 28.99, category: 'materials', transaction_type: 'expense', transaction_date: '2026-07-20', vat: 4.83 };
+const parsedWithVat = { merchant_name: 'Screwfix', amount: 28.99, category: 'materials', transaction_type: 'expense',
+      // Stubbing a typed function means honouring its type: parseReceipt always
+      // returns an array here, empty when the paper was not itemised.
+      line_items: [], transaction_date: '2026-07-20', vat: 4.83 };
 
 {
   const { calls } = await upload({ profile: REGISTERED, parsed: parsedWithVat });

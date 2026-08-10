@@ -70,7 +70,23 @@ export interface ParsedReceipt {
   // not even close. So a receipt that does not print the VAT comes back null and
   // he is never shown a figure nobody wrote down.
   vat: number | null;
+  // What was in the basket. Empty when the receipt is not itemised or the lines could not be read,
+  // which is the honest answer and is not the same as a receipt with nothing on it. See the block
+  // in PROMPT for why this is captured now and read by nothing yet.
+  line_items: ReceiptLine[];
 }
+
+export interface ReceiptLine {
+  description: string;
+  amount: number;
+}
+
+// ⚠️ A CEILING ON BOTH COUNT AND LENGTH, because this is model output going into a database column
+// and the only two ways it goes wrong are a hallucinated wall of lines and one enormous string.
+// A till receipt with more than sixty lines is a weekly shop, not a job, and eighty characters is
+// longer than any real line on any real receipt.
+const MAX_RECEIPT_LINES = 60;
+const MAX_LINE_CHARS = 80;
 
 const ALLOWED_CATEGORIES = ['tools', 'fuel', 'meals', 'materials', 'other'];
 
@@ -83,8 +99,40 @@ const PROMPT = [
   `  "category": one of ${ALLOWED_CATEGORIES.join(', ')},`,
   '  "transaction_type": "expense",',
   '  "transaction_date": the date printed on the receipt as YYYY-MM-DD, or null if you cannot read one,',
-  '  "vat": number, the VAT amount printed on the receipt in pounds, or null if none is printed',
+  '  "vat": number, the VAT amount printed on the receipt in pounds, or null if none is printed,',
+  '  "line_items": [ { "description": the item exactly as printed, "amount": number in pounds } ]',
   '}',
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT WAS IN THE BASKET, NOT JUST WHAT IT COST. Added 10 August 2026, before launch, for
+  // products that do not exist yet, because THE DATA IS PERISHABLE AND THE PHOTO IS NOT KEPT.
+  //
+  // The model is already looking at the paper. Reading the totals and throwing the lines away
+  // costs nothing extra today and cannot be recovered later: receipt images go back as 7 day
+  // signed links, they are deleted on erasure, and nobody re-processes half a million photographs.
+  // A year from now every receipt we hold would say "Screwfix, £47.20" and nothing about what was
+  // actually bought.
+  //
+  // ⚠️ WHAT IT IS FOR, SAID PLAINLY SO IT IS NOT MISTAKEN FOR SCOPE CREEP. Three things, and not
+  // one of them can be done from a total:
+  //   1. CAPITAL ALLOWANCES. A £340 Screwfix trip holding a £280 SDS drill is a capital purchase
+  //      hiding inside a consumables receipt. MTD software's known blind spot is losing exactly
+  //      these, and the total can never show it.
+  //   2. CATEGORISATION THAT IS ACTUALLY RIGHT. One receipt is very often two categories:
+  //      materials and a sandwich, tools and fuel. One-category-per-receipt is an error we have
+  //      been living with only because the lines were discarded.
+  //   3. WHAT HE ACTUALLY BUYS, which is the only honest basis for ever helping him buy it better.
+  //
+  // ⚠️ AND WHAT IT IS NOT FOR YET. Nothing reads this today. It is captured, stored, and left
+  // alone. Building on it is a later decision. Throwing it away in the meantime is not a decision
+  // anybody would take on purpose, which is the whole argument for doing this before launch.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  'For "line_items", list what was actually bought, one entry per line printed on the receipt.',
+  'Copy each description as it appears on the paper, including the shop\'s own abbreviations. Do',
+  'not tidy them up, expand them, or guess what an abbreviation stands for. A wrong expansion is',
+  'worse than an ugly one, because it reads as a fact.',
+  'If the receipt is not itemised, or you cannot read the lines, return an empty array. Never',
+  'invent a line, and never split the total into lines yourself.',
+  'Ignore subtotal, VAT, total, change and card lines. Those are not things he bought.',
   'Pick the closest category. Use "materials" for building supplies, "tools" for',
   'tools and hardware, "fuel" for petrol or diesel, "meals" for food and drink,',
   'and "other" for anything else. If you cannot read the total, set amount to 0.',
@@ -239,6 +287,24 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
       ? Math.min(rawVat, total)
       : null;
 
+    // ⚠️ EVERY LINE IS CLEANED, CAPPED AND CHECKED, and a bad one is dropped rather than the whole
+    // receipt refused. The lines are the optional part of this reading: a man who photographed his
+    // diesel still gets his expense logged if the model returned nonsense for the basket.
+    //
+    // ⚠️ AND A LINE IS NEVER RECONCILED AGAINST THE TOTAL. It is tempting to check the lines sum to
+    // `amount` and reject them if they do not, and it would be wrong: real receipts carry discounts,
+    // deposits, multi-buys and rounding, so a mismatch is normal and proves nothing. The total is
+    // read from the total line and stays the money. The lines are a description of the basket.
+    const rawLines = Array.isArray(parsed.line_items) ? parsed.line_items : [];
+    const line_items: ReceiptLine[] = rawLines
+      .slice(0, MAX_RECEIPT_LINES)
+      .map((l) => {
+        const desc = typeof l?.description === 'string' ? l.description.trim().slice(0, MAX_LINE_CHARS) : '';
+        const amt = Number(l?.amount);
+        return { description: desc, amount: Number.isFinite(amt) ? Math.abs(amt) : 0 };
+      })
+      .filter((l) => l.description.length > 0);
+
     return {
       merchant_name: (parsed.merchant_name || 'Unknown').toString().slice(0, 120),
       amount: total,
@@ -246,6 +312,7 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
       transaction_type: 'expense',
       transaction_date: rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null,
       vat,
+      line_items,
     };
   } catch {
     console.error('[claude] Could not parse JSON from model reply.');

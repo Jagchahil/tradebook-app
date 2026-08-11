@@ -178,17 +178,19 @@ ok('a stale daily job makes it NOT serving', cronsServing(only(run('digest', 30)
 // the watchdog had nothing to say because the job was running exactly as scheduled. A ceiling that
 // matches a schedule nobody questioned will happily watch a broken feature for ever.
 //
-// Four hours, not one: three consecutive missed dispatches is a real stoppage, scheduler drift is
-// not, and this file's header is emphatic that a ceiling too tight cries wolf. A too eager alarm
-// paged Jag on launch eve over a perfectly healthy job.
+// 🔴 AND IT CAME DOWN AGAIN ON 11 AUGUST, WITH THE SCHEDULE. The tick is every five minutes now,
+// so four hours would tolerate FORTY EIGHT missed dispatches: the same mistake a third time. One
+// hour tolerates twelve, which is an unarguable stoppage rather than scheduler drift, and this
+// file's header is emphatic that a ceiling too tight cries wolf. A too eager alarm paged Jag on
+// launch eve over a perfectly healthy job.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-ok('🔴 due IS HOURLY, NOT DAILY', MAX_QUIET_HOURS.due === 4);
-ok('🔴 AND A REMINDER ENGINE QUIET FOR 5 HOURS IS NOW AN ALARM, which 26h would have called fine',
-  cronAlarms(only(run('due', 5)), NOW).some((a) => a.job === 'due' && a.reason === 'stale'));
-ok('but an hour of quiet is not, so a single missed tick does not cry wolf',
-  cronAlarms(only(run('due', 1)), NOW).length === 0);
-ok('and three missed dispatches are tolerated, which is the drift allowance',
-  cronAlarms(only(run('due', 3)), NOW).length === 0);
+ok('🔴 due IS AN HOUR, NOT FOUR AND NOT A DAY', MAX_QUIET_HOURS.due === 1);
+ok('🔴 AND A REMINDER ENGINE QUIET FOR 2 HOURS IS AN ALARM, which 4h and 26h both called fine',
+  cronAlarms(only(run('due', 2)), NOW).some((a) => a.job === 'due' && a.reason === 'stale'));
+ok('but half an hour of quiet is not, so a handful of missed ticks does not cry wolf',
+  cronAlarms(only(run('due', 0.5)), NOW).length === 0);
+ok('and twelve missed ticks are what it takes, which is the drift allowance at five minutes',
+  cronAlarms(only(run('due', 0.25)), NOW).length === 0);
 // The agent walk is kicked by the daily `due` job. It was the ONLY cron with no watchdog: it
 // could die mid-chain and every user past the cursor silently stopped getting signals, while the
 // endpoint kept answering 200 and the dashboard stayed green.
@@ -295,7 +297,11 @@ console.log('\n9. The header describes the crons that actually exist.\n');
   const header = src.slice(0, src.indexOf('export const MAX_QUIET_HOURS'));
 
   // The slot table in the header: lines of the shape "//   name  <cron expression>   -> jobs".
-  const slots = [...header.matchAll(/^\/\/\s{3}(\w+)\s+([\d*]\s[\d*]+\s+\*\s\*\s\*)\s+->/gm)]
+  // ⚠️ FIVE FIELDS, WHATEVER THEY CONTAIN. This read `[\d*]\s[\d*]+...` and could not see a step
+  // expression, so when the fast slot became `*/5 * * * *` on 11 August the row vanished from the
+  // parse and the count check failed rather than the agreement check. A parser that cannot read a
+  // legal cron is a guard with a blind spot, which is the thing this file exists to hate.
+  const slots = [...header.matchAll(/^\/\/\s{3}(\w+)\s+((?:\S+\s+){4}\S+)\s+->/gm)]
     .map((m) => ({ name: m[1], schedule: m[2].replace(/\s+/g, ' ').trim() }));
   ok(`the header's slot table was parsed (${slots.length} rows), so the comparison below is real`,
     slots.length > 0);

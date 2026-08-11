@@ -15,6 +15,7 @@ import crypto from 'crypto';
 // "rides along with the daily run so no extra cron entry is needed (the Hobby plan caps cron jobs)".
 // This file just makes that the whole arrangement.
 //
+//   ?slot=tick */5 * * * *  due                                     , the reminder engine
 //   ?slot=am   0 7  * * *   due, trial, and (Mon/Wed/Fri) nudge     , the morning messages
 //   ?slot=pm   0 23 * * *   metrics, digest, and (Sunday) weekly    , the end-of-day work
 //
@@ -70,7 +71,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
 // UTC is the clock Vercel's scheduler runs on. getUTCDay: 0 = Sunday ... 5 = Friday.
 function jobsFor(slot: string, day: number): string[] {
   // ═══════════════════════════════════════════════════════════════════════════════════════════
-  // 🔴 THE HOURLY SLOT, AND WHY IT HAD TO EXIST. 10 AUGUST 2026.
+  // 🔴 THE TICK, AND WHY IT KEEPS GETTING FASTER. 10 AND 11 AUGUST 2026.
   //
   // `due` ran in the am slot and nowhere else, so THE REMINDER ENGINE COULD ONLY EVER DELIVER AT
   // ABOUT 08:00. A man who said "remind me at 3pm" got a row that fell due at 3pm and a text the
@@ -81,11 +82,24 @@ function jobsFor(slot: string, day: number): string[] {
   // schedule looked innocent while the gate took the blame. Fixing the gate alone would have left
   // every 3pm reminder still arriving the following morning, and it would have looked FIXED.
   //
-  // ⚠️ ONE JOB IN THIS SLOT, DELIBERATELY. Everything else here is genuinely daily work, and the
-  // cheapest way to turn an hourly tick into a bill is to let jobs drift into it because they
-  // happen to be nearby.
+  // 🔴 IT WENT HOURLY THAT DAY, AND HOURLY WAS STILL A PROMISE WE COULD NOT KEEP. 11 August.
+  //
+  // The bot answers a request to the MINUTE: "I will remind you on Mon 10 Aug, 08:00." On an hourly
+  // tick a reminder due at 08:01 waits until 09:00. Fifty nine minutes, on a sentence that named a
+  // minute. That is not a slow feature, it is the same fault as the one above wearing a smaller
+  // number, and the only reason it looked acceptable is that we knew why it happened.
+  //
+  // Proved live on 11 August: asked at 12:39 for 12:57, delivered 13:01. Four minutes, and four of
+  // those minutes were the wait for the next hour. So the tick became the smallest interval that
+  // makes a stated minute honest without being theatre: FIVE MINUTES, worst case five, and the
+  // watchdog in lib/cronwatch.ts moved with it in the same commit.
+  //
+  // ⚠️ ONE JOB IN THIS SLOT, DELIBERATELY, AND IT MATTERS TWELVE TIMES MORE NOW. Everything else
+  // here is genuinely daily work. This slot is 288 dispatches a day; the cheapest way to turn that
+  // into a bill is to let a job drift into it because it happens to be nearby. The agent walk did
+  // exactly that when the tick was hourly. test/cronschedule.test.mjs counts the paths.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
-  if (slot === 'hourly') return ['/api/cron/reminders?job=due'];
+  if (slot === 'tick') return ['/api/cron/reminders?job=due'];
 
   if (slot === 'am') {
     // ⚠️ THE HOUSEKEEPING IS DISPATCHED HERE NOW, NOT RIDDEN ALONG INSIDE `due`.

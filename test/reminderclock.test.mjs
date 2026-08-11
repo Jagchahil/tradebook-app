@@ -33,8 +33,8 @@ import {
   reminderAlarm,
   remindersServing,
   blockingAlarms,
-  REMINDER_DISPATCH_INTERVAL_HOURS,
-  REMINDER_MAX_LATE_HOURS,
+  REMINDER_DISPATCH_INTERVAL_MINUTES,
+  REMINDER_MAX_LATE_MINUTES,
 } from '../lib/cronwatch.ts';
 
 let pass = 0;
@@ -120,28 +120,30 @@ console.log('\n--- 2. THE CLAIM. Nothing is burned on a send that cannot land --
     due.includes('blocked:') && due.includes('sending blocked:'));
 }
 
-console.log('\n--- 3. THE ALARM. Red at one missed pass, quiet inside the honest wait ---\n');
+console.log('\n--- 3. THE ALARM. Red at a missed tick, quiet inside the honest wait ---\n');
 {
-  ok(`the dispatch interval is ${REMINDER_DISPATCH_INTERVAL_HOURS}h`, REMINDER_DISPATCH_INTERVAL_HOURS === 1);
-  ok('🔴 the ceiling is TWO dispatch intervals: one is the honest wait, the second is a missed pass',
-    REMINDER_MAX_LATE_HOURS === REMINDER_DISPATCH_INTERVAL_HOURS * 2);
+  ok(`the dispatch interval is ${REMINDER_DISPATCH_INTERVAL_MINUTES} minutes`,
+    REMINDER_DISPATCH_INTERVAL_MINUTES === 5);
+  ok('🔴 the ceiling is THREE dispatch intervals: one is the honest wait, two more is a stoppage with room for drift',
+    REMINDER_MAX_LATE_MINUTES === REMINDER_DISPATCH_INTERVAL_MINUTES * 3);
 
   ok('nothing due is not an alarm', reminderAlarm(backlog(0, null), NOW) === null);
 
-  // Inside the first pass. A reminder due at 08:01 is not late at 08:30; the pass at 09:00 has it.
-  ok('a reminder 30 minutes past due is waiting, not late', reminderAlarm(backlog(1, 30), NOW) === null);
-  ok('a reminder 59 minutes past due is still inside its first pass', reminderAlarm(backlog(1, 59), NOW) === null);
-  ok('a reminder exactly one interval late is not yet an alarm, that is scheduler drift',
-    reminderAlarm(backlog(1, 60), NOW) === null);
-  ok('nor at 119 minutes, which is drift on top of a full wait',
-    reminderAlarm(backlog(1, 119), NOW) === null);
+  // Inside the first tick. A reminder due at 08:01 is not late at 08:03; the tick at 08:05 has it.
+  ok('a reminder 3 minutes past due is waiting, not late', reminderAlarm(backlog(1, 3), NOW) === null);
+  ok('a reminder exactly one interval late is not yet an alarm, that is the honest wait',
+    reminderAlarm(backlog(1, 5), NOW) === null);
+  ok('nor at 14 minutes, which is drift on top of a full wait',
+    reminderAlarm(backlog(1, 14), NOW) === null);
 
-  // 🔴 THE ONE THAT MATTERS. A whole pass has come and gone.
-  const missed = reminderAlarm(backlog(1, 121), NOW);
-  ok('🔴 A MISSED PASS IS RED. 121 minutes past due raises the alarm', missed !== null);
+  // 🔴 THE ONE THAT MATTERS. Ticks have come and gone.
+  const missed = reminderAlarm(backlog(1, 16), NOW);
+  ok('🔴 A MISSED TICK IS RED. 16 minutes past due raises the alarm', missed !== null);
   ok('and it is reported as overdue', missed?.reason === 'overdue');
   ok('and it names the job the pager will look for', missed?.job === 'due');
-  ok('and it says how late, so nobody has to work it out at two in the morning', missed?.hoursQuiet === 2);
+  ok('and it says how late, so nobody has to work it out at two in the morning', missed?.hoursQuiet === 0.3);
+  ok('in minutes, which is the unit this cadence is actually measured in',
+    missed?.detail?.includes('16 minutes') === true);
 
   // The 10 August case itself, as the regression fixture.
   const tenAugust = reminderAlarm(backlog(1, 4 * 60 + 43), NOW);
@@ -154,6 +156,10 @@ console.log('\n--- 3. THE ALARM. Red at one missed pass, quiet inside the honest
     reminderAlarm(backlog(200, 180), NOW)?.detail?.includes('200 reminders') === true);
   ok('and one reminder is not called "1 reminders"',
     reminderAlarm(backlog(1, 180), NOW)?.detail?.includes('1 reminder due') === true);
+
+  // 🔴 THE OLD CEILING WOULD NOW BE SILENT FOR TWO HOURS. Pinned so the regression is named.
+  ok('🔴 A REMINDER AN HOUR LATE IS RED, which the hourly era tolerated in silence',
+    reminderAlarm(backlog(1, 60), NOW)?.reason === 'overdue');
 
   // 🔴 THE HOUSE DISEASE. A read that did not happen is not an empty backlog.
   ok('🔴 A BACKLOG WE CANNOT READ IS NOT A HEALTHY ONE', reminderAlarm(null, NOW) !== null);
@@ -191,14 +197,43 @@ console.log('\n--- 4. THE WIRING. An alarm nobody reads is a diary, not a watchd
   // The ceiling has to be derived from the schedule somebody else controls, or it goes stale the
   // first time the dispatch is slowed down and starts crying wolf on a cadence nobody chose.
   const vercel = JSON.parse(read('vercel.json'));
-  const hourly = (vercel.crons ?? []).find((c) => /slot=hourly/.test(c.path));
-  ok('vercel.json still has an hourly dispatch slot', Boolean(hourly));
-  ok(`🔴 AND ITS SCHEDULE MATCHES REMINDER_DISPATCH_INTERVAL_HOURS = ${REMINDER_DISPATCH_INTERVAL_HOURS}`,
-    hourly?.schedule?.replace(/\s+/g, ' ').trim() === '0 * * * *');
+  const tick = (vercel.crons ?? []).find((c) => /slot=tick/.test(c.path));
+  ok('vercel.json still has a fast dispatch slot', Boolean(tick));
+  // 🔴 DERIVED, NOT TYPED. The schedule is read out of vercel.json and turned into minutes, so
+  // changing the cron without moving the constant fails here rather than going quietly wrong.
+  const every = /^\*\/(\d+) \* \* \* \*$/.exec(tick?.schedule?.replace(/\s+/g, ' ').trim() ?? '');
+  ok('the fast slot runs every N minutes', every !== null);
+  ok(`🔴 AND N MATCHES REMINDER_DISPATCH_INTERVAL_MINUTES = ${REMINDER_DISPATCH_INTERVAL_MINUTES}`,
+    Number(every?.[1]) === REMINDER_DISPATCH_INTERVAL_MINUTES);
 
   const daily = read('app/api/cron/daily/route.ts');
-  ok('🔴 and the hourly slot still dispatches the due job, which is the link the ceiling assumes',
-    /slot === 'hourly'[^\n]*reminders\?job=due/.test(daily));
+  ok('🔴 and the tick slot still dispatches the due job, which is the link the ceiling assumes',
+    /slot === 'tick'[^\n]*reminders\?job=due/.test(daily));
+
+  // The job heartbeat has to follow the schedule down too, or it tolerates 48 missed ticks.
+  const quiet = /due: (\d+),/.exec(read('lib/cronwatch.ts'));
+  ok('🔴 THE due CEILING FOLLOWED THE SCHEDULE DOWN', Number(quiet?.[1]) === 1);
+}
+
+console.log('\n--- 5. The operator question gets an operator answer, or none ---\n');
+{
+  const health = read('app/api/health/route.ts');
+
+  // 🔴 A WRONG BEARER USED TO GET THE PUBLIC BODY AND A 200. Found 11 August by walking it: a
+  // quoted value in .env.local meant the header carried the quotes, the bearer did not match, and
+  // the reply looked like a clean bill of health for a question that had never been asked. Nothing
+  // leaked. What was missing was any way to tell "my secret is wrong" from "nothing to report",
+  // which is the house disease on the one endpoint whose whole job is to not have it.
+  ok('🔴 A CONFIG REQUEST WITHOUT A VALID BEARER IS A 401, NOT SOMEBODY ELSE\'S ANSWER',
+    /if \(req\.nextUrl\.searchParams\.get\('config'\) && !authorised\(req\)\) \{[\s\S]{0,160}?status: 401/.test(health));
+  ok('and the refusal comes before any work is done', before(health, "status: 401", 'const runs = await listCronRuns()'));
+  ok('🔴 AND IT CARRIES NOTHING BACK: no hint about whether the secret is set or how long it is',
+    /\{ error: 'unauthorised' \}/.test(health)
+    && !/status: 401[\s\S]{0,200}(CRON_SECRET|length|expected)/.test(health));
+
+  // The public door is unchanged and must stay open: UptimeRobot polls it with no bearer at all.
+  ok('the public health check still needs no authorisation', !/^\s*if \(!authorised\(req\)\) return/m.test(health));
+  ok('and still answers with the one word summaries', /crons: runs === null \? 'unknown'/.test(health));
 }
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);

@@ -1,4 +1,4 @@
-// THE SCHEDULE AND THE DISPATCHER MUST AGREE, AND THE HOURLY SLOT MUST STAY ONE JOB.
+// THE SCHEDULE AND THE DISPATCHER MUST AGREE, AND THE FAST SLOT MUST STAY ONE JOB.
 //
 //   node test/cronschedule.test.mjs
 //
@@ -25,11 +25,17 @@
 //
 // So this suite pins the three things that have to stay true together:
 //
-//   1. vercel.json actually schedules the hourly slot, hourly.
+//   1. vercel.json actually schedules the fast slot, fast.
 //   2. The dispatcher knows that slot, and dispatches `due` in it.
-//   3. 🔴 THE HOURLY SLOT CARRIES EXACTLY ONE JOB. Everything else in that file is daily work, and
-//      the cheapest way to turn an hourly tick into a bill is to let a job drift into it because
+//   3. 🔴 THE FAST SLOT CARRIES EXACTLY ONE JOB. Everything else in that file is daily work, and
+//      the cheapest way to turn a fast tick into a bill is to let a job drift into it because
 //      it happened to be nearby. The agent walk did exactly that by living inside `due`.
+//
+// ⚠️ 11 AUGUST: HOURLY WAS STILL A PROMISE WE COULD NOT KEEP, so the slot is `tick`, every five
+// minutes. The bot answers to the MINUTE ("I will remind you on Mon 10 Aug, 08:00") and an hourly
+// tick makes an 08:01 reminder wait until 09:00. Fifty nine minutes on a sentence naming a minute
+// is the fault above wearing a smaller number. Worst case is now five minutes, and point 3 matters
+// twelve times more than it did: this slot is 288 dispatches a day.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 import { readFileSync } from 'node:fs';
@@ -65,13 +71,18 @@ function slotBranch(slot) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-console.log('\n1. The schedule says hourly.\n');
+console.log('\n1. The schedule says every five minutes.\n');
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 {
-  const hourly = vercel.crons.find((c) => c.path.includes('slot=hourly'));
-  ok('🔴 vercel.json SCHEDULES THE HOURLY SLOT', Boolean(hourly));
-  ok('🔴 AND IT IS ACTUALLY HOURLY, not another daily entry wearing the name',
-    hourly?.schedule === '0 * * * *');
+  const tick = vercel.crons.find((c) => c.path.includes('slot=tick'));
+  ok('🔴 vercel.json SCHEDULES THE TICK SLOT', Boolean(tick));
+  ok('🔴 AND IT IS ACTUALLY EVERY FIVE MINUTES, not another entry wearing the name',
+    tick?.schedule === '*/5 * * * *');
+  // The slot is named for what it does, not for how often it used to do it. It was `hourly` until
+  // it stopped being hourly, and a slot whose name contradicts its schedule is the same class of
+  // lie as a comment that contradicts its table.
+  ok('🔴 AND NOTHING IS STILL CALLED hourly, because nothing is',
+    !vercel.crons.some((c) => c.path.includes('slot=hourly')) && !daily.includes("slot === 'hourly'"));
 
   // The two daily dispatchers are untouched and must stay. The pm slot carries metrics, whose
   // history cannot be backfilled: a day it does not run is a day of revenue gone for ever.
@@ -89,23 +100,23 @@ console.log('\n1. The schedule says hourly.\n');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-console.log('\n2. The hourly slot sends reminders, and does nothing else.\n');
+console.log('\n2. The tick slot sends reminders, and does nothing else.\n');
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 {
-  const hourly = slotBranch('hourly');
-  ok('the hourly branch was found, so the assertions below are real', hourly.length > 20);
-  ok('🔴 IT DISPATCHES THE DUE JOB', /\/api\/cron\/reminders\?job=due/.test(hourly));
+  const tickBranch = slotBranch('tick');
+  ok('the tick branch was found, so the assertions below are real', tickBranch.length > 20);
+  ok('🔴 IT DISPATCHES THE DUE JOB', /\/api\/cron\/reminders\?job=due/.test(tickBranch));
 
   // 🔴 EXACTLY ONE. Counted rather than eyeballed, because "and nothing else" is the whole point:
   // an hourly tick is 24 runs a day, and the agent walk is an AI spend per user. A second job in
   // here arrives as a bill at the end of the month, not as an error anybody sees.
-  const paths = hourly.match(/'\/api\/cron\/[^']+'/g) ?? [];
-  ok(`🔴 AND EXACTLY ONE JOB RUNS HOURLY (found ${paths.length}: ${paths.join(', ')})`,
+  const paths = tickBranch.match(/'\/api\/cron\/[^']+'/g) ?? [];
+  ok(`🔴 AND EXACTLY ONE JOB RUNS ON THE TICK (found ${paths.length}: ${paths.join(', ')})`,
     paths.length === 1);
 
   const am = slotBranch('am');
   ok('the am branch was found', am.length > 20);
-  ok('the am slot still runs due too, so a reminder is never waiting on the hour',
+  ok('the am slot still runs due too, so a reminder is never waiting on the tick alone',
     /\/api\/cron\/reminders\?job=due/.test(am));
 }
 
@@ -156,13 +167,13 @@ console.log('\n4. The watchdog ceiling matches the schedule it is watching.\n');
   const watch = read('lib/cronwatch.ts');
   const m = watch.match(/\n\s*due: (\d+),/);
   ok('the due ceiling was found', Boolean(m));
-  ok('🔴 THE due CEILING IS HOURS, NOT A DAY: it has to mean something again',
-    Number(m?.[1]) <= 6);
+  ok('🔴 THE due CEILING FOLLOWED THE SCHEDULE DOWN: 4h would now tolerate 48 missed ticks',
+    Number(m?.[1]) <= 2);
   // ⚠️ AND NOT ONE HOUR. This file's header says a ceiling too tight cries wolf, an alarm that
   // cries wolf gets muted, and a muted alarm looks like cover. On 9 August an over eager alarm put
   // /api/health at 503 and paged Jag on launch eve over a job that was entirely healthy.
-  ok('🔴 AND IT TOLERATES DRIFT: not so tight that one late dispatch pages anybody',
-    Number(m?.[1]) >= 3);
+  ok('🔴 AND IT STILL TOLERATES DRIFT: an hour is twelve missed ticks, not one late dispatch',
+    Number(m?.[1]) >= 1);
 }
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);

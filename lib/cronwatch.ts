@@ -30,7 +30,7 @@ export interface CronRun {
 // that cries wolf gets muted, and a muted alarm is worse than no alarm because it looks like cover.
 //
 // ⚠️ THERE ARE THREE DISPATCH SLOTS, NOT TWO, AND THIS PARAGRAPH SAID TWO UNTIL 10 AUGUST 2026.
-// Push 27 added the hourly slot that morning and the prose was never carried across, so the file
+// Push 27 added the fast slot that morning and the prose was never carried across, so the file
 // read "two DISPATCHERS" and "the two dispatch slots" directly above a list of three. The Hobby
 // limit sentence above is kept because it is why the dispatcher shape exists at all, but it no
 // longer constrains us: Vercel and Supabase both moved to Pro on 4 August, which is what made a
@@ -38,13 +38,18 @@ export interface CronRun {
 // ends up asking whether Vercel really registered all three, which is a question this file should
 // answer rather than raise.
 //
+// ⚠️ AND THE FAST SLOT WAS CALLED `hourly` UNTIL 11 AUGUST, WHEN IT STOPPED BEING HOURLY. It is
+// `tick` now, every five minutes, and it is named for what it does rather than for how often it
+// used to do it. A slot called hourly running every five minutes is the same class of lie as a
+// paragraph saying two above a list of three.
+//
 // The three dispatch slots, and what each still triggers:
 //
-//   hourly 0 *  * * *   -> due
+//   tick   */5 * * * *  -> due
 //   am     0 7  * * *   -> due, cleanup, bankfeed, agent, trial, and (Mon/Wed/Fri) nudge
 //   pm     0 23 * * *   -> metrics, digest, and (Sunday) weekly
 //
-//   due     kicked hourly              -> 4h   (three missed runs; see below)
+//   due     kicked every 5 min         -> 1h   (twelve missed ticks; see below)
 //   digest  kicked pm, daily            -> 26h
 //   agent   kicked am, daily            -> 26h
 //   nudge   kicked am, Mon/Wed/Fri      -> 80h  (the real gap is Fri to Mon, 72h)
@@ -53,22 +58,28 @@ export interface CronRun {
 //   metrics kicked pm, daily            -> 26h  (and it CANNOT be backfilled. See below.)
 export const MAX_QUIET_HOURS: Record<string, number> = {
   // ═══════════════════════════════════════════════════════════════════════════════════════════
-  // 🔴 26h WAS RIGHT AND IT WAS ALSO WHY NOBODY SAW THE REAL FAULT. TIGHTENED 10 AUGUST 2026.
+  // 🔴 26h, THEN 4h, NOW 1h. THE CEILING HAS FOLLOWED THE SCHEDULE DOWN TWICE. 11 AUGUST 2026.
   //
   // `due` ran once a day in the am slot, so a 26 hour ceiling was correct AND it meant the engine
   // could stop for most of a day without a word. Worse, a job that only ever runs at 08:00 can
   // only ever deliver at 08:00: a reminder set for 3pm arrived the following morning, every time,
-  // and the watchdog had nothing to say because the job was running exactly as scheduled.
+  // and the watchdog had nothing to say because the job was running exactly as scheduled. That is
+  // the lesson this whole file exists for: A CEILING THAT MATCHES AN UNQUESTIONED SCHEDULE WILL
+  // WATCH A BROKEN FEATURE FOR EVER AND REPORT SUCCESS.
   //
-  // It is hourly now, so the ceiling has to mean something again.
+  // It went hourly on 10 August and the ceiling went to 4h. It ticks every five minutes now, so
+  // 4h would tolerate FORTY EIGHT missed dispatches, which is that same mistake a third time.
   //
-  // ⚠️ FOUR HOURS, NOT ONE, AND THAT NUMBER IS DELIBERATE. This file's own header says a ceiling
-  // too tight cries wolf, and an alarm that cries wolf gets muted, and a muted alarm is worse than
-  // no alarm because it looks like cover. On 9 August a too eager alarm put /api/health at 503 and
-  // paged the founder on launch eve over a job that was perfectly healthy. Four hours tolerates
-  // three consecutive missed dispatches, which is a real stoppage rather than scheduler drift, and
-  // it still catches a dead reminder engine inside a morning instead of inside a day.
-  due: 4,
+  // ⚠️ ONE HOUR, NOT TEN MINUTES, AND THAT NUMBER IS DELIBERATE. This file's own header says a
+  // ceiling too tight cries wolf, and an alarm that cries wolf gets muted, and a muted alarm is
+  // worse than no alarm because it looks like cover. On 9 August a too eager alarm put
+  // /api/health at 503 and paged the founder on launch eve over a job that was perfectly healthy.
+  // An hour tolerates twelve consecutive missed ticks, which is an unarguable stoppage rather than
+  // scheduler drift, and it catches a dead reminder engine inside an hour instead of half a day.
+  //
+  // ⚠️ THIS IS THE JOB'S HEARTBEAT, NOT THE CUSTOMER'S PROMISE. Whether any actual reminder went
+  // out is a different question and it is answered further down, by reminderAlarm.
+  due: 1,
   digest: 26,
   // The agent walk. It has no cron entry of its own: the am dispatcher kicks it. It was the one
   // walk with no watchdog at all, so it could die mid-chain and every user past the cursor would
@@ -288,29 +299,30 @@ export function cronAlarms(runs: CronRun[], now: Date = new Date()): CronAlarm[]
 // them look identical to the man waiting for his text, so all of them look identical here.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-// How often the reminder engine is dispatched. vercel.json runs the hourly slot at `0 * * * *` and
+// How often the reminder engine is dispatched. vercel.json runs the tick slot at `*/5 * * * *` and
 // app/api/cron/daily sends that slot to /api/cron/reminders?job=due.
 //
-// ⚠️ test/reminderclock.test.mjs READS vercel.json AND HOLDS THIS NUMBER TO IT. Slow the dispatch
-// down and the ceiling below has to move in the same commit, or the alarm starts crying wolf on a
-// schedule somebody else chose. That is exactly how `due: 26` came to be correct and useless.
-export const REMINDER_DISPATCH_INTERVAL_HOURS = 1;
+// ⚠️ test/reminderclock.test.mjs READS vercel.json AND HOLDS THIS NUMBER TO IT. Change the
+// dispatch and the ceiling below has to move in the same commit, or the alarm starts crying wolf,
+// or worse stays quiet, on a schedule somebody else chose. That is exactly how `due: 26` came to
+// be correct and useless.
+export const REMINDER_DISPATCH_INTERVAL_MINUTES = 5;
 
 // How late a reminder may be before it is a fault rather than a wait.
 //
 // THE ARITHMETIC, BECAUSE A CEILING NOBODY CAN DERIVE IS A CEILING SOMEBODY WILL LOOSEN.
 //
-//   A reminder due at 08:01 is not late at 08:30. The next pass is at 09:00 and it will go then.
-//   The longest HONEST wait is therefore one whole dispatch interval, one hour, plus whatever
-//   drift the scheduler adds.
-//   A reminder still sitting there after TWO intervals has watched a pass come and go without
-//   being sent. That is a missed pass, and a missed pass is a fault.
+//   A reminder due at 08:01 is not late at 08:03. The next tick is at 08:05 and it will go then.
+//   The longest HONEST wait is therefore one whole dispatch interval, five minutes, plus whatever
+//   drift the scheduler adds. Vercel triggers a cron within about a minute of its schedule.
+//   A reminder still sitting there after THREE intervals has watched ticks come and go without
+//   being sent. That is a stoppage, and a stoppage is a fault.
 //
-// Two hours, not one. One hour would fire on ordinary drift, and this file's own header says a
+// Fifteen minutes, not five. Five would fire on ordinary drift, and this file's own header says a
 // ceiling too tight cries wolf, and an alarm that cries wolf gets muted, and a muted alarm is
 // worse than no alarm because it looks like cover. On 9 August a too eager alarm put /api/health
 // at 503 and paged the founder on launch eve over a job that was perfectly healthy.
-export const REMINDER_MAX_LATE_HOURS = REMINDER_DISPATCH_INTERVAL_HOURS * 2;
+export const REMINDER_MAX_LATE_MINUTES = REMINDER_DISPATCH_INTERVAL_MINUTES * 3;
 
 export interface ReminderBacklog {
   /** How many reminders have fallen due and are still unsent. */
@@ -345,16 +357,18 @@ export function reminderAlarm(backlog: ReminderBacklog | null, now: Date = new D
     };
   }
 
-  const lateHours = lateMs / 3_600_000;
-  if (lateHours <= REMINDER_MAX_LATE_HOURS) return null;
+  const lateMinutes = lateMs / 60_000;
+  if (lateMinutes <= REMINDER_MAX_LATE_MINUTES) return null;
+
+  const lateHours = lateMinutes / 60;
 
   return {
     job: 'due',
     reason: 'overdue',
     hoursQuiet: Math.round(lateHours * 10) / 10,
     detail: `${backlog.overdue} reminder${backlog.overdue === 1 ? '' : 's'} due and unsent, the oldest by `
-      + `${Math.round(lateHours * 10) / 10}h. The dispatch runs every ${REMINDER_DISPATCH_INTERVAL_HOURS}h, `
-      + `so a pass has come and gone without sending it.`,
+      + `${Math.round(lateMinutes)} minutes. The dispatch runs every ${REMINDER_DISPATCH_INTERVAL_MINUTES} `
+      + `minutes, so ticks have come and gone without sending it.`,
   };
 }
 

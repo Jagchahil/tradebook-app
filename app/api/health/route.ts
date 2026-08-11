@@ -62,7 +62,29 @@ function authorised(req: NextRequest): boolean {
 }
 
 export async function GET(req: NextRequest) {
-  if (req.nextUrl.searchParams.get('config') && authorised(req)) {
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A WRONG BEARER USED TO GET THE PUBLIC BODY AND A CHEERFUL 200. 11 AUGUST 2026.
+  //
+  // The condition here was `if (config && authorised(req))`, so an operator asking the strict
+  // question with a bad secret fell straight through to the public answer. Nothing leaked. What
+  // he got instead was WORSE THAN A LEAK: `crons: "ok"` when he had asked for the alarm list, and
+  // no way at all to tell "my secret is wrong" from "there is nothing to report".
+  //
+  // Found by walking it: a quoted value in .env.local meant `cut` handed the header the quotes as
+  // well, the bearer did not match, and the reply looked like a clean bill of health for a
+  // question that had never been asked. Two of us read it as good news for a minute.
+  //
+  // That is the house disease exactly, on the endpoint whose entire job is to not have it. So the
+  // strict question now gets a strict answer or a 401, and never somebody else's answer.
+  //
+  // ⚠️ THE 401 CARRIES NOTHING. Not whether CRON_SECRET is set, not how long it should be. A
+  // public endpoint that helps you tune a guess is a public endpoint that helps the wrong person.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (req.nextUrl.searchParams.get('config') && !authorised(req)) {
+    return NextResponse.json({ error: 'unauthorised' }, { status: 401 });
+  }
+
+  if (req.nextUrl.searchParams.get('config')) {
     // Presence only. Never the value, not even a prefix.
     const missing = SIGNING_SECRETS.filter((k) => !process.env[k]);
     const runs = await listCronRuns();

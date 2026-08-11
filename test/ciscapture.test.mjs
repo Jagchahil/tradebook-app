@@ -341,7 +341,7 @@ console.log('\n--- 6. THE ROUTE FILES NOTHING UNTIL BOTH COLUMNS CAN BE WRITTEN 
   const put = (name, body) => writeFileSync(path.join(rStage, name), body);
   // The real files for everything the route asks a question of. A stub of lib/reviewpile.ts would
   // be a test of the stub, and this branch is about what the pile decides.
-  for (const f of ['reviewpile', 'personal', 'capital', 'taxengine', 'money', 'vat']) {
+  for (const f of ['reviewpile', 'personal', 'capital', 'taxengine', 'money', 'vat', 'circumstances']) {
     put(`${f}.ts`, fixImports(read(`lib/${f}.ts`)));
   }
   put('nextserver.ts', `
@@ -375,6 +375,14 @@ export async function learnVendor() { log('learnVendor', {}); return true; }
 export async function setCapitalKind() { log('setCapitalKind', {}); return true; }
 export async function readVatProfile() { log('readVatProfile', {}); return null; }
 export async function confirmTransactionVat() { log('confirmTransactionVat', {}); return true; }
+export async function readCircumstances() { return state.circumstances ?? [{ key: 'cis', answer: 'yes' }]; }
+// The real one is an atomic PATCH guarded on the row's own amount and on cis_deduction being null.
+// The stub records exactly what the route handed it, because the whole point of the assertions
+// below is WHICH figure lands in WHICH column.
+export async function recordCisOnIncome(userId, id, expectedNet, patch) {
+  log('recordCisOnIncome', { id, expectedNet, patch });
+  return state.cisWriteFails ? 0 : 1;
+}
 `);
   put('route.ts', read('app/api/pile/route.ts')
     .replace(/from 'next\/server'/g, "from './nextserver.ts'")
@@ -386,9 +394,10 @@ export async function confirmTransactionVat() { log('confirmTransactionVat', {})
   const ID = '11111111-2222-4333-8444-555555555555';
   const PAYMENT_IN = { id: ID, vendor: 'Bloggs Construction', description: null, amount: 400, category: null, looks_personal: false };
 
-  const post = async (fields, rows = [PAYMENT_IN]) => {
+  const post = async (fields, rows = [PAYMENT_IN], circumstances = [{ key: 'cis', answer: 'yes' }]) => {
     DB.state.calls.length = 0;
     DB.state.rows = rows;
+    DB.state.circumstances = circumstances;
     const fd = new FormData();
     for (const [k, v] of Object.entries(fields)) fd.append(k, String(v));
     const res = await RT.POST({
@@ -401,21 +410,49 @@ export async function confirmTransactionVat() { log('confirmTransactionVat', {})
   const did = (calls, fn) => calls.filter((c) => c.fn === fn);
 
   {
+    // ⚠️ REWRITTEN 11 AUGUST 2026, EVENING. This block used to assert that a CIS answer filed
+    // NOTHING, because the first design needed a migration before either column could be written
+    // and a half fix that put the turnover right while losing the tax already paid would have been
+    // the vat_registered date all over again. The refusal was correct for as long as it stood and
+    // it is now obsolete: recordCisOnIncome() writes BOTH columns in one guarded PATCH and needs no
+    // DDL. So the assertions move from "it files nothing" to "it files exactly the right two
+    // figures", which is the claim that actually protects his books.
     const { res, calls } = await post({ ids: ID, verdict: 'cis', cis: '100' });
-    // 🔴 THE HALF FIX THAT LOOKS FINISHED. Nothing in lib/supabase.ts can write cis_deduction onto
-    // a row that already exists, so raising the payment to £500 and filing it would put his
-    // turnover right and leave the £100 HMRC is holding nowhere at all. That is the vat_registered
-    // date again: a man answering a question we then throw away. So it files nothing.
-    ok('🔴 A CIS ANSWER FILES NOTHING WHILE ONLY ONE OF THE TWO COLUMNS CAN BE WRITTEN',
+    const wrote = did(calls, 'recordCisOnIncome');
+    ok('🔴 A CIS ANSWER IS WRITTEN, ONCE, THROUGH THE ONE FUNCTION THAT CAN DO IT ATOMICALLY',
+      wrote.length === 1);
+    ok('🔴 THE GROSS GOES IN amount: £400 banked plus £100 taken is £500 of turnover',
+      wrote[0]?.patch?.amount === 500);
+    ok('🔴 AND THE TAX ALREADY PAID GOES IN cis_deduction, NOT INTO HIS COSTS',
+      wrote[0]?.patch?.cis_deduction === 100);
+    ok('🔴 AND THE DEPOSIT STILL RECONCILES: amount less the deduction is what hit the bank',
+      wrote[0].patch.amount - wrote[0].patch.cis_deduction === 400);
+    ok('the row\'s own amount is handed over as the optimistic guard, read server side',
+      wrote[0]?.expectedNet === 400);
+    ok('🔴 THE MONEY IS NEVER TAKEN FROM THE BROWSER: only the id and what he typed are posted',
+      !/body\.amount|body\.gross|body\.net/.test(pileRoute));
+    ok('it does not ALSO file through confirmIncome, which would be two writes on one press',
       did(calls, 'confirmIncome').length === 0 && did(calls, 'confirmPile').length === 0);
     ok('and it does not quietly strike the payment out either',
       did(calls, 'setManyPersonal').length === 0);
     ok('nor teach a rule about a customer who pays him',
       did(calls, 'learnVendor').length === 0);
     ok('he is sent back to the pile with a 303, so a refresh cannot repeat it',
-      res.kind === 'redirect' && res.status === 303 && res.location.includes('done=cishold'));
-    ok('🔴 AND HE IS TOLD PLAINLY THAT NOTHING MOVED, rather than shown a success he did not get',
-      /case 'cishold':/.test(pilePage) && /nothing has been filed/.test(pilePage));
+      res.kind === 'redirect' && res.status === 303);
+    ok('🔴 AND A WRITE THAT MATCHED NO ROWS IS NOT REPORTED AS A SUCCESS',
+      /applied \? 'ok' : 'cisbad'/.test(pileRoute));
+  }
+  {
+    // A man who never said he is in the scheme cannot post one, page or no page.
+    const { res, calls } = await post({ ids: ID, verdict: 'cis', cis: '100' }, [PAYMENT_IN], []);
+    ok('🔴 A MAN WHO NEVER SAID HE WORKS UNDER CIS IS REFUSED AT THE DOOR, not just on the screen',
+      did(calls, 'recordCisOnIncome').length === 0 && res.location.includes('done=nocis'));
+  }
+  {
+    // One payment, one statement, one figure. A group would put one deduction on every row in it.
+    const { calls } = await post({ ids: `${ID},22222222-2222-4333-8444-555555555555`, verdict: 'cis', cis: '100' });
+    ok('🔴 A CIS FIGURE IS NEVER APPLIED TO A GROUP: one payment, one contractor statement',
+      did(calls, 'recordCisOnIncome').length === 0);
   }
   {
     // The verdict is on the allowlist, so it can never be read as the plain file button and sent
@@ -437,9 +474,26 @@ export async function confirmTransactionVat() { log('confirmTransactionVat', {})
   // The route still writes nothing itself, and the two columns are named where the next person
   // will look for them.
   ok('the route calls lib and never the database', !/\bfetch\s*\(/.test(pileRoute) && !/rest\/v1/.test(pileRoute));
-  ok('🔴 AND THE MISSING HALF IS NAMED ON THE BRANCH, with the four changes that finish it',
-    /confirm_income_cis/.test(pileRoute) && /confirmIncomeCis/.test(pileRoute)
-    && /pileEntries select/.test(pileRoute));
+  // 🔴 AND THE COLUMN IS NAMED WHERE THE QUESTION IS TURNED ON. pileEntries lists its columns one
+  // by one, so a column nobody names arrives undefined however well the screen is written, and the
+  // page draws the question only for a row that can carry the answer.
+  ok('🔴 THE PILE READ NAMES cis_deduction, which is what lets the question be drawn at all',
+    /select=id,vendor,description,amount,category,looks_personal,vat_amount,vat_confirmed,cis_deduction/
+      .test(read('lib/supabase.ts')));
+  // The guards that make a bare PATCH as safe as the rpc would have been. Each one is a WHERE
+  // clause in the same statement as the write, so none of them is a client side suggestion.
+  const sb = read('lib/supabase.ts');
+  // ⚠️ ANCHORED ON THE DECLARATION, AND IT WAS NOT AT FIRST. Sabotage caught it: the name also
+  // appears in a comment on pileEntries, and that comment sits within 1600 characters of a select
+  // carrying user_id=eq., so deleting the real tenancy guard left this assertion green on the wrong
+  // function. Third vacuous assertion found this way today.
+  ok('🔴 THE WRITE IS SCOPED TO HIS OWN BOOKS', /export async function recordCisOnIncome[\s\S]{0,1600}?user_id=eq\./.test(sb));
+  ok('🔴 AND GUARDED ON THE AMOUNT THE PAGE ACTUALLY SHOWED HIM, so a moved row is refused',
+    /export async function recordCisOnIncome[\s\S]{0,1600}?amount=eq\.\$\{expectedNet\.toFixed\(2\)\}/.test(sb));
+  ok('🔴 AND A DEDUCTION CAN NEVER BE APPLIED TWICE, whatever a back button does',
+    /export async function recordCisOnIncome[\s\S]{0,1700}?cis_deduction=is\.null/.test(sb));
+  ok('the invariant is re-checked at the write, not merely trusted from the caller',
+    /patch\.amount - patch\.cis_deduction\) - expectedNet\) > 0\.005/.test(sb));
 
   // The screen does not draw a question the row cannot answer, so nobody meets that refusal. Same
   // shape the VAT columns shipped in on 1 August 2026: one line in the select turns it on.
@@ -450,5 +504,52 @@ export async function confirmTransactionVat() { log('confirmTransactionVat', {})
     R.cisToAsk([{ id: 'x', vendor: 'Bloggs', amount: 400, cis_deduction: 100 }], true).length === 0);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE PAYMENTS THE PILE WILL NEVER ASK ABOUT AGAIN.
+//
+// 🔴 THE HALF THAT ACTUALLY FIXED THE CUSTOMER. The pile question was built, proved and shipped,
+// and Danny's Overview still read "Put by for tax £3,337" on a January that is a refund, because
+// his 62 contractor deposits were confirmed weeks earlier in one bulk import and the pile is
+// finished with them for ever. Fixing the engine did not fix the man.
+//
+// And it is not an edge case. A contractor has 14 days after the end of the tax month to hand over
+// a payment and deduction statement, so the money lands first and the paperwork follows. The day
+// he can answer is routinely weeks after the day he confirmed the payment.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n7. Recording a deduction against money he confirmed long ago\n');
+{
+  const sb = read('lib/supabase.ts');
+  const page = read('app/app/tax/cis/page.tsx');
+  const route = read('app/api/cis/route.ts');
+
+  ok('🔴 THERE IS A READER FOR CONFIRMED INCOME CARRYING NO DEDUCTION', /export async function incomeRowsWithoutCis/.test(sb));
+  ok('and it looks at CONFIRMED rows, which is the whole point of it',
+    /incomeRowsWithoutCis[\s\S]{0,900}?confirmed=eq\.true/.test(sb));
+  ok('and only at rows with nothing recorded yet', /incomeRowsWithoutCis[\s\S]{0,900}?cis_deduction=is\.null/.test(sb));
+  ok('🔴 AND RENT IS EXCLUDED WITHOUT DROPPING EVERY TRADE ROW WITH IT',
+    /or=\(income_type\.is\.null,income_type\.neq\.property\)/.test(sb)
+    && !/&income_type=not\.eq\.property/.test(sb));
+
+  ok('the CIS screen offers the question', /Was CIS taken off these/.test(page));
+  ok('🔴 AND ONLY TO A MAN WHO SAID HE IS IN THE SCHEME', /worksUnderCis\(/.test(page));
+  ok('doc 103 empty test: no section at all when there is nothing to record',
+    /missing\.length > 0 \?/.test(page));
+  ok('🔴 THE FIGURE IS PRINTED BESIDE THE BOX AND NEVER INTO IT, so a guess is never agreed by a press',
+    /placeholder="0\.00"/.test(page) && !/defaultValue=\{[^}]*deduction/.test(page));
+  ok('the three rates are named, never flattened to twenty percent', /CIS_RATES/.test(page));
+  ok('one form per payment, so one statement is never applied to another payment',
+    /missing\.map\(\(r\) => \{/.test(page) && /<form key=\{r\.id\}/.test(page));
+
+  ok('the door checks the scheme answer itself, because a page is a suggestion',
+    /worksUnderCis\(answers\)/.test(route));
+  ok('🔴 THE MONEY IS READ SERVER SIDE: the browser sends an id and what he typed, never an amount',
+    /incomeRowsWithoutCis\(/.test(route) && !/body\?\.amount|f\.get\('amount'\)/.test(route));
+  ok('it writes through the one atomic function and nothing else',
+    /recordCisOnIncome\(/.test(route) && !/\bfetch\s*\(/.test(route));
+  ok('🔴 A REFUSED WRITE IS NOT DRESSED AS A SAVE', /applied \? 'saved' : 'gone'/.test(route));
+  ok('read only stops it, exactly where it stops the pile', /refuseUnentitled\(/.test(route));
+  ok('and the route has a decision in the paywall table',
+    /route: 'app\/api\/cis'/.test(read('lib/gate.ts')));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
-process.exitCode = fail ? 1 : 0;

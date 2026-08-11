@@ -11,9 +11,12 @@ import {
   learnVendor,
   readVatProfile,
   confirmTransactionVat,
+  recordCisOnIncome,
+  readCircumstances,
 } from '../../../lib/supabase';
 import { sessionUser } from '../../../lib/webauth';
-import { buildPile, summarisePile, canBulkConfirm, bulkConfirmPlan } from '../../../lib/reviewpile';
+import { buildPile, summarisePile, canBulkConfirm, bulkConfirmPlan, cisCapture } from '../../../lib/reviewpile';
+import { worksUnderCis } from '../../../lib/circumstances';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
@@ -312,35 +315,50 @@ export async function POST(req: NextRequest) {
   // the deposit that actually landed.
   //
   // ═══════════════════════════════════════════════════════════════════════════════════════
-  // 🔴 AND TODAY IT REFUSES, BECAUSE NOTHING IN lib/supabase.ts CAN WRITE cis_deduction ONTO A ROW
-  // THAT ALREADY EXISTS. THE REFUSAL IS THE POINT, NOT AN OVERSIGHT.
+  // 🔴 AND IT NEEDED NO MIGRATION IN THE END, WHICH IS WHY IT SHIPPED THE SAME DAY.
   //
-  // confirmIncome() files a payment in and touches no other column. Raising the amount without
-  // recording the deduction would put his turnover right and leave the tax already paid nowhere,
-  // which is a half fix that LOOKS finished: it is the vat_registered date all over again, a man
-  // answering a question we then throw away. So this files nothing at all, and the row stays in his
-  // pile where he can see it, which is the same rule the car question follows one branch down.
+  // This branch refused for a few hours on 11 August, on the reasoning that nothing in
+  // lib/supabase.ts could write cis_deduction onto a row that already existed, and that raising
+  // the amount without recording the deduction would be a half fix that LOOKS finished. That
+  // reasoning was right and the conclusion was wrong: cis_deduction has been in schema.sql since
+  // the beginning and the WhatsApp handler has been writing it for weeks. What the rpc was really
+  // buying was atomicity, and PostgREST gives that away: every filter on a PATCH lands in the same
+  // UPDATE ... WHERE that does the write. recordCisOnIncome() carries the argument in full.
   //
-  // ⚠️ NOBODY MEETS THIS REFUSAL. app/app/pile/page.tsx draws the question only for rows that can
-  // carry the answer, and pileEntries does not yet name the column, so the form is not on the
-  // screen. That is deliberately the same shape the VAT columns shipped in on 1 August 2026.
+  // ⚠️ ONE ROW, NOT A GROUP. Every other verdict on this screen applies one decision to many rows,
+  // because "these are all fuel" is a claim about a category. A CIS deduction is a fact about ONE
+  // payment, off one contractor's statement, and no two are alike. Handing a group one figure
+  // would put the same deduction on every row in it.
   //
-  // THE FOUR CHANGES THAT FINISH IT, none of which this file may make:
-  //   1. supabase/APPLY_2026-08-11_cis.sql: confirm_income_cis(p_user, p_id, p_cis), which sets
-  //      amount = amount + p_cis and cis_deduction = p_cis and confirmed = true, under exactly the
-  //      guards confirm_income already applies (his row, unconfirmed, amount > 0, not flagged).
-  //   2. lib/supabase.ts: confirmIncomeCis(), the wrapper, returning false when the function is
-  //      absent so this branch keeps refusing rather than pretending.
-  //   3. lib/supabase.ts: cis_deduction named in the pileEntries select and its return type, which
-  //      is the one line that turns the question on.
-  //   4. this branch: read his row, hand it and body.cis to cisCapture(), refuse a null, and store.
-  //      It also needs readCircumstances and worksUnderCis, so the answer cannot be posted by a man
-  //      who never said he is in the scheme. All three are named imports that the route stubs in
-  //      test/receiptvat.test.mjs and test/capitalwiring.test.mjs must gain in the same commit.
+  // ⚠️ AND HE HAS TO HAVE SAID HE IS IN THE SCHEME. Not because the arithmetic would break, but
+  // because a man who never told us he works under CIS has no business posting one, and the
+  // question is not drawn for him either. The check is here as well as on the page, because a page
+  // is a suggestion and a route is a door.
   // ═══════════════════════════════════════════════════════════════════════════════════════
   if (body.verdict === 'cis') {
-    if (form) return backToPile(req, 'cishold', 0);
-    return NextResponse.json({ error: 'cis_not_recordable', applied: 0 }, { status: 503 });
+    if (ids.length !== 1) {
+      return form ? backToPile(req, 'nothing', 0)
+        : NextResponse.json({ error: 'one_at_a_time', applied: 0 }, { status: 400 });
+    }
+    const answers = await readCircumstances(user.id).catch(() => null);
+    if (!worksUnderCis(answers)) {
+      return form ? backToPile(req, 'nocis', 0)
+        : NextResponse.json({ error: 'not_cis', applied: 0 }, { status: 403 });
+    }
+    // His own row, read server side. The browser sends the id and what he typed, never the money.
+    const row = (await pileEntries(user.id)).find((r) => r.id === ids[0]);
+    if (!row || !(row.amount > 0)) {
+      return form ? backToPile(req, 'nothing', 0)
+        : NextResponse.json({ error: 'not_found', applied: 0 }, { status: 404 });
+    }
+    const patch = cisCapture(row.amount, body.cis ?? '');
+    if (!patch) {
+      return form ? backToPile(req, 'cisbad', 0)
+        : NextResponse.json({ error: 'bad_cis', applied: 0 }, { status: 400 });
+    }
+    const applied = await recordCisOnIncome(user.id, row.id, row.amount, patch);
+    return form ? backToPile(req, applied ? 'ok' : 'cisbad', applied)
+      : NextResponse.json({ applied }, { status: applied ? 200 : 409 });
   }
 
   const vendor = (body.vendor ?? '').trim();

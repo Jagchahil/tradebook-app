@@ -271,7 +271,7 @@ console.log('\n8. Nothing is filed until we have stored what it was');
 {
   const rStage = mkdtempSync(path.join(tmpdir(), 'capwire-route-'));
   const put = (name, body) => writeFileSync(path.join(rStage, name), body);
-  for (const f of ['capital', 'taxengine', 'money', 'vat']) {
+  for (const f of ['capital', 'taxengine', 'money', 'vat', 'circumstances', 'reviewpile', 'personal']) {
     put(`${f}.ts`, fix(readFileSync(path.join(lib, `${f}.ts`), 'utf8')));
   }
   put('nextserver.ts', `
@@ -288,6 +288,16 @@ export async function gateForUser() { return 'ok'; }
 export function refuseUnentitled() { return { kind: 'json', status: 402, body: { error: 'locked' } }; }
 `);
   put('reviewpile.ts', `
+// Added 11 August 2026. The pile route's CIS branch imports cisCapture. The real one lives in
+// lib/reviewpile.ts and is proved by test/ciscapture.test.mjs; this stub only has to exist and to
+// keep the two columns the right way round, because a stub that swapped them would let a suite go
+// green over the exact defect the real function was written to stop.
+export function cisCapture(net, typed) {
+  const taken = Number(String(typed ?? '').replace(/[£,\s]/g, ''));
+  if (!Number.isFinite(taken) || taken < 0) return null;
+  return { amount: Math.round((net + taken) * 100) / 100, cis_deduction: taken };
+}
+
 export function buildPile() { return []; }
 export function summarisePile() { return { entries: 0 }; }
 export function canBulkConfirm() { return false; }
@@ -313,6 +323,10 @@ export async function confirmIncome() { return 0; }
 export async function setManyPersonal() { return 0; }
 export async function learnVendor() { return true; }
 export async function readVatProfile() { return null; }
+// Added 11 August 2026: the pile route's CIS branch imports these two, so a suite that stages
+// the route must stage them or the module fails to link.
+export async function readCircumstances() { return [{ key: 'cis', answer: 'yes' }]; }
+export async function recordCisOnIncome() { return 1; }
 export async function confirmTransactionVat() { return true; }
 `);
   put('route.ts', read('app/api/pile/route.ts')

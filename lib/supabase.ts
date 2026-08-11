@@ -7555,13 +7555,19 @@ export async function pileEntries(userId: string): Promise<Array<{
   // supabase/APPLY_2026-08-01_vat.sql has to be run BEFORE this line ships.
   vat_amount: number | null;
   vat_confirmed: boolean | null;
+  // 🔴 THE LINE THAT TURNS THE CIS QUESTION ON. Same rule as the VAT pair above, and the same
+  // ordering hazard, EXCEPT that this one carries no hazard at all: cis_deduction has existed in
+  // supabase/schema.sql since the beginning and app/api/whatsapp/route.ts has been writing it
+  // since handleCIS was built. There is no migration standing behind this select, which is why
+  // the capture needed none. See recordCisOnIncome().
+  cis_deduction: number | null;
 }>> {
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
       `&confirmed=eq.false&is_personal=eq.false` +
       `&source_type=in.(bank_feed,web_image,whatsapp_image,whatsapp_voice,whatsapp_text)` +
-      `&select=id,vendor,description,amount,category,looks_personal,vat_amount,vat_confirmed` +
+      `&select=id,vendor,description,amount,category,looks_personal,vat_amount,vat_confirmed,cis_deduction` +
       `&order=transaction_date.desc&limit=1000`,
     { headers: headers() },
   );
@@ -10750,5 +10756,146 @@ export async function hasConfirmedRowsInTaxYear(userId: string, startYear: numbe
     return /^\d+$/.test(total) && Number(total) > 0;
   } catch {
     return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// CIS CAPTURE. 11 August 2026, RUN 1 of the customer week, and the write half of finding F4.
+//
+// 🔴 NO MIGRATION, AND THAT IS A DECISION RATHER THAN A SHORTCUT.
+//
+// The first design for this was an rpc, confirm_income_cis, mirroring confirm_income so the gross
+// could be computed in the database as amount = amount + p_cis. That is a fine shape and it needed
+// a DDL apply against production before a single customer could answer the question.
+//
+// It is not necessary. transactions.cis_deduction ALREADY EXISTS: it is in supabase/schema.sql and
+// app/api/whatsapp/route.ts has been writing it since handleCIS was built. What the rpc really
+// bought was ATOMICITY, and PostgREST gives that for nothing: every filter on a PATCH becomes part
+// of one UPDATE ... WHERE, so the guards below are checked by Postgres in the same statement that
+// does the write. There is no read-then-write window to lose a race in.
+//
+// THE FOUR GUARDS, AND WHAT EACH ONE STOPS:
+//
+//   user_id       tenancy. Without it an id from another man's books is enough. Non negotiable.
+//   amount        OPTIMISTIC CONCURRENCY. expectedNet is the figure the page showed him and the
+//                 figure cisCapture() did its arithmetic on. If the row has moved since, this
+//                 matches nothing and we refuse, rather than grossing up a number he never saw.
+//   cis_deduction is.null. THE IDEMPOTENCY GUARD, and the one that matters most. A double submit,
+//                 a back button, a retried request: the second one matches no rows, so a deduction
+//                 can never be applied twice and his turnover can never be inflated by a press.
+//   is_personal   a row he has already put outside the business is not income to gross up.
+//
+// ⚠️ THE CATEGORY IS NOT TOUCHED. confirm_income owns that, and a write that quietly recategorised
+// a row while answering a question about tax would be doing two things behind one press.
+//
+// Returns the number of rows actually changed, which is 1 or 0 and never a guess: PostgREST is
+// asked for the representation so this counts what Postgres did, not what we hoped it would do.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function recordCisOnIncome(
+  userId: string,
+  id: string,
+  expectedNet: number,
+  patch: { amount: number; cis_deduction: number },
+): Promise<number> {
+  if (!UUID.test(id) || !userId) return 0;
+  if (!Number.isFinite(expectedNet) || expectedNet <= 0) return 0;
+  if (!Number.isFinite(patch.amount) || !Number.isFinite(patch.cis_deduction)) return 0;
+  // Belt and braces on the invariant the whole spine now rests on. The caller is lib/reviewpile.ts
+  // cisCapture(), which cannot produce anything else, and this refuses to be the place that lets a
+  // net figure through if a second caller ever appears.
+  if (Math.abs((patch.amount - patch.cis_deduction) - expectedNet) > 0.005) return 0;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/transactions?id=eq.${encodeURIComponent(id)}`
+        + `&user_id=eq.${encodeURIComponent(userId)}`
+        // Two decimals, to match the column rather than whatever JS prints. An optimistic guard
+        // that silently never matches is a feature that silently never works.
+        + `&amount=eq.${expectedNet.toFixed(2)}`
+        + '&cis_deduction=is.null'
+        + '&is_personal=eq.false',
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({
+          amount: patch.amount,
+          cis_deduction: patch.cis_deduction,
+          // A row he has just told us about is a row he has confirmed. Already true for anything
+          // reached from the CIS screen, which only ever lists money he confirmed weeks ago.
+          confirmed: true,
+        }),
+      },
+    );
+    if (!res.ok) return 0;
+    const rows = (await res.json().catch(() => null)) as unknown[] | null;
+    return Array.isArray(rows) ? rows.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** One payment in that carries no CIS deduction yet. */
+export interface CisMissingRow {
+  id: string;
+  amount: number;
+  transaction_date: string;
+  vendor: string | null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE ROWS THE PILE WILL NEVER ASK ABOUT AGAIN, AND WHY THEY ARE THE WHOLE PROBLEM.
+//
+// The review pile asks about money that is waiting for a yes. Danny's 62 contractor deposits were
+// confirmed weeks ago, in one bulk import, before anything in this product knew what CIS was. The
+// pile is done with them for ever, so a capture question that lives only there fixes the NEXT
+// subcontractor and leaves this one with a wrong number on his Overview until he files.
+//
+// ⚠️ AND IT IS NOT AN EDGE CASE, IT IS THE ORDINARY SHAPE OF THE SCHEME. A contractor has until 14
+// days after the end of the tax month to hand over a payment and deduction statement. The money
+// lands first and the paperwork follows. So the day a man can answer "what was taken off that
+// one" is routinely WEEKS after the day he confirmed the payment. A product that can only ask at
+// the moment money arrives is asking on the one day he cannot possibly know.
+//
+// So this reads back over confirmed income that has no deduction recorded, and /app/tax/cis lists
+// it. Newest first, because the statement in his hand this morning is for last month.
+//
+// ⚠️ PROPERTY INCOME IS EXCLUDED. Rent is never inside the scheme, and offering to record a CIS
+// deduction against a tenant's payment would be nonsense on the screen and wrong in the books.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function incomeRowsWithoutCis(
+  userId: string,
+  startISO: string,
+  endISO: string,
+  limit = 60,
+): Promise<CisMissingRow[]> {
+  const { url } = config();
+  if (!userId) return [];
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
+        + '&confirmed=eq.true&is_personal=eq.false&amount=gt.0&cis_deduction=is.null'
+        // 🔴 not.eq.property WOULD HAVE DROPPED EVERY ROW THIS EXISTS FOR. In SQL, NULL = 'property'
+        // is UNKNOWN, so NOT(UNKNOWN) is UNKNOWN, so a plain not.eq filters out every row whose
+        // income_type is null. Danny's 62 contractor deposits are ALL null: a bank import has no
+        // reason to set it. The filter meant to exclude rent would have excluded the entire trade.
+        + '&or=(income_type.is.null,income_type.neq.property)'
+        + `&transaction_date=gte.${encodeURIComponent(startISO)}`
+        + `&transaction_date=lte.${encodeURIComponent(endISO)}`
+        + `&select=id,amount,transaction_date,vendor&order=transaction_date.desc&limit=${limit}`,
+      { headers: headers() },
+    );
+    if (!res.ok) return [];
+    const rows = (await res.json().catch(() => null)) as Array<Record<string, unknown>> | null;
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .filter((r) => typeof r.id === 'string' && typeof r.transaction_date === 'string')
+      .map((r) => ({
+        id: r.id as string,
+        amount: Number(r.amount) || 0,
+        transaction_date: (r.transaction_date as string).slice(0, 10),
+        vendor: (r.vendor as string | null) ?? null,
+      }));
+  } catch {
+    return [];
   }
 }

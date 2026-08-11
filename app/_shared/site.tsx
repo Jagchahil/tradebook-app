@@ -1418,8 +1418,38 @@ export function SiteFooter() {
         </div>
         {/* The statutory particulars, on their own row so they are never squeezed out by the
             sentence above them. Plain text, not a link: reg 25 wants them disclosed, and a
-            disclosure a reader has to click for is not one. */}
-        <div style={{ borderTop: '1px solid #2C2C2C', marginTop: 20, paddingTop: 18, fontSize: 12.5, color: '#7A828E', lineHeight: 1.7 }}>
+            disclosure a reader has to click for is not one.
+
+            ═══════════════════════════════════════════════════════════════════════════════════
+            🔴 QUIETER, BUT NOT DIMMER, AND THE DIFFERENCE IS THE WHOLE NOTE. 11 August 2026.
+
+            Jag asked for the registered office to sit less loudly, having seen it as the first
+            thing his eye landed on. Three levers were available and only two of them were safe.
+
+            TAKEN: the type dropped from 12.5px to 11.5px, so it is smaller than the copyright
+            line above it rather than level with it, and the divider rule went, because a rule
+            announces a section and this is a tail. It now reads as small print, which is what
+            it is.
+
+            🔴 NOT TAKEN, AND NEVER TAKE IT: THE COLOUR. #7A828E on --band measures 4.58:1 in
+            light and 5.10:1 in dark. The light figure is EIGHT HUNDREDTHS above the 4.5:1 floor
+            this product holds every pair to. There is no headroom. The obvious next move for
+            anybody asked to make this quieter is to dim it, and one step down (#6E7683) is
+            3.88:1, which fails.
+
+            ⚠️ AND NOTHING WAS WATCHING IT. test/contrastapplication.test.mjs finds a pair when a
+            background and a colour sit in the SAME inline style object; this one inherits its
+            background from the <footer> two levels up, so the sweep has never seen it. A pair
+            eight hundredths off the floor with no guard on it is exactly how a legal disclosure
+            goes quietly unreadable. test/stickyfooter.test.mjs now computes this one from the
+            tokens, in both themes.
+
+            ⚠️ THE ADDRESS IS PUBLIC ON COMPANIES HOUSE REGARDLESS, so none of this is privacy.
+            The only thing that removes a home address from public view is changing the
+            registered office to a service address and then applying to suppress the old one.
+            Nothing on this page can do that job, and nothing on this page should pretend to.
+            ═══════════════════════════════════════════════════════════════════════════════════ */}
+        <div style={{ marginTop: 26, fontSize: 11.5, color: '#7A828E', lineHeight: 1.7 }}>
           {COMPANY.name} is a company registered in {COMPANY.jurisdiction}, company number {COMPANY.number}.
           {' '}Registered office: {COMPANY.office}.
         </div>

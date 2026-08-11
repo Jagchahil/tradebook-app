@@ -99,7 +99,60 @@ console.log('\n--- 4. The line that could not be read is still there to read ---
   ok('and the address it prints', /office: '52 Harrington Road, London, E11 4QW'/.test(src));
 }
 
-console.log('\n--- 5. The general rule, swept rather than spot checked ---\n');
+console.log('\n--- 5. The statutory line is quiet, and it is still readable ---\n');
+{
+  // 🔴 THIS PAIR HAS NO OTHER GUARD, AND IT SITS EIGHT HUNDREDTHS ABOVE THE FLOOR.
+  //
+  // test/contrastapplication.test.mjs finds a pair when a background and a colour sit in the SAME
+  // inline style object. The statutory particulars row carries only a colour; its background comes
+  // from the <footer> two levels up, so that sweep has never once looked at it. On 11 August the
+  // row was asked to be made quieter, and the obvious way to make text quieter is to dim it, which
+  // would have taken a legal disclosure under the line without a single test going red.
+  //
+  // So it is computed here, from the tokens, in both themes.
+  const tokens = readFileSync(path.join(root, 'lib/tokens.ts'), 'utf8');
+  const tok = (name) => (new RegExp(`\\b${name}\\s*=\\s*'(#[0-9A-Fa-f]{6})'`).exec(tokens) || [])[1];
+  const lum = (hex) => {
+    const c = [1, 3, 5].map((i) => parseInt(hex.substr(i, 2), 16) / 255)
+      .map((x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const ratio = (a, b) => {
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  const row = /<div style=\{\{ marginTop: \d+, fontSize: ([\d.]+), color: '(#[0-9A-Fa-f]{6})'[^}]*\}\}>\s*\n\s*\{COMPANY\.name\}/.exec(src);
+  ok('the statutory particulars row was read', row !== null);
+  const size = Number(row?.[1]);
+  const ink = row?.[2];
+
+  const band = tok('BAND');
+  const darkBand = tok('DARK_BAND');
+  ok(`the footer band tokens were read (${band} / ${darkBand})`, Boolean(band && darkBand));
+
+  const light = ratio(ink, band);
+  const dark = ratio(ink, darkBand);
+  ok(`🔴 THE STATUTORY LINE IS READABLE IN LIGHT: ${light.toFixed(2)}:1 on ${band}`, light >= 4.5);
+  ok(`🔴 AND IN DARK: ${dark.toFixed(2)}:1 on ${darkBand}`, dark >= 4.5);
+
+  // Quiet is a SIZE decision here, not a colour one, and the note in site.tsx says why.
+  const copyright = Number(/© 2026 \{COMPANY\.name\}/.test(src)
+    ? (/fontSize: ([\d.]+), color: '#8A93A0' \}\}>© 2026/.exec(src) || [])[1] ?? 13
+    : 13);
+  ok(`the line is smaller than the copyright above it (${size}px vs ${copyright}px)`, size < copyright);
+  ok('but not so small it stops being a disclosure', size >= 11);
+  ok('and it is not hidden, faded out or collapsed', !/display:\s*none|opacity:\s*0|visibility:\s*hidden/.test(row?.[0] ?? ''));
+
+  // All four particulars still render. reg 28 makes their absence an offence by the company AND
+  // by every officer in default, so "quieter" may never become "one of them went".
+  for (const bit of ['{COMPANY.name} is a company registered in {COMPANY.jurisdiction}', 'company number {COMPANY.number}', 'Registered office: {COMPANY.office}']) {
+    ok(`🔴 still disclosed: ${bit}`, src.includes(bit));
+  }
+  ok('and it is still plain text rather than something to click for', !/<Link[^>]*>\s*Registered office/.test(src));
+}
+
+console.log('\n--- 6. The general rule, swept rather than spot checked ---\n');
 {
   // Any OTHER rule that pins something to the bottom of the viewport has the same obligation. This
   // is the part that catches the next one, rather than the one we just fixed.

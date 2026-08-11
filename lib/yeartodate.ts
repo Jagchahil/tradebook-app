@@ -21,6 +21,9 @@
 import { capitalRelief, isCapitalKind, isWrittenDown } from './capital';
 import { isResidentialFinanceCost } from './propertyengine';
 import { quarterForDate } from './quarterpack';
+// The documented relationship between the two categories a tool can honestly land in. See the block
+// beside its call below, and lib/categories.ts for why the categoriser refuses to guess.
+import { couldBeToolSpend } from './categories';
 
 // One confirmed money row, as the aggregation needs it. The fields are the ones
 // getConfirmedTransactionsForRange selects; anything extra rides along untouched.
@@ -171,6 +174,28 @@ export function aggregateConfirmedRows(
       // A category is a fact about the row whichever way it is relieved, so it is logged for both
       // branches: a car filed under Vehicle should still count as a category he has logged.
       if (r.category) cats.add(String(r.category).toLowerCase());
+
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // 🔴 A DRILL BOUGHT AT SCREWFIX IS FILED AS MATERIALS, AND WAYS TO SAVE THEN TOLD A MAN WITH
+      // A VAN FULL OF TOOLS THAT HE HAD LOGGED NONE. Found 11 August 2026, RUN 1.
+      //
+      // lib/categories.ts sends the five shops a UK tradesman actually buys tools from, Screwfix,
+      // Toolstation, B&Q, Wickes and TradePoint, to `materials`, and it is right to: a bank line
+      // reading SCREWFIX DIRECT £280 genuinely could be either and the merchant name alone cannot
+      // settle it. Guessing is what that file exists to refuse.
+      //
+      // But findOptimisations asks a plain string equality question, "is 'tools' in the set", and
+      // gets a No it then reads out loud as "You have nothing logged this year for phone, tools."
+      // The question it is actually asking is whether he has logged ANY tool spend, and
+      // couldBeToolSpend is how that question gets an honest answer without the categoriser having
+      // to pretend it knows.
+      //
+      // ⚠️ HIS OWN CATEGORY OUTRANKS THIS, BOTH WAYS. couldBeToolSpend takes the stored category
+      // and obeys it, so a man who has moved a row to materials himself is not overruled by a
+      // vendor name. Nothing here changes a stored category, a total, or a penny of tax: it only
+      // widens what a nudge is allowed to believe it can see.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      if (couldBeToolSpend(String(r.vendor ?? ''), r.category ?? null)) cats.add('tools');
 
       // ═══════════════════════════════════════════════════════════════════════════════════════
       // 🔴 A CAR DOES NOT GO INTO ytdTradeExpenses AT ALL, AND THIS IS THE WHOLE FIX.

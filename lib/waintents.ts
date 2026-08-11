@@ -224,6 +224,127 @@ export function matchStopStart(body: string): 'stop' | 'start' | null {
   return null;
 }
 
+// --- The words the product itself hands out ------------------------------------------------------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A WORD WE TELL A CUSTOMER TO SEND BACK, WITH NOBODY OWNING IT INBOUND, IS A DEAD END. WE
+// SHIPPED ONE, AND IT WAS THE ONE ROAD OUT OF A REFUSAL.
+//
+// 11 August 2026, found by walking production. A customer tried to connect his WhatsApp number. It
+// was already bound to another and by then abandoned account, so bindingVerdict() returned 'taken'
+// and lib/walink.ts answered him in our own words:
+//
+//   "This number is already connected to a Lekhio account, so we have not changed anything. If that
+//    is not you, reply SUPPORT and a person will look at it."
+//
+// He replied SUPPORT.
+//
+// isSupportRequest() below did not match it. Its five regexes are deliberately specific and every
+// one of them wants a SENTENCE: "let me speak to a human", "this is broken", "I want a refund".
+// None of them covers the single token the product had just put in his hand. So SUPPORT fell
+// through roughly forty text branches in app/api/whatsapp/route.ts and landed on handleTextEntry,
+// THE RECEIPT AND EXPENSE PARSER, which set about booking the word as a transaction. The only road
+// out of the refusal was a dead end, and there were no words at all he could have sent to free his
+// own number.
+//
+// The same walk found the hole open in three more places, all of them the same shape:
+//
+//   . alwaysAnswered() in the webhook asks isSupportRequest(), so a read only or lapsed customer
+//     who texted SUPPORT failed the always answered list and got the paywall line back. A paywall
+//     may never be the thing that answers a cry for help.
+//   . Bare START was tested by isGetStarted() four branches ABOVE matchStopStart(), and its regex
+//     carried the word, so the exact token the STOP reply promises ("you can text START any time to
+//     switch them back on") reached the welcome card and never re-enabled a single nudge.
+//   . handleInvoiceFlow() and handleTaxGuideFlow() both run above matchStopStart() and both read a
+//     bare "stop" as "cancel this flow". A man who texted STOP in the middle of an invoice believed
+//     he had opted out, and his reminder_prefs row was never touched. Meta requires STOP to mean
+//     STOP, so that one is not merely rude.
+//
+// ⚠️ AND test/waintents.test.mjs WAS GREEN THROUGH ALL OF IT, because it asserts
+// matchStopStart('start reminders'), the two word form, which the predicate has always got right.
+// A predicate returning the correct answer proves nothing about whether the router ever calls it.
+//
+// SO THE WORDS ARE A REGISTRY, AND THE REGISTRY IS THE SINGLE SOURCE OF TRUTH. Each entry names the
+// handler that owns the word inbound and quotes the copy that hands it out, so a word cannot be put
+// in front of a customer without somebody's name against it. test/reservedwords.test.mjs reads the
+// outbound copy off disk, pulls out every word we tell him to reply with, and goes red on any one
+// of them this matcher does not recognise. That is the guard that would have caught 11 August.
+//
+// ⚠️ THE MATCH IS ANCHORED, AND THAT IS THE WHOLE JUDGEMENT IN IT. A BARE WORD IS AN INSTRUCTION
+// AND A SENTENCE IS NOT. "stop" is a man opting out. "stop the invoice" is a man cancelling one
+// step of one flow, and dispatching that as an opt out would turn a flow he abandoned into
+// reminders he never asked us to switch off. So the whole message has to BE the word, allowing for
+// the spaces and the full stop his keyboard adds and for any case he shouts it in.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export type ReservedWord = 'SUPPORT' | 'STOP' | 'START';
+
+export interface ReservedWordRule {
+  // Printed in capitals, because that is how the copy hands it to him and how he sends it back.
+  word: ReservedWord;
+  // The handler in app/api/whatsapp/route.ts that must receive it. A word with no owner is the bug.
+  owner: string;
+  // The sentence of ours that puts the word in his hand, so the reason it is reserved is readable.
+  handedOutBy: string;
+}
+
+export const RESERVED_WORDS: ReadonlyArray<ReservedWordRule> = [
+  {
+    word: 'SUPPORT',
+    owner: 'handleSupportRequest',
+    handedOutBy: "linkMessage('taken') in lib/walink.ts: reply SUPPORT and a person will look at it",
+  },
+  {
+    word: 'STOP',
+    owner: 'handleStopStart',
+    // Nothing of ours prints STOP today, and it stays reserved anyway. It is the one word every
+    // customer on earth already knows, Meta requires it to work on this channel, and the day
+    // somebody writes it into a nudge the owner is already here.
+    handedOutBy: 'the word every customer already knows, and the one Meta obliges us to honour',
+  },
+  {
+    word: 'START',
+    owner: 'handleStopStart',
+    handedOutBy: 'handleStopStart in the webhook: you can text START any time to switch them back on',
+  },
+];
+
+// ⚠️ THE WORDS THAT ARE ONLY OFFERED INSIDE A FLOW, AND ARE OWNED BY THAT FLOW RATHER THAN GLOBALLY.
+//
+// SEND, CHANGE, SKIP and NEXT are also words we tell a customer to reply with, and they are NOT
+// reserved, because they only mean anything while the question that offered them is still open.
+// Reserving SEND would take the word out of the invoice approval step, which is the one place in
+// the product where a customer's reply puts a document in front of another human being.
+//
+// They are written down anyway, and test/reservedwords.test.mjs holds each of them to a real
+// anchored regex in the router that actually matches the bare word. So this list cannot be used as
+// a quiet exemption for a word nothing on earth handles: it is a second kind of owner, not a
+// second kind of nobody.
+export interface FlowWordRule {
+  word: string;
+  flow: string;
+  owner: string;
+}
+
+export const FLOW_WORDS: ReadonlyArray<FlowWordRule> = [
+  { word: 'SEND', flow: 'invoice', owner: "the confirm step of handleInvoiceFlow" },
+  { word: 'CHANGE', flow: 'invoice', owner: "the confirm step of handleInvoiceFlow" },
+  { word: 'SKIP', flow: 'taxguide', owner: 'TAXGUIDE_SKIP' },
+  { word: 'NEXT', flow: 'taxguide', owner: 'TAXGUIDE_NEXT' },
+];
+
+// Anchored. The whole message is the word, or it is not a reserved word at all. Trailing punctuation
+// goes because a phone adds it, and the case goes because he is shouting it, which is the point.
+export function matchReservedWord(body: string): ReservedWord | null {
+  const t = String(body || '').trim().toLowerCase().replace(/[.,!?;:\s]+$/, '');
+  if (!t) return null;
+  const hit = RESERVED_WORDS.find((r) => r.word.toLowerCase() === t);
+  return hit ? hit.word : null;
+}
+
+export function isReservedWord(body: string): boolean {
+  return matchReservedWord(body) !== null;
+}
+
 // --- Fixing the last entry -----------------------------------------------------
 export function isDeleteLast(body: string): boolean {
   const t = body.trim().toLowerCase().replace(/[!.?\s]+$/, '');
@@ -1120,6 +1241,15 @@ const SUPPORT_WRONG = /\b(made a mistake|you'?re wrong|that'?s wrong|this (is|fi
 export function isSupportRequest(body: string): boolean {
   const t = String(body || '').trim().toLowerCase();
   if (!t) return false;
+  // 🔴 THE BARE WORD FIRST, AND IT COMES FROM THE REGISTRY RATHER THAN FROM A SIXTH REGEX HERE.
+  //
+  // This is the 11 August defect itself. lib/walink.ts tells a refused customer to reply SUPPORT and
+  // the five patterns below all want a sentence, so the one token we handed out was the one token
+  // this function refused. Adding /^support$/ to the list would have fixed the day and left the
+  // disease: the words we hand out would still be scattered through the copy with nothing tying
+  // them to an inbound owner. Asking RESERVED_WORDS is what makes the registry load bearing, and it
+  // is what test/reservedwords.test.mjs derives its guard from.
+  if (matchReservedWord(t) === 'SUPPORT') return true;
   return (
     SUPPORT_HUMAN.test(t) ||
     SUPPORT_COMPLAINT.test(t) ||
@@ -1135,6 +1265,11 @@ export type SupportReason = 'human' | 'complaint' | 'problem' | 'billing' | 'oth
 // 'human' even if it also mentions a problem, because that is what they actually asked for.
 export function supportReason(body: string): SupportReason {
   const t = String(body || '').trim().toLowerCase();
+  // The bare word is the most explicit ask for a person there is: we printed it, he sent it back and
+  // nothing else. It lands in the 'human' lane rather than 'other', because 'other' is where the
+  // desk puts a message it cannot classify, and this one is not unclassifiable, it is an answer to
+  // our own sentence.
+  if (matchReservedWord(t) === 'SUPPORT') return 'human';
   if (SUPPORT_HUMAN.test(t)) return 'human';
   if (SUPPORT_BILLING.test(t)) return 'billing';
   if (SUPPORT_COMPLAINT.test(t)) return 'complaint';

@@ -637,11 +637,42 @@ export function vatPosition(input: VatPositionInput): VatPosition {
 // everything you sell that is not exempt, which is more than anything we can see: cash he never
 // told us about is still his turnover. So the sentence names what we counted AND tells him to
 // check it against his own figures, because ours can only ever be a floor.
+//
+// ═════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE RENT CLAUSE CAME OUT OF IT ON 11 AUGUST 2026, BECAUSE MOST OF THEM HAVE NO RENT.
+//
+// The sentence used to open "This counts the trade income you have confirmed in Lekhio over the
+// last twelve months, AND NOT YOUR RENT, WHICH IS EXEMPT", and /app/tax/vat printed it to every
+// customer who reached the threshold arms. Most of them are sole traders with a van and no
+// property at all, and they were being told, on a screen about whether they must register for
+// VAT, what we are not counting of a rent they do not have. A man who reads that either decides
+// the screen is not about him or wonders what rent we think he has. Both are the same failure:
+// a fact about somebody else's money, presented as a fact about his.
+//
+// It is the identical bug /app/you/vat carried until 9 August, where the Reg 111 reclaim was
+// promised to a man who had never registered. The fix there was to branch the sentence on the
+// one fact that makes it true, and this is the same fix in the same shape.
+//
+// ⚠️ SO THE CLAUSE HAS ITS OWN OWNER RATHER THAN ITS OWN COPY. It is one sentence in one place,
+// and the three surfaces that say it (the two figure arms and the young account arm on
+// /app/tax/vat) append it only for a customer who actually has a property stream. Written out on
+// the surface instead, it would be three copies of one claim, which is how the young account arm
+// already came to word it differently from the other two.
+//
+// ⚠️ IT SITS IMMEDIATELY BELOW THE CONSTANT AND THAT IS DELIBERATE. test/vatpromise.test.mjs
+// reads 600 characters from the declaration above and requires all three facts inside that
+// window, because the pair IS the sentence and a clause filed somewhere tidier is a clause that
+// drifts away from the sentence it belongs to.
 // ═════════════════════════════════════════════════════════════════════════════════════════
 export const TURNOVER_BASIS_NOTE =
-  'This counts the trade income you have confirmed in Lekhio over the last twelve months, and not '
-  + 'your rent, which is exempt. Anything you have taken and not logged is still your turnover, so '
-  + 'check it against your own figures before you act on it.';
+  'This counts the trade income you have confirmed in Lekhio over the last twelve months. Anything '
+  + 'you have taken and not logged is still your turnover, so check it against your own figures '
+  + 'before you act on it.';
+
+// Said only to a customer who has a property stream. Tense free on purpose: it is appended to a
+// figure he has ("comes to £84,000") and to a figure he does not have yet ("it fills itself in").
+export const RENT_NOT_COUNTED_NOTE =
+  'The line is about your trade and not your rent, which is exempt.';
 
 export function mustRegister(rolling12mTaxableTurnover: number): boolean {
   return (Number(rolling12mTaxableTurnover) || 0) > VAT_REGISTRATION_THRESHOLD;

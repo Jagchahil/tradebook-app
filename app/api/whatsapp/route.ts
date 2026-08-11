@@ -143,6 +143,11 @@ import {
   isInvoiceThis,
   isSupportRequest,
   supportReason,
+  // The words the product itself tells a customer to send back. The registry and the whole 11
+  // August story live in lib/waintents.ts; this file is where they are DISPATCHED, which is the
+  // half that was missing.
+  matchReservedWord,
+  type ReservedWord,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { weeklySummaryText } from '../../../lib/weeklyupdate';
@@ -432,6 +437,33 @@ async function processMessage(message: IncomingMessage): Promise<void> {
       // It consumes the message when it finds a code, so nothing after it ever sees one.
       if (await handleConnectCode(from, text)) {
         // handled
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // 🔴 THE WORDS WE HANDED HIM, DISPATCHED BEFORE ANYTHING CAN EAT THEM. THIS IS THE FIX.
+      //
+      // 11 August 2026. A man was refused a binding with "reply SUPPORT and a person will look at
+      // it", replied SUPPORT, and the word fell through every branch below to handleTextEntry, the
+      // receipt parser, which tried to file it as a transaction. lib/waintents.ts holds the full
+      // story and the registry. What made it unfixable one regex at a time is that FOUR different
+      // things were in front of these words, and each of them looked reasonable on its own:
+      //
+      //   . handleInvoiceFlow, whose CANCEL pattern reads a bare "stop" as "cancel this invoice",
+      //     so a man who texted STOP mid invoice was never opted out of anything and his
+      //     reminder_prefs row was untouched. Meta requires STOP to mean STOP.
+      //   . handleTaxGuideFlow, whose TAXGUIDE_STOP does the same thing one flow over.
+      //   . the paywall, which answered a cry for help with a line about a subscription.
+      //   . isGetStarted, whose regex carried the word "start" four branches above matchStopStart,
+      //     so the word the STOP reply promises him reached the welcome card instead of the opt in.
+      //
+      // So the position in this chain IS the fix. Above the sessions, above the paywall, above the
+      // parser, second only to the binding code, which consumes the message when it finds one and
+      // cannot collide with a bare word anyway.
+      //
+      // ⚠️ IT IS DELIBERATELY NOT ABOVE handleConnectCode. That handler is the one door open to a
+      // number we do not know, it answers only a message carrying a hundred bit code, and a code is
+      // not a bare word. Putting anything above it would put a guess in front of a proof.
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      } else if (matchReservedWord(text)) {
+        await handleReservedWord(from, matchReservedWord(text) as ReservedWord, text);
       } else if (!alwaysAnswered(text) && (await workIsPaused(from))) {
         // 🔴 EVERYTHING ELSE IS WORK. Logging a spend, answering a question, totting up his week:
         // all of it is us doing something for him, and all of it stops together rather than in a
@@ -588,9 +620,23 @@ async function processMessage(message: IncomingMessage): Promise<void> {
 // "Get started" or a bare greeting. The first contact after they download the
 // app and tap "Message Lekhio on WhatsApp". A linked user gets a warm welcome;
 // an unknown number gets pointed to sign up. No AI, so this works before keys.
+//
+// 🔴 "start" CAME OUT OF THIS REGEX ON 11 AUGUST 2026, AND THAT IS THE WHOLE OF THE CHANGE.
+//
+// handleStopStart's own reply promises him "you can text START any time to switch them back on".
+// This gate was tested four branches ABOVE matchStopStart, so the word he was promised reached the
+// welcome card: a brand image, a hello and three buttons, and not one nudge switched back on. He
+// had been told the way back and the way back went somewhere else.
+//
+// Two owners for one word, with the wrong one first, is the shape of the whole 11 August finding.
+// The reserved dispatch at the top of processMessage now takes a bare START before this line is
+// reached, so removing the word here is belt and braces rather than the fix. It is worth doing
+// anyway: with it gone the FALLBACK is correct too, because matchStopStart below owns the word, and
+// a latent second owner is exactly how the first one got shipped. "get started", "hi", "hello" and
+// the rest are untouched, which is every greeting a first contact actually sends.
 function isGetStarted(body: string): boolean {
   const t = body.trim().toLowerCase().replace(/[!.\s]+$/, '');
-  return /^(get started|getstarted|start|hi|hiya|hello|hey|hey there|hello there|begin)$/.test(t);
+  return /^(get started|getstarted|hi|hiya|hello|hey|hey there|hello there|begin)$/.test(t);
 }
 
 // The first hello sets the tone for everything. A brand card, a short warm
@@ -972,9 +1018,16 @@ async function workIsPaused(from: string): Promise<boolean> {
 // Stopping messages, asking a human for help, and finding out what we are and what we cost. A
 // product that answers "STOP" with "add a card first" is not running a paywall, it is refusing to
 // let go of somebody, and for STOP specifically that is unlawful rather than merely grubby.
+//
+// 🔴 AND THE RESERVED WORDS ARE THE FIRST LINE OF IT, ADDED 11 AUGUST 2026. This list was built on
+// isSupportRequest(), which did not match the bare word SUPPORT, so a read only or lapsed customer
+// who sent us the exact token our own refusal had given him failed the always answered test and was
+// handed the paywall line. The paywall may never be the thing that answers a cry for help, and a
+// list that is one regex away from doing it is not a list, so it asks the registry now.
 function alwaysAnswered(text: string): boolean {
   return Boolean(
-    matchStopStart(text)
+    matchReservedWord(text)
+    || matchStopStart(text)
     || isSupportRequest(text)
     || isHelp(text)
     || isIdentity(text)
@@ -982,6 +1035,37 @@ function alwaysAnswered(text: string): boolean {
     || isPricing(text)
     || isThanks(text),
   );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 ONE WORD, ONE OWNER, AND THE FLOW HE WAS IN LETS GO OF HIM.
+//
+// The registry in lib/waintents.ts names the owner of every word we hand out, and this is where
+// that name is honoured. There is no new outbound message here on purpose: each word already has a
+// handler that says the right sentence, and a second voice for the same intent is a second sentence
+// to keep true. See section 7 of test/routing.test.mjs on why a new send is a conversation.
+//
+// ⚠️ THE SESSION IS CLEARED FIRST, AND THAT IS A DECISION RATHER THAN TIDINESS.
+//
+// He may be four questions into an invoice when he texts STOP. Honouring the STOP and leaving the
+// session open would answer him correctly and then read his NEXT message as the answer to a
+// question we are no longer asking: "spent 40 on diesel" becomes the customer name on a half built
+// invoice. Nothing has been sent to anybody at any step of either flow, because the invoice send
+// waits for an explicit SEND, so letting the draft go costs him one more "create invoice" and
+// nothing else.
+//
+// ⚠️ AND A FAILED CLEAR MAY NOT SWALLOW THE STOP. clearSession is a network call like everything
+// else here, and a throw would reach processMessage's catch, which would apologise and never touch
+// his preferences. STOP is the one instruction on this channel we are obliged to honour, so the
+// tidying is best effort and the instruction is not.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+async function handleReservedWord(from: string, word: ReservedWord, text: string): Promise<void> {
+  await clearSession(from).catch(() => {});
+  if (word === 'SUPPORT') {
+    await handleSupportRequest(from, text);
+    return;
+  }
+  await handleStopStart(from, word === 'STOP' ? 'stop' : 'start');
 }
 
 async function replyNotLinked(from: string): Promise<void> {
@@ -1382,30 +1466,63 @@ async function saveEntry(
 // --- Support escalation. The customer asked for a human, complained, or reported a problem. Lift them
 // out of the automated flow: acknowledge in-thread, and open a ticket for Jag to answer from the console
 // with a Claude-drafted reply. The reply goes back into THIS thread, free-form, inside Meta's 24-hour
-// window. Nothing is ever sent on its own, because Jag approves every reply. Only linked customers open a
-// ticket; an unknown number is pointed to the team instead, so the desk never fills with strangers.
+// window. Nothing is ever sent on its own, because Jag approves every reply.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE TICKET IS FILED ON THE NUMBER. IT IS NOT FILED UNDER AN ACCOUNT NOBODY HAS PROVED HE OWNS.
+//
+// This handler used to open with findUserIdByPhone(from) and do two things with the answer, and
+// both of them were wrong for the one man this whole change exists for.
+//
+// HE IS THE 'taken' CASE. His number is bound to somebody else's account, we have just told him so
+// in those words, and SUPPORT is the road we offered him. findUserIdByPhone(from) answers a
+// different question from the one a ticket asks. It answers "which account does this number feed",
+// and the ticket wants "whose complaint is this". Those are the same answer for every customer
+// whose number is his own, and they come apart precisely here: the account it returns is the
+// INCUMBENT'S. Filing his ticket under it writes a stranger's words into another person's record,
+// where a subject access request will hand them over, and it points anything a human does from that
+// ticket at the wrong set of books.
+//
+// The binding proves the phone and the account were held by one person AT THE MOMENT OF BINDING.
+// It does not prove they are held by one person today, and the man reading a 'taken' refusal is the
+// living proof of the gap. Nothing readable from inside this handler can tell the two apart. So the
+// account is not attached at all, and `userId: null` is written out rather than left off, so the
+// next reader sees a decision rather than an omission.
+//
+// ⚠️ NOTHING IS LOST BY IT. public.support_tickets.phone is NOT NULL and is the thread key: it is
+// what openTicket() dedupes on, what the console replies to, and, per the erasure manifest in
+// lib/supabase.ts, the only key that reaches every one of his rows. user_id is nullable there for
+// exactly this reason and the desk does not read it. An attribution we cannot prove is worth less
+// than none, because it is believed.
+//
+// 🔴 AND AN UNKNOWN NUMBER NOW GETS A TICKET RATHER THAN AN EMAIL ADDRESS.
+//
+// The old line said "the desk never fills with strangers". The stranger it kept out was the man
+// whose number we refused to bind, which is to say the one population that CANNOT reach us any
+// other way: no account resolves for him, so no web door and no in app door is open, and we had
+// sent him to a mailbox and hoped. He came to us on the only channel Meta has authenticated him on.
+// He gets a person, in this thread, like everybody else. The daily message cap above and openTicket
+// refreshing one open ticket per number rather than stacking them are what keep the volume sane.
+// The address survives one line down, where it is honest: the path where we could NOT open a ticket.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 async function handleSupportRequest(from: string, text: string): Promise<void> {
-  const userId = await findUserIdByPhone(from);
-  if (!userId) {
-    await sendText(
-      from,
-      // ⚠️ info@, NOT support@. There is no support@ mailbox: test/llmstxt.test.mjs already asserts
-      // "the support@ mailbox we do not have", and every other route to a human in the product,
-      // /in, privacy, terms, security, the trade pages and llms.txt, offers info@. This line sent
-      // the one population that CANNOT use the web door to the one address nobody reads.
-      'For a hand from the team, email info@lekhio.app and a person will help. If you are not set up yet, you can start at lekhio.app.',
-    );
-    return;
-  }
-
   const reason = supportReason(text);
 
   // Pre-draft a warm reply for Jag to edit, grounded in his own playbook (the common-issue notes he
   // keeps in Obsidian) when a known issue matches. Best effort: if AI is off or the call fails, the
   // draft is empty and Jag writes from scratch, and the customer's own message is right there in the console.
+  //
+  // ⚠️ THE BUDGET GATE WAS ADDED WITH THE 11 AUGUST FIX, AND IT IS THERE BECAUSE OF THE FIX.
+  //
+  // Until then this line was only ever reached by a number that resolved to an account, so the AI
+  // spend was bounded by the customer list. Opening the desk to a sender we cannot resolve, which is
+  // the whole point of the change above, opens this call to him too, and an unresolved sender has no
+  // subscription paying for it. So it asks the same budget every other AI path in this file asks. A
+  // refusal costs him nothing he can see: the ticket still opens and Jag still gets his message,
+  // written by the man himself, which is the version that matters anyway.
   let draft = '';
   try {
-    if (hasClaudeConfig()) {
+    if (hasClaudeConfig() && !(await aiBudgetBlocked(from))) {
       const kb = await matchKb(text).catch(() => []);
       draft = (await draftSupportReply(text, kb)) || '';
     }
@@ -1413,17 +1530,30 @@ async function handleSupportRequest(from: string, text: string): Promise<void> {
     draft = '';
   }
 
-  await openTicket({
+  const opened = await openTicket({
     phone: from,
-    userId,
+    // Read the block above this function before changing this. It is null on purpose.
+    userId: null,
     reason,
     customerMessage: text.slice(0, 2000),
     draftReply: draft,
   });
 
+  // ONE VERDICT, ONE SEND. openTicket() has always returned whether the write landed and nobody has
+  // ever looked, so a failed insert was answered with "I have passed this to a real person", which
+  // is the house disease in its purest form: a message nobody received that reads like a message
+  // that was sent. He is the one person in the product who is already unhappy, so he is the worst
+  // possible person to leave believing help is coming when it is not. The refusal names the mailbox,
+  // because on that path it is the only door left standing.
+  //
+  // ⚠️ info@, NOT support@. There is no support@ mailbox: test/llmstxt.test.mjs already asserts
+  // "the support@ mailbox we do not have", and every other route to a human in the product, /in,
+  // privacy, terms, security, the trade pages and llms.txt, offers info@.
   await sendText(
     from,
-    "Thanks, I've passed this straight to a real person on the Lekhio team, and they'll reply right here shortly. Feel free to add anything else in the meantime and I'll pass it on.",
+    opened
+      ? "Thanks, I've passed this straight to a real person on the Lekhio team, and they'll reply right here shortly. Feel free to add anything else in the meantime and I'll pass it on."
+      : 'I could not get that through to the team just then, so nobody has it yet. Email info@lekhio.app and a person will pick it up, or send it here again in a minute.',
   );
 }
 

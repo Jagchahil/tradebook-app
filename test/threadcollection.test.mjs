@@ -83,15 +83,35 @@ ok('the tax hub exists and still leads with taxPosition',
 // ── The pieces the answer is built from are imported by name, not re-derived here. ───────────
 ok('paymentsOnAccount and FACTS come from the engine, never reimplemented in the route',
   /import \{ paymentsOnAccount, FACTS \} from '\.\.\/\.\.\/\.\.\/lib\/taxengine'/.test(route));
+// ⚠️ THE CALL GREW A THIRD ARGUMENT ON 11 AUGUST 2026 AND BOTH SURFACES HAD TO GROW IT TOGETHER,
+// which is exactly what this pair of assertions exists to force. paymentsOnAccount now takes the
+// tax already deducted at source, because payments on account are dropped when that clears 80
+// percent, and a chat that kept passing two arguments would have gone on offering a subcontractor
+// two payments the Tax screen had already excused him. The regex is deliberately exact on the
+// third argument: a default would have let this drift silently, which is the whole failure mode.
+const POA_CALL = /paymentsOnAccount\(tax\.selfAssessmentTax, startYear \+ 1, tax\.cisSuffered\)/;
 ok('🔴 THE YEAR IS DERIVED THE WAY THE HUB DERIVES IT, so the two cannot print different Januaries',
   /import \{ quarterForDate \} from '\.\.\/\.\.\/\.\.\/lib\/quarterpack'/.test(route)
   && /quarterForDate\(new Date\(\)\)/.test(route)
-  && /paymentsOnAccount\(tax\.selfAssessmentTax, startYear \+ 1\)/.test(route));
+  && POA_CALL.test(route));
 ok('and the hub still derives it the same way, so this parity is real rather than asserted once',
-  /paymentsOnAccount\(tax\.selfAssessmentTax, startYear \+ 1\)/.test(hub));
+  POA_CALL.test(hub));
+// 🔴 AND THE FIGURE ITSELF. The sentence promises "the same figure your Tax screen leads with", so
+// the two must lead with the same field. Both now lead with what is left to find.
+const LEAD = /tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/;
+ok('🔴 THE CHAT LEADS WITH THE FIGURE THE TAX SCREEN LEADS WITH, CIS AND ALL',
+  LEAD.test(route) && LEAD.test(hub));
 
 // ── The gate itself. The company arm and the everyone else arm, both proved to exist. ────────
-const gate = /if \(optimiser\.businessType === 'limited_company'\) \{([\s\S]*?)\n  \} else \{([\s\S]*?)\n  \}\n  return `Put by/.exec(route);
+// ⚠️ THE TAIL OF THIS PATTERN WAS `\n  }\n  return `Put by`, WHICH PINNED THE RETURN TO THE LINE
+// IMMEDIATELY AFTER THE BRANCH. On 11 August the CIS credit put a comment block and two consts
+// between them and this went null, which reads as "there is no structure branch at all" when the
+// branch was untouched three lines up. The two arms are what this suite is about, so the pattern
+// now ends at the closing brace and the return is proved on its own below.
+const gate = /if \(optimiser\.businessType === 'limited_company'\) \{([\s\S]*?)\n  \} else \{([\s\S]*?)\n  \}\n/.exec(route);
+ok('and the branch still feeds the one sentence that is returned',
+  /return `Put by \$\{formatGbp\(leadFigure\)\} for tax\./.test(route)
+  && route.indexOf('collection = `${sameFigure}') < route.indexOf('return `Put by'));
 ok('🔴 THE COLLECTION SENTENCE IS BRANCHED ON THE STRUCTURE AT ALL',
   gate !== null);
 

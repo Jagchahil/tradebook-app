@@ -327,6 +327,9 @@ export function taxPosition(
   selfAssessmentTax: number;
   studentLoan: number;
   setAside: number;
+  cisSuffered: number;
+  setAsideAfterCis: number;
+  refundLikely: number;
   companyProfitExcluded: number;
 } {
   // 🔴 THE USE OF HOME NOW REACHES THIS FIGURE AT ALL. ytdHomeOffice was declared on OptimiserInput
@@ -520,18 +523,68 @@ export function taxPosition(
   const plans = input.studentPlans ?? [];
   const studentLoan = plans.length > 0 ? round(studentLoanForSA(personalTradeNet, employment, plans)) : 0;
 
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 CIS. TAX HE HAS ALREADY PAID, ON A SCREEN HEADED "PUT BY FOR TAX". Found 11 August 2026,
+  // RUN 1 of the customer week, walking the product as a groundworker.
+  //
+  // A CIS subcontractor's contractor takes 20 percent of his LABOUR before he is paid and hands it
+  // to HMRC against his bill. By August a working groundworker has typically had thousands taken.
+  // It is not a cost, it is not a deduction, it is HIS TAX, PAID, MONTHS EARLY.
+  //
+  // ytdCisSuffered has been declared on OptimiserInput since it was written, and until today the
+  // only three lines in this file that read it were the advisory tip in findOptimisations. The
+  // number in the largest type on the Overview never saw it. So the product told a man to put by
+  // £3,157 for a January in which he was in fact owed a refund of about £4,400, and offered him
+  // two payments on account of £1,579 on top.
+  //
+  // ⚠️ IT IS PROJECTED BY THE SAME FACTOR AS EVERYTHING ELSE, AND THAT IS NOT A DETAIL. The bill
+  // above is the projected FULL YEAR. Setting a year to date credit against a full year liability
+  // would claim he still has to find the tax on income his contractors are going to deduct from
+  // for the rest of the year. Half a credit against a whole bill is a wrong number in the
+  // expensive direction, so the two are projected together or not at all.
+  //
+  // ⚠️ AND IT IS NEVER TAKEN OFF selfAssessmentTax, WHICH STAYS THE LIABILITY. Five surfaces are
+  // held to that figure to the penny by test/moneyspine.test.mjs, and they are held there because
+  // a product whose screens disagree about a man's tax is not believed on any of them. A lender
+  // reading proof of income is asking what he OWES; a man reading the Overview is asking what he
+  // must FIND. Those are two different questions and the honest answer is to carry both numbers
+  // and name the difference, not to collapse them and quietly make one of them wrong.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  const cisSuffered = round(Math.max(0, input.ytdCisSuffered ?? 0) * factor);
+  const setAside = selfAssessmentTax + studentLoan;
+
   return {
     ...result,
     projected: canProject,
     employmentTax: round(employmentTax),
     selfAssessmentTax,
     studentLoan,
+    /** Tax his contractors have already handed HMRC on his behalf, projected to the full year. */
+    cisSuffered,
+    /**
+     * What he still has to find, after the tax that has already gone. This is the figure that
+     * belongs under the words "put by for tax", because putting by money HMRC is already holding
+     * is not something anybody needs to do.
+     */
+    setAsideAfterCis: Math.max(0, round(setAside - cisSuffered)),
+    /**
+     * The other side of the same subtraction. When more has been taken at source than the year is
+     * going to cost, January is a repayment rather than a bill, and a product that cannot say so
+     * is telling a man to save for a cheque he is owed.
+     *
+     * ⚠️ IT IS NOT A PROMISE AND NO SURFACE MAY PRINT IT AS ONE. It is an estimate on projected
+     * figures, it moves with every row he confirms, and only a filed return settles it.
+     */
+    refundLikely: Math.max(0, round(cisSuffered - setAside)),
     // The company profit deliberately left out of every figure above. 0 for everybody else, so it
     // is never a line on a sole trader's screen. See the note above it.
     companyProfitExcluded,
     // ONE HONEST NUMBER. Doc 103: the screen a man opens to find out what he owes gets one figure,
     // not a stack he has to add up himself.
-    setAside: selfAssessmentTax + studentLoan,
+    //
+    // ⚠️ THIS IS THE LIABILITY AND IT STAYS THE LIABILITY. setAsideAfterCis above is what he has
+    // left to find. See the CIS block for why the two are carried separately rather than merged.
+    setAside,
   };
 }
 
@@ -745,7 +798,33 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   // to the old behaviour. Only a KNOWN company and a KNOWN landlord are ever refused.
   const canClaimSimplifiedExpenses =
     input.businessType !== 'limited_company' && input.incomeShape !== 'property_only';
-  if (!input.homeOfficeClaimed && canClaimSimplifiedExpenses && projTradeNet > 0 && mRate > 0) {
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HE ALREADY ANSWERED THIS, AND WE ASKED HIM AGAIN IN NEARLY THE SAME WORDS. Found 11 August
+  // 2026, RUN 1 of the customer week.
+  //
+  // Setup asks "Do you do your quotes, invoices and paperwork at home?" and stores the answer. The
+  // card below asked "Do your quotes, invoices or admin from home?" and never read it. So a man who
+  // had tapped No half an hour earlier was shown a card headed "Claim use of home", with a real
+  // pound figure on it, contradicting the answer he had just given us.
+  //
+  // It is worse than a repeated question. This card carries a quantified estSaving that enters
+  // totalEstimatedSaving(), so a No was inflating the total we advertise to him. And the two cards
+  // directly below this one, marriage allowance, have read their circumstance and honoured a No
+  // since they were written. The rule existed twelve lines away and this card was outside it.
+  //
+  // ⚠️ ONLY AN EXPLICIT 'no' SUPPRESSES IT. A skip, a missing answer or a failed read are all
+  // unknown, and unknown behaves exactly as it did before this existed, which is the direction the
+  // rest of this file takes: not offering a real relief to a man who never answered would cost him
+  // money, and that is the expensive way to be wrong.
+  //
+  // 🔴 AND home_working HAD ZERO READERS IN THE WHOLE CODEBASE. Grep it before this line and the
+  // only two hits are its own definition and a comment. A question we ask a customer, store, and
+  // never once look at is not a question, it is a tax on his attention.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const worksFromHome = (input.circumstances ?? {}).home_working;
+  const saidNoToHome = worksFromHome === 'no';
+  if (!input.homeOfficeClaimed && !saidNoToHome && canClaimSimplifiedExpenses && projTradeNet > 0 && mRate > 0) {
     const monthly = homeOfficeFlatRateMonthly(25); // the 25 to 50 hours a month band
     const saving = round(monthly * 12 * mRate);
     out.push({

@@ -250,13 +250,33 @@ export default async function OverviewPage() {
       {showTax ? (
         <section className="lek-card lek-tax">
           <h1 className="lek-eyebrow">Put by for tax</h1>
-          <div className="lek-hero">{gbp0(tax.setAside)}</div>
+          {/* ⚠️ PUT BY MEANS PUT BY, so the figure is what he still has to find. Identical to the
+              bill for everybody with nothing taken at source. See lib/taxoptimiser.ts, taxPosition. */}
+          <div className="lek-hero">{gbp0(tax.cisSuffered > 0 ? tax.setAsideAfterCis : tax.setAside)}</div>
           <p className="lek-heronote">
             {tax.projected
               ? 'What your figures are heading for across the full tax year.'
               : 'What the year so far has built up. Too early to call the whole year yet.'}
-            {' '}It moves as you earn, and it is due by 31 January.
+            {/* 🔴 WHICH 31 JANUARY. This said "due by 31 January" with no year on it, on the card
+                carrying the largest number in the product, while the Tax tab one tap away printed
+                the year in full. For a man reading this in August 2026 the date is 31 January 2028,
+                which is eighteen months away and not the January he was picturing. A deadline with
+                no year is not a deadline, it is a season. The year is derived from the tax year the
+                figures are actually for, so it can never drift. */}
+            {' '}It moves as you earn, and it is due by 31 January {optimiser.startYear + 2}.
           </p>
+          {/* His contractors' share of it, when there is one. Same sentence as the Tax tab, same
+              refusal to promise a refund. doc 103's empty test keeps it off every other screen. */}
+          {tax.cisSuffered > 0 ? (
+            <p style={S.heroBasis}>
+              {gbp0(tax.cisSuffered)} of it has already gone to HMRC through CIS, so this is what is
+              left to find. The bill itself is about {gbp0(tax.setAside)}.
+              {tax.refundLikely > 0 ? (
+                <>{' '}On these figures January looks like a repayment of around {gbp0(tax.refundLikely)}
+                  rather than a bill, though only your filed return settles that.</>
+              ) : null}
+            </p>
+          ) : null}
           {/* ⚠️ WHAT IS IN THE NUMBER, WHENEVER IT IS MORE THAN THE BUSINESS.
               On the live site this card read £26,579 with "Profit £12,307" directly underneath it.
               Both figures were right and together they were unreadable, because this one is his

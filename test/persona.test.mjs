@@ -95,7 +95,7 @@ console.log('\nthe second axis: whether he trades at all');
 // ---------------------------------------------------------------------------------------------
 // 🔴 3. THE FOUR TRADE PROVISIONS, EACH WITH ITS SOURCE ON THE ENTRY.
 // ---------------------------------------------------------------------------------------------
-const TRADE_ONLY = ['prior_employment', 'low_profit_year', 'start_date', 'premises', 'vehicle', 'home_working'];
+const TRADE_ONLY = ['prior_employment', 'low_profit_year', 'start_date', 'premises', 'vehicle', 'home_working', 'cis'];
 {
   ok('🔴 every trade only question carries incomes: [trade] on the entry',
     TRADE_ONLY.every((k) => {
@@ -182,8 +182,8 @@ const TRADE_ONLY = ['prior_employment', 'low_profit_year', 'start_date', 'premis
   const all = [...household(), ...notHousehold(), ...mtdQuestions()];
   const landlord = progressIn(all, [], { structure: 'sole_trader', income: 'property_only' });
   const sparky = progressIn(all, [], { structure: 'sole_trader', income: 'trade' });
-  ok('🔴 the landlord\'s denominator is exactly six questions lighter, not padded with ones he can never answer',
-    landlord.askable === sparky.askable - 6);
+  ok('🔴 the landlord\'s denominator is exactly seven questions lighter, not padded with ones he can never answer',
+    landlord.askable === sparky.askable - 7);
   ok('🔴 an answer he gave before we knew his shape STILL COUNTS. The record is his, only the asking stops.',
     progressIn(notHousehold(), [{ key: 'prior_employment', answer: 'yes' }],
       { structure: 'sole_trader', income: 'property_only' }).answered === 1);

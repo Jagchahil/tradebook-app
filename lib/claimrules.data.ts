@@ -16,9 +16,11 @@
 // mobile. So now there is ONE file. A human edits it here, `scripts/sync-corpus.mjs` copies it to the
 // app, and test/taxrules-parity.test.mjs fails the build if the two ever differ by a single byte.
 //
-// Pure data and one pure function. No imports, no Node or React Native APIs, so both a Next build and
-// an Expo build can consume it unchanged. General information, never tax advice. The test is always
-// HMRC's "wholly and exclusively for the purposes of the trade".
+// Pure data and two pure functions: checkExpense, which looks a rule up, and isClaimQuestion, which
+// decides whether a sentence a customer typed may reach the lookup at all. That second one arrived
+// on 11 August 2026 and its header says why. No imports, no Node or React Native APIs, so both a
+// Next build and an Expo build can consume it unchanged. General information, never tax advice. The
+// test is always HMRC's "wholly and exclusively for the purposes of the trade".
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 export type Verdict = 'yes' | 'partly' | 'depends' | 'no';
@@ -102,10 +104,34 @@ export const EXPENSE_RULES: ExpenseRule[] = [
     detail: 'Simplified mileage is the easiest vehicle claim. 55p a mile for the first 10,000 business miles in the year, 25p after that. It covers fuel, insurance and wear, so you do not also claim those.',
   },
   {
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THE ALIAS 'data' WAS REMOVED ON 11 AUGUST 2026, AND THE STRING THAT KILLED IT WAS
+    // "delete all my data".
+    //
+    // A customer typed that into the in app chat. He was asking to be erased. He was handed
+    // "🟡 Phone and broadband. The business share. Work out the business percentage of your
+    // bill and claim that." Proved live. The chat's guard is the other half of that fault and
+    // is fixed in isClaimQuestion() below, but the guard alone does not close this one, because
+    // the word is ours as well as his: "can I delete my expense data?" carries a real claim word
+    // and a real question shape, so it passes the guard cleanly and still lands on a phone bill.
+    //
+    // ⚠️ SO THE ALIAS GOES, AND IT COSTS NOTHING, WHICH IS THE WHOLE ARGUMENT. It was carried for
+    // mobile data allowances, and every way a tradesman actually asks that already matches
+    // something else on this row: "mobile data" hits 'mobile', "data on my phone" hits 'phone',
+    // "my data bill" hits 'phone bill' when he words it that way and hits 'broadband' or
+    // 'internet' when he means the house. Nobody asks whether "data" is claimable. What the bare
+    // word DOES do is collide with the one vocabulary this product cannot afford to be confused
+    // about: his data, our privacy policy, and, since 11 August, a page at /app/you/data whose
+    // entire job is handing it back or destroying it.
+    //
+    // ⚠️ IT IS THE ONLY ALIAS IN THE CORPUS THAT IS A WORD FROM OUR OWN PRIVACY VOCABULARY. That
+    // is the test to apply before adding another: a rule may claim a word a customer uses about
+    // his TOOLS, never a word he uses about HIMSELF.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
     key: 'phone',
     title: 'Phone and broadband',
     verdict: 'partly',
-    aliases: ['phone', 'mobile', 'broadband', 'internet', 'wifi', 'phone bill', 'data'],
+    aliases: ['phone', 'mobile', 'broadband', 'internet', 'wifi', 'phone bill'],
     rule: 'The business share. Work out the business percentage of your bill and claim that. Text me, like "phone bill £45, 80% business".',
     detail: 'You cannot claim the whole bill unless the line is used only for business. Work out a fair business percentage and claim that slice. Same for broadband.',
   },
@@ -258,6 +284,11 @@ export const EXPENSE_RULES: ExpenseRule[] = [
 ];
 
 // Match a free-text query to a rule by its aliases. Pure, deterministic, no network.
+//
+// ⚠️ IT ANSWERS ANY STRING THAT HAPPENS TO CARRY AN ALIAS, AND THAT IS CORRECT FOR WHAT IT IS.
+// It is a lookup, not a router. Every caller that hands it a sentence a customer typed must first
+// decide that the sentence is a claim question at all, and isClaimQuestion() below is the one
+// place that decision is written down. Do not add a second one.
 export function checkExpense(query: string): ExpenseRule | null {
   const q = ' ' + query.toLowerCase().replace(/[^a-z0-9%\s]/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
   for (const r of EXPENSE_RULES) {
@@ -266,6 +297,82 @@ export function checkExpense(query: string): ExpenseRule | null {
     }
   }
   return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE DOOR IN FRONT OF THE CORPUS. IT LIVES HERE BECAUSE THE SECOND COPY OF IT WAS THE BUG.
+//
+// Found live in the in app chat, 11 August 2026, on two strings a customer actually typed:
+//
+//   "delete all my data"  ->  🟡 Phone and broadband. "The business share. Work out the business
+//                             percentage of your bill and claim that."
+//   "free subscription"   ->  ✅ Trade body and subscriptions.
+//
+// The first is a man asking to be erased. The second is a question about OUR price. Both were
+// answered with an expenses card, because app/api/thread/route.ts guarded its claim lane with one
+// condition, `!/£\s*\d/.test(q)`, under a comment claiming it was "guarded the same way the
+// WhatsApp checker guards itself". It was not. isExpenseCheck() in app/api/whatsapp/route.ts has
+// three conditions and only the money one had been copied across, so on the chat every sentence
+// without a pound sign reached a corpus that answers anything carrying an alias.
+//
+// 🔴 THE DEFECT IS THE COPY, NOT THE MISSING LINE. A guard that exists twice drifts, and this one
+// drifted in the direction nobody sees: nothing crashes, nothing looks broken, and the only person
+// who can tell is the customer holding a screenshot of a phone bill card under the words "delete
+// all my data". Writing the missing condition into the route by hand would have shipped a third
+// copy and set the next drift up. So the corpus owns the decision and every channel asks it.
+//
+// ⚠️ WHATSAPP STILL HOLDS A PRIVATE COPY, AND IT SHOULD BE COLLAPSED ONTO THIS ONE IN A LATER
+// PASS. isExpenseCheck() in app/api/whatsapp/route.ts does the same job with its own regexes,
+// and it also decides WHICH HANDLER a message reaches, so moving it is a routing change on the
+// busiest surface in the product and it is not smuggled in under a chat fix. Until that pass
+// lands there are two copies. There must never be three.
+//
+// THE THREE CONDITIONS, AND WHY EACH ONE EARNS ITS PLACE:
+//
+//   1. NO MONEY AMOUNT. A message carrying a pound figure is telling us about a purchase, not
+//      asking about the rules. WhatsApp's reasoning, kept word for word.
+//   2. IT HAS TO READ LIKE A QUESTION. "delete all my data" and "free subscription" are both
+//      instructions or fragments, and neither survives this line. It is the cheapest condition
+//      here and it is the one that caught both proved strings.
+//   3. IT HAS TO BE ABOUT CLAIMING. Either the claim vocabulary is in it, or it is the bare
+//      follow up "what about X".
+//
+// ⚠️ CONDITION 3 IS ONE CLAUSE WIDER THAN WHATSAPP'S AND THE CLAUSE IS DELIBERATE. WhatsApp lists
+// "what about" as a question SHAPE and then demands a claim word on top, so "what about my van
+// insurance", which is how a man asks the second question of a claim conversation, matches nothing
+// and goes to the model on both channels today. In this lane order there is nothing else a bare
+// "what about X" can mean: the product questions, the deadlines and the totals have all had their
+// turn above it. So the follow up is a claim signal in its own right.
+//
+// ⚠️ AND THE HONEST LIMIT OF THAT CLAUSE, WRITTEN DOWN RATHER THAN DISCOVERED LATER: "what about
+// my subscription?" now reaches the corpus and comes back about trade bodies. It is the same shape
+// as the "free subscription" fault and this guard does not close it. The real answer is that a
+// question about our price belongs to matchProductTruth() in lib/waintents.ts, which today knows
+// about filing, approval, savings, concealment and investment advice, and nothing about what we
+// charge. That is a lane to add there, not a denylist to grow here.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// The claim vocabulary. Kept identical to CLAIM_WORDS in app/api/whatsapp/route.ts so the two
+// copies can be collapsed onto this one without a behaviour change on that channel.
+const CLAIM_WORDS = /\b(claim|expense|deduct|deductible|allowable|write[- ]?off|writeoff|tax[- ]?deductible)\b/i;
+
+// A pound figure with a number after it. A logged purchase, not a question about the rules.
+const LOGGED_AMOUNT = /£\s*\d/;
+
+// It reads like somebody asking rather than somebody instructing.
+const ASKING = /\bcan i\b|\bcould i\b|\bable to\b|\bdo i\b|\bis (?:it|this|that|a|an|my|the)\b|\bare (?:my|these|those)\b|\bwhat about\b|\?/i;
+
+// "what about my van insurance". The second question of a claim conversation, carrying no claim
+// word because the first question already said it.
+const FOLLOW_UP = /\bwhat about\b/i;
+
+// Is this sentence a claim question at all? Ask this BEFORE checkExpense on any surface where a
+// customer types freely. Pure, deterministic, no network, same as everything else in this file.
+export function isClaimQuestion(query: string): boolean {
+  const q = query || '';
+  if (LOGGED_AMOUNT.test(q)) return false;
+  if (!ASKING.test(q)) return false;
+  return CLAIM_WORDS.test(q) || FOLLOW_UP.test(q);
 }
 
 export const VERDICT_ICON: Record<Verdict, string> = {

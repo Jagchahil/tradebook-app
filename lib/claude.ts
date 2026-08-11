@@ -743,6 +743,27 @@ export async function improveSupportAnswer(question: string, draft: string): Pro
 // (ACCOUNTANT_SYSTEM) and the WhatsApp money answer (answerMoneyQuestion), so the two channels can
 // never drift. The live round-trip on 21 Jul that caught Rakha telling a customer to go fetch a
 // GOV.UK link for the VAT threshold is why this exists.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// WHICH SELF ASSESSMENT YEAR IS CURRENTLY BEING FILED, FROM THE CLOCK.
+//
+// A UK tax year ends on 5 April. The return for the year that has just ended is the one people are
+// filing now, and it is due the following 31 January. So on any date from 6 April onward the year
+// being filed ended THIS calendar year; before 6 April it ended LAST calendar year.
+//
+// ⚠️ THESE EXIST SO THAT NO DEADLINE IN THIS FILE IS EVER A TYPED YEAR AGAIN. See the block in
+// taxFacts2627 for the six months this product spent serving a deadline that had already passed.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+function filingYearEnd(now: Date = new Date()): number {
+  const y = now.getUTCFullYear();
+  const beforeApril6 = now.getUTCMonth() < 3 || (now.getUTCMonth() === 3 && now.getUTCDate() < 6);
+  return beforeApril6 ? y - 1 : y;
+}
+
+function filingYearLabel(now: Date = new Date()): string {
+  const end = filingYearEnd(now);
+  return `${end - 1}/${String(end % 100).padStart(2, '0')}`;
+}
+
 function taxFacts2627(): string[] {
   return [
   `- Personal allowance £${FACTS.personalAllowance.toLocaleString('en-GB')}, tapered by £1 for every £2 of income over £${FACTS.personalAllowanceTaperFloor.toLocaleString('en-GB')}, nil at £${FACTS.personalAllowanceLostAt.toLocaleString('en-GB')}.`,
@@ -750,14 +771,42 @@ function taxFacts2627(): string[] {
   `- Class 4 NIC: ${asPercent(FACTS.class4MainRate)}% on profits £${FACTS.class4LowerLimit.toLocaleString('en-GB')} to £${FACTS.class4UpperLimit.toLocaleString('en-GB')}, ${asPercent(FACTS.class4UpperRate)}% above. Class 2 is voluntary since April 2024 (£${FACTS.class2WeeklyRate} a week if paid).`,
   `- Trading allowance £${FACTS.tradingAllowance.toLocaleString('en-GB')}. Annual Investment Allowance £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')} (100% relief on qualifying plant).`,
   `- VAT registration at £${FACTS.vatRegistrationThreshold.toLocaleString('en-GB')} rolling 12-month turnover, deregistration £${FACTS.vatDeregistrationThreshold.toLocaleString('en-GB')}.`,
-  `- CIS: ${asPercent(FACTS.cisRegisteredRate)}% deduction for registered subcontractors, ${asPercent(FACTS.cisUnregisteredRate)}% unregistered, on labour only, never materials.`,
   `- Mileage (simplified): car or van ${asPence(FACTS.mileageCarFirst10k)}p first ${FACTS.mileageFirstBandMiles.toLocaleString('en-GB')} miles then ${asPence(FACTS.mileageCarOver10k)}p, motorcycle ${asPence(FACTS.mileageMotorcycle)}p. Home office flat rate £${FACTS.homeFlatRate25to50}/£${FACTS.homeFlatRate51to100}/£${FACTS.homeFlatRate101plus} a month by hours.`,
   // 🔴 THE TEST YEAR IS PART OF THE FACT, AND ITS ABSENCE MADE THE MODEL CONFIDENTLY WRONG.
   // Without it the sheet reads as a test on the income the model can see, which is this year's,
   // so asked "am I in Making Tax Digital" it answered from the running total in front of it. HMRC
   // decides from a return already filed. The last clause is what stops the model concluding at all:
   // it does not hold the man's 2024/25 return and must say so rather than guess from what it has.
-  `- MTD for Income Tax thresholds: over £${FACTS.mtdThreshold2026.toLocaleString('en-GB')} for April 2026, over £${FACTS.mtdThreshold2027.toLocaleString('en-GB')} for April 2027, over £${FACTS.mtdThreshold2028.toLocaleString('en-GB')} for April 2028. Quarterly updates due 7 Aug, 7 Nov, 7 Feb, 7 May. Self Assessment for 2024/25 due 31 Jan 2026.`,
+  `- MTD for Income Tax thresholds: over £${FACTS.mtdThreshold2026.toLocaleString('en-GB')} for April 2026, over £${FACTS.mtdThreshold2027.toLocaleString('en-GB')} for April 2027, over £${FACTS.mtdThreshold2028.toLocaleString('en-GB')} for April 2028. Quarterly updates due 7 Aug, 7 Nov, 7 Feb, 7 May.`,
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE DEADLINE THAT EXPIRED SIX MONTHS BEFORE ANYBODY NOTICED. Found 11 August 2026, RUN 1.
+  //
+  // The line above used to end with the literal string "Self Assessment for 2024/25 due 31 Jan
+  // 2026". It was typed in when it was true and it stayed there. On 11 August 2026 a customer
+  // asked when his tax was due and was served a deadline that had passed in January, on both
+  // channels, because this block is spread into the WhatsApp prompt AND accountantSystem().
+  //
+  // ⚠️ AND THE MODEL WAS FORBIDDEN FROM NOTICING. The rule further down this file tells it to trust
+  // these figures absolutely, never to say a figure looks wrong, and never to correct itself. That
+  // rule is right for a RATE and it is lethal for a DATE, because a rate goes stale loudly at the
+  // Budget and a date goes stale quietly at midnight.
+  //
+  // So the deadline is now DERIVED FROM THE CLOCK, once, here, and there is no year literal left
+  // in it to rot. The tax year that is currently being filed is the one that ended on the last 5
+  // April, and its online return and payment are due on the 31 January that follows.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  `- Self Assessment deadlines, worked out from today's date and not typed in: the ${filingYearLabel()} return, for the year that ended 5 April ${filingYearEnd()}, is due online and paid by 31 January ${filingYearEnd() + 1}. Registering for the first time is due by 5 October ${filingYearEnd()}. NEVER state a Self Assessment deadline that is not in this line.`,
+  // ⚠️ CIS IS THE PRODUCT'S OWN CUSTOMER AND IT HAD ONE LINE. RUN 1 asked four CIS questions and
+  // got four wrong answers: the 20 and 30 garbled, arithmetic invented on a deposit that was
+  // already net, "claim it ALL back", and an offer to file a registered subbie as unregistered.
+  // The single line it had said 20, 30, labour only. It did not say gross status exists, it did
+  // not say the deduction is TAX rather than a fee, and above all it did not say that the money
+  // in his bank is NET, which is the trap every one of those answers fell into.
+  `- CIS, in full, because most of our customers are in it. The contractor takes ${asPercent(FACTS.cisRegisteredRate)}% from a REGISTERED subcontractor, ${asPercent(FACTS.cisUnregisteredRate)}% from an unregistered one, and NOTHING from one with gross payment status. There are three answers, not two. The deduction comes off LABOUR ONLY, after materials, plant hire, and VAT are taken out.`,
+  '- 🔴 WHAT CIS ACTUALLY IS: it is INCOME TAX, PAID EARLY, by his contractor, on his behalf. It is not a fee, not a charge, and NEVER an expense or a deduction from profit. It goes against his January bill and anything left over is repaid to him.',
+  '- 🔴 THE TRAP, AND IT IS THE ONE TO GET RIGHT: THE MONEY IN HIS BANK IS ALREADY NET. A payment of £490 in his account on a job with no materials was £612.50 of labour with £122.50 taken. His TURNOVER is the gross figure, not the deposit. So NEVER work out a deduction by taking 20% off a figure he read off his bank statement: that money has already been taken once and you would be taking it twice. If you are not certain whether a figure he gives you is gross or net, ASK HIM. His contractor must give him a payment and deduction statement within 14 days of the end of each tax month, and that statement is the document that settles it.',
+  '- 🔴 NEVER PROMISE A CIS REFUND, AND NEVER SAY HE GETS IT ALL BACK. Whether there is a repayment depends on his profit for the whole year against everything taken at source, so it is only ever an estimate before the return is filed, and it can be nil. And his registration status is a fact about him, not a setting: never offer to record a registered subcontractor as unregistered, or the other way round, to change a figure.',
+  '- Payments on account have a SECOND test and it is the one that matters to a subcontractor: they are dropped altogether when more than 80% of the tax for the year was already deducted at source. On an ordinary CIS year that is usually met, so a subcontractor is usually excused them.',
   '- WHICH TAX RETURN DECIDES IT: HMRC tests qualifying income on a return ALREADY FILED, not the year you are in. April 2026 is decided by the 2024/25 return, April 2027 by 2025/26, April 2028 by 2026/27. HMRC then WRITES to the people it has assessed. So this year\'s figures never settle it: if he has not told us whether that letter came, say what his figures show, say HMRC decides it from the earlier return and writes to him, and ask him. Never conclude that he is or is not mandated from the running total.',
   '- No late submission penalties apply to quarterly updates for 2026/27 (HMRC transitional easement). Points based penalties start 2027/28: 4 points then £200. Never imply a fine for a missed 2026/27 update.',
   '- Profits are taxed on the tax-year basis from 2024/25. The cash basis (money in and out when it moves) is the default for small businesses; accruals counts income and costs when invoiced or incurred. Opening and closing years can create overlap, so the first and last year need care.',

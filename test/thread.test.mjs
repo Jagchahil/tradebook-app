@@ -214,8 +214,16 @@ const taxHubCode = stripComments(read('app/app/tax/page.tsx'));
 ok('🔴 the owe answer is taxPosition on getOptimiserInput, the tax hub\'s own call, in both files',
   /taxPosition\(optimiser\)/.test(routeCode) && /taxPosition\(optimiser\)/.test(taxHubCode)
   && /getOptimiserInput\(/.test(routeCode) && /getOptimiserInput\(/.test(taxHubCode));
-ok('🔴 the figure spoken is setAside itself, the hub\'s hero number',
-  /formatGbp\(tax\.setAside\)/.test(routeCode) && /\{gbp0\(tax\.setAside\)\}/.test(taxHubCode));
+// ⚠️ REWRITTEN 11 AUGUST 2026, AND IT IS A STRONGER ASSERTION THAN THE ONE IT REPLACES. It used
+// to pin the literal `tax.setAside` on both sides. Both surfaces now lead with what a man still has
+// to FIND, which is the bill less any tax his contractors already handed HMRC, so the field moved
+// on both at once. Pinning the shared EXPRESSION rather than a field name is what makes the two
+// unable to drift: if either surface picks a different one of the three figures taxPosition now
+// returns, this goes red, which the old assertion could not have done.
+const LEAD_FIGURE = /tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/;
+ok('🔴 the figure spoken is the hub\'s hero number, chosen by the same expression in both files',
+  LEAD_FIGURE.test(routeCode) && LEAD_FIGURE.test(taxHubCode)
+  && /formatGbp\(leadFigure\)/.test(routeCode) && /gbp0\(tax\.cisSuffered > 0/.test(taxHubCode));
 ok('what is inside the number is the shared sentence, lib/taxoptimiser\'s own words',
   /setAsideBasisLine\(optimiser, tax\)/.test(routeCode) && /setAsideBasisLine\(optimiser, tax\)/.test(taxHubCode));
 ok('🔴 the little January is gone: no engine arithmetic of the owe branch\'s own',
@@ -326,8 +334,31 @@ ok('"what do I owe so far" is the tax question, answered from his rows with no A
   intents.matchTotalsQuestion('what do I owe so far')?.kind === 'tax');
 ok('"can I claim my boots" hits the deterministic claim corpus',
   claims.checkExpense('can I claim my boots') !== null);
-ok('a money amount never reaches the claim corpus from the thread (the WhatsApp guard, same regex)',
-  /!\/£\\s\*\\d\/\.test\(q\)/.test(routeCode));
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS ASSERTION USED TO GREP THE ROUTE FOR THE LITERAL `!/£\s*\d/.test(q)` AND CALL IT
+// "the WhatsApp guard, same regex". IT WAS PROVING THE DEFECT.
+//
+// The regex was the same. It was also the ONLY one of isExpenseCheck()'s three conditions that
+// had been copied over, and this line was the reason nobody looked: it read like parity had been
+// checked. On 11 August 2026 a customer typed "delete all my data" into the chat and was handed
+// 🟡 Phone and broadband, and "free subscription", a question about our price, came back a green
+// tick about trade bodies. Both sentences were free of pound signs, so both walked straight past
+// the one third of a guard this assertion was pinning in place.
+//
+// ⚠️ SO IT NO LONGER PINS A REGEX IN THE ROUTE, BECAUSE A REGEX IN THE ROUTE IS THE FAULT. The
+// decision about what may reach the corpus belongs to the file that owns the corpus, and
+// isClaimQuestion() in lib/claimrules.data.ts is now the one place it is written down. This
+// asserts the route ASKS it, ahead of the lookup, and proves the money condition still holds by
+// behaviour rather than by grep. The guard's full proof, including the negative set this suite
+// never had, is test/datadoor.test.mjs.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+ok('a money amount never reaches the claim corpus from the thread (the corpus\'s own guard, asked by name)',
+  /if \(isClaimQuestion\(q\)\) \{/.test(routeCode)
+  && routeCode.indexOf('isClaimQuestion(q)') > -1
+  && routeCode.indexOf('checkExpense(q)') > -1
+  && routeCode.indexOf('isClaimQuestion(q)') < routeCode.indexOf('checkExpense(q)')
+  && claims.isClaimQuestion('phone bill £45, 80% business') === false
+  && claims.isClaimQuestion('can I claim my boots') === true);
 
 // ---------------------------------------------------------------------------------------------
 // 7. 🔴 THE TENANCY ATTACK. The helpers, staged with a recording fetch, attacked at runtime.
@@ -547,7 +578,11 @@ export function asksAmount(q) { return /how much|how many/.test(q); }
 export function deadlineAnswer() { return 'The deadline answer.'; }
 export function clampReceiptDate(d) { return d || '2026-08-05'; }
 `);
-  w('taxrules.ts', 'export function checkExpense() { return null; }\nexport const VERDICT_ICON = {};\n');
+  // ⚠️ isClaimQuestion IS STUBBED FALSE, ALONGSIDE A checkExpense THAT ANSWERS NOTHING. This
+  // sandbox walks the ROUTING, not the corpus, and the two stubs agree: the claim lane produces no
+  // reply here either way. The real guard, its three conditions and the negative set that proves it
+  // refuses "delete all my data" live in test/datadoor.test.mjs against the real corpus.
+  w('taxrules.ts', 'export function checkExpense() { return null; }\nexport function isClaimQuestion() { return false; }\nexport const VERDICT_ICON = {};\n');
   // ⚠️ hasTaxPosition IS STUBBED TRUE ON PURPOSE. This sandbox exists to walk the ROUTING, and its
   // getOptimiserInput returns {}, so the real rule would answer false and short circuit every owed
   // assertion here into the empty state. The rule itself, both of its arms, and the fact that both

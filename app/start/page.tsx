@@ -35,16 +35,74 @@ const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sa
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 type TradeType = 'sole' | 'business' | 'ltd' | 'partnership' | null;
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WEDGE WAS NOT IN ITS OWN SIGNUP. FOUND 11 AUGUST 2026, THE DAY AFTER LAUNCH.
+//
+// CLAUDE.md names this product's audience in one sentence, by trade: "electricians, plumbers,
+// builders, plasterers, roofers, joiners, decorators, tilers, gas engineers, scaffolders,
+// groundworkers, landscapers". FOUR OF THOSE TWELVE HAD NO CHIP ON THIS SCREEN. A tiler, a gas
+// engineer, a scaffolder and a groundworker each reached the third question of his own signup,
+// read twenty trades, found that none of them was his, and had to answer "Something else", while
+// Cafe, Tutor, Photographer and Hairdresser each had a chip of their own.
+//
+// lib/trades.ts has held all four correctly since it was written, with a landing page each at
+// /for/<slug>. So we were buying a groundworker's attention with a page written for him and then
+// telling him at the front door that we do not know what he is. That is the same class of failure
+// as the Landlord note below, and it went out on launch day.
+//
+// It is not cosmetic. This chip is not a label, it is an ANSWER: it is posted to /api/onboard as
+// his trade, it is what findSic reads for a limited company, and it is what the setup questions
+// and the claims knowledge use to decide what to ask him about. "Something else" is a man we then
+// have to guess at, and the trades we guess best are the twelve above.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND IT IS NOT DERIVED FROM lib/trades.ts. THAT WAS THE FIRST FIX AND IT IS THE WRONG ONE.
+//
+// Deriving looks obviously right, because this is the THIRD hand written copy of the trade list
+// (the fourth is app/register-your-business/Wizard.tsx). Four reasons it is not:
+//
+//   1. THIS FILE IS A CLIENT COMPONENT. TRADES is 39 objects carrying a blurb and six claims of
+//      marketing prose each, for the /for/<slug> pages. Mapping over it here ships every byte of
+//      that to a phone on a bad signal so it can draw a row of chips. Nothing tree shakes an
+//      array you iterate.
+//   2. IT IS THE MARKETING SITE'S LIST, ORDERED FOR THE MARKETING SITE. 39 chips is not 20 chips
+//      with more choice, it is doc 103's Design Restraint failing on the screen where a man is
+//      deciding whether to bother: Virtual assistant, Makeup artist, Online seller and Musician
+//      are pages worth having and are not questions worth asking a roofer to scroll past.
+//   3. THE NAMES ARE NOT THE SAME NAMES. TRADES says "Painter and decorator", "Self employed
+//      driver", "Mobile hairdresser" and "Private tutor" where this list says Decorator, Driver,
+//      Hairdresser and Tutor. Deriving would silently change the string SAVED for every new
+//      signup and the string findSic matches on, to fix a display problem.
+//   4. IT DOES NOT HOLD THE TWO CHIPS THAT ARE NOT TRADES. Landlord (which also carries the
+//      rental flag, see submitSignup) and "Something else" (the free text way in for everybody
+//      else) have no entry in TRADES and never should, so a derived list needs hand patching at
+//      both ends anyway and stops being derived.
+//
+// What replaces the derivation is a guard that cannot rot: test/seams.test.mjs reads the trade
+// nouns out of CLAUDE.md itself and proves every one of them is reachable from this picker. The
+// doctrine is the source of truth, which is what we actually wanted from TRADES and never had.
+//
+// ⚠️ ORDER IS THE OTHER HALF OF THE FIX. The twelve the doctrine names come first, in its order,
+// because the wedge must be reachable without hunting. Nothing was removed to make room: every
+// chip below the wedge is somebody's answer in production already, and taking one away would move
+// a real cafe owner to "Something else", which is the bug this comment exists about, in reverse.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 const trades = [
-  'Electrician', 'Plumber', 'Builder', 'Plasterer', 'Roofer', 'Joiner',
-  'Decorator', 'Gardener', 'Cleaner', 'Driver', 'Hairdresser', 'Barber',
+  // The wedge, in the order CLAUDE.md names it.
+  'Electrician', 'Plumber', 'Builder', 'Plasterer', 'Roofer', 'Joiner', 'Decorator',
+  'Tiler', 'Gas engineer', 'Scaffolder', 'Groundworker', 'Landscaper',
+  // Then the rest of the trades this product serves, in the order they already stood in.
+  'Gardener', 'Cleaner', 'Driver', 'Hairdresser', 'Barber',
   // Landlord earned its chip on 31 July 2026, after a landlord persona walked this page and had
   // nowhere to land but "Something else". The product already keeps a property stream with its own
   // engine (lib/propertyengine.ts), so the front door saying nothing about it was the door lying
   // about the house. Picking it also carries the rental property flag with the signup, see
   // submitSignup: a man whose trade IS the letting should not have to also tick "alongside".
   'Landlord',
-  'Photographer', 'Tutor', 'Carer', 'Cafe', 'Market trader', 'Freelancer', 'Something else',
+  'Photographer', 'Tutor', 'Carer', 'Cafe', 'Market trader', 'Freelancer',
+  // The way in for everybody we did not name. It opens the free text box below, and what he types
+  // is what is saved, so nobody is ever turned away by a list.
+  'Something else',
 ];
 
 function digitsOnly(v: string) {

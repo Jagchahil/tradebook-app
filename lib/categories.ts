@@ -158,6 +158,54 @@ const CATEGORY_MAP: Array<[RegExp, Category]> = [
   [/\b(pod ?point|instavolt|gridserve|bp pulse|osprey charging|char\.?gy|ubitricity|shell recharge|ionity|fastned|supercharger|zap ?map)\b/i, 'fuel'],
   [/\b(petrol|diesel|fuel|filling station|service station|forecourt|ev charg)/i, 'fuel'],
 
+  // --- WHAT HE BOUGHT, WHICH BEATS WHERE HE BOUGHT IT ---------------------------------------
+  //
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A £280 SDS DRILL FROM SCREWFIX WAS FILED AS MATERIALS AND COULD NEVER BE ANYTHING ELSE.
+  // Found 11 August 2026.
+  //
+  // The materials rule directly below opens with the five shops a UK tradesman actually buys his
+  // TOOLS from: screwfix, toolstation, wickes, b&q, tradepoint. First match wins (see the note at
+  // the top of this map), and the whole tools ruleset was two lines of niche retailers and brands
+  // sitting UNDERNEATH it. So every tool bought at a tool shop was materials, for everybody, for
+  // ever, and no wording of the line could rescue it: "SCREWFIX SDS DRILL 280.00" was materials.
+  //
+  // That is not tidiness. Tools and equipment are the two categories the capital allowance logic
+  // reads (see the hire block below), and lib/agent.ts and lib/taxoptimiser.ts both ask whether he
+  // has logged any tool spend this year, which is how a man with a van full of tools gets told
+  // "You have nothing logged this year for phone, tools" by the feature whose whole job is proving
+  // we are paying attention.
+  //
+  // ⚠️ THE MERCHANT NAME IS NOT MOVED AND MUST NOT BE. "SCREWFIX DIRECT £280" is genuinely either:
+  // that is a shop where a man buys a drill and a shop where he buys a bag of screws, and the name
+  // alone cannot settle it. Guessing tools there would be this file's own warning coming true, a
+  // confident wrong rule that he nods along to. So the DEFAULT for a bare merchant line is
+  // unchanged, and what changes is that the line's OWN WORDS now get read first.
+  //
+  // A drill is a drill wherever it was bought. A description carrying "makita" or "mitre saw" is
+  // telling us what the thing IS, and a merchant name is only telling us where he was standing.
+  // Words about the THING win over words about the PLACE, which is why this block sits here, above
+  // the merchants, rather than where the tools rules used to sit.
+  //
+  // ⚠️ AND A BARE MERCHANT LINE IS NOT LEFT UNANSWERABLE EITHER. See TOOL_AND_MATERIAL_MERCHANTS
+  // and couldBeToolSpend at the foot of this file: rather than guess a category the data does not
+  // support, the relationship between the two categories is written down, so a reader asking "has
+  // he logged tool spend" can be answered honestly without demanding the exact string 'tools'.
+  //
+  // ⚠️ HIRE IS EXCLUDED BY THE LOOKAHEAD, AND THAT GUARD IS LOAD BEARING. "SPEEDY HIRE BREAKER" is
+  // a week's hire, which is a running cost, not a tool he owns. Without this it would be caught
+  // here and never reach the hire rule below, and a hire charge sitting in a capital category is a
+  // worse error than the one being fixed. The tool NOUNS are also deliberately narrow: no bare
+  // "saw" (he saw Dave about a job), no bare "grinder" (a cafe buys a coffee one), no bare "tool"
+  // (that is "tool hire" and "TOOLSTATION"). The bar is this file's own bar: not "is it usually a
+  // tool" but "is it a tool so nearly always that a man nodding along is safe".
+  //
+  // ⚠️ THE BRAND LIST IS NOT COPIED, IT IS MOVED. It used to sit below the merchants where it
+  // could only fire on a line that mentioned no shop at all. Two copies of a brand list would be
+  // the drift this file already warns about, so there is still exactly one.
+  // ═════════════════════════════════════════════════════════════════════════════════════════
+  [/^(?!.*\b(?:hire|hired|hiring|rental)\b).*\b(?:sds|drill|jigsaw|nail ?gun|nailer|chisel|planer|sander|angle grinder|impact (?:driver|wrench)|torque wrench|(?:circular|mitre|chop|table|recip(?:rocating)?) saw|socket set|spanner set|laser level|multi ?tool|power ?tools?|tool ?(?:box|bag|kit|chest)|dewalt|makita|milwaukee|festool|bosch pro|hikoki|stihl|husqvarna|snap[- ]?on|facom|knipex)\b/i, 'tools'],
+
   // --- MATERIALS: merchants, trade counters, wholesalers ----------------------------------
   // The chains first, then the regionals, then the trade words. This is the biggest single
   // category on a builder's statement and the one most worth getting right.
@@ -167,9 +215,16 @@ const CATEGORY_MAP: Array<[RegExp, Category]> = [
   [/\b(topps tiles|tile giant|magnet|benchmarx|jayson|sig plc|encon|minster|insulation|plasterboard|british gypsum|knauf|celotex|kingspan)\b/i, 'materials'],
   [/\b(builders? merchant|timber|plywood|aggregates|readymix|concrete|cement|sand ?& ?gravel|brick|blocks?)\b/i, 'materials'],
 
-  // --- TOOLS (hand and power, bought not hired) -------------------------------------------
+  // --- TOOLS: the shops that sell nothing else --------------------------------------------
+  //
+  // These are safe to read as a category because there is nothing ambiguous about them: nobody
+  // buys a bag of cement at Machine Mart. That is exactly what is NOT true of Screwfix, which is
+  // why Screwfix stays in the materials rule above and is answered a different way.
+  //
+  // ⚠️ THE BRANDS MOVED UP, they were not deleted. A brand names the THING, so it has to be read
+  // before the merchant list or a Makita bought at Screwfix is materials. This rule names SHOPS,
+  // which say only where he was, so it stays below the merchants where it has always been.
   [/\b(machine mart|toolstop|d ?& ?m tools|powertool world|ffx\b|tooled ?up|axminster|protrade|itsuk|toolbank)\b/i, 'tools'],
-  [/\b(dewalt|makita|milwaukee|festool|bosch pro|hikoki|stihl|husqvarna|snap[- ]?on|facom|knipex)\b/i, 'tools'],
 
   // --- EQUIPMENT and HIRE ------------------------------------------------------------------
   // Hire is not a tool you own, and it is not materials. It matters because tools and equipment
@@ -249,3 +304,51 @@ export function categoriseBankLine(text: string): Category {
 
 // How many rules we have, so a test can catch someone quietly deleting half the file.
 export const RULE_COUNT = CATEGORY_MAP.length;
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE FIVE SHOPS THAT SELL BOTH, AND THE ONE QUESTION THE CATEGORY ALONE CANNOT ANSWER.
+//
+// A bank line reading "SCREWFIX DIRECT 280.00" is a drill or it is a box of screws, and nothing in
+// it says which. This file's whole doctrine is that we do not guess in that position, so it stays
+// materials, which is the honest majority answer and the one he can correct in a tap.
+//
+// But downstream there is a question that is NOT "what category is this", and it was being asked
+// by demanding the exact string 'tools':
+//
+//   lib/taxoptimiser.ts  COMMON_COSTS includes 'tools', and a man with none in categoriesLogged is
+//                        told "You have nothing logged this year for phone, tools".
+//   lib/agent.ts         has('tools', 'equipment'), same shape, same sentence.
+//
+// A groundworker who buys every tool he owns from Screwfix and Toolstation logs all of it, sees it
+// filed as materials, and is then told by his own assistant that he has logged no tools all year.
+// He is not being nagged because the data is missing. He is being nagged because the question was
+// asked with the wrong word.
+//
+// ⚠️ SO THE RELATIONSHIP IS WRITTEN DOWN RATHER THAN THE CATEGORY BEING GUESSED. The category
+// stays exactly what it was. What is new is that a reader can ask whether a line COULD hold tool
+// spend and get an honest maybe, instead of a no that it has no way to check.
+//
+// ⚠️ FIVE NAMES, NOT THE WHOLE MATERIALS RULE. Jewson, Travis Perkins and Selco are builders
+// merchants: they have a tool counter and nobody goes there for one. These five are where a UK
+// tradesman genuinely buys his tools, which is the reason they were in the materials rule doing
+// this damage in the first place.
+//
+// ⚠️ AND 'equipment' IS NOT IN IT. That category is hire (see the rule), and a week on a breaker
+// is a running cost, not a tool he owns. Answering yes for it would put this file's own doctrine
+// back the other way round.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const TOOL_AND_MATERIAL_MERCHANTS = /\b(screwfix|toolstation|wickes|b ?& ?q|tradepoint)\b/i;
+
+// Could this line be tool spend? Pass the stored category when the row has one, because HIS answer
+// outranks our rules: a line he moved to materials himself is materials, and a line he moved to
+// tools is tools, whatever the merchant is called. With no category given, the rules answer.
+//
+// True for anything already filed as tools, and for materials bought at one of the five above.
+// Never a reason to change what is stored or shown, and never a claim: it is the difference
+// between "he has logged no tools" and "he may well have, under materials, at a tool shop".
+export function couldBeToolSpend(text: string, category?: string | null): boolean {
+  const line = String(text ?? '');
+  const c = (category ?? categoriseBankLine(line)).trim().toLowerCase();
+  if (c === 'tools') return true;
+  return c === 'materials' && TOOL_AND_MATERIAL_MERCHANTS.test(line);
+}

@@ -800,7 +800,11 @@ ok('🔴 A REFUSED RESEND LEAVES HIM ON THE CODE STEP',
 // the code is untouched, so 'code' is honest there and only there. Everything after that line is
 // holding a code that has already been accepted, and a one time code that has been accepted is gone.
 {
-  const anchor = "if (!res.ok) return back(req, 'code', next);";
+  // ⚠️ THE ANCHOR MOVED ON 11 AUGUST AND THE GUARD DID NOT. The email door now tries two GoTrue
+  // types, because a code minted through admin generate_link files under 'magiclink' and one minted
+  // through /auth/v1/otp files under 'email', and both roads are live at once. So the exchange ends
+  // one line later than it used to. Everything past it is still holding a spent code.
+  const anchor = "if (!res || !res.ok) return back(req, 'code', next);";
   const src = stripComments(verifyRoute);
   const at = src.indexOf(anchor);
   ok('the exchange anchor is still in the verify route, so this slice is not vacuous', at > 0);
@@ -810,7 +814,11 @@ ok('🔴 A REFUSED RESEND LEAVES HIM ON THE CODE STEP',
   ok(`🔴 NO FAILURE PAST THE CODE EXCHANGE INVITES HIM TO TYPE THAT CODE AGAIN: ${reasons.join(', ')}`,
     reasons.every((r) => r === 'session'));
   ok("...and 'code' survives on the one line where the code really was refused",
-    /if \(!res\.ok\) return back\(req, 'code', next\);/.test(src));
+    /if \(!res \|\| !res\.ok\) return back\(req, 'code', next\);/.test(src));
+  // 🔴 AND THE SECOND TYPE IS TRIED BEFORE ANYTHING IS CALLED WRONG. Pinning one type would turn
+  // every fallback send into "that code is wrong" for a man holding a code that was right.
+  ok('🔴 BOTH MINTS ARE TRIED BEFORE A CODE IS CALLED WRONG',
+    src.indexOf("type: 'magiclink'") > 0 && src.indexOf("type: 'magiclink'") < at);
 }
 ok('🔴 AND THE SENTENCE TELLS HIM THE CODE IS GONE AND WHAT TO DO INSTEAD',
   /used up/.test(SAYS.session) && /fresh one/.test(SAYS.session));
@@ -876,7 +884,7 @@ export async function rateLimitedShared(key) {
 export async function spendCapReached() { rl.calls.push('cap'); return rl.cap; }
 `);
   put('supabase.ts', `
-export const db = { account: { userId: 'u-1' }, attachOk: true, rowOk: true, sessionOk: true,
+export const db = { account: { userId: 'u-1' }, attachOk: true, rowOk: true, sessionOk: true, mint: '482913',
   user: { id: 'u-1', phone: '+447700900999', email: 'dave@example.com' }, calls: [] };
 export async function findContactAccount(channel, value) { db.calls.push({ fn: 'find', value }); return db.account; }
 export async function attachEmailToAuthUser() { db.calls.push({ fn: 'attach' }); return db.attachOk; }
@@ -885,6 +893,14 @@ export async function verifyAccessToken() { db.calls.push({ fn: 'token' }); retu
 export async function ensureUserRow() { db.calls.push({ fn: 'row' }); return db.rowOk; }
 export async function createWebSession() { db.calls.push({ fn: 'session' }); return db.sessionOk; }
 export async function reconcileSignupToUser() { return true; }
+export async function mintSignInCode(email) { db.calls.push({ fn: 'mint' }); return db.mint; }
+`);
+  // Our own mailer, staged, so the send half of the door can be forced open the way GoTrue's is.
+  // db.mint and mail.ok are the two switches the sign in P0 of 11 August needed and nobody had.
+  put('email.ts', `
+export const mail = { ok: true, configured: true, sent: [] };
+export function hasEmailConfig() { return mail.configured; }
+export async function sendSignInCodeEmail(to, code) { mail.sent.push(code); return mail.ok; }
 `);
   const fix = (s) => s.replace(/from 'next\/server'/g, "from './nextserver.ts'")
     .replace(/from '(?:\.\.\/)+lib\/([a-zA-Z]+)'/g, "from './$1.ts'");
@@ -894,6 +910,7 @@ export async function reconcileSignupToUser() { return true; }
   return {
     start: await import(u('start.ts')), verify: await import(u('verify.ts')),
     RL: await import(u('ratelimit.ts')), DB: await import(u('supabase.ts')), WS: await import(u('websession.ts')),
+    MAIL: await import(u('email.ts')),
   };
 })();
 
@@ -908,7 +925,13 @@ const authPost = (fields, cookies = {}, at = '/api/auth/start') => ({
 let gotrue;
 function fakeGoTrue(plan = {}) {
   gotrue = { sent: 0, burned: 0 };
+  // The staged mailer's counter resets with GoTrue's, so codesOut() below always describes one
+  // scenario. Guarded because this is a hoisted declaration and AUTH is a const above it.
+  if (AUTH && AUTH.MAIL) AUTH.MAIL.mail.sent.length = 0;
   globalThis.fetch = async (u) => {
+    if (String(u).endsWith('/auth/v1/verify') === false && String(u).includes('generate_link')) {
+      return { ok: true, status: 200, json: async () => ({ email_otp: '482913' }) };
+    }
     if (String(u).endsWith('/auth/v1/otp')) {
       if (plan.otpFails) return { ok: false, status: 429, json: async () => ({}) };
       gotrue.sent += 1;
@@ -922,6 +945,12 @@ function fakeGoTrue(plan = {}) {
 const reason = (res) => new URL(res.location).searchParams.get('e');
 const cookieOn = (res, n) => res.jar.find((c) => c.n === n);
 
+// 🔴 A CODE WENT OUT, BY WHICHEVER ROAD. Since 11 August the email door posts through our own
+// mailer and only falls back to GoTrue's, so counting GoTrue alone would read a perfectly healthy
+// send as nothing having happened. The question these tests ask has never been "did GoTrue post
+// it". It is "did a code leave the building", and this is that question.
+const codesOut = () => gotrue.sent + AUTH.MAIL.mail.sent.length;
+
 const PENDING = AUTH.WS.pendingCookieValue({ channel: 'email', value: 'dave@example.com' });
 ok('the harness really can mint a pending contact, so websession is configured here', PENDING.length > 20);
 
@@ -929,7 +958,7 @@ ok('the harness really can mint a pending contact, so websession is configured h
 {
   fakeGoTrue();
   const first = await AUTH.start.POST(authPost({ contact: 'dave@example.com' }));
-  ok('🔴 A RESEND IS POSSIBLE AT ALL: the first send arms the code step', gotrue.sent === 1 && first.location.includes('step=code'));
+  ok('🔴 A RESEND IS POSSIBLE AT ALL: the first send arms the code step', codesOut() === 1 && first.location.includes('step=code'));
   ok('🔴 AND THE MINUTE IS ARMED WITH IT', !!cookieOn(first, 'lek_w') && cookieOn(first, 'lek_w').a.maxAge === 60);
   ok('...httpOnly and same site, like every other cookie this door sets',
     cookieOn(first, 'lek_w').a.httpOnly === true && cookieOn(first, 'lek_w').a.sameSite === 'lax');
@@ -940,14 +969,14 @@ ok('the harness really can mint a pending contact, so websession is configured h
   AUTH.DB.db.calls.length = 0;
   const early = await AUTH.start.POST(authPost({}, { lek_p: PENDING, lek_w: '1' }));
   ok('🔴 A PRESS INSIDE THE MINUTE IS TOLD THE TRUTH, NOT THAT ONE IS ON ITS WAY', reason(early) === 'wait');
-  ok('🔴 AND NO CODE WENT OUT BEHIND THAT SENTENCE', gotrue.sent === 0);
+  ok('🔴 AND NO CODE WENT OUT BEHIND THAT SENTENCE', codesOut() === 0);
   ok('🔴 AND IT COST HIM NOTHING: not one send was counted against him', AUTH.RL.rl.calls.length === 0);
   ok('...nothing was looked up and nothing was logged either', AUTH.DB.db.calls.length === 0);
 
   // After the minute.
   fakeGoTrue();
   const again = await AUTH.start.POST(authPost({}, { lek_p: PENDING }));
-  ok('🔴 AFTER THE MINUTE A FRESH CODE REALLY GOES OUT, with nothing retyped', gotrue.sent === 1);
+  ok('🔴 AFTER THE MINUTE A FRESH CODE REALLY GOES OUT, with nothing retyped', codesOut() === 1);
   ok('🔴 TO THE ADDRESS IN THE SIGNED COOKIE, never one posted from that screen',
     AUTH.DB.db.calls.some((c) => c.fn === 'find' && c.value === 'dave@example.com'));
   ok('🔴 AND HE IS TOLD IT WENT', again.location.includes('sent=1'));
@@ -1015,6 +1044,76 @@ for (const [what, set, unset] of [
   const wrong = await AUTH.verify.POST(authPost({ code: '00000000' }, { lek_p: PENDING }, '/api/auth/verify'));
   ok('🔴 A GENUINELY WRONG CODE IS STILL TOLD IT IS WRONG, AND STILL INVITED TO TRY AGAIN',
     reason(wrong) === 'code' && gotrue.burned === 0 && /try again/.test(SAYS.code));
+}
+
+// ── FAULT 6, RUN. THE SEND THAT NEVER LEFT ──────────────────────────────────────────────────────
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SWITCH THIS HARNESS HAS CARRIED SINCE THE DAY IT WAS WRITTEN, AND NOBODY EVER FLICKED.
+//
+// `plan.otpFails` is defined at the top of fakeGoTrue and, until 11 August 2026, grep returned
+// exactly one hit in the whole suite: the definition. Somebody built the door to this failure,
+// walked up to it, and never opened it. On 11 August a customer walked through it instead: four
+// codes over sixty five minutes, none delivered, "We have sent you a code" every time.
+//
+// So this section forces BOTH halves shut. Our own mailer refuses, and GoTrue refuses behind it.
+// That is the real incident, and the screen must stop claiming success.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n11. THE SEND THAT NEVER LEFT. Both mailers shut, and the screen has to say so\n');
+{
+  // Both roads open: the code goes through OUR mailer and GoTrue is never asked to post anything.
+  fakeGoTrue();
+  AUTH.MAIL.mail.ok = true;
+  AUTH.MAIL.mail.sent.length = 0;
+  const good = await AUTH.start.POST(authPost({ contact: 'dave@example.com' }));
+  ok('🔴 THE CODE GOES OUT THROUGH OUR OWN MAILER, on the domain every other email uses',
+    AUTH.MAIL.mail.sent.length === 1);
+  ok('and GoTrue is never asked to post it, so its rate limit cannot lock anybody out', gotrue.sent === 0);
+  ok('he is sent on to the code step', good.location.includes('step=code') && reason(good) === null);
+  ok('and the audit row says it went', AUTH.DB.db.calls.some((c) => c.fn === 'log' && c.outcome === 'sent'));
+
+  // Our mailer down, GoTrue up: the fallback carries it. Nobody is locked out by the new road.
+  fakeGoTrue();
+  AUTH.MAIL.mail.ok = false;
+  const fell = await AUTH.start.POST(authPost({ contact: 'dave@example.com' }));
+  ok('🔴 OUR MAILER DOWN AND HE STILL GETS A CODE, because the old road is still there',
+    gotrue.sent === 1 && fell.location.includes('step=code') && reason(fell) === null);
+
+  // ⚠️ AND NOW THE INCIDENT. Both shut.
+  fakeGoTrue({ otpFails: true });
+  AUTH.MAIL.mail.ok = false;
+  AUTH.DB.db.calls.length = 0;
+  const dead = await AUTH.start.POST(authPost({ contact: 'dave@example.com' }));
+  ok('🔴 NOTHING WENT OUT AT ALL', gotrue.sent === 0 && AUTH.MAIL.mail.ok === false);
+  ok('🔴 AND HE IS NO LONGER TOLD A CODE IS ON ITS WAY', reason(dead) === 'send');
+  ok('🔴 AND THE SCREEN HE LANDS ON SAYS SO IN WORDS', /could not send/i.test(SAYS.send));
+  ok('he is not marched to the code step to type something that does not exist',
+    !dead.location.includes('step=code'));
+  ok('the failure is written down for whoever looks later',
+    AUTH.DB.db.calls.some((c) => c.fn === 'log' && c.outcome === 'failed'));
+
+  // A RESEND that fails leaves him where he was. Bouncing a man who already holds a code back to
+  // an empty address field is the fault FAULT 1 was written to end, reached from the other side.
+  fakeGoTrue({ otpFails: true });
+  const deadAgain = await AUTH.start.POST(authPost({}, { lek_p: PENDING }));
+  ok('🔴 A FAILED RESEND LEAVES HIM ON THE CODE STEP',
+    reason(deadAgain) === 'send' && deadAgain.location.includes('step=code'));
+
+  // 🔴 THE NEUTRALITY RULE SURVIVES THE HONESTY. A stranger is turned away before any send, so a
+  // stranger can never see 'send'. If that ever inverts, an outage turns this form into a customer
+  // list with a search box on it.
+  fakeGoTrue({ otpFails: true });
+  const wasAccount = AUTH.DB.db.account;
+  AUTH.DB.db.account = null;
+  const stranger = await AUTH.start.POST(authPost({ contact: 'nobody@example.com' }));
+  AUTH.DB.db.account = wasAccount;
+  ok('🔴 A STRANGER STILL GETS THE NEUTRAL SCREEN WHILE THE MAILER IS DOWN',
+    reason(stranger) === null && stranger.location.includes('step=code'));
+  ok('🔴 SO THE BROKEN DOOR NEVER TELLS ANYONE WHICH ADDRESSES ARE OURS',
+    reason(stranger) !== 'send');
+
+  // Put the harness back the way the rest of the file expects it.
+  AUTH.MAIL.mail.ok = true;
 }
 
 console.log(`\n${pass} passed, ${fail} failed.`);

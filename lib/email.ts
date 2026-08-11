@@ -217,6 +217,7 @@ export function weekEndingDay(now: Date = new Date()): string {
 export type RepeatKey =
   | 'invoice'
   | 'signup-code'
+  | 'signin-code'
   | 'weekly-ready'
   | 'payment-ok'
   | 'payment-fail'
@@ -235,6 +236,12 @@ export const REPEATING_SUBJECTS: Record<RepeatKey, (mark: string) => string> = {
 
   // The code itself. The fix that taught us all of this.
   'signup-code': (mark) => `${mark} is your Lekhio code`,
+
+  // 🔴 THE ONE THIS REGISTRY COULD NOT SEE UNTIL 11 AUGUST 2026. The sign in code was the only
+  // email in the product that never came through this file, so the ratchet above could not reach
+  // it, and the incident this whole registry was built after happened to that exact email. Its
+  // subject lived in the Supabase dashboard where no test can read it. It lives here now.
+  'signin-code': (mark) => `${mark} is your Lekhio sign in code`,
 
   // 🔴 THE WORST ONE. Every Sunday for the life of the customer, so by week three his whole
   // relationship with Lekhio was one collapsed conversation with an old date at the top of it.
@@ -299,6 +306,10 @@ export const SUBJECT_MARKS: Record<RepeatKey, { source: MarkSource; why: string 
   'signup-code': {
     source: 'caller',
     why: 'The six digit code itself, minted fresh by /api/signup/code on every request and expiring in ten minutes. It is also the thing he opened the email for, so it belongs at the front of the subject whether it threads or not.',
+  },
+  'signin-code': {
+    source: 'caller',
+    why: 'The code itself, minted fresh by GoTrue on every request. This is the email whose threading collapse cost a week on 7 August 2026, and it repeats harder than any other in the product: a man signs in on a new phone, gets it wrong, asks again, and two codes are a minute apart. A day mark would collapse exactly the pair that matters.',
   },
   'weekly-ready': {
     source: 'week',
@@ -522,6 +533,49 @@ export async function sendSignupCodeEmail(to: string, code: string): Promise<boo
     // anything. He is on a ladder.
     html: shell(inner, { preheader: `${safe} is your code. It lasts ten minutes.` }),
     tag: 'signup-code',
+  });
+}
+
+// --- the sign in code (fires from /api/auth/start) -------------------------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE EMAIL THAT WAS NOT IN THIS FILE, AND THE P0 THAT FOUND OUT. 11 August 2026.
+//
+// Every email in Lekhio goes through Resend, on a domain verified for it, with a checked boolean
+// coming back and a subject held by test/subjectrule.test.mjs. Every email except one. The sign in
+// code was rendered and delivered by Supabase GoTrue's own mailer, which meant:
+//
+//   . a different sender, on a different domain, with different SPF and DKIM alignment,
+//   . a template and a subject line living in a dashboard no test in this repo can read,
+//   . a project wide auth email ceiling shared with nothing else we send,
+//   . and, on Supabase's built in SMTP, a hard low rate limit that is documented as being for
+//     development, not for a launched product taking real signups.
+//
+// On 11 August four codes were asked for over sixty five minutes and none of them arrived, while
+// signup codes, welcome mail and waitlist confirms all landed within seconds on the same addresses,
+// because those went through here. A man could create an account and never get back into it.
+//
+// So the code is now MINTED by GoTrue, which still owns verification, and DELIVERED by us.
+// mintSignInCode() in lib/supabase.ts asks the admin API for the token without asking it to send
+// anything, and this sends it. One provider for every email in the product, one send() that
+// returns a real boolean, one subject registry, one place to look when it breaks.
+//
+// ⚠️ THE CALLER FALLS BACK. app/api/auth/start/route.ts still calls /auth/v1/otp if either half of
+// this path fails, so the worst case is the door we had yesterday and never a locked out customer.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function sendSignInCodeEmail(to: string, code: string): Promise<boolean> {
+  const safe = String(code ?? '').replace(/\D/g, '').slice(0, 8);
+  if (!safe) return false;
+  const inner = `
+    ${h1('Your sign in code')}
+    <div style="font-size:38px;font-weight:800;letter-spacing:10px;color:${INK};background:#F4F7FB;border:1px solid #E3EAF3;border-radius:12px;padding:20px 0;text-align:center;margin:6px 0 18px">${safe}</div>
+    ${p('Type this into Lekhio to sign in. It lasts a few minutes and can only be used once.')}
+    ${pMuted('If you did not ask to sign in, you can ignore this email. Nobody can get into your account without this code.')}`;
+  return send({
+    to,
+    subject: { repeats: 'signin-code', mark: safe },
+    html: shell(inner, { preheader: `${safe} is your sign in code.` }),
+    tag: 'signin-code',
   });
 }
 

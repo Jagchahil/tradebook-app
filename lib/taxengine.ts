@@ -419,16 +419,53 @@ export interface PaymentsOnAccount {
   eachPayment: number;
   firstDue: string;
   secondDue: string;
+  /**
+   * True when the bill cleared the threshold but the second test excused him anyway, because more
+   * than 80 percent of his tax was taken at source. Told apart from a small bill on purpose: the
+   * two are excused for completely different reasons and only one of them needs explaining.
+   */
+  excusedAtSource: boolean;
 }
 
-export function paymentsOnAccount(saBill: number, taxYearEnd = 2026): PaymentsOnAccount {
-  const required = saBill > FACTS.poaThreshold;
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SECOND TEST, WHICH THIS FUNCTION DID NOT HAVE, AND WHICH EXCUSES ALMOST EVERY CIS
+// SUBCONTRACTOR WE HAVE. Found 11 August 2026, RUN 1 of the customer week.
+//
+// Payments on account have TWO conditions and both must hold. HMRC asks for them when the last
+// bill was over £1,000 AND when LESS THAN 80 PERCENT of that year's tax was already deducted at
+// source. Until today this file tested the first and knew nothing of the second.
+//
+// That is not an academic gap. The taxpayer the second test was written for is precisely ours: a
+// construction subcontractor has 20 percent of his labour taken by his contractor before he is
+// paid, which on an ordinary year clears 80 percent of his bill comfortably. So the product told
+// the man most likely in the country to be EXEMPT that he owed two payments of £1,579 on a January
+// where he was in fact owed money back. Wrong test, wrong customer, wrong direction, and the
+// number was in the paragraph headed "January asks for more than the bill".
+//
+// ⚠️ deductedAtSource IS A REQUIRED ARGUMENT WITH A DEFAULT OF ZERO, NOT AN OPTIONAL FLAG. Zero
+// is the honest answer for every caller that does not know: nothing deducted means the second test
+// cannot excuse anybody, which is exactly what this function did yesterday. So no existing caller
+// changes its answer by a penny, and a caller that DOES know can now say so.
+//
+// The comparison is against the tax for the year, so a man whose whole bill was covered at source
+// (deducted >= bill) is excused too, which is the same arithmetic reaching the same place.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const POA_AT_SOURCE_SHARE = 0.8;
+
+export function paymentsOnAccount(saBill: number, taxYearEnd = 2026, deductedAtSource = 0): PaymentsOnAccount {
+  const overThreshold = saBill > FACTS.poaThreshold;
+  // A nil or negative bill can never be 80 percent covered by anything, and dividing by it would
+  // hand back an Infinity that reads as "excused" for a man who owes nothing anyway.
+  const atSourceShare = saBill > 0 ? Math.max(0, deductedAtSource) / saBill : 0;
+  const excusedAtSource = overThreshold && atSourceShare >= POA_AT_SOURCE_SHARE;
+  const required = overThreshold && !excusedAtSource;
   const each = required ? round2(saBill / 2) : 0;
   return {
     required,
     eachPayment: each,
     firstDue: `31 January ${taxYearEnd + 1}`,
     secondDue: `31 July ${taxYearEnd + 1}`,
+    excusedAtSource,
   };
 }
 

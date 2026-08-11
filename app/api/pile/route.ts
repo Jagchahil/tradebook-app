@@ -100,7 +100,11 @@ interface Decision {
   // 🔴 'vat'     yes, the VAT inside this one cost was this much. It files NOTHING and confirms no
   //             category: it is its own sentence, about its own column, and it is the only thing
   //             in the product that may set vat_confirmed. See the branch for why it is separate.
-  verdict: 'business' | 'personal' | 'confirm_known' | 'income' | 'vat';
+  // 🔴 'cis'     this payment in was £400 because a contractor took £100 off a £500 job. Two
+  //             columns, one press: the gross into amount and the tax already paid into
+  //             cis_deduction. Its own verdict because it is the only decision on this screen that
+  //             CHANGES a figure the bank gave us, and a figure that moves needs a door of its own.
+  verdict: 'business' | 'personal' | 'confirm_known' | 'income' | 'vat' | 'cis';
   category?: string;
   // Remember the answer for next time, so this shop is never asked about again. Default true:
   // the whole point is that he tells us once. He can turn it off per decision.
@@ -116,12 +120,16 @@ interface Decision {
   // Only read by the 'vat' verdict. What HE says the VAT was, in pounds, as typed. Validated
   // against his own row server side and never trusted as it stands.
   vat?: string | number;
+  // Only read by the 'cis' verdict. What HE says the contractor took off this one payment, in
+  // pounds, as typed. The GROSS is never sent: it is derived from his own bank row plus this, so
+  // the two columns cannot stop reconciling to the money that actually moved.
+  cis?: string | number;
 }
 
 // The words the form is allowed to send. A nested ternary was readable at three verdicts and
 // stopped being readable at five, and anything not on this list is read as 'business', which is
 // what the plain file button has always meant.
-const VERDICTS = ['personal', 'confirm_known', 'income', 'vat'] as const;
+const VERDICTS = ['personal', 'confirm_known', 'income', 'vat', 'cis'] as const;
 
 function verdictFrom(raw: unknown): Decision['verdict'] {
   const v = String(raw ?? '');
@@ -170,6 +178,7 @@ export async function POST(req: NextRequest) {
       verdict: verdictFrom(f.get('verdict')),
       category: String(f.get('category') ?? ''),
       vat: String(f.get('vat') ?? ''),
+      cis: String(f.get('cis') ?? ''),
       capitalKind: String(f.get('capital_kind') ?? ''),
       businessUsePct: String(f.get('business_use_pct') ?? ''),
     };
@@ -283,6 +292,55 @@ export async function POST(req: NextRequest) {
     const saved = await confirmTransactionVat(user.id, ids[0], claimed);
     if (form) return backToPile(req, saved ? 'vat' : 'nothing', saved ? 1 : 0);
     return NextResponse.json({ ok: saved, vat: claimed });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 CIS. THE TAX A CONTRACTOR HANDED TO HMRC BEFORE THE MONEY EVER REACHED HIS BANK.
+  //
+  // Found 11 August 2026 by walking the live product as a groundworker: 62 contractor payments
+  // totalling £34,400, and the £34,400 was NET of £4,400 and £2,800 already paid to HMRC across two
+  // tax years. Every one went into his income at its bank value, so his turnover was understated by
+  // exactly the tax taken and the tax already paid for him was invisible.
+  //
+  // TWO COLUMNS, ONE PRESS, AND THE ORDER OF THEM IS THE WHOLE THING:
+  //
+  //        transactions.amount IS THE GROSS.  transactions.cis_deduction IS THE TAX ALREADY PAID.
+  //
+  // lib/reviewpile.ts cisCapture() owns that arithmetic and returns a patch named after the two
+  // columns, so no call site can put them the wrong way round. The gross is DERIVED from his own
+  // bank row plus what he typed, never sent by the browser, so amount minus cis_deduction is always
+  // the deposit that actually landed.
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND TODAY IT REFUSES, BECAUSE NOTHING IN lib/supabase.ts CAN WRITE cis_deduction ONTO A ROW
+  // THAT ALREADY EXISTS. THE REFUSAL IS THE POINT, NOT AN OVERSIGHT.
+  //
+  // confirmIncome() files a payment in and touches no other column. Raising the amount without
+  // recording the deduction would put his turnover right and leave the tax already paid nowhere,
+  // which is a half fix that LOOKS finished: it is the vat_registered date all over again, a man
+  // answering a question we then throw away. So this files nothing at all, and the row stays in his
+  // pile where he can see it, which is the same rule the car question follows one branch down.
+  //
+  // ⚠️ NOBODY MEETS THIS REFUSAL. app/app/pile/page.tsx draws the question only for rows that can
+  // carry the answer, and pileEntries does not yet name the column, so the form is not on the
+  // screen. That is deliberately the same shape the VAT columns shipped in on 1 August 2026.
+  //
+  // THE FOUR CHANGES THAT FINISH IT, none of which this file may make:
+  //   1. supabase/APPLY_2026-08-11_cis.sql: confirm_income_cis(p_user, p_id, p_cis), which sets
+  //      amount = amount + p_cis and cis_deduction = p_cis and confirmed = true, under exactly the
+  //      guards confirm_income already applies (his row, unconfirmed, amount > 0, not flagged).
+  //   2. lib/supabase.ts: confirmIncomeCis(), the wrapper, returning false when the function is
+  //      absent so this branch keeps refusing rather than pretending.
+  //   3. lib/supabase.ts: cis_deduction named in the pileEntries select and its return type, which
+  //      is the one line that turns the question on.
+  //   4. this branch: read his row, hand it and body.cis to cisCapture(), refuse a null, and store.
+  //      It also needs readCircumstances and worksUnderCis, so the answer cannot be posted by a man
+  //      who never said he is in the scheme. All three are named imports that the route stubs in
+  //      test/receiptvat.test.mjs and test/capitalwiring.test.mjs must gain in the same commit.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  if (body.verdict === 'cis') {
+    if (form) return backToPile(req, 'cishold', 0);
+    return NextResponse.json({ error: 'cis_not_recordable', applied: 0 }, { status: 503 });
   }
 
   const vendor = (body.vendor ?? '').trim();

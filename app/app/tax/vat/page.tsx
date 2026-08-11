@@ -2,9 +2,12 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getConfirmedInputVat, getOutputVat, readVatProfile, taxableTurnoverFor } from '../../../../lib/supabase';
 import {
-  VAT_REGISTRATION_THRESHOLD, TURNOVER_BASIS_NOTE, formatVrn, inputVatNote, mustRegister, reg111Window, vatPosition,
+  accountHasRental, getConfirmedInputVat, getOutputVat, readVatProfile, taxableTurnoverFor,
+} from '../../../../lib/supabase';
+import {
+  VAT_REGISTRATION_THRESHOLD, RENT_NOT_COUNTED_NOTE, TURNOVER_BASIS_NOTE, formatVrn, inputVatNote,
+  mustRegister, reg111Window, vatPosition,
 } from '../../../../lib/vat';
 import type { VatPositionInput } from '../../../../lib/vat';
 import { asPercent } from '../../../../lib/taxengine';
@@ -111,6 +114,37 @@ export default async function VatPage() {
     : null;
   const overThreshold = turnover?.kind === 'known' && mustRegister(turnover.rolling12m);
   const yearTurnover = turnover?.kind === 'known' ? turnover.rolling12m : 0;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WE WERE TELLING A MAN WITH NO PROPERTY WHAT WE ARE NOT COUNTING OF HIS RENT. 11 AUGUST 2026.
+  //
+  // TURNOVER_BASIS_NOTE carried "and not your rent, which is exempt" inside it, and all three arms
+  // below printed it to everybody: the over the line arm, the under the line arm, and the young
+  // account arm in its own hand written words. Most of this product's customers are sole traders
+  // with a van and no property at all, so the most common reader of the most important sentence on
+  // this screen was being handed a fact about somebody else's money as though it were his.
+  //
+  // This is the bug /app/you/vat had until 9 August, in the same shape: Reg 111 promised to a man
+  // who had never registered. That fix branched the sentence on the one fact that makes it true,
+  // and so does this one. The clause has its own owner in lib/vat.ts now, so the three arms cannot
+  // drift on it, and it is appended only for a customer who has a property stream.
+  //
+  // ⚠️ accountHasRental READS HIS OWN STATEMENTS ONLY: the rental circumstance he ticked at signup
+  // or answered in setup, or rent he has confirmed himself. Nothing is inferred.
+  //
+  // ⚠️ AND A FAILED READ ANSWERS false, WHICH IS THE SAFE DIRECTION HERE AND IS WHY THIS IS NOT
+  // DRAWN LIKE THE FIGURES ARE. A landlord who loses one clause still reads a sentence that is
+  // true of him. A sole trader who gains it reads a sentence that is not, which is the defect.
+  // Nothing on this screen depends on it: no figure moves, and the line he is measured against is
+  // the same either way.
+  //
+  // ⚠️ ASKED ONLY ON THE ARM THAT SAYS IT. The registered arm never prints the basis sentence, so
+  // it never pays for this read, exactly as it never pays for taxableTurnoverFor above.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const hasRental = profile !== null && !profile.registered
+    ? await accountHasRental(user.id)
+    : false;
+  const rentClause = hasRental ? ` ${RENT_NOT_COUNTED_NOTE}` : '';
 
   // The whole position, asked for rather than worked out. Zeroes for a man who is not registered,
   // because vatPosition answers that case with a sentence and no table, which is the right answer
@@ -242,20 +276,27 @@ export default async function VatPage() {
                   on two screens and something slightly different on a third is the drift the shared
                   constant exists to prevent. So the forward looking version is written here, and it
                   keeps the half that actually matters most to a brand new account: money he takes
-                  and does not log still counts. He is the likeliest of anyone to under log. */}
+                  and does not log still counts. He is the likeliest of anyone to under log.
+                  🔴 THE RENT CLAUSE IS THE EXCEPTION, AND IT WAS THE PROOF OF THE POINT. This
+                  paragraph said "and not your rent, which is exempt" in its own words while the
+                  constant said it in slightly different ones, so one claim was written twice and
+                  the day it turned out to be wrong for most customers it had to be fixed twice.
+                  The tense bound half stays here. The clause comes from RENT_NOT_COUNTED_NOTE, the
+                  same owner the two figure arms use, and appears only for a customer who has
+                  property. Owning the sentence was never the point; owning each CLAIM in it is. */}
               <p style={S.empty}>
                 We cannot show you where you stand against it yet. Your account is under three
                 months old, and a rolling twelve month figure built out of a few weeks would be a
                 number you could act on and should not. Keep confirming what comes in and it fills
-                itself in. It will count the trade income you confirm here and not your rent, which
-                is exempt, so anything you take and do not log still counts towards your own line.
+                itself in. It will count the trade income you confirm here, so anything you take
+                and do not log still counts towards your own line.{rentClause}
               </p>
             </>
           ) : overThreshold ? (
             <p style={S.warn}>
               Your trade income over the last twelve months comes to {gbp0(yearTurnover)}, which is
               over the {gbp0(VAT_REGISTRATION_THRESHOLD)} line. Registering becomes compulsory once
-              your taxable turnover in any rolling twelve months goes over it. {TURNOVER_BASIS_NOTE}
+              your taxable turnover in any rolling twelve months goes over it. {TURNOVER_BASIS_NOTE}{rentClause}
             </p>
           ) : turnover?.kind === 'known' ? (
             /* 🔴 AND THE UNDER THE LINE CASE IS SAID TOO, which it never was. A blank screen for a
@@ -264,7 +305,7 @@ export default async function VatPage() {
             <p style={S.body}>
               Your trade income over the last twelve months comes to {gbp0(yearTurnover)}, which is
               under the {gbp0(VAT_REGISTRATION_THRESHOLD)} line, so registering is not compulsory
-              yet. {TURNOVER_BASIS_NOTE}
+              yet. {TURNOVER_BASIS_NOTE}{rentClause}
             </p>
           ) : null}
         </section>

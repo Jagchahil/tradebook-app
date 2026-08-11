@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimitedShared, spendCapReached, clientIp } from '../../../../lib/ratelimit';
-import { findContactAccount, attachEmailToAuthUser, logAuthSend } from '../../../../lib/supabase';
+import { findContactAccount, attachEmailToAuthUser, logAuthSend, mintSignInCode } from '../../../../lib/supabase';
+import { sendSignInCodeEmail, hasEmailConfig } from '../../../../lib/email';
 import {
   readIdentifier, targetHash, dailyCapFor, SMS_DAILY_WINDOW_SECONDS,
   PER_TARGET_SENDS, PER_TARGET_WINDOW_SECONDS, PER_SOURCE_SENDS, PER_SOURCE_WINDOW_SECONDS,
@@ -273,22 +274,64 @@ export async function POST(req: NextRequest) {
     ? { phone: id.value, create_user: !account.userId }
     : { email: id.value, create_user: false };
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE EMAIL CODE GOES THROUGH OUR OWN MAILER FIRST. 11 August 2026, and it was a P0.
+  //
+  // Four codes asked for over sixty five minutes, none delivered, this screen saying "We have sent
+  // you a code" every time. Signup codes, welcome mail and waitlist confirms all landed on the same
+  // addresses within seconds, because those go through Resend. This one went through GoTrue's own
+  // mailer: a different sender, a different domain, a template in a dashboard no test can read, and
+  // on Supabase's built in SMTP a rate limit documented as being for development.
+  //
+  // So: GoTrue still MINTS the code and still VERIFIES it. It no longer posts it. mintSignInCode
+  // asks the admin API for the token without asking it to send anything, and sendSignInCodeEmail
+  // puts it on the one road every other email in this product already proves works.
+  //
+  // ⚠️ THE OLD ROAD IS STILL HERE AND STILL RUNS. If minting fails, or Resend is not configured, or
+  // the send comes back false, we fall through to /auth/v1/otp exactly as before. A change to the
+  // sign in door on a live product must not be able to lock anybody out, so the worst case of this
+  // whole block is the door we had yesterday.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   let ok = false;
-  try {
-    const res = await fetch(`${url}/auth/v1/otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: anon },
-      body: JSON.stringify(body),
-    });
-    ok = res.ok;
-  } catch {
-    ok = false;
+
+  if (id.channel === 'email' && hasEmailConfig()) {
+    const minted = await mintSignInCode(id.value);
+    if (minted) ok = await sendSignInCodeEmail(id.value, minted);
+  }
+
+  if (!ok) {
+    try {
+      const res = await fetch(`${url}/auth/v1/otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: anon },
+        body: JSON.stringify(body),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
   }
 
   // Never log the number or the address. Both are personal data and the number is the account key.
   await logAuthSend(id.channel, hash, ok ? 'sent' : 'failed');
 
-  // Even a failed send goes onward, so a provider outage looks the same as a stranger's number and
-  // neither leaks. He types a code that does not work and is told plainly to try again.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND WHEN NOTHING WENT, THE SCREEN SAYS SO. THIS LINE USED TO SAY THE OPPOSITE.
+  //
+  // The old comment here read: "Even a failed send goes onward, so a provider outage looks the same
+  // as a stranger's number and neither leaks. He types a code that does not work and is told plainly
+  // to try again." Every clause of that is true and the conclusion was still wrong, because the man
+  // it describes types a code he never received. There is no code to type. He tries three times,
+  // burns his per contact limit, and leaves believing his account is gone.
+  //
+  // ⚠️ THE NEUTRALITY RULE AT THE TOP OF THIS FILE STILL HOLDS, AND THIS DOES NOT BREAK IT. A
+  // stranger's address is turned away above, at the findContactAccount check, and never reaches a
+  // send at all. So a stranger can no more see this screen than he can see the 'unavailable' the
+  // attach check twelve lines up has been returning since it was written. Both say the same thing
+  // and both say it only to people who are already ours: our infrastructure is not working. That is
+  // a fact about us, not about him, and telling him costs a minute and saves an account.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (!ok) return resend ? backToCode(req, 'send', next) : back(req, 'send', next);
+
   return onward(req, id.channel, id.value, next, resend);
 }

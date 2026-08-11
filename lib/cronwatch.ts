@@ -377,3 +377,78 @@ export function reminderAlarm(backlog: ReminderBacklog | null, now: Date = new D
 export function remindersServing(backlog: ReminderBacklog | null, now: Date = new Date()): boolean {
   return reminderAlarm(backlog, now) === null;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE LOGIN DOOR. 11 August 2026, and it is the same disease a third time.
+//
+// The reminder watch above exists because a signal could not tell "nothing was due" from
+// "everything was due and none of it went". This is that sentence again with the noun changed.
+//
+// On 11 August a customer asked for four sign in codes over sixty five minutes. None arrived. The
+// screen said "We have sent you a code" every time, /api/health returned 200 every time, and the
+// only place the truth existed was a column in auth_sends that nothing read. A man who had made an
+// account the day before could not get back into it, and nothing in the product knew.
+//
+// So this watches the one email whose failure locks a customer out. Not "did a cron run", not "is
+// the database up": did the codes we tried to send actually leave.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// How many attempts must be in the window before a clean sweep of failures means anything.
+//
+// THE ARITHMETIC, BECAUSE A THRESHOLD NOBODY CAN DERIVE IS A THRESHOLD SOMEBODY WILL LOOSEN.
+//
+//   One failure is a blip: a provider hiccup, a timeout, a bounced address. Two is bad luck.
+//   THREE in an hour with not one success is not luck, it is a road that is shut. The observed
+//   incident was four in sixty five minutes with zero successes.
+//
+// Three, not one, because this file's own header says an alarm that cries wolf gets muted, and a
+// muted alarm is worse than no alarm because it looks like cover. Three, not ten, because Lekhio is
+// a young product and ten failed sign ins is a week of being broken, not an hour.
+export const AUTH_SEND_MIN_ATTEMPTS = 3;
+
+/** What the login door has managed to send lately. Counts only, never an address. */
+export interface AuthSendHealth {
+  /** Sends we actually attempted in the window. Refusals are not attempts and are not counted. */
+  attempted: number;
+  /** How many of those the provider took. */
+  sent: number;
+  /** How many the provider refused or threw on. */
+  failed: number;
+  /** The window this covers, so the reader never has to assume it. */
+  windowMinutes: number;
+}
+
+// 🔴 null IN, ALARM OUT. The same rule as cronsServing and reminderAlarm, for the same reason: a
+// door we cannot see is the one most likely to be hiding something.
+export function authSendAlarm(health: AuthSendHealth | null): CronAlarm | null {
+  if (health === null) {
+    return {
+      job: 'signin',
+      reason: 'unreadable',
+      hoursQuiet: null,
+      detail: 'the login send log could not be read, so nothing here can say whether sign in codes are going out',
+    };
+  }
+
+  // A quiet hour is a quiet hour. Nobody asked for a code, so nothing failed, so there is nothing
+  // to say. This is the branch that stops the alarm firing every night at three.
+  if (health.attempted < AUTH_SEND_MIN_ATTEMPTS) return null;
+
+  // One success in the window means the road is open and something else went wrong with the rest.
+  // That is a different problem and it is not this one.
+  if (health.sent > 0) return null;
+
+  return {
+    job: 'signin',
+    reason: 'failed',
+    hoursQuiet: Math.round((health.windowMinutes / 60) * 10) / 10,
+    detail: `${health.failed} sign in code${health.failed === 1 ? '' : 's'} asked for in the last `
+      + `${health.windowMinutes} minutes and not one of them was accepted by the mail provider. `
+      + 'Anyone trying to sign in right now is being told a code is on its way and is not getting one.',
+  };
+}
+
+/** Is the login door actually posting codes? A window we cannot read is a no. */
+export function authSendsServing(health: AuthSendHealth | null): boolean {
+  return authSendAlarm(health) === null;
+}

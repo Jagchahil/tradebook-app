@@ -3,9 +3,9 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import { pileEntries, readOwnNames, readAccountUse, readCircumstances, getBusinessProfile, accountHasRental, readVatProfile } from '../../../lib/supabase';
-import { buildPile, summarisePile, partitionPile, waitingCount } from '../../../lib/reviewpile';
+import { buildPile, summarisePile, partitionPile, waitingCount, cisToAsk, CIS_RATES } from '../../../lib/reviewpile';
 import { inputVatNote } from '../../../lib/vat';
-import { household, notHousehold, mtdQuestions, progressIn, openQuestionsLead } from '../../../lib/circumstances';
+import { household, notHousehold, mtdQuestions, progressIn, openQuestionsLead, worksUnderCis } from '../../../lib/circumstances';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
@@ -92,6 +92,12 @@ function message(code: string | undefined, n: string | undefined): string | null
       return 'That VAT figure does not fit the payment. It cannot be more than the payment, and at the standard rate it cannot be more than a sixth of it.';
     case 'novat':
       return 'We have you down as not VAT registered, so there is nothing to reclaim here. If that is wrong, put it right under You.';
+    // 🔴 A CIS ANSWER IS TWO COLUMNS AND WE WILL NOT WRITE ONE OF THEM ON ITS OWN. See the branch
+    // in app/api/pile/route.ts: raising the payment to the gross without recording the tax already
+    // taken would put his turnover right and leave the money HMRC is holding nowhere at all, which
+    // is a half fix that reads as a finished one. So nothing was filed and nothing moved.
+    case 'cishold':
+      return 'We could not record what was taken off that payment, so nothing has been filed. It is still here, exactly as it was, and none of your figures have moved.';
     case 'nothing':
       return 'Nothing was changed. Try that again.';
     default:
@@ -257,6 +263,25 @@ export default async function PilePage({
   // leaves the pile and takes its unanswered VAT question with it.
   // ═══════════════════════════════════════════════════════════════════════════════════════
   const vatWaiting = vatRegistered ? vatToCheck(rows) : [];
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT A CONTRACTOR TOOK OFF BEFORE THE MONEY REACHED HIS BANK.
+  //
+  // Walked live as a groundworker on 11 August 2026: 401 imported rows, 62 of them contractor
+  // payments totalling £34,400, and that £34,400 was NET. £4,400 and £2,800 had already gone to
+  // HMRC across two tax years, and every one of those rows was filed as income at its bank value
+  // after this screen asked the only question it had, which is whose money it is. His turnover was
+  // understated by exactly the tax taken, and the tax already paid for him was nowhere.
+  //
+  // ⚠️ NOTHING NEW IS DRAWN FOR ANYBODY ELSE. cisToAsk returns an empty list unless he has told us
+  // in so many words that contractors take CIS off him, and a failed read of his answers is not a
+  // yes, so this whole section is absent from the screen of every man who is not in the scheme.
+  // The rest of his pile is exactly the pile it was.
+  //
+  // ⚠️ AND IT IS ASKED ABOVE THE MONEY IN BUTTONS, for the same reason the VAT question is asked
+  // above the filing ones: a row he files leaves the pile and takes its unanswered question with it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const cisWaiting = cisToAsk(rows, worksUnderCis(circRows));
 
   // What is still open ABOUT HIM, same count as /app/you: progressIn over every group, so the
   // empty state below cannot say "everything is filed and counted" while his questions wait.
@@ -583,6 +608,75 @@ export default async function PilePage({
                 {' '}Money in goes straight into your income figures and nothing takes it out again,
                 so we ask about {income.length === 1 ? 'it' : 'each of these'} on its own rather than
                 filing {income.length === 1 ? 'it' : 'them'} with everything else.
+              </p>
+              {/* Drawn only for a man who has told us contractors take CIS off him, and only while
+                  there is actually something to ask about, so it can never become a line that says
+                  nothing on most visits. */}
+              {cisWaiting.length > 0 && (
+                <p style={S.aside}>
+                  You told us the firms you work for take CIS off you first. What your bank shows is
+                  what was left after that, so the payments below are asked about one at a time. What
+                  they took is tax you have already paid, and it only counts once you tell us.
+                </p>
+              )}
+            </section>
+          )}
+
+          {/* ── 4a. WHAT WAS TAKEN OFF BEFORE HE WAS PAID ────────────────────────────────────
+              🔴 THE ARITHMETIC IS PRINTED AND THE BOX IS EMPTY, AND THAT IS THE WHOLE DESIGN.
+              Danny, the customer section 6 of test/moneyspine.test.mjs is built on, turned over
+              £25,400 and had £4,400 taken, which is 17.3 percent and not 20, because £3,400 of it
+              was materials and materials come out before the deduction is worked out. Filling the
+              box in for him would have put £850 of turnover he never earned into his return on a
+              press he did not read. lib/control.ts: never take a number without a receipt for
+              anything going to HMRC. So we do the sum, show it, and let him type.
+              ⚠️ THE THREE RATES COME FROM lib/reviewpile.ts AND ARE NEVER RESTATED HERE. There are
+              three of them, and a screen that says "20 percent" flattens a man on 30 percent and a
+              man with gross payment status into a figure that is not his. */}
+          {cisWaiting.length > 0 && (
+            <section className="lek-card">
+              <h2 className="lek-h2">
+                {cisWaiting.length === 1
+                  ? 'What was taken off this one'
+                  : `What was taken off these ${cisWaiting.length}`}
+              </h2>
+              <p style={S.sub}>{CIS_RATES}</p>
+              <ul style={S.lines}>
+                {cisWaiting.map((c) => (
+                  <li key={c.id} style={S.line}>
+                    <div style={S.rowTop}>
+                      <span style={S.vendor}>{c.vendor}</span>
+                      <span style={S.amount}>{gbp2(c.proposal.net)}</span>
+                    </div>
+                    <p style={S.meta}>
+                      That is what reached your bank. If it was labour only and you are
+                      registered, <b style={S.cat}>{gbp2(c.proposal.deduction)}</b> was taken
+                      and the job was <b style={S.cat}>{gbp2(c.proposal.gross)}</b> before it.
+                    </p>
+                    <p style={S.meta}>{c.proposal.assumes}</p>
+                    <form action="/api/pile" method="post" hidden={locked} style={S.formTight}>
+                      <input type="hidden" name="ids" value={c.id} />
+                      <input type="hidden" name="verdict" value="cis" />
+                      <label htmlFor={`cis-${c.id}`} style={S.label}>What they took off this one</label>
+                      {/* Empty, never filled in. A figure we put there is a figure he agrees to
+                          without reading it, and on a job with materials it is the wrong one. A
+                          plain text box rather than a number one, so the pound sign he can see on
+                          his statement is not silently refused by his browser. */}
+                      <input
+                        id={`cis-${c.id}`}
+                        name="cis"
+                        type="text"
+                        inputMode="decimal"
+                        className="lek-field"
+                        required
+                      />
+                      <button type="submit" className="lek-ghost">That is what they took</button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+              <p style={S.hint}>
+                If nothing was taken off one of these, leave it here and file it as money in below.
               </p>
             </section>
           )}

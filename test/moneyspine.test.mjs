@@ -28,10 +28,25 @@
 //   2. The pack's running estimate is TRADE ONLY. Property is taxed on its own schedule and the
 //      pack carries it separately (estimatedTax.propertyProfitExcluded says how much). So the
 //      pack total is compared to taxPosition only on accounts with no property.
-//   3. CIS, PAYE salary, savings interest, dividends and student loans change what a man PAYS,
-//      not what the documents STATE, and the proof of income says in print that other income is
-//      not included. The generator holds them at zero; their engine arithmetic is examined by
+//   3. PAYE salary, savings interest, dividends and student loans change what a man PAYS, not what
+//      the documents STATE, and the proof of income says in print that other income is not
+//      included. The generator holds them at zero; their engine arithmetic is examined by
 //      test/exams and the parity suites instead.
+//
+//      🔴 CIS USED TO BE ON THAT LIST AND IT DID NOT BELONG THERE. Corrected 11 August 2026 by RUN
+//      1 of the customer week, which found the hole by walking the product as a groundworker.
+//
+//      The old sentence read "CIS changes what a man PAYS, not what the documents STATE", and every
+//      account this generator built pinned ytdCisSuffered to zero on the strength of it. It is not
+//      true. A CIS deduction is stated on the return, it is stated on the contractor's payment and
+//      deduction statement, it is now stated on the proof of income, and it is the difference
+//      between a January bill and a January refund on the Overview. The guard was airtight across
+//      240 accounts precisely because not one of them was the customer this product was built for.
+//
+//      So CIS is IN the sweep now, and it is held to the rule that makes it safe: it never moves
+//      income, expenses or profit on any surface, and the liability every reader is compared on is
+//      unchanged by it. What it moves is setAsideAfterCis, which is a different question with a
+//      different name, and section 6 holds that separately.
 //   4. A PARTNERSHIP: taxPosition and the proof of income both scale to the partner's share and
 //      are compared here. The quarter pack deliberately shows the FIRM'S books with the
 //      wholeFirmCaption sentence, so its figures are not his slice and are not compared.
@@ -59,7 +74,7 @@ for (const f of [
   // lib/scotland.ts, one exported sentence with no imports of its own, printed by both money
   // documents staged above. position + whatif are the FIFTH surface: /app/tax/what-if computes
   // through lib/whatif.ts, which the guard used to leave out entirely.
-  'yeartodate', 'scotland', 'position', 'partnership', 'whatif',
+  'yeartodate', 'categories', 'scotland', 'position', 'partnership', 'whatif',
 ]) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
@@ -70,6 +85,8 @@ const BS = await import(pathToFileURL(path.join(stage, 'bookshare.ts')).href);
 const YTD = await import(pathToFileURL(path.join(stage, 'yeartodate.ts')).href);
 const CAP = await import(pathToFileURL(path.join(stage, 'capital.ts')).href);
 const PROP = await import(pathToFileURL(path.join(stage, 'propertyengine.ts')).href);
+// The engine that owns payments on account, so section 6 tests the rule and not a copy of it.
+const TE = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);
 const WI = await import(pathToFileURL(path.join(stage, 'whatif.ts')).href);
 
 let pass = 0, fail = 0;
@@ -115,8 +132,19 @@ function buildAccount(i) {
 
   if (hasTrade) {
     const nIncome = 1 + Math.floor(rand() * 2);
+    // 🔴 ONE ACCOUNT IN THREE IS A SUBCONTRACTOR. See declared exception 3 for why they used not to
+    // exist here at all. amount is the GROSS, which is what the return reports and what the
+    // contractor's statement shows; cis_deduction is the 20 percent of labour he never saw. Getting
+    // that invariant backwards, storing the bank deposit as the amount, is the capture defect this
+    // suite now exists to keep out of the engines.
+    const isSubbie = i % 3 === 0;
     for (let k = 0; k < nIncome; k++) {
-      rows.push({ amount: pick(INCOMES), transaction_date: '2026-06-15', category: null, vendor: 'Customer', income_type: null, capital_kind: null });
+      const gross = pick(INCOMES);
+      rows.push({
+        amount: gross, transaction_date: '2026-06-15', category: null, vendor: 'Customer',
+        income_type: null, capital_kind: null,
+        cis_deduction: isSubbie ? round2(gross * 0.2) : null,
+      });
     }
     rows.push({ amount: -pick(COSTS), transaction_date: '2026-07-01', category: pick(['materials', 'tools', 'fuel', 'insurance']), vendor: 'Trade suppliers', income_type: null, capital_kind: null });
     if (rand() < 0.3) {
@@ -164,7 +192,8 @@ function readAll(acct) {
   const input = {
     startYear: 2026, monthsElapsed: 12, daysElapsed: 365,
     ytdTradeIncome: round2(ytd.ytdTradeIncome), ytdTradeExpenses: round2(ytd.ytdTradeExpenses),
-    ytdCisSuffered: 0, employmentIncome: 0, studentPlans: [],
+    // 🔴 REAL CIS ON REAL ACCOUNTS, not a pinned zero. See declared exception 3.
+    ytdCisSuffered: round2(ytd.ytdCisSuffered), employmentIncome: 0, studentPlans: [],
     categoriesLogged: ytd.categoriesLogged, homeOfficeClaimed: false,
     tradingAllowanceElected: false,
     ytdCapitalAllowances: round2(ytd.ytdCapitalAllowances),
@@ -183,6 +212,9 @@ function readAll(acct) {
   const docTxns = rows.map((r) => ({
     amount: r.amount, transaction_date: r.transaction_date, income_type: r.income_type,
     category: r.category, vendor: r.vendor,
+    // The same column the aggregate reads, through to the document, so a deduction cannot be
+    // counted on one surface and missing on another.
+    cis_deduction: r.cis_deduction ?? null,
     writtenDown: CAP.isWrittenDown(r.capital_kind),
   }));
   const structure = isPartnership ? { type: 'partnership', sharePercent } : { type: 'sole_trader' };
@@ -275,6 +307,128 @@ for (let i = 0; i < N; i++) {
   if (fail > before) sweepFailures++;
 }
 ok(`the sweep ran the full ${N} accounts`, true);
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 6. CIS. THE DEDUCTION THAT WAS PINNED TO ZERO FOR 240 ACCOUNTS.
+//
+// RUN 1 of the customer week walked the product as a groundworker on 11 August 2026 and found the
+// Overview telling him to put by £3,157, with two payments on account of £1,579 on top, for a
+// January in which he was owed roughly £4,400 back. Every figure came from engines this suite had
+// declared green, because declared exception 3 held ytdCisSuffered at zero on every account it
+// ever built. The guard was airtight and it was pointed away from the customer.
+//
+// The rule that makes CIS safe to carry, and what this section holds:
+//   . it NEVER moves income, expenses or profit, on any surface. It is tax paid, not a cost.
+//   . the LIABILITY every reader is compared on is unchanged by it, to the penny.
+//   . what it moves is a separately named figure, and the two sides of that subtraction cannot
+//     both be true at once.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n6. CIS: tax already paid, and the four things it must never touch\n');
+{
+  const base = {
+    startYear: 2026, monthsElapsed: 12, daysElapsed: 365,
+    ytdTradeIncome: 25400, ytdTradeExpenses: 17825.11,
+    employmentIncome: 0, studentPlans: [], categoriesLogged: ['materials'],
+    homeOfficeClaimed: false, tradingAllowanceElected: false, ytdCapitalAllowances: 0,
+    vehicleBoughtThroughBooks: true, ytdHomeOffice: 0, mileageClaimed: false, ytdMileage: 0,
+    ytdHomeOfficeLogged: 0, purchaseGoal: null,
+    ytdPropertyIncome: 0, ytdPropertyExpenses: 0, ytdPropertyFinance: 0,
+    savingsIncome: 0, dividendIncome: 0, businessType: 'sole_trader', incomeShape: 'trade',
+  };
+
+  // Danny's own year, to the penny, from the fixture built before the product was opened.
+  // Turnover £25,400 gross, costs and the van £17,825.11, so profit £7,574.89, under the personal
+  // allowance, so nil tax. £4,400 taken at source. January is a repayment.
+  const danny = O.taxPosition({ ...base, ytdCisSuffered: 4400 });
+  ok('DANNY: the bill on a profit under the personal allowance is nil', near(danny.setAside, 0, 0.01));
+  ok('DANNY: the CIS already taken is carried, not discarded', near(danny.cisSuffered, 4400, 0.01));
+  ok('🔴 DANNY: THERE IS NOTHING TO PUT BY, because HMRC is already holding more than the year costs',
+    near(danny.setAsideAfterCis, 0, 0.01));
+  ok('🔴 DANNY: AND JANUARY IS A REPAYMENT OF £4,400, WHICH THE PRODUCT COULD NOT SAY',
+    near(danny.refundLikely, 4400, 0.01));
+
+  // The invariant, across the whole boundary rich income pool: CIS changes the set aside and
+  // nothing else. Run every income twice, once with a deduction and once without.
+  let liabilityMoved = 0;
+  let bothSidesTrue = 0;
+  let creditWrong = 0;
+  for (const inc of INCOMES) {
+    for (const suffered of [0, 500, 4400, 25000, 100000]) {
+      const withCis = O.taxPosition({ ...base, ytdTradeIncome: inc, ytdCisSuffered: suffered });
+      const without = O.taxPosition({ ...base, ytdTradeIncome: inc, ytdCisSuffered: 0 });
+      if (!near(withCis.setAside, without.setAside, 0.005)) liabilityMoved++;
+      if (!near(withCis.totalTax, without.totalTax, 0.005)) liabilityMoved++;
+      if (withCis.setAsideAfterCis > 0.005 && withCis.refundLikely > 0.005) bothSidesTrue++;
+      const expected = Math.max(0, round2(without.setAside - suffered));
+      if (!near(withCis.setAsideAfterCis, expected, 0.02)) creditWrong++;
+    }
+  }
+  ok('🔴 CIS NEVER MOVES THE LIABILITY, on any income in the pool', liabilityMoved === 0);
+  ok('🔴 A MAN IS NEVER BOTH OWED MONEY AND ASKED FOR IT', bothSidesTrue === 0);
+  ok('the credit is exactly the subtraction, floored at nothing to find', creditWrong === 0);
+
+  // A deduction can never make the set aside larger, which is the direction that would cost him
+  // money, and it can never take it below zero, which would read as a negative bill.
+  const heavy = O.taxPosition({ ...base, ytdTradeIncome: 200000, ytdCisSuffered: 999999 });
+  ok('an overpayment never produces a negative set aside', heavy.setAsideAfterCis === 0);
+  ok('and the excess is reported as the repayment it is', heavy.refundLikely > 0);
+  const negative = O.taxPosition({ ...base, ytdCisSuffered: -5000 });
+  ok('a nonsense negative deduction is ignored rather than added to the bill', negative.cisSuffered === 0);
+
+  // 🔴 PROJECTION SYMMETRY. The bill above is the projected full year. Setting a year to date
+  // credit against it would tell a man to find tax his contractors are going to deduct anyway.
+  const halfYear = { ...base, monthsElapsed: 6, daysElapsed: 182, ytdCisSuffered: 2200 };
+  const proj = O.taxPosition(halfYear);
+  const flat = O.taxPosition({ ...halfYear }, { project: false });
+  ok('🔴 THE CREDIT IS PROJECTED WITH THE BILL, NEVER HELD AT YEAR TO DATE',
+    proj.projected === true && proj.cisSuffered > 2200 && near(flat.cisSuffered, 2200, 0.01));
+
+  // The documents. A deduction is stated, and it moves not one figure a lender reads.
+  const gross = [{ amount: 12000, transaction_date: '2026-06-15', income_type: null, category: null, vendor: 'Contractor', writtenDown: false }];
+  const withHeld = [{ ...gross[0], cis_deduction: 2400 }];
+  const plain = IP.buildIncomeProof(gross, 'Subbie', 2026, new Date('2027-04-05'), null, 0);
+  const subbie = IP.buildIncomeProof(withHeld, 'Subbie', 2026, new Date('2027-04-05'), null, 0);
+  ok('🔴 THE PROOF OF INCOME STATES THE DEDUCTION AT LAST', near(subbie.cisDeducted, 2400, 0.01));
+  ok('🔴 AND IT MOVES NEITHER INCOME, EXPENSES, PROFIT NOR THE TAX ON THE DOCUMENT',
+    subbie.income === plain.income && subbie.expenses === plain.expenses
+    && subbie.profit === plain.profit && subbie.estimatedTax === plain.estimatedTax);
+  ok('a summary with no CIS carries a zero rather than a gap', plain.cisDeducted === 0);
+
+  // 🔴 AND THE LABEL. The lender document titled a figure "Gross income" over a number that was
+  // net of 20 percent for every subcontractor who ever generated one.
+  const htmlSub = IP.renderIncomeProofHtml(subbie);
+  const htmlPlain = IP.renderIncomeProofHtml(plain);
+  ok('🔴 A SUBCONTRACTOR\'S TURNOVER IS NOT LABELLED WITH A WORD THAT CONTRADICTS IT',
+    !/Gross income/.test(htmlSub) && /before CIS/.test(htmlSub));
+  ok('and the label is untouched for everybody else', /Gross income/.test(htmlPlain));
+  ok('the document says the money that reached the bank was lower', /reached the bank was lower/.test(htmlSub));
+
+  // Payments on account. The second test, and the customer it was written for.
+  const poaPlain = TE.paymentsOnAccount(5000, 2027, 0);
+  const poaSubbie = TE.paymentsOnAccount(5000, 2027, 4400);
+  const poaNear = TE.paymentsOnAccount(5000, 2027, 3900);
+  ok('payments on account still apply to a man with nothing taken at source', poaPlain.required === true);
+  ok('🔴 AND ARE DROPPED WHEN MORE THAN 80 PERCENT WAS ALREADY TAKEN',
+    poaSubbie.required === false && poaSubbie.excusedAtSource === true);
+  ok('the excuse is told apart from a small bill, because only one of them needs explaining',
+    TE.paymentsOnAccount(500, 2027, 0).excusedAtSource === false);
+  ok('just under the line still asks, so the threshold is real', poaNear.required === true);
+  // ⚠️ THIS ASSERTION REPLACED A VACUOUS ONE, CAUGHT BY SABOTAGE ON 11 AUGUST. The first version
+  // checked that a nil bill does not divide into an excuse, and it could not fail: excusedAtSource
+  // already requires overThreshold, so the division is unreachable below £1,000 and breaking its
+  // guard changed nothing. The real invariant is the implication itself, so that is what is held.
+  let excusedBelowThreshold = 0;
+  for (const bill of [0, -500, 1, 999.99, 1000]) {
+    for (const taken of [0, 900, 4400, 100000]) {
+      if (TE.paymentsOnAccount(bill, 2027, taken).excusedAtSource) excusedBelowThreshold++;
+    }
+  }
+  ok('🔴 AN EXCUSE IS ONLY EVER GIVEN FOR A BILL THAT WAS ASKED FOR IN THE FIRST PLACE',
+    excusedBelowThreshold === 0);
+  ok('and a nil bill is never handed a payment on account either',
+    TE.paymentsOnAccount(0, 2027, 4400).required === false
+    && Number.isFinite(TE.paymentsOnAccount(0, 2027, 4400).eachPayment));
+}
 
 console.log(`\n  ${pass} passed, ${fail} failed.${sweepFailures ? ` (${sweepFailures} accounts diverged)` : ''}`);
 process.exit(fail === 0 ? 0 : 1);

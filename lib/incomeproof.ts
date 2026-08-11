@@ -57,6 +57,26 @@ export interface IncomeProofTxn {
   // which is every existing fixture, so every trade only summary is identical to the penny.
   category?: string | null;
   vendor?: string | null;
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE TAX HIS CONTRACTOR TOOK BEFORE HE WAS PAID. Added 11 August 2026, RUN 1.
+  //
+  // On a CIS row `amount` is the GROSS, what the job was worth, and this is the 20 percent of the
+  // labour the contractor handed HMRC on his behalf. The two together are what the contractor's
+  // payment and deduction statement says, and a subcontractor's whole year is made of them.
+  //
+  // ⚠️ IT DOES NOT TOUCH INCOME, EXPENSES OR PROFIT AND MUST NOT. It is tax paid, not a cost. It
+  // is here so this document can STATE it, because a lender reading an income summary that is
+  // silent about several thousand pounds of tax already paid is reading an incomplete document.
+  //
+  // ⚠️ SNAKE CASE, TO MATCH THE COLUMN AND THE ROW SHAPE lib/supabase.ts ALREADY HANDS THIS FILE.
+  // getConfirmedTransactionsForRange has selected cis_deduction since it was written; this
+  // interface simply never asked for it, exactly as it never asked for category and vendor. So
+  // there is no plumbing to add and no caller to change.
+  //
+  // Absent reads as zero, which is every row written before today and every non CIS trade, so
+  // every existing summary is identical to the penny.
+  cis_deduction?: number | null;
 }
 
 export interface IncomeProof {
@@ -66,6 +86,8 @@ export interface IncomeProof {
   income: number;
   expenses: number;
   profit: number;
+  /** Tax already handed to HMRC by his contractors under CIS. Zero for everybody else. */
+  cisDeducted: number;
   /** The two streams behind `profit`, each floored at zero, because tax is charged on them apart. */
   tradeProfit: number;
   propertyProfit: number;
@@ -207,11 +229,15 @@ export function buildIncomeProof(
   let propertyIncome = 0;
   let propertyExpenses = 0;
   let financeCost = 0;
+  let cisDeducted = 0;
   for (const t of txns) {
     const a = Number(t.amount) || 0;
     const isProperty = String(t.income_type ?? '').toLowerCase() === 'property';
     if (a >= 0) {
       income += a;
+      // Tax paid, never income and never a cost. See the field's own note.
+      const cis = Number(t.cis_deduction);
+      if (Number.isFinite(cis) && cis > 0) cisDeducted += cis;
       if (isProperty) propertyIncome += a; else tradeIncome += a;
     } else {
       const mag = -a;
@@ -349,6 +375,9 @@ export function buildIncomeProof(
     income,
     expenses,
     profit,
+    // ⚠️ A PARTNER'S SLICE, THE SAME SHARE AS THE TRADE FIGURES ABOVE, because the deduction is
+    // taken from the firm's labour and his share of it is his share of the books.
+    cisDeducted: round2(cisDeducted * share),
     tradeProfit,
     propertyProfit,
     capitalCost,
@@ -497,14 +526,16 @@ export function renderIncomeProofHtml(p: IncomeProof): string {
 
   <div class="card">
     <table>
-      ${row('Gross income', gbp(p.income))}
+      ${row(p.cisDeducted > 0 ? 'Turnover before CIS' : 'Gross income', gbp(p.income))}
       ${row('Allowable expenses', gbp(p.expenses), { muted: true })}
       ${row('Net profit', gbp(p.profit), { bold: true })}
+      ${p.cisDeducted > 0 ? row('CIS deducted at source', gbp(p.cisDeducted), { muted: true }) : ''}
       ${p.personalTaxShown ? row(p.estimatedTaxLabel, gbp(p.estimatedTax), { muted: true }) : ''}
     </table>
     ${p.capitalCost > 0 ? `<div class="capital">${gbp(p.capitalCost)} more left the account on ${p.capitalCount === 1 ? 'a car' : `${p.capitalCount} cars`}, which is not an allowable expense in one year. A car comes off over several years rather than all at once, so it is not in the figures above.${p.capitalAllowance > 0 ? ` This year's writing down allowance of ${gbp(p.capitalAllowance)} is already taken off the profit above.` : ''}</div>` : ''}
     ${p.capitalCost === 0 && p.capitalAllowance > 0 ? `<div class="capital">This year's writing down allowance of ${gbp(p.capitalAllowance)} on a vehicle is already taken off the profit above, which is why it is not simply the gross income less the allowable expenses.</div>` : ''}
     ${p.financeCost > 0 ? `<div class="capital">${gbp(p.financeCost)} of residential mortgage interest is not an allowable expense either, so it is not in the figures above. Since Section 24 it is relieved as a basic rate tax credit instead${p.financeCredit > 0 ? `, and the credit of ${gbp(p.financeCredit)} is already taken off the estimated tax` : ''}.</div>` : ''}
+    ${p.cisDeducted > 0 ? `<div class="capital">${gbp(p.cisDeducted)} of tax was taken from these payments at source under the Construction Industry Scheme and paid to HMRC by the contractors. The turnover above is the figure BEFORE that deduction, which is what the tax return reports and what the contractors' payment and deduction statements show. The amount that reached the bank was lower by that much.</div>` : ''}
     ${p.shareNote ? `<div class="whose">${esc(p.shareNote)}</div>` : ''}
     ${p.companyNote ? `<div class="whose">${esc(p.companyNote)}</div>` : ''}
     <div class="stamp">Prepared by Lekhio &middot; ${esc(generated)} &middot; ${p.txCount} entries</div>

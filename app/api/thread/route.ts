@@ -11,7 +11,7 @@ import {
   matchProductTruth, productTruthAnswer,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
-import { checkExpense, VERDICT_ICON } from '../../../lib/taxrules';
+import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
 import { taxPosition, setAsideBasisLine, hasTaxPosition } from '../../../lib/taxoptimiser';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { quarterForDate } from '../../../lib/quarterpack';
@@ -217,10 +217,32 @@ async function composeReply(userId: string, q: string): Promise<string> {
   const totals = matchTotalsQuestion(q);
   if (totals) return totalsAnswer(userId, totals);
 
-  // 3. "Can I claim it" questions: the deterministic claim rules, no AI. Guarded the same way
-  // the WhatsApp checker guards itself: a message carrying a money amount is probably telling
-  // us about a purchase, not asking about the rules, and the thread does not log entries.
-  if (!/£\s*\d/.test(q)) {
+  // 3. "Can I claim it" questions: the deterministic claim rules, no AI.
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THIS GUARD USED TO BE ONE THIRD OF A GUARD, UNDER A COMMENT SAYING IT WAS ALL OF IT.
+  //
+  // The line here read `if (!/£\s*\d/.test(q))`, and the comment above it claimed the lane was
+  // "guarded the same way the WhatsApp checker guards itself". It was not. isExpenseCheck() in
+  // app/api/whatsapp/route.ts asks three things and only the money one had been copied over, so
+  // on this surface every sentence without a pound sign in it reached a corpus that answers any
+  // string carrying an alias. Proved live on 11 August 2026, on two things a customer typed:
+  //
+  //   "delete all my data"  ->  🟡 Phone and broadband, because the phone rule carried the alias
+  //                             'data' for mobile data allowances. He was asking to be erased.
+  //   "free subscription"   ->  ✅ Trade body and subscriptions. He was asking about our price.
+  //
+  // ⚠️ THE FIX IS NOT THE MISSING REGEX TYPED IN HERE. That would have been a third hand copy of
+  // a rule that had already drifted once, and the copy IS the defect. lib/claimrules.data.ts owns
+  // the corpus, so it owns the decision about what may reach the corpus: isClaimQuestion() is the
+  // one door, this route asks it, and its header records what each condition is for and where the
+  // remaining WhatsApp copy still lives. checkExpense stays the call by name, the same function
+  // the webhook runs, because a lookalike here is the fault this whole file exists to avoid.
+  //
+  // ⚠️ AND THE ALIAS WENT TOO. A guard narrows the door; it does not fix a rule that claims a word
+  // from our own privacy vocabulary. See the phone rule's own note in lib/claimrules.data.ts.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (isClaimQuestion(q)) {
     const hit = checkExpense(q);
     if (hit) {
       return [
@@ -453,11 +475,30 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
     collection = `${sameFigure}.`;
   } else {
     const { startYear } = quarterForDate(new Date());
-    const poa = paymentsOnAccount(tax.selfAssessmentTax, startYear + 1);
+    // 🔴 THE CIS CREDIT GOES IN HERE TOO, AND THAT IS NOT OPTIONAL. paymentsOnAccount gained its
+    // second test on 11 August 2026: payments are dropped when more than 80 percent of the tax was
+    // already taken at source. The hub passes tax.cisSuffered, so if this line did not, the chat
+    // would keep offering two payments to a subcontractor the Tax screen had already excused. The
+    // sentence below promises this is the same figure that screen leads with.
+    const poa = paymentsOnAccount(tax.selfAssessmentTax, startYear + 1, tax.cisSuffered);
     collection = `${sameFigure}, and Self Assessment collects it in one bill, due by ${poa.firstDue}.`;
     if (poa.required) {
       collection += ` Because the bill is over ${gbp0(FACTS.poaThreshold)}, HMRC also asks for two payments on account towards the following year, about ${gbp0(poa.eachPayment)} each, due ${poa.firstDue} and ${poa.secondDue}.`;
     }
   }
-  return `Put by ${formatGbp(tax.setAside)} for tax. ${note}${basis ? ` ${basis}` : ''} ${collection}`;
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE SAME FIGURE MEANS THE SAME FIGURE. Since 11 August 2026 the Overview and the Tax screen
+  // lead with what he still has to FIND, which for a subcontractor is the bill less the tax his
+  // contractors already handed HMRC. A chat that quoted the bill instead would be off by thousands
+  // while the sentence beside it claimed the two agreed, and a man who catches our surfaces
+  // disagreeing about his tax stops believing any of them. lib/taxoptimiser.ts carries both.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const leadFigure = tax.cisSuffered > 0 ? tax.setAsideAfterCis : tax.setAside;
+  const cisLine = tax.cisSuffered > 0
+    ? ` ${formatGbp(tax.cisSuffered)} of the bill has already gone to HMRC through CIS, so that part is paid and this is what is left.${
+      tax.refundLikely > 0
+        ? ` On these figures January looks like a repayment of about ${formatGbp(tax.refundLikely)} rather than a bill, though only your filed return settles that.`
+        : ''}`
+    : '';
+  return `Put by ${formatGbp(leadFigure)} for tax. ${note}${basis ? ` ${basis}` : ''}${cisLine} ${collection}`;
 }

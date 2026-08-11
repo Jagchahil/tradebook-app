@@ -30,6 +30,11 @@
 // means the real one is what gets tested.
 import { matchesOwnName } from './personal';
 import { shouldAskCapital } from './capital';
+// The three CIS rates and nothing else. They live in FACTS because Khoji watches FACTS against
+// GOV.UK every night, and a rate typed into a second file is a rate that stays at last year's
+// number after an approved change lands. lib/capital.ts reaches through the same door for the same
+// reason, so this adds no file to the chain any suite already stages.
+import { FACTS } from './taxengine';
 
 export type KeyOf = (vendor: string) => string;
 
@@ -350,4 +355,201 @@ export function summarisePile(groups: PileGroup[]): PileSummary {
     income: groups.filter((g) => g.kind === 'income').length,
     totalOut: groups.filter((g) => g.kind === 'ask').reduce((n, g) => n + g.total, 0),
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 CIS. WHAT THE CONTRACTOR TOOK OFF BEFORE THE MONEY EVER REACHED HIS BANK.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE INCIDENT, 11 AUGUST 2026. RUN 1 of the customer week, walked as a groundworker.
+//
+// 401 rows imported from a real year of statements. 62 of them were contractor payments totalling
+// £34,400, and every one of those was booked as income at its bank value after a single yes and no
+// question: is this money in yours. It is. That was never the question that mattered. £4,400 and
+// £2,800 across two tax years had already gone to HMRC out of those payments, and neither figure
+// existed anywhere in this product, because neither figure ever touched his account.
+//
+// So his turnover was understated by exactly the tax taken, on his return and on the document he
+// hands a lender, and the tax already paid on his behalf was invisible, which is how the product
+// came to tell a man to put money by that HMRC was already holding.
+//
+// 🔴 THE INVARIANT THE REST OF THE PRODUCT NOW RESTS ON, AND THE REASON cisCapture() EXISTS AT ALL:
+//
+//        transactions.amount IS THE GROSS.  transactions.cis_deduction IS THE TAX ALREADY PAID.
+//
+// handleCIS in the WhatsApp webhook has stored it that way since the beginning, and the optimiser,
+// the proof of income, the quarter pack and the payments on account test all read it that way.
+// Section 6 of test/moneyspine.test.mjs holds every one of them to it, so it is the live invariant
+// of a launched product rather than a convention. Getting the two columns the wrong way round here
+// would put a wrong figure into five surfaces in one press, so the patch this file returns is named
+// after the columns it fills. A caller cannot swap them without renaming a field.
+//
+// ⚠️ IT BELONGS AT THE REVIEW STEP AND NOWHERE EARLIER. lib/statementimport.ts is a reader: it turns
+// a CSV into rows and it is not allowed to invent a figure that is not on the statement. The man is
+// present here, and he is the only one who knows.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// The most that can arithmetically sit behind a deposit, and it is a real ceiling rather than a
+// guess: 30 percent is the highest rate in the scheme, so a deposit of £400 cannot have had more
+// than £171.43 taken off it by anybody. Same shape as vatFromGross in lib/vat.ts, and it is here
+// for the same reason: a page and a route that each work it out are two answers to one question.
+export function cisCeiling(net: number): number {
+  if (!Number.isFinite(net) || net <= 0) return 0;
+  const rate = FACTS.cisUnregisteredRate;
+  return round2((net * rate) / (1 - rate));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE PROPOSAL, AND WHY IT IS PRINTED AND NEVER PREFILLED.
+//
+// He knows the deposit. He often has the contractor's payment and deduction statement in the van,
+// and he often does not. So the product does the arithmetic for him and shows it: £400 in the bank,
+// at 20 percent on labour with no materials, is £100 taken and a £500 job. That is the whole of the
+// help we can honestly give, and it saves him doing division up a ladder.
+//
+// ⚠️ IT IS NOT PUT IN THE BOX FOR HIM, AND OUR OWN FLAGSHIP CIS CUSTOMER IS THE PROOF.
+//
+// Danny, the fixture section 6 of test/moneyspine.test.mjs is built on, turned over £25,400 gross
+// and had £4,400 taken. That is 17.3 percent of the job, not 20, because £3,400 of it was materials
+// and materials come out BEFORE the deduction is worked out. Run the proposal on the £21,000 that
+// actually reached his bank and it says £5,250 was taken and the job was £26,250. Both figures are
+// wrong, both are wrong in the direction that overstates his turnover, and if the box had been
+// prefilled he would have pressed the button and never seen it.
+//
+// lib/control.ts holds the standard this is measured against: NEVER TAKE A NUMBER WITHOUT A RECEIPT
+// for proof of income or anything going to HMRC. A prefilled figure is a number with no receipt
+// wearing his consent. So the box starts empty, the arithmetic sits next to it where he can read it
+// and copy it if it is right, and nothing is ever stored that he did not put there himself.
+//
+// ⚠️ THE FIGURES AND THE TWO SENTENCES COME BACK TOGETHER OR NOT AT ALL. That is the lib/control.ts
+// pattern, and it is the same argument: a proposed gross printed on its own reads as a fact about
+// his job, and it is not one, it is arithmetic with an assumption inside it. There is deliberately
+// no exported function that hands over the numbers bare.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export interface CisProposal {
+  // What actually hit the bank. His fact, from his statement, never touched.
+  net: number;
+  // What 20 percent on labour only would have been. A sum, not a claim.
+  deduction: number;
+  gross: number;
+  // Why the sum above may be wrong for this payment, in his words.
+  assumes: string;
+  // The three rates, because there are three and flattening them to "20 percent" is how a man with
+  // gross payment status is asked for a deduction that does not exist, and a man on 30 percent is
+  // told a third of what was taken.
+  rates: string;
+}
+
+export const CIS_ASSUMES =
+  'That is 20 percent of the labour and nothing else. Materials, plant hire and any VAT come off '
+  + 'the job before the deduction is worked out, so if there were any on this one, less was taken '
+  + 'than that. The statement your contractor gives you has the figure he actually used.';
+
+export const CIS_RATES =
+  'How much comes off depends on where you stand with HMRC: 20 percent if you are registered for '
+  + 'CIS, 30 percent if you are not, and nothing at all if you have gross payment status.';
+
+export function cisProposal(net: number): CisProposal | null {
+  if (!Number.isFinite(net) || net <= 0) return null;
+  const rate = FACTS.cisRegisteredRate;
+  const gross = round2(net / (1 - rate));
+  return {
+    net: round2(net),
+    deduction: round2(gross - net),
+    gross,
+    assumes: CIS_ASSUMES,
+    rates: CIS_RATES,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHICH PAYMENTS IN GET THE QUESTION, AND THE TWO GATES ON IT.
+//
+// ⚠️ CIS IS NOT A PROPERTY OF THE ROW, IT IS A PROPERTY OF THE MAN, so this is deliberately NOT a
+// fourth GroupKind. A kind would have to be decided in buildPile, which sees a bank line and cannot
+// know whether the payer was a contractor, and it would ripple through partitionPile, waitingCount,
+// the pile page and the phone app for a fact none of them own. The kind stays 'income'. What
+// changes is that a man who has told us he is paid under CIS is asked one more thing about it.
+//
+//   1. HE TOLD US. worksUnderCis in lib/circumstances.ts, and only an explicit yes counts. A false
+//      returns an EMPTY LIST, which is the byte for byte guarantee: a man who is not in the scheme
+//      sees precisely the pile he saw yesterday, with no extra sentence, no extra box and no extra
+//      press. Doc 103: a question with one sensible answer is a question we do not ask.
+//
+//   2. THE ROW CAN CARRY THE ANSWER. pileEntries in lib/supabase.ts names its columns one by one,
+//      and until it names cis_deduction the field arrives undefined however well this is written.
+//      An undefined field means the answer would have nowhere to go, and asking a man for a figure
+//      we then discard is the exact failure the vat_registered date made for two and a half weeks
+//      (lib/circumstances.ts says so in capitals). So an undefined field draws NOTHING: no wrong
+//      number, no broken screen, and no question he answers into a hole. It is the same shape the
+//      VAT columns shipped in on 1 August 2026 and it is switched on by the same one line.
+//
+// And a row that already carries a deduction is never asked about again, because it has been
+// answered somewhere else and asking twice teaches him we are not listening.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export interface CisRow {
+  id: string;
+  vendor: string | null;
+  amount: number;
+  cis_deduction?: number | string | null;
+}
+
+export interface CisAsk {
+  id: string;
+  vendor: string;
+  proposal: CisProposal;
+}
+
+export function cisToAsk(rows: CisRow[], underCis: boolean): CisAsk[] {
+  if (!underCis) return [];
+  const out: CisAsk[] = [];
+  for (const r of rows) {
+    // Money IN only. A cost has no CIS in it: the scheme takes from what a subcontractor is PAID.
+    if (!(r.amount > 0)) continue;
+    if (r.cis_deduction === undefined) continue;
+    const already = r.cis_deduction === null ? 0 : Number(r.cis_deduction);
+    if (Number.isFinite(already) && already > 0) continue;
+    const proposal = cisProposal(r.amount);
+    if (!proposal) continue;
+    out.push({ id: r.id, vendor: (r.vendor ?? '').trim() || 'Unknown', proposal });
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHAT GETS STORED, AND IT IS THE ONLY PLACE IN THE PRODUCT THAT WORKS IT OUT.
+//
+// The fields are named after the columns on purpose. `amount` is the gross and `cis_deduction` is
+// the tax already paid, and a caller holding this object cannot put them in the wrong order without
+// renaming a field, which is the one bug that would put a wrong figure into five surfaces at once.
+//
+// 🔴 THE DEPOSIT IS THE FIXED POINT. He types what was taken; the gross is DERIVED from the bank
+// figure plus that. Never the other way round. A gross typed in by hand would let the two columns
+// stop reconciling to the money that actually moved, and then no reader could tell which of the
+// three numbers was the wrong one. amount minus cis_deduction is the deposit, always, to the penny.
+//
+// ⚠️ AN EMPTY BOX IS NOT A ZERO. Zero is a real answer, and a man with gross payment status should
+// be able to give it, but he has to say it. An empty box is a man who has not answered, and reading
+// it as nought taken would file the deposit as the whole job on his silence. Same rule as the VAT
+// branch in app/api/pile/route.ts, and the same reason.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export interface CisRowPatch {
+  amount: number;
+  cis_deduction: number;
+}
+
+export function cisCapture(net: number, typed: string | number): CisRowPatch | null {
+  if (!Number.isFinite(net) || net <= 0) return null;
+  // A pound sign and a stray comma are him typing what he can see on the statement, not him being
+  // wrong. Everything else is refused rather than coerced.
+  const cleaned = String(typed ?? '').trim().replace(/[£,\s]/g, '');
+  if (cleaned === '') return null;
+  const taken = Number(cleaned);
+  if (!Number.isFinite(taken) || taken < 0) return null;
+  // Nothing above the 30 percent ceiling can be true of any subcontractor in the scheme, and a
+  // figure typed one digit long would otherwise raise his turnover for ever on one press.
+  if (taken > cisCeiling(net)) return null;
+  return { amount: round2(net + taken), cis_deduction: round2(taken) };
 }

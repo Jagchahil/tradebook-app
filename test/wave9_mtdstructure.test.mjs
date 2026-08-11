@@ -182,8 +182,14 @@ console.log('\nwave nine: MTD, payments on account and National Insurance belong
     typeof poaCard === 'string' && /payments on\s+account/.test(poaCard));
   ok('and the engine still decides for everyone else: poa.required is untouched',
     /paymentsOnAccount\(tax\.selfAssessmentTax/.test(hub) && /poa\.required \? \(/.test(hub));
+  // ⚠️ ON codeOnly() BOTH SIDES, AND IT WAS NOT BEFORE. EIGHTH INSTANCE OF THIS CODEBASE'S OLDEST
+  // TRAP, and the note at line 168 above is the seventh. without() strips comments from the HAYSTACK
+  // and then splits on an arm that still HAS them, so the moment anybody puts a JSX comment inside
+  // the payments on account card the split finds nothing, the whole card stays in the haystack, and
+  // its own copy fails the assertion. That is what happened on 11 August when the card gained the
+  // sentence about the 80 percent test. The card is comment stripped too now, so the two match.
   ok('🔴 A DIRECTOR IS NOT TOLD ABOUT PAYMENTS ON ACCOUNT ANYWHERE ELSE ON THE PAGE',
-    !/payments on account/i.test(flat(without(hub, [poaCard]))));
+    !/payments on account/i.test(flat(without(hub, [codeOnly(poaCard)]))));
 
   // The January sentence under the number, which is a Self Assessment sentence.
   ok('🔴 THE JANUARY DATE IS BEHIND THE SAME BRANCH, not printed at a man who has no January date',

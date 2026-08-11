@@ -208,8 +208,28 @@ export function linkMessage(verdict: LinkVerdict): string {
       return 'That code has been used already. If you need to connect a different phone, open Lekhio on the web and get a new one.';
     case 'none':
       return 'We could not find that code. Open Lekhio on the web, go to Connect WhatsApp, and send the one it shows you.';
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THIS SENTENCE NAMED A ROAD THAT DID NOT EXIST, AND IT IS THE ONLY ROAD OUT OF HERE.
+    //
+    // 11 August 2026. A customer hit this refusal, read it, and replied SUPPORT. isSupportRequest()
+    // in lib/waintents.ts did not match the bare word, so SUPPORT fell through every branch of the
+    // webhook and reached the RECEIPT PARSER, which tried to book it as a transaction. He could not
+    // free his own number with any words at all. The word is owned now: see RESERVED_WORDS in
+    // lib/waintents.ts and the dispatch at the top of processMessage.
+    //
+    // ⚠️ THE WORD STAYS AND THE PROMISE CHANGES, because the promise was the part that was thin.
+    // "A person will look at it" invites him to press a word and wait, and the thing he is asking
+    // for is a number moved between two accounts. The comment above bindingVerdict argues,
+    // correctly, why that is never self service: whoever asks for it may be the man who wants his
+    // colleague's books, and the reply he is reading may be going to that man. So he is told the
+    // SHAPE of the road instead. A person, by hand, and proof of both sides. That is a longer
+    // sentence than "reply SUPPORT" and it is the difference between a queue and a void.
+    //
+    // ⚠️ AND IT STILL NAMES NOBODY. No account, no number, no email, no hint of whose it is. See
+    // the block above this function; test/walink.test.mjs holds every refusal to it.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
     case 'taken':
-      return 'This number is already connected to a Lekhio account, so we have not changed anything. If that is not you, reply SUPPORT and a person will look at it.';
+      return 'This number is already connected to a Lekhio account, so we have not changed anything. If that is not you, reply SUPPORT and a person will pick it up. Moving a number from one account to another is done by hand, and you will be asked to prove you hold both sides, so nothing will change until then.';
     case 'already':
       return 'This phone is already connected. Send me a photo of a receipt whenever you like and I will log it.';
     case 'notuk':

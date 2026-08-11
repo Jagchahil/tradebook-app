@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { listCronRuns, readKnowledgeState, getReminderBacklog } from '../../../lib/supabase';
-import { cronAlarms, blockingAlarms, unseenAlarms, cronsServing, reminderAlarm, remindersServing } from '../../../lib/cronwatch';
+import { listCronRuns, readKnowledgeState, getReminderBacklog, getAuthSendHealth } from '../../../lib/supabase';
+import { cronAlarms, blockingAlarms, unseenAlarms, cronsServing, reminderAlarm, remindersServing, authSendAlarm, authSendsServing } from '../../../lib/cronwatch';
 import { knowledgeAlarms, knowledgeStatus } from '../../../lib/knowledgewatch';
 
 // A tiny health check for uptime monitoring. Reports whether the app is up and
@@ -94,6 +94,12 @@ export async function GET(req: NextRequest) {
     // Is the PROMISE being kept, not just the job running. See lib/cronwatch.ts, reminderAlarm.
     const backlog = await getReminderBacklog();
     const lateReminders = reminderAlarm(backlog);
+    // 🔴 CAN ANYBODY ACTUALLY GET IN. See lib/cronwatch.ts, authSendAlarm. On 11 August this
+    // endpoint answered 200 for over an hour while every sign in code in the product silently
+    // failed to send, because nothing here was watching the one email a locked out customer cannot
+    // do without.
+    const authSends = await getAuthSendHealth();
+    const deadMailer = authSendAlarm(authSends);
     // ⚠️ THE OPERATOR VIEW IS STRICT ON PURPOSE, and differs from the public one. This body is a
     // to-do list for whoever is holding the pager, so a cron that has never run belongs in its
     // `ok: false`. The PUBLIC body answers a different question, "is the site serving", and a job
@@ -106,7 +112,7 @@ export async function GET(req: NextRequest) {
     // spot the public path had. brain !== null was already here; the crons half was missing it. An
     // operator who cannot read the history has a problem, and the strict view is where it belongs.
     const ok = missing.length === 0 && runs !== null && alarms.length === 0 && brain !== null && brainAlarms.length === 0
-      && lateReminders === null;
+      && lateReminders === null && deadMailer === null;
     return NextResponse.json(
       {
         ok,
@@ -125,11 +131,14 @@ export async function GET(req: NextRequest) {
           bankTokenKey: Boolean(process.env.BANK_TOKEN_KEY),
         },
         crons: runs ?? 'unreadable',
-        alarms: [...blockingAlarms(alarms), ...(lateReminders ? [lateReminders] : [])],
+        alarms: [...blockingAlarms(alarms), ...(lateReminders ? [lateReminders] : []), ...(deadMailer ? [deadMailer] : [])],
         // WHAT IS ACTUALLY WAITING. The operator side names it because naming it is the whole use
         // of the row: a count and an age tell whoever holds the pager whether this is a gate that
         // shut a minute ago or an engine that stopped in the night.
         reminders: backlog === null ? 'unreadable' : { overdue: backlog.overdue, oldestDue: backlog.oldestDue },
+        // THE LOGIN DOOR, IN COUNTS. Never an address: lib/logindoor.ts hashed it before it was
+        // written, and the operator side needs the shape of the failure, not who it happened to.
+        signin: authSends === null ? 'unreadable' : { attempted: authSends.attempted, sent: authSends.sent, failed: authSends.failed, windowMinutes: authSends.windowMinutes },
         // Registered, never seen. Not an outage; a wiring question. Named here because this side
         // is behind the bearer and naming it is the entire use of the row.
         unseen: unseenAlarms(alarms),
@@ -237,6 +246,25 @@ export async function GET(req: NextRequest) {
   const backlog = await getReminderBacklog();
   const remindersOk = remindersServing(backlog);
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 CAN A CUSTOMER GET IN. Added 11 August 2026, RUN 1 of the customer week, and it is the
+  // reminder clock's argument one paragraph down.
+  //
+  // A reminder that never lands costs a man a deadline. A SIGN IN CODE that never lands costs him
+  // the whole product: his books are behind a door that will not open, and every screen he can
+  // still reach tells him a code is on its way. That happened, for at least sixty five minutes,
+  // and this endpoint returned 200 for every second of it.
+  //
+  // ⚠️ THIS IS AN OUTAGE AND IT IS A 503. By this file's own taxonomy: something that WAS working
+  // has stopped, and users are being turned away right now. There is no reading of "is the site
+  // serving" on which a site nobody can sign into is serving.
+  //
+  // ⚠️ AND THE COUNT IS NOT PUBLIC. How many people failed to sign in to Lekhio in the last hour
+  // is our business. One word here, the counts behind the bearer, the same rule as the rows above.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const authSends = await getAuthSendHealth();
+  const signInOk = authSendsServing(authSends);
+
   // THE BRAIN (docs/105). Three ways this goes red, and the first one is why Khoji exists at all.
   //
   //   drift   a constant in lib/taxengine.ts DISAGREES WITH GOV.UK right now. Our tax engine is
@@ -260,7 +288,7 @@ export async function GET(req: NextRequest) {
   const brainAlarms = brain ? knowledgeAlarms(brain) : [];
   const brainOk = brain !== null && brainAlarms.length === 0;
 
-  const healthy = db && cronsOk && brainOk && remindersOk;
+  const healthy = db && cronsOk && brainOk && remindersOk && signInOk;
   return NextResponse.json(
     {
       ok: healthy,
@@ -272,6 +300,8 @@ export async function GET(req: NextRequest) {
       crons: runs === null ? 'unknown' : cronsOk ? 'ok' : 'stale',
       // One word, never a count. See the block above remindersOk.
       reminders: backlog === null ? 'unknown' : remindersOk ? 'ok' : 'late',
+      // One word, never a count. See the block above signInOk.
+      signin: authSends === null ? 'unknown' : signInOk ? 'ok' : 'failing',
       // A count, never a name. Zero is omitted rather than printed, so this row appears only when
       // there is genuinely something not yet seen. See the block above.
       ...(unseen.length ? { cronsUnseen: unseen.length } : {}),

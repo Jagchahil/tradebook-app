@@ -194,8 +194,8 @@ const keys = (list) => list.map((c) => c.key);
   // and a door on /app/you promising questions he can never be asked is a door that lies twice.
   const llAll = progressIn([...household(), ...notHousehold(), ...mtdQuestions()], [], LANDLORD);
   const unknownAll = progressIn([...household(), ...notHousehold(), ...mtdQuestions()], [], null);
-  ok('🔴 his denominator is exactly the six trade questions lighter',
-    llAll.askable === unknownAll.askable - 6);
+  ok('🔴 his denominator is exactly the seven trade questions lighter',
+    llAll.askable === unknownAll.askable - 7);
   ok('an answer he gave before we knew still counts: the record of what he told us is his',
     progressIn(notHousehold(), [{ key: 'prior_employment', answer: 'yes' }], LANDLORD).answered === 1);
 }

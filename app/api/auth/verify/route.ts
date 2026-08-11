@@ -98,21 +98,42 @@ export async function POST(req: NextRequest) {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
   if (!url || !anon) return NextResponse.redirect(new URL('/in?e=unavailable', req.url), 303);
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 TWO TYPES ON THE EMAIL DOOR, AND BOTH OF THEM ARE HIS OWN CODE.
+  //
+  // Since 11 August /api/auth/start mints the email code through admin generate_link and posts it
+  // through Resend, so that a Supabase mailer outage cannot lock a customer out again. GoTrue files
+  // a code minted that way under 'magiclink'. A code minted the old way, by /auth/v1/otp, is filed
+  // under 'email'. Both are live at once: the old road is still the fallback, and a code sent five
+  // minutes before a deploy must still work five minutes after it.
+  //
+  // ⚠️ SO A REFUSAL IS ONLY A REFUSAL ONCE BOTH TYPES HAVE SAID NO. Pinning one type would have
+  // turned every fallback send into "that code is wrong" for a man holding a code that was right,
+  // which is the same lie this run was spent removing from the other half of the door.
+  //
+  // This costs one extra request, only on a code that has already failed once, only on email.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const attempts: Array<Record<string, string>> = pending.channel === 'sms'
+    ? [{ type: 'sms', phone: pending.value, token: code }]
+    : [
+      { type: 'email', email: pending.value, token: code },
+      { type: 'magiclink', email: pending.value, token: code },
+    ];
+
   let accessToken = '';
   try {
-    const res = await fetch(`${url}/auth/v1/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: anon },
-      // GoTrue wants a different type and a different field per channel. One login, two doors.
-      body: JSON.stringify(
-        pending.channel === 'sms'
-          ? { type: 'sms', phone: pending.value, token: code }
-          : { type: 'email', email: pending.value, token: code },
-      ),
-    });
+    let res: Response | null = null;
+    for (const body of attempts) {
+      res = await fetch(`${url}/auth/v1/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: anon },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) break;
+    }
     // ⚠️ THE ONE HONEST 'code' IN THE FILE, AND THE LAST LINE ON WHICH THE CODE IS STILL HIS.
     // GoTrue refused it, so it was never handed in, so typing another one really is the fix.
-    if (!res.ok) return back(req, 'code', next);
+    if (!res || !res.ok) return back(req, 'code', next);
     const json = (await res.json()) as { access_token?: string };
     accessToken = json.access_token || '';
   } catch {

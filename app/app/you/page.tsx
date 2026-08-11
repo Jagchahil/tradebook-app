@@ -392,6 +392,34 @@ export default async function YouPage({
             <span style={S.doorLabel}>Share your books</span>
             <span style={S.rowBody}>A read only link you can take back whenever you like.</span>
           </a>
+          {/* ⚠️ ONE QUIET ROW, AT THE BOTTOM, AND THAT IS THE WHOLE PLACEMENT ARGUMENT.
+              Doc 103's once test: a man takes a copy of his data perhaps twice in his life and
+              deletes his account exactly once. A louder treatment would put leaving in front of
+              every customer who never intends to, on the screen where he came to fix his trade or
+              his email, and a row shaped like a warning would read as us bracing for it.
+
+              🔴 IT IS HERE BECAUSE ON 11 AUGUST 2026 IT WAS NOWHERE. A customer asked the chat to
+              delete all his data, then looked for the door on every screen we have. There was
+              none. /api/account/delete and /api/account/export both worked, both were exempt from
+              the paywall on purpose (lib/gate.ts: "HIS RIGHT TO LEAVE"), and a grep for
+              `api/account` across the whole repo found lib/gate.ts and two test files. Nothing
+              linked to either. The hub listed nine doors and neither of these was among them.
+
+              ⚠️ IT IS IN "Yours" RATHER THAN "Yours to change", and the section header is the
+              reason: the rows above are doors that are HIS rather than about him, his invoices
+              and his diary and the two papers he hands somebody else. His data is the oldest
+              thing on that list and the only one with a law behind it.
+
+              ⚠️ WHAT CAME OUT TO MAKE ROOM. Nothing on this screen, and that is answered rather
+              than dodged: what this row removes is a support email and a wait. /privacy told him
+              to write to info@lekhio.app to use either right, so a rights request cost him a
+              message and cost us somebody running an erasure by hand. */}
+          <a href="/app/you/data" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Your data</span>
+            <span style={S.rowBody}>
+              Take a copy of everything we hold, or tell us to delete it.
+            </span>
+          </a>
         </div>
       </section>
 

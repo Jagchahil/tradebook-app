@@ -405,6 +405,96 @@ export const CIRCUMSTANCES: Circumstance[] = [
     },
   },
   {
+    // ═══════════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THE QUESTION NOTHING IN THIS PRODUCT ASKED, FOR THE COMMONEST CUSTOMER IT HAS.
+    //
+    // Found 11 August 2026 by walking the live product as a groundworker. 401 rows from a real year
+    // of statements. 62 of them were contractor payments totalling £34,400, and that £34,400 was
+    // NET: £4,400 and £2,800 had already been handed to HMRC on his behalf across two tax years.
+    // Every one of those 62 rows was booked as income at its bank value, with one bare yes and no
+    // question asked. So his turnover was understated by exactly the tax taken, on the return and on
+    // the document he gives a lender, and the tax already paid for him was invisible, which is how
+    // the product came to tell him to put by money HMRC was already holding.
+    //
+    // ⚠️ AND THE ONLY CIS FLAG IN THE PRODUCT WAS BEHIND A DOOR HE NEVER OPENS. vat_profiles
+    // .cis_subcontractor is set on /app/you/vat, which is gated on being VAT registered. A non VAT
+    // registered sole trader subcontractor, which is the commonest Lekhio customer there is, was
+    // never asked on any surface at all. This is the hole where the question should have been, the
+    // same shape marriage was in (doc 108 §3): not a bug, an absence.
+    //
+    // ⚠️ NONE OF IT IS VISIBLE IN A BANK FEED, WHICH IS THE WHOLE POINT OF THIS FILE. A statement
+    // line says £400 arrived. It cannot say the job was £500 and that £100 went to HMRC, because
+    // the £100 never touched his account. Only he can tell us, and until 11 August 2026 there was
+    // nowhere for him to say it.
+    //
+    // ═══════════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 WHAT THIS QUESTION CANNOT HOLD, SAID OUT LOUD, BECAUSE THIS FILE HAS TWICE SHIPPED A
+    // QUESTION THAT ASKED FOR SOMETHING `Answer` COULD NOT STORE.
+    //
+    // CIS HAS THREE ANSWERS, NOT TWO. A contractor takes 20 percent from a subcontractor who is
+    // registered, 30 percent from one who is not, and NOTHING AT ALL from one with gross payment
+    // status. That is a fact about his standing with HMRC, it is worth thousands, and it cannot
+    // live here: `Answer` holds 'yes', 'no' and 'skip', and 'skip' is not an answer, it is the
+    // absence of one. There is nowhere in three words to put three rates.
+    //
+    // The compound question ban above says what happens if we try anyway. The married question did
+    // it with two facts and produced a black hole on a no. vat_registered did it with a DATE, for
+    // two and a half weeks, and the date "went nowhere, every time, for everybody" while the `why`
+    // underneath promised him a reclaim that hung entirely off it. This would be the third, and it
+    // would be the worst of them, because a rate written into an answer type that cannot hold it is
+    // a rate the pile would then have to guess.
+    //
+    // 🔴 SO THE RATE LIVES WHERE IT CAN BE HELD, AND THE PILE NEVER ASSUMES IT.
+    //   * The fact HE gives us here is the one fact a yes or a no can carry: whether anybody takes
+    //     CIS off him at all. One question, one fact.
+    //   * The RATE belongs beside vat_profiles.cis_subcontractor, on a screen of its own under You,
+    //     ungated from VAT, exactly as the registration date went to /app/you/vat. It is three
+    //     states and it needs three buttons. Written up for Jag on 11 August 2026.
+    //   * And until it exists, lib/reviewpile.ts asks him what was ACTUALLY TAKEN off each payment
+    //     rather than applying a rate to it, which is the only honest thing to do with a number
+    //     nobody has told us. See cisProposal() there: materials, plant hire and VAT come out
+    //     before the deduction is worked out, so even a known rate does not settle a payment.
+    // ═══════════════════════════════════════════════════════════════════════════════════════════
+    key: 'cis',
+    ask: 'Do the firms you work for take CIS off your money before it reaches you?',
+    why: 'What they take is not a cost and it is not lost. It is tax already paid on your behalf, it comes off your bill at the end of the year, and it is often the difference between a January bill and a cheque back. Your bank only ever shows what was left after it, so nothing we can read tells us it happened. Only you can.',
+    worthOrder: 'huge',
+    claimant: 'him',
+    // The deduction belongs on the return for the year it was suffered. Where a year was filed
+    // without it, overpayment relief reaches back four years from the end of that tax year.
+    backYears: 4,
+    evidence: 'The payment and deduction statement your contractor has to give you within 14 days of the end of each tax month. It shows what the job was, what came off for materials, and what was taken.',
+    source: 'FA 2004 Part 3 Chapter 3 (the Construction Industry Scheme); SI 2005/2045 reg 4 (payment and deduction statements); CISR15060. Rates are 20 percent registered, 30 percent unregistered, and nothing at all with gross payment status. Overpayment relief: TMA 1970 Sch 1AB, four years.',
+    // 🔴 NOT FOR A COMPANY, AND IT IS NOT A NUISANCE QUESTION, IT IS A DIFFERENT MECHANISM.
+    //
+    // A company inside CIS suffers deductions too, but it never sets them against a person's
+    // Self Assessment bill. It reclaims them through its own payroll, on the Employer Payment
+    // Summary, against the PAYE and National Insurance it owes. The `why` above promises a January
+    // bill turning into a repayment, and that promise is flatly untrue of a director: his company's
+    // deductions cannot reach his personal return at all, and the whole of this product's CIS
+    // arithmetic (setAsideAfterCis and refundLikely in lib/taxoptimiser.ts) is a personal sum.
+    //
+    // ⚠️ THIS LEAVES A CIS COMPANY WITH NO QUESTION AND NO CREDIT, which is honest and is not
+    // finished. It is a real mechanism we now never ask about. Noted for Jag rather than guessed
+    // at, because an entry here has to name what a man can actually get back.
+    structures: ['sole_trader', 'partnership'],
+    // 🔴 AND NOT FOR A LANDLORD. CIS is a scheme for payments under construction contracts made to
+    // a subcontractor for construction work. Rent is not a payment for construction work, and a man
+    // whose whole business is letting has no contractor to be paid by. Asking it would assert a
+    // trade he has told us he does not have, which is the failure the incomes axis exists to stop.
+    incomes: ['trade'],
+    // 🔴 AND NOT A WORD ABOUT A REPAYMENT TO A MAN WHO HAS JUST SAID NOBODY TAKES ANYTHING OFF HIM.
+    // Same rule as vat_registered one entry up: appliesTo() reads the persona and never the answer,
+    // so a promise can be perfectly applicable to his trade and flatly untrue of him because of
+    // what he told us. The replacement says something true of his own position instead, and it
+    // gives him a real reason to come back and change this answer if he ever takes that kind of
+    // work, because the day he does is the day his bank figures stop being his turnover.
+    untrueOn: {
+      answer: 'no',
+      instead: 'Nobody stopping tax before you are paid is the ordinary position outside construction, and it means what lands in your account is the whole of what you earned. If you ever take work where a firm holds some of it back for HMRC, say so here: from that day what reaches your bank is not what you were paid, and we would count the difference as tax you have already handed over.',
+    },
+  },
+  {
     // The basic rate is added automatically. THE HIGHER RATE SLICE IS NOT. He has to claim it, and
     // vast numbers of people never do.
     key: 'pension',
@@ -1057,6 +1147,28 @@ export function heldStudentLoan(
   if (row.answer === 'yes') return { state: 'yes', asked: row.asked ?? null };
   if (row.answer === 'no') return { state: 'no', asked: row.asked ?? null };
   return { state: 'untold', asked: null };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 DOES A CONTRACTOR TAKE TAX OFF HIM BEFORE HE IS PAID. THE ONLY WAY A SURFACE SHOULD LEARN IT.
+//
+// The pile has to know this to ask the right question about a payment in, and /app/pile already
+// reads his answers for the open questions footnote, so it costs no second read. It lives here for
+// the reason mtdStatedFrom does: a surface that picks the row out of the bag itself is a second
+// copy of "what counts as a yes", and the copy that drifts is the one a man is looking at.
+//
+// 🔴 ONLY AN EXPLICIT 'yes' IS A YES. A skip, a missing row, a failed read and anything else that
+// ever lands in that column are the same fact, which is that we have not been told, and being told
+// nothing must never turn into a question about a deduction on a payment from his own customer. The
+// cost of the two mistakes is not symmetric: not asking a CIS man costs him the question he can
+// still answer on the next payment, while asking a man who is not in the scheme puts a box in front
+// of him inviting a figure that does not exist, on the one screen where his income is decided.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const CIS_KEY = 'cis';
+
+export function worksUnderCis(rows: Array<{ key: string; answer: string }> | null | undefined): boolean {
+  if (!Array.isArray(rows)) return false;
+  return rows.some((r) => r.key === CIS_KEY && r.answer === 'yes');
 }
 
 function openIn(

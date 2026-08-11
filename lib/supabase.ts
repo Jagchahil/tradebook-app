@@ -4573,11 +4573,37 @@ export async function insertTransaction(record: NewTransaction): Promise<void> {
 // accountant questions only. Simple totals questions are answered without AI by
 // totalsForUser below, so 60 recent rows is plenty of context and keeps the
 // prompt small and cheap.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WINDOW THAT WAS HANDED OVER AS THE WHOLE BOOK. Found 11 August 2026, RUN 1.
+//
+// This reads the newest 60 rows, and until today it handed them to the model under the heading
+// "Their own figures" with nothing to say that 60 was a limit. So a customer with 401 confirmed
+// rows going back to August 2025 asked a question and was told, in the product's own words:
+//
+//     "I can see your books from July and August 2026."
+//
+// The model was not lying and it was not hallucinating. It was accurately describing the only
+// thing it had been given: sixty rows, newest first, which on a working account is about six
+// weeks. Three hundred and forty one rows were amputated silently and the stump was labelled as
+// the whole. A man who is told his own product cannot see the year he has just spent logging
+// stops believing every other number on the screen, and he is right to.
+//
+// ⚠️ THE FIX IS NOT A BIGGER LIMIT. There is always an account one row past whatever the limit
+// becomes, and the failure at 600 would be identical and harder to spot. The fix is that the
+// window DECLARES ITSELF: how many rows exist, what range they cover, and how many of them are in
+// front of the model. The prompt then tells it to answer about the window and to say plainly that
+// a total is not something it can add up from a sample.
+//
+// A count costs nothing: PostgREST returns it in the Content-Range header for the price of one
+// extra header on a request we were making anyway.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export async function transactionSummaryForUser(userId: string, limit = 60): Promise<string> {
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&is_personal=eq.false&select=amount,category,vendor,transaction_date,confirmed&order=transaction_date.desc&limit=${limit}`,
-    { headers: headers() },
+    // count=exact makes PostgREST report the TOTAL matching rows in Content-Range, not just the
+    // page. Prefer is additive, so nothing about the body changes.
+    { headers: headers({ Prefer: 'count=exact' }) },
   );
   if (!res.ok) return '';
   const rows = (await res.json().catch(() => null)) as Array<{
@@ -4588,15 +4614,35 @@ export async function transactionSummaryForUser(userId: string, limit = 60): Pro
     confirmed: boolean | null;
   }> | null;
   if (rows === null) return '';
-  return rows
-    .map((r) => {
-      const amt = Number(r.amount) || 0;
-      const dir = amt >= 0 ? 'income' : 'expense';
-      const date = (r.transaction_date ?? '').slice(0, 10);
-      const tag = r.confirmed ? '' : ' (to review)';
-      return `${date} ${dir} £${Math.abs(amt).toFixed(2)} ${r.category ?? ''} ${r.vendor ?? ''}${tag}`.trim();
-    })
-    .join('\n');
+  if (rows.length === 0) return '';
+
+  // "0-59/401". A server that does not send it, or sends a * for the total, leaves this null and
+  // the sentence below simply says less. An unreadable count is never invented.
+  const range = res.headers.get('content-range') ?? '';
+  const totalRaw = range.includes('/') ? range.split('/')[1] : '';
+  const total = /^\d+$/.test(totalRaw) ? Number(totalRaw) : null;
+
+  const lines = rows.map((r) => {
+    const amt = Number(r.amount) || 0;
+    const dir = amt >= 0 ? 'income' : 'expense';
+    const date = (r.transaction_date ?? '').slice(0, 10);
+    const tag = r.confirmed ? '' : ' (to review)';
+    return `${date} ${dir} £${Math.abs(amt).toFixed(2)} ${r.category ?? ''} ${r.vendor ?? ''}${tag}`.trim();
+  });
+
+  // Rows come back newest first, so the oldest in the window is the last one.
+  const newest = (rows[0]?.transaction_date ?? '').slice(0, 10);
+  const oldest = (rows[rows.length - 1]?.transaction_date ?? '').slice(0, 10);
+
+  // ⚠️ THE HEADING IS PART OF THE DATA. It goes in the same string rather than in the prompt,
+  // because there are three callers on two channels and a sentence that lives in one of them is a
+  // sentence the other two are missing.
+  const truncated = total !== null && total > rows.length;
+  const header = truncated
+    ? `THIS IS A WINDOW, NOT HIS WHOLE BOOK. He has ${total} entries in total. The ${rows.length} newest are below, covering ${oldest} to ${newest}. The other ${total - rows.length} are older and you CANNOT see them. Never tell him this is everything you have, never describe the range below as the range of his books, and never add these up into a total for a period: the totals are computed elsewhere and given to you separately when they are needed.`
+    : `His entries, ${rows.length} of them, covering ${oldest} to ${newest}. This is all of them.`;
+
+  return `${header}\n${lines.join('\n')}`;
 }
 
 // The quarter end pack (lib/quarterpack.ts) needs the user's CONFIRMED entries
@@ -10593,3 +10639,116 @@ export async function readActivityFeed(userId: string, limit: number, seal: Feed
   return items.slice(0, cap);
 }
 // --- end of the activity feed block -----------------------------------------------------------
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE SIGN IN DOOR, 11 August 2026. Minting the code without asking GoTrue to post it, and
+// watching whether the codes we do send are actually leaving. APPENDED, per the append only rule:
+// nothing above this line was touched.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// 🔴 MINT, DO NOT SEND. The admin generate_link endpoint hands back the one time code for an
+// EXISTING auth user without posting anything itself, which is the whole point: GoTrue keeps
+// ownership of minting and verification, and delivery moves to Resend beside every other email we
+// send. See the header on sendSignInCodeEmail in lib/email.ts for why that matters.
+//
+// ⚠️ 'magiclink' NEVER CREATES A USER. That is deliberate and it is load bearing. 'signup' would
+// mint an account for any address posted at the door, which is the exact leak the neutrality rule
+// in app/api/auth/start/route.ts exists to prevent. An address GoTrue has never seen returns null
+// here and the caller falls back, rather than quietly bringing an account into being.
+//
+// Returns null on ANY failure: not configured, non-2xx, unparseable, or a body with no code in it.
+// A null is never an error the customer sees, it is the caller's signal to use the old road.
+export async function mintSignInCode(email: string): Promise<string | null> {
+  const { url, key } = config();
+  if (!url || !key || !email) return null;
+  try {
+    const res = await fetch(`${url}/auth/v1/admin/generate_link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ type: 'magiclink', email }),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => null)) as
+      | { email_otp?: unknown; properties?: { email_otp?: unknown } }
+      | null;
+    // GoTrue has returned this at the top level and nested under properties across versions. Read
+    // both rather than pinning one and finding out in production which one this project speaks.
+    const raw = body?.email_otp ?? body?.properties?.email_otp;
+    const code = String(raw ?? '').replace(/\D/g, '');
+    return code.length >= 6 ? code : null;
+  } catch {
+    return null;
+  }
+}
+
+import type { AuthSendHealth } from './cronwatch';
+
+// 🔴 THE PROBE THE P0 DID NOT HAVE. Four codes were asked for and none arrived, and /api/health
+// said 200 the whole time, because nothing in the product was watching the one email a locked out
+// customer cannot do without.
+//
+// Only 'sent' and 'failed' are counted. The three refusal outcomes are the door working correctly
+// (a stranger's address, a cap, a rate limit) and folding them in would make a quiet night of
+// refusals read as a broken mailer.
+//
+// Returns null on any failed read, and the alarm treats null as a fault. "I could not look" is not
+// "everything is fine", which is the rule cronsServing and reminderAlarm already set.
+export async function getAuthSendHealth(windowMinutes = 60): Promise<AuthSendHealth | null> {
+  const { url } = config();
+  if (!url) return null;
+  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/auth_sends?select=outcome&created_at=gte.${encodeURIComponent(since)}`
+        + `&outcome=in.(sent,failed)&limit=1000`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ outcome?: string }> | null;
+    if (!Array.isArray(rows)) return null;
+    let sent = 0;
+    let failed = 0;
+    for (const r of rows) {
+      if (r?.outcome === 'sent') sent += 1;
+      else if (r?.outcome === 'failed') failed += 1;
+    }
+    return { attempted: sent + failed, sent, failed, windowMinutes };
+  } catch {
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// IS THERE A PREVIOUS TAX YEAR TO LOOK AT. 11 August 2026, RUN 1 of the customer week.
+//
+// The Tax screen shows the year that started on 6 April. The return due this coming January is the
+// year BEFORE it, and until today the only door to that year in the whole product was a chip
+// inside Proof of income. For a CIS subcontractor that is usually where his refund is.
+//
+// Doc 103's empty test says a row that says "nothing here" most of the time teaches him to stop
+// looking, so the door is drawn only when there is genuinely a year behind it. One HEAD request,
+// no rows returned, no body parsed: this asks a yes or no question and gets one back.
+//
+// ⚠️ FALSE ON A FAILED READ, WHICH IS THE SAFE DIRECTION HERE AND ONLY HERE. Withholding a door is
+// a smaller harm than drawing one onto an empty page and teaching him the product is padded. He
+// reaches the same year from Proof of income either way, exactly as he did yesterday.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function hasConfirmedRowsInTaxYear(userId: string, startYear: number): Promise<boolean> {
+  const { url } = config();
+  if (!userId || !Number.isFinite(startYear)) return false;
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
+        + `&confirmed=eq.true&is_personal=eq.false`
+        + `&transaction_date=gte.${startYear}-04-06&transaction_date=lte.${startYear + 1}-04-05`
+        + '&select=id&limit=1',
+      { method: 'HEAD', headers: headers({ Prefer: 'count=exact' }) },
+    );
+    if (!res.ok) return false;
+    const range = res.headers.get('content-range') ?? '';
+    const total = range.includes('/') ? range.split('/')[1] : '';
+    return /^\d+$/.test(total) && Number(total) > 0;
+  } catch {
+    return false;
+  }
+}

@@ -4,6 +4,7 @@ import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import {
   getOptimiserInput, getConfirmedTransactionsForRange, getBusinessProfile, readVatProfile,
+  hasConfirmedRowsInTaxYear,
 } from '../../../lib/supabase';
 import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
 import { SCOTLAND_LINE } from '../../../lib/scotland';
@@ -57,7 +58,7 @@ export default async function TaxHubPage() {
   const taxYearStart = quarterBounds(startYear, 1).start;
   const quarterEnd = quarterBounds(startYear, index).end;
 
-  const [optimiser, txns, biz, vat] = await Promise.all([
+  const [optimiser, txns, biz, vat, hasPriorYear] = await Promise.all([
     getOptimiserInput(user.id),
     // The same window /api/quarter-pack reads, so the MTD line below is the pack's own answer.
     getConfirmedTransactionsForRange(user.id, taxYearStart, quarterEnd).catch(() => []),
@@ -67,6 +68,8 @@ export default async function TaxHubPage() {
     // Whether he is VAT registered at all, for the door below. Null is "we could not read it",
     // never "he is not registered", so an unknown draws nothing.
     readVatProfile(user.id).catch(() => null),
+    // Is there a year behind the door before we draw one. See hasConfirmedRowsInTaxYear.
+    hasConfirmedRowsInTaxYear(user.id, startYear - 1).catch(() => false),
   ]);
 
   const tax = taxPosition(optimiser);
@@ -141,7 +144,13 @@ export default async function TaxHubPage() {
   // What January asks for, from the engine. Payments on account run on the Self Assessment tax
   // WITHOUT the student loan, because HMRC's payments on account never include loan repayments,
   // and the year label is startYear + 1 so the engine prints the correct January.
-  const poa = paymentsOnAccount(tax.selfAssessmentTax, startYear + 1);
+  //
+  // 🔴 AND THE SECOND TEST GOES IN WITH IT. Payments on account are excused when more than 80
+  // percent of the tax was already deducted at source, and a CIS subcontractor is the taxpayer that
+  // rule was written for. Until 11 August 2026 this line asked only whether the bill was over
+  // £1,000, so a groundworker owed a refund was shown two payments of £1,579 under a heading that
+  // said January asks for more than the bill. lib/taxengine.ts, paymentsOnAccount, has the argument.
+  const poa = paymentsOnAccount(tax.selfAssessmentTax, startYear + 1, tax.cisSuffered);
 
   // THE RENTAL STREAM, NAMED. Step 4 of signup promises that each stream is taxed its own way and
   // kept separate the way HMRC keeps them; until 31 July 2026 this screen never said the word rent
@@ -226,7 +235,12 @@ export default async function TaxHubPage() {
       {showPosition ? (
         <section className="lek-card lek-position">
           <h1 className="lek-eyebrow">Where you stand</h1>
-          <div className="lek-hero">{gbp0(tax.setAside)}</div>
+          {/* ⚠️ THE FIGURE IS WHAT HE STILL HAS TO FIND, NOT THE BILL. For everybody with nothing
+              taken at source the two are the same number to the penny and nothing here moves. For a
+              CIS subcontractor they are thousands apart, and the words over this figure say "where
+              you stand", which is a question about his position and not about our arithmetic.
+              lib/taxoptimiser.ts, taxPosition, carries both and explains why. */}
+          <div className="lek-hero">{gbp0(tax.cisSuffered > 0 ? tax.setAsideAfterCis : tax.setAside)}</div>
           <p className="lek-heronote">
             {tax.projected
               ? 'What the year is heading for, on everything you have confirmed so far.'
@@ -235,6 +249,25 @@ export default async function TaxHubPage() {
                 See the structure note above: his company is not in Self Assessment. */}
             {isCompany ? null : <>{' '}Self Assessment collects it in one bill, due by {poa.firstDue}.</>}
           </p>
+          {/* ── WHAT HIS CONTRACTORS HAVE ALREADY PAID FOR HIM. ────────────────────────────────
+              Drawn only when there is CIS in the books, doc 103's empty test. It shows the working,
+              which is lib/ledger.ts's standard: he can check our number against his own statements.
+
+              ⚠️ AND THE REFUND IS NEVER A PROMISE. It is an estimate on projected figures and only
+              a filed return settles it, so the sentence says so rather than leaving him to find out
+              in January. This product has already once quoted a man a CIS refund that did not
+              exist. */}
+          {tax.cisSuffered > 0 ? (
+            <p style={S.heroBasis}>
+              Your contractors have already handed HMRC {gbp0(tax.cisSuffered)} of this under CIS, so
+              that part is paid. The bill itself works out at about {gbp0(tax.setAside)}.
+              {tax.refundLikely > 0 ? (
+                <>{' '}On these figures more has been taken than the year is going to cost, so January
+                  looks like a repayment of around {gbp0(tax.refundLikely)} rather than a bill. That is
+                  an estimate and it moves as you confirm more. Only your filed return settles it.</>
+              ) : null}
+            </p>
+          ) : null}
           {/* And the absence is explained rather than left as a gap, because a man reading a large
               figure with no date on it will invent one. The claim is the narrow one setup already
               makes: the company files its own return, and his own position is a different question. */}
@@ -295,6 +328,19 @@ export default async function TaxHubPage() {
             itself, which is the part that catches people. Your student loan, if one is being
             collected, is never part of payments on account.
           </p>
+          {/* 🔴 THE SECOND TEST, SAID OUT LOUD, BECAUSE HE IS ONE GOOD YEAR FROM FAILING IT. A man
+              whose CIS covers most of his bill is excused this year and is not excused for ever:
+              take on a mate, or go gross status, and the share falls under 80 percent and the two
+              payments arrive. Telling him the rule rather than only its answer is the difference
+              between a number and something he can act on. */}
+          {tax.cisSuffered > 0 ? (
+            <p style={S.body}>
+              There is a second test and you are close to it. Payments on account are dropped
+              altogether when more than 80 percent of your tax was already taken at source. Your CIS
+              covers about {Math.round((tax.cisSuffered / Math.max(1, tax.selfAssessmentTax)) * 100)} percent
+              of the bill, so if that share goes over 80 they stop.
+            </p>
+          ) : null}
         </section>
       ) : null}
 
@@ -369,6 +415,34 @@ export default async function TaxHubPage() {
               <span style={S.rowBody}>
                 The line you have to register at, what happens if you cross it, and where your own
                 twelve months put you once we have them.
+              </span>
+            </a>
+          ) : null}
+          {/* ═══════════════════════════════════════════════════════════════════════════════════
+              🔴 THE YEAR HE IS ACTUALLY FILING IN JANUARY, WHICH WAS REACHABLE FROM ONE PAGE.
+              Found 11 August 2026, RUN 1 of the customer week.
+
+              Every figure on this screen is the year that STARTED on 6 April. The return due this
+              coming 31 January is the year BEFORE it, and until today the only door to it in the
+              whole product was a chip inside Proof of income, a page a man opens when a lender asks
+              him for something. The Tax screen did not mention it. The chat did not mention it.
+              For a subcontractor that year is usually where his refund is: our own walk found about
+              £4,400 sitting behind a chip on a document page.
+
+              So the door is here, on the screen headed with a January date, and it says which year
+              it is rather than "last year", because a man who is late filing needs to see the year
+              and not do the arithmetic himself.
+
+              ⚠️ DOC 103'S EMPTY TEST. Drawn only when the account is old enough to have a previous
+              year in it at all. A row saying "nothing there" on a two week old account is a row he
+              learns to skip, and then he misses the January it matters.
+              ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {hasPriorYear ? (
+            <a href={`/app/proof-of-income?y=${startYear - 1}`} style={S.door} className="lek-hit">
+              <span style={S.doorLabel}>Last tax year, {startYear - 1} to {String(startYear % 100).padStart(2, '0')}</span>
+              <span style={S.rowBody}>
+                The year the return due on 31 January {startYear + 1} is for. Everything above is
+                this tax year, which is a different bill on a different January.
               </span>
             </a>
           ) : null}

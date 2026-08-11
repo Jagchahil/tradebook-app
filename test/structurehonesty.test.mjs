@@ -144,8 +144,12 @@ const { CIRCUMSTANCES, unanswered, unansweredMtd, progressIn, mtdQuestions, hous
 // partnerships comprising solely individual partners can claim this simplified expenses." A
 // company is outside ITTOIA, so a director cannot use the £10, £18, £26 bands at any hours, and
 // "no receipts to keep at all" was promising him the wrong thing entirely.
+// ⚠️ 'cis' JOINED THIS LIST ON 11 AUGUST 2026. A subcontractor's CIS deduction is credited against
+// HIS January bill, and a company's is reclaimed through its own EPS against PAYE, never against a
+// person's Self Assessment. So the question is sole trader and partner, exactly like the three
+// above it, and the closed world assertion below is what forced it to be declared here.
 const SOLE_ONLY = [
-  'prior_employment', 'low_profit_year', 'home_working',
+  'prior_employment', 'low_profit_year', 'home_working', 'cis',
 ];
 
 // \ud83d\udd34 3 AUGUST 2026: THE FOUR MTD KEYS CAME OFF THE LIST ABOVE, AND THAT WAS THE BUG.
@@ -244,7 +248,7 @@ const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_mandated_letter', 'mtd_signed_up', '
   const soleAll = progressIn([...household(), ...notHousehold()], [], 'sole_trader');
   // Three, not two, since wave nine: the old job, the voluntary Class 2 tick box, and the use of
   // home flat rate a company cannot have.
-  ok('🔴 the director\'s money denominator is exactly three questions lighter', ltdAll.askable === soleAll.askable - 3);
+  ok('🔴 the director\'s money denominator is exactly four questions lighter', ltdAll.askable === soleAll.askable - 4);
   ok('🔴 AND THE DIRECTOR IS NEVER PROMISED THE FLAT RATE HE CANNOT CLAIM', !forLtd.includes('home_working'));
   ok('a sole trader keeps it, because s94H is his', forSole.includes('home_working'));
   ok('an answer he gave as a sole trader still counts after incorporating: the record is his',

@@ -1123,9 +1123,31 @@ details.faq[open] .faq-body{max-height:360px;opacity:1;margin-top:12px}
 .rowlabel{font-weight:500;color:${INK}}
 .fixrow{display:grid;grid-template-columns:1fr 44px 1fr;align-items:center;gap:0;margin-bottom:18px}
 .fixarrow{display:flex;align-items:center;justify-content:center;color:${RIVER};font-size:22px;font-weight:700}
+/* ═══════════════════════════════════════════════════════════════════════════════════
+   🔴 A FIXED BAR AT THE BOTTOM OF THE PAGE HAS TO PAY FOR ITS OWN SPACE. 11 August 2026,
+   found by RUN 0 of the customer week.
+
+   The bar was fixed to bottom:0 and nothing anywhere reserved the strip it covers. So at
+   maximum scroll the last line of the footer ended level with the bottom of the viewport
+   and the bar sat on top of it. The line underneath was the statutory one, the company
+   number and the registered office, which could therefore never be read to the end.
+
+   ⚠️ RUN 0 RECORDED THIS AS A DESKTOP FAULT AND IT IS A PHONE ONE. The bar is display:none
+   above 760px and has been since it was written, so no desktop has ever shown it. The
+   geometry was measured with the bar forced visible, which is why the report is right about
+   the overlap and wrong about where. Corrected here so the next reader does not go looking
+   for it on a screen that never had it.
+
+   ONE NUMBER, TWO USES. --stickycta-h is the height the bar reserves and the height it
+   occupies, so the two cannot drift apart the next time the button's padding changes.
+   test/stickyfooter.test.mjs holds them to each other.
+   ═══════════════════════════════════════════════════════════════════════════════════ */
 .stickycta{display:none}
 @media (max-width:760px){.fixrow{grid-template-columns:1fr;gap:12px;margin-bottom:22px}.fixarrow{transform:rotate(90deg);margin:0 auto}
-  .stickycta{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border-top:1px solid ${LINE};padding:10px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 24px rgba(0,0,0,.18)}
+  .stickycta{--stickycta-h:62px;display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;min-height:var(--stickycta-h);box-sizing:border-box;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border-top:1px solid ${LINE};padding:10px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 24px rgba(0,0,0,.18)}
+  /* The padding goes on the FOOTER, not the body, so the footer's own dark background carries
+     on underneath the bar. On the body it would show as a pale strip below a dark footer. */
+  body:has(.stickycta) .sitefooter{padding-bottom:calc(62px + env(safe-area-inset-bottom))}
 }
 @media (max-width:880px){
   .hero-h1-size{font-size:40px}.h2{font-size:27px}
@@ -1368,7 +1390,7 @@ export function SiteFooter() {
     </div>
   );
   return (
-    <footer style={{ background: INK_BG, color: '#fff' }}>
+    <footer className="sitefooter" style={{ background: INK_BG, color: '#fff' }}>
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: '52px 24px 40px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 32, marginBottom: 40 }}>
           {col('Product', [['/product', 'How it works'], ['/how-mtd-works', 'How MTD works'], ['/compare', 'Compare'], ['/pricing', 'Pricing'], ['/start', 'Sign up'], ['/app/you/billing', 'Manage subscription']])}

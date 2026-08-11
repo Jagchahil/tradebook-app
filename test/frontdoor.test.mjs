@@ -787,11 +787,18 @@ for (const f of BANNER_PAGES) {
     !/MTD reminders|deadline reminders|deadlines that matter|nudge about your tax deadlines/i.test(leadCode));
   // ⚠️ THE ONE THAT IS STORED. consent_text is the record of what he agreed to, so it must be the
   // gated wording and never a constant sitting beside it.
+  // ⚠️ leadConsentText NOW TAKES THE PROMISE (11 August 2026): /free-mtd-filing is a waitlist and
+  // was recording a consent to send a "result" it has none of. See leadPromise in lib/features.ts.
+  // The claim here is UNCHANGED, the wording stored is the one lib/features decides and never a
+  // constant sitting beside it; only the call signature moved.
   ok('🔴 and the CONSENT it records is the gated wording, not a hard typed one',
-    /consent_text: leadConsentText\(\)/.test(leadCode) && !/const CONSENT_TEXT/.test(leadCode));
+    /consent_text: leadConsentText\(promise\)/.test(leadCode) && !/const CONSENT_TEXT/.test(leadCode));
+  // Two of the four now take a LeadPromise, so the declaration is matched loosely and the claim is
+  // made where it actually lives: every one of the four still branches on remindersLive(), so the
+  // day the flag flips no copy is rewritten.
   ok('both wordings still live side by side, so the flag flipping needs no copy rewrite',
     ['leadHeading', 'leadSub', 'leadConsentText', 'leadDoneLine']
-      .every((f) => new RegExp(`export function ${f}\\(\\): string \\{\\s*return remindersLive\\(\\)`).test(read('lib/features.ts'))));
+      .every((f) => new RegExp(`export function ${f}\\([^)]*\\): string \\{[\\s\\S]{0,600}?return remindersLive\\(\\)`).test(read('lib/features.ts'))));
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 AND THE WORDS THEMSELVES ARE RUN, NOT READ, BECAUSE MOVING THE LIE INTO lib/ HID IT.

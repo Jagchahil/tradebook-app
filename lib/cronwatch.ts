@@ -129,7 +129,7 @@ export const MAX_QUIET_HOURS: Record<string, number> = {
 
 export interface CronAlarm {
   job: string;
-  reason: 'never_run' | 'never_finished' | 'stale' | 'failed';
+  reason: 'never_run' | 'never_finished' | 'stale' | 'failed' | 'overdue' | 'unreadable';
   hoursQuiet: number | null;
   detail: string | null;
 }
@@ -266,4 +266,100 @@ export function cronAlarms(runs: CronRun[], now: Date = new Date()): CronAlarm[]
   }
 
   return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE JOB CAN BE PERFECTLY HEALTHY WHILE THE PROMISE IS BROKEN. 11 AUGUST 2026.
+//
+// Everything above this line watches the JOB: did it run, did it finish, did it finish badly. On
+// 10 August the `due` job ran on time, finished, reported ok, and delivered nothing, because the
+// WhatsApp template gate was shut. A man who asked at 13:23 on Sunday for a reminder at 08:00 on
+// Monday got it at 12:43, four hours and forty three minutes after the sentence we sent him. The
+// engine was green the whole time. Nothing in this file could have said otherwise, because nothing
+// in this file was watching the thing he was promised.
+//
+// The gate was a launch day one off and it is shut no longer. What was NOT a one off is that it
+// could happen again with nobody the wiser, which is the house disease wearing a different coat:
+// a signal that cannot tell "nothing was due" from "everything was due and none of it went".
+//
+// So this watches the PROMISE. Is there a reminder that fell due, is still unsent, and has been
+// waiting longer than the dispatch can honestly explain. That question has one right answer and it
+// does not care why: a shut gate, a dead hop, a missing template, a scheduler that stopped. All of
+// them look identical to the man waiting for his text, so all of them look identical here.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// How often the reminder engine is dispatched. vercel.json runs the hourly slot at `0 * * * *` and
+// app/api/cron/daily sends that slot to /api/cron/reminders?job=due.
+//
+// ⚠️ test/reminderclock.test.mjs READS vercel.json AND HOLDS THIS NUMBER TO IT. Slow the dispatch
+// down and the ceiling below has to move in the same commit, or the alarm starts crying wolf on a
+// schedule somebody else chose. That is exactly how `due: 26` came to be correct and useless.
+export const REMINDER_DISPATCH_INTERVAL_HOURS = 1;
+
+// How late a reminder may be before it is a fault rather than a wait.
+//
+// THE ARITHMETIC, BECAUSE A CEILING NOBODY CAN DERIVE IS A CEILING SOMEBODY WILL LOOSEN.
+//
+//   A reminder due at 08:01 is not late at 08:30. The next pass is at 09:00 and it will go then.
+//   The longest HONEST wait is therefore one whole dispatch interval, one hour, plus whatever
+//   drift the scheduler adds.
+//   A reminder still sitting there after TWO intervals has watched a pass come and go without
+//   being sent. That is a missed pass, and a missed pass is a fault.
+//
+// Two hours, not one. One hour would fire on ordinary drift, and this file's own header says a
+// ceiling too tight cries wolf, and an alarm that cries wolf gets muted, and a muted alarm is
+// worse than no alarm because it looks like cover. On 9 August a too eager alarm put /api/health
+// at 503 and paged the founder on launch eve over a job that was perfectly healthy.
+export const REMINDER_MAX_LATE_HOURS = REMINDER_DISPATCH_INTERVAL_HOURS * 2;
+
+export interface ReminderBacklog {
+  /** How many reminders have fallen due and are still unsent. */
+  overdue: number;
+  /** The oldest of them, ISO. null when there are none. */
+  oldestDue: string | null;
+}
+
+// 🔴 null IN, ALARM OUT, THE SAME RULE cronsServing() SETS FOUR LINES ABOVE. getReminderBacklog()
+// returns null on any failed read, and "I could not look" is not "there is nothing there". A
+// backlog we cannot see is the one state most likely to be hiding something, so it is the one
+// state that must never score as healthy.
+export function reminderAlarm(backlog: ReminderBacklog | null, now: Date = new Date()): CronAlarm | null {
+  if (backlog === null) {
+    return {
+      job: 'due',
+      reason: 'unreadable',
+      hoursQuiet: null,
+      detail: 'the reminder backlog could not be read, so nothing here can say whether reminders are going out',
+    };
+  }
+
+  if (backlog.overdue === 0 || !backlog.oldestDue) return null;
+
+  const lateMs = now.getTime() - new Date(backlog.oldestDue).getTime();
+  if (!Number.isFinite(lateMs)) {
+    return {
+      job: 'due',
+      reason: 'unreadable',
+      hoursQuiet: null,
+      detail: 'the oldest overdue reminder has an unreadable due time',
+    };
+  }
+
+  const lateHours = lateMs / 3_600_000;
+  if (lateHours <= REMINDER_MAX_LATE_HOURS) return null;
+
+  return {
+    job: 'due',
+    reason: 'overdue',
+    hoursQuiet: Math.round(lateHours * 10) / 10,
+    detail: `${backlog.overdue} reminder${backlog.overdue === 1 ? '' : 's'} due and unsent, the oldest by `
+      + `${Math.round(lateHours * 10) / 10}h. The dispatch runs every ${REMINDER_DISPATCH_INTERVAL_HOURS}h, `
+      + `so a pass has come and gone without sending it.`,
+  };
+}
+
+// Is the promise being kept? Empty backlog, or a backlog young enough that the next pass will
+// clear it, is a yes. Anything else, including a backlog we cannot read, is a no.
+export function remindersServing(backlog: ReminderBacklog | null, now: Date = new Date()): boolean {
+  return reminderAlarm(backlog, now) === null;
 }

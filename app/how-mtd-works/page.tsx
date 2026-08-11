@@ -35,6 +35,39 @@ export const metadata: Metadata = {
 const T26 = FACTS.mtdThreshold2026; // first mandated from April 2026
 const T27 = FACTS.mtdThreshold2027; // April 2027
 const T28 = FACTS.mtdThreshold2028; // April 2028
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE SLIDER'S GEOMETRY. One place, so the drawing cannot drift from the arithmetic.
+//
+// The rail is `min="0" max="100"` and MTD_JS reads it as `k*1000`, so the top of the rail is
+// £100,000 and the mapping is linear. SLIDER_MAX says that out loud, and test/mtdslider.test.mjs
+// holds it to the input's own max attribute: change the rail and the labels have to move with it.
+//
+// ⚠️ THE THUMB IS 30px AND THAT IS WHY THIS IS NOT A BARE PERCENTAGE. A range thumb's centre
+// travels from half a thumb in to half a thumb short of the end, so `left: 50%` is not where the
+// thumb sits at half way. Off by a few pixels is how a drawing starts lying quietly.
+const SLIDER_MAX = 100_000;
+const THUMB_PX = 30; // must equal the thumb width in MTD_CSS, pinned by the test
+
+const tickLeft = (value: number): string =>
+  `calc((100% - ${THUMB_PX}px) * ${value / SLIDER_MAX} + ${THUMB_PX / 2}px)`;
+
+// The labels, each carrying the value it is drawn at. The three middle ones are the mandation
+// thresholds themselves, so when HMRC moves one the number and its position move together.
+//
+// ⚠️ THE POUND SIGN IS NOT IN HERE, AND THAT IS test/webauth.test.mjs's RULE, NOT A STYLE CHOICE.
+// This file is the ONE named exception to "no page builds a pound of its own", granted for the
+// injected slider script alone, and the exception is held to that reason: outside MTD_JS nothing
+// here may build a currency string. So the tick carries its text and the JSX puts the £ in front
+// of it, exactly as the markup did before this table existed.
+const TICKS: { text: string; value: number }[] = [
+  { text: '0', value: 0 },
+  { text: `${T28 / 1000}k`, value: T28 },
+  { text: `${T27 / 1000}k`, value: T27 },
+  { text: `${T26 / 1000}k`, value: T26 },
+  { text: '100k+', value: SLIDER_MAX },
+];
+
 // One formatter, no exceptions. Thresholds are always positive so nothing was wrong today, and
 // "correct by luck" is what test/webauth.test.mjs calls that. See the slider script below for the
 // one place on this page that genuinely cannot ask lib/money, and why.
@@ -110,7 +143,26 @@ const MTD_CSS = css`
 .slider{width:100%;-webkit-appearance:none;appearance:none;height:10px;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--saffron),var(--river));outline:none;margin:14px 0 8px}
 .slider::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:999px;background:#fff;border:3px solid var(--river);cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2)}
 .slider::-moz-range-thumb{width:30px;height:30px;border-radius:999px;background:#fff;border:3px solid var(--river);cursor:pointer}
-.ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--tx-mut);font-weight:600;margin-bottom:18px}
+/* ═══════════════════════════════════════════════════════════════════════════════════
+   🔴 THIS WAS display:flex;justify-content:space-between AND THE DRAWING TOLD A LIE.
+   Found by RUN 0 of the customer week, 11 August 2026.
+
+   The rail is LINEAR: value 0 to 100, one unit is £1,000, so £50,000 belongs at half way
+   along it. Spacing five labels evenly puts £20k at a quarter, £30k at a half and £50k at
+   roughly seven tenths. A thumb dragged to £60,000 therefore sat visibly LEFT of the mark
+   reading "£50k" while the verdict box underneath correctly said he was over that line.
+
+   The three numbers drawn in the wrong places were the three mandation thresholds, which
+   is the entire point of the widget. The logic was right throughout. The picture was not,
+   and a man reads the picture.
+
+   So each label is now placed at ITS OWN VALUE, by tickLeft() below, which divides by the
+   same SLIDER_MAX the rail uses. The thumb is 30px wide and its centre travels from 15px
+   to 15px short of the far end, so the arithmetic accounts for that: a label sitting at a
+   flat percentage of the rail would still be a few pixels out from the thumb it describes.
+   ═══════════════════════════════════════════════════════════════════════════════════ */
+.ticks{position:relative;height:14px;font-size:11px;color:var(--tx-mut);font-weight:600;margin-bottom:18px}
+.ticks span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
 .result{border-radius:16px;padding:18px;text-align:center;transition:.3s}
 .result .rtitle{font-size:22px;font-weight:900;letter-spacing:-.02em}
 .result .rdate{font-size:13px;font-weight:800;margin-top:2px}
@@ -239,7 +291,11 @@ export default function HowMtdWorksPage() {
             <div className="csub">Your turnover and any rent added together, before a single expense comes off. That is not your profit, which is the number most people reach for. HMRC runs this test on a tax return you have already filed, so the year to use is the one on your last return.</div>
             <div className="incomeval" id="incomeVal">£60,000</div>
             <input type="range" min="0" max="100" step="5" defaultValue="60" className="slider" id="slider" aria-label="Your gross income for the year, turnover and rent added together before expenses" />
-            <div className="ticks"><span>£0</span><span>£{T28 / 1000}k</span><span>£{T27 / 1000}k</span><span>£{T26 / 1000}k</span><span>£100k+</span></div>
+            <div className="ticks">
+              {TICKS.map((t) => (
+                <span key={t.text} style={{ left: tickLeft(t.value) }}>£{t.text}</span>
+              ))}
+            </div>
             <div className="result" id="result" style={{ background: 'var(--river-tint)' }}>
               <div className="rtitle" style={{ color: 'var(--river)' }}>That is over the April 2026 line</div>
               <div className="rdate" style={{ color: 'var(--river)' }}>THE {gbp(T26)} THRESHOLD</div>

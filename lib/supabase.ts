@@ -4065,6 +4065,43 @@ export async function getDueReminders(nowIso: string, limit = 100): Promise<DueR
   return parsed;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 IS THE PROMISE BEING KEPT? Added 11 August 2026, after RUN 0 of the customer week.
+//
+// getDueReminders answers "what should go out now". Nothing answered "what should have gone out
+// and did not", so on 10 August a man's 08:00 reminder sat unsent until 12:43 while the job that
+// was supposed to send it reported perfect health every hour. See lib/cronwatch.ts, reminderAlarm.
+//
+// Same filter as getDueReminders on purpose. If the two ever disagree about what "due" means, this
+// stops being a check on that query and becomes a second opinion nobody asked for.
+//
+// ⚠️ null ON ANY FAILED READ, AND NEVER AN EMPTY BACKLOG. A read that did not happen must not
+// arrive at the watchdog dressed as good news.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function getReminderBacklog(nowIso: string = new Date().toISOString()): Promise<ReminderBacklog | null> {
+  try {
+    const { url } = config();
+    const q = `${url}/rest/v1/events?select=remind_at&reminded=eq.false&remind_at=not.is.null&remind_at=lte.${encodeURIComponent(nowIso)}&order=remind_at.asc&limit=1`;
+    const res = await fetch(q, {
+      headers: headers({ Prefer: 'count=exact' }),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as unknown;
+    if (rows === null || !Array.isArray(rows)) return null;
+    // PostgREST puts the exact count after the slash of content-range, e.g. "0-0/7". A row we can
+    // see but a count we cannot parse falls back to what we can actually see rather than to zero.
+    const total = Number((res.headers.get('content-range') || '').split('/')[1]);
+    const oldest = (rows[0] as { remind_at?: string | null } | undefined)?.remind_at ?? null;
+    return {
+      overdue: Number.isFinite(total) ? total : rows.length,
+      oldestDue: oldest,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function markReminded(id: string): Promise<void> {
   const { url } = config();
   await fetch(`${url}/rest/v1/events?id=eq.${encodeURIComponent(id)}`, {
@@ -7361,7 +7398,7 @@ export interface OverdueCron {
   hours_ago: number;
 }
 
-import type { CronRun } from './cronwatch';
+import type { CronRun, ReminderBacklog } from './cronwatch';
 
 // Every job's last known state. Small table, one row per job, so no paging needed.
 export async function listCronRuns(): Promise<CronRun[] | null> {

@@ -58,7 +58,40 @@ export interface RuleSource {
    * Keep it a full sentence: a fragment can survive a rewrite that reverses its meaning.
    */
   quote: string;
-  /** The statute or case, where there is one. This is what makes it law rather than guidance. */
+  /**
+   * The statute or case, where there is one. This is what makes it law rather than guidance.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   * 🔴 THIS FIELD IS PUBLISHED. IT IS NOT A NOTE TO OURSELVES. 11 August 2026.
+   *
+   * RUN 0 of the customer week read /can-i-claim as a stranger and found this on the Pension
+   * contributions card, live, in front of customers:
+   *
+   *     "S188 Finance Act 2004 (relief at source). [warning sign] This sources the RELIEF ONLY.
+   *      We also tell him a personal pension is NOT a business expense, and HMRC nowhere says so
+   *      in words we can quote: it is an argument from omission. That half of the rule remains
+   *      OURS."
+   *
+   * Every word of that is TRUE and every word of it was written for us. "We", "him", "OURS" is
+   * the sourcing audit talking to itself, and a customer reading it learns that the people
+   * telling him what to sign his name to are arguing with each other about whether they can back
+   * it up. Similar residue sat on Haircuts, Bank charges, Materials, Bad debts and Training, and
+   * on several cards the whole GOV.UK bullet list had simply been pasted in.
+   *
+   * It reaches further than that one page: /app/tax/can-i-claim shows it to signed in customers,
+   * /rules.json publishes it, and lib/synthesis.ts feeds the part before the first semicolon into
+   * a layer captioned "This is the law itself. Parliament wrote it." An internal aside inherits
+   * that caption.
+   *
+   * THE RULE, AND test/citationvoice.test.mjs ENFORCES IT.
+   *
+   *   A CITATION IS A REFERENCE, NOT PROSE. One sentence. The statute, the case, or the GOV.UK
+   *   page. No second sentence, because a second sentence is commentary. Nothing in the first
+   *   person, nothing shouted in capitals, and never the page's bullet list pasted underneath.
+   *
+   * Working notes belong in a comment, like this one, where the customer never has to read them.
+   * ═══════════════════════════════════════════════════════════════════════════════════════════
+   */
   authority?: string;
 }
 
@@ -79,7 +112,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'Marriage Allowance',
       url: 'https://www.gov.uk/marriage-allowance',
       quote: 'Marriage Allowance lets you transfer £1,260 of your Personal Allowance to your husband, wife or civil partner.',
-      authority: 'GOV.UK, Marriage Allowance. Watched nightly by Khoji (fact: marriageAllowanceTransfer).',
+      authority: 'GOV.UK, Marriage Allowance',
     },
   ],
   // --- Clothing. The contentious one, and the one that is actually case law. ---------------
@@ -153,7 +186,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'BIM37910',
       url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim37910',
       quote: 'Most professionals have to keep up appearances but their clothing costs are not allowable (even where they amount to a quasi uniform as in Mallalieu v Drummond).',
-      authority: 'S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL). The principle, not a named example: HMRC nowhere names haircuts.',
+      authority: 'S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL)',
     },
   ],
 
@@ -162,7 +195,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'Tax on your private pension contributions: tax relief',
       url: 'https://www.gov.uk/tax-on-your-private-pension/pension-tax-relief',
       quote: 'You can claim additional tax relief on your Self Assessment tax return for money you put into a private pension of:',
-      authority: 'S188 Finance Act 2004 (relief at source). ⚠️ This sources the RELIEF ONLY. We also tell him a personal pension is NOT a business expense, and HMRC nowhere says so in words we can quote: it is an argument from omission (pensions appear nowhere in the allowable expenses guide). That half of the rule remains OURS.',
+      authority: 'S188 Finance Act 2004 (relief at source)',
     },
   ],
   protective: [
@@ -329,7 +362,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'Office, property and equipment',
       url: 'https://www.gov.uk/expenses-if-youre-self-employed/office-property',
       quote: 'If you’re self-employed - a sole trader or individual in a business partnership - you can claim items you’d normally use for less than 2 years as allowable expenses, for example:',
-      authority: 'GOV.UK, Expenses if you are self-employed. The list under it is: stationery; rent, rates, power and insurance costs.',
+      authority: 'GOV.UK, Expenses if you are self-employed',
     },
   ],
 
@@ -341,13 +374,13 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'Training courses',
       url: 'https://www.gov.uk/expenses-if-youre-self-employed/training-courses',
       quote: 'develop new skills and knowledge to support your business - this includes administrative skills',
-      authority: 'GOV.UK, Expenses if you are self-employed: Training courses. HMRC BROADENED this in 2024. New skills ARE allowable where they relate to changes in the industry or support the existing business. Only training to START a new business, or to expand into an area not directly related to the industry, is excluded.',
+      authority: 'GOV.UK, Expenses if you are self-employed: Training courses',
     },
     {
       code: 'Training courses (the limit)',
       url: 'https://www.gov.uk/expenses-if-youre-self-employed/training-courses',
       quote: 'You cannot claim for training courses that help you:',
-      authority: 'The list under it is: start a new business; expand into new areas of business that are not directly related to your industry. That is the whole of the restriction now.',
+      authority: 'GOV.UK, Expenses if you are self-employed: Training courses',
     },
   ],
 
@@ -356,7 +389,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'Reselling goods',
       url: 'https://www.gov.uk/expenses-if-youre-self-employed/reselling-goods',
       quote: 'You cannot claim for:',
-      authority: 'GOV.UK, Expenses if you are self-employed: Reselling goods. Allowable: goods for resale (stock); raw materials; direct costs from producing goods. NOT allowable: goods or materials bought for private use; depreciation of equipment.',
+      authority: 'GOV.UK, Expenses if you are self-employed: Reselling goods',
     },
   ],
 
@@ -367,7 +400,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'Legal and financial costs',
       url: 'https://www.gov.uk/expenses-if-youre-self-employed/legal-financial',
       quote: 'You cannot claim for repayments of loans, overdrafts or finance arrangements.',
-      authority: 'GOV.UK, Legal and financial costs. Allowable: bank, overdraft and credit card charges; interest on bank and business loans; hire purchase interest; leasing payments. NO CAP is stated. The old cash-basis interest restriction went with the cash basis reform on 6 April 2024.',
+      authority: 'GOV.UK, Expenses if you are self-employed: Legal and financial costs',
     },
   ],
 
@@ -376,7 +409,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'Marketing, entertainment and subscriptions',
       url: 'https://www.gov.uk/expenses-if-youre-self-employed/marketing-entertainment-subscriptions',
       quote: 'If you’re self-employed - a sole trader or individual in a business partnership - you can claim allowable business expenses for costs such as:',
-      authority: 'GOV.UK. The list under it is: advertising in newspapers or directories; bulk mail advertising (mailshots); free samples; website costs. NOT allowable: entertaining clients, suppliers and customers; event hospitality; most gifts.',
+      authority: 'GOV.UK, Expenses if you are self-employed: Marketing, entertainment and subscriptions',
     },
   ],
 
@@ -385,7 +418,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'Subscriptions',
       url: 'https://www.gov.uk/expenses-if-youre-self-employed/marketing-entertainment-subscriptions',
       quote: 'trade body or professional organisation membership if related to your business',
-      authority: 'GOV.UK, Marketing, entertainment and subscriptions. Also allowable: trade or professional journals. NOT allowable: payments to political parties; gym membership fees; donations to charity.',
+      authority: 'GOV.UK, Expenses if you are self-employed: Marketing, entertainment and subscriptions',
     },
   ],
 
@@ -397,7 +430,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'BIM42701',
       url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim42701',
       quote: 'A deduction for a bad or doubtful debt is to be made in arriving at the profits of the year in which the debt becomes bad or doubtful.',
-      authority: 'S35 Income Tax (Trading and Other Income) Act 2005. A SPECIFIC bad debt is allowable; a general reserve is not (same page: "A general reserve ... should not be admitted as a deduction").',
+      authority: 'S35 Income Tax (Trading and Other Income) Act 2005',
     },
   ],
   pretrading: [
@@ -405,7 +438,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'BIM46351',
       url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim46351',
       quote: 'The above legislation provides relief in respect of certain expenditure of a revenue nature incurred for the purposes of a trade, profession or vocation before it is commenced.',
-      authority: 'S57 Income Tax (Trading and Other Income) Act 2005. Revenue costs in the seven years before commencement, allowable as if incurred on the first day of trading. Capital is handled separately.',
+      authority: 'S57 Income Tax (Trading and Other Income) Act 2005',
     },
   ],
 

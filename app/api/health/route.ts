@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { listCronRuns, readKnowledgeState } from '../../../lib/supabase';
-import { cronAlarms, blockingAlarms, unseenAlarms, cronsServing } from '../../../lib/cronwatch';
+import { listCronRuns, readKnowledgeState, getReminderBacklog } from '../../../lib/supabase';
+import { cronAlarms, blockingAlarms, unseenAlarms, cronsServing, reminderAlarm, remindersServing } from '../../../lib/cronwatch';
 import { knowledgeAlarms, knowledgeStatus } from '../../../lib/knowledgewatch';
 
 // A tiny health check for uptime monitoring. Reports whether the app is up and
@@ -69,6 +69,9 @@ export async function GET(req: NextRequest) {
     const alarms = runs ? cronAlarms(runs) : [];
     const brain = await readKnowledgeState();
     const brainAlarms = brain ? knowledgeAlarms(brain) : [];
+    // Is the PROMISE being kept, not just the job running. See lib/cronwatch.ts, reminderAlarm.
+    const backlog = await getReminderBacklog();
+    const lateReminders = reminderAlarm(backlog);
     // ⚠️ THE OPERATOR VIEW IS STRICT ON PURPOSE, and differs from the public one. This body is a
     // to-do list for whoever is holding the pager, so a cron that has never run belongs in its
     // `ok: false`. The PUBLIC body answers a different question, "is the site serving", and a job
@@ -80,7 +83,8 @@ export async function GET(req: NextRequest) {
     // this ok stayed true when the cron history was UNREADABLE, the same "no is not nothing" blind
     // spot the public path had. brain !== null was already here; the crons half was missing it. An
     // operator who cannot read the history has a problem, and the strict view is where it belongs.
-    const ok = missing.length === 0 && runs !== null && alarms.length === 0 && brain !== null && brainAlarms.length === 0;
+    const ok = missing.length === 0 && runs !== null && alarms.length === 0 && brain !== null && brainAlarms.length === 0
+      && lateReminders === null;
     return NextResponse.json(
       {
         ok,
@@ -99,7 +103,11 @@ export async function GET(req: NextRequest) {
           bankTokenKey: Boolean(process.env.BANK_TOKEN_KEY),
         },
         crons: runs ?? 'unreadable',
-        alarms: blockingAlarms(alarms),
+        alarms: [...blockingAlarms(alarms), ...(lateReminders ? [lateReminders] : [])],
+        // WHAT IS ACTUALLY WAITING. The operator side names it because naming it is the whole use
+        // of the row: a count and an age tell whoever holds the pager whether this is a gate that
+        // shut a minute ago or an engine that stopped in the night.
+        reminders: backlog === null ? 'unreadable' : { overdue: backlog.overdue, oldestDue: backlog.oldestDue },
         // Registered, never seen. Not an outage; a wiring question. Named here because this side
         // is behind the bearer and naming it is the entire use of the row.
         unseen: unseenAlarms(alarms),
@@ -190,6 +198,23 @@ export async function GET(req: NextRequest) {
   // pager must not have. An unreadable history is a question: `crons: "unknown"` in the body, not ok.
   const cronsOk = cronsServing(runs);
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE JOB RUNNING IS NOT THE PROMISE BEING KEPT. Added 11 August 2026, RUN 0 of the customer
+  // week. On 10 August `due` ran on the hour, finished, reported ok, and sent nothing, because the
+  // WhatsApp template gate was shut. A reminder promised for 08:00 landed at 12:43 and every
+  // signal in this file was green throughout. lib/cronwatch.ts, reminderAlarm, has the argument.
+  //
+  // ⚠️ THIS IS AN OUTAGE AND IT IS A 503, BY THIS FILE'S OWN TAXONOMY. Something that WAS working
+  // has stopped and users are being missed right now. That is the line between a 503 and a row
+  // nobody is woken for, and an unsent reminder is on the wrong side of it: he asked us to
+  // remember so that HE could stop, and he finds out on the morning it mattered.
+  //
+  // ⚠️ AND THE COUNT IS NOT PUBLIC. How many of our customers are waiting on a text is our
+  // business, not a stranger's. One word, the same rule the cron and brain rows follow.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const backlog = await getReminderBacklog();
+  const remindersOk = remindersServing(backlog);
+
   // THE BRAIN (docs/105). Three ways this goes red, and the first one is why Khoji exists at all.
   //
   //   drift   a constant in lib/taxengine.ts DISAGREES WITH GOV.UK right now. Our tax engine is
@@ -213,7 +238,7 @@ export async function GET(req: NextRequest) {
   const brainAlarms = brain ? knowledgeAlarms(brain) : [];
   const brainOk = brain !== null && brainAlarms.length === 0;
 
-  const healthy = db && cronsOk && brainOk;
+  const healthy = db && cronsOk && brainOk && remindersOk;
   return NextResponse.json(
     {
       ok: healthy,
@@ -223,6 +248,8 @@ export async function GET(req: NextRequest) {
       // database being down, and used to be indistinguishable from perfect health.
       key: privileged ? 'ok' : 'not-privileged',
       crons: runs === null ? 'unknown' : cronsOk ? 'ok' : 'stale',
+      // One word, never a count. See the block above remindersOk.
+      reminders: backlog === null ? 'unknown' : remindersOk ? 'ok' : 'late',
       // A count, never a name. Zero is omitted rather than printed, so this row appears only when
       // there is genuinely something not yet seen. See the block above.
       ...(unseen.length ? { cronsUnseen: unseen.length } : {}),

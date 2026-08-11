@@ -239,7 +239,23 @@ export default function Generator() {
         @media print {
           .no-print{display:none !important;}
           .paper{box-shadow:none !important;border:none !important;margin:0 !important;max-width:100% !important;}
-          @page{margin:14mm;}
+          /* ═══════════════════════════════════════════════════════════════════════════
+             THE BROWSER'S OWN FURNITURE, AND WHAT WE CAN HONESTLY DO ABOUT IT.
+             RUN 0 of the customer week, 11 August 2026: with Chrome's defaults, Save as
+             PDF wraps the invoice in "8/11/26, 10:54 AM" and the page title along the top
+             and the full URL and "1/1" along the bottom. The invoice inside is exactly
+             right and one page. A customer who does not know to untick Headers and
+             footers emails that to the person who owes him money.
+
+             ⚠️ NO STYLESHEET CAN TURN IT OFF. It is a browser print setting, drawn outside
+             the document, and a page that claimed otherwise would be worse than one that
+             says nothing. NO BACKTICKS IN HERE: this comment lives inside a css template
+             literal and a quoted property name would close it. size:A4 fixes the paper, so
+             the margins below are
+             the ones we chose rather than whatever the last print job left set. The line
+             under the button tells him the one tick that actually clears it.
+             ═══════════════════════════════════════════════════════════════════════════ */
+          @page{size:A4;margin:14mm;}
         }
         .gen-grid{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:28px;align-items:start;}
         @media(max-width:900px){.gen-grid{grid-template-columns:1fr;}}
@@ -315,7 +331,11 @@ export default function Generator() {
             <textarea id="inv-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
 
             <button onClick={() => window.print()} style={{ marginTop: 20, width: '100%', background: RIVER, color: 'var(--on-river)', border: 'none', borderRadius: 12, padding: '15px 0', fontSize: 16, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Download or print {docWord.toLowerCase()}</button>
-            <p style={{ fontSize: 12, color: MUTED, textAlign: 'center', marginTop: 10 }}>Free, no signup. Choose &ldquo;Save as PDF&rdquo; in the print window.</p>
+            {/* ⚠️ THE SECOND SENTENCE IS THE FIX, AND IT IS A SENTENCE BECAUSE IT CANNOT BE CODE.
+                Chrome draws its own date and web address around the page unless he unticks
+                Headers and footers, and no stylesheet can reach that setting. Saying so once,
+                where he is standing, beats him finding out from his customer. */}
+            <p style={{ fontSize: 12, color: MUTED, textAlign: 'center', marginTop: 10, lineHeight: 1.5 }}>Free, no signup. Choose &ldquo;Save as PDF&rdquo; in the print window, and turn off &ldquo;Headers and footers&rdquo; so the date and the web address stay off your {docWord.toLowerCase()}.</p>
           </div>
         </div>
 

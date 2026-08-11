@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { captureContact } from '../../../lib/supabase';
 import { rateLimitedShared, clientIp } from '../../../lib/ratelimit';
 import { hasEmailConfig, sendLeadConfirmEmail } from '../../../lib/email';
+import { leadPromise } from '../../../lib/features';
 import { confirmUrl, unsubscribeUrl } from '../../../lib/leadtoken';
 
 // Consent engine + CRM capture. Stores a lead ONLY with an explicit true consent flag, the exact
@@ -57,7 +58,9 @@ export async function POST(req: NextRequest) {
     // is lawful and the consent record stands on its own.
     if (hasEmailConfig()) {
       after(async () => {
-        try { await sendLeadConfirmEmail(email, confirmUrl(email), unsubscribeUrl(email)); }
+        // 🔴 THE SOURCE DECIDES WHAT THIS EMAIL PROMISES. /free-mtd-filing is a waitlist and the
+        // confirm used to tell those people they had asked for a result. See lib/features.ts.
+        try { await sendLeadConfirmEmail(email, confirmUrl(email), unsubscribeUrl(email), new Date(), leadPromise(source ?? '')); }
         catch { /* best effort */ }
       });
     }

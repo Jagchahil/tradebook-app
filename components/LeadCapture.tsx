@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { leadConsentText, leadDoneLine, leadHeading, leadSub } from '../lib/features';
+import { leadButton, leadConsentText, leadDoneLine, leadHeading, leadPromise, leadSub } from '../lib/features';
 import {
   RIVER, RIVER_DEEP, RIVER_TINT, INK, MUTED, GREEN, GREEN_TINT, ON_GREEN_TINT, RED, PANEL, ON_RIVER, edge,
 } from '../lib/apptheme';
@@ -56,6 +56,9 @@ export default function LeadCapture({
   heading?: string;
   sub?: string;
 }) {
+  // 🔴 WHAT WE ARE PROMISING HIM, DECIDED BY THE SOURCE AND NOT BY THIS COMPONENT. See leadPromise
+  // in lib/features.ts for what /free-mtd-filing was saying before this existed.
+  const promise = leadPromise(source);
   const [email, setEmail] = useState('');
   const [consent, setConsent] = useState(false);
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
@@ -82,7 +85,7 @@ export default function LeadCapture({
           source,
           result_note: resultNote,
           consent: true,
-          consent_text: leadConsentText(),
+          consent_text: leadConsentText(promise),
         }),
       });
       if (!res.ok) {
@@ -107,7 +110,7 @@ export default function LeadCapture({
             them from one place. See lib/tokens.ts. */}
         <div style={{ fontSize: 16, fontWeight: 800, color: ON_GREEN_TINT, marginBottom: 4 }}>You are on the list.</div>
         <p style={{ fontSize: 14.5, color: INK, lineHeight: 1.6, margin: 0 }}>
-          {leadDoneLine()}
+          {leadDoneLine(promise)}
         </p>
       </div>
     );
@@ -142,7 +145,7 @@ export default function LeadCapture({
           disabled={state === 'sending'}
           style={{ background: RIVER, color: ON_RIVER, fontSize: 15, fontWeight: 700, padding: '13px 22px', borderRadius: 11, border: 'none', cursor: 'pointer', opacity: state === 'sending' ? 0.7 : 1 }}
         >
-          {state === 'sending' ? 'Sending…' : 'Email me my result'}
+          {state === 'sending' ? 'Sending…' : leadButton(promise)}
         </button>
       </div>
 
@@ -153,7 +156,7 @@ export default function LeadCapture({
           onChange={(ev) => setConsent(ev.target.checked)}
           style={{ marginTop: 3, width: 17, height: 17, flexShrink: 0, accentColor: RIVER }}
         />
-        <span style={{ fontSize: 13, color: MUTED, lineHeight: 1.5 }}>{leadConsentText()}</span>
+        <span style={{ fontSize: 13, color: MUTED, lineHeight: 1.5 }}>{leadConsentText(promise)}</span>
       </label>
 
       {error ? <p style={{ color: RED, fontSize: 13, margin: '10px 0 0' }}>{error}</p> : null}

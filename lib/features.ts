@@ -154,6 +154,53 @@ export function nudgeClause(): string {
 // Both wordings sit side by side here, the same discipline as everything else in this file, so
 // the day the flag flips all twelve pages upgrade themselves and nobody has to remember.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 ONE CAPTURE, TWO DIFFERENT PROMISES, AND UNTIL TODAY IT ONLY KNEW HOW TO MAKE ONE.
+// RUN 0 of the customer week, 11 August 2026.
+//
+// LeadCapture renders on twelve public pages. Eleven of them are tools that have just worked
+// something out for him, so "Email me my result" is the plain truth: there IS a result, he can see
+// it above the box, and the email carries it.
+//
+// The twelfth is /free-mtd-filing, where free filing is not built yet and the page says so
+// honestly. There is no result. He is joining a list. And the button still said "Email me my
+// result", the tick box still said "email me my result", the thank you still said "We will send
+// your result over", and the confirm email still opened "You asked us to send you your result".
+//
+// Four promises of a thing that does not exist, on the one page whose entire job is to be straight
+// with him about what does not exist yet. Nobody wrote any of them for that page. They arrived
+// with the component, which is how this kind of lie always arrives.
+//
+// ⚠️ THE PAGE ALREADY OVERRODE ITS HEADING AND SUB, WHICH IS WHY THIS WAS INVISIBLE. The two lines
+// somebody thinks to change were changed and read correctly ("Be first when free filing opens").
+// The four that live inside the component were not, because nobody opens a shared component to
+// check what it promises on a page they are not looking at.
+//
+// So the promise is now a property of the SOURCE, decided in one place, and every sentence that
+// says "result" reads it. A thirteenth page joins as one line here, or it inherits the honest
+// default. test/leadpromise.test.mjs holds the waitlist source to never saying the word.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+/** What we are actually promising this person in return for the address. */
+export type LeadPromise =
+  // A tool has already worked something out for him and the email carries it.
+  | 'result'
+  // Nothing has been worked out. He is asking to be told when something opens.
+  | 'waitlist';
+
+// The sources that are a list rather than a tool. Named, not inferred, because guessing from the
+// page name is how the next honest page quietly starts promising a result again.
+const WAITLIST_SOURCES = new Set(['free-mtd-filing']);
+
+export function leadPromise(source: string): LeadPromise {
+  return WAITLIST_SOURCES.has(source) ? 'waitlist' : 'result';
+}
+
+// The word on the button he presses. It is the last thing he reads before handing over an address.
+export function leadButton(promise: LeadPromise = 'result'): string {
+  return promise === 'waitlist' ? 'Tell me when it opens' : 'Email me my result';
+}
+
 export function leadHeading(): string {
   return remindersLive()
     ? 'Want your result emailed, plus your deadline reminders?'
@@ -169,7 +216,12 @@ export function leadSub(): string {
 // 🔴 THE WORDS HE ACTUALLY AGREES TO, WHICH ARE STORED AND WHICH HAVE TO BE TRUE ON THE DAY HE
 // AGREES TO THEM. Not "what we might do later", and not softened: if it says reminders, reminders
 // have to be a thing this product does when he ticks it.
-export function leadConsentText(): string {
+export function leadConsentText(promise: LeadPromise = 'result'): string {
+  // ⚠️ THE WAITLIST WORDING PROMISES NOTHING WE CANNOT DO. It is stored as the proof of what he
+  // agreed to, so it has to be true on the day he ticks it, and free filing is not built.
+  if (promise === 'waitlist') {
+    return 'Yes, tell me when free filing opens, plus occasional money saving tips from Lekhio. I can unsubscribe at any time.';
+  }
   return remindersLive()
     ? 'Yes, email me my result plus occasional tax deadline reminders and money saving tips from Lekhio. I can unsubscribe at any time.'
     : 'Yes, email me my result plus occasional money saving tips from Lekhio. I can unsubscribe at any time.';
@@ -177,7 +229,10 @@ export function leadConsentText(): string {
 
 // ⚠️ THE THANK YOU IS A PROMISE TOO. "We will keep you right on the deadlines that matter" is made
 // AFTER he has handed the address over, which is the point at which a promise costs him something.
-export function leadDoneLine(): string {
+export function leadDoneLine(promise: LeadPromise = 'result'): string {
+  if (promise === 'waitlist') {
+    return 'We will email you the moment free filing opens. Check your inbox to confirm your address.';
+  }
   return remindersLive()
     ? 'We will send your result and keep you right on the deadlines that matter. Check your inbox.'
     : 'We will send your result over. Check your inbox.';

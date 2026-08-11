@@ -17,6 +17,7 @@ import { HOW_LONG } from './onboarding';
 // lib/vat.ts has no imports of its own, so this costs nothing.
 import { REVERSE_CHARGE_WORDING } from './vat';
 import { gbp2 } from './money';
+import type { LeadPromise } from './features';
 
 const KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.EMAIL_FROM || 'Lekhio <invoices@lekhio.app>';
@@ -220,6 +221,7 @@ export type RepeatKey =
   | 'payment-ok'
   | 'payment-fail'
   | 'lead-confirm'
+  | 'lead-confirm-list'
   | 'lead-result'
   | 'waitlist';
 
@@ -248,6 +250,13 @@ export const REPEATING_SUBJECTS: Record<RepeatKey, (mark: string) => string> = {
   // Every use of a free tool. Two uses a month apart used to collapse, and he would tap the older
   // link, which is now the expired one. See lib/leadtoken.ts.
   'lead-confirm': (mark) => `Confirm your email to get your result, ${mark}`,
+
+  // 🔴 THE SAME EMAIL, ON A PAGE WHERE THERE IS NO RESULT. /free-mtd-filing is a waitlist: free
+  // filing is not built, the page says so plainly, and the confirm that followed it still opened
+  // "You asked us to send you your result". A subject of its own, because a man who used a
+  // calculator this morning and joined this list this afternoon is confirming two different
+  // things and must not have them collapse into one Gmail conversation.
+  'lead-confirm-list': (mark) => `Confirm your email to join the free filing list, ${mark}`,
 
   // Every confirm.
   'lead-result': (mark) => `Your result from Lekhio, ${mark}`,
@@ -306,6 +315,12 @@ export const SUBJECT_MARKS: Record<RepeatKey, { source: MarkSource; why: string 
   'lead-confirm': {
     source: 'moment',
     why: 'THE ONE OBSERVED IN THE INBOX ON 9 AUGUST 2026: two confirms 53 seconds apart, one thread, headed by the older message. Running two calculators back to back is exactly what the free tools are built to invite, each confirm is a separate signed token, and the link he can see is the older one. It works today only because the window is seven days.',
+  },
+  'lead-confirm-list': {
+    source: 'moment',
+    why: 'The waitlist twin of lead-confirm, and it repeats for the same reason: he can rejoin, and '
+      + 'a confirm he joined in July must not sit underneath one he joined in March. Same mark, same '
+      + 'argument, different sentence.',
   },
   'lead-result': {
     source: 'moment',
@@ -733,7 +748,30 @@ export async function sendLeadConfirmEmail(
   confirmLink: string,
   unsubscribeLink: string,
   when: Date = new Date(),
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHICH PROMISE THIS CONFIRM IS CONFIRMING. Added 11 August 2026, RUN 0 of the customer week.
+  //
+  // Eleven of the twelve capture points are tools that have already worked something out, so "your
+  // result" is true. /free-mtd-filing is a waitlist for a thing that is not built, and this email
+  // was telling those people they had asked for a result. See leadPromise in lib/features.ts.
+  //
+  // ⚠️ IT DEFAULTS TO 'result', WHICH IS THE ELEVEN. A caller that forgets to say gets the wording
+  // that is true almost everywhere, and test/leadpromise.test.mjs holds the one caller to passing
+  // it through rather than trusting the default.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  promise: LeadPromise = 'result',
 ): Promise<boolean> {
+  // 🔴 TWO SENDERS, NOT A TERNARY, AND test/subjectrule.test.mjs IS WHY. That suite requires each
+  // repeating subject key to have exactly ONE send site it can find by searching for the key. A
+  // ternary inside one send means neither key appears in this file as a searchable literal, and the
+  // property it protects, that any subject a customer received leads back to one place, is gone.
+  //
+  // ⚠️ AND THE FIRST DRAFT OF THIS COMMENT SPELLED THE KEY OUT TO EXPLAIN IT, which the guard
+  // counted as a second send site and failed on. It counts raw source, comments included, and it
+  // should: it cannot tell prose from code and it must not have to. Same trap test/run-all.mjs
+  // records against the domain guard. Do not relax it. Fix the comment.
+  if (promise === 'waitlist') return sendLeadListConfirmEmail(to, confirmLink, unsubscribeLink, when);
+
   const inner = `
     ${h1('One quick tap to confirm.')}
     ${p('You asked us to send you your result. Tap below to confirm and you’re all set.')}
@@ -744,6 +782,30 @@ export async function sendLeadConfirmEmail(
     to, subject: { repeats: 'lead-confirm', mark: subjectMoment(when) },
     html: shell(inner, { preheader: 'One tap and your result is on its way.', unsubscribeLink }),
     listUnsub: unsubscribeLink, tag: 'lead-confirm',
+  });
+}
+
+// The same email on a page where there is no result. /free-mtd-filing is a waitlist for something
+// that is not built, and the page is honest about that; this is the confirm catching up with it.
+//
+// ⚠️ REACHED THROUGH sendLeadConfirmEmail, NEVER CALLED DIRECTLY BY A ROUTE. One door, one decision,
+// taken from the source. A second caller here is a second place to get the promise wrong.
+export async function sendLeadListConfirmEmail(
+  to: string,
+  confirmLink: string,
+  unsubscribeLink: string,
+  when: Date = new Date(),
+): Promise<boolean> {
+  const inner = `
+    ${h1('One quick tap to confirm.')}
+    ${p('You asked to be told when free filing opens. Tap below to confirm your address and you are on the list.')}
+    ${button(confirmLink, 'Confirm my email')}
+    ${pMuted('This link works for a week. After that, join again from the page and we will send you a fresh one.')}
+    ${pMuted('If you didn’t request this, ignore this email and nothing will happen.')}`;
+  return send({
+    to, subject: { repeats: 'lead-confirm-list', mark: subjectMoment(when) },
+    html: shell(inner, { preheader: 'One tap and you are on the list.', unsubscribeLink }),
+    listUnsub: unsubscribeLink, tag: 'lead-confirm-list',
   });
 }
 

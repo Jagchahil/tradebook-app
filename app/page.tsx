@@ -218,6 +218,64 @@ const HOME_CSS = css`
 .final h2{font-size:24px}
 .pamt{font-size:44px}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   🔴 THE PHONE RHYTHM, AND THE PHONE READING LOAD. 11 August 2026, RUN 0 of the customer week.
+
+   Jag walked the site on his own handset and reported no overlap, no clipping and no rendering
+   fault of any kind. What he reported was worse, because no test can see it: "there's way too
+   much writing on there, it's too much reading on mobile", and the alignment "alternates
+   centered, off centre, centered", so the page never settles.
+
+   He is right, and it is measurable. At one column the sections read:
+
+     hero          centred
+     the argument  heading LEFT, body left      <- the odd one out
+     three steps   heading centred, cards CENTRED  <- the other odd one out
+     the employee  heading centred, rows left
+     the reviews   centred heading, a belt that scrolls itself
+     the price     centred heading, card left
+     hire it       centred
+
+   THE DISCIPLINE, ONE LINE: on a phone, every content section is a CENTRED HEADING OVER A LEFT
+   BODY. The hero and the closing card are their own pattern and stay centred throughout, which
+   is what everybody expects of a front door and a sign off. Two rules below bring the two
+   outliers into that discipline and nothing else moves.
+
+   ⚠️ THESE RULES ARE .home SCOPED AND LIVE ONLY HERE, deliberately. MARKETING_CSS carries a
+   byte identical twin of most of this sheet and test/sharedcss.test.mjs holds the pairs
+   together; a rule that never had a twin cannot break a pair, and the other pages were not
+   walked on the handset so they are not mine to re-rhythm today.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+@media(max-width:760px){
+.home .argsec > .h2{text-align:center}
+.home .hstep{text-align:left}
+.home .hstep .stepn{margin:0 0 16px}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════
+   🔴 THE REVIEW BELT IS THE HEAVIEST BLOCK ON THE PAGE AND HE CANNOT CONTROL IT.
+
+   Measured on production: 1,191 words on the home page, and 370 of them are this one section,
+   because a seamless loop needs a second copy of the run. Six quotes, drawn twice, sliding past
+   at a speed somebody else chose, on the screen of a man holding a ladder rail with his other
+   hand. He cannot slow it down, he cannot go back, and half of what goes by he has already read.
+
+   ⚠️ THE FIX IS A BRANCH THIS FILE ALREADY HAD. A reader who asks for reduced motion is given a
+   row he scrolls himself, with the duplicate copy hidden. That is the right answer for a thumb
+   too, so the phone gets the same treatment rather than a new one: no animation, no second pass,
+   swipe at your own pace. Every real quote is still there and still read exactly once, which is
+   the property the aria-hidden copy exists to protect.
+
+   The card narrows so the next one peeks in at the edge, which is how a thumb learns there is
+   something to swipe without being told.
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
+@media(max-width:640px){
+.home .rev-marquee{overflow-x:auto;-webkit-mask-image:none;mask-image:none}
+.home .rev-track{animation:none;padding:0 22px}
+.home .rev-track .quote[aria-hidden="true"]{display:none}
+.home .rev-track .quote{width:min(320px,84vw)}
+}
 `;
 
 export default async function HomePage() {
@@ -288,7 +346,7 @@ export default async function HomePage() {
           from lib/control.ts, which only ever ships as a pair. */}
       <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
-          <div className="reveal" style={{ maxWidth: 760, margin: '0 auto' }}>
+          <div className="reveal argsec" style={{ maxWidth: 760, margin: '0 auto' }}>
             <h2 className="h2">Any app that says it will do your tax for you is lying to you.</h2>
             <p className="argbody">HMRC holds you responsible. It always has.</p>
             {/* The deal, as three rows a man can look at rather than a paragraph he has to read.
@@ -321,7 +379,9 @@ export default async function HomePage() {
         <div className="wrap">
           <div className="center reveal" style={{ marginBottom: 44 }}>
             <h2 className="h2">Three steps. That is the whole thing.</h2>
-            <p className="lead">Set it up once. It works in the background from then on.</p>
+            {/* The lead that sat here said "Set it up once. It works in the background from then
+                on." The three cards below say it, at length, in the next forty words. Cut on
+                11 August 2026 for the mobile reading load, RUN 0 of the customer week. */}
           </div>
           {/* 🔴 STEP ONE IS SOMETHING HE CAN DO ON DAY ONE. It used to be "Connect your bank",
               which needs a provider we do not have. All three of these work the moment he signs

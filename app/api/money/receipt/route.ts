@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sessionUser } from '../../../../lib/webauth';
 import { hasClaudeConfig } from '../../../../lib/claude';
-import { bumpAiUsage, countActiveSubscribers } from '../../../../lib/supabase';
 import {
   ingestReceiptImage, MAX_RECEIPT_BYTES, RECEIPT_IMAGE_TYPES,
 } from '../../../../lib/receiptingest';
-import { aiCapsFor } from '../../../../lib/margin';
-import { decideSpend } from '../../../../lib/aicost';
+import { receiptSpendBlocked } from '../../../../lib/aibudget';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
 import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
 
@@ -60,7 +58,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Burst guard first, because it is free. The budget rings below each cost a database write.
-  if (await rateLimitedShared(`receiptweb:${user.id}`, 10, 10 * 60 * 1000)) {
+  // Forty in ten minutes, raised from ten on 12 August 2026: a shoebox of receipts fed through
+  // the one upload door is a real customer doing real bookkeeping, and the budget rings behind
+  // this are the guard on the actual spend. This is abuse control, not the wallet.
+  if (await rateLimitedShared(`receiptweb:${user.id}`, 40, 10 * 60 * 1000)) {
     return isForm ? back('problem=slow') : NextResponse.json({ error: 'too_many_requests' }, { status: 429 });
   }
 
@@ -90,19 +91,9 @@ export async function POST(req: NextRequest) {
     return isForm ? back('problem=type') : NextResponse.json({ error: 'bad_type' }, { status: 415 });
   }
 
-  // The same three rings the WhatsApp webhook's aiBudgetBlocked walks, with the same judge.
-  // decideSpend reads the counts BEFORE this call, so our own bump is subtracted. The rings are
-  // GLOBAL on purpose: web reads and WhatsApp reads spend from one wallet, so neither surface
-  // can quietly drain the other's day.
-  const subs = await countActiveSubscribers();
-  const caps = aiCapsFor(subs ?? 0);
-  const userDay = caps.killed ? null : await bumpAiUsage('receiptweb', user.id);
-  const globalDay = caps.killed ? null : await bumpAiUsage('global', 'all');
-  const globalMonth = caps.killed ? null : await bumpAiUsage('globalmonth', new Date().toISOString().slice(0, 7));
-  const blocked = caps.killed
-    || userDay === null || globalDay === null || globalMonth === null
-    || !decideSpend({ globalDay: globalDay - 1, globalMonth: globalMonth - 1, userDay: userDay - 1 }, caps).allowed;
-  if (blocked) {
+  // The wallet walk moved whole to lib/aibudget.ts on 12 August 2026, when the one upload door
+  // became its second caller. Same three rings, same judge, one copy. See that file's header.
+  if (await receiptSpendBlocked(user.id)) {
     return isForm ? back('problem=budget') : NextResponse.json({ error: 'budget' }, { status: 429 });
   }
 

@@ -106,7 +106,10 @@ export default async function CapturePage({
     <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
 
-      <AppNav current="/app/money/capture" />
+      {/* The Money tab, not this page's own path: the one upload door superseded this page in
+          the shell on 12 August 2026, so the shell no longer lists this route. The page still
+          answers its URL for open tabs, and it lives in Money territory, so Money lights. */}
+      <AppNav current="/app/money" />
 
       {said ? <p style={S.said}>{said}</p> : null}
 

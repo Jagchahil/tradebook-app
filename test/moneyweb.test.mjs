@@ -407,11 +407,18 @@ ok('the row is written for the session user and marked as what it is',
 ok('🔴 AND NEVER FOR A USER THE REQUEST NAMED', !/body\.user|f\.get\(\s*['"]user/i.test(codeOnly(routeReceipt)));
 ok('an unreadable total is refused, not filed as a £0 he acts on',
   /parsed\.amount <= 0/.test(ingest) && /problem=unread/.test(routeReceipt));
+// The rings moved whole into lib/aibudget.ts on 12 August 2026, when the one upload door
+// became their second caller. The route is a CALLER now; the rings themselves are asserted
+// where they live, and the route is held to actually asking the wallet.
+const wallet = read('lib/aibudget.ts');
 ok('the AI spend walks the same rings as the webhook: caps, counters, judge',
-  /aiCapsFor\(/.test(routeReceipt) && /bumpAiUsage\('global', 'all'\)/.test(routeReceipt) && /decideSpend\(/.test(routeReceipt));
+  /aiCapsFor\(/.test(wallet) && /bumpAiUsage\('global', 'all'\)/.test(wallet) && /decideSpend\(/.test(wallet)
+  && /await receiptSpendBlocked\(user\.id\)/.test(routeReceipt));
 ok('the upload is validated before the budget is spent',
   // Compared on the CALL SITES, not the imports, which sit at the top of every file.
-  codeOnly(routeReceipt).indexOf('req.formData()') < codeOnly(routeReceipt).indexOf('await countActiveSubscribers()'));
+  codeOnly(routeReceipt).indexOf('req.formData()') !== -1
+  && codeOnly(routeReceipt).indexOf('receiptSpendBlocked(user.id)') !== -1
+  && codeOnly(routeReceipt).indexOf('req.formData()') < codeOnly(routeReceipt).indexOf('receiptSpendBlocked(user.id)'));
 ok('there is a size ceiling and a type allowlist, and they are the walk\'s own',
   /MAX_RECEIPT_BYTES/.test(routeReceipt) && /RECEIPT_IMAGE_TYPES/.test(routeReceipt)
   && /image\/jpeg/.test(ingest) && /problem=type/.test(routeReceipt) && /problem=big/.test(routeReceipt));
@@ -571,6 +578,7 @@ export function hasClaudeConfig() { return true; }
 export async function parseReceipt() { return state.parsed; }
 `);
   w('aicost.ts', 'export function decideSpend() { return { allowed: true }; }\n');
+  w('aibudget.ts', 'export async function receiptSpendBlocked() { return false; }\n');
   w('margin.ts', 'export function aiCapsFor() { return { killed: false }; }\n');
   w('waintents.ts', "export function clampReceiptDate(d) { return d || '2026-08-05'; }\n");
   w('supabase.ts', `
@@ -662,7 +670,10 @@ ok('both routes actually consult the gate',
 // ---------------------------------------------------------------------------------------------
 const sections = nav.slice(nav.indexOf('export const SECTIONS'), nav.indexOf('export function AppNav'));
 ok('the nav offers the manual entry screen under Money', /href: '\/app\/money\/add'/.test(sections));
-ok('the nav offers the receipt screen under Money', /href: '\/app\/money\/capture'/.test(sections));
+// The one upload door replaced the capture and import rows on 12 August 2026: receipts and
+// statements are offered TOGETHER, under Money and on the plus, and the old pages only answer
+// their URLs. The nav promise this line holds is that receipt capture is OFFERED somewhere.
+ok('the nav offers the upload door under Money', /href: '\/app\/money\/upload'/.test(sections));
 ok('the detail view is reached from a row, never from the menu', !/\/app\/entry/.test(sections));
 ok('the detail page still lights up Money in the nav', /<AppNav current="\/app\/money" \/>/.test(pageEntry));
 

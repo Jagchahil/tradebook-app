@@ -609,7 +609,8 @@ async function BankStep({ userId, note }: { userId: string; note: string | null 
         // not something we can honestly offer yet, and the statement importer does the same job.
         <p style={S.body}>
           The bank feed is on its way. Until it lands, a bank statement CSV does the same job:
-          download one from your bank and give it to us at Upload a statement once you are inside.
+          download one from your bank and give it to us at Upload receipts or statements once you
+          are inside, along with any receipts, all in one go.
         </p>
       ) : !enabled ? (
         // Doc 103's honesty test. A button whose only function is to say the feature does not exist

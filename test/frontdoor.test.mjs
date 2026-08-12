@@ -577,10 +577,10 @@ console.log('\n=== the bank feed is offered by one switch, honestly ===\n');
   const BOTH_STATES = [
     ['app/app/page.tsx',
       'Connect your bank and new spending lands here on its own, ready for you to check.',
-      'Add an entry, upload a till slip, or import a bank statement, and it lands here ready for you to check.'],
+      'Add an entry, or upload your receipts and statements, and it lands here ready for you to check.'],
     ['app/app/money/page.tsx',
       'Connect your bank and every payment lands here on its own.',
-      'Add an entry, upload a till slip, or import a statement, and every payment lands here.'],
+      'Add an entry, or upload your receipts and statements, and every payment lands here.'],
     ['app/app/tax/page.tsx',
       'Connect your bank and your tax position builds itself from what you confirm.',
       'Add what you earn and spend, by hand or by statement, and your tax position builds itself from what you confirm.'],

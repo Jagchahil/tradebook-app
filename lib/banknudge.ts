@@ -108,7 +108,7 @@ export function shouldOfferEasierRoute(bank: BankState): boolean {
 export function bankOfferLine(bank: BankState): string {
   return bankFeedOffered() && bank.available
     ? 'Want to stop hitting this? Connect your bank in the Lekhio app. Every payment in and out gets logged for you automatically, with no daily limit and no photos to remember.'
-    : 'Want to stop hitting this? Import a bank statement in the Lekhio app, under Money. A whole month of spending lands in one go, with no daily limit and nothing to photograph.';
+    : 'Want to stop hitting this? Upload a bank statement in the Lekhio app, under Money. A whole month of spending lands in one go, with no daily limit and nothing to photograph.';
 }
 
 // The message we send when the AI budget refuses a request.
@@ -152,5 +152,5 @@ export function receiptMilestoneNudge(receiptsToday: number, bank: BankState): s
   if (receiptsToday !== NUDGE_AFTER_RECEIPTS) return null;
   return bankFeedOffered() && bank.available
     ? 'That is five receipts today. You do not have to keep doing this. Connect your bank in the Lekhio app and anything you pay by card or transfer is logged for you the moment it happens.'
-    : 'That is five receipts today. You do not have to keep doing this. Import a bank statement in the Lekhio app, under Money, and everything you paid by card or transfer lands in your books in one go.';
+    : 'That is five receipts today. You do not have to keep doing this. Upload a bank statement in the Lekhio app, under Money, and everything you paid by card or transfer lands in your books in one go.';
 }

@@ -556,10 +556,10 @@ export default async function OverviewPage() {
         {waiting > 0
           ? bankFeedOffered()
             ? 'Everything above is money you have confirmed. New spending lands in your bank feed on its own.'
-            : 'Everything above is money you have confirmed. Add an entry, upload a till slip, or import a bank statement, and it lands here ready for you to check.'
+            : 'Everything above is money you have confirmed. Add an entry, or upload your receipts and statements, and it lands here ready for you to check.'
           : bankFeedOffered()
             ? 'Everything here is money you have confirmed. Connect your bank and new spending lands here on its own, ready for you to check.'
-            : 'Everything here is money you have confirmed. Add an entry, upload a till slip, or import a bank statement, and it lands here ready for you to check.'}
+            : 'Everything here is money you have confirmed. Add an entry, or upload your receipts and statements, and it lands here ready for you to check.'}
       </p>
 
       {/* ═══════════════════════════════════════════════════════════════════════════════════════

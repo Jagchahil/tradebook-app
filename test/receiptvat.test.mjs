@@ -115,7 +115,7 @@ console.log('\n2. The parser, staged and run against a stubbed model');
 
 const stage = mkdtempSync(path.join(tmpdir(), 'receiptvat-'));
 const asTs = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'nistudentloan', 'ltdengine', 'aicost', 'housestyle', 'claude']) {
+for (const f of ['taxengine', 'nistudentloan', 'ltdengine', 'aicost', 'housestyle', 'receiptrescue', 'claude']) {
   writeFileSync(path.join(stage, `${f}.ts`), asTs(read(`lib/${f}.ts`)));
 }
 
@@ -219,6 +219,7 @@ writeFileSync(path.join(rStage, 'dedupe.ts'), 'export function findDuplicate() {
 writeFileSync(path.join(rStage, 'memory.ts'), 'export function normaliseVendor(v) { return String(v || "").toLowerCase(); }\n');
 writeFileSync(path.join(rStage, 'margin.ts'), 'export function aiCapsFor() { return { killed: false }; }\n');
 writeFileSync(path.join(rStage, 'aicost.ts'), 'export function decideSpend() { return { allowed: true }; }\n');
+writeFileSync(path.join(rStage, 'aibudget.ts'), 'export async function receiptSpendBlocked() { return false; }\n');
 writeFileSync(path.join(rStage, 'ratelimit.ts'), 'export async function rateLimitedShared() { return false; }\n');
 writeFileSync(path.join(rStage, 'gateserver.ts'), `
 export async function gateForUser() { return 'ok'; }

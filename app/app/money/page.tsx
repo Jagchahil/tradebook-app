@@ -223,7 +223,7 @@ export default async function MoneyPage({
           <p style={S.quiet}>
             {bankFeedOffered()
               ? 'Connect your bank and every payment lands here on its own.'
-              : 'Add an entry, upload a till slip, or import a statement, and every payment lands here.'}
+              : 'Add an entry, or upload your receipts and statements, and every payment lands here.'}
           </p>
         </section>
       ) : (
@@ -301,13 +301,15 @@ export default async function MoneyPage({
             <span style={S.doorLabel}>Add an entry</span>
             <span style={S.rowBody}>Cash in hand, typed straight in.</span>
           </a>
-          <a href="/app/money/capture" style={S.door} className="lek-hit">
-            <span style={S.doorLabel}>Upload a till slip</span>
-            <span style={S.rowBody}>We read it, and nothing counts until you say so.</span>
-          </a>
-          <a href="/app/money/import" style={S.door} className="lek-hit">
-            <span style={S.doorLabel}>Upload a statement</span>
-            <span style={S.rowBody}>A CSV from your bank, read without connecting it.</span>
+          {/* ONE ROW WHERE TWO STOOD, 12 August 2026. "Upload a till slip" and "Upload a
+              statement" asked him to sort his own paperwork before the product would look at
+              it, one file at a time through each. The one door takes photographs and CSVs
+              together, as many as he picks, and does the sorting itself. The old pages still
+              answer their URLs for open tabs; this screen offers the door that does the job.
+              Doc 103's standing question, answered: a row was taken out to make room. */}
+          <a href="/app/money/upload" style={S.door} className="lek-hit">
+            <span style={S.doorLabel}>Upload receipts or statements</span>
+            <span style={S.rowBody}>Photos and bank CSVs together, as many as you like. Nothing counts until you say so.</span>
           </a>
           <a href="/app/goals" style={S.door} className="lek-hit">
             <span style={S.doorLabel}>Goals</span>

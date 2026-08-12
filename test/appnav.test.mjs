@@ -53,12 +53,15 @@ ok('the active tab is marked for the eye and the screen reader',
 ok('a page under a tab lights the tab: the owner is found through SECTIONS items',
   /sec\.href === current \|\| sec\.items\.some\(\(i\) => i\.href === current\)/.test(nav));
 
-console.log('\n=== the plus sheet: six actions, no script ===\n');
+console.log('\n=== the plus sheet: five actions, no script ===\n');
 
-ok('🔴 THE SHEET HOLDS EXACTLY THESE SIX, PER DOC 103, AND A SEVENTH MUST ARGUE ONE OUT',
+ok('🔴 THE SHEET HOLDS EXACTLY THESE FIVE, PER DOC 103, AND A SIXTH MUST ARGUE ONE OUT',
+  // Five where six stood, 12 August 2026: the till slip and statement rows asked him to sort
+  // his own paperwork before the product would look at it. The one upload door does the
+  // sorting, so the sheet SHRANK, which is the direction doc 103 approves of.
   JSON.stringify(plusHrefs) === JSON.stringify([
     '/app/invoices/new', '/app/diary', '/app/goals',
-    '/app/money/add', '/app/money/capture', '/app/money/import',
+    '/app/money/add', '/app/money/upload',
   ]));
 ok('the plus is a <details>, so it opens and closes with no client script',
   nav.includes('<details className="lek-plus">') && !/^'use client'/m.test(nav));
@@ -184,8 +187,10 @@ const MAPPING = [
   ['/app/pile', 'app/app/money/page.tsx'],                   // Waiting on you: the Money page row
   ['/app/goals', 'app/app/money/page.tsx'],                  // Goals: Money's doors, and the plus
   ['/app/money/add', 'app/app/money/page.tsx'],              // Add an entry: Money's doors, and the plus
-  ['/app/money/capture', 'app/app/money/page.tsx'],          // Upload a till slip: Money's doors, and the plus
-  ['/app/money/import', 'app/app/money/page.tsx'],           // Upload a statement: Money's doors, and the plus
+  // The till slip and statement doors were superseded by the ONE upload door on 12 August
+  // 2026. Their pages still answer their URLs for open tabs, but the offered home for both
+  // jobs is /app/money/upload, on the Money page and the plus. One row where two stood.
+  ['/app/money/upload', 'app/app/money/page.tsx'],           // Upload receipts or statements: Money's doors, and the plus
   ['/app/tax', null],                                        // Where you stand: the Tax tab
   ['/app/tax/summary', 'app/app/tax/page.tsx'],              // Quarterly summary: the tax hub
   ['/app/tax/what-if', 'app/app/tax/page.tsx'],              // What if: the tax hub

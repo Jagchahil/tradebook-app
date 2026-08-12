@@ -17,6 +17,9 @@ import { FACTS, asPence, asPercent } from './taxengine';
 import { LTD } from './ltdengine';
 import { aiEnabled } from './aicost';
 import { houseCopy } from './housestyle';
+// The truncated-reply rescue lives in its own pure module so the test suite can load it
+// directly; the story is in that file's header and at RECEIPT_MAX_TOKENS below.
+import { rescueTruncatedReceipt } from './receiptrescue';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 // Two tiers. The structured extraction tasks (receipt fields, entry parsing,
@@ -194,6 +197,11 @@ function logUsage(feature: string, data: { model?: string; usage?: { input_token
 type ClaudeReply = {
   content?: Array<{ type: string; text?: string }>;
   model?: string;
+  // Why the model stopped. 'max_tokens' means the reply was CUT OFF at the ceiling, which is
+  // not an error status and not a malformed body: it is a 200 carrying half a JSON object.
+  // parseReceipt reads it to tell "the paper was unreadable" from "our own ceiling cut the
+  // reading short", because those two deserve opposite log lines and opposite fixes.
+  stop_reason?: string;
   usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number };
 };
 
@@ -215,6 +223,30 @@ async function readClaudeReply(res: Response, feature: string): Promise<ClaudeRe
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE CEILING THAT REFUSED EVERY LONG RECEIPT, 12 AUGUST 2026. RUN 2's florist photographed
+// a 27 line cash and carry till roll, perfectly printed, and was told "I could not read that
+// one. A clearer photograph usually does it." Twice. The photograph was never the problem.
+//
+// max_tokens sat at 300 from the days when the reply was five fields. On 10 August the prompt
+// gained line_items, one entry per printed line, and nobody raised the ceiling to match a field
+// that scales with the length of the paper. A weekly-shop receipt needs several hundred tokens
+// of lines alone, so the reply was CUT OFF mid array, JSON.parse threw, and the whole reading
+// came back null. The doctrine in receiptingest.ts says the lines are the optional part of the
+// reading and a man still gets his expense when the basket comes back nonsense. Truncation
+// defeated that on the worst possible receipts: the longest ones, which are the itemised ones
+// the line capture exists for.
+//
+// Two fixes, together, because either alone leaves a cliff:
+//   1. The ceiling now fits the prompt: sixty capped lines at roughly fifteen tokens each,
+//      plus the money fields, sits under 1,200, so 1,600 is headroom rather than hope.
+//   2. A reply that still gets cut off gives up its LINES, never its MONEY. The prompt prints
+//      the money fields before line_items, so the truncated prefix always carries them, and
+//      rescueTruncatedReceipt reads them out of it. Only what the model actually wrote is
+//      taken: no amount in the prefix means no rescue, because a guess is worse than a retry.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const RECEIPT_MAX_TOKENS = 1600;
+
 export async function parseReceipt(base64: string, mediaType: string): Promise<ParsedReceipt | null> {
   if (!ready() || !KEY) return null;
 
@@ -232,7 +264,8 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
       signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
       body: JSON.stringify({
         model: MODEL_FAST,
-        max_tokens: 300,
+        // See RECEIPT_MAX_TOKENS above: 300 here refused every long till roll for two days.
+        max_tokens: RECEIPT_MAX_TOKENS,
         messages: [
           {
             role: 'user',
@@ -265,8 +298,25 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
   const textBlock = data.content?.find((c) => c.type === 'text')?.text;
   if (!textBlock) return null;
 
+  let parsed: Partial<ParsedReceipt>;
   try {
-    const parsed = JSON.parse(clean(textBlock)) as Partial<ParsedReceipt>;
+    parsed = JSON.parse(clean(textBlock)) as Partial<ParsedReceipt>;
+  } catch {
+    // A reply that is not JSON is nearly always a reply that was CUT OFF at the ceiling. The
+    // rescue takes the money fields from the prefix and gives up the lines; it never invents.
+    // Anything it cannot rescue stays a null, exactly as before.
+    const saved = rescueTruncatedReceipt(clean(textBlock));
+    if (!saved) {
+      console.error(
+        `[claude] Could not parse JSON from model reply${data.stop_reason === 'max_tokens' ? ' (cut off at the token ceiling)' : ''}.`,
+      );
+      return null;
+    }
+    console.log(`[ai] feature=receipt_vision rescued=1 stop=${data.stop_reason ?? 'unknown'}`);
+    parsed = saved;
+  }
+
+  try {
     const amount = Number(parsed.amount);
     const category =
       parsed.category && ALLOWED_CATEGORIES.includes(parsed.category)

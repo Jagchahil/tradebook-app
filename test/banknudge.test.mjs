@@ -57,7 +57,7 @@ ok('user cap tells them when to retry', userCap.includes('tomorrow'));
 // Finexer want £650 a month, so there is nothing to connect to, and this line pinned a sentence
 // that sent a man who had just been refused a receipt read at a door that does not open. It now
 // pins BOTH sides: off, the way out has to be one he can take today; on, the old sentence returns.
-ok('user cap names a way out he can take today', userCap.includes('Import a bank statement'));
+ok('user cap names a way out he can take today', userCap.includes('Upload a bank statement'));
 ok('user cap never sends him at a bank we cannot connect', !userCap.includes('Connect your bank'));
 process.env.BANK_FEED_OFFERED = 'true';
 ok(
@@ -85,8 +85,8 @@ ok('milestone silent when already connected', N.receiptMilestoneNudge(5, CONNECT
 // fallback was written for exactly the no provider case, and this assertion went on holding the
 // nudge silent so the fallback could never fire. A test that pins a feature shut is the same
 // failure as test/walink.test.mjs pinning the welcome message at a door that had closed.
-ok('🔴 the milestone DOES fire with no provider, and names the statement import',
-  /import a bank statement/i.test(N.receiptMilestoneNudge(5, OFF) || ''));
+ok('🔴 the milestone DOES fire with no provider, and names the statement upload',
+  /upload a bank statement/i.test(N.receiptMilestoneNudge(5, OFF) || ''));
 ok('and it never names a bank connection when there is no provider to deliver one',
   !/connect your bank/i.test(N.receiptMilestoneNudge(5, OFF) || ''));
 ok('milestone never fires at zero', N.receiptMilestoneNudge(0, OFFERABLE) === null);

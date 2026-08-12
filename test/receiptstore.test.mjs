@@ -147,8 +147,10 @@ ok('🔴 an unknown type is refused, never guessed',
     code.indexOf('storeReceiptImage(userId, bytes, mediaType)') > -1
     && code.indexOf('storeReceiptImage(') < code.indexOf('parseReceipt(base64, mediaType)'));
   ok('🔴 and AFTER the budget rings: a refused spend never reaches the walk, so it stores nothing',
-    routeCode.indexOf('decideSpend(') > -1
-    && routeCode.indexOf('decideSpend(') < routeCode.indexOf('ingestReceiptImage(')
+    // The rings live in lib/aibudget.ts since 12 August 2026; the route asks the wallet, and
+    // the ask still sits BEFORE the walk, so a refused spend still stores nothing.
+    routeCode.indexOf('receiptSpendBlocked(user.id)') > -1
+    && routeCode.indexOf('receiptSpendBlocked(user.id)') < routeCode.indexOf('ingestReceiptImage(')
     && !/storeReceiptImage/.test(routeCode));
   ok('🔴 a null from storage stops NOTHING: no early return sits between the store and the insert',
     !/if \(!storedPath\)/.test(code) && !/storedPath ===? null\)\s*return/.test(code));

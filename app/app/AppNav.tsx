@@ -38,8 +38,9 @@ export const PLUS_ACTIONS: ReadonlyArray<NavItem> = [
   { href: '/app/diary', label: 'Jobs diary' },
   { href: '/app/goals', label: 'Goals' },
   { href: '/app/money/add', label: 'Add an entry' },
-  { href: '/app/money/capture', label: 'Upload a till slip' },
-  { href: '/app/money/import', label: 'Upload a statement' },
+  // ONE ROW WHERE TWO STOOD, 12 August 2026. The till slip and statement rows asked him to
+  // sort his own paperwork before the product would look at it. The one door sorts for him.
+  { href: '/app/money/upload', label: 'Upload receipts or statements' },
 ];
 
 // ⚠️ ONLY ROUTES THAT EXIST GO IN HERE, AND test/appnav.test.mjs FAILS THE BUILD IF ONE DOES NOT.
@@ -73,8 +74,7 @@ export const SECTIONS: ReadonlyArray<NavSection> = [
       { href: '/app/pile', label: 'Waiting on you', hint: 'Anything we could not call ourselves' },
       { href: '/app/goals', label: 'Goals', hint: 'What you are saving for, written down' },
       { href: '/app/money/add', label: 'Add an entry', hint: 'Cash in hand, typed straight in' },
-      { href: '/app/money/capture', label: 'Upload a till slip', hint: 'We read it, and nothing counts until you say so' },
-      { href: '/app/money/import', label: 'Upload a statement', hint: 'A CSV from your bank, read without connecting it' },
+      { href: '/app/money/upload', label: 'Upload receipts or statements', hint: 'Photos and bank CSVs together, and nothing counts until you say so' },
     ],
   },
   {

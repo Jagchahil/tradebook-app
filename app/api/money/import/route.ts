@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sessionUser } from '../../../../lib/webauth';
-import { parseStatement } from '../../../../lib/statementimport';
-import { mapBankTransaction } from '../../../../lib/bankfeed';
-import { categoriseBankLine } from '../../../../lib/categories';
-import {
-  BankEntryInsert, insertBankTransactions, knownExternalIds, readOwnNames,
-  getUserRules, getVendorPatterns,
-} from '../../../../lib/supabase';
-import { normaliseVendor, recall } from '../../../../lib/memory';
-import { looksPersonal } from '../../../../lib/personal';
+import { ingestStatementCsv } from '../../../../lib/statementingest';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
 import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
 
@@ -20,26 +12,15 @@ import { gateForUser, refuseUnentitled } from '../../../../lib/gateserver';
 //   POST multipart { statement: <csv> }  ->  rows in his books, every one UNCONFIRMED
 //
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-// ⚠️ ONE ENGINE, AND THIS ROUTE IS A CALLER OF IT, NOT A SECOND COPY.
+// ⚠️ ONE WALK, AND THIS ROUTE IS A CALLER OF IT, NOT A COPY. The whole statement walk (parse,
+// enrich, split known from fresh, insert, count) lived inline here until 12 August 2026, when
+// the one door for uploads (/api/money/upload) became its second caller. It moved whole to
+// lib/statementingest.ts, reasoning and all, exactly as the receipt walk lives in
+// lib/receiptingest.ts. This file owns what a door owns: the session, the gate, the burst
+// limit, the upload's validity, and the sentence said back.
 //
-// lib/statementimport.ts detects the bank and walks the file, but the line normalisation is
-// mapBankTransaction from lib/bankfeed.ts with categoriseBankLine injected, the exact call
-// lib/banksync.ts makes for a feed line. The enrichment below (his own names, the vendor rules
-// he has taught us) is the same functions the sync runs, for the same reasons its comments
-// give: the flags must land ON THE ROW, because confirm_pile re applies its guard in SQL
-// against those columns, and a guard the database cannot see is a suggestion.
-//
-// 🔴 NOTHING IN THIS FILE EVER CONFIRMS A ROW. The sync auto files a vendor the user has
-// taught us; this route deliberately does not, and the difference is the size of the act. A
-// feed drips in a handful of lines a day. A statement lands months in one press, and "the
-// rules you taught me quietly filed ninety days of history while you watched a spinner" is not
-// an approval gate, it is a rubber stamp with his name on it. Everything lands waiting. His
-// taught categories still arrive as suggestions, so the pile files them in one honest tap.
-//
-// ⚠️ NO AI, NO BUDGET RINGS, AND THAT IS THE POINT OF THE CHANNEL. A receipt photograph costs
-// a model call; a CSV the bank produced is exact figures we were handed for nothing. The
-// import is deterministic, so it has no spend to meter and it works when the AI wallet is
-// empty. See lib/margin.ts for why the free channels are the ones we want people on.
+// 🔴 NOTHING ON THIS PATH EVER CONFIRMS A ROW. The argument, at length, is in the walk's own
+// header. Everything lands waiting for his yes.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 export const runtime = 'nodejs';
@@ -98,94 +79,29 @@ export async function POST(req: NextRequest) {
 
   const text = Buffer.from(await part.arrayBuffer()).toString('utf8');
 
-  // THE ONE ENGINE, INJECTED. The same mapper and the same keyword map every bank feed line
-  // goes through, so the two channels cannot disagree about what a line means.
-  const outcome = parseStatement(text, user.id, (line) => mapBankTransaction(line, categoriseBankLine));
-  if (!outcome.ok) {
-    if (isForm) return back(`problem=${outcome.reason}`);
-    return NextResponse.json({ error: outcome.reason, message: outcome.message }, { status: 422 });
+  // The one walk, for the session's user and nobody the request named.
+  const result = await ingestStatementCsv({ userId: user.id, text });
+
+  if (result.outcome === 'rejected') {
+    if (isForm) return back(`problem=${result.reason}`);
+    return NextResponse.json({ error: result.reason, message: result.message }, { status: 422 });
   }
-
-  const entries: BankEntryInsert[] = outcome.entries.map((e) => ({ ...e }));
-
-  // THE SAME ENRICHMENT THE SYNC RUNS, minus the auto file (see the header). Never fatal: if
-  // the brain is unreachable the rows land exactly as mapped and he corrects them by hand,
-  // which is what he did before the brain existed.
-  try {
-    let ownNames: string[] = [];
-    try {
-      ownNames = await readOwnNames(user.id);
-    } catch {
-      ownNames = [];
-    }
-    // The personal check runs on EVERY line, known vendor or not, for the reason written at
-    // length in lib/banksync.ts: the flag must be on the row before anything can bulk confirm
-    // it, because confirm_pile enforces it in SQL against that column.
-    for (const entry of entries) {
-      if (looksPersonal(entry.vendor, entry.description, ownNames, entry.amount) !== null) {
-        entry.looks_personal = true;
-      }
-    }
-    const keys = entries.map((e) => normaliseVendor(e.vendor));
-    const [rules, patterns] = await Promise.all([
-      getUserRules(user.id),
-      getVendorPatterns(keys.filter(Boolean)),
-    ]);
-    if (rules.length > 0 || patterns.length > 0) {
-      for (const entry of entries) {
-        const known = recall(entry.vendor, rules, patterns);
-        if (known.source === 'none') continue;
-        // A category we know beats the keyword map's guess. It arrives as a SUGGESTION on an
-        // unconfirmed row, never as a filed answer: see the header for why this route does
-        // not auto file what the sync would.
-        if (known.category) entry.category = known.category;
-        // If he has told us a vendor is not business money, we never ask twice. Out of the
-        // tax figures on arrival, reversible with one tap, exactly as the sync does it.
-        if (known.isPersonal === true) entry.is_personal = true;
-      }
-    }
-  } catch {
-    /* the brain is an improvement, never a dependency */
+  if (result.outcome === 'failed') {
+    return isForm ? back('problem=unavailable') : NextResponse.json({ error: 'unavailable' }, { status: 503 });
   }
-
-  // What is genuinely new, asked of the database before writing, so the result screen counts
-  // facts. A null answer means the read failed; the insert's own on_conflict rule still makes
-  // re inserting everything harmless, so the import proceeds and only the split is derived.
-  const known = await knownExternalIds(user.id, entries.map((e) => e.external_id));
-  const fresh = known === null ? entries : entries.filter((e) => !known.has(e.external_id));
-
-  let inserted = 0;
-  if (fresh.length > 0) {
-    inserted = await insertBankTransactions(user.id, fresh);
-    // insertBankTransactions swallows chunk failures and returns what truly landed. Rows we
-    // KNEW were new and that did not land is a failed write, and a failed write must not be
-    // reported as "already in your books", which is what a silent zero would read as.
-    if (inserted === 0) {
-      return isForm ? back('problem=unavailable') : NextResponse.json({ error: 'unavailable' }, { status: 503 });
-    }
-  }
-
-  const read = entries.length;
-  // "Already in your books" is the database's own answer where we have one. Deriving it as
-  // read minus inserted would, on the rare partial write failure, claim the failed rows were
-  // already his, which is the one direction of wrong he would act on. When the pre read failed
-  // the derivation is all there is, and the on_conflict rule makes it exact in that case.
-  const already = known !== null ? known.size : read - inserted;
-  const personalAmongFresh = fresh.filter((e) => e.is_personal === true).length;
-  const toReview = Math.max(0, inserted - personalAmongFresh);
 
   const counts =
-    `bank=${outcome.bankCode}&read=${read}&known=${already}&fresh=${inserted}` +
-    `&review=${toReview}&skipped=${outcome.skipped}`;
+    `bank=${result.bankCode}&read=${result.read}&known=${result.already}&fresh=${result.inserted}` +
+    `&review=${result.toReview}&skipped=${result.skipped}`;
   return isForm
     ? back(`done=1&${counts}`)
     : NextResponse.json({
         ok: true,
-        bank: outcome.bank,
-        read,
-        alreadyKnown: already,
-        inserted,
-        toReview,
-        skipped: outcome.skipped,
+        bank: result.bank,
+        read: result.read,
+        alreadyKnown: result.already,
+        inserted: result.inserted,
+        toReview: result.toReview,
+        skipped: result.skipped,
       });
 }

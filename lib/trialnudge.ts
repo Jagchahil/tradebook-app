@@ -206,7 +206,7 @@ function bankFeedOffered(): boolean {
 const EMPTY_WEEK_DOOR = () =>
   bankFeedOffered()
     ? 'Connect your bank and everything you spend lands here on its own, with nothing for you to send us.'
-    : `Import a bank statement and a whole month lands in your books in one go. Lekhio reads the ones eleven UK banks hand out: ${APP_URL}/app/money/import`;
+    : `Upload a bank statement and a whole month lands in your books in one go, receipts alongside it if you like. Lekhio reads the CSVs eleven UK banks hand out: ${APP_URL}/app/money/upload`;
 
 export function trialWeekMessage(week: TrialWeek): { subject: string; body: string } {
   const lines: string[] = [];

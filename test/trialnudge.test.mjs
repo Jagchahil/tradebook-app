@@ -231,7 +231,7 @@ ok('🔴 an empty week says so plainly rather than printing zeros',
 // "connect your bank" was an instruction a customer could not carry out. The statement importer
 // covers eleven UK banks and needs nobody's permission, so that is where the empty week points.
 ok('and it points at a door that actually opens today',
-  empty.body.includes('/app/money/import') && !/connect your bank/i.test(empty.body));
+  empty.body.includes('/app/money/upload') && !/connect your bank/i.test(empty.body));
 ok('the empty version still says the trial ends tomorrow', empty.body.includes('ends tomorrow'));
 ok('the empty version carries the same chats door', empty.body.includes('/app/thread'));
 

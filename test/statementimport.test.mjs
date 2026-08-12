@@ -351,40 +351,46 @@ const METTLE = [
 }
 
 // ---------------------------------------------------------------------------------------------
-// 6. THE ROUTE. Session only, gated, one insert path, and nothing is ever confirmed.
+// 6. THE ROUTE, AND THE WALK IT CALLS. Session only, gated, one insert path, and nothing is
+// ever confirmed. The walk itself (parse, enrich, split, insert, count) moved whole into
+// lib/statementingest.ts on 12 August 2026, when the one upload door became its second caller,
+// so the pipeline assertions below read the WALK and the door assertions read the ROUTE.
 // ---------------------------------------------------------------------------------------------
 const route = read('app/api/money/import/route.ts');
+const walk = read('lib/statementingest.ts');
 const G = await import(pathToFileURL(path.join(root, 'lib/gate.ts')).href);
 {
   ok('the route takes the account from the session', /sessionUser\(req\)/.test(route));
   ok('🔴 AND NEVER FROM THE REQUEST', !/body\.user|f\.get\(\s*['"]user/i.test(codeOnly(route)));
   ok('🔴 the rows are written for the session user through the one bulk path',
-    /insertBankTransactions\(user\.id, fresh\)/.test(route));
-  ok('🔴 the route writes through lib/supabase.ts and nothing else', !/\bfetch\s*\(|rest\/v1/.test(codeOnly(route)));
+    /await ingestStatementCsv\(\{ userId: user\.id, text \}\)/.test(route)
+    && /insertBankTransactions\(userId, fresh\)/.test(walk));
+  ok('🔴 the route writes through lib/supabase.ts and nothing else',
+    !/\bfetch\s*\(|rest\/v1/.test(codeOnly(route)) && !/\bfetch\s*\(|rest\/v1/.test(codeOnly(walk)));
   ok('🔴 THE ONE ENGINE IS INJECTED: the real mapper with the real keyword map',
-    /parseStatement\(text, user\.id, \(line\) => mapBankTransaction\(line, categoriseBankLine\)\)/.test(route));
-  ok('🔴 NOTHING IN THE ROUTE EVER CONFIRMS A ROW', !/confirmed:\s*true/.test(codeOnly(route)));
-  ok('🔴 and the sync\'s auto file is deliberately not imported: a statement lands months in one press', !/shouldAutoFile/.test(route));
+    /parseStatement\(text, userId, \(line\) => mapBankTransaction\(line, categoriseBankLine\)\)/.test(walk));
+  ok('🔴 NOTHING IN THE ROUTE EVER CONFIRMS A ROW', !/confirmed:\s*true/.test(codeOnly(route)) && !/confirmed:\s*true/.test(codeOnly(walk)));
+  ok('🔴 and the sync\'s auto file is deliberately not imported: a statement lands months in one press', !/shouldAutoFile/.test(route) && !/shouldAutoFile/.test(walk));
   // ⚠️ LOOSENED 2 AUGUST 2026. This pinned the exact argument list, so adding the AMOUNT as a
   // fourth argument broke it while the property it is named for stayed true. The property is that
   // the check runs per line and the flag lands on the row.
   ok('the personal check runs on every line so the flag lands ON the row',
-    /looksPersonal\(entry\.vendor, entry\.description, ownNames/.test(route)
-    && /entry\.looks_personal = true/.test(route));
+    /looksPersonal\(entry\.vendor, entry\.description, ownNames/.test(walk)
+    && /entry\.looks_personal = true/.test(walk));
   // 🔴 AND THE DIRECTION GOES WITH IT. Without the amount, PERSON_NAME fires on a CREDIT, and a
   // person paying money into a trading account is a customer. Walking a real statement on
   // 2 August 2026 put three of an electrician's domestic customers in the careful pile, where the
   // only button is "not business money" and the SQL refuses a flagged row, so £3,050 of real
   // income could not be recorded by any route. See the block above looksPersonal in lib/personal.ts.
   ok('🔴 AND THE AMOUNT TRAVELS WITH IT, so a customer paying in is not read as a transfer',
-    /looksPersonal\(entry\.vendor, entry\.description, ownNames, entry\.amount\)/.test(route));
-  ok('his taught vendors arrive as suggestions through the same recall the sync uses', /recall\(entry\.vendor, rules, patterns\)/.test(route));
+    /looksPersonal\(entry\.vendor, entry\.description, ownNames, entry\.amount\)/.test(walk));
+  ok('his taught vendors arrive as suggestions through the same recall the sync uses', /recall\(entry\.vendor, rules, patterns\)/.test(walk));
   ok('there is a size ceiling', /MAX_BYTES/.test(route) && /part\.size > MAX_BYTES/.test(route));
   ok('and a type check that falls back to the filename, because browsers disagree about CSV',
     /CSV_TYPES/.test(route) && /endsWith\('\.csv'\)/.test(route));
   ok('a form caller gets a 303, never JSON', /NextResponse\.redirect\([\s\S]{0,160}?,\s*303\)/.test(route) && !/,\s*302\)/.test(route));
   ok('a failed write is refused out loud, not reported as already known', /problem=unavailable/.test(route));
-  ok('a re upload is asked of the database before writing, so the counts are facts', /knownExternalIds\(user\.id/.test(route));
+  ok('a re upload is asked of the database before writing, so the counts are facts', /knownExternalIds\(userId/.test(walk));
   ok('🔴 app/api/money/import has a gate decision and it is entitled', G.ruleFor('app/api/money/import') === 'entitled');
   ok('and the route actually consults the gate', /gateForUser/.test(route));
   ok('the route is rate limited', /rateLimitedShared\(`stmtimport:/.test(route));
@@ -405,11 +411,13 @@ const G = await import(pathToFileURL(path.join(root, 'lib/gate.ts')).href);
   ok('🔴 the bank name is looked up from the fixed list, never printed out of the query string', /bankNameFor\(one\('bank'\)/.test(page));
   ok('the unrecognised refusal is the ONE sentence from the lib', /UNRECOGNISED_LINE/.test(page));
   ok('a locked account sees the read only banner', /READONLY_TITLE/.test(page));
-  ok('the page carries the shell and names itself', /<AppNav current="\/app\/money\/import" \/>/.test(page));
+  // The one upload door superseded this page in the shell on 12 August 2026, so the page
+  // lights the Money tab rather than naming a route the shell no longer lists.
+  ok('the page carries the shell and lights Money', /<AppNav current="\/app\/money" \/>/.test(page));
 
   const nav = read('app/app/AppNav.tsx');
   const sections = nav.slice(nav.indexOf('export const SECTIONS'), nav.indexOf('export function AppNav'));
-  ok('the nav offers the statement door under Money', /href: '\/app\/money\/import'/.test(sections));
+  ok('the nav offers the upload door under Money, which is where statements go now', /href: '\/app\/money\/upload'/.test(sections));
 }
 
 // ---------------------------------------------------------------------------------------------

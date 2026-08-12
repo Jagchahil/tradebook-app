@@ -322,10 +322,10 @@ const offTrial = TN.trialWeekMessage(emptyWeek).body;
 
 for (const [label, copy] of [['the cap offer', offOffer], ['the busy message', offBusy], ['the milestone nudge', offMilestone], ['the trial week email', offTrial]]) {
   ok(`🔴 ${label} never names a bank we cannot connect`, !/connect your bank/i.test(copy));
-  ok(`${label} names a door that opens today`, /import a bank statement/i.test(copy));
+  ok(`${label} names a door that opens today`, /upload a bank statement/i.test(copy));
   ok(`${label} carries no forbidden dashes`, !NO_DASH.test(copy));
 }
-ok('the trial email links the import screen rather than describing it', offTrial.includes('/app/money/import'));
+ok('the trial email links the upload screen rather than describing it', offTrial.includes('/app/money/upload'));
 ok('the trial email still names the eleven banks we can actually read', /eleven UK banks/.test(offTrial));
 ok('the trial email keeps the rest of the message whole', offTrial.includes('/app/thread') && offTrial.includes('ends tomorrow'));
 ok('the trial email never writes the rival domain', !/lekhio\.(?!app)/i.test(offTrial));

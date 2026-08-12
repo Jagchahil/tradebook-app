@@ -151,10 +151,46 @@ const t1 = W.matchTotalsQuestion('how much have I spent this month?', now);
 ok('spent this month', t1 && t1.kind === 'spent' && t1.sinceISO === '2026-07-01' && t1.periodLabel === 'this month');
 const t2 = W.matchTotalsQuestion('how much did I spend on fuel this year', now);
 ok('spent on fuel this tax year', t2 && t2.kind === 'spent' && t2.category === 'fuel' && t2.sinceISO === '2026-04-06');
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 SILENCE MEANS THE TAX YEAR. THIS ASSERTION USED TO SAY THE OPPOSITE.
+//
+// It read `sinceISO === null`, all time, and it passed for as long as that was the default. On
+// 12 August 2026 a man on the live WhatsApp number typed "how much have i made this yeat" and was
+// answered "You have brought in £70,000.00 all time". The typo missed periodFrom's year test by
+// one letter and the fall through handed him a different period without noticing.
+//
+// The typo was not the fault. matchTotalsQuestion has forced the tax year for a TAX question since
+// it was written, with the reason in its own comment: "the only period that makes sense". What he
+// made, what he spent and his profit are all numbers with a bill attached, drawn on the same year.
+// And "all time" means since Lekhio started counting, which for a June joiner is eleven weeks under
+// a phrase that sounds like a career.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 const t3 = W.matchTotalsQuestion('what is my profit', now);
-ok('profit all time', t3 && t3.kind === 'profit' && t3.sinceISO === null);
+ok('🔴 PROFIT WITH NO PERIOD IS THE TAX YEAR, not since we started counting',
+  t3 && t3.kind === 'profit' && t3.sinceISO === '2026-04-06' && t3.periodLabel === 'this tax year');
+const t3b = W.matchTotalsQuestion('how much have i made all time', now);
+ok('and all time is still reachable, deliberately',
+  t3b && t3b.kind === 'made' && t3b.sinceISO === null);
+ok('🔴 AND WHEN IT IS REACHED IT SAYS WHAT IT ACTUALLY COVERS',
+  t3b && t3b.periodLabel === 'since your first entry here' && !/all time/.test(t3b.periodLabel));
+const t3c = W.matchTotalsQuestion('how much have i made ever', now);
+ok('"ever" reaches it too', t3c && t3c.sinceISO === null);
+// 🔴 THE BRANCH IS A FLAG, NOT THE DISPLAY TEXT. Both routers used to choose between "Nothing
+// logged yet" and "Nothing logged <period>" by comparing periodLabel to the string 'all time'.
+// Rewording the label would have shipped "For since your first entry here:" from four call sites.
+ok('🔴 THE ALL TIME BRANCH IS A BOOLEAN, so rewording the label cannot break a sentence',
+  t3b && t3b.allTime === true && t3c.allTime === true);
+// The defect, exactly as typed on the handset. It is a year question with a typo in it, and the
+// answer it gets is now the year either way.
+const t3d = W.matchTotalsQuestion('how much have i made this yeat', now);
+ok('🔴 AND THE TYPO THAT STARTED THIS GETS THE YEAR, because that is what silence means now',
+  t3d && t3d.kind === 'made' && t3d.sinceISO === '2026-04-06');
 const t4 = W.matchTotalsQuestion('how much tax do I owe', now);
 ok('tax keyed to the tax year', t4 && t4.kind === 'tax' && t4.sinceISO === '2026-04-06');
+ok('and the flag is false for every real period',
+  t3.allTime === false && t1.allTime === false && t2.allTime === false && t4.allTime === false);
+ok('the flag and the window never disagree, so neither can drift alone',
+  [t1, t2, t3, t3b, t3c, t4].every((t) => t.allTime === (t.sinceISO === null)));
 const t5 = W.matchTotalsQuestion('how much have I made this week?', now);
 ok('made this week starts Monday', t5 && t5.kind === 'made' && t5.sinceISO === '2026-06-29');
 ok('money entry is not a totals question', W.matchTotalsQuestion('spent £40 on diesel', now) === null);

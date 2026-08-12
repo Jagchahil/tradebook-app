@@ -400,7 +400,7 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
     // its own wording ("Send me a receipt") because on that channel a receipt is the very thing he
     // is holding. Here he is on the web, where the chat takes no receipts and his number may not
     // be bound, so the sentence names the door that always works: the Money pages.
-    return `Nothing logged ${q.periodLabel === 'all time' ? 'yet' : q.periodLabel}. Add what you earn and spend from the Money pages and the tally starts itself.`;
+    return `Nothing logged ${q.allTime ? 'yet' : q.periodLabel}. Add what you earn and spend from the Money pages and the tally starts itself.`;
   }
 
   const profit = totals.income - totals.expenses;
@@ -412,7 +412,7 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
     return `You have brought in ${formatGbp(totals.income)} ${q.periodLabel}. Nice going. Profit after expenses is ${formatGbp(profit)}.`;
   }
   if (q.kind === 'profit') {
-    return `${q.periodLabel === 'all time' ? 'All time' : `For ${q.periodLabel}`}: ${formatGbp(totals.income)} in, ${formatGbp(totals.expenses)} out, so ${formatGbp(profit)} profit.`;
+    return `${q.allTime ? 'All time' : `For ${q.periodLabel}`}: ${formatGbp(totals.income)} in, ${formatGbp(totals.expenses)} out, so ${formatGbp(profit)} profit.`;
   }
 
   // 🔴 WHAT HE OWES IS THE TAX HUB'S OWN NUMBER, FETCHED BY NAME, NEVER RE-DERIVED.

@@ -18,7 +18,7 @@
 // back to a one-off esbuild transpile, exactly like test/exams/run-exams.mjs.
 
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
@@ -116,6 +116,118 @@ if (mismatches.length > 0) {
   }
   if (mismatches.length > 20) {
     console.log(`  ...and ${mismatches.length - 20} more.`);
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE SIXTH SURFACE. WHAT THE PHONE TELLS HIM TO PUT BY.
+//
+// 🔴 FOUND 12 AUGUST 2026 BY READING THE PHONE AFTER THE WEB HAD BEEN FIXED AND CLOSED.
+//
+// RUN 1 of the customer week raised this as its flagship P1: a groundworker whose contractors had
+// already handed HMRC £2,800 on his behalf was told to put by £3,337 he did not owe, on a January
+// that is a refund. The web money spine was corrected and held to the penny across five surfaces.
+//
+// The phone was never in that packet, and it is a whole separate tax engine in a second repository.
+// app/(tabs)/you.tsx drew the biggest number in the app, under a comment reading "THE NUMBER HE
+// CAME FOR", straight from businessTaxOnProfit() with no deduction of any kind. So the same
+// customer, on the same account, on the same afternoon, read £0 on the web and about £3,337 on his
+// phone, and the phone is the one he actually looks at.
+//
+// ⚠️ AND THE PHONE ALREADY DISAGREED WITH ITSELF: app/tax-summary.tsx had netted CIS off since it
+// was written. Two screens, two answers, one number. So the arithmetic moved into lib/tax.ts and
+// both screens ask it, and this section is what stops either of them wandering off again.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== the phone: tax already paid at source comes off what he puts by ===\n');
+{
+  const okc = (name, cond) => {
+    if (cond) { pass += 1; console.log(`  PASS  ${name}`); }
+    else { fail += 1; console.log(`  FAIL  ${name}`); mismatches.push(name); }
+  };
+
+  okc('🔴 THE PHONE ENGINE HAS ONE READER FOR WHAT IS LEFT TO FIND',
+    typeof app.setAsideAfterCis === 'function');
+
+  if (typeof app.setAsideAfterCis === 'function') {
+    // DANNY, the customer the finding is named after. Profit £11,639, CIS suffered £2,800.
+    // His liability on that profit is smaller than the tax already handed over, so the honest
+    // answer is nothing to put by and a refund coming, not a bill.
+    const danny = app.setAsideAfterCis('sole_trader', 11639, 2800);
+    okc('DANNY: the liability is the engine’s own figure on his profit',
+      danny.liability === Math.round(app.businessTaxOnProfit('sole_trader', 11639)));
+    okc('🔴 DANNY: AND THE TAX HIS CONTRACTORS ALREADY PAID COMES OFF IT',
+      danny.setAside === Math.max(0, danny.liability - 2800));
+    // ⚠️ AND THE FIRST DRAFT OF THIS LINE ASSERTED setAside < liability, WHICH IS FALSE FOR DANNY
+    // AND FOR A GOOD REASON. His £11,639 profit is under the personal allowance, so his liability
+    // is nil and there is nothing for the deduction to reduce: every penny of the £2,800 is a
+    // refund. Asserting the deduction "bites" needs a customer who actually has a bill.
+    okc('🔴 DANNY: SO HE IS NOT TOLD TO PUT BY ANYTHING, and the whole £2,800 is owed back',
+      danny.setAside === 0 && danny.refundLikely === 2800 - danny.liability);
+    const withABill = app.setAsideAfterCis('sole_trader', 40000, 2800);
+    okc('🔴 AND ON A MAN WHO DOES HAVE A BILL, THE DEDUCTION COMES OFF IT',
+      withABill.liability > 0
+      && withABill.setAside === withABill.liability - 2800
+      && withABill.setAside < withABill.liability);
+
+    // A sweep, because the defect was a missing subtraction and a missing subtraction hides best
+    // in one worked example.
+    let wrong = 0; let negative = 0; let bothAtOnce = 0;
+    for (const profit of [0, 5000, 11639, 20000, 40000, 60000, 120000]) {
+      for (const cis of [0, 1, 500, 2800, 9000, 40000]) {
+        const r = app.setAsideAfterCis('sole_trader', profit, cis);
+        if (r.setAside !== Math.max(0, r.liability - cis)) wrong += 1;
+        if (r.setAside < 0 || r.refundLikely < 0) negative += 1;
+        // A man cannot owe money and be owed money on the same figures.
+        if (r.setAside > 0 && r.refundLikely > 0) bothAtOnce += 1;
+      }
+    }
+    okc('🔴 THE DEDUCTION HAPPENS ON EVERY COMBINATION, not just the worked example', wrong === 0);
+    okc('and neither answer can go negative, so a big refund is never a negative bill', negative === 0);
+    okc('🔴 AND HE IS NEVER TOLD HE OWES AND IS OWED AT THE SAME TIME', bothAtOnce === 0);
+
+    // The refund is the other side of the same subtraction, and it only exists when there is one.
+    const owed = app.setAsideAfterCis('sole_trader', 11639, 9000);
+    okc('when the deductions are bigger than the bill, the difference is a refund',
+      owed.setAside === 0 && owed.refundLikely === Math.max(0, owed.liability * -1 + 9000));
+
+    // ⚠️ A COMPANY IS A DIFFERENT TAXPAYER. A director's personal CIS does not reduce his
+    // company's Corporation Tax, and a company under CIS suffers it against PAYE rather than CT.
+    // Netting it off here would be the wrong bill, so the engine refuses rather than approximates.
+    const ltd = app.setAsideAfterCis('limited_company', 60000, 9000);
+    okc('🔴 A DIRECTOR’S CIS NEVER REDUCES HIS COMPANY’S CORPORATION TAX',
+      ltd.cis === 0 && ltd.setAside === ltd.liability && ltd.refundLikely === 0);
+
+    // The extra tax argument is how the quarter screen folds in a student loan, and it must be
+    // part of the bill the deduction comes off, never something the deduction skips.
+    const withSl = app.setAsideAfterCis('sole_trader', 40000, 1000, 500);
+    const withoutSl = app.setAsideAfterCis('sole_trader', 40000, 1000, 0);
+    okc('extra tax joins the bill before the deduction, not after it',
+      withSl.liability === withoutSl.liability + 500 && withSl.setAside === withoutSl.setAside + 500);
+  }
+
+  // ⚠️ AND BOTH SCREENS ASK IT. The whole defect was one screen doing the arithmetic and the
+  // other not, so a guard on the function alone would have passed on the day this was broken.
+  const appRoot = path.resolve(here, '../../tradebook-app');
+  const readApp = (rel) => readFileSync(path.join(appRoot, rel), 'utf8');
+  //
+  // 🔴 AND THE GUARD NAMES THE ASSIGNMENT, NOT THE CALL. The first draft asserted the file merely
+  // CONTAINS 'setAsideAfterCis(' and sabotage walked straight through it: renaming the binding to
+  // setAside0 orphaned the result and left the call text sitting there, green. Calling a function
+  // and throwing the answer away is exactly the shape of the defect this section exists for. The
+  // same mistake, in the same afternoon, as the three router guard that passed on an import.
+  for (const [screen, file, ...marks] of [
+    ['the home screen, where the big number lives', 'app/(tabs)/you.tsx',
+      'const pos = setAsideAfterCis(', 'const setAside = PREVIEW ? 3240 : pos.setAside;'],
+    ['the quarter screen', 'app/tax-summary.tsx',
+      'const setAside = setAsideAfterCis('],
+  ]) {
+    let src = '';
+    try { src = readApp(file); } catch { src = ''; }
+    okc(`${screen}: the file was read`, src.length > 500);
+    for (const mark of marks) {
+      okc(`🔴 ${screen}: the number it draws comes from the engine  \`${mark}\``, src.includes(mark));
+    }
   }
 }
 

@@ -733,8 +733,15 @@ export function deadlineAnswer(now: Date, asker: DeadlineAsker): string {
 export type TotalsKind = 'spent' | 'made' | 'profit' | 'tax';
 export interface TotalsQuestion {
   kind: TotalsKind;
-  sinceISO: string | null; // null = all time (tax year to date for tax)
+  sinceISO: string | null; // null = since his first entry here
   periodLabel: string;
+  // 🔴 A FLAG, BECAUSE FOUR CALL SITES WERE DECIDING CONTROL FLOW BY COMPARING DISPLAY TEXT.
+  // Both routers carried `q.periodLabel === 'all time'` to choose between "Nothing logged yet" and
+  // "Nothing logged <period>", and between "All time:" and "For <period>:". Rewording the label on
+  // 12 August would have shipped "Nothing logged since your first entry here" and "For since your
+  // first entry here:" to a customer, from four places, in two routers. A label is for reading. A
+  // boolean is for branching.
+  allTime: boolean;
   category: string | null; // e.g. fuel, when they ask "on fuel"
 }
 
@@ -756,12 +763,38 @@ function periodFrom(b: string, now: Date): { sinceISO: string | null; label: str
     const s = new Date(Date.UTC(d.getUTCFullYear(), q, 1));
     return { sinceISO: s.toISOString().slice(0, 10), label: 'this quarter' };
   }
-  if (/\bthis (tax )?year\b|\bso far\b|\byear to date\b/.test(b)) {
-    // The UK tax year starts 6 April.
-    const y = d.getUTCMonth() > 3 || (d.getUTCMonth() === 3 && d.getUTCDate() >= 6) ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
+  // The UK tax year starts 6 April.
+  const taxYear = () => {
+    const y = d.getUTCMonth() > 3 || (d.getUTCMonth() === 3 && d.getUTCDate() >= 6)
+      ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
     return { sinceISO: `${y}-04-06`, label: 'this tax year' };
+  };
+  if (/\bthis (tax )?year\b|\bso far\b|\byear to date\b/.test(b)) return taxYear();
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 SINCE EVER IS A THING HE HAS TO ASK FOR. IT IS NOT WHAT SILENCE MEANS.
+  //
+  // Found 12 August 2026 on the live WhatsApp number. A man typed "how much have i made this yeat"
+  // and Lekhio replied "You have brought in £70,000.00 all time." He asked about a YEAR, the typo
+  // missed this function's year test by one letter, and the fall through handed him a different
+  // period without ever noticing the two did not match.
+  //
+  // ⚠️ AND THE FALL THROUGH WAS THE REAL FAULT, NOT THE TYPO. matchTotalsQuestion below has forced
+  // the tax year for a TAX question since it was written, with the reason in its own comment: "the
+  // only period that makes sense". That reason does not stop at tax. What he made, what he spent
+  // and his profit are all numbers with a bill attached, and the bill is drawn on the tax year.
+  // A man on a ladder asking what he has made means the year he is going to be taxed on.
+  //
+  // 🔴 AND "ALL TIME" IS NOT TRUE ANYWAY. It means since Lekhio started counting, which for a
+  // customer who joined in June is eleven weeks, printed under a phrase that sounds like a career.
+  // A man who has traded twelve years reads "all time" and sees a number that is missing most of
+  // his life. So it is only ever reached deliberately now, and when it is reached it says what it
+  // actually covers.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (/\ball ?time\b|\bever\b|\bsince i (started|joined|signed up)\b|\baltogether\b|\bin total\b/.test(b)) {
+    return { sinceISO: null, label: 'since your first entry here' };
   }
-  return { sinceISO: null, label: 'all time' };
+  return taxYear();
 }
 
 export function matchTotalsQuestion(body: string, now: Date = new Date()): TotalsQuestion | null {
@@ -783,7 +816,7 @@ export function matchTotalsQuestion(body: string, now: Date = new Date()): Total
   if (kind === 'tax') {
     const d = new Date(now);
     const y = d.getUTCMonth() > 3 || (d.getUTCMonth() === 3 && d.getUTCDate() >= 6) ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
-    return { kind, sinceISO: `${y}-04-06`, periodLabel: 'this tax year', category: null };
+    return { kind, sinceISO: `${y}-04-06`, periodLabel: 'this tax year', allTime: false, category: null };
   }
   const catM = b.match(/\bon\s+([a-z][a-z ]{2,19})/);
   let category: string | null = null;
@@ -793,7 +826,7 @@ export function matchTotalsQuestion(body: string, now: Date = new Date()): Total
     if (mapped !== 'other') category = mapped;
     else if (KNOWN_CATEGORIES.includes(word)) category = word;
   }
-  return { kind, sinceISO: period.sinceISO, periodLabel: period.label, category };
+  return { kind, sinceISO: period.sinceISO, periodLabel: period.label, allTime: period.sinceISO === null, category };
 }
 
 export function formatGbp(n: number): string {

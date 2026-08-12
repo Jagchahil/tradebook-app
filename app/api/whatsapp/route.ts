@@ -1985,7 +1985,7 @@ async function handleTotals(from: string, body: string): Promise<void> {
       );
       return;
     }
-    await sendText(from, `Nothing logged ${q.periodLabel === 'all time' ? 'yet' : q.periodLabel}. Send me a receipt or what you spent and I will start the tally.`);
+    await sendText(from, `Nothing logged ${q.allTime ? 'yet' : q.periodLabel}. Send me a receipt or what you spent and I will start the tally.`);
     return;
   }
   const profit = totals.income - totals.expenses;
@@ -1999,7 +1999,7 @@ async function handleTotals(from: string, body: string): Promise<void> {
     return;
   }
   if (q.kind === 'profit') {
-    await sendText(from, `${q.periodLabel === 'all time' ? 'All time' : `For ${q.periodLabel}`}: ${formatGbp(totals.income)} in, ${formatGbp(totals.expenses)} out, so ${formatGbp(profit)} profit.`);
+    await sendText(from, `${q.allTime ? 'All time' : `For ${q.periodLabel}`}: ${formatGbp(totals.income)} in, ${formatGbp(totals.expenses)} out, so ${formatGbp(profit)} profit.`);
     return;
   }
   // 🔴 WHAT HE OWES IS THE TAX HUB'S OWN NUMBER, FETCHED BY NAME, NEVER RE-DERIVED.

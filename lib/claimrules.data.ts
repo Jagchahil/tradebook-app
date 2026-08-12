@@ -289,14 +289,46 @@ export const EXPENSE_RULES: ExpenseRule[] = [
 // It is a lookup, not a router. Every caller that hands it a sentence a customer typed must first
 // decide that the sentence is a claim question at all, and isClaimQuestion() below is the one
 // place that decision is written down. Do not add a second one.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE LONGEST ALIAS WINS, AND IT USED TO BE THE FIRST RULE IN THE FILE. 11 August 2026.
+//
+// This walked EXPENSE_RULES in order and returned the first rule with any alias in the string. File
+// order is not a judgement about which alias is the better match, and on three real questions it
+// gave the wrong one. The worst by a distance:
+//
+//   "can I claim a parking ticket?"  ->  TRAINING AND COURSES, "Mostly yes."
+//
+// because the training rule carries the alias 'ticket' and sits three rules above parking. This
+// file's own parking rule says HMRC never allows a penalty. So the corpus contradicted itself and
+// told a man a fine was probably claimable, which is the OVER CLAIM direction, on the exact class
+// Finance Act 2026 Sch 22 reaches, on a product whose header is about not helping bring an
+// inaccurate return about. Two more of the same shape: "car parking" answered A CAR ('car' beat
+// 'car park'), and "van insurance" answered A VAN ('van' beat 'van insurance').
+//
+// ⚠️ THE FIX IS SPECIFICITY, NOT REORDERING. Reordering trades one arbitrary tie break for another
+// and the next alias collision is somebody else's afternoon. The longest matching alias is the most
+// specific thing the customer actually said: 'parking ticket' beats 'ticket', 'car park' beats
+// 'car', 'van insurance' beats 'van'. File order survives only as the final tie break between two
+// aliases of the SAME length, where it is as good as anything.
+//
+// ⚠️ AND IT IS STILL WHOLE WORD, SPACE DELIMITED, AND STILL RETURNS null WHEN NOTHING MATCHES.
+// isClaimQuestion() in front of it decides whether the corpus should be asked at all.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
 export function checkExpense(query: string): ExpenseRule | null {
   const q = ' ' + query.toLowerCase().replace(/[^a-z0-9%\s]/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
+  let best: ExpenseRule | null = null;
+  let bestLen = 0;
   for (const r of EXPENSE_RULES) {
     for (const a of r.aliases) {
-      if (q.includes(' ' + a.toLowerCase() + ' ')) return r;
+      const alias = a.toLowerCase();
+      // Strictly greater, so the earlier rule keeps a tie and nothing already correct moves.
+      if (alias.length > bestLen && q.includes(' ' + alias + ' ')) {
+        best = r;
+        bestLen = alias.length;
+      }
     }
   }
-  return null;
+  return best;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

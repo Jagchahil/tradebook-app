@@ -569,6 +569,10 @@ export async function answerMoneyQuestion() { return 'the model answer'; }
 // The data rights lane. Stubbed to its plainest clause: the real matcher and its two findings are
 // in lib/waintents.ts, and test/datadoor.test.mjs walks the whole phrase table through it.
 export function isDataRightsRequest(q) { return /delete .*(data|account)/i.test(q); }
+// The vehicle lane. Stubbed to its plainest clause; the real matcher, and the reason it refuses to
+// name a winner, are in lib/waintents.ts and pinned by test/datadoor.test.mjs.
+export function isVehicleQuestion(q) { return /\b(van|vehicle)\b[^.?!]{0,40}\b(claim|mileage)\b/i.test(q); }
+export function vehicleAnswer() { return 'Tax, then Vehicle.'; }
 export const DATA_RIGHTS_ANSWER = 'You, then Your data.';
 export function matchProductTruth() { return null; }
 export function productTruthAnswer() { return ''; }

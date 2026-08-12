@@ -6,7 +6,7 @@ import {
 import { sessionUser } from '../../../lib/webauth';
 import { cisCapture } from '../../../lib/reviewpile';
 import { worksUnderCis } from '../../../lib/circumstances';
-import { quarterForDate } from '../../../lib/quarterpack';
+import { resolveProofYear } from '../../../lib/proofyear';
 import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 
 export const runtime = 'nodejs';
@@ -37,8 +37,12 @@ export const runtime = 'nodejs';
 // on. lib/reviewpile.ts cisProposal() prints the arithmetic beside the box and never into it.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-function back(req: NextRequest, done: string) {
-  return NextResponse.redirect(new URL(`/app/tax/cis?done=${done}`, req.url), 303);
+// ⚠️ THE YEAR TRAVELS BACK WITH HIM. Without it, answering a 2025/26 row bounced him onto the
+// current year and the row he had just filled in was nowhere to be seen, which reads exactly like
+// the write failing.
+function back(req: NextRequest, done: string, year?: number) {
+  const y = year ? `&y=${year}` : '';
+  return NextResponse.redirect(new URL(`/app/tax/cis?done=${done}${y}`, req.url), 303);
 }
 
 export async function POST(req: NextRequest) {
@@ -59,14 +63,17 @@ export async function POST(req: NextRequest) {
   const form = type.includes('form');
   let id = '';
   let typed = '';
+  let yearRaw = '';
   if (form) {
     const f = await req.formData();
     id = String(f.get('id') ?? '');
     typed = String(f.get('cis') ?? '');
+    yearRaw = String(f.get('y') ?? '');
   } else {
-    const body = (await req.json().catch(() => null)) as { id?: string; cis?: string } | null;
+    const body = (await req.json().catch(() => null)) as { id?: string; cis?: string; y?: string } | null;
     id = String(body?.id ?? '');
     typed = String(body?.cis ?? '');
+    yearRaw = String(body?.y ?? '');
   }
 
   // 🔴 HE HAS TO HAVE TOLD US HE IS IN THE SCHEME. The screen only draws the question for a man who
@@ -75,20 +82,25 @@ export async function POST(req: NextRequest) {
   const answers = await readCircumstances(user.id).catch(() => null);
   if (!worksUnderCis(answers)) return form ? back(req, 'nocis') : NextResponse.json({ error: 'not_cis' }, { status: 403 });
 
-  // ⚠️ THE MONEY IS READ SERVER SIDE, ALWAYS. The browser sends an id and a figure he typed off a
-  // statement. It never sends the amount, so it can never move his turnover by posting one.
-  const { startYear } = quarterForDate(new Date());
-  const rows = await incomeRowsWithoutCis(user.id, `${startYear}-04-06`, `${startYear + 1}-04-05`);
+  // ⚠️ THE MONEY IS READ SERVER SIDE, ALWAYS. The browser sends an id, a figure he typed off a
+  // statement, and which year he was looking at. It never sends the amount, so it can never move
+  // his turnover by posting one.
+  //
+  // 🔴 THE YEAR IS CLAMPED BY THE SAME FUNCTION THE PAGE USES, so a query string cannot reach a
+  // window the screen would never draw, and an absent or nonsense value falls back to the current
+  // year exactly as it did before the chooser existed.
+  const year = resolveProofYear(yearRaw, new Date());
+  const rows = await incomeRowsWithoutCis(user.id, `${year}-04-06`, `${year + 1}-04-05`);
   const row = rows.find((r) => r.id === id);
-  if (!row) return form ? back(req, 'gone') : NextResponse.json({ error: 'not_found' }, { status: 404 });
+  if (!row) return form ? back(req, 'gone', year) : NextResponse.json({ error: 'not_found' }, { status: 404 });
 
   const patch = cisCapture(row.amount, typed);
-  if (!patch) return form ? back(req, 'bad') : NextResponse.json({ error: 'bad_cis' }, { status: 400 });
+  if (!patch) return form ? back(req, 'bad', year) : NextResponse.json({ error: 'bad_cis' }, { status: 400 });
 
   // recordCisOnIncome carries its own guards, in the same statement as the write: his row, the
   // amount unchanged since we read it, and no deduction recorded already. A zero back is a refusal
   // and it is never dressed as a success.
   const applied = await recordCisOnIncome(user.id, row.id, row.amount, patch);
-  return form ? back(req, applied ? 'saved' : 'gone')
+  return form ? back(req, applied ? 'saved' : 'gone', year)
     : NextResponse.json({ applied }, { status: applied ? 200 : 409 });
 }

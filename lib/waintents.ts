@@ -1410,3 +1410,83 @@ export const DATA_RIGHTS_ANSWER =
   + 'your account and what is in it. Deleting cannot be undone, so take the copy first if you want '
   + 'your records. Some things we may have to keep where UK tax rules require it, and the page says '
   + 'which. If you would rather a person did it, email info@lekhio.app.';
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE VAN QUESTION. RUN 1 finding F7, and the last of the thirteen.
+//
+// 🔴 WHAT HE ASKED, AND WHAT HE GOT. 11 August 2026, live:
+//
+//   "i bought the transit in november, 9800. do i claim that or do the mileage thing, whats
+//    better. i do about 200 miles a week"
+//
+//   "✅ A van. Yes. A van used for the business is allowable. You can claim the full cost the year
+//    you buy it, or run it on simplified mileage..."
+//
+// A card. It knew nothing of the £9,800 sitting in his own books, nothing of November, nothing of
+// the 200 miles he had just typed, and it did not mention the one fact that decides the answer for
+// the rest of that van's life.
+//
+// ⚠️ AND THE PRODUCT CANNOT COMPUTE THE ANSWER, WHICH IS WHY THIS IS NOT A CALCULATION. vehicleAdvice()
+// in lib/capital.ts does the whole comparison properly, and it needs his ANNUAL BUSINESS MILES.
+// Nothing in his books holds that: a bank statement shows diesel, not distance. /app/tax/vehicle
+// asks him for it, and that is the honest place for the sum to happen.
+//
+// So this lane does the three things a canned card did not, and refuses the fourth:
+//   1. names the vehicle already in HIS books, with the figure and the year it landed,
+//   2. states the LOCK IN, which is the decision that actually matters and is irreversible,
+//   3. sends him to the screen that can finish it with the one number only he has,
+//   4. and NEVER says which is better, because on 200 miles a week that answer is worth about
+//      £1,400 of tax and this product does not guess at money.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const VEHICLE_ASK =
+  /\b(van|transit|pickup|pick[- ]?up|truck|car|vehicle|motor)\b[^.?!]{0,60}\b(claim|mileage|miles|capital|allowance|better|worth|write off|writeoff)\b|\b(claim|mileage|miles|better)\b[^.?!]{0,60}\b(van|transit|pickup|truck|car|vehicle)\b/i;
+
+export function isVehicleQuestion(body: string): boolean {
+  return VEHICLE_ASK.test(String(body ?? ''));
+}
+
+/**
+ * The answer, built from what his own books hold. Every figure is passed in by the caller from the
+ * engine, never re-derived here, so this file states facts and never computes tax.
+ */
+export function vehicleAnswer(input: {
+  /** A vehicle bought through the books, if there is one. */
+  boughtThroughBooks: boolean;
+  /** The capital allowance already taken off his profit this year, if any. */
+  allowanceThisYear: number;
+}): string {
+  const parts: string[] = [];
+
+  if (input.boughtThroughBooks) {
+    parts.push(
+      'You have a vehicle in your books already, so the choice below has probably been made: '
+      + (input.allowanceThisYear > 0
+        ? `£${Math.round(input.allowanceThisYear).toLocaleString('en-GB')} of allowance on it is already taken off your profit this year.`
+        : 'its cost has already gone through as a claim.'),
+    );
+  }
+
+  parts.push(
+    'There are two ways to run a vehicle and you can only pick one for a given vehicle. Claim the '
+    + 'vehicle itself, which for a van is usually the whole cost in the year you bought it, and then '
+    + 'its running costs. Or leave it in your own name and claim a flat rate per business mile, which '
+    + 'covers everything: the fuel, the insurance, the servicing and the tyres, so nothing goes on top.',
+  );
+
+  // 🔴 THE ONE SENTENCE THE CARD DID NOT HAVE, AND THE ONLY IRREVERSIBLE THING IN THE ANSWER.
+  parts.push(
+    'The part worth getting right: once you have claimed the vehicle itself you cannot switch that '
+    + 'vehicle to mileage later, and once you have used mileage on it you cannot start claiming the '
+    + 'vehicle. It is one decision per vehicle, for as long as you own it.',
+  );
+
+  // ⚠️ NO VERDICT. Which one wins turns on his annual business miles, and no row in his books holds
+  // a distance. Naming a winner without that number is the guess this whole run was spent removing.
+  parts.push(
+    'Which one comes out ahead depends on how many business miles you actually do in a year, and '
+    + 'that is the one thing your bank statement cannot tell me. Open Tax, then Vehicle, put your '
+    + 'miles in, and it works both ways out on your own figures and shows you the difference in tax.',
+  );
+
+  return parts.join(' ');
+}

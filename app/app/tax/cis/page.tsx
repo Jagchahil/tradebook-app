@@ -6,13 +6,14 @@ import { getOptimiserInput, incomeRowsWithoutCis, readCircumstances } from '../.
 import { worksUnderCis } from '../../../../lib/circumstances';
 import { cisProposal, CIS_RATES } from '../../../../lib/reviewpile';
 import { quarterForDate } from '../../../../lib/quarterpack';
+import { currentTaxYear, resolveProofYear } from '../../../../lib/proofyear';
 import { ledgerFor } from '../../../../lib/ledger';
 import { findOptimisations } from '../../../../lib/taxoptimiser';
 import { FACTS, asPercent } from '../../../../lib/taxengine';
 import { gbp0 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, BREAK, FONT, SPACE, TYPE } from '../../../../lib/tokens';
 import {
-  INK, LINE, MUTED, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, edge,
+  INK, LINE, MUTED, PAPER, RIVER, RIVER_DEEP, RIVER_TINT, SURFACE, edge,
 } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
@@ -37,8 +38,8 @@ export default async function CisPage({ searchParams }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const doneRaw = sp.done;
-  const done = Array.isArray(doneRaw) ? doneRaw[0] : doneRaw;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const done = one(sp.done);
   const jar = await cookies();
   const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
   // Carries him back here after he signs in, the /app/you/billing pattern: safeNext() in
@@ -58,9 +59,30 @@ export default async function CisPage({ searchParams }: {
   // learns to skip, and then he misses the month it matters.
   // ═══════════════════════════════════════════════════════════════════════════════════════
   const underCis = worksUnderCis(await readCircumstances(user.id).catch(() => null));
-  const { startYear } = quarterForDate(new Date());
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHICH YEAR, AND WHY THIS SCREEN OF ALL SCREENS NEEDS THE CHOICE.
+  //
+  // Found 11 August 2026 by grossing up a real account and watching the RIGHT number appear while
+  // the BIGGEST one stayed hidden. The capture shipped covering the current tax year only. Danny's
+  // 2026/27 turnover went from £14,020 to £16,820 and his Overview went from "put by £3,337" to a
+  // repayment, all correct. And his actual refund, about £4,400, is in 2025/26: the year he still
+  // has to file, the one the January bill is for, and the one nothing on this screen could reach.
+  //
+  // ⚠️ FOR A SUBCONTRACTOR THE PRIOR YEAR IS THE POINT. The current year is a running estimate that
+  // settles in eighteen months. The year just gone is a return due this January with real money
+  // sitting behind it, and CIS is the reason there is money to come back at all. A screen about
+  // deductions that can only see the year that has not finished is looking the wrong way.
+  //
+  // resolveProofYear is the same clamp /app/proof-of-income uses, so the two year choosers cannot
+  // disagree about which years exist, and neither can be walked past its bounds with a query string.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const now = new Date();
+  const thisYear = currentTaxYear(now);
+  const year = resolveProofYear(one(sp.y), now);
+  const { startYear: liveYear } = quarterForDate(now);
   const missing = underCis
-    ? await incomeRowsWithoutCis(user.id, `${startYear}-04-06`, `${startYear + 1}-04-05`).catch(() => [])
+    ? await incomeRowsWithoutCis(user.id, `${year}-04-06`, `${year + 1}-04-05`).catch(() => [])
     : [];
 
   return (
@@ -112,6 +134,34 @@ export default async function CisPage({ searchParams }: {
           own statement. There is deliberately no "apply 20 percent to all of these": that would be
           us guessing at his materials, and materials are the one thing the rate is never charged
           on. The arithmetic is printed beside the box and never into it. */}
+      {/* ⚠️ THE CHIPS ARE DRAWN FOR A CIS CUSTOMER WHATEVER THE LIST HOLDS, because "nothing left
+          to record in 2026 to 27" is only readable if he can see which year he is looking at, and
+          because the year he needs is usually the one he is NOT on. Two years, the same pair
+          /app/proof-of-income offers, for the same reason: further back is a document question. */}
+      {underCis ? (
+        <section className="lek-card">
+          <h2 className="lek-h2">Which year</h2>
+          <div style={S.years}>
+            {[thisYear, thisYear - 1].map((y) => (y === year ? (
+              <span key={y} style={S.yearOn}>
+                {y === liveYear ? 'This tax year' : `${y} to ${String((y + 1) % 100).padStart(2, '0')}`}
+              </span>
+            ) : (
+              <a key={y} href={`/app/tax/cis?y=${y}`} style={S.year} className="lek-hit">
+                {y === liveYear ? 'This tax year' : `${y} to ${String((y + 1) % 100).padStart(2, '0')}`}
+              </a>
+            )))}
+          </div>
+          {year !== liveYear ? (
+            <p style={S.quiet}>
+              This is the year your next Self Assessment return is for, due by 31 January{' '}
+              {year + 2}. If your contractors took CIS off you during it, that money is already with
+              HMRC and it comes off that bill. For most subcontractors it is where the refund is.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
       {missing.length > 0 ? (
         <section className="lek-card">
           <h2 className="lek-h2">Was CIS taken off these?</h2>
@@ -134,6 +184,9 @@ export default async function CisPage({ searchParams }: {
               return (
                 <form key={r.id} method="post" action="/api/cis" style={S.row}>
                   <input type="hidden" name="id" value={r.id} />
+                  {/* The window the row was READ from, so the route looks in the same year rather
+                      than assuming the live one and refusing every prior year answer as not found. */}
+                  <input type="hidden" name="y" value={year} />
                   <div style={S.rowHead}>
                     <span style={S.rowWho}>{r.vendor ?? 'A payment in'}</span>
                     <span style={S.rowSum}>{gbp0(r.amount)} banked on {r.transaction_date}</span>
@@ -200,6 +253,10 @@ const S: Record<string, React.CSSProperties> = {
   quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: `${SPACE.sm}px 0 0`, maxWidth: '62ch' },
   good: { fontSize: TYPE.note, lineHeight: 1.55, color: RIVER_DEEP, fontWeight: 700, margin: `${SPACE.sm}px 0 0` },
   warn: { fontSize: TYPE.note, lineHeight: 1.55, color: INK, fontWeight: 700, margin: `${SPACE.sm}px 0 0` },
+
+  years: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: SPACE.sm },
+  year: { display: 'inline-block', textDecoration: 'none', background: SURFACE, color: RIVER_DEEP, borderRadius: 999, padding: '8px 14px', fontSize: TYPE.note, fontWeight: 700 },
+  yearOn: { display: 'inline-block', background: RIVER_DEEP, color: PAPER, borderRadius: 999, padding: '8px 14px', fontSize: TYPE.note, fontWeight: 800 },
 
   rows: { display: 'grid', gap: SPACE.sm, marginTop: SPACE.md },
   row: { display: 'block', background: RIVER_TINT, borderRadius: 12, padding: '12px 14px', border: `1px solid ${edge(RIVER, 20)}` },

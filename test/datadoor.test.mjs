@@ -424,5 +424,62 @@ console.log('\nTHE CHAT POINTS AT THE DOOR, deterministically\n');
     before(route, 'isDataRightsRequest(q)', 'answerMoneyQuestion('));
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE LAST THREE OF THE THIRTEEN, CLOSED 11 August 2026.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nF7 the van, the corpus tie break, and the spoken reserved word\n');
+{
+  // ── F7. The van question reaches his own books, and refuses to pick a winner. ──────────────
+  const asks = [
+    'do i claim the van or do the mileage thing whats better',
+    'i bought the transit in november 9800 do i claim that or mileage',
+    'is the van better on mileage',
+  ];
+  ok('🔴 THE VAN QUESTION IS RECOGNISED AT ALL', asks.every((a) => WA.isVehicleQuestion(a)));
+  ok('and an ordinary claim question is not', !WA.isVehicleQuestion('can I claim my boots')
+    && !WA.isVehicleQuestion('what did i spend on fuel'));
+
+  const withVan = WA.vehicleAnswer({ boughtThroughBooks: true, allowanceThisYear: 9800 });
+  const without = WA.vehicleAnswer({ boughtThroughBooks: false, allowanceThisYear: 0 });
+  ok('🔴 IT NAMES THE VEHICLE ALREADY IN HIS BOOKS, and the figure', /9,800/.test(withVan));
+  ok('and says nothing about a vehicle he has not got', !/already/.test(without));
+  ok('🔴 IT STATES THE LOCK IN, which is the irreversible part the card never mentioned',
+    /cannot switch/.test(withVan) && /cannot start claiming/.test(withVan));
+  ok('🔴 AND IT NEVER SAYS WHICH IS BETTER, because that turns on miles his books do not hold',
+    !/\b(better|best|cheaper|you should claim|I would)\b/i.test(without.replace('comes out ahead', '')));
+  ok('it sends him to the screen that can finish the sum', /Tax, then Vehicle/.test(without));
+
+  const route = read('app/api/thread/route.ts');
+  ok('🔴 THE LANE RUNS BEFORE THE CLAIM CORPUS, which is what answered it with a card',
+    before(route, 'isVehicleQuestion(q)', 'checkExpense(q)'));
+  ok('and it reads his own books rather than a template',
+    /vehicleBoughtThroughBooks/.test(route) && /ytdCapitalAllowances/.test(route));
+
+  // ── The corpus tie break. An over claim on a penalty is the worst thing this file can do. ──
+  ok('🔴 A PARKING TICKET IS NO LONGER ANSWERED WITH "TRAINING AND COURSES, MOSTLY YES"',
+    checkExpense('can I claim a parking ticket')?.key === 'parking');
+  ok('🔴 AND THE RULE IT NOW REACHES IS THE ONE THAT SAYS HMRC NEVER ALLOWS A FINE',
+    /never/i.test(checkExpense('can I claim a parking ticket')?.rule ?? ''));
+  ok('car parking is parking, not a car', checkExpense('can I claim car parking')?.key === 'parking');
+  ok('van insurance is insurance, not a van',
+    checkExpense('what about my van insurance')?.key === 'insurance');
+  ok('and the plain cases are untouched',
+    checkExpense('can I claim my van')?.key === 'van'
+    && checkExpense('can I claim a car')?.key === 'car'
+    && checkExpense('can I claim a course')?.key === 'training');
+  ok('🔴 THE MATCHER PICKS THE MOST SPECIFIC ALIAS, not the first rule in the file',
+    /alias\.length > bestLen/.test(read('lib/claimrules.data.ts')));
+
+  // ── A spoken reserved word is still a reserved word. ───────────────────────────────────────
+  const vf = read('lib/voiceflow.ts');
+  ok('🔴 A VOICE NOTE IS CHECKED FOR A RESERVED WORD BEFORE IT REACHES THE PARSER',
+    before(vf, 'matchReservedWord(clean)', 'parseSpokenTransaction(clean)'));
+  ok('🔴 AND IT REFUSES RATHER THAN ACTS, because Whisper mishears and a misheard STOP is worse',
+    /nothing has changed/.test(vf) && /Send it to me as a text/.test(vf));
+  ok('the outcome is named, so the caller can tell it from a failed parse',
+    /'reserved'/.test(vf) && /VoiceFinishOutcome = [^;]*'reserved'/.test(vf));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

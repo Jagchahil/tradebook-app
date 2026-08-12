@@ -9,6 +9,7 @@ import { aiCapsFor } from '../../../lib/margin';
 import {
   matchTotalsQuestion, formatGbp, isDeadlineQuestion, asksAmount, deadlineAnswer, type TotalsQuestion,
   matchProductTruth, productTruthAnswer, isDataRightsRequest, DATA_RIGHTS_ANSWER,
+  isVehicleQuestion, vehicleAnswer,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
@@ -222,6 +223,20 @@ async function composeReply(userId: string, q: string): Promise<string> {
   // answer to "delete everything you hold on me" does not get to be probabilistic, and it must not
   // cost an AI call either, because a man at his spend cap still has the right to leave.
   if (isDataRightsRequest(q)) return DATA_RIGHTS_ANSWER;
+
+  // 🔴 THE VAN QUESTION, ABOVE THE CLAIM CORPUS, BECAUSE THE CORPUS ANSWERED IT WITH A CARD.
+  // RUN 1 finding F7: a man typed the price, the month and his weekly miles, and got a generic
+  // "yes, a van is allowable" that knew none of it and never mentioned the lock in. This reads his
+  // own books for the vehicle and names the irreversible part, and it deliberately does NOT say
+  // which route wins: that turns on annual business miles, which no row in his books holds. See
+  // lib/waintents.ts, vehicleAnswer.
+  if (isVehicleQuestion(q)) {
+    const o = await getOptimiserInput(userId).catch(() => null);
+    return vehicleAnswer({
+      boughtThroughBooks: o?.vehicleBoughtThroughBooks === true,
+      allowanceThisYear: Math.max(0, o?.ytdCapitalAllowances ?? 0),
+    });
+  }
 
   // 3. "Can I claim it" questions: the deterministic claim rules, no AI.
   //

@@ -6,7 +6,7 @@
 
 import { parseSpokenTransaction } from './claude';
 import { insertTransaction } from './supabase';
-import { entryDate } from './waintents';
+import { entryDate, matchReservedWord } from './waintents';
 import { sendText } from './whatsapp';
 
 // The confirmation we send after logging a note. Lifted verbatim from the webhook so voice and text
@@ -30,7 +30,7 @@ export function confirmationLine(parsed: {
   return `Got it. ${parsed.merchant_name} for ${amountText}. Filed under ${parsed.category}. Check it in the app and confirm.`;
 }
 
-export type VoiceFinishOutcome = 'logged' | 'no_amount' | 'blank';
+export type VoiceFinishOutcome = 'logged' | 'no_amount' | 'blank' | 'reserved';
 
 // Given a transcript, parse it, log the entry if it holds a real amount, and reply to the customer. The
 // transcript itself is NOT stored (description is left empty for a spoken note) — only the parsed vendor,
@@ -46,6 +46,31 @@ export async function finishVoiceEntry(
   if (!clean) {
     await sendText(fromPhone, 'I could not make out that voice note. Try saying it again, nice and clear.');
     return 'blank';
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A SPOKEN RESERVED WORD IS STILL A RESERVED WORD. Found 11 August 2026.
+  //
+  // The typed path reserves SUPPORT, STOP and START above every session flow and above the parser,
+  // because a customer replying with a word WE handed him must never be fed to a receipt reader.
+  // This path went straight to parseSpokenTransaction, so a man who said "stop" into his phone had
+  // it treated as an expense with no amount in it, and was told to try again with something like
+  // "forty quid of diesel". Under PECR an opt out has to be honoured, and on WhatsApp it does not
+  // even need a regulator: enough people press Block and Meta takes the number off us.
+  //
+  // ⚠️ IT REFUSES RATHER THAN ACTS. Whisper mishears, and acting on a misheard STOP would silence a
+  // man who never asked for it. So the voice path never opts anybody in or out by itself: it says
+  // what it heard, asks him to send the word as a text, and lets the typed path (which is exact)
+  // do the thing. One sentence, no state changed, and the word stops being eaten.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const reserved = matchReservedWord(clean);
+  if (reserved) {
+    await sendText(
+      fromPhone,
+      `It sounded like you said ${reserved}. I did not want to act on that from a voice note in case `
+      + `I misheard you, so nothing has changed. Send it to me as a text and I will do it straight away.`,
+    );
+    return 'reserved';
   }
 
   const parsed = await parseSpokenTransaction(clean);

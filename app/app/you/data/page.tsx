@@ -151,17 +151,28 @@ export default async function YourDataPage({
           <a href="/privacy" style={S.inlineLink}>privacy policy</a>, and it is the only reason
           anything survives this.
         </p>
-        {/* ⚠️ THE ONE THING DELETING HIS ACCOUNT DOES NOT DO, SAID BEFORE HE PRESSES ANYTHING.
-            deleteUserData() empties the subscriptions row; it makes no call to the payment
-            provider, so a live card mandate carries on billing a man whose books are gone and
-            whose account cannot be found by the billing webhook afterwards. Silence here would
-            be the worst kind of half truth, because everybody assumes leaving stops the money.
-            The honest fix is on the route rather than on this page, and it is reported. */}
+        {/* ═══════════════════════════════════════════════════════════════════════════════════
+            🔴 THIS PARAGRAPH USED TO WARN HIM THAT LEAVING DOES NOT STOP THE MONEY, AND IT WAS
+            TRUE FOR ABOUT A DAY. 12 August 2026.
+
+            deleteUserData() emptied the subscriptions row and never told Stripe, so a man who
+            erased himself kept a live monthly charge against an account that no longer existed,
+            with no row left for the billing webhook to match it to. Told to cancel first, most
+            people would not, and the ones who did not would be charged for ever.
+
+            It now cancels the subscription outright before the walk, and this paragraph says so.
+
+            ⚠️ THE COPY MOVED WITH THE CODE, ON THE SAME COMMIT, and test/datadoor.test.mjs holds
+            them together: it asserted "the walk still makes no call to the payment provider, so
+            the warning below is still true", and it went RED the moment the call was added. That
+            is the assertion doing exactly what it was written for, on exactly the commit it was
+            written for. A warning that outlives the thing it warns about is a lie with a good
+            excuse. ═══════════════════════════════════════════════════════════════════════════ */}
         <p style={S.quiet}>
-          If you are paying us, cancel in{' '}
-          <a href="/app/you/billing" style={S.inlineLink}>Billing</a> first. Deleting your account
-          clears your records here and does not by itself stop a card payment already set up with
-          our payment provider.
+          If you are paying us, deleting your account cancels that too. We stop the subscription
+          with our payment provider before anything else is touched, so there is no last payment
+          after you have gone. You can see it in{' '}
+          <a href="/app/you/billing" style={S.inlineLink}>Billing</a> until the moment you do this.
         </p>
 
         {mistyped ? (
@@ -219,7 +230,39 @@ export default async function YourDataPage({
         )}
       </section>
 
-      <p style={S.foot}>
+      {/* ═══════════════════════════════════════════════════════════════════════════════════
+          UNPLUG THE PHONE. RUN 1 proved there was no way to do this anywhere in the product.
+
+          A number bound to an account could not be released by anybody. WhatsApp refused a new
+          pairing with "already connected to a Lekhio account", the only road it offered was a
+          support queue, and there was no unbind on the web, on WhatsApp or in settings. One stale
+          binding took a real handset out of Lekhio for good.
+
+          ⚠️ IT IS HIS OWN NUMBER OFF HIS OWN ACCOUNT, never a move between two. That is what makes
+          it safe to do himself: nobody needs proof of who owns a number he is giving up. Once he
+          lets go, the handset side claims it with a connect code exactly as it always has.
+
+          It sits on this page rather than under Connect, because the shape of it is the same as
+          the two above: a thing he is entitled to do with his own data whenever he likes.
+          ═══════════════════════════════════════════════════════════════════════════════════ */}
+          <h2 style={S.lede}>Unplug your phone</h2>
+          <p style={S.fact}>
+            This takes your mobile number off this account. Nothing else changes: every receipt and
+            every entry you have sent us stays exactly where it is, and you can connect the same
+            phone again, or a different one, whenever you like.
+          </p>
+          <p style={S.quiet}>
+            Do this if the number on here is not yours any more, or if you want to use it on a
+            different Lekhio account. A number can only be on one account at a time, so nobody else
+            can connect that handset until you let go of it.
+          </p>
+          {one('done') === 'unplugged' ? <p style={S.armed}>Done. That number is free to connect anywhere now.</p> : null}
+          {one('done') === 'unplugfailed' ? <p style={S.warn}>Something went wrong our end and your number has NOT been unplugged. Nothing was changed. Try again in a minute.</p> : null}
+          <form method="post" action="/api/account/phone">
+            <button type="submit" style={S.carryOn} className="lek-hit">Unplug my phone</button>
+          </form>
+
+          <p style={S.foot}>
         Rather ask a person? Email info@lekhio.app and we will do either of these for you.
       </p>
     </main>

@@ -273,8 +273,15 @@ console.log('\n--- 3. THE ERASURE DOOR EXISTS, AND A CUSTOMER CAN REACH IT ---\n
   // link can ARM this page. That is safe only because arming it destroys nothing. If the erasure
   // itself ever became reachable by GET, any other site could fire it with an image tag, which is
   // the same reasoning the sign out row on /app/you is a form for.
-  ok('🔴 the erasure is a POST and the page owns no other write',
-    (pageCode.match(/method="post"/g) ?? []).length === 1);
+  // ⚠️ TWO POSTS SINCE 12 AUGUST: the erasure, and unplugging his phone. Both are writes and both
+  // are correctly POSTs. The property worth holding is not "one form", it is that NOTHING
+  // DESTRUCTIVE IS REACHABLE BY GET, so the count moved and the claim did not.
+  ok('🔴 every write on this page is a POST, and the erasure is one of them',
+    (pageCode.match(/method="post"/g) ?? []).length === 2
+    && /action="\/api\/account\/delete"/.test(pageCode)
+    && /action="\/api\/account\/phone"/.test(pageCode));
+  ok('🔴 AND NOTHING DESTRUCTIVE IS REACHABLE BY GET, which is the actual rule',
+    !/method="get"[\s\S]{0,400}?api\/account/.test(pageCode));
 
   ok('a mistyped word is told so rather than silently redrawing the form',
     /const mistyped = typed\.length > 0 && !armed/.test(pageCode) && /did not match/.test(pageCode));
@@ -365,17 +372,33 @@ console.log('\n--- 5. 🔴 THE COPY PROMISES NO MORE THAN THE PRIVACY POLICY DOE
   ok('and it tells him to take a copy first, which is the one thing that makes it survivable',
     /take a copy first/i.test(page));
 
-  // 🔴 THE ONE THING ERASURE DOES NOT DO, SAID BEFORE HE PRESSES. deleteUserData() clears the
-  // subscriptions row and makes no call to the payment provider, so a live card mandate outlives
-  // the account. Silence would be the worst kind of half truth: everybody assumes leaving stops
-  // the money.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THIS ASSERTION FIRED ON THE COMMIT IT WAS WRITTEN FOR, AND THAT IS THE POINT OF IT.
+  //
+  // It used to read: "it still makes no call to the payment provider, so the warning below is
+  // still true", pinned beside a page that told him to cancel in Billing first. On 12 August the
+  // call was added and this went red, which is exactly what it existed to do: a warning that
+  // outlives the thing it warns about is a lie with a good excuse.
+  //
+  // So it inverts. The erasure MUST cancel, it must do so BEFORE the walk (the id lives in the row
+  // the walk deletes, so reading it afterwards cancels nothing, silently), and the page must no
+  // longer tell him to do it himself.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
   const db = read('lib/supabase.ts');
   const del = /export async function deleteUserData[\s\S]*?\n}/.exec(db)?.[0] ?? '';
   ok('the erasure walk was read', del.length > 0);
-  ok('🔴 it still makes no call to the payment provider, so the warning below is still true',
-    !/stripe/i.test(del));
-  ok('🔴 and the page tells him to cancel billing first, and where',
-    /href="\/app\/you\/billing"/.test(page) && /cancel/i.test(page));
+  ok('🔴 ERASURE CANCELS THE CARD MANDATE, so leaving actually stops the money',
+    /cancelSubscriptionNow\(/.test(del));
+  // ⚠️ THROUGH before(), NOT A RAW indexOf. Sabotage caught this one: delete the read entirely and
+  // indexOf returns -1, and -1 is less than everything, so the assertion passed on a function that
+  // no longer read the id at all. That is the exact trap this file's own before() helper exists
+  // for, and it is the eighth vacuous assertion found this way across these two days.
+  ok('🔴 AND THE ID IS READ BEFORE THE WALK DELETES THE ROW THAT HOLDS IT',
+    before(del, 'getLiveSubscriptionId', 'cancelSubscriptionNow'));
+  ok('a failed cancel does not veto the erasure, because a provider outage is not a legal reason',
+    !/if \(!\s*await cancelSubscriptionNow/.test(del) && !/allOk = false;[\s]*\/\/ *stripe/i.test(del));
+  ok('🔴 AND THE PAGE NO LONGER TELLS HIM TO CANCEL IT HIMSELF FIRST',
+    /deleting your account cancels that too/i.test(page));
 }
 
 
@@ -479,6 +502,82 @@ console.log('\nF7 the van, the corpus tie break, and the spoken reserved word\n'
     /nothing has changed/.test(vf) && /Send it to me as a text/.test(vf));
   ok('the outcome is named, so the caller can tell it from a failed parse',
     /'reserved'/.test(vf) && /VoiceFinishOutcome = [^;]*'reserved'/.test(vf));
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE PHONE A MAN COULD NEVER UNPLUG. RUN 1 finding F2, the half no keyword could reach.
+//
+// 🔴 lib/supabase.ts PREDICTED THIS FUNCTION AND TOLD IT WHAT TO DO, months before it existed:
+// "a phone number, once set on users, is never unset: the bank has /api/bank/disconnect, the phone
+// has no equivalent anywhere in the tree", and "THE DAY SOMEBODY ADDS A PHONE DISCONNECT, THIS
+// BECOMES A LIVE GDPR HOLE. His number would sit in ai_usage.key through an erasure that reported
+// success." Both halves are held below.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nUnplugging the phone, and the GDPR hole the warning predicted\n');
+{
+  const db = read('lib/supabase.ts');
+  const fn = /export async function disconnectPhone[\s\S]*?\n}/.exec(db)?.[0] ?? '';
+  ok('there is a way to unplug a phone at all, which there was not before', fn.length > 0);
+
+  ok('🔴 EVERY PHONE KEYED TABLE IS CLEARED FIRST, while the number that keys them is still there',
+    before(fn, "keyKind !== 'phone'", 'phone_number: null'));
+  ok('🔴 AND IT REFUSES TO UNSET THE NUMBER IF ANY OF THOSE DELETES FAILED, which is the hole',
+    /if \(!allOk\) return false;[\s\S]{0,900}?phone_number: null/.test(fn));
+  ok('the tables come from the manifest, so a fifth one is covered by the same commit',
+    /USER_DATA_TABLES/.test(fn) && !/support_tickets|ai_usage/.test(fn));
+  ok('no number on the account is not a failure', /if \(!phone\) return true;/.test(fn));
+
+  const route = read('app/api/account/phone/route.ts');
+  ok('the door needs a session', /sessionUser\(req\)/.test(route));
+  ok('🔴 IT UNBINDS HIS OWN NUMBER AND NEVER MOVES ONE BETWEEN ACCOUNTS, which is why it is safe',
+    /disconnectPhone\(user\.id\)/.test(route) && !/userId|targetUser|moveTo/.test(route));
+  ok('and it is not gated by the paywall, for the same reason erasure is not',
+    /route: 'app\/api\/account\/phone', rule: 'always'/.test(read('lib/gate.ts')));
+  ok('a failure is reported rather than dressed as success',
+    /done=\$\{ok \? 'unplugged' : 'unplugfailed'\}/.test(route));
+
+  const page = read('app/app/you/data/page.tsx');
+  ok('🔴 AND THERE IS A DOOR ON A SCREEN, which is the whole finding',
+    /Unplug your phone/.test(page) && /action="\/api\/account\/phone"/.test(page));
+  ok('it says plainly that nothing else is lost', /stays exactly where it is/.test(page));
+  ok('and why he might want to, since a number can only be on one account',
+    /only be on one account at a time/.test(page));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE HEADLINE THAT COUNTED FOUR OF THE SIX THINGS ON THE SCREEN.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nThe pile headline, and the two questions it never counted\n');
+{
+  const rp = read('lib/reviewpile.ts');
+  ok('🔴 waitingCount TAKES THE EXTRA QUESTIONS AT ALL', /export function waitingCount\(p: PilePartition, extras = 0\)/.test(rp));
+  ok('and defaults to zero, so a customer with neither is identical to the penny',
+    /extras = 0/.test(rp) && /Math\.max\(0, Math\.trunc\(extras\) \|\| 0\)/.test(rp));
+
+  const pile = read('app/app/pile/page.tsx');
+  ok('🔴 THE PILE PASSES BOTH THE VAT AND THE CIS COUNTS',
+    /waitingCount\(\{ known, unknown, careful, income \}, vatWaiting\.length \+ cisWaiting\.length\)/.test(pile));
+  ok('🔴 AND IT IS COMPUTED AFTER BOTH LISTS EXIST, or the page is a dead zone crash on every load',
+    before(pile, 'const vatWaiting', 'const decidable')
+    && before(pile, 'const cisWaiting', 'const decidable'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE POLICY THAT STILL POINTED AT A MAILBOX, AND THE TWO CIS QUESTIONS THAT LOOKED THE SAME.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nThe privacy page, and telling the two CIS questions apart\n');
+{
+  const priv = read('app/privacy/page.tsx');
+  ok('🔴 THE POLICY NAMES THE DOOR BEFORE THE MAILBOX', /You, then\s+Your data/.test(priv.replace(/\s+/g, ' ')));
+  ok('and still gives the mailbox for the rights that have no door',
+    /info@lekhio\.app/.test(priv));
+
+  const vat = read('app/app/you/vat/page.tsx');
+  ok('🔴 THE VAT QUESTION NAMES WHAT IT DECIDES, so it does not read as a duplicate',
+    /Do your invoices need the CIS reverse charge\?/.test(vat));
+  ok('and says out loud that the other one is a different question',
+    /separate question from the one about CIS being taken off your own pay/.test(vat));
 }
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);

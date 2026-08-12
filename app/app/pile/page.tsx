@@ -244,7 +244,7 @@ export default async function PilePage({
   // was to build the door: confirm_income, one payer at a time, in supabase/APPLY_2026-07-31.
   // ═══════════════════════════════════════════════════════════════════════════════════════
   const { known, unknown, careful, income } = partitionPile(groups, accountUse);
-  const decidable = waitingCount({ known, unknown, careful, income });
+
   const knownRows = known.reduce((n, g) => n + g.count, 0);
   const incomeRows = income.reduce((n, g) => n + g.count, 0);
 
@@ -282,6 +282,20 @@ export default async function PilePage({
   // above the filing ones: a row he files leaves the pile and takes its unanswered question with it.
   // ═══════════════════════════════════════════════════════════════════════════════════════
   const cisWaiting = cisToAsk(rows, worksUnderCis(circRows));
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE HEADLINE COUNTS WHAT IS ACTUALLY ON THE SCREEN. 12 August 2026.
+  //
+  // waitingCount took four partitions and the pile has drawn SIX kinds of question since the CIS
+  // capture landed: the VAT confirm arrived on 1 August, the CIS one on 11 August, and neither was
+  // ever added. So a subcontractor read "4 questions waiting" over five of them, and a headline
+  // that disagrees with the list beneath it teaches him to distrust both.
+  //
+  // ⚠️ COMPUTED HERE, AFTER BOTH LISTS EXIST, and not a line earlier. It sat above cisWaiting for
+  // about a minute while this was written, which is a temporal dead zone crash on every pile in
+  // the product, and exactly the kind of thing a page that renders on the server fails loudly on.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const decidable = waitingCount({ known, unknown, careful, income }, vatWaiting.length + cisWaiting.length);
 
   // What is still open ABOUT HIM, same count as /app/you: progressIn over every group, so the
   // empty state below cannot say "everything is filed and counted" while his questions wait.

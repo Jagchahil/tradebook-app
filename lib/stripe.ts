@@ -532,3 +532,41 @@ export function verifyStripeSignature(payload: string, sigHeader: string | null)
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
 }
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// CANCEL A SUBSCRIPTION OUTRIGHT. Added 12 August 2026, for erasure and for nothing else.
+//
+// 🔴 THE HOLE IT CLOSES. deleteUserData() walks every table and deletes the `subscriptions` row,
+// and Stripe never heard about any of it. So a man who exercised his right to erasure had:
+//
+//   . his account and every record of it gone from our side,
+//   . a LIVE CARD MANDATE still billing him monthly at Stripe,
+//   . and no row left on our side for the billing webhook to match the payment against, so the
+//     charges would arrive for ever with nobody able to explain them.
+//
+// He asked us to forget him and we kept taking his money. That is worse than the missing erasure
+// door RUN 1 opened with, because this one takes pounds off a man who has left.
+//
+// ⚠️ IMMEDIATELY, NOT AT PERIOD END. cancel_at_period_end leaves the mandate live for up to a
+// month, and there is no account left to serve him for that month. A man who is erasing himself is
+// not asking for the rest of what he paid for, he is asking to be gone.
+//
+// ⚠️ AND A CANCEL THAT FAILS MUST NOT STOP THE ERASURE. His right to be forgotten does not wait on
+// our payment provider being up. The caller logs the failure and carries on, which is the correct
+// direction to fail in: the data goes either way, and a subscription we failed to cancel is
+// visible in the Stripe dashboard, where a person can finish it. The opposite (refusing to erase
+// because Stripe is down) would hand a provider outage a veto over a legal right.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+export async function cancelSubscriptionNow(id: string): Promise<boolean> {
+  if (!KEY || !id) return false;
+  try {
+    const res = await fetch(`${API}/subscriptions/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${KEY}` },
+    });
+    // 404 is a subscription Stripe does not have, which is the state we wanted anyway.
+    return res.ok || res.status === 404;
+  } catch {
+    return false;
+  }
+}

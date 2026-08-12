@@ -3853,10 +3853,36 @@ async function signedReceiptLinks(userId: string): Promise<{ items: ExportedRece
 // Right to erasure: delete every row for this user across all tables, including
 // the server-only ones that do not cascade from `users`, then his receipt images
 // out of the storage bucket, then the auth user.
+// lib/stripe.ts has no imports of its own beyond node crypto, so this cannot be circular.
+import { cancelSubscriptionNow } from './stripe';
+
+// The live subscription id for a user, or null. Read by deleteUserData before it walks the tables,
+// because the id lives in the row that walk deletes.
+async function getLiveSubscriptionId(userId: string): Promise<string | null> {
+  const { url } = config();
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(userId)}`
+        + '&select=stripe_subscription_id&limit=1',
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ stripe_subscription_id?: string | null }> | null;
+    const id = Array.isArray(rows) ? rows[0]?.stripe_subscription_id : null;
+    return typeof id === 'string' && id ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function deleteUserData(userId: string, email: string | null): Promise<boolean> {
   const { url, key } = config();
   const phone = await getPhoneForUser(userId);
   const identities = userDataIdentities(userId, email, phone);
+  // 🔴 READ BEFORE THE WALK DELETES THE ROW THAT HOLDS IT. Reading it afterwards finds nothing and
+  // cancels nothing, silently, which is the same defect wearing a different coat. See the cancel
+  // block further down for why an uncancelled mandate is worse than the missing erasure door was.
+  const subToCancel = await getLiveSubscriptionId(userId);
   // Track whether every delete actually succeeded, so a GDPR erasure never
   // reports success while leaving financial data behind on a failed sub-delete.
   let allOk = true;
@@ -3903,6 +3929,25 @@ export async function deleteUserData(userId: string, email: string | null): Prom
     if (!value) continue;
     await del(`${t.table}?${t.userKey}=eq.${encodeURIComponent(value)}`);
   }
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THE CARD MANDATE, WHICH LIVES AT STRIPE AND NOT IN ANY OF THESE TABLES. 12 August 2026.
+  //
+  // The `subscriptions` row above is deleted like everything else, and until today Stripe never
+  // heard about it. So a man who erased himself kept a LIVE MONTHLY CHARGE, against an account
+  // that no longer existed, with no row left for the billing webhook to match it to. He asked us
+  // to forget him and we went on taking his money, for ever, unexplainably.
+  //
+  // ⚠️ IT IS READ BEFORE THE TABLES ARE WALKED, because the id lives in the row the walk deletes.
+  // Reading it afterwards finds nothing and cancels nothing, silently, which is the same bug in a
+  // different coat.
+  //
+  // ⚠️ AND A FAILED CANCEL DOES NOT FAIL THE ERASURE. His right to be forgotten does not wait on
+  // our payment provider being reachable: the data goes either way, and an uncancelled
+  // subscription is visible in the Stripe dashboard where a person can finish it. Letting a
+  // provider outage veto a legal right would be the worse direction by far.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  if (subToCancel) await cancelSubscriptionNow(subToCancel);
+
   // His photographs. Folded into allOk exactly like a table: an erasure that could not empty the
   // bucket has not erased him, and must not answer ok.
   if (!(await deleteReceiptImages(userId))) allOk = false;
@@ -10911,5 +10956,91 @@ export async function incomeRowsWithoutCis(
       }));
   } catch {
     return [];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// UNPLUG THE PHONE. 12 August 2026, and it is the answer to a question this file asked itself.
+//
+// 🔴 THE COMMENT INSIDE deleteUserData PREDICTED THIS EXACT FUNCTION AND TOLD IT WHAT TO DO:
+//
+//     "a phone number, once set on users, is never unset: the bank has /api/bank/disconnect, the
+//      phone has no equivalent anywhere in the tree."
+//     "⚠️ THE DAY SOMEBODY ADDS A PHONE DISCONNECT, THIS BECOMES A LIVE GDPR HOLE. His number
+//      would sit in ai_usage.key through an erasure that reported success."
+//
+// That gap is what RUN 1 walked into. A number bound to an account could not be moved by anybody:
+// the customer had no door, the WhatsApp refusal's only road was a support queue, and there was no
+// unbind anywhere in the tree. lib/walink.ts bindingVerdict returns 'taken' the moment
+// findUserIdByPhone finds ANY users row holding the number, so one stale binding locks a real
+// handset out of the product for ever.
+//
+// ⚠️ SO THE ORDER OF THE TWO STEPS IS THE WHOLE SAFETY OF THIS FUNCTION, AND IT IS THE OPPOSITE OF
+// THE OBVIOUS ONE. The phone keyed tables are cleared FIRST, while users.phone_number still holds
+// the number that keys them. Unset it first and those rows become unreachable by any future
+// erasure, exactly as the warning above says, and his number sits in ai_usage.key for ever with
+// nothing to point at it.
+//
+// The four tables are not listed by hand here. They are read out of USER_DATA_TABLES, so a fifth
+// phone keyed table added to the manifest is cleared by this door on the same commit, with no
+// second list to forget.
+//
+// ⚠️ AND IT FAILS CLOSED. If any phone keyed delete fails, the number is NOT unset and the caller
+// is told. A half done disconnect that frees the number while leaving rows keyed by it is the
+// precise hole the warning describes, so it is the one outcome this refuses to produce.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function disconnectPhone(userId: string): Promise<boolean> {
+  const { url } = config();
+  if (!userId) return false;
+  const phone = await getPhoneForUser(userId);
+  // No number on the account is not a failure. Nothing to unbind, nothing keyed by it.
+  if (!phone) return true;
+
+  let allOk = true;
+  const del = async (path: string): Promise<void> => {
+    try {
+      const res = await fetch(`${url}/rest/v1/${path}`, {
+        method: 'DELETE',
+        headers: headers({ Prefer: 'return=minimal' }),
+      });
+      if (res.ok) return;
+      // Same forgiveness deleteUserData grants, for the same reason: a table that is not in the
+      // database yet holds no rows for anybody, and wa_out is documented as one of those.
+      if (res.status === 404) {
+        const body = await res.text().catch(() => '');
+        if (body.includes('PGRST205') || /could not find the table/i.test(body)) return;
+      }
+      allOk = false;
+    } catch {
+      allOk = false;
+    }
+  };
+
+  // STEP ONE. Everything keyed by the number, while the number is still on the row.
+  for (const t of USER_DATA_TABLES) {
+    if (t.keyKind !== 'phone') continue;
+    await del(`${t.table}?${t.userKey}=eq.${encodeURIComponent(phone)}`);
+  }
+  if (!allOk) return false;
+
+  // STEP TWO, and only now. The binding itself.
+  //
+  // ⚠️ THIS IS THE ONE WRITE IN THE TREE THAT SETS phone_number TO NULL, and
+  // test/datarights.test.mjs has a guard whose entire job is to go red when that appears. That
+  // guard was written to fire on this commit. It has been narrowed to allow exactly this function,
+  // by name, and nothing else, so the invariant it protects is now "no OTHER code unsets a number",
+  // which is still worth holding and is the thing that was actually meant.
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=minimal' }),
+        body: JSON.stringify({ phone_number: null }),
+      },
+    );
+    return res.ok;
+  } catch {
+    return false;
   }
 }

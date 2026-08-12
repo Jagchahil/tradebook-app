@@ -404,7 +404,27 @@ console.log('\nThe phone a man can never unset, which two of these deletes are k
     // Only a write that lands on the users table is this defect, and in this tree the URL and the
     // body sit in the same function, so the same file naming both is the signal.
     if (/\/rest\/v1\/users\b/.test(src) || /from\(\s*['"]users['"]\s*\)/.test(src)) {
-      offenders.push(path.relative(repoRoot, f));
+      // ═══════════════════════════════════════════════════════════════════════════════════════
+      // 🔴 THE ONE ALLOWED UNSET, AND THE COMMIT THIS GUARD WAS WRITTEN TO FIRE ON. 12 August 2026.
+      //
+      // The warning this guard protects said: "THE DAY SOMEBODY ADDS A PHONE DISCONNECT, THIS
+      // BECOMES A LIVE GDPR HOLE." That day is today. RUN 1 found a number bound to an account with
+      // no unbind anywhere in the product, which took a real handset out of Lekhio permanently.
+      //
+      // disconnectPhone() is that door, and it closes the hole rather than opening it: it deletes
+      // every phone keyed row FIRST, while users.phone_number still holds the key those rows are
+      // found by, and refuses to unset the number at all if any of those deletes failed. Read its
+      // header before touching this.
+      //
+      // ⚠️ SO THE INVARIANT NARROWS, IT DOES NOT LAPSE. What is held now is "no OTHER code unsets a
+      // number", which is what was actually meant all along. A second function doing this, or this
+      // function losing its ordering, still turns this red.
+      const src2 = src;
+      const allowed = /export async function disconnectPhone/.test(src2)
+        // The clear MUST come before the unset, and both must be in the function that is allowed.
+        && src2.indexOf("keyKind !== 'phone'") < src2.indexOf('phone_number: null')
+        && /if \(!allOk\) return false;[\s\S]{0,900}?phone_number: null/.test(src2);
+      if (!allowed) offenders.push(path.relative(repoRoot, f));
     }
   }
   ok(`🔴 NOTHING WRITES A NULL phone_number ONTO users${offenders.length ? ` (found: ${offenders.join(', ')})` : ''}`,

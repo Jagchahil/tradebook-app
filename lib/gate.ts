@@ -228,6 +228,7 @@ export const GATED_ROUTES: GatedRoute[] = [
 
   // ── THE WORK. This is what he is actually paying for. ─────────────────────────────────────
   { route: 'app/api/pile', rule: 'entitled', why: 'Confirming and filing what is waiting. The single most valuable thing we do, and the clearest thing to stop.' },
+  { route: 'app/api/account/phone', rule: 'always', why: 'LETTING GO OF A CONNECTION IS NOT A FEATURE. Same reasoning as erasure and export above: a man whose trial ended must not be left holding a number he cannot use and cannot release, and until he releases it nobody else can connect that handset at all.' },
   { route: 'app/api/cis', rule: 'entitled', why: 'Recording what a contractor deducted at source. It writes to his books exactly as the pile does, so it stops where the pile stops. He can still SEE every deduction already on the account: what read only takes away is changing them.' },
   { route: 'app/api/ask', rule: 'entitled', why: 'Answering a money question with AI. Work, and the only one here with a per use cost to us.' },
   // 🔴 MARKED 'always' BECAUSE IT CANNOT BE GATED, NOT BECAUSE IT SHOULD NOT BE, AND THAT IS A

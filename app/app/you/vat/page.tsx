@@ -266,17 +266,44 @@ function YourVatFacts({ p, today }: { p: VatProfileRow; today: string }) {
               domestic reverse charge, VATA 1994 s55A. Guessing it from a trade name would be
               guessing at a figure on a document a customer pays from, so it is asked, once, and
               a hairdresser never sees a word about it again. */}
+          {/* ═══════════════════════════════════════════════════════════════════════════════
+              🔴 THIS IS NOT THE SAME QUESTION AS THE ONE IN YOUR CIRCUMSTANCES, AND THEY LOOKED
+              LIKE DUPLICATES UNTIL SOMEBODY WROTE THIS DOWN. 12 August 2026.
+
+              /app/you/circumstances asks "do the firms you work for take CIS off your money before
+              it reaches you?" That is about HIS TAX: what has already gone to HMRC on his behalf,
+              what comes off his January bill, and whether he is owed a refund. Every sole trader in
+              construction gets asked it, VAT registered or not.
+
+              This one is about VAT, and only VAT: whether the invoices he SENDS carry the domestic
+              reverse charge under VATA 1994 s55A. It is behind the registered gate because an
+              unregistered trader has no VAT to reverse charge, and it would be a question with no
+              consequence.
+
+              ⚠️ SO THE GATE IS CORRECT AND THE WORDING WAS NOT. Two boxes that read alike and live
+              on different screens are how a man decides the product is not listening, and how the
+              next person to read this file "tidies" one of them away. The legend now names what it
+              decides, which is the only honest way to justify asking a second time.
+
+              ⚠️ AND NEITHER OF THEM STORES THE RATE. 20, 30 or nothing at all depends on his
+              registration standing with HMRC, and the product deliberately asks what was ACTUALLY
+              taken off each payment rather than applying a rate: materials, plant hire and VAT come
+              off the job first, so on a real year the effective rate was 17.3 percent, not 20. See
+              lib/reviewpile.ts cisProposal, which prints the arithmetic and never fills it in.
+              ═══════════════════════════════════════════════════════════════════════════════ */}
           <fieldset style={S.fieldset}>
-            <legend style={S.label}>Do you do construction work reported under CIS?</legend>
+            <legend style={S.label}>Do your invoices need the CIS reverse charge?</legend>
             <p style={S.hint}>
-              It decides whether your invoices ever carry the reverse charge, where you charge your
-              customer no VAT at all and he accounts for it himself.
+              A separate question from the one about CIS being taken off your own pay, which is in
+              Your circumstances and is about your tax. This one is about the invoices you send: a
+              registered subcontractor billing a main contractor charges no VAT at all, and the
+              contractor accounts for it himself.
             </p>
             <label style={S.radioRow}>
               <input type="radio" name="cisSubcontractor" value="yes" defaultChecked={p.cisSubcontractor} style={S.radio} />
               <span>
                 <span style={S.radioTop}>Yes</span>
-                <span style={S.radioHint}>Building, plumbing, sparks, groundwork, all of it under CIS.</span>
+                <span style={S.radioHint}>Construction work reported under CIS. Building, plumbing, sparks, groundwork.</span>
               </span>
             </label>
             <label style={S.radioRow}>

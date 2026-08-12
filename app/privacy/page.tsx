@@ -242,7 +242,7 @@ export default function PrivacyPage() {
           <li style={li}>Object to or restrict certain processing.</li>
         </ul>
         <p style={para}>
-          To use any of these rights, email info@lekhio.app. You can also complain to the
+          Two of these you can do yourself, right now, without asking us: sign in and go to You, then Your data. You can take a copy of everything we hold in one file, and you can tell us to delete your account and what is in it. For anything else here, email info@lekhio.app. You can also complain to the
           Information Commissioner&apos;s Office at ico.org.uk if you are unhappy with how we handle your
           data.
         </p>

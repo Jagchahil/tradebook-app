@@ -312,8 +312,23 @@ export function partitionPile(groups: PileGroup[], accountUse: AccountUse = 'mix
 // that has to be got right again at the next call site, and the copy that drifts is the one he is
 // looking at. So it lives here, where a test can run it, and the three screens ask.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-export function waitingCount(p: PilePartition): number {
-  return p.known.length + p.unknown.length + p.careful.length + p.income.length;
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 IT COUNTED FOUR OF THE SIX THINGS ON THE SCREEN. 12 August 2026.
+//
+// This is the number the Overview and the Money page put in front of him: "4 questions waiting".
+// The pile draws SIX kinds of question, because the VAT confirm arrived on 1 August and the CIS
+// capture on 11 August, and neither was added here. So a subcontractor read "4 questions" and
+// counted five on the page, and a headline that disagrees with the screen underneath it teaches
+// him to stop trusting both.
+//
+// ⚠️ THE EXTRAS ARE PASSED IN RATHER THAN DERIVED, because whether a row carries a VAT or CIS
+// question is a fact about the MAN (is he registered, is he in the scheme) and this module cannot
+// see him. Defaulting to zero keeps every existing caller identical to the penny, which is exactly
+// what a customer with neither question should still read.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export function waitingCount(p: PilePartition, extras = 0): number {
+  return p.known.length + p.unknown.length + p.careful.length + p.income.length
+    + Math.max(0, Math.trunc(extras) || 0);
 }
 
 // ⚠️ THE SERVER RECOMPUTES THIS. THE CLIENT NEVER SENDS A LIST OF IDS TO CONFIRM.

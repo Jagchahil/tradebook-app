@@ -373,7 +373,7 @@ ok('🔴 AND THE ROUTER REACHES IT BEFORE THE WELCOME CARD', before(pm, GATE, 'i
 
   // 1. THE SHIPPING FUNCTION, WHOLE. Every predicate is the real one.
   const real = await build('real', [
-    `import { matchReservedWord, matchStopStart, isSupportRequest, isIdentity, matchProductTruth, isPricing, isThanks } from '${waHref}';`,
+    `import { matchReservedWord, matchStopStart, isSupportRequest, isIdentity, matchProductTruth, isPricing, isThanks, isDataRightsRequest } from '${waHref}';`,
     helpRe,
     helpSrc,
   ].join('\n'));
@@ -401,6 +401,9 @@ ok('🔴 AND THE ROUTER REACHES IT BEFORE THE WELCOME CARD', before(pm, GATE, 'i
     'const matchProductTruth = () => null;',
     'const isPricing = () => false;',
     'const isThanks = () => false;',
+    // Added 12 August with the data rights lane. Silenced here like every other neighbour, so the
+    // registry alone still has to answer for the reserved words.
+    'const isDataRightsRequest = () => false;',
   ].join('\n'));
 
   for (const w of WORDS) {

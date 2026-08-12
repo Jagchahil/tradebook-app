@@ -563,4 +563,72 @@ console.log('\n7. Recording a deduction against money he confirmed long ago\n');
     /route: 'app\/api\/cis'/.test(read('lib/gate.ts')));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE HERO BELONGS TO THE YEAR ON SCREEN.
+//
+// 🔴 FOUND 12 AUGUST 2026 BY PRESSING THE CHOOSER THAT SHIPPED THE DAY BEFORE. The year travelled
+// through the form, the route, and the redirect. It did not travel to the top of the page. The hero
+// was ledgerFor().refundDue, which is the live year and only ever the live year, under a heading
+// that read "CIS taken off your pay this year" whichever chip was lit.
+//
+// So the 2025/26 screen showed £2,800 of 2026/27 money, labelled this year, directly above thirty
+// six unanswered 2025/26 payments. He fills one in, lands back on the year he was on, and the big
+// number does not move, because it never could. That is indistinguishable from the write failing,
+// and preventing exactly that misreading is the reason y is carried through the form at all.
+//
+// ⚠️ AND THE REFUND PROJECTION BENEATH IT WAS WORSE THAN STALE. cis_refund is a running estimate
+// of the year in progress. Printed over a finished year it answers a question about the return due
+// this January with a guess about next January's.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n8. The figure at the top is the year he is looking at\n');
+{
+  const sb = read('lib/supabase.ts');
+  const page = read('app/app/tax/cis/page.tsx');
+
+  ok('🔴 THERE IS A READER FOR A YEAR THE LEDGER DOES NOT MODEL',
+    /export async function cisRecordedForYear\(/.test(sb));
+  ok('and it sums recorded deductions only, so an unanswered year cannot read as a refund',
+    /export async function cisRecordedForYear\([\s\S]{0,1200}?cis_deduction=gt\.0/.test(sb));
+  ok('over his own confirmed business income, the same window the list uses',
+    /export async function cisRecordedForYear\([\s\S]{0,1200}?user_id=eq\./.test(sb)
+    && /export async function cisRecordedForYear\([\s\S]{0,1200}?confirmed=eq\.true&is_personal=eq\.false/.test(sb)
+    && /export async function cisRecordedForYear\([\s\S]{0,1200}?transaction_date=gte\./.test(sb)
+    && /export async function cisRecordedForYear\([\s\S]{0,1200}?transaction_date=lte\./.test(sb));
+  ok('🔴 A FAILED READ IS ZERO, NEVER A NUMBER THE DATABASE NEVER SAID',
+    /export async function cisRecordedForYear\([\s\S]{0,1400}?if \(!res\.ok\) return 0;/.test(sb)
+    && /export async function cisRecordedForYear\([\s\S]{0,1600}?\} catch \{\n {4}return 0;/.test(sb));
+
+  // The live year keeps coming from the ledger. The comment at the top of the page has stood since
+  // this product quoted a man a refund that did not exist, and a second reader over the live number
+  // is the thing it forbids. The prior year has no first reader to disagree with.
+  ok('🔴 THE PRIOR YEAR READER IS ONLY REACHED ON A PRIOR YEAR',
+    /priorYear\s*\n?\s*\? await cisRecordedForYear\(/.test(page));
+  ok('🔴 AND THE LIVE YEAR IS STILL THE LEDGER, NOT A SECOND OPINION ON THE SAME MONEY',
+    /: l\.refundDue;/.test(page));
+  ok('which year is decided against the live one, not against the chooser bounds',
+    /const priorYear = year !== liveYear;/.test(page));
+
+  ok('🔴 THE HEADING NAMES THE YEAR RATHER THAN ASSERTING THIS ONE',
+    /CIS taken off your pay \{priorYear \? `in \$\{yearLabel\}` : 'this year'\}/.test(page));
+  ok('🔴 AND THE FIGURE UNDER IT IS THE ONE THAT MATCHES THAT HEADING',
+    /lek-hero">\{gbp0\(shownCis\)\}/.test(page)
+    && !/lek-hero">\{gbp0\(l\.refundDue\)\}/.test(page));
+  ok('the card is drawn on what is shown, so an empty prior year is not hidden behind a live total',
+    /\{shownCis > 0 \? \(/.test(page) && !/\{l\.refundDue > 0 \? \(/.test(page));
+  ok('and the empty state names the year too, because "this year" was the whole bug',
+    /No CIS deductions on your books \{priorYear \? `for \$\{yearLabel\}` : 'this year'\}/.test(page));
+
+  ok('🔴 THE LIVE YEAR REFUND PROJECTION IS NOT PRINTED OVER A FINISHED YEAR',
+    /\{priorYear \? null : \(/.test(page)
+    && before(page, '{priorYear ? null : (', 'Where the refund stands'));
+  ok('and the projection is still drawn for the year it describes',
+    /refundBuilding \? \(/.test(page) && before(page, 'Where the refund stands', '{refundBuilding.detail}'));
+
+  // The save notice promises the figures above have moved. Before this fix that sentence was false
+  // on every prior year press, which is the same lie the hero was telling, in the confirmation.
+  ok('so "your figures above have moved" is now true on both years',
+    /Saved\. Your figures above have moved\./.test(page)
+    && before(page, 'const shownCis', 'Your figures above have moved'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);

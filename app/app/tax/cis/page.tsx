@@ -2,7 +2,9 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { getOptimiserInput, incomeRowsWithoutCis, readCircumstances } from '../../../../lib/supabase';
+import {
+  cisRecordedForYear, getOptimiserInput, incomeRowsWithoutCis, readCircumstances,
+} from '../../../../lib/supabase';
 import { worksUnderCis } from '../../../../lib/circumstances';
 import { cisProposal, CIS_RATES } from '../../../../lib/reviewpile';
 import { quarterForDate } from '../../../../lib/quarterpack';
@@ -85,17 +87,36 @@ export default async function CisPage({ searchParams }: {
     ? await incomeRowsWithoutCis(user.id, `${year}-04-06`, `${year + 1}-04-05`).catch(() => [])
     : [];
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE HERO BELONGS TO THE YEAR ON SCREEN. Found 12 August by pressing the chooser that
+  // shipped the day before. l.refundDue is the live year and only ever the live year, under a
+  // heading that said "this year" whichever chip was lit, so 2025/26 drew a 2026/27 figure over
+  // a list of 2025/26 payments. He answers one, lands back on the same year, and the number does
+  // not move. The whole point of carrying y through the form was that it would.
+  //
+  // ⚠️ THE LIVE YEAR STILL COMES FROM THE LEDGER, UNTOUCHED, because the warning at the top of
+  // this file is about exactly that number and it has not stopped being true. The prior year is a
+  // window the ledger does not model at all, so reading it here is not a second opinion, it is
+  // the only one.
+  const priorYear = year !== liveYear;
+  const shownCis = priorYear
+    ? await cisRecordedForYear(user.id, `${year}-04-06`, `${year + 1}-04-05`).catch(() => 0)
+    : l.refundDue;
+  const yearLabel = `${year} to ${String((year + 1) % 100).padStart(2, '0')}`;
+
   return (
     <main className="lek-wrap" style={S.wrap}>
       <style>{CSS}</style>
 
       <AppNav current="/app/tax" />
 
-      {l.refundDue > 0 ? (
+      {shownCis > 0 ? (
         <>
           <section className="lek-card lek-cis">
-            <h1 className="lek-eyebrow">CIS taken off your pay this year</h1>
-            <div className="lek-hero">{gbp0(l.refundDue)}</div>
+            <h1 className="lek-eyebrow">
+              CIS taken off your pay {priorYear ? `in ${yearLabel}` : 'this year'}
+            </h1>
+            <div className="lek-hero">{gbp0(shownCis)}</div>
             <p className="lek-heronote">
               That is your money, already handed to HMRC by your contractors. It is credited
               against your bill when your return is filed, and whatever is left over comes back to
@@ -103,24 +124,34 @@ export default async function CisPage({ searchParams }: {
             </p>
           </section>
 
-          <section className="lek-card">
-            <h2 className="lek-h2">Where the refund stands</h2>
-            {refundBuilding ? (
-              // The engine's own sentence, with his figures in it and the student loan netted off.
-              <p style={S.body}>{refundBuilding.detail}</p>
-            ) : (
-              <p style={S.body}>
-                So far the year&apos;s bill is bigger than what has been deducted, so the
-                deductions are paying your bill down rather than building a refund. If that flips
-                as the year goes on, the refund appears here with the figure.
-              </p>
-            )}
-          </section>
+          {/* ⚠️ THE REFUND POSITION IS A LIVE YEAR SENTENCE AND IT DOES NOT TRAVEL. The optimiser
+              models the year in progress: its cis_refund item nets off a student loan on running
+              totals that stop at today. Printing it over a finished year would be answering a
+              question about January's return with an estimate of next January's. For a year that
+              has ended the honest thing is the date the bill lands and nothing more, which the
+              chooser below already says. */}
+          {priorYear ? null : (
+            <section className="lek-card">
+              <h2 className="lek-h2">Where the refund stands</h2>
+              {refundBuilding ? (
+                // The engine's own sentence, with his figures in it and the student loan netted off.
+                <p style={S.body}>{refundBuilding.detail}</p>
+              ) : (
+                <p style={S.body}>
+                  So far the year&apos;s bill is bigger than what has been deducted, so the
+                  deductions are paying your bill down rather than building a refund. If that flips
+                  as the year goes on, the refund appears here with the figure.
+                </p>
+              )}
+            </section>
+          )}
         </>
       ) : (
         <section className="lek-card">
           <h1 className="lek-h2">CIS</h1>
-          <p style={S.body}>No CIS deductions on your books this year.</p>
+          <p style={S.body}>
+            No CIS deductions on your books {priorYear ? `for ${yearLabel}` : 'this year'}.
+          </p>
           <p style={S.quiet}>
             When a contractor deducts CIS from a payment you confirm, it is counted here on its
             own, credited against your tax, and never mixed into what Lekhio saved you.

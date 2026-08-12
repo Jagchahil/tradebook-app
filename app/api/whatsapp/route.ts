@@ -148,6 +148,11 @@ import {
   // half that was missing.
   matchReservedWord,
   type ReservedWord,
+  // The two lanes RUN 1 closed on one surface out of three. See the dispatch chain above.
+  isDataRightsRequest,
+  DATA_RIGHTS_ANSWER,
+  isVehicleQuestion,
+  vehicleAnswer,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { weeklySummaryText } from '../../../lib/weeklyupdate';
@@ -548,6 +553,23 @@ async function processMessage(message: IncomingMessage): Promise<void> {
           // channels; test/laneparity.test.mjs walks both routers and holds it.
           } else if (isDeadlineQuestion(text) && !asksAmount(text)) {
             await handleDeadlineQuestion(from);
+          // 🔴 HIS DATA RIGHTS, ABOVE THE CLAIM CORPUS, ON THE CHANNEL HE ACTUALLY USES.
+          //
+          // RUN 1 closed this on app/api/thread and nowhere else. On 12 August the same question
+          // was put to this router and to /api/ask and both fell through, which means the finding
+          // was closed on the surface a customer of a WHATSAPP FIRST product is least likely to be
+          // sitting in. He asks where he is, and where he is, is here.
+          //
+          // ⚠️ AND THE CORPUS IS THIRTY LINES BELOW WITH A 'data' ALIAS ON THE PHONE RULE. The
+          // chat route's own header records what that cost: "delete all my data" was answered
+          // 🟡 Phone and broadband. This gate runs first so the sentence never reaches it.
+          } else if (isDataRightsRequest(text)) {
+            await sendText(from, DATA_RIGHTS_ANSWER);
+          // 🔴 THE VAN, ABOVE THE CORPUS, FOR THE REASON F7 WAS RAISED: the corpus answered a man
+          // who had typed the price, the month and his weekly miles with a generic card that knew
+          // none of it and never mentioned that the choice is locked for as long as he owns it.
+          } else if (isVehicleQuestion(text)) {
+            await handleVehicleQuestion(from);
           } else if (isExpenseCheck(text)) {
             await handleExpenseCheck(from, text);
           } else if (isSetupRequest(text)) {
@@ -1033,6 +1055,11 @@ function alwaysAnswered(text: string): boolean {
     || isIdentity(text)
     || matchProductTruth(text) !== null
     || isPricing(text)
+    // 🔴 A MAN WHOSE TRIAL ENDED STILL HAS THE RIGHT TO LEAVE. Same judgement as erasure, export
+    // and /api/account/phone in lib/gate.ts: letting go is never a feature he can be charged for,
+    // and being handed the paywall line when he asks how to be erased is the worst possible answer
+    // to that question. Article 12 does not have a subscription tier.
+    || isDataRightsRequest(text)
     || isThanks(text),
   );
 }
@@ -1693,6 +1720,20 @@ async function handleProductTruth(from: string, text: string): Promise<void> {
   const kind = matchProductTruth(text);
   if (!kind) return;
   await sendText(from, productTruthAnswer(kind, { filingLive: hmrcFilingLive() }));
+}
+
+// The van, with the vehicle in his own books in it. Same call as app/api/thread and app/api/ask,
+// so one question gets one answer on all three surfaces. It deliberately never names a winner:
+// that turns on annual business miles and no row in his books holds a distance.
+async function handleVehicleQuestion(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  // ⚠️ A FAILED LOOKUP IS NOT A REASON TO SAY NOTHING. The general half of the answer, the two
+  // routes and the lock in, is true for everybody, and vehicleAnswer builds it from these defaults.
+  const o = userId ? await getOptimiserInput(userId).catch(() => null) : null;
+  await sendText(from, vehicleAnswer({
+    boughtThroughBooks: o?.vehicleBoughtThroughBooks === true,
+    allowanceThisYear: Math.max(0, o?.ytdCapitalAllowances ?? 0),
+  }));
 }
 
 async function handleIdentity(from: string): Promise<void> {

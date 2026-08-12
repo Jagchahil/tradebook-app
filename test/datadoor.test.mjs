@@ -247,8 +247,22 @@ console.log('\n--- 3. THE ERASURE DOOR EXISTS, AND A CUSTOMER CAN REACH IT ---\n
 
   ok('🔴 it posts the erasure to the route that already does the work',
     /action="\/api\/account\/delete" method="post"/.test(pageCode));
-  ok('...and does not reimplement any of it: no table walking, no database of its own',
-    !/deleteUserData|USER_DATA_TABLES|supabase/i.test(pageCode));
+  // ⚠️ THIS USED TO BAN THE WORD 'supabase' FROM THE PAGE ENTIRELY, and on 12 August that ban
+  // stopped a four digit read of his own phone number, which is not erasure and is not a table
+  // walk. The rule it was reaching for is narrower than the string it tested, so it is written out
+  // properly now: the page may ASK the one library a question, it may never do the destruction.
+  //
+  // 🔴 AND THE ALLOWED IMPORT IS NAMED. A blanket ban is a rule that gets deleted the first time it
+  // is inconvenient. An allowlist goes red the moment somebody adds deleteUserData beside it, which
+  // is the thing actually worth stopping.
+  ok('...and does not reimplement any of it: no table walking, no destruction of its own',
+    !/deleteUserData|USER_DATA_TABLES|eraseUser|\/rest\/v1\//.test(pageCode));
+  ok('🔴 AND IT REACHES THE DATABASE LIBRARY FOR EXACTLY ONE NAMED THING, or not at all',
+    (pageCode.match(/from '[^']*lib\/supabase'/g) ?? []).length <= 1
+    && !/import \* as .* from '[^']*lib\/supabase'/.test(pageCode)
+    && (!/lib\/supabase'/.test(pageCode)
+      || /import \{ phoneTailForUser \} from '[^']*lib\/supabase'/.test(pageCode)));
+  ok('and it does no fetching of its own, whatever it imports', !/\bfetch\s*\(/.test(pageCode));
 
   // 🔴 THE CONFIRMATION STEP, PROVED BY CONTAINMENT RATHER THAN BY ORDER. The destructive form must
   // be INSIDE the armed branch, so that until the word comes back matching it is not in the HTML at
@@ -540,9 +554,46 @@ console.log('\nUnplugging the phone, and the GDPR hole the warning predicted\n')
   const page = read('app/app/you/data/page.tsx');
   ok('🔴 AND THERE IS A DOOR ON A SCREEN, which is the whole finding',
     /Unplug your phone/.test(page) && /action="\/api\/account\/phone"/.test(page));
-  ok('it says plainly that nothing else is lost', /stays exactly where it is/.test(page));
+  // Whitespace insensitive, because JSX wraps this sentence across lines and the first version of
+  // this guard went red on a reflow rather than on a meaning.
+  ok('it says plainly that nothing else is lost',
+    /stays\s+exactly\s+where\s+it\s+is/.test(page));
   ok('and why he might want to, since a number can only be on one account',
     /only be on one account at a time/.test(page));
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND IT IS DRAWN FOR A MAN WITH A PHONE ON HERE, AND FOR NOBODY ELSE.
+  //
+  // Found 12 August by opening the door on an account that has never had a number on it. It was
+  // there, offering to unplug nothing, with "Done. That number is free to connect anywhere now."
+  // loaded behind it. Doc 103's empty test, failed twice: a control with nothing to do teaches him
+  // to scroll past this page, and a confirmation about a thing that never existed is the kind of
+  // lie that spends the credit of every other confirmation on the screen.
+  //
+  // ⚠️ AND IT NEVER SAID WHICH NUMBER. The reason a man opens this door is that a number is on an
+  // account it should not be on, which is exactly the case where he cannot see it from the handset.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  ok('🔴 THERE IS A READER FOR THE NUMBER ON THE ACCOUNT',
+    /export async function phoneTailForUser\(/.test(db));
+  ok('and it hands back four digits, never the number',
+    /export async function phoneTailForUser\([\s\S]{0,1200}?digits\.slice\(-4\)/.test(db));
+  ok('🔴 A FAILED READ HIDES THE DOOR RATHER THAN DRAWING IT OVER A BLANK',
+    /export async function phoneTailForUser\([\s\S]{0,1000}?if \(!res\.ok\) return null;/.test(db)
+    && /export async function phoneTailForUser\([\s\S]{0,1400}?\} catch \{\n {4}return null;/.test(db));
+  ok('🔴 THE SECTION IS GATED ON HAVING A NUMBER', /\{phoneTail \? \(/.test(page));
+  ok('...and the gate is fed by that reader, not by something the page decided',
+    /const phoneTail = await phoneTailForUser\(user\.id\)/.test(page)
+    && before(page, 'const phoneTail = await phoneTailForUser(user.id)', '{phoneTail ? ('));
+  ok('🔴 THE NUMBER IS NAMED, so he is not pressing a button over an unnamed thing',
+    /The number on this account ends \{phoneTail\}/.test(page));
+  // The success line is drawn AFTER the gate closes behind it: the unplug worked, phoneTail is
+  // null on the redirect, and a confirmation inside the section would vanish with the section.
+  ok('🔴 AND THE CONFIRMATION SURVIVES THE THING IT CONFIRMS',
+    before(page, "{phoneTail ? (", "{one('done') === 'unplugged'")
+    && before(page, '</>\n          ) : null}', "{one('done') === 'unplugged'"));
+  ok('while the failure line stays inside, because a failure means the number is still there',
+    before(page, "{phoneTail ? (", "{one('done') === 'unplugfailed'")
+    && before(page, "{one('done') === 'unplugfailed'", '</>\n          ) : null}'));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

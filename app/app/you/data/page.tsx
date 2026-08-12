@@ -7,6 +7,7 @@ import {
   INK, LINE, MUTED, ON_RED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP, SURFACE,
   edge,
 } from '../../../../lib/apptheme';
+import { phoneTailForUser } from '../../../../lib/supabase';
 import { AppNav } from '../../AppNav';
 
 export const runtime = 'nodejs';
@@ -90,6 +91,12 @@ export default async function YourDataPage({
 
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
+
+  // 🔴 THE PHONE SECTION IS DRAWN FOR A MAN WITH A PHONE ON HERE, AND FOR NOBODY ELSE. Doc 103's
+  // empty test. See phoneTailForUser in lib/supabase.ts for what shipping it unconditionally cost:
+  // an unplug button, and a "that number is free to connect anywhere now" waiting behind it, on
+  // accounts that have never had a number.
+  const phoneTail = await phoneTailForUser(user.id).catch(() => null);
 
   const typed = (one('erase') ?? '').trim().toUpperCase();
   const armed = typed === CONFIRM_WORD;
@@ -245,22 +252,38 @@ export default async function YourDataPage({
           It sits on this page rather than under Connect, because the shape of it is the same as
           the two above: a thing he is entitled to do with his own data whenever he likes.
           ═══════════════════════════════════════════════════════════════════════════════════ */}
-          <h2 style={S.lede}>Unplug your phone</h2>
-          <p style={S.fact}>
-            This takes your mobile number off this account. Nothing else changes: every receipt and
-            every entry you have sent us stays exactly where it is, and you can connect the same
-            phone again, or a different one, whenever you like.
-          </p>
-          <p style={S.quiet}>
-            Do this if the number on here is not yours any more, or if you want to use it on a
-            different Lekhio account. A number can only be on one account at a time, so nobody else
-            can connect that handset until you let go of it.
-          </p>
+          {/* ⚠️ AND ONLY WHEN THERE IS A NUMBER TO LET GO OF. Doc 103's empty test, and this one
+              fails it twice: a control with nothing to do, over a confirmation that would have
+              said "that number is free to connect anywhere now" about a number that never was. */}
+          {phoneTail ? (
+            <>
+              <h2 style={S.lede}>Unplug your phone</h2>
+              <p style={S.fact}>
+                {/* 🔴 THE NUMBER IS NAMED. Four digits, because the reason a man is standing here
+                    is usually that the number on the account is one he cannot see from the handset
+                    side, and a button over an unnamed thing is a guess with a full stop after it.
+                    Four rather than all of it: the common case is a number that belongs to somebody
+                    who has left, and that is not the account holder's to be handed in full. */}
+                The number on this account ends {phoneTail}. Unplugging takes it off, and nothing
+                else changes: every receipt and every entry you have sent us stays exactly where it
+                is, and you can connect the same phone again, or a different one, whenever you like.
+              </p>
+              <p style={S.quiet}>
+                Do this if that number is not yours any more, or if you want to use it on a
+                different Lekhio account. A number can only be on one account at a time, so nobody
+                else can connect that handset until you let go of it.
+              </p>
+              {one('done') === 'unplugfailed' ? <p style={S.warn}>Something went wrong our end and your number has NOT been unplugged. Nothing was changed. Try again in a minute.</p> : null}
+              <form method="post" action="/api/account/phone">
+                <button type="submit" style={S.carryOn} className="lek-hit">Unplug my phone</button>
+              </form>
+            </>
+          ) : null}
+          {/* ⚠️ THE SUCCESS LINE LIVES OUTSIDE THE GATE, because the gate is false by the time he
+              reads it. The unplug worked, the number is gone, phoneTail is null, and a confirmation
+              drawn inside the section would vanish on the very redirect that earned it. He would
+              press the button and watch the whole thing disappear without a word. */}
           {one('done') === 'unplugged' ? <p style={S.armed}>Done. That number is free to connect anywhere now.</p> : null}
-          {one('done') === 'unplugfailed' ? <p style={S.warn}>Something went wrong our end and your number has NOT been unplugged. Nothing was changed. Try again in a minute.</p> : null}
-          <form method="post" action="/api/account/phone">
-            <button type="submit" style={S.carryOn} className="lek-hit">Unplug my phone</button>
-          </form>
 
           <p style={S.foot}>
         Rather ask a person? Email info@lekhio.app and we will do either of these for you.

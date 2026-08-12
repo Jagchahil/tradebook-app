@@ -10960,6 +10960,91 @@ export async function incomeRowsWithoutCis(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+// WHAT WAS ACTUALLY RECORDED IN A YEAR THE LEDGER DOES NOT MODEL.
+//
+// 🔴 FOUND 12 AUGUST 2026 BY PRESSING THE YEAR CHOOSER THE DAY AFTER IT SHIPPED. The CIS screen's
+// hero is ledgerFor().refundDue, which is the LIVE year and only ever the live year, under a
+// heading that says "this year". The list beneath it obeys the chooser. So on 2025/26 the screen
+// showed a 2026/27 figure, labelled this year, over thirty six unanswered 2025/26 payments: he
+// answers one, comes back on the year he was on, and the big number does not move, because it
+// never could. That reads exactly like the write failing, which is the one thing the year round
+// trip in app/api/cis/route.ts was built to prevent.
+//
+// ⚠️ IT IS NOT A SECOND READER OVER THE LIVE YEAR AND MUST NEVER BECOME ONE. app/app/tax/cis
+// calls this ONLY when the year on screen is not the live one: a year the ledger has no opinion
+// about, so there is no first reader to disagree with. The comment at the top of that page has
+// stood since the day this product quoted a man a refund that did not exist. It still stands.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function cisRecordedForYear(
+  userId: string,
+  startISO: string,
+  endISO: string,
+): Promise<number> {
+  const { url } = config();
+  if (!userId) return 0;
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
+        + '&confirmed=eq.true&is_personal=eq.false&amount=gt.0'
+        + '&cis_deduction=gt.0'
+        + `&transaction_date=gte.${encodeURIComponent(startISO)}`
+        + `&transaction_date=lte.${encodeURIComponent(endISO)}`
+        + '&select=cis_deduction&limit=20000',
+      { headers: headers() },
+    );
+    if (!res.ok) return 0;
+    const rows = (await res.json().catch(() => null)) as Array<Record<string, unknown>> | null;
+    if (!Array.isArray(rows)) return 0;
+    // A failed read and an empty year both return 0, and the page says the same true thing about
+    // both: nothing recorded. It never turns a failure into a refund.
+    return Math.round(rows.reduce((t, r) => t + (Number(r.cis_deduction) || 0), 0) * 100) / 100;
+  } catch {
+    return 0;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE LAST FOUR OF THE NUMBER ON THIS ACCOUNT, OR NULL BECAUSE THERE IS NOT ONE.
+//
+// 🔴 THE UNPLUG DOOR SHIPPED WITHOUT THIS AND IT WAS WRONG TWICE OVER. Found 12 August by looking
+// at it on an account with no phone on it at all.
+//
+//   It was drawn for everybody. Doc 103's empty test: a control that has nothing to do most of
+//   the time is a control he learns to scroll past, and then he cannot find it the week he needs
+//   it. He is on this page to export or to erase; the phone section is noise unless there is a
+//   phone.
+//
+//   And it never said WHICH number. The whole reason a man opens this door is that a number is on
+//   an account it should not be on, usually one he cannot see from the handset side, and the copy
+//   asked him to decide "if the number on here is not yours any more" without showing him what it
+//   was. A confirmation button over an unnamed thing is a guess with a full stop after it.
+//
+// ⚠️ FOUR DIGITS, NOT THE NUMBER. Enough for him to recognise his own handset, and the common case
+// for this door is a number that belongs to somebody else, a man who has left, whose full number is
+// not the account holder's to be handed on a plate. Four digits identifies without publishing.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function phoneTailForUser(userId: string): Promise<string | null> {
+  const { url } = config();
+  if (!userId) return null;
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=phone_number&limit=1`,
+      { headers: headers() },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json().catch(() => null)) as Array<{ phone_number: string | null }> | null;
+    const raw = Array.isArray(rows) && rows[0]?.phone_number ? String(rows[0].phone_number) : '';
+    const digits = raw.replace(/\D/g, '');
+    // ⚠️ A FAILED READ IS NULL AND NULL HIDES THE DOOR. That is the safe way round: a man whose
+    // number we could not read is shown nothing rather than an unplug button over a blank, and the
+    // page has never been the only road, the mailbox at the bottom of it still works.
+    return digits.length >= 4 ? digits.slice(-4) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 // UNPLUG THE PHONE. 12 August 2026, and it is the answer to a question this file asked itself.
 //
 // 🔴 THE COMMENT INSIDE deleteUserData PREDICTED THIS EXACT FUNCTION AND TOLD IT WHAT TO DO:

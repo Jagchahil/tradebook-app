@@ -8,7 +8,11 @@ import { rateLimitedShared } from '../../../lib/ratelimit';
 import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
 import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
-import { matchProductTruth, productTruthAnswer } from '../../../lib/waintents';
+import {
+  matchProductTruth, productTruthAnswer,
+  isDataRightsRequest, DATA_RIGHTS_ANSWER, isVehicleQuestion, vehicleAnswer,
+} from '../../../lib/waintents';
+import { getOptimiserInput } from '../../../lib/supabase';
 import { hmrcFilingLive } from '../../../lib/features';
 
 // The in-app accountant endpoint. The app posts a question with the user's
@@ -82,8 +86,36 @@ export async function POST(req: NextRequest) {
   // deterministic and true: it costs nothing, and it must never be served from a shared cache or
   // withheld because a man has used up his paid questions.
   const productKind = matchProductTruth(question);
-  if (productKind) {
-    const truth = productTruthAnswer(productKind, { filingLive: hmrcFilingLive() });
+  let truth = productKind ? productTruthAnswer(productKind, { filingLive: hmrcFilingLive() }) : '';
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THE OTHER TWO DETERMINISTIC LANES, ON THIS SURFACE TOO. Found 12 August 2026 by asking
+  // this route the two questions RUN 1 closed, and watching both fall straight through.
+  //
+  // The lanes were built and proved, and they landed on app/api/thread only. This product answers
+  // questions on THREE surfaces and the fix reached one of them. It is the same miss as the lender
+  // document the day before: one renderer fixed, one hand written page left lying.
+  //
+  // ⚠️ WHAT THIS ROUTE ACTUALLY SAID TO A CUSTOMER, LIVE, ON 12 AUGUST, when asked how to delete
+  // his data: "usually under something like Settings, Account, or Privacy" and "contact Lekhio
+  // support directly". A guess, hedged, about a door that exists at /app/you/data, plus the exact
+  // support queue RUN 1 was spent removing. AND IT COST HIM ONE OF HIS SIX QUESTIONS FOR THE DAY.
+  // That is the part that turns a wrong answer into a wrong product: the man being metered for
+  // asking how to leave is the man most likely to have decided to.
+  //
+  // Both sit above the cache and above the cap, exactly like product truth, and for the same
+  // reason: the answer is fixed and true, so it costs nothing and is never withheld.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (!truth && isDataRightsRequest(question)) truth = DATA_RIGHTS_ANSWER;
+  if (!truth && isVehicleQuestion(question)) {
+    const o = await getOptimiserInput(userId).catch(() => null);
+    truth = vehicleAnswer({
+      boughtThroughBooks: o?.vehicleBoughtThroughBooks === true,
+      allowanceThisYear: Math.max(0, o?.ytdCapitalAllowances ?? 0),
+    });
+  }
+
+  if (truth) {
     let conversationId = '';
     if (conversationIdIn && (await conversationOwnedBy(userId, conversationIdIn))) {
       conversationId = conversationIdIn;

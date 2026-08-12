@@ -335,5 +335,162 @@ ok('no hyphen used as a dash in any phrase either', CASES.every((c) => !/\s-\s/.
 ok('and not one phrase names a domain that is not ours',
   CASES.every((c) => !/lekhio\.(co|net|org|io)/i.test(c.phrase)));
 
+// ---------------------------------------------------------------------------------------------
+// 8. THREE ROUTERS, NOT TWO. THE LANES THAT MUST EXIST ON EVERY SURFACE THAT ANSWERS A QUESTION.
+// ---------------------------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHY THIS SECTION EXISTS, AND WHY THIS SUITE OF ALL SUITES WAS THE ONE THAT MISSED IT.
+//
+// This file was written to stop one phrase getting two answers on two channels. It has said "both
+// channels" since the day it was written. THERE ARE THREE. app/api/ask is the in app accountant,
+// it takes a typed question and returns an answer, and it was never in the comparison at all.
+//
+// So on 11 August RUN 1 closed two findings by building deterministic lanes, wiring them into
+// app/api/thread, proving them by unit test and sabotage, and shipping. On 12 August the same two
+// questions were put to the other two routers, live, and both fell through to the model:
+//
+//   "how do I delete all my data?"   ->  /api/ask: "usually under something like Settings,
+//                                        Account, or Privacy", then "contact Lekhio support
+//                                        directly". A guess about a door that exists, and the
+//                                        exact support queue the finding was raised to remove.
+//                                        AND IT SPENT ONE OF HIS SIX QUESTIONS FOR THE DAY.
+//
+//   "should I buy the van through the business or claim mileage?"
+//                                    ->  /api/ask: a generic two routes answer that had never
+//                                        heard of the vehicle already in his books.
+//
+// A lane is not shipped when it is written. It is shipped when every door that can be asked the
+// question runs it. So the table below is the rule, the routers are read off disk, and adding a
+// fourth answering surface without adding it here goes red on the file list, not silently.
+//
+// ⚠️ THIS IS A TABLE OF THE LANES THAT MUST BE EVERYWHERE, NOT OF EVERY LANE. Most of what
+// lib/waintents.ts exports is about the WhatsApp channel itself: STOP and START, an acknowledgement
+// of a receipt, "delete the last one". Those have no meaning in a box on a web page and requiring
+// them there would make this suite go red for a reason it does not believe in. The bar for this
+// table is narrow and it is written down: the answer must be one where being WRONG on a surface is
+// a breach or an irreversible decision, never merely a worse reply.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== lane parity: three routers ===\n');
+
+// ⚠️ THE IMPORT BLOCK IS CUT OFF FIRST, AND THE FIRST DRAFT OF THIS SECTION IS THE REASON.
+//
+// It asserted that each router file CONTAINS the words isDataRightsRequest and vehicleAnswer.
+// Sabotage replaced every call site with `false` on all three routers in turn and the suite stayed
+// green all six times, because the names were still up in the import list. An import is not a
+// wiring. It is a name a file happens to know, and this suite had just spent seven sections saying
+// that a predicate returning the right answer proves nothing about whether the router calls it.
+//
+// So the imports go, and every marker below is a CALL, with that router's own argument name in it.
+// Walks the prologue rather than searching for the last `from '...'` anywhere in the file, which
+// is what the second draft did and it cut nine tenths of every router away. Comments are already
+// stripped, so the prologue is exactly the run of import statements at the top, single line and
+// multi line, and it ends at the first line of real code.
+function cutImports(s) {
+  const lines = s.split('\n');
+  let depth = 0;
+  let end = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const t = lines[i].trim();
+    if (depth === 0 && t === '') continue;
+    if (depth === 0 && !t.startsWith('import')) break;
+    depth += (lines[i].match(/\{/g) ?? []).length - (lines[i].match(/\}/g) ?? []).length;
+    end = i + 1;
+  }
+  return lines.slice(end).join('\n');
+}
+const askCode = stripComments(read('app/api/ask/route.ts'));
+const ROUTERS = [
+  ['whatsapp', cutImports(waCode), 'text'],
+  ['thread', cutImports(threadCode), 'q'],
+  ['ask', cutImports(askCode), 'question'],
+];
+
+ok('🔴 ALL THREE ANSWERING ROUTERS WERE READ, and each is a real file with a POST handler',
+  ROUTERS.length === 3
+  // The open paren matters. POST is a prefix of POSTX, and the first draft of this line called a
+  // renamed handler a router.
+  && ROUTERS.every(([, code]) => code.length > 500 && /export async function POST\(/.test(code)));
+ok('...and cutting the imports did not cut the body away with them',
+  ROUTERS.every(([, code]) => code.includes('await')));
+
+// ⚠️ THE DISPATCH SITE IS NAMED PER ROUTER, NOT DERIVED FROM THE ARGUMENT NAME.
+//
+// The third draft used one shape, `isDataRightsRequest(<that router's arg>)`, and sabotage killed
+// the webhook's dispatch branch without turning it red: the webhook calls the same predicate a
+// second time inside alwaysAnswered(), the paywall exemption list, and that call kept the marker
+// alive. A router that exempts a question from the paywall and then has nothing to answer it with
+// is not a wired lane, it is a hole with a note on it.
+//
+// The three routers genuinely have three shapes, an else if chain, an early return and an
+// assignment, so the honest thing is to write down which line is the dispatch on each.
+const EVERYWHERE = [
+  {
+    lane: 'his data rights',
+    sites: {
+      whatsapp: '} else if (isDataRightsRequest(text)) {',
+      thread: 'if (isDataRightsRequest(q)) return DATA_RIGHTS_ANSWER;',
+      ask: 'if (!truth && isDataRightsRequest(question)) truth = DATA_RIGHTS_ANSWER;',
+    },
+    why: 'a wrong answer to "erase me" is a breach, and it must never be metered or refused for money',
+  },
+  {
+    lane: 'the vehicle question',
+    sites: {
+      whatsapp: '} else if (isVehicleQuestion(text)) {',
+      thread: 'if (isVehicleQuestion(q)) {',
+      ask: 'if (!truth && isVehicleQuestion(question)) {',
+    },
+    why: 'the choice is locked for as long as he owns it, so a generic card is an irreversible wrong turn',
+  },
+  {
+    lane: 'product truth',
+    sites: {
+      whatsapp: 'matchProductTruth(text) !== null',
+      thread: 'matchProductTruth(q)',
+      ask: 'matchProductTruth(question)',
+    },
+    why: 'a screenshot of Lekhio claiming HMRC approval is the same problem whichever box it was typed in',
+  },
+];
+
+for (const { lane, sites, why } of EVERYWHERE) {
+  for (const [name, code] of ROUTERS) {
+    const site = sites[name];
+    ok(`${lane}: DISPATCHED by the ${name} router  (${why})`,
+      typeof site === 'string' && code.includes(site));
+  }
+}
+
+// 🔴 AND IT RUNS BEFORE THE MODEL ON EVERY ONE OF THEM, which is the half that makes it free.
+// A lane wired in below the paid call answers correctly and still charges him for the question.
+// Each router's own name for the paid call, because they do not share one. Located by indexOf and
+// asserted present before any comparison, so a rename turns this red rather than quietly true.
+const modelCall = {
+  whatsapp: 'answerMoneyQuestion(body',
+  thread: 'answerMoneyQuestion(q',
+  ask: 'answerAccountantQuestion(',
+};
+const rightsSite = EVERYWHERE[0].sites;
+for (const [name, code] of ROUTERS) {
+  const needle = modelCall[name];
+  const modelAt = code.indexOf(needle);
+  // The DISPATCH site, not any mention. On the webhook the paywall exemption calls the same
+  // predicate, and comparing that index with the model's would have compared the wrong two things.
+  const laneAt = code.indexOf(rightsSite[name]);
+  ok(`${name}: the paid model call \`${needle}\` was located, so the comparison is not vacuous`,
+    modelAt !== -1);
+  ok(`${name}: ...and the data rights CALL was located too`, laneAt !== -1);
+  ok(`🔴 ${name}: HE IS NEVER CHARGED A QUESTION FOR ASKING HOW TO LEAVE`,
+    modelAt !== -1 && laneAt !== -1 && laneAt < modelAt);
+  // The answer has to be the fixed one. A lane that fires early and then hands the question to the
+  // model anyway is the defect wearing the fix's clothes.
+  ok(`${name}: and the fixed words are what he gets`, code.includes('DATA_RIGHTS_ANSWER'));
+}
+
+// 🔴 AND THE PAYWALL NEVER ANSWERS IT EITHER. Same judgement as erasure, export and the phone
+// unplug in lib/gate.ts: letting go is not a feature he can be charged for.
+ok('🔴 THE WHATSAPP PAYWALL EXEMPTION NAMES THE DATA RIGHTS LANE',
+  /function alwaysAnswered[\s\S]{0,900}?isDataRightsRequest\(text\)/.test(waCode));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

@@ -566,6 +566,10 @@ export async function answerMoneyQuestion() { return 'the model answer'; }
   w('aicost.ts', 'export function decideSpend() { return { allowed: true }; }\n');
   w('margin.ts', 'export function aiCapsFor() { return { killed: false }; }\n');
   w('waintents.ts', `
+// The data rights lane. Stubbed to its plainest clause: the real matcher and its two findings are
+// in lib/waintents.ts, and test/datadoor.test.mjs walks the whole phrase table through it.
+export function isDataRightsRequest(q) { return /delete .*(data|account)/i.test(q); }
+export const DATA_RIGHTS_ANSWER = 'You, then Your data.';
 export function matchProductTruth() { return null; }
 export function productTruthAnswer() { return ''; }
 export function matchTotalsQuestion() { return null; }

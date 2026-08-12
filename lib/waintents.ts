@@ -1361,3 +1361,52 @@ export function useOfHomeHoursQuestion(options: Array<{ band: number; label: str
     'Roughly how many hours a month is it? Just tell me the number.',
   ].join('\n');
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// HIS DATA, AND THE DOOR THAT NOW EXISTS FOR IT.
+//
+// 🔴 FOUND TWICE, THE SECOND TIME BY WALKING THE FIX. 11 August 2026.
+//
+// RUN 1 asked the chat "delete all my data" and got a card about phone and broadband, because the
+// claim corpus carries the alias 'data' for mobile allowances and the guard in front of it was one
+// third of the one WhatsApp uses. That was finding F8, and fixing it let the question reach the
+// model, which answered:
+//
+//   "That's a data protection question, not a tax one, so it's outside what I do here. You'd need
+//    to contact Lekhio's support team directly about deleting your account and data."
+//
+// Which was true in the morning and false by the evening. /app/you/data shipped the same day: he
+// can take a copy or close the account himself, in two taps, without asking anybody. Sending a man
+// to a support queue for something he can do himself is the same failure as having no door at all,
+// wearing better manners.
+//
+// ⚠️ SO THIS IS A DETERMINISTIC LANE AND NOT A PROMPT. A model told about a door will mention it
+// most of the time. The right answer to "delete everything you hold on me" does not get to be
+// probabilistic, and it must never be spent on an AI call either: a man at his cap still has the
+// right to leave. See lib/gate.ts, which exempts the erasure route from the paywall for the same
+// reason.
+//
+// ⚠️ AND IT NEVER DELETES ANYTHING. It points at the door. Erasure is irreversible and it asks for
+// the word DELETE on a page of its own, which is where that decision belongs.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const DATA_RIGHTS =
+  /\b(delete|erase|remove|wipe|close|cancel|destroy)\b[^.?!]{0,30}\b(my|all|everything|the)\b[^.?!]{0,30}\b(data|account|details|records|information|info)\b/i;
+// "delete everything you have on me" names no noun at all, which is exactly how a person says it
+// when he is angry. Kept narrow: the verb has to be a destroying one and the object has to be
+// EVERYTHING, so "delete the last entry" and "remove that receipt" are untouched.
+const DATA_RIGHTS_ALL = /\b(delete|erase|wipe|destroy|remove)\b[^.?!]{0,20}\beverything\b/i;
+const DATA_RIGHTS_COPY =
+  /\b(gdpr|right to be forgotten|subject access|data protection)\b|\b(export|download|copy)\b[^.?!]{0,25}\b(my|all)\b[^.?!]{0,25}\bdata\b/i;
+
+export function isDataRightsRequest(body: string): boolean {
+  const t = String(body ?? '');
+  return DATA_RIGHTS.test(t) || DATA_RIGHTS_ALL.test(t) || DATA_RIGHTS_COPY.test(t);
+}
+
+/** Where to send him. One sentence per right, and no promise that anything has happened yet. */
+export const DATA_RIGHTS_ANSWER =
+  'That one is yours to do yourself, and you do not need us to agree to it. Go to You, then Your '
+  + 'data. You can take a copy of everything we hold in one file, and you can tell us to delete '
+  + 'your account and what is in it. Deleting cannot be undone, so take the copy first if you want '
+  + 'your records. Some things we may have to keep where UK tax rules require it, and the page says '
+  + 'which. If you would rather a person did it, email info@lekhio.app.';

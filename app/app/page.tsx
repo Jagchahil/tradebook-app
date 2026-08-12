@@ -272,8 +272,12 @@ export default async function OverviewPage() {
               {gbp0(tax.cisSuffered)} of it has already gone to HMRC through CIS, so this is what is
               left to find. The bill itself is about {gbp0(tax.setAside)}.
               {tax.refundLikely > 0 ? (
-                <>{' '}On these figures January looks like a repayment of around {gbp0(tax.refundLikely)}
-                  rather than a bill, though only your filed return settles that.</>
+                // ⚠️ THE {' '} AFTER THE FIGURE IS LOAD BEARING. JSX drops the whitespace between an
+                // expression and the text on the NEXT line, so this rendered "£2,623rather than a
+                // bill" on the live Overview. Caught by looking at the screen, not by any test.
+                <>{' '}On these figures January looks like a repayment of around{' '}
+                  {gbp0(tax.refundLikely)}{' '}rather than a bill, though only your filed return
+                  settles that.</>
               ) : null}
             </p>
           ) : null}

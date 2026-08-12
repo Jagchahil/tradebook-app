@@ -401,6 +401,25 @@ console.log('\n6. CIS: tax already paid, and the four things it must never touch
   ok('🔴 A SUBCONTRACTOR\'S TURNOVER IS NOT LABELLED WITH A WORD THAT CONTRADICTS IT',
     !/Gross income/.test(htmlSub) && /before CIS/.test(htmlSub));
   ok('and the label is untouched for everybody else', /Gross income/.test(htmlPlain));
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 TWO SURFACES DRAW THIS DOCUMENT, AND ONE OF THEM WAS MISSED FOR AN HOUR.
+  //
+  // renderIncomeProofHtml() is the copy a lender is SENT or DOWNLOADS. app/app/proof-of-income
+  // is the copy the customer READS, and it is hand written JSX with its own <dt> labels. The CIS
+  // fix went into the renderer on 11 August and the page went on saying "Gross income" over a
+  // grossed up figure until somebody looked at it in a browser.
+  //
+  // So the condition is pinned on BOTH, by reading the page off disk. A document that changes its
+  // name depending on which door you came through is not a document.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const proofPage = readFileSync(path.join(root, "app/app/proof-of-income/page.tsx"), 'utf8');
+  ok('🔴 THE ON SCREEN DOCUMENT USES THE SAME CONDITION AS THE ONE A LENDER IS SENT',
+    /proof\.cisDeducted > 0 \? 'Turnover before CIS' : 'Gross income'/.test(proofPage));
+  ok('🔴 AND IT STATES THE DEDUCTION ON ITS OWN LINE TOO, never folded into income or costs',
+    /CIS deducted at source/.test(proofPage) && /CIS deducted at source/.test(htmlSub));
+  ok('and neither surface hardcodes the old label any more',
+    !/<dt style=\{S\.th\}>Gross income<\/dt>/.test(proofPage));
   ok('the document says the money that reached the bank was lower', /reached the bank was lower/.test(htmlSub));
 
   // Payments on account. The second test, and the customer it was written for.

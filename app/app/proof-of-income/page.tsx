@@ -136,7 +136,15 @@ export default async function ProofOfIncomePage({
 
             <dl style={S.table}>
               <div style={S.tr}>
-                <dt style={S.th}>Gross income</dt>
+                {/* 🔴 TWO SURFACES DRAW THIS DOCUMENT AND ONLY ONE OF THEM WAS FIXED. Found by
+                    looking at the live page on 11 August, an hour after the label was corrected in
+                    lib/incomeproof.ts. renderIncomeProofHtml() is the copy he DOWNLOADS or shares
+                    with a lender; this JSX is the copy he READS on screen, and it had "Gross
+                    income" typed into it. A subcontractor's turnover is not gross of the tax his
+                    contractor already took, and calling it gross on the one document a lender
+                    reads is the finding this run opened with. The label comes from the same
+                    condition on both, so they cannot say different things about one figure. */}
+                <dt style={S.th}>{proof.cisDeducted > 0 ? 'Turnover before CIS' : 'Gross income'}</dt>
                 <dd style={S.td}>{gbp2(proof.income)}</dd>
               </div>
               <div style={S.tr}>
@@ -147,6 +155,14 @@ export default async function ProofOfIncomePage({
                 <dt style={S.thBold}>Net profit</dt>
                 <dd style={S.tdBold}>{gbp2(proof.profit)}</dd>
               </div>
+              {/* Tax already paid, stated on its own line, never mixed into income or costs. Drawn
+                  only when there is CIS on the year, doc 103's empty test. */}
+              {proof.cisDeducted > 0 ? (
+                <div style={S.tr}>
+                  <dt style={S.thMut}>CIS deducted at source</dt>
+                  <dd style={S.tdMut}>{gbp2(proof.cisDeducted)}</dd>
+                </div>
+              ) : null}
               <div style={S.trLast}>
                 {/* 🔴 THE LABEL COMES FROM THE ENGINE, BECAUSE IT IS NOT ALWAYS TRUE. This said
                     "Estimated Income Tax and National Insurance" for everybody, on a document that
@@ -179,6 +195,18 @@ export default async function ProofOfIncomePage({
                 the money leave the account in the books and never learn why it is not in expenses.
                 lib/incomeproof.ts decides the figure off the same writtenDown boolean lib/quarterpack
                 .ts uses, so the printed sheet and /app/tax/summary cannot drift. */}
+            {/* ⚠️ THE SAME SENTENCE renderIncomeProofHtml() PRINTS, because a lender who is handed
+                the download and a lender who is sent the link must read one document. Without it
+                the figure above changes its name and nothing on the page says why. */}
+            {proof.cisDeducted > 0 ? (
+              <p style={S.capital}>
+                {gbp2(proof.cisDeducted)} of tax was taken from these payments at source under the
+                Construction Industry Scheme and paid to HMRC by the contractors. The turnover above
+                is the figure BEFORE that deduction, which is what the tax return reports and what
+                the contractors&apos; payment and deduction statements show. The amount that reached
+                the bank was lower by that much.
+              </p>
+            ) : null}
             {proof.capitalCost > 0 ? (
               <p style={S.capital}>
                 {gbp2(proof.capitalCost)} more left the account on{' '}

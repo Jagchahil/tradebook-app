@@ -42,6 +42,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { checkExpense, isClaimQuestion, EXPENSE_RULES } from '../lib/claimrules.data.ts';
+// lib/waintents.ts is pure and has no relative imports, so it loads directly.
+import * as WA from '../lib/waintents.ts';
 
 let pass = 0;
 let fail = 0;
@@ -374,6 +376,52 @@ console.log('\n--- 5. 🔴 THE COPY PROMISES NO MORE THAN THE PRIVACY POLICY DOE
     !/stripe/i.test(del));
   ok('🔴 and the page tells him to cancel billing first, and where',
     /href="\/app\/you\/billing"/.test(page) && /cancel/i.test(page));
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE ANSWER THE CHAT GIVES ONCE THE CARD IS OUT OF THE WAY.
+//
+// 🔴 THE SECOND HALF OF F12, FOUND BY WALKING THE FIX ON 11 AUGUST. Removing the phone card let
+// "delete all my data" reach the model, which replied, live, on production:
+//
+//   "That's a data protection question, not a tax one, so it's outside what I do here. You'd need
+//    to contact Lekhio's support team directly about deleting your account and data."
+//
+// True in the morning, false by the evening: /app/you/data shipped the same day. Sending a man to
+// a support queue for something he can do himself in two taps is the same failure as having no
+// door, with better manners on it.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nTHE CHAT POINTS AT THE DOOR, deterministically\n');
+{
+  const asks = [
+    'delete all my data', 'delete everything you have on me', 'i want to close my account',
+    'remove all my information', 'can I export my data', 'gdpr request',
+    'right to be forgotten', 'delete my account please',
+  ];
+  ok('🔴 EVERY WAY HE MIGHT ASK IS RECOGNISED', asks.every((a) => WA.isDataRightsRequest(a)));
+
+  // A guard that fires at everything would swallow real tax questions, which is the defect this
+  // whole finding is made of, reached from the other side.
+  const notAsks = [
+    'can I claim my phone bill', 'delete the last entry', 'what is my data allowance',
+    'remove that receipt', 'can I claim broadband', 'how much did I spend on materials',
+  ];
+  ok('🔴 AND ORDINARY WORK IS NOT', notAsks.every((a) => !WA.isDataRightsRequest(a)));
+
+  ok('the answer names the door rather than a support queue',
+    /You, then Your data/.test(WA.DATA_RIGHTS_ANSWER));
+  ok('🔴 AND IT DOES NOT SEND HIM TO SUPPORT AS THE FIRST ANSWER',
+    WA.DATA_RIGHTS_ANSWER.indexOf('Your data') < WA.DATA_RIGHTS_ANSWER.indexOf('info@lekhio.app'));
+  ok('it warns that erasure cannot be undone', /cannot be undone/.test(WA.DATA_RIGHTS_ANSWER));
+  ok('and it does not promise more than the privacy policy does',
+    /may have to keep/.test(WA.DATA_RIGHTS_ANSWER));
+
+  const route = read('app/api/thread/route.ts');
+  ok('🔴 THE LANE RUNS BEFORE THE CLAIM CORPUS, which is what used to eat the question',
+    before(route, 'isDataRightsRequest(q)', 'checkExpense(q)'));
+  ok('🔴 AND BEFORE THE MODEL, so it costs nothing and cannot vary',
+    before(route, 'isDataRightsRequest(q)', 'answerMoneyQuestion('));
 }
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);

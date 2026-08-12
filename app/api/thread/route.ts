@@ -8,7 +8,7 @@ import { decideSpend } from '../../../lib/aicost';
 import { aiCapsFor } from '../../../lib/margin';
 import {
   matchTotalsQuestion, formatGbp, isDeadlineQuestion, asksAmount, deadlineAnswer, type TotalsQuestion,
-  matchProductTruth, productTruthAnswer,
+  matchProductTruth, productTruthAnswer, isDataRightsRequest, DATA_RIGHTS_ANSWER,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
@@ -216,6 +216,12 @@ async function composeReply(userId: string, q: string): Promise<string> {
   // 2. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
   const totals = matchTotalsQuestion(q);
   if (totals) return totalsAnswer(userId, totals);
+
+  // 🔴 HIS DATA RIGHTS, ABOVE THE CLAIM CORPUS AND ABOVE THE MODEL. See lib/waintents.ts,
+  // isDataRightsRequest, for the two findings that put it here. Deterministic on purpose: the
+  // answer to "delete everything you hold on me" does not get to be probabilistic, and it must not
+  // cost an AI call either, because a man at his spend cap still has the right to leave.
+  if (isDataRightsRequest(q)) return DATA_RIGHTS_ANSWER;
 
   // 3. "Can I claim it" questions: the deterministic claim rules, no AI.
   //

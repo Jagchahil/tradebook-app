@@ -491,7 +491,12 @@ export async function recordCisOnIncome(userId, id, expectedNet, patch) {
   ok('🔴 AND GUARDED ON THE AMOUNT THE PAGE ACTUALLY SHOWED HIM, so a moved row is refused',
     /export async function recordCisOnIncome[\s\S]{0,1600}?amount=eq\.\$\{expectedNet\.toFixed\(2\)\}/.test(sb));
   ok('🔴 AND A DEDUCTION CAN NEVER BE APPLIED TWICE, whatever a back button does',
-    /export async function recordCisOnIncome[\s\S]{0,1700}?cis_deduction=is\.null/.test(sb));
+    /export async function recordCisOnIncome[\s\S]{0,2200}?or=\(cis_deduction\.is\.null,cis_deduction\.eq\.0\)/.test(sb));
+  // Once a real figure is in the column it is neither null nor zero, so the guard above still
+  // refuses the second press. Zero is treated as unrecorded, never as an answer, and the screen
+  // says so in words: leave it blank if nothing was taken off it.
+  ok('and a recorded deduction is outside the guard, so the second press matches no rows',
+    /leave it blank|Leave one blank/i.test(read('app/app/tax/cis/page.tsx')));
   ok('the invariant is re-checked at the write, not merely trusted from the caller',
     /patch\.amount - patch\.cis_deduction\) - expectedNet\) > 0\.005/.test(sb));
 
@@ -525,9 +530,15 @@ console.log('\n7. Recording a deduction against money he confirmed long ago\n');
   ok('🔴 THERE IS A READER FOR CONFIRMED INCOME CARRYING NO DEDUCTION', /export async function incomeRowsWithoutCis/.test(sb));
   ok('and it looks at CONFIRMED rows, which is the whole point of it',
     /incomeRowsWithoutCis[\s\S]{0,900}?confirmed=eq\.true/.test(sb));
-  ok('and only at rows with nothing recorded yet', /incomeRowsWithoutCis[\s\S]{0,900}?cis_deduction=is\.null/.test(sb));
+  // 🔴 NULL OR ZERO. Found by walking production on 11 August: the column defaults to 0, so every
+  // row that came in off a bank import carries a real zero and an is.null test matched nothing.
+  // The screen shipped, drew nothing at all, and every suite here was green. A stub decides its
+  // own column defaults, which is exactly why this class of defect survives a test suite.
+  ok('🔴 AND AT ROWS WITH NOTHING RECORDED YET, WHICH IS NULL OR ZERO, NOT NULL ALONE',
+    /incomeRowsWithoutCis[\s\S]{0,1400}?or\(cis_deduction\.is\.null,cis_deduction\.eq\.0\)/.test(sb)
+    && !/incomeRowsWithoutCis[\s\S]{0,1400}?&cis_deduction=is\.null&/.test(sb));
   ok('🔴 AND RENT IS EXCLUDED WITHOUT DROPPING EVERY TRADE ROW WITH IT',
-    /or=\(income_type\.is\.null,income_type\.neq\.property\)/.test(sb)
+    /or\(income_type\.is\.null,income_type\.neq\.property\)/.test(sb)
     && !/&income_type=not\.eq\.property/.test(sb));
 
   ok('the CIS screen offers the question', /Was CIS taken off these/.test(page));

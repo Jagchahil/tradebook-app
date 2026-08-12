@@ -10812,7 +10812,16 @@ export async function recordCisOnIncome(
         // Two decimals, to match the column rather than whatever JS prints. An optimistic guard
         // that silently never matches is a feature that silently never works.
         + `&amount=eq.${expectedNet.toFixed(2)}`
-        + '&cis_deduction=is.null'
+        // 🔴 NULL OR ZERO, AND THE ZERO HALF WAS FOUND BY WALKING PRODUCTION, NOT BY A TEST.
+        // The column defaults to 0 rather than NULL, so every one of Danny's 402 rows carries a
+        // real 0 and an is.null guard matched precisely nothing: the reader returned an empty list
+        // and the section never drew. The suite could not have caught it, because a stub decides
+        // its own column defaults. Only the live account knew.
+        //
+        // ⚠️ IT IS STILL IDEMPOTENT, which is the property this guard exists for. Once a real
+        // deduction is written the column holds it, so it is neither null nor zero, and a second
+        // press matches no rows. A double submit still cannot inflate his turnover.
+        + '&or=(cis_deduction.is.null,cis_deduction.eq.0)'
         + '&is_personal=eq.false',
       {
         method: 'PATCH',
@@ -10873,12 +10882,17 @@ export async function incomeRowsWithoutCis(
   try {
     const res = await fetch(
       `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
-        + '&confirmed=eq.true&is_personal=eq.false&amount=gt.0&cis_deduction=is.null'
-        // 🔴 not.eq.property WOULD HAVE DROPPED EVERY ROW THIS EXISTS FOR. In SQL, NULL = 'property'
-        // is UNKNOWN, so NOT(UNKNOWN) is UNKNOWN, so a plain not.eq filters out every row whose
-        // income_type is null. Danny's 62 contractor deposits are ALL null: a bank import has no
-        // reason to set it. The filter meant to exclude rent would have excluded the entire trade.
-        + '&or=(income_type.is.null,income_type.neq.property)'
+        + '&confirmed=eq.true&is_personal=eq.false&amount=gt.0'
+        // 🔴 TWO CONDITIONS, NESTED, BECAUSE ONE or= PARAMETER CANNOT CARRY BOTH.
+        //
+        // NOTHING RECORDED YET is null OR zero: the column defaults to 0, so an is.null test on its
+        // own matches no row that came in off a bank import. Found live on 11 August, after the
+        // screen shipped and drew nothing at all.
+        //
+        // NOT RENT has to name the null case too. In SQL, NULL = 'property' is UNKNOWN and
+        // NOT(UNKNOWN) is UNKNOWN, so a plain not.eq would filter out every row whose income_type
+        // is null. The filter meant to exclude rent would have excluded the entire trade.
+        + '&and=(or(cis_deduction.is.null,cis_deduction.eq.0),or(income_type.is.null,income_type.neq.property))'
         + `&transaction_date=gte.${encodeURIComponent(startISO)}`
         + `&transaction_date=lte.${encodeURIComponent(endISO)}`
         + `&select=id,amount,transaction_date,vendor&order=transaction_date.desc&limit=${limit}`,

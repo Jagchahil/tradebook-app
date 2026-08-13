@@ -36,7 +36,7 @@ const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 const stage = mkdtempSync(path.join(tmpdir(), 'capwire-'));
 for (const f of [
   'taxengine', 'money', 'capital', 'nistudentloan', 'ltdengine', 'personalincome',
-  'propertyengine', 'autonomy', 'taxoptimiser', 'ledger', 'personal', 'reviewpile',
+  'propertyengine', 'autonomy', 'taxoptimiser', 'ledger', 'personal', 'receiptconfidence', 'reviewpile',
 ]) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
@@ -271,7 +271,7 @@ console.log('\n8. Nothing is filed until we have stored what it was');
 {
   const rStage = mkdtempSync(path.join(tmpdir(), 'capwire-route-'));
   const put = (name, body) => writeFileSync(path.join(rStage, name), body);
-  for (const f of ['capital', 'taxengine', 'money', 'vat', 'circumstances', 'reviewpile', 'personal', 'propertylanes']) {
+  for (const f of ['capital', 'taxengine', 'money', 'vat', 'circumstances', 'receiptconfidence', 'reviewpile', 'personal', 'propertylanes']) {
     put(`${f}.ts`, fix(readFileSync(path.join(lib, `${f}.ts`), 'utf8')));
   }
   put('nextserver.ts', `

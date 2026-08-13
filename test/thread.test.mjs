@@ -632,6 +632,7 @@ export function chatRefBelongsTo() { return true; }
   // The REAL walk and its REAL matcher, wired to the stubs, exactly as production wires them.
   w('dedupe.ts', read('lib/dedupe.ts'));
   w('memory.ts', read('lib/memory.ts'));
+  w('receiptconfidence.ts', read('lib/receiptconfidence.ts'));
   w('receiptingest.ts', read('lib/receiptingest.ts').replace(/from '\.\/([a-zA-Z]+)'/g, "from './$1.ts'"));
   // 🔴 AND THE REAL ENGINES BEHIND THE COLLECTION SENTENCE, 9 AUGUST 2026. The owed answer now
   // names the January date and, over the threshold, the two payments on account, all of it read

@@ -113,7 +113,7 @@ interface Decision {
   //    separate word from confirm_known on purpose. RUN 2, 12 August 2026: a machine read amount
   //    and a bank line's amount are different kinds of evidence, one press must never answer for
   //    both, and the two lists are drawn separately on the screen. See lib/reviewpile.ts.
-  verdict: 'business' | 'personal' | 'confirm_known' | 'confirm_read' | 'income' | 'vat' | 'cis';
+  verdict: 'business' | 'personal' | 'confirm_known' | 'confirm_read' | 'confirm_unsure' | 'income' | 'vat' | 'cis';
   category?: string;
   // Remember the answer for next time, so this shop is never asked about again. Default true:
   // the whole point is that he tells us once. He can turn it off per decision.
@@ -138,7 +138,11 @@ interface Decision {
 // The words the form is allowed to send. A nested ternary was readable at three verdicts and
 // stopped being readable at five, and anything not on this list is read as 'business', which is
 // what the plain file button has always meant.
-const VERDICTS = ['personal', 'confirm_known', 'confirm_read', 'income', 'vat', 'cis'] as const;
+// 🔴 'confirm_unsure' IS ITS OWN WORD FOR THE SAME REASON 'confirm_read' IS. R2, 13 August 2026.
+// confirm_read covers readings the machine said it was SURE of. A reading it said it struggled with
+// is a different question and gets a different press, so a yes about eight crisp receipts can never
+// carry a ninth the model itself flagged. See lib/receiptconfidence.ts.
+const VERDICTS = ['personal', 'confirm_known', 'confirm_read', 'confirm_unsure', 'income', 'vat', 'cis'] as const;
 
 function verdictFrom(raw: unknown): Decision['verdict'] {
   const v = String(raw ?? '');
@@ -222,14 +226,15 @@ export async function POST(req: NextRequest) {
   // test/webauth.test.mjs asserts that pileEntries and buildPile are within 400 characters of each
   // other, which is its way of holding "this branch rebuilds the pile server side". A comment
   // wedged between them pushes the two apart and fails a guard that is still true.
-  if (body.verdict === 'confirm_known' || body.verdict === 'confirm_read') {
-    const wantRead = body.verdict === 'confirm_read';
+  if (body.verdict === 'confirm_known' || body.verdict === 'confirm_read' || body.verdict === 'confirm_unsure') {
+    const wantRead = body.verdict !== 'confirm_known';
+    const wantUnsure = body.verdict === 'confirm_unsure';
     const [freshRows, ownNames, accountUse] = await Promise.all([
       pileEntries(user.id), readOwnNames(user.id), readAccountUse(user.id),
     ]);
     const plan = bulkConfirmPlan(
       buildPile(freshRows, normaliseVendor, ownNames, categoriseBankLine)
-        .filter((g) => g.readFromPhoto === wantRead),
+        .filter((g) => g.readFromPhoto === wantRead && g.uncertainAmount === wantUnsure),
       accountUse,
     );
     let applied = 0;

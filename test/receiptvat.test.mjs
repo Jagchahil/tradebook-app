@@ -259,6 +259,7 @@ export async function storeReceiptImage() { return 'u-1/abc.jpg'; }
 `);
 // The REAL walk goes on the bench, wired to the stubs above: the route calls it, and it is
 // where the VAT gating now lives, so a stub of it would be a test of the stub.
+writeFileSync(path.join(rStage, 'receiptconfidence.ts'), read('lib/receiptconfidence.ts'));
 writeFileSync(
   path.join(rStage, 'receiptingest.ts'),
   read('lib/receiptingest.ts').replace(/from '\.\/([a-zA-Z]+)'/g, "from './$1.ts'"),
@@ -355,6 +356,7 @@ const pStage = mkdtempSync(path.join(tmpdir(), 'receiptvat-pile-'));
 // lib/vat.ts goes in WHOLE, because the ceiling is the thing under test and a stub of it would be
 // a test of the stub. It has zero imports on purpose, which is what makes that possible.
 writeFileSync(path.join(pStage, 'vat.ts'), read('lib/vat.ts'));
+  writeFileSync(path.join(pStage, 'receiptconfidence.ts'), read('lib/receiptconfidence.ts'));
 // RUN 2: the route routes a property cost to the other stream, so lib/propertylanes.ts is staged
 // as well. It is pure and import free, so it goes in whole.
 writeFileSync(path.join(pStage, 'propertylanes.ts'), read('lib/propertylanes.ts'));
@@ -377,6 +379,7 @@ writeFileSync(path.join(pStage, 'gateserver.ts'), `
 export async function gateForUser() { return 'ok'; }
 export function refuseUnentitled() { return { kind: 'json', status: 402, body: { error: 'locked' } }; }
 `);
+writeFileSync(path.join(pStage, 'receiptconfidence.ts'), readFileSync(path.join(root, 'lib/receiptconfidence.ts'), 'utf8'));
 writeFileSync(path.join(pStage, 'reviewpile.ts'), `
 // Added 11 August 2026. The pile route's CIS branch imports cisCapture. The real one lives in
 // lib/reviewpile.ts and is proved by test/ciscapture.test.mjs; this stub only has to exist and to

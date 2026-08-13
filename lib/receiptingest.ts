@@ -46,6 +46,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 import { parseReceipt, type ReceiptLine } from './claude';
+import { scoreFor } from './receiptconfidence';
 import { clampReceiptDate } from './waintents';
 import {
   insertTransaction, recentUnconfirmedForMatch, recentlyCapturedForMatch, mergeIntoTransaction,
@@ -203,6 +204,15 @@ export async function ingestReceiptImage(args: {
     // The photograph's path in the private bucket, or null when storage failed. The figures
     // are already in hand either way: a lost image never loses them.
     raw_input_url: storedPath,
+    // 🔴 HOW WELL THE MACHINE COULD SEE THE TOTAL, STORED. R2, 13 August 2026.
+    //
+    // The column has existed on public.transactions since the schema was written and NOTHING had
+    // ever written to it: `confidence_score numeric` was declared here and in NewTransaction and
+    // read in exactly no places. So this needs no migration. The shelf was built and left empty,
+    // which is why the faded £110.55 could walk into the pile looking like every other row.
+    //
+    // null when the model was not asked, and null is not "clear": see lib/receiptconfidence.ts.
+    confidence_score: scoreFor(parsed.amount_confidence),
     ...(whatsappMessageId ? { raw_whatsapp_message_id: whatsappMessageId } : {}),
   };
   if (receiptVat !== null) {

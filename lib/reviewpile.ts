@@ -29,6 +29,7 @@
 // So it is passed in. The caller supplies the real normaliser, and so does the test, which
 // means the real one is what gets tested.
 import { matchesOwnName } from './personal';
+import { isUncertainAmount } from './receiptconfidence';
 import { shouldAskCapital } from './capital';
 // The three CIS rates and nothing else. They live in FACTS because Khoji watches FACTS against
 // GOV.UK every night, and a rate typed into a second file is a rate that stays at last year's
@@ -101,6 +102,11 @@ export interface PileEntry {
   // Where the row came from. 'whatsapp_image' and 'web_image' mean a MACHINE read the amount off a
   // photograph and no human has ever checked it. See MACHINE_READ_SOURCES below.
   source_type?: string | null;
+  // 🔴 HOW WELL THE MACHINE COULD SEE THE TOTAL, OR NULL BECAUSE IT WAS NEVER ASKED. R2, 13 Aug.
+  // source_type above says the amount is a READING. This says whether the reading was taken off
+  // paper anybody could make out. lib/receiptconfidence.ts owns what the number means, and null is
+  // NOT "clear": it is every row written before the question existed.
+  confidence_score?: number | null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -159,6 +165,10 @@ export interface PileGroup {
   // Every row in here came off a photograph, so every AMOUNT in here is a reading rather than a
   // fact. The screen says so, and it never mixes with bank sourced rows. See MACHINE_READ_SOURCES.
   readFromPhoto: boolean;
+  // Every AMOUNT in here was read off paper the machine itself said it struggled with. The screen
+  // says so and asks him to look at the figure, and it never mixes with readings we are sure of,
+  // for the same reason a reading never mixes with a bank line. See lib/receiptconfidence.ts.
+  uncertainAmount: boolean;
 }
 
 // One decision, many rows. The whole point.
@@ -207,10 +217,22 @@ export function buildPile(
     // one press must never answer for both.
     const read = isMachineRead(e.source_type);
 
+    // 🔴 AND SO IS WHETHER WE COULD ACTUALLY READ IT. R2, 13 August 2026.
+    //
+    // The line above stops a photograph's amount riding a BANK ROW's press. It does not stop a
+    // photograph we could barely read riding the press of a photograph we read perfectly, and a
+    // florist with eight Porters receipts in one upload has exactly that shape. The faded £110.55
+    // and a crisp £324.69 are both readings, both from the same shop, both money out: same group,
+    // one press, and the £8 nobody can ever question again.
+    //
+    // ⚠️ ONLY AN EXPLICIT LOW SCORE SPLITS. Null means the model was never asked, which is every
+    // row written before today, and those must group exactly as they always have.
+    const unsure = isUncertainAmount(e.confidence_score);
+
     // The kind is part of the key. A refund FROM Screwfix and a purchase AT Screwfix are the
     // same shop and completely different questions, and answering one must never answer the
     // other.
-    const id = `${kind}:${read ? 'read' : 'given'}:${key}`;
+    const id = `${kind}:${read ? 'read' : 'given'}${unsure ? ':unsure' : ''}:${key}`;
 
     const existing = map.get(id);
     if (existing) {
@@ -235,6 +257,7 @@ export function buildPile(
       suggested: suggestionFor(e, categorise),
       ids: [e.id],
       readFromPhoto: read,
+      uncertainAmount: unsure,
     });
   }
 

@@ -121,3 +121,96 @@ export const FINANCE_COST_NOTE =
 export const PROPERTY_STREAM_NOTE =
   'Filed against your property, kept separate from your trade. Rent carries no National Insurance, '
   + 'so keeping the two apart is what stops your Class 4 bill running high.';
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE PROPERTY EAR. R2-F18, 13 August 2026.
+//
+// Rosa said, into her phone:
+//
+//   "The Okafors' rent came in yesterday, nine hundred and fifty. That's the flat upstairs, not
+//    the shop."
+//
+// Whisper transcribed it perfectly. The stream disambiguation is IN HER WORDS, said unprompted,
+// in the exact form a person uses when they know two things could be confused. It was filed as
+// TRADE INCOME, and the pile's rent button rescued it one button later.
+//
+// Everything above this line routes on a CATEGORY he picked off a list. Nothing routed on what he
+// SAID, and voice is the input this product tells people to use.
+//
+// ⚠️ IT MUST BE ABLE TO SAY NO, AND THAT IS THE HARD HALF. Rosa pays £1,400 a month of SHOP RENT to
+// SO BLOOM PROPERTIES. That is a trade cost. An ear that hears "rent" and reaches for the property
+// stream would take a florist's largest deductible expense out of her trade and put it against her
+// rental income, which is worse than the bug it fixes: the money in case was rescued by a button on
+// the next screen, and a misfiled cost is silent.
+//
+// So the rule is: a PROPERTY MARKER is required (a flat, a tenant, a let, upstairs, the property),
+// and any TRADE MARKER in the same breath (the shop, the unit, the premises, the yard) refuses.
+// "Not the shop" is a property sentence and "rent on the shop" is a trade one, and the difference
+// is which noun the rent belongs to, not which words appear.
+//
+// ⚠️ AND IT ONLY EVER PROPOSES. Nothing here confirms anything: the row still lands unconfirmed and
+// he still presses. What it changes is which stream the row is waiting in, so his rent stops
+// arriving as trade income and needing a correction he did not know he had to make.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// A let property, in the words people actually use. Deliberately narrow: every one of these names
+// a dwelling or a tenant, not a payment.
+const PROPERTY_MARKERS = [
+  'the flat', 'my flat', 'flat upstairs', 'upstairs flat', 'the upstairs',
+  'my tenant', 'the tenant', 'tenants', 'the tenancy',
+  'buy to let', 'the let', 'my let', 'the rental', 'my rental',
+  // ⚠️ 'the property' AND 'my property' ARE DELIBERATELY NOT HERE. They are the loosest phrases a
+  // landlord uses and the likeliest to appear inside a PAYEE's name: "paid the property developers",
+  // "the property management people". The sabotage pass surfaced it. Every other marker in this list
+  // names a dwelling or a tenant and cannot be a company, so narrowing the list beats bolting
+  // exceptions onto it, and the sentences a real landlord speaks are still caught by the rest.
+  'rental property', 'the house i rent out', 'i rent out',
+  'the maisonette', 'the bedsit', 'the annexe',
+];
+
+// The trade, in the same words. If one of these is what the money is about, it is not property,
+// however much the sentence talks about rent.
+const TRADE_MARKERS = [
+  'the shop', 'my shop', 'shop rent', 'rent on the shop', 'the unit', 'my unit',
+  'the premises', 'the yard', 'the workshop', 'the studio', 'the salon', 'the cafe',
+  'the stall', 'the pitch', 'the lockup', 'the lock up', 'the storage unit', 'the warehouse',
+];
+
+// "not the shop" is a PROPERTY sentence: he is telling us which one it is not. So a trade marker
+// that is negated does not refuse. Matched as its own phrase rather than by parsing the sentence,
+// because parsing English negation is a bigger promise than this needs to make.
+const NEGATED_TRADE = [
+  'not the shop', 'not my shop', 'not the business', 'not for the shop', 'nothing to do with the shop',
+  'not the unit', 'not the premises', 'not the yard', 'not the workshop',
+];
+
+function hay(text: string | null | undefined): string {
+  return ` ${String(text ?? '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ')} `;
+}
+
+/**
+ * Did he say, in his own words, that this money is about a property he lets?
+ *
+ * Null when he said nothing either way, which is almost every message and must stay the default.
+ * 'property' only when a property marker is present and no un-negated trade marker is.
+ *
+ * ⚠️ NULL IS NOT 'trade'. The caller keeps whatever it was going to do, so a message this function
+ * has no opinion about behaves exactly as it did before this function existed.
+ */
+export function spokenStream(text: string | null | undefined): Stream | null {
+  const h = hay(text);
+  if (!h.trim()) return null;
+
+  const saidProperty = PROPERTY_MARKERS.some((m) => h.includes(` ${m} `));
+  if (!saidProperty) return null;
+
+  // Blank out the negated forms first, so "that's the flat upstairs, not the shop" keeps its
+  // property marker and loses its trade one.
+  let rest = h;
+  for (const n of NEGATED_TRADE) rest = rest.split(` ${n} `).join(' ');
+
+  const saidTrade = TRADE_MARKERS.some((m) => rest.includes(` ${m} `));
+  if (saidTrade) return null;
+
+  return 'property';
+}

@@ -7,6 +7,7 @@
 import { parseSpokenTransaction } from './claude';
 import { insertTransaction } from './supabase';
 import { entryDate, matchReservedWord } from './waintents';
+import { spokenStream, streamFor } from './propertylanes';
 import { sendText } from './whatsapp';
 
 // The confirmation we send after logging a note. Lifted verbatim from the webhook so voice and text
@@ -83,6 +84,27 @@ export async function finishVoiceEntry(
   }
 
   const magnitude = Math.abs(parsed.amount);
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE STREAM HE NAMED OUT LOUD. R2-F18, 13 August 2026.
+  //
+  // "The Okafors' rent came in yesterday, nine hundred and fifty. That's the flat upstairs, not the
+  // shop." Transcribed perfectly, filed as TRADE INCOME. The disambiguation was in her words,
+  // unprompted, in the exact form a person uses when they know two things could be confused, and
+  // this walk had no ear for it at all. The pile's rent button rescued it one button later, which
+  // is the product asking her to correct something she had already got right.
+  //
+  // ⚠️ THE CATEGORY STILL WINS WHERE IT HAS AN OPINION. streamFor() routes a chosen category and it
+  // is the older, surer signal. The ear only speaks where the category is silent, so a man who says
+  // "mortgage interest on the flat" gets the same answer twice rather than an argument.
+  //
+  // ⚠️ AND IT ONLY EVER PROPOSES. The row lands unconfirmed exactly as before and he still presses.
+  // What changed is which stream it waits in. See spokenStream() for why "not the shop" is a
+  // property sentence and "shop rent" is not.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const heard = spokenStream(clean);
+  const stream = streamFor(parsed.category) === 'property' ? 'property' : heard ?? 'trade';
+
   await insertTransaction({
     user_id: userId,
     vendor: parsed.merchant_name,
@@ -93,6 +115,7 @@ export async function finishVoiceEntry(
     description: '', // a spoken note's sentence is never written to the ledger
     confirmed: false,
     raw_whatsapp_message_id: messageId,
+    ...(stream === 'property' ? { income_type: 'property' as const } : {}),
   });
   await sendText(fromPhone, confirmationLine(parsed));
   return 'logged';

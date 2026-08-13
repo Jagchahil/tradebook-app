@@ -33,7 +33,7 @@ const stage = mkdtempSync(path.join(tmpdir(), 'wave9income-'));
 // Every file lib/reviewpile.ts reaches, not just the first one it grew. See the note in
 // test/reviewpile.test.mjs: capital.ts arrived on 2 August 2026 and both suites failed on module
 // resolution rather than on the pile behaviour they exist to protect.
-for (const name of ['reviewpile', 'personal', 'capital', 'taxengine', 'money']) {
+for (const name of ['receiptconfidence', 'reviewpile', 'personal', 'capital', 'taxengine', 'money']) {
   writeFileSync(
     path.join(stage, `${name}.ts`),
     read(`lib/${name}.ts`).replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'"),

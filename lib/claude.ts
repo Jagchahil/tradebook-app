@@ -20,6 +20,7 @@ import { houseCopy } from './housestyle';
 // The truncated-reply rescue lives in its own pure module so the test suite can load it
 // directly; the story is in that file's header and at RECEIPT_MAX_TOKENS below.
 import { rescueTruncatedReceipt } from './receiptrescue';
+import type { AmountConfidence } from './receiptconfidence';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 // Two tiers. The structured extraction tasks (receipt fields, entry parsing,
@@ -77,6 +78,19 @@ export interface ParsedReceipt {
   // which is the honest answer and is not the same as a receipt with nothing on it. See the block
   // in PROMPT for why this is captured now and read by nothing yet.
   line_items: ReceiptLine[];
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HOW WELL THE TOTAL COULD ACTUALLY BE SEEN. Added 13 August 2026, and it is the half of
+  // R2-F3 that was left undone.
+  //
+  // A deliberately faded receipt was read as £110.55 when the paper says £118.55, and came back
+  // through this interface in exactly the shape a crisp printed invoice does. Nothing downstream
+  // could treat the two differently because there was nothing to treat differently.
+  //
+  // ⚠️ UNDEFINED MEANS THE MODEL WAS NOT ASKED, NOT THAT IT SAID CLEAR. The truncation rescue path
+  // reads money out of a cut off prefix and never reaches this field, and every row in every book
+  // written before today has nothing here. lib/receiptconfidence.ts holds the rule that only an
+  // explicit 'unsure' changes anything, so the signal can add caution and never remove it.
+  amount_confidence?: AmountConfidence;
 }
 
 export interface ReceiptLine {
@@ -103,8 +117,26 @@ const PROMPT = [
   '  "transaction_type": "expense",',
   '  "transaction_date": the date printed on the receipt as YYYY-MM-DD, or null if you cannot read one,',
   '  "vat": number, the VAT amount printed on the receipt in pounds, or null if none is printed,',
-  '  "line_items": [ { "description": the item exactly as printed, "amount": number in pounds } ]',
+  '  "line_items": [ { "description": the item exactly as printed, "amount": number in pounds } ],',
+  '  "amount_confidence": "clear" or "unsure", about the TOTAL only',
   '}',
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A QUESTION ABOUT THE PAPER, NOT A PROBABILITY. R2, 13 August 2026.
+  //
+  // "How confident are you, 0 to 1" produces a number that looks like calibration and is not: it
+  // clusters near the top and moves for reasons that have nothing to do with the photograph. So we
+  // ask about the IMAGE, which is in front of it, and about the ONE field that matters, and the
+  // answer is checkable by a human holding the same receipt.
+  //
+  // Deliberately biased toward "unsure": the cost of a false unsure is one glance at a receipt he
+  // still has. The cost of a false clear is a wrong number in his books that nothing will ever
+  // question again.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  'For amount_confidence, judge only how well you could SEE the total, not how likely the number is:',
+  '"clear" means every digit of the total is crisply legible and could not be read any other way.',
+  '"unsure" means the paper is faded, creased, torn, blurred, in shadow, cut off, or ANY single digit '
+  + 'could reasonably be read as a different digit. If you are weighing it up at all, say unsure.',
+  'This is about the printing and the photograph, never about whether the amount seems plausible.',
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 WHAT WAS IN THE BASKET, NOT JUST WHAT IT COST. Added 10 August 2026, before launch, for
   // products that do not exist yet, because THE DATA IS PERISHABLE AND THE PHOTO IS NOT KEPT.
@@ -363,6 +395,14 @@ export async function parseReceipt(base64: string, mediaType: string): Promise<P
       transaction_date: rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null,
       vat,
       line_items,
+      // ⚠️ ONLY THE TWO WORDS WE ASKED FOR COUNT. Anything else, including a number, a sentence, a
+      // missing field or an older prompt's reply, comes back undefined, which lib/receiptconfidence
+      // reads as "not asked" rather than as "clear". A signal that can be produced by accident is
+      // not a signal, and this one is only ever allowed to ADD caution.
+      amount_confidence:
+        parsed.amount_confidence === 'clear' || parsed.amount_confidence === 'unsure'
+          ? parsed.amount_confidence
+          : undefined,
     };
   } catch {
     console.error('[claude] Could not parse JSON from model reply.');

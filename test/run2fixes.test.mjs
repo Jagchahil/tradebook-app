@@ -59,7 +59,7 @@ import { CATEGORIES } from '../lib/categories.ts';
 const libDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'run2-'));
 const fixImports = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['money', 'personal', 'capital', 'taxengine', 'reviewpile']) {
+for (const f of ['money', 'personal', 'capital', 'taxengine', 'receiptconfidence', 'reviewpile']) {
   writeFileSync(path.join(stage, `${f}.ts`), fixImports(readFileSync(path.join(libDir, `${f}.ts`), 'utf8')));
 }
 const RP = await import(pathToFileURL(path.join(stage, 'reviewpile.ts')).href);
@@ -338,7 +338,11 @@ console.log('F3: a machine read amount never rides a press about something else'
   const pile = codeOnly(read('app/app/pile/page.tsx'));
   // ⚠️ THE ASSIGNMENT, NOT THE IDENTIFIER. `const knownRead = []` keeps every mention of the name
   // in the file and draws nothing at all, which is the finding coming straight back.
-  ok('the photograph list is DERIVED from the flag', /const knownRead = known\.filter\(\(g\) => g\.readFromPhoto\)/.test(pile));
+  // ⚠️ THE ASSIGNMENT AND THE FLAG, NOT THE EXACT CONDITION. On 13 August the list gained a second
+  // clause (`&& !g.uncertainAmount`) so a reading the model struggled with gets its own press. The
+  // guard's job is that the list is DERIVED FROM readFromPhoto rather than hardcoded, which is what
+  // `const knownRead = []` would defeat, and that is still exactly what it checks.
+  ok('the photograph list is DERIVED from the flag', /const knownRead = known\.filter\(\(g\) => g\.readFromPhoto\b/.test(pile));
   ok('the bank list is derived from its negation', /const knownGiven = known\.filter\(\(g\) => !g\.readFromPhoto\)/.test(pile));
   ok('the photograph list has its own press', /value="confirm_read"/.test(pile));
   ok('the bank list keeps its own', /value="confirm_known"/.test(pile));

@@ -593,7 +593,7 @@ ok('so does the api', pileRoute.includes('categoriseBankLine'));
 // The account gate reaches both surfaces, or one of them would presume what the other refuses.
 ok('the page partitions by what the account is for', /partitionPile\(groups, accountUse\)/.test(pile));
 ok('the api gates the one tap by it too', /canBulkConfirm\(g, accountUse\)/.test(pileRoute));
-ok('🔴 AND THE BULK PLAN IS GATED BY IT', /bulkConfirmPlan\(\s*[\s\S]{0,160}accountUse,/.test(pileRoute));
+ok('🔴 AND THE BULK PLAN IS GATED BY IT', /bulkConfirmPlan\(\s*[\s\S]{0,260}accountUse,/.test(pileRoute));
 
 console.log('\n8. THE MONEY LOG IS A SURFACE, AND ITS TOTALS AGREE WITH THE OVERVIEW');
 //

@@ -438,6 +438,7 @@ ok('🔴 the route reads the camera field first and falls back to the picker fie
   // The matcher and the vendor keys go in WHOLE: a stub of the thing under test would be a
   // test of the stub. Both are import free on purpose, which is what makes this possible.
   writeFileSync(path.join(iStage, 'dedupe.ts'), read('lib/dedupe.ts'));
+  writeFileSync(path.join(iStage, 'receiptconfidence.ts'), read('lib/receiptconfidence.ts'));
   writeFileSync(path.join(iStage, 'memory.ts'), read('lib/memory.ts'));
   writeFileSync(path.join(iStage, 'waintents.ts'), 'export function clampReceiptDate(d) { return d || "2026-08-05"; }\n');
   writeFileSync(path.join(iStage, 'claude.ts'), [
@@ -463,6 +464,7 @@ export async function mergeIntoTransaction(userId, id, patch) {
 export async function storeReceiptImage() { return state.storedPath; }
 export async function readVatProfile() { return null; }
 `);
+  writeFileSync(path.join(iStage, 'receiptconfidence.ts'), read('lib/receiptconfidence.ts'));
   writeFileSync(
     path.join(iStage, 'receiptingest.ts'),
     read('lib/receiptingest.ts').replace(/from '\.\/([a-zA-Z]+)'/g, "from './$1.ts'"),
@@ -605,6 +607,7 @@ export async function readVatProfile() { return null; }
   // stages the same walk for the chat's door.
   w('dedupe.ts', read('lib/dedupe.ts'));
   w('memory.ts', read('lib/memory.ts'));
+  w('receiptconfidence.ts', read('lib/receiptconfidence.ts'));
   w('receiptingest.ts', read('lib/receiptingest.ts').replace(/from '\.\/([a-zA-Z]+)'/g, "from './$1.ts'"));
   w('route.ts', routeReceipt
     .replace(/from 'next\/server'/g, "from './nextserver.ts'")

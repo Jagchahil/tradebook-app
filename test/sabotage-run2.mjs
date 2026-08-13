@@ -212,8 +212,8 @@ const SABOTAGES = [
   {
     name: 'F3 a photograph rejoins the bank rows in one group',
     apply: (d) => edit(d, 'lib/reviewpile.ts',
-      "    const id = `${kind}:${read ? 'read' : 'given'}:${key}`;",
-      '    const id = `${kind}:${key}`;'),
+      "    const id = `${kind}:${read ? 'read' : 'given'}${unsure ? ':unsure' : ''}:${key}`;",
+      "    const id = `${kind}${unsure ? ':unsure' : ''}:${key}`;"),
   },
   {
     name: 'F3 a bank line is treated as machine read',
@@ -228,20 +228,20 @@ const SABOTAGES = [
   {
     name: 'F3 the server files both lists on one press',
     apply: (d) => edit(d, 'app/api/pile/route.ts',
-      '        .filter((g) => g.readFromPhoto === wantRead),',
-      '        .filter(() => true),'),
+      '        .filter((g) => g.readFromPhoto === wantRead && g.uncertainAmount === wantUnsure),',
+      '        .filter((g) => g.uncertainAmount === wantUnsure),'),
   },
   {
     name: 'F3 the pile stops selecting the source column',
     apply: (d) => edit(d, 'lib/supabase.ts',
-      'cis_deduction,source_type`',
-      'cis_deduction`'),
+      'cis_deduction,source_type,confidence_score`',
+      'cis_deduction,confidence_score`'),
   },
   {
     name: 'F3 the screen merges the two confident lists again',
     apply: (d) => edit(d, 'app/app/pile/page.tsx',
-      '  const knownRead = known.filter((g) => g.readFromPhoto);',
-      '  const knownRead = [];'),
+      '  const knownRead = known.filter((g) => g.readFromPhoto && !g.uncertainAmount);',
+      '  const knownRead = known.filter((g) => !g.uncertainAmount);'),
   },
 
   // ── F4 / F13: dedupe ──────────────────────────────────────────────────────────────────────

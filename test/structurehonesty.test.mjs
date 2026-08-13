@@ -429,8 +429,14 @@ console.log('\n🔴 THE FIFTH LIE: THE WEB SIGNUP COULD NOT SAY "TWO OF US"\n');
     /if \(t === 'partnership'\) return 'partnership';/.test(supa));
   ok('...and a trading name still folds, because that IS a sole trader',
     !/if \(t === 'business'\) return 'partnership'/.test(supa));
+  // ⚠️ THE COLUMN, NOT THE WHOLE LIST IN ORDER. This pinned every column of the reconcile SELECT as
+  // one string, so it went red on 13 August when `person_name` was added beside `name` (a customer's
+  // own name was being asked for, stored, and then never selected here, so it never reached the
+  // account). That is a guard failing on a change it has no opinion about, which teaches people to
+  // edit guards. It is NOT weakened: it still requires partnership_share in THIS select, anchored to
+  // the same trade_type prefix, and still requires the write that acts on it.
   ok('🔴 and the share is carried onto the user when he proves his email',
-    /select=trade_type,trade,name,address,postcode,vat_registered,streams,partnership_share/.test(supa)
+    /select=trade_type,trade,name[^`]*partnership_share/.test(supa)
     && /setPartnershipShare\(userId, pct\)/.test(supa));
   ok('...only for a partnership, and only for a number we believe',
     /tradeTypeToBusinessType\(s\.trade_type\) === 'partnership'/.test(supa)

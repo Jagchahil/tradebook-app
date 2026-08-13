@@ -1775,12 +1775,13 @@ export async function reconcileSignupToUser(
   // The most recent signup for this man that has not been reconciled yet.
   const res = await fetch(
     `${url}/rest/v1/signups?${match}&reconciled_at=is.null` +
-      `&select=trade_type,trade,name,address,postcode,vat_registered,streams,partnership_share&order=created_at.desc&limit=1`,
+      `&select=trade_type,trade,name,person_name,address,postcode,vat_registered,streams,partnership_share&order=created_at.desc&limit=1`,
     { headers: headers() },
   );
   if (!res.ok) return { reconciled: false, applied: [] };
   const rows = (await res.json().catch(() => null)) as Array<{
-    trade_type: string | null; trade: string | null; name: string | null; address: string | null;
+    trade_type: string | null; trade: string | null; name: string | null; person_name: string | null;
+    address: string | null;
     postcode: string | null; vat_registered: boolean | null; streams: string[] | null;
     partnership_share?: number | string | null;
   }> | null;
@@ -1813,12 +1814,30 @@ export async function reconcileSignupToUser(
 
   // 2. Name and address onto the profile, for invoices and the quarter pack header.
   const patch: Record<string, unknown> = {};
+  const businessShaped = s.trade_type === 'ltd' || s.trade_type === 'business' || s.trade_type === 'partnership';
   if (s.name) {
     // A partnership's name belongs beside a company's and a trading name, not in the person field.
     // /start asks a partner for his own full name separately, exactly as it does for the other two.
-    if (s.trade_type === 'ltd' || s.trade_type === 'business' || s.trade_type === 'partnership') patch.business_name = s.name;
+    if (businessShaped) patch.business_name = s.name;
     else patch.name = s.name;
   }
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND HIS OWN NAME, WHICH WAS ASKED FOR, STORED, AND THEN DROPPED ON THE FLOOR. R2, 13 Aug 2026.
+  //
+  // /start REQUIRES a person's name for a business, a limited company and a partnership (step 2
+  // will not advance without it), app/api/onboard sends it as personName, and createSignup writes
+  // it to signups.person_name. This function never selected the column, so it never reached the
+  // account: a florist who finished all seven setup steps had users.name NULL, and every surface
+  // that greets a customer by name had nothing to greet her with.
+  //
+  // ⚠️ THE BRANCH ABOVE IS UNCHANGED FOR A SOLE TRADER, deliberately. His business name IS his name
+  // and it already lands in the right column, so nothing an existing sole trader has moves by a
+  // character. This only ever fills a field that was empty.
+  //
+  // ⚠️ AND IT NEVER OVERWRITES. patch.name is only set here when the branch above did not set it,
+  // which is exactly the business shaped case, so a name already written stays written.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (businessShaped && s.person_name && patch.name === undefined) patch.name = s.person_name;
   const addr = [s.address, s.postcode].filter(Boolean).join(', ');
   if (addr) patch.address = addr;
 
@@ -7736,13 +7755,24 @@ export async function pileEntries(userId: string): Promise<Array<{
   // No migration stands behind this line. source_type has been in supabase/schema.sql since the
   // beginning, so naming it here cannot empty the pile the way an unmigrated column would.
   source_type: string | null;
+  // 🔴 AND HOW WELL THE MACHINE COULD SEE THE TOTAL. R2, 13 August 2026.
+  //
+  // The other half of the £110.55. source_type above says the amount is a READING; this says
+  // whether the reading was taken off paper anybody could actually make out. Null for every row
+  // written before the model was asked, and null is NOT "clear": lib/receiptconfidence.ts holds
+  // that rule so no screen invents its own.
+  //
+  // No migration stands behind this line either. confidence_score has been in supabase/schema.sql
+  // since the beginning, declared on NewTransaction, and until today written by nothing and read
+  // by nothing at all.
+  confidence_score: number | null;
 }>> {
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
       `&confirmed=eq.false&is_personal=eq.false` +
       `&source_type=in.(bank_feed,web_image,whatsapp_image,whatsapp_voice,whatsapp_text)` +
-      `&select=id,vendor,description,amount,category,looks_personal,vat_amount,vat_confirmed,cis_deduction,source_type` +
+      `&select=id,vendor,description,amount,category,looks_personal,vat_amount,vat_confirmed,cis_deduction,source_type,confidence_score` +
       `&order=transaction_date.desc&limit=1000`,
     { headers: headers() },
   );

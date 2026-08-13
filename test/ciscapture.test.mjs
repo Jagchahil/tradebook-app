@@ -56,7 +56,7 @@ const stage = mkdtempSync(path.join(tmpdir(), 'ciscapture-'));
 // ⚠️ EVERY FILE IN THE CHAIN, not just the one under test. lib/reviewpile.ts reaches personal,
 // capital, taxengine and money, and a staging list that has to be edited by hand the next time it
 // gains an import is a suite that goes red for a reason it was never written to protect.
-for (const f of ['reviewpile', 'personal', 'capital', 'taxengine', 'money', 'vat', 'propertylanes']) {
+for (const f of ['receiptconfidence', 'reviewpile', 'personal', 'capital', 'taxengine', 'money', 'vat', 'propertylanes']) {
   writeFileSync(path.join(stage, `${f}.ts`), fixImports(read(`lib/${f}.ts`)));
 }
 const staged = (f) => import(pathToFileURL(path.join(stage, `${f}.ts`)).href);
@@ -341,7 +341,7 @@ console.log('\n--- 6. THE ROUTE FILES NOTHING UNTIL BOTH COLUMNS CAN BE WRITTEN 
   const put = (name, body) => writeFileSync(path.join(rStage, name), body);
   // The real files for everything the route asks a question of. A stub of lib/reviewpile.ts would
   // be a test of the stub, and this branch is about what the pile decides.
-  for (const f of ['reviewpile', 'personal', 'capital', 'taxengine', 'money', 'vat', 'circumstances', 'propertylanes']) {
+  for (const f of ['receiptconfidence', 'reviewpile', 'personal', 'capital', 'taxengine', 'money', 'vat', 'circumstances', 'propertylanes']) {
     put(`${f}.ts`, fixImports(read(`lib/${f}.ts`)));
   }
   put('nextserver.ts', `
@@ -467,8 +467,11 @@ export async function recordCisOnIncome(userId, id, expectedNet, patch) {
     // than as a new path nobody reviewed. RUN 2 added 'confirm_read': the one tap over rows read
     // off photographs, kept separate from confirm_known because a machine read amount and a bank
     // line's amount are different kinds of evidence. See lib/reviewpile.ts.
+    // Then 'confirm_unsure', 13 August: a reading the model itself said it struggled with is a
+    // different question again, so a yes about eight crisp receipts cannot carry a ninth faded one.
+    // This guard went red when it was added, which is the guard working.
     ok('and the word is on the verdict allowlist rather than being read as business',
-      /'personal', 'confirm_known', 'confirm_read', 'income', 'vat', 'cis'/.test(pileRoute));
+      /'personal', 'confirm_known', 'confirm_read', 'confirm_unsure', 'income', 'vat', 'cis'/.test(pileRoute));
   }
   {
     // CONTROL. Every other decision on this screen behaves exactly as it did.

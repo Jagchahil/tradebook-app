@@ -23,7 +23,7 @@ const stageDir = mkdtempSync(pathStage.join(tmpdirStage(), 'reviewpile-'));
 // was written to protect. A staging list that has to be edited every time the file under test gains
 // an import is a test that breaks for reasons unrelated to its subject. So: every file in the
 // chain, and a regex that gives ALL of them their extension back.
-const CHAIN = ['reviewpile', 'personal', 'capital', 'taxengine', 'money'];
+const CHAIN = ['receiptconfidence', 'reviewpile', 'personal', 'capital', 'taxengine', 'money'];
 for (const name of CHAIN) {
   writeStage(
     pathStage.join(stageDir, `${name}.ts`),

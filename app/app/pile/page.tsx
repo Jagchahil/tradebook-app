@@ -4,6 +4,7 @@ import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import { pileEntries, readOwnNames, readAccountUse, readCircumstances, getBusinessProfile, accountHasRental, readVatProfile } from '../../../lib/supabase';
 import { buildPile, summarisePile, partitionPile, waitingCount, cisToAsk, CIS_RATES } from '../../../lib/reviewpile';
+import { UNCERTAIN_SECTION_TITLE, UNCERTAIN_SECTION_NOTE, uncertainAmountLine } from '../../../lib/receiptconfidence';
 import { inputVatNote } from '../../../lib/vat';
 import { household, notHousehold, mtdQuestions, progressIn, openQuestionsLead, worksUnderCis } from '../../../lib/circumstances';
 import { normaliseVendor } from '../../../lib/memory';
@@ -260,10 +261,18 @@ export default async function PilePage({
   // ⚠️ THE SPLIT IS THE POINT, NOT THE SLOWDOWN. What can no longer happen is a press about a
   // shop's CATEGORY silently confirming a machine's guess at an AMOUNT nobody has ever seen.
   const knownGiven = known.filter((g) => !g.readFromPhoto);
-  const knownRead = known.filter((g) => g.readFromPhoto);
+  // 🔴 AND THE READINGS SPLIT AGAIN, ON WHETHER WE COULD ACTUALLY READ THEM. R2, 13 August 2026.
+  //
+  // The list below already separates a photograph's amount from a bank line's. It did not separate
+  // a photograph we read perfectly from one the machine itself said it struggled with, so a florist
+  // with eight Porters receipts in one upload files the faded one with a press about the other
+  // seven. That is the same collision R2-F3 fixed one level up, one level down.
+  const knownRead = known.filter((g) => g.readFromPhoto && !g.uncertainAmount);
+  const knownUnsure = known.filter((g) => g.readFromPhoto && g.uncertainAmount);
 
   const givenRows = knownGiven.reduce((n, g) => n + g.count, 0);
   const readRows = knownRead.reduce((n, g) => n + g.count, 0);
+  const unsureRows = knownUnsure.reduce((n, g) => n + g.count, 0);
   const incomeRows = income.reduce((n, g) => n + g.count, 0);
 
   const vatRegistered = vatProfile !== null && vatProfile.registered;
@@ -549,6 +558,64 @@ export default async function PilePage({
               <p style={S.hint}>
                 If a total looks wrong, sort that one below. A photograph is a reading, so it is
                 worth a glance.
+              </p>
+            </section>
+          )}
+
+          {/* ── 1c. THE ONES WE STRUGGLED TO READ ────────────────────────────────────────────
+              ═══════════════════════════════════════════════════════════════════════════════
+              🔴 THE OTHER HALF OF THE £110.55. RUN 2, 13 August 2026.
+
+              R2-F3, above, stopped a machine's reading being confirmed by a press about a BANK
+              ROW. It did not stop it being confirmed by a press about ANOTHER READING, and eight
+              receipts from one shop in one upload is exactly that shape. It also did nothing at
+              all about the reading being wrong, which the report said twice was the most
+              important thing not done.
+
+              The model is now asked, about every receipt, whether it could actually SEE the
+              total: whether every digit was crisply legible or whether the paper was faded,
+              creased, cut off or ambiguous. When it says it struggled, the row lands here.
+
+              ⚠️ THIS IS NOT A REFUSAL AND IT IS NOT AN APOLOGY. The figure is still shown, still
+              filed in one press, and he is never asked to retype it. What changes is that the
+              press is about THESE amounts and the sentence tells him which number to glance at
+              on paper he still has in his van.
+
+              ⚠️ AND IT NEVER BLAMES HIS PHOTOGRAPH. "A clearer photograph usually does it" was
+              what this product said to a florist twice about a perfectly printed till roll, when
+              the fault was our own token ceiling. Some receipts are faded because they are
+              receipts.
+              ═══════════════════════════════════════════════════════════════════════════════ */}
+          {knownUnsure.length > 0 && (
+            <section className="lek-card">
+              <h2 className="lek-h2">{UNCERTAIN_SECTION_TITLE}</h2>
+              <p style={S.sub}>{UNCERTAIN_SECTION_NOTE}</p>
+              <ul style={S.lines}>
+                {knownUnsure.map((g) => (
+                  <li key={g.key} style={S.line}>
+                    <div style={S.rowTop}>
+                      <span style={S.vendor}>{g.vendor}</span>
+                      <span style={S.amount}>{gbp0(g.total)}</span>
+                    </div>
+                    <p style={S.meta}>
+                      {g.count === 1 ? 'One receipt' : `${g.count} receipts`}, filed as{' '}
+                      <b style={S.cat}>{g.suggested}</b>.
+                    </p>
+                    <p style={S.meta}>{uncertainAmountLine(gbp0(g.total))}</p>
+                    <VatNote show={vatRegistered} category={g.suggested} text={g.vendor} />
+                  </li>
+                ))}
+              </ul>
+              <form action="/api/pile" method="post" hidden={locked} style={S.form}>
+                <input type="hidden" name="verdict" value="confirm_unsure" />
+                <button type="submit" className="lek-primary">
+                  {knownUnsure.length === 1
+                    ? 'That figure is right, file it'
+                    : `Those figures are right, file all ${unsureRows}`}
+                </button>
+              </form>
+              <p style={S.hint}>
+                If one of them is wrong, sort that one below instead and put the real figure in.
               </p>
             </section>
           )}

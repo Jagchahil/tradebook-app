@@ -268,6 +268,27 @@ export default async function TaxSummaryPage() {
                     ? 'An update carries property as its own stream, never mixed into the trade.'
                     : 'Rent is kept as its own stream here, never mixed into the trade.'}
                 </p>
+                {/* 🔴 THE MORTGAGE INTEREST, NAMED, BECAUSE IT LEFT HIS ACCOUNT AND IS NOT IN THE
+                    PROFIT ABOVE. R2-F25, 13 August 2026.
+
+                    It used to be inside "out" and netted off the profit, which understated the
+                    profit by the whole of the interest and described a submission nobody should
+                    make: on an update, residential finance goes in its own field precisely because
+                    it is not an allowable expense. Section 24, since 2020.
+
+                    Silence was not an option either. The capital line above this block exists
+                    because taking a car out of expenses and saying nothing once put "Out £72,088"
+                    and "Profit £22,776" on two screens of one product with nothing joining them.
+                    A landlord who paid £2,440 to his lender must be able to see where it went. */}
+                {sub.property.financeCost > 0 ? (
+                  <p style={S.quiet}>
+                    A further <b>{gbp0(sub.property.financeCost)}</b> went out on mortgage interest,
+                    and it is deliberately not in the profit above. Since Section 24 the interest on
+                    a residential let is not deducted from your rental income: it comes back as a
+                    20% credit against your tax instead, which is worked out for you on the Tax
+                    page. {makesUpdates ? 'An update reports it in its own box for the same reason.' : ''}
+                  </p>
+                ) : null}
               </div>
             ) : null}
 

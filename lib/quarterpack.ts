@@ -59,6 +59,38 @@ export interface PackTxn {
   // asked, and false is the behaviour this module has always had.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   writtenDown?: boolean;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A RESIDENTIAL LANDLORD'S MORTGAGE INTEREST, WHICH IS NOT AN ALLOWABLE EXPENSE AT ALL.
+  // R2-F25, 13 August 2026.
+  //
+  // Section 24 stopped residential finance costs being deducted from rental profit in 2020. They
+  // are relieved as a basic rate credit instead, and on a quarterly update they go in their own
+  // field (`residentialFinancialCost`) precisely because they are not part of allowable expenses.
+  // Netting them off property profit understates the profit and describes a different, wrong
+  // submission.
+  //
+  // ⚠️ THIS EXACT BUG WAS FOUND LIVE ON 6 AUGUST 2026 AND FIXED ON ONE SURFACE ONLY. lib/supabase.ts
+  // records it against the shared book: without the stream, that reader "counted it as a running
+  // cost and the shared book printed a profit £15,000 lower than the proof of income document for
+  // the same account". The fix was applied to getBookShareRows, which has handed a decided
+  // `financeCost` boolean ever since. Its sibling twenty lines up, getConfirmedTransactionsForRange,
+  // which is what feeds THIS module, never learned. One reader was taught the rule and the other
+  // was not, and the difference stayed invisible for a week because no door existed through which a
+  // property cost could be written. See R2-F5 and R2-F7 for that door.
+  //
+  // ⚠️ A DECIDED BOOLEAN, SAME AS writtenDown ABOVE, AND FOR BOTH OF ITS REASONS. The rule lives in
+  // lib/propertyengine.ts (isResidentialFinanceCost) and may only live there. And this module holds
+  // exactly one relative import and cannot take another, because three suites stage it without
+  // propertyengine and the staging does a single fixed string replace.
+  //
+  // ⚠️ THE NAME MATCHES lib/supabase.ts's EXISTING FIELD ON THE BOOKSHARE ROW, deliberately. A
+  // second name for one fact is the drift this file already warns about for capital_kind.
+  //
+  // ⚠️ UNDEFINED READS AS FALSE, which is every fixture and every trade row, and false is the
+  // behaviour this module has always had.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  financeCost?: boolean;
 }
 
 export interface QuarterBounds {
@@ -82,6 +114,15 @@ export interface StreamSummary {
   capitalCost: number;
   /** How many payments make up capitalCost. Zero whenever capitalCost is zero. */
   capitalCount: number;
+  // 🔴 RESIDENTIAL MORTGAGE INTEREST, OUT OF expenses AND REPORTED BESIDE IT. R2-F25.
+  // Same shape and the same reason as capitalCost above: a cost that genuinely left his account,
+  // that an update does NOT treat as an allowable expense, and that must therefore be visible
+  // rather than dropped. Section 24 relieves it as a 20% credit, so it belongs in its own field on
+  // an update and its own line on any screen that prints property expenses. Always 0 on the trade
+  // stream: a trade's loan interest IS deductible and nothing here changes it.
+  financeCost: number;
+  /** How many payments make up financeCost. Zero whenever financeCost is zero. */
+  financeCount: number;
 }
 
 export interface EstimatedTax {
@@ -251,6 +292,8 @@ function summariseStream(txns: PackTxn[], wantProperty: boolean): StreamSummary 
   let expenses = 0;
   let capitalCost = 0;
   let capitalCount = 0;
+  let financeCost = 0;
+  let financeCount = 0;
   const byCat = new Map<string, number>();
   for (const t of txns) {
     const isProperty = (t.income_type ?? '').toLowerCase() === 'property';
@@ -270,6 +313,18 @@ function summariseStream(txns: PackTxn[], wantProperty: boolean): StreamSummary 
         capitalCount += 1;
         continue;
       }
+      // 🔴 AND A RESIDENTIAL LANDLORD'S MORTGAGE INTEREST IS NOT AN ALLOWABLE EXPENSE EITHER.
+      // R2-F25. Section 24 relieves it as a basic rate credit rather than a deduction, so it leaves
+      // expenses and it leaves the category breakdown, exactly as a car does, and it is counted
+      // where the reader can see it instead of being netted off the profit. Gated on wantProperty
+      // as well as the flag: a TRADE's loan interest is deductible and must not be touched, and
+      // belt and braces beyond the caller already deciding it, because the cost of getting this
+      // one wrong in the trade direction is a real deduction silently disappearing.
+      if (wantProperty && t.financeCost === true) {
+        financeCost += mag;
+        financeCount += 1;
+        continue;
+      }
       expenses += mag;
       const cat = (t.category ?? 'other').trim().toLowerCase() || 'other';
       byCat.set(cat, (byCat.get(cat) ?? 0) + mag);
@@ -287,6 +342,8 @@ function summariseStream(txns: PackTxn[], wantProperty: boolean): StreamSummary 
     expensesByCategory,
     capitalCost: round2(capitalCost),
     capitalCount,
+    financeCost: round2(financeCost),
+    financeCount,
   };
 }
 
@@ -563,7 +620,8 @@ export function renderQuarterPackHtml(pack: QuarterPack): string {
         <tr><td style="padding:6px 0;font-weight:600">Rent received</td><td style="padding:6px 0;text-align:right;font-weight:600">${gbp(p.income)}</td></tr>
         ${streamRows(p)}
         <tr style="border-top:1px solid ${BORDER}"><td style="padding:8px 0;font-weight:700">Property profit this quarter</td><td style="padding:8px 0;text-align:right;font-weight:700">${gbp(p.net)}</td></tr>
-      </table>`
+      </table>
+      ${p.financeCost > 0 ? `<p style="margin:8px 0 0;font-size:13px;color:${MUTED}">Residential mortgage interest of ${gbp(p.financeCost)} was paid in this period and is deliberately NOT deducted above. Since Section 24 it is relieved as a basic rate tax credit rather than an expense, and an update reports it in its own field for that reason.</p>` : ''}`
     : '';
 
   // 🔴 AND THE MAKING TAX DIGITAL SENTENCE IS NOT ADDRESSED TO A DIRECTOR AT ALL.

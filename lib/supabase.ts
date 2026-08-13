@@ -4799,6 +4799,23 @@ export async function getConfirmedTransactionsForRange(
       capital_kind: (r.capital_kind as string | null) ?? null,
       business_use_pct: r.business_use_pct == null ? null : Number(r.business_use_pct),
       writtenDown: isWrittenDown(r.capital_kind),
+      // 🔴 AND WHETHER IT IS A RESIDENTIAL LANDLORD'S MORTGAGE INTEREST. R2-F25, 13 August 2026.
+      //
+      // This line is twenty rows below getBookShareRows, which has decided exactly this since
+      // 6 August, when the shared book was found printing a profit £15,000 lower than the proof of
+      // income for the same account. That fix taught ONE reader. This one, which feeds the quarter
+      // pack and therefore the page headed "what a quarterly update would report today", was left
+      // as it was, and the two disagreed by the whole of the interest.
+      //
+      // It stayed invisible for a week because no door existed through which a property cost could
+      // be written at all (R2-F5, R2-F7). The morning that door opened, /app/tax said her property
+      // profit was £4,750 and /app/tax/summary said £2,310, off the same rows.
+      //
+      // Decided here and handed over as a boolean, exactly as writtenDown is, because
+      // lib/quarterpack.ts holds one relative import and cannot take another.
+      financeCost:
+        String(r.income_type ?? '').toLowerCase() === 'property' &&
+        isResidentialFinanceCost(r.category as string | null, r.vendor as string | null),
     }));
 }
 

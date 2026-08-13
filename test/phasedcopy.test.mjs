@@ -59,6 +59,33 @@ console.log('B. R2-F29. A possessive only works in front of a name');
     /Read \$\{name\} receipt/.test(feed) && /Read your \$\{name\} receipt/.test(feed));
 }
 
+console.log('C. 🔴 R2-F32. The cold open, and the guard that could not see it');
+
+// Found by unplugging Rosa's number and texting the product as a stranger. This is what a wrong
+// number gets, what a prospect who texts before signing up gets, and what every ex-customer gets.
+const wa = readFileSync(path.join(root, 'app/api/whatsapp/route.ts'), 'utf8');
+const notLinkedAt = wa.indexOf('async function replyNotLinked');
+const notLinked = notLinkedAt >= 0 ? wa.slice(notLinkedAt, wa.indexOf('\n}', notLinkedAt)) : '';
+const notLinkedCode = codeOnly(notLinked);
+
+ok('the cold open exists', notLinked.length > 0);
+ok('🔴 it no longer says it DOES his tax', !/I do your books and tax/.test(notLinkedCode));
+ok('🔴 it says it PREPARES, which is the whole doctrine',
+  /I keep your books and get your tax ready/.test(notLinkedCode));
+// It still has to be a useful sentence to a stranger, not just a compliant one.
+ok('it still says what the thing is', /I am Lekhio/.test(notLinkedCode));
+ok('and what to do next', /Get set up at/.test(notLinkedCode));
+ok('with the trial length from the module that owns it', /\$\{TRIAL_DAYS\} days free/.test(notLinkedCode));
+ok('🔴 and it leaks nothing about whoever had the number before',
+  !/was on an account|previous account|removed from|used to be/i.test(notLinkedCode));
+
+// 🔴 THE STRUCTURAL HALF, WHICH MATTERS MORE THAN THE SENTENCE. test/compliance.test.mjs scans
+// app/ recursively, including this file, and its regex was written entirely in the first person
+// PLURAL. Every WhatsApp string speaks as "I". The guard could not see a word of the chat.
+const comp = readFileSync(path.join(root, 'test/compliance.test.mjs'), 'utf8');
+ok('🔴 the compliance guard covers "I" as well as "we"', /\\b\(we\|i\)/.test(comp));
+ok('and it still covers the original plural forms', /we do your tax for you/.test(comp));
+
 console.log('');
 console.log(`${pass} passed, ${fail} failed.`);
 process.exit(fail === 0 ? 0 : 1);

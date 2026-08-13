@@ -1162,7 +1162,23 @@ async function replyNotLinked(from: string): Promise<void> {
   await sendText(
     from,
     [
-      'Hi, I am Lekhio. I do your books and tax, right here on WhatsApp. Snap a receipt, log your mileage, ask about your money, all by text.',
+      // 🔴 "I DO YOUR BOOKS AND TAX" SAID THE ONE THING CLAUDE.md FORBIDS. R2-F32, 13 August 2026.
+      //
+      // Found by unplugging Rosa's number at the close of Run 2 and texting the product as a
+      // stranger. This is the cold open: what a wrong number gets, what a prospect who texts before
+      // signing up gets, what every ex-customer gets. Over time it is one of the most read sentences
+      // this product has, and it began "I do your books and tax".
+      //
+      // CLAUDE.md, non negotiable: "We PREPARE. The user APPROVES. We never 'do their tax.'" Lekhio
+      // cannot file. The pipeline waits on HMRC production access. A stranger's first sentence from
+      // us described a service we do not provide and are not authorised to.
+      //
+      // ⚠️ AND test/compliance.test.mjs SCANS THIS FILE AND COULD NOT SEE IT. Its regex is
+      // /we (will )?file your tax|we do your tax for you|.../ and every WhatsApp string in this
+      // product speaks in the FIRST PERSON SINGULAR: "I am Lekhio", "I do", "I will remind you",
+      // 47 times in this file alone. The guard was written for the web's voice and applied to the
+      // chat's. It has been widened, and that half matters more than this sentence.
+      'Hi, I am Lekhio. I keep your books and get your tax ready, right here on WhatsApp. Snap a receipt, log your mileage, ask about your money, all by text.',
       '',
       // 🔴 THIS SAID "first month free", AND THE TRIAL HAS BEEN SEVEN DAYS SINCE 29 JULY.
       //

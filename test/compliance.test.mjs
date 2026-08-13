@@ -197,7 +197,20 @@ ok('🔴 NOWHERE DO WE SAY "we file your tax". Not once, in any screen.',
   // CLAUDE.md, and now the statute agrees with it. We PREPARE. He APPROVES. HMRC keeps the taxpayer
   // legally responsible at all times, and the moment we imply otherwise we have described ourselves
   // as his agent in his own words.
-  !/we (will )?file your tax|we do your tax for you|we submit your tax return for you/i.test(copy));
+  // 🔴 AND IT COVERS "I" AS WELL AS "WE". R2-F32, 13 August 2026.
+  //
+  // This assertion scanned app/ recursively, which includes the WhatsApp route, and still missed
+  // "Hi, I am Lekhio. I do your books and tax" sitting in the cold open reply to every stranger who
+  // ever texts the number. The regex was written for the web's voice. The chat speaks in the FIRST
+  // PERSON SINGULAR, 47 times in that one file, so the guard covering this product's most important
+  // claim could not see a word of it.
+  //
+  // A guard whose pronoun does not match the product's voice is not a narrow guard, it is an absent
+  // one for everything written in the other voice.
+  !/\b(we|i) (will )?(file|submit) your tax/i.test(copy)
+  && !/\b(we|i) do your (books and )?tax\b/i.test(copy)
+  && !/\b(we|i) (handle|sort out|take care of) your tax\b/i.test(copy)
+  && !/we do your tax for you|we submit your tax return for you/i.test(copy));
 
 // ⚠️ AND HERE IS THE PROSE TRAP, FOR THE SIXTH TIME IN THIS REPO.
 //

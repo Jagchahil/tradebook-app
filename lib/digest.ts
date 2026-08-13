@@ -149,10 +149,39 @@ export function buildDigest(split: DigestSplit): string | null {
     // thing narrating his money does not know what happened, and stopped reading it.
     //
     // So we say the only thing we know for certain is true: it landed, and it counts.
+    // ═══════════════════════════════════════════════════════════════════════════════════
+    // 🔴 AND THE SENTENCE ABOVE WAS STILL NOT TRUE. RUN 2, 13 August 2026, 00:00.
+    //
+    // A florist who had uploaded a YEAR of bank statements that afternoon was told at midnight:
+    // "20 things landed from your bank today, and they count", followed by six SumUp payouts, a
+    // Porters run dated 6 August and a Biffa bill.
+    //
+    // Two words were wrong and each was wrong on its own.
+    //
+    //   "FROM YOUR BANK"   There is no bank feed. CLAUDE.md's control doctrine says so as a
+    //                      POSITION: "We have no bank provider, and that is a position rather
+    //                      than an apology. Nothing enters your books that you did not put
+    //                      there." She put these there, by hand, through the upload door. The
+    //                      one sentence this product should never say is the one that describes
+    //                      a feed it has deliberately not built, and it was saying it nightly.
+    //                      (bankEntriesForDigestMany filters source_type = 'bank_feed', which is
+    //                      the value insertBankTransactions writes for a CSV IMPORT too. The
+    //                      column name is the whole of the mistake.)
+    //
+    //   "TODAY"            The query is created_at within 24 hours, which for an import is the
+    //                      moment the file was read, not the day the money moved. Her rows were
+    //                      dated across twelve months. Not one of them landed today.
+    //
+    // ⚠️ THE FIX IS THE SAME ONE THIS COMMENT BLOCK ALREADY MADE ONCE, APPLIED AGAIN. The note
+    // above records taking out "I filed 3 things FOR YOU" because we would have been claiming
+    // his work. This is the identical error one clause along: claiming a CHANNEL we do not have,
+    // for money that arrived on a day it did not. So it says the only thing we know for certain
+    // is true again: these are in his books, and they count.
+    // ═══════════════════════════════════════════════════════════════════════════════════
     parts.push(
       filed.length === 1
-        ? 'One thing landed from your bank today, and it counts:'
-        : `${filed.length} things landed from your bank today, and they count:`,
+        ? 'One thing is in your books and counting:'
+        : `${filed.length} things are in your books and counting:`,
     );
     parts.push(shown.map((e) => `• ${line(e)}`).join('\n') + (more > 0 ? `\n• and ${more} more` : ''));
   }
@@ -163,9 +192,24 @@ export function buildDigest(split: DigestSplit): string | null {
     parts.push(shown.map((e) => `• ${line(e)}`).join('\n'));
     parts.push('Reply YES to file those too, or tell me what they were and I will remember.');
   } else if (filed.length > 0) {
-    // Nothing to ask, so we do not ask. We say what happened and get out of the way.
-    // That is the whole point.
-    parts.push('Nothing needs you. Reply NO if any of that looks wrong.');
+    // ═══════════════════════════════════════════════════════════════════════════════════
+    // 🔴 "NOTHING NEEDS YOU" WAS A FALSE ALL CLEAR ABOUT MONEY. RUN 2, 13 August 2026.
+    //
+    // `asking` is scoped to source_type = 'bank_feed', so it can only ever see one door. At
+    // midnight this said "Nothing needs you" to a customer with £380 sitting in her pile,
+    // waiting for a decision, because that row came from the chat and not from a statement.
+    //
+    // A digest that says nothing needs you is the ONE sentence a busy person acts on: it is
+    // permission to close the phone. Saying it while money waits is worse than saying nothing,
+    // and it is worse the more the customer trusts it.
+    //
+    // ⚠️ SO IT NAMES ITS OWN SCOPE. We cannot widen the query from here (this file is pure and
+    // takes what it is given), and widening it upstream would change which rows the digest
+    // ASKS about, which is a bigger decision than a wording fix. What we can do is stop the
+    // sentence claiming more than it checked. "Nothing here needs you" is true of what it saw.
+    // The full scope fix is written up as R2-F22 and is not this packet's to make.
+    // ═══════════════════════════════════════════════════════════════════════════════════
+    parts.push('Nothing here needs you. Reply NO if any of that looks wrong.');
   }
 
   return parts.join('\n\n');

@@ -9,6 +9,9 @@ import { household, notHousehold, mtdQuestions, progressIn, openQuestionsLead, w
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
+// RUN 2: money out reaches the property stream now. Drawn only for a customer who lets something,
+// exactly as the "It was rent" button below already is. See lib/propertylanes.ts.
+import { categoriesFor } from '../../../lib/propertylanes';
 import { capitalOptions, capitalQuestion, capitalWhy, shouldAskCapital } from '../../../lib/capital';
 import { gbp0, gbp2 } from '../../../lib/money';
 import { bankFeedOffered } from '../../../lib/bankfeed';
@@ -245,7 +248,22 @@ export default async function PilePage({
   // ═══════════════════════════════════════════════════════════════════════════════════════
   const { known, unknown, careful, income } = partitionPile(groups, accountUse);
 
-  const knownRows = known.reduce((n, g) => n + g.count, 0);
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A PHOTOGRAPH'S AMOUNT AND A BANK LINE'S AMOUNT ARE NOT THE SAME KIND OF THING.
+  // RUN 2, 12 August 2026. See MACHINE_READ_SOURCES in lib/reviewpile.ts for the £110.55.
+  //
+  // buildPile keeps them in separate groups now, so this screen can say what each list actually
+  // is. The confident list splits in two: what the bank told us, and what a machine read off
+  // paper. Both still file in one press, because the founder quit at two files out of eight when
+  // this product made him work one at a time and that finding stands.
+  //
+  // ⚠️ THE SPLIT IS THE POINT, NOT THE SLOWDOWN. What can no longer happen is a press about a
+  // shop's CATEGORY silently confirming a machine's guess at an AMOUNT nobody has ever seen.
+  const knownGiven = known.filter((g) => !g.readFromPhoto);
+  const knownRead = known.filter((g) => g.readFromPhoto);
+
+  const givenRows = knownGiven.reduce((n, g) => n + g.count, 0);
+  const readRows = knownRead.reduce((n, g) => n + g.count, 0);
   const incomeRows = income.reduce((n, g) => n + g.count, 0);
 
   const vatRegistered = vatProfile !== null && vatProfile.registered;
@@ -437,15 +455,16 @@ export default async function PilePage({
               four option select next to a merchant we already recognise is asking a question we
               have already answered, and doing it twenty times is what made this screen feel like
               work. He only needs the dropdown when he DISAGREES, which is what the row link is. */}
-          {known.length > 0 && (
+          {knownGiven.length > 0 && (
             <section className="lek-card">
-              <h2 className="lek-h2">We recognise {known.length === 1 ? 'this one' : `these ${known.length}`}</h2>
+              <h2 className="lek-h2">We recognise {knownGiven.length === 1 ? 'this one' : `these ${knownGiven.length}`}</h2>
               <p style={S.sub}>
-                {knownRows === 1 ? 'One payment' : `${knownRows} payments`}, and we are confident
-                about {known.length === 1 ? 'it' : 'them'}. Have a read, then file the lot in one go.
+                {givenRows === 1 ? 'One payment' : `${givenRows} payments`} from your bank, and we
+                are confident about {knownGiven.length === 1 ? 'it' : 'them'}. Have a read, then
+                file the lot in one go.
               </p>
               <ul style={S.lines}>
-                {known.map((g) => (
+                {knownGiven.map((g) => (
                   <li key={g.key} style={S.line}>
                     <div style={S.rowTop}>
                       <span style={S.vendor}>{g.vendor}</span>
@@ -471,11 +490,65 @@ export default async function PilePage({
               <form action="/api/pile" method="post" hidden={locked} style={S.form}>
                 <input type="hidden" name="verdict" value="confirm_known" />
                 <button type="submit" className="lek-primary">
-                  Yes, file {known.length === 1 ? 'it' : `all ${knownRows}`}
+                  Yes, file {knownGiven.length === 1 ? 'it' : `all ${givenRows}`}
                 </button>
               </form>
               <p style={S.hint}>
                 Anything you disagree with, sort it below after. Nothing here is final.
+              </p>
+            </section>
+          )}
+
+          {/* ── 1b. THE ONES WE READ OFF PAPER ───────────────────────────────────────────────
+              ═══════════════════════════════════════════════════════════════════════════════
+              🔴 ITS OWN LIST, ITS OWN PRESS, AND ITS OWN SENTENCE. RUN 2, 12 August 2026.
+
+              These amounts were read off photographs by a machine. The bank's figures are facts;
+              these are readings, and one of them on this run was a faded receipt read confidently
+              as £110.55 where the paper says £118.55.
+
+              It used to sit in the same list as the bank rows for the same shop, so a press about
+              a SHOP'S CATEGORY also confirmed a machine's guess at an AMOUNT. Two promises
+              collided ("answer once for a shop", "nothing counts until you have said it is
+              right") and the wrong one won.
+
+              ⚠️ STILL ONE PRESS. The founder quit at two files out of eight when this product
+              made him work one at a time, and that finding stands. What changed is that the list
+              says what it is, prints the amount it read, and is filed by a press of its own.
+              ═══════════════════════════════════════════════════════════════════════════════ */}
+          {knownRead.length > 0 && (
+            <section className="lek-card">
+              <h2 className="lek-h2">
+                {readRows === 1 ? 'One I read off a photograph' : `${readRows} I read off your photographs`}
+              </h2>
+              <p style={S.sub}>
+                The shop and the total here are what I read off the paper, not what your bank told
+                me. Have a look at the figures, then file them in one go.
+              </p>
+              <ul style={S.lines}>
+                {knownRead.map((g) => (
+                  <li key={g.key} style={S.line}>
+                    <div style={S.rowTop}>
+                      <span style={S.vendor}>{g.vendor}</span>
+                      <span style={S.amount}>{gbp0(g.total)}</span>
+                    </div>
+                    <p style={S.meta}>
+                      {g.count === 1 ? 'One receipt' : `${g.count} receipts`}, filed as{' '}
+                      <b style={S.cat}>{g.suggested}</b>.
+                    </p>
+                    <VatNote show={vatRegistered} category={g.suggested} text={g.vendor} />
+                  </li>
+                ))}
+              </ul>
+              <form action="/api/pile" method="post" hidden={locked} style={S.form}>
+                <input type="hidden" name="verdict" value="confirm_read" />
+                <button type="submit" className="lek-primary">
+                  Yes, file {knownRead.length === 1 ? 'it' : `all ${readRows}`}
+                </button>
+              </form>
+              <p style={S.hint}>
+                If a total looks wrong, sort that one below. A photograph is a reading, so it is
+                worth a glance.
               </p>
             </section>
           )}
@@ -562,7 +635,11 @@ export default async function PilePage({
                 </label>
                 <select id={`cat-${g.key}`} name="category" defaultValue={g.suggested ?? ''} className="lek-select" required>
                   {!g.suggested && <option value="">Choose one</option>}
-                  {CATEGORIES.map((c) => (
+                  {/* ⚠️ THE LIST GROWS BY FOUR ONLY FOR SOMEBODY WHO LETS SOMETHING. A plumber in
+                      a van has no property, so four extra rows are four decisions he reads past to
+                      reach the one he wants (doc 103). The same `rental` gate the rent button uses,
+                      so the two halves of the property story appear together or not at all. */}
+                  {categoriesFor(CATEGORIES, rental).map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>

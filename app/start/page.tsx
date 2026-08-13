@@ -99,7 +99,13 @@ const trades = [
   // about the house. Picking it also carries the rental property flag with the signup, see
   // submitSignup: a man whose trade IS the letting should not have to also tick "alongside".
   'Landlord',
-  'Photographer', 'Tutor', 'Carer', 'Cafe', 'Market trader', 'Freelancer',
+  // Florist earned its chip on 12 August 2026 for exactly the reason Landlord earned its own, and
+  // by the same route: a florist persona walked this page, read twenty five chips, and had to
+  // answer "Something else" about a high street shop with a chiller, a card machine and a market
+  // run at four in the morning. Cafe and Market trader were already here, and a flower shop is the
+  // same business shape as both. It sits with them rather than at the end, because the cluster is
+  // how somebody scanning finds himself.
+  'Photographer', 'Tutor', 'Carer', 'Cafe', 'Florist', 'Market trader', 'Freelancer',
   // The way in for everybody we did not name. It opens the free text box below, and what he types
   // is what is saved, so nobody is ever turned away by a list.
   'Something else',

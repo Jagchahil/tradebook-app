@@ -4,7 +4,10 @@ import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import {
   accountHasRental, getConfirmedInputVat, getOutputVat, readVatProfile, taxableTurnoverFor,
+  getConfirmedTransactionsForRange,
 } from '../../../../lib/supabase';
+// RUN 2: the figure comes from his rows now, not from an account age gate. See the block below.
+import { vatStanding, CARD_FEE_NOTE, FLOOR_NOTE } from '../../../../lib/vatstanding';
 import {
   VAT_REGISTRATION_THRESHOLD, RENT_NOT_COUNTED_NOTE, TURNOVER_BASIS_NOTE, formatVrn, inputVatNote,
   mustRegister, reg111Window, vatPosition,
@@ -109,11 +112,54 @@ export default async function VatPage() {
   // taxableTurnoverFor asks the very RPC the weekly asks, so the two now agree to the penny by
   // construction. It answers THREE ways: a figure, "not twelve months of him yet", and "could not
   // read", and all three are said out loud below rather than collapsed into a blank.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE GATE WAS ON HOW OLD HIS ACCOUNT IS, NOT ON WHAT HIS BOOKS COVER. RUN 2, 12 Aug 2026.
+  //
+  // taxableTurnoverFor asks the weekly's RPC, and that RPC nulls the figure while users.created_at
+  // is under three months old. So a florist who signed up this afternoon and imported a full year
+  // of statements was told "We cannot show you where you stand against it yet. Your account is
+  // under three months old", with twelve months of confirmed rows sitting underneath the sentence
+  // and £6,438 of headroom against the line she was frightened of.
+  //
+  // 🔴 AND THIS CODEBASE HAD ALREADY WRITTEN THE ARGUMENT DOWN. getOptimiserInput in
+  // lib/supabase.ts carries it in full: "THE FIX IS THE EARLIEST ROW HE HAS GIVEN US, NOT
+  // users.created_at ... The account date is the obvious answer and it is wrong for the man who
+  // joins in August and imports his statements back to April." It names this very screen as the
+  // one still doing it, and calls the pair "Two definitions of enough history, one screen apart."
+  // That comment was written on 9 August. This is the other half landing.
+  //
+  // ⚠️ SO THE FIGURE IS BUILT FROM HIS ROWS AND THE RPC IS THE FALLBACK, not the other way round.
+  // lib/vatstanding.ts answers from the same confirmed trade income the weekly counts, sums only
+  // the last twelve months, excludes rent by income_type, and says out loud whether his rows
+  // actually SPAN a year: under that it hands back a FLOOR ("at least"), which can only ever
+  // under-state and is strictly better than the silence this screen used to offer.
+  // ⚠️ ONE READING OF THE CLOCK PER PAGE. `now` is taken once at the top and everything derives
+  // from it, which is the rule the quarter bounds above already follow: two readings of "today" on
+  // one page is how a boundary day comes to disagree with itself. It also keeps the purity lint
+  // happy, which flags a second Date.now() in a render.
+  const rowsFrom = new Date(now.getTime() - 400 * 86400_000).toISOString().slice(0, 10);
+  const standing = profile !== null && !profile.registered
+    ? await getConfirmedTransactionsForRange(user.id, rowsFrom, to)
+      .then((rows) => vatStanding(rows, to, VAT_REGISTRATION_THRESHOLD, false))
+      .catch(() => null)
+    : null;
+
   const turnover = profile !== null && !profile.registered
     ? await taxableTurnoverFor(user.id)
     : null;
-  const overThreshold = turnover?.kind === 'known' && mustRegister(turnover.rolling12m);
-  const yearTurnover = turnover?.kind === 'known' ? turnover.rolling12m : 0;
+  // The rows are the primary answer; the RPC survives as a cross check and as the fallback for a
+  // read that failed. Where both have a figure they agree by construction (same definition of
+  // trade income), and where they disagree the ROWS win, because they are the evidence.
+  const haveStanding = standing !== null && (standing.kind === 'known' || standing.kind === 'floor');
+  const overThreshold = haveStanding
+    ? (standing as { over: boolean }).over
+    : turnover?.kind === 'known' && mustRegister(turnover.rolling12m);
+  const yearTurnover = haveStanding
+    ? (standing as { rolling12m: number }).rolling12m
+    : turnover?.kind === 'known' ? turnover.rolling12m : 0;
+  // A floor is a real number with a caveat, never a blank. The copy below says "at least".
+  const isFloor = standing !== null && standing.kind === 'floor';
+  const nearLine = haveStanding && (standing as { nearLine: boolean }).nearLine;
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 WE WERE TELLING A MAN WITH NO PROPERTY WHAT WE ARE NOT COUNTING OF HIS RENT. 11 AUGUST 2026.
@@ -235,7 +281,37 @@ export default async function VatPage() {
 
               It matters more here than anywhere else on the page: registering late is a penalty,
               and silence reads exactly like being safely under the line. */}
-          {turnover?.kind === 'unreadable' ? (
+          {/* ═══════════════════════════════════════════════════════════════════════════════
+              🔴 THE ROWS ANSWER FIRST NOW. RUN 2, 12 August 2026. See the block by the fetch.
+
+              The three RPC arms below are unchanged and still carry their history, but they are
+              reached only when the rows could not answer. A customer who has given us a year of
+              statements gets his figure on the day he imports them, whatever his account's
+              birthday says, and a customer who has given us four months gets a FLOOR rather than
+              silence: "at least £X" can only under-state, and under-stating is the direction that
+              never tells a man he is safely below a line he has crossed.
+              ═══════════════════════════════════════════════════════════════════════════════ */}
+          {haveStanding ? (
+            <>
+              <p style={S.figure}>
+                {isFloor ? 'At least ' : ''}{gbp0(yearTurnover)}
+              </p>
+              <p style={S.body}>
+                {overThreshold
+                  ? `That is your taxable turnover over the last twelve months, and it is over the ${gbp0(VAT_REGISTRATION_THRESHOLD)} line. Registering is not optional now, and registering late is a penalty.`
+                  : `That is your taxable turnover over the last twelve months, against a ${gbp0(VAT_REGISTRATION_THRESHOLD)} line. It is the rolling twelve months that counts rather than your tax year, so it can happen in any month.`}
+              </p>
+              {isFloor ? <p style={S.body}>{FLOOR_NOTE}</p> : null}
+              {/* ⚠️ THE CARD FEE GAP, ONLY WHERE IT CAN CHANGE WHAT HE DOES. A provider pays out
+                  NET of its fee and the VAT test runs on the GROSS takings, so the books under-read
+                  for anybody taking cards. On the account that found this, that gap is £1,157
+                  against £6,438 of headroom: a fifth of what is left, hidden in an arithmetic he
+                  never sees. Said near the line and nowhere else, because over it he must register
+                  regardless and far below it the sentence is noise. */}
+              {nearLine ? <p style={S.body}>{CARD_FEE_NOTE}</p> : null}
+              <p style={S.body}>{TURNOVER_BASIS_NOTE}{rentClause}</p>
+            </>
+          ) : turnover?.kind === 'unreadable' ? (
             <p style={S.empty}>
               We could not read your figures just now, so there is no turnover here rather than a
               turnover with a hole in it. Give it a moment and load the page again.
@@ -479,6 +555,9 @@ const S: Record<string, React.CSSProperties> = {
   body: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: '10px 0 0', maxWidth: '62ch' },
   quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '10px 0 0', maxWidth: '62ch' },
   empty: { fontSize: TYPE.strong, fontWeight: 700, margin: 0 },
+  // His rolling twelve months, drawn as the fact it is. RUN 2: this screen used to have no figure
+  // on this arm at all, so there was nothing for a number to be styled as.
+  figure: { fontSize: TYPE.stat, fontWeight: 800, letterSpacing: '-0.02em', margin: '4px 0 0', color: INK },
   good: { fontSize: TYPE.body, lineHeight: 1.6, color: ON_GREEN_TINT, background: GREEN_TINT, borderRadius: RADIUS.md, padding: '12px 14px', margin: '12px 0 0', maxWidth: '62ch' },
   warn: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SAFFRON_TINT, border: `1px solid ${LINE}`, borderColor: edge(SAFFRON_DEEP, 27), borderRadius: RADIUS.lg, padding: '13px 15px', margin: '14px 0 0', maxWidth: '62ch' },
 

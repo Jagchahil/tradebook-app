@@ -184,8 +184,20 @@ ok('a deduction of zero does not appear as a line at all',
 
 // --- the headline -------------------------------------------------------------------------------
 
-ok('the headline is one line, his number, no adjectives',
-  headline(l).includes('£') && headline(l).includes("taxman"));
+// 🔴 RUN 2, 12 August 2026: THE PINNED WORD WAS "taxman", AND THE SENTENCE IT PINNED CLAIMED THE
+// DOING. "Lekhio has kept £6,187 out of the taxman's hands" counted the tax effect of costs the
+// CUSTOMER confirmed, which she would have claimed with a shoebox, a spreadsheet or the accountant
+// she used before. Doc 104: the first employee does not take credit for the flowers.
+//
+// ⚠️ SO THE ASSERTION IS THE INTENT NOW, NOT A WORD. One line, his figure in it, and no claim that
+// this product did the saving. Pinning a noun only ever proved a sentence existed.
+{
+  const h = headline(l);
+  ok('the headline is one line, and his number is in it',
+    h.includes('£') && !h.includes('\n') && h.length > 20);
+  ok('🔴 AND IT DOES NOT CLAIM WE SAVED HIM THE MONEY: they are his costs',
+    !/Lekhio (has )?(kept|saved)/i.test(h) && /you|your/i.test(h));
+}
 
 ok('...and when there is nothing to say, it says nothing rather than something',
   headline(early) === early.note);

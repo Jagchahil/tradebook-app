@@ -5,6 +5,7 @@ import {
   readOwnNames,
   readAccountUse,
   confirmPile,
+  confirmPileProperty,
   setCapitalKind,
   confirmIncome,
   setManyPersonal,
@@ -17,6 +18,7 @@ import {
 import { sessionUser } from '../../../lib/webauth';
 import { buildPile, summarisePile, canBulkConfirm, bulkConfirmPlan, cisCapture } from '../../../lib/reviewpile';
 import { worksUnderCis } from '../../../lib/circumstances';
+import { isPropertyCategory } from '../../../lib/propertylanes';
 import { normaliseVendor } from '../../../lib/memory';
 import { looksPersonal } from '../../../lib/personal';
 import { CATEGORIES, categoriseBankLine } from '../../../lib/categories';
@@ -107,7 +109,11 @@ interface Decision {
   //             columns, one press: the gross into amount and the tax already paid into
   //             cis_deduction. Its own verdict because it is the only decision on this screen that
   //             CHANGES a figure the bank gave us, and a figure that moves needs a door of its own.
-  verdict: 'business' | 'personal' | 'confirm_known' | 'income' | 'vat' | 'cis';
+  // 🔴 'confirm_read' is the SAME one tap over the groups that came off PHOTOGRAPHS, and it is a
+  //    separate word from confirm_known on purpose. RUN 2, 12 August 2026: a machine read amount
+  //    and a bank line's amount are different kinds of evidence, one press must never answer for
+  //    both, and the two lists are drawn separately on the screen. See lib/reviewpile.ts.
+  verdict: 'business' | 'personal' | 'confirm_known' | 'confirm_read' | 'income' | 'vat' | 'cis';
   category?: string;
   // Remember the answer for next time, so this shop is never asked about again. Default true:
   // the whole point is that he tells us once. He can turn it off per decision.
@@ -132,7 +138,7 @@ interface Decision {
 // The words the form is allowed to send. A nested ternary was readable at three verdicts and
 // stopped being readable at five, and anything not on this list is read as 'business', which is
 // what the plain file button has always meant.
-const VERDICTS = ['personal', 'confirm_known', 'income', 'vat', 'cis'] as const;
+const VERDICTS = ['personal', 'confirm_known', 'confirm_read', 'income', 'vat', 'cis'] as const;
 
 function verdictFrom(raw: unknown): Decision['verdict'] {
   const v = String(raw ?? '');
@@ -207,12 +213,23 @@ export async function POST(req: NextRequest) {
   // it was confident about. confirm_pile then re-applies its own rules in SQL on top. Three layers,
   // and not one of them trusts the browser.
   // ═══════════════════════════════════════════════════════════════════════════════════════
-  if (body.verdict === 'confirm_known') {
+  // 🔴 THE TWO LISTS ARE FILED BY TWO DIFFERENT PRESSES, AND THE SERVER DOES THE SPLITTING.
+  // RUN 2, 12 August 2026. The browser still sends no ids: it sends WHICH LIST, and the server
+  // rebuilds the pile and decides for itself which groups are in it. See lib/reviewpile.ts for why
+  // a photograph's amount must never be confirmed by a press that was about a bank row's category.
+  //
+  // ⚠️ THE COMMENT SITS ABOVE THE BRANCH RATHER THAN INSIDE IT, and that is not only taste:
+  // test/webauth.test.mjs asserts that pileEntries and buildPile are within 400 characters of each
+  // other, which is its way of holding "this branch rebuilds the pile server side". A comment
+  // wedged between them pushes the two apart and fails a guard that is still true.
+  if (body.verdict === 'confirm_known' || body.verdict === 'confirm_read') {
+    const wantRead = body.verdict === 'confirm_read';
     const [freshRows, ownNames, accountUse] = await Promise.all([
       pileEntries(user.id), readOwnNames(user.id), readAccountUse(user.id),
     ]);
     const plan = bulkConfirmPlan(
-      buildPile(freshRows, normaliseVendor, ownNames, categoriseBankLine),
+      buildPile(freshRows, normaliseVendor, ownNames, categoriseBankLine)
+        .filter((g) => g.readFromPhoto === wantRead),
       accountUse,
     );
     let applied = 0;
@@ -458,7 +475,23 @@ export async function POST(req: NextRequest) {
   // confirm_pile does the work in one statement AND re-applies the rules in SQL: money out
   // only, nothing flagged as looking personal, and only his own rows. So a hand-rolled POST
   // with a benefit's id in it confirms nothing, and the count that comes back says so.
-  const applied = await confirmPile(user.id, ids, category);
+  //
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND A PROPERTY COST GOES THROUGH THE OTHER DOOR. RUN 2, 12 August 2026.
+  //
+  // Until today every cost this route filed landed in the TRADE stream, because that was the only
+  // stream a cost could reach. A landlord's mortgage interest, filed under this product's own
+  // 'mortgage interest' category, was deducted in full against her trade: the thing Section 24
+  // stopped in 2020, done by the plumbing rather than by the engine, which had the correct rule
+  // sitting unused in lib/propertyengine.ts the whole time.
+  //
+  // confirm_pile_property is the same one statement with the same money guards and a narrower
+  // category allowlist, and it sets income_type = 'property'. A build deployed before
+  // supabase/APPLY_2026-08-13_property_expense_stream.sql is run gets 0 back and the screen says
+  // it could not file, which is this codebase's existing honest shape for a missing migration.
+  const applied = isPropertyCategory(category)
+    ? await confirmPileProperty(user.id, ids, category)
+    : await confirmPile(user.id, ids, category);
 
   if (remember && key) {
     // Shared with the crowd, because a shop's category is not private and it helps the next

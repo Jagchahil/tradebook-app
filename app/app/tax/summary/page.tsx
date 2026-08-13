@@ -8,7 +8,7 @@ import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { wholeFirmCaption } from '../../../../lib/position';
 import { mtdStatedFrom } from '../../../../lib/circumstances';
 import { gbp0 } from '../../lib/money';
-import { outstandingUpdate, updateDue, UPDATE_ORDINAL } from '../due';
+import { outstandingUpdate, overdueUpdate, updateDue, UPDATE_ORDINAL } from '../due';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
   INK, LINE, MUTED, ON_GREEN_TINT, PAPER, RIVER, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge,
@@ -148,6 +148,8 @@ export default async function TaxSummaryPage() {
   // UTC, because quarterForDate() above reads the clock in UTC. Two readings of "today" on one
   // page is how a boundary day comes to disagree with itself.
   const outstanding = mandated ? outstandingUpdate(now.toISOString().slice(0, 10), startYear, index) : null;
+  // 🔴 THE ONE THAT HAS ALREADY GONE. See overdueUpdate in ../due.ts for the five days this cost.
+  const overdue = mandated ? overdueUpdate(now.toISOString().slice(0, 10), startYear, index) : null;
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -317,6 +319,34 @@ export default async function TaxSummaryPage() {
           not a hedge: for a man under the line it is the only sentence that tells him where the
           answer really comes from. See docs and Jag's note on the wider sweep.
           ═══════════════════════════════════════════════════════════════════════════════════ */}
+      {/* ═══════════════════════════════════════════════════════════════════════════════
+          🔴 THE MISSED UPDATE, ABOVE THE CALENDAR, BECAUSE IT IS THE MORE URGENT FACT.
+
+          Drawn only when there is one, so for everybody in good standing this box does not exist
+          (doc 103's empty test). It never says "you have not sent it": Lekhio cannot file yet, so
+          we have no record either way and she may well have sent it through other software or an
+          agent. "I have no record of this going" is the sentence that stays true for her too.
+
+          The easement and the return gate ship together, always. Penalty points are genuinely
+          waived for 2026/27 and saying so alone would be an all clear, which this is not: every
+          update has to be in before the year's return can be filed.
+          ═══════════════════════════════════════════════════════════════════════════════ */}
+      {isCompany ? null : overdue ? (
+        <section className="lek-card" style={S.overdue}>
+          <h2 className="lek-h2">Your {overdue.ordinal} update was due on {overdue.due}</h2>
+          <p style={S.body}>
+            It covers 6 April to {prettyEnd(overdue.end)}, and I have no record of it going. Lekhio
+            cannot send an update to HMRC yet, so it has to go through other software that can file
+            them, or whoever does your return. The figures on this page are the ones it asks for.
+          </p>
+          <p style={S.quiet}>
+            There are no penalty points for a late quarterly update in 2026/27. That is not the same
+            as it not mattering: every update for the year has to be in before the return for that
+            year can be filed, so a missed one is put off rather than written off.
+          </p>
+        </section>
+      ) : null}
+
       {isCompany ? null : mandated ? (
         <section className="lek-card">
           <h2 className="lek-h2">
@@ -498,6 +528,11 @@ const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
 
   warn: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SAFFRON_TINT, border: `1px solid ${LINE}`, borderColor: edge(SAFFRON_DEEP, 27), borderRadius: RADIUS.lg, padding: '13px 15px', margin: '0 0 14px' },
+
+  // The missed update. The same saffron the warn banner uses, so "this one needs you" reads the
+  // same wherever it appears, and never red: she is one press from fine and there are no penalty
+  // points this year.
+  overdue: { background: SAFFRON_TINT, borderColor: edge(SAFFRON_DEEP, 27) },
 
   window: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: `0 0 ${SPACE.md}px`, maxWidth: '62ch' },
   body: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: 0, maxWidth: '62ch' },

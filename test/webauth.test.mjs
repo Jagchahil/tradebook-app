@@ -560,7 +560,9 @@ ok('every not-business decision goes through setManyPersonal', pileRoute.include
 // Anchored on the BRANCH, not the first mention of the word: 'confirm_known' also appears in the
 // type and in the form parsing above it, and slicing from there swept the ordinary id reading into
 // the range and failed for the wrong reason.
-const bulk = pileRoute.slice(pileRoute.indexOf("if (body.verdict === 'confirm_known')"));
+// RUN 2: the branch now owns TWO verdicts (confirm_known for bank rows, confirm_read for rows
+// read off photographs), so the anchor stops at the first verdict rather than the closing paren.
+const bulk = pileRoute.slice(pileRoute.indexOf("if (body.verdict === 'confirm_known'"));
 ok('the bulk branch rebuilds the pile server side', /pileEntries\(user\.id\)[\s\S]{0,400}buildPile\(/.test(bulk));
 ok('🔴 IT ASKS lib WHICH GROUPS IT WAS CONFIDENT ABOUT', bulk.includes('bulkConfirmPlan('));
 ok(

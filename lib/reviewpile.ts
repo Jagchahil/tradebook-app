@@ -98,6 +98,44 @@ export interface PileEntry {
   amount: number;            // negative = money out
   category: string | null;
   looks_personal?: boolean | null;
+  // Where the row came from. 'whatsapp_image' and 'web_image' mean a MACHINE read the amount off a
+  // photograph and no human has ever checked it. See MACHINE_READ_SOURCES below.
+  source_type?: string | null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A CATEGORY ANSWER ABOUT BANK ROWS CONFIRMED AN AMOUNT NOBODY HAD EVER SEEN. RUN 2, 12 Aug 2026.
+//
+// A deliberately faded receipt was read as £110.55. The paper says £118.55. The parser gave up no
+// signal that it was unsure, so the row went into the pile looking exactly like every other row.
+//
+// It then joined the PORTERS group, which was mostly bank lines. She answered the group once, the
+// way this product asks her to ("answer once for a shop and we will file every future payment there
+// the same way"), and that single press about a CATEGORY confirmed a machine's guess at an AMOUNT.
+// The Home feed afterwards reads "Filed PORTERS WHOLESALE FLOWERS as stock. £110.55 out", beside a
+// receipt from the same evening still correctly marked "waiting for your yes".
+//
+// Two promises collided and the wrong one won:
+//   "answer once for a shop"      is about the CATEGORY, and is a good promise.
+//   "nothing counts until you
+//    have said it is right"       is about the FIGURE, and it is the one that guards money.
+//
+// ⚠️ THE FIX IS TO KEEP THE TWO SOURCES APART, NOT TO SLOW EVERYTHING DOWN. A photograph and a bank
+// line are different kinds of evidence: the bank's amount is a FACT and the photograph's is a
+// READING. Putting them in one group means one press answers for both. So the source class is part
+// of the group key now, exactly as `kind` already is, and for exactly the same reason: "A refund
+// FROM Screwfix and a purchase AT Screwfix are the same shop and completely different questions,
+// and answering one must never answer the other."
+//
+// The bulk confirm survives, because the founder quit at two files out of eight when this product
+// made him work one at a time and that finding stands. A screenful of photographs can still be
+// filed in one press. What can no longer happen is a photograph being filed by a press that was
+// about something else.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const MACHINE_READ_SOURCES = ['whatsapp_image', 'web_image'] as const;
+
+export function isMachineRead(sourceType: string | null | undefined): boolean {
+  return (MACHINE_READ_SOURCES as readonly string[]).includes(String(sourceType ?? '').trim().toLowerCase());
 }
 
 export type GroupKind =
@@ -118,6 +156,9 @@ export interface PileGroup {
   ids: string[];
   // Only for 'careful'. Why we think it might not be business money, in his words, not ours.
   reason?: string;
+  // Every row in here came off a photograph, so every AMOUNT in here is a reading rather than a
+  // fact. The screen says so, and it never mixes with bank sourced rows. See MACHINE_READ_SOURCES.
+  readFromPhoto: boolean;
 }
 
 // One decision, many rows. The whole point.
@@ -161,10 +202,15 @@ export function buildPile(
     const self = matchesOwnName(e.vendor, ownNames);
     const kind: GroupKind = (e.looks_personal || self) ? 'careful' : e.amount >= 0 ? 'income' : 'ask';
 
+    // 🔴 THE SOURCE CLASS IS PART OF THE KEY, for the same reason `kind` is. See
+    // MACHINE_READ_SOURCES above: a photograph's amount is a reading, a bank line's is a fact, and
+    // one press must never answer for both.
+    const read = isMachineRead(e.source_type);
+
     // The kind is part of the key. A refund FROM Screwfix and a purchase AT Screwfix are the
     // same shop and completely different questions, and answering one must never answer the
     // other.
-    const id = `${kind}:${key}`;
+    const id = `${kind}:${read ? 'read' : 'given'}:${key}`;
 
     const existing = map.get(id);
     if (existing) {
@@ -188,6 +234,7 @@ export function buildPile(
       total: Math.abs(e.amount),
       suggested: suggestionFor(e, categorise),
       ids: [e.id],
+      readFromPhoto: read,
     });
   }
 

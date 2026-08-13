@@ -240,8 +240,17 @@ ok('a failed read of the RPC is unreadable, and the catch cannot turn it into a 
   /const facts = await weeklyUpdateFactsFor\(\[userId\]\)\.catch\(\(\) => null\);/.test(supaSrc)
   && /if \(facts === null\) return \{ kind: 'unreadable' \};/.test(supaSrc));
 
-// ── All four arms, and the order they are checked in. ────────────────────────────────────────
-const iBad = taxVat.indexOf("{turnover?.kind === 'unreadable' ? (");
+// ── The arms, and the order they are checked in. ─────────────────────────────────────────────
+//
+// 🔴 RUN 2 ADDED A FIFTH, AND PUT IT FIRST. The four below all hang off taxableTurnoverFor, whose
+// RPC nulls the figure while the ACCOUNT is under three months old. A florist who signed up that
+// afternoon and imported a year of statements was told "we cannot show you where you stand yet"
+// with twelve months of confirmed rows underneath the sentence. The new arm answers from those
+// rows (lib/vatstanding.ts) and the RPC arms became the fallback rather than the answer.
+const iRows = taxVat.indexOf('{haveStanding ? (');
+ok('the rows arm exists and is checked FIRST, before any account age gate',
+  iRows >= 0 && iRows < taxVat.indexOf("turnover?.kind === 'unreadable'"));
+const iBad = taxVat.indexOf(") : turnover?.kind === 'unreadable' ? (");
 const iNew = taxVat.indexOf(") : turnover?.kind === 'tooNew' ? (");
 const iOver = taxVat.indexOf(') : overThreshold ? (');
 const iUnder = taxVat.indexOf(") : turnover?.kind === 'known' ? (");
@@ -284,9 +293,11 @@ ok('and it warns the newest accounts about money they have not logged, who need 
   /do not log still counts/.test(newArm));
 
 // ── One sentence about what was counted, in one place, on both figure arms. ──────────────────
+// RUN 2: three arms print a figure now (the rows answer, over the line, under the line) and every
+// one of them leads with the shared constant rather than writing its own version of the sentence.
 ok('🔴 THE BASIS SENTENCE IS SHARED, not written out on the surface that prints it',
   /export const TURNOVER_BASIS_NOTE =/.test(vatLib)
-  && (taxVat.match(/\{TURNOVER_BASIS_NOTE\}/g) || []).length === 2);
+  && (taxVat.match(/\{TURNOVER_BASIS_NOTE\}/g) || []).length === 3);
 // ⚠️ THE JOINS ARE CLOSED UP FIRST. The constant is written across four source lines as
 // `'...and not ' + 'your rent...'`, so a regex for "not your rent" tests the SOURCE and fails on a
 // string that reads perfectly. What a man sees is the concatenation, so that is what is asserted.

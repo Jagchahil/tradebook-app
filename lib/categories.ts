@@ -86,6 +86,29 @@ export const CATEGORIES = [
   // HOME mortgage and quietly claim tax relief on it. That is not a small error, it is a wrong
   // claim on a real return. He chooses this one.
   'mortgage interest',
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A LANDLORD'S OTHER THREE COSTS, ADDED RUN 2, 12 August 2026.
+  //
+  // 'mortgage interest' has been here since the property work and was the ONLY property cost a
+  // customer could name. Everything else a landlord actually pays had to go in 'other': the
+  // letting agent's monthly fee, the boiler repair, the ground rent on a leasehold flat.
+  //
+  // That was not only untidy. lib/propertylanes.ts is the door that routes a cost to the property
+  // STREAM, and it routes on the category, so a cost with no property category could not reach the
+  // property stream at all. A florist letting the flat above her shop had £475 of agent fees
+  // deducted against her TRADE, which leaks 6% Class 4 on money that carries no National Insurance.
+  //
+  // ⚠️ THESE FOUR ARE THE ONLY WAY INTO THE PROPERTY STREAM and they are drawn only for a customer
+  // who has one. See offerPropertyCategories: four extra rows in a plumber's category list are
+  // four decisions he has to read past, which is doc 103's whole argument.
+  //
+  // ⚠️ AND NO AUTO RULES, for the same reason 'mortgage interest' has none. A regex on "agent"
+  // catches an estate agent selling his house and an insurance agent; a regex on "repairs" catches
+  // his van. Property costs are his to place, once, and then recall remembers the shop.
+  'letting agent',
+  'property repairs',
+  'ground rent',
   'other',
 ] as const;
 

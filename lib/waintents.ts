@@ -351,10 +351,43 @@ export function isDeleteLast(body: string): boolean {
   return /^(delete( that| it| the last one| last)?|undo( that| it)?|remove (that|it|the last one)|scrap (that|it)|that('?s| is) wrong|wrong,? delete( it| that)?|cancel that entry)$/.test(t);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 "actually make that 12.60 i read it wrong" LOGGED A SECOND ENTRY. RUN 2, 12 August 2026.
+//
+// She logged £12.40 for flower food, saw her own mistake, and corrected it in the next message the
+// way anybody would. Both regexes below missed it, for two independent reasons:
+//
+//   the LEAD IN   only "no," was allowed in front of the verb. She said "actually".
+//   the TAIL      the amount had to be the last thing in the message. She said why she was
+//                 correcting it: "i read it wrong".
+//
+// So the correction fell through to the entry parser and became a NEW row. Her books ended the
+// evening holding £12.40 AND £12.60, both confirmed, £25.00 recorded where £12.60 was meant, and
+// the review pile filed the pair under "we are confident about them".
+//
+// ⚠️ THE BACK REFERENCE IS WHAT MAKES A TRAILING CLAUSE SAFE. "make that 12.60 for the flowers"
+// points at something already said and is an edit. "spent 12.60 on flowers" is a new entry and
+// must stay one. So the widened form REQUIRES "that / it / the last one", and only then allows
+// words after the amount. The original tight form is kept underneath it, unchanged, for the
+// phrasings that carry no back reference ("change to 40"), where the amount must still end the
+// message or a new entry could be swallowed.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The things people say before correcting themselves. Deliberately a small closed set: a wide
+// prefix class would let a genuine entry ("just spent 40") reach the edit path.
+const EDIT_LEAD_IN = '(?:no,?\\s*|actually,?\\s*|sorry,?\\s*|oh,?\\s*|wait,?\\s*|hang on,?\\s*|hold on,?\\s*)*';
+const AMOUNT = '£?\\s*(\\d[\\d,]*(?:\\.\\d{1,2})?)\\s*(?:quid|pounds?)?';
+
 export function matchEditLast(body: string): { amount: number } | null {
   const t = body.trim();
-  const m = t.match(/^(?:no,?\s*)?(?:change|make|edit|correct)\s+(?:that|it|the last one)?\s*(?:to|was)?\s*£?\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:quid|pounds?)?\s*[.!]?$/i)
-    || t.match(/^(?:that|it)\s+(?:was|should be)\s+£?\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:quid|pounds?)?\s*[.!]?$/i);
+  const m =
+    // Widened form: a back reference is present, so anything may follow the amount.
+    t.match(new RegExp(`^${EDIT_LEAD_IN}(?:change|make|edit|correct)\\s+(?:that|it|the last one)\\s*(?:to|was)?\\s*${AMOUNT}\\b.*$`, 'i'))
+    // "sorry i meant 12.60", "no i meant 12.60 not 12.40"
+    || t.match(new RegExp(`^${EDIT_LEAD_IN}i\\s+meant\\s+${AMOUNT}\\b.*$`, 'i'))
+    // Original tight forms, unchanged: no back reference, so the amount must end the message.
+    || t.match(new RegExp(`^${EDIT_LEAD_IN}(?:change|make|edit|correct)\\s+(?:that|it|the last one)?\\s*(?:to|was)?\\s*${AMOUNT}\\s*[.!]?$`, 'i'))
+    || t.match(new RegExp(`^(?:that|it)\\s+(?:was|should be)\\s+${AMOUNT}\\s*[.!]?$`, 'i'));
   if (!m) return null;
   const n = parseFloat(m[1].replace(/,/g, ''));
   if (!Number.isFinite(n) || n <= 0 || n > 1_000_000) return null;
@@ -1522,4 +1555,279 @@ export function vehicleAnswer(input: {
   );
 
   return parts.join(' ');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// RUN 2 REPAIRS, 12 August 2026. Six intents this file could not recognise, each of which sent a
+// real customer's real question to the money entry parser, which answered every one of them with
+// "Tell me what you spent or got paid and how much, for example spent £40 on diesel".
+//
+// A florist got that sentence for: hello, five tulip emojis, gibberish, "did my payment go
+// through" (three times), and the single most consequential tax question she will ever ask.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// --- VAT: the question this product exists to answer well --------------------------------
+//
+// 🔴 THERE WAS NO VAT MATCHER AT ALL. Every VAT question fell to the entry parser, which is why
+// "should i be registered for vat? im scared im getting close" came back as diesel and Dave.
+//
+// ⚠️ IT MUST NOT SWALLOW A VAT AMOUNT ON A RECEIPT. "vat was £4.83" is a figure being logged, not
+// a question, so any message carrying a money amount is left to the entry path, exactly as
+// isPricing does above and for the same reason.
+export function isVatQuestion(body: string): boolean {
+  const b = body.trim();
+  if (/£\s*\d/.test(b)) return false;
+  if (!/\bvat\b|\bvalue added tax\b/i.test(b)) return false;
+  // A statement of fact about his own registration is not a question for us to answer.
+  if (/^\s*(i am|i'm|im)\s+(now\s+)?vat\s+registered/i.test(b)) return false;
+  return true;
+}
+
+// The threshold question specifically, so a surface can lead with the figure rather than the rules.
+// Anything else VAT shaped still gets the VAT answer, just rules first.
+export function isVatThresholdQuestion(body: string): boolean {
+  if (!isVatQuestion(body)) return false;
+  return /\b(threshold|register|registered|registration|90|ninety|limit|line|close|near|over|go over|cross)\b/i.test(body);
+}
+
+// --- Somebody else's money ----------------------------------------------------------------
+//
+// 🔴 RUN 1 FOUND THIS AND IT WAS STILL LIVE ON THIS ROUTER. "what does the barber next door owe
+// you lot then" was answered with HER OWN set aside figure, £1,200, read out as though it were an
+// answer to the question asked.
+//
+// Nothing escaped: it was her number, on her account. But a product that answers a question about
+// a third party by reciting the asker's own private figure has confused whose books it is holding,
+// and the day the wording is slightly different it is a disclosure rather than a non sequitur.
+//
+// ⚠️ THE POSSESSIVE IS THE SIGNAL, NOT THE NOUN. "my mate", "the barber next door", "her", "their"
+// carry it; "the barber" alone might be his own trade. So a third party word must appear WITH a
+// question about money, and first person words anywhere in the message call it off.
+const THIRD_PARTY_RE =
+  /\b(?:the\s+)?(?:barber|shop|business|bloke|guy|woman|man|lad|fella|neighbour|neighbor|competitor|mate|friend|brother|sister|cousin|landlord|tenant|customer|client)\s+(?:next door|down the road|over the road|opposite|upstairs|across)\b|\b(?:my (?:mate|friend|brother|sister|cousin|neighbour|neighbor))\b|\b(?:his|her|their|someone else'?s?|somebody else'?s?|anyone else'?s?)\s+(?:books|tax|figures|takings|profit|income|account|bill|turnover|vat)\b/i;
+
+const FIRST_PERSON_RE = /\b(?:my own|i|me|mine)\b/i;
+
+export function isAboutSomeoneElse(body: string): boolean {
+  const b = body.trim();
+  if (!THIRD_PARTY_RE.test(b)) return false;
+  // "what do i owe compared to my mate" is still fundamentally about him. Only refuse when the
+  // question is squarely about the other party.
+  if (/\bcompared to\b|\bvs\b|\bversus\b/i.test(b)) return false;
+  if (FIRST_PERSON_RE.test(b) && !/\byou lot\b|\byou\b/i.test(b)) return false;
+  return /\bowe|owes|owed|earn|earns|made|makes|turnover|profit|tax|takings|books|figures|pay|pays\b/i.test(b);
+}
+
+export const SOMEONE_ELSE_ANSWER =
+  'I can only see your books, so I have no idea and could not tell you if I did. If it is your own '
+  + 'figures you are after, ask me about those and I will give you them straight.';
+
+// --- A draft invoice is not income ---------------------------------------------------------
+//
+// 🔴 "draft an invoice for the fennel wedding balance, 380" WAS LOGGED AS £380 OF INCOME RECEIVED.
+//
+// A balance she is OWED became money she HAS, waiting in the pile for one press that would
+// overstate her income by exactly the sum she still has to chase. isInvoiceThis above only ever
+// matched the two words "invoice this", so every other way of asking for an invoice fell to the
+// entry parser, which saw a number and a customer name and did what it does.
+//
+// ⚠️ ASKING FOR AN INVOICE IS NEVER AN ENTRY, WHATEVER ELSE IS IN THE SENTENCE. That is the whole
+// rule and it has to sit ABOVE the money parse in the dispatch chain, because the message
+// deliberately contains an amount.
+export interface InvoiceDraftRequest {
+  amount: number | null;
+  // What it is for, as they said it, so the draft can be read back in their own words.
+  subject: string | null;
+}
+
+export function matchInvoiceDraft(body: string): InvoiceDraftRequest | null {
+  const b = body.trim();
+  const asks = /\b(?:draft|make|create|raise|write|do|send|prepare|knock up)\s+(?:me\s+)?(?:an?\s+)?invoice\b/i.test(b)
+    || /\binvoice\s+(?:for|to)\b/i.test(b)
+    || /\bcan you invoice\b/i.test(b);
+  if (!asks) return null;
+  const amount = extractMoneyAmount(b);
+  // "invoice for the Fennel wedding balance" -> subject is what sits between "for" and the amount.
+  const subj = b.match(/\bfor\s+(?:the\s+)?([a-z0-9''\s]{3,60}?)(?:\s*,|\s+\d|$)/i);
+  const subject = subj ? subj[1].trim().replace(/\s+/g, ' ') : null;
+  return { amount, subject: subject && subject.length > 2 ? subject : null };
+}
+
+// What a draft request gets back. It NEVER writes a row, and it never sends anything.
+export function invoiceDraftAnswer(req: InvoiceDraftRequest, gbp: (n: number) => string): string {
+  const bits: string[] = [];
+  const what = req.subject ? ` for ${req.subject}` : '';
+  bits.push(
+    req.amount !== null
+      ? `Right, an invoice${what} for ${gbp(req.amount)}.`
+      : `Right, an invoice${what}.`,
+  );
+  // 🔴 THE SENTENCE THAT WAS MISSING AND IS THE WHOLE POINT.
+  bits.push(
+    'That is money you are owed, not money you have, so nothing has gone into your figures and '
+    + 'nothing will until it is actually paid.',
+  );
+  bits.push(
+    'Open Lekhio and go to Make an invoice: your details and their details go on it, you read it '
+    + 'over, and you decide whether it goes. I do not send anything on your behalf.',
+  );
+  return bits.join(' ');
+}
+
+// --- A language we cannot write back in ---------------------------------------------------
+//
+// 🔴 A PUNJABI TAX QUESTION WAS RECOGNISED AS PUNJABI AND THEN REFUSED AS OFF TOPIC.
+//
+// "ਮੈਨੂੰ ਦੱਸੋ ਮੈਂ ਇਸ ਮਹੀਨੇ ਟੈਕਸ ਵਾਸਤੇ ਕਿੰਨੇ ਪੈਸੇ ਰੱਖਾਂ?" is "tell me how much to put aside for tax this month",
+// which is the question this same router had answered in English twelve minutes earlier. The reply
+// was "That question is in Punjabi and is not about your UK tax or business accounts", which is
+// wrong on the only fact it asserts, and it asked her to come back in English.
+//
+// For a product whose stated audience is substantially South Asian, that is a brand failure sitting
+// on top of a classification bug.
+//
+// ⚠️ THE FIX IS NOT TO TRANSLATE. We cannot yet write a tax answer in Punjabi we would stand
+// behind, and a machine translated one about somebody's tax bill is worse than none. The fix is to
+// ANSWER THE QUESTION, in English, and to apologise for the language rather than refuse the
+// person. Detection here is script based and deliberately crude: it only decides which apology to
+// attach, never whether to help.
+const NON_LATIN_SCRIPTS: Array<[RegExp, string]> = [
+  [/[਀-੿]/, 'Punjabi'],
+  [/[ऀ-ॿ]/, 'Hindi'],
+  [/[؀-ۿݐ-ݿ]/, 'Urdu or Arabic'],
+  [/[ঀ-৿]/, 'Bengali'],
+  [/[஀-௿]/, 'Tamil'],
+  [/[Ѐ-ӿ]/, 'Russian'],
+  [/[一-鿿]/, 'Chinese'],
+];
+
+export function detectScript(body: string): string | null {
+  for (const [re, name] of NON_LATIN_SCRIPTS) {
+    if (re.test(body)) return name;
+  }
+  return null;
+}
+
+// Prefixed to the real answer, never sent on its own.
+export function languageApology(language: string): string {
+  return `I can read your ${language} but I cannot write you a tax answer in it yet, and I am not `
+    + 'going to guess at one in a language I cannot check. Here it is in English, and I am sorry '
+    + 'about that.';
+}
+
+// --- The conversational floor -------------------------------------------------------------
+//
+// 🔴 EVERY UNRECOGNISED MESSAGE WAS TREATED AS A FAILED ATTEMPT TO LOG MONEY.
+//
+// That is what produced diesel and Dave for a greeting, for five tulips, for gibberish, and for a
+// two thousand character rant about the council taking her loading bay. Each individual reply is
+// defensible. The pattern is a product that cannot say hello to a florist.
+//
+// ⚠️ THE TEST IS WHETHER IT LOOKS LIKE AN ENTRY AT ALL, and that question was never asked. A
+// message with no digits in it has not failed to be a money entry, because it was never trying.
+export function looksLikeMoneyEntry(body: string): boolean {
+  const b = body.trim();
+  if (!/\d/.test(b)) return false;
+  if (b.length > 400) return false; // nobody logs a receipt in four hundred characters
+  return true;
+}
+
+export function isGreeting(body: string): boolean {
+  const t = body.trim().toLowerCase().replace(/[!.?\s]+$/, '');
+  if (t.length > 80) return false;
+  return /^(hi|hey|hiya|hello|yo|alright|all ?right|morning|good morning|afternoon|good afternoon|evening|good evening|hi there|hey there)\b/.test(t)
+    // "hiya is this the flower shop thing? my mate set me up on it"
+    || /^(hi|hey|hiya|hello)\b.*\b(is this|what is this|who is this|set me up|signed me up)\b/.test(t);
+}
+
+// Emoji, punctuation, or a handful of characters with no words in them.
+export function isNonWords(body: string): boolean {
+  const t = body.trim();
+  if (t.length === 0) return true;
+  // Strip everything that is a letter or a digit in any script. What remains is decoration.
+  const words = t.replace(/[^\p{L}\p{N}]/gu, '');
+  return words.length === 0;
+}
+
+// ⚠️ A VENT IS NOT A REQUEST AND MUST NOT BE PARSED FOR ANYTHING. Long, no question mark, and no
+// obvious ask. The rant that broke this was routed to the REMINDER parser, because it happened to
+// contain "at half five" and "tuesday", and came back asking her to phrase her reminder better.
+export function isVent(body: string): boolean {
+  const b = body.trim();
+  if (b.length < 300) return false;
+  if (b.includes('?')) return false;
+  return true;
+}
+
+export const VENT_REPLY =
+  'That sounds like a rotten morning, and I am sorry. I am only your books, so I cannot do anything '
+  + 'about the council, but if the ticket or anything else costs you money, send me the paperwork '
+  + 'and I will keep it where you can find it.';
+
+export function greetingReply(businessName: string | null): string {
+  const who = businessName ? ` I have you as ${businessName}.` : '';
+  return `Hello.${who} I keep your books: send me a photo of a receipt, tell me what you spent or `
+    + 'took, or ask me anything about your tax and I will answer from your own figures.';
+}
+
+// --- British clock time -------------------------------------------------------------------
+//
+// 🔴 "half 7 in the morning" WAS CONFIRMED BACK AS 06:30.
+//
+// In British English "half seven" is half PAST seven, 07:30. The half-TO reading, 06:30, is the
+// German and Dutch convention, and it is what a model reaches for when nothing tells it otherwise.
+// The confirmation line said "I will remind you on Thu 13 Aug, 06:30" in its own words, so the
+// product told her, in writing, that it had understood her and would wake her an hour early.
+//
+// ⚠️ NORMALISED BEFORE THE MODEL SEES IT, NOT FIXED AFTERWARDS. A deterministic rewrite is free,
+// testable and cannot regress with a prompt change. The prompt gains a line too, as belt and
+// braces, but this function is the guard.
+const NUMBER_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+  seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+};
+
+function hourFrom(token: string): number | null {
+  const t = token.trim().toLowerCase();
+  if (/^\d{1,2}$/.test(t)) {
+    const n = Number(t);
+    return n >= 1 && n <= 12 ? n : null;
+  }
+  return NUMBER_WORDS[t] ?? null;
+}
+
+export function normaliseBritishTime(body: string): string {
+  let out = String(body ?? '');
+
+  // "half seven", "half 7", "half past seven" -> "7:30". The "past" form is already unambiguous
+  // and is rewritten too so both reach the model identically.
+  out = out.replace(
+    /\bhalf\s+(?:past\s+)?(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi,
+    (whole, tok: string) => {
+      const h = hourFrom(tok);
+      return h === null ? whole : `${h}:30`;
+    },
+  );
+
+  // "quarter past eight" -> "8:15"
+  out = out.replace(
+    /\bquarter\s+past\s+(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi,
+    (whole, tok: string) => {
+      const h = hourFrom(tok);
+      return h === null ? whole : `${h}:15`;
+    },
+  );
+
+  // "quarter to nine" -> "8:45". Twelve wraps to eleven.
+  out = out.replace(
+    /\bquarter\s+to\s+(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi,
+    (whole, tok: string) => {
+      const h = hourFrom(tok);
+      if (h === null) return whole;
+      const prev = h === 1 ? 12 : h - 1;
+      return `${prev}:45`;
+    },
+  );
+
+  return out;
 }

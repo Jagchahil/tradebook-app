@@ -7069,6 +7069,50 @@ export async function forgetUserRule(userId: string, vendorKey: string): Promise
 // A card payment from the bank and the photo of its receipt are ONE purchase. See
 // lib/dedupe.ts for why this was broken in both directions.
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SAME PHOTOGRAPH, SENT TWICE, LOGGED TWICE. RUN 2, 12 August 2026.
+//
+// The founder sent a handful of receipts, then sent the whole set, so four images arrived twice
+// within about forty seconds of each other. One was caught. Three were not, and £139.51 of
+// double counted expense went into the books through a pile card that said "we are confident".
+//
+// The reason is one line: recentUnconfirmedForMatch filters on TRANSACTION_DATE, and the receipt
+// ingest asks it for the last ten days. So the pool only ever contains rows whose PRINTED date is
+// recent.
+//
+//   NCGM        printed 7 August, five days old   -> inside the window -> CAUGHT
+//   OASIS       printed 30 July                   -> outside           -> missed
+//   KITE        printed 29 July                   -> outside           -> missed
+//   RYMAN       printed 27 June                   -> outside           -> missed
+//
+// That window is right for what it was built for, which is matching a receipt against the card
+// payment the bank settled a day or two later. It is wrong for the case this product exists to
+// serve: the one door was built precisely so a customer could empty a SHOEBOX, and a shoebox is
+// full of paper printed weeks ago.
+//
+// ⚠️ SO THE SECOND PASS ASKS A DIFFERENT QUESTION, AND IT IS THE HONEST ONE. "Did I take this
+// same photograph in recently?" is about when it ARRIVED, not when it was printed. This reader
+// filters on created_at, and the ingest uses it for the receipt-versus-receipt pass only. Pass
+// one, the bank merge, keeps transaction_date and its settlement lag tolerance, because that pass
+// genuinely is about dates being near each other.
+export async function recentlyCapturedForMatch(
+  userId: string,
+  sinceISO: string,
+): Promise<Array<{ id: string; vendor: string | null; amount: number; transaction_date: string | null; category: string | null; source_type: string | null }>> {
+  const { url } = config();
+  const res = await fetch(
+    `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+      `&confirmed=eq.false` +
+      `&created_at=gte.${encodeURIComponent(sinceISO)}` +
+      `&select=id,vendor,amount,transaction_date,category,source_type&limit=300`,
+    { headers: headers() },
+  );
+  if (!res.ok) return [];
+  const parsed = await res.json().catch(() => null);
+  if (parsed === null) return [];
+  return parsed;
+}
+
 // Recent UNCONFIRMED entries that a new capture might duplicate. Unconfirmed only:
 // once the user has approved something we do not go rearranging it behind them.
 export async function recentUnconfirmedForMatch(
@@ -7091,6 +7135,39 @@ export async function recentUnconfirmedForMatch(
 
 // Fold a receipt into the bank line it duplicates, so ONE entry is left holding the
 // bank's figures and the receipt's evidence.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE RECEIPT THE STATEMENT SUPERSEDED. RUN 2, 12 August 2026.
+//
+// When a bank statement arrives carrying a line the customer had ALREADY photographed, the pair is
+// one purchase and lib/dedupe.ts's rule decides which survives: "keep ONE entry, take the BANK's
+// figures (they are facts, not readings), and keep the RECEIPT's evidence." So the bank row lands
+// and the waiting receipt row is dropped, with its category carried across first by the caller.
+//
+// ⚠️ UNCONFIRMED ROWS ONLY, AND THE GUARD IS IN THE QUERY. A confirmed row is one the customer has
+// approved, and this function must never be able to reach one: that is his record, and removing it
+// because a CSV happened to contain something similar is exactly the "rearranging it behind him"
+// this codebase refuses everywhere else. The receipt image itself is untouched in storage.
+//
+// Returns how many rows actually went, so the caller counts facts rather than intentions.
+export async function dropSupersededReceipts(userId: string, ids: string[]): Promise<number> {
+  const clean = ids.filter((i) => UUID.test(i));
+  if (clean.length === 0) return 0;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
+        `&confirmed=eq.false` +
+        `&id=in.(${clean.join(',')})`,
+      { method: 'DELETE', headers: headers({ Prefer: 'return=representation' }) },
+    );
+    if (!res.ok) return 0;
+    const gone = await res.json().catch(() => null);
+    return Array.isArray(gone) ? gone.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function mergeIntoTransaction(
   userId: string,
   id: string,
@@ -7606,13 +7683,23 @@ export async function pileEntries(userId: string): Promise<Array<{
   // since handleCIS was built. There is no migration standing behind this select, which is why
   // the capture needed none. See recordCisOnIncome().
   cis_deduction: number | null;
+  // 🔴 THE COLUMN THAT KEEPS A PHOTOGRAPH'S AMOUNT OUT OF A BANK ROW'S GROUP. RUN 2, 12 Aug 2026.
+  //
+  // It was already in the WHERE clause above and not in the SELECT, so the pile could filter on it
+  // and never read it. lib/reviewpile.ts needs the value, not the filter: a machine read amount and
+  // a bank line's amount are different kinds of evidence and one press must never answer for both.
+  // See MACHINE_READ_SOURCES there for the £110.55 this cost.
+  //
+  // No migration stands behind this line. source_type has been in supabase/schema.sql since the
+  // beginning, so naming it here cannot empty the pile the way an unmigrated column would.
+  source_type: string | null;
 }>> {
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
       `&confirmed=eq.false&is_personal=eq.false` +
       `&source_type=in.(bank_feed,web_image,whatsapp_image,whatsapp_voice,whatsapp_text)` +
-      `&select=id,vendor,description,amount,category,looks_personal,vat_amount,vat_confirmed,cis_deduction` +
+      `&select=id,vendor,description,amount,category,looks_personal,vat_amount,vat_confirmed,cis_deduction,source_type` +
       `&order=transaction_date.desc&limit=1000`,
     { headers: headers() },
   );
@@ -7634,6 +7721,35 @@ export async function confirmPile(userId: string, ids: string[], category: strin
   try {
     const { url } = config();
     const res = await fetch(`${url}/rest/v1/rpc/confirm_pile`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_user: userId, p_ids: clean, p_category: category }),
+    });
+    if (!res.ok) return 0;
+    const n = await res.json().catch(() => null);
+    if (n === null) return 0;
+    return typeof n === 'number' ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+// 🔴 A COST THAT BELONGS TO THE PROPERTY, NOT THE TRADE. RUN 2, 12 August 2026.
+//
+// See supabase/APPLY_2026-08-13_property_expense_stream.sql for the whole argument. In short:
+// money IN has had a property lane since 31 July and money OUT never had one, so a landlord's
+// agent fees and mortgage interest were deducted against her trade, the second of those in full,
+// which is what Section 24 stopped. Everything downstream was already correct and starved.
+//
+// Same money guards as confirm_pile (out only, never flagged, only his rows) with a narrower
+// category allowlist enforced in SQL. A missing function returns 0 and the screen says it could
+// not file, rather than reporting success for rows that never moved.
+export async function confirmPileProperty(userId: string, ids: string[], category: string): Promise<number> {
+  const clean = ids.filter((i) => UUID.test(i));
+  if (clean.length === 0) return 0;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/rpc/confirm_pile_property`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({ p_user: userId, p_ids: clean, p_category: category }),

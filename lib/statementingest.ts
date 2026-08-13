@@ -29,11 +29,14 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 import { parseStatement } from './statementimport';
+import { findDuplicate } from './dedupe';
 import { mapBankTransaction } from './bankfeed';
 import { categoriseBankLine } from './categories';
 import {
   BankEntryInsert, insertBankTransactions, knownExternalIds, readOwnNames,
   getUserRules, getVendorPatterns,
+  // RUN 2: the sideways glance at receipts already waiting. See the merge block below.
+  recentlyCapturedForMatch, dropSupersededReceipts,
 } from './supabase';
 import { normaliseVendor, recall } from './memory';
 import { looksPersonal } from './personal';
@@ -58,6 +61,9 @@ export type StatementIngestResult =
       inserted: number;
       toReview: number;
       skipped: number;
+      // How many receipts already waiting turned out to be the same purchase as a line in this
+      // statement. Folded away rather than counted twice. Zero for almost every import.
+      mergedWithReceipts: number;
     };
 
 export async function ingestStatementCsv(args: {
@@ -121,6 +127,64 @@ export async function ingestStatementCsv(args: {
   const known = await knownExternalIds(userId, entries.map((e) => e.external_id));
   const fresh = known === null ? entries : entries.filter((e) => !known.has(e.external_id));
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE MERGE ONLY EVER RAN ONE WAY ROUND. RUN 2, 12 August 2026.
+  //
+  // lib/dedupe.ts exists, carries the whole doctrine in its header, and had exactly ONE caller:
+  // lib/receiptingest.ts. So the direction "bank line arrives, then he photographs the receipt"
+  // was handled, and the reverse direction was not handled at all.
+  //
+  // The reverse direction is not an edge case. It is what happens whenever somebody catches up:
+  // photograph the pile of paper, then import the statement. On this run two receipts went in at
+  // 15:45 and the year's CSV at 16:15, and the import looked at 622 rows without once glancing
+  // sideways at the two receipts already waiting. Both PORTERS £81.43 and both CHILLFLOW £3,200.00
+  // ended up in the books, and £3,200 of that is a chiller she bought once.
+  //
+  // The capture page's own copy promises this works: "If your bank already sent me the same
+  // payment, the receipt is put with it rather than counted twice." It was a promise about one
+  // ordering.
+  //
+  // ⚠️ THE BANK'S FIGURES WIN AND THE RECEIPT'S EVIDENCE IS KEPT, which is lib/dedupe.ts's own
+  // rule and the reason the merge runs at insert time rather than being left to Things to check:
+  // "keep ONE entry, take the BANK's figures (they are facts, not readings), and keep the
+  // RECEIPT's evidence". Here that means the waiting receipt row is folded away and the bank row
+  // lands, because the bank row is the one with the exact amount and the exact date.
+  //
+  // Never fatal. A failed lookup falls through to the plain insert exactly as it did yesterday,
+  // and the duplicate rule in Things to check remains the safety net it always was.
+  let mergedWithReceipts = 0;
+  try {
+    if (fresh.length > 0) {
+      const capturedSince = new Date(Date.now() - 90 * 86400_000).toISOString();
+      const waiting = (await recentlyCapturedForMatch(userId, capturedSince)).filter(
+        (r) => r.source_type === 'web_image' || r.source_type === 'whatsapp_image',
+      );
+      if (waiting.length > 0) {
+        const claimed = new Set<string>();
+        for (const e of fresh) {
+          const hit = findDuplicate(
+            { vendor: e.vendor, amount: e.amount, transaction_date: e.transaction_date },
+            waiting.filter((w) => !claimed.has(String(w.id))),
+            normaliseVendor,
+          );
+          if (hit && hit.strength === 'same') {
+            // The receipt's own category is the one the customer chose or the vision read, and it
+            // is better than anything a bank narrative can be categorised into, so it rides across
+            // onto the bank row rather than being thrown away with it.
+            if (hit.match.category) e.category = String(hit.match.category);
+            claimed.add(String(hit.match.id));
+          }
+        }
+        // One statement, one delete, and only rows this walk actually matched.
+        if (claimed.size > 0) {
+          mergedWithReceipts = await dropSupersededReceipts(userId, [...claimed]);
+        }
+      }
+    }
+  } catch {
+    /* the sideways glance is a kindness, never a dependency */
+  }
+
   let inserted = 0;
   if (fresh.length > 0) {
     inserted = await insertBankTransactions(userId, fresh);
@@ -148,5 +212,6 @@ export async function ingestStatementCsv(args: {
     inserted,
     toReview,
     skipped: outcome.skipped,
+    mergedWithReceipts,
   };
 }

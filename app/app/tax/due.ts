@@ -112,3 +112,57 @@ export function outstandingUpdate(
     dueISO,
   };
 }
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 🔴 "PAST ITS OWN DUE DATE IT IS HISTORY, AND HISTORY IS NOT A NUDGE." RUN 2, 12 August 2026.
+//
+// That line is thirty rows above this one and it is why nothing on this screen mentioned the
+// update Rosa had already missed. The reasoning is impeccable for a NUDGE and wrong for a
+// STATUTORY OBLIGATION, and outstandingUpdate cannot tell the two apart because it was only ever
+// asked to write one sentence.
+//
+// She is the first genuinely mandated customer this product has walked. HMRC wrote to her in
+// March, she told us so at setup, her first update covered 6 April to 5 July and was due on
+// 7 AUGUST. The walk was on 12 August. The screen said: "The second update of 2026/27 ... is due
+// by 7 November 2026. Your figures are already kept in the shape an update reports, so the
+// deadline is a date, not a job." Serene, accurate about November, and silent about the thing
+// that had already gone.
+//
+// A missed quarterly update is not history. It is an obligation still outstanding, and it gates
+// the return for the whole year until it is made.
+//
+// ⚠️ THE SAME FLOOR AND THE SAME SHAPE AS outstandingUpdate, deliberately, so the two cannot
+// disagree about which quarter is which: same previousQuarter, same graded concept for the start
+// of the regime, same null when there is nothing to say. Only the comparison flips.
+//
+// ⚠️ ONE QUARTER, THE MOST RECENT. lib/mtdupdates.ts holds the whole schedule for the chat doors,
+// which answer in prose and may need to say "three of your updates are past due". A screen with a
+// list of missed deadlines on it is a screen that frightens somebody who is one press from being
+// fine, and the most recent one is the one he acts on first. test/mtdupdates.test.mjs pins the two
+// files against each other so the page and the chat can never name different quarters.
+export function overdueUpdate(
+  todayIso: string,
+  startYear: number,
+  quarter: 1 | 2 | 3 | 4,
+): OutstandingUpdate | null {
+  const prev = previousQuarter(startYear, quarter);
+  const dueISO = updateDueISO(prev.startYear, prev.quarter);
+
+  const first = concept('mtd_first_quarter_deadline');
+  if (typeof first !== 'string') return null;
+
+  // Before the regime opened there was no update to miss.
+  if (dueISO < first) return null;
+
+  // Still open, or not yet due: that is outstandingUpdate's sentence, not this one.
+  if (todayIso <= dueISO) return null;
+
+  return {
+    startYear: prev.startYear,
+    quarter: prev.quarter,
+    ordinal: UPDATE_ORDINAL[prev.quarter],
+    end: quarterBounds(prev.startYear, prev.quarter).end,
+    due: updateDue(prev.startYear, prev.quarter),
+    dueISO,
+  };
+}

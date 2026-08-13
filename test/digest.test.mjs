@@ -42,7 +42,12 @@ const msg = D.buildDigest({ filed: KNOWN, asking: NEW });
 // today, because you have told me about them before". `filed` is every confirmed bank
 // entry from the last day, which includes the ones HE opened the app and confirmed
 // himself. So we claimed his work, and invented a reason for a decision he made.
-ok('says what happened, and counts it', msg.includes('3 things landed from your bank today, and they count'));
+// 🔴 RUN 2, 13 August 2026: the pinned sentence claimed a CHANNEL we do not have ("from your
+// bank": there is no bank feed, she imported a CSV herself) on a DAY the money did not move
+// (created_at is the import moment; her rows spanned twelve months). See lib/digest.ts.
+ok('says what happened, and counts it', msg.includes('3 things are in your books and counting'));
+ok('🔴 AND IT NEVER CLAIMS A BANK FEED THIS PRODUCT HAS NOT BUILT', !/from your bank/i.test(msg));
+ok('🔴 NOR THAT MONEY DATED MONTHS AGO ARRIVED TODAY', !/landed .{0,20}today/i.test(msg));
 ok('never claims to have done his work for him', !msg.includes('I filed'));
 ok('and invents no reason for a decision it did not make', !msg.includes('you have told me about'));
 ok('names the shop, the money and the category', msg.includes('Screwfix, £84.30, materials'));
@@ -54,13 +59,16 @@ ok('an "other" category is never printed as if it meant something', !msg.include
 // Nothing new: then we do not ask. We just say what we did.
 const noQuestion = D.buildDigest({ filed: KNOWN, asking: [] });
 ok('NOTHING to ask means NO question is asked', !noQuestion.includes('do not recognise'));
-ok('it just says what it did', noQuestion.includes('Nothing needs you'));
+// 🔴 RUN 2: "Nothing needs you" is scoped to bank sourced rows only, and said "nothing" while
+// £380 waited in the pile from another door. It names its own scope now. See R2-F22.
+ok('it just says what it did', noQuestion.includes('Nothing here needs you'));
+ok('🔴 AND THE ALL CLEAR IS SCOPED TO WHAT IT ACTUALLY LOOKED AT', !/^Nothing needs you/m.test(noQuestion));
 ok('and leaves a way to undo', noQuestion.includes('Reply NO'));
 
 // Only new things: no "I filed" claim we did not earn.
 const onlyNew = D.buildDigest({ filed: [], asking: NEW });
-ok('nothing landed means no claim that anything landed', !onlyNew.includes('landed from your bank'));
-ok('one reads as one, not "1 things"', D.buildDigest({ filed: [KNOWN[0]], asking: [] }).includes('One thing landed'));
+ok('nothing landed means no claim that anything landed', !onlyNew.includes('in your books and counting'));
+ok('one reads as one, not "1 things"', D.buildDigest({ filed: [KNOWN[0]], asking: [] }).includes('One thing is in your books'));
 
 ok('nothing at all means no message at all', D.buildDigest({ filed: [], asking: [] }) === null);
 

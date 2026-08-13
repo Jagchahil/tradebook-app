@@ -402,10 +402,31 @@ export function ledger(input: LedgerInput): Ledger {
 }
 
 // The sentence for the top of the screen. One line, his numbers, no adjectives.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 IT USED TO SAY "LEKHIO HAS KEPT £6,187 OUT OF THE TAXMAN'S HANDS". RUN 2, 12 August 2026.
+//
+// The arithmetic underneath is honest: it is the tax effect of the costs he has confirmed, and
+// the caption below the panel says exactly that ("costs you logged"). The HEADLINE was the
+// problem, and it was one word: "kept" claims the doing.
+//
+// The florist who read it had confirmed £29,693 of flowers, shop rent, power and waste. She would
+// have claimed every penny of that with a paper ledger, a spreadsheet, or the accountant she used
+// before. What Lekhio did was make it quicker and harder to lose. What the sentence said was that
+// Lekhio saved her the money.
+//
+// Doc 104: the first employee does not take credit for the flowers. Doc 103's alignment test says
+// never reward him for the manual work the product exists to remove, and this is the same error
+// with the roles swapped: rewarding OURSELVES for the work he did.
+//
+// ⚠️ THE FIGURE DOES NOT MOVE, AND THAT IS THE POINT. Nothing about the ledger changes. The
+// sentence now says whose costs they are and what the costs did, which is both more accurate and,
+// on a screen he opens to see what he owes, more useful.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 export function headline(l: Ledger): string {
   if (!l.enough) return l.note ?? '';
   if (l.saved <= 0) return 'Nothing saved yet. Get your costs in, by hand or by statement, and every one starts counting.';
-  return `Lekhio has kept £${l.saved.toLocaleString('en-GB')} out of the taxman's hands this year.`;
+  return `The costs you have logged are keeping £${l.saved.toLocaleString('en-GB')} off your tax bill this year.`;
 }
 
 // ── One assembler, every surface ─────────────────────────────────────────────────────────────────

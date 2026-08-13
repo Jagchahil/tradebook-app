@@ -48,6 +48,10 @@ export interface Entry {
   amount?: number | null;
   transaction_date?: string | null;
   source_type?: string | null;
+  // Carried so a caller folding two rows together can move the surviving row's category across.
+  // Never read by the matcher itself: a category is not evidence about whether two rows are the
+  // same purchase, and matching on it would merge two different £40 fill ups at the same garage.
+  category?: string | null;
 }
 
 export type MatchStrength =

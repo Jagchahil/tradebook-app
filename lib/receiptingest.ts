@@ -48,7 +48,7 @@
 import { parseReceipt, type ReceiptLine } from './claude';
 import { clampReceiptDate } from './waintents';
 import {
-  insertTransaction, recentUnconfirmedForMatch, mergeIntoTransaction,
+  insertTransaction, recentUnconfirmedForMatch, recentlyCapturedForMatch, mergeIntoTransaction,
   storeReceiptImage, readVatProfile,
 } from './supabase';
 import type { NewTransaction } from './supabase';
@@ -152,10 +152,21 @@ export async function ingestReceiptImage(args: {
     // is nothing to fold together, because the row that exists already says everything this
     // photograph says. Confirmed rows are deliberately not in the pool: once he has approved
     // something we do not go rearranging it behind him, and the anomaly rule still watches.
-    const receiptRows = recent.filter(
+    // 🔴 A DIFFERENT POOL, ASKED A DIFFERENT WAY. RUN 2, 12 August 2026.
+    //
+    // `recent` above is filtered by the receipt's PRINTED date, which is right for pass one (a card
+    // payment settles a day or two after the paper is printed) and wrong for this pass. Sending the
+    // same photograph twice is about when it ARRIVED, and the shoebox this product was built to
+    // empty is full of paper printed weeks ago. Three of four duplicate sends walked straight
+    // through this line because their printed dates were 30 July, 29 July and 27 June.
+    //
+    // recentlyCapturedForMatch filters on created_at instead. Two days covers a customer who
+    // photographs a pile, gets interrupted, and starts again the next morning.
+    const capturedSince = new Date(Date.now() - 2 * 86400_000).toISOString();
+    const capturedRows = (await recentlyCapturedForMatch(userId, capturedSince)).filter(
       (r) => r.source_type === 'web_image' || r.source_type === 'whatsapp_image',
     );
-    const dupHit = findDuplicate(incoming, receiptRows, normaliseVendor);
+    const dupHit = findDuplicate(incoming, capturedRows, normaliseVendor);
     if (dupHit && dupHit.strength === 'same') {
       return {
         outcome: 'duplicate',

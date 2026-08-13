@@ -50,6 +50,7 @@ import {
   readCircumstances,
   saveCircumstance,
   getBusinessProfile,
+  getConfirmedTransactionsForRange,
   findUserIdByPhone,
   normalizeUkPhone,
   readLiveWaLink,
@@ -153,7 +154,24 @@ import {
   DATA_RIGHTS_ANSWER,
   isVehicleQuestion,
   vehicleAnswer,
+  // RUN 2, 12 August 2026. See the dispatch chain and the floor at the end of it.
+  isVatQuestion,
+  isAboutSomeoneElse,
+  SOMEONE_ELSE_ANSWER,
+  matchInvoiceDraft,
+  invoiceDraftAnswer,
+  isVent,
+  VENT_REPLY,
+  isGreeting,
+  greetingReply,
+  isNonWords,
+  looksLikeMoneyEntry,
+  normaliseBritishTime,
 } from '../../../lib/waintents';
+import {
+  vatStanding, standingSentence, BACKWARD_TEST, FORWARD_TEST, CARD_FEE_NOTE,
+} from '../../../lib/vatstanding';
+import { VAT_REGISTRATION_THRESHOLD } from '../../../lib/vat';
 import { hmrcFilingLive } from '../../../lib/features';
 import { weeklySummaryText } from '../../../lib/weeklyupdate';
 import {
@@ -565,6 +583,28 @@ async function processMessage(message: IncomingMessage): Promise<void> {
           // 🟡 Phone and broadband. This gate runs first so the sentence never reaches it.
           } else if (isDataRightsRequest(text)) {
             await sendText(from, DATA_RIGHTS_ANSWER);
+          // ═══════════════════════════════════════════════════════════════════════════════
+          // RUN 2, 12 August 2026. Four lanes that did not exist, in the order they must run.
+          //
+          // 🔴 SOMEBODY ELSE'S MONEY GOES FIRST. "what does the barber next door owe you lot
+          // then" reached the totals lane and was answered with HER OWN set aside figure. It has
+          // to sit above every lane that reads her books, because the failure IS a lane that
+          // reads her books answering a question that was not about them. RUN 1 found this shape
+          // on the chat router; it was still live here.
+          } else if (isAboutSomeoneElse(text)) {
+            await sendText(from, SOMEONE_ELSE_ANSWER);
+          // 🔴 AN INVOICE REQUEST IS NEVER AN ENTRY, and it must be caught before anything that
+          // sees the amount inside it. "draft an invoice for the fennel wedding balance, 380"
+          // was logged as £380 of income RECEIVED: money she is owed, filed as money she has,
+          // one press from overstating the income she still has to chase.
+          } else if (matchInvoiceDraft(text) !== null) {
+            await handleInvoiceDraft(from, text);
+          // 🔴 VAT, WHICH HAD NO LANE AT ALL. Every VAT question fell to the entry parser, so
+          // the most consequential question a near threshold customer asks came back as "for
+          // example spent £40 on diesel". Above the totals lane because "should i register for
+          // vat" also trips asksAmount.
+          } else if (isVatQuestion(text)) {
+            await handleVatQuestion(from);
           // 🔴 THE VAN, ABOVE THE CORPUS, FOR THE REASON F7 WAS RAISED: the corpus answered a man
           // who had typed the price, the month and his weekly miles with a generic card that knew
           // none of it and never mentioned that the choice is locked for as long as he owns it.
@@ -603,6 +643,29 @@ async function processMessage(message: IncomingMessage): Promise<void> {
           } else if (matchTotalsQuestion(text)) {
             await handleTotals(from, text);
           } else if (isQuestion(text)) {
+            await handleMoneyQuestion(from, text);
+          // ═══════════════════════════════════════════════════════════════════════════════
+          // 🔴 THE CONVERSATIONAL FLOOR. RUN 2, 12 August 2026.
+          //
+          // Everything that reached the end of this chain was handed to the money ENTRY parser,
+          // so a message that was never trying to log money came back as "Tell me what you spent
+          // or got paid and how much, for example spent £40 on diesel or got paid £500 by Dave".
+          //
+          // One florist received that sentence for: hello, five tulip emojis, gibberish, and the
+          // same question sent three times in ten seconds. Her two thousand character rant about
+          // the council taking her loading bay went to the REMINDER parser instead, because it
+          // contained "half five" and "tuesday", and came back asking her to phrase her reminder
+          // more like "remind me to price up Dave's job tomorrow at 8am".
+          //
+          // ⚠️ THE QUESTION NOBODY ASKED WAS WHETHER IT LOOKED LIKE AN ENTRY AT ALL. A message
+          // with no digit in it has not failed to be a money entry. It was never one.
+          } else if (isVent(text)) {
+            await sendText(from, VENT_REPLY);
+          } else if (isGreeting(text)) {
+            await handleGreeting(from);
+          } else if (isNonWords(text)) {
+            await sendText(from, 'Got your message. What can I do for you?');
+          } else if (!looksLikeMoneyEntry(text)) {
             await handleMoneyQuestion(from, text);
           } else {
             await handleTextEntry(from, messageId, text);
@@ -1725,6 +1788,94 @@ async function handleProductTruth(from: string, text: string): Promise<void> {
 // The van, with the vehicle in his own books in it. Same call as app/api/thread and app/api/ask,
 // so one question gets one answer on all three surfaces. It deliberately never names a winner:
 // that turns on annual business miles and no row in his books holds a distance.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHERE HE STANDS AGAINST THE VAT LINE. RUN 2, 12 August 2026.
+//
+// There was no VAT lane on this router at all, so "should i be registered for vat? im scared im
+// getting close" fell to the entry parser and came back as diesel and Dave. Pushed twice, the
+// router eventually offered her TAX YEAR takings, which is the wrong window and had her exempt
+// rent inside it, from an account whose own books held the right answer.
+//
+// ⚠️ THE FIGURE COMES FROM lib/vatstanding.ts AND NOWHERE ELSE. Three surfaces answered this
+// question three different wrong ways on one evening. There is one owner now.
+async function handleVatQuestion(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+
+  // Twelve months back plus a day, so the window is closed by vatStanding rather than by the query
+  // being clever. A read that fails is answered honestly below, never as "you are fine".
+  const today = new Date();
+  const from12m = new Date(today.getTime() - 400 * 86400000).toISOString().slice(0, 10);
+  const [rows, vatProfile] = await Promise.all([
+    getConfirmedTransactionsForRange(userId, from12m, today.toISOString().slice(0, 10)).catch(() => null),
+    readVatProfile(userId).catch(() => null),
+  ]);
+
+  if (rows === null) {
+    await sendText(
+      from,
+      'I could not read your figures just now, and I am not going to answer a VAT question with a '
+      + 'guess. Try me again in a minute.',
+    );
+    return;
+  }
+
+  const standing = vatStanding(
+    rows,
+    today.toISOString().slice(0, 10),
+    VAT_REGISTRATION_THRESHOLD,
+    vatProfile !== null && vatProfile.registered,
+  );
+
+  const parts: string[] = [standingSentence(standing, formatGbp)];
+
+  // The two statutory tests, always both. People who know about the rolling twelve months usually
+  // do not know about the forward look, and the forward look is the one that registers you the
+  // same day.
+  parts.push(BACKWARD_TEST);
+  parts.push(FORWARD_TEST);
+
+  // ⚠️ THE CARD FEE CAVEAT, ONLY WHERE IT CAN CHANGE WHAT HE DOES. A card provider pays out net of
+  // its fee and the VAT test runs on the gross takings, so the books under-read for anyone taking
+  // cards. On this account that gap is £1,157 against £6,438 of headroom.
+  if ('nearLine' in standing && standing.nearLine) parts.push(CARD_FEE_NOTE);
+
+  parts.push('Source: https://www.gov.uk/vat-registration/when-to-register');
+
+  await sendText(from, parts.join('\n\n'));
+}
+
+// 🔴 AN INVOICE IS NOT INCOME. See matchInvoiceDraft in lib/waintents.ts for what this cost.
+// Nothing is written here, on purpose: the draft is built on the web where she can read it before
+// anybody sees it, and this router's job is to say so without logging a penny.
+async function handleInvoiceDraft(from: string, text: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  const req = matchInvoiceDraft(text);
+  if (!req) return;
+  await sendText(from, invoiceDraftAnswer(req, formatGbp));
+}
+
+// 🔴 HELLO. The product could not say it: a greeting reached the entry parser and came back
+// asking what she had spent. Uses the business name when we have it, because the account knows
+// who she is and re-introducing ourselves to a bound customer is its own small insult.
+async function handleGreeting(from: string): Promise<void> {
+  const userId = await findUserIdByPhone(from);
+  if (!userId) {
+    await replyNotLinked(from);
+    return;
+  }
+  // ⚠️ THE TRADING NAME IS NOT ON THE BUSINESS PROFILE, and this is not worth a second read to
+  // find out. greetingReply degrades to the nameless form, which is warm and true for everybody.
+  await sendText(from, greetingReply(null));
+}
+
 async function handleVehicleQuestion(from: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   // ⚠️ A FAILED LOOKUP IS NOT A REASON TO SAY NOTHING. The general half of the answer, the two
@@ -2955,7 +3106,16 @@ async function scheduleSentence(from: string, body: string): Promise<string | nu
     await sendBudgetRefusal(from, refused);
     return null;
   }
-  const parsed = await parseSchedule(body, new Date().toISOString());
+  // 🔴 "half 7 in the morning" WAS CONFIRMED BACK AS 06:30. RUN 2, 12 August 2026.
+  //
+  // In British English "half seven" is 07:30. The half-TO reading is the German and Dutch one, and
+  // it is where a model lands when nothing tells it otherwise. The confirmation line then told her
+  // in writing that it would wake her an hour early, which is the only reason it was caught.
+  //
+  // ⚠️ REWRITTEN BEFORE THE MODEL SEES IT, rather than corrected after. Deterministic, free, and it
+  // cannot regress the next time the prompt is edited. SCHEDULE_PROMPT gained a line as well, so
+  // both halves would have to fail together.
+  const parsed = await parseSchedule(normaliseBritishTime(body), new Date().toISOString());
   if (!parsed) {
     return 'I could not work out a time for that. Try, for example, "remind me to price up Dave\'s job tomorrow at 8am".';
   }

@@ -447,6 +447,11 @@ ok('🔴 the route reads the camera field first and falls back to the picker fie
   writeFileSync(path.join(iStage, 'supabase.ts'), `
 export const state = { rows: [], calls: [], insertFails: false, storedPath: 'receipts/u-1/2026-08-05-x.jpg' };
 export async function recentUnconfirmedForMatch() { return state.rows; }
+// RUN 2: the receipt-versus-receipt pass asks a different question, "did this photograph arrive
+// recently", so it reads by created_at through its own function. Same pool in the stub, because
+// what this suite is testing is the walk, not the window. See lib/receiptingest.ts.
+export async function recentlyCapturedForMatch() { return state.rows; }
+export async function dropSupersededReceipts() { return 0; }
 export async function insertTransaction(record) {
   state.calls.push({ fn: 'insert', record: { ...record } });
   if (state.insertFails) throw new Error('down');
@@ -586,6 +591,11 @@ export const state = { rows: [], writes: [] };
 export async function bumpAiUsage() { return 1; }
 export async function countActiveSubscribers() { return 10; }
 export async function recentUnconfirmedForMatch() { return state.rows; }
+// RUN 2: the receipt-versus-receipt pass asks a different question, "did this photograph arrive
+// recently", so it reads by created_at through its own function. Same pool in the stub, because
+// what this suite is testing is the walk, not the window. See lib/receiptingest.ts.
+export async function recentlyCapturedForMatch() { return state.rows; }
+export async function dropSupersededReceipts() { return 0; }
 export async function insertTransaction(record) { state.writes.push({ fn: 'insert', record: { ...record } }); }
 export async function mergeIntoTransaction(userId, id, patch) { state.writes.push({ fn: 'merge', id, patch }); return true; }
 export async function storeReceiptImage() { return 'receipts/u-1/2026-08-05-x.jpg'; }

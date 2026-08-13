@@ -69,7 +69,7 @@ export const EXPENSE_RULES: ExpenseRule[] = [
     verdict: 'yes',
     aliases: ['tools', 'tool', 'drill', 'saw', 'ladder', 'equipment', 'machinery', 'kit', 'power tool', 'laptop', 'computer', 'printer', 'camera', 'machine'],
     rule: 'Yes, fully. Tools and equipment for the work are allowable. Big items can be claimed in full the year you buy them through the Annual Investment Allowance.',
-    detail: 'Tools, machinery, a work laptop, all allowable. For larger purchases the Annual Investment Allowance lets you deduct the whole cost in the year you buy it, up to £1 million, so the full amount comes off your profit.',
+    detail: 'Tools, machinery, a work laptop, all allowable. For larger purchases the whole cost comes off the year you pay for it rather than being spread over years. On the cash basis, which is the standard method for sole traders and what most people here are on, that is simply how a cost works. On the accruals basis the same result comes through the Annual Investment Allowance, up to £1 million. Either way the full amount comes off your profit.',
   },
   {
     key: 'van',
@@ -77,7 +77,7 @@ export const EXPENSE_RULES: ExpenseRule[] = [
     verdict: 'yes',
     aliases: ['van', 'transit', 'pickup', 'flatbed'],
     rule: 'Yes. A van used for the business is allowable. You can claim the full cost the year you buy it, or run it on simplified mileage instead.',
-    detail: 'A van is a clean claim. Either deduct the cost through the Annual Investment Allowance and claim the running costs, or keep it simple and claim 55p a mile for the first 10,000 business miles, then 25p. Use one method or the other, not both.',
+    detail: 'A van is a clean claim. Either deduct the cost the year you pay for it and claim the running costs (on the cash basis that is just a cost; on the accruals basis it is the Annual Investment Allowance), or keep it simple and claim 55p a mile for the first 10,000 business miles, then 25p. Use one method or the other, not both.',
   },
   {
     key: 'car',
@@ -150,6 +150,50 @@ export const EXPENSE_RULES: ExpenseRule[] = [
     aliases: ['rent', 'workshop', 'unit', 'lockup', 'lock up', 'yard', 'storage', 'premises', 'shop rent', 'studio'],
     rule: 'Yes. Rent, rates, power and insurance on premises you use for the business are allowable.',
     detail: 'A workshop, unit, yard or storage you rent for the business is fully allowable, along with its rates, power and insurance.',
+  },
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 NOT ONE PROPERTY CARD, ON A SCREEN CITED TO BIM AND CASE LAW. RUN 2, 12 August 2026.
+  //
+  // A florist letting the flat above her shop opened "Can I claim it", read fifteen cards written
+  // for a man in a van, and found nothing about the other half of her tax return. The product
+  // keeps a property stream, has a Section 24 engine, asks about rent at setup, and had no answer
+  // here to the three questions every landlord asks.
+  //
+  // ⚠️ THE THIRD ONE IS THE MONEY. Mortgage interest is the single most misunderstood cost in UK
+  // property, because it WAS deducted in full until 2020 and half the internet still says so. A
+  // product that has the correct rule in its engine and says nothing about it on the page a
+  // customer goes to for rules is a product keeping its best knowledge to itself.
+  {
+    key: 'property-repairs',
+    title: 'Repairs to a property you let',
+    verdict: 'yes',
+    aliases: ['repair', 'repairs', 'boiler', 'damp', 'redecorate', 'redecorating', 'gutter', 'roof repair', 'tenant', 'let', 'letting', 'rental repair', 'maintenance'],
+    rule: 'Yes, if it is a repair. Putting something back as it was is allowable. Making it better is not, that is an improvement and it waits until you sell.',
+    detail: 'The line is repair against improvement. Replacing a broken boiler with a similar one, fixing damp, redecorating between tenants: allowable, in the year you pay. Adding an extension, installing a security system where there was not one, or replacing a kitchen with one of a higher specification: that is capital, it does not come off your rental profit, and it counts towards your gain when you sell instead. Like for like with modern materials is still a repair, so a single glazed window replaced with double glazing is usually fine.',
+  },
+  {
+    key: 'letting-agent',
+    title: 'Letting agent fees',
+    verdict: 'yes',
+    aliases: ['agent', 'letting agent', 'management fee', 'agency fee', 'tenant find', 'ground rent', 'service charge', 'landlord insurance'],
+    rule: 'Yes. Agent fees, ground rent, service charges and landlord insurance all come off your rental income.',
+    detail: 'The ordinary running costs of letting are allowable against the rent: the agent\'s monthly management fee and their tenant finding fee, ground rent and service charges on a leasehold, and landlord insurance for buildings, contents and public liability. These are property costs, not trade costs, so they belong to the rent and not to your business, and Lekhio keeps the two apart.',
+  },
+  {
+    key: 'mortgage-interest',
+    title: 'Mortgage interest on a let property',
+    verdict: 'depends',
+    aliases: ['mortgage', 'mortgage interest', 'buy to let', 'btl', 'section 24', 'interest on the mortgage', 'landlord mortgage'],
+    rule: 'Not as an expense, but you do get relief. Since Section 24 it is a 20% tax credit instead of a deduction, and that is worth less to a higher rate payer.',
+    detail: 'This changed in stages and finished in April 2020, and a lot of advice still online is out of date. Interest on a residential buy to let is no longer deducted from your rental income. Instead you get a basic rate tax reducer worth 20% of the interest, capped at the lowest of your finance costs, your property profits, and your income above the personal allowance. Anything the cap blocks carries forward to future years rather than being lost. Two things follow: your rental PROFIT is higher than you may expect, and if you claim the £1,000 property allowance you give this relief up entirely, so it is one or the other.',
+  },
+  {
+    key: 'property-allowance',
+    title: 'The £1,000 property allowance',
+    verdict: 'depends',
+    aliases: ['property allowance', '1000 allowance', 'rent a room', 'small rental', 'lodger'],
+    rule: 'It depends which is bigger. Claim the £1,000 allowance instead of your actual costs, never both, and never alongside the mortgage interest credit.',
+    detail: 'If your rental costs come to less than £1,000 a year the allowance is simply better, and if rents are under £1,000 there is usually nothing to report at all. It replaces your actual expenses rather than adding to them, and you cannot take it and the mortgage interest tax reducer, so a mortgaged landlord is almost always better off with actual costs. A lodger in your own home is a different scheme again: Rent a Room gives you £7,500 tax free.',
   },
   {
     // HMRC BROADENED this in 2024. Keeping current skills, keeping up with the tech in your trade, and
@@ -426,7 +470,7 @@ export const TAX_TIPS: { title: string; body: string }[] = [
   { title: 'Claim every allowable expense', body: 'The biggest one. Money you spend on the business that you forget to claim is tax you did not need to pay. Log it all, even the small stuff.' },
   { title: 'Working from home', body: 'Do your quotes and admin at home? Claim the flat rate, up to £26 a month, or a fair share of your actual bills.' },
   { title: 'Mileage', body: 'Every business mile is 55p for the first 10,000, then 25p. It adds up fast over a year of driving to jobs.' },
-  { title: 'Tools in full, the year you buy them', body: 'The Annual Investment Allowance lets you deduct the whole cost of tools, equipment and a van in the year you buy, not spread over years.' },
+  { title: 'Tools in full, the year you buy them', body: 'The whole cost of tools, equipment and a van comes off the year you pay for it, not spread over years. On the cash basis that is simply how a cost works; on the accruals basis it is the Annual Investment Allowance.' },
   { title: 'Phone and broadband', body: 'Claim the business share of your phone and internet. For most trades that is most of the bill.' },
   { title: 'A pension', body: 'Paying into a pension gets you tax relief and cuts your bill. One of the most tax efficient moves there is for the self employed.' },
   { title: 'Claim your CIS back', body: 'If contractors deduct CIS from your pay, that is tax already handed over. It comes off your bill at tax time, and is often a refund.' },

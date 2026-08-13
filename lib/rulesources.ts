@@ -115,6 +115,54 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       authority: 'GOV.UK, Marriage Allowance',
     },
   ],
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // --- The landlord's four. RUN 2, 12 August 2026. ---------------------------------------
+  //
+  // "Can I claim it" had fifteen cards written for a man in a van and not one about property, on a
+  // product that keeps a property stream and has a Section 24 engine. A florist letting the flat
+  // above her shop found nothing there about the other half of her return.
+  //
+  // VERIFIED against the live page, 13 August 2026: GOV.UK, "Work out your rental income when you
+  // let property", last updated 19 March 2025. Every quote below is that page's own sentence, and
+  // every claim on the four cards is one of them.
+  'property-repairs': [
+    {
+      code: 'Work out your rental income when you let property',
+      url: 'https://www.gov.uk/guidance/income-tax-when-you-rent-out-a-property-working-out-your-rental-income',
+      quote: 'A repair restores an asset to its original condition, sometimes by replacing parts of it.',
+      authority: 'GOV.UK, Work out your rental income when you let property',
+    },
+    {
+      code: 'Capital expenditure',
+      url: 'https://www.gov.uk/guidance/income-tax-when-you-rent-out-a-property-working-out-your-rental-income',
+      quote: 'Capital expenses are not allowable and cannot be claimed against your rental income.',
+      authority: 'GOV.UK, Work out your rental income when you let property',
+    },
+  ],
+  'letting-agent': [
+    {
+      code: 'Allowable expenses',
+      url: 'https://www.gov.uk/guidance/income-tax-when-you-rent-out-a-property-working-out-your-rental-income',
+      quote: 'letting agent fees and management fees',
+      authority: 'GOV.UK, Work out your rental income when you let property',
+    },
+  ],
+  'mortgage-interest': [
+    {
+      code: 'Changes to tax relief for residential property',
+      url: 'https://www.gov.uk/guidance/income-tax-when-you-rent-out-a-property-working-out-your-rental-income',
+      quote: 'From 6 April 2020 Income Tax relief on all residential property finance costs is restricted to the basic rate of Income Tax.',
+      authority: 'GOV.UK, Work out your rental income when you let property',
+    },
+  ],
+  'property-allowance': [
+    {
+      code: 'Property allowance',
+      url: 'https://www.gov.uk/guidance/income-tax-when-you-rent-out-a-property-working-out-your-rental-income',
+      quote: 'If you claim the property allowance you cannot claim a deduction for your expenses.',
+      authority: 'GOV.UK, Work out your rental income when you let property',
+    },
+  ],
   // --- Clothing. The contentious one, and the one that is actually case law. ---------------
   //
   // VERIFIED against the live page, 13 July 2026. BIM37910 is titled "Wholly and exclusively:

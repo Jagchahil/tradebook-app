@@ -1069,6 +1069,10 @@ const SCHEDULE_PROMPT = (text: string, nowIso: string): string =>
     '  "remind_at": ISO 8601 date-time for when to remind them. Use the start time, or 30 minutes before for a job or a quote.',
     '}',
     'Resolve relative times like "tomorrow at 8am", "next Tuesday", or "in 2 hours" against the current time.',
+    // 🔴 RUN 2, 12 August 2026: "half 7 in the morning" came back as 06:30. British English means
+    // half PAST, so half seven is 07:30. lib/waintents.ts normaliseBritishTime rewrites these
+    // before this prompt is built and is the real guard; this line is the second lock.
+    'This is British English. "half seven" means 07:30, never 06:30. "quarter past eight" is 08:15 and "quarter to nine" is 08:45.',
     'If the message is NOT about scheduling anything, reply with {"is_event": false}.',
     'Reply with JSON only, no other text.',
   ].join('\n');

@@ -616,6 +616,10 @@ export async function saveLekhioThreadMessage(userId, threadId, role, content) {
   return true;
 }
 export async function recentUnconfirmedForMatch() { return state.rows; }
+// RUN 2: the receipt walk asks a second question through its own reader, "did this photograph
+// arrive recently". See lib/receiptingest.ts.
+export async function recentlyCapturedForMatch() { return state.rows; }
+export async function dropSupersededReceipts() { return 0; }
 export async function insertTransaction(record) { state.writes.push({ fn: 'insert', record: { ...record } }); }
 export async function mergeIntoTransaction(userId, id, patch) { state.writes.push({ fn: 'merge', id, patch }); return true; }
 export async function storeReceiptImage() { return 'receipts/u-1/2026-08-05-x.jpg'; }

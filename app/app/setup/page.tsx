@@ -755,7 +755,11 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
             <h1 style={S.h1}>Here is what we have found you.</h1>
             <div style={S.bigWrap}>
               <div style={S.big2}>{gbp0(l.saved)}</div>
-              <div style={S.bigNote}>kept out of the taxman&apos;s hands so far this year.</div>
+              {/* 🔴 SAME REWORD AS lib/ledger.ts's headline, RUN 2, 12 August 2026, and for the
+                  same reason: the figure is the tax effect of costs HE confirmed, and "kept out of
+                  the taxman's hands" claimed the doing. He would have claimed his own materials
+                  with a shoebox. What changes is that they are not lost. */}
+              <div style={S.bigNote}>off your tax bill so far this year, from the costs you have logged.</div>
             </div>
             <div style={S.two}>
               <div>

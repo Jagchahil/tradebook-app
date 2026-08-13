@@ -244,6 +244,11 @@ export async function insertTransaction(record) {
   }
 }
 export async function recentUnconfirmedForMatch() { return state.rows; }
+// RUN 2: the receipt-versus-receipt pass asks a different question, "did this photograph arrive
+// recently", so it reads by created_at through its own function. Same pool in the stub, because
+// what this suite is testing is the walk, not the window. See lib/receiptingest.ts.
+export async function recentlyCapturedForMatch() { return state.rows; }
+export async function dropSupersededReceipts() { return 0; }
 export async function mergeIntoTransaction(userId, id, patch) {
   state.calls.push({ fn: 'mergeIntoTransaction', id, patch });
   return true;
@@ -350,6 +355,9 @@ const pStage = mkdtempSync(path.join(tmpdir(), 'receiptvat-pile-'));
 // lib/vat.ts goes in WHOLE, because the ceiling is the thing under test and a stub of it would be
 // a test of the stub. It has zero imports on purpose, which is what makes that possible.
 writeFileSync(path.join(pStage, 'vat.ts'), read('lib/vat.ts'));
+// RUN 2: the route routes a property cost to the other stream, so lib/propertylanes.ts is staged
+// as well. It is pure and import free, so it goes in whole.
+writeFileSync(path.join(pStage, 'propertylanes.ts'), read('lib/propertylanes.ts'));
 // The pile route's CIS branch reads his answers through lib/circumstances.ts, so it is staged too.
 // Same extensionless rewrite every suite in here uses.
 writeFileSync(
@@ -410,6 +418,11 @@ export async function readOwnNames() { return []; }
 export async function readAccountUse() { return 'mixed'; }
 export async function confirmPile(userId, ids, category) {
   state.calls.push({ fn: 'confirmPile', ids, category });
+  return ids.length;
+}
+// RUN 2: a property cost files through its own door. Stubbed so the route can be imported.
+export async function confirmPileProperty(userId, ids, category) {
+  state.calls.push({ fn: 'confirmPileProperty', ids, category });
   return ids.length;
 }
 export async function confirmIncome(userId, ids, kind) {

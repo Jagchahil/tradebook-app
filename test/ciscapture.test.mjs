@@ -56,7 +56,7 @@ const stage = mkdtempSync(path.join(tmpdir(), 'ciscapture-'));
 // ⚠️ EVERY FILE IN THE CHAIN, not just the one under test. lib/reviewpile.ts reaches personal,
 // capital, taxengine and money, and a staging list that has to be edited by hand the next time it
 // gains an import is a suite that goes red for a reason it was never written to protect.
-for (const f of ['reviewpile', 'personal', 'capital', 'taxengine', 'money', 'vat']) {
+for (const f of ['reviewpile', 'personal', 'capital', 'taxengine', 'money', 'vat', 'propertylanes']) {
   writeFileSync(path.join(stage, `${f}.ts`), fixImports(read(`lib/${f}.ts`)));
 }
 const staged = (f) => import(pathToFileURL(path.join(stage, `${f}.ts`)).href);
@@ -341,7 +341,7 @@ console.log('\n--- 6. THE ROUTE FILES NOTHING UNTIL BOTH COLUMNS CAN BE WRITTEN 
   const put = (name, body) => writeFileSync(path.join(rStage, name), body);
   // The real files for everything the route asks a question of. A stub of lib/reviewpile.ts would
   // be a test of the stub, and this branch is about what the pile decides.
-  for (const f of ['reviewpile', 'personal', 'capital', 'taxengine', 'money', 'vat', 'circumstances']) {
+  for (const f of ['reviewpile', 'personal', 'capital', 'taxengine', 'money', 'vat', 'circumstances', 'propertylanes']) {
     put(`${f}.ts`, fixImports(read(`lib/${f}.ts`)));
   }
   put('nextserver.ts', `
@@ -369,6 +369,9 @@ export async function pileEntries() { return state.rows; }
 export async function readOwnNames() { return []; }
 export async function readAccountUse() { return 'mixed'; }
 export async function confirmPile(userId, ids, category) { log('confirmPile', { ids, category }); return ids.length; }
+// RUN 2: a property cost files through its own door, so the stub has to offer it or the route
+// cannot even be imported. See lib/propertylanes.ts.
+export async function confirmPileProperty(userId, ids, category) { log('confirmPileProperty', { ids, category }); return ids.length; }
 export async function confirmIncome(userId, ids, kind) { log('confirmIncome', { ids, kind }); return ids.length; }
 export async function setManyPersonal(userId, ids) { log('setManyPersonal', { ids }); return ids.length; }
 export async function learnVendor() { log('learnVendor', {}); return true; }
@@ -460,8 +463,12 @@ export async function recordCisOnIncome(userId, id, expectedNet, patch) {
     const { calls } = await post({ ids: ID, verdict: 'cis', category: 'materials', cis: '100' });
     ok('🔴 A CIS POST CAN NEVER FALL THROUGH INTO THE FILE A COST PATH, whatever else is on it',
       did(calls, 'confirmPile').length === 0);
+    // ⚠️ THE WHOLE ALLOWLIST, PINNED, so a verdict added quietly shows up here as a red rather
+    // than as a new path nobody reviewed. RUN 2 added 'confirm_read': the one tap over rows read
+    // off photographs, kept separate from confirm_known because a machine read amount and a bank
+    // line's amount are different kinds of evidence. See lib/reviewpile.ts.
     ok('and the word is on the verdict allowlist rather than being read as business',
-      /'personal', 'confirm_known', 'income', 'vat', 'cis'/.test(pileRoute));
+      /'personal', 'confirm_known', 'confirm_read', 'income', 'vat', 'cis'/.test(pileRoute));
   }
   {
     // CONTROL. Every other decision on this screen behaves exactly as it did.

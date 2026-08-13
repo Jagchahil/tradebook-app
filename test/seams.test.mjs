@@ -187,11 +187,15 @@ console.log('\n--- 3. THE RENT CLAUSE IS SAID TO A MAN WHO HAS RENT, AND TO NOBO
   // ⚠️ ALL THREE ARMS, INCLUDING THE HAND WRITTEN ONE. Two of them share TURNOVER_BASIS_NOTE and
   // the young account arm writes its own tense bound sentence, which is correct and is exactly why
   // the rent clause escaped: it was written out there in slightly different words.
-  ok('🔴 ALL THREE ARMS TAKE THE SAME BRANCH',
-    (taxVat.match(/\{rentClause\}/g) || []).length === 3);
+  // RUN 2 added a FOURTH arm: the one that answers from his confirmed rows rather than from the
+  // account age RPC. It carries the clause too, which is the whole point of counting them.
+  ok('🔴 ALL FOUR ARMS TAKE THE SAME BRANCH',
+    (taxVat.match(/\{rentClause\}/g) || []).length === 4);
   ok('the over the line arm still leads with the shared basis sentence',
     taxVat.includes('{TURNOVER_BASIS_NOTE}{rentClause}'));
-  ok('and both figure arms do', (taxVat.match(/\{TURNOVER_BASIS_NOTE\}\{rentClause\}/g) || []).length === 2);
+  // Three arms print a FIGURE now (over the line, under the line, and the rows answer), and every
+  // one of them leads with the shared basis sentence rather than writing its own.
+  ok('and every figure arm does', (taxVat.match(/\{TURNOVER_BASIS_NOTE\}\{rentClause\}/g) || []).length === 3);
 
   // A failed read answers false, which drops one clause from a landlord's screen and never adds a
   // wrong one to anybody's. The unsafe direction is the one that put this bug here.

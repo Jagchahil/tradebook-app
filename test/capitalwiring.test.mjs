@@ -271,7 +271,7 @@ console.log('\n8. Nothing is filed until we have stored what it was');
 {
   const rStage = mkdtempSync(path.join(tmpdir(), 'capwire-route-'));
   const put = (name, body) => writeFileSync(path.join(rStage, name), body);
-  for (const f of ['capital', 'taxengine', 'money', 'vat', 'circumstances', 'reviewpile', 'personal']) {
+  for (const f of ['capital', 'taxengine', 'money', 'vat', 'circumstances', 'reviewpile', 'personal', 'propertylanes']) {
     put(`${f}.ts`, fix(readFileSync(path.join(lib, `${f}.ts`), 'utf8')));
   }
   put('nextserver.ts', `
@@ -313,6 +313,11 @@ export async function readOwnNames() { return []; }
 export async function readAccountUse() { return 'mixed'; }
 export async function confirmPile(userId, ids, category) {
   state.calls.push({ fn: 'confirmPile', ids, category });
+  return ids.length;
+}
+// RUN 2: the property stream door. Stubbed alongside confirmPile so the route imports.
+export async function confirmPileProperty(userId, ids, category) {
+  state.calls.push({ fn: 'confirmPileProperty', ids, category });
   return ids.length;
 }
 export async function setCapitalKind(userId, ids, kind, pct) {

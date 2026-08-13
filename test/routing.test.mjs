@@ -899,7 +899,16 @@ export { handleSchedule };
 `;
   const sStage = mkdtempSync(path.join(tmpdir(), 'waschedule-'));
   const sFile = path.join(sStage, 'schedulewalk.ts');
-  writeFileSync(sFile, SSTUBS + schedBody);
+  // 🔴 RUN 2: handleSchedule now rewrites British clock time before the model sees it, because
+  // "half 7 in the morning" was confirmed back as 06:30. The REAL normaliseBritishTime is staged
+  // beside the walk rather than stubbed: a pass-through stub would keep this suite green on the
+  // day the rewrite breaks, which is the one thing it should not do. lib/waintents.ts imports only
+  // a type, so it stages on its own.
+  writeFileSync(
+    path.join(sStage, 'waintents.ts'),
+    readFileSync(path.join(repo, 'lib/waintents.ts'), 'utf8'),
+  );
+  writeFileSync(sFile, "import { normaliseBritishTime } from './waintents.ts';\n" + SSTUBS + schedBody);
   const S = await import(pathToFileURL(sFile).href);
 
   const GOOD = { title: 'Price up Dave\'s job', kind: 'reminder', starts_at: null, remind_at: '2026-08-08T07:00:00.000Z' };

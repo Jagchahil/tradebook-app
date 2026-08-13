@@ -207,9 +207,14 @@ ok('🔴 every one of the three reads is scoped by user_id from the session',
   calls.length === 3 && calls.every((c) => c.url.includes('user_id=eq.alice')));
 ok('🔴 and every read is a GET: the feed is a record, it changes nothing',
   calls.every((c) => c.method === 'GET'));
+// ⚠️ THE COLUMNS, NAMED, NOT THE LIST IN ORDER. This pinned the whole select as one ordered string
+// and went red on 13 August when `decided_at` was added, which is a guard failing on a change it has
+// no opinion about. Named individually it is STRONGER: it now also guarantees the new column, and a
+// column dropped from the middle still fails.
 ok('the transactions read carries the columns the sentences need, newest first',
   calls[0].url.includes('/rest/v1/transactions?')
-  && calls[0].url.includes('select=id,vendor,amount,category,confirmed,is_personal,source_type,created_at,transaction_date')
+  && ['id', 'vendor', 'amount', 'category', 'confirmed', 'is_personal', 'source_type',
+      'created_at', 'decided_at', 'transaction_date'].every((c) => new RegExp(`[=,]${c}[,&]`).test(calls[0].url))
   && calls[0].url.includes('order=created_at.desc'));
 ok('the messages read is one query across his conversations, newest first',
   calls[1].url.includes('/rest/v1/messages?') && calls[1].url.includes('order=created_at.desc'));

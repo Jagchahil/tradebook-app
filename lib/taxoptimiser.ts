@@ -751,6 +751,12 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   const projTradeNet = projectedTradeNetOf(input, factor);
   const propIncome = Math.max(0, input.ytdPropertyIncome ?? 0);
   const propExpenses = Math.max(0, input.ytdPropertyExpenses ?? 0);
+  // 🔴 R2-F27. Mortgage interest is deliberately NOT in ytdPropertyExpenses, and the levers below
+  // were reading expenses alone: a florist with £2,440 of buy to let interest was told on live
+  // production that she had "very little logged" and that the £1,000 allowance was being used,
+  // while taxPosition() above had correctly chosen actual costs and given her the Section 24
+  // credit. Two contradictory sentences to one customer, out of one file.
+  const propFinance = Math.max(0, input.ytdPropertyFinance ?? 0);
   // 🔴 AND HIS RENT IS IN IT. His projected income across every stream we know about. Employment was
   // always here; savings and dividends were added so the marginal-rate levers below judge his rate on
   // his WHOLE income; property was left out, and it was read fourteen lines later in the same
@@ -957,7 +963,7 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   //    fees, insurance). Reversible admin: a prompt to log them.
   //    (propIncome and propExpenses are read at the top of this function now, because his rent
   //    belongs in projTotalIncome and they were being declared after the figure that needed them.)
-  if (propIncome > 0 && propExpenses < propIncome * 0.1) {
+  if (propIncome > 0 && propExpenses + propFinance < propIncome * 0.1) {
     out.push({
       key: 'property_costs',
       title: 'Property costs you may not be claiming',
@@ -997,7 +1003,7 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   const propAllowanceStr = PROPERTY_FACTS[propYear].propertyAllowance.toLocaleString('en-GB');
   const rentalSaidYes = (input.circumstances ?? {}).rental === 'yes';
   if (propIncome > 0) {
-    const split = propertyProfit(propIncome, propExpenses, propYear);
+    const split = propertyProfit(propIncome, propExpenses, propYear, propFinance);
     out.push({
       key: 'property_allowance',
       title: `The £${propAllowanceStr} property allowance, or your actual costs`,

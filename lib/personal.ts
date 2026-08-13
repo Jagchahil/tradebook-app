@@ -304,3 +304,101 @@ export function impactOf(items: MaybePersonal[]): { incomeRemoved: number; expen
     expensesRemoved: Math.round(expensesRemoved * 100) / 100,
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 IS THIS PAYEE A PERSON, OR A SHOP? R2-F6, 13 August 2026.
+//
+// Rosa's three wedding customers collapsed into ONE asking group, so the product offered to learn a
+// rule about three different households at once. She answered once, which was right, because the
+// answer happened to be the same for all three. The next one will not be.
+//
+// 🔴 AND THE FILE THAT CAUSED IT ALREADY WROTE DOWN WHY THIS IS THE WORSE FAILURE. lib/memory.ts,
+// normaliseVendor, in its own words:
+//
+//   "a COLLISION (two different merchants share a key) writes the wrong category into someone's
+//    books, silently, and they have no reason to doubt it. So we fail towards missing."
+//
+// That reasoning is correct and the design that came out of it (two words, noise and towns stripped)
+// defends well against SHOP against SHOP. It has no defence against PERSON against PERSON, and the
+// odds there are far worse: human surnames collide constantly, and the one part that tells two
+// people apart, the initial, is deliberately thrown away by a line that says
+// "a stray single letter is debris from a stripped reference, never a name". On a UK bank feed,
+// "M OKAFOR" and "L WYATT" are precisely what a person's payee line looks like.
+//
+// ⚠️ AND THE FIX IS NOT TO CHANGE THE KEY. vendor_rules.vendor_key IS that normalisation, so
+// changing it orphans every rule every customer has ever taught this product. The collision is
+// tolerable. What is not tolerable is turning a collision into a RULE, because a rule is exactly
+// the mechanism by which "the wrong category is written silently, and they have no reason to doubt
+// it" comes true, months later, on a household nobody has met yet.
+//
+// So: a person-like payee still GROUPS, because answering once is still the kindness, and one press
+// about three wedding payments is one press. It just never becomes a standing rule, and the screen
+// stops promising one.
+//
+// ⚠️ DEFAULTS TO FALSE, ALWAYS. An unrecognised payee is treated exactly as it is today. This only
+// ever WITHHOLDS a promise; it can never add one.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// Words that mean an organisation, so whatever else the line looks like it is not one person.
+const COMPANY_WORDS = new Set([
+  'ltd', 'limited', 'plc', 'llp', 'llc', 'inc', 'cic', 'cio', 'co', 'company', 'group', 'holdings',
+  'services', 'service', 'supplies', 'supply', 'wholesale', 'trading', 'trade', 'stores', 'store',
+  'energy', 'water', 'gas', 'telecom', 'telecoms', 'mobile', 'broadband', 'insurance', 'assurance',
+  'bank', 'banking', 'finance', 'financial', 'mortgage', 'mortgages', 'council', 'hmrc', 'dvla',
+  'motors', 'motor', 'garage', 'autos', 'auto', 'tyres', 'builders', 'merchants', 'merchant',
+  'foods', 'food', 'catering', 'cafe', 'restaurant', 'hotel', 'pharmacy', 'clinic', 'dental',
+  'solutions', 'systems', 'consulting', 'consultancy', 'partners', 'associates', 'agency',
+  'properties', 'property', 'lettings', 'estates', 'management', 'maintenance', 'contractors',
+  'waste', 'recycling', 'transport', 'logistics', 'couriers', 'delivery', 'payments', 'payouts',
+  'sumup', 'stripe', 'paypal', 'worldpay', 'zettle', 'square', 'gocardless', 'klarna',
+  'tesco', 'asda', 'sainsburys', 'aldi', 'lidl', 'costa', 'greggs', 'screwfix', 'toolstation',
+]);
+
+// Titles that only ever precede a person.
+const PERSON_TITLES = new Set(['mr', 'mrs', 'ms', 'miss', 'dr', 'sir', 'rev', 'prof']);
+
+/**
+ * Does this payee line look like a HUMAN BEING rather than a business?
+ *
+ * Conservative on purpose. False here means "treat it exactly as this product always has", which is
+ * the safe direction, so only clear shapes say true:
+ *
+ *   a title            "MR J SMITH", "MRS OKAFOR"
+ *   initial + surname  "M OKAFOR", "L WYATT"       (the standard UK bank payee shape)
+ *   surname + initial  "OKAFOR M"
+ *
+ * Any company word anywhere refuses outright, so "PROPERTY MANAGEMENT M SMITH" is a business.
+ */
+export function looksLikePerson(vendor: string | null | undefined): boolean {
+  const v = normaliseNameKey(vendor);
+  if (!v) return false;
+  // Any digit at all and it is a reference, a store number or an account, not a name.
+  if (/\d/.test(v)) return false;
+
+  const words = v.split(' ').filter(Boolean);
+  if (words.length === 0) return false;
+  // A company word ANYWHERE refuses outright, so "J SMITH PLUMBING SERVICES" is a business and
+  // "M OKAFOR" beside a payment processor's name is that processor.
+  if (words.some((w) => COMPANY_WORDS.has(w))) return false;
+
+  if (PERSON_TITLES.has(words[0])) return true;
+
+  // ⚠️ THE SHAPE IS LOOKED FOR ANYWHERE IN THE LINE, NOT MATCHED AGAINST THE WHOLE OF IT.
+  //
+  // The first draft required the entire payee to be the name, which is not what a statement looks
+  // like: "FP CREDIT M OKAFOR WEDDING" is five words of which two are the person. Its own suite
+  // caught that on the first run.
+  //
+  // ⚠️ AND A SURNAME MUST BE AT LEAST FOUR LETTERS, so "B AND Q" cannot read as an initial beside a
+  // surname called "and". That loses a genuine Fox, Day or Lee, and losing them is the safe
+  // direction: a miss leaves this product behaving exactly as it does today.
+  const NAME_MIN = 4;
+  for (let i = 0; i < words.length - 1; i += 1) {
+    const a = words[i];
+    const b = words[i + 1];
+    const initialThenName = a.length === 1 && b.length >= NAME_MIN;
+    const nameThenInitial = b.length === 1 && a.length >= NAME_MIN;
+    if (initialThenName || nameThenInitial) return true;
+  }
+  return false;
+}

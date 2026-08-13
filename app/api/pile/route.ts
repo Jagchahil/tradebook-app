@@ -245,7 +245,14 @@ export async function POST(req: NextRequest) {
       // Remembering is the point: he has now agreed our guess for this shop, so it becomes his
       // answer and the next payment there is filed without asking. Shared with the crowd, because a
       // shop's category is not private. Nothing personal is ever shared.
-      if (item.key) await learnVendor(user.id, item.key, item.category, null, true);
+      //
+      // 🔴 EXCEPT WHEN THE PAYEE IS A PERSON. R2-F6, 13 August 2026. Three of a florist's wedding
+      // customers shared one vendor key, so one press offered to teach a standing rule about three
+      // different households. lib/memory.ts already states that a key collision "writes the wrong
+      // category into someone's books, silently, and they have no reason to doubt it", and a rule is
+      // precisely the mechanism that makes that true later, on somebody nobody has met yet. The
+      // press still files what is in front of him. It just stops becoming a law about strangers.
+      if (item.key && !item.personLike) await learnVendor(user.id, item.key, item.category, null, true);
     }
     if (form) {
       if (applied === 0) return backToPile(req, 'nothing', 0);

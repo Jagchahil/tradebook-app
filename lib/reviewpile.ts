@@ -28,7 +28,7 @@
 //
 // So it is passed in. The caller supplies the real normaliser, and so does the test, which
 // means the real one is what gets tested.
-import { matchesOwnName } from './personal';
+import { matchesOwnName, looksLikePerson } from './personal';
 import { isUncertainAmount } from './receiptconfidence';
 import { shouldAskCapital } from './capital';
 // The three CIS rates and nothing else. They live in FACTS because Khoji watches FACTS against
@@ -169,6 +169,18 @@ export interface PileGroup {
   // says so and asks him to look at the figure, and it never mixes with readings we are sure of,
   // for the same reason a reading never mixes with a bank line. See lib/receiptconfidence.ts.
   uncertainAmount: boolean;
+  // 🔴 THE PAYEE IS A HUMAN BEING, SO THERE IS NO RULE TO LEARN ABOUT HIM. R2-F6, 13 August 2026.
+  //
+  // Three of Rosa's wedding customers collapsed into one asking group, and the product offered to
+  // learn a standing rule about all three at once. The group is still worth having: one press for
+  // three wedding payments is the kindness this screen exists for. The RULE is not, because
+  // lib/memory.ts already wrote down why a key collision is the worse failure ("writes the wrong
+  // category into someone's books, silently, and they have no reason to doubt it") and a rule is
+  // exactly how that comes true, months later, on a household nobody has met.
+  //
+  // The key is NOT changed to fix this. vendor_rules.vendor_key IS that normalisation, and changing
+  // it orphans every rule every customer has ever taught. See looksLikePerson in lib/personal.ts.
+  personLike: boolean;
 }
 
 // One decision, many rows. The whole point.
@@ -229,6 +241,9 @@ export function buildPile(
     // row written before today, and those must group exactly as they always have.
     const unsure = isUncertainAmount(e.confidence_score);
 
+    // R2-F6. A person is not a shop, and only a shop has a category worth remembering.
+    const person = looksLikePerson(vendor);
+
     // The kind is part of the key. A refund FROM Screwfix and a purchase AT Screwfix are the
     // same shop and completely different questions, and answering one must never answer the
     // other.
@@ -258,6 +273,7 @@ export function buildPile(
       ids: [e.id],
       readFromPhoto: read,
       uncertainAmount: unsure,
+      personLike: person,
     });
   }
 
@@ -413,13 +429,17 @@ export function waitingCount(p: PilePartition, extras = 0): number {
 export function bulkConfirmPlan(
   groups: PileGroup[],
   accountUse: AccountUse = 'mixed',
-): Array<{ vendor: string; key: string; category: string; ids: string[] }> {
+): Array<{ vendor: string; key: string; category: string; ids: string[]; personLike: boolean }> {
   return partitionPile(groups, accountUse).known.map((g) => ({
     vendor: g.vendor,
     key: g.key,
     // canBulkConfirm already guarantees a suggestion exists, so this is never the empty string.
     category: g.suggested as string,
     ids: g.ids,
+    // R2-F6. Carried through so the CALLER can decide whether there is a rule worth learning. The
+    // plan says what to file; whether it also becomes a law about this payee is a separate question
+    // and the answer is no when the payee is a person. See looksLikePerson in lib/personal.ts.
+    personLike: g.personLike,
   }));
 }
 

@@ -6886,7 +6886,10 @@ export async function setManyPersonal(userId: string, ids: string[]): Promise<nu
     {
       method: 'PATCH',
       headers: headers({ Prefer: 'return=minimal' }),
-      body: JSON.stringify({ is_personal: true }),
+      // 🔴 AND WHEN HE DECIDED IT. R2-F11, 13 August 2026. Saying "not business" is a decision he
+      // made at a moment, and the feed used to date it by when the row ARRIVED. It also never set
+      // confirmed, which is why the same feed went on calling a decided row "waiting for your yes".
+      body: JSON.stringify({ is_personal: true, decided_at: new Date().toISOString() }),
     },
   );
   return res.ok ? clean.length : 0;
@@ -10749,6 +10752,10 @@ interface FeedTxRow {
   is_personal?: boolean | null;
   source_type?: string | null;
   created_at?: string | null;
+  // 🔴 WHEN HE DECIDED, WHICH IS A DIFFERENT MOMENT FROM WHEN IT ARRIVED. R2-F11.
+  // Null for every row decided before 13 August 2026, and for everything still waiting. Never
+  // backfilled: a decision time nobody observed is not a fact. See the migration.
+  decided_at?: string | null;
   transaction_date?: string | null;
 }
 
@@ -10760,7 +10767,24 @@ interface FeedTxRow {
 //   . confirmed money in: filed as money in
 // Money is always lib/money.ts to the penny, never a hand built pound.
 function feedTxItem(seal: FeedSeal, r: FeedTxRow): FeedItem | null {
-  const when = typeof r.created_at === 'string' ? r.created_at : '';
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE TIME FOLLOWS THE VERB. R2-F11, 13 August 2026.
+  //
+  // Every sentence here used to be stamped created_at, the moment the row ARRIVED. That is right
+  // for "Logged PORTERS" and "Read your Booker receipt", because arriving is what happened. It is
+  // wrong for "Filed PORTERS as stock", which happened when he pressed the button. A florist who
+  // imported a statement at 15:04 and answered her pile at 17:00 read a feed saying she had filed
+  // things an hour before she opened the screen.
+  //
+  // This is a LOG. It says what happened and when it happened, and the two have to match.
+  //
+  // ⚠️ THE FALLBACK IS THE OLD BEHAVIOUR AND IS NOT A CLAIM. Rows decided before decided_at existed
+  // have no record of when, so they read created_at exactly as they always did. Nothing is
+  // backfilled, because inventing a decision time is writing a fact nobody observed into a log.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const arrived = typeof r.created_at === 'string' ? r.created_at : '';
+  const decided = typeof r.decided_at === 'string' && r.decided_at ? r.decided_at : '';
+  const when = arrived;
   const amount = typeof r.amount === 'number'
     ? r.amount
     : (typeof r.amount === 'string' && r.amount.trim() !== '' ? Number(r.amount) : Number.NaN);
@@ -10771,22 +10795,45 @@ function feedTxItem(seal: FeedSeal, r: FeedTxRow): FeedItem | null {
   // The minter fails closed to '' on any bad shape, and '' means the row draws unlinked.
   const sealed = typeof r.id === 'string' && month ? seal.entry(r.id, month) : '';
   const ref = sealed ? `/app/entry?e=${encodeURIComponent(sealed)}` : '';
+  // 🔴 "NOT BUSINESS" IS A DECISION, AND THIS CHECK USED TO SIT BELOW THE ONE BELOW IT. R2-F11.
+  //
+  // Marking a row personal sets is_personal and deliberately never sets confirmed, so every such
+  // row fell into the `confirmed !== true` branch and the feed went on telling him it was "waiting
+  // for your yes" about something he had already answered. He had decided. We were still asking.
+  if (r.is_personal === true) {
+    return {
+      kind: 'filed',
+      when: decided || when,
+      title: `Set aside ${name} as personal.`,
+      detail: `${money}, outside your business books.`,
+      ref,
+    };
+  }
   if (r.confirmed !== true) {
     const fromPhoto = typeof r.source_type === 'string' && r.source_type.startsWith('whatsapp');
+    // Still waiting, so ARRIVED is the right moment and the only one there is.
     return fromPhoto
-      ? { kind: 'receipt', when, title: `Read your ${name} receipt.`, detail: `${money}, waiting for your yes.`, ref }
+      // 🔴 "READ YOUR A CUSTOMER RECEIPT." R2-F29, caught by the Phase D retest, 13 August 2026.
+      //
+      // labelFor falls back to phrases like "a customer" and "the market" when a payee has no name,
+      // which are good sentences on their own and ungrammatical after "your". The possessive only
+      // works in front of a NAME, so it is dropped when the label is already an article phrase.
+      ? {
+        kind: 'receipt',
+        when,
+        title: /^(a|an|the)\s/i.test(name) ? `Read ${name} receipt.` : `Read your ${name} receipt.`,
+        detail: `${money}, waiting for your yes.`,
+        ref,
+      }
       : { kind: 'waiting', when, title: `Logged ${name}.`, detail: `${money}, waiting for your yes.`, ref };
   }
-  if (r.is_personal === true) {
-    return { kind: 'filed', when, title: `Set aside ${name} as personal.`, detail: `${money}, outside your business books.`, ref };
-  }
   if (amount >= 0) {
-    return { kind: 'filed', when, title: `Filed ${money} in from ${name}.`, detail: '', ref };
+    return { kind: 'filed', when: decided || when, title: `Filed ${money} in from ${name}.`, detail: '', ref };
   }
   const cat = typeof r.category === 'string' && r.category ? r.category : '';
   return {
     kind: 'filed',
-    when,
+    when: decided || when,
     title: cat ? `Filed ${name} as ${cat}.` : `Filed ${name}.`,
     detail: `${money} out.`,
     ref,
@@ -10806,7 +10853,7 @@ export async function readActivityFeed(userId: string, limit: number, seal: Feed
       const { url } = config();
       const res = await fetch(
         `${url}/rest/v1/transactions?user_id=eq.${uid}` +
-          `&select=id,vendor,amount,category,confirmed,is_personal,source_type,created_at,transaction_date` +
+          `&select=id,vendor,amount,category,confirmed,is_personal,source_type,created_at,decided_at,transaction_date` +
           `&order=created_at.desc&limit=${cap}`,
         { headers: headers(), signal: AbortSignal.timeout(6000) },
       );

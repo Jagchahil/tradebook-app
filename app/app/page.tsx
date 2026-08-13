@@ -446,7 +446,19 @@ export default async function OverviewPage() {
           "£12.99 saves you £2,000" is a specification, not a slogan. If we cannot show him the
           £2,000 we have not earned the £12.99. lib/ledger.ts holds the argument. */}
       <section className="lek-card">
-        <h2 className="lek-h2">What Lekhio has saved you</h2>
+        {/* 🔴 R2-F10 WAS ONLY HALF FIXED, AND THE PHASE D RETEST CAUGHT THE OTHER HALF.
+            13 August 2026.
+
+            The HEADLINE was reworded on 12 August: "Lekhio has kept £6,187 out of the taxman's
+            hands" became "The costs you have logged are keeping £6,187 off your tax bill". Doc 104:
+            the first employee does not take credit for the flowers. She confirmed £29,693 of stock,
+            rent, power and waste, and she would have claimed every penny of it with a shoebox.
+
+            The HEADING above it went on saying "What Lekhio has saved you", and the two tiles below
+            it still said "Without Lekhio" and "With Lekhio". So the sentence was corrected and the
+            frame around it made the same claim, louder, in bigger type. A reword that leaves the
+            heading alone has fixed the quotable line and nothing else. */}
+        <h2 className="lek-h2">What your costs are worth</h2>
         <p style={S.headline}>{headline(l)}</p>
 
         {l.enough ? (
@@ -458,11 +470,11 @@ export default async function OverviewPage() {
             <p style={S.scope}>Tax your business adds to your bill, before and after what you claimed.</p>
             <div className="lek-two">
               <div>
-                <div className="lek-tile-label">Without Lekhio</div>
+                <div className="lek-tile-label">If you claimed nothing</div>
                 <div className="lek-big">{gbp0(l.withoutLekhio)}</div>
               </div>
               <div>
-                <div className="lek-tile-label">With Lekhio</div>
+                <div className="lek-tile-label">With what you claimed</div>
                 <div className="lek-big" style={{ color: GREEN }}>{gbp0(l.withLekhio)}</div>
               </div>
             </div>

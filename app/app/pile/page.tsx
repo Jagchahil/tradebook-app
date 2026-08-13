@@ -391,9 +391,21 @@ export default async function PilePage({
             <h1 className="lek-title">
               {summary.entries} to check, and {decidable === 1 ? 'one question' : `only ${decidable} questions`}.
             </h1>
+            {/* 🔴 THE PROMISE IS ABOUT SHOPS, AND IT IS NOW ONLY MADE WHEN A SHOP IS ON THE SCREEN.
+                R2-F6, 13 August 2026. A florist's three wedding customers collapsed into one asking
+                group, so this sentence was promising to file "every future payment there the same
+                way" about three different households. It is a true and good promise about PORTERS.
+                It is an overreach about a person, who is usually one job. lib/personal.ts's
+                looksLikePerson decides which, and app/api/pile/route.ts stops learning the rule. A
+                sentence the code no longer honours is worse than no sentence. */}
             <p style={S.sub}>
-              We have grouped them by who you paid. Answer once for a shop and we will file every
-              future payment there the same way, without asking again.
+              We have grouped them by who you paid.{' '}
+              {groups.some((g) => !g.personLike)
+                ? 'Answer once for a shop and we will file every future payment there the same way, without asking again.'
+                : 'Answer once and we will file the lot.'}
+              {groups.some((g) => g.personLike)
+                ? ' Where you were paid by a person rather than a shop, we file what is here and learn nothing: the next one is somebody else.'
+                : ''}
             </p>
             {income.length > 0 && (
               <p style={S.aside}>

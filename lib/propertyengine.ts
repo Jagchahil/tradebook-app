@@ -105,11 +105,48 @@ export interface PropertyProfitResult {
 // Compute both routes and take the better one, telling the user which and why.
 // The £1,000 property allowance replaces actual expenses (never both) and
 // cannot create a loss. Actual expenses can, and the loss carries forward.
-export function propertyProfit(rents: number, actualExpenses: number, year: PropertyTaxYear): PropertyProfitResult {
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 financeCosts, ADDED 13 August 2026, R2-F27, AND IT ONLY EVER TOUCHES THE DECISION.
+//
+// lib/taxoptimiser.ts has warned about this in a comment since the property engine was written:
+//
+//   "AND IT IS NOT AS SIMPLE AS CALLING propertyProfit(). That function compares the allowance
+//    against actualExpenses ALONE, and mortgage interest is deliberately NOT in
+//    ytdPropertyExpenses... Handing it the expenses figure on its own would tell a mortgaged
+//    landlord with £15,000 of interest and £500 of other costs that the allowance beats him, and
+//    silently destroy his Section 24 credit. That would be a far bigger error than the one being
+//    fixed, and in the DANGEROUS direction."
+//
+// taxPosition() therefore does the comparison itself and never calls this function. Six hundred
+// lines below that comment, the Ways to save lever calls it with the expenses figure on its own,
+// and a florist with £2,440 of buy to let interest was told on live production that "the £1,000
+// property allowance beats your £0 of expenses, so it is used instead" while the Tax page beside it
+// had correctly chosen actual costs and given her the Section 24 credit.
+//
+// The warning was right, it was written down, and it was not enforced by anything. So the rule
+// moves INTO this function, where a caller cannot get it wrong by omission.
+//
+// The law: partial relief deducts £1,000 INSTEAD OF ALL property deductions, expenses and finance
+// costs alike, and a man claiming it gets no finance cost relief at all. So the COMPARISON is
+// against expenses PLUS finance. The DEDUCTION and the PROFIT are unchanged: finance is never
+// deducted from property profit, that is the whole of Section 24.
+//
+// ⚠️ DEFAULTS TO 0, so every existing caller behaves exactly as it did. This can only ever move a
+// mortgaged landlord OFF the allowance, which is the safe direction: taking it destroys his credit.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export function propertyProfit(
+  rents: number,
+  actualExpenses: number,
+  year: PropertyTaxYear,
+  financeCosts = 0,
+): PropertyProfitResult {
   const f = PROPERTY_FACTS[year];
   const r = Math.max(0, rents);
   const e = Math.max(0, actualExpenses);
-  if (r <= f.propertyAllowance && e <= r) {
+  // What the allowance is actually weighed against. Expenses alone is the bug.
+  const weighed = e + Math.max(0, financeCosts);
+  if (r <= f.propertyAllowance && weighed <= r) {
     return {
       rents: r,
       deduction: r,
@@ -119,8 +156,8 @@ export function propertyProfit(rents: number, actualExpenses: number, year: Prop
       note: `Rents of £${Math.round(r).toLocaleString('en-GB')} sit within the £1,000 property allowance: nothing to tax and usually nothing to report.`,
     };
   }
-  if (e >= f.propertyAllowance) {
-    const profit = r - e;
+  if (weighed >= f.propertyAllowance) {
+    const profit = r - e; // finance is NOT deducted here: Section 24 relieves it as a credit.
     return {
       rents: r,
       deduction: e,
@@ -130,7 +167,12 @@ export function propertyProfit(rents: number, actualExpenses: number, year: Prop
       note:
         profit < 0
           ? 'Actual expenses exceed rents: the loss carries forward against future property profits.'
-          : 'Actual expenses beat the £1,000 property allowance, so they are deducted instead.',
+          : financeCosts > 0 && e < f.propertyAllowance
+            // He is off the allowance because of his INTEREST, not his expenses, and telling him
+            // "actual expenses beat the allowance" when his expenses are £0 reads as nonsense.
+            ? 'Your mortgage interest is worth more as a Section 24 credit than the £1,000 property '
+              + 'allowance would be, and you cannot have both, so your actual costs are used.'
+            : 'Actual expenses beat the £1,000 property allowance, so they are deducted instead.',
     };
   }
   return {

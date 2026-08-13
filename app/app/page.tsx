@@ -16,7 +16,7 @@ import { waLinksConfigured } from '../../lib/walink';
 import { gateForUser } from '../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../lib/gate';
 import { ledgerFor, headline } from '../../lib/ledger';
-import { taxPosition, setAsideBasisLine } from '../../lib/taxoptimiser';
+import { taxPosition, setAsideBasisLine, billFromPosition } from '../../lib/taxoptimiser';
 import { SCOTLAND_LINE } from '../../lib/scotland';
 import { weeklyInput, weeklyLine } from '../../lib/weeklyupdate';
 import { weekOf } from '../../lib/weekchart';
@@ -252,7 +252,7 @@ export default async function OverviewPage() {
           <h1 className="lek-eyebrow">Put by for tax</h1>
           {/* ⚠️ PUT BY MEANS PUT BY, so the figure is what he still has to find. Identical to the
               bill for everybody with nothing taken at source. See lib/taxoptimiser.ts, taxPosition. */}
-          <div className="lek-hero">{gbp0(tax.cisSuffered > 0 ? tax.setAsideAfterCis : tax.setAside)}</div>
+          <div className="lek-hero">{gbp0(billFromPosition(tax))}</div>
           <p className="lek-heronote">
             {tax.projected
               ? 'What your figures are heading for across the full tax year.'
@@ -267,10 +267,27 @@ export default async function OverviewPage() {
           </p>
           {/* His contractors' share of it, when there is one. Same sentence as the Tax tab, same
               refusal to promise a refund. doc 103's empty test keeps it off every other screen. */}
+          {/* ═══════════════════════════════════════════════════════════════════════════════
+              🔴 A PROJECTION IN THE PAST TENSE IS A LIE ABOUT MONEY THAT HAS MOVED. Run 3, 13 Aug 2026.
+
+              tax.cisSuffered is the year's CIS PROJECTED, exactly like the bill it is subtracted
+              from, and this sentence announced it as a thing that had happened. On 13 August 2026
+              Marcus Whitfield read "£9,207 of it has already gone to HMRC through CIS" while the
+              card four hundred pixels below said "£2,800 of CIS has been taken off your pay this
+              year". £2,800 had gone. £9,207 had not. lib/taxoptimiser.ts says it in its own
+              comment: a projection dressed as a fact is a lie.
+
+              ⚠️ THE FIGURE DOES NOT CHANGE, THE TENSE DOES. It has to stay the projected one or it
+              stops matching setAsideAfterCis, which is this number subtracted from a projected
+              bill. What was wrong was claiming it had already happened, so the sentence now says
+              which it is, and says it only when the figures are actually a projection.
+              ═══════════════════════════════════════════════════════════════════════════════ */}
           {tax.cisSuffered > 0 ? (
             <p style={S.heroBasis}>
-              {gbp0(tax.cisSuffered)} of it has already gone to HMRC through CIS, so this is what is
-              left to find. The bill itself is about {gbp0(tax.setAside)}.
+              {tax.projected
+                ? `${gbp0(tax.cisSuffered)} of it is on course to come off through CIS across the year, so this is what is left to find.`
+                : `${gbp0(tax.cisSuffered)} of it has already gone to HMRC through CIS, so this is what is left to find.`}
+              {' '}The bill itself is about {gbp0(tax.setAside)}.
               {tax.refundLikely > 0 ? (
                 // ⚠️ THE {' '} AFTER THE FIGURE IS LOAD BEARING. JSX drops the whitespace between an
                 // expression and the text on the NEXT line, so this rendered "£2,623rather than a

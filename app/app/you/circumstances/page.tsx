@@ -303,6 +303,58 @@ function StudentLoanHeld({ rows }: {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE JOB HE TICKED AT SIGNUP, AND THE BOX THAT MAKES IT COUNT. Run 3, 13 August 2026.
+//
+// The student loan tick gets the section above: what he said, where it came from, and a LINK to
+// the screen that collects the half that pays. The payroll job tick got none of that, and the half
+// that pays is the salary AMOUNT, which lives on the National Insurance page inside a collapsed
+// Tools row that nothing anywhere points at.
+//
+// Marcus Whitfield ticked "A PAYE job" on the website, was told "We ask for the exact figures once
+// you are inside", and then read "16 answered, 0 still worth answering" on /app/you while the
+// figure that sets the rate on every pound of his profit was still zero. He asked the chat in plain
+// words, naming the amount, and was answered with a set aside that ignored it. On his own year that
+// is a January bill of £3,492 shown against a true £7,234, and a student loan reading £0 against a
+// true £1,320, because £25,649 of trade alone is under the Plan 2 threshold and £44,049 of total
+// income is well over it. The engine stacks a salary correctly the moment it has one. Nothing asked.
+//
+// ⚠️ SAME SHAPE AS THE STUDENT LOAN, ON PURPOSE. A record and not a question, no buttons, the
+// provenance said out loud, and the screen that can actually do something about it named and
+// linked. Two ticks on one signup form should not get two different levels of care.
+//
+// ⚠️ AND NOTHING AT ALL FOR A MAN WHO SAID NO. doc 103's empty test, exactly as above.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const JOB_SAID = 'You told us you also have a job on the payroll.';
+const JOB_PRE =
+  'What we count is the salary, because a wage uses your allowance and your basic rate band before '
+  + 'a penny of your profit is taxed, so it sets the rate your business is taxed at and it decides '
+  + 'what January collects on your student loan. Your ';
+const JOB_LINK = 'National Insurance page';
+const JOB_POST = ' under Tax is where to put the figure in, and where to put us right if this is wrong.';
+
+function EmploymentHeld({ rows }: {
+  rows: Array<{ key: string; answer: string; asked?: string | null }>;
+}) {
+  const row = rows.find((r) => r.key === 'other_job');
+  if (!row || row.answer !== 'yes') return null;
+  return (
+    <section className="lek-card">
+      <h2 className="lek-h2">Your job on the payroll</h2>
+      <p style={S.slSaid}>{JOB_SAID}</p>
+      <p style={S.slNote}>
+        {writtenInFromSignup(row.asked ?? null) ? SL_FROM_SIGNUP : SL_FROM_RECORD}
+        {' '}
+        {SL_NOT_ASKED_HERE}
+        {' '}
+        {JOB_PRE}
+        <a href="/app/tax/ni" style={S.slLink}>{JOB_LINK}</a>
+        {JOB_POST}
+      </p>
+    </section>
+  );
+}
+
 export default async function CircumstancesPage() {
   const jar = await cookies();
   const user = await userFromSessionCookie(jar.get(SESSION_COOKIE)?.value ?? null);
@@ -400,6 +452,7 @@ export default async function CircumstancesPage() {
 
       {/* A RECORD, NOT A QUESTION, SO IT SITS AFTER THE QUESTIONS. Above the foot, because the foot
           is about answers he pressed and this is the one he never was asked. See StudentLoanHeld. */}
+      <EmploymentHeld rows={rows} />
       <StudentLoanHeld rows={rows} />
 
       <p style={S.foot}>

@@ -181,7 +181,7 @@ import { quarterForDate } from '../../../lib/quarterpack';
 import { openTicket } from '../../../lib/support';
 import { matchKb } from '../../../lib/supportkb';
 import { soleTraderTax, homeOfficeFlatRateMonthly, FACTS } from '../../../lib/taxengine';
-import { taxPosition, setAsideBasisLine, hasTaxPosition } from '../../../lib/taxoptimiser';
+import { taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition } from '../../../lib/taxoptimiser';
 import { aprilDelta } from '../../../lib/propertyengine';
 import { niPosition, studentLoanRepayment, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
@@ -2195,7 +2195,10 @@ async function handleTotals(from: string, body: string): Promise<void> {
   // written as. A man with costs logged and no income confirmed was told "Put by £0.00 for tax",
   // and the basis line went underneath it explaining the make up of nothing. See oweAnswer.
   const hasPosition = hasTaxPosition(optimiser, tax.setAside);
-  const owed = oweAnswer(tax.setAside, tax.projected, hasPosition);
+  // 🔴 THE FIGURE IS WHAT HE HAS TO FIND, NOT THE LIABILITY, AND IT WAS THE LIABILITY HERE.
+  // 13 August 2026: "Put by £37,457.00 for tax" on WhatsApp against £28,250 on every web surface,
+  // the difference being his £9,207 of CIS. billFromPosition() is the one door; see the note on it.
+  const owed = oweAnswer(billFromPosition(tax), tax.projected, hasPosition);
   await sendText(from, hasPosition && basis ? `${owed} ${basis}` : owed);
 }
 

@@ -287,13 +287,54 @@ export const DAYS_IN_TAX_YEAR = 365;
 // ask the one definition instead of keeping a copy. OptimiserInput satisfies it unchanged, so every
 // existing call is identical. lib/elections.ts was the third copy of this arithmetic and the reason
 // this widened: see tradingAllowanceChoice.
-export function projectionFactor(input: { monthsElapsed: number; daysElapsed: number }): { canProject: boolean; factor: number } {
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE DIVISOR IS THE ELAPSED YEAR, NOT THE SPAN OF THE ROWS. RUN 3, 13 August 2026.
+//
+// daysElapsed arrived here measured from the EARLIEST TRANSACTION ROW rather than from 6 April
+// (lib/supabase.ts, getOptimiserInput). The comment there reasons it out over twenty lines and
+// lists three cases, and the fourth is the common one and is missing: a man who was trading on
+// 6 April whose first bank line simply lands later. A quiet fortnight in April is not a shorter
+// year. Marcus Whitfield, first row 24 April, had 111 days of money divided into a 111 day year
+// on 13 August and every figure in the product came out 17 percent high: a set aside of £28,250
+// against a true £24,155, and a pension lever telling a basic rate man he was £52,472 into the
+// 40 percent band. The same comment names the risk in the opposite direction and then floors the
+// window at 6 April without ever capping how late it may start.
+//
+// ⚠️ SO THE TWO NUMBERS ARE NOW SEPARATE, BECAUSE THEY ANSWER SEPARATE QUESTIONS.
+//   daysElapsed   HOW MUCH OF THE YEAR HAS RUN. Always from 6 April. It is the DIVISOR.
+//   observedDays  HOW MUCH OF IT WE HAVE EVIDENCE FOR. From his earliest row. It is the GATE.
+//
+// Every case the original reasoning protected keeps its answer:
+//   established account, rows from April  -> observed 130 of 130. Projects. Unchanged.
+//   joined in August, imported back to April -> observed 130 of 130. Projects. Unchanged.
+//   joined in August, one job this week   -> observed 7. WITHHELD, as it was. Unchanged.
+//   trading since April, first row 24 April -> observed 111 of 130. Projects on 130. FIXED.
+//
+// ⚠️ observedDays IS OPTIONAL AND DEFAULTS TO daysElapsed, so a caller that does not know behaves
+// exactly as it did before this parameter existed: it asserts its evidence covers its window,
+// which is what passing one number always meant.
+//
+// ⚠️ WHAT THIS STILL CANNOT DO is tell a quiet April from a trade that started in June, because
+// nothing in the product asks when he started trading. Both get the wide divisor, which UNDER
+// projects a genuine mid-year starter rather than over projecting him. That is the safe direction
+// and it is the honest one: we would rather be short about money he might make than confident.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Three months of evidence before we call anything a year. The same three months monthsElapsed has
+// always meant, applied to the window our rows actually cover rather than to the calendar.
+export const PROJECTION_MIN_OBSERVED_DAYS = 90;
+
+export function projectionFactor(
+  input: { monthsElapsed: number; daysElapsed: number; observedDays?: number },
+): { canProject: boolean; factor: number } {
   const rawDays = Math.floor(Number(input.daysElapsed));
   // Clamped at the length of the year, so a clock that is ahead of itself can never project DOWN.
   const usableDays = Number.isFinite(rawDays) && rawDays > 0
     ? Math.min(DAYS_IN_TAX_YEAR, rawDays)
     : 0;
-  const canProject = input.monthsElapsed >= 3 && usableDays > 0;
+  const rawObserved = Math.floor(Number(input.observedDays ?? usableDays));
+  const observed = Number.isFinite(rawObserved) && rawObserved > 0 ? rawObserved : 0;
+  const canProject =
+    input.monthsElapsed >= 3 && usableDays > 0 && observed >= PROJECTION_MIN_OBSERVED_DAYS;
   return { canProject, factor: canProject ? DAYS_IN_TAX_YEAR / usableDays : 1 };
 }
 
@@ -452,14 +493,51 @@ export interface PaymentsOnAccount {
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 export const POA_AT_SOURCE_SHARE = 0.8;
 
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE SAME FIGURE HAS TO COME OFF THE AMOUNT, NOT ONLY OFF THE TEST. RUN 3, 13 August 2026.
+//
+// Run 1 gave this function deductedAtSource two days ago and wired it into the second test only.
+// So the man whose CIS excuses him entirely was fixed, and the man whose CIS covers a third of his
+// bill was left being asked for half of a number he does not owe. Marcus Whitfield, a half share
+// partner with 30 percent covered, was told January wanted two payments of £15,428. The true
+// figure was £10,823.50. Same function, same variable, two days apart.
+//
+// HMRC's Self Assessment Manual SAM1010 states the relevant amount in full: payments on account are
+// "half the previous year's Tax and NIC liability after the deduction of any: Capital Gains Tax,
+// Tax deducted at source, Underpayment transferred to PAYE, SA Student Loan and/or Postgraduate
+// Loan Repayments, Class 2 NICS". This file already excluded the loan and Class 2, because the
+// caller passes income tax plus Class 4 only. Tax deducted at source was the one left in.
+//
+// ⚠️ THE TWO TESTS READ DIFFERENT QUANTITIES AND THAT IS DELIBERATE. The £1,000 threshold and
+// the halving both run on the RELEVANT AMOUNT, which is what Self Assessment will actually collect.
+// The 80 percent test runs on the share of the WHOLE bill that was taken at source, because that is
+// how the exemption is written. Reading one quantity for both would make the exemption unreachable.
+//
+// ⚠️ NOBODY WITHOUT TAX AT SOURCE MOVES BY A PENNY. deductedAtSource defaults to zero, the
+// relevant amount is then the bill, and every sole trader with no CIS and no PAYE gets exactly the
+// figure they got yesterday.
+// ═══════════════════════════════════════════════════════════════════════════════════════
 export function paymentsOnAccount(saBill: number, taxYearEnd = 2026, deductedAtSource = 0): PaymentsOnAccount {
-  const overThreshold = saBill > FACTS.poaThreshold;
+  const atSource = Math.max(0, Number.isFinite(deductedAtSource) ? deductedAtSource : 0);
+  // What Self Assessment is actually going to collect, which is what next year's instalments are
+  // towards. Never negative: a year covered more than fully at source asks for nothing on account.
+  const relevantAmount = Math.max(0, round2(saBill - atSource));
+  const overThreshold = relevantAmount > FACTS.poaThreshold;
   // A nil or negative bill can never be 80 percent covered by anything, and dividing by it would
   // hand back an Infinity that reads as "excused" for a man who owes nothing anyway.
-  const atSourceShare = saBill > 0 ? Math.max(0, deductedAtSource) / saBill : 0;
-  const excusedAtSource = overThreshold && atSourceShare >= POA_AT_SOURCE_SHARE;
-  const required = overThreshold && !excusedAtSource;
-  const each = required ? round2(saBill / 2) : 0;
+  const atSourceShare = saBill > 0 ? atSource / saBill : 0;
+  const coveredAtSource = atSourceShare >= POA_AT_SOURCE_SHARE;
+  const required = overThreshold && !coveredAtSource;
+  // ⚠️ AND excusedAtSource IS TESTED ON THE GROSS BILL, NOT THE RELEVANT AMOUNT, WHICH IS THE
+  // WHOLE POINT OF IT. Caught by test/moneyspine.test.mjs on the first cut of this fix: a £5,000
+  // bill with £4,400 taken at source is 88 percent covered, so the relevant amount is £600 and
+  // falls under the £1,000 floor. Reading the floor off the relevant amount made him "excused
+  // because his bill was small", when the truth is his bill was NOT small and his contractors had
+  // already paid nearly all of it. The two excuses need different sentences on the screen, which
+  // is why Run 1 separated them in the first place. So: required reads the relevant amount, and
+  // the at-source excuse reads the bill it is an excuse from.
+  const excusedAtSource = coveredAtSource && saBill > FACTS.poaThreshold;
+  const each = required ? round2(relevantAmount / 2) : 0;
   return {
     required,
     eachPayment: each,

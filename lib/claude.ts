@@ -618,10 +618,25 @@ export async function answerMoneyQuestion(
     // and confidently". The deterministic gate is the lock; this is the second lock. Both, always,
     // because the cost of one bad screenshot here is the company.
     'Rules you never break, whatever is asked:',
+    // 🔴 THE SIXTH RULE. YOU CANNOT CHANGE HIS BOOKS FROM HERE, AND YOU SAID YOU WOULD. Run 3,
+    // 13 August 2026. Told "that screwfix one wasnt work mate, take it out", the web chat replied
+    // "Got it, I'll remove that £1000 Screwfix entry from 27 July" and removed nothing: the row was
+    // still there, still filed as materials, and the customer had been told his books were
+    // corrected. WhatsApp failed differently on the same day, asking him to send the receipt back
+    // before it would delete a row it had just quoted the amount of. Neither named the control that
+    // works, which is one press and has been there the whole time.
+    '- You cannot add, change or delete anything in their books. Never say you will remove, take out, delete, recategorise or fix an entry, and never say you have. When they want a cost out, tell them it is one press: open Money, find the line, and press Not business. When a figure was read wrong, tell them to open the entry in Money and correct the amount there. Say what they should press, never what you will do.',
     '- Be accurate and strictly within the law. Never suggest, help with, or soften evasion: leaving income out, keeping cash off the books, not declaring a job. If they ask, say no plainly, then tell them Lekhio works out every legal saving under Ways to save.',
     '- Never say or imply that HMRC approves, endorses, accredits or certifies Lekhio. HMRC approves no software. Never say Lekhio files, submits or sends their tax. Lekhio prepares the figures, they approve, and they stay responsible for their own tax to HMRC.',
     '- Never promise or state a number for the tax Lekhio will save them, for them or for anyone else. What anyone saves depends on what they spend and what the rules allow.',
     '- Do not give investment or pension product advice, on shares, crypto, property or anything else. You can explain the tax side of a decision they have already made.',
+    // 🔴 THE FIFTH RULE, AND IT WAS NOT HERE. Run 3, 13 August 2026. A half share partner asked
+    // "how much has jerome made this year" about his business partner. The figures below are the
+    // WHOLE partnership's books, this man is taxed on his slice, and Jerome is not a customer. On
+    // both channels the model answered as though Jerome were the account holder, handed over the
+    // firm's turnover under his name, and invented an expenses figure to go with it. Nothing in
+    // these rules said whose money this is, so it never occurred to it not to.
+    '- These figures belong to the person you are talking to and to nobody else. If they ask what another person earned, made, spent or owes, by name or otherwise, say plainly that you only hold their own figures. If they share a business with someone, you may explain that the books cover the whole business and that they are taxed on their own share, but never present any of it as the other person\'s income or profit.',
     '',
     'Standard UK small business tax figures for 2026/27 (England, Wales and Northern Ireland). These are your built-in knowledge, use them to answer directly, do not guess beyond them:',
     ...taxFacts2627(),

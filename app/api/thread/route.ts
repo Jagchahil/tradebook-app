@@ -9,11 +9,12 @@ import { aiCapsFor } from '../../../lib/margin';
 import {
   matchTotalsQuestion, formatGbp, isDeadlineQuestion, asksAmount, deadlineAnswer, type TotalsQuestion,
   matchProductTruth, productTruthAnswer, isDataRightsRequest, DATA_RIGHTS_ANSWER,
+  isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
   isVehicleQuestion, vehicleAnswer,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
-import { taxPosition, setAsideBasisLine, hasTaxPosition } from '../../../lib/taxoptimiser';
+import { taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition } from '../../../lib/taxoptimiser';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { quarterForDate } from '../../../lib/quarterpack';
 import { gbp0 } from '../../../lib/money';
@@ -214,6 +215,26 @@ async function composeReply(userId: string, q: string): Promise<string> {
     });
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 SOMEBODY ELSE'S MONEY, AND THIS ROUTER HAD NO GATE AT ALL. Run 3, 13 August 2026.
+  //
+  // Run 1 found this shape ON THE CHAT ROUTER. Run 2 built isAboutSomeoneElse and wired it into
+  // the WhatsApp webhook, with a comment noting it was still live there. Nothing ever wired it
+  // here, so the router the finding came from was the one channel with no gate.
+  //
+  // Marcus Whitfield asked this chat "how much has jerome made this year" about his business
+  // partner and was handed the whole firm's turnover under Jerome's name with an invented
+  // expenses figure attached. Same question, same evening, same answer shape on WhatsApp.
+  //
+  // ⚠️ ABOVE EVERY LANE THAT READS HIS BOOKS, for the reason the webhook gives: the failure IS a
+  // lane that reads his books answering a question that was not about them.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // ⚠️ NO SELF NAMES PASSED, AND THAT IS THE CHEAP SAFE CHOICE. Reading users.person_name here
+  // would add a database round trip to every chat message to remove a false positive that costs
+  // one re-ask ("how much has marcus made", asked by Marcus). selfNameTokens() is exported and
+  // ready for a caller that already holds the name; nothing should fetch it just for this.
+  if (isAboutSomeoneElse(q)) return SOMEONE_ELSE_ANSWER;
+
   // 2. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
   const totals = matchTotalsQuestion(q);
   if (totals) return totalsAnswer(userId, totals);
@@ -223,6 +244,7 @@ async function composeReply(userId: string, q: string): Promise<string> {
   // answer to "delete everything you hold on me" does not get to be probabilistic, and it must not
   // cost an AI call either, because a man at his spend cap still has the right to leave.
   if (isDataRightsRequest(q)) return DATA_RIGHTS_ANSWER;
+
 
   // 🔴 THE VAN QUESTION, ABOVE THE CLAIM CORPUS, BECAUSE THE CORPUS ANSWERED IT WITH A CARD.
   // RUN 1 finding F7: a man typed the price, the month and his weekly miles, and got a generic
@@ -514,7 +536,7 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
   // while the sentence beside it claimed the two agreed, and a man who catches our surfaces
   // disagreeing about his tax stops believing any of them. lib/taxoptimiser.ts carries both.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
-  const leadFigure = tax.cisSuffered > 0 ? tax.setAsideAfterCis : tax.setAside;
+  const leadFigure = billFromPosition(tax);
   const cisLine = tax.cisSuffered > 0
     ? ` ${formatGbp(tax.cisSuffered)} of the bill has already gone to HMRC through CIS, so that part is paid and this is what is left.${
       tax.refundLikely > 0

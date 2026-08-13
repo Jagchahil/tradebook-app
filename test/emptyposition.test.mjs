@@ -152,17 +152,26 @@ ok('the thread still fetches the hub\'s own figure before deciding anything',
   /taxPosition\(optimiser\)/.test(thread) && /taxPosition\(optimiser\)/.test(wa));
 ok('🔴 THE THREAD ASKS THE RULE AND RETURNS BEFORE IT BUILDS A SENTENCE',
   /if \(!hasTaxPosition\(optimiser, tax\.setAside\)\) \{/.test(thread));
+// ⚠️ THE GATE READS setAside AND THE SENTENCE READS billFromPosition, AND THAT IS DELIBERATE.
+// hasTaxPosition asks "is there a position at all", which is a question about the LIABILITY: a man
+// whose whole bill is covered by CIS still has a position and still gets told about it. What he is
+// asked to PUT BY is what is left to find. Run 3 separated the two; before it, both were setAside
+// and WhatsApp quoted the liability under the words "put by".
 ok('🔴 WHATSAPP ASKS THE SAME FUNCTION AND HANDS THE ANSWER TO oweAnswer',
   /const hasPosition = hasTaxPosition\(optimiser, tax\.setAside\);/.test(wa)
-  && /oweAnswer\(tax\.setAside, tax\.projected, hasPosition\)/.test(wa));
+  && /oweAnswer\(billFromPosition\(tax\), tax\.projected, hasPosition\)/.test(wa));
 ok('🔴 AND WHATSAPP DROPS THE BASIS LINE ON AN EMPTY POSITION: there is no make up of nothing',
   /hasPosition && basis \?/.test(wa));
 ok('🔴 NEITHER LANE KEEPS A SECOND COPY OF THE RULE',
   !/moneyIn > 0 \|\| tax\.setAside > 0/.test(thread)
   && !/moneyIn > 0 \|\| tax\.setAside > 0/.test(wa));
+// ⚠️ THE LIST GREW BY ONE NAME IN RUN 3, billFromPosition, and it is named here rather than
+// loosened to a wildcard: "reaching for it some other way" is exactly what this line forbids, and a
+// wildcard would stop forbidding it.
+const IMPORTS_BY_NAME =
+  /import \{ taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition \} from '\.\.\/\.\.\/\.\.\/lib\/taxoptimiser'/;
 ok('both import it by name rather than reaching for it some other way',
-  /import \{ taxPosition, setAsideBasisLine, hasTaxPosition \} from '\.\.\/\.\.\/\.\.\/lib\/taxoptimiser'/.test(thread)
-  && /import \{ taxPosition, setAsideBasisLine, hasTaxPosition \} from '\.\.\/\.\.\/\.\.\/lib\/taxoptimiser'/.test(wa));
+  IMPORTS_BY_NAME.test(thread) && IMPORTS_BY_NAME.test(wa));
 
 // ── The thread's own empty sentence, read out of the source it is written in. ─────────────────
 const threadEmpty = /return 'Nothing to work out yet\.([^']*)';/.exec(thread);

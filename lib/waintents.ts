@@ -1608,13 +1608,80 @@ const THIRD_PARTY_RE =
 
 const FIRST_PERSON_RE = /\b(?:my own|i|me|mine)\b/i;
 
-export function isAboutSomeoneElse(body: string): boolean {
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND A PERSON WITH A NAME MATCHED NONE OF IT. Run 3, 13 August 2026.
+//
+// The rule above needs a trade noun WITH a location ("the barber next door"), or "my mate", or a
+// possessive pronoun WITH a money noun. That is the right shape for the stranger it was written
+// for. It has no shape at all for the person a partner actually asks about, which is his partner,
+// by his first name.
+//
+// Marcus Whitfield asked "how much has jerome made this year" on BOTH channels. WhatsApp answered
+// "Jerome's made £96,000 gross income so far this year, with £34,401.52 in expenses, leaving him
+// £61,598.48 profit". The web chat answered the same question with £40,600 and £55,400. £96,000 is
+// the WHOLE FIRM'S turnover, Jerome's share is half of it, and neither expenses figure is a number
+// this product has ever computed: the true one is £44,701.52. Two channels, two inventions, one
+// man's name on both.
+//
+// ⚠️ AND THE GATE WAS ON ONE CHANNEL. app/api/thread/route.ts never called this function at all,
+// so the web chat had no gate of any kind. Run 1 found this shape on the chat router, Run 2 fixed
+// it on WhatsApp, and the router it was found on was never wired. Fixed in the same packet.
+//
+// ⚠️ A NAME IS RECOGNISED BY ITS SHAPE, NOT BY A LIST OF NAMES, because we cannot have a list of
+// every partner, spouse and subbie our customers will ever mention. The shape is "how much has
+// <word> made" and "<word>'s profit", with a stoplist of the words that are not people and the
+// customer's own name passed in where the caller knows it. A stoplist is the safe direction: a
+// word we have not thought of is treated as a person and the question is politely declined, which
+// costs one re-ask. The other direction costs a disclosure.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const NOT_A_PERSON = new Set([
+  'i', 'me', 'my', 'mine', 'we', 'us', 'our', 'you', 'your', 'it', 'that', 'this', 'the', 'a', 'an',
+  'he', 'she', 'they', 'them', 'everyone', 'anyone', 'someone', 'somebody', 'nobody',
+  'tax', 'vat', 'hmrc', 'lekhio', 'business', 'company', 'firm', 'shop', 'partnership', 'trade',
+  'account', 'invoice', 'client', 'customer', 'job', 'work', 'van', 'yard', 'site',
+  'profit', 'income', 'turnover', 'takings', 'money', 'everything', 'something', 'anything',
+  'year', 'month', 'week', 'quarter', 'day', 'today', 'yesterday', 'tomorrow', 'april', 'january',
+]);
+
+const NAMED_PERSON_VERB_RE =
+  /\bhow much (?:has|have|had|did|does|do|is|was)\s+(?:the\s+)?([a-z][a-z'\u2019-]{1,20})\s+(?:made|make|makes|earn|earned|earns|owe|owes|owed|spent|spend|spends|paid|pay|pays|taken|take|takes|turned|billed|invoiced)\b/i;
+
+const NAMED_PERSON_POSSESSIVE_RE =
+  /\b([a-z][a-z'\u2019-]{1,20})(?:'s|\u2019s)\s+(?:books|tax|figures|takings|profit|income|account|bill|turnover|vat|earnings|wages|money|share)\b/i;
+
+// The customer's own name is not somebody else. Split on whitespace so "Marcus Whitfield" excuses
+// both "marcus" and "whitfield", and lower cased because nobody capitalises their partner on
+// WhatsApp.
+export function selfNameTokens(fullName: string | null | undefined): string[] {
+  return String(fullName ?? '')
+    .toLowerCase()
+    .split(/[^a-z'\u2019-]+/)
+    .filter((w) => w.length > 1);
+}
+
+function namesAPerson(b: string, selfNames: string[]): boolean {
+  for (const re of [NAMED_PERSON_VERB_RE, NAMED_PERSON_POSSESSIVE_RE]) {
+    const m = b.match(re);
+    if (!m) continue;
+    const word = (m[1] ?? '').toLowerCase();
+    if (!word || NOT_A_PERSON.has(word)) continue;
+    if (selfNames.includes(word)) continue;
+    return true;
+  }
+  return false;
+}
+
+export function isAboutSomeoneElse(body: string, selfNames: string[] = []): boolean {
   const b = body.trim();
-  if (!THIRD_PARTY_RE.test(b)) return false;
+  const named = namesAPerson(b, selfNames);
+  if (!THIRD_PARTY_RE.test(b) && !named) return false;
   // "what do i owe compared to my mate" is still fundamentally about him. Only refuse when the
   // question is squarely about the other party.
   if (/\bcompared to\b|\bvs\b|\bversus\b/i.test(b)) return false;
   if (FIRST_PERSON_RE.test(b) && !/\byou lot\b|\byou\b/i.test(b)) return false;
+  // A named person carries its own money verb inside the pattern, so it does not have to prove one
+  // twice. The original shape still does, exactly as before.
+  if (named) return true;
   return /\bowe|owes|owed|earn|earns|made|makes|turnover|profit|tax|takings|books|figures|pay|pays\b/i.test(b);
 }
 

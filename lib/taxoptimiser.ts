@@ -43,6 +43,23 @@ export interface OptimiserInput {
   // forgets, the same way lib/gate.ts fails the build on a route it has never heard of.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   daysElapsed: number;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HOW MUCH OF THAT YEAR WE HAVE EVIDENCE FOR. THE GATE, NEVER THE DIVISOR. Run 3, 13 Aug 2026.
+  //
+  // daysElapsed above answers "how much of the year has run" and is measured from 6 April. This
+  // answers "how much of it can we see" and is measured from his earliest row. They were ONE
+  // number until today, measured from the row, so a man trading since 6 April whose first bank
+  // line landed on 24 April had his whole year declared 111 days long and every figure came out
+  // 17 percent high. See projectionFactor() in lib/taxengine.ts for the four cases.
+  //
+  // ⚠️ OPTIONAL, AND OPTIONAL ON PURPOSE, WHICH IS THE OPPOSITE CALL TO daysElapsed ABOVE. Passing
+  // one number always meant "my evidence covers my window", so defaulting to daysElapsed is not a
+  // fallback that hides a bug, it is the assertion the old single field was already making. A
+  // caller that has not been taught the difference keeps the answer it had, and the one caller
+  // that builds this from real rows (getOptimiserInput) now says which is which.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  observedDays?: number;
   ytdTradeIncome: number;
   ytdTradeExpenses: number;
   ytdCisSuffered: number;
@@ -684,7 +701,22 @@ export function hasTaxPosition(input: OptimiserInput, setAside: number): boolean
 // this number has taken it off. setAside stays the liability; this is what he has to find.
 // ═════════════════════════════════════════════════════════════════════════════════════════════
 export function selfAssessmentBill(input: OptimiserInput): number {
-  const t = taxPosition(input);
+  return billFromPosition(taxPosition(input));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SAME DOOR FOR A CALLER THAT ALREADY HOLDS THE POSITION. Run 3, 13 August 2026.
+//
+// selfAssessmentBill above recomputes taxPosition, so a route that had already called it wrote the
+// ternary out by hand instead. Two of them did, and the third did not: on 13 August 2026 WhatsApp
+// answered "what do i owe" with "Put by £37,457.00 for tax" while the Overview, the Tax hub and
+// the web chat all led with £28,250. £9,207 apart, which is exactly the CIS, on the same books, on
+// the same evening. The word "put by" means what he still has to find, and app/app/page.tsx says
+// so in capitals directly above its own copy of this expression.
+//
+// A ternary is not a rule. This is the rule, and now nobody has to remember it.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+export function billFromPosition(t: { cisSuffered: number; setAsideAfterCis: number; setAside: number }): number {
   return t.cisSuffered > 0 ? t.setAsideAfterCis : t.setAside;
 }
 
@@ -784,11 +816,35 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   //    earner. Irreversible (moving money), so it can only ever be drafted.
   if (projTotalIncome > FACTS.class4UpperLimit) {
     const over = round(projTotalIncome - FACTS.class4UpperLimit);
-    const saving = round(over * 0.2); // higher-rate relief on income pulled below the threshold
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 A FLAT 20 POINTS IGNORED THE 60 PERCENT BAND THIS FILE ALREADY KNOWS ABOUT. Run 3, 13 Aug.
+    //
+    // marginalRate() forty lines up returns 0.62 above the taper floor, and the use of home lever
+    // below prices itself off it. This one multiplied the whole overshoot by 0.2. On 13 August 2026
+    // one screen quoted "Claim use of home, about £74" (£120 at 62 percent, taper aware) directly
+    // under "Step out of the 40% band, about £10,494" (£52,472 at 20 points, taper blind), from the
+    // same engine, on the same income.
+    //
+    // Between £100,000 and £125,140 the personal allowance tapers away, so a pound of pension
+    // relief there is worth 40p of higher rate PLUS 20p of allowance handed back. That slice is the
+    // most valuable pension lever in the UK system and the panel headed "richest first" did not
+    // mention it. Class 4 is NOT in this figure: pension relief does not touch National Insurance,
+    // which is why this uses its own rates rather than calling marginalRate().
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    const taperFloor = FACTS.personalAllowanceTaperFloor;
+    // The part of the overshoot sitting in the 60 percent band, capped at the taper's own width.
+    const taperWidth = Math.max(0, FACTS.personalAllowance * 2);
+    const inTaper = Math.max(0, Math.min(projTotalIncome, taperFloor + taperWidth) - Math.max(taperFloor, FACTS.class4UpperLimit));
+    const plainHigher = Math.max(0, over - inTaper);
+    const saving = round(plainHigher * 0.2 + inTaper * 0.4); // 40 - 20 in the band, 60 - 20 in the taper
     out.push({
       key: 'pension_higher_rate',
       title: 'Step out of the 40% band',
-      detail: `Your income is heading about £${over.toLocaleString('en-GB')} into the 40% higher rate. A pension contribution of up to that amount brings you back under and can save up to about £${saving.toLocaleString('en-GB')} in higher-rate tax. Your provider sets the amount. We are not a financial adviser, you decide.`,
+      detail: `Your income is heading about £${over.toLocaleString('en-GB')} into the 40% higher rate. A pension contribution of up to that amount brings you back under and can save up to about £${saving.toLocaleString('en-GB')} in tax.${
+        inTaper > 0
+          ? ` About £${round(inTaper).toLocaleString('en-GB')} of that sits above £${taperFloor.toLocaleString('en-GB')}, where your personal allowance is being taken away as well, so those pounds are relieved at an effective 60% rather than 40%. That is the most valuable part to move.`
+          : ''
+      } Your provider sets the amount. We are not a financial adviser, you decide.`,
       estSaving: saving,
       action: 'make_payment',
     });

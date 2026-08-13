@@ -226,8 +226,22 @@ ok('no forbidden dashes in either', [oweP, oweE].every((s) => !/[–—]/.test(s
   ok('🔴 the WhatsApp owe answer is taxPosition on getOptimiserInput, the thread and tax hub call',
     /taxPosition\(optimiser\)/.test(waSrc) && /taxPosition\(optimiser\)/.test(threadSrc)
     && /getOptimiserInput\(userId\)/.test(waSrc) && /getOptimiserInput\(userId\)/.test(threadSrc));
-  ok('🔴 the figure WhatsApp speaks is setAside itself, through oweAnswer',
-    /oweAnswer\(tax\.setAside, tax\.projected, hasPosition\)/.test(waSrc));
+  // 🔴 THIS ASSERTION CAUSED THE BUG IT WAS WRITTEN TO PREVENT. Run 3, 13 August 2026.
+  //
+  // Its heading, four lines up, is that both channels must derive the owe figure from the same
+  // function so they cannot drift. It then pinned the LITERAL `tax.setAside`. On 11 August the CIS
+  // credit landed and the web surfaces moved to what a man still has to FIND. This line held
+  // WhatsApp on the liability and stayed green, and on 13 August WhatsApp answered "Put by
+  // £37,457.00 for tax" against £28,250 everywhere else, the difference being exactly his CIS.
+  //
+  // A guard that names one side's expression cannot notice the other side moving. So what is
+  // pinned now is the shared FUNCTION, and that neither side writes the rule out by hand.
+  ok('🔴 the figure WhatsApp speaks comes through the one door, billFromPosition',
+    /oweAnswer\(billFromPosition\(tax\), tax\.projected, hasPosition\)/.test(waSrc));
+  ok('🔴 and the thread speaks the same one, so the channels cannot drift again',
+    /billFromPosition\(tax\)/.test(threadSrc));
+  ok('🔴 neither channel keeps a hand written copy of the CIS rule',
+    !/tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/.test(waSrc + threadSrc));
   ok('🔴 the little January is gone from the webhook: no second engine on this question',
     !/studentLoanForSA/.test(waSrc) && !/corporationTax\(/.test(waSrc) && !/rough bill/.test(waSrc));
   ok('the projection notes are the thread\'s own sentences word for word',
@@ -538,7 +552,7 @@ for (const phrase of ['claim use of home', 'claim use of home, 30 hours a month'
 // A DIRECTOR'S "WHAT DO I OWE" CARRIES THE SENTENCE THAT EXPLAINS THE SMALLER NUMBER.
 // ---------------------------------------------------------------------------------------------
 ok('🔴 the owe answer renders setAsideBasisLine, so WhatsApp cannot show a smaller figure bare',
-  /setAsideBasisLine/.test(wroute) && /oweAnswer\(tax\.setAside, tax\.projected, hasPosition\)/.test(wroute));
+  /setAsideBasisLine/.test(wroute) && /oweAnswer\(billFromPosition\(tax\), tax\.projected, hasPosition\)/.test(wroute));
 
 // ---------------------------------------------------------------------------------------------
 // QUESTIONS ABOUT LEKHIO ITSELF NEVER REACH THE CLAIM RULEBOOK OR THE TOTALS LANE. (6 Aug 2026.)

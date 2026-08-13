@@ -6,7 +6,7 @@ import {
   getOptimiserInput, getConfirmedTransactionsForRange, getBusinessProfile, readVatProfile,
   hasConfirmedRowsInTaxYear,
 } from '../../../lib/supabase';
-import { taxPosition, setAsideBasisLine } from '../../../lib/taxoptimiser';
+import { taxPosition, setAsideBasisLine, billFromPosition } from '../../../lib/taxoptimiser';
 import { SCOTLAND_LINE } from '../../../lib/scotland';
 import { shareCaption } from '../../../lib/position';
 import { bankFeedOffered } from '../../../lib/bankfeed';
@@ -240,7 +240,7 @@ export default async function TaxHubPage() {
               CIS subcontractor they are thousands apart, and the words over this figure say "where
               you stand", which is a question about his position and not about our arithmetic.
               lib/taxoptimiser.ts, taxPosition, carries both and explains why. */}
-          <div className="lek-hero">{gbp0(tax.cisSuffered > 0 ? tax.setAsideAfterCis : tax.setAside)}</div>
+          <div className="lek-hero">{gbp0(billFromPosition(tax))}</div>
           <p className="lek-heronote">
             {tax.projected
               ? 'What the year is heading for, on everything you have confirmed so far.'
@@ -259,8 +259,10 @@ export default async function TaxHubPage() {
               exist. */}
           {tax.cisSuffered > 0 ? (
             <p style={S.heroBasis}>
-              Your contractors have already handed HMRC {gbp0(tax.cisSuffered)} of this under CIS, so
-              that part is paid. The bill itself works out at about {gbp0(tax.setAside)}.
+              {tax.projected
+                ? `Your contractors are on course to hand HMRC ${gbp0(tax.cisSuffered)} of this under CIS across the year, so that much of it is paid as you go rather than in January.`
+                : `Your contractors have already handed HMRC ${gbp0(tax.cisSuffered)} of this under CIS, so that part is paid.`}
+              {' '}The bill itself works out at about {gbp0(tax.setAside)}.
               {tax.refundLikely > 0 ? (
                 <>{' '}On these figures more has been taken than the year is going to cost, so January
                   looks like a repayment of around {gbp0(tax.refundLikely)} rather than a bill. That is

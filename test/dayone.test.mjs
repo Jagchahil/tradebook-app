@@ -93,18 +93,37 @@ const iso = (d) => d.toISOString().slice(0, 10);
 const daysAgo = (n) => { const d = new Date(); d.setUTCDate(d.getUTCDate() - n); return iso(d); };
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
-console.log('\nThe window we project over is the span we have evidence for.\n');
+console.log('\nThe window we project over is the elapsed YEAR. The evidence is a separate gate.\n');
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 {
   // A man who joined this week and logged one job two days ago.
   const fresh = await optimiserWith([
     { amount: 300, category: 'income', vendor: 'job', transaction_date: daysAgo(2), cis_deduction: null, income_type: 'trade', capital_kind: null, business_use_pct: null },
   ]);
-  ok('🔴 A TWO DAY OLD BOOK IS A TWO DAY WINDOW, not "125 days since 6 April"',
-    fresh.daysElapsed <= 3);
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 REVERSED IN RUN 3, 13 AUGUST 2026, AND THE OUTCOME THIS SUITE PROTECTS IS UNCHANGED.
+  //
+  // This block used to assert that daysElapsed ITSELF was the narrow window: a two day old book
+  // was a two day year. That is a coherent position and it is the one that shipped, and it is only
+  // safe at the extreme end, where the confidence gate catches it. In the middle it inflates
+  // silently. Marcus Whitfield was trading from 6 April and his first bank row landed on 24 April.
+  // 111 days of money went into a 111 day year on 13 August, his set aside came out 17 percent
+  // high, and the "ways to save" panel told a basic rate man he was £52,472 into the 40 percent
+  // band and should put £52,472 into a pension.
+  //
+  // The numerator is labelled "since 6 April" on the card. The denominator has to be too.
+  //
+  // ⚠️ SO THE TWO IDEAS ARE NOW TWO FIELDS, and every assertion below this one still passes
+  // untouched: the factor is still exactly 1, his money is still counted in full, a backfilled
+  // book still gets the wide window, a future dated row still cannot shrink anything. What moved
+  // is WHICH FIELD carries the narrowness, not what a thin book is allowed to do.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  ok('🔴 A TWO DAY OLD BOOK IS TWO DAYS OF EVIDENCE, and the tax year is still the tax year',
+    fresh.observedDays <= 3 && fresh.daysElapsed > fresh.observedDays);
   ok('🔴 SO THE CONFIDENCE GATE IS SHUT, which is the whole point of it existing',
-    fresh.monthsElapsed < 3
-    && ENGINE.projectionFactor(fresh).canProject === false);
+    ENGINE.projectionFactor(fresh).canProject === false);
+  ok('🔴 AND IT IS THE EVIDENCE THAT SHUTS IT, not a year that pretends to be two days long',
+    ENGINE.projectionFactor({ ...fresh, observedDays: 200 }).canProject === true);
   ok('and the factor is exactly 1, so nothing is multiplied up',
     ENGINE.projectionFactor(fresh).factor === 1);
   ok('his money is still counted in full, because the window governs the RATE and not the total',

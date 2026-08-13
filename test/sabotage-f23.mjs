@@ -120,10 +120,14 @@ const SABOTAGES = [
       'return t.selfAssessmentTax;'),
   },
   {
+    // ⚠️ RE-ANCHORED 13 AUGUST 2026, RUN 3, AND THE MISS IS THE POINT. This pointed at the two
+    // line body of selfAssessmentBill, which Run 3 collapsed into a call to the new shared door
+    // billFromPosition(). The anchor stopped matching, edit() threw, and this sabotage silently
+    // became ABSENT rather than passing: 22 of 22 read as 20 of 22 and only the combined tree
+    // re-run showed it. Exactly the Run 2 fault this file's own header records.
     name: 'selfAssessmentBill grows its own arithmetic instead of asking taxPosition',
     apply: (d) => edit(d, 'lib/taxoptimiser.ts',
-      `  const t = taxPosition(input);
-  return t.cisSuffered > 0 ? t.setAsideAfterCis : t.setAside;`,
+      '  return billFromPosition(taxPosition(input));',
       `  return soleTraderTax(Math.max(0, input.ytdTradeIncome - input.ytdTradeExpenses)
     + Math.max(0, input.ytdPropertyIncome ?? 0)).total;`),
   },
@@ -188,12 +192,14 @@ const CONTROLS = [
       '// 7. Payments on account cliff (wording touched, behaviour identical).'),
   },
   {
+    // ⚠️ RE-ANCHORED WITH THE SABOTAGE ABOVE, ONTO THE DOOR ITSELF, so the control still renames a
+    // local and still changes nothing. A control that cannot apply is worse than a sabotage that
+    // cannot apply: it reports BAD and hides behind a number that still looks nearly full.
     name: 'the local variable is renamed in taxoptimiser',
     apply: (d) => edit(d, 'lib/taxoptimiser.ts',
-      `  const t = taxPosition(input);
-  return t.cisSuffered > 0 ? t.setAsideAfterCis : t.setAside;`,
+      '  return billFromPosition(taxPosition(input));',
       `  const position = taxPosition(input);
-  return position.cisSuffered > 0 ? position.setAsideAfterCis : position.setAside;`),
+  return billFromPosition(position);`),
   },
   {
     name: 'whitespace is added to the reader in supabase.ts',

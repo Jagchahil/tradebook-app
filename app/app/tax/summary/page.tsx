@@ -292,11 +292,22 @@ export default async function TaxSummaryPage() {
               </div>
             ) : null}
 
+            {/* ═════════════════════════════════════════════════════════════════════════════
+                🔴 WHOSE PAY. THE ONE SENTENCE ON THIS PAGE THAT DID NOT SAY. Run 3, 13 Aug 2026.
+
+                Every figure in the block above is the WHOLE FIRM'S and the page says so twice. This
+                sentence sat three lines under a paragraph explaining that his SHARE goes on his own
+                return, and called the firm's £5,600 "your pay". Home, correctly, calls his half of
+                it £2,800. So the product showed a partner £9,207, £5,600 and £2,800 for his CIS on
+                three screens in one evening, each of them in the first person about his money.
+
+                The figure is right for this page and stays. What it is a figure OF is now said. */}
             {sub.cisSuffered > 0 ? (
               <p style={S.refund}>
-                <b>{gbp0(sub.cisSuffered)}</b> of CIS has been deducted from your pay since 6 April.
-                That is tax already handed over on your behalf, and it is counted when the year is
-                settled.
+                <b>{gbp0(sub.cisSuffered)}</b> of CIS has been deducted since 6 April
+                {isPartnership ? ' from the firm\u2019s payments' : ' from your pay'}. That is tax
+                already handed over on your behalf, and it is counted when the year is settled.
+                {isPartnership ? ' Your own share of it is on your Overview, and that is the figure that reaches your return.' : ''}
               </p>
             ) : null}
           </>

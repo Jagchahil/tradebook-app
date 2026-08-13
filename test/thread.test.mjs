@@ -220,10 +220,20 @@ ok('🔴 the owe answer is taxPosition on getOptimiserInput, the tax hub\'s own 
 // on both at once. Pinning the shared EXPRESSION rather than a field name is what makes the two
 // unable to drift: if either surface picks a different one of the three figures taxPosition now
 // returns, this goes red, which the old assertion could not have done.
-const LEAD_FIGURE = /tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/;
-ok('🔴 the figure spoken is the hub\'s hero number, chosen by the same expression in both files',
+// ⚠️ REWRITTEN 13 AUGUST 2026, RUN 3, AND IT IS STRONGER AGAIN. It pinned the shared EXPRESSION,
+// on the reasoning that a shared expression cannot drift. It can, and it did: test/waintents.test.mjs
+// pinned WhatsApp to `oweAnswer(tax.setAside, ...)` in a DIFFERENT suite, so when the CIS credit
+// moved the web surfaces to setAsideAfterCis on 11 August, that other guard held WhatsApp still and
+// stayed green. On 13 August WhatsApp said "Put by £37,457.00" while every web surface said £28,250.
+// A regex can only pin the two places it is pointed at. So the rule is a FUNCTION now,
+// billFromPosition() in lib/taxoptimiser.ts, and what is pinned is that every surface CALLS it.
+const LEAD_FIGURE = /billFromPosition\(tax\)/;
+ok('🔴 the figure spoken is the hub\'s hero number, chosen by the same FUNCTION in both files',
   LEAD_FIGURE.test(routeCode) && LEAD_FIGURE.test(taxHubCode)
-  && /formatGbp\(leadFigure\)/.test(routeCode) && /gbp0\(tax\.cisSuffered > 0/.test(taxHubCode));
+  && /formatGbp\(leadFigure\)/.test(routeCode) && /gbp0\(billFromPosition\(tax\)\)/.test(taxHubCode));
+ok('🔴 AND NEITHER SURFACE KEEPS A HAND WRITTEN COPY OF THE RULE',
+  !/tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/.test(routeCode)
+  && !/tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/.test(taxHubCode));
 ok('what is inside the number is the shared sentence, lib/taxoptimiser\'s own words',
   /setAsideBasisLine\(optimiser, tax\)/.test(routeCode) && /setAsideBasisLine\(optimiser, tax\)/.test(taxHubCode));
 ok('🔴 the little January is gone: no engine arithmetic of the owe branch\'s own',
@@ -585,6 +595,12 @@ export function isDeadlineQuestion(q) { return /deadline/.test(q); }
 export function asksAmount(q) { return /how much|how many/.test(q); }
 export function deadlineAnswer() { return 'The deadline answer.'; }
 export function clampReceiptDate(d) { return d || '2026-08-05'; }
+// Somebody else's money. Stubbed to its plainest clause: a name next to a money verb. The real
+// matcher, its stoplist, its false positive set and the two channels it now guards are owned by
+// test/run3fixes.test.mjs. This sandbox walks the ROUTING, which is that the gate exists and sits
+// above every lane that reads his rows.
+export function isAboutSomeoneElse(q) { return /how much (has|did) [a-z]+ (made|make|earn|earned)/i.test(q); }
+export const SOMEONE_ELSE_ANSWER = 'I can only see your books.';
 `);
   // ⚠️ isClaimQuestion IS STUBBED FALSE, ALONGSIDE A checkExpense THAT ANSWERS NOTHING. This
   // sandbox walks the ROUTING, not the corpus, and the two stubs agree: the claim lane produces no
@@ -600,6 +616,10 @@ export function clampReceiptDate(d) { return d || '2026-08-05'; }
 export function taxPosition() { return { setAside: 0, projected: false }; }
 export function setAsideBasisLine() { return ''; }
 export function hasTaxPosition() { return true; }
+// The one door both chat lanes now lead with, stubbed to the rule it encodes: what he has to FIND,
+// which is the bill less any CIS. The real function and the drift it exists to stop are owned by
+// test/run3fixes.test.mjs and test/threadcollection.test.mjs.
+export function billFromPosition(t) { return t.cisSuffered > 0 ? t.setAsideAfterCis : t.setAside; }
 `);
   w('supabase.ts', `
 export const state = { rows: [], writes: [], turns: [] };

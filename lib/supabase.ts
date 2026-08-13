@@ -4702,9 +4702,27 @@ export async function transactionSummaryForUser(userId: string, limit = 60): Pro
   // because there are three callers on two channels and a sentence that lives in one of them is a
   // sentence the other two are missing.
   const truncated = total !== null && total > rows.length;
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 "NEVER ADD THESE UP" WAS ON THE WRONG BRANCH. Run 3, 13 August 2026.
+  //
+  // The instruction lived only in the truncated arm, so it reached the model exactly when the
+  // model had no chance of totalling anyway, and was absent when it had every row in front of it
+  // and the words "This is all of them" for encouragement. Marcus Whitfield had 23 entries, under
+  // the 60 row limit, so he got the second arm. Asked what his business partner had made, the
+  // model added his 18 expense rows by hand and answered £34,401.52 on WhatsApp and £40,600 in the
+  // web chat. The true figure is £44,701.52. Two channels, two wrong sums, neither of them a
+  // number this product computed. The four income rows are few and large, which is why £96,000
+  // came out right and hid it.
+  //
+  // The rule does not depend on the window, so it does not live on one arm of the window test.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const NEVER_TOTAL =
+    'Never add these rows up into a total for any period or any person: every total in this product'
+    + ' is computed by the engine and handed to you separately when it is needed, and a total you'
+    + ' work out yourself here will be wrong and will contradict his own screens.';
   const header = truncated
-    ? `THIS IS A WINDOW, NOT HIS WHOLE BOOK. He has ${total} entries in total. The ${rows.length} newest are below, covering ${oldest} to ${newest}. The other ${total - rows.length} are older and you CANNOT see them. Never tell him this is everything you have, never describe the range below as the range of his books, and never add these up into a total for a period: the totals are computed elsewhere and given to you separately when they are needed.`
-    : `His entries, ${rows.length} of them, covering ${oldest} to ${newest}. This is all of them.`;
+    ? `THIS IS A WINDOW, NOT HIS WHOLE BOOK. He has ${total} entries in total. The ${rows.length} newest are below, covering ${oldest} to ${newest}. The other ${total - rows.length} are older and you CANNOT see them. Never tell him this is everything you have, never describe the range below as the range of his books. ${NEVER_TOTAL}`
+    : `His entries, ${rows.length} of them, covering ${oldest} to ${newest}. This is all of them. ${NEVER_TOTAL}`;
 
   return `${header}\n${lines.join('\n')}`;
 }
@@ -4961,17 +4979,30 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   // Never earlier than the tax year start: a row dated before 6 April is out of this year's window
   // and must not widen it. Never later than today either, so a mistyped future date cannot shrink
   // the window to nothing and silently switch a real customer's projection off.
-  const start = earliestSeen && earliestSeen.getTime() > yearStart.getTime() && earliestSeen.getTime() <= now.getTime()
+  const observedFrom = earliestSeen && earliestSeen.getTime() > yearStart.getTime() && earliestSeen.getTime() <= now.getTime()
     ? earliestSeen
     : yearStart;
 
-  const monthsElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (30.44 * 86400000)));
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THE WINDOW ABOVE IS THE EVIDENCE, NOT THE YEAR. RUN 3, 13 August 2026.
+  //
+  // observedFrom used to be called `start` and was used for BOTH numbers below, so a man whose
+  // first bank line landed on 24 April had his year declared 111 days long on 13 August and every
+  // figure in the product came out 17 percent high. The three cases the comment above works
+  // through are all right; the fourth is the common one and was never listed: he was trading on
+  // 6 April and simply had a quiet fortnight. April being quiet does not shorten his tax year.
+  //
+  // So the year is the year, and the rows are the evidence, and they are different variables now.
+  // projectionFactor() in lib/taxengine.ts divides by the first and gates on the second.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  const monthsElapsed = Math.max(0, Math.floor((now.getTime() - yearStart.getTime()) / (30.44 * 86400000)));
+  const observedDays = Math.max(0, Math.floor((now.getTime() - observedFrom.getTime()) / 86400000));
 
   // 🔴 DAYS, AND IT IS THE DIVISOR. monthsElapsed above is floor(days / 30.44) and is now ONLY the
   // confidence gate. Dividing real days of money by whole months over-stated the set aside by 51%
   // on 2 August 2026 and made it fall by a third overnight at each month tick. See
   // projectionFactor() in lib/taxoptimiser.ts, which is the one place that turns this into a rate.
-  const daysElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86400000));
+  const daysElapsed = Math.max(0, Math.floor((now.getTime() - yearStart.getTime()) / 86400000));
 
   // The use of home election for THIS tax year. Best effort: a read that fails is logged and treated
   // as no election, so the optimiser keeps reminding him rather than silently dropping a claim.
@@ -5006,6 +5037,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     startYear,
     monthsElapsed,
     daysElapsed,
+    observedDays,
     ytdTradeIncome: Math.round(ytdTradeIncome * 100) / 100,
     ytdTradeExpenses: Math.round(ytdTradeExpenses * 100) / 100,
     ytdCapitalAllowances: Math.round(ytdCapitalAllowances * 100) / 100,

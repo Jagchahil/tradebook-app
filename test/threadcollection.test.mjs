@@ -98,9 +98,18 @@ ok('and the hub still derives it the same way, so this parity is real rather tha
   POA_CALL.test(hub));
 // 🔴 AND THE FIGURE ITSELF. The sentence promises "the same figure your Tax screen leads with", so
 // the two must lead with the same field. Both now lead with what is left to find.
-const LEAD = /tax\.cisSuffered > 0 \? tax\.setAsideAfterCis : tax\.setAside/;
+// ⚠️ REWRITTEN 13 AUGUST 2026, RUN 3, AND IT IS STRONGER AGAIN. It pinned the shared EXPRESSION,
+// on the reasoning that a shared expression cannot drift. It can, and it did: test/waintents.test.mjs
+// pinned WhatsApp to `oweAnswer(tax.setAside, ...)` in a DIFFERENT suite, so when the CIS credit
+// moved the web surfaces to setAsideAfterCis on 11 August, that other guard held WhatsApp still and
+// stayed green. On 13 August WhatsApp said "Put by £37,457.00" while every web surface said £28,250.
+// A regex can only pin the two places it is pointed at. So the rule is a FUNCTION now,
+// billFromPosition() in lib/taxoptimiser.ts, and what is pinned is that every surface CALLS it.
+const LEAD = /billFromPosition\(tax\)/;
 ok('🔴 THE CHAT LEADS WITH THE FIGURE THE TAX SCREEN LEADS WITH, CIS AND ALL',
   LEAD.test(route) && LEAD.test(hub));
+ok('🔴 AND SO DOES WHATSAPP, WHICH IS THE ONE THAT DRIFTED',
+  /billFromPosition\(tax\)/.test(readFileSync(path.join(root, 'app/api/whatsapp/route.ts'), 'utf8')));
 
 // ── The gate itself. The company arm and the everyone else arm, both proved to exist. ────────
 // ⚠️ THE TAIL OF THIS PATTERN WAS `\n  }\n  return `Put by`, WHICH PINNED THE RETURN TO THE LINE

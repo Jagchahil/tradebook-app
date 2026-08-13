@@ -4,7 +4,7 @@ import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
-  INK, LINE, MUTED, ON_RED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP, SURFACE,
+  GREEN_TINT, INK, LINE, MUTED, ON_RED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP, SURFACE,
   edge,
 } from '../../../../lib/apptheme';
 import { phoneTailForUser } from '../../../../lib/supabase';
@@ -283,7 +283,7 @@ export default async function YourDataPage({
               reads it. The unplug worked, the number is gone, phoneTail is null, and a confirmation
               drawn inside the section would vanish on the very redirect that earned it. He would
               press the button and watch the whole thing disappear without a word. */}
-          {one('done') === 'unplugged' ? <p style={S.armed}>Done. That number is free to connect anywhere now.</p> : null}
+          {one('done') === 'unplugged' ? <p style={S.done}>Your phone is unplugged. That number is free to connect anywhere now.</p> : null}
 
           <p style={S.foot}>
         Rather ask a person? Email info@lekhio.app and we will do either of these for you.
@@ -315,6 +315,18 @@ const S: Record<string, React.CSSProperties> = {
   warnFlat: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: RED_TINT, borderRadius: RADIUS.md, padding: SPACE.sm, margin: `${SPACE.xs}px 0 0`, maxWidth: '62ch' },
   warn: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: RED_TINT, border: `1px solid ${LINE}`, borderColor: edge(RED, 20), borderRadius: RADIUS.md, padding: SPACE.sm, margin: `${SPACE.sm}px 0 0` },
   armed: { fontSize: TYPE.body, lineHeight: 1.6, fontWeight: 700, color: INK, background: RED_TINT, borderRadius: RADIUS.md, padding: SPACE.sm, margin: `${SPACE.sm}px 0 0`, maxWidth: '62ch' },
+  // 🔴 A SUCCESS IS NOT A DANGER, AND ON THIS SCREEN THAT IS NOT A STYLE PREFERENCE. R2-F31,
+  // 13 August 2026, found by actually doing the unplug rather than reading the code for it.
+  //
+  // "Done. That number is free to connect anywhere now." was drawn with `armed`, which is
+  // RED_TINT: the style that exists for the moment a DELETE is armed. And because the unplug
+  // section correctly disappears once the number is gone, that red box lands directly underneath
+  // the "Delete everything" card and its "Type DELETE to carry on" form.
+  //
+  // So a customer who has just unplugged a phone scrolls down and reads, in red, immediately below
+  // a delete form: "Done." On the one screen in this product where misreading that costs him
+  // everything he has. Green tint, and it is the only success on the page, so it earns the colour.
+  done: { fontSize: TYPE.body, lineHeight: 1.6, fontWeight: 700, color: INK, background: GREEN_TINT, borderRadius: RADIUS.md, padding: SPACE.sm, margin: `${SPACE.sm}px 0 0`, maxWidth: '62ch' },
 
   inlineLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },
 

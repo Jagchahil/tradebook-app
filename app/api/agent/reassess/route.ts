@@ -8,6 +8,7 @@ import {
   insertAgentSignals,
   refreshFactsFromDb,
   readCircumstances,
+  selfAssessmentBillFor,
 } from '../../../../lib/supabase';
 import { sessionUser } from '../../../../lib/webauth';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
@@ -52,12 +53,15 @@ export async function POST(req: NextRequest) {
   if (agg.months.length === 0 && agg.unconfirmed === 0) return NextResponse.json({ ok: true, signals: [] });
 
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lekhio.app';
-  const [goals, overdue, profile, income, circs] = await Promise.all([
+  const [goals, overdue, profile, income, circs, bill] = await Promise.all([
     getActiveGoals(userId),
     listOverdueInvoices(userId),
     getBusinessProfile(userId),
     getStudentLoanSettings(userId),
     readCircumstances(userId),
+    // 🔴 R2-F23. The same bill /app/tax draws, so the on demand path and the nightly walk and the
+    // page are one number. See AgentInput.selfAssessmentBill.
+    selfAssessmentBillFor(userId),
   ]);
 
   const input: AgentInput = {
@@ -95,6 +99,8 @@ export async function POST(req: NextRequest) {
     // only this year's money. mtdStatedFrom() maps a skip, a missing key and a failed read all to
     // null, which means "not asked yet" and never "no". See mtdPosition() in lib/taxengine.ts.
     mtdStated: mtdStatedFrom(Object.fromEntries((circs ?? []).map((c) => [c.key, c.answer]))),
+    // 🔴 R2-F23. One engine, one bill.
+    selfAssessmentBill: bill,
   };
 
   const signals = computeSignalsForStructure(input);

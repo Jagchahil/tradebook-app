@@ -107,6 +107,44 @@ export interface AgentInput {
   mtdStated: 'yes' | 'no' | null;
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE SELF ASSESSMENT BILL, FROM THE ONE ENGINE THAT KNOWS WHAT RENT IS. R2-F23, 13 Aug 2026.
+  //
+  // poa_cliff used to work this out for itself, as soleTraderTax(projectAnnual(d.ytdProfit)), and
+  // derive() below blends every stream into a single profit. For a sole trader that is correct, and
+  // it is what every parity suite pins. For a sole trader who is ALSO a landlord it is wrong twice
+  // over: Class 4 National Insurance is charged on rental profit, which carries none, and the
+  // £1,000 property allowance never lands, so GROSS rent is taxed.
+  //
+  // A florist walking production was texted "your Self Assessment bill is heading for about £1,708"
+  // at 08:00 on 13 August. /app/tax said £1,171 thirty five minutes later, off the same books.
+  // £394.15 of that gap was National Insurance on her rent, on a trade profit of £7,896 that owes
+  // no Class 4 at all. The other £142.85 was the property allowance never being taken off.
+  //
+  // ⚠️ AND IT WAS NOT A WRONG SENTENCE, IT WAS A WRONG BUTTON. The signal carries a set_aside
+  // action, so a customer doing the sensible thing put £537 of working capital aside for a bill
+  // that does not exist. The doctrine block further down this file predicted exactly this ("a set
+  // aside that is double what he owes") and gated poa_cliff off for LIMITED COMPANIES on 30 July
+  // for the same class of error. Nobody asked the reverse question about landlords.
+  //
+  // So this number is no longer computed here. Both routes call taxPosition() on
+  // getOptimiserInput(), the SAME two calls /app/tax makes to draw its own headline, and pass the
+  // answer in. The phone and the page cannot drift apart again because they are one function call.
+  //
+  // ⚠️ REQUIRED, NOT OPTIONAL, for exactly the reason mtdStated above is: optional-with-a-default
+  // keeps the old behaviour alive, silently, for whoever did not read the memo.
+  //
+  // ⚠️ NULL MEANS "COULD NOT BE COMPUTED", AND FOR A CUSTOMER WITH RENT NULL FIRES NOTHING. A trade
+  // only customer falls back to the old arithmetic, which taxPosition equals to the penny for him
+  // ("When the only income is a trade it equals soleTraderTax", lib/taxoptimiser.ts), so no
+  // existing user's figure moves. No signal beats a wrong signal, every time.
+  //
+  // ⚠️ AND IT IS A NUMBER RATHER THAN AN IMPORT OF lib/taxoptimiser.ts, ON PURPOSE, for the same
+  // reason mtdStated is a raw answer: two suites stage this module with a FIXED dependency list and
+  // Node's type stripping cannot resolve an extensionless import, so a new import here would break
+  // them on module resolution rather than on anything real.
+  selfAssessmentBill: number | null;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 THE SECOND AXIS: WHETHER HE TRADES AT ALL, WHICH businessType CANNOT ANSWER.
   //
   // A man who signs up through the Landlord chip is stored as a sole trader, because he files a
@@ -590,12 +628,26 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
   }
 
   // 7. Payments on account cliff.
+  //
+  // 🔴 R2-F23. THE FIGURE COMES FROM THE ROUTE NOW, NOT FROM HERE. See selfAssessmentBill on
+  // AgentInput for the florist who was texted £1,708 against a page reading £1,171. The blend below
+  // survives only as the trade-only fallback, where taxPosition equals it to the penny.
   if (canProject) {
     const projTax = soleTraderTax(projProfit).total;
     const projSl = plans.length > 0 ? studentLoanForSA(projProfit, salary, plans) : 0;
     const projCis = projectAnnual(d.ytdCis, d);
-    const estBill = Math.max(0, projTax + projSl - projCis);
-    if (estBill > FACTS.poaThreshold) {
+    const blendedBill = Math.max(0, projTax + projSl - projCis);
+    // Rent is what makes the blend wrong, so rent is what withholds the fallback.
+    const hasRent = (input.property?.rents ?? 0) > 0;
+    // ⚠️ typeof AND isFinite, NOT `!== null`. The field is required in TypeScript, but the suites
+    // that drive this engine are .mjs and tsc never sees them, so an object that simply omits it
+    // arrives as undefined. `undefined !== null` is TRUE, which would have walked a NaN straight
+    // into a customer's set aside. Anything that is not a real number takes the safe path.
+    const given = input.selfAssessmentBill;
+    const estBill = typeof given === 'number' && Number.isFinite(given)
+      ? Math.max(0, given)
+      : hasRent ? null : blendedBill;
+    if (estBill !== null && estBill > FACTS.poaThreshold) {
       const poa = Math.round(estBill / 2);
       out.push({
         signalKey: 'poa_cliff',

@@ -25,7 +25,7 @@ import { quarterForDate, quarterBounds } from './quarterpack';
 // hand here; see the note on isResidentialFinanceCost for the document that drifted because of it.
 import { isResidentialFinanceCost } from './propertyengine';
 import { sumCapitalAllowances as sumCapitalAllowancesYtd, aggregateConfirmedRows as aggregateRowsYtd } from './yeartodate';
-import type { OptimiserInput } from './taxoptimiser';
+import { selfAssessmentBill, type OptimiserInput } from './taxoptimiser';
 import { qaDedupeKey, qaPrunePaths } from './qaretention';
 import type { KnowledgeState } from './knowledgewatch';
 import type {
@@ -6356,6 +6356,32 @@ export interface AgentAggregates {
   categories: string[] | null;
   unconfirmed: number;
   equipment: number;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE BILL THE AGENT IS ALLOWED TO QUOTE. R2-F23, 13 August 2026.
+//
+// getOptimiserInput + selfAssessmentBill is the pair /app/tax already calls to draw the number in
+// its largest type. The agent used to work its own out, from a profit with every stream blended
+// into one, and on the morning of 13 August it texted a florist £1,708 while that page showed her
+// £1,171. £394.15 of the gap was Class 4 National Insurance on rent, which carries none.
+//
+// ⚠️ A FAILURE RETURNS NULL AND NULL IS NOT ZERO. Zero would read as "no bill" and silently mean
+// "nothing to warn about", which is the same silent-default trap AgentInput.mtdStated is written
+// against. Null means "could not be computed", and the engine withholds the signal from anyone
+// with rent rather than falling back to arithmetic that is wrong for them.
+//
+// ⚠️ IT IS A WHOLE EXTRA READ PER USER PER RUN, and that is the price of the two surfaces agreeing.
+// The cron already does five round trips per user in one Promise.all; this is the sixth, in the
+// same wave, so it costs latency once rather than per user in series.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+export async function selfAssessmentBillFor(userId: string): Promise<number | null> {
+  try {
+    return selfAssessmentBill(await getOptimiserInput(userId));
+  } catch (err) {
+    console.error('[agent] self assessment bill unavailable:', err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 // The one round trip aggregate for the signal engine (agent_user_aggregates RPC).

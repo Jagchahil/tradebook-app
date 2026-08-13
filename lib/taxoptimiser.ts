@@ -662,6 +662,32 @@ export function hasTaxPosition(input: OptimiserInput, setAside: number): boolean
   return moneyIn > 0 || setAside > 0;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE ONE BILL. R2-F23, 13 August 2026.
+//
+// The number /app/tax prints in its largest type, as ONE named expression instead of the same
+// ternary written out in each place that wants it.
+//
+// It exists because the same customer was told two different bills on one morning. The Tax page
+// drew £1,171 from taxPosition(). The agent's payments on account text drew £1,708 from
+// soleTraderTax() over a blended profit, which charges Class 4 National Insurance on rent (it
+// carries none) and taxes rent gross (the £1,000 property allowance never lands). She is a florist
+// with a flat above the shop, and her trade profit of £7,896 owes no Class 4 at all.
+//
+// The two surfaces did not disagree because either engine was wrong. taxPosition was right, all
+// morning. They disagreed because only ONE of them was calling it, and the other had grown its own
+// arithmetic. This function is the door that stops that happening a third time: a caller wanting
+// "his bill" now has one thing to call, and the expression lives in the module that owns the rules.
+//
+// ⚠️ CIS COMES OFF, BECAUSE THE QUESTION IS ALWAYS "WHAT WILL JANUARY ASK ME FOR". A subbie with
+// £2,800 already taken at source does not owe it twice, and every surface that has ever printed
+// this number has taken it off. setAside stays the liability; this is what he has to find.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+export function selfAssessmentBill(input: OptimiserInput): number {
+  const t = taxPosition(input);
+  return t.cisSuffered > 0 ? t.setAsideAfterCis : t.setAside;
+}
+
 // The sentence under the big number. Null when there is nothing worth explaining, which is a pure
 // sole trader with no job and no dividends: for him the figure is simply his business's tax and
 // saying so adds a line without adding a fact.

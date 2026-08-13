@@ -93,7 +93,12 @@ const row = (over = {}) => ({
 const standingOf = ({ gateRead, ageDays, pageRow }) => {
   if (typeof G.gateFor !== 'function' || typeof W.standingFor !== 'function') return MISSING;
   const entitled = gateRead.kind === 'read'
-    ? E.isEntitled({ status: gateRead.status, current_period_end: gateRead.current_period_end })
+    // ⚠️ NOW, EXPLICITLY. isEntitled's second argument defaults to new Date(), and every other
+    // instant in this suite is pinned to NOW. Omitting it let the WALL CLOCK into one link of the
+    // chain: case 3's trial ends 13 August, so this suite passed on the day it was written and
+    // went red on 13 August 2026 with no code change at all. Optional-with-a-default again, the
+    // same trap lib/agent.ts records for mtdStated. A pinned suite pins every instant in it.
+    ? E.isEntitled({ status: gateRead.status, current_period_end: gateRead.current_period_end }, NOW)
     : false;
   const gate = G.gateFor(gateRead, entitled, ageDays, TRIAL);
   const trial = noRowTrialOf(gateRead, ageDays, NOW);

@@ -218,6 +218,11 @@ ok('an unknown shape still is', has(A.computeSignalsForStructure(withGoal), 'goa
 const withProperty = input(dec, monthsFor(dec, 12, { incomePerMonth: 7000, expensesPerMonth: 1000 }), {
   categories: ['rent'],
   property: { rents: 63000, expenses: 3000, finance: 6000, rents12: 84000 },
+  // 🔴 R2-F23, 13 August 2026. poa_cliff no longer works a landlord's bill out for itself, because
+  // the blended profit it used charges Class 4 National Insurance on rent, which carries none. Both
+  // routes now hand the figure in from taxPosition(), so the fixture does what production does.
+  // The assertion below is UNCHANGED: a landlord still gets the signal. Only the wiring moved.
+  selfAssessmentBill: 24000,
 });
 ok('🔴 Section 24 still reaches the landlord it was written for', has(landlord(withProperty), 's24_exposure'));
 ok('🔴 and the April 2027 property rates preview does too', has(landlord(withProperty), 'property_rates_2027'));
@@ -227,6 +232,19 @@ ok('so does Making Tax Digital, which counts property income too',
   keys(landlord(withProperty)).some((k) => k.startsWith('mtd_')));
 ok('and the whole person thresholds, which a landlord crosses like anybody else',
   has(landlord(withProperty), 'higher_rate_approach') && has(landlord(withProperty), 'poa_cliff'));
+// 🔴 AND THE WITHHOLDING IS DELIBERATE, NOT AN ACCIDENT OF THE FIXTURE ABOVE. Without the figure
+// the payments on account signal does NOT fire for him, because the only number this engine could
+// reach for is one that taxes his rent as trade. Silence beats a wrong bill: the sentence carries a
+// set_aside button, and a landlord who taps it moves real money. higher_rate_approach is not on the
+// same footing and must still reach him, which is what proves this is a targeted withholding
+// rather than the landlord losing his whole threshold set again.
+{
+  const noFigure = { ...withProperty, selfAssessmentBill: null };
+  ok('🔴 without the real figure the bill signal is withheld, never guessed',
+    !has(landlord(noFigure), 'poa_cliff'));
+  ok('and only that one is withheld: the rest of his thresholds still reach him',
+    has(landlord(noFigure), 'higher_rate_approach'));
+}
 
 // Nothing is ever added, reworded or reordered by the gate: it is a filter and only a filter.
 for (const [label, i] of [['lean', lean], ['mid year', midYear], ['low cost', lowCost], ['near year end', withGoal], ['landlord facts', withProperty]]) {

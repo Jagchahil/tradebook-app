@@ -1007,9 +1007,20 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
     out.push({
       key: 'property_allowance',
       title: `The £${propAllowanceStr} property allowance, or your actual costs`,
+      // 🔴 THE BASIS MUST NAME EVERY FIGURE THE DECISION USED. Caught by the Phase D retest of F27,
+      // 13 August 2026. With the allowance comparison fixed, the card read "Your mortgage interest is
+      // worth more as a Section 24 credit than the £1,000 property allowance would be" and then
+      // "Worked out on the £4,750 of rent and £0 of property costs you have confirmed this year",
+      // which invites the obvious question: WHAT mortgage interest? The figure that drove the answer
+      // was the one figure not on the card. This page's own footer promises the working, and a
+      // working with the deciding number left out is not one.
       detail:
         `${split.note} Worked out on the £${round(propIncome).toLocaleString('en-GB')} of rent and `
-        + `£${round(propExpenses).toLocaleString('en-GB')} of property costs you have confirmed this year.`,
+        + `£${round(propExpenses).toLocaleString('en-GB')} of property costs you have confirmed this year`
+        + (propFinance > 0
+          ? `, plus £${round(propFinance).toLocaleString('en-GB')} of mortgage interest, which is held `
+            + 'out of your property profit and relieved as a credit instead.'
+          : '.'),
       estSaving: 0,
       info: true,
       action: 'confirm_prompt',

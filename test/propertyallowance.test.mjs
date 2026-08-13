@@ -103,6 +103,16 @@ console.log('D. 🔴 And the caller that got it wrong now passes it');
   // who calls this with three arguments.
   ok('the original warning is still there for the next person',
     /silently destroy his Section 24 credit/.test(opt));
+  // 🔴 AND THE BASIS NAMES THE DECIDING FIGURE. Caught by retesting F27's own fix on production:
+  // the card said "your mortgage interest is worth more as a Section 24 credit" and then showed the
+  // rent and the £0 of costs and NOT the interest, which is the one number that drove the answer.
+  // This page's footer promises the working, and a working with the deciding number left out is not
+  // one.
+  ok('🔴 the basis names the mortgage interest when there is any',
+    /plus £\$\{round\(propFinance\)\.toLocaleString\('en-GB'\)\} of mortgage interest/.test(opt));
+  ok('and says why it is not in the profit', /held \s*`?\s*\+ 'out of your property profit and relieved as a credit instead\.'/.test(opt)
+    || /out of your property profit and relieved as a credit instead/.test(opt));
+  ok('a landlord with no interest gets no extra clause', /: '\.'\),/.test(opt));
 }
 
 console.log('');

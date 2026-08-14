@@ -530,7 +530,74 @@ sabotage('🔴 A LEAK CHECK THAT COULD NOT RUN STOPS STOPPING THE JOB', (d) =>
 
 sabotage('the reason a count could not be taken stops being printed', (d) =>
   edit(d, 'khoji/caselawcertificate.mjs',
-    "    tally._qa_cache_note = 'no text columns found on qa_cache, so nothing could be searched';",
+    "    tally._qa_cache_note = `qa_cache is visible to \"${role}\" but has no text columns, so there is`\n      + ' nothing to search. That is a schema change, not a permission problem.';",
+    ''));
+
+// ── AN ABSENT GRANT AND AN ABSENT TABLE LOOK IDENTICAL. Found 14 August 2026. ───────────────
+
+sabotage('🔴 the detector stops asking whether the table is visible at all', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    "    + \" where table_schema = 'public' and table_name = 'qa_cache'\",\n  );\n  const visible = (tbl.rows[0]?.n ?? 0) > 0;",
+    "    + \" where table_schema = 'public' and table_name = 'qa_cache'\",\n  );\n  const visible = true;"));
+
+sabotage('🔴 THE TWO FAILURES ARE COLLAPSED BACK INTO ONE, so a grant reads as a missing table', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    '  } else if (textCols.length === 0) {',
+    '  } else if (false) {'));
+
+sabotage('🔴 the invisible case goes back to blaming the schema', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    "    tally._qa_cache_note = `qa_cache is not visible to the role \"${role}\". Either it does not exist`",
+    "    tally._qa_cache_note = `no text columns found on qa_cache`; void (`"));
+
+sabotage('the role stops being named, so nobody knows who could not see it', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    "  const who = await db.query('select current_user as role');\n  const role = who.rows[0]?.role ?? 'unknown';",
+    "  const role = 'unknown';"));
+
+// ── A REFUSED CACHE INVALIDATION IS AN INCIDENT, NOT A LOG LINE. ────────────────────────────
+
+sabotage('🔴 THE ORIGINAL DEFECT: a refused cache invalidation is logged and swallowed', (d) =>
+  edit(d, 'khoji/watch.mjs',
+    '        cacheStaleFailed = e.message;',
+    '        log(`engine change detected, cache invalidation skipped: ${e.message}`);'));
+
+sabotage('🔴 the failure is recorded and then never acted on', (d) =>
+  edit(d, 'khoji/watch.mjs',
+    '  if (cacheStaleFailed) {',
+    '  if (false) {'));
+
+sabotage('🔴 it notices but exits 0, so launchd records a success', (d) =>
+  edit(d, 'khoji/watch.mjs',
+    "    console.error('   role needs update on public.qa_cache. See khoji/schema.sql.');\n    process.exit(1);",
+    "    console.error('   role needs update on public.qa_cache. See khoji/schema.sql.');"));
+
+sabotage('🔴 the flag is declared inside the transaction it has to outlive', (d) => {
+  const p = path.join(d, 'khoji/watch.mjs');
+  let src = readFileSync(p, 'utf8');
+  const decl = '  let cacheStaleFailed = null;\n';
+  if (!src.includes(decl)) throw new Error('ANCHOR MISSING: cacheStaleFailed decl');
+  src = src.replace(decl, '');
+  const inside = '  await withDb(async (db) => {\n';
+  if (!src.includes(inside)) throw new Error('ANCHOR MISSING: withDb open');
+  writeFileSync(p, src.replace(inside, inside + '    let cacheStaleFailed = null;\n'));
+});
+
+// ── THE GRANT IS WRITTEN DOWN, or the next environment will not have it. ────────────────────
+
+sabotage('🔴 the qa_cache grant is dropped from schema.sql', (d) =>
+  edit(d, 'khoji/schema.sql',
+    'grant select, update on public.qa_cache to khoji_writer;',
+    ''));
+
+sabotage('🔴 qa_cache is granted update but not select, so the certificate still cannot see it', (d) =>
+  edit(d, 'khoji/schema.sql',
+    'grant select, update on public.qa_cache to khoji_writer;',
+    'grant update on public.qa_cache to khoji_writer;'));
+
+sabotage('the khoji_law grant is dropped, so the certificate cannot erase what it certifies', (d) =>
+  edit(d, 'khoji/schema.sql',
+    'grant select, insert, update, delete on public.khoji_law to khoji_writer;',
     ''));
 
 // ── NO-OP CONTROLS. These must stay GREEN, or this runner only detects that a file moved. ────
@@ -569,7 +636,7 @@ process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 84) {
-  process.stdout.write(`  COUNT WRONG: expected 84 sabotages to apply, got ${applied}\n`);
+if (applied !== 95) {
+  process.stdout.write(`  COUNT WRONG: expected 95 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

@@ -203,6 +203,12 @@ async function main() {
     process.exit(1);
   }
 
+  // Set inside the transaction when the answer cache could not be staled. Declared out here on
+  // purpose: it is READ after the connection closes, so it has to outlive the callback. The
+  // first version declared it inside and read it outside, which is a ReferenceError, not a
+  // warning, and would have taken the whole watcher down the first time an engine figure moved.
+  let cacheStaleFailed = null;
+
   await withDb(async (db) => {
     // Dedupe against what we already hold.
     const urls = items.map((i) => i.source_url);
@@ -275,14 +281,37 @@ async function main() {
     }
 
     if (engineChanged) {
+      // 🔴 A CACHE WE COULD NOT STALE IS NOT A CACHE THAT IS FINE.
+      //
+      // This used to log "cache invalidation skipped" and carry on, which reads like a note and is
+      // actually an incident. engineChanged means a tax figure or rule we assert has MOVED. Every
+      // answer sitting in qa_cache was computed under the old one. If the update is refused, a
+      // customer asking the same question tomorrow gets yesterday's law, confidently, with our name
+      // on it. That is the fortnight-of-being-wrong failure with a different shape.
+      //
+      // ⚠️ AND IT HAS BEEN FAILING SILENTLY. khoji's database role was granted select,
+      // insert and update on knowledge_items and nothing else, so this UPDATE has been refused every
+      // time it mattered and the only trace was one log line nobody reads. Found on 14 August 2026
+      // because information_schema showed the certificate no columns on qa_cache: that view only
+      // shows what the role can touch, so an absent grant and an absent table look identical.
       try {
         const r = await db.query("update public.qa_cache set status = 'stale' where status = 'active'");
         log(`engine change detected, marked ${r.rowCount} cached answers stale`);
       } catch (e) {
-        log(`engine change detected, cache invalidation skipped: ${e.message}`);
+        cacheStaleFailed = e.message;
       }
     }
   });
+
+  if (cacheStaleFailed) {
+    console.error('\n🔴 A TAX FIGURE MOVED AND THE ANSWER CACHE COULD NOT BE STALED.');
+    console.error(`   ${cacheStaleFailed}`);
+    console.error('   Cached answers were computed under the old figure. Until this is fixed a');
+    console.error('   customer can be given yesterday\'s law. If it is a permission error, khoji\'s');
+    console.error('   role needs update on public.qa_cache. See khoji/schema.sql.');
+    process.exit(1);
+  }
+
   log('done');
 }
 

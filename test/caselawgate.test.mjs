@@ -76,6 +76,7 @@ const srcTakedown = read('khoji/caselawtakedown.mjs');
 const srcCertificate = read('khoji/caselawcertificate.mjs');
 const srcLawWatch = read('khoji/lawwatch.mjs');
 const srcRunSh = read('khoji/run.sh');
+const srcSchema = read('khoji/schema.sql');
 const pageTerms = read('app/terms/page.tsx');
 const pageDesk = read('app/team/knowledge/page.tsx');
 const TD = await import(pathToFileURL(path.join(root, 'khoji/caselawtakedown.mjs')).href);
@@ -862,16 +863,98 @@ ok('rubbish is not caselaw', C.isCaselawRow(null) === false && C.isCaselawRow('x
   ok('🔴 AND A COUNT IT COULD NOT TAKE STOPS THE JOB rather than reading as zero',
     /if \(before\.qa_cache === null\)/.test(cert)
     && /THE LEAK DETECTOR COULD NOT RUN/.test(srcCertificate));
-  // ⚠️ ANCHORED IN THE BRANCH THAT SETS IT. Testing the file for the name went green over a
+  // ⚠️ ANCHORED IN THE BRANCHES THAT SET IT. Testing the file for the name went green over a
   // sabotage that removed it from the one branch where it is the only explanation available.
-  const noCols = cert.slice(cert.indexOf('if (textCols.length === 0)'), cert.indexOf('} else {'));
-  ok('the slice really is the no columns branch', noCols.includes('tally.qa_cache = null'));
-  ok('🔴 THE BRANCH THAT CANNOT COUNT SAYS WHY',
-    /tally\._qa_cache_note = '/.test(noCols));
+  // Repointed again when a THIRD branch appeared: there are now two ways to fail (invisible, and
+  // visible but no text columns) and each has to say which one it was.
+  const failing = cert.slice(cert.indexOf('if (!visible)'), cert.indexOf('tally.qa_cache = qa.rows'));
+  ok('the slice really is the two failing branches',
+    failing.split('tally.qa_cache = null').length === 3);
+  ok('🔴 EVERY BRANCH THAT CANNOT COUNT SAYS WHY',
+    failing.split('tally._qa_cache_note =').length === 3);
   ok('and the branch that can count says what it searched',
     /tally\._qa_cache_note = `searched/.test(cert));
   ok('the reason is printed rather than swallowed', /_qa_cache_note/.test(cert));
   ok('a null count never reads as erased', CERT.isClean({ knowledge_items: null, khoji_law: 0 }) === false);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// N. AN ABSENT GRANT AND AN ABSENT TABLE LOOK IDENTICAL, AND ONE OF THEM WAS LIVE.
+//
+// The leak detector reported "no text columns found on qa_cache". qa_cache has four text columns,
+// `answer` among them. information_schema shows a role ONLY what it can touch, and khoji's role was
+// granted select, insert and update on knowledge_items and nothing else, so the table was invisible
+// to it. Reporting a missing privilege as a missing table sends whoever reads it hunting for
+// something that was never gone.
+//
+// 🔴 AND THE SAME MISSING GRANT WAS BREAKING SOMETHING CUSTOMER FACING. watch.mjs stales every
+// cached answer when a tax figure MOVES. That update was being refused every time it mattered,
+// inside a try/catch that logged one line and carried on, so a customer could be handed an answer
+// computed under the old figure. Third instance in one day of the same shape: a check that could
+// not run, treated as a check that passed.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const cert = codeOnly(srcCertificate);
+  const watch = codeOnly(srcWatch);
+
+  // ⚠️ ASKING IS NOT THE SAME AS LISTENING. As first written this only proved the query was
+  // in the file and came first. A sabotage that ran the query and then set `visible = true`
+  // regardless STAYED GREEN. What matters is that the answer is DERIVED FROM THE RESULT.
+  ok('🔴 THE DETECTOR ASKS WHETHER THE TABLE IS VISIBLE BEFORE ASKING ABOUT ITS COLUMNS',
+    /information_schema\.tables/.test(cert)
+    && cert.indexOf('information_schema.tables') < cert.indexOf('information_schema.columns'));
+  ok('🔴 AND THE ANSWER COMES OUT OF THAT QUERY, not out of a constant',
+    /const visible = \(tbl\.rows\[0\]\?\.n \?\? 0\) > 0;/.test(cert));
+  ok('and the column lookup is skipped entirely when it is not visible',
+    /const cols = visible\s*\n?\s*\? await db\.query/.test(cert));
+  ok('🔴 AND IT REPORTS INVISIBLE SEPARATELY FROM NO TEXT COLUMNS',
+    /if \(!visible\)/.test(cert) && /else if \(textCols\.length === 0\)/.test(cert));
+  ok('🔴 THE INVISIBLE CASE REFUSES TO CALL IT A MISSING TABLE',
+    /Either it does not exist/.test(srcCertificate) && /no privilege on it/.test(srcCertificate));
+  ok('it names the role, because cannot see it is only actionable with a who',
+    /current_user as role/.test(cert) && /\$\{role\}/.test(srcCertificate));
+  ok('and it points at the grant rather than leaving you to find it',
+    /schema\.sql/.test(srcCertificate));
+  ok('both failing cases still stop the job rather than reading as clean',
+    /tally\.qa_cache = null;/.test(cert) && cert.split('tally.qa_cache = null;').length === 3);
+
+  // 🔴 THE CUSTOMER FACING HALF. A cache that could not be staled is an incident.
+  ok('🔴 A REFUSED CACHE INVALIDATION IS NO LONGER SWALLOWED',
+    !/cache invalidation skipped/.test(watch));
+  // ⚠️ THE SLICE IS BOUNDED. Slicing from the block to the END OF THE FILE catches the
+  // unrelated process.exit(1) in main().catch at the bottom, so deleting the exit inside this
+  // block left the assertion green. Same trap as the Run 5 indexOf guard that passed on a
+  // deletion. An open ended slice is not an anchor.
+  const staleBlock = watch.slice(watch.indexOf('if (cacheStaleFailed) {'),
+    watch.indexOf("log('done')", watch.indexOf('if (cacheStaleFailed) {')));
+  ok('the slice really is the block and stops before the end of the file',
+    staleBlock.length > 50 && staleBlock.length < 1200 && !staleBlock.includes('main().catch'));
+  ok('🔴 IT EXITS NON ZERO, so launchd and run.sh both see it',
+    /if \(cacheStaleFailed\) \{/.test(watch) && staleBlock.includes('process.exit(1)'));
+  ok('it says what a customer would actually get',
+    /yesterday/.test(srcWatch) && /law/.test(srcWatch));
+  ok('it names the grant that fixes it', /update on public\.qa_cache/.test(srcWatch));
+
+  // ⚠️ THE FLAG OUTLIVES THE CONNECTION, and the first version did not. Declaring it inside
+  // the withDb callback and reading it outside is a ReferenceError, not a warning, and would have
+  // taken the whole watcher down the first time an engine figure moved.
+  ok('🔴 the flag is declared BEFORE the transaction opens',
+    watch.indexOf('let cacheStaleFailed = null;') > -1
+    && watch.indexOf('let cacheStaleFailed = null;') < watch.indexOf('await withDb(async (db) => {'));
+  ok('🔴 AND IT IS READ AFTER THE TRANSACTION CLOSES',
+    watch.indexOf('if (cacheStaleFailed) {')
+      > watch.indexOf('  });', watch.indexOf('await withDb(async (db) => {')));
+
+  // 🔴 AND THE GRANT IS WRITTEN DOWN. A permission discovered by accident and fixed by hand in
+  // a console is a permission the next environment will not have.
+  for (const t of ['qa_cache', 'khoji_law', 'khoji_runs']) {
+    ok(`schema.sql grants khoji_writer access to ${t}`,
+      new RegExp('grant [a-z, ]+ on public\\.' + t + ' to khoji_writer;').test(srcSchema));
+  }
+  ok('🔴 qa_cache carries BOTH select and update, because the certificate must SEE it and the\n     watcher must WRITE it',
+    /grant select, update on public\.qa_cache to khoji_writer;/.test(srcSchema));
+  ok('the grants say why they exist, not just what they are',
+    /least privilege that was never revisited/i.test(srcSchema));
 }
 
 console.log(`\n${pass} passed, ${fail} failed.`);

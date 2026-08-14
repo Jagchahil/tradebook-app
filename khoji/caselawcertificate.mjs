@@ -185,19 +185,47 @@ async function tallyFrom(db) {
   // tribunal decision, the filter in getRelevantKnowledge has failed and a judgment has reached a
   // user, which is the thing the whole caselaw gate exists to prevent. It surfaces here because
   // this is the one job that looks at every store at once.
-  // ⚠️ IT DISCOVERS THE COLUMNS RATHER THAN GUESSING ONE. The first version hard coded `answer`,
-  // that column is not called `answer` here, the query threw, and the whole check reported a quiet
-  // minus one that nothing acted on. A leak detector that cannot find the thing it is meant to be
-  // reading is not a leak detector, and reporting that as a number was the wrong shape entirely.
-  const cols = await db.query(
-    "select column_name from information_schema.columns"
-    + " where table_schema = 'public' and table_name = 'qa_cache'"
-    + " and data_type in ('text','character varying')",
+  // ⚠️ IT DISCOVERS THE COLUMNS RATHER THAN GUESSING ONE, AND IT TELLS THREE FAILURES APART.
+  //
+  // The first version hard coded a column called `answer`. The query threw and the whole check
+  // reported a quiet minus one that nothing acted on. The second version discovered its columns and
+  // found none, and reported "no text columns on qa_cache", which was WRONG AND MISLEADING: the
+  // table has four text columns, `answer` among them.
+  //
+  // 🔴 information_schema SHOWS ONLY WHAT THE CURRENT ROLE CAN TOUCH. khoji's role was granted
+  // select, insert and update on knowledge_items and nothing else, so qa_cache is invisible to it,
+  // and an absent grant looks EXACTLY like an absent table from in here. Reporting one as the other
+  // sends whoever reads it hunting for a table that was never missing.
+  //
+  // So the three are separated, and the role is named, because "cannot see it" is only actionable
+  // if you know who could not see it.
+  const who = await db.query('select current_user as role');
+  const role = who.rows[0]?.role ?? 'unknown';
+
+  const tbl = await db.query(
+    "select count(*)::int as n from information_schema.tables"
+    + " where table_schema = 'public' and table_name = 'qa_cache'",
   );
+  const visible = (tbl.rows[0]?.n ?? 0) > 0;
+
+  const cols = visible
+    ? await db.query(
+      "select column_name from information_schema.columns"
+      + " where table_schema = 'public' and table_name = 'qa_cache'"
+      + " and data_type in ('text','character varying')",
+    )
+    : { rows: [] };
   const textCols = cols.rows.map((r) => r.column_name);
-  if (textCols.length === 0) {
+
+  if (!visible) {
     tally.qa_cache = null;
-    tally._qa_cache_note = 'no text columns found on qa_cache, so nothing could be searched';
+    tally._qa_cache_note = `qa_cache is not visible to the role "${role}". Either it does not exist`
+      + ' or that role holds no privilege on it, and information_schema cannot tell those apart.'
+      + ' Either way the cache was NOT checked. See khoji/schema.sql for the grant.';
+  } else if (textCols.length === 0) {
+    tally.qa_cache = null;
+    tally._qa_cache_note = `qa_cache is visible to "${role}" but has no text columns, so there is`
+      + ' nothing to search. That is a schema change, not a permission problem.';
   } else {
     const where = textCols
       .map((c) => `("${c}" ilike '%tribunal decision%' or "${c}" ilike '%UKUT%' or "${c}" ilike '%UKFTT%')`)

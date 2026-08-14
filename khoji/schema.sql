@@ -42,6 +42,31 @@ $$;
 grant usage on schema public to khoji_writer;
 grant select, insert, update on public.knowledge_items to khoji_writer;
 
+-- 🔴 AND THE OTHER TABLES KHOJI ACTUALLY TOUCHES. Added 14 August 2026 after finding that
+-- it had none of them, and that the absence was invisible.
+--
+-- Least privilege is right, but least privilege that was never revisited as the watcher grew is
+-- just a set of quiet failures. Two of them were live:
+--
+--   qa_cache   watch.mjs stales cached answers when a tax figure MOVES. The update was refused
+--              every time, inside a try/catch that logged one line and carried on, so a customer
+--              could be given an answer computed under the old figure. select is needed as well as
+--              update, because the certificate has to be able to SEE the table to certify anything
+--              about it, and information_schema shows a role only what it can touch: with no grant,
+--              an absent table and an absent privilege look identical.
+--
+--   khoji_law  the certificate clears the Find Case Law body hash on termination. It can only
+--              certify erasure of a thing it is allowed to read and write.
+--
+-- khoji_runs is the heartbeat every job writes. khoji_bodies and khoji_documents are the other
+-- watchers' own tables. Granted explicitly rather than left to inheritance so this list IS the
+-- answer to "what can the mini touch", and nothing here reaches a single row of customer money.
+grant select, update on public.qa_cache to khoji_writer;
+grant select, insert, update, delete on public.khoji_law to khoji_writer;
+grant select, insert on public.khoji_runs to khoji_writer;
+grant select, insert, update on public.khoji_bodies to khoji_writer;
+grant select, insert, update on public.khoji_documents to khoji_writer;
+
 -- RLS still applies to khoji_writer (it is not the service role), so it needs an
 -- explicit policy. This one scopes all access to this role only.
 do $$

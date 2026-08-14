@@ -600,6 +600,21 @@ sabotage('the khoji_law grant is dropped, so the certificate cannot erase what i
     'grant select, insert, update, delete on public.khoji_law to khoji_writer;',
     ''));
 
+// ── THE GRANT LIST IS DERIVED, so a NEW table cannot arrive without one. ────────────────────
+//
+// 🔴 THIS IS THE ONE THAT PROVES THE DERIVATION. A hardcoded list of tables would stay green here,
+// because the new table is not on it. That is exactly how qa_cache came to be missing for months.
+
+sabotage('🔴 A JOB STARTS TOUCHING A NEW TABLE AND NOBODY ADDS THE GRANT', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    "  const runs = await db.query(",
+    "  await db.query('select 1 from public.qa_events limit 1');\n  const runs = await db.query("));
+
+sabotage('NO-OP: a job touches a table that IS already granted', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    "  const runs = await db.query(",
+    "  await db.query('select 1 from public.khoji_bodies limit 1');\n  const runs = await db.query("), false);
+
 // ── NO-OP CONTROLS. These must stay GREEN, or this runner only detects that a file moved. ────
 
 sabotage('NO-OP: a comment word changes in the caselaw definition', (d) =>
@@ -636,7 +651,7 @@ process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 95) {
-  process.stdout.write(`  COUNT WRONG: expected 95 sabotages to apply, got ${applied}\n`);
+if (applied !== 97) {
+  process.stdout.write(`  COUNT WRONG: expected 97 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

@@ -947,10 +947,22 @@ ok('rubbish is not caselaw', C.isCaselawRow(null) === false && C.isCaselawRow('x
 
   // 🔴 AND THE GRANT IS WRITTEN DOWN. A permission discovered by accident and fixed by hand in
   // a console is a permission the next environment will not have.
-  for (const t of ['qa_cache', 'khoji_law', 'khoji_runs']) {
-    ok(`schema.sql grants khoji_writer access to ${t}`,
-      new RegExp('grant [a-z, ]+ on public\\.' + t + ' to khoji_writer;').test(srcSchema));
-  }
+  //
+  // ⚠️ DERIVED FROM THE CODE, NOT A LIST I TYPED. A hardcoded list of three tables is a list
+  // that goes stale the first time somebody adds a fourth, which is exactly how qa_cache came to
+  // be missing for months. So the tables are read out of khoji's own SQL and every one of them
+  // must appear in schema.sql. Add a table to a job and forget the grant, and this goes red
+  // rather than the job failing quietly at five in the morning.
+  const khojiSql = ['watch.mjs', 'distill.mjs', 'tribunal.mjs', 'lawwatch.mjs', 'bodies.mjs',
+    'caselawtakedown.mjs', 'caselawcertificate.mjs']
+    .map((f) => read('khoji/' + f)).join('\n');
+  const touched = [...new Set([...khojiSql.matchAll(/public\.([a-z_]+)/g)].map((m) => m[1]))].sort();
+  ok('the tables were actually discovered, not an empty list read as a pass',
+    touched.length >= 5 && touched.includes('knowledge_items') && touched.includes('qa_cache'));
+  const ungranted = touched.filter((t) =>
+    !new RegExp('grant [a-z, ]+ on public\\.' + t + ' to khoji_writer;').test(srcSchema));
+  ok('🔴 EVERY TABLE KHOJI TOUCHES HAS A GRANT IN schema.sql: ' + (ungranted.join(', ') || 'none missing'),
+    ungranted.length === 0);
   ok('🔴 qa_cache carries BOTH select and update, because the certificate must SEE it and the\n     watcher must WRITE it',
     /grant select, update on public\.qa_cache to khoji_writer;/.test(srcSchema));
   ok('the grants say why they exist, not just what they are',

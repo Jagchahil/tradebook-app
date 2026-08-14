@@ -249,7 +249,17 @@ async function main() {
           null,          // No model judged this. A keyword matched a judge's own summary.
           false,         // Not proven impact. It is a prompt to READ, not a verdict.
           'needs_distillation',
-          { tribunal: true, published: h.published, touches: h.touches.map((t) => t.rule) },
+          // \ud83d\udd34 source_updated_at IS THE TAKEDOWN JOB'S BASELINE, AND IT HAS TO BE TAKEN HERE.
+          // khoji/caselawtakedown.mjs discharges the licence term "use the current version, remove what
+          // has been replaced", and it can only call a decision revised against a version stamp we
+          // actually took. Without this the job can never do better than baseline every row on every
+          // run, which is a job that reports success and checks nothing.
+          {
+            tribunal: true,
+            published: h.published,
+            source_updated_at: h.published,
+            touches: h.touches.map((t) => t.rule),
+          },
         ],
       );
     }

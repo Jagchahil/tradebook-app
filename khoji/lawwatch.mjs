@@ -26,6 +26,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 import { createHash } from 'node:crypto';
+import { ALLOWED_HOSTS as LICENSED_HOSTS } from './caselaw.mjs';
 
 function log(...a) { console.log('[khoji:lawwatch]', ...a); }
 
@@ -74,13 +75,14 @@ export const WATCHED_LEGAL = [
   { url: 'https://www.legislation.gov.uk/ukpga/1986/45/contents', field: 'insolvency', kind: 'statute' },
 ];
 
-// Only these hosts may ever be watched. The same licence list proven on 14 July, enforced in code so
-// a careless addition to WATCHED_LEGAL cannot point Khoji at a source we have no right to scrape.
-export const ALLOWED_HOSTS = [
-  'www.legislation.gov.uk', 'legislation.gov.uk',
-  'www.gov.uk', 'gov.uk',
-  'caselaw.nationalarchives.gov.uk',
-];
+// Only these hosts may ever be watched, enforced in code so a careless addition to WATCHED_LEGAL
+// cannot point Khoji at a source we have no right to scrape.
+//
+// ⚠️ IT IS NO LONGER ITS OWN LIST. It was, and a second copy of a licence list is exactly the
+// thing that goes stale: the host would be allowed here, unknown to the registry that says which
+// licence covers it, and read under no licence at all. khoji/caselaw.mjs owns the one list and
+// says which licence each host carries and what obligations follow. Add a host there or nowhere.
+export const ALLOWED_HOSTS = LICENSED_HOSTS;
 
 export function isAllowed(url) {
   try { return ALLOWED_HOSTS.includes(new URL(url).host.toLowerCase()); }

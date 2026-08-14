@@ -114,13 +114,49 @@ export function isCaselawKnowledgeRow(
   return false;
 }
 
-export const ALLOWED_SOURCE_HOSTS = [
-  'www.legislation.gov.uk',
-  'legislation.gov.uk',
-  'www.gov.uk',
-  'gov.uk',
-  'caselaw.nationalarchives.gov.uk',
-] as const;
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// WHICH SOURCE IS UNDER WHICH LICENCE. The TypeScript mirror of SOURCE_LICENCES in
+// khoji/caselaw.mjs, which carries the full reasoning. test/caselawgate.test.mjs asserts the two
+// lists hold the same hosts in the same order and agree on which one needs an acknowledgement.
+//
+// 🔴 THE POINT OF IT IS THE DAY SOMEBODY POINTS A WATCHER AT FIND CASE LAW. The obligations that
+// come with that host are written here rather than in a document, so they arrive in the same commit
+// as the change instead of a year later in a letter.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const OGL = 'Open Government Licence v3.0';
+export const FCL_LICENCE = 'Find Case Law transactional licence, TNA ref CAS-341311-V2P0M2';
+
+export interface SourceLicence {
+  host: string;
+  licence: string;
+  /** True where the licence obliges a prominent acknowledgement. Today only Find Case Law. */
+  acknowledgement: boolean;
+}
+
+export const SOURCE_LICENCES: readonly SourceLicence[] = [
+  { host: 'legislation.gov.uk', licence: OGL, acknowledgement: false },
+  { host: 'www.legislation.gov.uk', licence: OGL, acknowledgement: false },
+  { host: 'gov.uk', licence: OGL, acknowledgement: false },
+  { host: 'www.gov.uk', licence: OGL, acknowledgement: false },
+  { host: 'caselaw.nationalarchives.gov.uk', licence: FCL_LICENCE, acknowledgement: true },
+];
+
+export function licenceFor(url: string): SourceLicence | null {
+  try {
+    const host = new URL(url).host.toLowerCase();
+    return SOURCE_LICENCES.find((s) => s.host === host) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function acknowledgementRequiredFor(url: string): boolean {
+  return Boolean(licenceFor(url)?.acknowledgement);
+}
+
+// ⚠️ DERIVED, NOT TYPED OUT AGAIN. It was its own array, and that is precisely how a host ends up
+// allowed by one list and unknown to the other, which is a host being read under no licence at all.
+export const ALLOWED_SOURCE_HOSTS: readonly string[] = SOURCE_LICENCES.map((s) => s.host);
 
 /** The professional exams whose SYLLABUS TOPICS shape the exam bank. We are examined on the same
  *  ground these qualifications cover. We ingest their PUBLISHED SYLLABI (freely available) as a map

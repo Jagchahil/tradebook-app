@@ -72,6 +72,14 @@ const srcWatch = read('khoji/watch.mjs');
 const srcTribunal = read('khoji/tribunal.mjs');
 const srcLawSources = read('lib/lawsources.ts');
 const supa = read('lib/supabase.ts');
+const srcTakedown = read('khoji/caselawtakedown.mjs');
+const srcCertificate = read('khoji/caselawcertificate.mjs');
+const srcLawWatch = read('khoji/lawwatch.mjs');
+const srcRunSh = read('khoji/run.sh');
+const pageTerms = read('app/terms/page.tsx');
+const pageDesk = read('app/team/knowledge/page.tsx');
+const TD = await import(pathToFileURL(path.join(root, 'khoji/caselawtakedown.mjs')).href);
+const CERT = await import(pathToFileURL(path.join(root, 'khoji/caselawcertificate.mjs')).href);
 
 console.log('\nthe find case law licence: three binding principles, held by code');
 
@@ -356,12 +364,316 @@ ok('rubbish is not caselaw', C.isCaselawRow(null) === false && C.isCaselawRow('x
     'lib/lawsources.ts': srcLawSources,
     'test/caselawgate.test.mjs': read('test/caselawgate.test.mjs'),
     'test/sabotage-caselaw.mjs': read('test/sabotage-caselaw.mjs'),
+    'khoji/caselawtakedown.mjs': srcTakedown,
+    'khoji/caselawcertificate.mjs': srcCertificate,
+    'app/terms/page.tsx': pageTerms,
+    'app/team/knowledge/page.tsx': pageDesk,
   };
-  ok('the sweep covers the whole pipeline, not just the two files this fix created',
-    Object.keys(files).length === 7);
+  // ⚠️ WIDENED AGAIN as the licence work grew. The list is the point: every time this fix
+  // reached a new file and the sweep did not follow it, the sweep started passing over a file it
+  // had never seen. The count is asserted so adding a file to the fix and forgetting the sweep
+  // fails here rather than shipping.
+  ok('the sweep covers every file this fix touched, not just the ones it created',
+    Object.keys(files).length === 11);
   const bad = Object.entries(files).filter(([, src]) => DASH.test(src)).map(([n]) => n);
   ok('🔴 no em dash and no en dash in anything this fix shipped: ' + (bad.join(', ') || 'none'),
     bad.length === 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// F. THE TAKEDOWN AND CURRENT VERSION TERM.
+//
+//   "The Re-user must use the current version of the Licensed Material and must remove any
+//   Licensed Material that is no longer published or has been replaced."
+//
+// Every other watcher in khoji asks a forward question. This is the only one that goes back and
+// asks whether a row it wrote a year ago is still true, and until 14 August 2026 it did not exist,
+// so the term was a sentence in a document with nothing behind it.
+//
+// 🔴 THE ASSERTION THAT MATTERS MOST IN THIS FILE IS THE ONE ABOUT A 500. If a bad night on the
+// mini could quietly empty the record, a licence obligation would have become a way to lose the
+// desk's work. So the decision is a pure function that takes no client and opens no socket, and it
+// is called here with the fault cases directly.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  ok('the takedown job exists', srcTakedown.length > 500);
+  ok('the certificate job exists', srcCertificate.length > 500);
+
+  // 🔴 A FAULT NEVER REMOVES ANYTHING. Six ways for a night to go wrong, and not one of them
+  // may return a removal.
+  const faults = [
+    { name: 'a network error', arg: { networkError: true, status: 0 } },
+    // A network error must win even when the status looks definitive, because a thrown fetch
+    // leaves whatever status happened to be in the variable.
+    { name: 'a network error carrying a stale 404', arg: { networkError: true, status: 404 } },
+    { name: 'a 500 from the origin', arg: { status: 500 } },
+    { name: 'a 502 from a proxy', arg: { status: 502 } },
+    { name: 'a 429 rate limit', arg: { status: 429 } },
+    { name: 'no status at all', arg: {} },
+  ];
+  for (const f of faults) {
+    const d = TD.decide({ ...f.arg, recorded: '2026-01-01', current: null });
+    ok(`🔴 ${f.name} NEVER removes licensed material`, d.action === 'none' && d.reason === 'blind');
+  }
+
+  // And the three that must.
+  ok('🔴 a 404 removes it', TD.decide({ status: 404, recorded: '2026-01-01' }).action === 'redact');
+  ok('🔴 a 410 removes it', TD.decide({ status: 410, recorded: '2026-01-01' }).action === 'redact');
+  ok('🔴 a withdrawal notice removes it',
+    TD.decide({ status: 200, withdrawn: true, recorded: '2026-01-01', current: '2026-01-01' }).action === 'redact');
+  ok('🔴 a source revised since we recorded it removes the superseded copy',
+    TD.decide({ status: 200, recorded: '2026-01-01', current: '2026-06-01' }).action === 'redact');
+
+  // ⚠️ A FIRST SIGHT IS A BASELINE, NOT AN ALARM. The same rule khoji/lawwatch.mjs holds. A row
+  // written before this job existed has no stamp, and calling that "revised" would redact the whole
+  // record on the first run.
+  ok('a row with no recorded stamp is baselined, not removed',
+    TD.decide({ status: 200, recorded: null, current: '2026-06-01' }).action === 'stamp');
+  ok('a source older than our stamp is left alone',
+    TD.decide({ status: 200, recorded: '2026-06-01', current: '2026-01-01' }).action === 'none');
+  ok('an unparseable stamp is not a revision',
+    TD.decide({ status: 200, recorded: 'not a date', current: 'also not' }).action === 'stamp');
+
+  // 🔴 AND THE STAMP HAS TO BE TAKEN AT INGEST OR THE JOB CAN NEVER DO BETTER THAN BASELINE.
+  ok('🔴 tribunal.mjs records source_updated_at when it files a decision',
+    /source_updated_at: h\.published/.test(codeOnly(srcTribunal)));
+  ok('the takedown job reads that same field back',
+    /source_updated_at/.test(codeOnly(srcTakedown)));
+
+  // A URL we cannot parse is blind, never gone.
+  ok('a URL we cannot parse yields no path, so the row is left alone',
+    TD.contentPathFor('not a url') === null);
+  ok('a URL on a host that is not gov.uk yields no path',
+    TD.contentPathFor('https://example.com/thing') === null);
+  ok('a gov.uk decision URL yields its path',
+    TD.contentPathFor('https://www.gov.uk/tax-and-chancery-tribunal-decisions/x') === '/tax-and-chancery-tribunal-decisions/x');
+
+  // 🔴 IT REDACTS, IT DOES NOT DELETE, AND THE REASON IS RE-INGEST.
+  // source_url is the conflict key. Hard delete the row and tribunal.mjs files the withdrawn
+  // decision again on the very next run, so the job would remove material at 05:20 and put it back
+  // at 05:15 the following morning, reporting success both times.
+  const tdCode = codeOnly(srcTakedown);
+  ok('🔴 THE TAKEDOWN JOB NEVER DELETES A knowledge_items ROW',
+    !/delete\s+from\s+public\.knowledge_items/i.test(tdCode));
+  ok('it updates instead', /update public\.knowledge_items/.test(tdCode));
+  ok('and tribunal.mjs still relies on the conflict key that the tombstone preserves',
+    /on conflict \(source_url\) do nothing/.test(codeOnly(srcTribunal)));
+
+  // A run that could not read something exits loud. Not knowing is not the same as being fine.
+  ok('🔴 the job exits non-zero when anything was unreadable',
+    /process\.exit\(blind > 0 \? 1 : 0\)/.test(tdCode));
+
+  // 🔴 AND IT ACTUALLY RUNS. A job nobody calls discharges nothing.
+  //
+  // ⚠️ READ THROUGH A SHELL COMMENT STRIPPER, AND THE FIRST VERSION DID NOT. It tested the
+  // raw file for `node caselawtakedown.mjs`, and a sabotage that commented the line out to
+  // `# node caselawtakedown.mjs` STAYED GREEN, because the string is still there inside the
+  // comment. codeOnly() strips `//` and `/* */`, which is the wrong language for a shell script.
+  // Exactly the codeOnly blindness this fix was already about, in a file nobody thought to check.
+  const shellCode = srcRunSh.replace(/(^|\n)[ \t]*#[^\n]*/g, '$1');
+  ok('🔴 THE NIGHTLY RUN CALLS THE TAKEDOWN JOB, on a line that is not commented out',
+    /node caselawtakedown\.mjs/.test(shellCode));
+  ok('and its exit code is captured', /takedown_rc=\$\?/.test(shellCode));
+  ok('and its exit code is not swallowed',
+    /if \[ "\$takedown_rc" -ne 0 \]; then exit "\$takedown_rc"; fi/.test(shellCode));
+  // The stripper has to actually strip, or this is just the old check wearing a hat.
+  ok('the shell comment stripper removes a commented line',
+    !/node caselawtakedown\.mjs/.test('# node caselawtakedown.mjs "$@"'.replace(/(^|\n)[ \t]*#[^\n]*/g, '$1')));
+
+  // Both jobs must agree with the rest of the product about what a caselaw row IS. They take the
+  // inclusion from the shared exclusion rather than writing their own SQL.
+  ok('the takedown job derives its row test from the shared exclusion',
+    /CASELAW_SQL_INCLUSION = 'not ' \+ CASELAW_SQL_EXCLUSION/.test(tdCode));
+  ok('the certificate derives its row test from the shared exclusion',
+    /CASELAW_SQL_INCLUSION = 'not ' \+ CASELAW_SQL_EXCLUSION/.test(codeOnly(srcCertificate)));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// G. THE CERTIFICATE OF ERASURE.
+//
+//   On termination the Re-user must erase the Licensed Material and CERTIFY that erasure.
+//
+// A certificate is a statement of fact signed by a person, and it is worthless if that person is
+// guessing. On the day it is asked for, the person signing will be Jag, under time pressure, years
+// after this was written, with no memory of where any of it ended up.
+//
+// 🔴 SO THE CERTIFICATE IS BUILT FROM A RE-READ AND NEVER FROM WHAT THE ERASURE BELIEVES IT DID.
+// Exactly the rule the persona erasures are held to: rowCount is a claim, a second SELECT is
+// evidence. A certificate that prints whatever happened is a lie with a letterhead.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const certCode = codeOnly(srcCertificate);
+
+  ok('every place licensed material can live is enumerated in one list',
+    Array.isArray(CERT.PLACES) && CERT.PLACES.length >= 4);
+  ok('the prose store is named and is erasable',
+    CERT.PLACES.some((p) => p.table === 'knowledge_items' && p.erase === true && p.holds === 'prose'));
+  ok('the hash store is named and is erasable anyway',
+    CERT.PLACES.some((p) => p.table === 'khoji_law' && p.erase === true));
+  // ⚠️ AND THE TWO THAT ARE HONESTLY NOT ERASABLE ARE NAMED WITH THE REASON, rather than left
+  // out. Erasing our own run history would destroy the audit trail proving the removals happened.
+  ok('the audit trail is enumerated and explicitly NOT erased',
+    CERT.PLACES.some((p) => p.table === 'khoji_runs' && p.erase === false && /audit/i.test(p.note)));
+  ok('every place carries a note explaining what it holds',
+    CERT.PLACES.every((p) => typeof p.note === 'string' && p.note.length > 20));
+
+  // 🔴 THERE IS NO PARTIAL CERTIFICATE.
+  ok('🔴 one remaining row means NOT clean', CERT.isClean({ knowledge_items: 1, khoji_law: 0 }) === false);
+  ok('🔴 one remaining hash means NOT clean', CERT.isClean({ knowledge_items: 0, khoji_law: 1 }) === false);
+  ok('all zero means clean', CERT.isClean({ knowledge_items: 0, khoji_law: 0 }) === true);
+  // A missing count is not a zero. An absent key must not read as erased.
+  // ⚠️ THIS ONE CAUGHT A REAL DEFECT AND ONLY BECAUSE IT WAS REWRITTEN. As first written it
+  // read `isClean({knowledge_items: 0}) === true || isClean({}) === true`, which is an assertion
+  // that cannot fail. Pointed at the actual question it exposed `?? 0` inside isClean: a place
+  // that had never been counted certified as erased.
+  ok('🔴 A PLACE THAT WAS NEVER COUNTED DOES NOT READ AS ERASED',
+    CERT.isClean({ knowledge_items: 0 }) === false && CERT.isClean({}) === false);
+  ok('an undefined count is not clean either',
+    CERT.isClean({ knowledge_items: 0, khoji_law: undefined }) === false);
+  ok('a tally that is not an object at all is not clean',
+    CERT.isClean(null) === false && CERT.isClean(undefined) === false);
+
+  // The count uses the SAME predicate the takedown job clears against, or the certificate would
+  // certify a state the takedown job never reaches.
+  const held = { source_name: C.CASELAW_SOURCE_NAME, title: 'A decision', summary: 'catchwords' };
+  const cleared = { source_name: C.CASELAW_SOURCE_NAME, title: C.REDACTED_TITLE, summary: C.REDACTED_SUMMARY };
+  const revised = { source_name: C.CASELAW_SOURCE_NAME, title: C.REDACTED_TITLE, summary: C.REVISED_SUMMARY };
+  const notOurs = { source_name: 'HMRC guidance', title: 'A page', summary: 'words' };
+  ok('a row still holding catchwords is counted', CERT.countHolding([held]) === 1);
+  ok('🔴 a redacted row is NOT counted', CERT.countHolding([cleared]) === 0);
+  ok('a row redacted as revised is NOT counted either', CERT.countHolding([revised]) === 0);
+  ok('somebody else\'s row is never counted, and is never erased', CERT.countHolding([notOurs]) === 0);
+  ok('the mixed case counts only what is held', CERT.countHolding([held, cleared, notOurs, revised]) === 1);
+
+  // 🔴 THE RE-READ. Anchored on the erasure being followed by a fresh tally and a refusal.
+  ok('🔴 the certificate is built from a tally taken AFTER the erasure',
+    certCode.indexOf('const after = await withDb(tallyFrom)') > certCode.indexOf('ERASING'));
+  ok('🔴 AND IT REFUSES TO PRINT IF THE RE-READ IS NOT CLEAN',
+    /if \(!isClean\(after\)\)/.test(certCode) && /NO CERTIFICATE HAS BEEN PRINTED/.test(srcCertificate));
+  ok('the refusal exits non-zero',
+    certCode.slice(certCode.indexOf('if (!isClean(after))')).includes('process.exit(1)'));
+  // The printed text must come after the refusal, not before it.
+  ok('🔴 the certificate text is printed only past the refusal',
+    certCode.indexOf('certificateText({ tally: after') > certCode.indexOf('if (!isClean(after))'));
+
+  // The certificate names the licence, and carries the acknowledgement.
+  const text = CERT.certificateText({ tally: { knowledge_items: 0, khoji_law: 0, khoji_runs: 3, qa_cache: 0 }, when: 'X' });
+  ok('the certificate names the licence reference', text.includes('CAS-341311-V2P0M2'));
+  ok('the certificate names the licensee', text.includes('Lekhio Ltd'));
+  ok('🔴 the certificate carries the acknowledgement from the shared constant',
+    text.includes(C.TNA_ACKNOWLEDGEMENT));
+  ok('the certificate says the counts were read back after the erasure',
+    /read back AFTER the erasure/.test(text));
+  ok('a place still holding material is reported as REMAINING, not as erased',
+    /REMAINING/.test(CERT.certificateText({ tally: { knowledge_items: 2, khoji_law: 0 }, when: 'X' })));
+
+  // 🔴 THE LEAK DETECTOR. The one job that looks at every store at once is the right place to
+  // notice that a cached customer answer mentions a tribunal decision, which would mean the filter
+  // in getRelevantKnowledge had failed and a judgment had reached a user.
+  ok('🔴 the certificate stops dead if a cached customer answer mentions a decision',
+    /A CACHED CUSTOMER ANSWER MENTIONS A TRIBUNAL DECISION/.test(srcCertificate)
+    && /process\.exit\(2\)/.test(certCode));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// H. THE TWO STATEMENTS ARE RENDERED, NOT MERELY DECLARED.
+//
+// Section B2 proves the constants hold the Licensor's exact words. That discharges nothing on its
+// own: "must appear in a prominent location" is about a screen, and a constant nobody prints is a
+// promise to nobody. This section is about the screens.
+//
+// 🔴 AND NEITHER PAGE MAY TYPE THE WORDS OUT. The licence holds us to a form of words. A hand
+// typed second copy is the breach waiting to happen, so the pages must interpolate the constant and
+// must contain no literal of either sentence.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const surfaces = { 'app/terms/page.tsx': pageTerms, 'app/team/knowledge/page.tsx': pageDesk };
+
+  for (const [name, src] of Object.entries(surfaces)) {
+    const code = codeOnly(src);
+    ok(`${name} imports both statements from lib/lawsources`,
+      /import \{[^}]*TNA_ACKNOWLEDGEMENT[^}]*\} from ['"][^'"]*lawsources['"]/.test(code)
+      && /TNA_PARTIAL_REPRESENTATION/.test(code));
+    // ⚠️ ANCHORED ON THE JSX, NOT THE IMPORT. An import is not a rendering: deleting the element
+    // and leaving the import at the top is exactly the shape that kept a Run 5 guard green.
+    ok(`🔴 ${name} RENDERS the acknowledgement`, /\{TNA_ACKNOWLEDGEMENT\}/.test(code));
+    ok(`🔴 ${name} RENDERS the partial representation statement`, /\{TNA_PARTIAL_REPRESENTATION\}/.test(code));
+    ok(`${name} does not retype the acknowledgement`,
+      !src.includes('Crown copyright material reproduced'));
+    ok(`${name} does not retype the partial representation statement`,
+      !src.includes('only partially represent'));
+  }
+
+  // The public one has to be reachable without an account, so it must not sit under app/app.
+  // ⚠️ AS FIRST WRITTEN THIS ENDED IN `|| true` AND COULD NEVER GO RED. What it is actually
+  // for is that a prominent location has to be somewhere a person who is not a customer can
+  // reach, so the real question is whether the page reads a session before it renders.
+  ok('🔴 THE PUBLIC COPY READS NO SESSION, so a reader who is not a customer sees it',
+    !/sessionUser|requireUser|requireSession|redirect\('\/in'\)/.test(codeOnly(pageTerms)));
+  ok('the public copy is at /terms, which the footer links from every page',
+    /alternates: \{ canonical: '\/terms' \}/.test(pageTerms));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// I. WHICH SOURCE IS UNDER WHICH LICENCE, AND WHY THE ANSWER LIVES IN CODE.
+//
+// We signed a licence whose stated purpose is monitoring Find Case Law, and the watcher we run
+// reads GOV.UK. That is two publishers of the same kind of material under two licences, and the
+// reasoning for reading GOV.UK is at the top of khoji/tribunal.mjs and still correct.
+//
+// 🔴 THE DANGER IN A MISMATCH IS NEVER THE DAY YOU NOTICE IT. It is the day somebody points a
+// watcher at the other host because it has better coverage, ships it, and inherits four obligations
+// nobody told them about, because the obligations were written in a document and not in the code.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const tsList = (srcLawSources.match(/export const SOURCE_LICENCES[\s\S]*?\];/) || [''])[0];
+
+  ok('the registry exists in both languages',
+    Array.isArray(C.SOURCE_LICENCES) && C.SOURCE_LICENCES.length >= 5 && tsList.length > 100);
+
+  // 🔴 THE TWO LANGUAGES AGREE, HOST FOR HOST AND FLAG FOR FLAG.
+  for (const entry of C.SOURCE_LICENCES) {
+    ok(`the TypeScript side knows ${entry.host}`, tsList.includes(`host: '${entry.host}'`));
+  }
+  const tsHosts = [...tsList.matchAll(/host: '([^']+)'/g)].map((m) => m[1]);
+  ok('🔴 NEITHER SIDE KNOWS A HOST THE OTHER DOES NOT',
+    tsHosts.join('|') === C.SOURCE_LICENCES.map((e) => e.host).join('|'));
+  const tsAck = [...tsList.matchAll(/acknowledgement: (true|false)/g)].map((m) => m[1] === 'true');
+  ok('🔴 AND THEY AGREE ON WHICH HOST CARRIES THE ACKNOWLEDGEMENT',
+    tsAck.join('|') === C.SOURCE_LICENCES.map((e) => e.acknowledgement).join('|'));
+
+  ok('🔴 Find Case Law is the host that carries obligations', C.acknowledgementRequiredFor('https://caselaw.nationalarchives.gov.uk/anything') === true);
+  ok('GOV.UK does not', C.acknowledgementRequiredFor('https://www.gov.uk/anything') === false);
+  ok('legislation.gov.uk does not', C.acknowledgementRequiredFor('https://www.legislation.gov.uk/x') === false);
+  ok('a host we never listed carries no licence at all', C.licenceFor('https://example.com/') === null);
+  ok('nonsense is not silently licensed', C.acknowledgementRequiredFor('not a url') === false);
+
+  // 🔴 THE CONDITIONAL OBLIGATION. If any host in the registry needs an acknowledgement, then
+  // the statements must be RENDERED somewhere. This is the assertion that turns the mismatch from a
+  // thing we remember into a thing the build enforces.
+  const needs = C.SOURCE_LICENCES.filter((e) => e.acknowledgement);
+  if (needs.length > 0) {
+    ok('🔴 A HOST NEEDS AN ACKNOWLEDGEMENT, SO IT IS ON A SCREEN',
+      /\{TNA_ACKNOWLEDGEMENT\}/.test(pageTerms) && /\{TNA_ACKNOWLEDGEMENT\}/.test(pageDesk));
+    ok('🔴 AND THE TAKEDOWN AND CERTIFICATE JOBS BOTH EXIST',
+      srcTakedown.length > 500 && srcCertificate.length > 500);
+  }
+
+  // ⚠️ ONE HOST LIST, NOT THREE. It was three: lawwatch kept its own, lib/lawsources kept its
+  // own, and the registry is new. A host allowed by one and unknown to another is a host being read
+  // under no licence at all.
+  ok('🔴 khoji/lawwatch.mjs takes its allowlist from the registry rather than keeping its own',
+    /import \{ ALLOWED_HOSTS as LICENSED_HOSTS \} from '\.\/caselaw\.mjs'/.test(codeOnly(srcLawWatch))
+    && /export const ALLOWED_HOSTS = LICENSED_HOSTS;/.test(codeOnly(srcLawWatch)));
+  ok('🔴 lib/lawsources.ts derives its allowlist from the registry rather than keeping its own',
+    /export const ALLOWED_SOURCE_HOSTS: readonly string\[\] = SOURCE_LICENCES\.map/.test(codeOnly(srcLawSources)));
+
+  // 🔴 AND NOTHING STORES TEXT FROM FIND CASE LAW TODAY. lawwatch reads that host and keeps a
+  // sixteen character hash. If it ever started keeping the body, the material would be Licensed
+  // Material sitting in a table the certificate counts as holding a hash.
+  const lw = codeOnly(srcLawWatch);
+  ok('🔴 lawwatch stores a hash of the body, never the body',
+    /body_hash/.test(lw) && !/body_text|body: r\.body|indexable_content/.test(lw));
 }
 
 console.log(`\n${pass} passed, ${fail} failed.`);

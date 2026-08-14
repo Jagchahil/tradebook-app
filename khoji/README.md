@@ -68,6 +68,19 @@ anything ships. Khoji never edits the engine itself. It only tells you to look.
 - `distill.mjs`   the Anthropic distillation (dormant until credit)
 - `sources.json`  the feeds and pages it watches (edit freely)
 - `schema.sql`    the table and the restricted writer role (run once in Supabase)
+- `caselaw.mjs`   the Find Case Law licence in code: what a caselaw row is, the party stripper,
+                  the two statements the licence obliges us to display, and which host is under
+                  which licence. Everything else here imports from it rather than restating it.
+- `caselawtakedown.mjs`  THE ONLY JOB THAT LOOKS BACKWARDS. The licence obliges us to use the
+                  current version and to remove material no longer published or replaced. Every
+                  other watcher asks a forward question, so without this a withdrawn decision
+                  would sit in the desk queue for the rest of the licence term. It redacts, it
+                  never deletes the row, and a night it could not read is a loud exit, never a
+                  removal. Runs nightly from run.sh.
+- `caselawcertificate.mjs`  What we would have to prove on the day we stop. `--erase` removes
+                  the licensed material, re-reads the database, and prints the certificate of
+                  erasure ONLY if the second read is clean. Run with no flag it just counts and
+                  writes nothing, which is safe any day.
 - `run.sh`        the launchd wrapper (loads .env, fixes PATH)
 - `com.lekhio.khoji.plist`  the daily 05:15 schedule
 - `.env.example`  copy to `.env` and fill in

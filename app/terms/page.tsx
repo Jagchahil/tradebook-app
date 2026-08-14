@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { A11Y_CSS, APP_THEME_CSS } from '../../lib/tokens';
 import { INK, LINE, MUTED, PAPER, RIVER } from '../../lib/apptheme';
+import { TNA_ACKNOWLEDGEMENT, TNA_PARTIAL_REPRESENTATION } from '../../lib/lawsources';
 
 export const metadata: Metadata = {
   alternates: { canonical: '/terms' },
@@ -134,6 +135,26 @@ export default function TermsPage() {
           You can stop using Lekhio and close your account at any time. We may end your access if
           you break these terms. If we do, we will tell you why where we can.
         </p>
+
+        {/* 🔴 A LICENCE TERM, NOT A NICETY, AND THE REASON IT IS ON A PUBLIC PAGE.
+            The Find Case Law licence (TNA ref CAS-341311-V2P0M2, signed 14 August 2026) requires
+            the acknowledgement to appear "in a prominent location and in a form approved by the
+            Licensor", and separately requires us to state that the material only partially
+            represents the activities of the courts and tribunals.
+
+            Both strings come from lib/lawsources.ts. Nothing here is typed out by hand, because a
+            second copy of a form of words we are contractually held to is a copy that can drift,
+            and drifting out of the approved form IS the breach. test/caselawgate.test.mjs asserts
+            this page renders the constants and holds no literal of either sentence. */}
+        <h2 style={heading}>Where our legal information comes from</h2>
+        <p style={para}>
+          We read the law at source. Statute from legislation.gov.uk, HMRC guidance from GOV.UK, and
+          tribunal decisions as they are published, under the Open Government Licence unless stated
+          otherwise. We prepare and you approve. We never tell you a court has decided something on
+          our own say so.
+        </p>
+        <p style={para}>{TNA_ACKNOWLEDGEMENT}</p>
+        <p style={para}>{TNA_PARTIAL_REPRESENTATION}</p>
 
         <h2 style={heading}>Law</h2>
         <p style={para}>

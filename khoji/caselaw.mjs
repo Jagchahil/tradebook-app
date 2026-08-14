@@ -136,12 +136,25 @@ const REF_CLOSE = '|';
 // of this ate them: "UT-2024-000141 CATS NORTH SEA v HMRC" came back as the marker alone, because
 // the party match began at the U of UT. So they are lifted out, the names are removed, and they
 // are put back.
-const REFERENCES = /\b(?:UT-\d{4}-\d+|TC\/?\d{4,}|\[\d{4}\]\s+[A-Z]+\s+\d+(?:\s+\([A-Z]+\))?)/g;
+// \u26a0\ufe0f THE \\b GOES INSIDE THE ALTERNATION, NOT IN FRONT OF IT, AND THAT IS NOT A STYLE CHOICE.
+// A leading \\b can never match before the `[` of a neutral citation, because a word boundary needs a
+// word character on ONE side and the characters either side of that `[` are a space and a bracket.
+// So for three days this branch was dead and NO neutral citation was protected at all. The suite
+// said otherwise, because in its example the party match ran out before it reached the citation, so
+// the citation survived by luck rather than by protection. It was found by running the stripper on
+// the two rows actually in the record, where the luck did not hold and "[2026] UKUT 00300 (TCC)"
+// came back as "[2026] UKUT 00300 (". A guard that passes for the wrong reason is not a guard.
+const REFERENCES = /(?:\b(?:UT-\d{4}-\d+|TC\/?\d{4,})|\[\d{4}\]\s+[A-Z]+\s+\d+(?:\s+\([A-Z]+\))?)/g;
 
 // A party name: a capitalised token, then up to seven more capitalised tokens or small connector
 // words, so "The Commissioners for HMRC" and "CATS NORTH SEA LTD" both match and a whole
 // paragraph does not.
-const PARTY = "[A-Z][A-Za-z0-9&.'()-]*(?:\\s+(?:[A-Z][A-Za-z0-9&.'()-]*|and|of|for|the|&)){0,7}";
+// \u26a0\ufe0f THE CURLY APOSTROPHE IS IN THE CLASS BECAUSE THE COURTS USE IT. GOV.UK writes
+// "HIS MAJESTY\u2019S REVENUE AND CUSTOMS" with U+2019, not with a typewriter quote, and without it the
+// match stopped dead at MAJESTY and left \u2019S REVENUE AND CUSTOMS hanging off the marker. Found on a
+// real stored row, not in a fixture.
+const NAME_CHAR = "[A-Za-z0-9&.'\u2018\u2019()-]";
+const PARTY = '[A-Z]' + NAME_CHAR + "*(?:\\s+(?:[A-Z]" + NAME_CHAR + "*|and|of|for|the|&)){0,7}";
 // "A v B", "A -v- B", "A v. B".
 const PARTIES_SRC = '\\b' + PARTY + '\\s+-?\\s*v\\.?\\s*-?\\s+' + PARTY;
 
@@ -172,4 +185,143 @@ export function namesParties(text) {
   const withoutMarkers = text.split(PARTY_MARKER).join(' ');
   const withoutRefs = withoutMarkers.replace(REFERENCES, ' ');
   return new RegExp(PARTIES_SRC).test(withoutRefs);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE LICENCE OBLIGATIONS THAT OUTLIVE THE INGEST.
+//
+// Signing the licence bought a right and took on four duties. Two of them are not about what we
+// write, they are about what we go on holding after we wrote it, and code that only runs at ingest
+// can never discharge either:
+//
+//   TERM. "The Re-user must use the current version of the Licensed Material and must remove any
+//   Licensed Material that is no longer published or has been replaced."
+//
+//   TERMINATION. On termination the Re-user must certify erasure of the Licensed Material.
+//
+// So the shapes both jobs share live here, once, and both call them. If the redaction that the
+// takedown job performs and the redaction the certificate counts as done ever drifted apart, the
+// certificate would certify something that had not happened, which is the worst failure available
+// in this file.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// What a row looks like once the licensed material is out of it. The source_url STAYS.
+//
+// 🔴 AND KEEPING THE URL IS A DECISION, NOT AN OVERSIGHT. GOV.UK builds a decision's slug out of
+// the case name, so the address of a public record contains the parties. It stays for three
+// reasons and each one is load bearing: it is the published locator of a public record rather than
+// material drawn from the record, it is our unique key so a withdrawn decision cannot be silently
+// re-ingested on the next run, and the takedown check cannot re-ask a question about a decision it
+// has no address for. It never reaches a customer. getRelevantKnowledge refuses caselaw rows at the
+// query AND again in code, and test/caselawgate.test.mjs proves both.
+export const REMOVED_AT_SOURCE = 'removed_at_source';
+
+export const REDACTED_TITLE = 'Tribunal decision withdrawn at source. Licensed material removed.';
+export const REDACTED_SUMMARY = [
+  'This decision is no longer published by the source, or has been replaced.',
+  '',
+  'The licensed material that was held against this record has been removed under the terms of the',
+  'Find Case Law licence. Nothing was decided about any rule on the strength of it.',
+].join('\n');
+
+export const REVISED_SUMMARY = [
+  'The source has published a revised version of this decision since we recorded it.',
+  '',
+  'The licensed material we were holding was the superseded version, so it has been removed rather',
+  'than shown. Read the current decision at the source before deciding anything.',
+].join('\n');
+
+// Does this row still hold licensed material? The certificate counts with this and the takedown job
+// clears until this is false, so neither can believe something the other has not done.
+export function holdsLicensedMaterial(row) {
+  if (!row) return false;
+  if (!isCaselawRow(row)) return false;
+  const title = String(row.title ?? '');
+  const summary = String(row.summary ?? '');
+  if (title === REDACTED_TITLE && (summary === REDACTED_SUMMARY || summary === REVISED_SUMMARY)) return false;
+  return title.length > 0 || summary.length > 0;
+}
+
+// A first sight is a baseline, not an alarm. The same rule khoji/lawwatch.mjs holds: we cannot call
+// a decision revised against a version stamp we never took.
+export function revisionVerdict(recordedStamp, currentStamp) {
+  if (!currentStamp) return 'unknown';
+  if (!recordedStamp) return 'baseline';
+  const a = new Date(recordedStamp).getTime();
+  const b = new Date(currentStamp).getTime();
+  if (Number.isNaN(a) || Number.isNaN(b)) return 'unknown';
+  return b > a ? 'revised' : 'current';
+}
+
+// 🔴 THE ONLY THREE ANSWERS THAT MAY REMOVE ANYTHING, AND A NETWORK FAULT IS NOT ONE OF THEM.
+//
+// A timeout is not "no longer published". A 500 is not "no longer published". DNS falling over on
+// the mini at five in the morning is not "no longer published". If a bad night could quietly empty
+// the record, the licence obligation would have become a way to lose the desk's work, so the fault
+// cases return 'blind' and the caller is required to do nothing at all with them.
+export function publicationVerdict({ status, withdrawn, networkError }) {
+  if (networkError) return 'blind';
+  if (status === 404 || status === 410) return 'gone';
+  if (typeof status !== 'number' || status < 200 || status >= 300) return 'blind';
+  if (withdrawn) return 'gone';
+  return 'published';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// WHICH SOURCE IS UNDER WHICH LICENCE. ONE LIST, AND EVERY OBLIGATION HANGS OFF IT.
+//
+// 🔴 THE MISMATCH THIS EXISTS TO MAKE IMPOSSIBLE.
+//
+// On 14 August 2026 we signed a Find Case Law licence whose stated purpose is monitoring Find Case
+// Law, and the watcher we actually run reads GOV.UK. That is not a breach. It is two publishers of
+// the same kind of material under two different licences, and the reasoning for reading GOV.UK is
+// at the top of khoji/tribunal.mjs and still correct. It is a mismatch, and the danger in a
+// mismatch is never the day you notice it. It is the day somebody points a watcher at the other
+// host because it has better coverage, ships it, and inherits four obligations nobody told them
+// about, because the obligations were written down in a document and not in the code.
+//
+// So the licence is a property of the HOST, the obligations are a property of the LICENCE, and
+// test/caselawgate.test.mjs holds the product to them. Point anything at Find Case Law and the
+// acknowledgement, the partial representation statement, the takedown job and the certificate all
+// become mandatory that same commit, or the build goes red.
+//
+// ⚠️ TODAY: caselaw.nationalarchives.gov.uk is read by khoji/lawwatch.mjs, which hashes the landing
+// page and stores SIXTEEN CHARACTERS OF SHA-256 and nothing else. No Licensed Material is retained
+// from that host. The licence is exercised as a read, which is free under the Open Justice Licence
+// anyway, and the transactional licence is what would let us move the watcher onto their API and
+// their full record. That is a decision to take on purpose, not to drift into.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+export const OGL = 'Open Government Licence v3.0';
+export const FCL_LICENCE = 'Find Case Law transactional licence, TNA ref CAS-341311-V2P0M2';
+
+export const SOURCE_LICENCES = [
+  { host: 'legislation.gov.uk', licence: OGL, acknowledgement: false },
+  { host: 'www.legislation.gov.uk', licence: OGL, acknowledgement: false },
+  { host: 'gov.uk', licence: OGL, acknowledgement: false },
+  { host: 'www.gov.uk', licence: OGL, acknowledgement: false },
+  // The only host in the product that carries obligations beyond attribution.
+  { host: 'caselaw.nationalarchives.gov.uk', licence: FCL_LICENCE, acknowledgement: true },
+];
+
+// The one list of hosts anything may read. khoji/lawwatch.mjs and lib/lawsources.ts both take it
+// from here rather than keeping their own, because a host that is allowed in one list and unknown
+// to the other is a host being read under no licence at all.
+export const ALLOWED_HOSTS = SOURCE_LICENCES.map((s) => s.host);
+
+export function licenceFor(url) {
+  try {
+    const host = new URL(url).host.toLowerCase();
+    return SOURCE_LICENCES.find((s) => s.host === host) || null;
+  } catch {
+    return null;
+  }
+}
+
+// Does reading this URL put us under the acknowledgement obligation? The suite asks this of every
+// host in the registry, and where the answer is yes it requires the statements to be RENDERED, not
+// merely declared. A constant nobody prints discharges nothing.
+export function acknowledgementRequiredFor(url) {
+  const l = licenceFor(url);
+  return Boolean(l && l.acknowledgement);
 }

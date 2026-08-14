@@ -96,6 +96,21 @@ budget_rc=$?
 node tribunal.mjs "$@" >> logs/khoji.log 2>&1
 tribunal_rc=$?
 
+# caselawtakedown.mjs. THE ONLY JOB THAT LOOKS BACKWARDS.
+#
+# Every watcher above asks a forward question: is today's number, sentence or document still right.
+# Not one of them ever revisits a row it wrote a year ago. The Find Case Law licence obliges us to
+# use the CURRENT version and to REMOVE material that is no longer published or has been replaced,
+# and a decision can be withdrawn on appeal or reissued with a correction long after we filed it.
+# Without this, a row would sit in the desk queue for the rest of the licence term saying a rule was
+# at risk on the strength of a judgment that no longer exists, and nothing would say a word.
+#
+# It REDACTS, it never deletes the row: source_url is the key that stops tribunal.mjs re-ingesting
+# a withdrawn decision on the very next run. It exits non-zero if it could not read something,
+# because "we could not tell" is not evidence that a decision is still published.
+node caselawtakedown.mjs "$@" >> logs/khoji.log 2>&1
+takedown_rc=$?
+
 # lawwatch.mjs. Khoji watches the LAW ITSELF, not just the tax pages.
 #
 # The others read GOV.UK. This reads the primary law the LAW EXAM BANK is anchored to: the statutes
@@ -121,12 +136,13 @@ bodies_rc=$?
 # Report the worst thing that happened, so launchd's exit code means something. A 2 from the differ
 # or the corpus means the ground has moved under us, which is an incident, not a crash: /api/health
 # has already gone red off the row it wrote. A 1 from any of them means the job itself is broken.
-echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc budget rc=$budget_rc tribunal rc=$tribunal_rc lawwatch rc=$lawwatch_rc bodies rc=$bodies_rc" >> logs/khoji.log
+echo "[khoji] watch rc=$watch_rc diff rc=$diff_rc corpus rc=$corpus_rc amend rc=$amend_rc budget rc=$budget_rc tribunal rc=$tribunal_rc takedown rc=$takedown_rc lawwatch rc=$lawwatch_rc bodies rc=$bodies_rc" >> logs/khoji.log
 if [ "$watch_rc" -ne 0 ]; then exit "$watch_rc"; fi
 if [ "$diff_rc" -ne 0 ]; then exit "$diff_rc"; fi
 if [ "$corpus_rc" -ne 0 ]; then exit "$corpus_rc"; fi
 if [ "$amend_rc" -ne 0 ]; then exit "$amend_rc"; fi
 if [ "$budget_rc" -ne 0 ]; then exit "$budget_rc"; fi
 if [ "$tribunal_rc" -ne 0 ]; then exit "$tribunal_rc"; fi
+if [ "$takedown_rc" -ne 0 ]; then exit "$takedown_rc"; fi
 if [ "$lawwatch_rc" -ne 0 ]; then exit "$lawwatch_rc"; fi
 exit "$bodies_rc"

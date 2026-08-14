@@ -248,6 +248,186 @@ sabotage('🔴 THE SWEEP IS NARROWED BACK to the two files the fix created', (d)
     "    'khoji/tribunal.mjs': srcTribunal,\n",
     ''));
 
+// ── F. THE TAKEDOWN AND CURRENT VERSION TERM. ───────────────────────────────────────────────
+//
+// 🔴 THE FOUR THAT MATTER MOST ARE THE ONES WHERE A BAD NIGHT REMOVES THE DESK'S WORK. If a
+// timeout, a 500 or a rate limit could empty the record, the licence obligation would have become a
+// way to lose everything, quietly, at five in the morning, reporting success.
+
+sabotage('🔴 A 500 IS TREATED AS "no longer published", so a bad night empties the record', (d) =>
+  edit(d, 'khoji/caselaw.mjs',
+    "  if (typeof status !== 'number' || status < 200 || status >= 300) return 'blind';",
+    "  if (typeof status !== 'number' || status < 200 || status >= 300) return 'gone';"));
+
+sabotage('🔴 THE NETWORK ERROR CHECK IS DROPPED, so a thrown fetch removes material', (d) =>
+  edit(d, 'khoji/caselaw.mjs',
+    "  if (networkError) return 'blind';\n",
+    ''));
+
+sabotage('🔴 A FIRST SIGHT IS CALLED A REVISION, so the first run redacts the whole record', (d) =>
+  edit(d, 'khoji/caselaw.mjs',
+    "  if (!recordedStamp) return 'baseline';",
+    "  if (!recordedStamp) return 'revised';"));
+
+sabotage('🔴 SOMEBODY TIDIES UP THE TOMBSTONE, so tribunal.mjs re-ingests it the next morning', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    '      redacted += 1;\n    } else if (verdict.action === ',
+    "      await withDb(async (db) => {\n"
+    + "        await db.query('delete from public.knowledge_items where source_url = $1', [row.source_url]);\n"
+    + '      });\n'
+    + '      redacted += 1;\n    } else if (verdict.action === '));
+
+sabotage('🔴 tribunal.mjs stops stamping the source version, so the job can only ever baseline', (d) =>
+  edit(d, 'khoji/tribunal.mjs',
+    '            source_updated_at: h.published,\n',
+    ''));
+
+// 🔴 THIS ONE WAS A HOLE ON THE FIRST PASS AND IT IS THE REASON THE GUARD CHANGED. Commenting
+// the line out leaves the string `node caselawtakedown.mjs` sitting in the file, and the guard was
+// reading the raw file. It now reads through a shell comment stripper.
+sabotage('🔴 THE NIGHTLY RUN STOPS CALLING IT, commented out so the string is still there', (d) =>
+  edit(d, 'khoji/run.sh',
+    'node caselawtakedown.mjs "$@"',
+    '# node caselawtakedown.mjs "$@"'));
+
+sabotage('🔴 the nightly run deletes the call outright', (d) =>
+  edit(d, 'khoji/run.sh',
+    'node caselawtakedown.mjs "$@" >> logs/khoji.log 2>&1\ntakedown_rc=$?\n',
+    ''));
+
+sabotage('🔴 the takedown exit code is swallowed, so a blind night reports success', (d) =>
+  edit(d, 'khoji/run.sh',
+    'if [ "$takedown_rc" -ne 0 ]; then exit "$takedown_rc"; fi',
+    ''));
+
+sabotage('🔴 a row it could not read stops making the run exit loud', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    'process.exit(blind > 0 ? 1 : 0);',
+    'process.exit(0);'));
+
+sabotage('the host check on the URL is dropped, so it asks gov.uk about somebody else\'s page', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    "    if (u.host.toLowerCase() !== 'www.gov.uk' && u.host.toLowerCase() !== 'gov.uk') return null;\n",
+    ''));
+
+sabotage('the job writes its own idea of what a caselaw row is instead of the shared one', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    "export const CASELAW_SQL_INCLUSION = 'not ' + CASELAW_SQL_EXCLUSION;",
+    "export const CASELAW_SQL_INCLUSION = \"source_name like '%tribunal%'\";"));
+
+// ── G. THE CERTIFICATE OF ERASURE. ──────────────────────────────────────────────────────────
+//
+// 🔴 A CERTIFICATE THAT PRINTS WHATEVER HAPPENED IS A LIE WITH A LETTERHEAD.
+
+sabotage('🔴 A MISSING COUNT GOES BACK TO READING AS ZERO, so an unrun query certifies as erased', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    '  return PLACES.filter((p) => p.erase).every((p) => tally[p.table] === 0);',
+    '  return PLACES.filter((p) => p.erase).every((p) => (tally[p.table] ?? 0) === 0);'));
+
+sabotage('🔴 THE CERTIFICATE IS BUILT FROM THE COUNT TAKEN BEFORE THE ERASURE', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    'certificateText({ tally: after, when })',
+    'certificateText({ tally: before, when })'));
+
+sabotage('🔴 THE REFUSAL IS REMOVED, so it certifies over the top of material still held', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    '  if (!isClean(after)) {',
+    '  if (false) {'));
+
+sabotage('🔴 a redacted row is counted as still holding material, so it can never certify clean', (d) =>
+  edit(d, 'khoji/caselaw.mjs',
+    '  if (title === REDACTED_TITLE && (summary === REDACTED_SUMMARY || summary === REVISED_SUMMARY)) return false;\n',
+    ''));
+
+sabotage('🔴 the audit trail is marked erasable, destroying the proof the removals happened', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    "    table: 'khoji_runs',\n    holds: 'counts',\n    erase: false,",
+    "    table: 'khoji_runs',\n    holds: 'counts',\n    erase: true,"));
+
+sabotage('🔴 the leak detector stops stopping, so a judgment reaching a customer is only logged', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    '    process.exit(2);',
+    '    // carry on regardless'));
+
+sabotage('a place stops carrying the note that says what it holds', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    "    note: 'A sixteen character body hash of the Find Case Law landing page. Not reversible. Cleared anyway.',",
+    "    note: 'hash',"));
+
+// ── H. THE TWO STATEMENTS ARE RENDERED, NOT MERELY DECLARED. ────────────────────────────────
+//
+// ⚠️ EACH OF THESE LEAVES THE IMPORT IN PLACE. An import is not a rendering, and a guard that
+// anchored on the import would stay green over a page that had stopped printing the words.
+
+sabotage('🔴 THE ACKNOWLEDGEMENT ELEMENT IS DELETED FROM /terms, leaving the import behind', (d) =>
+  edit(d, 'app/terms/page.tsx',
+    '        <p style={para}>{TNA_ACKNOWLEDGEMENT}</p>\n',
+    ''));
+
+sabotage('🔴 the partial representation element is deleted from /terms', (d) =>
+  edit(d, 'app/terms/page.tsx',
+    '        <p style={para}>{TNA_PARTIAL_REPRESENTATION}</p>\n',
+    ''));
+
+sabotage('🔴 THE ACKNOWLEDGEMENT ELEMENT IS DELETED FROM THE DESK, where the material is shown', (d) =>
+  edit(d, 'app/team/knowledge/page.tsx',
+    '        <p style={{ ...T.small, marginTop: 6 }}>{TNA_ACKNOWLEDGEMENT}</p>\n',
+    ''));
+
+sabotage('🔴 the desk stops rendering the partial representation statement', (d) =>
+  edit(d, 'app/team/knowledge/page.tsx',
+    '        <p style={{ ...T.small, marginTop: 6 }}>{TNA_PARTIAL_REPRESENTATION}</p>\n',
+    ''));
+
+sabotage('🔴 SOMEBODY RETYPES THE WORDS instead of using the constant, and they can now drift', (d) =>
+  edit(d, 'app/terms/page.tsx',
+    '<p style={para}>{TNA_ACKNOWLEDGEMENT}</p>',
+    '<p style={para}>Crown copyright material reproduced by permission of The National Archives.</p>'));
+
+sabotage('🔴 the public copy starts reading a session, so only a customer can see it', (d) =>
+  edit(d, 'app/terms/page.tsx',
+    'export default function TermsPage() {',
+    'export default function TermsPage() {\n  const user = sessionUser();'));
+
+// ── I. WHICH SOURCE IS UNDER WHICH LICENCE. ─────────────────────────────────────────────────
+
+sabotage('🔴 the TypeScript registry loses a host the .mjs side still allows', (d) =>
+  edit(d, 'lib/lawsources.ts',
+    "  { host: 'gov.uk', licence: OGL, acknowledgement: false },\n",
+    ''));
+
+sabotage('🔴 THE TWO SIDES DISAGREE ABOUT WHICH HOST NEEDS AN ACKNOWLEDGEMENT', (d) =>
+  edit(d, 'lib/lawsources.ts',
+    "  { host: 'caselaw.nationalarchives.gov.uk', licence: FCL_LICENCE, acknowledgement: true },",
+    "  { host: 'caselaw.nationalarchives.gov.uk', licence: FCL_LICENCE, acknowledgement: false },"));
+
+sabotage('🔴 lawwatch goes back to keeping its own copy of the licensed host list', (d) =>
+  edit(d, 'khoji/lawwatch.mjs',
+    'export const ALLOWED_HOSTS = LICENSED_HOSTS;',
+    "export const ALLOWED_HOSTS = [\n  'www.legislation.gov.uk', 'legislation.gov.uk',\n  'www.gov.uk', 'gov.uk',\n  'caselaw.nationalarchives.gov.uk',\n];"));
+
+sabotage('🔴 lib/lawsources goes back to keeping its own copy of the allowlist', (d) =>
+  edit(d, 'lib/lawsources.ts',
+    'export const ALLOWED_SOURCE_HOSTS: readonly string[] = SOURCE_LICENCES.map((s) => s.host);',
+    "export const ALLOWED_SOURCE_HOSTS: readonly string[] = [\n  'www.gov.uk', 'gov.uk',\n];"));
+
+sabotage('🔴 LAWWATCH STARTS KEEPING THE BODY OF THE FIND CASE LAW PAGE, not just a hash', (d) =>
+  edit(d, 'khoji/lawwatch.mjs',
+    'body_hash = excluded.body_hash,',
+    'body_hash = excluded.body_hash, body_text = excluded.body_text,'));
+
+// ── THE DASH SWEEP FOLLOWS THE FIX INTO ITS NEW FILES. ──────────────────────────────────────
+
+sabotage('🔴 an em dash appears in the takedown job', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    '// KHOJI CHECKS THAT WHAT WE HOLD IS STILL WHAT THE COURT PUBLISHES.',
+    '// KHOJI CHECKS ' + EM_DASH + ' that what we hold is still what the court publishes.'));
+
+sabotage('🔴 an en dash appears on the terms page', (d) =>
+  edit(d, 'app/terms/page.tsx',
+    '<h2 style={heading}>Where our legal information comes from</h2>',
+    '<h2 style={heading}>Where our legal information ' + EN_DASH + ' comes from</h2>'));
+
 // ── NO-OP CONTROLS. These must stay GREEN, or this runner only detects that a file moved. ────
 
 sabotage('NO-OP: a comment word changes in the caselaw definition', (d) =>
@@ -265,11 +445,26 @@ sabotage('NO-OP: a comment word changes in lawsources', (d) =>
     '// Must match CASELAW_SOURCE_NAME in khoji/caselaw.mjs exactly.',
     '// Must equal CASELAW_SOURCE_NAME in khoji/caselaw.mjs exactly.'), false);
 
+sabotage('NO-OP: a comment word changes in the takedown job', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    '// Every other watcher in this folder asks a forward question.',
+    '// Every other watcher in this folder asks a forwards question.'), false);
+
+sabotage('NO-OP: a comment word changes in the certificate', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    '// THE COUNT. Pure where it can be',
+    '// THE TALLY. Pure where it can be'), false);
+
+sabotage('NO-OP: whitespace changes on the terms page', (d) =>
+  edit(d, 'app/terms/page.tsx',
+    '<h2 style={heading}>Law</h2>',
+    '<h2 style={heading}>Law</h2>\n'), false);
+
 process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 33) {
-  process.stdout.write(`  COUNT WRONG: expected 33 sabotages to apply, got ${applied}\n`);
+if (applied !== 67) {
+  process.stdout.write(`  COUNT WRONG: expected 67 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

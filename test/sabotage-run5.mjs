@@ -43,9 +43,9 @@ function scratch() {
   return dir;
 }
 
-function runSuite(dir) {
+function runSuite(dir, suite = 'jobdiary') {
   try {
-    const out = execFileSync('node', [path.join(dir, 'test/jobdiary.test.mjs')], {
+    const out = execFileSync('node', [path.join(dir, `test/${suite}.test.mjs`)], {
       cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
     });
     return { red: /[1-9]\d* failed\./.test(out), out };
@@ -63,7 +63,10 @@ const edit = (dir, rel, from, to) => {
 
 let applied = 0, held = 0, holes = 0, broken = 0;
 
-function sabotage(name, mutate, expectRed = true) {
+function sabotage(name, mutate, expectRed = true) { return sabotageIn('jobdiary', name, mutate, expectRed); }
+
+// Some guards live in a sibling suite. Naming the suite beats a second runner file.
+function sabotageIn(suite, name, mutate, expectRed = true) {
   const dir = scratch();
   try {
     mutate(dir);
@@ -74,7 +77,7 @@ function sabotage(name, mutate, expectRed = true) {
     rmSync(dir, { recursive: true, force: true });
     return;
   }
-  const { red } = runSuite(dir);
+  const { red } = runSuite(dir, suite);
   rmSync(dir, { recursive: true, force: true });
   if (red === expectRed) {
     held += 1;
@@ -333,6 +336,35 @@ sabotage('a failed diary read draws an empty week he did not empty', (d) =>
     'We could not read your diary just this minute',
     'You have nothing booked'));
 
+sabotage('🔴 THE SECOND DEFECT: the diary list stops opening a job, so a job next week has no door', (d) =>
+  edit(d, 'app/app/diary/page.tsx',
+    '<a href={`/app/diary?job=${encodeURIComponent(job.id)}`} style={S.titlePastLink}>{job.title}</a>',
+    '<span style={S.titlePast}>{job.title}</span>'));
+
+sabotage('the upcoming list stops opening a job', (d) =>
+  edit(d, 'app/app/diary/page.tsx',
+    '<a href={`/app/diary?job=${encodeURIComponent(job.id)}`} style={S.titleLink}>{job.title}</a>',
+    '<span style={S.title}>{job.title}</span>'));
+
+// 🔴 THE RESTATED ID RULE MUST STILL BITE. It permits exactly one shape of id in a link, the
+// read only job door, and nothing else. These prove it refuses the rest. They run diarygoals
+// rather than jobdiary, so the runner below picks the suite by name.
+
+sabotageIn('diarygoals', '🔴 a job id appears in a link that is NOT the job door', (d) =>
+  edit(d, 'app/app/diary/page.tsx',
+    '<a href={`/app/diary?job=${encodeURIComponent(job.id)}`} style={S.titleLink}>{job.title}</a>',
+    '<a href={`/app/invoices/new?job=${job.id}`} style={S.titleLink}>{job.title}</a>'));
+
+sabotageIn('diarygoals', '🔴 the job door stops being read through the session', (d) =>
+  edit(d, 'app/app/diary/page.tsx',
+    'const row = await readDiaryJob(user.id, jobParam);',
+    'const row = await readDiaryJobAnyone(jobParam);'));
+
+sabotageIn('diarygoals', '🔴 a mutating id moves out of its hidden field into a link', (d) =>
+  edit(d, 'app/app/diary/page.tsx',
+    '<input type="hidden" name="id" value={job.id} />\n                        <button type="submit" className="lek-act">Remove</button>',
+    '<button type="submit" className="lek-act">Remove</button>'));
+
 // ── 9. NO-OP CONTROLS. These must stay GREEN, or this runner only detects that a file moved. ──
 
 sabotage('NO-OP: a comment word changes in the hours block', (d) =>
@@ -354,7 +386,7 @@ process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 48) {
-  process.stdout.write(`  COUNT WRONG: expected 48 sabotages to apply, got ${applied}\n`);
+if (applied !== 53) {
+  process.stdout.write(`  COUNT WRONG: expected 53 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

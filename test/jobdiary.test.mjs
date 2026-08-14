@@ -421,6 +421,16 @@ ok('🔴 there is no members, sharing or invitation table in this migration',
   // 🔴 THE RENDER, NOT THE STRING. This sentence is ALSO one of notice()'s refusals, so asserting
   // that the file contains it passed while the JSX drawing it had been replaced. Anchored on the
   // element now, which is the thing a man actually sees.
+  // 🔴 THE LIST MUST OPEN THE JOB, AND FOR ONE DAY IT DID NOT. The job screen shipped reachable
+  // from exactly one place, the hub's diary card, which shows today and the next few. A job booked
+  // for next Tuesday, or one that wrapped up last week, had photographs and materials and no door
+  // anywhere in the product that opened them. /app/diary listed his jobs and was the one page that
+  // could not open one. All three lists on it now do, and this COUNTS them so a later edit cannot
+  // quietly drop one and leave the other two looking fine.
+  {
+    const opens = (pageDiary.match(/href=\{`\/app\/diary\?job=\$\{encodeURIComponent\(job\.id\)\}`\}/g) || []).length;
+    ok('🔴 ALL THREE JOB LISTS ON THE DIARY PAGE OPEN THEIR OWN JOB: ' + opens + ' of 3', opens === 3);
+  }
   ok('🔴 a job that is not his says so plainly rather than rendering an empty job',
     pageDiary.includes('<p style={S.empty}>We could not find that job.</p>'));
 }

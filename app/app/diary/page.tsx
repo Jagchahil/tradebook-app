@@ -383,7 +383,7 @@ export default async function DiaryPage({
                 {upcoming.map((job) => (
                   <li key={job.id} style={S.row}>
                     <div style={S.rowMain}>
-                      <span style={S.title}>{job.title}</span>
+                      <a href={`/app/diary?job=${encodeURIComponent(job.id)}`} style={S.titleLink}>{job.title}</a>
                       <span style={S.note}>
                         {whenPhrase(job.startsAt, now)}, {durationPhrase(job.startsAt, job.endsAt)}
                         {job.customerName ? `, for ${job.customerName}` : ''}
@@ -414,7 +414,7 @@ export default async function DiaryPage({
                 {awaiting.map((job) => (
                   <li key={job.id} style={S.row}>
                     <div style={S.rowMain}>
-                      <span style={S.title}>{job.title}</span>
+                      <a href={`/app/diary?job=${encodeURIComponent(job.id)}`} style={S.titleLink}>{job.title}</a>
                       <span style={S.note}>
                         wrapped up {pastDayPhrase(job.endsAt, now)}
                         {job.customerName ? `, for ${job.customerName}` : ''}
@@ -508,7 +508,7 @@ export default async function DiaryPage({
                 {past.map((job) => (
                   <li key={job.id} style={S.row}>
                     <div style={S.rowMain}>
-                      <span style={S.titlePast}>{job.title}</span>
+                      <a href={`/app/diary?job=${encodeURIComponent(job.id)}`} style={S.titlePastLink}>{job.title}</a>
                       <span style={S.note}>
                         wrapped up {pastDayPhrase(job.endsAt, now)}, invoice drafted
                       </span>
@@ -566,6 +566,17 @@ const S: Record<string, React.CSSProperties> = {
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.sm, padding: `${SPACE.sm}px 0`, borderBottom: `1px solid ${LINE}`, flexWrap: 'wrap' },
   rowMain: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
   title: { fontSize: TYPE.strong, fontWeight: 800, letterSpacing: '-0.01em' },
+  // 🔴 EVERY JOB IN THE LIST OPENS ITS OWN SCREEN, AND FOR ONE DAY IT DID NOT.
+  //
+  // The job screen shipped reachable from exactly one place: the hub's diary card, which shows
+  // TODAY and the next five. So a job booked for next Tuesday, or one that wrapped up last week,
+  // had photographs and materials and no door anywhere in the product that opened them. This page
+  // is the one a man reaches from the "Jobs diary" row and from the plus menu, and it was the one
+  // page that listed his jobs and could not open one.
+  //
+  // Found by walking production. The title is the door because the title is the thing he reads.
+  titleLink: { fontSize: TYPE.strong, fontWeight: 800, letterSpacing: '-0.01em', color: RIVER_DEEP, textDecoration: 'none' },
+  titlePastLink: { fontSize: TYPE.body, fontWeight: 700, color: MUTED, textDecoration: 'none' },
   titlePast: { fontSize: TYPE.body, fontWeight: 700, color: MUTED },
   note: { fontSize: TYPE.note, lineHeight: 1.5, color: MUTED },
   acts: { display: 'flex', gap: SPACE.xs, alignItems: 'center', flexWrap: 'wrap' },

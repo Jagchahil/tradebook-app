@@ -503,9 +503,66 @@ ok('neither page ships client script', !/^'use client'/m.test(pageDiary) && !/^'
 ok('both pages carry the shell', pageDiary.includes('<AppNav current=') && pageGoals.includes('<AppNav current='));
 ok('every action on both pages is a plain form post',
   !/onClick|onSubmit|useState|useEffect/.test(pageDiary) && !/onClick|onSubmit|useState|useEffect/.test(pageGoals));
-ok('🔴 no id ever reaches a URL from either page, ids ride in hidden fields',
-  !/href=[^\n]*\.id/.test(pageDiary) && !/href=[^\n]*\.id/.test(pageGoals)
-  && /name="id" value=\{job\.id\}/.test(pageDiary) && /name="id" value=\{g\.id\}/.test(pageGoals));
+// ⚠️ RESTATED 14 AUGUST 2026, AND IT IS STRICTLY STRONGER THAN WHAT IT REPLACED.
+//
+// It used to read "no id ever reaches a URL from either page", pointed at pageDiary and pageGoals.
+// Two things were wrong with that. It was ALREADY FALSE of shipped code, because /app/you had
+// carried `href={`/app/diary?job=${j.id}`}` since the hub was rebuilt and this assertion was never
+// pointed at that page. And it forbade more than the standing rule does: test/webauth.test.mjs
+// bans a DYNAMIC SEGMENT under app/app, and bans reading a USER id out of a query, and a job id in
+// a query string is neither.
+//
+// 🔴 WHAT ACTUALLY PROTECTS HIM IS UNCHANGED AND IS ASSERTED BELOW: the id of anything that
+// MUTATES rides in a hidden form field, and every accessor filters on the session's user AND the
+// row, so a stranger's uuid matches nothing and the screen says it could not find that job. The
+// URL shape was only ever the second line of that defence.
+//
+// So the rule now says what it means, and says it about ALL THREE pages rather than two: the ONE
+// id permitted in a link is the read only job door, its reader must be session scoped, and
+// anything else carrying an id in an href fails.
+{
+  const pages = { pageDiary, pageGoals, pageYou: read('app/app/you/page.tsx') };
+  const JOB_DOOR = /href=\{`\/app\/diary\?job=\$\{encodeURIComponent\(\w+\.id\)\}`\}/g;
+  const offenders = Object.entries(pages).filter(([, src]) => {
+    // Every href on the page that mentions an id, minus the ones that are the job door.
+    const withId = (src.match(/href=[^\n]*\.id/g) || []).length;
+    const doors = (src.match(JOB_DOOR) || []).length;
+    return withId !== doors;
+  }).map(([n]) => n);
+  ok('🔴 THE ONLY ID IN A LINK IS THE READ ONLY JOB DOOR: ' + (offenders.join(', ') || 'none'),
+    offenders.length === 0);
+  ok('🔴 and that door is read through the session, so a stranger uuid matches nothing',
+    /readDiaryJob\(user\.id, jobParam\)/.test(pageDiary));
+  ok('🔴 the goals page has no detail screen and so carries no id in any link at all',
+    !/href=[^\n]*\.id/.test(pageGoals));
+}
+// 🔴 EVERY ROW ACTION CARRIES ITS OWN ID, COUNTED, NOT "AT LEAST ONE SOMEWHERE".
+//
+// This used to be `/name="id" value={job.id}/.test(pageDiary)`, which proves only that ONE hidden
+// id exists on the page. The sabotage pass caught it: deleting the hidden field from the Remove
+// form left the other forms matching and the guard reported green over a button that would post
+// no row at all. So it counts instead. Every form posting to the diary or goals API is a row
+// action and needs an id, EXCEPT the one that adds a new row, which has no row yet.
+{
+  const formsNeedingAnId = (src, api) => {
+    const forms = src.split(`action="${api}"`).slice(1);
+    return forms.filter((chunk) => {
+      const body = chunk.slice(0, chunk.indexOf('</form>') + 1 || chunk.length);
+      return !/name="action" value="add"/.test(body);
+    });
+  };
+  const missing = [];
+  for (const [label, src, api] of [['diary', pageDiary, '/api/diary'], ['goals', pageGoals, '/api/goals']]) {
+    for (const body of formsNeedingAnId(src, api)) {
+      const chunk = body.slice(0, body.indexOf('</form>') + 1 || body.length);
+      if (!/name="id"/.test(chunk)) missing.push(label);
+    }
+  }
+  ok('🔴 EVERY ROW ACTION POSTS ITS ID IN A HIDDEN FIELD: ' + (missing.join(', ') || 'all of them'),
+    missing.length === 0);
+  ok('and the ids posted are the row ids, not something built on the page',
+    /name="id" value=\{job\.id\}/.test(pageDiary) && /name="id" value=\{g\.id\}/.test(pageGoals));
+}
 ok('🔴 a failed read is said plainly, the honest unreadable line, never an empty screen',
   /could not read your diary/.test(pageDiary) && /could not read your goals/.test(pageGoals)
   && /raw !== null/.test(pageDiary) && /raw !== null/.test(pageGoals));

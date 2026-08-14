@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import {
-  listDiaryJobs, readDiaryJob, listJobPhotos, listJobMaterials, listUntaggedCosts, signJobPhoto,
+  listDiaryJobs, readDiaryJob, listJobPhotos, listJobMaterials, listUntaggedCosts,
 } from '../../../lib/supabase';
 import { normaliseDiaryRow, splitDiary, whenPhrase, pastDayPhrase, durationPhrase } from '../../../lib/diary';
 import { hoursFromSlot, hoursGuessPhrase, materialsTotal, CAPTION_MAX } from '../../../lib/jobphotos';
@@ -144,10 +144,20 @@ export default async function DiaryPage({
     const photos = await listJobPhotos(user.id, jobParam);
     const costs = await listJobMaterials(user.id, jobParam);
     const spare = await listUntaggedCosts(user.id);
-    // A signed link per picture, minted now against his session and dead in ten minutes. The
-    // bucket is private and no public URL for it exists: this is the only way bytes reach him.
+    // 🔴 EVERY PICTURE IS DRAWN FROM OUR OWN ORIGIN, AND THE FIRST VERSION WAS NOT.
+    //
+    // It minted a ten minute signed URL on the storage host and put it straight in the img src.
+    // Storage served it correctly and NOTHING EVER RENDERED, because next.config.mjs sends
+    // `img-src 'self' data: blob:` and the storage origin is not in that list. The feature stored,
+    // signed and served perfectly and could not put one photograph on one screen. It was found by
+    // walking production; no assertion covered it, because every one of them was about the path,
+    // the row and the erasure rather than about a picture appearing.
+    //
+    // /api/diary/photo/view streams the bytes from a route we own, so `img-src 'self'` is
+    // untouched and no signed URL is ever written into this document. No await here either: the
+    // browser fetches each one, so the page renders without waiting on storage at all.
     const shots = photos
-      ? await Promise.all(photos.map(async (p) => ({ ...p, src: await signJobPhoto(user.id, p.storage_path) })))
+      ? photos.map((p) => ({ ...p, src: `/api/diary/photo/view?id=${encodeURIComponent(p.id)}` }))
       : [];
     const spend = materialsTotal(costs ?? []);
     const hours = job ? hoursFromSlot(job.startsAt, job.endsAt) : null;

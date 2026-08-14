@@ -10515,25 +10515,58 @@ export async function deleteJobPhoto(userId: string, photoId: string): Promise<b
   }
 }
 
-// A short lived signed link for ONE of his photographs, or null. The bucket is private and no
-// public URL for it exists or is ever built: this is the only way bytes reach a browser, it is
-// minted per request against his session, and it expires.
-export async function signJobPhoto(userId: string, storagePath: string): Promise<string | null> {
-  if (!userId || !storagePath.startsWith(`${RECEIPTS_BUCKET}/${userId}/`)) return null;
+// ONE of his photographs, as bytes, or null.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS RETURNS BYTES AND NOT A LINK, AND THE FIRST VERSION RETURNED A LINK. It minted a ten
+// minute signed URL on the storage host and put it in the page's <img src>. Storage served it
+// correctly, 200 with the right content type, and NO CUSTOMER COULD EVER SEE A PHOTOGRAPH,
+// because next.config.mjs sends `img-src 'self' data: blob:` and the storage origin is not in
+// that list. The bytes were fine, the signature was fine, the browser refused to draw them.
+//
+// It was found by walking production, not by the suite, because every assertion was about the
+// path, the row and the erasure, and the one thing nobody asserted was that a picture appears on
+// a screen. test/jobdiary.test.mjs now holds the property that survives: the page's image source
+// is OUR OWN ORIGIN, which is the thing the policy actually requires.
+//
+// ⚠️ AND THE FIX IS A PROXY RATHER THAN A WIDER POLICY, deliberately. Adding the storage host to
+// img-src would have worked in one line and cost two things: every page would carry a bearer URL
+// in its HTML that works for ten minutes for anybody who reads the source, and a third party
+// origin would be allowed to draw pixels into our pages for ever after. Streaming the bytes
+// through a route we own keeps `img-src 'self'` untouched, keeps the signed URL out of the
+// document entirely, and puts the tenancy check on our server where the session already is.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export async function readJobPhotoBytes(
+  userId: string,
+  photoId: string,
+): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
+  if (!userId || !UUID.test(photoId)) return null;
   try {
-    const { url } = config();
-    const rest = storagePath.slice(`${RECEIPTS_BUCKET}/`.length);
-    const res = await fetch(`${url}/storage/v1/object/sign/${RECEIPTS_BUCKET}/${rest}`, {
-      method: 'POST',
-      headers: headers(),
-      // Ten minutes. Long enough to look at the job, short enough that a link copied out of a
-      // page source is dead before it is useful to anybody.
-      body: JSON.stringify({ expiresIn: 600 }),
-      signal: AbortSignal.timeout(6000),
+    const { url, key } = config();
+    // His row, or nothing. Both filters in the query, so a stranger's photo uuid matches nothing
+    // and this returns null rather than another man's picture.
+    const read = await fetch(
+      `${url}/rest/v1/job_photos?user_id=eq.${encodeURIComponent(userId)}`
+      + `&id=eq.${encodeURIComponent(photoId)}&select=storage_path&limit=1`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!read.ok) return null;
+    const rows = (await read.json()) as Array<{ storage_path?: string }>;
+    const storagePath = rows[0]?.storage_path ?? '';
+    // Belt and braces on top of the query: a path outside HIS folder is never fetched, whatever
+    // the row says. It cannot happen through addJobPhoto, and it costs nothing to refuse.
+    if (!storagePath.startsWith(`${RECEIPTS_BUCKET}/${userId}/`)) return null;
+    const res = await fetch(`${url}/storage/v1/object/${storagePath}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;
-    const body = (await res.json().catch(() => null)) as { signedURL?: string } | null;
-    return body?.signedURL ? `${url}/storage/v1${body.signedURL}` : null;
+    const contentType = res.headers.get('content-type') || '';
+    // Only an image ever comes back out of here. The upload allowlists the type going in, and
+    // this refuses anything else coming out, so the route can never be turned into a way to
+    // serve a document out of the bucket.
+    if (!contentType.startsWith('image/')) return null;
+    return { bytes: await res.arrayBuffer(), contentType };
   } catch {
     return null;
   }

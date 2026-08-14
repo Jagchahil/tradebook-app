@@ -34,6 +34,12 @@ function scratch() {
   for (const d of ['lib', 'test', 'app', 'supabase']) {
     cpSync(path.join(root, d), path.join(dir, d), { recursive: true });
   }
+  // ⚠️ next.config.mjs CARRIES THE CONTENT SECURITY POLICY, and the suite reads img-src out of it
+  // to decide whether the job screen's pictures can appear at all. Without it here the suite
+  // throws on a scratch copy and EVERY no-op control goes red, which is how this omission was
+  // caught: six controls failed at once, which is the shape of a broken harness rather than a
+  // broken guard.
+  cpSync(path.join(root, 'next.config.mjs'), path.join(dir, 'next.config.mjs'));
   return dir;
 }
 
@@ -174,6 +180,43 @@ sabotage('a hostile nonce can climb out of his folder', (d) =>
     "  const clean = (nonce || '').replace(/[^a-z0-9-]/gi, '').slice(0, 36);\n  if (!clean) return null;\n  return `${RECEIPTS_BUCKET}/${userId}/job-",
     "  const clean = (nonce || '').slice(0, 36);\n  if (!clean) return null;\n  return `${RECEIPTS_BUCKET}/${userId}/job-"));
 
+// ── 5b. THE PICTURE THAT COULD NOT APPEAR. The bug that actually shipped, 14 August 2026. ────
+
+sabotage('🔴 THE ORIGINAL DEFECT: the job page goes back to a signed storage URL in the img src', (d) =>
+  edit(d, 'app/app/diary/page.tsx',
+    'const shots = photos\n      ? photos.map((p) => ({ ...p, src: `/api/diary/photo/view?id=${encodeURIComponent(p.id)}` }))\n      : [];',
+    'const shots = photos\n      ? await Promise.all(photos.map(async (p) => ({ ...p, src: await signJobPhoto(user.id, p.storage_path) })))\n      : [];'));
+
+sabotage('the view route stops checking the session, so anybody can pull a photograph', (d) =>
+  edit(d, 'app/api/diary/photo/view/route.ts',
+    '  const user = await sessionUser(req);\n  if (!user) return new NextResponse(null, { status: 401 });',
+    '  const user = (await sessionUser(req)) ?? { id: req.nextUrl.searchParams.get(\'u\') ?? \'\' };'));
+
+sabotage('🔴 the view route stops scoping the read to HIS session', (d) =>
+  edit(d, 'app/api/diary/photo/view/route.ts',
+    'const photo = await readJobPhotoBytes(user.id, id);',
+    'const photo = await readJobPhotoBytes(user.id, id) ?? await readJobPhotoBytes(id, id);'), false);
+
+sabotage('the photo id stops being shape checked in the view route', (d) =>
+  edit(d, 'app/api/diary/photo/view/route.ts',
+    '  if (!UUID.test(id)) return new NextResponse(null, { status: 404 });',
+    '  if (!id) return new NextResponse(null, { status: 404 });'));
+
+sabotage('a customer photograph becomes cacheable by a shared cache', (d) =>
+  edit(d, 'app/api/diary/photo/view/route.ts',
+    "'Cache-Control': 'private, no-store, max-age=0',",
+    "'Cache-Control': 'public, max-age=600',"));
+
+sabotage('🔴 the bucket starts handing back things that are not images', (d) =>
+  edit(d, 'lib/supabase.ts',
+    "    if (!contentType.startsWith('image/')) return null;",
+    '    void contentType;'));
+
+sabotage('🔴 a storage path outside HIS folder is fetched anyway', (d) =>
+  edit(d, 'lib/supabase.ts',
+    '    if (!storagePath.startsWith(`${RECEIPTS_BUCKET}/${userId}/`)) return null;\n    const res = await fetch(`${url}/storage/v1/object/${storagePath}`, {\n      headers: { apikey: key, Authorization: `Bearer ${key}` },',
+    '    const res = await fetch(`${url}/storage/v1/object/${storagePath}`, {\n      headers: { apikey: key, Authorization: `Bearer ${key}` },'));
+
 // ── 6. THE MANIFEST AND THE MIGRATION. ────────────────────────────────────────────────────────
 
 sabotage('🔴 job_photos falls out of USER_DATA_TABLES and both data rights doors miss it', (d) =>
@@ -311,7 +354,7 @@ process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 41) {
-  process.stdout.write(`  COUNT WRONG: expected 41 sabotages to apply, got ${applied}\n`);
+if (applied !== 48) {
+  process.stdout.write(`  COUNT WRONG: expected 48 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

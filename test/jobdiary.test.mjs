@@ -268,6 +268,60 @@ ok('🔴 nothing in the module writes a caption for him',
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+// 5b. THE PICTURE ACTUALLY APPEARS. The assertion this suite did not have on the day it shipped.
+//
+// 🔴 WHAT HAPPENED. The job screen drew each photograph from a ten minute signed URL on the
+// storage host. Storage served it correctly: 200, image/png, the right bytes. Nothing rendered
+// for anybody, ever, because next.config.mjs sends `img-src 'self' data: blob:` and the storage
+// origin is not in that list. A feature that stored, signed and served perfectly and could not
+// put one picture on one screen. Found by walking production on the day of the push.
+//
+// Every assertion in section 5 was about the storage PATH, and they were all correct and all
+// beside the point. "Assert the render, not the string" had been learned about copy and not yet
+// about pixels. The property that survives a rewrite is this one: whatever draws a photograph
+// must come from an origin the policy actually permits.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const nextConfig = read('next.config.mjs');
+  const imgSrc = (nextConfig.match(/"img-src[^"]*"/) || [])[0] || '';
+  ok('the policy names an img-src at all', imgSrc.length > 0);
+
+  // The hosts the page is allowed to draw an image from, read out of the policy rather than
+  // written down here, so this cannot drift from the header we actually send.
+  const allowsStorageOrigin = /supabase|storage/i.test(imgSrc);
+  const imgSrcs = [...pageDiary.matchAll(/<img[\s\S]{0,200}?src=\{([^}]*)\}/g)].map((m) => m[1]);
+  ok('the job screen draws at least one image', imgSrcs.length > 0);
+
+  // 🔴 THE ASSERTION. Either the source is our own origin, or the policy explicitly allows the
+  // origin it does use. Anything else is a picture that cannot appear.
+  const offOrigin = imgSrcs.filter((x) => /sign|storage|supabase|https?:/i.test(x));
+  ok('🔴 EVERY IMAGE ON THE JOB SCREEN COMES FROM AN ORIGIN img-src ALLOWS: ' + (offOrigin.join(', ') || 'all same origin'),
+    offOrigin.length === 0 || allowsStorageOrigin);
+
+  // And the concrete shape of the fix, so a later change cannot quietly go back to a signed URL
+  // in the document while leaving the policy alone.
+  ok('the picture is streamed from a route we own',
+    pageDiary.includes('/api/diary/photo/view?id='));
+  ok('🔴 no signed storage link is ever written into the job page',
+    !codeOnly(pageDiary).includes('signJobPhoto'));
+
+  const viewRoute = read('app/api/diary/photo/view/route.ts');
+  const vcode = codeOnly(viewRoute);
+  ok('the view route runs only for a session', /sessionUser\(req\)/.test(vcode) && /401/.test(vcode));
+  ok('🔴 the view route reads HIS row, so a stranger uuid is a 404',
+    /readJobPhotoBytes\(user\.id, id\)/.test(vcode) && /404/.test(vcode));
+  ok('the photo id is shape checked before it reaches a query', /UUID\.test\(id\)/.test(vcode));
+  ok('a customer photograph is never left in a shared cache',
+    /private, no-store/.test(vcode) && /nosniff/.test(vcode));
+
+  // The accessor refuses anything that is not an image and anything outside his own folder.
+  const acc = supa.slice(supa.indexOf('export async function readJobPhotoBytes'));
+  ok('🔴 only an image ever comes back out of the bucket', /contentType\.startsWith\('image\/'\)/.test(acc));
+  ok('🔴 a path outside HIS folder is never fetched, whatever the row says',
+    /storagePath\.startsWith\(`\$\{RECEIPTS_BUCKET\}\/\$\{userId\}\/`\)/.test(acc));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 // 6. THE GDPR MANIFEST, AND THE MIGRATION.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 ok('🔴 job_photos is in USER_DATA_TABLES, so both data rights doors walk it',
@@ -404,6 +458,7 @@ ok('🔴 there is no members, sharing or invitation table in this migration',
   const files = {
     'lib/jobphotos.ts': srcJob,
     'app/api/diary/photo/route.ts': routePhoto,
+    'app/api/diary/photo/view/route.ts': read('app/api/diary/photo/view/route.ts'),
     'test/jobdiary.test.mjs': read('test/jobdiary.test.mjs'),
   };
   const DASH = /[\u2013\u2014]/;

@@ -212,6 +212,21 @@ ok('and the box says nothing is assumed, which is this product s whole doctrine 
 ok('the hint has a real style key, not a missing one on a Record that typechecks anyway',
   /^  hint: \{/m.test(addPage));
 
+// ── AND THE COST COMES DOWN BY THE VAT, or the reclaim is a second bite at the same money. ───
+// Found in the Phase 5 walk of the fix above, an hour after it shipped: a 1,200 cost with 200 of
+// stated VAT was booking a 1,200 deduction AND a 200 reclaim.
+ok('🔴 the row is recorded NET of any VAT he stated',
+  /const netAmount = vatAmount === null/.test(manualRoute)
+  && /Math\.round\(\(magnitude - vatAmount\) \* 100\) \/ 100/.test(manualRoute));
+ok('🔴 and the insert uses that net, never the gross he typed',
+  /amount: direction === 'out' \? -netAmount : netAmount,/.test(manualRoute)
+  && !/amount: direction === 'out' \? -magnitude : magnitude,/.test(manualRoute));
+ok('a man who states no VAT is untouched: his net is his gross',
+  /vatAmount === null\s*\n?\s*\? magnitude/.test(manualRoute));
+ok('🔴 and the form says so, because the figure in his books will not be the one he typed',
+  /the cost in your books becomes the bit without it/.test(addPage)
+  && /never as both/.test(addPage));
+
 // ── P2-6. What we hold now holds the two settings that decide every invoice. ─────────────────
 ok('the VAT page states the scheme in his words',
   vatYouPage.includes('<p style={S.fact}>{schemeSentence}</p>')

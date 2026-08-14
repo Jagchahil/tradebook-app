@@ -228,6 +228,19 @@ sabotage('the reverse charge signpost is drawn without both answers', (d) =>
 sabotage('the reverse charge signpost disappears', (d) =>
   edit(d, 'app/app/setup/page.tsx', 'domestic reverse charge', 'thing we will not name'));
 
+sabotage('the cost goes back to the gross, so the reclaim is taken twice', (d) =>
+  edit(d, 'app/api/money/manual/route.ts',
+    "amount: direction === 'out' ? -netAmount : netAmount,",
+    "amount: direction === 'out' ? -magnitude : magnitude,"));
+
+sabotage('netAmount stops subtracting the VAT', (d) =>
+  edit(d, 'app/api/money/manual/route.ts',
+    ': Math.round((magnitude - vatAmount) * 100) / 100;',
+    ': magnitude;'));
+
+sabotage('the form stops warning that the cost will be netted down', (d) =>
+  edit(d, 'app/app/money/add/page.tsx', 'the cost in your books becomes the bit without it', 'nothing happens to it'));
+
 // ── NO-OP CONTROLS for part 2. ───────────────────────────────────────────────────────────────
 sabotage('NO-OP: a comment word in the manual route changes', (d) =>
   edit(d, 'app/api/money/manual/route.ts',
@@ -243,7 +256,7 @@ process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 32) {
-  process.stdout.write(`  COUNT WRONG: expected 32 sabotages to apply, got ${applied}\n`);
+if (applied !== 35) {
+  process.stdout.write(`  COUNT WRONG: expected 35 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

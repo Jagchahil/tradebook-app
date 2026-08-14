@@ -160,12 +160,34 @@ export async function POST(req: NextRequest) {
     if (v > 0) vatAmount = v;
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THE COST ITSELF COMES DOWN BY IT. Found in the Phase 5 walk of the fix above, 14 August
+  // 2026, an hour after it shipped.
+  //
+  // Giving him the reclaim without netting the row was worse than the bug it replaced. He typed
+  // 1,200 of materials and stated 200 of VAT, and his books then showed a 1,200 cost AND a 200
+  // reclaim: the 200 came off his VAT bill and off his profit, twice, on one receipt.
+  //
+  // For a VAT registered trader the expense IS the net. The VAT is not his money and never was his
+  // cost, which is the same sentence invoiceIncomeAmount enforces on the income side. That fix was
+  // shipped without following the argument across to the other side of the ledger, which is Run 2's
+  // lesson exactly: the arithmetic was never the problem, what reached the arithmetic was.
+  //
+  // ⚠️ NOTHING DOWNSTREAM CHANGES. Every profit reader in the product sums `amount`, so netting it
+  // here is the whole fix and no surface has to learn about VAT. And a man who states no VAT is
+  // untouched: netAmount is his gross, exactly as before.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const netAmount = vatAmount === null
+    ? magnitude
+    : Math.round((magnitude - vatAmount) * 100) / 100;
+
   try {
     await insertTransaction({
       user_id: user.id,
       vendor,
       // The sign convention every reader in the product shares: negative out, positive in.
-      amount: direction === 'out' ? -magnitude : magnitude,
+      // The NET of any VAT he has stated. See the block above: the VAT is not his cost.
+      amount: direction === 'out' ? -netAmount : netAmount,
       category: filedAs,
       transaction_date: date,
       source_type: 'web_manual',

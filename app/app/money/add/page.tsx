@@ -244,6 +244,12 @@ export default async function AddEntryPage({
                   receipt has no VAT on it, or if you would rather not claim it: nothing is ever
                   assumed here, and a figure only counts towards your reclaim because you typed it.
                 </p>
+                <p style={S.hint}>
+                  Tell us the VAT and the cost in your books becomes the bit without it, because the
+                  VAT comes back to you off your VAT return instead. So {gbp0(1200)} of materials
+                  with {gbp0(200)} of VAT goes down as a {gbp0(1000)} cost and a {gbp0(200)} reclaim,
+                  never as both.
+                </p>
               </>
             ) : null}
 

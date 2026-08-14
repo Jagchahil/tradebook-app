@@ -326,7 +326,11 @@ ok('🔴 the row is written for the session user', /user_id: user\.id/.test(rout
 ok('🔴 THE ROUTE NEVER WRITES A ROW ITSELF, IT CALLS insertTransaction',
   routeManual.includes('insertTransaction(') && !/\bfetch\s*\(|rest\/v1/.test(codeOnly(routeManual)));
 ok('🔴 the sign follows the direction, through one expression',
-  /amount: direction === 'out' \? -magnitude : magnitude/.test(routeManual));
+  // ⚠️ THE QUANTITY MOVED IN RUN 4 AND THE PROPERTY DID NOT. It was `magnitude`, the gross he
+  // typed; it is now `netAmount`, which is that gross less any VAT he stated, because the VAT on a
+  // cost is not his cost. Still one expression, still the sign driven by direction, which is the
+  // only thing this assertion has ever owned. test/run4fixes.test.mjs owns the netting itself.
+  /amount: direction === 'out' \? -netAmount : netAmount/.test(routeManual));
 ok('🔴 MONEY IN IS ALWAYS INCOME, WHATEVER THE FORM SAID',
   /direction === 'in' \? 'income'/.test(routeManual));
 ok('money out takes a validated category or the honest word other',

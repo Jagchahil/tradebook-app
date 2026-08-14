@@ -171,7 +171,7 @@ ok('🔴 the pack and the payload agree on what HMRC receives',
 const read = (p) => readFileSync(path.join(root, p), 'utf8');
 const resources = read('app/resources/page.tsx');
 const howItWorks = read('app/how-mtd-works/page.tsx');
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 ok('🔴 no page describes a quarterly update as a discrete three month block',
   !/covering August to October|covering November to January|covering February to April/.test(codeOnly(resources)));

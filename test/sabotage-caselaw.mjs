@@ -47,6 +47,11 @@ const edit = (dir, rel, from, to) => {
   writeFileSync(p, s.split(from).join(to));
 };
 
+// Written as escapes on purpose. This file is itself inside the sweep it is testing, and a
+// literal dash here would make the sweep fail on the sabotage runner rather than on the code.
+const EM_DASH = '\u2014';
+const EN_DASH = '\u2013';
+
 let applied = 0, held = 0, holes = 0, broken = 0;
 
 function sabotage(name, mutate, expectRed = true) {
@@ -163,11 +168,85 @@ sabotage('🔴 a public JSON endpoint is built from knowledge_items', (d) =>
     'export function GET() {',
     "const FEED = 'knowledge_items?select=*';\nvoid FEED;\n\nexport function GET() {"));
 
+// ── THE LICENCE'S OWN TERMS. Signed 14 August 2026. ─────────────────────────────────────────
+
+sabotage('🔴 the acknowledgement is reworded, so it stops being the Licensor approved form', (d) =>
+  edit(d, 'khoji/caselaw.mjs',
+    "'Crown copyright material reproduced by permission of The National Archives. '",
+    "'Crown copyright material used with permission of The National Archives. '"));
+
+sabotage('🔴 somebody FIXES the en dash in the acknowledgement, breaching the approved form', (d) =>
+  edit(d, 'khoji/caselaw.mjs',
+    'Open Justice \\u2013 Licence',
+    'Open Justice Licence'));
+
+sabotage('the partial representation statement stops saying what the licence requires', (d) =>
+  edit(d, 'khoji/caselaw.mjs',
+    'only partially represent ',
+    'fully represent '));
+
+sabotage('🔴 the two languages drift on the acknowledgement', (d) =>
+  edit(d, 'lib/lawsources.ts',
+    "  + 'The contents of the judgment can be used under the Open Justice \\u2013 Licence.';",
+    "  + 'The contents of the judgment can be used under the Open Justice Licence.';"));
+
+// ── PERSONAL DATA. Excluded from the licence outright. ──────────────────────────────────────
+
+sabotage('🔴 THE WRITER STORES THE TITLE RAW AGAIN, party names and all', (d) =>
+  edit(d, 'khoji/tribunal.mjs',
+    'title: stripParties(r.title),',
+    'title: r.title,'));
+
+sabotage('🔴 THE WRITER STORES THE CATCHWORDS RAW AGAIN', (d) =>
+  edit(d, 'khoji/tribunal.mjs',
+    "catchwords: stripParties((r.indexable_content || '').replace(/\\s+/g, ' ').trim()).slice(0, 800),",
+    "catchwords: (r.indexable_content || '').replace(/\\s+/g, ' ').trim().slice(0, 800),"));
+
+sabotage('the party stripper stops removing a hyphenated -v- name', (d) =>
+  edit(d, 'khoji/caselaw.mjs',
+    "const PARTIES_SRC = '\\\\b' + PARTY + '\\\\s+-?\\\\s*v\\\\.?\\\\s*-?\\\\s+' + PARTY;",
+    "const PARTIES_SRC = '\\\\b' + PARTY + '\\\\s+v\\\\s+' + PARTY;"));
+
+sabotage('🔴 the case reference stops being protected, so the desk cannot find the decision', (d) =>
+  edit(d, 'khoji/caselaw.mjs',
+    '  const guarded = text.replace(REFERENCES, (m) => {',
+    '  const guarded = text.replace(/$^/, (m) => {'));
+
+sabotage('the detector becomes stateful again, so it answers differently every other call', (d) =>
+  edit(d, 'khoji/caselaw.mjs',
+    "  return new RegExp(PARTIES_SRC).test(withoutRefs);",
+    "  return SHARED_PARTIES.test(withoutRefs);"));
+
 // ── THE SUITE ITSELF CANNOT VANISH. ─────────────────────────────────────────────────────────
 
 sabotage('🔴 the caselaw definition file is deleted', (d) => {
   rmSync(path.join(d, 'khoji/caselaw.mjs'));
 });
+
+// ── THE HOUSE DASH RULE, ACROSS THE WHOLE PIPELINE. Widened 14 August 2026. ─────────────
+//
+// The sweep was pointed at two files and passed for weeks while an em dash sat in the title
+// tribunal.mjs writes into the desk queue. These prove it now sees the rest of the pipeline.
+
+sabotage('🔴 THE ORIGINAL DEFECT: an em dash goes back into the desk queue title', (d) =>
+  edit(d, 'khoji/tribunal.mjs',
+    "join(', ')}. ${h.title}",
+    "join(', ')} " + EM_DASH + " ${h.title}"));
+
+sabotage('🔴 an em dash appears in a watch.mjs comment', (d) =>
+  edit(d, 'khoji/watch.mjs',
+    'service availability". Every one marked',
+    'service availability" ' + EM_DASH + ' every one marked'));
+
+sabotage('🔴 an en dash appears in lawsources', (d) =>
+  edit(d, 'lib/lawsources.ts',
+    '// Must match CASELAW_SOURCE_NAME in khoji/caselaw.mjs exactly.',
+    '// Must match CASELAW_SOURCE_NAME ' + EN_DASH + ' in khoji/caselaw.mjs exactly.'));
+
+sabotage('🔴 THE SWEEP IS NARROWED BACK to the two files the fix created', (d) =>
+  edit(d, 'test/caselawgate.test.mjs',
+    "    'khoji/tribunal.mjs': srcTribunal,\n",
+    ''));
 
 // ── NO-OP CONTROLS. These must stay GREEN, or this runner only detects that a file moved. ────
 
@@ -190,7 +269,7 @@ process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 20) {
-  process.stdout.write(`  COUNT WRONG: expected 20 sabotages to apply, got ${applied}\n`);
+if (applied !== 33) {
+  process.stdout.write(`  COUNT WRONG: expected 33 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

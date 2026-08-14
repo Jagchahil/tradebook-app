@@ -37,7 +37,7 @@ const ok = (name, cond) => {
 
 // Comments argue at length about what the code must not do, so a check for code or customer copy
 // strips them first, same as test/moneyweb.test.mjs.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 // Stage the optimiser and the property engine for bare node, the taxoptimiser.test.mjs harness.
 const stage = mkdtempSync(path.join(tmpdir(), 'landlord-'));

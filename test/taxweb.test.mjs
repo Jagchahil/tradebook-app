@@ -42,7 +42,7 @@ const ok = (name, cond) => {
 // Comments stripped before asking what the CODE does or what a CUSTOMER reads. Every one of these
 // files explains at length why the thing it does not do would be wrong, and a check that cannot
 // tell the argument from the sentence gets deleted, not fixed.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 const flat = (s) => s.replace(/\s+/g, ' ');
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

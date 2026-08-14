@@ -73,6 +73,29 @@ export type LegalField =
 // test/caselawgate.test.mjs asserts the two strings are byte identical, so they cannot drift.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// THE TWO STATEMENTS THE EXECUTED LICENCE REQUIRES, WORD FOR WORD.
+//
+// TNA ref CAS-341311-V2P0M2, signed 14 August 2026. "An acknowledgement in the form specified must
+// appear in a prominent location and in a form approved by the Licensor", and separately the
+// Re-user "must state in a prominent location ... that the Licensed Material only partially
+// represents the activities of the courts and tribunals".
+//
+// 🔴 THE EN DASH IN "Open Justice \u2013 Licence" IS THE ONE THE HOUSE RULE DOES NOT WIN AGAINST.
+// It is written as an escape so this file contains no literal dash, while the string it exports
+// carries the Licensor's exact form. test/caselawgate.test.mjs asserts the dash is PRESENT, so a
+// sweep that "fixes" it fails the build rather than quietly breaching the licence.
+//
+// ⚠️ DUPLICATED IN khoji/caselaw.mjs because khoji is .mjs under bare node and cannot import this.
+// The suite compares them.
+export const TNA_ACKNOWLEDGEMENT =
+  'Crown copyright material reproduced by permission of The National Archives. '
+  + 'The contents of the judgment can be used under the Open Justice \u2013 Licence.';
+
+export const TNA_PARTIAL_REPRESENTATION =
+  'Court judgments and tribunal decisions published on Find Case Law only partially represent '
+  + 'the activities of the courts and tribunals.';
+
 // Must match CASELAW_SOURCE_NAME in khoji/caselaw.mjs exactly. The test enforces it.
 export const CASELAW_SOURCE_NAME = 'Tax tribunal decision (GOV.UK, Open Government Licence)';
 

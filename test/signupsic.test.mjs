@@ -27,7 +27,7 @@ const ok = (name, cond) => { if (cond) { pass++; console.log(`  ok  ${name}`); }
 // Comments stripped before asking what a CUSTOMER reads: the old SIC sentence survives in a
 // comment explaining why it was wrong, and a check that cannot tell the argument from the copy
 // gets deleted, not fixed.
-const codeOnlyStart = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnlyStart = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 console.log('\nsignup SIC matching: information, never a filing');
 

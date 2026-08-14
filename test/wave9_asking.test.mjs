@@ -52,7 +52,7 @@ const ok = (name, cond) => {
 
 // Comments stripped before asking what the CODE does, as everywhere else in this test directory:
 // these files argue at length, in prose, about the very calls being counted here.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 console.log('\nwave nine: every surface that asks a man a question knows who it is asking');
 

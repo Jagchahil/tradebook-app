@@ -176,7 +176,7 @@ const pageSrc = read('app/start/page.tsx');
 const draftSrc = read('app/start/draft.ts');
 // Comments stripped before asking what the CODE does, same discipline test/signupsic.test.mjs
 // and friends use: a comment can describe an old bug without being mistaken for a live one.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 const pageCode = codeOnly(pageSrc);
 
 // Find the restore effect: the useEffect whose dependency array is [] and whose body calls

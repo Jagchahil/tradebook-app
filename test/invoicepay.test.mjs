@@ -46,7 +46,7 @@ const ok = (name, cond) => {
 
 // Comments stripped before looking for code a file must not contain: these files explain at
 // length why the thing they refuse to do would be wrong, and the check must read the code.
-const codeOnly = (src) => src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 console.log('\ninvoice card payment: no payout route, no session, no button');
 

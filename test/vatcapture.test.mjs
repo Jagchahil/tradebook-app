@@ -52,7 +52,7 @@ const ok = (name, cond) => {
 // Comments are stripped before looking for code a file must not contain. Every file here explains
 // at length why the thing it does not do would be wrong, and a check that cannot tell the argument
 // from the sentence gets deleted rather than fixed.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 const circumstancesSrc = read('lib/circumstances.ts');
 const routeSrc = read('app/api/vat/route.ts');

@@ -45,7 +45,7 @@ const ok = (name, cond) => {
 // Comments are stripped before looking for a string a CUSTOMER sees, or for code the file must
 // not contain. Every one of these files explains at length why the thing it does not do would be
 // wrong, and a check that cannot tell the argument from the sentence gets deleted, not fixed.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 // Stage app/app/entryref.ts for bare node: it imports lib/moneylog.ts extensionless, which Next
 // resolves and type stripping does not. Same fix as test/reviewpile.test.mjs, same reason.

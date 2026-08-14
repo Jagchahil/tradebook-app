@@ -63,7 +63,7 @@ const ok = (name, cond) => {
 // Comments are stripped before looking for code a file must NOT contain. Every file here argues at
 // length about why the wrong thing would be wrong, and a check that cannot tell the argument from
 // the code gets deleted rather than fixed.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 const claudeSrc = read('lib/claude.ts');
 const receiptSrc = read('app/api/money/receipt/route.ts');

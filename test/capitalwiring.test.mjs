@@ -715,7 +715,7 @@ ok('and every kind the product knows is covered by that answer either way',
 {
   // The wiring, on source, because the arithmetic above passes just as happily when nothing calls
   // it. A comment stripper first: this asserts what the code does, not what it says about itself.
-  const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
   const supa = codeOnly(read('lib/supabase.ts'));
   // The row loop moved whole into lib/yeartodate.ts on 6 August 2026 so the guard suite can
   // drive the exact function production runs. The pins on the loop move with it; the pins on

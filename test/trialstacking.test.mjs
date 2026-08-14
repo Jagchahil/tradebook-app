@@ -271,7 +271,7 @@ async function checkoutWith(trialEnd, extra = {}) {
 console.log('\n=== source pins ===\n');
 {
   const src = readFileSync(path.join(repoRoot, 'lib', 'stripe.ts'), 'utf8');
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
   const mint = code.slice(code.indexOf('export async function createSubscriptionCheckout'));
   ok('the trial field is set from resolveTrialForCheckout, never from a bare day count',
     /resolveTrialForCheckout\(/.test(mint)

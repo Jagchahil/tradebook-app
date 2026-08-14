@@ -49,7 +49,7 @@ const ok = (name, cond) => {
 
 // Comments argue at length about the things the code must not do, so they are stripped before
 // any "the file never says X" assertion. Same helper as test/moneyweb.test.mjs.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 // THE REAL ENGINE, INJECTED. The same line the route runs.
 const OWNER = '9c1b2a3d-0000-4000-8000-00000000aaaa';

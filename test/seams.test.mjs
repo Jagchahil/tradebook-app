@@ -76,7 +76,7 @@ function before(hay, a, b) {
 // Comments are where the arguments live, and an argument is not a behaviour. Every claim about
 // what the code DOES is made against the source with the comments taken out, so a sentence quoted
 // in a note explaining a bug can never be mistaken for the bug still being there.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 const startPage = codeOnly(read('app/start/page.tsx'));
 const taxVat = codeOnly(read('app/app/tax/vat/page.tsx'));

@@ -71,7 +71,7 @@ const ok = (name, cond) => {
 // Comments are stripped before looking for a string a CUSTOMER sees. Every one of these files
 // explains at length why the thing it does not do would be wrong, and a check that cannot tell an
 // argument against a sentence from the sentence is a check that gets deleted rather than fixed.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 console.log('\nsetting up on the web: resumable, and holding nothing');
 

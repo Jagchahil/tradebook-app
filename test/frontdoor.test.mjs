@@ -51,7 +51,7 @@ const rel = (f) => path.relative(root, f);
 const walkAll = walk;
 // ⚠️ DEFINED HERE RATHER THAN BESIDE ITS FIRST USE, because three separate sweeps now need it and
 // the two added on 30 July run before the one it was originally written for.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 let pass = 0;
 let fail = 0;
@@ -77,6 +77,10 @@ ok('the app tree was actually walked (not vacuous)', pages.length > 30);
 //   PHONE NUMBER, and a web signup's number is deliberately unproved, so until he binds it every
 //   such link is a door to a room he cannot enter.
 //
+// ⚠️ AND THE RULE IS ABOUT A NUMBER, WHICH IS SHARPER THAN "a wa.me link". A numberless
+// `wa.me/?text=` opens his own share sheet to send something to HIS customer. It resolves to no
+// account, needs no binding, and is not a door to any room. See the narrowing at the assertion.
+//
 // Binding is what changed on 30 July, and it changed by the only route that makes the link honest:
 // he proves the number by sending us a code from it. So the rule narrows rather than lifting. The
 // link may exist in exactly one file, /app/connect, which is the page whose entire job is that
@@ -89,7 +93,24 @@ ok('the app tree was actually walked (not vacuous)', pages.length > 30);
 // ⚠️ COMMENTS ARE STRIPPED FIRST. The connect page's own header explains at length why the link
 // travels the direction it does, and it has to say wa.me to make sense. What matters is the link a
 // customer can press, not the reasoning above it.
-const waLinks = pages.filter((f) => /wa\.me/.test(codeOnly(read(rel(f))))).map(rel);
+// ⚠️ NARROWED 14 AUGUST 2026, AND ONLY AFTER THE GUARD WAS FIRST MADE ABLE TO SEE.
+//
+// This assertion had been passing over three live links for weeks. The house codeOnly() strips
+// `//` as a line comment, and `https://wa.me/...` contains one, so every wa.me link written as a
+// full URL was truncated to `https:` before the filter ever saw it. Fixing codeOnly across the
+// repo is what surfaced them.
+//
+// What it surfaced was NOT the bug this rule was written for. Its own reasoning above is about a
+// wa.me link CARRYING A NUMBER: inbound WhatsApp resolves a message to an account by phone number,
+// and a web signup's number is unproved, so until he binds it such a link is a door to a room he
+// cannot enter. The three links found are `wa.me/?text=` with NO number. They open HIS OWN share
+// sheet so he can send an invoice or a books link to HIS customer. They message Lekhio not at all,
+// they need no binding, and they work for anybody with the app installed.
+//
+// So the rule keeps its full force where the harm is and stops firing where there is none. A
+// numbered link on any page but /app/connect still fails, which is the defect it exists to catch.
+const NUMBERED_WA = /wa\.me\/(?:%2B|\+)?\d/;
+const waLinks = pages.filter((f) => NUMBERED_WA.test(codeOnly(read(rel(f))))).map(rel);
 ok(
   `🔴 no page writes a wa.me link itself${waLinks.length ? `\n     ${waLinks.join('\n     ')}` : ''}`,
   waLinks.length === 0,
@@ -145,7 +166,7 @@ ok('the logged in app has screens to check', inApp.length >= 3);
 ok('the connect page is one of them', inApp.map(rel).includes(CONNECT_PAGE));
 const appInstructs = inApp
   .filter((f) => rel(f) !== CONNECT_PAGE && rel(f) !== 'app/app/page.tsx' && rel(f) !== APP_NAV)
-  .filter((f) => /WhatsApp/.test(read(rel(f)).replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')))
+  .filter((f) => /WhatsApp/.test(read(rel(f)).replace(/(^|[^:])\/\/[^\n]*/g, '$1').replace(/\/\*[\s\S]*?\*\//g, '')))
   .map(rel);
 ok(
   `🔴 no screen inside /app instructs a WhatsApp action${appInstructs.length ? `\n     ${appInstructs.join('\n     ')}` : ''}`,
@@ -155,7 +176,7 @@ ok(
 
 // The nav's exemption, paid for. It may name WhatsApp; it may not instruct.
 {
-  const whole = read(APP_NAV).replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const whole = read(APP_NAV).replace(/(^|[^:])\/\/[^\n]*/g, '$1').replace(/\/\*[\s\S]*?\*\//g, '');
   // Everything above the style object, which is the only part that renders words at a customer.
   // Checking the whole file matches "text" inside textDecoration, and a guard that cries wolf on a
   // CSS property is a guard the next person switches off.

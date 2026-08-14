@@ -42,7 +42,7 @@ const ok = (name, cond) => {
 // Comments stripped before asking what the CODE does or what a CUSTOMER reads, exactly as
 // test/taxweb.test.mjs does: these files explain at length why the things they do not do would be
 // wrong, and a check that cannot tell the argument from the sentence gets deleted, not fixed.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 const flat = (s) => s.replace(/\s+/g, ' ');
 
 const page = read('app/app/pay-yourself/page.tsx');

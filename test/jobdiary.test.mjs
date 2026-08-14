@@ -51,7 +51,7 @@ const ok = (name, cond) => {
 // Comments are stripped before looking for code a file must NOT contain. These files explain at
 // length why the thing they refuse to do would be wrong, and a check that cannot tell the
 // argument from the sentence is a check that gets deleted rather than fixed.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 const J = await import(pathToFileURL(path.join(root, 'lib/jobphotos.ts')).href);
 const D = await import(pathToFileURL(path.join(root, 'lib/diary.ts')).href);

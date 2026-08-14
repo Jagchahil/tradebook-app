@@ -42,7 +42,7 @@ const ok = (name, cond) => {
   else { fail += 1; console.log(`  FAIL  ${name}`); }
 };
 const read = (rel) => { try { return readFileSync(path.join(root, rel), 'utf8'); } catch { return ''; } };
-const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 const missing = (want, got) => want.filter((x) => !got.includes(x));
 

@@ -54,7 +54,7 @@ const ok = (name, cond) => {
 // a check that gets deleted rather than fixed.
 //
 // 🔴 AND THIS ONE IS URL SAFE, WHICH THE HOUSE HELPER IS NOT. The stripper used across this repo
-// is `.replace(/\/\/[^\n]*/g, '')`, and the `//` in `https://` matches it. So a line reading
+// is `.replace(/(^|[^:])\/\/[^\n]*/g, '$1')`, and the `//` in `https://` matches it. So a line reading
 //     const FCL = 'https://caselaw.nationalarchives.gov.uk/search';
 // becomes `const FCL = 'https:` before any assertion sees it, and EVERY NEGATIVE GUARD IN THIS
 // REPO THAT HUNTS FOR A FORBIDDEN URL IS BLIND TO IT. That was found on 14 August 2026 by a
@@ -197,6 +197,85 @@ ok('rubbish is not caselaw', C.isCaselawRow(null) === false && C.isCaselawRow('x
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════
+// B2. THE TWO STATEMENTS THE EXECUTED LICENCE REQUIRES, WORD FOR WORD.
+//
+// The licence signed on 14 August 2026 is stricter than the application's nine principles, and
+// these are hard obligations rather than good practice:
+//
+//   "An acknowledgement in the form specified must appear in a prominent location and in a form
+//   approved by the Licensor."
+//
+//   Restrictions (b): the Re-user "must state in a prominent location and in a form approved by
+//   the Licensor that the Licensed Material only partially represents the activities of the
+//   courts and tribunals".
+//
+// 🔴 THE ACKNOWLEDGEMENT CONTAINS AN EN DASH AND THAT IS THE ONE PLACE IN THIS PRODUCT WHERE ONE
+// BELONGS. The house rule bans en dashes everywhere. The licence specifies the form of words. So
+// the dash is asserted PRESENT here: a well meaning sweep that "fixes" it fails the build rather
+// than quietly putting us in breach.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const EN_DASH = '\u2013';
+  ok('the acknowledgement is declared', typeof C.TNA_ACKNOWLEDGEMENT === 'string');
+  ok('🔴 IT IS THE LICENSOR\'S EXACT FORM OF WORDS',
+    C.TNA_ACKNOWLEDGEMENT
+      === 'Crown copyright material reproduced by permission of The National Archives. '
+        + 'The contents of the judgment can be used under the Open Justice ' + EN_DASH + ' Licence.');
+  ok('🔴 AND THE EN DASH IS PRESENT, because the licence specifies the form and the house rule does not win here',
+    C.TNA_ACKNOWLEDGEMENT.includes(EN_DASH));
+  ok('the partial representation statement is declared and says what the licence requires',
+    typeof C.TNA_PARTIAL_REPRESENTATION === 'string'
+    && /only partially represent/i.test(C.TNA_PARTIAL_REPRESENTATION)
+    && /courts and tribunals/i.test(C.TNA_PARTIAL_REPRESENTATION));
+  // Both languages again, so a surface written in TypeScript cannot show a reworded version.
+  const ackTs = (srcLawSources.match(/export const TNA_ACKNOWLEDGEMENT =([\s\S]*?);/) || [])[1] || '';
+  ok('🔴 the TypeScript side carries the SAME acknowledgement, byte for byte',
+    ackTs.includes('Crown copyright material reproduced by permission of The National Archives.')
+    && ackTs.includes('Open Justice')
+    && ackTs.includes('\\u2013'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// B3. PERSONAL DATA IS NOT LICENSED, SO IT IS NEVER STORED.
+//
+// The Exclusions clause: this licence does not cover "personal data contained in the Licensed
+// Material", and "this Licence is not a data sharing agreement for personal data". And principle
+// 6 of the application, in Jag's own words: "We do not store, enrich, index or infer personal
+// data about any individual named in a decision."
+//
+// The code did the opposite until 14 August 2026. A tribunal title IS the parties.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  ok('the case reference survives, because it identifies a public record and is not personal data',
+    C.stripParties('UT-2024-000141 CATS NORTH SEA v HMRC').includes('UT-2024-000141'));
+  ok('the neutral citation survives',
+    C.stripParties('Smith v The Commissioners for HMRC [2024] UKUT 123 (TCC)').includes('[2024] UKUT 123 (TCC)'));
+  ok('🔴 AND THE NAMES DO NOT',
+    !/CATS NORTH SEA/.test(C.stripParties('UT-2024-000141 CATS NORTH SEA v HMRC'))
+    && !/Smith/.test(C.stripParties('Smith v The Commissioners for HMRC [2024] UKUT 123 (TCC)')));
+  ok('a hyphenated -v- names parties too',
+    !/Patel/.test(C.stripParties('J Patel -v- HMRC, CAPITAL ALLOWANCES')));
+  ok('subject matter with no parties in it is left alone',
+    C.stripParties('CAPITAL ALLOWANCES: whether a van is a car') === 'CAPITAL ALLOWANCES: whether a van is a car');
+  ok('stripping twice changes nothing',
+    C.stripParties(C.stripParties('Smith v HMRC')) === C.stripParties('Smith v HMRC'));
+  // ⚠️ A /g REGEX CARRIES lastIndex BETWEEN CALLS. namesParties builds a fresh one each time,
+  // because a shared one would answer differently on every other call and read as flakiness.
+  ok('🔴 the detector is not stateful, so it answers the same twice running',
+    C.namesParties('Smith v HMRC') === true && C.namesParties('Smith v HMRC') === true);
+  ok('and it says a stripped string is clean',
+    C.namesParties(C.stripParties('Smith v The Commissioners for HMRC')) === false);
+}
+{
+  // 🔴 THE WRITER MUST STRIP BEFORE IT STORES. Anchored on the call inside the row it builds,
+  // not on the import, because an import is not a wiring.
+  const code = codeOnly(srcTribunal);
+  const hits = code.slice(code.indexOf('hits.push('), code.indexOf('hits.push(') + 600);
+  ok('🔴 THE TITLE IS STRIPPED BEFORE IT IS KEPT', /title: stripParties\(/.test(hits));
+  ok('🔴 AND SO ARE THE CATCHWORDS', /catchwords: stripParties\(/.test(hits));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 // C. NO JUDGMENT IS FETCHED, HOSTED, OR INDEXED.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 {
@@ -255,10 +334,31 @@ ok('rubbish is not caselaw', C.isCaselawRow(null) === false && C.isCaselawRow('x
   // Written as \u escapes on purpose: a literal en or em dash in the detector would make this
   // suite fail on its own source, which is a test that can never be run. Same trap jobdiary hit.
   const DASH = /[\u2013\u2014]/;
+  // ⚠️ khoji/caselaw.mjs IS EXEMPT AND THE EXEMPTION IS NAMED. It carries the Licensor's approved
+  // acknowledgement, which contains an en dash, written as a \\u2013 escape so the file has no
+  // literal dash in it while the STRING it exports does. The assertion above proves the string
+  // has the dash; this one proves the file has no OTHER one.
+  //
+  // ⚠️ WIDENED 14 AUGUST 2026, AND IT FOUND TWO. The sweep used to look at the two files this
+  // fix created, which is the narrowest possible reading of "anywhere". Pointing it at the whole
+  // caselaw pipeline turned up an em dash in the TITLE khoji/tribunal.mjs writes into the desk
+  // queue, and one in a comment in khoji/watch.mjs. Both had shipped. A rule only holds where it
+  // is pointed, so it is now pointed at every file in the pipeline.
+  //
+  // khoji/tribunaltest.mjs IS EXEMPT AND THE EXEMPTION IS NAMED. Its fixtures are real catchwords
+  // lifted from real decisions, and the judiciary writes en dashes. Correcting a quotation of the
+  // input would make the fixture stop representing the thing it exists to represent.
   const files = {
     'khoji/caselaw.mjs': srcCaselaw,
+    'khoji/tribunal.mjs': srcTribunal,
+    'khoji/watch.mjs': read('khoji/watch.mjs'),
+    'khoji/distill.mjs': read('khoji/distill.mjs'),
+    'lib/lawsources.ts': srcLawSources,
     'test/caselawgate.test.mjs': read('test/caselawgate.test.mjs'),
+    'test/sabotage-caselaw.mjs': read('test/sabotage-caselaw.mjs'),
   };
+  ok('the sweep covers the whole pipeline, not just the two files this fix created',
+    Object.keys(files).length === 7);
   const bad = Object.entries(files).filter(([, src]) => DASH.test(src)).map(([n]) => n);
   ok('🔴 no em dash and no en dash in anything this fix shipped: ' + (bad.join(', ') || 'none'),
     bad.length === 0);

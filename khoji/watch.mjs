@@ -132,7 +132,7 @@ function writeNote(item, d, status) {
   // The vault is a HUMAN's second brain. It syncs to Jag's laptop and sits next to his own notes on
   // Business, Daily and Nutrition. On 12 July it held 143 Khoji notes and most of them were
   // "Preparing for Vaping Products Duty", "Currency codes for data element 4/10 of the customs
-  // declaration", "Customs Declaration Service: service availability" — every one marked
+  // declaration", "Customs Declaration Service: service availability". Every one marked
   // `affects: not relevant`, `confidence: 0.15`, by Khoji itself.
   //
   // Binning an item in the database and then filing it in his vault anyway is not a bin, it is a

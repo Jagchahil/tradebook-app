@@ -100,7 +100,7 @@ ok(`a granted trial really ends in ${S.TRIAL_DAYS} days (got ${grantedDays})`, g
 
   // Comments are stripped: several of these files argue at length about the fourteen day mistake and
   // must keep saying "14 days" to make sense. What matters is what a customer is shown.
-  const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
   // "first month free", "a month free", "one month free" and friends. No trial is a month.
   const monthly = files.filter((f) => /(first|one|a)\s+month\s+free|free\s+(for\s+)?(a|one|the\s+first)\s+month/i

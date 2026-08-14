@@ -51,7 +51,7 @@ const ok = (name, cond) => {
 
 // Comments stripped before looking for code a file must not contain, moneyweb's own reason:
 // these files explain at length why the thing they do not do would be wrong.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 // app/app/invoiceref.ts imports only node:crypto, so it stages alone.
 function stageInvoiceref(secret) {

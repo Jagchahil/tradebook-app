@@ -52,7 +52,7 @@ const hub = read(HUB);
 // Comments stripped before asking what the CODE does or what a CUSTOMER reads. The page explains
 // at length why the thing it does not do would be wrong, and a check that cannot tell the argument
 // from the sentence gets deleted rather than fixed.
-const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 const flat = (s) => s.replace(/\s+/g, ' ');
 const copy = flat(codeOnly(page));
 

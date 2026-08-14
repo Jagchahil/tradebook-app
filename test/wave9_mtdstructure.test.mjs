@@ -57,7 +57,7 @@ const ok = (name, cond) => {
 // Comments stripped before asking what a CUSTOMER reads, as everywhere else in this directory:
 // these files argue at length about the sentences they refuse to say, and a guard that cannot tell
 // the argument from the sentence gets switched off rather than fixed.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 const flat = (s) => s.replace(/\s+/g, ' ');
 
 // ⚠️ THE GATES ARE RUN, NOT READ. A test that retypes `businessType === 'limited_company'` proves

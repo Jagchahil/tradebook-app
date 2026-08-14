@@ -102,7 +102,7 @@ ok('the app API logs c.ask too, never the body the client posted',
 const channels = [...apiSrc.matchAll(/saveCircumstance\([^)]*?,\s*(?:'([a-z]+)'|([^,)]*\?[^)]*))\)/g)];
 ok('the channel is a server decision, out of a closed set',
   /isForm \? 'web' : 'app'/.test(apiSrc)
-  && !/channel/.test(apiSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, ''))
+  && !/channel/.test(apiSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1'))
   && channels.length >= 2);
 
 ok('the question we SEND is exactly the question we LOG, with nothing bolted on',

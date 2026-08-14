@@ -160,7 +160,7 @@ const keysOf = (input) => computeSignals(input).map((s) => s.signalKey);
     && /Never calculate it from the total/.test(receipt));
   ok('🔴 AND THE READING IS NEVER A CLAIM: nothing in lib/claude.ts confirms a VAT figure',
     /vat: number \| null;/.test(receipt)
-    && !/vat_confirmed/.test(receipt.replace(/\/\/[^\n]*/g, '')));
+    && !/vat_confirmed/.test(receipt.replace(/(^|[^:])\/\/[^\n]*/g, '$1')));
 
   const claims = [
     ['app/api/whatsapp/route.ts', 'the shop, the total and the VAT'],

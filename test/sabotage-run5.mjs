@@ -31,7 +31,10 @@ const root = path.resolve(here, '..');
 
 function scratch() {
   const dir = mkdtempSync(path.join(tmpdir(), 'sab-run5-'));
-  for (const d of ['lib', 'test', 'app', 'supabase']) {
+  // ⚠️ components/ IS HERE BECAUSE test/frontdoor.test.mjs WALKS IT. Without it that suite throws
+  // on a scratch copy and its no-op control goes red, which is the shape of a broken harness
+  // rather than a broken guard. Same lesson next.config.mjs taught an hour earlier.
+  for (const d of ['lib', 'test', 'app', 'supabase', 'components']) {
     cpSync(path.join(root, d), path.join(dir, d), { recursive: true });
   }
   // ⚠️ next.config.mjs CARRIES THE CONTENT SECURITY POLICY, and the suite reads img-src out of it
@@ -365,6 +368,28 @@ sabotageIn('diarygoals', '🔴 a mutating id moves out of its hidden field into 
     '<input type="hidden" name="id" value={job.id} />\n                        <button type="submit" className="lek-act">Remove</button>',
     '<button type="submit" className="lek-act">Remove</button>'));
 
+// ── 10. THE wa.me RULE, NARROWED ON 14 AUGUST 2026. Prove it still bites where the harm is. ──
+//
+// The rule was passing over three live links because codeOnly() truncated every full URL at
+// `https:`. Fixing that surfaced them, and they turned out to be numberless share sheets rather
+// than the defect the rule exists for. It now fires on a link CARRYING A NUMBER, which is the
+// shape that resolves to an account a man may not have bound. These prove that still holds.
+
+sabotageIn('frontdoor', '🔴 THE ORIGINAL DEFECT: a NUMBERED wa.me link appears on a customer page', (d) =>
+  edit(d, 'app/app/share-books/page.tsx',
+    'href={`https://wa.me/?text=${encodeURIComponent(shareText)}`}',
+    'href={`https://wa.me/447593214044?text=${encodeURIComponent(shareText)}`}'));
+
+sabotageIn('frontdoor', '🔴 a numbered wa.me link appears on the invoice page', (d) =>
+  edit(d, 'app/app/invoice/page.tsx',
+    'href={`https://wa.me/?text=${encodeURIComponent(draft)}`}',
+    'href={`https://wa.me/%2B447593214044?text=${encodeURIComponent(draft)}`}'));
+
+sabotageIn('frontdoor', 'NO-OP: the numberless share sheet is left exactly as it is', (d) =>
+  edit(d, 'app/app/share-books/page.tsx',
+    'Share the link',
+    'Share the link'), false);
+
 // ── 9. NO-OP CONTROLS. These must stay GREEN, or this runner only detects that a file moved. ──
 
 sabotage('NO-OP: a comment word changes in the hours block', (d) =>
@@ -386,7 +411,7 @@ process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 53) {
-  process.stdout.write(`  COUNT WRONG: expected 53 sabotages to apply, got ${applied}\n`);
+if (applied !== 56) {
+  process.stdout.write(`  COUNT WRONG: expected 56 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

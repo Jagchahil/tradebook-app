@@ -41,7 +41,7 @@ const ok = (name, cond) => {
 
 // Comments stripped before asking what the CODE does or what a CUSTOMER reads, as everywhere else
 // in this test directory: these files argue at length about the things they refuse to do.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 console.log('\nstructure honesty: labels, askability, the register, and the empty pay page');
 

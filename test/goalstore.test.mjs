@@ -45,7 +45,7 @@ const ok = (name, cond) => {
 // Comments stripped before looking for code a file must not contain: the headers argue at length
 // about user_goals precisely because nothing may touch it, and a check that cannot tell the
 // argument from the deed would fail the build over its own explanation.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 const sqlCodeOnly = (src) => src.replace(/--[^\n]*/g, '');
 
 const GO = await import(pathToFileURL(path.join(root, 'lib/goals.ts')).href);

@@ -47,7 +47,7 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const read = (rel) => readFileSync(path.join(root, rel), 'utf8');
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 // Node's type stripping cannot follow an extensionless relative import, so the module and every
 // file it reaches are staged with the rewrite the engine suites use. See test/subjectrule.test.mjs.

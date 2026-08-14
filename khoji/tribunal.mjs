@@ -51,7 +51,7 @@
 //   node tribunal.mjs --since=N   look back N days (default 30)
 
 import { createHash } from 'node:crypto';
-import { CASELAW_SOURCE_NAME } from './caselaw.mjs';
+import { CASELAW_SOURCE_NAME, stripParties } from './caselaw.mjs';
 
 const DRY = process.argv.includes('--dry-run');
 const DB_URL = process.env.KHOJI_DB_URL || '';
@@ -176,11 +176,17 @@ async function main() {
   for (const r of fresh) {
     const touches = triage(`${r.title} ${r.indexable_content || ''}`);
     if (touches.length) {
+      // 🔴 THE PARTIES COME OUT BEFORE ANYTHING IS KEPT. The licence's Exclusions clause does not
+      // cover "personal data contained in the Licensed Material", and principle 6 of our own
+      // application says we do not store personal data about any individual named in a decision.
+      // A tribunal title IS the parties, and the catchwords repeat them. The triage happens on
+      // `touches`, which is OUR watched list, so nothing the desk needs is lost. See
+      // khoji/caselaw.mjs for why it over removes rather than guesses.
       hits.push({
-        title: r.title,
+        title: stripParties(r.title),
         link: r.link,
         published: r.public_timestamp,
-        catchwords: (r.indexable_content || '').replace(/\s+/g, ' ').trim().slice(0, 800),
+        catchwords: stripParties((r.indexable_content || '').replace(/\s+/g, ' ').trim()).slice(0, 800),
         touches,
         hash: createHash('sha256').update(r.link).digest('hex').slice(0, 12),
       });
@@ -227,7 +233,7 @@ async function main() {
         [
           `https://www.gov.uk${h.link}`,
           CASELAW_SOURCE_NAME,
-          `⚖️ MAY AFFECT: ${h.touches.map((t) => t.rule).join(', ')} — ${h.title}`,
+          `⚖️ MAY AFFECT: ${h.touches.map((t) => t.rule).join(', ')}. ${h.title}`,
           [
             'A tribunal has decided a case that touches a rule we assert. A judgment can reverse a tax',
             'answer without HMRC changing a single page, and no other watcher we own can see it.',

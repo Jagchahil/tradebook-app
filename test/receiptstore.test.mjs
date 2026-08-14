@@ -36,7 +36,7 @@ const ok = (name, cond) => {
   if (cond) { pass++; console.log(`  ok  ${name}`); } else { fail++; console.log(`  FAIL ${name}`); }
 };
 
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 const sqlCodeOnly = (src) => src.replace(/--[^\n]*/g, '');
 
 const routeReceipt = read('app/api/money/receipt/route.ts');

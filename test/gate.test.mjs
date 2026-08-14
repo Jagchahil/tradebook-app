@@ -299,7 +299,7 @@ for (const r of ['app/api/billing/status', 'app/api/billing/trial']) {
   // ⚠️ COMMENTS STRIPPED FIRST. The route's own header names isEntitled in order to explain why it
   // is NOT used, and a guard that forbids a file from explaining itself is a guard somebody deletes.
   // The same trap caught the fourteen day sweep in test/trialnudge.test.mjs an hour earlier.
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
   ok(`${r} does not compute a second opinion with isEntitled`, !/isEntitled/.test(code));
 }
 

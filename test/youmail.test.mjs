@@ -48,7 +48,7 @@ const ok = (name, cond) => {
 // Comments stripped before asking what the CODE does. Every one of these files explains at length
 // the mistakes it refuses to make, and a grep that cannot tell the warning from the deed fails on
 // the warning.
-const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+const codeOnly = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 // a appears, b appears, and a appears FIRST. The order pins below are all this one question.
 const before = (src, a, b) => src.includes(a) && src.includes(b) && src.indexOf(a) < src.indexOf(b);

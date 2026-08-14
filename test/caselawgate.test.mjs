@@ -963,6 +963,25 @@ ok('rubbish is not caselaw', C.isCaselawRow(null) === false && C.isCaselawRow('x
     !new RegExp('grant [a-z, ]+ on public\\.' + t + ' to khoji_writer;').test(srcSchema));
   ok('🔴 EVERY TABLE KHOJI TOUCHES HAS A GRANT IN schema.sql: ' + (ungranted.join(', ') || 'none missing'),
     ungranted.length === 0);
+
+  // ⚠️ AND THE DERIVATION ONLY WORKS BECAUSE EVERY REFERENCE IS SCHEMA QUALIFIED, so that is
+  // now a rule rather than a convention. The guard above keys on `public.<table>`. Write
+  // `insert into khoji_foo` with no schema and the table is invisible to it, so the grant check
+  // can be bypassed by dropping five characters. This closes that door.
+  const unqualified = [];
+  for (const name of ['watch.mjs', 'distill.mjs', 'tribunal.mjs', 'lawwatch.mjs', 'bodies.mjs',
+    'caselawtakedown.mjs', 'caselawcertificate.mjs', 'diff.mjs', 'amend.mjs', 'budget.mjs',
+    'corpus.mjs']) {
+    const f = 'khoji/' + name;
+    if (!existsSync(path.join(root, f))) continue;
+    const src = codeOnly(read(f));
+    for (const m of src.matchAll(/\b(?:from|into|update|join)\s+((?!public\.|information_schema\.)[a-z_]{3,})\b/gi)) {
+      // Only the ones that look like OUR tables. `from res.json()` and friends are not SQL.
+      if (/^(khoji_[a-z_]+|knowledge_items|qa_cache)$/.test(m[1])) unqualified.push(`${f}: ${m[0]}`);
+    }
+  }
+  ok('🔴 NO KHOJI SQL NAMES ONE OF OUR TABLES WITHOUT public.: '
+    + (unqualified.join(' | ') || 'none'), unqualified.length === 0);
   ok('🔴 qa_cache carries BOTH select and update, because the certificate must SEE it and the\n     watcher must WRITE it',
     /grant select, update on public\.qa_cache to khoji_writer;/.test(srcSchema));
   ok('the grants say why they exist, not just what they are',

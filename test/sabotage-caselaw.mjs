@@ -615,6 +615,22 @@ sabotage('NO-OP: a job touches a table that IS already granted', (d) =>
     "  const runs = await db.query(",
     "  await db.query('select 1 from public.khoji_bodies limit 1');\n  const runs = await db.query("), false);
 
+sabotage('🔴 A TABLE IS NAMED WITHOUT public., which would hide it from the grant check', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    "    \"select count(*)::int as n from public.khoji_runs where kind in ('tribunal','caselawtakedown')\",",
+    "    \"select count(*)::int as n from khoji_runs where kind in ('tribunal','caselawtakedown')\","));
+
+// ⚠️ A DOCUMENTED LIMIT, NOT A GUARD. This one STAYS GREEN on purpose and the reason is
+// worth writing down. khoji_history is written by a worker in the mini's separate lekhio-workers
+// folder, which this repo cannot see, so the derived check has no way to know the table is needed.
+// The grant is in schema.sql for truthfulness, not enforcement. If that worker ever moves into
+// khoji/, the derived check picks it up automatically and this control will start failing, which is
+// the correct moment to delete it.
+sabotage('KNOWN LIMIT: dropping the khoji_history grant is NOT caught, because its writer is not in this repo', (d) =>
+  edit(d, 'khoji/schema.sql',
+    'grant select, insert on public.khoji_history to khoji_writer;',
+    ''), false);
+
 // ── NO-OP CONTROLS. These must stay GREEN, or this runner only detects that a file moved. ────
 
 sabotage('NO-OP: a comment word changes in the caselaw definition', (d) =>
@@ -651,7 +667,7 @@ process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 97) {
-  process.stdout.write(`  COUNT WRONG: expected 97 sabotages to apply, got ${applied}\n`);
+if (applied !== 99) {
+  process.stdout.write(`  COUNT WRONG: expected 99 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

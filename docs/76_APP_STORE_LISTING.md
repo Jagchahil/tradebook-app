@@ -27,7 +27,16 @@ ASK ANYTHING
 "How much have I spent this month?" "Can I claim my work boots?" "When is my tax due?" Ask in plain English on WhatsApp and get a straight answer from your own figures.
 
 WHAT IT COSTS
-£12.99 a month or £129 a year, everything in. Your first 7 days are free, no card needed.
+Your first 7 days are free, no card needed. After that Lekhio is a paid subscription, and you
+can see the current price and manage it at lekhio.app.
+
+<!-- The price used to be printed here. Removed 14 August 2026.
+     Guideline 3.1.1(a) covers apps AND THEIR METADATA. A bare figure with no link is grey
+     rather than fatal, and Xero and QuickBooks print one. But the binary was carefully
+     scrubbed of every price, checkout and purchase link, and startSubscriptionCheckout is
+     dead on purpose with a comment saying so. Printing the number in the listing is the one
+     place that discipline leaks, it is free to remove, and a figure in a store listing goes
+     stale the day the price changes. -->
 
 THE SMALL PRINT, HONESTLY
 Lekhio is an independent UK company. We are not HMRC and HMRC does not endorse us. Lekhio prepares your figures; you approve them; you stay responsible for your tax. General guidance, not regulated tax advice. Figures use the England, Wales and Northern Ireland income tax bands.
@@ -51,4 +60,4 @@ Demo account: provide a test phone number with OTP disabled or a review build fl
 
 ## Category and rating
 
-Apple: Finance (primary), Business (secondary). Google: Finance. Content rating: everyone. Data safety: financial info and phone number collected, encrypted in transit and at rest, deletable in app (Settings, Your data), never sold.
+Apple: Finance (primary), Business (secondary). Google: Finance. Content rating: everyone. Data safety: financial info and phone number collected, encrypted in transit and at rest, deletable in app (Settings, Your data, Delete my account), never sold.

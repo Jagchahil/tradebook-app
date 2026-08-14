@@ -16,7 +16,7 @@
 
 process.env.REP_TRIAL_CODES = 'ROADSHOW24, dave-rep ,MANCHESTER';
 
-import { readFileSync, readdirSync, lstatSync } from 'node:fs';
+import { readFileSync, readdirSync, lstatSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
@@ -73,16 +73,25 @@ ok(`a granted trial really ends in ${S.TRIAL_DAYS} days (got ${grantedDays})`, g
 // whose whole pitch is being straight with him about money. It had been live for a day and nothing
 // went red, because a sentence is not a type error.
 //
-// The store listings are the same failure, older: they still say fourteen days, which is why
-// [[project_appstore_connect_17jul]] carries a warning rather than a fix. Those are outside the
-// repo. Everything INSIDE it is now checked here.
+// 🔴 AND "OUTSIDE THE REPO" WAS THE HOLE. Fixed 14 August 2026.
+//
+// This comment used to end: "The store listings still say fourteen days. Those are outside the
+// repo. Everything INSIDE it is now checked here." Both halves were true and the conclusion was
+// wrong. The MOBILE APP is a different repo, so the sweep stopped at the boundary, and on the far
+// side of that boundary the app a customer actually installs was promising FOURTEEN DAYS in four
+// places while this file granted seven. One of those four was the referral message a user SENDS TO
+// ANOTHER PERSON: "Use my link and your first 14 days are free."
+//
+// So a man was told a fortnight, cut off on day eight, and told a friend the same thing in a
+// message we wrote for him. The rule was right, it was simply pointed at one repo.
+//
+// Three suites in this folder already read ../../tradebook-app. It was reachable the whole time.
 //
 // The rule: a customer facing file may name a trial length only by reading TRIAL_DAYS. A literal
 // number of free days, or a free month, is a second copy of a commercial promise.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 {
-  const roots = ['app', 'lib'];
-  const skip = new Set(['node_modules', '.next', 'dist']);
+  const skip = new Set(['node_modules', '.next', 'dist', 'ios', 'android']);
   const files = [];
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
@@ -95,8 +104,25 @@ ok(`a granted trial really ends in ${S.TRIAL_DAYS} days (got ${grantedDays})`, g
     }
   };
   const root = path.resolve(here, '..');
-  for (const r of roots) walk(join(root, r));
-  ok('the app and lib trees were actually walked (not vacuous)', files.length > 100);
+  for (const r of ['app', 'lib']) walk(join(root, r));
+  const webCount = files.length;
+  ok('the app and lib trees were actually walked (not vacuous)', webCount > 100);
+
+  // 🔴 AND ACROSS THE BOUNDARY, INTO THE APP A CUSTOMER ACTUALLY INSTALLS.
+  const mobileRoot = path.resolve(here, '../../tradebook-app');
+  const mobileDirs = ['app', 'lib', 'components'].map((d) => join(mobileRoot, d)).filter(existsSync);
+  for (const d of mobileDirs) walk(d);
+  const mobileCount = files.length - webCount;
+
+  // ⚠️ A CHECK THAT COULD NOT RUN IS NOT A CHECK THAT PASSED, and that is exactly how a
+  // cross repo sweep dies: on a machine without the sibling checkout it finds nothing, reports
+  // nothing, and goes green for ever. So the absence is stated out loud rather than swallowed, and
+  // finding the repo but reading no files from it is a FAILURE, not a pass.
+  if (mobileDirs.length === 0) {
+    console.log('  SKIP  the mobile app is not checked out beside this repo, so it was NOT swept');
+  } else {
+    ok(`the mobile app was actually swept, ${mobileCount} file(s), not vacuously`, mobileCount > 20);
+  }
 
   // Comments are stripped: several of these files argue at length about the fourteen day mistake and
   // must keep saying "14 days" to make sense. What matters is what a customer is shown.
@@ -110,11 +136,29 @@ ok(`a granted trial really ends in ${S.TRIAL_DAYS} days (got ${grantedDays})`, g
     monthly.length === 0);
 
   // A literal "<n> days free" / "<n> day free trial" that is not the real number.
+  //
+  // 🔴 THE PATTERN IS DEFINED ONCE AND THE CONTROL BELOW USES THE SAME OBJECT. It was
+  // written out twice, and a control that tests a SECOND COPY of a regex proves nothing about the
+  // one doing the work. Pin the shared function, never the shared expression.
+  //
+  // ⚠️ AND IT MISSED TWO PHRASINGS UNTIL 14 AUGUST 2026, one of which was live.
+  // "your first 14 days are free" has "are" between the noun and "free", so the original
+  // `(\d+)\s*days?\s+free` never matched it. That exact sentence was in the mobile app's referral
+  // message, the one a user SENDS TO ANOTHER PERSON. The sweep had been reporting clean over it.
+  // Found by the known bad string control below, on the first run of that control.
+  const TRIAL_CLAIM = () => new RegExp(
+    "(\\d+)\\s*days?[\u2019']?(\\s+are)?\\s+free"
+    + "|(\\d+)\\s*days?\\s+(free\\s+)?trial"
+    + "|free\\s+for\\s+(\\d+)\\s*days?",
+    'gi',
+  );
+  const claimNumber = (m) => Number(m[1] || m[3] || m[5]);
+
   const wrongDays = [];
   for (const f of files) {
     const src = codeOnly(readFileSync(f, 'utf8'));
-    for (const m of src.matchAll(/(\d+)\s*days?\s+free|(\d+)\s*day\s+(free\s+)?trial|free\s+for\s+(\d+)\s*days?/gi)) {
-      const n = Number(m[1] || m[2] || m[4]);
+    for (const m of src.matchAll(TRIAL_CLAIM())) {
+      const n = claimNumber(m);
       // 30 is the field sales rep trial, which is real and lives in lib/stripe.ts as REP_TRIAL_DAYS.
       if (n !== S.TRIAL_DAYS && n !== S.REP_TRIAL_DAYS) {
         wrongDays.push(`${relative(root, f)}: "${m[0].trim()}"`);
@@ -123,6 +167,25 @@ ok(`a granted trial really ends in ${S.TRIAL_DAYS} days (got ${grantedDays})`, g
   }
   ok(`🔴 no file advertises a trial length other than ${S.TRIAL_DAYS} or ${S.REP_TRIAL_DAYS}${wrongDays.length ? `\n     ${wrongDays.join('\n     ')}` : ''}`,
     wrongDays.length === 0);
+
+  // ⚠️ AND THE DETECTOR IS SHOWN A KNOWN BAD STRING, because a sweep that finds nothing
+  // and a sweep that cannot see are the same output. The scratch sabotage harnesses in this folder
+  // copy only THIS repo, so they cannot reach the mobile app to break it. This control can, and it
+  // runs every time.
+  const BAD = [
+    '14 days free',
+    'free for 14 days',
+    'a 14 day free trial',
+    'your first 14 days are free',
+  ];
+  const missed = BAD.filter((t) => ![...t.matchAll(TRIAL_CLAIM())]
+    .map(claimNumber).some((n) => n !== S.TRIAL_DAYS && n !== S.REP_TRIAL_DAYS));
+  ok(`🔴 THE DETECTOR CATCHES EVERY KNOWN BAD PHRASING${missed.length ? `\n     missed: ${missed.join(' | ')}` : ''}`,
+    missed.length === 0);
+  const GOOD = `first ${S.TRIAL_DAYS} days are free, and a ${S.REP_TRIAL_DAYS} day free trial for reps`;
+  const falsePositives = [...GOOD.matchAll(TRIAL_CLAIM())]
+    .map(claimNumber).filter((n) => n !== S.TRIAL_DAYS && n !== S.REP_TRIAL_DAYS);
+  ok('and does not fire on the correct numbers', falsePositives.length === 0);
 
   // ⚠️ AND THE SIGNUP TIME PROMISE, WHICH DRIFTED THE SAME WAY ON THE SAME PAGES.
   // "two minutes to get set up" was true when setup was six questions. It is ten to fifteen now, and

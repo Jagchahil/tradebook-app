@@ -67,6 +67,14 @@ grant select, insert on public.khoji_runs to khoji_writer;
 grant select, insert, update on public.khoji_bodies to khoji_writer;
 grant select, insert, update on public.khoji_documents to khoji_writer;
 
+-- ⚠️ AND khoji_history, WHOSE WRITER IS NOT IN THIS REPO. It was already granted in the live
+-- database and undocumented here, which I first read as a privilege with no caller. It has a
+-- caller. The pocket (lib/pocket.ts, rendered by app/team/Memory.tsx) READS it, and the worker
+-- that writes it lives in the mini's separate lekhio-workers folder rather than in khoji/.
+-- Documented here because this file claims to be the answer to "what can the mini touch", and a
+-- claim with a hole in it is worse than no claim. Public tax constants only, nobody's figures.
+grant select, insert on public.khoji_history to khoji_writer;
+
 -- RLS still applies to khoji_writer (it is not the service role), so it needs an
 -- explicit policy. This one scopes all access to this role only.
 do $$

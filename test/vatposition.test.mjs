@@ -292,7 +292,12 @@ ok('and a failed figures read shows a blank he can retry, not a zero he would be
 ok('an empty quarter is said in words, never worn as a confident zero',
   /const nothingYet = pos !== null && out !== null/.test(codeOnly(page))
   && /\{nothingYet \? \(/.test(page)
-  && /Nothing raised or confirmed since \{pretty\(from\)\}/.test(page));
+  // ⚠️ THE SENTENCE MOVED INTO A TEMPLATE LITERAL IN RUN 4, because the empty case now has two
+  // arms: a truly empty quarter, and a quarter whose invoices are all still marked unsent. The
+  // property this suite owns is unchanged, that an empty quarter is SAID rather than worn as a
+  // confident zero, so it is asserted on the sentence rather than on the JSX braces it used to
+  // sit in. test/run4fixes.test.mjs owns the second arm.
+  && /Nothing raised or confirmed since \$\{pretty\(from\)\}/.test(page));
 ok('the reads are the three lib/supabase.ts functions, never an inline query',
   page.includes('readVatProfile') && page.includes('getOutputVat') && page.includes('getConfirmedInputVat')
   && !/fetch\(/.test(codeOnly(page)));

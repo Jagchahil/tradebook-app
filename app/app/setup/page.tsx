@@ -502,6 +502,30 @@ async function MtdStep({ userId }: { userId: string }) {
         worth thirty seconds.
       </p>
 
+      {/* ═══════════════════════════════════════════════════════════════════════════════════
+          🔴 A VAT REGISTERED CUSTOMER WAS TOLD NOTHING ABOUT MTD FOR VAT. Run 4, 14 August 2026.
+
+          This step is titled "Where you stand with HMRC" and asks only about Making Tax Digital
+          for INCOME TAX. Dwayne Osei reached it two screens after answering Yes to "Are you VAT
+          registered?", and MTD for VAT has been compulsory for every VAT registered business since
+          April 2022. So the one Making Tax Digital duty he certainly already has was the one this
+          screen did not mention, while asking him about one he might not.
+
+          ⚠️ DRAWN ONLY FOR A MAN IT IS TRUE OF, which is the rule lib/circumstances.ts has kept
+          since the Reg 111 promise was pulled off the unregistered: his own vat_registered answer
+          gates it, and nothing is inferred.
+          ═══════════════════════════════════════════════════════════════════════════════════════ */}
+      {answers.get('vat_registered') === 'yes' ? (
+        <p style={S.body}>
+          One thing about VAT, because you told us you are registered. Making Tax Digital already
+          applies to your VAT, and has done for every VAT registered business since April 2022. It
+          is a separate duty from the one we are asking about here: your VAT records have to be kept
+          digitally and your VAT return has to go through software that talks to HMRC. Lekhio does
+          not send VAT returns, so keep filing yours the way you do today. What we do is keep the
+          figures and the receipts behind them straight, so it is quick when you file.
+        </p>
+      ) : null}
+
       {askable > 0 ? <p style={S.count}>{answeredHere} of {askable} answered</p> : null}
 
       {list.length === 0 ? (
@@ -836,6 +860,32 @@ async function RevealStep({ userId, note }: { userId: string; note: string | nul
                 </li>
               ))}
             </ul>
+            {/* ═══════════════════════════════════════════════════════════════════════════════
+                🔴 THE CONTROL EXISTED AND THE SCREEN WHERE HE DECIDES HE WANTS IT DID NOT SAY SO.
+                Run 4, 14 August 2026, and it is the third time this exact shape has been found.
+
+                Dwayne Osei answered Yes to VAT registration at signup and Yes to CIS coming off his
+                money in setup, and landed here. This screen named VAT and named CIS, one under the
+                other, and said nothing about the one rule that sits where those two facts meet. The
+                reverse charge question is built, it is correct, and it is on /app/you/vat, which he
+                had no reason to open. Meanwhile his invoices default to charging 20% he is not
+                allowed to charge.
+
+                ⚠️ DRAWN ONLY WHERE BOTH ANSWERS ARE HIS OWN YES. Nothing is inferred from his trade
+                and nothing is written: this is a signpost, and the decision stays on the VAT page.
+                ═══════════════════════════════════════════════════════════════════════════════ */}
+            {said.has('vat_registered') && said.has('cis') ? (
+              <p style={S.openedWhy}>
+                <b>One more, because you told us both of those.</b> You are VAT registered and CIS
+                comes off your money, and where those two meet there is a rule most subcontractors
+                get told about by their accountant a year late. On construction work for a
+                contractor who is VAT and CIS registered you charge no VAT at all, and he accounts
+                for it to HMRC himself. It is the domestic reverse charge and it has applied since
+                March 2021. Turn it on at your VAT page under You, and every invoice you raise after
+                that is made the right way round. Left off, you are putting 20% on invoices you were
+                never allowed to charge it on.
+              </p>
+            ) : null}
             <p style={S.hint}>
               {/* ⚠️ THIS SAID "No figures on this page, on purpose", AND THERE ARE FIGURES ON THIS
                   PAGE. Several `why` sentences carry a sourced amount, like the £252 on Marriage

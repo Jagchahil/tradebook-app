@@ -105,6 +105,17 @@ const capabilityUrlHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // ⚠️ THE DOOR IS /start, AND /signup IS WHAT EVERY STRANGER TYPES. Run 4, 14 August 2026: a cold
+  // walk went to lekhio.app/signup first and got the branded 404. The 404 is handled well and that
+  // is not the point: a man who guesses the commonest URL in software should land on the form, not
+  // on a page telling him it is not his fault. 308 so it is cached and never re-asked.
+  async redirects() {
+    return [
+      { source: '/signup', destination: '/start', permanent: true },
+      { source: '/sign-up', destination: '/start', permanent: true },
+      { source: '/register', destination: '/start', permanent: true },
+    ];
+  },
   async headers() {
     return [
       { source: '/:path*', headers: baseSecurityHeaders },

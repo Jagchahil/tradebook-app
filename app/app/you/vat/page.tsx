@@ -145,7 +145,23 @@ function RegisteredQuestion({ answer }: { answer: 'yes' | 'no' | null }) {
 
 // EVERYTHING ELSE, AND ONLY FOR THE MAN IT IS TRUE OF. One form, one press, because four separate
 // saves is four decisions handed to a man who came here to type one date.
-function YourVatFacts({ p, today }: { p: VatProfileRow; today: string }) {
+function YourVatFacts(
+  { p, today, reverseChargeDefault }:
+  { p: VatProfileRow; today: string; reverseChargeDefault: boolean },
+) {
+  // The two settings that decide whether every invoice he sends carries 20% or none, said in his
+  // words rather than left to be inferred from which radio happens to be filled in below.
+  const schemeSentence = p.scheme === 'flat_rate'
+    ? 'You are on the flat rate scheme, so you pay a percentage of your VAT inclusive turnover and do not reclaim the VAT on what you buy.'
+    : p.scheme === 'cash'
+      ? 'You are on cash accounting, so your VAT falls due when your customer pays you rather than when you invoice him.'
+      : p.scheme === 'annual'
+        ? 'You are on annual accounting, so you pay instalments through the year and settle up once at the end of it.'
+        : 'You are on the standard scheme, so you charge VAT on what you sell and reclaim the VAT on what you buy.';
+  const reverseChargeSentence = p.cisSubcontractor
+    ? 'Your invoices carry the CIS reverse charge, so on construction work for a VAT and CIS registered contractor you charge no VAT at all and he accounts for it himself.'
+    : 'Your invoices charge VAT the normal way. If you are a subcontractor billing a main contractor, the answer below should be Yes.';
+
   const reclaim = reclaimLine(p.registeredOn);
   const shown = formatVrn(p.vrn);
 
@@ -166,6 +182,12 @@ function YourVatFacts({ p, today }: { p: VatProfileRow; today: string }) {
             we cannot work out what you could still reclaim on the kit you already owned.
           </p>
         )}
+        {/* 🔴 RUN 4, 14 August 2026: THIS BLOCK HELD THE NUMBER AND THE DATE AND NOT THE TWO
+            SETTINGS THAT DECIDE WHETHER EVERY INVOICE HE SENDS CARRIES 20% OR NONE. A man checking
+            what we believe about him could not see the scheme or the reverse charge answer, which
+            are the only two facts on this page that change a figure his customer reads. */}
+        <p style={S.fact}>{schemeSentence}</p>
+        <p style={S.fact}>{reverseChargeSentence}</p>
         {reclaim ? <p style={S.unlock}>{reclaim}</p> : null}
       </section>
 
@@ -300,14 +322,14 @@ function YourVatFacts({ p, today }: { p: VatProfileRow; today: string }) {
               contractor accounts for it himself.
             </p>
             <label style={S.radioRow}>
-              <input type="radio" name="cisSubcontractor" value="yes" defaultChecked={p.cisSubcontractor} style={S.radio} />
+              <input type="radio" name="cisSubcontractor" value="yes" defaultChecked={reverseChargeDefault} style={S.radio} />
               <span>
                 <span style={S.radioTop}>Yes</span>
                 <span style={S.radioHint}>Construction work reported under CIS. Building, plumbing, sparks, groundwork.</span>
               </span>
             </label>
             <label style={S.radioRow}>
-              <input type="radio" name="cisSubcontractor" value="no" defaultChecked={!p.cisSubcontractor} style={S.radio} />
+              <input type="radio" name="cisSubcontractor" value="no" defaultChecked={!reverseChargeDefault} style={S.radio} />
               <span>
                 <span style={S.radioTop}>No</span>
                 <span style={S.radioHint}>Your work is not reported under CIS.</span>
@@ -380,6 +402,24 @@ export default async function VatPage({
     || profile.cisSubcontractor
     || profile.flatRatePercent !== null;
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE REVERSE CHARGE ANSWER DEFAULTED TO NO FOR THE ONE MAN WHO NEEDS IT ON. Run 4.
+  //
+  // Dwayne Osei reached this page having already told the product three things: his trade is
+  // groundworker, he is VAT registered, and CIS is taken off his money before it reaches him.
+  // That triple IS the reverse charge population. The radio still rendered No preselected, and a
+  // No here puts 20% on invoices a subcontractor must not charge.
+  //
+  // ⚠️ THIS CHANGES WHAT IS DRAWN, NEVER WHAT IS STORED. Nothing is written until he presses save,
+  // which is the same rule the rest of this screen keeps. And it only applies to a man who has
+  // never saved any VAT details at all, so a customer who has deliberately answered No keeps his
+  // No for ever: profile.cisSubcontractor false plus a number or a date on file means he decided.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const cisSuffered = rows?.find((r) => r.key === 'cis')?.answer ?? null;
+  const neverSavedVatDetails = !profile.vrn && !profile.registeredOn && !profile.cisSubcontractor;
+  const reverseChargeDefault = profile.cisSubcontractor
+    || (neverSavedVatDetails && cisSuffered === 'yes');
+
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -416,7 +456,9 @@ export default async function VatPage({
 
       <RegisteredQuestion answer={answered} />
 
-      {profile.registered ? <YourVatFacts p={profile} today={today} /> : null}
+      {profile.registered
+        ? <YourVatFacts p={profile} today={today} reverseChargeDefault={reverseChargeDefault} />
+        : null}
 
       {/* HIS TO TAKE BACK, and only drawn when there is something to take. The same reasoning as
           the /api/elections DELETE: a fact he gave us and now wants gone is his to remove, in one

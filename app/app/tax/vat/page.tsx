@@ -219,6 +219,15 @@ export default async function VatPage() {
 
   // A refund quarter is a real thing. It is not clamped, not hidden, and the label carries the
   // direction so the figure itself can be printed without a minus sign in front of a pound.
+  // ⚠️ WHAT THIS SCREEN IS HOLDING BACK, AND WHY IT MUST SAY SO. Run 4, 14 August 2026: three
+  // issued invoices sat inside the quarter, one carrying 400 of real output VAT, and this screen
+  // printed "Nothing raised or confirmed". They are excluded because they are still marked as not
+  // sent, which is the right exclusion (a draft is not a supply) and the wrong silence. Naming
+  // them costs one sentence and turns an invisible understatement into a visible one.
+  const unsentCount = out !== null ? out.unsentCount : 0;
+  const unsentVat = out !== null ? out.unsentVat : 0;
+  const unsentNet = out !== null ? out.unsentNet : 0;
+
   const refund = pos !== null && pos.due < 0;
   const reverseCharge = out !== null ? out.reverseChargeVat : 0;
   const withProof = inp !== null ? inp.withProof : 0;
@@ -409,7 +418,11 @@ export default async function VatPage() {
             </p>
 
             {nothingYet ? (
-              <p style={S.empty}>Nothing raised or confirmed since {pretty(from)}.</p>
+              <p style={S.empty}>
+                {unsentCount > 0
+                  ? `Nothing counted yet since ${pretty(from)}, though you have ${unsentCount} ${unsentCount === 1 ? 'invoice' : 'invoices'} waiting below.`
+                  : `Nothing raised or confirmed since ${pretty(from)}.`}
+              </p>
             ) : (
               <div style={S.figRow}>
                 <div>
@@ -437,6 +450,22 @@ export default async function VatPage() {
                 {pretty(from)}, less {gbp0(pos.inputVat)} on what you have bought and confirmed.
               </p>
             )}
+
+            {unsentCount > 0 ? (
+              <p style={S.quiet}>
+                <b>
+                  {unsentCount === 1
+                    ? 'One invoice is not in this figure.'
+                    : `${unsentCount} invoices are not in this figure.`}
+                </b>{' '}
+                {unsentCount === 1 ? 'It is' : 'They are'} made and dated but not yet marked as sent,
+                and until you mark {unsentCount === 1 ? 'it' : 'them'} we treat{' '}
+                {unsentCount === 1 ? 'it' : 'them'} as a draft rather than as a supply. That is{' '}
+                {gbp0(unsentNet)} of work carrying {gbp0(unsentVat)} of VAT. If you have already sent{' '}
+                {unsentCount === 1 ? 'it' : 'them'}, open your invoices and press I have sent it, and
+                this figure will take {unsentCount === 1 ? 'it' : 'them'} in.
+              </p>
+            ) : null}
 
             {refund ? (
               <p style={S.good}>

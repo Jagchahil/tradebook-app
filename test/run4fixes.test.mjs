@@ -137,5 +137,128 @@ ok('🔴 the Stripe collected amount is still compared against inv.total, NOT th
 const added = between('🔴 A PAID INVOICE USED TO BOOK', 'export async function markInvoicePaidByOwner(');
 ok('no en dash or em dash anywhere in the new block', added.length > 200 && !/[–—]/.test(added));
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// PART 2. THE REST OF THE RUN 4 PACKET. Everything else the walk found, down to the P3.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+const readFile = (rel) => readFileSync(path.join(root, rel), 'utf8');
+const nextConfig = readFile('next.config.mjs');
+const vatQuarterPage = readFile('app/app/tax/vat/page.tsx');
+const vatYouPage = readFile('app/app/you/vat/page.tsx');
+const setupPage = readFile('app/app/setup/page.tsx');
+const addPage = readFile('app/app/money/add/page.tsx');
+const manualRoute = readFile('app/api/money/manual/route.ts');
+
+// ── P3-8. /signup is the commonest guess in software and it 404ed. ───────────────────────────
+ok('next.config sends /signup to the door rather than to the 404',
+  /async redirects\(\)/.test(nextConfig)
+  && /source: '\/signup', destination: '\/start', permanent: true/.test(nextConfig));
+ok('and the other two guesses a stranger makes go the same way',
+  /source: '\/sign-up', destination: '\/start'/.test(nextConfig)
+  && /source: '\/register', destination: '\/start'/.test(nextConfig));
+
+// ── P1-1. An issued invoice sits in draft, and the screen must SAY what it is holding back. ──
+{
+  const realFetch = globalThis.fetch;
+  const rows = [
+    { status: 'sent', tax: 400, total: 2400, reverse_charge_vat: 0 },
+    { status: 'draft', tax: 0, total: 5000, reverse_charge_vat: 1000 },
+    { status: 'draft', tax: 150, total: 900, reverse_charge_vat: 0 },
+  ];
+  globalThis.fetch = async () => new Response(JSON.stringify(rows), { status: 200 });
+  const outv = await SB.getOutputVat('11111111-2222-3333-4444-555555555555', '2026-07-01', '2026-08-13');
+  globalThis.fetch = realFetch;
+
+  ok('getOutputVat still excludes drafts from the figure, because a draft is not a supply',
+    outv !== null && outv.outputVat === 400 && outv.grossTurnover === 2400 && outv.reverseChargeVat === 0);
+  ok('🔴 but it now REPORTS them: the count of what it held back',
+    outv !== null && outv.unsentCount === 2);
+  ok('...the net of what it held back', outv !== null && outv.unsentNet === 5900);
+  ok('...and the VAT inside it, reverse charge included, because both are money he must account for',
+    outv !== null && outv.unsentVat === 1150);
+}
+ok('the quarter page reads the held back figures',
+  /out\.unsentCount/.test(vatQuarterPage) && /out\.unsentVat/.test(vatQuarterPage)
+  && /out\.unsentNet/.test(vatQuarterPage));
+ok('🔴 the empty sentence stops claiming nothing was raised when invoices are sitting there',
+  /unsentCount > 0/.test(vatQuarterPage)
+  && /though you have \$\{unsentCount\}/.test(vatQuarterPage));
+ok('🔴 and the warning is drawn in EVERY branch, not only the empty one, because a figure that is short is worse than none',
+  vatQuarterPage.includes('{unsentCount > 0 ? (')
+  && vatQuarterPage.indexOf('are not in this figure.') > 0
+  && vatQuarterPage.indexOf('{unsentCount > 0 ? (') < vatQuarterPage.indexOf('More VAT came back on what you bought'));
+ok('it tells him the one press that fixes it', /press I have sent it/.test(vatQuarterPage));
+
+// ── P1-3. A typed cost can carry its VAT, and only from a man who can reclaim it. ────────────
+ok('NewTransaction can carry a confirmed VAT figure',
+  /vat_amount\?: number \| null;/.test(src) && /vat_confirmed\?: boolean;/.test(src));
+ok('🔴 the manual route reads a vat field on both the form and the JSON door',
+  /f\.get\('vat'\)/.test(manualRoute) && /body\.vat/.test(manualRoute));
+ok('🔴 it refuses a flat rate trader, who reclaims nothing on what he buys',
+  /scheme !== 'flat_rate'/.test(manualRoute));
+ok('it refuses anybody who is not registered', /vatProfile\.registered/.test(manualRoute));
+ok('🔴 the ceiling is a sixth of the gross, which is the VAT inside a 20% price',
+  /const ceiling = Math\.round\(\(magnitude \/ 6\) \* 100\) \/ 100;/.test(manualRoute)
+  && /v > ceiling/.test(manualRoute));
+ok('it only ever applies to money going OUT', /direction === 'out'/.test(manualRoute));
+ok('🔴 vat_amount and vat_confirmed are written TOGETHER or not at all, which is what getConfirmedInputVat reads',
+  /vat_amount: vatAmount, vat_confirmed: true/.test(manualRoute));
+ok('a refused VAT figure saves nothing and says why in his words',
+  /problem=vat/.test(manualRoute) && /cannot be more than a sixth of what you paid/.test(addPage));
+ok('the form draws the box only for a registered man who is not on the flat rate',
+  /canReclaimVat/.test(addPage) && /scheme !== 'flat_rate'/.test(addPage));
+ok('and the box says nothing is assumed, which is this product s whole doctrine on costs',
+  /a figure only counts towards your reclaim because you typed it/.test(addPage));
+ok('the hint has a real style key, not a missing one on a Record that typechecks anyway',
+  /^  hint: \{/m.test(addPage));
+
+// ── P2-6. What we hold now holds the two settings that decide every invoice. ─────────────────
+ok('the VAT page states the scheme in his words',
+  vatYouPage.includes('<p style={S.fact}>{schemeSentence}</p>')
+  && /You are on the standard scheme, so you charge VAT on what you sell/.test(vatYouPage));
+ok('🔴 and states the reverse charge answer, which decides whether an invoice carries 20% or none',
+  vatYouPage.includes('<p style={S.fact}>{reverseChargeSentence}</p>')
+  && /Your invoices carry the CIS reverse charge/.test(vatYouPage));
+ok('both are drawn inside What we hold, not somewhere else on the page',
+  vatYouPage.indexOf('What we hold') < vatYouPage.indexOf('<p style={S.fact}>{schemeSentence}</p>'));
+
+// ── P2-4. The reverse charge default stops being No for the man who needs it on. ─────────────
+ok('🔴 the default reads his own CIS answer rather than the stored boolean alone',
+  /const cisSuffered = rows\?\.find\(\(r\) => r\.key === 'cis'\)\?\.answer/.test(vatYouPage)
+  && /cisSuffered === 'yes'/.test(vatYouPage));
+ok('🔴 it only ever applies to a man who has saved NOTHING, so a deliberate No survives for ever',
+  /const neverSavedVatDetails = !profile\.vrn && !profile\.registeredOn && !profile\.cisSubcontractor;/.test(vatYouPage));
+ok('and both radios read that one default, so they cannot disagree with each other',
+  (vatYouPage.match(/defaultChecked=\{reverseChargeDefault\}/g) || []).length === 1
+  && (vatYouPage.match(/defaultChecked=\{!reverseChargeDefault\}/g) || []).length === 1);
+ok('nothing is written by drawing it: the default is a render, and the save is still his press',
+  /THIS CHANGES WHAT IS DRAWN, NEVER WHAT IS STORED/.test(vatYouPage));
+
+// ── P2-7 and P2-5. The two signposts. ────────────────────────────────────────────────────────
+ok('🔴 a VAT registered customer is told MTD already applies to his VAT',
+  /Making Tax Digital already/.test(setupPage) && /since April 2022/.test(setupPage));
+ok('...gated on his own answer, never inferred',
+  /answers\.get\('vat_registered'\) === 'yes'/.test(setupPage));
+ok('...and it does not promise we file it for him',
+  /Lekhio\s+does\s+not send VAT returns/.test(setupPage.replace(/\s+/g, ' ')) 
+  || /does not send VAT returns/.test(setupPage));
+ok('🔴 the reveal signposts the reverse charge where VAT and CIS meet',
+  /domestic reverse charge/.test(setupPage) && /March 2021/.test(setupPage));
+ok('...drawn only where BOTH answers are his own yes',
+  /said\.has\('vat_registered'\) && said\.has\('cis'\)/.test(setupPage));
+ok('...and it points at the control rather than doing it for him',
+  /Turn it on at your VAT page under You/.test(setupPage));
+
+// ── House rules across every file the packet touched. ────────────────────────────────────────
+for (const [name, text] of [
+  ['next.config.mjs', nextConfig],
+  ['the quarter page', vatQuarterPage],
+  ['the VAT page', vatYouPage],
+  ['the add form', addPage],
+  ['the manual route', manualRoute],
+]) {
+  ok(`no en dash or em dash in ${name}`, !/[\u2013\u2014]/.test(text));
+}
+
 process.stdout.write(`\n  ${pass} passed, ${fail} failed\n`);
 if (fail > 0) process.exit(1);

@@ -2,10 +2,11 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { accountHasRental } from '../../../../lib/supabase';
+import { accountHasRental, readVatProfile } from '../../../../lib/supabase';
 import { bankFeedOffered } from '../../../../lib/bankfeed';
 import { CATEGORIES } from '../../../../lib/categories';
 import { isMonthKey } from '../../../../lib/moneylog';
+import { gbp0 } from '../../../../lib/money';
 import { gateForUser } from '../../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../../lib/gate';
 import { controlChoice } from '../../../../lib/control';
@@ -69,6 +70,9 @@ function notice(done: string | undefined, problem: string | undefined): string |
       return 'That was a lot at once. Give it a minute and try again.';
     case 'unavailable':
       return 'That did not save. Nothing has changed, so try it again.';
+    case 'vat':
+      return 'That VAT figure did not look right, so nothing was saved. It comes off the receipt, '
+        + 'it cannot be more than a sixth of what you paid, and it only goes on money going out.';
     default:
       return null;
   }
@@ -95,7 +99,20 @@ export default async function AddEntryPage({
   // Whether the rent choice is drawn at all. lib/supabase.ts owns the question: he said he has
   // rental property (at signup or in setup), or he has already logged confirmed rent. For everyone
   // else the form stays exactly two choices, doc 103's empty test.
-  const [gate, rental] = await Promise.all([gateForUser(user.id), accountHasRental(user.id)]);
+  const [gate, rental, vatProfile] = await Promise.all([
+    gateForUser(user.id),
+    accountHasRental(user.id),
+    readVatProfile(user.id).catch(() => null),
+  ]);
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE VAT ON A TYPED COST HAD NOWHERE TO GO. Run 4, 14 August 2026. See the doctrine block in
+  // app/api/money/manual/route.ts for the full finding.
+  //
+  // ⚠️ NOT FOR THE FLAT RATE MAN. He pays a percentage of turnover and does not reclaim on what he
+  // buys, so a box asking him for VAT would be asking for a number that never becomes money.
+  // ⚠️ AND NOT FOR ANYBODY WHO IS NOT REGISTERED, which is most of this product's customers. One
+  // question fewer on the commonest form in the app, which is doc 103's empty test.
+  const canReclaimVat = vatProfile !== null && vatProfile.registered && vatProfile.scheme !== 'flat_rate';
   const locked = gate === 'readonly';
 
   // Today and the oldest day the server will accept. The WINDOW is owned by clampReceiptDate in
@@ -205,6 +222,31 @@ export default async function AddEntryPage({
               className="lek-field"
             />
 
+            {canReclaimVat ? (
+              <>
+                <label htmlFor="vat" style={S.label}>
+                  How much of that was VAT, if you are claiming it back
+                </label>
+                <input
+                  id="vat"
+                  name="vat"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  max="1000000"
+                  className="lek-field"
+                />
+                <p style={S.hint}>
+                  Off the receipt, and only for money going out. On a normal 20% receipt it is a
+                  sixth of the total, so {gbp0(1200)} of materials carries {gbp0(200)}. Leave it
+                  empty if the
+                  receipt has no VAT on it, or if you would rather not claim it: nothing is ever
+                  assumed here, and a figure only counts towards your reclaim because you typed it.
+                </p>
+              </>
+            ) : null}
+
             <label htmlFor="who" style={S.label}>Who. The shop, or whoever paid you</label>
             <input id="who" name="vendor" type="text" maxLength={120} required className="lek-field" />
 
@@ -294,6 +336,9 @@ const S: Record<string, React.CSSProperties> = {
   radioHint: { display: 'block', fontSize: TYPE.note, color: MUTED, marginTop: 1 },
 
   label: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, margin: '12px 0 6px' },
+  // Sits tight under the field it explains. Added with the VAT box in Run 4: the block used S.hint
+  // and this object is a Record, so a missing key typechecks and renders unstyled.
+  hint: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '6px 0 0' },
   weight: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '14px 0 0' },
   foot: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
 };

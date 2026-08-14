@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sessionUser } from '../../../../lib/webauth';
-import { insertTransaction } from '../../../../lib/supabase';
+import { insertTransaction, readVatProfile } from '../../../../lib/supabase';
 import { isCategory } from '../../../../lib/categories';
 import { clampReceiptDate } from '../../../../lib/waintents';
 import { rateLimitedShared } from '../../../../lib/ratelimit';
@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
   let vendor = '';
   let date = '';
   let category = '';
+  let vatRaw = '';
   if (isForm) {
     const f = await req.formData().catch(() => null);
     if (!f) return back('problem=bad');
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
     vendor = String(f.get('vendor') ?? '');
     date = String(f.get('date') ?? '');
     category = String(f.get('category') ?? '');
+    vatRaw = String(f.get('vat') ?? '');
   } else {
     let body: Record<string, unknown> = {};
     try {
@@ -79,6 +81,7 @@ export async function POST(req: NextRequest) {
     vendor = typeof body.vendor === 'string' ? body.vendor : '';
     date = typeof body.date === 'string' ? body.date : '';
     category = typeof body.category === 'string' ? body.category : '';
+    vatRaw = typeof body.vat === 'string' || typeof body.vat === 'number' ? String(body.vat) : '';
   }
 
   // 'rent' is money in for a property. It exists so a landlord's rent can be DISTINGUISHED from
@@ -119,6 +122,44 @@ export async function POST(req: NextRequest) {
   const trimmed = category.trim().toLowerCase();
   const filedAs = direction === 'in' ? 'income' : direction === 'rent' ? 'rent' : (isCategory(trimmed) ? trimmed : 'other');
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 A TYPED COST COULD NEVER CARRY ITS INPUT VAT, SO A REPAYMENT TRADER WAS SHOWN A BILL.
+  // Run 4, 14 August 2026.
+  //
+  // Dwayne Osei, VAT registered groundworker on the domestic reverse charge, typed in 1,200 of
+  // materials from Jewson. /app/tax/vat then read "400 of VAT charged on the invoices you have
+  // raised, less £0 on what you have bought and confirmed". The 200 he is owed on that receipt had
+  // nowhere to be recorded: this form had no VAT field, getConfirmedInputVat filters on
+  // vat_confirmed, and the only writer of vat_confirmed was the pile, which shows unconfirmed rows
+  // only, while everything typed here lands confirmed by design. There was no door anywhere.
+  //
+  // His sales carry no VAT at all, so his input VAT IS his whole VAT position. He is owed money
+  // every quarter and the product would have shown him a bill for ever. The refund branch on that
+  // screen was already built and correct and simply could not be reached.
+  //
+  // ⚠️ HIS OWN TYPING, SO IT LANDS CONFIRMED, which is the same argument this route already makes
+  // for the amount itself. A parser still may not set it.
+  //
+  // ⚠️ NOT ON THE FLAT RATE SCHEME. A flat rate trader pays a percentage of turnover and does not
+  // reclaim on what he buys, so a VAT figure from him would be a number that never becomes money.
+  // The form does not draw the field for him and this refuses it if it arrives anyway.
+  const vatProfile = await readVatProfile(user.id).catch(() => null);
+  const canReclaim = vatProfile !== null && vatProfile.registered && vatProfile.scheme !== 'flat_rate';
+  let vatAmount: number | null = null;
+  if (vatRaw.trim() !== '' && direction === 'out') {
+    if (!canReclaim) {
+      return isForm ? back('problem=vat') : NextResponse.json({ error: 'vat_not_reclaimable' }, { status: 400 });
+    }
+    const v = Math.round(Number(vatRaw.replace(/[,\s£]/g, '')) * 100) / 100;
+    // A sixth of the gross is the VAT inside a 20% price. More than that is a typo every time,
+    // and letting it through would put a reclaim on his return that no receipt stands behind.
+    const ceiling = Math.round((magnitude / 6) * 100) / 100;
+    if (!Number.isFinite(v) || v < 0 || v > ceiling) {
+      return isForm ? back('problem=vat') : NextResponse.json({ error: 'bad_vat' }, { status: 400 });
+    }
+    if (v > 0) vatAmount = v;
+  }
+
   try {
     await insertTransaction({
       user_id: user.id,
@@ -128,6 +169,9 @@ export async function POST(req: NextRequest) {
       category: filedAs,
       transaction_date: date,
       source_type: 'web_manual',
+      // Only ever set together. A vat_amount without vat_confirmed is invisible to
+      // getConfirmedInputVat, and a vat_confirmed without a figure is a lie about a receipt.
+      ...(vatAmount === null ? {} : { vat_amount: vatAmount, vat_confirmed: true }),
       // His own typing, approved by his own press. See the header for why this is the one
       // capture that does not wait.
       confirmed: true,

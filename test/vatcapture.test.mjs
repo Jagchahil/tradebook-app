@@ -468,7 +468,10 @@ ok('the fields live in the other component, all of them',
   /name="vrn"/.test(facts) && /name="registeredOn"/.test(facts) && /name="scheme"/.test(facts)
   && /name="cisSubcontractor"/.test(facts));
 ok('🔴 WHICH IS DRAWN ONLY FOR A MAN WHO HAS SAID HE IS REGISTERED',
-  /\{profile\.registered \? <YourVatFacts/.test(pageSrc));
+  // ⚠️ WHITESPACE AGNOSTIC SINCE RUN 4, 14 August 2026. The property is that profile.registered
+  // GATES the component, not that the two sit on one line: the call grew a third prop and wrapped,
+  // and a guard that fails on a line break is a guard that gets edited to pass rather than read.
+  /\{profile\.registered\s*\?\s*<YourVatFacts/.test(pageSrc));
 ok('the flat rate percentage waits for a man who says he is on the flat rate scheme',
   /p\.scheme === 'flat_rate' \?/.test(facts) && /name="flatRatePercent"/.test(facts));
 ok('the first year answer is a pair of radios, because an unticked box sends silence',

@@ -933,11 +933,34 @@ export async function getConfirmedInputVat(
 
 // The VAT he has CHARGED, from his own invoices, for a date range. Reverse charge invoices carry no
 // output tax by construction: he charged nothing, so there is nothing here to declare.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AN ISSUED INVOICE IS STORED AS A DRAFT, AND THE VAT SCREEN SAID NOTHING AT ALL. Run 4.
+//
+// Dwayne Osei raised three invoices inside the quarter, one carrying 400 of real output VAT, and
+// /app/tax/vat said "Nothing raised or confirmed since 1 July 2026". createInvoice writes, in ONE
+// insert, a tax_point of today, an issued_date of today, a minted invoice number, a customer
+// facing link that prints "Reverse charge: VAT Act 1994 Section 55A applies"... and status 'draft'.
+// Those fields contradict each other. The document has been issued.
+//
+// ⚠️ THE FILTER BELOW IS RIGHT AND STAYS. A draft is not a supply, and app/app/invoices/words.ts
+// documents the draft status as a deliberate choice because HE sends the link himself. Flipping
+// the status would fight that judgement and three other surfaces read it.
+//
+// ⚠️ SO THE FIX IS THAT THE SCREEN STOPS BEING SILENT. The same query already fetches these rows
+// to skip them, so counting them costs nothing, and the page can now NAME what it is holding back
+// instead of printing a nothing that is not true. Silence was the defect, not the exclusion.
 export async function getOutputVat(
   userId: string,
   fromISO: string,
   toISO: string,
-): Promise<{ outputVat: number; grossTurnover: number; reverseChargeVat: number } | null> {
+): Promise<{
+  outputVat: number;
+  grossTurnover: number;
+  reverseChargeVat: number;
+  unsentCount: number;
+  unsentNet: number;
+  unsentVat: number;
+} | null> {
   const { url } = config();
   try {
     const res = await fetch(
@@ -951,14 +974,30 @@ export async function getOutputVat(
     let outputVat = 0;
     let grossTurnover = 0;
     let reverseChargeVat = 0;
+    let unsentCount = 0;
+    let unsentNet = 0;
+    let unsentVat = 0;
     for (const r of Array.isArray(rows) ? rows : []) {
-      if (String(r.status ?? '') === 'draft') continue; // a draft is not a supply
+      if (String(r.status ?? '') === 'draft') {
+        // a draft is not a supply, so it stays out of the figure. It does NOT stay out of sight.
+        unsentCount += 1;
+        unsentNet += Number(r.total) || 0;
+        unsentVat += (Number(r.tax) || 0) + (Number(r.reverse_charge_vat) || 0);
+        continue;
+      }
       outputVat += Number(r.tax) || 0;
       grossTurnover += Number(r.total) || 0;
       reverseChargeVat += Number(r.reverse_charge_vat) || 0;
     }
     const r2 = (n: number) => Math.round(n * 100) / 100;
-    return { outputVat: r2(outputVat), grossTurnover: r2(grossTurnover), reverseChargeVat: r2(reverseChargeVat) };
+    return {
+      outputVat: r2(outputVat),
+      grossTurnover: r2(grossTurnover),
+      reverseChargeVat: r2(reverseChargeVat),
+      unsentCount,
+      unsentNet: r2(unsentNet),
+      unsentVat: r2(unsentVat),
+    };
   } catch {
     return null;
   }
@@ -1145,6 +1184,12 @@ export interface NewTransaction {
   confirmed?: boolean;
   raw_whatsapp_message_id?: string | null;
   cis_deduction?: number | null;
+  // The VAT on ONE cost, and whether he has stated it himself. getConfirmedInputVat reads exactly
+  // this pair, and confirmTransactionVat was the only writer of it until Run 4 found that a typed
+  // cost therefore had no door to its VAT at all. A parser must still never set these: a vision
+  // read is a guess, and a guessed VAT figure is worse than none because he will trust it.
+  vat_amount?: number | null;
+  vat_confirmed?: boolean;
   // The stream (doc 82 s4): trade by default, property for rental money.
   income_type?: 'trade' | 'property';
   property_id?: string | null;

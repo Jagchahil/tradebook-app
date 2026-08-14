@@ -31,6 +31,8 @@ function scratch() {
   for (const d of ['lib', 'test', 'app', 'supabase']) {
     cpSync(path.join(root, d), path.join(dir, d), { recursive: true });
   }
+  // next.config.mjs carries the /signup redirect, so it has to be sabotageable too.
+  cpSync(path.join(root, 'next.config.mjs'), path.join(dir, 'next.config.mjs'));
   return dir;
 }
 
@@ -157,11 +159,91 @@ sabotage('NO-OP: an unrelated console.error string changes', (d) =>
     "console.error('[createInvoice] failed:', res.status);",
     "console.error('[createInvoice] insert failed:', res.status);"), false);
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// PART 2. THE REST OF THE PACKET.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+sabotage('/signup goes back to being a 404', (d) =>
+  edit(d, 'next.config.mjs', "{ source: '/signup', destination: '/start', permanent: true },", ''));
+
+sabotage('getOutputVat stops counting what it holds back', (d) =>
+  edit(d, 'lib/supabase.ts', '        unsentCount += 1;', '        unsentCount += 0;'));
+
+sabotage('getOutputVat stops totalling the VAT inside the held back invoices', (d) =>
+  edit(d, 'lib/supabase.ts',
+    '        unsentVat += (Number(r.tax) || 0) + (Number(r.reverse_charge_vat) || 0);',
+    '        unsentVat += 0;'));
+
+sabotage('the quarter page stops drawing the warning at all', (d) =>
+  edit(d, 'app/app/tax/vat/page.tsx', '            {unsentCount > 0 ? (', '            {false ? ('));
+
+sabotage('the empty sentence goes back to claiming nothing was raised', (d) =>
+  edit(d, 'app/app/tax/vat/page.tsx',
+    "                  ? `Nothing counted yet since ${pretty(from)}, though you have ${unsentCount} ${unsentCount === 1 ? 'invoice' : 'invoices'} waiting below.`",
+    "                  ? `Nothing raised or confirmed since ${pretty(from)}.`"));
+
+sabotage('the manual route lets a flat rate trader claim input VAT he cannot have', (d) =>
+  edit(d, 'app/api/money/manual/route.ts', "vatProfile.scheme !== 'flat_rate'", 'true'));
+
+sabotage('the manual route drops the sixth of gross ceiling', (d) =>
+  edit(d, 'app/api/money/manual/route.ts', 'v > ceiling', 'false'));
+
+sabotage('the manual route writes a VAT figure without confirming it, so nothing reads it', (d) =>
+  edit(d, 'app/api/money/manual/route.ts',
+    '{ vat_amount: vatAmount, vat_confirmed: true }',
+    '{ vat_amount: vatAmount }'));
+
+sabotage('the add form draws the VAT box for a man who is not registered', (d) =>
+  edit(d, 'app/app/money/add/page.tsx',
+    "const canReclaimVat = vatProfile !== null && vatProfile.registered && vatProfile.scheme !== 'flat_rate';",
+    'const canReclaimVat = true;'));
+
+sabotage('the hint style key goes missing again, so the copy renders unstyled', (d) =>
+  edit(d, 'app/app/money/add/page.tsx',
+    "  hint: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '6px 0 0' },", ''));
+
+sabotage('What we hold stops saying the reverse charge answer', (d) =>
+  edit(d, 'app/app/you/vat/page.tsx', '        <p style={S.fact}>{reverseChargeSentence}</p>', ''));
+
+sabotage('What we hold stops saying the scheme', (d) =>
+  edit(d, 'app/app/you/vat/page.tsx', '        <p style={S.fact}>{schemeSentence}</p>', ''));
+
+sabotage('the reverse charge default reverts to the stored boolean alone', (d) =>
+  edit(d, 'app/app/you/vat/page.tsx', "|| (neverSavedVatDetails && cisSuffered === 'yes')", ''));
+
+sabotage('the default starts overriding a deliberate No', (d) =>
+  edit(d, 'app/app/you/vat/page.tsx',
+    'const neverSavedVatDetails = !profile.vrn && !profile.registeredOn && !profile.cisSubcontractor;',
+    'const neverSavedVatDetails = true;'));
+
+sabotage('the MTD for VAT note is drawn for everybody, registered or not', (d) =>
+  edit(d, 'app/app/setup/page.tsx', "{answers.get('vat_registered') === 'yes' ? (", '{true ? ('));
+
+sabotage('the MTD for VAT note disappears', (d) =>
+  edit(d, 'app/app/setup/page.tsx', 'Making Tax Digital already', 'Nothing at all here about'));
+
+sabotage('the reverse charge signpost is drawn without both answers', (d) =>
+  edit(d, 'app/app/setup/page.tsx', "{said.has('vat_registered') && said.has('cis') ? (", '{true ? ('));
+
+sabotage('the reverse charge signpost disappears', (d) =>
+  edit(d, 'app/app/setup/page.tsx', 'domestic reverse charge', 'thing we will not name'));
+
+// ── NO-OP CONTROLS for part 2. ───────────────────────────────────────────────────────────────
+sabotage('NO-OP: a comment word in the manual route changes', (d) =>
+  edit(d, 'app/api/money/manual/route.ts',
+    '// His sales carry no VAT at all,',
+    '// The sales he makes carry no VAT at all,'), false);
+
+sabotage('NO-OP: the redirect for /register changes destination spelling in a comment only', (d) =>
+  edit(d, 'next.config.mjs',
+    '  // on a page telling him it is not his fault. 308 so it is cached and never re-asked.',
+    '  // on a page telling him it is not his fault. A permanent redirect, so it is never re-asked.'), false);
+
 process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 12) {
-  process.stdout.write(`  COUNT WRONG: expected 12 sabotages to apply, got ${applied}\n`);
+if (applied !== 32) {
+  process.stdout.write(`  COUNT WRONG: expected 32 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

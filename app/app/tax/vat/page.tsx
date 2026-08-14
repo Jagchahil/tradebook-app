@@ -7,7 +7,9 @@ import {
   getConfirmedTransactionsForRange,
 } from '../../../../lib/supabase';
 // RUN 2: the figure comes from his rows now, not from an account age gate. See the block below.
-import { vatStanding, CARD_FEE_NOTE, FLOOR_NOTE } from '../../../../lib/vatstanding';
+import {
+  vatStanding, CARD_FEE_NOTE, FLOOR_NOTE, BACKWARD_TEST, FORWARD_TEST,
+} from '../../../../lib/vatstanding';
 import {
   VAT_REGISTRATION_THRESHOLD, RENT_NOT_COUNTED_NOTE, TURNOVER_BASIS_NOTE, formatVrn, inputVatNote,
   mustRegister, reg111Window, vatPosition,
@@ -17,7 +19,7 @@ import { asPercent } from '../../../../lib/taxengine';
 import { gbp0, gbpAbs0 } from '../../lib/money';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
-  GREEN_TINT, INK, LINE, MUTED, ON_GREEN_TINT, PAPER, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge,
+  GREEN_TINT, INK, LINE, MUTED, ON_GREEN_TINT, PAPER, RIVER, SAFFRON_DEEP, SAFFRON_TINT, SURFACE, edge,
 } from '../../../../lib/apptheme';
 import { AppNav } from '../../AppNav';
 
@@ -393,6 +395,37 @@ export default async function VatPage() {
               yet. {TURNOVER_BASIS_NOTE}{rentClause}
             </p>
           ) : null}
+          {/* ═══════════════════════════════════════════════════════════════════════════════
+              🔴 THE TWO STATUTORY TESTS, WHICH THIS SCREEN DID NOT CARRY UNTIL RUN 6.
+              14 August 2026, found by a cleaner £6,000 from the line.
+
+              Both tests have been owned constants in lib/vatstanding.ts since Run 2, headed "The
+              two statutory tests, in the order a customer meets them". Every consumer of them in
+              the product was app/api/whatsapp/route.ts. So a customer who ASKED on WhatsApp was
+              told both, and the same customer standing on this screen was told neither. The
+              router's own comment says why they matter: "always both. People who know about the
+              rolling twelve months usually do not know about the forward look, and the forward
+              look is the one that registers you the same day."
+
+              A rule only holds where it is pointed. It was pointed at the router.
+
+              ⚠️ SAID ON EVERY ARM OF THIS BRANCH, including the failed read and the under three
+              months one. The rules are the rules whether or not we could read her figures, and
+              this is the arm where silence reads exactly like being safely under the line.
+
+              ⚠️ AND THE FORWARD LOOK MATTERS MOST TO THE PERSON WHO FOUND IT. She does end of
+              tenancy work. One block contract with a letting agent is the shape that trips the
+              thirty day test, which registers her from the day she realised rather than after the
+              month ends.
+              ═══════════════════════════════════════════════════════════════════════════════ */}
+          <p style={S.body}>{BACKWARD_TEST}</p>
+          <p style={S.body}>{FORWARD_TEST}</p>
+          <p style={S.quiet}>
+            Source:{' '}
+            <a href="https://www.gov.uk/vat-registration/when-to-register" style={S.inlineLink}>
+              GOV.UK, Register for VAT: when to register
+            </a>
+          </p>
         </section>
       ) : pos === null ? (
         /* ── REGISTERED, BUT ONE OF THE TWO READS FAILED. Same rule: no invented zero. ─────── */
@@ -581,6 +614,13 @@ const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
 
   window: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: `0 0 ${SPACE.md}px`, maxWidth: '62ch' },
+
+  // ⚠️ DECLARED, BECAUSE S IS Record<string, React.CSSProperties> AND A MISSING KEY TYPECHECKS.
+  // S.inlineLink was written into the source link below out of habit, from another screen that
+  // has it. tsc said nothing, because an absent key on an index signature is a valid lookup that
+  // returns undefined, and the link would simply have rendered unstyled on a money screen. Same
+  // trap S.hint set on /app/money/add. Grep the key.
+  inlineLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },
   body: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: '10px 0 0', maxWidth: '62ch' },
   quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: '10px 0 0', maxWidth: '62ch' },
   empty: { fontSize: TYPE.strong, fontWeight: 700, margin: 0 },

@@ -275,12 +275,34 @@ ok('...and a KNOWN sole trader with a KNOWN trade changes nothing about the rest
   JSON.stringify(O.findOptimisations({ ...trader, businessType: 'sole_trader', incomeShape: 'trade' })) === JSON.stringify(asToday));
 
 // Refusing the one lever must not quietly take the others with it.
-ok('the company keeps every other lever it was getting',
+//
+// ⚠️ AMENDED 14 August 2026, RUN 6, AND THE RULE IT EXISTS TO PROTECT IS WRITTEN DOWN HERE so the
+// next person does not have to reconstruct it: REFUSING home_office FOR A COMPANY MUST NOT
+// SILENTLY DROP LEVERS THAT HAVE NOTHING TO DO WITH IT. That rule stands and is asserted below,
+// on a fixture with a purchase goal so there is a real lever in the comparison rather than an
+// empty list quietly passing.
+//
+// What the old form ALSO did, without meaning to, was freeze a SECOND defect in place. It required
+// the company to keep marriage_allowance_receive, and the only reason a company was ever getting
+// that lever is that the fixture's £32,000 of COMPANY profit was being handed to
+// marriageAllowance() as though it were the director's own income. To RECEIVE the allowance you
+// must be a basic rate INCOME TAX payer. She pays no income tax on her company's profit at all.
+// taxengine's own comment on that function: "an optimiser that suggests something he is barred
+// from is one he stops reading." So the lever going quiet for a director is the fix working, and
+// the two assertions under this one hold that from both sides.
+const withGoal = { ...trader, purchaseGoal: { title: 'a van', amount: 12_000 } };
+ok('the company keeps every lever that is not about him personally',
   (() => {
-    const before = asToday.map((o) => o.key).filter((k) => k !== 'home_office');
-    const after = O.findOptimisations({ ...trader, businessType: 'limited_company' }).map((o) => o.key);
-    return before.length > 0 && before.every((k) => after.includes(k)) && after.length === before.length;
+    const personal = ['home_office', 'marriage_allowance_receive'];
+    const before = O.findOptimisations({ ...withGoal, businessType: 'sole_trader' })
+      .map((o) => o.key).filter((k) => !personal.includes(k));
+    const after = O.findOptimisations({ ...withGoal, businessType: 'limited_company' }).map((o) => o.key);
+    return before.length > 0 && before.every((k) => after.includes(k));
   })());
+ok('🔴 A DIRECTOR WITH NO PERSONAL INCOME IS NOT OFFERED MARRIAGE ALLOWANCE TO RECEIVE',
+  !find(O.findOptimisations({ ...trader, businessType: 'limited_company' }), 'marriage_allowance_receive'));
+ok('...and the lever itself is not broken: the same figures as a sole trader still get it',
+  !!find(O.findOptimisations({ ...trader, businessType: 'sole_trader' }), 'marriage_allowance_receive'));
 
 // The optimiser restates the rule inline rather than importing lib/elections.ts, because three test
 // suites stage it with a fixed dependency list and Node cannot resolve an extensionless import. That

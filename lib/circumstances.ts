@@ -653,6 +653,51 @@ export const CIRCUMSTANCES: Circumstance[] = [
     incomes: ['trade'],
   },
   {
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THE EMPLOYMENT ALLOWANCE, WHICH THIS PRODUCT DID NOT KNOW EXISTED UNTIL RUN 6.
+    //
+    // 14 August 2026. A cleaner with five staff, trading through her own company, opened
+    // /app/pay-yourself and was told "Employer National Insurance £1,136. The company owes this
+    // on salary above the employer threshold." Her company owed none of it. The Employment
+    // Allowance is £10,500 and it covers her whole employer NI bill several times over.
+    //
+    // grep the repo before this commit: "employment allowance" returned NOTHING, and so did
+    // 10500. The single largest relief available to a small employer was absent from a product
+    // that sells itself on finding the reliefs you are owed.
+    //
+    // ⚠️ AND IT IS A QUESTION RATHER THAN AN ASSUMPTION, because claiming it wrongly is worse
+    // than missing it. GOV.UK: "If your company has only one director, they must not be the only
+    // employee liable for secondary Class 1 National Insurance." A one director company with no
+    // other staff is NOT eligible, and that is the commonest shape on this product. Rows filed
+    // under the `wages` category are a reason to ASK. They are never an answer: a director who
+    // pays a subcontractor out of that category would be told he can claim an allowance he
+    // cannot, and an unknown treated as an answer is how a job removed live data in Run 5.
+    //
+    // ⚠️ ONLY A COMPANY IS ASKED, AND THAT IS A DELIBERATE NARROWING RATHER THAN THE RULE.
+    // A sole trader with staff can claim the allowance too. He has no employer NI on his OWN
+    // drawings though, so the only screen that can USE this answer today is /app/pay-yourself,
+    // which is a company screen. taxoptimiser's own comment names the trap: "A question we ask a
+    // customer, store, and never once look at is not a question, it is a tax on his attention."
+    // So it is asked where it is read, and when a sole trader employer screen exists, widen this
+    // list and not before.
+    //
+    // ⚠️ AND IT SAYS "the business", NOT "the company", ON PURPOSE. An UNKNOWN structure is asked
+    // everything, by the doctrine forty lines up: the filter only ever bites on a KNOWN structure,
+    // because hiding a real relief from a man whose profile read timed out is the worse failure.
+    // That is right, and it means this question reaches people we do not yet know are companies.
+    // Worded "the company" it would have asked a sole trader about a company he does not have.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    structures: ['limited_company'],
+    key: 'other_wages',
+    ask: 'Does anybody else draw a wage from the business?',
+    why: 'If somebody does, your company can claim the Employment Allowance, which takes up to £10,500 a year off its employer National Insurance bill. A company whose only employee is its director cannot claim it, which is why we have to ask rather than assume.',
+    worthOrder: 'large',
+    claimant: 'his company',
+    backYears: 4,
+    evidence: 'Your own payroll. Anybody on the company payroll besides you counts, at any wage.',
+    source: 'GOV.UK, Employment Allowance: eligibility. "If your company has only one director, they must not be the only employee liable for secondary Class 1 National Insurance."',
+  },
+  {
     // 🔴 THE ONLY ARTICLE 9 QUESTION IN THIS FILE, AND FOR AN HOUR TODAY IT WAS IN THE WHATSAPP CHAIN.
     //
     // The chain I shipped this morning walks the list and sends the next question as a green button.

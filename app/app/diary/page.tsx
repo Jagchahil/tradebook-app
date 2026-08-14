@@ -185,7 +185,12 @@ export default async function DiaryPage({
               says About, it says where it came from, and the correction is right beside it. */}
           {hours !== null ? (
             <div style={S.hoursBox}>
-              <span style={S.hours}>{hoursGuessPhrase(hours)}</span>
+              {/* The words for a day or more come from durationPhrase, the same call the line
+                  directly above this one makes. One booking described two ways on one screen was
+                  the finding: this said "About 24h" while that said "one day". */}
+              <span style={S.hours}>
+                {hoursGuessPhrase(hours, job ? durationPhrase(job.startsAt, job.endsAt) : null)}
+              </span>
               <details style={S.fold}>
                 <summary style={S.foldTop}>Change the times</summary>
                 <p style={S.quiet}>

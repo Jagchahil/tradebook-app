@@ -167,6 +167,17 @@ const SOLE_ONLY = [
 // stays on this list: the claim "no MTD question is ever put to a partner" has to hold for the row
 // that is still in the file, not only for the ones still being asked.
 const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_mandated_letter', 'mtd_signed_up', 'mtd_agent', 'mtd_already_filed'];
+
+// ⚠️ ADDED 14 August 2026, RUN 6. THE FILTER NOW BITES IN BOTH DIRECTIONS, so the whitelist has to
+// as well. Until today every `structures` entry in the module narrowed a question AWAY from a
+// company. other_wages is the first that narrows one TOWARD one: it asks whether anybody else is
+// on the payroll, which is what decides the £10,500 Employment Allowance, and the only screen that
+// reads the answer today is /app/pay-yourself, which is a company screen.
+//
+// The rule the assertion below protects is unchanged and is the reason this list exists at all:
+// NO QUESTION CARRIES A STRUCTURE FILTER BY ACCIDENT. Every one is named here, on purpose, with a
+// reason written on the entry itself.
+const LTD_ONLY = ['other_wages'];
 {
   ok('🔴 the three sole trader questions carry their structures on the entry, with reasoning beside them',
     SOLE_ONLY.every((k) => {
@@ -196,8 +207,15 @@ const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_mandated_letter', 'mtd_signed_up', '
   ok('\ud83d\udd34 THE SUCCESSOR ASKS ABOUT HMRC\'S LETTER AND CONTAINS NO DIGIT AT ALL',
     /HMRC/.test(letterAsk) && /written/.test(letterAsk) && !/[0-9]/.test(letterAsk));
   ok('every other question is for every structure: absent means everyone',
-    CIRCUMSTANCES.filter((c) => !SOLE_ONLY.includes(c.key) && !MTD_SOLE_ONLY.includes(c.key))
+    CIRCUMSTANCES.filter((c) => !SOLE_ONLY.includes(c.key) && !MTD_SOLE_ONLY.includes(c.key)
+      && !LTD_ONLY.includes(c.key))
       .every((c) => c.structures === undefined));
+  ok('🔴 and the company only list is not empty, so the line above is not passing vacuously',
+    LTD_ONLY.length > 0
+    && LTD_ONLY.every((k) => {
+      const c = CIRCUMSTANCES.find((x) => x.key === k);
+      return !!c && Array.isArray(c.structures) && c.structures.join(',') === 'limited_company';
+    }));
 
   const forLtd = unanswered([], 'limited_company').map((c) => c.key);
   const forSole = unanswered([], 'sole_trader').map((c) => c.key);
@@ -211,8 +229,22 @@ const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_mandated_letter', 'mtd_signed_up', '
   ok('🔴 a sole trader keeps all three', forSole.includes('prior_employment') && forSole.includes('low_profit_year'));
   ok('🔴 a partner keeps all three too: his share IS self employment income',
     forPartner.includes('prior_employment') && forPartner.includes('low_profit_year'));
+  // ⚠️ AMENDED 14 August 2026, RUN 6. THE RULE IS UNCHANGED: an unknown structure is asked
+  // EVERYTHING, because hiding a real relief from a man whose profile read timed out is by far the
+  // worse failure. What changed is that "everything" can no longer be spelled "the same number as a
+  // sole trader". It could be until today only because no question had ever narrowed TOWARD a
+  // company, so a sole trader happened to be asked the lot. That is a proxy, not the rule, and the
+  // Employment Allowance question broke the coincidence without breaking the doctrine.
+  //
+  // So it is asserted directly now: unknown is EXACTLY the union of what every known structure is
+  // asked, no fewer and no more.
+  const unionOfKnown = [...new Set([...forSole, ...forLtd, ...forPartner])];
   ok('🔴 AN UNKNOWN STRUCTURE ASKS EVERYTHING, the safe direction the module argues for',
-    unknown.includes('prior_employment') && unknown.length === forSole.length);
+    unknown.includes('prior_employment')
+    && unionOfKnown.every((k) => unknown.includes(k))
+    && unknown.length === unionOfKnown.length);
+  ok('...and that is a real test: a sole trader is NOT asked everything any more',
+    forSole.length < unknown.length && !forSole.includes('other_wages'));
 
   ok('🔴 THE MTD GATE IS REFUSED FOR A COMPANY, and the three follow ups stop with it',
     unansweredMtd([], 'limited_company').length === 0);
@@ -248,7 +280,22 @@ const MTD_SOLE_ONLY = ['mtd_mandated', 'mtd_mandated_letter', 'mtd_signed_up', '
   const soleAll = progressIn([...household(), ...notHousehold()], [], 'sole_trader');
   // Three, not two, since wave nine: the old job, the voluntary Class 2 tick box, and the use of
   // home flat rate a company cannot have.
-  ok('🔴 the director\'s money denominator is exactly four questions lighter', ltdAll.askable === soleAll.askable - 4);
+  // ⚠️ AMENDED 14 August 2026, RUN 6. THE RULE THIS EXISTS TO PROTECT, written down so the next
+  // person does not have to reconstruct it from a number: A QUESTION THAT IS NOT FOR HIM IS NOT
+  // "WAITING FOR HIM", so a director's denominator must never carry the trade only questions.
+  //
+  // The old form asserted a bare count difference of four. That froze the list at one moment and
+  // went red the first time a company GAINED a question of its own rather than losing one, which
+  // is what happened when the Employment Allowance question arrived. A count cannot tell those two
+  // apart. Naming both directions protects the same rule and cannot drift into a lie.
+  const onlySole = forSole.filter((k) => !forLtd.includes(k));
+  const onlyLtd = forLtd.filter((k) => !forSole.includes(k));
+  ok('🔴 the director is spared exactly the questions that are not his, named rather than counted',
+    onlySole.join(',') === 'prior_employment,cis,low_profit_year,home_working');
+  ok('🔴 and the only one he is asked that a sole trader is not is the Employment Allowance question',
+    onlyLtd.join(',') === 'other_wages');
+  ok('...so his denominator is still lighter overall, which was the point of the old count',
+    ltdAll.askable < soleAll.askable);
   ok('🔴 AND THE DIRECTOR IS NEVER PROMISED THE FLAT RATE HE CANNOT CLAIM', !forLtd.includes('home_working'));
   ok('a sole trader keeps it, because s94H is his', forSole.includes('home_working'));
   ok('an answer he gave as a sole trader still counts after incorporating: the record is his',

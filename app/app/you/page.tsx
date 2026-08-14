@@ -15,7 +15,7 @@ import { registrationLine } from '../../../lib/companieshouse';
 import {
   household, notHousehold, mtdQuestions, progressIn, type IncomeShape,
 } from '../../../lib/circumstances';
-import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
+import { A11Y_CSS, APP_CSS, FONT, MOTION, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
   GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP, SURFACE,
   edge,
@@ -392,8 +392,8 @@ export default async function YouPage({
 
           ⚠️ <details> AND NOT A SCRIPT. Every screen under app/app is server rendered with no
           client JavaScript, and the browser has had this element for a decade. ─────────────── */}
-      <details className="lek-card" style={S.fold}>
-        <summary style={S.foldTop}>
+      <details className="lek-card lek-fold" style={S.fold}>
+        <summary className="lek-fold-top" style={S.foldTop}>
           <span style={S.foldLabel}>Yours to change</span>
           {asked && asked.askable - asked.answered > 0 ? (
             <span style={S.foldCount}>
@@ -462,8 +462,8 @@ export default async function YouPage({
           diary they are raised from, and the two papers he hands to somebody else. These rows
           came off the old sidebar when the shell became the bottom bar, and this hub is their
           home now, in the same shape as the rows above so the page reads as one system. ──────── */}
-      <details className="lek-card" style={S.fold}>
-        <summary style={S.foldTop}>
+      <details className="lek-card lek-fold" style={S.fold}>
+        <summary className="lek-fold-top" style={S.foldTop}>
           <span style={S.foldLabel}>Yours</span>
         </summary>
         <div style={S.doors}>
@@ -531,6 +531,37 @@ const CSS = [
   A11Y_CSS,
   APP_CSS,
   `.lek-eyebrow{font-size:${TYPE.label}px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:${RIVER_DEEP};margin:0 0 ${SPACE.xs}px}`,
+
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE TWO FOLDS HAD NO DISCLOSURE MARKER AT ALL, AND NINE DOORS READ AS TWO EMPTY CARDS.
+  // Run 6, 14 August 2026, found by a customer walking this page for the first time.
+  //
+  // A <summary> is display:list-item by default, and THAT is what generates the ::marker box the
+  // browser paints the disclosure triangle into. S.foldTop sets display:flex, which removes the
+  // box. Read live off production that morning:
+  //
+  //   { label: "Yours to change", summaryDisplay: "flex",
+  //     listStyleType: "disclosure-closed", after: "none", before: "none", cls: "(none)" }
+  //
+  // The computed list-style-type is STILL disclosure-closed, so the browser still wants a triangle
+  // and has nowhere to put it. And the element carried NO class, so no stylesheet could reach it
+  // to draw a replacement.
+  //
+  // Behind those two headings: circumstances, allowances, billing, the review, every invoice, the
+  // jobs diary, proof of income, share books, and the whole data rights lane. A customer who
+  // cannot find /app/you/data cannot exercise a right this product promises "neither one needs our
+  // permission".
+  //
+  // ⚠️ AND THE PATTERN ALREADY EXISTED, TWICE, IN THIS CODEBASE. app/app/tax/page.tsx kills the
+  // native marker and draws its own chevron with ::after, and AppNav.tsx carries the warning in as
+  // many words: "and ::-webkit-details-marker, and none of those exist in a React style object."
+  // The rule was known, written down and correct. It was simply never pointed at this page.
+  // ═════════════════════════════════════════════════════════════════════════════════════════════
+  `.lek-fold-top{list-style:none}`,
+  `.lek-fold-top::-webkit-details-marker{display:none}`,
+  `.lek-fold-top::after{content:'';flex:none;margin-left:auto;align-self:center;width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);opacity:.55;transition:transform ${MOTION.enter} ${MOTION.ease}}`,
+  `.lek-fold[open]>.lek-fold-top::after{transform:rotate(-135deg) translateY(2px)}`,
+  `@media(prefers-reduced-motion:reduce){.lek-fold-top::after{transition:none}}`,
 ].join('');
 
 const S: Record<string, React.CSSProperties> = {

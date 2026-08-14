@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
-import { getOptimiserInput, getBusinessProfile } from '../../../lib/supabase';
+import { getOptimiserInput, getBusinessProfile, readCircumstances } from '../../../lib/supabase';
 import { payModel, type BusinessType, type PayPlan } from './plan';
 import { bankFeedOffered } from '../../../lib/bankfeed';
 import { gbp0 } from '../../../lib/money';
@@ -53,11 +53,19 @@ export default async function PayYourselfPage() {
   // lib/websession.ts allowlists /app and below, so this cannot become an open redirect.
   if (!user) redirect('/in?next=%2Fapp%2Fpay-yourself');
 
-  const [optimiser, biz] = await Promise.all([
+  const [optimiser, biz, answers] = await Promise.all([
     getOptimiserInput(user.id),
     getBusinessProfile(user.id).catch(() => null),
+    // ⚠️ NULL IS AN UNREADABLE READ, NEVER A "no". It falls through to the unsure wording below,
+    // which is the direction that cannot tell him a bill is settled when it may not be.
+    readCircumstances(user.id).catch(() => null),
   ]);
   const structure: BusinessType = biz?.businessType ?? 'sole_trader';
+  // The one answer this screen needs, read the same way /app/you reads its answers. An answer we
+  // do not have is null, and null is spelled "unsure" on the screen, never "no".
+  const raw = answers?.find((a) => a.key === 'other_wages')?.answer ?? null;
+  const otherWages: 'yes' | 'no' | null = raw === 'yes' || raw === 'no' ? raw : null;
+
   const model = payModel(structure, optimiser);
 
   return (
@@ -217,7 +225,7 @@ export default async function PayYourselfPage() {
 
       {/* ── A COMPANY DIRECTOR. Salary, then dividends, then the wall, all the engine's own. ─── */}
       {model.kind === 'company' ? (
-        <CompanyShape profit={model.profit} plan={model.plan} />
+        <CompanyShape profit={model.profit} plan={model.plan} otherWages={otherWages} />
       ) : null}
 
       {/* THE STANDING LINE. This page prepares understanding, and that is all it does. Said at
@@ -232,7 +240,9 @@ export default async function PayYourselfPage() {
 
 // The director's shape, drawn whole from one payYourself() answer. A component rather than a
 // second page so the footer, the nav and the gate reasoning stay written exactly once.
-function CompanyShape({ profit, plan }: { profit: number; plan: PayPlan }) {
+function CompanyShape(
+  { profit, plan, otherWages }: { profit: number; plan: PayPlan; otherWages: 'yes' | 'no' | null },
+) {
   const best = plan.best;
   // The winning rung, matched by identity: best IS one of the rung plans, never a re-derivation.
   const bestRung = plan.rungs.find((r) => r.plan === best) ?? plan.rungs[0];
@@ -266,7 +276,7 @@ function CompanyShape({ profit, plan }: { profit: number; plan: PayPlan }) {
             <span style={S.oweFig}>{gbp0(best.corpTax)}</span>
           </div>
           <p style={S.oweBasis}>
-            On the {gbp0(best.ctProfit)} of profit left after your salary. The salary is a company
+            On the {gbp0(best.ctProfit)}{' '}of profit left after your salary. The salary is a company
             cost, so it comes off before Corporation Tax is worked out, which is part of why paying
             one is efficient. This is the company&apos;s own bill, paid from the company&apos;s
             account, not yours.
@@ -282,6 +292,26 @@ function CompanyShape({ profit, plan }: { profit: number; plan: PayPlan }) {
               The company owes this on salary above the employer threshold. It is already counted
               in the take home figure at the top, and it is the cost the lower salary rungs below
               exist to avoid.
+            </p>
+            {/* ═══════════════════════════════════════════════════════════════════════════════
+                🔴 THE EMPLOYMENT ALLOWANCE, WHICH THIS PRODUCT DID NOT KNOW EXISTED UNTIL TODAY.
+                Run 6, 14 August 2026. A cleaner with five staff read the figure above as settled.
+                It is not: £10,500 a year of Employment Allowance covers her whole employer NI bill
+                several times over, and grep returned NOTHING for the phrase anywhere in the repo.
+
+                ⚠️ THE FIGURE ABOVE STILL DOES NOT TAKE IT OFF, AND THIS SAYS SO IN AS MANY WORDS.
+                Applying it needs the answer to reach planLtd(), which is mirrored in the app and
+                pinned by ltd-parity, and that is a two repo change. Saying nothing until then
+                would leave a confident wrong number on a money screen for the sake of a tidy
+                deploy. This module's rule, from its own comments: we would rather say something
+                honest and incomplete than a confident wrong number.
+                ═══════════════════════════════════════════════════════════════════════════════ */}
+            <p style={S.oweBasis}>
+              {otherWages === 'yes'
+                ? 'Your company can claim the Employment Allowance, because somebody else draws a wage from it. That is up to £10,500 a year off this bill, and on these figures it covers the whole of it. The figures above do not take it off yet, so treat this line as the most you would pay rather than what you owe.'
+                : otherWages === 'no'
+                  ? 'A company whose only employee is its director cannot claim the Employment Allowance, so this one stands as it is. If you take somebody on, tell us and it changes.'
+                  : 'If anybody else draws a wage from the business, your company can claim the Employment Allowance, up to £10,500 a year, and on these figures that would cover this bill entirely. We have to ask before we can count it, because a company whose only employee is its director cannot claim it.'}
             </p>
           </div>
         ) : null}

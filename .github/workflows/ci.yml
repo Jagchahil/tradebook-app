@@ -96,3 +96,24 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+
+      # ═══════════════════════════════════════════════════════════════════════════════════════
+      # A FIGURE GLUED TO THE WORD AFTER IT, AND THE ONLY PLACE IT CAN BE SEEN.
+      #
+      # Run 6, 14 August 2026. /app/pay-yourself printed "On the £23,295of profit" and
+      # /app/tax/summary printed "figures for 2026/27added up", live, for weeks. The SOURCE is
+      # correct in all three places. SWC, which is what next build compiles with, strips the
+      # leading whitespace of those JSX text runs; TypeScript does not, which was proved by
+      # running this repo's own TypeScript over the same files and watching it emit the space
+      # every time.
+      #
+      # So `npx tsc --noEmit` two steps up is STRUCTURALLY INCAPABLE of catching this, and so is
+      # every suite in run-all.mjs, because none of them build. This step reads the COMPILED
+      # output, which is why it runs AFTER the build and nowhere else.
+      #
+      # ⚠️ IT EXITS NON ZERO WHEN THERE IS NO BUILD TO READ, on purpose. A check that could not
+      # run has not passed. test/run6fixes.test.mjs proves the scanner itself against fixtures and
+      # against fake builds, so its logic is guarded without needing a build.
+      # ═══════════════════════════════════════════════════════════════════════════════════════
+      - name: No figure is glued to the word after it
+        run: node scripts/check-glued-figures.mjs

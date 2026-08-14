@@ -200,7 +200,7 @@ export default async function ProofOfIncomePage({
                 the figure above changes its name and nothing on the page says why. */}
             {proof.cisDeducted > 0 ? (
               <p style={S.capital}>
-                {gbp2(proof.cisDeducted)} of tax was taken from these payments at source under the
+                {gbp2(proof.cisDeducted)}{' '}of tax was taken from these payments at source under the
                 Construction Industry Scheme and paid to HMRC by the contractors. The turnover above
                 is the figure BEFORE that deduction, which is what the tax return reports and what
                 the contractors&apos; payment and deduction statements show. The amount that reached

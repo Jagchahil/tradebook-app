@@ -175,7 +175,7 @@ export default async function TaxSummaryPage() {
           <p style={S.window}>
             Making Tax Digital for Income Tax covers self employment and rent on a personal return,
             and your company&apos;s trade is neither: the company files its own return. So this is
-            not an update, it is your own figures for {pack.taxYear} added up. That window is the
+            not an update, it is your own figures for {pack.taxYear}{' '}added up. That window is the
             personal tax year rather than your company&apos;s accounting period, so read it as a
             running total and not as a set of accounts.
           </p>

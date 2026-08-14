@@ -194,8 +194,20 @@ const keys = (list) => list.map((c) => c.key);
   // and a door on /app/you promising questions he can never be asked is a door that lies twice.
   const llAll = progressIn([...household(), ...notHousehold(), ...mtdQuestions()], [], LANDLORD);
   const unknownAll = progressIn([...household(), ...notHousehold(), ...mtdQuestions()], [], null);
-  ok('🔴 his denominator is exactly the seven trade questions lighter',
-    llAll.askable === unknownAll.askable - 7);
+  // ⚠️ AMENDED 14 August 2026, RUN 6. THE RULE IS UNCHANGED and it is the sentence above: a
+  // question that does not exist for him is not "waiting for him". What changed is that a bare
+  // count cannot say WHICH questions, so it could not tell the difference between a landlord
+  // correctly losing a trade question and an unknown correctly GAINING a company one. The
+  // Employment Allowance question is the second kind, and the old count read it as the first.
+  const llKeys = [...keys(unanswered([], LANDLORD)), ...keys(unansweredMtd([], LANDLORD))];
+  const unKeys = [...keys(unanswered([])), ...keys(unansweredMtd([]))];
+  ok('🔴 the landlord is spared exactly the questions that are not his, named rather than counted',
+    unKeys.filter((k) => !llKeys.includes(k)).join(',')
+      === 'prior_employment,start_date,cis,low_profit_year,premises,other_wages,vehicle,home_working');
+  ok('...and he gains nothing an unknown does not also get',
+    llKeys.every((k) => unKeys.includes(k)));
+  ok('...so his denominator is still lighter, which was the point of the old count',
+    llAll.askable < unknownAll.askable);
   ok('an answer he gave before we knew still counts: the record of what he told us is his',
     progressIn(notHousehold(), [{ key: 'prior_employment', answer: 'yes' }], LANDLORD).answered === 1);
 }
@@ -215,8 +227,16 @@ const keys = (list) => list.map((c) => c.key);
   ok('null and undefined are unknown, exactly as the old bare string callers were',
     keys(unanswered([], null)).length === unknown.length
     && keys(unanswered([], undefined)).length === unknown.length);
+  // ⚠️ AMENDED 14 August 2026, RUN 6. The rule here is about the API SHAPE: a bare structure
+  // string must behave exactly as the object form does. Comparing a sole trader's count to an
+  // unknown's was only ever a proxy for that, and it worked because no question had yet narrowed
+  // TOWARD a company, so a sole trader happened to be asked everything. other_wages ended that
+  // coincidence. The rule is asserted directly now, against the object form, which is what it was
+  // always trying to say.
   ok('a bare structure string still behaves as it always did, so nothing broke by being left alone',
-    sole.length === unknown.length);
+    sole.join(',') === keys(unanswered([], { structure: 'sole_trader' })).join(','));
+  ok('🔴 and a known sole trader is now asked strictly less than an unknown, which is the new truth',
+    sole.length < unknown.length && !sole.includes('other_wages') && unknown.includes('other_wages'));
   ok('🔴 AND A DIRECTOR WHO IS ALSO A LANDLORD LOSES BOTH SETS, never gains one back',
     keys(unanswered([], { structure: 'limited_company', income: 'property_only' }))
       .every((k) => !['prior_employment', 'low_profit_year', 'home_working', 'vehicle'].includes(k)));

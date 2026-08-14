@@ -21,7 +21,7 @@ import {
 // its answer; it never reworks the comparison, for the same reason no component holds a tax
 // constant: two copies of a rule drift, and the copy that drifts is the one he is looking at.
 import { propertyProfit, PROPERTY_FACTS, type PropertyTaxYear } from './propertyengine';
-import { compare } from './ltdengine';
+import { compare, corporationTax } from './ltdengine';
 import { combinedIncomeTax, type PersonalIncomeResult } from './personalincome';
 import { decideAction, type AutonomyLevel } from './autonomy';
 import { studentLoanForSA, type StudentPlan } from './nistudentloan';
@@ -767,6 +767,42 @@ export function setAsideBasisLine(
 // these while trading is a strong signal of unclaimed, tax-reducing spend.
 const COMMON_COSTS = ['fuel', 'phone', 'insurance', 'tools'];
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// WHAT ONE POUND OF ALLOWABLE COST SAVES, AND WHOSE BILL IT COMES OFF.
+//
+// ONE exported function, because this sentence is drawn by more than one lever and two copies of
+// an arithmetic drift. A SOLE TRADER saves his own income tax plus Class 4 at his marginal rate.
+// A COMPANY saves CORPORATION TAX, in the company, on the company's own profit. Its director
+// saves nothing personally by spending the company's money: what reaches her is salary and
+// dividends, which are a different tax on a different return.
+//
+// The company rate is DIFFERENCED off corporationTax() over a £100 step rather than read off a
+// constant, so marginal relief between the two limits prices itself and a Budget that moves a
+// limit moves this with it. At £37,000 of profit that is £19 per £100, the small profits rate.
+// Inside marginal relief it is £26.50 per £100, which no constant in this file would have known.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export interface DeductibleSaving {
+  /** What £1 of allowable cost takes off the bill, as a decimal. */
+  rate: number;
+  /** Whose bill it comes off. The sentence must say, because these are two taxpayers. */
+  whose: 'you' | 'company';
+}
+
+export function deductibleSaving(
+  isCompany: boolean,
+  companyProfit: number,
+  personalTotalIncome: number,
+): DeductibleSaving {
+  if (!isCompany) return { rate: marginalRate(personalTotalIncome), whose: 'you' };
+  const profit = Math.max(0, companyProfit);
+  if (profit <= 0) return { rate: 0, whose: 'company' };
+  const step = Math.min(100, profit);
+  return {
+    rate: (corporationTax(profit) - corporationTax(profit - step)) / step,
+    whose: 'company',
+  };
+}
+
 // Find every lever, richest first. Pure: same input, same list.
 export function findOptimisations(input: OptimiserInput): Optimisation[] {
   const out: Optimisation[] = [];
@@ -803,13 +839,34 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   // go UP, so a quoted saving gets bigger and a lever that was silent may start speaking. Nothing
   // is taken away from anybody: a man with no property is unchanged to the penny.
   const projPropertyNet = Math.max(0, propIncome - propExpenses) * factor;
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 personalTradeNet, NOT projTradeNet, AND IT IS THE RULE taxPosition() ALREADY HOLDS.
+  // Run 6, 14 August 2026, found by a limited company director walking a live account.
+  //
+  // taxPosition() excludes a company's trading profit from a personal figure, under twenty five
+  // lines explaining that it is the wrong tax, on the wrong person, in the wrong entity, and that
+  // `selfEmployment` is the one slot carrying Class 4. This function then rebuilt its own total
+  // three hundred lines further down and reached straight past that fix for the raw number.
+  //
+  // WHAT THE CUSTOMER SAW. A director with £37,000 of COMPANY profit was told, on
+  // /app/tax/ways-to-save: "every £100 of allowable cost saves about £26 at your rate". £26 is
+  // marginalRate()'s basic band, which is "20 + 6", and the 6 is CLASS 4 NATIONAL INSURANCE. She
+  // is a director and an employee of her own company. She pays no Class 4 at all, ever.
+  //
+  // A rule only holds where it is pointed, and this one was pointed at taxPosition().
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const isCompany = input.businessType === 'limited_company';
+  const personalTradeNet = isCompany ? 0 : projTradeNet;
   const projTotalIncome =
-    projTradeNet +
+    personalTradeNet +
     projPropertyNet +
     Math.max(0, input.employmentIncome) +
     Math.max(0, input.savingsIncome ?? 0) +
     Math.max(0, input.dividendIncome ?? 0);
   const mRate = marginalRate(projTotalIncome);
+  // The two levers below quote what a deductible pound saves. Both ask ONE function, so a company
+  // and a sole trader can never be handed the same rate by two different sentences.
+  const deduct = deductibleSaving(isCompany, projTradeNet, projTotalIncome);
   const cats = input.categoriesLogged.map((c) => c.toLowerCase());
 
   // 1. Pension to step back out of the 40% band. The biggest lever for a higher
@@ -853,12 +910,12 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   // 2. Buying a planned asset before 5 April, so the whole cost lands this year
   //    under the Annual Investment Allowance. Irreversible (a purchase): draft only.
   const g = input.purchaseGoal;
-  if (g && g.amount > 0 && mRate > 0) {
-    const saving = round(g.amount * mRate);
+  if (g && g.amount > 0 && deduct.rate > 0) {
+    const saving = round(g.amount * deduct.rate);
     out.push({
       key: 'aia_timing',
       title: `Timing on ${g.title}`,
-      detail: `If you buy ${g.title} (about £${round(g.amount).toLocaleString('en-GB')}) before 5 April, the whole cost comes off this year's tax under the Annual Investment Allowance, saving about £${saving.toLocaleString('en-GB')} at your rate. You choose when to buy.`,
+      detail: `If you buy ${g.title} (about £${round(g.amount).toLocaleString('en-GB')}) before 5 April, the whole cost comes off this year's tax under the Annual Investment Allowance, saving about £${saving.toLocaleString('en-GB')} ${deduct.whose === 'company' ? "off your company's Corporation Tax" : 'at your rate'}. You choose when to buy.`,
       estSaving: saving,
       action: 'purchase',
     });
@@ -867,11 +924,11 @@ export function findOptimisations(input: OptimiserInput): Optimisation[] {
   // 3. Costs the user is likely paying but not logging. Reversible admin: at the
   //    auto level Lekhio can prompt for these itself.
   const missing = COMMON_COSTS.filter((c) => !cats.includes(c));
-  if (input.ytdTradeIncome > 0 && missing.length >= 2 && mRate > 0) {
+  if (input.ytdTradeIncome > 0 && missing.length >= 2 && deduct.rate > 0) {
     out.push({
       key: 'missed_expenses',
       title: 'Costs you may not be claiming',
-      detail: `You have nothing logged this year for ${missing.join(', ')}. If you pay for these for work, logging them lowers your tax: every £100 of allowable cost saves about £${round(100 * mRate)} at your rate. Snap the receipts or text them and Lekhio sorts the rest.`,
+      detail: `You have nothing logged this year for ${missing.join(', ')}. If you pay for these for work, logging them lowers your tax: every £100 of allowable cost ${deduct.whose === 'company' ? `takes about £${round(100 * deduct.rate)} off your company's Corporation Tax` : `saves about £${round(100 * deduct.rate)} at your rate`}. Snap the receipts or text them and Lekhio sorts the rest.`,
       estSaving: 0,
       action: 'log_entry',
     });

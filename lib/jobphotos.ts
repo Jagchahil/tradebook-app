@@ -73,8 +73,40 @@ export function hoursFromSlot(startsAt: string, endsAt: string): number | null {
   return Math.max(1, Math.round(ms / HOUR_MS));
 }
 
-export function hoursGuessPhrase(hours: number | null): string | null {
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A DAY'S CLEANING IS NOT TWENTY FOUR HOURS. Run 6, 14 August 2026.
+//
+// A job booked as "One day" at 8:30am read, on the job screen: "About 24h, from your diary". The
+// same job read "one day" correctly two lines above it in the diary list. Both came off the same
+// pair of timestamps.
+//
+// The two halves of parseDurationHours() in lib/diary.ts mean different things by an hour. Below a
+// day it stores WORKING hours, which is why half a day is 4. At a day and above it stores CALENDAR
+// hours, because a day job occupies the day on a diary and the week strip has to place it. Half of
+// one day is four hours on one branch and twelve on the other.
+//
+// ⚠️ AND THE SLOT IS NOT THE THING TO CHANGE. Compressing a two day job into sixteen contiguous
+// working hours would end it at midnight on the first day, and the week strip, "Coming up" and the
+// job_soon nudge all place jobs off that slot. The calendar is right. The SENTENCE was wrong.
+//
+// So below a day this still says hours, which is what he booked and what he means. At a day and
+// over it says the same words the diary list says, because that is what the slot actually knows.
+// One booking cannot be described two ways on two screens: that was the whole finding.
+//
+// ⚠️ THERE IS STILL NO EIGHT HOUR OPTION on either duration list, so a man who wants to say "a
+// working day" rather than "a day" cannot. That is deliberately NOT fixed here. It is a change to
+// what the product offers rather than to what it says, doc 103 asks what comes off the screen to
+// make room, and it is not answerable from a defect report.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ THE WORDS FOR A DAY OR MORE ARE PASSED IN, NOT IMPORTED. durationPhrase lives in lib/diary.ts
+// and this module is IMPORT FREE ON PURPOSE, which is not a style preference: test/jobdiary.test.mjs
+// imports this file DIRECTLY off disk with no staging and no specifier rewriting, so a single
+// import here fails the whole suite with a module not found. The header four lines up says so and
+// I added one anyway on the first attempt. The caller already holds the phrase the diary list is
+// drawn from, so handing it over costs nothing and keeps both properties.
+export function hoursGuessPhrase(hours: number | null, dayPhrase?: string | null): string | null {
   if (hours === null) return null;
+  if (hours >= 24) return dayPhrase ? `About ${dayPhrase}, from your diary` : null;
   return `About ${hours}h, from your diary`;
 }
 

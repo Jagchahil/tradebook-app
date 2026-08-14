@@ -5201,7 +5201,7 @@ export async function markInvoicePaidServer(
   const { url } = config();
 
   const invRes = await fetch(
-    `${url}/rest/v1/invoices?id=eq.${encodeURIComponent(invoiceId)}&select=user_id,number,customer_name,total,status&limit=1`,
+    `${url}/rest/v1/invoices?id=eq.${encodeURIComponent(invoiceId)}&select=user_id,number,customer_name,subtotal,total,status&limit=1`,
     { headers: headers() },
   );
   if (!invRes.ok) return;
@@ -5209,6 +5209,7 @@ export async function markInvoicePaidServer(
     user_id: string;
     number: string;
     customer_name: string;
+    subtotal: number | null;
     total: number;
     status: string;
   }> | null;
@@ -5245,7 +5246,8 @@ export async function markInvoicePaidServer(
   await insertTransaction({
     user_id: inv.user_id,
     vendor: inv.customer_name,
-    amount: Math.abs(Number(inv.total) || 0),
+    // The NET. invoiceIncomeAmount owns this rule: the VAT on this invoice is not his income.
+    amount: invoiceIncomeAmount(inv),
     category: 'income',
     transaction_date: new Date().toISOString().slice(0, 10),
     source_type: 'invoice',
@@ -10376,19 +10378,58 @@ export async function markInvoiceSentByOwner(userId: string, invoiceId: string):
 // 🔴 THE INCOME IS BOOKED AT MOST ONCE. The flip filters on status=neq.paid and asks for the
 // rows back, exactly the atomic gate the Stripe path uses, so this racing a webhook (or a double
 // press) can only book the income on whichever write actually flipped the row.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A PAID INVOICE USED TO BOOK ITS VAT INCLUSIVE TOTAL AS INCOME. RUN 4, 14 August 2026.
+//
+// Dwayne Osei, VAT registered groundworker. He raised a 2,000 invoice, VAT 400, total 2,400, and
+// pressed "I have been paid". 2,400 landed in his income. /app/money read In 2,400 and Profit
+// 600. /app/proof-of-income read Gross income 2,400.00, which is the figure a lender reads, on a
+// job worth 2,000.
+//
+// The VAT is HMRC money passing through his hands. It is not turnover, it is not profit, and it
+// must never reach a books row. Both paid paths selected the total column and booked the total
+// column; neither read subtotal, though createInvoice writes subtotal on every row.
+//
+// ⚠️ ONE FUNCTION AND BOTH DOORS CALL IT. There are two ways an invoice becomes paid, the Stripe
+// delivery and his own press, and they sat 5,000 lines apart booking the same wrong column. A
+// shared regex over both would only hold whichever one it was pointed at, so the agreement is a
+// CALL, not a matching expression, and test/run4fixes.test.mjs asserts the call at both sites.
+//
+// ⚠️ IT LIVES INSIDE THE DiaryJobDbRow TAIL ON PURPOSE. Four suites stage this file by slicing
+// from that interface onward and importing the slice, so a helper defined above it is invisible
+// to the stub and markInvoicePaidByOwner throws inside the test rather than booking anything.
+// Declarations hoist, so markInvoicePaidServer 5,000 lines earlier still resolves it.
+//
+// ⚠️ AND IT NEEDS NO BRANCH ON VAT STATUS. A trader who is not registered has tax 0 and a total
+// equal to his subtotal, so the net is his gross and this returns the number it always did. The
+// fallback to total is for legacy rows written before subtotal existed: a null there must mean
+// "we only have the one figure", never zero.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export function invoiceIncomeAmount(
+  inv: { subtotal?: number | string | null; total?: number | string | null },
+): number {
+  const net = Number(inv.subtotal);
+  // Any non zero finite subtotal is the net. Zero means the column was never written,
+  // which is a legacy row, not a free job, so that is the one case that falls through.
+  if (Number.isFinite(net) && net !== 0) return Math.abs(net);
+  const gross = Number(inv.total);
+  return Number.isFinite(gross) ? Math.abs(gross) : 0;
+}
+
 export async function markInvoicePaidByOwner(userId: string, invoiceId: string): Promise<boolean> {
   if (!userId || !UUID.test(invoiceId)) return false;
   try {
     const { url } = config();
     const read = await fetch(
       `${url}/rest/v1/invoices?user_id=eq.${encodeURIComponent(userId)}`
-      + `&id=eq.${encodeURIComponent(invoiceId)}&select=number,customer_name,total,status&limit=1`,
+      + `&id=eq.${encodeURIComponent(invoiceId)}&select=number,customer_name,subtotal,total,status&limit=1`,
       { headers: headers(), signal: AbortSignal.timeout(6000) },
     );
     if (!read.ok) return false;
     const rows = (await read.json()) as Array<{
       number: string;
       customer_name: string;
+      subtotal: number | string | null;
       total: number | string;
       status: string;
     }>;
@@ -10413,7 +10454,8 @@ export async function markInvoicePaidByOwner(userId: string, invoiceId: string):
     await insertTransaction({
       user_id: userId,
       vendor: inv.customer_name,
-      amount: Math.abs(Number(inv.total) || 0),
+      // The NET. invoiceIncomeAmount owns this rule: the VAT on this invoice is not his income.
+      amount: invoiceIncomeAmount(inv),
       category: 'income',
       transaction_date: new Date().toISOString().slice(0, 10),
       source_type: 'invoice',

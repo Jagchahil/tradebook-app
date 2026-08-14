@@ -51,6 +51,7 @@
 //   node tribunal.mjs --since=N   look back N days (default 30)
 
 import { createHash } from 'node:crypto';
+import { CASELAW_SOURCE_NAME } from './caselaw.mjs';
 
 const DRY = process.argv.includes('--dry-run');
 const DB_URL = process.env.KHOJI_DB_URL || '';
@@ -225,7 +226,7 @@ async function main() {
          on conflict (source_url) do nothing`,
         [
           `https://www.gov.uk${h.link}`,
-          'Tax tribunal decision (GOV.UK, Open Government Licence)',
+          CASELAW_SOURCE_NAME,
           `⚖️ MAY AFFECT: ${h.touches.map((t) => t.rule).join(', ')} — ${h.title}`,
           [
             'A tribunal has decided a case that touches a rule we assert. A judgment can reverse a tax',

@@ -120,7 +120,14 @@ ok('🔴 AND WE STOP THERE. The catchwords decide whether a HUMAN reads the judg
 ok('...and nothing here touches the Find Case Law API',
   // Their restriction is on bulk programmatic searching across THEIR records. We read GOV.UK's own
   // OGL feed instead. Different publisher, different licence, nothing to apply for.
-  !/nationalarchives|caselaw\./i.test(code)
+  //
+  // ⚠️ POINTED AT THE HOST, NOT THE WORD. This read `/nationalarchives|caselaw\./i`, and the bare
+  // `caselaw.` half fired on 14 August 2026 on `import ... from './caselaw.mjs'`, a LOCAL module
+  // that holds the licence rules and touches no network at all. A guard that cannot tell their
+  // hostname from our filename is a guard that gets deleted the first time it is inconvenient.
+  // The claim is unchanged: this file must not reach for their API.
+  !/nationalarchives/i.test(code)
+  && !/caselaw\.nationalarchives|https?:\/\/[^'"\s]*caselaw/i.test(code)
   && /filter_format', 'tax_tribunal_decision/.test(code));
 
 // ---------------------------------------------------------------------------------------------
@@ -133,14 +140,26 @@ ok('🔴 A HIT LANDS IN THE APPROVAL QUEUE. It does not touch the engine.',
   // entitled to. Jag reads it. Jag decides. That is the whole product.
   /'needs_distillation'/.test(code) && /engine_impact/.test(code));
 
+// ⚠️ THIS ASSERTION WAS UNFAILABLE UNTIL 14 AUGUST 2026. It read
+//   /null,\s*$/m.test(code) || /confidence/.test(code)
+// and the word `confidence` is in the INSERT's own column list, so the right hand side was true
+// under every possible change to this file. It could not go red. It has been pointed at the
+// argument it stands for instead: the row is inserted with a literal null in the confidence
+// position, because no model judged it, and the file must not acquire a model that could.
 ok('...with confidence NULL, because no model judged it. A keyword matched a judge\'s own summary.',
-  /null,\s*$/m.test(code) || /confidence/.test(code));
+  /null,\s+\/\/ No model judged this/.test(code === src ? src : src)
+  && !/anthropic|claude|distill\(/i.test(code));
 
+// ⚠️ THESE TWO TESTED `src`, THE RAW FILE, IN A SUITE THAT COMPUTES A COMMENT STRIPPED COPY ON
+// LINE 35 AND THEN DID NOT USE IT. So a comment mentioning the phrase satisfied them and the
+// strings could have been deleted from the INSERT with both still green. They test `code` now,
+// which is the copy with the arguments removed, so only the row a customer's reviewer actually
+// sees can satisfy them.
 ok('...and the item NAMES the rule at risk and quotes the judge, so the human knows what to read for',
-  /RULE AT RISK/.test(code) && /judge's own catchwords|judge\\'s own catchwords/i.test(src));
+  /RULE AT RISK/.test(code) && /catchwords/i.test(code));
 
 ok('...and says plainly that nothing is automatic',
-  /Nothing here is automatic/.test(src));
+  /Nothing here is automatic/.test(code));
 
 ok('the run is labelled kind=tribunal, so it can never be mistaken for the differ\'s pulse',
   // Fourth writer into khoji_runs. brain.ts renders the newest DIFFER row as a sentence about tax

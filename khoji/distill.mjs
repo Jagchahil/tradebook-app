@@ -1,3 +1,4 @@
+import { isCaselawRow } from './caselaw.mjs';
 // Khoji distillation. Turns a raw GOV.UK / HMRC update into a clean, sourced
 // summary. This is the ONLY part that costs Anthropic credit, and it is dormant
 // by default: with KHOJI_DISTILL not set to "on", or no ANTHROPIC_API_KEY, every
@@ -73,6 +74,19 @@ export function isManual(item) {
 
 export function triageStatus(item, d) {
   if (!d) return 'needs_distillation';
+
+  // 🔴 0. A JUDGMENT. NEVER BINNED, NEVER DISTILLED, AND IT GOES BACK IN THE QUEUE.
+  //
+  // The other exemptions below stop a row being DISMISSED. This one is stronger: a caselaw row
+  // must come back as needs_distillation, because the licence says a PERSON reviews every
+  // candidate change and the pipeline only ever flags. 'distilled' would mean a model had judged
+  // it, and the whole argument of khoji/tribunal.mjs is that no model judged it: a keyword
+  // matched a judge's own catchwords, and that is a prompt for a human to READ.
+  //
+  // This is defence in depth. khoji/watch.mjs's backlog select already excludes these rows, so
+  // in the normal path distill() never sees one. If a future caller finds another way to hand one
+  // over, it still cannot be binned and it still cannot be marked judged.
+  if (isCaselawRow(item)) return 'needs_distillation';
 
   // 1. A watched rates page. Never binned, at any confidence. The mileage row was 0.15.
   const isWatchedPage = String(item.source_url || '').includes('#');

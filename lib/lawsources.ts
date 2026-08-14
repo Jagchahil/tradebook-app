@@ -48,6 +48,49 @@ export type LegalField =
   | 'insolvency';
 
 /** The domains we are licensed to read and cite, and nothing else. */
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A JUDGMENT NEVER REACHES A USER. PRINCIPLE B, IN CODE.
+//
+// Lekhio Ltd holds a Find Case Law transactional licence from The National Archives (ref
+// CAS-341311-V2P0M2). One of the nine binding principles is: never reproduce, paraphrase,
+// summarise or comment on a judgment TO A USER. Extract the tax treatment point and the citation,
+// link to the official record, and cite the underlying legislation or HMRC guidance. Never the
+// judgment's holding.
+//
+// Until 14 August 2026 NOTHING IN THIS CODEBASE ENFORCED THAT. khoji/tribunal.mjs stores up to 800
+// characters of the judge's own catchwords in knowledge_items.summary, on purpose, because a human
+// at the team desk needs to read them to decide. The moment anybody clicked approve, that row
+// became status='reviewed', and getRelevantKnowledge admits reviewed rows and interpolates their
+// summary straight into the prompt that answers a customer's tax question on WhatsApp, in Ask, and
+// in the web thread. The only reason it had not happened is that nobody had clicked approve yet.
+//
+// So the catchwords stay in the row, where the human reads them, and the row is refused at the one
+// read that feeds a user. What a customer may see about a case is what lib/rulesources.ts already
+// publishes: a citation, held to a reference and not prose by test/citationvoice.test.mjs.
+//
+// ⚠️ THE CONSTANT IS DUPLICATED IN khoji/caselaw.mjs ON PURPOSE. khoji is .mjs under bare node on a
+// Mac mini and lib/ is TypeScript compiled by Next; neither can import the other.
+// test/caselawgate.test.mjs asserts the two strings are byte identical, so they cannot drift.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// Must match CASELAW_SOURCE_NAME in khoji/caselaw.mjs exactly. The test enforces it.
+export const CASELAW_SOURCE_NAME = 'Tax tribunal decision (GOV.UK, Open Government Licence)';
+
+// A PostgREST filter that keeps caselaw rows out of a query. Used by getRelevantKnowledge, which
+// is the one read whose output reaches a customer.
+export const CASELAW_NOT_FILTER = `&source_name=not.eq.${encodeURIComponent(CASELAW_SOURCE_NAME)}`;
+
+export function isCaselawKnowledgeRow(
+  row: { source_name?: string | null; raw?: unknown } | null | undefined,
+): boolean {
+  if (!row) return false;
+  if ((row.source_name ?? '') === CASELAW_SOURCE_NAME) return true;
+  const raw = row.raw;
+  if (raw && typeof raw === 'object' && (raw as { tribunal?: unknown }).tribunal === true) return true;
+  if (typeof raw === 'string' && /"tribunal"\s*:\s*true/.test(raw)) return true;
+  return false;
+}
+
 export const ALLOWED_SOURCE_HOSTS = [
   'www.legislation.gov.uk',
   'legislation.gov.uk',

@@ -17,6 +17,7 @@ import {
 } from './trialidentity';
 import type { TrialRow } from './trialnudge';
 import { CUSTOMER_COLUMNS, normaliseSource } from './team';
+import { CASELAW_NOT_FILTER, isCaselawKnowledgeRow } from './lawsources';
 import type { TeamCustomer, TeamMember } from './team';
 import type { Snapshot } from './metrics';
 import { parseLevel, type AutonomyLevel } from './autonomy';
@@ -233,6 +234,12 @@ export interface KnowledgeItem {
   summary: string;
   source_url: string;
   effective_date: string | null;
+  // ⚠️ SELECTED SO THE CASELAW REFUSAL CAN SEE THEM, AND NOT RENDERED ANYWHERE. Every caller
+  // interpolates title, summary and source_url only. These two exist so isCaselawKnowledgeRow can
+  // recognise a judgment derived row after it comes back, as a second line behind the database
+  // filter. See lib/lawsources.ts for why a judgment never reaches a user.
+  source_name?: string | null;
+  raw?: unknown;
 }
 
 const KNOWLEDGE_STOPWORDS = new Set([
@@ -282,9 +289,22 @@ export async function getRelevantKnowledge(question: string, limit = 6): Promise
     // THE RAIL: corpus.mjs will only ever write status='verbatim' for a gov.uk URL. If that rail
     // ever breaks, we would be publishing a stranger's words under HMRC's authority, and no test in
     // this repo would be more important than the one that catches it (test/rulesources.test.mjs).
+    // 🔴 AND A JUDGMENT NEVER COMES BACK FROM HERE. PRINCIPLE B OF THE FIND CASE LAW LICENCE.
+    //
+    // khoji/tribunal.mjs stores up to 800 characters of a judge's own catchwords in `summary`, on
+    // purpose, because the human at the team desk has to read them to decide. This is the one read
+    // whose output is interpolated into a prompt that answers a CUSTOMER: app/api/whatsapp,
+    // app/api/ask and app/api/thread all take these rows and write `- ${title}: ${summary}` into
+    // the model's context. One click of approve on a tribunal card, and a judge's words would have
+    // gone to a man asking about his van on WhatsApp. Nothing prevented it until 14 August 2026.
+    //
+    // The row keeps its catchwords for the desk. It is refused here. lib/lawsources.ts owns what a
+    // caselaw row is, and the filter is applied at the DATABASE so the rows never travel, with the
+    // predicate applied again below in case a row is ever marked only in `raw`.
     let path =
-      'knowledge_items?status=in.(reviewed,verbatim)&source_url=not.is.null&summary=not.is.null' +
-      `&select=title,summary,source_url,effective_date&order=effective_date.desc.nullslast&limit=${limit}`;
+      'knowledge_items?status=in.(reviewed,verbatim)&source_url=not.is.null&summary=not.is.null'
+      + CASELAW_NOT_FILTER +
+      `&select=title,summary,source_url,effective_date,source_name,raw&order=effective_date.desc.nullslast&limit=${limit}`;
     // Surface items that relate to the question. With no usable words we fall back
     // to the most recent verified items.
     if (words.length) {
@@ -297,7 +317,7 @@ export async function getRelevantKnowledge(question: string, limit = 6): Promise
     if (!res.ok) return [];
     const rows = (await res.json()) as KnowledgeItem[];
     return Array.isArray(rows)
-      ? rows.filter((r) => r && r.summary && r.source_url).slice(0, limit)
+      ? rows.filter((r) => r && r.summary && r.source_url && !isCaselawKnowledgeRow(r)).slice(0, limit)
       : [];
   } catch {
     return [];

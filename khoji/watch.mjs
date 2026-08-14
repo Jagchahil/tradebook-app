@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { distill, distillEnabled, triageStatus } from './distill.mjs';
+import { CASELAW_SQL_EXCLUSION } from './caselaw.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DRY = process.argv.includes('--dry-run');
@@ -238,8 +239,22 @@ async function main() {
 
     // Backlog: once distillation is on, work through items captured while dormant.
     if (distillEnabled()) {
+      // 🔴 CASELAW ROWS ARE EXCLUDED, AND THIS LINE IS A LICENCE CONDITION RATHER THAN A TIDY UP.
+      //
+      // This select used to read EVERY needs_distillation row with no source filter. Tribunal
+      // rows sit in that queue by design, waiting for a person to read them. So on any night with
+      // distillation on, a language model picked one up, rewrote the human authored summary that
+      // carries the judge's catchwords and the words "Nothing here is automatic", replaced the
+      // deliberate `confidence = null` with a score of its own, and could move the row to
+      // 'dismissed' where no human would ever see it again.
+      //
+      // That is principle A (a PERSON reviews every candidate, the pipeline only flags) and
+      // principle B (never summarise or comment on a judgment) broken at once, by a script that
+      // had never heard of either. khoji/caselaw.mjs owns what a caselaw row is; this asks it.
       const pend = await db.query(
-        "select id, source_url, source_name, title, raw from public.knowledge_items where status = 'needs_distillation' order by created_at asc limit $1",
+        "select id, source_url, source_name, title, raw from public.knowledge_items"
+        + " where status = 'needs_distillation' and " + CASELAW_SQL_EXCLUSION
+        + ' order by created_at asc limit $1',
         [MAX_ITEMS],
       );
       let done = 0;

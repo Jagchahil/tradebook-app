@@ -3556,6 +3556,14 @@ export const USER_DATA_TABLES: readonly UserDataTable[] = [
   // What he is saving for and what he does for a living.
   { table: 'goals', userKey: 'user_id', keyKind: 'user_id', select: '*' },
   { table: 'diary_jobs', userKey: 'user_id', keyKind: 'user_id', select: '*' },
+  // ⚠️ THE ROWS ARE LISTED HERE AND THE PICTURES ARE ALREADY COVERED, by construction rather than
+  // because somebody remembered. A job photograph's bytes go to `receipts/<user id>/job-<day>...`
+  // in the SAME private bucket as his receipt photographs (see jobPhotoStoragePath), so
+  // deleteReceiptImages, which wipes the whole `<user id>/` prefix, takes them in the same pass,
+  // and the export's signed links reach them for the same reason. A second bucket would have meant
+  // a second erasure walk somebody has to remember to write, and this codebase has already shipped
+  // one table whose storage outlived its erasure. One prefix, one wipe.
+  { table: 'job_photos', userKey: 'user_id', keyKind: 'user_id', select: '*' },
   // ⚠️ THE OLD GOALS TABLE IS DELIBERATELY NOT LISTED HERE, AND THAT IS NOT AN OVERSIGHT.
   // The founder consolidated it into public.goals on 31 July 2026: the rows were migrated, it
   // is read only legacy until launch two, and test/goalstore.test.mjs walks the whole server
@@ -10327,6 +10335,326 @@ export async function storeReceiptImage(
     });
     if (!res.ok) return null;
     return storagePath;
+  } catch {
+    return null;
+  }
+}
+
+// --- HIS PHOTOGRAPHS OF HIS OWN JOB ------------------------------------------------------------
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE SAME BUCKET AND THE SAME USER FOLDER AS HIS RECEIPTS, AND THAT IS THE ERASURE ARGUMENT.
+//
+// A job photograph is the same class of thing as a receipt photograph: a private picture, taken
+// by him, of something that proves what happened. It could have had its own bucket. It does not,
+// because deleteReceiptImages wipes `<user id>/` as ONE PREFIX, and the export signs links out of
+// the same folder. Put job photographs anywhere else and both of those need a second walk that
+// somebody has to remember to write. On 6 August 2026 this codebase discovered it had been
+// keeping every erased customer's receipt images forever, for exactly that reason. Once is
+// enough.
+//
+// ⚠️ THE FILENAME CARRIES THE `job-` PREFIX so a human reading the bucket can tell a photograph of
+// a wall from a photograph of a till receipt. Nothing keys off it: the tenancy is the folder, the
+// job link is the row in job_photos, and a filename is never an authority for anything.
+//
+// ⚠️ AND THE EXTENSION ALLOWLIST IS receiptFileExtension's, CALLED RATHER THAN COPIED. Two
+// allowlists for the same private bucket would drift, and the first sign of the drift would be a
+// media type one path accepts and the other refuses. One function, both callers.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// `receipts/<user id>/job-<day>-<nonce>.<ext>`, or null when any piece fails its shape.
+export function jobPhotoStoragePath(
+  userId: string,
+  mediaType: string,
+  dayISO: string,
+  nonce: string,
+): string | null {
+  if (!UUID.test(userId)) return null;
+  const ext = receiptFileExtension(mediaType);
+  if (!ext) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayISO)) return null;
+  const clean = (nonce || '').replace(/[^a-z0-9-]/gi, '').slice(0, 36);
+  if (!clean) return null;
+  return `${RECEIPTS_BUCKET}/${userId}/job-${dayISO}-${clean}.${ext}`;
+}
+
+// Upload the bytes, return the storage path, or null on ANY failure. Null and never a throw, the
+// same contract storeReceiptImage keeps: a storage bad minute must never take down the screen.
+export async function storeJobPhotoImage(
+  userId: string,
+  bytes: Uint8Array<ArrayBuffer>,
+  mediaType: string,
+): Promise<string | null> {
+  const storagePath = jobPhotoStoragePath(
+    userId,
+    mediaType,
+    new Date().toISOString().slice(0, 10),
+    globalThis.crypto.randomUUID(),
+  );
+  if (!storagePath) return null;
+  // The same 4MB ceiling the receipt path enforces, repeated here so no future caller can push a
+  // video sized blob into the bucket by skipping the route's check.
+  if (!bytes || bytes.byteLength === 0 || bytes.byteLength > 4 * 1024 * 1024) return null;
+  try {
+    const { url, key } = config();
+    const res = await fetch(`${url}/storage/v1/object/${storagePath}`, {
+      // Not headers(): the body is the image, so the content type must be the image's own.
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': mediaType },
+      body: bytes,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    return storagePath;
+  } catch {
+    return null;
+  }
+}
+
+export interface JobPhotoDbRow {
+  id: string;
+  job_id: string;
+  storage_path: string;
+  caption: string | null;
+  created_at: string;
+}
+
+const JOB_PHOTO_COLS = 'id,job_id,storage_path,caption,created_at';
+
+// His photographs for one of his jobs, oldest first, which is the order he took them and
+// therefore the order the job happened in. null on a failed read and [] on empty, the diary's
+// honesty contract: "no photographs yet" and "we could not look" are different sentences.
+export async function listJobPhotos(userId: string, jobId: string): Promise<JobPhotoDbRow[] | null> {
+  if (!userId || !UUID.test(jobId)) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/job_photos?user_id=eq.${encodeURIComponent(userId)}`
+      + `&job_id=eq.${encodeURIComponent(jobId)}&select=${JOB_PHOTO_COLS}&order=created_at.asc&limit=200`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as JobPhotoDbRow[];
+  } catch {
+    return null;
+  }
+}
+
+// ⚠️ THE JOB IS CHECKED BEFORE THE ROW IS WRITTEN, and it is checked by reading HIS job rather
+// than by trusting the form. Without this, a stranger's job uuid in the form body would attach
+// his photograph to somebody else's job id: the row would still carry the uploader's user_id, so
+// no read would ever surface it, but we would be holding a picture filed against a job that is
+// not his. readDiaryJob filters on user AND row, so a job that is not his comes back null here.
+export async function addJobPhoto(
+  userId: string,
+  jobId: string,
+  storagePath: string,
+  caption: string | null,
+): Promise<boolean> {
+  if (!userId || !UUID.test(jobId) || !storagePath) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(`${url}/rest/v1/job_photos`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ user_id: userId, job_id: jobId, storage_path: storagePath, caption }),
+      signal: AbortSignal.timeout(6000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Taking his own photograph back down. Both filters in the URL and representation asked for, so
+// deleting nothing reads as the false it is, the shape setDiaryJobStatus established.
+//
+// ⚠️ THE ROW GOES AND THE OBJECT GOES WITH IT. A delete that left the bytes in the bucket would
+// leave an unreferenced object nothing in the database remembers, which is the exact defect that
+// made erasure incomplete before 6 August. The storage delete is attempted first: if it fails the
+// row stays, so the picture is still reachable and still deletable, rather than orphaned.
+export async function deleteJobPhoto(userId: string, photoId: string): Promise<boolean> {
+  if (!userId || !UUID.test(photoId)) return false;
+  try {
+    const { url } = config();
+    const read = await fetch(
+      `${url}/rest/v1/job_photos?user_id=eq.${encodeURIComponent(userId)}`
+      + `&id=eq.${encodeURIComponent(photoId)}&select=storage_path&limit=1`,
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!read.ok) return false;
+    const rows = (await read.json()) as Array<{ storage_path?: string }>;
+    const objectPath = rows[0]?.storage_path ?? '';
+    // A row whose path is not in HIS folder is not one this function will delete bytes for. It
+    // cannot happen through addJobPhoto, and a path check here costs nothing and refuses to be
+    // the thing that deletes another man's object if it ever does.
+    if (!objectPath.startsWith(`${RECEIPTS_BUCKET}/${userId}/`)) return false;
+    const rest = objectPath.slice(`${RECEIPTS_BUCKET}/`.length);
+    const del = await fetch(`${url}/storage/v1/object/${RECEIPTS_BUCKET}`, {
+      method: 'DELETE',
+      headers: headers(),
+      body: JSON.stringify({ prefixes: [rest] }),
+      signal: AbortSignal.timeout(10000),
+    });
+    // 404 is not a failure: an object that is not there is holding nothing of his, and the row
+    // should still go so the screen stops promising a picture that does not exist.
+    if (!del.ok && del.status !== 404) return false;
+    const res = await fetch(
+      `${url}/rest/v1/job_photos?user_id=eq.${encodeURIComponent(userId)}&id=eq.${encodeURIComponent(photoId)}`,
+      {
+        method: 'DELETE',
+        headers: headers({ Prefer: 'return=representation' }),
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!res.ok) return false;
+    const gone = (await res.json()) as unknown[];
+    return gone.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// A short lived signed link for ONE of his photographs, or null. The bucket is private and no
+// public URL for it exists or is ever built: this is the only way bytes reach a browser, it is
+// minted per request against his session, and it expires.
+export async function signJobPhoto(userId: string, storagePath: string): Promise<string | null> {
+  if (!userId || !storagePath.startsWith(`${RECEIPTS_BUCKET}/${userId}/`)) return null;
+  try {
+    const { url } = config();
+    const rest = storagePath.slice(`${RECEIPTS_BUCKET}/`.length);
+    const res = await fetch(`${url}/storage/v1/object/sign/${RECEIPTS_BUCKET}/${rest}`, {
+      method: 'POST',
+      headers: headers(),
+      // Ten minutes. Long enough to look at the job, short enough that a link copied out of a
+      // page source is dead before it is useful to anybody.
+      body: JSON.stringify({ expiresIn: 600 }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => null)) as { signedURL?: string } | null;
+    return body?.signedURL ? `${url}/storage/v1${body.signedURL}` : null;
+  } catch {
+    return null;
+  }
+}
+
+// What he spent on this job, off his own transaction rows. The figures are NOT totalled here:
+// this hands back the rows and lib/jobphotos.ts's materialsTotal decides which of them count,
+// on fixtures a test can attack. A total computed in an accessor is a total no suite can reach.
+export interface JobCostDbRow {
+  id: string;
+  vendor: string | null;
+  amount: number | string | null;
+  confirmed: boolean | null;
+  transaction_date: string | null;
+}
+
+// His recent costs that are not yet against any job, so the job screen can offer him a short
+// list to pick from rather than asking him to remember a transaction id.
+//
+// ⚠️ CONFIRMED ONLY, AND THAT IS A KINDNESS RATHER THAN A RESTRICTION. An unconfirmed row is a
+// receipt still sitting in his pile. Offering it here would be a second place to deal with the
+// pile, with none of the pile's context, and whichever screen he used second would show him a
+// decision he had already made. The pile is where a receipt becomes real. This list is for
+// filing something that already is.
+export async function listUntaggedCosts(userId: string): Promise<JobCostDbRow[] | null> {
+  if (!userId) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
+      + '&diary_job_id=is.null&confirmed=is.true&amount=lt.0'
+      + '&select=id,vendor,amount,confirmed,transaction_date&order=transaction_date.desc&limit=40',
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as JobCostDbRow[];
+  } catch {
+    return null;
+  }
+}
+
+// Put one of HIS costs against one of HIS jobs, or take it off again with jobId null.
+//
+// ⚠️ BOTH ROWS ARE PROVED HIS BY THE QUERY, not by the form. The transaction filter carries the
+// user id, so a stranger's transaction uuid matches nothing. The job id is checked by the caller
+// with readDiaryJob for the same reason. And representation is asked for so a match of zero rows
+// reads as the false it is rather than as a silent success.
+//
+// 🔴 IT MOVES NO MONEY AND CONFIRMS NOTHING. The only column this writes is diary_job_id. It
+// cannot change an amount, a category or the confirmed flag, which is why filing a receipt
+// against a job is not an approval gate: nothing about his figures is different afterwards.
+export async function setTransactionJob(
+  userId: string,
+  transactionId: string,
+  jobId: string | null,
+): Promise<boolean> {
+  if (!userId || !UUID.test(transactionId)) return false;
+  if (jobId !== null && !UUID.test(jobId)) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
+      + `&id=eq.${encodeURIComponent(transactionId)}`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ diary_job_id: jobId }),
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json()) as unknown[];
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// Move the slot, which is how he corrects the hours. There is no separate "actual hours" column
+// and there is not going to be one: starts_at and ends_at are the single copy of the truth about
+// when the job ran, and a second stored answer to one question is two answers that disagree
+// within a month. See lib/jobphotos.ts's hours block.
+export async function setDiaryJobSlot(
+  userId: string,
+  jobId: string,
+  startsAt: string,
+  endsAt: string,
+): Promise<boolean> {
+  if (!userId || !UUID.test(jobId)) return false;
+  if (Date.parse(endsAt) <= Date.parse(startsAt)) return false;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/diary_jobs?user_id=eq.${encodeURIComponent(userId)}&id=eq.${encodeURIComponent(jobId)}`,
+      {
+        method: 'PATCH',
+        headers: headers({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ starts_at: startsAt, ends_at: endsAt }),
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json()) as unknown[];
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function listJobMaterials(userId: string, jobId: string): Promise<JobCostDbRow[] | null> {
+  if (!userId || !UUID.test(jobId)) return null;
+  try {
+    const { url } = config();
+    const res = await fetch(
+      `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}`
+      + `&diary_job_id=eq.${encodeURIComponent(jobId)}`
+      + '&select=id,vendor,amount,confirmed,transaction_date&order=transaction_date.desc&limit=200',
+      { headers: headers(), signal: AbortSignal.timeout(6000) },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as JobCostDbRow[];
   } catch {
     return null;
   }

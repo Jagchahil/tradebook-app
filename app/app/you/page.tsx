@@ -1,17 +1,20 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { userFromSessionCookie, identityForUser } from '../../../lib/webauth';
+import { userFromSessionCookie } from '../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../lib/websession';
 import {
   readIdentityCard, getBusinessProfile, readCircumstances, readSignupCompany, readVatProfile,
+  listDiaryJobs,
   type SignupCompany, type VatProfileRow,
 } from '../../../lib/supabase';
+import {
+  normaliseDiaryRow, splitDiary, weekStrip, jobsOnDay, whenPhrase, durationPhrase,
+} from '../../../lib/diary';
 import { formatVrn } from '../../../lib/vat';
 import { registrationLine } from '../../../lib/companieshouse';
 import {
   household, notHousehold, mtdQuestions, progressIn, type IncomeShape,
 } from '../../../lib/circumstances';
-import { maskEmail, bindNotice, BOUND_LINE } from './identity';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../lib/tokens';
 import {
   GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP, SURFACE,
@@ -43,12 +46,13 @@ export const dynamic = 'force-dynamic';
 // number, the date he registered and his scheme, so this says what we know and gets out of the
 // way. A hub that repeats a page is a hub he has to read twice.
 //
-// 🔴 THE EMAIL IS PRINTED MASKED, AND THE ADD FLOW LIVES HERE. A page read over a shoulder on a
-// site, cached, screenshotted for support: the full address adds nothing its owner does not
-// already know. The add flow is the delicate one: the 29 July takeover fix is law, so the send
-// and the bind both live in /api/you/email, the address rides a signed cookie between the two
-// steps, and every sentence this page can say about it is a fixed string in ./identity.ts that
-// structurally cannot carry another man's details. See those files before touching the forms.
+// 🔴 THE CONTACT POINTS MOVED TO SETTINGS ON 14 AUGUST 2026, AND THIS PARAGRAPH USED TO SAY THE
+// OPPOSITE. The email, masked, and the add flow now live on /app/you/settings, because an address
+// a man sets once in his life was costing every customer a card at the top of the screen he opens
+// to see his diary. The 29 July takeover fix did not move with it: the send and the bind still
+// live in /api/you/email, the address still rides a signed cookie between the two steps, and every
+// sentence about it is still a fixed string in ./identity.ts that structurally cannot carry
+// another man's details. What changed is which page draws the form and where the route lands.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 // How he trades, said in his words. The profile defaults an unset structure to sole trader, which
@@ -167,11 +171,10 @@ export default async function YouPage({
   const sp = await searchParams;
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
 
-  const [card, profile, rows, identity, company, vatProfile] = await Promise.all([
+  const [card, profile, rows, company, vatProfile, diaryRows] = await Promise.all([
     readIdentityCard(user.id),
     getBusinessProfile(user.id).catch(() => null),
     readCircumstances(user.id),
-    identityForUser(user),
     // What the signup lookup recorded about his company, read from the signups row itself so this
     // page cannot assert a registration the lookup never found. Null on any failure, which makes
     // the sentence LESS assertive, never more.
@@ -179,7 +182,27 @@ export default async function YouPage({
     // His VAT position. Null is an unreadable read, never "not registered", so vatLine falls back
     // to the logged answer rather than telling a registered man his invoices carry no VAT.
     readVatProfile(user.id).catch(() => null),
+    // His diary, which is the hero of this page. null is a failed read and is said plainly
+    // rather than drawn as an empty week he did not empty.
+    listDiaryJobs(user.id).catch(() => null),
   ]);
+
+  // ⚠️ EVERY DIARY DECISION IS MADE IN lib/diary.ts, ON FIXTURES A TEST CAN ATTACK. Which day a
+  // job belongs to, what the seven cells are, which jobs are still coming: none of it is worked
+  // out on this page. The page reads rows and draws what comes back, which is the same contract
+  // /app/diary keeps.
+  const now = new Date();
+  const diaryRead = diaryRows !== null;
+  const jobs = diaryRead
+    ? diaryRows.map(normaliseDiaryRow).filter((j): j is NonNullable<typeof j> => j !== null)
+    : [];
+  const week = weekStrip(jobs, now);
+  const today = jobsOnDay(jobs, week[0]?.day ?? '');
+  const { upcoming, awaiting } = splitDiary(jobs, now);
+  // The Jobs tab shows what is still live: what is coming and what has wrapped up and is waiting
+  // on an invoice. Invoiced history stays on /app/diary, because a hub that carried his whole
+  // back catalogue would be a hub he has to scroll past to reach today.
+  const tab = one('tab') === 'jobs' ? 'jobs' : 'diary';
 
   // The logged answer, which is what we have for a man who told us at signup or over WhatsApp and
   // has never opened the VAT screen.
@@ -205,8 +228,6 @@ export default async function YouPage({
       income,
     });
 
-  const notice = bindNotice(one('e'));
-  const bind = one('bind');
 
   return (
     <main className="lek-wrap" style={S.wrap}>
@@ -245,82 +266,141 @@ export default async function YouPage({
         )}
       </section>
 
-      {/* ── HOW WE REACH HIM. The email, masked, and the WhatsApp binding. ─────────────────────
-          The add email flow draws here because this is the page a man is on when he wonders where
-          his codes go. Both forms are plain posts; the server does every check again. */}
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          THE DIARY, AS THE HERO OF THIS PAGE. Jag's own layout call, 13 August 2026.
+
+          🔴 WHAT CAME OUT TO MAKE ROOM, because doc 103 says that question gets answered rather
+          than dodged. Two things. "How we reach you" was a whole card on this screen for an
+          address he sets once in his life and a phone he binds once: it has moved into Settings,
+          which is one tap away and outside the folds. And nine doors that were nine equal rows
+          are now two folds and one row, so the thing he opens this page to see is at the top
+          rather than tenth.
+
+          ⚠️ IT IS A SUMMARY AND NOT A SECOND DIARY. Seven cells, today's jobs, and a way in.
+          Every write, every photograph and every figure lives on /app/diary, because two screens
+          that both let him change a booking are two screens that disagree about one the moment
+          one of them is edited.
+
+          ⚠️ THE TABS ARE A QUERY PARAMETER, not a script. Every screen under app/app is server
+          rendered with no client JavaScript, so a tab is a link that reloads the page. It costs
+          a round trip and it means the back button does what he expects.
+          ═════════════════════════════════════════════════════════════════════════════════════ */}
       <section className="lek-card">
-        <h2 className="lek-h2">How we reach you</h2>
+        <div style={S.tabs}>
+          <a href="/app/you" style={tab === 'diary' ? S.tabOn : S.tab} className="lek-hit">Diary</a>
+          <a href="/app/you?tab=jobs" style={tab === 'jobs' ? S.tabOn : S.tab} className="lek-hit">Jobs</a>
+        </div>
 
-        {notice ? <p style={S.warn}>{notice}</p> : null}
+        {!diaryRead ? (
+          <p style={S.warn}>
+            We could not read your diary just this minute. Nothing is lost. Give it a moment and
+            reload.
+          </p>
+        ) : tab === 'diary' ? (
+          <>
+            {/* ── THE WEEK. Seven cells starting today, so every one of them is a day he can
+                still do something about. A day with nothing on it carries no count at all:
+                a row of zeroes is seven pieces of nothing to read and dismiss. ─────────────── */}
+            <ol style={S.week}>
+              {week.map((c) => (
+                <li key={c.day} style={c.isToday ? S.cellNow : S.cell}>
+                  <span style={S.cellDay}>{c.letter}</span>
+                  <span style={S.cellDate}>{c.date}</span>
+                  {c.count > 0 ? <span style={S.dot} aria-label={`${c.count} booked`} /> : null}
+                </li>
+              ))}
+            </ol>
 
-        {identity.email ? (
-          <>
-            <p style={S.fact}>
-              Your email is <b>{maskEmail(identity.email)}</b>. Codes for signing in go there, and
-              you can sign in with the address itself.
-            </p>
-            {bind === 'done' ? <p style={S.good}>{BOUND_LINE}</p> : null}
-          </>
-        ) : bind === 'code' ? (
-          <>
-            <p style={S.fact}>
-              We have emailed a six digit code to the address you just gave us. Type it here and
-              the address is yours on this account.
-            </p>
-            <form action="/api/you/email/verify" method="post" style={S.form}>
-              <label htmlFor="code" style={S.label}>The code from the email</label>
-              <div style={S.formRow}>
-                <input
-                  id="code"
-                  name="code"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  required
-                  style={S.codeInput}
-                />
-                <button type="submit" style={S.submit}>Add this email</button>
-              </div>
-            </form>
-            <p style={S.quiet}>
-              Nothing arrived, or wrong address? <a href="/app/you" style={S.inlineLink}>Start
-              again</a> and we will send a fresh code. The code lasts ten minutes.
-            </p>
+            <h2 className="lek-h2">Today</h2>
+            {today.length === 0 ? (
+              <p style={S.rowBody}>
+                Nothing booked today.{upcoming.length > 0
+                  ? ` Next is ${upcoming[0].title}, ${whenPhrase(upcoming[0].startsAt, now)}.`
+                  : ''}
+              </p>
+            ) : (
+              <ul style={S.jobs}>
+                {today.map((j) => (
+                  <li key={j.id} style={S.job}>
+                    <a href={`/app/diary?job=${encodeURIComponent(j.id)}`} style={S.jobLink} className="lek-hit">
+                      <span style={S.jobTitle}>{j.title}</span>
+                      <span style={S.rowBody}>
+                        {whenPhrase(j.startsAt, now)}, {durationPhrase(j.startsAt, j.endsAt)}
+                        {j.customerName ? `, for ${j.customerName}` : ''}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
           </>
         ) : (
           <>
-            <p style={S.fact}>
-              There is no email on your account yet. Add one and your sign in codes can come by
-              email, and the address itself becomes a way back in if you ever change your phone.
-            </p>
-            <form action="/api/you/email/start" method="post" style={S.form}>
-              <label htmlFor="email" style={S.label}>Your email address</label>
-              <div style={S.formRow}>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  maxLength={254}
-                  required
-                  style={S.emailInput}
-                />
-                <button type="submit" style={S.submit}>Send me a code</button>
-              </div>
-            </form>
-            <p style={S.quiet}>
-              We email a six digit code to prove the address is yours. Nothing is added until you
-              type it back.
-            </p>
+            <h2 className="lek-h2">Coming up</h2>
+            {upcoming.length === 0 ? (
+              <p style={S.rowBody}>Nothing booked yet.</p>
+            ) : (
+              <ul style={S.jobs}>
+                {upcoming.slice(0, 5).map((j) => (
+                  <li key={j.id} style={S.job}>
+                    <a href={`/app/diary?job=${encodeURIComponent(j.id)}`} style={S.jobLink} className="lek-hit">
+                      <span style={S.jobTitle}>{j.title}</span>
+                      <span style={S.rowBody}>
+                        {whenPhrase(j.startsAt, now)}, {durationPhrase(j.startsAt, j.endsAt)}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* ⚠️ SHOWN WHEN THERE IS SOMETHING IN IT AND HIDDEN WHEN THERE IS NOT, which is
+                doc 103's empty test. Every one of these is work he has finished and not yet
+                asked to be paid for, which is the only heading on this page worth interrupting
+                him for. A permanent "nothing waiting" row would teach him to stop looking. */}
+            {awaiting.length > 0 ? (
+              <>
+                <h2 className="lek-h2">Wrapped up, not invoiced</h2>
+                <ul style={S.jobs}>
+                  {awaiting.slice(0, 5).map((j) => (
+                    <li key={j.id} style={S.job}>
+                      <a href={`/app/diary?job=${encodeURIComponent(j.id)}`} style={S.jobLink} className="lek-hit">
+                        <span style={S.jobTitle}>{j.title}</span>
+                        <span style={S.rowBody}>one press from an invoice</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
           </>
         )}
 
+        <a href="/app/diary" style={S.add} className="lek-hit">Put a job in</a>
       </section>
 
-      {/* ── THE DOORS DOWN. Each answers one question well; this page repeats none of them. ─── */}
-      <section className="lek-card">
-        <h2 className="lek-h2">Yours to change</h2>
+      {/* ── THE DOORS DOWN, FOLDED. Each answers one question well; this page repeats none of
+          them, and since 14 August it does not print all nine at once either.
+
+          ⚠️ A FOLD IS A COST AND IT IS PAID HERE ON PURPOSE. Doc 103 says folding a section is
+          exactly how a claim stops being checked, which is why the CIRCUMSTANCES COUNT IS PRINTED
+          ON THE CLOSED SUMMARY rather than hidden behind it: the one thing in here that is worth
+          interrupting him for is money or standing he cannot get until he answers, and that stays
+          visible with the fold shut. Everything else in these two groups is a door he opens when
+          he has a reason, and nine equal rows above his diary was nine things to read and reject
+          before reaching what he came for.
+
+          ⚠️ <details> AND NOT A SCRIPT. Every screen under app/app is server rendered with no
+          client JavaScript, and the browser has had this element for a decade. ─────────────── */}
+      <details className="lek-card" style={S.fold}>
+        <summary style={S.foldTop}>
+          <span style={S.foldLabel}>Yours to change</span>
+          {asked && asked.askable - asked.answered > 0 ? (
+            <span style={S.foldCount}>
+              {asked.askable - asked.answered} still worth answering
+            </span>
+          ) : null}
+        </summary>
         <div style={S.doors}>
           <a href="/app/you/circumstances" style={S.door} className="lek-hit">
             <span style={S.doorLabel}>Your circumstances</span>
@@ -341,10 +421,6 @@ export default async function YouPage({
               Working from home, and the flat trading allowance. The two we cannot decide for you,
               because the answer is something only you know.
             </span>
-          </a>
-          <a href="/app/you/settings" style={S.door} className="lek-hit">
-            <span style={S.doorLabel}>Settings</span>
-            <span style={S.rowBody}>What Lekhio sends you without being asked, and how to stop it.</span>
           </a>
           {/* Not /account, which needs an SMS code a web account cannot get. This door rides the
               session he is already in. */}
@@ -367,14 +443,29 @@ export default async function YouPage({
             </span>
           </a>
         </div>
-      </section>
+      </details>
+
+      {/* ── SETTINGS, OUTSIDE THE FOLDS, ALWAYS ONE TAP. Jag's own call, and the argument is that
+          it is the only door here a man is SENT to rather than one he goes looking for: a message
+          arrives, he wants it to stop, and hunting for the off switch inside a closed drop down is
+          the moment he stops believing there is one. It also now holds how we reach him, which is
+          the other thing he arrives at this page already looking for. ────────────────────────── */}
+      <a href="/app/you/settings" style={S.settings} className="lek-hit">
+        <span style={S.doorLabel}>Settings</span>
+        <span style={S.rowBody}>
+          What Lekhio sends you without being asked and how to stop it, your email, and your
+          connected phone.
+        </span>
+      </a>
 
       {/* ── YOURS. The documents and doors that are his rather than about him: invoices, the
           diary they are raised from, and the two papers he hands to somebody else. These rows
           came off the old sidebar when the shell became the bottom bar, and this hub is their
           home now, in the same shape as the rows above so the page reads as one system. ──────── */}
-      <section className="lek-card">
-        <h2 className="lek-h2">Yours</h2>
+      <details className="lek-card" style={S.fold}>
+        <summary style={S.foldTop}>
+          <span style={S.foldLabel}>Yours</span>
+        </summary>
         <div style={S.doors}>
           <a href="/app/invoices" style={S.door} className="lek-hit">
             <span style={S.doorLabel}>Every invoice</span>
@@ -421,7 +512,7 @@ export default async function YouPage({
             </span>
           </a>
         </div>
-      </section>
+      </details>
 
       {/* ── SIGNING OUT, AS A ROW ON THE PROFILE. It lived on the old sidebar, and a door that
           disappears with a redesign is a door a man rattles. Still a form and never a link: a GET
@@ -430,27 +521,6 @@ export default async function YouPage({
         <button type="submit" style={S.outBtn} className="lek-hit">Sign out</button>
       </form>
 
-      {/* ── THE CONNECT BANNER, AT THE BOTTOM OF THE PROFILE, WHERE IT WAS ASKED TO LIVE. ───────
-          ⚠️ THE WORD WHATSAPP IS DELIBERATELY NOT ON THIS SCREEN. test/frontdoor.test.mjs holds
-          every screen but the connect page to that, because screens used to instruct actions a
-          man with no bound number could not take. This card reports the binding as the connect
-          page's own copy does, "your phone", and the door leads where the word lives. */}
-      <section className="lek-card">
-        {card?.phone ? (
-          <p style={S.fact}>
-            Your phone is connected. Messages from the number ending <b>{card.phone.slice(-4)}</b>{' '}
-            come straight into your books.
-          </p>
-        ) : (
-          <p style={S.fact}>
-            Your phone is not connected yet. Connect it and a photo of a receipt is all it takes
-            to log one.
-          </p>
-        )}
-        <a href="/app/connect" style={S.inlineLink}>
-          {card?.phone ? 'Manage your connected phone' : 'Connect your phone'}
-        </a>
-      </section>
     </main>
   );
 }
@@ -480,6 +550,38 @@ const S: Record<string, React.CSSProperties> = {
   emailInput: { flex: '1 1 220px', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: TYPE.strong, fontFamily: FONT, color: INK },
   codeInput: { flex: '0 1 160px', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: TYPE.stat, fontFamily: FONT, color: INK, letterSpacing: '0.2em', fontVariantNumeric: 'tabular-nums' },
   submit: { background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.sm, padding: '11px 18px', fontSize: TYPE.body, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
+
+  // ── The diary hero, added 14 August 2026 ───────────────────────────────────────────────────
+  tabs: { display: 'flex', gap: SPACE.xs, marginBottom: SPACE.sm },
+  tab: { textDecoration: 'none', fontSize: TYPE.note, fontWeight: 800, color: MUTED, background: SURFACE, borderRadius: RADIUS.pill, padding: '8px 16px' },
+  tabOn: { textDecoration: 'none', fontSize: TYPE.note, fontWeight: 800, color: ON_RIVER, background: RIVER, borderRadius: RADIUS.pill, padding: '8px 16px' },
+
+  // Seven cells and nothing else. A day with no jobs draws no dot, because a row of empty
+  // markers is seven pieces of nothing to read past.
+  week: { listStyle: 'none', display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, margin: `0 0 ${SPACE.md}px`, padding: 0 },
+  cell: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '8px 0', borderRadius: RADIUS.sm, background: SURFACE },
+  cellNow: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '8px 0', borderRadius: RADIUS.sm, background: RIVER, color: ON_RIVER },
+  cellDay: { fontSize: TYPE.label, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' },
+  cellDate: { fontSize: TYPE.body, fontWeight: 800, fontVariantNumeric: 'tabular-nums' },
+  dot: { display: 'block', width: 5, height: 5, borderRadius: 999, background: 'currentColor' },
+
+  jobs: { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: SPACE.xs },
+  job: { margin: 0 },
+  jobLink: { display: 'block', textDecoration: 'none', background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px' },
+  jobTitle: { display: 'block', fontSize: TYPE.body, fontWeight: 800, color: RIVER_DEEP, marginBottom: 3 },
+  add: { display: 'inline-block', marginTop: SPACE.sm, textDecoration: 'none', fontSize: TYPE.note, fontWeight: 800, color: RIVER, background: SURFACE, borderRadius: RADIUS.pill, padding: '10px 18px' },
+
+  // ── The two folds, and the one row that is never folded ────────────────────────────────────
+  fold: { marginBottom: SPACE.md },
+  foldTop: { cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: SPACE.xs, flexWrap: 'wrap' },
+  foldLabel: { fontSize: TYPE.strong, fontWeight: 800, letterSpacing: '-0.01em', color: INK },
+  // ⚠️ PRINTED ON THE CLOSED SUMMARY ON PURPOSE. Doc 103: folding a section is exactly how a claim
+  // stops being checked, so the one item in there that is money or standing he cannot get until he
+  // answers stays visible with the fold shut. It shows NOTHING when there is nothing owed, because
+  // a count we cannot justify is a red dot that teaches him to ignore red dots.
+  foldCount: { fontSize: TYPE.note, fontWeight: 700, color: RIVER_DEEP },
+
+  settings: { display: 'block', textDecoration: 'none', background: PANEL, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '14px', marginBottom: SPACE.md },
 
   doors: { display: 'grid', gridTemplateColumns: '1fr', gap: SPACE.xs },
   door: { display: 'block', textDecoration: 'none', background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px' },

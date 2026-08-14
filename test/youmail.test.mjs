@@ -239,7 +239,7 @@ const start = codeOnly(read('app/api/you/email/start/route.ts'));
 
 ok('🔴 THE SEND RUNS ONLY FOR A SESSION: sessionUser is checked before the form is even read',
   before(start, 'sessionUser(req)', 'formData()') && start.includes('if (!user) return'));
-ok('a stranger is sent to the door, not given an error to probe', start.includes("'/in?next=/app/you'"));
+ok('a stranger is sent to the door, not given an error to probe', start.includes("'/in?next=/app/you/settings'"));
 ok('🔴 rate limited per ACCOUNT', start.includes('bem:u:${user.id}'));
 ok('🔴 AND per target address', start.includes('bem:t:${hash}'));
 ok('and per caller address', start.includes('bem:ip:'));
@@ -319,12 +319,26 @@ for (const [name, src, route] of [
 
 ok('🔴 NOT ONE MONEY FIGURE ON THE OVERVIEW: no ledger, no formatter, no money import',
   !pageYou.includes('gbp0') && !pageYou.includes('ledgerFor') && !pageYou.includes("lib/money"));
+// ⚠️ THE ADD EMAIL FLOW MOVED TO /app/you/settings ON 14 AUGUST 2026, AND THESE ASSERTIONS MOVED
+// WITH IT RATHER THAN BEING DELETED. An address a man sets once in his life was costing every
+// customer a card at the top of the screen he opens to see his diary. What did NOT move is the
+// 29 July takeover fix: the send and the bind still live in /api/you/email, the address still
+// rides a signed cookie between the two steps, and the sentences are still fixed strings in
+// app/app/you/identity.ts. So the guard follows the markup to the page that now draws it.
 ok('🔴 the email is printed through the mask, and the raw address is never interpolated',
-  pageYou.includes('maskEmail(') && !pageYou.includes('{identity.email}'));
-ok('the add form posts to the start route', pageYou.includes('action="/api/you/email/start"'));
-ok('the code form posts to the verify route', pageYou.includes('action="/api/you/email/verify"'));
-ok('the code input invites the one time code', pageYou.includes('one-time-code'));
-ok('the whatsapp line shows the last four digits only', pageYou.includes('.slice(-4)'));
+  pageSet.includes('maskEmail(') && !pageSet.includes('{identity.email}'));
+ok('the add form posts to the start route', pageSet.includes('action="/api/you/email/start"'));
+ok('the code form posts to the verify route', pageSet.includes('action="/api/you/email/verify"'));
+ok('the code input invites the one time code', pageSet.includes('one-time-code'));
+ok('the whatsapp line shows the last four digits only', pageSet.includes('.slice(-4)'));
+
+// 🔴 AND THE HUB MAY NOT GROW ANY OF IT BACK. This is the half a move like this usually loses: the
+// old page keeps a copy, the two drift, and the raw address reappears on the screen nobody is
+// checking any more. On 14 August the connect banner WAS duplicated onto both pages by exactly
+// that mistake and this assertion is what would have caught it.
+ok('🔴 the hub carries no copy of the contact flow: one page draws it, and it is Settings',
+  !pageYou.includes('maskEmail(') && !pageYou.includes('identity.email')
+  && !pageYou.includes('/api/you/email/') && !pageYou.includes('.slice(-4)'));
 
 ok('circumstances posts every answer to the one logging route', pageCirc.includes('action="/api/circumstances"'));
 ok('and lands back on itself with the token, never a posted path', pageCirc.includes('name="back" value="you"'));

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sessionUser } from '../../../lib/webauth';
 import { userBurst } from '../../../lib/ratelimit';
 import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
-import { addDiaryJob, readDiaryJob, setDiaryJobStatus, deleteDiaryJob } from '../../../lib/supabase';
+import {
+  addDiaryJob, readDiaryJob, setDiaryJobStatus, deleteDiaryJob,
+  deleteJobPhoto, setTransactionJob, setDiaryJobSlot,
+} from '../../../lib/supabase';
 import { londonToUtcIso, parseDurationHours } from '../../../lib/diary';
 
 export const runtime = 'nodejs';
@@ -34,6 +37,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(req: NextRequest) {
   const back = (q: string) => NextResponse.redirect(new URL(`/app/diary?${q}`, req.url), 303);
+  // Back to the one job he was looking at. The job id is a query parameter rather than a path
+  // segment because test/webauth.test.mjs forbids a dynamic segment anywhere under app/app, and
+  // the read behind it filters on the session's user AND the row, so a uuid that is not his
+  // matches nothing and the screen says so plainly. A bad or missing id falls back to the list.
+  const backToJob = (jobId: string, q: string) =>
+    (UUID.test(jobId)
+      ? NextResponse.redirect(new URL(`/app/diary?job=${encodeURIComponent(jobId)}&${q}`, req.url), 303)
+      : back(q));
 
   // A form caller with no session is a man whose session expired while the page sat open. He
   // goes to the door and comes back to his diary, not to a JSON error he cannot read.
@@ -90,6 +101,56 @@ export async function POST(req: NextRequest) {
     // taking back his own entry must never cost £12.99.
     const done = await deleteDiaryJob(user.id, id);
     return done ? back('done=removed') : back('problem=missing');
+  }
+
+  // ── The four actions the job screen added on 14 August 2026 ────────────────────────────────
+  //
+  // Every one of them points at one row he owns, carries its id in the form body, and the gate
+  // falls exactly where it falls above: filing something new is the work, taking his own thing
+  // back off is him keeping his own record straight and is never gated.
+
+  if (action === 'photo-remove') {
+    // Not gated, the 'remove' argument exactly: undoing his own act must never cost £12.99.
+    // deleteJobPhoto takes the bytes out of the bucket before the row, so a picture is never
+    // left orphaned in storage with nothing in the database pointing at it.
+    const gone = await deleteJobPhoto(user.id, id);
+    return gone ? backToJob(String(f.get('job') ?? ''), 'done=photogone') : back('problem=missing');
+  }
+
+  if (action === 'tag') {
+    // Filing a confirmed cost against a job. New work, so it is gated with add.
+    if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app/diary');
+    const jobId = String(f.get('job') ?? '');
+    if (!UUID.test(jobId)) return back('problem=bad');
+    // The job is proved his before the transaction is touched, so a stranger's job uuid can
+    // never be written onto one of his own rows.
+    if (!(await readDiaryJob(user.id, jobId))) return back('problem=missing');
+    // 🔴 id here is the TRANSACTION, and setTransactionJob writes ONE column. No amount, no
+    // category, no confirmed flag. Filing a receipt against a job changes nothing about his
+    // figures, which is exactly why it does not ask him to approve anything.
+    const tagged = await setTransactionJob(user.id, id, jobId);
+    return tagged ? backToJob(jobId, 'done=tagged') : back('problem=missing');
+  }
+
+  if (action === 'untag') {
+    // Not gated: taking his own label back off.
+    const off = await setTransactionJob(user.id, id, null);
+    return off ? backToJob(String(f.get('job') ?? ''), 'done=untagged') : back('problem=missing');
+  }
+
+  if (action === 'retime') {
+    // 🔴 THIS IS THE EDIT BESIDE THE HOURS, AND HE NEVER TYPES A NUMBER OF HOURS. He corrects
+    // when the job actually ran, and the hours follow from the slot. There is no stored "actual
+    // hours" column in this product and there is not going to be one: two stored answers to one
+    // question disagree within a month, and the slot is the one the diary was already built on.
+    if ((await gateForUser(user.id)) === 'readonly') return refuseUnentitled(req, '/app/diary');
+    const hours = parseDurationHours(String(f.get('length') ?? ''));
+    if (hours === null) return back('problem=bad');
+    const startsAt = londonToUtcIso(String(f.get('date') ?? ''), String(f.get('time') ?? ''));
+    if (!startsAt) return back('problem=bad');
+    const endsAt = new Date(Date.parse(startsAt) + hours * 3_600_000).toISOString();
+    const moved = await setDiaryJobSlot(user.id, id, startsAt, endsAt);
+    return moved ? backToJob(id, 'done=retimed') : back('problem=missing');
   }
 
   if (action === 'draft') {

@@ -49,14 +49,14 @@ const DAILY_CAP = 200;
 const DAILY_WINDOW_SECONDS = 24 * 60 * 60;
 
 function back(req: NextRequest, code: string) {
-  return NextResponse.redirect(new URL(`/app/you?e=${code}`, req.url), 303);
+  return NextResponse.redirect(new URL(`/app/you/settings?e=${code}`, req.url), 303);
 }
 
 export async function POST(req: NextRequest) {
   // The one gate. sessionUser checks the origin on a POST itself, so a cross site form cannot
   // reach past this line even with the cookie attached.
   const user = await sessionUser(req);
-  if (!user) return NextResponse.redirect(new URL('/in?next=/app/you', req.url), 303);
+  if (!user) return NextResponse.redirect(new URL('/in?next=/app/you/settings', req.url), 303);
 
   // No signing secret means no pending cookie and no code hash worth storing, so nothing sent
   // could ever be typed back. Say so rather than emailing a dead end.
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
   if (!sent) return back(req, 'send');
 
   // Onward to the code step, with the address in a signed cookie and nowhere else.
-  const res = NextResponse.redirect(new URL('/app/you?bind=code', req.url), 303);
+  const res = NextResponse.redirect(new URL('/app/you/settings?bind=code', req.url), 303);
   res.cookies.set(
     EMAIL_BIND_COOKIE,
     pendingCookieValue({ channel: 'email', value: email }),

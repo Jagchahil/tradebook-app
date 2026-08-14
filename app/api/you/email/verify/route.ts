@@ -47,12 +47,12 @@ const PER_ACCOUNT_VERIFIES = 10;
 const VERIFY_WINDOW_SECONDS = 15 * 60;
 
 function back(req: NextRequest, code: string) {
-  return NextResponse.redirect(new URL(`/app/you?bind=code&e=${code}`, req.url), 303);
+  return NextResponse.redirect(new URL(`/app/you/settings?bind=code&e=${code}`, req.url), 303);
 }
 
 export async function POST(req: NextRequest) {
   const user = await sessionUser(req);
-  if (!user) return NextResponse.redirect(new URL('/in?next=/app/you', req.url), 303);
+  if (!user) return NextResponse.redirect(new URL('/in?next=/app/you/settings', req.url), 303);
 
   if (!webSessionsConfigured() || !signupCodesConfigured()) return back(req, 'unavailable');
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   // costs him one form, and means a code is only ever compared against the address WE sent it to.
   const pending = verifyPendingCookie(req.cookies.get(EMAIL_BIND_COOKIE)?.value ?? null);
   if (!pending || pending.channel !== 'email') {
-    return NextResponse.redirect(new URL('/app/you?e=expired', req.url), 303);
+    return NextResponse.redirect(new URL('/app/you/settings?e=expired', req.url), 303);
   }
 
   const form = await req.formData().catch(() => null);
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
 
   // Done. The pending address is spent with the code, so it is cleared rather than left signed
   // in his browser.
-  const res = NextResponse.redirect(new URL('/app/you?bind=done', req.url), 303);
+  const res = NextResponse.redirect(new URL('/app/you/settings?bind=done', req.url), 303);
   res.cookies.set(EMAIL_BIND_COOKIE, '', sessionCookieAttributes(0));
   return res;
 }

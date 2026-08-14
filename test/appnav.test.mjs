@@ -207,7 +207,10 @@ const MAPPING = [
   ['/app/you', null],                                        // About you: the You tab
   ['/app/you/circumstances', 'app/app/you/page.tsx'],        // Circumstances: the You hub
   ['/app/you/elections', 'app/app/you/page.tsx'],            // Allowances: the You hub
-  ['/app/connect', 'app/app/you/page.tsx'],                  // WhatsApp: the You hub's phone banner
+  // ⚠️ MOVED 14 AUGUST 2026. The phone banner went into Settings with the rest of "how we reach
+  // you", because a phone a man binds once was costing a card at the top of the hub he opens to
+  // see his diary. The claim this map makes is unchanged: every destination has a real door.
+  ['/app/connect', 'app/app/you/settings/page.tsx'],          // WhatsApp: the phone banner, now in Settings
   ['/app/you/billing', 'app/app/you/page.tsx'],              // Billing: the You hub
   ['/app/you/settings', 'app/app/you/page.tsx'],             // Settings: the You hub
 ];

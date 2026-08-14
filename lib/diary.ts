@@ -327,3 +327,93 @@ export function decideDiaryNudges(
   }
   return out;
 }
+
+// ── The week strip, which is the whole of what a calendar earns on this screen ───────────────
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 SEVEN CELLS, AND DELIBERATELY NOT A MONTH GRID. Doc 103's once test, applied to a calendar.
+//
+// A month grid is 35 cells, of which 30 are empty for most tradesmen most of the time, and it
+// answers "what is the shape of October". He does not open his books to ask that. He opens them
+// on a Tuesday morning with one hand on a rail to ask what is on today and whether he has
+// forgotten anything this week. Seven cells answer that question and cost him one line.
+//
+// ⚠️ IT STARTS TODAY, NOT ON MONDAY. A Monday to Sunday strip spends its first cells on days that
+// have already happened, so on a Friday five sevenths of it is history he cannot act on. Starting
+// today means every cell is a day he can still do something about, and the last one is a week out,
+// which is as far ahead as a booking is worth showing on a summary.
+//
+// ⚠️ EMPTY IS SAID BY ABSENCE, NEVER BY A ZERO. A cell with no jobs carries no count at all. A
+// row of "0"s is seven pieces of nothing he has to read and dismiss to find the one day that has
+// something on it, which is the empty test failing on a calendar.
+//
+// PURE, and it takes `now` like everything else here, so the suite runs the same in January.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+export interface DayCell {
+  // The London calendar day, as YYYY-MM-DD. The key, and what a form posts back.
+  day: string;
+  // One letter for the strip, three for anything wider. Both come from the same weekday name so
+  // they can never disagree about which day a cell is.
+  letter: string;
+  short: string;
+  // The date in the month, which is what he actually reads off a calendar.
+  date: number;
+  isToday: boolean;
+  // How many of his jobs start on this day. Zero is real and the strip renders nothing for it.
+  count: number;
+}
+
+export const WEEK_CELLS = 7;
+
+// The London calendar day of an instant, as YYYY-MM-DD. Private: every caller here wants a cell
+// or a phrase, not a date string, and a second date formatter in this file is how the strip and
+// the phrases end up disagreeing about which day midnight belongs to.
+function londonDayISO(at: Date): string {
+  const p = londonParts(at);
+  return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+}
+
+export function weekStrip(jobs: ReadonlyArray<DiaryJob>, now: Date): DayCell[] {
+  // Count first, so the seven lookups below are seven map reads rather than seven passes over
+  // his whole diary. A man with 500 jobs in the table renders this strip in one pass.
+  const counts = new Map<string, number>();
+  for (const job of jobs) {
+    const t = Date.parse(job.startsAt);
+    if (!Number.isFinite(t)) continue;
+    const day = londonDayISO(new Date(t));
+    counts.set(day, (counts.get(day) ?? 0) + 1);
+  }
+
+  const todayISO = londonDayISO(now);
+  const cells: DayCell[] = [];
+  for (let i = 0; i < WEEK_CELLS; i++) {
+    // Midday rather than midnight, on purpose. Stepping a day at a time from an instant near a
+    // clock change lands 23 or 25 hours later, and from midnight that can skip or repeat a
+    // calendar day. From the middle of the day an hour either way is still the same day.
+    const at = new Date(now.getTime() + i * DAY_MS);
+    const p = londonParts(at);
+    const day = londonDayISO(at);
+    cells.push({
+      day,
+      letter: p.weekday.slice(0, 1),
+      short: p.weekday.slice(0, 3),
+      date: p.day,
+      isToday: day === todayISO,
+      count: counts.get(day) ?? 0,
+    });
+  }
+  return cells;
+}
+
+// The jobs that start on one London day, in the order they start. What a cell opens onto, and
+// what "today" on the hub is built from.
+export function jobsOnDay(jobs: ReadonlyArray<DiaryJob>, day: string): DiaryJob[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return [];
+  return jobs
+    .filter((j) => {
+      const t = Date.parse(j.startsAt);
+      return Number.isFinite(t) && londonDayISO(new Date(t)) === day;
+    })
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+}

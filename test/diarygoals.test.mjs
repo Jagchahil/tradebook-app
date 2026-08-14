@@ -448,8 +448,35 @@ ok('🔴 the form offers the hour slots by name: one hour, two hours, half a day
 // The gate falls on the work. Marking his own row done, or removing it, is never gated.
 {
   const branch = (src, from, to) => src.slice(src.indexOf(from), to ? src.indexOf(to) : src.length);
-  ok('diary: done and remove are his record, ungated',
-    !/gateForUser/.test(branch(routeDiary, "action === 'done'", "action === 'draft'")));
+
+  // ⚠️ ONE BRANCH AT A TIME, BY NAME, AND NOT A REGION BETWEEN TWO MARKERS. This used to slice
+  // from `action === 'done'` to `action === 'draft'` and assert the whole span was ungated, which
+  // was only ever a PROXY for "the actions that are his own record are ungated". On 14 August 2026
+  // the job screen put four more actions in that span, two of them gated on purpose, and the proxy
+  // went red while the claim it stands for was still true. A regex only holds where it is pointed,
+  // so it is pointed at each branch instead of at the gap between two of them.
+  //
+  // The branch of one action runs from its own `action === 'x'` to the next `if (action ===`.
+  const actionBranch = (src, name) => {
+    const from = src.indexOf(`action === '${name}'`);
+    if (from < 0) return '';
+    const next = src.indexOf('if (action ===', from + 1);
+    return src.slice(from, next < 0 ? src.length : next);
+  };
+
+  // His own record, corrected or withdrawn by him. Never gated: a lapsed card must not leave a
+  // wrong entry standing, and undoing his own act must never cost £12.99.
+  for (const name of ['done', 'remove', 'photo-remove', 'untag']) {
+    const b = actionBranch(routeDiary, name);
+    ok(`diary: ${name} is his own record, ungated`, b.length > 0 && !/gateForUser/.test(b));
+  }
+  // 🔴 AND THE OTHER HALF, WHICH THE OLD ASSERTION NEVER MADE. Naming only what must not be gated
+  // leaves the case where somebody ungates the work by accident, and every one of these is work:
+  // a new row, a new stored photograph, a new label, a corrected slot.
+  for (const name of ['add', 'tag', 'retime', 'draft']) {
+    const b = actionBranch(routeDiary, name);
+    ok(`diary: ${name} is the work, and it is gated`, b.length > 0 && /gateForUser/.test(b));
+  }
   ok('goals: done and remove are his record, ungated',
     !/gateForUser/.test(branch(routeGoals, "action === 'done'")));
   ok('remove is a real delete of his own row', /deleteDiaryJob\(user\.id, id\)/.test(routeDiary)

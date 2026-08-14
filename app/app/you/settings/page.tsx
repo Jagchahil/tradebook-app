@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { userFromSessionCookie } from '../../../../lib/webauth';
+import { userFromSessionCookie, identityForUser } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { readNudgePrefs, readIdentityCard } from '../../../../lib/supabase';
 import { templateLegBlock } from '../../../../lib/routing';
-import { settingsNotice } from '../identity';
+import { settingsNotice, maskEmail, bindNotice, BOUND_LINE } from '../identity';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
 import {
   GREEN_TINT, INK, LINE, MUTED, ON_RIVER, PANEL, PAPER, RED, RED_TINT, RIVER, RIVER_DEEP, SURFACE,
@@ -78,6 +78,11 @@ export default async function SettingsPage({
   const one = (k: string) => (Array.isArray(sp[k]) ? sp[k][0] : sp[k]) as string | undefined;
   const notice = settingsNotice(one('done') ?? one('e'));
   const saved = one('done') === 'saved';
+  // The add email flow's own sentences, which came here with the card. bindNotice returns a fixed
+  // string per code and structurally cannot carry another man's address, which is the whole point
+  // of it living in ../identity.ts rather than being built here.
+  const emailNotice = bindNotice(one('e'));
+  const bind = one('bind');
 
   // ═══════════════════════════════════════════════════════════════════════════════════════
   // 🔴 THE DAILY REMINDER SWITCH SAID "ON" FOR A MESSAGE THAT IS NEVER SENT.
@@ -99,9 +104,11 @@ export default async function SettingsPage({
   // by push and email with hasWhatsApp false, so it reaches a web only customer today. This page
   // was half true, which is the hardest kind to see.
   // ═══════════════════════════════════════════════════════════════════════════════════════
-  const [prefs, card] = await Promise.all([
+  const [prefs, card, identity] = await Promise.all([
     readNudgePrefs(user.id),
     readIdentityCard(user.id).catch(() => null),
+    // His contact points, for the card that moved here from /app/you on 14 August 2026.
+    identityForUser(user),
   ]);
   // Unknown is not a promise. A failed read draws no daily row rather than claiming one.
   //
@@ -157,6 +164,108 @@ export default async function SettingsPage({
         )}
       </section>
 
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          HOW WE REACH HIM. Moved here from /app/you on 14 August 2026.
+
+          ⚠️ A THING YOU SET ONCE DOES NOT DESERVE A CARD ON THE HUB. An email address and a bound
+          phone are set once each, and they were costing every customer a whole card at the top of
+          the screen he opens to see his diary. Settings is one tap, sits outside the folds, and is
+          exactly where a man looks for "where do my codes go".
+
+          🔴 THE ADD FLOW IS THE DELICATE ONE AND IT DID NOT CHANGE. The 29 July takeover fix is
+          law: the send and the bind both live in /api/you/email, the address rides a signed cookie
+          between the two steps, and every sentence this page can say about it is a fixed string in
+          ../identity.ts that structurally cannot carry another man's details. What moved is the
+          markup and the redirect target. Nothing about the proof of ownership moved.
+          ═════════════════════════════════════════════════════════════════════════════════════ */}
+      <section className="lek-card">
+        <h2 className="lek-h2">How we reach you</h2>
+
+        {emailNotice ? <p style={S.warn}>{emailNotice}</p> : null}
+
+        {identity.email ? (
+          <>
+            <p style={S.fact}>
+              Your email is <b>{maskEmail(identity.email)}</b>. Codes for signing in go there, and
+              you can sign in with the address itself.
+            </p>
+            {bind === 'done' ? <p style={S.good}>{BOUND_LINE}</p> : null}
+          </>
+        ) : bind === 'code' ? (
+          <>
+            <p style={S.fact}>
+              We have emailed a six digit code to the address you just gave us. Type it here and
+              the address is yours on this account.
+            </p>
+            <form action="/api/you/email/verify" method="post" style={S.form}>
+              <label htmlFor="code" style={S.label}>The code from the email</label>
+              <div style={S.formRow}>
+                <input
+                  id="code"
+                  name="code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  required
+                  style={S.codeInput}
+                />
+                <button type="submit" style={S.submit}>Add this email</button>
+              </div>
+            </form>
+            <p style={S.quiet}>
+              Nothing arrived, or wrong address? <a href="/app/you/settings" style={S.inlineLink}>Start
+              again</a> and we will send a fresh code. The code lasts ten minutes.
+            </p>
+          </>
+        ) : (
+          <>
+            <p style={S.fact}>
+              There is no email on your account yet. Add one and your sign in codes can come by
+              email, and the address itself becomes a way back in if you ever change your phone.
+            </p>
+            <form action="/api/you/email/start" method="post" style={S.form}>
+              <label htmlFor="email" style={S.label}>Your email address</label>
+              <div style={S.formRow}>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  maxLength={254}
+                  required
+                  style={S.emailInput}
+                />
+                <button type="submit" style={S.submit}>Send me a code</button>
+              </div>
+            </form>
+            <p style={S.quiet}>
+              We email a six digit code to prove the address is yours. Nothing is added until you
+              type it back.
+            </p>
+          </>
+        )}
+
+        {/* ⚠️ THE WORD WHATSAPP IS DELIBERATELY NOT ON THIS SCREEN. test/frontdoor.test.mjs holds
+            every screen but the connect page to that, because screens used to instruct actions a
+            man with no bound number could not take. This reports the binding as the connect page's
+            own copy does, "your phone", and the door leads where the word lives. */}
+        {card?.phone ? (
+          <p style={S.fact}>
+            Your phone is connected. Messages from the number ending <b>{card.phone.slice(-4)}</b>{' '}
+            come straight into your books.
+          </p>
+        ) : (
+          <p style={S.fact}>
+            Your phone is not connected yet. Connect it and a photo of a receipt is all it takes
+            to log one.
+          </p>
+        )}
+        <a href="/app/connect" style={S.inlineLink}>
+          {card?.phone ? 'Manage your connected phone' : 'Connect your phone'}
+        </a>
+      </section>
+
       <p style={S.foot}>
         Replies to things you send us are not switched here. Ask a question, get an answer, always.
       </p>
@@ -190,4 +299,15 @@ const S: Record<string, React.CSSProperties> = {
   turnOn: { background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.sm, padding: '11px 16px', fontSize: TYPE.body, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
 
   foot: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '18px 4px 0' },
+
+  // ── How we reach him, moved from /app/you on 14 August 2026 with its own styles ─────────────
+  fact: { fontSize: TYPE.body, lineHeight: 1.6, color: INK, margin: `0 0 ${SPACE.xs}px`, maxWidth: '62ch' },
+  quiet: { fontSize: TYPE.note, lineHeight: 1.55, color: MUTED, margin: `${SPACE.xs}px 0 0`, maxWidth: '62ch' },
+  inlineLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },
+  form: { margin: `${SPACE.sm}px 0 0`, background: SURFACE, borderRadius: RADIUS.md, padding: SPACE.sm },
+  label: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, marginBottom: SPACE.xs },
+  formRow: { display: 'flex', gap: SPACE.xs, flexWrap: 'wrap' },
+  emailInput: { flex: '1 1 220px', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: TYPE.strong, fontFamily: FONT, color: INK },
+  codeInput: { flex: '0 1 160px', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: TYPE.stat, fontFamily: FONT, color: INK, letterSpacing: '0.2em', fontVariantNumeric: 'tabular-nums' },
+  submit: { background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.sm, padding: '11px 18px', fontSize: TYPE.body, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
 };

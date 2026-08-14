@@ -434,11 +434,17 @@ ok('rubbish is not caselaw', C.isCaselawRow(null) === false && C.isCaselawRow('x
   ok('an unparseable stamp is not a revision',
     TD.decide({ status: 200, recorded: 'not a date', current: 'also not' }).action === 'stamp');
 
-  // 🔴 AND THE STAMP HAS TO BE TAKEN AT INGEST OR THE JOB CAN NEVER DO BETTER THAN BASELINE.
-  ok('🔴 tribunal.mjs records source_updated_at when it files a decision',
-    /source_updated_at: h\.published/.test(codeOnly(srcTribunal)));
-  ok('the takedown job reads that same field back',
-    /source_updated_at/.test(codeOnly(srcTakedown)));
+  // ⚠️ THIS PAIR WAS REWRITTEN, NOT DELETED, AND THE DIFFERENCE MATTERS.
+  // It used to assert that tribunal.mjs stamped source_updated_at and that the takedown job read
+  // it back. That was the wrong design: the writer takes its timestamp from the SEARCH endpoint
+  // and the takedown job reads the CONTENT API, so it compared two different fields from two
+  // different endpoints. They agreed on the rows in the record, which is exactly why it looked
+  // correct. The takedown job now stamps and reads its own, and section L holds it to that. What
+  // survives here is the rule the pair existed for: the writer must not leave a duplicate
+  // timestamp lying about for somebody to compare the wrong thing against.
+  ok('🔴 tribunal.mjs keeps ONE source timestamp, not two that can be confused',
+    !/source_updated_at/.test(codeOnly(srcTribunal))
+    && /published: h\.published/.test(codeOnly(srcTribunal)));
 
   // A URL we cannot parse is blind, never gone.
   ok('a URL we cannot parse yields no path, so the row is left alone',
@@ -674,6 +680,198 @@ ok('rubbish is not caselaw', C.isCaselawRow(null) === false && C.isCaselawRow('x
   const lw = codeOnly(srcLawWatch);
   ok('🔴 lawwatch stores a hash of the body, never the body',
     /body_hash/.test(lw) && !/body_text|body: r\.body|indexable_content/.test(lw));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// J. THE 14 AUGUST 2026 INCIDENT. TWO LIVE DECISIONS REDACTED BY ONE PAIR OF BRACES.
+//
+// The takedown job's first real run removed the licensed material from BOTH rows in the record and
+// reported success. The decisions were published throughout, and still are.
+//
+// 🔴 THE CAUSE: `Boolean(doc.withdrawn_notice)`. GOV.UK's content API returns
+// `withdrawn_notice: {}`, AN EMPTY OBJECT, for content that is not withdrawn, and `Boolean({})` is
+// `true` in JavaScript. Every live page on GOV.UK read as withdrawn. Not some of them. Every one.
+//
+// It was proved by a control, not by reading the code: /vat-rates, a page that has never been
+// withdrawn, came back withdrawn=true. So the assertions below are written against the SHAPE THE
+// API ACTUALLY RETURNS rather than against a shape I imagined, and the run controls that would have
+// caught it on the first dry run are asserted to exist and to be reached before any row is judged.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  // 🔴 THE EXACT PAYLOAD GOV.UK SENDS FOR SOMETHING THAT IS NOT WITHDRAWN.
+  ok('🔴 AN EMPTY withdrawn_notice IS NOT A WITHDRAWAL', TD.isWithdrawn({ withdrawn_notice: {} }) === false);
+  ok('a missing withdrawn_notice is not a withdrawal', TD.isWithdrawn({}) === false);
+  ok('a null withdrawn_notice is not a withdrawal', TD.isWithdrawn({ withdrawn_notice: null }) === false);
+  ok('an empty explanation is not a withdrawal',
+    TD.isWithdrawn({ withdrawn_notice: { explanation: '   ' } }) === false);
+  ok('an empty withdrawn_at is not a withdrawal',
+    TD.isWithdrawn({ withdrawn_notice: { withdrawn_at: '' } }) === false);
+  // And the real thing still is one, or the fix would have traded one failure for its opposite.
+  ok('🔴 A REAL WITHDRAWAL, WITH A DATE, STILL IS ONE',
+    TD.isWithdrawn({ withdrawn_notice: { withdrawn_at: '2026-08-01T00:00:00Z' } }) === true);
+  ok('🔴 A REAL WITHDRAWAL, WITH AN EXPLANATION, STILL IS ONE',
+    TD.isWithdrawn({ withdrawn_notice: { explanation: 'This decision has been set aside.' } }) === true);
+
+  // 🔴 AND THE WHOLE PATH, END TO END, ON THE REAL PAYLOAD. The unit above is not enough: the
+  // defect was that a true from here became a redact over there.
+  ok('🔴 A LIVE PAGE WITH AN EMPTY withdrawn_notice IS NEVER REDACTED',
+    TD.decide({
+      status: 200,
+      withdrawn: TD.isWithdrawn({ withdrawn_notice: {}, public_updated_at: '2026-08-06T11:52:57+01:00' }),
+      recorded: '2026-08-06T11:52:57+01:00',
+      current: '2026-08-06T11:52:57+01:00',
+    }).action === 'none');
+  ok('and a genuinely withdrawn one still is',
+    TD.decide({
+      status: 200,
+      withdrawn: TD.isWithdrawn({ withdrawn_notice: { explanation: 'set aside' } }),
+      recorded: '2026-08-06T11:52:57+01:00',
+      current: '2026-08-06T11:52:57+01:00',
+    }).action === 'redact');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// K. THE RUN CONTROLS. The check that was missing, and the reason it was missing.
+//
+// 🔴 THIS REPO HAS A NO-OP CONTROL IN EVERY SABOTAGE HARNESS IT OWNS, and did not have one in
+// the single place that removes data from production. A verdict function that has never been shown
+// a known-good answer is not a verdict function, it is a hope.
+//
+// Two questions asked of the live endpoint on every run, before any row is judged. If either fails
+// the whole run is blind: nothing removed, nothing stamped, loud exit.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const good = { live: { published: 'published', withdrawn: false }, absent: { published: 'gone' } };
+  ok('the controls pass when the endpoint behaves', TD.controlsVerdict(good).ok === true);
+
+  ok('🔴 A LIVE PAGE READING AS GONE FAILS THE RUN',
+    TD.controlsVerdict({ ...good, live: { published: 'gone', withdrawn: false } }).ok === false);
+  ok('🔴 A LIVE PAGE READING AS WITHDRAWN FAILS THE RUN, which is the 14 August defect exactly',
+    TD.controlsVerdict({ ...good, live: { published: 'published', withdrawn: true } }).ok === false);
+  ok('🔴 AN ABSENT PATH READING AS PUBLISHED FAILS THE RUN',
+    TD.controlsVerdict({ ...good, absent: { published: 'published' } }).ok === false);
+  ok('a live page we could not read at all fails the run',
+    TD.controlsVerdict({ ...good, live: { published: 'blind', withdrawn: false } }).ok === false);
+  ok('an absent path we could not read at all fails the run',
+    TD.controlsVerdict({ ...good, absent: { published: 'blind' } }).ok === false);
+  ok('a failure says why, rather than just failing',
+    TD.controlsVerdict({ ...good, live: { published: 'published', withdrawn: true } }).reasons.length > 0);
+
+  // 🔴 AND THEY ARE ACTUALLY REACHED, BEFORE THE LOOP. A control computed and never consulted
+  // is the same as no control.
+  const td = codeOnly(srcTakedown);
+  ok('🔴 the controls are consulted and stop the run',
+    /if \(!controls\.ok\) \{/.test(td) && td.slice(td.indexOf('if (!controls.ok)')).includes('process.exit(1)'));
+  // ⚠️ MEASURED INSIDE main() ONLY. As first written it compared indices across the whole
+  // file, and restore() sits above main() with a `for (const row of rows)` of its own, so it was
+  // comparing the controls against the WRONG LOOP and went red for the wrong reason.
+  const mainOnly = td.slice(td.indexOf('async function main()'));
+  ok('the slice really is main and not the whole file',
+    mainOnly.length > 200 && mainOnly.length < td.length);
+  ok('🔴 AND THEY RUN BEFORE ANY ROW IS JUDGED',
+    mainOnly.indexOf('if (!controls.ok)') > -1
+    && mainOnly.indexOf('for (const row of rows)') > -1
+    && mainOnly.indexOf('if (!controls.ok)') < mainOnly.indexOf('for (const row of rows)'));
+  ok('the two control paths are named constants, not buried literals',
+    typeof TD.CONTROL_LIVE === 'string' && typeof TD.CONTROL_ABSENT === 'string'
+    && TD.CONTROL_LIVE !== TD.CONTROL_ABSENT);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// L. LIKE COMPARED WITH LIKE, AND A REMOVAL THAT CAN BE UNDONE.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const td = codeOnly(srcTakedown);
+
+  // ⚠️ THE STAMP COMES FROM THE ENDPOINT THIS JOB READS, NOT FROM THE ONE THE WRITER READS.
+  // It used to fall back to the search endpoint's public_timestamp, a different field from a
+  // different endpoint. They agreed on the rows in the record, which is exactly why it looked fine.
+  ok('🔴 the revision comparison uses only a stamp this job took',
+    TD.recordedStamp({ content_api_updated_at: '2026-01-01' }) === '2026-01-01');
+  ok('🔴 AND IGNORES THE WRITER\'S FIELD, so two endpoints are never compared',
+    TD.recordedStamp({ source_updated_at: '2026-01-01', published: '2026-01-01' }) === null);
+  ok('a row this job has never stamped baselines rather than being called revised',
+    TD.decide({ status: 200, recorded: TD.recordedStamp({ published: '2026-01-01' }), current: '2026-06-01' }).action === 'stamp');
+  ok('the stamp it writes is the one it reads back',
+    /content_api_updated_at/.test(td) && td.split('content_api_updated_at').length >= 3);
+
+  // 🔴 A DESTRUCTIVE STEP THAT KEEPS NO NOTE OF WHAT IT DESTROYED CANNOT BE WALKED BACK.
+  // When the withdrawn_notice defect redacted two live decisions, nothing in either row recorded
+  // that they had been 'reviewed'.
+  // ⚠️ ANCHORED INSIDE THE REDACTION'S OWN QUERY. As first written it tested the file for
+  // the string anywhere, and restore() mentions the same field twice, so a sabotage that took it
+  // out of the UPDATE that actually writes it STAYED GREEN. The name being present somewhere is
+  // not the same as the destructive step recording it.
+  const redactQuery = td.slice(td.indexOf("if (verdict.action === 'redact')"),
+    td.indexOf("} else if (verdict.action === 'stamp')"));
+  ok('the slice really is the redaction', redactQuery.includes('update public.knowledge_items'));
+  ok('🔴 THE REDACTION ITSELF RECORDS THE STATUS IT OVERWROTE',
+    /'status_before_removal', \$\d::text/.test(redactQuery));
+  ok('and it passes the row\'s real status, not a constant',
+    /row\.status \|\| 'needs_distillation'/.test(redactQuery));
+  ok('the restore reads that status back rather than guessing one',
+    /status_before_removal/.test(td) && /restore/.test(td));
+
+  // 🔴 RESTORE EXISTS, AND IT REFUSES TO PUT BACK SOMETHING GENUINELY TAKEN DOWN.
+  ok('🔴 there is a way to put back what a wrong removal took', /RESTORE = process\.argv\.includes\('--restore'\)/.test(td));
+  ok('🔴 AND IT LEAVES A GENUINELY GONE DECISION REDACTED, which is the actual obligation',
+    /if \(published === 'gone'\) \{ left \+= 1;/.test(td));
+  ok('it will not restore over a source it could not read',
+    /if \(published === 'blind'\) \{ blind \+= 1;/.test(td));
+  // 🔴 AND THE CONTROLS GUARD THE RESTORE TOO. The takedown pass fails towards removing
+  // something it should have kept, which is recoverable. This one fails towards putting back
+  // material we are obliged not to hold, which is the breach itself.
+  const restoreOnly = td.slice(td.indexOf('async function restore()'), td.indexOf('async function main()'));
+  ok('the slice really is restore', restoreOnly.length > 200);
+  ok('🔴 THE RESTORE RUNS THE CONTROLS BEFORE IT PUTS ANYTHING BACK',
+    /if \(!guard\.ok\)/.test(restoreOnly)
+    && restoreOnly.indexOf('if (!guard.ok)') < restoreOnly.indexOf('for (const row of rows)'));
+  ok('and a failed control stops it', restoreOnly.slice(restoreOnly.indexOf('if (!guard.ok)')).includes('process.exit(1)'));
+
+  // 🔴 AND IT REBUILDS THROUGH THE SAME STRIPPER THE WRITER USES. A restore that hand rebuilt
+  // the row would be the one place in the product where the parties quietly came back.
+  const rebuilt = TD.rebuild(
+    { title: 'DAVID HILL and DAVID MCCRACKEN v THE COMMISSIONERS FOR HMRC [2026] UKUT 00306 (TCC)', indexable_content: 'PENALTIES. Smith v HMRC considered.' },
+    ['penalties / discovery'],
+  );
+  ok('🔴 A RESTORED TITLE NAMES NO PARTIES', C.namesParties(rebuilt.title) === false);
+  ok('🔴 RESTORED CATCHWORDS NAME NO PARTIES', C.namesParties(rebuilt.catchwords) === false);
+  ok('a restored title keeps the citation, so the desk can still find the decision',
+    rebuilt.title.includes('[2026] UKUT 00306 (TCC)'));
+  ok('a restored title still leads with the rule at risk, which is our text and not the judge\'s',
+    rebuilt.title.includes('penalties / discovery'));
+  ok('the restore calls the shared stripper rather than its own',
+    /title: `⚖️ MAY AFFECT: \$\{rules\}\. \$\{stripParties\(hit\.title\)\}`/.test(td)
+    && /catchwords: stripParties\(/.test(td));
+  ok('a restored summary says it was restored, so the desk is not misled about its history',
+    TD.restoredSummary(['x'], 'y').includes('Restored after an incorrect removal'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// M. A CHECK THAT COULD NOT RUN IS NOT A CHECK THAT PASSED.
+//
+// The leak detector hard coded a column called `answer`, that column does not exist in this
+// deployment, the query threw, and the whole thing reported a quiet minus one that nothing acted
+// on. Same failure shape as the empty withdrawn_notice: a value that is not an answer, treated as
+// one.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const cert = codeOnly(srcCertificate);
+  ok('🔴 the leak detector discovers its columns rather than guessing one',
+    /information_schema\.columns/.test(cert) && /table_name = 'qa_cache'/.test(cert));
+  ok('🔴 AND A COUNT IT COULD NOT TAKE STOPS THE JOB rather than reading as zero',
+    /if \(before\.qa_cache === null\)/.test(cert)
+    && /THE LEAK DETECTOR COULD NOT RUN/.test(srcCertificate));
+  // ⚠️ ANCHORED IN THE BRANCH THAT SETS IT. Testing the file for the name went green over a
+  // sabotage that removed it from the one branch where it is the only explanation available.
+  const noCols = cert.slice(cert.indexOf('if (textCols.length === 0)'), cert.indexOf('} else {'));
+  ok('the slice really is the no columns branch', noCols.includes('tally.qa_cache = null'));
+  ok('🔴 THE BRANCH THAT CANNOT COUNT SAYS WHY',
+    /tally\._qa_cache_note = '/.test(noCols));
+  ok('and the branch that can count says what it searched',
+    /tally\._qa_cache_note = `searched/.test(cert));
+  ok('the reason is printed rather than swallowed', /_qa_cache_note/.test(cert));
+  ok('a null count never reads as erased', CERT.isClean({ knowledge_items: null, khoji_law: 0 }) === false);
 }
 
 console.log(`\n${pass} passed, ${fail} failed.`);

@@ -277,11 +277,6 @@ sabotage('🔴 SOMEBODY TIDIES UP THE TOMBSTONE, so tribunal.mjs re-ingests it t
     + '      });\n'
     + '      redacted += 1;\n    } else if (verdict.action === '));
 
-sabotage('🔴 tribunal.mjs stops stamping the source version, so the job can only ever baseline', (d) =>
-  edit(d, 'khoji/tribunal.mjs',
-    '            source_updated_at: h.published,\n',
-    ''));
-
 // 🔴 THIS ONE WAS A HOLE ON THE FIRST PASS AND IT IS THE REASON THE GUARD CHANGED. Commenting
 // the line out leaves the string `node caselawtakedown.mjs` sitting in the file, and the guard was
 // reading the raw file. It now reads through a shell comment stripper.
@@ -428,6 +423,116 @@ sabotage('🔴 an en dash appears on the terms page', (d) =>
     '<h2 style={heading}>Where our legal information comes from</h2>',
     '<h2 style={heading}>Where our legal information ' + EN_DASH + ' comes from</h2>'));
 
+// ── THE 14 AUGUST 2026 INCIDENT. Restored exactly, so it can never be shipped twice. ────────
+
+sabotage('🔴 THE DEFECT THAT WAS ACTUALLY LIVE: Boolean(withdrawn_notice), so every live page reads withdrawn', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    '  const w = doc.withdrawn_notice;',
+    '  return Boolean(doc.withdrawn_notice);\n  const w = doc.withdrawn_notice;'));
+
+sabotage('🔴 an empty object stops being recognised as "not withdrawn"', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    "  if (!w || typeof w !== 'object' || Array.isArray(w)) return false;",
+    '  if (!w) return false;\n  if (typeof w === "object") return true;'));
+
+sabotage('🔴 a REAL withdrawal stops being one, which is the opposite failure', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    "  return typeof w.explanation === 'string' && w.explanation.trim() !== '';",
+    '  return false;'));
+
+// ── THE RUN CONTROLS. The check that was missing. ───────────────────────────────────────────
+
+sabotage('🔴 THE CONTROLS ARE COMPUTED AND NEVER CONSULTED, which is the same as no controls', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    '  if (!controls.ok) {',
+    '  if (false && !controls.ok) {'));
+
+sabotage('🔴 the live control stops noticing that a live page reads withdrawn', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    "  if (live.withdrawn) {\n    reasons.push('a page we know is not withdrawn came back withdrawn');\n  }",
+    ''));
+
+sabotage('🔴 the live control stops noticing that a live page reads gone', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    "  if (live.published !== 'published') {",
+    "  if (false) {"));
+
+sabotage('🔴 the absent control stops noticing that everything answers 200', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    "  if (absent.published !== 'gone') {",
+    "  if (false) {"));
+
+sabotage('🔴 the controls are moved BELOW the loop, so rows are judged before they are checked', (d) => {
+  const p = path.join(d, 'khoji/caselawtakedown.mjs');
+  let src = readFileSync(p, 'utf8');
+  const start = src.indexOf('  // 🔴 THE CONTROLS RUN BEFORE ANY ROW IS JUDGED.');
+  const end = src.indexOf("  log('run controls green:");
+  if (start < 0 || end < 0) throw new Error('ANCHOR MISSING: control block');
+  const block = src.slice(start, end);
+  src = src.slice(0, start) + src.slice(end);
+  const loop = src.indexOf('  for (const row of rows) {', src.indexOf('async function main()'));
+  if (loop < 0) throw new Error('ANCHOR MISSING: main loop');
+  // Inserted INSIDE the loop, not merely at its opening brace. The first version spliced the
+  // block immediately before `for (...)`, which is still above it, so nothing changed and the
+  // sabotage stayed green while claiming to have moved something.
+  const after = loop + '  for (const row of rows) {'.length;
+  writeFileSync(p, src.slice(0, after) + '\n' + block + src.slice(after));
+});
+
+sabotage('🔴 the RESTORE stops running the controls, so a bad endpoint puts material back', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    '  if (!guard.ok) {',
+    '  if (false && !guard.ok) {'));
+
+// ── LIKE COMPARED WITH LIKE, AND A REMOVAL THAT CAN BE UNDONE. ──────────────────────────────
+
+sabotage('🔴 the revision check goes back to comparing two endpoints', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    '  return raw.content_api_updated_at || null;',
+    '  return raw.content_api_updated_at || raw.source_updated_at || raw.published || null;'));
+
+sabotage('🔴 the writer leaves a duplicate timestamp for somebody to compare the wrong thing against', (d) =>
+  edit(d, 'khoji/tribunal.mjs',
+    '{ tribunal: true, published: h.published, touches: h.touches.map((t) => t.rule) },',
+    '{ tribunal: true, published: h.published, source_updated_at: h.published, touches: h.touches.map((t) => t.rule) },'));
+
+sabotage('🔴 A REDACTION STOPS RECORDING WHAT IT OVERWROTE, so it cannot be walked back', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    "                   'status_before_removal', $6::text",
+    "                   'removed', true"));
+
+sabotage('🔴 the restore puts back a decision that is genuinely gone at source', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    "    if (published === 'gone') { left += 1;",
+    "    if (false) { left += 1;"));
+
+sabotage('🔴 THE RESTORE REBUILDS THE TITLE WITHOUT STRIPPING THE PARTIES', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    'title: `⚖️ MAY AFFECT: ${rules}. ${stripParties(hit.title)}`,',
+    'title: `⚖️ MAY AFFECT: ${rules}. ${hit.title}`,'));
+
+sabotage('🔴 the restore rebuilds the catchwords without stripping the parties', (d) =>
+  edit(d, 'khoji/caselawtakedown.mjs',
+    "catchwords: stripParties((hit.indexable_content || '').replace(/\\s+/g, ' ').trim()).slice(0, 800),",
+    "catchwords: (hit.indexable_content || '').replace(/\\s+/g, ' ').trim().slice(0, 800),"));
+
+// ── A CHECK THAT COULD NOT RUN IS NOT A CHECK THAT PASSED. ──────────────────────────────────
+
+sabotage('🔴 the leak detector goes back to guessing a column name', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    "    + \" where table_schema = 'public' and table_name = 'qa_cache'\"",
+    "    + \" where table_schema = 'public' and table_name = 'nope'\""));
+
+sabotage('🔴 A LEAK CHECK THAT COULD NOT RUN STOPS STOPPING THE JOB', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    '  if (before.qa_cache === null) {',
+    '  if (false) {'));
+
+sabotage('the reason a count could not be taken stops being printed', (d) =>
+  edit(d, 'khoji/caselawcertificate.mjs',
+    "    tally._qa_cache_note = 'no text columns found on qa_cache, so nothing could be searched';",
+    ''));
+
 // ── NO-OP CONTROLS. These must stay GREEN, or this runner only detects that a file moved. ────
 
 sabotage('NO-OP: a comment word changes in the caselaw definition', (d) =>
@@ -464,7 +569,7 @@ process.stdout.write(
   `\n  ${applied} sabotages applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`,
 );
 if (holes > 0 || broken > 0) process.exit(1);
-if (applied !== 67) {
-  process.stdout.write(`  COUNT WRONG: expected 67 sabotages to apply, got ${applied}\n`);
+if (applied !== 84) {
+  process.stdout.write(`  COUNT WRONG: expected 84 sabotages to apply, got ${applied}\n`);
   process.exit(1);
 }

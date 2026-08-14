@@ -185,16 +185,26 @@ async function tallyFrom(db) {
   // tribunal decision, the filter in getRelevantKnowledge has failed and a judgment has reached a
   // user, which is the thing the whole caselaw gate exists to prevent. It surfaces here because
   // this is the one job that looks at every store at once.
-  try {
-    const qa = await db.query(
-      "select count(*)::int as n from public.qa_cache where answer ilike '%tribunal decision%'"
-      + " or answer ilike '%UKUT%' or answer ilike '%UKFTT%'",
-    );
+  // ⚠️ IT DISCOVERS THE COLUMNS RATHER THAN GUESSING ONE. The first version hard coded `answer`,
+  // that column is not called `answer` here, the query threw, and the whole check reported a quiet
+  // minus one that nothing acted on. A leak detector that cannot find the thing it is meant to be
+  // reading is not a leak detector, and reporting that as a number was the wrong shape entirely.
+  const cols = await db.query(
+    "select column_name from information_schema.columns"
+    + " where table_schema = 'public' and table_name = 'qa_cache'"
+    + " and data_type in ('text','character varying')",
+  );
+  const textCols = cols.rows.map((r) => r.column_name);
+  if (textCols.length === 0) {
+    tally.qa_cache = null;
+    tally._qa_cache_note = 'no text columns found on qa_cache, so nothing could be searched';
+  } else {
+    const where = textCols
+      .map((c) => `("${c}" ilike '%tribunal decision%' or "${c}" ilike '%UKUT%' or "${c}" ilike '%UKFTT%')`)
+      .join(' or ');
+    const qa = await db.query(`select count(*)::int as n from public.qa_cache where ${where}`);
     tally.qa_cache = qa.rows[0]?.n ?? 0;
-  } catch {
-    // The column may not be called answer in every deployment. An unreadable check is reported as
-    // unknown rather than silently as zero.
-    tally.qa_cache = -1;
+    tally._qa_cache_note = `searched ${textCols.length} text column(s): ${textCols.join(', ')}`;
   }
 
   return tally;
@@ -209,8 +219,18 @@ async function main() {
   const before = await withDb(tallyFrom);
 
   log('BEFORE');
-  for (const p of PLACES) log(`  ${p.table.padEnd(18)} ${before[p.table]}`);
+  for (const p of PLACES) log(`  ${p.table.padEnd(18)} ${before[p.table] === null ? 'COULD NOT COUNT' : before[p.table]}`);
   log(`  (${before._knowledge_items_total} caselaw row(s) in total, of which ${before.knowledge_items} still hold material)`);
+  if (before._qa_cache_note) log(`  qa_cache: ${before._qa_cache_note}`);
+
+  // 🔴 A CHECK THAT COULD NOT RUN IS NOT A CHECK THAT PASSED. It reported a quiet minus one and
+  // carried on, which is the same failure shape as the empty withdrawn_notice: a value that is not
+  // an answer being treated as one.
+  if (before.qa_cache === null) {
+    console.error('\n🔴 THE LEAK DETECTOR COULD NOT RUN. It has not told you the cache is clean.');
+    console.error('   ' + (before._qa_cache_note || 'no reason recorded'));
+    process.exit(1);
+  }
 
   if (before.qa_cache > 0) {
     console.error('\n🔴 A CACHED CUSTOMER ANSWER MENTIONS A TRIBUNAL DECISION.');

@@ -108,6 +108,10 @@ tribunal_rc=$?
 # It REDACTS, it never deletes the row: source_url is the key that stops tribunal.mjs re-ingesting
 # a withdrawn decision on the very next run. It exits non-zero if it could not read something,
 # because "we could not tell" is not evidence that a decision is still published.
+# It runs two LIVE CONTROLS before it judges a single row: a page we know is published must read
+# published and not withdrawn, and a path we know does not exist must read gone. If either fails
+# the whole run is blind and nothing is touched. That check was missing on 14 August 2026, when
+# GOV.UK's empty withdrawn_notice object read as true and two live decisions were redacted.
 node caselawtakedown.mjs "$@" >> logs/khoji.log 2>&1
 takedown_rc=$?
 

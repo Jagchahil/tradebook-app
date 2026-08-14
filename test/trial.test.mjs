@@ -165,7 +165,20 @@ ok(`a granted trial really ends in ${S.TRIAL_DAYS} days (got ${grantedDays})`, g
       }
     }
   }
-  ok(`🔴 no file advertises a trial length other than ${S.TRIAL_DAYS} or ${S.REP_TRIAL_DAYS}${wrongDays.length ? `\n     ${wrongDays.join('\n     ')}` : ''}`,
+  // ⚠️ IF THE OFFENDERS ARE ALL IN THE SIBLING REPO, SAY SO AND SAY WHY.
+  //
+  // A cross repo guard makes the two repos' pushes ORDER DEPENDENT, and CI checks the mobile repo
+  // out at its current HEAD with no ref pin. Push the web fix first and every run between the two
+  // pushes goes red on a mismatch that is already half fixed. That is correct behaviour and it
+  // looks exactly like a broken build, so the message explains itself rather than leaving the next
+  // person to work it out at eleven at night. It happened on ci #531, 14 August 2026.
+  const crossRepoOnly = wrongDays.length > 0 && wrongDays.every((w) => w.startsWith('..'));
+  const hint = crossRepoOnly
+    ? '\n     EVERY ONE OF THESE IS IN THE MOBILE REPO, NOT THIS ONE.'
+      + '\n     If you have just pushed the web fix and not yet the mobile one, this is the ordering'
+      + '\n     hazard, not a broken build. Push the sibling, then re-run this job.'
+    : '';
+  ok(`🔴 no file advertises a trial length other than ${S.TRIAL_DAYS} or ${S.REP_TRIAL_DAYS}${wrongDays.length ? `\n     ${wrongDays.join('\n     ')}${hint}` : ''}`,
     wrongDays.length === 0);
 
   // ⚠️ AND THE DETECTOR IS SHOWN A KNOWN BAD STRING, because a sweep that finds nothing

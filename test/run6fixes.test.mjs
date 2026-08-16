@@ -474,5 +474,153 @@ for (const [f, needle] of spaceFix) {
 }
 
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 8. F10. "CAN I CLAIM IT" WAS SOLE TRADER LAW READ BY A COMPANY DIRECTOR.
+//
+// Maureen is a director AND an employee of her own limited company. She read thirty odd cards on
+// /app/tax/can-i-claim on 16 August 2026. Neither the page nor lib/claimrules.data.ts contains the
+// word businessType, limited_company or structure, and it never will: the cards are ONE corpus,
+// shared with the phone and published at /rules.json, and branching every card on a structure the
+// reader has not always told us is how you get two versions of the law that drift apart.
+//
+// SO THE FIX IS NOT A BRANCH. IT IS THAT EVERY SENTENCE MUST BE TRUE OF BOTH READERS AT ONCE.
+// That is a stronger requirement than a branch, and it is what these assertions hold to.
+//
+// Two sentences were not.
+//
+//   1. The tools card said the cash basis is "the standard method for sole traders and what most
+//      people here are on". GOV.UK, Cash basis, read live: "Some businesses cannot use cash basis,
+//      for example, limited companies." Her company cannot use it. The card told her she was on it.
+//
+//   2. The pension card said a pension is not a business cost and stopped. For her it is the wrong
+//      half. HMRC PTM043100: employer contributions ARE deducted as an expense in computing the
+//      profits of a trade. Her COMPANY can pay into her pension, deduct it against Corporation Tax
+//      and pay no National Insurance on it at either end. /app/pay-yourself exists to help her
+//      choose between salary, dividends and a pension, and this page did not mention the third.
+//
+// Nothing here is a wrong yes or no. It is a page that never asked what she was and then made
+// assertions about her anyway. That is the Run 6 shape: the knowledge is not missing, the
+// pointing is.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n8. F10. THE CLAIM CORPUS, READ BY A DIRECTOR AND BY A SOLE TRADER AT THE SAME TIME.');
+
+const CR = await load('claimrules.data');
+const RULES = CR.EXPENSE_RULES;
+const ruleFor = (k) => RULES.find((r) => r.key === k);
+const fields = (r) => `${r.rule} ${r.detail}`;
+
+ok('the claim corpus loaded and has cards in it', Array.isArray(RULES) && RULES.length > 20);
+
+// 8a. THE SENTENCE THAT WAS FALSE ABOUT HER.
+{
+  const tools = ruleFor('tools');
+  ok('the tools card is still there', Boolean(tools));
+  const d = tools?.detail ?? '';
+  ok('🔴 IT NO LONGER TELLS EVERY READER THE CASH BASIS IS THE METHOD THEY ARE ON',
+    !/standard method for sole traders|what most people here are on/i.test(d));
+  ok('it names who the cash basis is actually open to', /sole traders and partnerships can use/.test(d));
+  ok('🔴 AND IT NAMES THE BASIS A COMPANY IS ACTUALLY ON, in the same breath',
+    /accruals basis/.test(d) && /limited company/.test(d));
+  ok('and the answer still lands in the same place for both, which is why one card can serve both',
+    /Annual Investment Allowance/.test(d) && /Either way/.test(d));
+}
+
+// 8b. THE LEVER THAT WAS MISSING, WHICH IS THE PART THAT COST HER MONEY.
+{
+  const pen = ruleFor('pension');
+  ok('the pension card is still there', Boolean(pen));
+  ok('🔴 IT NO LONGER ANSWERS A QUESTION THAT DEPENDS WITH A FLAT NO',
+    pen?.verdict === 'depends');
+  ok('the headline says the answer turns on who pays', /depends who pays it/i.test(pen?.rule ?? ''));
+  ok('🔴 AND THE COMPANY ARM IS IN THE HEADLINE, not buried in the detail nobody opens',
+    /Corporation Tax/.test(pen?.rule ?? ''));
+  const d = pen?.detail ?? '';
+  ok('the personal arm survived, because it was never wrong, only incomplete',
+    /20% is added automatically/.test(d));
+  ok('the company arm names who pays, what it comes off, and the National Insurance',
+    /company pays the contribution/i.test(d) && /Corporation Tax/.test(d)
+    && /no National Insurance on it at either end/i.test(d));
+  ok('and it points her at the choice /app/pay-yourself exists to make',
+    /salary/i.test(d) && /dividends/i.test(d));
+}
+
+// 8c. THE SHAPE, NOT THE TWO SENTENCES. This is the assertion that catches the NEXT one.
+//
+// ⚠️ A card that names one basis or one structure and not the other is a card making an assertion
+// about a reader it never asked. Both of the F10 sentences were exactly that shape, and neither
+// would have been caught by a fixture, because the corpus has no structure input to feed one.
+{
+  const OTHER = [
+    [/\bcash basis\b/i, /\baccruals\b/i, 'names the cash basis without the accruals basis'],
+    [/\baccruals\b/i, /\bcash basis\b/i, 'names the accruals basis without the cash basis'],
+  ];
+  const offenders = [];
+  for (const r of RULES) {
+    for (const [has, needs, why] of OTHER) {
+      const t = fields(r);
+      if (has.test(t) && !needs.test(t)) offenders.push(`${r.key} ${why}`);
+    }
+  }
+  ok(`🔴 NO CARD NAMES ONE ACCOUNTING BASIS AND LEAVES THE OTHER READER GUESSING${offenders.length ? `: ${offenders.join('; ')}` : ''}`,
+    offenders.length === 0);
+
+  // And the tips carried the same sentence, in a shorter dress.
+  const tips = CR.TAX_TIPS ?? [];
+  const badTips = tips.filter((t) => /cash basis/i.test(t.body) && !/accruals/i.test(t.body));
+  ok(`🔴 AND NEITHER DOES A TAX TIP${badTips.length ? `: ${badTips.map((t) => t.title).join('; ')}` : ''}`,
+    badTips.length === 0);
+}
+
+// 8d. THE CITATIONS. A director reading these was reading the wrong Act.
+{
+  const RS = await load('rulesources');
+  const sources = Object.entries(RS.RULE_SOURCES);
+
+  const pension = RS.RULE_SOURCES.pension ?? [];
+  ok('the pension card now carries two sources, not one', pension.length === 2);
+  const ptm = pension.find((x) => x.code === 'PTM043100');
+  ok('🔴 AND THE SECOND ONE IS HMRC SAYING THE COMPANY ARM ITSELF', Boolean(ptm));
+  ok('it is a gov.uk page, because nothing else is an authority',
+    /^https:\/\/www\.gov\.uk\/hmrc-internal-manuals\/pensions-tax-manual\/ptm043100$/.test(ptm?.url ?? ''));
+  ok('its authority names the company Act as well as the personal one',
+    /CTA 2009/.test(ptm?.authority ?? '') && /ITTOIA 2005/.test(ptm?.authority ?? ''));
+
+  // ⚠️ THE QUOTE IS LOAD BEARING AND IT IS THE EASIEST THING HERE TO GET SILENTLY WRONG.
+  // khoji/corpus.mjs matches the quote as a SUBSTRING of the live page. A quote trimmed short and
+  // given a full stop of its own matches nothing, and then Khoji alarms every night forever on a
+  // citation that is word for word right. That is the exact failure mode corpus.mjs was written
+  // to avoid, so the quote must end where HMRC's sentence ends.
+  ok('🔴 THE PTM QUOTE ENDS WHERE HMRC ENDS IT, so the nightly check can find it',
+    /taxable profit\.$/.test(ptm?.quote ?? ''));
+  ok('...and it is long enough to be an anchor rather than a fragment', (ptm?.quote ?? '').length > 100);
+
+  // Every ITTOIA citation now names the company section beside it. One exception, written down.
+  const NO_CTA_SIBLING = new Set(['bad_debt']);
+  const wrongAct = [];
+  for (const [key, list] of sources) {
+    if (NO_CTA_SIBLING.has(key)) continue;
+    for (const src of list) {
+      const a = src.authority ?? '';
+      if (/ITTOIA|Income Tax \(Trading/.test(a) && !/CTA 2009/.test(a)) wrongAct.push(`${key}: ${a}`);
+    }
+  }
+  ok(`🔴 EVERY CARD THAT NAMES THE SOLE TRADER ACT NAMES THE COMPANY ACT TOO${wrongAct.length ? `: ${wrongAct.join(' | ')}` : ''}`,
+    wrongAct.length === 0);
+
+  // The exception is not a hole. It is a refusal, and it has to stay a deliberate one.
+  const badDebt = RS.RULE_SOURCES.bad_debt ?? [];
+  ok('bad debts is still cited to ITTOIA', badDebt.some((x) => /ITTOIA|Income Tax \(Trading/.test(x.authority ?? '')));
+  ok('🔴 AND IT STILL HAS NO CTA SIBLING, because S55 CTA 2009 RESTRICTS the deduction this card '
+    + 'grants and a tidy wrong pair is worse than an honest gap',
+    badDebt.every((x) => !/CTA 2009/.test(x.authority ?? '')));
+}
+
+// 8e. AND IT REACHES HER. A corpus fixed in lib that the page does not render is a fix nobody got.
+for (const file of ['app/can-i-claim/page.tsx', 'app/app/tax/can-i-claim/page.tsx']) {
+  const src = readFileSync(path.join(root, file), 'utf8');
+  ok(`${file} renders the headline answer`, /\.rule\b|\{r\.rule\}|rule\}/.test(src));
+  ok(`${file} renders the detail, which is where the company arm lives`, /\.detail\b/.test(src));
+}
+
 console.log(`\n${passed} passed, ${failed} failed.`);
 process.exit(failed > 0 ? 1 : 0);

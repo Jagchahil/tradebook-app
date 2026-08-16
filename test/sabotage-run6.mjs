@@ -368,6 +368,102 @@ sabotage('the scanner finds glued figures and exits zero anyway',
     "      + '  already does in sixteen places in these same files.\\n\\n',\n    );\n    process.exit(1);",
     "      + '  already does in sixteen places in these same files.\\n\\n',\n    );\n    process.exit(0);"));
 
+// ── F10. THE CLAIM CORPUS READ BY A DIRECTOR. ────────────────────────────────────────────────
+
+// THE ORIGINAL DEFECT, in the words that were on the page and on the phone on 16 August.
+sabotage('the tools card tells every reader the cash basis is the method they are on',
+  (d) => edit(d, 'lib/claimrules.data.ts',
+    'On the cash basis, which sole traders and partnerships can use, that is simply how a cost works.',
+    'On the cash basis, which is the standard method for sole traders and what most people here are on, that is simply how a cost works.'));
+
+// The half that makes the card true for a company, removed on its own. This is the shape guard,
+// not the sentence guard: nothing false is said, one reader is simply left out.
+sabotage('the accruals half of the tools card is dropped, leaving a company reader unaddressed',
+  (d) => edit(d, 'lib/claimrules.data.ts',
+    ' On the accruals basis, which is what a limited company always uses, the same result comes through the Annual Investment Allowance, up to £1 million.',
+    ''));
+
+sabotage('the bank charges card names the cash basis and only the cash basis again',
+  (d) => edit(d, 'lib/claimrules.data.ts',
+    'The old cap on interest under the cash basis, which only ever applied to sole traders and partnerships, was removed on 6 April 2024, and it never applied on the accruals basis a limited company uses.',
+    'The old cap on interest under the cash basis was removed on 6 April 2024.'));
+
+sabotage('a tax tip carries the cash basis on its own, which is the same defect in a shorter dress',
+  (d) => edit(d, 'lib/claimrules.data.ts',
+    "body: 'The whole cost of tools, equipment and a van comes off the year you pay for it, not spread over years. On the cash basis that is simply how a cost works; on the accruals basis it is the Annual Investment Allowance.'",
+    "body: 'The whole cost of tools, equipment and a van comes off the year you pay for it, not spread over years. On the cash basis that is simply how a cost works.'"));
+
+sabotage('the pension card goes back to answering a question that depends with a flat no',
+  (d) => edit(d, 'lib/claimrules.data.ts',
+    "rule: 'It depends who pays it. A pension you pay into yourself is not a business cost, though you still get tax relief on it. If you trade through a company, the company can pay in and deduct it against Corporation Tax.'",
+    "rule: 'Not an expense, but a tax saver. A personal pension is not a business cost, but it gets you tax relief and cuts your bill.'"));
+
+sabotage('the pension verdict goes back to no while the words stay right',
+  (d) => edit(d, 'lib/claimrules.data.ts',
+    "    key: 'pension',\n    title: 'Pension contributions',\n    verdict: 'depends',",
+    "    key: 'pension',\n    title: 'Pension contributions',\n    verdict: 'no',"));
+
+sabotage('the company arm survives in the headline but loses the National Insurance, which is half its value',
+  (d) => edit(d, 'lib/claimrules.data.ts',
+    ', and there is no National Insurance on it at either end',
+    ''));
+
+sabotage('the PTM source is deleted and the company arm is back to being our opinion',
+  (d) => edit(d, 'lib/rulesources.ts',
+    "      code: 'PTM043100',",
+    "      code: 'PTM043101',"));
+
+// ⚠️ THE SILENT ONE. Nothing renders differently. Khoji simply never finds the sentence again and
+// alarms every night forever on a citation that is word for word right.
+sabotage('the PTM quote is trimmed short and given a full stop of its own',
+  (d) => edit(d, 'lib/rulesources.ts',
+    "investment business, and so reducing the amount of an employer's taxable profit.\",",
+    "investment business.\","));
+
+sabotage('the PTM citation points somewhere that is not gov.uk',
+  (d) => edit(d, 'lib/rulesources.ts',
+    "url: 'https://www.gov.uk/hmrc-internal-manuals/pensions-tax-manual/ptm043100',",
+    "url: 'https://www.pensionsadvisoryservice.org.uk/ptm043100',"));
+
+sabotage('the wholly and exclusively cards go back to naming the sole trader Act alone',
+  (d) => edit(d, 'lib/rulesources.ts',
+    "authority: 'S34(1)(a) ITTOIA 2005; S54(1)(a) CTA 2009; Mallalieu v Drummond [1983] 57 TC 330 (HL)',",
+    "authority: 'S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL)',"));
+
+sabotage('pre trading loses its company section',
+  (d) => edit(d, 'lib/rulesources.ts',
+    "authority: 'S57 ITTOIA 2005; S61 CTA 2009 (pre-trading expenses)',",
+    "authority: 'S57 Income Tax (Trading and Other Income) Act 2005',"));
+
+// ⚠️ THE OPPOSITE MISTAKE, and the reason 8d holds a written down exception rather than a blanket
+// rule. Pairing every card with a CTA section looks tidier and points a director at a section that
+// says close to the opposite of what the card grants her.
+sabotage('bad debts gets a tidy CTA sibling that restricts the deduction the card grants',
+  (d) => edit(d, 'lib/rulesources.ts',
+    "authority: 'S35 Income Tax (Trading and Other Income) Act 2005',",
+    "authority: 'S35 ITTOIA 2005; S55 CTA 2009 (bad debts)',"));
+
+sabotage('the signed in page stops rendering the detail, so the company arm never reaches her',
+  (d) => edit(d, 'app/app/tax/can-i-claim/page.tsx',
+    '<p style={S.ruleDetail}>{r.detail}</p>',
+    '<p style={S.ruleDetail}>{r.rule}</p>'));
+
+sabotage('the public page stops rendering the detail too',
+  (d) => edit(d, 'app/can-i-claim/page.tsx',
+    '{r.detail}</p>',
+    '{r.title}</p>'));
+
+// And the citation voice guard itself, which is what let PTM through in the first place.
+sabotageIn('citationvoice', 'a citation shouts a word that is not an HMRC manual code',
+  (d) => edit(d, 'lib/rulesources.ts',
+    "code: 'PTM043100',",
+    "code: 'PENSIONS MANUAL 043100',"));
+
+sabotageIn('citationvoice', 'the acronym whitelist is opened up to anything in capitals',
+  (d) => edit(d, 'test/citationvoice.test.mjs',
+    'if (token.length >= 3 && token === token.toUpperCase() && !ACRONYMS.has(token)) {',
+    'if (false && token.length >= 3 && token === token.toUpperCase() && !ACRONYMS.has(token)) {'));
+
 // ── NO OP CONTROLS. These change nothing that matters and MUST stay green, or this runner is
 //    only detecting that a file was touched at all. ───────────────────────────────────────────
 
@@ -386,7 +482,7 @@ sabotage('CONTROL: renaming the local binding changes nothing',
     '  const deduct = deductibleSaving(isCompany, projTradeNet, projTotalIncome);',
     '  const deductible = deductibleSaving(isCompany, projTradeNet, projTotalIncome);\n  const deduct = deductible;'), false);
 
-const EXPECTED = 56;
+const EXPECTED = 73;
 process.stdout.write(`\n  ${applied} applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`);
 if (holes > 0 || broken > 0) process.exit(1);
 if (applied !== EXPECTED) {

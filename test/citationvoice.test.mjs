@@ -52,9 +52,26 @@ const read = (rel) => readFileSync(path.resolve(here, '..', rel), 'utf8');
 
 // The acronyms a real citation is made of. Anything else shouted in capitals is somebody making a
 // point, and a citation does not make points.
+//
+// AMENDED IN RUN 6, 16 August 2026, AND HERE IS WHY IT WAS STALE RATHER THAN ME BEING WRONG.
+//
+// The rule this list protects: a citation is made of the short forms a reference is actually
+// written in. Anything else in capitals is somebody raising their voice at the customer, and a
+// citation does not raise its voice. That rule is unchanged.
+//
+// The list already carried THREE HMRC internal manual prefixes. BIM is the Business Income
+// Manual, EIM the Employment Income Manual, CG the Capital Gains Manual. Two of those three,
+// EIM and CG, are cited by NOTHING in lib/rulesources.ts and never have been. So the list was
+// written as the CLASS of thing a citation is made of, not as an inventory of what happened to
+// be in the file that day. PTM is the Pensions Tax Manual, the same class exactly, and it was
+// missing only because no card had needed to point at it yet.
+//
+// If a later run adds a manual prefix that is NOT a real HMRC manual, that is the thing this
+// guard should still catch, so the test is: does GOV.UK publish a manual under that prefix.
+// PTM043100 is live at gov.uk/hmrc-internal-manuals/pensions-tax-manual/ptm043100.
 const ACRONYMS = new Set([
   'GOV', 'UK', 'HMRC', 'ITTOIA', 'ITEPA', 'ITA', 'TCGA', 'TMA', 'CTA', 'CAA', 'VATA', 'FA',
-  'HL', 'TC', 'STC', 'EWCA', 'EWHC', 'UKSC', 'UKUT', 'UKFTT', 'BIM', 'EIM', 'CG', 'SI',
+  'HL', 'TC', 'STC', 'EWCA', 'EWHC', 'UKSC', 'UKUT', 'UKFTT', 'BIM', 'EIM', 'CG', 'SI', 'PTM',
   'VAT', 'CIS', 'MTD', 'PAYE', 'NI', 'CWF',
 ]);
 
@@ -113,6 +130,9 @@ ok('and it lets a real citation through',
   voiceFaults('S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL)').length === 0);
 ok('and it lets a GOV.UK page reference through',
   voiceFaults('GOV.UK, Expenses if you are self-employed: Training courses').length === 0);
+ok('and it lets a real HMRC manual code through', voiceFaults('PTM043100').length === 0);
+ok('🔴 while STILL catching a capitalised word that is not a manual code',
+  voiceFaults('PENSIONS043100').length > 0);
 
 let dirty = 0;
 for (const { key, i, s } of all) {

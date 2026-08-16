@@ -69,7 +69,7 @@ export const EXPENSE_RULES: ExpenseRule[] = [
     verdict: 'yes',
     aliases: ['tools', 'tool', 'drill', 'saw', 'ladder', 'equipment', 'machinery', 'kit', 'power tool', 'laptop', 'computer', 'printer', 'camera', 'machine'],
     rule: 'Yes, fully. Tools and equipment for the work are allowable. Big items can be claimed in full the year you buy them through the Annual Investment Allowance.',
-    detail: 'Tools, machinery, a work laptop, all allowable. For larger purchases the whole cost comes off the year you pay for it rather than being spread over years. On the cash basis, which is the standard method for sole traders and what most people here are on, that is simply how a cost works. On the accruals basis the same result comes through the Annual Investment Allowance, up to £1 million. Either way the full amount comes off your profit.',
+    detail: 'Tools, machinery, a work laptop, all allowable. For larger purchases the whole cost comes off the year you pay for it rather than being spread over years. On the cash basis, which sole traders and partnerships can use, that is simply how a cost works. On the accruals basis, which is what a limited company always uses, the same result comes through the Annual Investment Allowance, up to £1 million. Either way the full amount comes off your profit.',
   },
   {
     key: 'van',
@@ -260,14 +260,19 @@ export const EXPENSE_RULES: ExpenseRule[] = [
   },
   {
     // The £500 cash-basis interest restriction was removed on 6 April 2024, and cash basis is now the
-    // default method. So there is no cap to warn about; the only thing not allowable is repaying the
-    // loan capital itself. A vague "there is a cap" made people stop logging loan interest.
+    // default method FOR SOLE TRADERS AND PARTNERSHIPS. So there is no cap to warn about; the only
+    // thing not allowable is repaying the loan capital itself. A vague "there is a cap" made people
+    // stop logging loan interest.
+    //
+    // Run 6, 16 August 2026: the customer sentence named the cash basis and only the cash basis, at
+    // a director whose company cannot use it. Third instance of the same shape on this page, and
+    // the one a human reader missed twice. See section 8c of test/run6fixes.test.mjs.
     key: 'bankfinance',
     title: 'Bank charges and interest',
     verdict: 'yes',
     aliases: ['bank charges', 'bank fees', 'interest', 'overdraft', 'card fees', 'finance charges', 'loan interest'],
     rule: 'Yes. Business bank charges and interest on business borrowing are allowable. Repaying the loan itself is not.',
-    detail: 'Charges on a business account, overdraft and card fees, interest on business loans, hire purchase interest and leasing payments are all allowable. What you cannot claim is the repayment of the loan itself, only the interest and the charges on it. The old cap on interest under the cash basis was removed on 6 April 2024.',
+    detail: 'Charges on a business account, overdraft and card fees, interest on business loans, hire purchase interest and leasing payments are all allowable. What you cannot claim is the repayment of the loan itself, only the interest and the charges on it. The old cap on interest under the cash basis, which only ever applied to sole traders and partnerships, was removed on 6 April 2024, and it never applied on the accruals basis a limited company uses.',
   },
   {
     key: 'marketing',
@@ -306,8 +311,8 @@ export const EXPENSE_RULES: ExpenseRule[] = [
     title: 'Pension contributions',
     verdict: 'depends',
     aliases: ['pension', 'sipp', 'retirement', 'pension contribution'],
-    rule: 'Not an expense, but a tax saver. A personal pension is not a business cost, but it gets you tax relief and cuts your bill. Well worth it.',
-    detail: 'You do not put a personal pension through as a business expense, but paying in gets you tax relief, 20% added automatically and more reclaimed if you are a higher rate payer. One of the best legal ways to cut your tax.',
+    rule: 'It depends who pays it. A pension you pay into yourself is not a business cost, though you still get tax relief on it. If you trade through a company, the company can pay in and deduct it against Corporation Tax.',
+    detail: 'Paying in yourself is not a business expense, but you get tax relief on it: 20% is added automatically and a higher rate payer reclaims more. If you trade through a limited company it works differently and usually better. The COMPANY pays the contribution, deducts it against Corporation Tax as an expense of the trade, and there is no National Insurance on it at either end. For a director choosing between more salary, more dividends and a pension, that is often the most efficient pound to move.',
   },
   {
     key: 'bad_debt',

@@ -173,7 +173,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'BIM37910',
       url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim37910',
       quote: 'You should disallow expenditure on ordinary clothing worn by a trader during the course of their trade.',
-      authority: 'S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL)',
+      authority: 'S34(1)(a) ITTOIA 2005; S54(1)(a) CTA 2009; Mallalieu v Drummond [1983] 57 TC 330 (HL)',
     },
   ],
   // We tell a man his client lunch is not allowable "however good for business it feels". That is a
@@ -206,7 +206,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'Expenses if you are self-employed: legal and financial costs',
       url: 'https://www.gov.uk/expenses-if-youre-self-employed/legal-financial',
       quote: 'You can claim for any insurance policy for your business, for example public liability insurance.',
-      authority: 'S34 ITTOIA 2005 (wholly and exclusively)',
+      authority: 'S34 ITTOIA 2005; S54 CTA 2009 (wholly and exclusively)',
     },
   ],
 
@@ -215,7 +215,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'Expenses if you are self-employed: legal and financial costs',
       url: 'https://www.gov.uk/expenses-if-youre-self-employed/legal-financial',
       quote: "If you're self-employed - a sole trader or individual in a business partnership - accountancy, legal and other professional fees can count as allowable business expenses.",
-      authority: 'S34 ITTOIA 2005; fines and penalties disallowed, see the same page',
+      authority: 'S34 ITTOIA 2005; S54 CTA 2009 (fines and penalties disallowed)',
     },
   ],
 
@@ -234,7 +234,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'BIM37910',
       url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim37910',
       quote: 'Most professionals have to keep up appearances but their clothing costs are not allowable (even where they amount to a quasi uniform as in Mallalieu v Drummond).',
-      authority: 'S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL)',
+      authority: 'S34(1)(a) ITTOIA 2005; S54(1)(a) CTA 2009; Mallalieu v Drummond [1983] 57 TC 330 (HL)',
     },
   ],
 
@@ -245,13 +245,39 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       quote: 'You can claim additional tax relief on your Self Assessment tax return for money you put into a private pension of:',
       authority: 'S188 Finance Act 2004 (relief at source)',
     },
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 THE HALF OF THIS RULE THAT USED TO BE OURS IS NOW HMRC'S. Run 6, 16 August 2026.
+    //
+    // The block at the top of this file quotes the Run 0 audit finding, live on this very card:
+    // "we also tell him a personal pension is NOT a business expense, and HMRC nowhere says so in
+    // words we can quote: it is an argument from omission. That half of the rule remains OURS."
+    //
+    // It was right that we had no quote. It was wrong that no quote exists. HMRC says it plainly
+    // in the Pensions Tax Manual, and it says the OPPOSITE of what our card said for a company:
+    // an employer's contribution IS deducted as an expense, under CTA 2009 for a company exactly
+    // as under ITTOIA 2005 for a sole trader.
+    //
+    // A limited company director read the old card on 16 August and was told a pension is not a
+    // business cost, full stop. Her company can pay it, deduct it against Corporation Tax, and
+    // pay no National Insurance on it at either end. It is usually the best pound she can move,
+    // and it was the one lever this page did not mention.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // The quote runs to the END of HMRC's sentence on purpose. khoji/corpus.mjs matches the quote
+    // as a substring of the page, so a quote cut short and given a full stop of its own matches
+    // nothing and alarms every night forever on a citation that is word for word right.
+    {
+      code: 'PTM043100',
+      url: 'https://www.gov.uk/hmrc-internal-manuals/pensions-tax-manual/ptm043100',
+      quote: "Tax relief on employer contributions to a registered pension scheme is given by allowing contributions to be deducted as an expense in computing the profits of a trade, profession or investment business, and so reducing the amount of an employer's taxable profit.",
+      authority: 'S196 Finance Act 2004; S54 CTA 2009 and S34 ITTOIA 2005 (wholly and exclusively)',
+    },
   ],
   protective: [
     {
       code: 'BIM37910',
       url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim37910',
       quote: 'You should therefore allow a deduction for protective clothing and uniforms.',
-      authority: 'S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL)',
+      authority: 'S34(1)(a) ITTOIA 2005; S54(1)(a) CTA 2009; Mallalieu v Drummond [1983] 57 TC 330 (HL)',
     },
   ],
   uniform: [
@@ -259,7 +285,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'BIM37910',
       url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim37910',
       quote: 'You should therefore allow a deduction for protective clothing and uniforms.',
-      authority: 'S34(1)(a) ITTOIA 2005; Mallalieu v Drummond [1983] 57 TC 330 (HL)',
+      authority: 'S34(1)(a) ITTOIA 2005; S54(1)(a) CTA 2009; Mallalieu v Drummond [1983] 57 TC 330 (HL)',
     },
   ],
 
@@ -478,6 +504,13 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'BIM42701',
       url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim42701',
       quote: 'A deduction for a bad or doubtful debt is to be made in arriving at the profits of the year in which the debt becomes bad or doubtful.',
+      // NO CTA 2009 SIBLING ON THIS ONE, ON PURPOSE. Every other card on this page names the
+      // company section beside the ITTOIA one, because s54 CTA 2009 is word for word the
+      // company form of s34 ITTOIA and s61 is word for word the company form of s57. Bad debts
+      // is not that. S55 CTA 2009 is titled Bad debts but it RESTRICTS a deduction for a non
+      // money debt; a company's ordinary trade debts run through the loan relationships rules
+      // instead. Citing it here would point a director at a section that says close to the
+      // opposite of what this card tells her. An honest gap beats a tidy wrong pair.
       authority: 'S35 Income Tax (Trading and Other Income) Act 2005',
     },
   ],
@@ -486,7 +519,7 @@ export const RULE_SOURCES: Record<string, RuleSource[]> = {
       code: 'BIM46351',
       url: 'https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim46351',
       quote: 'The above legislation provides relief in respect of certain expenditure of a revenue nature incurred for the purposes of a trade, profession or vocation before it is commenced.',
-      authority: 'S57 Income Tax (Trading and Other Income) Act 2005',
+      authority: 'S57 ITTOIA 2005; S61 CTA 2009 (pre-trading expenses)',
     },
   ],
 

@@ -6,9 +6,18 @@
 -- table is where the freshness now lands. It holds ONLY public tax-law source hashes and verdicts:
 -- no user, no money, nothing that belongs to anybody.
 --
--- Same posture as khoji_documents (proven in the 14 Jul audit): RLS on, and the only writer is the
--- khoji_writer service credential on the mini. The web app reads it through the service role, which
--- bypasses RLS. anon and authenticated get nothing.
+-- Same posture as khoji_documents: RLS on, and the only writer is the khoji_writer service
+-- credential on the mini. The web app reads it through the service role, which bypasses RLS. anon
+-- and authenticated get nothing.
+--
+-- ⚠️ CORRECTED 16 AUGUST 2026, RUN 7. This sentence used to read "proven in the 14 Jul audit". It
+-- was proven, against the LIVE DATABASE, where it was true and still is. It was not true of this
+-- repo: khoji_documents was created by APPLY_2026-07-14_amendments.sql and NOTHING HERE EVER TURNED
+-- ITS ROW LEVEL SECURITY ON. Somebody enabled it by hand and never wrote it back, so for a month
+-- this repo could not rebuild the database it serves, and this line is why nobody looked. The
+-- enable statement now exists in APPLY_2026-08-16_khoji_documents_rls.sql, and
+-- test/schemaparity.test.mjs holds the shape: every table this repo creates enables row level
+-- security HERE, and no SQL comment may claim a posture for a table this repo does not actually set.
 
 create table if not exists public.khoji_law (
   url         text primary key,

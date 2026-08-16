@@ -1,0 +1,33 @@
+-- 🔴 KHOJI_DOCUMENTS. ROW LEVEL SECURITY, WRITTEN DOWN AT LAST.
+--
+-- Found by test/schemaparity.test.mjs on 16 August 2026, in Run 7.
+--
+-- WHAT WAS WRONG. Nothing, in production. The live catalogue read on 16 August 2026 says
+-- relrowsecurity is true for all seventy two tables, khoji_documents included. What was wrong was
+-- THIS REPO: of the seventy one tables it creates, seventy carried their own enable statement and
+-- this one carried none. Somebody turned it on by hand in the dashboard and it was never written
+-- back. So the live database was correct and unreproducible: a rebuild from this repo, a staging
+-- environment, or a restore, would have come up with the tax law amendment watcher's table open to
+-- anybody holding the public anon key, and nothing anywhere would have said so.
+--
+-- ⚠️ AND A SENTENCE IS WHY NOBODY LOOKED. APPLY_2026-07-15_khoji_law.sql said "Same posture as
+-- khoji_documents (proven in the 14 Jul audit): RLS on". Every word of that is true OF PRODUCTION,
+-- which is where it was proven, and false of the code. A thing checked against the live database
+-- and then written down as a fact about the repo is the exact shape Run 7 was sent to find. That
+-- sentence has been corrected in place rather than deleted, so the next reader sees what happened.
+--
+-- POSTURE. Deliberately identical to khoji_law and khoji_bodies: row level security ON and NO
+-- POLICIES, which is stricter than any policy we could write. anon and authenticated get nothing.
+-- The only writer is the khoji_writer service credential on the mini, and the web app reads through
+-- the service role, which bypasses row level security. The table holds public tax law source URLs,
+-- body hashes and verdicts: no user, no money, nothing that belongs to anybody.
+--
+-- SAFE TO RUN. It is already true in production, so this is a no op there and the point of it is
+-- that a rebuild is now correct. Idempotent either way.
+
+alter table public.khoji_documents enable row level security;
+
+-- Read it back. Expect one row, khoji_documents, true.
+-- select relname, relrowsecurity
+--   from pg_class c join pg_namespace n on n.oid = c.relnamespace
+--  where n.nspname = 'public' and c.relname = 'khoji_documents';

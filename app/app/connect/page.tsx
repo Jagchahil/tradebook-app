@@ -110,6 +110,22 @@ export default async function ConnectPage({
               <button type="submit" style={S.secondary}>Connect a different phone</button>
             </form>
           ) : null}
+          {/* ═══════════════════════════════════════════════════════════════════════════════════
+              🔴 F8, RUN 6. THE PAGE ABOUT YOUR PHONE COULD NOT UNPLUG YOUR PHONE.
+              This screen offered exactly one thing to a customer holding a number they wanted off
+              the account: connect a DIFFERENT one. The unplug itself is well built and works, and
+              it lives on /app/you/data underneath the account deletion block, which is the last
+              place a person looks and the first place they are frightened to press anything.
+              The two reasons anybody wants this are "that number is not mine any more" and "I am
+              handing this phone on", and both are the moments a customer is least willing to hunt.
+              ⚠️ ONE LINE, AND NOT A SECOND BUTTON. Two unplug controls in two places is two things
+              to keep true. This says where the door is and sends them to it by name.
+              ═══════════════════════════════════════════════════════════════════════════════════ */}
+          <p style={S.note}>
+            Want that number off the account instead?{' '}
+            <a href="/app/you/data#unplug" style={S.inlineLink}>Unplug your phone</a>. Everything
+            you have already sent us stays exactly where it is.
+          </p>
         </section>
       ) : !configured ? (
         <section style={S.card}>
@@ -240,5 +256,10 @@ const S: Record<string, React.CSSProperties> = {
   code: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 15, fontWeight: 700, background: SURFACE, borderRadius: RADIUS.md, padding: '13px 14px', margin: 0, wordBreak: 'break-all' },
   problem: { fontSize: 14, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: 13, margin: '0 0 14px' },
   foot: { fontSize: 13, lineHeight: 1.55, color: MUTED, textAlign: 'center', margin: '4px 4px 0' },
+  // ⚠️ DECLARED, NOT ASSUMED. S is Record<string, React.CSSProperties>, so a key that does not
+  // exist typechecks perfectly and renders with no style at all. That is exactly how the VAT page
+  // shipped an unstyled link earlier in this same run, with tsc green the whole way.
+  note: { fontSize: 13.5, lineHeight: 1.6, color: MUTED, margin: '14px 0 0' },
+  inlineLink: { color: RIVER_DEEP, fontWeight: 700, textDecoration: 'underline' },
   footLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },
 };

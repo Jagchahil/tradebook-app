@@ -573,6 +573,122 @@ sabotageIn('invoicesweb', 'the address note mentions VAT to a woman who is not r
     'every invoice must carry.',
     'every invoice must carry, whether or not you charge VAT.'));
 
+// ── F8. THE PAGE ABOUT YOUR PHONE. ───────────────────────────────────────────────────────────
+
+// THE ORIGINAL DEFECT: a connected customer offered nothing but a different phone.
+sabotage('the pointer to the unplug is taken off the page about your phone',
+  (d) => edit(d, 'app/app/connect/page.tsx',
+    '<a href="/app/you/data#unplug" style={S.inlineLink}>Unplug your phone</a>',
+    '<span>nothing</span>'));
+
+// ⚠️ THE QUIET ONE. The link is there, the anchor is not, and the browser lands the customer at
+// the TOP of the data rights page. Which is next to "Delete everything", which is the exact
+// journey this fix exists to stop. Nothing looks broken from the connect page.
+sabotage('the anchor at the other end is renamed and the link lands next to Delete everything',
+  (d) => edit(d, 'app/app/you/data/page.tsx',
+    '<h2 id="unplug" style={S.lede}>Unplug your phone</h2>',
+    '<h2 style={S.lede}>Unplug your phone</h2>'));
+
+// The F4 lesson from earlier in this same run, put back: S is Record<string, CSSProperties>, so a
+// key that does not exist typechecks perfectly and renders with no style at all.
+sabotage('the inline link style key is removed and the link renders as plain unstyled text',
+  (d) => edit(d, 'app/app/connect/page.tsx',
+    "  inlineLink: { color: RIVER_DEEP, fontWeight: 700, textDecoration: 'underline' },",
+    ''));
+
+sabotage('the note style key is removed',
+  (d) => edit(d, 'app/app/connect/page.tsx',
+    "  note: { fontSize: 13.5, lineHeight: 1.6, color: MUTED, margin: '14px 0 0' },",
+    ''));
+
+// ⚠️ AND THE OPPOSITE MISTAKE. A second unplug button on /app/connect is two controls over one
+// fact, and the one that rots is the one nobody walks.
+sabotage('a second unplug control is added to the connect page instead of a pointer',
+  (d) => edit(d, 'app/app/connect/page.tsx',
+    '          <p style={S.note}>',
+    '          <form method="post" action="/api/account/phone"><button type="submit">Unplug</button></form>\n          <p style={S.note}>'));
+
+sabotage('the reassurance a person needs before pressing it is dropped',
+  (d) => edit(d, 'app/app/connect/page.tsx',
+    'Everything\n            you have already sent us stays exactly where it is.',
+    ''));
+
+// ── F7. TWO QUESTIONS IN ONE MESSAGE. ────────────────────────────────────────────────────────
+
+// THE ORIGINAL DEFECT: the router takes one intent and says nothing about the rest.
+sabotage('the webhook stops naming the half it threw away',
+  (d) => edit(d, 'app/api/whatsapp/route.ts',
+    '          if (alsoAsked) await sendText(from, compoundAskNote(alsoAsked));',
+    ''));
+
+sabotage('the chat stops naming it, so one channel is honest and the other is not',
+  (d) => edit(d, 'app/api/thread/route.ts',
+    'return alsoAsked ? `${compoundAskNote(alsoAsked)}\\n\\n${body}` : body;',
+    'return body;'));
+
+// ⚠️ THE PLACEMENT IS THE DESIGN. Inside a branch it is thirty edits that rot on the next reorder
+// of a chain this codebase reorders about once a run.
+sabotage('the webhook check moves inside one branch, so every other lane goes silent again',
+  (d) => edit(d, 'app/api/whatsapp/route.ts',
+    '          const alsoAsked = compoundAsk(text);\n          if (alsoAsked) await sendText(from, compoundAskNote(alsoAsked));',
+    '          if (isVehicleQuestion(text)) {\n            const alsoAsked = compoundAsk(text);\n            if (alsoAsked) await sendText(from, compoundAskNote(alsoAsked));\n          }'));
+
+// The detector, both ways it can fail.
+sabotage('a fragment after an "and" counts as a second question, so ordinary lists get a note',
+  (d) => edit(d, 'lib/waintents.ts',
+    '  if (words.length < 3) return false;',
+    '  if (words.length < 1) return false;'));
+
+sabotage('the detector fires on one question, so every message gets a puzzled note on top of it',
+  (d) => edit(d, 'lib/waintents.ts',
+    '  if (asks.length < 2) return null;',
+    '  if (asks.length < 1) return null;'));
+
+sabotage('the detector never fires, which is the defect with a function in front of it',
+  (d) => edit(d, 'lib/waintents.ts',
+    '  if (asks.length < 2) return null;',
+    '  if (asks.length < 99) return null;'));
+
+// ⚠️ THE SPLITTERS. Every extra one buys a new way to put a note on a message that never had two
+// questions in it, and " also " is the one that looked most reasonable.
+sabotage('" also " is added as a splitter and a question plus an entry becomes two questions',
+  (d) => edit(d, 'lib/waintents.ts',
+    '    .split(/\\?|;|\\s+and\\s+/i)',
+    '    .split(/\\?|;|\\s+and\\s+|\\s+also\\s+/i)'));
+
+sabotage('a comma splits, so every ordinary sentence with a comma in it grows a second question',
+  (d) => edit(d, 'lib/waintents.ts',
+    '    .split(/\\?|;|\\s+and\\s+/i)',
+    '    .split(/\\?|;|,|\\s+and\\s+/i)'));
+
+// The note itself, and the two things it must never say.
+sabotage('the note claims which one was answered, which the module cannot know',
+  (d) => edit(d, 'lib/waintents.ts',
+    "    'If only one of those is answered, send me the other on its own and I will answer that one properly.',",
+    "    'The first of those is answered below. Send me the other on its own and I will answer it too.',"));
+
+sabotage('the note drops the hedge and asserts a drop the model may not have made',
+  (d) => edit(d, 'lib/waintents.ts',
+    "    'If only one of those is answered, send me the other on its own and I will answer that one properly.',",
+    "    'Only one of those is answered. Send me the other on its own and I will answer that one properly.',"));
+
+sabotage('the note stops reading her own words back, so she cannot tell which half went',
+  (d) => edit(d, 'lib/waintents.ts',
+    '  const listed = asks.map((a, i) => `${i + 1}. ${a}`).join(\'\\n\');',
+    "  const listed = 'Two things.';"));
+
+sabotage('a very long clause is quoted back whole instead of trimmed',
+  (d) => edit(d, 'lib/waintents.ts',
+    '  return asks.slice(0, 3).map((a) => (a.length > 90 ? `${a.slice(0, 87).trimEnd()}...` : a));',
+    '  return asks.slice(0, 3);'));
+
+// ⚠️ AND THE COPY. A second definition of these patterns inside a route is the fault the deadline
+// tie break block at the top of this module exists to stop happening again.
+sabotage('the webhook grows its own copy of the question patterns',
+  (d) => edit(d, 'app/api/whatsapp/route.ts',
+    '          const alsoAsked = compoundAsk(text);',
+    '          const looksLikeAsk = (p) => /\\b(what|how)\\b/i.test(p);\n          const alsoAsked = looksLikeAsk(text) ? compoundAsk(text) : null;'));
+
 // ── NO OP CONTROLS. These change nothing that matters and MUST stay green, or this runner is
 //    only detecting that a file was touched at all. ───────────────────────────────────────────
 
@@ -591,7 +707,7 @@ sabotage('CONTROL: renaming the local binding changes nothing',
     '  const deduct = deductibleSaving(isCompany, projTradeNet, projTotalIncome);',
     '  const deductible = deductibleSaving(isCompany, projTradeNet, projTotalIncome);\n  const deduct = deductible;'), false);
 
-const EXPECTED = 92;
+const EXPECTED = 111;
 process.stdout.write(`\n  ${applied} applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`);
 if (holes > 0 || broken > 0) process.exit(1);
 if (applied !== EXPECTED) {

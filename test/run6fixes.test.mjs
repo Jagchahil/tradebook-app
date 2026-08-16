@@ -781,5 +781,185 @@ console.log('\n9. F9. THE DOCUMENT A CUSTOMER WHO IS NOT VAT REGISTERED RECEIVES
     !/\bupdate\s+public\.invoices\b/i.test(sql));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 10. F8. THE PAGE ABOUT YOUR PHONE COULD NOT UNPLUG YOUR PHONE.
+//
+// /app/connect with a phone connected offered a customer holding a number they wanted OFF the
+// account exactly one thing: connect a DIFFERENT one. The unplug exists, works, and is well
+// written. It lives on /app/you/data underneath the account deletion block.
+//
+// P3, because the door does exist. Worth fixing because the two reasons anybody wants it are
+// "that number is not mine any more" and "I am handing this phone on", and both are the moments a
+// customer is least willing to hunt for a control next to "Delete everything".
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n10. F8. THE DOOR IS NOW SIGNPOSTED FROM THE ROOM PEOPLE STAND IN.');
+{
+  const connect = readFileSync(path.join(root, 'app/app/connect/page.tsx'), 'utf8');
+  const data = readFileSync(path.join(root, 'app/app/you/data/page.tsx'), 'utf8');
+  const connectCode = codeOnly(connect);
+
+  ok('🔴 THE CONNECTED PAGE NOW POINTS AT THE UNPLUG', /\/app\/you\/data#unplug/.test(connectCode));
+  ok('...and names it in the words the other page uses, so it is one thing and not two',
+    /Unplug your phone<\/a>/.test(connectCode));
+  ok('...and says the thing a person is actually afraid of before they press it',
+    /stays exactly where it is/.test(connectCode));
+
+  // ⚠️ A LINK TO AN ANCHOR THAT DOES NOT EXIST LANDS AT THE TOP OF THE PAGE, which is next to
+  // "Delete everything", which is precisely the journey this fix exists to stop. So the anchor is
+  // asserted at the other end, not just the href at this one.
+  ok('🔴 AND THE ANCHOR IT POINTS AT ACTUALLY EXISTS ON THE OTHER PAGE',
+    /<h2 id="unplug"/.test(data));
+  ok('the unplug itself is untouched and still posts to the same route',
+    /action="\/api\/account\/phone"/.test(data) && /Unplug my phone/.test(data));
+
+  // The F4 lesson from this same run: S is Record<string, CSSProperties>, so a missing key
+  // typechecks and renders unstyled. tsc cannot see this one either.
+  for (const key of ['note', 'inlineLink']) {
+    ok(`S.${key} is declared, because a missing style key typechecks and renders as nothing`,
+      new RegExp(`\\n  ${key}: \\{`).test(connect));
+  }
+
+  // ⚠️ NOT A SECOND BUTTON. Two unplug controls in two places is two things to keep true, and the
+  // one that rots is the one nobody walks. This is a signpost and it must stay a signpost.
+  ok('🔴 AND IT IS A POINTER, NOT A SECOND UNPLUG CONTROL',
+    !/api\/account\/phone/.test(connectCode));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 11. F7. A COMPOUND QUESTION IS ANSWERED IN HALF, SILENTLY.
+//
+// "can I claim a new carpet cleaning machine and what mileage rate do I get for the van"
+//
+// A long, correct, genuinely good answer about the van. Not one word about the machine, and no
+// sign that half the question had gone. Both lanes work: the machine, asked on its own a minute
+// later, got the tools card. It is a first match router taking one intent and discarding the rest
+// of the sentence without saying so.
+//
+// ⚠️ THE HARD PART OF THIS GUARD IS THE QUIET SIDE, NOT THE LOUD ONE. A detector that fires on
+// the finding's sentence is easy. A detector that fires on an ordinary message puts a puzzled note
+// on top of a correct answer, every day, for everybody, and that is a worse product than the bug.
+// So most of what follows is messages this must stay SILENT on, taken from the live findings of
+// runs 1 through 6 rather than invented.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n11. F7. TWO QUESTIONS IN ONE MESSAGE, AND THE HALF THAT USED TO VANISH.');
+
+const W = await load('waintents');
+
+// 11a. THE SENTENCE FROM THE FINDING.
+{
+  const asked = 'can I claim a new carpet cleaning machine and what mileage rate do I get for the van';
+  const asks = W.compoundAsk(asked);
+  ok('🔴 THE SENTENCE MAUREEN ACTUALLY TYPED IS SEEN AS TWO QUESTIONS', Array.isArray(asks) && asks.length === 2);
+  ok('...and the half that vanished is named back to her in her own words',
+    (asks ?? []).some((a) => /carpet cleaning machine/i.test(a)));
+  ok('...and so is the half that was answered', (asks ?? []).some((a) => /mileage rate/i.test(a)));
+
+  const note = W.compoundAskNote(asks ?? []);
+  ok('the note lists them numbered, because two things read as two things', /1\. /.test(note) && /2\. /.test(note));
+  ok('🔴 AND IT NEVER CLAIMS WHICH ONE WAS ANSWERED, because knowing that means a second copy of '
+    + 'the router order in a file that is not the router',
+    !/the first|the second|below is|above is/i.test(note));
+  ok('🔴 AND IT IS HEDGED, because the last lane on both channels is a model and a model sometimes '
+    + 'does answer both. Saying one was dropped when it was not is the same fault the other way up',
+    /If only one of those is answered/.test(note));
+  ok('it asks for the other one on its own, which is the whole point',
+    /on its own/.test(note));
+  ok('and it is short enough to read on a phone above an answer', note.length < 400);
+}
+
+// 11b. THE QUIET SIDE. Every one of these is a real message from a real walk.
+{
+  const MUST_STAY_QUIET = [
+    ['what do i owe', 'one question'],
+    ['how much did i make last month', 'one question'],
+    ['when is my tax due', 'the 8 August deadline sentence'],
+    ['40 diesel and 20 parking', 'TWO ENTRIES, which the parser handles whole'],
+    ['can i claim my boots and gloves', 'one question with a list in it'],
+    // ⚠️ THESE THREE EXIST BECAUSE OF THE WORD FLOOR IN looksLikeAsk, AND THE FIRST DRAFT OF THIS
+    // LIST COULD NOT TEST IT. Every quiet phrase above has a tail that is not a question at all,
+    // so removing the floor entirely changed nothing and a sabotage sat there green. A fragment
+    // that IS a question word is the only thing the floor is actually holding back.
+    ['what do i owe and when', 'an elided tail, one word, still one question'],
+    ['what do i owe and how much', 'an elided tail, two words, still one question'],
+    ['is it worth it and why', 'the reason is part of the same question'],
+    ['what do i owe and i also spent 40 on fuel', 'a question plus an entry, not two questions'],
+    ['claim use of home, 30 hours a month', 'the 1 August election phrase'],
+    ['draft an invoice for the fennel wedding balance, 380', 'the Run 2 invoice sentence'],
+    ['i bought the transit in november, 9800. do i claim that or do the mileage thing, whats better. i do about 200 miles a week',
+      'the RUN 1 van sentence. ONE question with an OR in it, and the lane that answers it is good'],
+    ['hi', 'a greeting'],
+    ['thanks mate', 'thanks'],
+    ['STOP', 'a reserved word Meta requires to mean one thing'],
+    ['yes', 'an acknowledgement mid flow'],
+    ['delete all my data', 'a data rights request'],
+  ];
+  for (const [msg, why] of MUST_STAY_QUIET) {
+    ok(`silent on "${msg.slice(0, 46)}${msg.length > 46 ? '...' : ''}" (${why})`, W.compoundAsk(msg) === null);
+  }
+  ok('🔴 AND A FRAGMENT AFTER AN "and" IS NOT A SECOND QUESTION',
+    W.compoundAsk('can i claim my boots and gloves') === null);
+}
+
+// 11c. THE LOUD SIDE, beyond the one sentence that started it.
+{
+  const MUST_FIRE = [
+    'what is the deadline and how much do i owe',
+    'what do i owe? when is it due?',
+    'can you tell me what i owe and when it is due',
+  ];
+  for (const msg of MUST_FIRE) {
+    const r = W.compoundAsk(msg);
+    ok(`two questions seen in "${msg.slice(0, 46)}"`, Array.isArray(r) && r.length >= 2);
+  }
+  ok('a very long clause is trimmed rather than quoted whole back at her',
+    (W.compoundAsk(`what about ${'x'.repeat(200)} and how much do i owe`) ?? []).every((a) => a.length <= 90));
+  ok('and it never reads back more than three, because nobody types four',
+    (W.compoundAsk('what is a and what is b and what is c and what is d') ?? []).length <= 3);
+  ok('control characters cannot ride back out in the note',
+    !/[\x00-\x1f]/.test((W.compoundAsk('what is this and how much do i owe') ?? []).join(' ')));
+}
+
+// 11d. BOTH CHANNELS, WIRED THE SAME WAY, WHICH IS WHY IT LIVES IN THE PURE MODULE.
+{
+  const wa = codeOnly(readFileSync(path.join(root, 'app/api/whatsapp/route.ts'), 'utf8'));
+  const th = codeOnly(readFileSync(path.join(root, 'app/api/thread/route.ts'), 'utf8'));
+
+  ok('🔴 THE WEBHOOK SAYS SO', /const alsoAsked = compoundAsk\(text\);/.test(wa)
+    && /sendText\(from, compoundAskNote\(alsoAsked\)\)/.test(wa));
+  ok('🔴 AND THE CHAT SAYS SO, or one channel is honest and the other is not',
+    /const alsoAsked = compoundAsk\(q\);/.test(th) && /compoundAskNote\(alsoAsked\)/.test(th));
+
+  // ⚠️ THE PLACEMENT IS THE DESIGN. Inside a branch it is thirty edits that go stale on the next
+  // reorder; outside the chain it cannot.
+  // ⚠️ THE FIRST DRAFT OF THIS ASSERTED A POSITION, WHICH IS NOT THE SAME AS UNCONDITIONALITY.
+  // It checked that the call appears AFTER the last branch of the chain. The sabotage pass wrapped
+  // the very same two lines in `if (isVehicleQuestion(text))`, in the very same place, and stayed
+  // green. So it is asserted at the chain's OWN INDENTATION: ten spaces is the level the else if
+  // chain lives at, and anything nested inside a branch is deeper than that.
+  ok('🔴 THE WEBHOOK CHECK SITS AFTER THE WHOLE CHAIN, not inside one branch of it',
+    wa.indexOf('const alsoAsked') > wa.indexOf('await handleTextEntry(from, messageId, text);')
+    && /\n          const alsoAsked = compoundAsk\(text\);\n          if \(alsoAsked\) await sendText\(from, compoundAskNote\(alsoAsked\)\);\n/.test(wa));
+  ok('the chat wraps the lane chain rather than editing every return in it',
+    /async function composeOneLane/.test(th)
+    && /const body = await composeOneLane\(userId, q\);/.test(th));
+
+  // ⚠️ AND NEITHER CHANNEL MAY GROW ITS OWN COPY OF THE PATTERNS. A copy is the defect.
+  for (const [name, src] of [['webhook', wa], ['chat', th]]) {
+    ok(`the ${name} holds no second copy of the question patterns`,
+      !/INTERROGATIVE|MODAL_ASK|looksLikeAsk/.test(src));
+  }
+}
+
+// 11e. THE ORDERING BLOCK IT IS NOT. This is the part a reader gets wrong.
+{
+  const src = readFileSync(path.join(root, 'lib/waintents.ts'), 'utf8');
+  ok('the file records that the deadline ordering block is about something else',
+    /OVERLAPPING lanes/.test(src) && /SECOND QUESTION/.test(src));
+  ok('🔴 AND THAT THE FIX IS NOT "ANSWER BOTH", which puts a model where a lane is',
+    /THE FIX IS NOT "ANSWER BOTH"/.test(src));
+  ok('the splitters are deliberately three, and the file says which two were left out',
+    /" also " AND " plus " ARE NOT HERE ON PURPOSE/.test(src));
+}
+
 console.log(`\n${passed} passed, ${failed} failed.`);
 process.exit(failed > 0 ? 1 : 0);

@@ -257,7 +257,12 @@ export default async function YourDataPage({
               said "that number is free to connect anywhere now" about a number that never was. */}
           {phoneTail ? (
             <>
-              <h2 style={S.lede}>Unplug your phone</h2>
+              {/* ⚠️ THE id IS LOAD BEARING AND IT IS NOT DECORATION. /app/connect points here by
+                  hash, because a customer who wants to unplug a number goes to the page about
+                  their number. Renaming or removing this leaves that pointer landing on the top of
+                  a data rights page next to "Delete everything", which is where it landed before
+                  Run 6 and is the reason nobody found this. */}
+              <h2 id="unplug" style={S.lede}>Unplug your phone</h2>
               <p style={S.fact}>
                 {/* 🔴 THE NUMBER IS NAMED. Four digits, because the reason a man is standing here
                     is usually that the number on the account is one he cannot see from the handset

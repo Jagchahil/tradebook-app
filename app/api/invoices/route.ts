@@ -107,6 +107,8 @@ export async function POST(req: NextRequest) {
   let markRef = '';
   let customer = '';
   let contact = '';
+  let address = '';
+  let workedOn = '';
   let items: string[] = [];
   let amounts: string[] = [];
   let rates: string[] = [];
@@ -124,6 +126,8 @@ export async function POST(req: NextRequest) {
     markRef = String(f.get('ref') ?? '');
     customer = String(f.get('customer') ?? '');
     contact = String(f.get('contact') ?? '');
+    address = String(f.get('address') ?? '');
+    workedOn = String(f.get('worked_on') ?? '');
     items = f.getAll('item').map(String);
     amounts = f.getAll('amount').map(String);
     rates = f.getAll('rate').map(String);
@@ -141,6 +145,8 @@ export async function POST(req: NextRequest) {
     }
     customer = typeof body.customer === 'string' ? body.customer : '';
     contact = typeof body.contact === 'string' ? body.contact : '';
+    address = typeof body.address === 'string' ? body.address : '';
+    workedOn = typeof body.worked_on === 'string' ? body.worked_on : '';
     const li = Array.isArray(body.line_items) ? body.line_items : [];
     for (const raw of li) {
       const r = (raw ?? {}) as { description?: unknown; amount?: unknown; rate?: unknown };
@@ -197,6 +203,41 @@ export async function POST(req: NextRequest) {
   }
   // The contact is stored for HIS reference and prefills HIS mailto link. We never message it.
   const customerContact = contact.trim().slice(0, 160) || null;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE TWO BULLETS THAT APPLY TO EVERYBODY. GOV.UK, "Invoices: what they must include":
+  // "the company name and address of the customer you're invoicing" and "the date the goods or
+  // service were provided (supply date)". This file already implements the HARDER standard, VAT
+  // Regulations 1995 reg 14, and reg 14 only reaches the minority of users who are registered.
+  // A rule only holds where it is pointed, and this one was pointed at reg 14.
+  //
+  // ⚠️ THE FORM MUST CARRY BOTH. THE API MUST NOT DEMAND THEM. That is a deliberate split and
+  // not an oversight. /app/invoices/new is a man filling in a document, and asking him is the
+  // right pressure on the one page in this product that leaves the building. /api/whatsapp posts
+  // here from a sentence a man dictated with one hand, where there is no address to have. The
+  // rule is the same in both places: what he did not say is never invented, it is left blank,
+  // and the document simply does not print that line.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const customerAddress = address.trim().replace(/[ \t]+\n/g, '\n').slice(0, 300) || null;
+  if (isForm && !customerAddress) {
+    return back('problem=address');
+  }
+
+  // A date this product wrote or a date he picked, and nothing else. An unreadable one is refused
+  // rather than quietly becoming today: a supply date is a fact about when the work happened, and
+  // guessing it wrong on a document is worse than the form asking him again.
+  const supplyDate = workedOn.trim();
+  let supply: string | null = null;
+  if (supplyDate) {
+    const ok = /^\d{4}-\d{2}-\d{2}$/.test(supplyDate) && !Number.isNaN(Date.parse(supplyDate));
+    if (!ok) {
+      return isForm ? back('problem=worked') : NextResponse.json({ error: 'bad_supply_date' }, { status: 400 });
+    }
+    supply = supplyDate;
+  }
+  if (isForm && !supply) {
+    return back('problem=worked');
+  }
 
   // ⚠️ A HALF TYPED LINE IS REFUSED, NEVER DROPPED. Quietly skipping a row that has a
   // description but no readable amount would issue an invoice missing the £450 he meant to
@@ -308,6 +349,8 @@ export async function POST(req: NextRequest) {
   const inv = await createInvoice(user.id, {
     customer_name: customer,
     customer_contact: customerContact,
+    customer_address: customerAddress,
+    supply_date: supply,
     // The priced lines, so the rate that was applied is stored beside the work it was applied to.
     // A VAT invoice has to show the rate on each line: VAT Regulations 1995 reg 14.
     line_items: priced.lines.map((li) => ({

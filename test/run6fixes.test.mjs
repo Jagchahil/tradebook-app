@@ -622,5 +622,164 @@ for (const file of ['app/can-i-claim/page.tsx', 'app/app/tax/can-i-claim/page.ts
   ok(`${file} renders the detail, which is where the company arm lives`, /\.detail\b/.test(src));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 9. F9. THE INVOICE WAS BUILT TO THE VAT RULES AND NEVER TO THE ONES THAT APPLY TO EVERYBODY.
+//
+// app/invoice/[id]/page.tsx opens with twenty lines on VAT Regulations 1995 reg 14 and implements
+// it well, reverse charge and all. Reg 14 reaches the minority of users who are VAT registered.
+// GOV.UK, "Invoices: what they must include", reaches all of them, and Maureen's first invoice was
+// short of two of its bullets:
+//
+//     the company name and address of the customer you are invoicing     NAME ONLY
+//     the date the goods or service were provided (supply date)          ABSENT
+//
+// The supply date existed in spirit. Line 120 read:
+//
+//     const dateValue = (carriesVat ? invoice.tax_point : null) || invoice.issued_date;
+//
+// The tax point IS the supply date and the product holds one, and it was shown to VAT registered
+// senders alone. Everybody else got the issue date. The customer's address existed nowhere: no
+// column, no form field, no render, and a grep for supplyDate or serviceDate across lib and app
+// returned nothing at all.
+//
+// ⚠️ AND THIS IS WHY THE FIXTURE BELOW IS NOT VAT REGISTERED. Every existing invoice suite is
+// pointed at reg 14 and every one of them was green while this was broken, because a VAT fixture
+// takes the carriesVat branch and prints a date either way. A guard written the easy way here
+// would have been green on the day the defect was found.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n9. F9. THE DOCUMENT A CUSTOMER WHO IS NOT VAT REGISTERED RECEIVES.');
+
+// 9a. THE DOCUMENT ITSELF, ATTACKED AT THE BYTES, WITH NO VAT ANYWHERE IN IT.
+{
+  const PDFINV = await load('invoicepdf');
+  const notRegistered = {
+    number: 'INV-0001',
+    customer_name: 'Hamilton Lettings',
+    customer_address: '14 Brigstock Road\nThornton Heath\nCR7 7JH',
+    customer_contact: null,
+    line_items: [
+      { description: 'End of tenancy clean, 3 bed flat, Thornton Heath', amount: 340 },
+      { description: 'Carpet clean, two bedrooms', amount: 90 },
+    ],
+    subtotal: 430, tax: 0, total: 430, reverse_charge_vat: 0,
+    // 🔴 'none' IS THE WHOLE POINT. Not null, which is the old world, and not 'charged'.
+    vat_treatment: 'none', tax_point: '2026-08-16',
+    // She cleaned the flat on the 14th and billed it on the 16th. Those are different dates and
+    // that is the ordinary case, not the awkward one.
+    supply_date: '2026-08-14',
+    status: 'draft', notes: null, issued_date: '2026-08-16', due_date: '2026-08-30',
+    business_name: 'LEKHIO LTD', business_contact: null,
+    business_address: 'Unit 12, Sydenham Road, Croydon, CR0 1LH', business_vrn: null,
+  };
+  const bytes = PDFINV.buildInvoicePdf(notRegistered);
+  const doc = Buffer.from(bytes).toString('latin1');
+
+  ok('the file is a PDF at all, so the rest of this is about a real document', doc.startsWith('%PDF-'));
+  ok('🔴 THE CUSTOMER ADDRESS IS ON THE DOCUMENT, every line of it',
+    doc.includes('14 Brigstock Road') && doc.includes('Thornton Heath') && doc.includes('CR7 7JH'));
+  ok('🔴 AND SO IS THE DATE THE WORK WAS DONE, on an invoice carrying no VAT at all',
+    /Work done/.test(doc) && /14 August 2026/.test(doc));
+  ok('the issue date is still there and still says what it is',
+    /Issued/.test(doc) && /16 August 2026/.test(doc));
+  ok('and the two dates are not the same date, so this fixture can actually tell them apart',
+    notRegistered.supply_date !== notRegistered.issued_date);
+  ok('🔴 AND NOTHING ON IT MENTIONS VAT, because she is not registered and never was',
+    !/VAT/.test(doc));
+
+  // ⚠️ THE OLD WORLD. A row raised before 16 August 2026 carries null in both columns, and it
+  // must print exactly as it printed on the day it was sent. This is the rule already written at
+  // the top of the page for vat_treatment, and it now has two more columns to hold.
+  const legacy = { ...notRegistered, customer_address: null, supply_date: null, vat_treatment: null };
+  const old = Buffer.from(PDFINV.buildInvoicePdf(legacy)).toString('latin1');
+  ok('🔴 A ROW FROM BEFORE THIS CHANGE PRINTS NO SUPPLY LINE, rather than the issue date wearing one',
+    !/Work done/.test(old));
+  ok('...and no address block it never had', !/Brigstock/.test(old));
+  ok('...and it is still a readable document, not a crash', old.startsWith('%PDF-') && old.includes('Hamilton Lettings'));
+}
+
+// 9b. THE OTHER RENDERING OF THE SAME DOCUMENT. Two renderings, never two documents.
+{
+  const doc = readFileSync(path.join(root, 'app/invoice/[id]/page.tsx'), 'utf8');
+  const src = codeOnly(doc);
+  ok('the page prints the customer address', /invoice\.customer_address/.test(src));
+  // ⚠️ THE WHOLE STATEMENT, NOT A FRAGMENT OF IT. The first draft of this assertion looked for
+  // prettyDate(invoice.supply_date) anywhere and separately banned one exact conditional. The
+  // sabotage pass wrote a DIFFERENT conditional around the same call and stayed green. A guard
+  // against "this is gated" has to anchor on the ungated statement itself, ending at its
+  // semicolon, or it is only banning the one gate you happened to think of.
+  ok('🔴 AND IT PRINTS THE SUPPLY DATE OUTSIDE THE carriesVat BRANCH, which was the defect',
+    /\n  const workedOn = prettyDate\(invoice\.supply_date\);\n/.test(src));
+  ok('the supply date has its own label rather than borrowing the tax point one',
+    /Work done/.test(src) && /\{dateLabel\}/.test(src));
+  ok('a missing address prints nothing rather than an empty heading',
+    /\{invoice\.customer_address \?/.test(src));
+  ok('a missing supply date prints nothing either', /\{workedOn \?/.test(src));
+  ok('🔴 AND THE TAX POINT IS UNTOUCHED, because it is a VAT figure and not this bullet',
+    /const dateValue = \(carriesVat \? invoice\.tax_point : null\) \|\| invoice\.issued_date;/.test(src));
+}
+
+// 9c. THE FORM ASKS, AND THE ROUTE DOES NOT INVENT.
+{
+  const form = readFileSync(path.join(root, 'app/app/invoices/new/page.tsx'), 'utf8');
+  const route = readFileSync(path.join(root, 'app/api/invoices/route.ts'), 'utf8');
+  const routeCode = codeOnly(route);
+
+  ok('the form asks for the address', /name="address"/.test(form));
+  ok('the form asks when the work was done, as a date and not free text',
+    /name="worked_on"/.test(form) && /type="date"/.test(form));
+  ok('🔴 BOTH ARE REQUIRED ON THE FORM, which is the page whose output leaves the building',
+    /<textarea id="address"[^>]*required/.test(form) && /id="worked_on"[^>]*required/.test(form));
+  ok('and a future supply date cannot be picked, because work is not done before it is done',
+    /id="worked_on"[^>]*max=\{today\}/.test(form));
+  ok('the refusals are said in words rather than shown as a code',
+    /case 'address':/.test(form) && /case 'worked':/.test(form));
+
+  ok('the route reads both off the form', /f\.get\('address'\)/.test(routeCode) && /f\.get\('worked_on'\)/.test(routeCode));
+  ok('🔴 AND REFUSES A FORM POST THAT IS MISSING EITHER',
+    /isForm && !customerAddress/.test(routeCode) && /problem=address/.test(routeCode)
+    && /isForm && !supply/.test(routeCode) && /problem=worked/.test(routeCode));
+  ok('🔴 BUT DOES NOT DEMAND THEM OF THE API, so a man dictating an invoice on WhatsApp is not blocked',
+    /isForm && !customerAddress/.test(routeCode) && !/^\s*if \(!customerAddress\)/m.test(routeCode));
+  ok('an unreadable date is refused rather than quietly becoming today',
+    /bad_supply_date/.test(routeCode));
+  ok('and both are handed to createInvoice', /customer_address: customerAddress/.test(routeCode)
+    && /supply_date: supply/.test(routeCode));
+}
+
+// 9d. THE DIARY ALREADY KNEW. This is the half of the fix that costs her nothing.
+{
+  const diary = codeOnly(readFileSync(path.join(root, 'app/api/diary/route.ts'), 'utf8'));
+  ok('🔴 THE DIARY CARRIES THE DATE ACROSS, because it is the one surface that already holds it',
+    /on=\$\{worked\}/.test(diary) && /job\.starts_at/.test(diary));
+  ok('...off the row we read server side, never a form field, the same rule the name follows',
+    /const job = await readDiaryJob\(user\.id, id\)/.test(diary));
+  const newPage = codeOnly(readFileSync(path.join(root, 'app/app/invoices/new/page.tsx'), 'utf8'));
+  ok('...and the form still does not trust it, because it arrived in a URL',
+    /prefillOn/.test(newPage) && /\\d\{4\}-\\d\{2\}-\\d\{2\}/.test(newPage));
+  ok('...falling back to today rather than to nothing, so the box is never empty',
+    /: today;/.test(newPage));
+}
+
+// 9e. THE COLUMNS. A render with nowhere to read from is a fix that ships broken.
+{
+  const sup = readFileSync(path.join(root, 'lib/supabase.ts'), 'utf8');
+  ok('the public row carries both fields', /customer_address: string \| null;/.test(sup)
+    && /supply_date: string \| null;/.test(sup));
+  ok('🔴 AND THE SELECT ACTUALLY ASKS THE DATABASE FOR THEM. A column selected by nothing is the '
+    + 'exact shape of the address bug that was already fixed once on this page',
+    /select=number,customer_name,customer_address,/.test(sup) && /tax_point,supply_date,status/.test(sup));
+  ok('a new invoice always has a supply date, falling back to the day it was raised',
+    /supply_date: input\.supply_date \?\? today\.toISOString\(\)\.slice\(0, 10\)/.test(sup));
+  ok('🔴 AND THE CUSTOMER CONTACT IS STILL KEPT OFF THE PUBLIC LINK, which the address is not',
+    /customer_contact: null,/.test(sup));
+
+  const sql = readFileSync(path.join(root, 'supabase/APPLY_2026-08-16_invoice_baseline.sql'), 'utf8');
+  ok('the migration exists and adds both columns',
+    /add column if not exists customer_address text/.test(sql)
+    && /add column if not exists supply_date date/.test(sql));
+  ok('🔴 AND IT BACKFILLS NOTHING, so a sent invoice does not change after the fact',
+    !/\bupdate\s+public\.invoices\b/i.test(sql));
+}
+
 console.log(`\n${passed} passed, ${failed} failed.`);
 process.exit(failed > 0 ? 1 : 0);

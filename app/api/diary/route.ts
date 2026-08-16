@@ -168,7 +168,15 @@ export async function POST(req: NextRequest) {
     const moved = await setDiaryJobStatus(user.id, id, 'invoiced');
     if (!moved) return back('problem=unavailable');
 
-    const q = job.customer_name ? `?for=${encodeURIComponent(job.customer_name)}` : '';
+    // ⚠️ THE DATE COMES ACROSS TOO, AND FROM THE SAME PLACE THE NAME DOES: HIS OWN ROW, read
+    // back server side, never a form field. GOV.UK asks every invoice for the date the work was
+    // done, and the diary is the one surface in this product that already knows it. A job slotted
+    // for the 14th and billed on the 16th should not make him remember the 14th.
+    const bits: string[] = [];
+    if (job.customer_name) bits.push(`for=${encodeURIComponent(job.customer_name)}`);
+    const worked = typeof job.starts_at === 'string' ? job.starts_at.slice(0, 10) : '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(worked)) bits.push(`on=${worked}`);
+    const q = bits.length ? `?${bits.join('&')}` : '';
     return NextResponse.redirect(new URL(`/app/invoices/new${q}`, req.url), 303);
   }
 

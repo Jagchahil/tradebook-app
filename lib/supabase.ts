@@ -1059,6 +1059,15 @@ export async function confirmTransactionVat(
 export interface ServerInvoiceInput {
   customer_name: string;
   customer_contact?: string | null;
+  // GOV.UK, Invoices: what they must include, asks for the customer's ADDRESS and for the date
+  // the work was done. Optional here and required at the form, which is not an inconsistency:
+  // /app/invoices/new is a man filling in a document at a desk and he can be asked, and a man
+  // dictating "invoice Hamilton Lettings 340" into WhatsApp genuinely has no address to give.
+  // A blank field prints nothing. It never prints a guess.
+  customer_address?: string | null;
+  // The supply date. NOT the tax point. See supabase/APPLY_2026-08-16_invoice_baseline.sql for
+  // why those are two columns and why writing one into the other would restate a VAT figure.
+  supply_date?: string | null;
   line_items: Array<{ description: string; amount: number; rate?: string }>;
   vat?: {
     treatment: 'none' | 'charged' | 'reverse_charge';
@@ -1133,6 +1142,7 @@ export async function createInvoice(
       number,
       customer_name: input.customer_name,
       customer_contact: input.customer_contact ?? null,
+      customer_address: input.customer_address ?? null,
       line_items: input.line_items,
       subtotal,
       // 🔴 THIS USED TO BE A HARDCODED tax: 0 AND total: subtotal, WHICH WAS ACCIDENTALLY RIGHT.
@@ -1145,6 +1155,11 @@ export async function createInvoice(
       vat_treatment: input.vat ? input.vat.treatment : null,
       reverse_charge_vat: input.vat ? input.vat.reverseChargeVat : 0,
       tax_point: today.toISOString().slice(0, 10),
+      // ⚠️ THE FALLBACK IS TODAY, NOT NULL. Null means "raised before this product asked", and it
+      // is the one thing the document reads as permission to print no supply line at all. A new
+      // invoice always knows a supply date, because the worst case is that the work was done the
+      // day it was billed, which is what a man logging a job as he leaves it is telling us.
+      supply_date: input.supply_date ?? today.toISOString().slice(0, 10),
       status: 'draft',
       issued_date: today.toISOString().slice(0, 10),
       due_date: due.toISOString().slice(0, 10),
@@ -5800,6 +5815,10 @@ export interface PublicInvoice {
   number: string;
   customer_name: string;
   customer_contact: string | null;
+  // ⚠️ THIS ONE IS ON THE PUBLIC LINK ON PURPOSE, AND customer_contact IS NOT. His customer's
+  // phone number is a detail he keeps; the address is a field the law puts ON the document, and
+  // the person reading the link is the customer whose address it is.
+  customer_address: string | null;
   line_items: InvoiceLine[];
   // Before VAT. Written since the table was created and, until now, selected by nothing.
   subtotal: number;
@@ -5812,6 +5831,9 @@ export interface PublicInvoice {
   // null on every invoice that predates VAT support. Render those exactly as they were sent.
   vat_treatment: 'none' | 'charged' | 'reverse_charge' | null;
   tax_point: string | null;
+  // The date the work was done, which GOV.UK asks for on EVERY invoice and not only a VAT one.
+  // Null on every row raised before 16 August 2026, and those print exactly as they always did.
+  supply_date: string | null;
   status: string;
   notes: string | null;
   issued_date: string | null;
@@ -5831,7 +5853,7 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
   const { url } = config();
 
   const invRes = await fetch(
-    `${url}/rest/v1/invoices?id=eq.${encodeURIComponent(id)}&select=number,customer_name,customer_contact,line_items,subtotal,tax,total,reverse_charge_vat,vat_treatment,tax_point,status,notes,issued_date,due_date,user_id&limit=1`,
+    `${url}/rest/v1/invoices?id=eq.${encodeURIComponent(id)}&select=number,customer_name,customer_address,customer_contact,line_items,subtotal,tax,total,reverse_charge_vat,vat_treatment,tax_point,supply_date,status,notes,issued_date,due_date,user_id&limit=1`,
     { headers: headers() },
   );
   if (!invRes.ok) return null;
@@ -5878,6 +5900,7 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
   return {
     number: (inv.number as string) ?? '',
     customer_name: (inv.customer_name as string) ?? '',
+    customer_address: (inv.customer_address as string) ?? null,
     // Keep the customer's own contact details off the public, shareable link.
     customer_contact: null,
     line_items: lineItems,
@@ -5887,6 +5910,7 @@ export async function getPublicInvoice(id: string): Promise<PublicInvoice | null
     reverse_charge_vat: Number(inv.reverse_charge_vat) || 0,
     vat_treatment: (inv.vat_treatment as PublicInvoice['vat_treatment']) ?? null,
     tax_point: (inv.tax_point as string) ?? null,
+    supply_date: (inv.supply_date as string) ?? null,
     status: (inv.status as string) ?? 'draft',
     notes: (inv.notes as string) ?? null,
     issued_date: (inv.issued_date as string) ?? null,

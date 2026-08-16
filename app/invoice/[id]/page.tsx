@@ -21,6 +21,17 @@ import { gbp2 } from '../../../lib/money';
 // and is not null: it is the recorded answer that he was not VAT registered, and a man who is not
 // registered must never show VAT on an invoice at all.
 //
+// 🔴 AND REG 14 IS NOT THE ONLY LIST. Run 6, 16 August 2026. Everything above is the VAT
+// standard, which is the harder one, and it reaches only the minority of users who are
+// registered. GOV.UK, "Invoices: what they must include", reaches all of them and asks for two
+// things this document did not carry: THE CUSTOMER'S ADDRESS, and THE DATE THE WORK WAS DONE.
+// The supply date existed in spirit as the tax point and was printed for VAT registered senders
+// alone; the customer's address existed nowhere at all. A rule only holds where it is pointed.
+//
+// ⚠️ AND A NULL IN EITHER IS THE OLD WORLD, exactly like vat_treatment below. An invoice raised
+// before 16 August 2026 prints with no supply line and no customer address, which is how it
+// printed on the day it was sent. Nothing is backfilled and nothing is guessed.
+//
 // 🔴 UNDER THE REVERSE CHARGE THE VAT IS SHOWN AND IS NOT IN THE TOTAL. VATREVCON37100: the
 // figure the customer accounts for "should not be included in the amount shown as total VAT
 // charged". So the total charged is nil, the figure sits in its own block with the wording HMRC
@@ -118,6 +129,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   // The tax point is the date of supply, and it is the date the law names on a VAT invoice.
   const dateLabel = carriesVat ? 'Tax point' : 'Issued';
   const dateValue = (carriesVat ? invoice.tax_point : null) || invoice.issued_date;
+  // 🔴 SHOWN TO EVERYBODY, WHICH WAS THE WHOLE DEFECT. The tax point above answers the VAT
+  // regulation and is a VAT figure with its own 14 day rule. This answers the GOV.UK bullet that
+  // applies to every invoice in the country, and it is a different date whenever the work was not
+  // done on the day it was billed, which for a cleaner or a sparks is most of the time.
+  const workedOn = prettyDate(invoice.supply_date);
 
   return (
     <main style={{ backgroundColor: OFF_WHITE, color: INK, fontFamily: FONT, minHeight: '100vh', padding: '32px 16px' }}>
@@ -163,12 +179,21 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <div style={{ minWidth: 180 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>To</div>
             <div style={{ fontSize: 15, fontWeight: 600 }}>{invoice.customer_name}</div>
+            {invoice.customer_address ? (
+              <div style={{ fontSize: 14, color: MUTED, marginTop: 2, whiteSpace: 'pre-line' }}>{invoice.customer_address}</div>
+            ) : null}
             {invoice.customer_contact ? <div style={{ fontSize: 14, color: MUTED, marginTop: 2 }}>{invoice.customer_contact}</div> : null}
           </div>
           {dateValue ? (
             <div style={{ minWidth: 120 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>{dateLabel}</div>
               <div style={{ fontSize: 15 }}>{prettyDate(dateValue)}</div>
+            </div>
+          ) : null}
+          {workedOn ? (
+            <div style={{ minWidth: 120 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>Work done</div>
+              <div style={{ fontSize: 15 }}>{workedOn}</div>
             </div>
           ) : null}
         </div>

@@ -59,6 +59,10 @@ function notice(problem: string | undefined): string | null {
       return 'Something in that did not read right. Nothing was saved, so have another go.';
     case 'vat':
       return 'We could not check your VAT position, so nothing was made. An invoice with the wrong VAT on it is worse than one you have to make twice. Try it again in a minute.';
+    case 'address':
+      return 'That one needs your customer\u2019s address, so nothing was made. It is not us being fussy: GOV.UK lists the customer\u2019s address as something every invoice must carry, and this is the page that becomes the document.';
+    case 'worked':
+      return 'That one needs the date the work was done, so nothing was made. GOV.UK calls it the supply date and asks for it on every invoice, and it is often not the day you are billing.';
     case 'vatasked':
       return 'That was missing the three answers about your customer, so nothing was made. They decide whether you charge VAT on this job at all, so the form below asks them again.';
     default:
@@ -92,6 +96,15 @@ export default async function NewInvoicePage({
   // retype. ⚠️ THE WORK AND THE PRICE ARE NEVER PREFILLED. The diary knows no figures, and an
   // invented amount on an invoice is the one lie this product must never tell.
   const prefillFor = (one('for') ?? '').replace(/[\x00-\x1f\x7f]/g, ' ').trim().slice(0, 120);
+
+  // ?on=YYYY-MM-DD, written by /api/diary off the SAME row that gave us ?for=. The diary knows
+  // when the work was done, which is the whole reason the supply date is cheap to ask for here.
+  // ⚠️ IT IS STILL A URL AND STILL NOT TRUSTED. Anything that is not a plain ISO date is dropped
+  // and the box falls back to today, which he can change. The one thing it may never do is put a
+  // date he did not choose onto a document.
+  const onRaw = (one('on') ?? '').trim();
+  const today = new Date().toISOString().slice(0, 10);
+  const prefillOn = /^\d{4}-\d{2}-\d{2}$/.test(onRaw) && !Number.isNaN(Date.parse(onRaw)) ? onRaw : today;
 
   const gate = await gateForUser(user.id);
   const locked = gate === 'readonly';
@@ -178,6 +191,39 @@ export default async function NewInvoicePage({
             {/* The weight of the field, said at the field: this is a note for him, never a send
                 target for us. */}
             <p style={S.fieldNote}>Only so you have it to hand. We never contact your customer.</p>
+
+            {/* ═══════════════════════════════════════════════════════════════════════════════
+                🔴 THE TWO GOV.UK BULLETS THAT ARE NOT ABOUT VAT.
+                "the company name and address of the customer you're invoicing" and "the date the
+                goods or service were provided (supply date)". This product built the invoice to
+                VAT Regulations 1995 reg 14, carefully and well, and reg 14 reaches the minority
+                of users who are registered. These two reach all of them.
+
+                ⚠️ REQUIRED HERE AND NOT IN /api/invoices, WHICH IS THE POINT. This is a man at a
+                desk filling in a document, and this is the one page whose output leaves the
+                building and is read by somebody else's accountant. He can be asked. The same
+                route also serves /api/whatsapp, where a man dictates "invoice Hamilton Lettings
+                340" one handed and has no address to give, and there a blank field prints
+                nothing rather than a guess.
+                ═══════════════════════════════════════════════════════════════════════════════ */}
+            <label htmlFor="address" style={S.label}>Their address</label>
+            <textarea id="address" name="address" rows={3} maxLength={300} required className="lek-field" />
+            {/* ⚠️ NO MENTION OF VAT IN THIS NOTE, AND THE FIRST DRAFT HAD ONE. It read "whether
+                or not you charge VAT", which is reassurance to a registered reader and a question
+                planted in an unregistered one on the screen where she is trying to bill a job.
+                test/invoicesweb.test.mjs holds the rule and caught it. The address is asked of
+                everybody for a reason that has nothing to do with VAT, so it is said that way. */}
+            <p style={S.fieldNote}>
+              It goes on the invoice. GOV.UK lists the customer&rsquo;s address as one of the things
+              every invoice must carry.
+            </p>
+
+            <label htmlFor="worked_on" style={S.label}>When the work was done</label>
+            <input id="worked_on" name="worked_on" type="date" required max={today} className="lek-field" defaultValue={prefillOn} />
+            <p style={S.fieldNote}>
+              GOV.UK calls this the supply date. It is often not the day you are billing, so the
+              invoice shows both.
+            </p>
 
             <fieldset style={S.fieldset}>
               <legend style={S.label}>The work, a line at a time</legend>

@@ -464,6 +464,115 @@ sabotageIn('citationvoice', 'the acronym whitelist is opened up to anything in c
     'if (token.length >= 3 && token === token.toUpperCase() && !ACRONYMS.has(token)) {',
     'if (false && token.length >= 3 && token === token.toUpperCase() && !ACRONYMS.has(token)) {'));
 
+// ── F9. THE INVOICE AND THE RULES THAT APPLY TO EVERYBODY. ───────────────────────────────────
+//
+// ⚠️ THE SCRATCH COPY NEEDS supabase/ FOR THESE. Section 9e reads the migration off disk, and a
+// missing file there would take the whole suite down and read as every guard working at once.
+
+// THE ORIGINAL DEFECT, the line as it stood on production this morning, in both renderings.
+sabotage('the supply date goes back inside the carriesVat branch on the page',
+  (d) => edit(d, 'app/invoice/[id]/page.tsx',
+    '  const workedOn = prettyDate(invoice.supply_date);',
+    '  const workedOn = carriesVat ? prettyDate(invoice.supply_date) : null;'));
+
+sabotage('the file the customer is forwarded loses the supply date, so the two renderings differ',
+  (d) => edit(d, 'lib/invoicepdf.ts',
+    '  if (invoice.supply_date) {\n    page.textRight(RIGHT, rightY, `Work done ${dateWords(invoice.supply_date)}`, { size: 10, grey: 0.35 });\n    rightY += 14;\n  }',
+    ''));
+
+sabotage('the file loses the customer address',
+  (d) => edit(d, 'lib/invoicepdf.ts',
+    '  for (const line of addressLines) {\n    page.text(MARGIN, leftY, line, { size: 9, grey: 0.4 });\n    leftY += 11;\n  }',
+    ''));
+
+sabotage('the page stops printing the customer address',
+  (d) => edit(d, 'app/invoice/[id]/page.tsx',
+    '{invoice.customer_address ? (',
+    '{false && invoice.customer_address ? ('));
+
+// ⚠️ THE SILENT ONE, AND IT IS THE SHAPE THAT CAUSED THE SUPPLIER ADDRESS BUG ON THIS SAME PAGE.
+// Everything renders. The column simply is not selected, so it arrives undefined forever.
+sabotage('the columns exist, the renders exist, and the select never asks the database for them',
+  (d) => edit(d, 'lib/supabase.ts',
+    'select=number,customer_name,customer_address,customer_contact,line_items,subtotal,tax,total,reverse_charge_vat,vat_treatment,tax_point,supply_date,status',
+    'select=number,customer_name,customer_contact,line_items,subtotal,tax,total,reverse_charge_vat,vat_treatment,tax_point,status'));
+
+sabotage('the insert drops the supply date on the floor',
+  (d) => edit(d, 'lib/supabase.ts',
+    '      supply_date: input.supply_date ?? today.toISOString().slice(0, 10),',
+    '      supply_date: null,'));
+
+sabotage('the insert drops the customer address',
+  (d) => edit(d, 'app/api/invoices/route.ts',
+    '    customer_address: customerAddress,',
+    '    customer_address: null,'));
+
+sabotage('the form asks for the address and lets him past without one',
+  (d) => edit(d, 'app/app/invoices/new/page.tsx',
+    '<textarea id="address" name="address" rows={3} maxLength={300} required className="lek-field" />',
+    '<textarea id="address" name="address" rows={3} maxLength={300} className="lek-field" />'));
+
+sabotage('the form asks when the work was done and lets him past without answering',
+  (d) => edit(d, 'app/app/invoices/new/page.tsx',
+    '<input id="worked_on" name="worked_on" type="date" required max={today} className="lek-field" defaultValue={prefillOn} />',
+    '<input id="worked_on" name="worked_on" type="date" max={today} className="lek-field" defaultValue={prefillOn} />'));
+
+sabotage('a supply date in the future can be picked, so work is billed before it is done',
+  (d) => edit(d, 'app/app/invoices/new/page.tsx',
+    'type="date" required max={today}',
+    'type="date" required'));
+
+sabotage('the route stops refusing a form with no address',
+  (d) => edit(d, 'app/api/invoices/route.ts',
+    '  if (isForm && !customerAddress) {\n    return back(\'problem=address\');\n  }',
+    ''));
+
+sabotage('the route stops refusing a form with no supply date',
+  (d) => edit(d, 'app/api/invoices/route.ts',
+    '  if (isForm && !supply) {\n    return back(\'problem=worked\');\n  }',
+    ''));
+
+// ⚠️ THE OPPOSITE MISTAKE, and it is the one that would break WhatsApp for everybody. Demanding
+// these of the API blocks a man dictating an invoice one handed, who has no address to give.
+sabotage('the address is demanded of the API too, which blocks invoicing from a message',
+  (d) => edit(d, 'app/api/invoices/route.ts',
+    '  if (isForm && !customerAddress) {',
+    '  if (!customerAddress) {'));
+
+sabotage('an unreadable supply date quietly becomes today instead of being refused',
+  (d) => edit(d, 'app/api/invoices/route.ts',
+    "      return isForm ? back('problem=worked') : NextResponse.json({ error: 'bad_supply_date' }, { status: 400 });",
+    '      supply = null;'));
+
+// ⚠️ AND THE OLD WORLD, which is the assertion nobody thinks to write. A sent invoice must not
+// change after the fact, so a null must print nothing rather than falling back to a date it never
+// carried. This is the same rule vat_treatment null has held on this page since 1 August.
+sabotage('a legacy invoice starts printing the issue date wearing a supply date label',
+  (d) => edit(d, 'lib/invoicepdf.ts',
+    '  if (invoice.supply_date) {\n    page.textRight(RIGHT, rightY, `Work done ${dateWords(invoice.supply_date)}`',
+    '  if (invoice.supply_date || invoice.issued_date) {\n    page.textRight(RIGHT, rightY, `Work done ${dateWords(invoice.supply_date || invoice.issued_date)}`'));
+
+sabotage('the migration backfills every sent invoice with a supply date it never had',
+  (d) => edit(d, 'supabase/APPLY_2026-08-16_invoice_baseline.sql',
+    'alter table public.invoices add column if not exists supply_date date;',
+    'alter table public.invoices add column if not exists supply_date date;\nupdate public.invoices set supply_date = issued_date where supply_date is null;'));
+
+sabotage('the diary stops carrying the date it already holds',
+  (d) => edit(d, 'app/api/diary/route.ts',
+    'if (/^\\d{4}-\\d{2}-\\d{2}$/.test(worked)) bits.push(`on=${worked}`);',
+    ''));
+
+sabotage('the form trusts the date out of the URL without checking its shape',
+  (d) => edit(d, 'app/app/invoices/new/page.tsx',
+    "const prefillOn = /^\\d{4}-\\d{2}-\\d{2}$/.test(onRaw) && !Number.isNaN(Date.parse(onRaw)) ? onRaw : today;",
+    'const prefillOn = onRaw || today;'));
+
+// And the rule the invoice form has held since VAT landed, which my own first draft broke.
+sabotageIn('invoicesweb', 'the address note mentions VAT to a woman who is not registered',
+  (d) => edit(d, 'app/app/invoices/new/page.tsx',
+    'every invoice must carry.',
+    'every invoice must carry, whether or not you charge VAT.'));
+
 // ── NO OP CONTROLS. These change nothing that matters and MUST stay green, or this runner is
 //    only detecting that a file was touched at all. ───────────────────────────────────────────
 
@@ -482,7 +591,7 @@ sabotage('CONTROL: renaming the local binding changes nothing',
     '  const deduct = deductibleSaving(isCompany, projTradeNet, projTotalIncome);',
     '  const deductible = deductibleSaving(isCompany, projTradeNet, projTotalIncome);\n  const deduct = deductible;'), false);
 
-const EXPECTED = 73;
+const EXPECTED = 92;
 process.stdout.write(`\n  ${applied} applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`);
 if (holes > 0 || broken > 0) process.exit(1);
 if (applied !== EXPECTED) {

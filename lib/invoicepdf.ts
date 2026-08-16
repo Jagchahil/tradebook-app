@@ -17,6 +17,10 @@
 // so does this. Anything moved or dropped here is not a design decision, it is a defective
 // invoice, and the man who sent it carries that and not us.
 //
+// 🔴 REG 14 IS NOT THE ONLY LIST, AND THE OTHER ONE APPLIES TO EVERYBODY. GOV.UK, "Invoices:
+// what they must include": the customer's ADDRESS and the DATE THE WORK WAS DONE. The page prints
+// both from 16 August 2026 and so does this, or the two renderings are two documents again.
+//
 // ⚠️ AND vat_treatment === null IS THE OLD WORLD. An invoice raised before the product knew about
 // VAT prints with no rate, no VAT line and no VAT number, exactly as it printed on the day it was
 // sent. A customer may have paid it and filed it. Reprinting it with figures it never had would
@@ -109,13 +113,43 @@ export function buildInvoicePdf(invoice: PublicInvoice): Buffer {
   const dateValue = (carriesVat ? invoice.tax_point : null) || invoice.issued_date;
   page.textRight(RIGHT, y, `${carriesVat ? 'Tax point' : 'Issued'} ${dateWords(dateValue)}`, { size: 10 });
   y += 14;
-  if (invoice.customer_contact) {
-    page.text(MARGIN, y, invoice.customer_contact, { size: 9, grey: 0.4 });
+
+  // ⚠️ TWO COLUMNS FROM HERE, AND THEY MUST NOT DRIVE EACH OTHER. The customer's address is the
+  // only MULTI LINE field on this document: it arrives with its own newlines and can run to four
+  // lines. Advancing one shared cursor through it would push the dates on the right down the page
+  // by however long the address happened to be, so an invoice to a farm would print its due date
+  // three lines lower than an invoice to a flat. Left runs down, right runs down, and the block
+  // ends at whichever got further.
+  let leftY = y;
+  let rightY = y;
+
+  // The supply date, which GOV.UK asks for on every invoice and not only a VAT one. Null is an
+  // invoice raised before this product asked, and it prints nothing rather than the issue date
+  // wearing a supply date's label.
+  if (invoice.supply_date) {
+    page.textRight(RIGHT, rightY, `Work done ${dateWords(invoice.supply_date)}`, { size: 10, grey: 0.35 });
+    rightY += 14;
   }
   if (invoice.due_date) {
-    page.textRight(RIGHT, y, `Due ${dateWords(invoice.due_date)}`, { size: 10, grey: 0.35 });
+    page.textRight(RIGHT, rightY, `Due ${dateWords(invoice.due_date)}`, { size: 10, grey: 0.35 });
+    rightY += 14;
   }
-  y += 30;
+
+  const addressLines = String(invoice.customer_address ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => wrapText(line, RIGHT - MARGIN - 200, 9));
+  for (const line of addressLines) {
+    page.text(MARGIN, leftY, line, { size: 9, grey: 0.4 });
+    leftY += 11;
+  }
+  if (invoice.customer_contact) {
+    page.text(MARGIN, leftY, invoice.customer_contact, { size: 9, grey: 0.4 });
+    leftY += 11;
+  }
+
+  y = Math.max(leftY, rightY) + 19;
 
   // ── The work ──────────────────────────────────────────────────────────────────────────────
   const amountX = RIGHT;

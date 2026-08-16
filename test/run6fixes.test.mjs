@@ -906,6 +906,11 @@ const W = await load('waintents');
     'what is the deadline and how much do i owe',
     'what do i owe? when is it due?',
     'can you tell me what i owe and when it is due',
+    // ⚠️ THIS ONE ARRIVED FROM THE SABOTAGE PASS RATHER THAN FROM A WALK. A sabotage that ADDED
+    // " also " as a splitter could not make anything go red, which meant the claim in the module
+    // ("it joins clauses inside one thought") was wrong rather than the guard being holed. It is
+    // the single shape in seven that the fourth splitter changes, and it changes it correctly.
+    'can i claim boots also can i claim gloves',
   ];
   for (const msg of MUST_FIRE) {
     const r = W.compoundAsk(msg);
@@ -957,8 +962,10 @@ const W = await load('waintents');
     /OVERLAPPING lanes/.test(src) && /SECOND QUESTION/.test(src));
   ok('🔴 AND THAT THE FIX IS NOT "ANSWER BOTH", which puts a model where a lane is',
     /THE FIX IS NOT "ANSWER BOTH"/.test(src));
-  ok('the splitters are deliberately three, and the file says which two were left out',
-    /" also " AND " plus " ARE NOT HERE ON PURPOSE/.test(src));
+  ok('🔴 THE SPLITTER LIST RECORDS THAT IT WAS TESTED, not that it was assumed',
+    /I TESTED IT, AND THE FIRST DRAFT OF THIS COMMENT SAID THE OPPOSITE/.test(src));
+  ok('...and the one it still leaves out has a reason that can be stated',
+    /" plus " IS STILL OUT, AND NOW FOR A REASON I CAN STATE/.test(src));
 }
 
 console.log(`\n${passed} passed, ${failed} failed.`);

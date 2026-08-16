@@ -10,7 +10,7 @@ import {
   matchTotalsQuestion, formatGbp, isDeadlineQuestion, asksAmount, deadlineAnswer, type TotalsQuestion,
   matchProductTruth, productTruthAnswer, isDataRightsRequest, DATA_RIGHTS_ANSWER,
   isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
-  isVehicleQuestion, vehicleAnswer,
+  isVehicleQuestion, vehicleAnswer, compoundAsk, compoundAskNote,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
@@ -153,9 +153,29 @@ export async function POST(req: NextRequest) {
   return back('#end');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 F7, RUN 6. THE HALF OF THE MESSAGE A FIRST MATCH ROUTER THROWS AWAY WITHOUT SAYING SO.
+//
+// composeOneLane below is a chain of first matches, exactly like the webhook's. Whichever lane
+// takes the message answers ITS reading, and the rest of the sentence is gone. Maureen asked
+// about a carpet cleaning machine AND a mileage rate in one line, got a very good answer about
+// the van, and nothing at all about the machine, with no sign that half of it had gone.
+//
+// ⚠️ THE NOTE GOES ON THE OUTSIDE AND KNOWS NOTHING ABOUT WHICH LANE WON. Working that out means
+// a second copy of the router's order living somewhere that is not the router, and that copy is
+// the defect this file keeps deleting. The note lists her own words back and asks for the other
+// one on its own, which is true whichever lane the chain took, today and after the next reorder.
+// See lib/waintents.ts, compoundAsk, for why the detection is as narrow as it is.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+async function composeReply(userId: string, q: string): Promise<string> {
+  const body = await composeOneLane(userId, q);
+  const alsoAsked = compoundAsk(q);
+  return alsoAsked ? `${compoundAskNote(alsoAsked)}\n\n${body}` : body;
+}
+
 // The WhatsApp answering order, without the WhatsApp only lanes (capture, sessions, buttons).
 // Always returns a sentence: honesty when it cannot answer is part of the contract.
-async function composeReply(userId: string, q: string): Promise<string> {
+async function composeOneLane(userId: string, q: string): Promise<string> {
   // 0. Questions about Lekhio itself: filing, approval, promised savings. First, because the
   // totals lane and the claim rulebook both answered these with the right answer to the wrong
   // question (found live, 6 August 2026), and a screenshot of a green tick under "are you HMRC

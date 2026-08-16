@@ -601,6 +601,18 @@ export function clampReceiptDate(d) { return d || '2026-08-05'; }
 // above every lane that reads his rows.
 export function isAboutSomeoneElse(q) { return /how much (has|did) [a-z]+ (made|make|earn|earned)/i.test(q); }
 export const SOMEONE_ELSE_ANSWER = 'I can only see your books.';
+// RUN 6 F7. Two questions in one message, and the half a first match router used to throw away
+// without saying so. Stubbed to its plainest clause: two parts either side of an "and" that each
+// carry a question word. The real detector, and the long list of ordinary messages it must stay
+// SILENT on, are owned by test/run6fixes.test.mjs against the real lib/waintents.ts. What this
+// sandbox walks is the WIRING: that the note goes on the OUTSIDE of the lane chain, so it cannot
+// go stale when the chain is reordered, which is a thing that chain does about once a run.
+export function compoundAsk(q) {
+  const parts = String(q).split(/\\?|;|\\s+and\\s+/i).map((p) => p.trim())
+    .filter((p) => p.split(/\\s+/).length >= 3 && /\\b(what|how|when|why|can|is)\\b/i.test(p));
+  return parts.length >= 2 ? parts.slice(0, 3) : null;
+}
+export function compoundAskNote(asks) { return 'TWO QUESTIONS: ' + asks.join(' | '); }
 `);
   // ⚠️ isClaimQuestion IS STUBBED FALSE, ALONGSIDE A checkExpense THAT ANSWERS NOTHING. This
   // sandbox walks the ROUTING, not the corpus, and the two stubs agree: the claim lane produces no
@@ -738,6 +750,34 @@ export function chatRefBelongsTo() { return true; }
       writes.length === 0 && turns.length === 2
       && turns[0].content === 'when is the tax deadline'
       && turns[1].content === 'The deadline answer.');
+  }
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 RUN 6 F7. TWO QUESTIONS IN ONE MESSAGE, ANSWERED IN HALF, SILENTLY.
+  //
+  // This is the ONE place in the tree where composeReply actually RUNS, so it is the only place
+  // that can prove the note is attached to the reply rather than merely present in the file. The
+  // detector itself, and the fourteen ordinary messages it must stay silent on, are owned by
+  // test/run6fixes.test.mjs against the real matcher.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  {
+    // ⚠️ THE FIXTURE IS A DEADLINE PLUS A CLAIM, NOT A DEADLINE PLUS A "how much". The first
+    // draft used the latter and the reply came back off the MODEL, because "how much" trips the
+    // asksAmount tie break twenty lines up and the message falls past the deadline lane on
+    // purpose. That is the router working exactly as the 9 August fix intends. It also meant the
+    // assertion proved nothing about a deterministic lane, which is the case this finding is
+    // about, so the fixture names one.
+    const { turns } = await post({ q: 'when is the tax deadline and can i claim a van' });
+    ok('🔴 A COMPOUND QUESTION IS TOLD SO, IN THE REPLY THAT REACHES THE CHAT',
+      turns.length === 2 && /TWO QUESTIONS:/.test(turns[1].content));
+    ok('...and the lane still answers, so the note is added to an answer and never instead of one',
+      /The deadline answer\./.test(turns[1].content));
+    ok('...with the note ABOVE the answer, because a person reads down',
+      turns[1].content.indexOf('TWO QUESTIONS:') < turns[1].content.indexOf('The deadline answer.'));
+  }
+  {
+    const { turns } = await post({ q: 'when is the tax deadline' });
+    ok('🔴 AND ONE QUESTION GETS NO NOTE AT ALL, which is the case that must never regress',
+      turns[1].content === 'The deadline answer.');
   }
   {
     const { res, turns } = await post({});

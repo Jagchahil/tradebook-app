@@ -1898,3 +1898,122 @@ export function normaliseBritishTime(body: string): string {
 
   return out;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A COMPOUND QUESTION IS ANSWERED IN HALF, SILENTLY. RUN 6 finding F7, 16 August 2026.
+//
+// Maureen asked, in one message:
+//
+//   "can I claim a new carpet cleaning machine and what mileage rate do I get for the van"
+//
+// She got a long, correct and genuinely good answer about the vehicle: the two ways to run one,
+// that it is one irreversible decision per vehicle for as long as she owns it, and a route to the
+// screen that can price it on her own miles. AND NOT ONE WORD ABOUT THE MACHINE. No answer, and
+// no acknowledgement that half the question had gone.
+//
+// BOTH LANES WORK. Asked on its own a minute later, the machine got the tools and equipment card,
+// correct and honestly caveated. So this is not a broken lane. It is a first match router that
+// takes ONE intent and discards the rest of the sentence without saying so.
+//
+// ⚠️ THE ORDERING BLOCK FIFTY LINES ABOVE THIS FILE'S DEADLINE LANE IS ABOUT SOMETHING ELSE, and
+// that is why none of it caught this. Every word of it is about which of two OVERLAPPING lanes
+// should win for ONE question: "when is my tax due" claimed by both the date lane and the money
+// lane. Here the loser is not a rival reading of the same question. It is a SECOND QUESTION, and
+// it simply vanishes.
+//
+// 🔴 THE FIX IS NOT "ANSWER BOTH". That puts a model where a deterministic lane is, and it turns
+// one wrong answer into two. Doc 103's honesty test is the one being failed: the screen answered
+// half of what she asked and let her believe it had answered all of it. She had no way to know the
+// machine question was never heard.
+//
+// So this names what was not answered and nothing more. An unanswered question named is a customer
+// who asks again. An unanswered question hidden is a customer who thinks she has her answer.
+//
+// ⚠️ AND IT IS DELIBERATELY DEAF TO WHICH LANE WON. Working that out would mean a second copy of
+// the router's own order, in a file that is not the router, and a copy IS the defect this codebase
+// keeps deleting. So the note never claims WHICH of the two is answered. It says one of them is,
+// lists both in her own words, and asks for the other on its own. That sentence is true whichever
+// lane the chain happened to take, today and after the next reordering.
+//
+// ⚠️ IT LIVES HERE, IN THE PURE MODULE, FOR THE REASON THE DEADLINE TIE BREAK DOES. Both channels
+// gate on it: app/api/whatsapp/route.ts and app/api/thread/route.ts. A copy of these patterns in a
+// route would be the second definition that goes stale.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// A part is an ASK if it names a question word, or leads with a modal aimed at the person asking.
+// Deliberately narrow: a false positive here puts a puzzled note on an ordinary message, which is
+// a worse trade than staying quiet on an odd phrasing.
+const INTERROGATIVE = /\b(what|whats|which|how|when|why|who|where)\b/i;
+const MODAL_ASK = /\b(can|could|should|do|does|did|am|is|are|will|would)\s+(i|it|we|my|this|that|a|an|the|they|you)\b/i;
+
+function looksLikeAsk(part: string): boolean {
+  const words = part.trim().split(/\s+/).filter(Boolean);
+  // Under three words is a fragment, not a question. "and gloves" is not a second ask.
+  if (words.length < 3) return false;
+  return INTERROGATIVE.test(part) || MODAL_ASK.test(part);
+}
+
+/**
+ * Split a message where a person would hear a join. Four: " and ", " also ", a question mark, and
+ * a semicolon.
+ *
+ * ⚠️ " also " IS HERE BECAUSE I TESTED IT, AND THE FIRST DRAFT OF THIS COMMENT SAID THE OPPOSITE.
+ *
+ * It read: " also " and " plus " join clauses inside ONE thought far more often than they start a
+ * second question, so leaving them out is the safe choice. That is a reasonable sentence and it is
+ * not true. Run the seven realistic messages that carry the word through both versions and exactly
+ * ONE changes: "can i claim boots also can i claim gloves", which is two questions and was being
+ * answered in half. Every other one, including the message the old comment named as its evidence,
+ * comes out identical, because the three word floor and the question word test in looksLikeAsk are
+ * what hold the false positives back, not the shortness of this list.
+ *
+ * The sabotage pass is what caught it: a sabotage that ADDED " also " could not make anything go
+ * red, and a sabotage that cannot bite means either the guard has a hole or the claim is wrong.
+ * Here the claim was wrong.
+ *
+ * ⚠️ " plus " IS STILL OUT, AND NOW FOR A REASON I CAN STATE: no message in six customer weeks has
+ * used it to join two questions, so there is nothing to test it against. A splitter deserves a
+ * real message behind it, and that one has not turned up yet.
+ */
+export function splitAsks(body: string): string[] {
+  return String(body ?? '')
+    .replace(/[\x00-\x1f\x7f]/g, ' ')
+    .split(/\?|;|\s+and\s+|\s+also\s+/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
+/**
+ * The distinct asks in one message, or null if there is at most one. Null is the ordinary case and
+ * the router carries on exactly as it always has.
+ */
+export function compoundAsk(body: string): string[] | null {
+  const asks = splitAsks(body).filter(looksLikeAsk);
+  if (asks.length < 2) return null;
+  // Three is as many as anybody types and as many as is useful to read back.
+  return asks.slice(0, 3).map((a) => (a.length > 90 ? `${a.slice(0, 87).trimEnd()}...` : a));
+}
+
+const COUNT_WORD: Record<number, string> = { 2: 'Two', 3: 'Three' };
+
+/**
+ * The note itself. Her own words back, and NO CLAIM ABOUT WHICH ONE GOT ANSWERED.
+ *
+ * ⚠️ "IF ONLY ONE OF THOSE IS ANSWERED" IS HEDGED ON PURPOSE AND THE HEDGE IS THE HONEST PART.
+ * A flat "only one of those is answered" would be a statement this function cannot back. Most
+ * lanes are deterministic and take exactly one reading, but the last lane on both channels is a
+ * model, and a model given two questions sometimes answers both. Telling her one was dropped when
+ * it was not is the same class of fault as saying nothing when it was: a sentence about her
+ * message that is not true of her message. This wording is true either way, and it still does the
+ * one job the finding asks of it, which is to make her look.
+ */
+export function compoundAskNote(asks: string[]): string {
+  const listed = asks.map((a, i) => `${i + 1}. ${a}`).join('\n');
+  return [
+    `${COUNT_WORD[asks.length] ?? 'Several'} questions in one there, and I take them one at a time:`,
+    '',
+    listed,
+    '',
+    'If only one of those is answered, send me the other on its own and I will answer that one properly.',
+  ].join('\n');
+}

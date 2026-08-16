@@ -47,7 +47,18 @@ const edit = (dir, rel, from, to) => {
 
 let applied = 0, held = 0, holes = 0, broken = 0;
 
+// ⚠️ A SLICE FILTER, AND THE COUNT CHECK AT THE BOTTOM KNOWS ABOUT IT. The packet is 111 sabotages
+// and each one copies the tree and runs a 200 assertion suite, so a full pass is minutes rather
+// than seconds and does not fit inside every environment's command timeout. --only= runs the
+// subset whose name carries the substring.
+//
+// 🔴 A SLICED RUN IS NOT A PASS AND SAYS SO. The expected count is only enforced on a full run,
+// and a sliced one prints SLICE in its summary, because "0 holes" over thirteen sabotages read as
+// "0 holes" over a hundred and eleven is exactly the shape of a green tree that guards nothing.
+const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7);
+
 function sabotageIn(suite, name, mutate, expectRed = true) {
+  if (ONLY && !name.includes(ONLY)) return;
   const dir = scratch();
   try { mutate(dir); applied += 1; }
   catch (e) {
@@ -649,17 +660,19 @@ sabotage('the detector never fires, which is the defect with a function in front
     '  if (asks.length < 2) return null;',
     '  if (asks.length < 99) return null;'));
 
-// ⚠️ THE SPLITTERS. Every extra one buys a new way to put a note on a message that never had two
-// questions in it, and " also " is the one that looked most reasonable.
-sabotage('" also " is added as a splitter and a question plus an entry becomes two questions',
+// ⚠️ THE SPLITTERS, AND THIS PAIR IS WHERE THE HARNESS EARNED ITS KEEP. The first version of the
+// first one ADDED " also " and could not make anything go red, because the claim it was defending
+// ("it joins clauses inside one thought") was false. It is now the other way round: " also " is a
+// splitter, and taking it out answers a real compound in half again.
+sabotage('" also " is dropped as a splitter and a real compound goes back to being answered in half',
   (d) => edit(d, 'lib/waintents.ts',
-    '    .split(/\\?|;|\\s+and\\s+/i)',
-    '    .split(/\\?|;|\\s+and\\s+|\\s+also\\s+/i)'));
+    '    .split(/\\?|;|\\s+and\\s+|\\s+also\\s+/i)',
+    '    .split(/\\?|;|\\s+and\\s+/i)'));
 
 sabotage('a comma splits, so every ordinary sentence with a comma in it grows a second question',
   (d) => edit(d, 'lib/waintents.ts',
-    '    .split(/\\?|;|\\s+and\\s+/i)',
-    '    .split(/\\?|;|,|\\s+and\\s+/i)'));
+    '    .split(/\\?|;|\\s+and\\s+|\\s+also\\s+/i)',
+    '    .split(/\\?|;|,|\\s+and\\s+|\\s+also\\s+/i)'));
 
 // The note itself, and the two things it must never say.
 sabotage('the note claims which one was answered, which the module cannot know',
@@ -708,8 +721,16 @@ sabotage('CONTROL: renaming the local binding changes nothing',
     '  const deductible = deductibleSaving(isCompany, projTradeNet, projTotalIncome);\n  const deduct = deductible;'), false);
 
 const EXPECTED = 111;
-process.stdout.write(`\n  ${applied} applied, ${held} behaved, ${holes} holes, ${broken} broken anchors\n`);
+process.stdout.write(`\n  ${applied} applied, ${held} behaved, ${holes} holes, ${broken} broken anchors`
+  + (ONLY ? `   SLICE "${ONLY}", NOT A FULL PASS\n` : '\n'));
 if (holes > 0 || broken > 0) process.exit(1);
+if (ONLY) {
+  if (applied === 0) {
+    process.stdout.write(`  SLICE MATCHED NOTHING: "${ONLY}" is not in any sabotage name\n`);
+    process.exit(1);
+  }
+  process.exit(0);
+}
 if (applied !== EXPECTED) {
   process.stdout.write(`  COUNT WRONG: expected ${EXPECTED} sabotages to apply, got ${applied}\n`);
   process.exit(1);

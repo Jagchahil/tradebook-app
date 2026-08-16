@@ -153,6 +153,8 @@ import {
   isDataRightsRequest,
   DATA_RIGHTS_ANSWER,
   isVehicleQuestion,
+  compoundAsk,
+  compoundAskNote,
   vehicleAnswer,
   // RUN 2, 12 August 2026. See the dispatch chain and the floor at the end of it.
   isVatQuestion,
@@ -670,6 +672,26 @@ async function processMessage(message: IncomingMessage): Promise<void> {
           } else {
             await handleTextEntry(from, messageId, text);
           }
+          // ═══════════════════════════════════════════════════════════════════════════════════
+          // 🔴 F7. THE HALF OF THE MESSAGE THIS CHAIN JUST THREW AWAY WITHOUT SAYING SO.
+          //
+          // Every branch above is a first match. Whichever one takes the message answers ITS
+          // reading and the rest of the sentence is gone, and until now it went silently.
+          //
+          // ⚠️ IT SITS AFTER THE WHOLE CHAIN, NOT INSIDE ANY BRANCH, AND THAT IS THE POINT. It is
+          // not thirty edits and it does not need to know which lane won, so it cannot go stale
+          // when the order changes, which is a thing this chain does about once a run.
+          //
+          // ⚠️ AND IT IS BELOW EVERY FLOW AND EVERY RESERVED WORD ALREADY. This block only runs
+          // when the invoice flow, the tax guide flow, the setup goal and the partnership share
+          // have all declined the message, and STOP, START, SUPPORT and the paywall are handled
+          // above that. So a man mid flow answering a question never gets a note about it.
+          //
+          // compoundAsk() needs TWO clauses that each independently read as a question, so a money
+          // entry with an "and" in it ("40 diesel and 20 parking") can never reach here.
+          // ═══════════════════════════════════════════════════════════════════════════════════
+          const alsoAsked = compoundAsk(text);
+          if (alsoAsked) await sendText(from, compoundAskNote(alsoAsked));
         }
       }
       }

@@ -702,6 +702,43 @@ sabotage('the webhook grows its own copy of the question patterns',
     '          const alsoAsked = compoundAsk(text);',
     '          const looksLikeAsk = (p) => /\\b(what|how)\\b/i.test(p);\n          const alsoAsked = looksLikeAsk(text) ? compoundAsk(text) : null;'));
 
+// ── THE STALE BUILD. R7, and the scanner's third way of lying. ───────────────────────────────
+
+sabotage('the staleness clock is removed and a build older than the source passes again',
+  (d) => edit(d, 'scripts/check-glued-figures.mjs',
+    '  if (newestSource !== null && newestSource > newestChunk) {',
+    '  if (false && newestSource !== null && newestSource > newestChunk) {'));
+
+sabotage('the clock finds a stale build and exits zero anyway',
+  (d) => edit(d, 'scripts/check-glued-figures.mjs',
+    "      + '  Exiting non zero: a check that read the wrong input has not passed.\\n\\n',\n    );\n    process.exit(1);",
+    "      + '  Exiting non zero: a check that read the wrong input has not passed.\\n\\n',\n    );\n    process.exit(0);"));
+
+// ⚠️ THE COMPARISON IS >, NOT >=, AND NOT <. Flipped, a FRESH build is called stale and every
+// correct run fails, which gets the check switched off within a day.
+sabotage('the comparison is flipped, so a fresh build is the thing that fails',
+  (d) => edit(d, 'scripts/check-glued-figures.mjs',
+    '  if (newestSource !== null && newestSource > newestChunk) {',
+    '  if (newestSource !== null && newestSource < newestChunk) {'));
+
+// ⚠️ AND THE ROOTS. test/ in this list makes every test edit a build failure, which is the
+// permanent false alarm this codebase deletes on sight. app/ out of it blinds the clock to the
+// screens the scanner exists to protect.
+sabotage('test is added to the source roots, making every test edit a permanent false alarm',
+  (d) => edit(d, 'scripts/check-glued-figures.mjs',
+    "export const SOURCE_DIRS = ['app', 'lib', 'components'];",
+    "export const SOURCE_DIRS = ['app', 'lib', 'components', 'test'];"));
+
+sabotage('app is dropped from the source roots, so the clock cannot see the screens',
+  (d) => edit(d, 'scripts/check-glued-figures.mjs',
+    "export const SOURCE_DIRS = ['app', 'lib', 'components'];",
+    "export const SOURCE_DIRS = ['lib', 'components'];"));
+
+sabotage('the newest mtime walk stops at the top level, so a nested screen never counts',
+  (d) => edit(d, 'scripts/check-glued-figures.mjs',
+    '      if (e.isDirectory()) { walk(full); continue; }',
+    '      if (e.isDirectory()) { continue; }'));
+
 // ── NO OP CONTROLS. These change nothing that matters and MUST stay green, or this runner is
 //    only detecting that a file was touched at all. ───────────────────────────────────────────
 
@@ -720,7 +757,7 @@ sabotage('CONTROL: renaming the local binding changes nothing',
     '  const deduct = deductibleSaving(isCompany, projTradeNet, projTotalIncome);',
     '  const deductible = deductibleSaving(isCompany, projTradeNet, projTotalIncome);\n  const deduct = deductible;'), false);
 
-const EXPECTED = 111;
+const EXPECTED = 117;
 process.stdout.write(`\n  ${applied} applied, ${held} behaved, ${holes} holes, ${broken} broken anchors`
   + (ONLY ? `   SLICE "${ONLY}", NOT A FULL PASS\n` : '\n'));
 if (holes > 0 || broken > 0) process.exit(1);

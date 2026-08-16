@@ -7,7 +7,7 @@
 // made to FAIL against the old code before it was allowed to count.
 
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -453,6 +453,55 @@ ok('🔴 A CHUNK DIRECTORY THAT EXISTS AND HOLDS NOTHING IS NOT A PASS EITHER',
 const dirty = runIn(fakeBuild({ 'a.js': GLUED }));
 ok('🔴 AND WHEN IT ACTUALLY FINDS ONE IT EXITS NON ZERO', dirty.code !== 0);
 ok('...and prints the glued words so the fix is findable', /of profit left after/.test(dirty.out));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ THE THIRD WAY IT COULD LIE, AND IT DID LIE THIS WAY ON 16 AUGUST 2026.
+//
+// Missing build directory and empty chunk directory are both covered above. A STALE build is the
+// quietest of the three, because it prints a real number and a clean bill of health. `npm run
+// build` failed in a Linux workspace on the SWC binary, this script read a `.next` from an earlier
+// build, and reported "No glued figures. 354 compiled chunks scanned" and exit 0. The machine that
+// could actually build said 355. It reported a pass over output that predated the source.
+//
+// The rule it now holds: if anything under app/, lib/ or components/ is newer than the newest
+// compiled chunk, the build cannot have seen it and the scan proves nothing.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const agedBuild = (sourceIsNewer) => {
+  const d = fakeBuild({ 'a.js': SPACED });
+  const chunk = path.join(d, ...G.CHUNK_DIR.split('/'), 'a.js');
+  // ⚠️ THE SOURCE FILE IS NESTED, AND THE FIRST DRAFT PUT IT AT THE TOP OF lib/. A sabotage that
+  // stopped the walk descending into subdirectories could not make anything go red, because a top
+  // level file is found either way. Every screen this scanner protects lives three or four levels
+  // down, so the fixture lives where they do.
+  const deep = path.join(d, 'app', 'app', 'pay-yourself');
+  mkdirSync(deep, { recursive: true });
+  const src = path.join(deep, 'page.tsx');
+  writeFileSync(src, 'export default function P() { return null; }');
+  const now = Date.now() / 1000;
+  utimesSync(chunk, now - 60, now - 60);
+  const srcAt = now - (sourceIsNewer ? 10 : 90);
+  utimesSync(src, srcAt, srcAt);
+  return d;
+};
+
+const stale = runIn(agedBuild(true));
+ok('🔴 A BUILD OLDER THAN THE SOURCE IS NOT A PASS, WHICH IS HOW IT LIED ON 16 AUGUST',
+  stale.code !== 0 && /THE BUILD IS OLDER THAN THE SOURCE/.test(stale.out));
+ok('...and it says HOW FAR behind, so nobody has to guess whether it matters',
+  /by \d+s/.test(stale.out));
+ok('...and names the command that fixes it', /npm run build/.test(stale.out));
+
+const fresh = runIn(agedBuild(false));
+ok('🔴 AND A BUILD NEWER THAN THE SOURCE STILL PASSES, so this is a clock and not a tripwire',
+  fresh.code === 0 && /all newer than your source/.test(fresh.out));
+
+// ⚠️ THE CLOCK MUST NOT LOOK AT DIRECTORIES THAT CANNOT REACH A CHUNK. Editing a test cannot
+// change compiled output, so a test edit that failed the build check would be a permanent false
+// alarm, which is the one thing this whole file exists to avoid.
+ok('the source roots are exactly the ones that can put a JSX text run into a chunk',
+  JSON.stringify(G.SOURCE_DIRS) === JSON.stringify(['app', 'lib', 'components']));
+ok('an absent source tree is not "stale", because there is nothing to be stale against',
+  G.newestMtimeMs(mkdtempSync(path.join(tmpdir(), 'nosrc-')), G.SOURCE_DIRS) === null);
 
 const clean = runIn(fakeBuild({ 'a.js': SPACED }));
 ok('🔴 A CLEAN BUILD PASSES, so this is a detector and not a tripwire',

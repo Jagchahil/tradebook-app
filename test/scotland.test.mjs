@@ -273,6 +273,134 @@ ok('and the lender screen guards it the same way',
   /personalTaxShown \? <>\{' '\}\{SCOTLAND_LINE\}<\/> : null/.test(read('app/app/proof-of-income/page.tsx')));
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 3b. THE OTHER REPO. THE SAME BAR, APPLIED TO THE PHONE.
+//
+// 🔴 RUN 7, 17 AUGUST 2026. Everything above this block covered ONE CHECKOUT. Eleven screens in the
+// mobile repo import a band derived producer from its hand written mirror lib/tax.ts and NOT ONE
+// said anything. The sentence did not exist in that repository at all.
+//
+// The web decision was already written as a shape rather than as a list of screens, and it was
+// still blind here, because a shape is only as wide as the ground it is asked to walk. THE SCOPE OF
+// A GUARD IS A PLACE A DEFECT CAN HIDE, and this is the instance that proves it.
+//
+// Same bar as section 2, quoted from the decision: "would a trader be misled by THIS number if the
+// line were absent", which lands it on the money he banks against, and on everything that leaves
+// the product for a lender or an accountant. Levers one tap behind a screen that already carries it
+// stay quiet, exactly as they do on the web.
+//
+// ⚠️ TWO SCREENS SHARE A NAME WITH A WEB SCREEN AND HAVE THE OPPOSITE FACTS. Web
+// app/app/tax/summary/page.tsx is excused above because it renders nothing band derived, which is
+// still true. Mobile app/tax-summary.tsx imports soleTraderTax, planLtd AND setAsideAfterCis.
+// Carrying the web reason across by name would be wrong, and this suite would not catch that on
+// its own, so it is written down here.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 3b. the mobile repo says it on exactly the surfaces that need it ===\n');
+
+const MOBILE = path.resolve(root, '..', 'tradebook-app');
+const mobileRead = (rel) => { try { return readFileSync(path.join(MOBILE, rel), 'utf8'); } catch { return ''; } };
+
+if (!existsSync(MOBILE)) {
+  console.log('  note  ../tradebook-app is not checked out beside this repo, the mobile disclosure block is skipped.');
+  console.log('  note  ⚠️ A SKIP IS NOT A PASS. Run 5 lost about 600 assertions to exactly this and did not notice.');
+} else {
+  // The sentence, mirrored. Two slightly different caveats across two repos is worse than within
+  // one, because nobody ever reads them side by side.
+  const MOBILE_SRC = mobileRead('lib/scotland.ts');
+  ok('🔴 the mobile repo has lib/scotland.ts at all', MOBILE_SRC.length > 0);
+  const mDecl = /export const SCOTLAND_LINE\s*(?::\s*string\s*)?=\s*\n?\s*'([^']*)'/.exec(MOBILE_SRC);
+  ok('and it exports SCOTLAND_LINE as a single string literal', Boolean(mDecl));
+  ok('🔴 BYTE IDENTICAL to the web sentence, no second caveat',
+    Boolean(mDecl) && mDecl[1] === LINE);
+
+  // Discovered from disk, never typed: anything importing a band derived producer from the mirror.
+  const MOBILE_PRODUCERS = new Set([
+    'soleTraderTax', 'planLtd', 'businessTaxOnProfit', 'businessTaxSaved', 'setAsideAfterCis',
+    'incomeTaxOnProfit', 'salaryIncomeTax', 'dividendTax', 'corporationTax', 'class4NIC',
+  ]);
+  const mobileFiles = walk(path.join(MOBILE, 'app')).map((r) => r.replace(/^.*?tradebook-app\//, ''));
+  const mWalk = [];
+  (function collect(dir) {
+    let entries; try { entries = readdirSync(dir); } catch { return; }
+    for (const e of entries) {
+      if (SKIP_DIRS.has(e)) continue;
+      const p = path.join(dir, e);
+      let st; try { st = statSync(p); } catch { continue; }
+      if (st.isDirectory()) collect(p);
+      else if (/\.(ts|tsx)$/.test(e)) mWalk.push(path.relative(MOBILE, p).split(path.sep).join('/'));
+    }
+  })(path.join(MOBILE, 'app'));
+
+  const mobileBandDerived = mWalk.filter((rel) =>
+    importsOf(mobileRead(rel)).some((i) => i.from === 'tax' && MOBILE_PRODUCERS.has(i.name))).sort();
+
+  const mSaysIt = mobileBandDerived.filter((rel) => {
+    const src = mobileRead(rel);
+    if (!importsOf(src).some((i) => i.name === 'SCOTLAND_LINE' && i.from === 'scotland')) return false;
+    return (src.match(/SCOTLAND_LINE/g) ?? []).length >= 2;
+  }).sort();
+
+  // ─── THE DECIDED LIST, PHONE SIDE ──────────────────────────────────────────────────────────
+  const M_DISCLOSED = [
+    // The tax destination in its own right. A man arrives here from the tab bar without ever
+    // opening Home, which is the same argument app/app/tax/page.tsx makes on the web.
+    'app/(tabs)/tax.tsx',
+    // The set aside again, on the screen he opens most. setAsideAfterCis IS what he puts by.
+    'app/(tabs)/you.tsx',
+    // 🔴 THE STOP ITEM, and on this repo it is worse than on the web: as well as the screen it
+    // builds a share() text document AND a pdf(), both printing an estimated tax figure, and both
+    // are handed to a broker by a customer who cannot ask us what it means.
+    'app/proof-of-income.tsx',
+    // Band derived, unlike the web screen of the same name. See the warning above.
+    'app/tax-summary.tsx',
+    // estimateTax() is commented "for the export", and the two Share.share calls send the JSON and
+    // the CSV a man hands his accountant. A computed tax figure leaving the building on paper is
+    // the founder's own stop reasoning, so it carries the line even though the web export does not
+    // compute one at all.
+    'app/(tabs)/settings.tsx',
+  ].sort();
+
+  const M_NOT_DISCLOSED = {
+    'app/(tabs)/index.tsx':
+      'Home, and it was on the disclosed list until the render was actually read. Its ONLY band derived output is `pot`, which feeds the goal widget: profit minus tax, meaning what is left to save towards a van. That is an affordability figure, not a statement of what he owes and not something he banks against, so it takes the same reasoning as app/goals.tsx below. The set aside he acts on is on the You tab, which does carry the line.',
+    'app/pay-yourself.tsx':
+      'A lever. It answers what to take as salary against dividends, one tap behind the tax tab which carries the line. Its web sibling app/app/pay-yourself/plan.ts is excused above for exactly this reason.',
+    'app/what-if.tsx':
+      'A difference between two figures that move together. Both move the same way under Scottish bands, so the answer it gives is less wrong than either figure alone, and it sits one tap behind a screen that carries the line. Same reasoning as lib/whatif.ts above.',
+    'app/cis.tsx':
+      'A refund position one tap behind the tax tab, which carries the line above the same figure. Same reasoning as app/app/tax/cis/page.tsx above.',
+    'app/goals.tsx':
+      'profit minus businessTaxOnProfit is an affordability pot for a thing he is saving for, not a statement of what he owes. Doc 103: a caveat under every goal is the ten helpful additions that make an unhelpful product.',
+    'app/wrapped.tsx':
+      'The closest call on this list, and it is recorded as a call rather than an oversight. It shares a year in review out of the product, so something does leave the building, but the figure is what his logged expenses SAVED him, not what he owes, and the destination is a social share rather than a lender or an accountant. The founder\'s bar names those two readers. If a Scot ever reports being misled by the wrapped figure, this is the entry to change.',
+  };
+
+  const mClassified = [...M_DISCLOSED, ...Object.keys(M_NOT_DISCLOSED)].sort();
+  ok(`🔴 EQUALITY: every band derived mobile surface is classified (${mobileBandDerived.length} found)`,
+    same(mobileBandDerived, mClassified));
+  if (!same(mobileBandDerived, mClassified)) {
+    console.log(`        found on disk but never decided: ${JSON.stringify(missing(mobileBandDerived, mClassified))}`);
+    console.log(`        decided but no longer on disk:   ${JSON.stringify(missing(mClassified, mobileBandDerived))}`);
+  }
+  ok('🔴 EQUALITY: exactly the decided mobile surfaces say it, none missing, none added',
+    same(mSaysIt, M_DISCLOSED));
+  if (!same(mSaysIt, M_DISCLOSED)) {
+    console.log(`        decided but silent: ${JSON.stringify(missing(M_DISCLOSED, mSaysIt))}`);
+    console.log(`        says it but undecided: ${JSON.stringify(missing(mSaysIt, M_DISCLOSED))}`);
+  }
+  for (const rel of M_DISCLOSED) ok(`  mobile ${rel} exists and says it`, mSaysIt.includes(rel));
+  ok('and every mobile "not disclosed" carries a reason somebody can read',
+    Object.values(M_NOT_DISCLOSED).every((why) => typeof why === 'string' && why.length > 40));
+  ok('and no mobile surface is on both lists at once',
+    M_DISCLOSED.every((f) => !(f in M_NOT_DISCLOSED)));
+
+  // 🔴 THE STOP ITEM, NAMED ON ITS OWN so a rename cannot quietly drop it out of the equality.
+  ok('🔴 STOP ITEM: the phone lender screen says it', mSaysIt.includes('app/proof-of-income.tsx'));
+  const poi = mobileRead('app/proof-of-income.tsx');
+  ok('🔴 STOP ITEM: and the SHARED document carries it, not just the screen',
+    /SCOTLAND_LINE/.test(poi.split('async function share()')[1]?.split('async function pdf()')[0] ?? ''));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
 // 4. THE RATCHET ITSELF. THIS IS THE ASSERTION THAT IS MEANT TO FAIL ONE DAY.
 //
 // While no Scottish band is modelled, "Scottish rates are coming to Lekhio" is true. The moment one

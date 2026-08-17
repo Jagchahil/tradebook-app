@@ -11,12 +11,13 @@ import {
   matchProductTruth, productTruthAnswer, isDataRightsRequest, DATA_RIGHTS_ANSWER,
   isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
   isVehicleQuestion, vehicleAnswer, compoundAsk, compoundAskNote,
-  isScottishRatesQuestion,
+  isScottishRatesQuestion, isVatQuestion,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
 import { taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition } from '../../../lib/taxoptimiser';
 import { SCOTLAND_LINE, SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
+import { vatAnswerForUser } from '../../../lib/vatanswer';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { quarterForDate } from '../../../lib/quarterpack';
 import { gbp0 } from '../../../lib/money';
@@ -256,6 +257,33 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
   // one re-ask ("how much has marcus made", asked by Marcus). selfNameTokens() is exported and
   // ready for a caller that already holds the name; nothing should fetch it just for this.
   if (isAboutSomeoneElse(q)) return SOMEONE_ELSE_ANSWER;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 VAT, WHICH THIS ROUTER ANSWERED OUT OF THE MODEL. B18, 17 August 2026.
+  //
+  // FOUND ON THIS SURFACE, SIGNED IN, WITH A REAL ACCOUNT UNDER IT. "am in glasgow, is vat
+  // different up here", asked of this chat as Callum Strachan, 77 confirmed entries, came back:
+  // "No, VAT is the same across the UK, including Scotland. The threshold is £90,000 rolling
+  // 12-month turnover to register, and deregistration at £88,000."
+  //
+  // Every figure in that is right. What is missing is him. The webhook has read his own rolling
+  // twelve months and opened with his figure and his headroom since Run 2, and isVatQuestion was
+  // dispatched there and by nothing else, so the man who asked the most consequential threshold
+  // question of his trading life on the web got the statute and the man who asked it on WhatsApp
+  // got his position. One phrase, three channels, two different answers, which is the defect
+  // test/laneparity.test.mjs exists for and the one B16 wrote the rule about six commits ago.
+  //
+  // ⚠️ ABOVE THE TOTALS LANE, which is the order app/api/whatsapp/route.ts runs and the reason is
+  // written out there: "should i register for vat" carries a quantity word and would otherwise be
+  // eaten by matchTotalsQuestion and answered with a set aside figure.
+  //
+  // ⚠️ AND THE ANSWER IS THE SAME FUNCTION, NOT THE SAME SHAPE. lib/vatanswer.ts does the reading
+  // and lib/vatstanding.ts does the words, so this router computes nothing and can say nothing the
+  // other two do not say. A lookalike here is the fault the banner at the top of this file exists
+  // to avoid, and VAT is the question this product has already answered three different wrong ways
+  // on one evening.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  if (isVatQuestion(q)) return vatAnswerForUser(userId);
 
   // 2. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
   const totals = matchTotalsQuestion(q);

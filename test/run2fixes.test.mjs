@@ -185,39 +185,86 @@ console.log('F14: every door calls the one function');
 {
   const wa = codeOnly(read('app/api/whatsapp/route.ts'));
   ok('WhatsApp has a VAT lane at all', /isVatQuestion\(text\)/.test(wa));
-  ok('WhatsApp answers it from vatStanding, not from a template', /vatStanding\(/.test(wa));
   // ⚠️ THE ORDER IS THE GUARD, so it is asserted on the DISPATCH CHAIN rather than on the file:
   // both needles appear in the imports too, and an import order proves nothing about a lane order.
   // The chain is the text between the first `else if` and the closing of the block.
   const chain = wa.slice(wa.indexOf('} else if (isPhoneShare(text))'), wa.indexOf('await handleTextEntry(from, messageId, text)'));
   ok('the VAT lane sits ABOVE the totals lane', before(chain, 'isVatQuestion(text)', 'matchTotalsQuestion(text)'));
   ok('the VAT lane sits ABOVE the open question lane', before(chain, 'isVatQuestion(text)', 'isQuestion(text)'));
-  ok('a failed read refuses to guess', /not going to answer a VAT question with a/.test(read('app/api/whatsapp/route.ts')));
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 "EVERY DOOR CALLS THE ONE FUNCTION" WAS THIS BLOCK'S TITLE ON 12 AUGUST AND IT ONLY BECAME
+  // TRUE ON 17 AUGUST. B18.
+  //
+  // Every assertion in here used to read app/api/whatsapp/route.ts, because that is where the
+  // answer was assembled, and it was the only channel with a VAT lane at all. So the block held
+  // the promise on the one door that had it and said nothing about the two that did not. The web
+  // chat, asked "am in glasgow, is vat different up here" by a signed in sole trader with 77
+  // confirmed entries, returned the statute out of the model and never mentioned his turnover.
+  //
+  // THE ASSERTIONS NOW FOLLOW THE WORK. lib/vatstanding.ts assembles the answer, lib/vatanswer.ts
+  // reads his rows, and all three routers call it. Anchored on the files that do the thing, so a
+  // future move turns this red rather than leaving it quietly true about a file that stopped
+  // mattering, which is the R5 fault this corpus has now paid for four times.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const answerSrc = codeOnly(read('lib/vatstanding.ts'));
+  const readerSrc = codeOnly(read('lib/vatanswer.ts'));
+
+  ok('🔴 the answer is built from vatStanding, not from a template', /vatStanding\(/.test(readerSrc));
+  ok('...and the reader is the ONE reader: lib/vatanswer.ts holds the only vatAnswerForUser',
+    (read('lib/vatanswer.ts').match(/export async function vatAnswerForUser/g) || []).length === 1);
+
+  // 🔴 ALL THREE DOORS, DERIVED, AND NONE OF THEM ASSEMBLING ANYTHING OF ITS OWN. The second half
+  // is the one that matters: a router that calls the shared reader AND keeps a copy of the
+  // sentences is two owners again with a shared function standing next to it looking like one.
+  for (const rel of ['app/api/whatsapp/route.ts', 'app/api/thread/route.ts', 'app/api/ask/route.ts']) {
+    const src = codeOnly(read(rel));
+    ok(`  ${rel}: calls vatAnswerForUser`, /vatAnswerForUser\(/.test(src));
+    ok(`  ${rel}: and assembles NONE of the answer itself`,
+      !/BACKWARD_TEST/.test(src) && !/FORWARD_TEST/.test(src) && !/CARD_FEE_NOTE/.test(src)
+      && !/standingSentence\(/.test(src) && !/vatStanding\(/.test(src));
+  }
+
+  ok('a failed read refuses to guess, in one sentence every channel shares',
+    /not going to answer a VAT question with a/.test(read('lib/vatstanding.ts'))
+    && /return VAT_UNREADABLE;/.test(readerSrc));
+  // 🔴 AND THE REFUSAL IS ON THE ROWS, NOT ON THE PROFILE. A missing VAT profile only costs the
+  // "already registered" short cut; the threshold answer under it is still his and still true.
+  // Refusing a man an actionable answer because a second read failed is the opposite defect.
+  ok('🔴 ...and it is the ROWS failing that refuses, never the profile',
+    /if \(rows === null\) return VAT_UNREADABLE;/.test(readerSrc));
+
   // 🔴 THE FIGURE LEADS, AND THE STATUTORY TESTS FOLLOW IT. B16, 17 August 2026.
   //
   // This is the promise a deleted predicate used to stand next to without holding: a man near the
-  // line gets WHERE HE STANDS first and the rules after, never the other way round. Derived from the
-  // route rather than typed: the standing sentence must be the FIRST element of the parts array, and
-  // both statutory tests must be pushed after it. Held by index, so reversing them turns this red.
+  // line gets WHERE HE STANDS first and the rules after, never the other way round. Derived from
+  // the builder rather than typed: the standing sentence must be the FIRST element of the parts
+  // array, and both statutory tests must be pushed after it. Held by index, so reversing them
+  // turns this red.
   {
-    // ⚠️ COMMENTS STRIPPED FIRST, in the safe form. The block above this one quotes the old
-    // predicate's comment, which names the standing sentence, and the naive /\/\/[^\n]*/ shape
-    // truncates every https:// URL in the file it is handed. Three suites have learned that.
-    const codeOnly = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-    const src = codeOnly(read('app/api/whatsapp/route.ts'));
-    const leadAt = src.indexOf('const parts: string[] = [standingSentence(');
-    const backAt = src.indexOf('parts.push(BACKWARD_TEST)');
-    const fwdAt = src.indexOf('parts.push(FORWARD_TEST)');
+    const leadAt = answerSrc.indexOf('const parts: string[] = [standingSentence(');
+    const backAt = answerSrc.indexOf('parts.push(BACKWARD_TEST)');
+    const fwdAt = answerSrc.indexOf('parts.push(FORWARD_TEST)');
     ok('🔴 the VAT answer OPENS with his standing figure, not with the rules',
       leadAt !== -1);
     ok('🔴 ...and both statutory tests come AFTER it, so he is never handed rules first',
       leadAt !== -1 && backAt > leadAt && fwdAt > leadAt);
-    ok('⚠️ and the standing sentence is the one in lib/vatstanding.ts, carrying his own twelve month figure',
+    ok('⚠️ and the standing sentence carries his own twelve month figure',
       /export function standingSentence/.test(read('lib/vatstanding.ts'))
       && /rolling12m/.test(read('lib/vatstanding.ts')));
   }
-  ok('the gov.uk source travels with the answer', /gov\.uk\/vat-registration\/when-to-register/.test(read('app/api/whatsapp/route.ts')));
+  // 🔴 THE CARD FEE NOTE IS THE ONE PART THAT IS CONDITIONAL, AND IT IS CONDITIONAL ON nearLine
+  // AND NOTHING ELSE. Flattened to always it is noise far from the line; dropped on the web it
+  // warns a near line customer on WhatsApp and not in the chat about the same understatement in
+  // the same rows. Both are real, so the condition is asserted rather than assumed.
+  ok('🔴 the card fee note travels on every channel, and only when he is near the line',
+    /if \('nearLine' in s && s\.nearLine\) parts\.push\(CARD_FEE_NOTE\);/.test(answerSrc));
 
+  ok('the gov.uk source travels with the answer', /gov\.uk\/vat-registration\/when-to-register/.test(read('lib/vatstanding.ts')));
+  ok('...and it is pushed into the answer, not merely defined in the file',
+    /parts\.push\(VAT_SOURCE\)/.test(answerSrc));
+}
+{
   const page = codeOnly(read('app/app/tax/vat/page.tsx'));
   ok('the VAT page builds the figure from his rows', /vatStanding\(rows,/.test(page));
   ok('the page prefers the rows over the account age RPC', before(page, 'const standing =', 'const turnover ='));

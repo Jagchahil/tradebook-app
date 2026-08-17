@@ -624,6 +624,16 @@ export function isScottishRatesQuestion(q) {
   // predicate silently never matched, and the walk below came back with the model answer.
   return /\\b(scotland|scottish|glasgow)\\b/i.test(q) && /\\b(tax|rate|rates|band|bands)\\b/i.test(q);
 }
+// B18, 17 August 2026. The VAT lane, which this router did not have. Stubbed to its plainest
+// clause, the word itself with no money amount beside it: the real matcher's refusal of a logged
+// figure and of a statement of fact about his own registration is owned by test/waintents.test.mjs.
+// What this sandbox walks is that the gate exists, that it sits above the model, and above all that
+// what comes back is HIS POSITION and not the statute.
+export function isVatQuestion(q) {
+  // ⚠️ DOUBLE BACKSLASHES, for the reason written on the stub above.
+  if (/\u00a3\\s*\\d/.test(q)) return false;
+  return /\\bvat\\b/i.test(q);
+}
 `);
   // ⚠️ isClaimQuestion IS STUBBED FALSE, ALONGSIDE A checkExpense THAT ANSWERS NOTHING. This
   // sandbox walks the ROUTING, not the corpus, and the two stubs agree: the claim lane produces no
@@ -667,6 +677,19 @@ export async function insertTransaction(record) { state.writes.push({ fn: 'inser
 export async function mergeIntoTransaction(userId, id, patch) { state.writes.push({ fn: 'merge', id, patch }); return true; }
 export async function storeReceiptImage() { return 'receipts/u-1/2026-08-05-x.jpg'; }
 export async function readVatProfile() { return null; }
+`);
+  // 🔴 B18. THE ONE VAT READER, STUBBED SO THE WALK CAN TELL WHOSE BOOKS WERE OPENED. The real
+  // lib/vatanswer.ts does two Supabase reads and hands lib/vatstanding.ts the rows; its window, its
+  // refusal on a failed read and the order of the sentences it produces are owned by
+  // test/run2fixes.test.mjs against the real files. What this sandbox proves is the half no static
+  // read can: that a customer typing a VAT question into this chat receives HIS FIGURE, that the
+  // reader was asked about HIS account, and that the model was never called.
+  w('vatanswer.ts', `
+export const state = { asked: [] };
+export async function vatAnswerForUser(userId) {
+  state.asked.push(userId);
+  return 'Your last twelve months come to \u00a383,562.07, so you are \u00a36,437.93 below the line.';
+}
 `);
   w('chatref.ts', `
 export function verifyChatRef(ref) { return ref === 'sealed' ? { kind: 'chat', id: 'conv-1' } : null; }
@@ -752,6 +775,7 @@ export function chatRefBelongsTo() { return true; }
   const AI = await import(pathToFileURL(path.join(rt, 'claude.ts')).href);
   const RI = await import(pathToFileURL(path.join(rt, 'receiptingest.ts')).href);
   const SCOT = await import(pathToFileURL(path.join(rt, 'scotland.ts')).href);
+  const VA = await import(pathToFileURL(path.join(rt, 'vatanswer.ts')).href);
 
   const screwfix = {
     merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
@@ -850,6 +874,43 @@ export function chatRefBelongsTo() { return true; }
     const { turns } = await post({ q: 'am in glasgow mate, how much should i be putting by for the taxman' });
     ok('⚠️ a Scottish message asking HOW MUCH is not eaten by the rates lane',
       turns.length === 2 && turns[1].content !== SCOT.SCOTTISH_RATES_ANSWER);
+  }
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B18. THE VAT LANE, RUN RATHER THAN READ. 17 August 2026.
+  //
+  // FOUND ON THIS SURFACE. Signed in as a Glasgow sole trader with 77 confirmed entries, this chat
+  // was asked "am in glasgow, is vat different up here" and answered: "No, VAT is the same across
+  // the UK, including Scotland. The threshold is £90,000 rolling 12-month turnover to register, and
+  // deregistration at £88,000." Every figure correct, and not one of them his. isVatQuestion was
+  // dispatched by the webhook and by nothing else, so the man who asked the most consequential
+  // threshold question of his trading life on the web got the statute out of a model while his own
+  // books sat one table away.
+  //
+  // ⚠️ THE THIRD ASSERTION IS THE ONE THAT COULD NOT BE MADE ANYWHERE ELSE. laneparity derives that
+  // the call site sits above the model, which is an argument about indices. This RUNS the route, so
+  // it can hold that the reader was handed THIS customer's id, which is the difference between a
+  // wired lane and a lane that answers about somebody.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  {
+    VA.state.asked.length = 0;
+    const { turns, writes } = await post({ q: 'should i be registered for vat, im scared im getting close' });
+    ok('🔴 A VAT QUESTION IS ANSWERED FROM HIS OWN ROWS, and the ingest never wakes',
+      writes.length === 0 && turns.length === 2
+      && turns[1].content === 'Your last twelve months come to £83,562.07, so you are £6,437.93 below the line.');
+    ok('🔴 ...AND THE MODEL WAS NEVER ASKED, so he is not charged for it and it cannot invent a run rate',
+      turns.length === 2 && turns[1].content !== 'the model answer');
+    ok('🔴 ...AND THE READER WAS ASKED ABOUT HIS ACCOUNT, not merely called',
+      VA.state.asked.length === 1 && VA.state.asked[0] === 'u-1');
+  }
+  // ⚠️ AND A VAT AMOUNT BEING LOGGED IS NOT A VAT QUESTION. "vat was £4.83" is a figure on a
+  // receipt, and a lane that eats it turns an entry into a lecture about the threshold. The real
+  // matcher refuses any message carrying a money amount; the stub carries that one clause, so this
+  // walks the wiring rather than restating test/waintents.test.mjs.
+  {
+    VA.state.asked.length = 0;
+    const { turns } = await post({ q: 'the vat on it was £4.83' });
+    ok('⚠️ a VAT amount being logged never reaches the VAT lane',
+      VA.state.asked.length === 0 && turns[1].content !== 'Your last twelve months come to £83,562.07, so you are £6,437.93 below the line.');
   }
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 RUN 6 F7. TWO QUESTIONS IN ONE MESSAGE, ANSWERED IN HALF, SILENTLY.

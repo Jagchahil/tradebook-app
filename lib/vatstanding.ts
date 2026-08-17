@@ -213,3 +213,74 @@ export function standingSentence(s: VatStanding, gbp: (n: number) => string): st
           + `${gbp(s.distance)} below the line.`;
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WHOLE ANSWER, NOT JUST THE FIRST SENTENCE. B18, 17 August 2026.
+//
+// standingSentence above has been the shared piece since Run 2. The four things that go AROUND it
+// were not shared: they were assembled inside handleVatQuestion in app/api/whatsapp/route.ts, so
+// the only channel that could give a customer the whole answer was the one channel that had a VAT
+// lane at all.
+//
+// 🔴 WHAT THAT COST, LIVE, ON 17 AUGUST. Signed in as Callum Strachan, a Glasgow sole trader with
+// 77 confirmed entries, the web chat was asked "am in glasgow, is vat different up here". It
+// replied: "No, VAT is the same across the UK, including Scotland. The threshold is £90,000 rolling
+// 12-month turnover to register, and deregistration at £88,000."
+//
+// Every figure in that is correct. That is not the defect. The defect is that it is the STATUTE,
+// out of a language model, to a man whose own books were sitting one table away and hold the only
+// part of the answer that is about him. He asked the most consequential threshold question of his
+// trading life and was told what the law says instead of where he stands in it, and crossing that
+// line late is a penalty.
+//
+// ⚠️ SO THE ASSEMBLY MOVES HERE AND THE ROUTERS KEEP NONE OF IT. Same judgement as the header of
+// this file: this product has shipped three different answers to one statutory question before, and
+// the only structural cure is that there is one place to be right. lib/vatanswer.ts does the two
+// reads. This function does the words. Neither lives in a router.
+//
+// ⚠️ THE CARD FEE CAVEAT TRAVELS, AND THE QUESTION WAS ASKED PROPERLY BEFORE IT DID. The doubt
+// recorded on the backlog was whether it belongs on a surface that cannot see the bank feed the
+// webhook can. It does, and the two things are unrelated: app/api/thread/route.ts withholds the
+// bank OFFER in busyMessage because it cannot verify a connection, which is a fact about our
+// plumbing. CARD_FEE_NOTE is a fact about HIS ROWS, that a card payout banks net of the provider's
+// fee while the VAT test runs on the gross supply, and those are the same rows on all three
+// surfaces. Withholding it on the web would mean a near line customer is warned on WhatsApp and not
+// warned in the chat, about the same understatement, in the same books.
+//
+// ⚠️ AND IT IS STILL SAID ONLY WHERE IT CAN CHANGE WHAT HE DOES, which is why the nearLine guard
+// comes with it rather than being flattened into "always". Over the line he must register whatever
+// the fee did; far below it the sentence is noise on a screen doc 103 says he is reading one handed.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The source travels with the answer, on every channel. A statutory claim a customer cannot check
+// is a claim he has to take on trust, and this one decides whether he registers.
+export const VAT_SOURCE = 'Source: https://www.gov.uk/vat-registration/when-to-register';
+
+// 🔴 A FAILED READ IS SAID OUT LOUD, IT IS NEVER A REASSURANCE. If the rows do not come back we do
+// not know where he stands, and the one answer that must never be given to a man near the line is a
+// comfortable sounding guess. These are the webhook's own words, moved here so all three channels
+// refuse in the same sentence rather than three sentences that drift.
+export const VAT_UNREADABLE =
+  'I could not read your figures just now, and I am not going to answer a VAT question with a '
+  + 'guess. Try me again in a minute.';
+
+/**
+ * The VAT answer every door gives, in the order a frightened customer needs it.
+ *
+ * His figure first, then both statutory tests, then the card fee gap when it is close enough to
+ * matter, then the source. The lead is not a style choice: it is the promise test/run2fixes.test.mjs
+ * holds by index, that a man is told WHERE HE STANDS before he is told what the rules are.
+ */
+export function vatAnswer(s: VatStanding, gbp: (n: number) => string): string {
+  const parts: string[] = [standingSentence(s, gbp)];
+
+  // Both tests, always. People who know about the rolling twelve months usually do not know about
+  // the forward look, and the forward look is the one that registers you the same day.
+  parts.push(BACKWARD_TEST);
+  parts.push(FORWARD_TEST);
+
+  if ('nearLine' in s && s.nearLine) parts.push(CARD_FEE_NOTE);
+
+  parts.push(VAT_SOURCE);
+  return parts.join('\n\n');
+}

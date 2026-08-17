@@ -417,7 +417,22 @@ function stripComments(s) {
   return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
-const CALL_SITE_CEILING = 154;
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🟢 AND 154 WENT BACK TO 153 ON 17 AUGUST 2026, A FEW HOURS LATER, BY THE SAME 31 JULY RULE.
+//
+// B18 collapsed handleVatQuestion in app/api/whatsapp/route.ts. It held two sends, the answer and
+// an honest refusal on a failed read, plus forty lines of window arithmetic and sentence assembly
+// that the web chat and the in app accountant did not have and therefore could not give a customer.
+// The read moved to lib/vatanswer.ts, the words to lib/vatstanding.ts, and all three routers now
+// call one function. The handler that is left has ONE send in it.
+//
+// So the count fell to 153 and this number follows it down, unasked, because the alternative is the
+// spare slot the paragraph above spends a whole page refusing: a ratchet sitting one above the code
+// is a countdown that gets spent on whichever send is written next rather than on one anybody
+// weighed. A ceiling that only ever ratchets DOWN when work is shared out is the ratchet doing the
+// job it was built for.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const CALL_SITE_CEILING = 153;
 let callSites = 0;
 const perFile = [];
 for (const f of [...walk(path.join(repo, 'app')), ...walk(lib)]) {

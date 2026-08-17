@@ -50,7 +50,6 @@ import {
   readCircumstances,
   saveCircumstance,
   getBusinessProfile,
-  getConfirmedTransactionsForRange,
   findUserIdByPhone,
   normalizeUkPhone,
   readLiveWaLink,
@@ -172,10 +171,7 @@ import {
   looksLikeMoneyEntry,
   normaliseBritishTime,
 } from '../../../lib/waintents';
-import {
-  vatStanding, standingSentence, BACKWARD_TEST, FORWARD_TEST, CARD_FEE_NOTE,
-} from '../../../lib/vatstanding';
-import { VAT_REGISTRATION_THRESHOLD } from '../../../lib/vat';
+import { vatAnswerForUser } from '../../../lib/vatanswer';
 import { hmrcFilingLive } from '../../../lib/features';
 import { weeklySummaryText } from '../../../lib/weeklyupdate';
 import {
@@ -1864,54 +1860,21 @@ async function handleProductTruth(from: string, text: string): Promise<void> {
 //
 // ⚠️ THE FIGURE COMES FROM lib/vatstanding.ts AND NOWHERE ELSE. Three surfaces answered this
 // question three different wrong ways on one evening. There is one owner now.
+//
+// 🔴 AND ON 17 AUGUST 2026, B18, THE READ AND THE ASSEMBLY LEFT THIS FILE TOO. They were forty
+// lines of window arithmetic, a threshold, a registered flag, four sentences in an order that is
+// itself a promise, and an honest refusal. All of it sat inside this handler, on the one channel
+// that had a VAT lane, so the web chat and the in app accountant answered the same question out of
+// the model with the statute and no sight of his books. lib/vatanswer.ts is the one reader now and
+// all three routers call it. What is left here is the only part that is genuinely WhatsApp's: a
+// phone number is not an account until it has been bound to one.
 async function handleVatQuestion(from: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
     await replyNotLinked(from);
     return;
   }
-
-  // Twelve months back plus a day, so the window is closed by vatStanding rather than by the query
-  // being clever. A read that fails is answered honestly below, never as "you are fine".
-  const today = new Date();
-  const from12m = new Date(today.getTime() - 400 * 86400000).toISOString().slice(0, 10);
-  const [rows, vatProfile] = await Promise.all([
-    getConfirmedTransactionsForRange(userId, from12m, today.toISOString().slice(0, 10)).catch(() => null),
-    readVatProfile(userId).catch(() => null),
-  ]);
-
-  if (rows === null) {
-    await sendText(
-      from,
-      'I could not read your figures just now, and I am not going to answer a VAT question with a '
-      + 'guess. Try me again in a minute.',
-    );
-    return;
-  }
-
-  const standing = vatStanding(
-    rows,
-    today.toISOString().slice(0, 10),
-    VAT_REGISTRATION_THRESHOLD,
-    vatProfile !== null && vatProfile.registered,
-  );
-
-  const parts: string[] = [standingSentence(standing, formatGbp)];
-
-  // The two statutory tests, always both. People who know about the rolling twelve months usually
-  // do not know about the forward look, and the forward look is the one that registers you the
-  // same day.
-  parts.push(BACKWARD_TEST);
-  parts.push(FORWARD_TEST);
-
-  // ⚠️ THE CARD FEE CAVEAT, ONLY WHERE IT CAN CHANGE WHAT HE DOES. A card provider pays out net of
-  // its fee and the VAT test runs on the gross takings, so the books under-read for anyone taking
-  // cards. On this account that gap is £1,157 against £6,438 of headroom.
-  if ('nearLine' in standing && standing.nearLine) parts.push(CARD_FEE_NOTE);
-
-  parts.push('Source: https://www.gov.uk/vat-registration/when-to-register');
-
-  await sendText(from, parts.join('\n\n'));
+  await sendText(from, await vatAnswerForUser(userId));
 }
 
 // 🔴 AN INVOICE IS NOT INCOME. See matchInvoiceDraft in lib/waintents.ts for what this cost.

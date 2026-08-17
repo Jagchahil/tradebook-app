@@ -323,10 +323,17 @@ ok('🔴 nor behind a successful turnover read, because a failed read does not c
 ok('🔴 THE SOURCE LINK USES A STYLE KEY THAT EXISTS, which tsc cannot tell you',
   /style=\{S\.inlineLink\}/.test(vatCode) && /^ {2}inlineLink: \{/m.test(vat));
 
-// And the chat must keep saying it, so this is a widening and never a move.
-const wa = codeOnly(readFileSync(path.join(root, 'app/api/whatsapp/route.ts'), 'utf8'));
-ok('the WhatsApp answer still pushes both tests, so the chat lost nothing',
-  /parts\.push\(BACKWARD_TEST\)/.test(wa) && /parts\.push\(FORWARD_TEST\)/.test(wa));
+// And the conversational answer must keep saying it, so this is a widening and never a move.
+//
+// ⚠️ THE OWNER MOVED ON 17 AUGUST 2026, B18, AND THIS ASSERTION FOLLOWED THE WORK RATHER THAN
+// BEING DELETED. It used to read app/api/whatsapp/route.ts for `parts.push(BACKWARD_TEST)`, which
+// was correct while the webhook assembled the answer. It no longer does: vatAnswer in
+// lib/vatstanding.ts assembles it and all three routers call it through lib/vatanswer.ts, so the
+// promise this line makes ("the chat lost nothing") is now true of three channels instead of one,
+// and the file that can prove it is the one that does the pushing.
+const vatAns = codeOnly(readFileSync(path.join(root, 'lib/vatstanding.ts'), 'utf8'));
+ok('the conversational answer still pushes both tests, so no channel lost anything',
+  /parts\.push\(BACKWARD_TEST\)/.test(vatAns) && /parts\.push\(FORWARD_TEST\)/.test(vatAns));
 
 
 

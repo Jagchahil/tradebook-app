@@ -624,5 +624,109 @@ for (const [name, code] of ROUTERS) {
     && !/scotland\|scottish/i.test(code));
 }
 
+// ---------------------------------------------------------------------------------------------
+// 7. B18. THE VAT LANE, ON ALL THREE ROUTERS, ANSWERED FROM HIS OWN ROWS.
+// ---------------------------------------------------------------------------------------------
+// 🔴 WHY THIS SECTION EXISTS, AND IT IS THE OLDEST SHAPE IN THIS SUITE. isVatQuestion has existed
+// since Run 2 and was dispatched by app/api/whatsapp/route.ts and by nothing else, so a VAT question
+// typed into the web chat or the in app accountant was answered by the MODEL.
+//
+// Asked "am in glasgow, is vat different up here" on 17 August 2026, signed in as a sole trader with
+// 77 confirmed entries, the web chat returned: "No, VAT is the same across the UK, including
+// Scotland. The threshold is £90,000 rolling 12-month turnover to register, and deregistration at
+// £88,000." Every figure in it is correct and was checked against gov.uk live. The defect is that
+// none of it is about him. On WhatsApp the same words read his real rolling twelve months and open
+// with his own figure and his own headroom, because that is the only part of a threshold answer a
+// man can act on, and crossing the line late is a penalty.
+//
+// ⚠️ THE SITES ARE NAMED PER ROUTER, for the reason section 5 gives: the three routers genuinely
+// have three shapes, an else if chain, an early return and an assignment, and deriving one shape
+// from the argument name is how a sabotage killed a branch without turning this red.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 7. B18: the VAT lane, derived from all three routers ===\n');
+
+const vatSites = {
+  whatsapp: 'isVatQuestion(text)',
+  thread: 'isVatQuestion(q)',
+  ask: 'isVatQuestion(question)',
+};
+
+for (const [name, code] of ROUTERS) {
+  const needle = vatSites[name];
+  const n = occurrences(code, needle);
+  ok(`${name}: \`${needle}\` EXISTS in the router`, n > 0);
+  ok(`${name}: ...and exactly once, so its index names one call site`, n === 1);
+  const vatAt = n === 1 ? code.indexOf(needle) : -1;
+
+  // 🔴 AND IT IS ANSWERED BY THE ONE READER. A lane that fires and then hands the question to the
+  // model anyway is the defect wearing the fix's clothes, and this is the lane where that failure
+  // would be invisible: the model's answer to a VAT question is fluent, correct about the statute,
+  // and silent about him, which is exactly what was found live.
+  ok(`${name}: and the answer comes from lib/vatanswer.ts, not from the model`,
+    code.includes('vatAnswerForUser('));
+
+  const modelNeedle = modelCall[name];
+  const modelAt = code.indexOf(modelNeedle);
+  ok(`${name}: the paid model call was located, so the bound below is not vacuous`, modelAt !== -1);
+  ok(`🔴 ${name}: THE VAT LANE RUNS BEFORE THE MODEL, so a man near the line is never metered for it`,
+    vatAt !== -1 && modelAt !== -1 && vatAt < modelAt);
+}
+
+// The upper bound, on the two routers that HAVE a totals lane. app/api/whatsapp/route.ts has run the
+// VAT lane above the totals lane since Run 2 and says why in the chain: "should i register for vat"
+// carries a quantity word, so matchTotalsQuestion claims it and answers a registration question with
+// a set aside figure. /api/ask has no totals lane at all, so there is nothing there to order against
+// and asserting one would pass by the absence of the thing it guards.
+for (const [name, code, arg] of ROUTERS.filter(([n]) => n !== 'ask')) {
+  const totalsNeedle = `matchTotalsQuestion(${arg})`;
+  const totalsAt = code.indexOf(totalsNeedle);
+  const vatAt = code.indexOf(vatSites[name]);
+  ok(`${name}: the totals gate \`${totalsNeedle}\` was located`, totalsAt !== -1);
+  ok(`🔴 ${name}: AND THE VAT LANE RUNS ABOVE IT, so "should i register for vat" is not eaten by it`,
+    totalsAt !== -1 && vatAt !== -1 && vatAt < totalsAt);
+}
+
+// 🔴 AND ON /api/ask IT RUNS ABOVE THE SHARED CACHE, WHICH IS NOT A STYLE POINT.
+//
+// qa_cache is keyed on the QUESTION ALONE, with no user id, and is served to every other customer
+// who ever asks the same thing. That route's own header spends a paragraph explaining that the
+// guarantee has to be STRUCTURAL rather than hopeful: an answer that can be cached is composed with
+// no personal input at all. This answer is nothing but personal input. It carries his rolling twelve
+// month turnover and his distance from the line.
+//
+// The lane returns before questionNorm is ever computed, so no path reaches upsertQaCache with it.
+// Held by index in both directions, and both markers proved present first.
+{
+  const askCodeOnly = ROUTERS.find(([n]) => n === 'ask')[1];
+  const vatAt = askCodeOnly.indexOf(vatSites.ask);
+  const normAt = askCodeOnly.indexOf('const questionNorm = normaliseQuestion(question);');
+  const upsertAt = askCodeOnly.indexOf('upsertQaCache(');
+  ok('ask: the cache key line was located, so the bound below is not vacuous', normAt !== -1);
+  ok('ask: the cache WRITE was located too', upsertAt !== -1);
+  ok('🔴 ask: HIS OWN TURNOVER FIGURE IS RETURNED BEFORE THE SHARED CACHE IS EVEN KEYED',
+    vatAt !== -1 && normAt !== -1 && vatAt < normAt && vatAt < upsertAt);
+}
+
+// ⚠️ AND NO ROUTER ASSEMBLES ANY OF IT. This is the half that makes the parity durable rather than
+// momentary: three routers calling one reader while one of them also keeps the sentences is two
+// owners again, with a shared function standing next to them looking like the fix. The statutory
+// tests, the card fee note and the standing sentence are named here because they are what the
+// webhook used to hold, and they are the four things the other two channels never had.
+for (const [name, code] of ROUTERS) {
+  ok(`  ${name}: keeps no copy of the VAT sentences`,
+    !/BACKWARD_TEST/.test(code) && !/FORWARD_TEST/.test(code)
+    && !/CARD_FEE_NOTE/.test(code) && !/standingSentence\(/.test(code));
+  ok(`  ${name}: and does not read the rows for itself either`,
+    !/vatStanding\(/.test(code));
+}
+
+// One reader, one predicate, one set of words, each with exactly one home.
+ok('🔴 lib/vatanswer.ts holds the ONE reader',
+  (read('lib/vatanswer.ts').match(/export async function vatAnswerForUser/g) || []).length === 1);
+ok('🔴 lib/waintents.ts holds the ONE predicate',
+  (read('lib/waintents.ts').match(/export function isVatQuestion/g) || []).length === 1);
+ok('🔴 lib/vatstanding.ts holds the ONE assembly',
+  (read('lib/vatstanding.ts').match(/export function vatAnswer\(/g) || []).length === 1);
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

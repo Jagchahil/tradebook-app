@@ -11,9 +11,10 @@ import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 import {
   matchProductTruth, productTruthAnswer,
   isDataRightsRequest, DATA_RIGHTS_ANSWER, isVehicleQuestion, vehicleAnswer,
-  isScottishRatesQuestion,
+  isScottishRatesQuestion, isVatQuestion,
 } from '../../../lib/waintents';
 import { SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
+import { vatAnswerForUser } from '../../../lib/vatanswer';
 import { getOptimiserInput } from '../../../lib/supabase';
 import { hmrcFilingLive } from '../../../lib/features';
 
@@ -116,6 +117,27 @@ export async function POST(req: NextRequest) {
       allowanceThisYear: Math.max(0, o?.ytdCapitalAllowances ?? 0),
     });
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 VAT, ON THIS SURFACE TOO, AND HERE IT WAS COSTING HIM A QUESTION AS WELL. B18, 17 August
+  // 2026. isVatQuestion was dispatched by app/api/whatsapp/route.ts and by nothing else, so the in
+  // app accountant answered the threshold question from the model. The block above this one was
+  // written on 12 August about the data rights lane and says the whole of it in advance: "this
+  // product answers questions on THREE surfaces and the fix reached one of them."
+  //
+  // ⚠️ IT SITS WITH THE OTHER DETERMINISTIC LANES, ABOVE THE CACHE AND ABOVE THE CAP, AND THE CACHE
+  // IS THE PART THAT IS NOT OPTIONAL. qa_cache is keyed on the QUESTION ALONE with no user id and
+  // is served to every other customer who asks the same thing. This answer carries his own rolling
+  // twelve month turnover. Returning it here means it is returned before questionNorm is ever
+  // computed and long before upsertQaCache is reached, so a personal figure cannot enter a shared
+  // cache by any path. That is a structural guarantee rather than a hopeful one, exactly as the
+  // comment on the transaction summary below demands, and test/laneparity.test.mjs holds the order.
+  //
+  // ⚠️ AND ABOVE THE CAP BECAUSE A MAN NEAR THE LINE MUST NOT BE REFUSED THIS ONE FOR HAVING USED
+  // UP HIS SIX. Registering late is a penalty. The read is two queries against his own rows and
+  // costs no model call at all, so there is nothing to meter.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (!truth && isVatQuestion(question)) truth = await vatAnswerForUser(userId);
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 SCOTTISH RATES, ON THIS SURFACE TOO, AND THE HEADER ABOVE SAYS WHY IN ADVANCE. B16, 17

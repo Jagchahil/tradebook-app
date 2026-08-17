@@ -1773,13 +1773,76 @@ const NOT_A_PERSON = new Set([
   'account', 'invoice', 'client', 'customer', 'job', 'work', 'van', 'yard', 'site',
   'profit', 'income', 'turnover', 'takings', 'money', 'everything', 'something', 'anything',
   'year', 'month', 'week', 'quarter', 'day', 'today', 'yesterday', 'tomorrow', 'april', 'january',
+  // 🔴 B23, 17 August 2026, AND BOTH WERE FOUND BY MEASURING RATHER THAN BY READING. A landlord's
+  // tenant is a ROLE, not a name, and this list already knew that about his client, his customer
+  // and his firm. "how much is the tenant's rent" and "how much rent do the tenants pay" are both
+  // a man asking about his OWN income, and both started being refused the moment the property
+  // nouns went into the possessive pattern below.
+  'tenant', 'landlord',
 ]);
 
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B23. AND THE EAR COULD NOT HEAR AN ORDINARY QUESTION ABOUT SOMEBODY ELSE'S NATIONAL
+// INSURANCE, STUDENT LOAN OR PROPERTY. 17 August 2026, on production, signed in as a real account.
+//
+//   "how much national insurance does jerome pay"
+//     -> "National Insurance this tax year: £303.24 Class 4 on your profit so far. Your State
+//         Pension year looks covered."
+//   "whats jerome's student loan"
+//     -> "Nothing due so far: your income this tax year (£17,624.00) is under the Plan 4
+//         (Scotland) threshold of £33,795.00."
+//
+// Word for word the answer to his own question, about a man who is not him, and the second one
+// reads his income out loud. Run 1's finding shape with a POUNDS payload rather than B22's dates.
+//
+// ⚠️ B22 FIXED THE ORDER. THIS IS THE EAR, AND THE ORDER WAS NEVER THE WHOLE OF IT. The gate now
+// runs above the deadline lane on all three routers, which does nothing at all for a sentence the
+// gate cannot hear. A routing fix and a matcher fix are two different jobs on one defect.
+//
+// TWO SHAPES, MEASURED AGAINST THE NINE MISSES WRITTEN DOWN IN THE BACKLOG.
+//
+//   1. THE POSSESSIVE NOUN LIST WAS TOO SHORT. It ended at "share" and carried no noun for any of
+//      the three lanes B19 had just wired to three routers, so "whats jerome's student loan" was
+//      not a possessive this file recognised. Adding them closes THREE of the nine.
+//   2. AN OBJECT NOUN BETWEEN "how much" AND THE AUXILIARY BROKE THE VERB SHAPE. It required
+//      "how much <aux> <name> <verb>", so "how much NATIONAL INSURANCE does jerome pay" never
+//      matched: after "how much" comes a noun, not an auxiliary. A bounded optional run of words
+//      between them closes THREE more.
+//
+// ⚠️ THE RUN IS FIVE WORDS AND DIGITS COUNT, AND BOTH NUMBERS WERE MEASURED RATHER THAN CHOSEN.
+// The backlog sized this run at three words of letters, which was a guess and is too short for
+// what people type: "how much tax and national insurance does dave pay" is four, and "how much
+// income tax and class 4 does jerome pay" is five AND contains a digit, so a letters only class
+// could never match it however long the run was. Five with digits hears all three of those, three
+// hears none of them, and every widening step from three to eight costs the SAME on all four
+// corpora in section 9d: nothing. FIVE IS THE SMALLEST RUN THAT HEARS EVERYTHING MEASURED, which
+// is the bound worth writing down rather than the largest that happens to be free.
+//
+// 🔴 AND THE RUN REFUSES PREPOSITIONS, WHICH IS THE WHOLE OF ITS SAFETY. Without that, "how much
+// OF MY INCOME does the taxman take" captures "taxman" and refuses a man asking about his own tax
+// bill. The object of "how much X does Y pay" is a noun phrase; the moment a preposition appears,
+// the sentence has stopped being that shape and the word after the auxiliary is not a name.
+//
+// 🔴 WHAT THIS DOES NOT CLOSE, AND IT IS THREE OF THE NINE, ASSERTED SO IT CANNOT BE READ AS MORE.
+// "does jerome pay class 4" and "what national insurance is priya on" carry no "how much" at all.
+// "how are daves rentals doing" is a possessive with NO APOSTROPHE, and the optional apostrophe was
+// built, measured and REJECTED: it buys four third party shapes and costs SIX false positives
+// ("how much is this month's rent", "what is the business's turnover", "how much is the garages
+// rent"). Without the apostrophe, every plural noun in the language becomes a named person and the
+// stoplist has to carry the whole dictionary to stay safe. THE APOSTROPHE IS THE SIGNAL THAT A
+// PERSON IS BEING NAMED. test/laneparity.test.mjs section 9d holds the 6 of 9 and the 3 left open.
+//
+// ⚠️ AND EVERY NOUN IN THAT LIST IS EXERCISED BY A PHRASING IN 9d, OR IT IS NOT IN THE LIST. An
+// alternative nothing walks can be deleted in silence, which is this repo's oldest lesson wearing
+// a regex. "position" was drafted into it and taken back out on the same argument: the one miss it
+// was added for ("what is dave's property position") is already closed by propert(y|ies), so it
+// earned nothing, and it reached into questions that are not about money at all.
+// ═══════════════════════════════════════════════════════════════════════════════════════
 const NAMED_PERSON_VERB_RE =
-  /\bhow much (?:has|have|had|did|does|do|is|was)\s+(?:the\s+)?([a-z][a-z'\u2019-]{1,20})\s+(?:made|make|makes|earn|earned|earns|owe|owes|owed|spent|spend|spends|paid|pay|pays|taken|take|takes|turned|billed|invoiced)\b/i;
+  /\bhow much (?:(?!of\b|from\b|to\b|in\b|on\b|for\b|with\b|off\b|out\b|at\b|by\b|as\b)[a-z0-9'\u2019-]+\s+){0,5}?(?:has|have|had|did|does|do|is|was)\s+(?:the\s+)?([a-z][a-z'\u2019-]{1,20})\s+(?:made|make|makes|earn|earned|earns|owe|owes|owed|spent|spend|spends|paid|pay|pays|taken|take|takes|turned|billed|invoiced)\b/i;
 
 const NAMED_PERSON_POSSESSIVE_RE =
-  /\b([a-z][a-z'\u2019-]{1,20})(?:'s|\u2019s)\s+(?:books|tax|figures|takings|profit|income|account|bill|turnover|vat|earnings|wages|money|share)\b/i;
+  /\b([a-z][a-z'\u2019-]{1,20})(?:'s|\u2019s)\s+(?:books|tax|figures|takings|profit|income|account|bill|turnover|vat|earnings|wages|money|share|national insurance|ni|class ?[24]|student loan|propert(?:y|ies)|rentals?|rent)\b/i;
 
 // The customer's own name is not somebody else. Split on whitespace so "Marcus Whitfield" excuses
 // both "marcus" and "whitfield", and lower cased because nobody capitalises their partner on
@@ -1797,6 +1860,11 @@ function namesAPerson(b: string, selfNames: string[]): boolean {
     if (!m) continue;
     const word = (m[1] ?? '').toLowerCase();
     if (!word || NOT_A_PERSON.has(word)) continue;
+    // 🔴 B23. THE STOPLIST WAS SINGULAR ONLY AND NOBODY HAD NOTICED, because until the object noun
+    // shape above existed nothing could capture a plural. "customer", "client", "shop", "year" and
+    // "month" are all in it and NONE of them worked in the plural, so "how much rent do the tenants
+    // pay" read "tenants" as a person. A word that is not a person is not a person in either number.
+    if (word.endsWith('s') && NOT_A_PERSON.has(word.slice(0, -1))) continue;
     if (selfNames.includes(word)) continue;
     return true;
   }

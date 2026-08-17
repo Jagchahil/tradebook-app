@@ -1259,6 +1259,363 @@ for (const [name, code] of ROUTERS) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// 9d. B23. THE THIRD PARTY GATE'S EAR, WIDENED, AND MEASURED IN BOTH DIRECTIONS.
+// ---------------------------------------------------------------------------------------------
+// 🔴 FOUND 17 August 2026 ON PRODUCTION, signed in, by the three lanes session typing the adjacent
+// question into the surface it had just wired, AFTER its own walk had already succeeded.
+//
+//   "how much national insurance does jerome pay"
+//     -> "National Insurance this tax year: £303.24 Class 4 on your profit so far."
+//   "whats jerome's student loan"
+//     -> "Nothing due so far: your income this tax year (£17,624.00) is under the Plan 4
+//         (Scotland) threshold of £33,795.00."
+//
+// Word for word the answer to his own question, about a man who is not him, and the second one
+// reads his income out loud. Section 9c hoisted the gate ABOVE the deadline lane on all three
+// routers, which does nothing whatever for a sentence the gate cannot HEAR. B22 was the order.
+// This is the ear, and they are two jobs on one defect.
+//
+// ⚠️ EVERY WIDENING IS MEASURED IN BOTH DIRECTIONS, IN THE SAME PACKET, AND THE NUMBERS ARE THE
+// ONES MEASURED RATHER THAN THE ONES HOPED FOR. Section 9c's "1 of 4" is the model: if one of the
+// numbers below goes red because somebody widened the matcher again, THAT IS THIS SECTION WORKING.
+// Re measure it, write the new number in, and say in the commit what the gate can now hear. Do NOT
+// delete the line: its whole job is that a partial fix can never be read later as a whole one.
+//
+// FOUR CORPORA, AND EACH ONE ANSWERS A DIFFERENT QUESTION.
+//
+//   the nine misses      does it hear what it could not hear
+//   the six controls     did the widening LOSE anything it already heard
+//   the self phrasings   did it start refusing a man asking about his own money
+//   the 37 predicates    did it start eating an honest lane, visible BY NAME rather than in bulk
+//
+// ⚠️ THE FOURTH IS THE ONE THAT COULD NOT BE DONE IN AGGREGATE. A count of false positives over a
+// pile of sentences says a widening is safe on average. The scope table names every predicate any
+// router dispatches, so the sweep can be complete BY CONSTRUCTION instead of by somebody's memory:
+// the keys below are asserted equal to the derived dispatch list in BOTH directions, so a new lane
+// goes red by name until somebody writes a phrasing for it.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 9d. B23: the third party gate\'s ear, measured in both directions ===\n');
+
+// The nine, verbatim from the finding. These are the targets.
+const B23_MISSES = [
+  'how much national insurance does jerome pay',
+  "whats jerome's student loan",
+  "how are jerome's properties doing",
+  'how much national insurance has jerome paid',
+  'how much student loan does priya owe',
+  "what is dave's property position",
+  'does jerome pay class 4',
+  'what national insurance is priya on',
+  'how are daves rentals doing',
+];
+
+// Third party shapes the gate ALREADY heard before B23. A widening that loses one has traded a
+// refusal for a refusal and gained nothing.
+const B23_CONTROLS = [
+  'how much has jerome made this year',
+  "whats jerome's profit",
+  'how much did priya earn',
+  'how much has jerome spent this year',
+  "whats jerome's income",
+  'what does the barber next door owe you lot then',
+];
+
+// A vent is long, has no question mark, and asks for nothing. The predicate needs 300 characters.
+const VENT = 'right so the council have been at it again this morning i parked on the same bit of road i have parked on for eleven years and there was a bloke there with a machine before i had even got the ladders off the roof and he would not have it that i was working and now there is a ticket on the windscreen and the whole day is behind before it has started and i have three jobs on and no way of getting to any of them on time';
+
+// Ordinary self phrasings. The direction a widening costs a customer his answer. The first
+// seventeen are section 11b's own B19_PHRASES, unchanged, so the three lanes are held to the same
+// corpus here as there. The rest are the shapes the two widenings put at risk, named in the item
+// or found by measuring: "how much <noun> do i <verb>", where the captured word would be "i"; the
+// bare s possessives; a CUSTOMER named in his own question; and a business whose name is a person.
+const B23_SELF = [
+  'how much national insurance do i pay',
+  'what is my class 4',
+  'do i need to pay class 2',
+  'am i paying enough for my state pension',
+  'how much ni do i pay',
+  'what national insurance will i owe this year',
+  'do i pay national insurance on my profit',
+  'how much student loan will i owe',
+  'whats my uni loan looking like',
+  'do i owe on my postgraduate loan',
+  'how much student loan is building up',
+  'what will my student loan repayment be',
+  'how are my properties doing',
+  'what tax do i owe on my rental',
+  'how is my rental income doing',
+  'what is my property position',
+  'how much tax on my rentals',
+  // Shape 2's NAMED RISK: "how much <noun> do i <verb>", where the captured word would be "i".
+  'how much tax do i pay',
+  'how much student loan do i owe',
+  'how much national insurance did i pay last year',
+  'how much class 4 do i pay',
+  'how much vat do i owe',
+  'how much money did i make',
+  'how much have i paid in tax',
+  'how much rent did i take this month',
+  'how much profit have i made',
+  'how much did i earn last year',
+  'how much do i owe',
+  // The same shape with no first person word in it at all, which is where the stoplist has to work.
+  'how much tax does a sole trader pay',
+  'how much national insurance does a self employed person pay',
+  'how much student loan does the average person owe',
+  'how much rent does the flat bring in',
+  'how much of my income does the taxman take',
+  "how much is this month's rent",
+  "how much was last year's rent",
+  "what is the business's turnover",
+  "how much is the tenant's rent",
+  // The new possessive nouns, on things that are not people.
+  "what is the company's national insurance",
+  "what is the business's rent",
+  "how much is this year's ni",
+  // The long object noun, on his own money. This is the direction the run's bound puts at risk.
+  'how much tax and national insurance do i pay',
+  'how much income tax and class 4 do i pay',
+  'how much tax and national insurance does a sole trader pay',
+  'how much tax and national insurance does the average sparky pay',
+  // Bare s possessives, which is where an optional apostrophe would do its damage. Every one of
+  // these is a man asking about his OWN money in the way people actually type.
+  'how much is the flats rent',
+  'how much is the houses rent',
+  'how much was this weeks takings',
+  'how much is this quarters vat',
+  'how much is the customers bill',
+  'whats the clients account',
+  'hows the firms profit',
+  'what is the units rent',
+  'how much is the garages rent',
+  'how much rent do the tenants pay',
+  'how much did the landlord charge',
+  // The customer named in his own question, which is the shape the job asked to be checked.
+  'what did i invoice priya for',
+  'how much have i invoiced priya',
+  'how much has priya paid me',
+  'what did i bill dave for',
+  // A business whose name looks like a person.
+  "how much is dave's plumbing turning over",
+  'how much has murphy and sons paid me',
+];
+
+// Third party shapes with a bare s possessive and NO apostrophe. Measured separately and left
+// OPEN on purpose, with the argument in lib/waintents.ts: making the apostrophe optional buys
+// these four and costs six false positives, because without it every plural noun in the language
+// becomes a named person.
+const B23_BARE_S = [
+  'how are daves rentals doing',
+  'how much is my mates rent',
+  'what is dads share',
+  'hows jeromes profit looking',
+];
+
+// One or more phrasings for every predicate any router dispatches.
+const B23_LANE_PHRASINGS = {
+  isAboutSomeoneElse: ['how much has jerome made this year'],
+  isDataRightsRequest: ['delete all my data', 'export all my data', 'right to be forgotten'],
+  isDeadlineQuestion: ['when is my tax due', 'when is the self assessment deadline'],
+  isDeleteLast: ['delete that', 'undo that'],
+  isGoalDone: ['goal done', 'goal smashed'],
+  isGoalQuestion: ['how am i doing on my goal', 'hows my goal going'],
+  isGreeting: ['hello', 'hi mate'],
+  isIdentity: ['who are you', 'what is lekhio'],
+  isInvoiceThis: ['invoice this'],
+  isNiQuestion: ['how much national insurance do i pay', 'what is my class 4'],
+  isNonWords: ['...', '\u{1F44D}'],
+  isPricing: ['how much does lekhio cost', 'what does lekhio cost'],
+  isPropertyQuestion: ['how are my properties doing', 'what is my property position'],
+  isSavingsQuestion: ['how much have you saved me', 'was it worth it'],
+  isScottishRatesQuestion: ['do i pay scottish tax rates', 'i live in scotland what rate am i on'],
+  isSetupRequest: ['set me up', 'run setup'],
+  isStudentLoanQuestion: ['how much student loan will i owe'],
+  isSupportRequest: ['i want to talk to a human', 'i have a complaint'],
+  isThanks: ['thanks', 'nice one'],
+  isVatQuestion: ['should i be registered for vat', 'whats the vat threshold'],
+  isVehicleQuestion: ['can i claim for my van', 'is mileage better on the van'],
+  isVent: [VENT],
+  isWeeklySummaryRequest: ['send me my weekly summary'],
+  looksLikeMoneyEntry: ['screwfix 42.30', 'diesel 60'],
+  matchAck: ['yes', 'yep'],
+  matchChaseRequest: ['chase that invoice'],
+  matchEditLast: ['change that to 50'],
+  matchGoalSet: ['my goal is a van for 24k'],
+  matchInvoiceDraft: ['draft an invoice for the fennel wedding balance, 380'],
+  matchProductTruth: ['are you hmrc approved', 'do you file my tax return'],
+  matchRentIn: ['rent in 750'],
+  matchReservedWord: ['stop'],
+  matchSalarySet: ['my salary is 30000'],
+  matchStopStart: ['stop', 'start'],
+  matchStudentLoanPlanSet: ['plan 2'],
+  matchTotalsQuestion: ['how much do i owe', 'what have i made this year'],
+  matchUseOfHomeElection: ['claim use of home, i do 30 hours a month'],
+};
+
+// 🔴 ONE THIRD PARTY PHRASING PER NOUN ADDED TO THE POSSESSIVE PATTERN, so no alternative in it
+// can be deleted in silence. A noun with nothing walking it is a noun a sabotage removes for free,
+// and this repo has been bitten by exactly that shape more than once. If a noun ever leaves the
+// pattern deliberately, its line here leaves with it, in the same commit, with the reason.
+const B23_NOUNS = [
+  "whats jerome's national insurance",
+  "whats jerome's ni",
+  "whats jerome's class 4",
+  "whats priya's class 2",
+  "whats jerome's student loan",
+  "how are jerome's properties doing",
+  "what is dave's property",
+  "hows jerome's rentals doing",
+  "whats jerome's rent",
+];
+
+{
+  const deaf = B23_NOUNS.filter((p) => !aboutElse(p));
+  ok(`🔴 EVERY NOUN IN THE POSSESSIVE PATTERN IS WALKED, ${B23_NOUNS.length} phrasings${deaf.length ? `, NOT HEARD: ${deaf.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    deaf.length === 0);
+}
+
+// 🔴 THIRD PARTY QUESTIONS WITH A LONG OBJECT NOUN, which is what set the run's bound. The item
+// that sized this shape guessed three words of letters. People type more than that and they type
+// digits: "class 4" is the name HMRC uses. Five with digits is the SMALLEST run that hears all
+// three of these; three hears none of them; every step from three to eight costs the same on all
+// four corpora below, which is nothing. If the run is ever shortened, these go red first.
+const B23_LONG_OBJECT = [
+  'how much tax and national insurance does dave pay',
+  'how much income tax and class 4 does jerome pay',
+  'how much student loan and national insurance does priya owe',
+];
+
+{
+  const deaf = B23_LONG_OBJECT.filter((p) => !aboutElse(p));
+  ok(`🔴 THE OBJECT NOUN RUN REACHES ALL ${B23_LONG_OBJECT.length} LONG THIRD PARTY SHAPES${deaf.length ? `, NOT HEARD: ${deaf.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    deaf.length === 0);
+}
+
+// ── DIRECTION ONE: THE NINE. ────────────────────────────────────────────────────────────────
+{
+  const heard = B23_MISSES.filter((p) => aboutElse(p));
+  const open = B23_MISSES.filter((p) => !aboutElse(p));
+  ok(`⚠️ THE GATE HEARS ${heard.length} OF ${B23_MISSES.length} THIRD PARTY MONEY SHAPES. RE MEASURE THIS, NEVER DELETE IT`,
+    heard.length === 6);
+  // 🔴 AND THE THREE IT STILL CANNOT HEAR, BY NAME, so a later reader cannot mistake a widening
+  // for a closure. Two carry no "how much" at all and one is a possessive with no apostrophe.
+  eq('⚠️ ...and the three left open are these three and no others',
+    open.slice().sort(),
+    ['does jerome pay class 4', 'how are daves rentals doing', 'what national insurance is priya on']);
+  // Every one of the nine still reaches one of the three lanes, which is what makes it a defect
+  // rather than a curiosity: a phrase the gate misses is answered from HIS rows.
+  const claimed = B23_MISSES.filter((p) => W.isNiQuestion(p) || W.isStudentLoanQuestion(p) || W.isPropertyQuestion(p));
+  ok(`🔴 all ${claimed.length} of ${B23_MISSES.length} are still claimed by one of the three lanes, so a miss is answered from HIS OWN rows`,
+    claimed.length === B23_MISSES.length);
+}
+
+// ── DIRECTION TWO: NOTHING WAS LOST. ────────────────────────────────────────────────────────
+{
+  const lost = B23_CONTROLS.filter((p) => !aboutElse(p));
+  ok(`🔴 THE WIDENING LOSES NONE OF THE ${B23_CONTROLS.length} SHAPES THE GATE ALREADY HEARD${lost.length ? `, LOST: ${lost.join('; ')}` : ''}`,
+    lost.length === 0);
+}
+
+// ── DIRECTION THREE: A MAN ASKING ABOUT HIS OWN MONEY IS NEVER REFUSED. ─────────────────────
+{
+  const refused = B23_SELF.filter((p) => aboutElse(p));
+  ok(`the self corpus is big enough to be worth something, ${B23_SELF.length} phrasings`, B23_SELF.length >= 50);
+  ok(`🔴 ZERO OF ${B23_SELF.length} ORDINARY SELF PHRASINGS ARE REFUSED BY THE WIDENED EAR${refused.length ? `, REFUSED: ${refused.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    refused.length === 0);
+}
+
+// ── AND THE ONE THAT WAS MEASURED AND LEFT OPEN, ASSERTED SO THE DECISION CANNOT ROT. ───────
+{
+  const heard = B23_BARE_S.filter((p) => aboutElse(p));
+  // ⚠️ IF THIS GOES RED, SOMEBODY MADE THE APOSTROPHE OPTIONAL. That is allowed, and it is a real
+  // improvement, but it is NOT free: re run the self corpus above in the same packet and write
+  // down what it cost. The six it cost when this was measured are named in lib/waintents.ts.
+  ok(`⚠️ THE GATE HEARS ${heard.length} OF ${B23_BARE_S.length} BARE S POSSESSIVES, which is the shape deliberately left open`,
+    heard.length === 0);
+}
+
+// ── DIRECTION FOUR: THE SWEEP ACROSS EVERY DISPATCHED PREDICATE. ────────────────────────────
+{
+  // The dispatch list, derived exactly as section 9b derives it, so this sweep is complete by
+  // construction rather than by anybody's memory of which lanes exist.
+  const names = new Set();
+  for (const m of read('lib/waintents.ts').matchAll(/^export\s+(?:async\s+)?function\s+([A-Za-z0-9_]+)/gm)) names.add(m[1]);
+  for (const m of read('lib/waintents.ts').matchAll(/^export\s+const\s+([A-Za-z0-9_]+)/gm)) names.add(m[1]);
+  const dispatched = [...names].filter((n) => /^(is|match|looksLike)[A-Z]/.test(n)
+    && !['asksAmount', 'compoundAsk'].includes(n)
+    && ROUTERS.some(([, code]) => new RegExp(`\\b${n}\\s*\\(`).test(code))).sort();
+  ok(`the dispatch list was derived off disk, ${dispatched.length} predicates`, dispatched.length >= 30);
+
+  const noPhrasings = dispatched.filter((n) => !B23_LANE_PHRASINGS[n]).sort();
+  ok(`🔴 EVERY DISPATCHED PREDICATE HAS A PHRASING IN THIS SWEEP${noPhrasings.length ? `, MISSING: ${noPhrasings.join(', ')}` : ''}`,
+    noPhrasings.length === 0);
+  const deadKeys = Object.keys(B23_LANE_PHRASINGS).filter((n) => !dispatched.includes(n)).sort();
+  ok(`🔴 AND NO PHRASING LIST HAS ROTTED${deadKeys.length ? `, DEAD: ${deadKeys.join(', ')}` : ''}`,
+    deadKeys.length === 0);
+
+  // A phrase that does not reach its own predicate proves nothing about anything above it.
+  const unreached = [];
+  let walked = 0;
+  for (const [lane, phrases] of Object.entries(B23_LANE_PHRASINGS)) {
+    for (const p of phrases) {
+      walked += 1;
+      let own = false;
+      try { const r = W[lane](p); own = r !== null && r !== false && r !== undefined; } catch { own = false; }
+      if (!own) unreached.push(`${lane}: ${JSON.stringify(p)}`);
+    }
+  }
+  ok(`the sweep walked ${walked} phrasings, so it is not vacuous`, walked >= 55);
+  ok(`🔴 EVERY PHRASING REACHES ITS OWN PREDICATE${unreached.length ? `, DOES NOT: ${unreached.join('; ')}` : ''}`,
+    unreached.length === 0);
+
+  const eaten = [];
+  for (const [lane, phrases] of Object.entries(B23_LANE_PHRASINGS)) {
+    if (lane === 'isAboutSomeoneElse') continue;
+    for (const p of phrases) if (aboutElse(p)) eaten.push(`${lane}: ${JSON.stringify(p)}`);
+  }
+  ok(`🔴 THE WIDENED EAR CLAIMS NONE OF THEM${eaten.length ? `, EATEN: ${eaten.join('; ')}` : ''}`,
+    eaten.length === 0);
+}
+
+// ── AND THE ORDER, WHICH A MATCHER CHANGE CAN BREAK WITHOUT TOUCHING A ROUTER. ──────────────
+//
+// 🔴 THIS IS THE HALF SECTION 9c CANNOT DO. 9c proves the gate sits above the deadline lane by
+// index. It says nothing about whether a sentence the gate can NOW hear reaches it, because on the
+// day 9c was written the gate could not hear these six at all. A phrase claimed by a lane sitting
+// ABOVE the gate is answered by that lane and never refused, which is the defect with a different
+// lane wearing it. So the gates above the gate are DERIVED per router and every newly heard phrase
+// is walked through all of them.
+{
+  const exported = [];
+  for (const m of read('lib/waintents.ts').matchAll(/^export\s+(?:async\s+)?function\s+((?:is|match|looksLike)[A-Za-z0-9_]*)/gm)) exported.push(m[1]);
+  const NEWLY_HEARD = B23_MISSES.filter((p) => aboutElse(p));
+  ok(`the six newly heard phrases were derived, not typed, ${NEWLY_HEARD.length} of them`, NEWLY_HEARD.length === 6);
+
+  for (const [name, code] of ROUTERS) {
+    const gateAt = code.indexOf(elseSites[name]);
+    ok(`${name}: the gate site was located, so the walk below is not vacuous`, gateAt !== -1);
+    const above = exported.filter((fn) => {
+      if (fn === 'isAboutSomeoneElse') return false;
+      const m = code.match(new RegExp(`\\b${fn}\\s*\\(`));
+      return m && m.index !== -1 && m.index < gateAt;
+    });
+    const eaten = [];
+    for (const phrase of NEWLY_HEARD) {
+      for (const fn of above) {
+        let hit = false;
+        try { const r = W[fn](phrase); hit = r !== null && r !== false && r !== undefined; } catch { hit = false; }
+        // Same note as 11b: the deadline gate is `isDeadlineQuestion(x) && !asksAmount(x)`, so
+        // judging the predicate alone would report a phrase eaten that the router never gives it.
+        if (hit && fn === 'isDeadlineQuestion' && W.asksAmount(phrase)) hit = false;
+        if (hit) eaten.push(`${fn} claims ${JSON.stringify(phrase)}`);
+      }
+    }
+    ok(`🔴 ${name}: NOTHING ABOVE THE GATE CLAIMS ONE OF THE SIX IT CAN NOW HEAR${eaten.length ? `, EATEN: ${eaten.join('; ')}` : ''}`,
+      eaten.length === 0);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
 // 11. B19. THE NATIONAL INSURANCE, STUDENT LOAN AND PROPERTY LANES, ON ALL THREE ROUTERS.
 // ---------------------------------------------------------------------------------------------
 // 🔴 WHY THIS SECTION EXISTS, AND IT IS THE SIXTH TIME. isNiQuestion, isStudentLoanQuestion and

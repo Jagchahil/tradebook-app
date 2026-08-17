@@ -158,6 +158,8 @@ import {
   vehicleAnswer,
   // RUN 2, 12 August 2026. See the dispatch chain and the floor at the end of it.
   isVatQuestion,
+  // B16 and the B2 intercept, 17 August 2026. See the dispatch chain, above isQuestion.
+  isScottishRatesQuestion,
   isAboutSomeoneElse,
   SOMEONE_ELSE_ANSWER,
   matchInvoiceDraft,
@@ -184,7 +186,7 @@ import { openTicket } from '../../../lib/support';
 import { matchKb } from '../../../lib/supportkb';
 import { soleTraderTax, homeOfficeFlatRateMonthly, FACTS } from '../../../lib/taxengine';
 import { taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition } from '../../../lib/taxoptimiser';
-import { SCOTLAND_LINE } from '../../../lib/scotland';
+import { SCOTLAND_LINE, SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { aprilDelta } from '../../../lib/propertyengine';
 import { niPosition, studentLoanRepayment, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
@@ -645,6 +647,31 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handleWeeklySummary(from);
           } else if (matchTotalsQuestion(text)) {
             await handleTotals(from, text);
+          // ═══════════════════════════════════════════════════════════════════════════════
+          // 🔴 SCOTTISH RATES, THE LAST GATE BEFORE THE MODEL. B16, 17 August 2026.
+          //
+          // B2 caught this channel's own prompt block with NO Scotland rule in it at all, and the
+          // in app accountant, which did have one, answering a Glasgow plumber that his rates are
+          // the same as England and then quoting a band table from no year in force. The rule is
+          // now in the block both prompts spread. This is the gate that means it does not have to
+          // be obeyed: one sentence, from lib/scotland.ts, computed by nobody.
+          //
+          // ⚠️ IT SITS BELOW matchTotalsQuestion AND THAT ORDER IS THE POINT, NOT AN ACCIDENT.
+          // "am in glasgow mate, how much should i be putting by for the taxman" is a man asking
+          // for HIS FIGURE, and since J8 the totals lane answers it with the figure AND the
+          // sentence. Above the totals lane he would get the caveat and no number, which is
+          // "he asked how much and was told a rule": the same defect test/laneparity.test.mjs was
+          // written for, with the hands changed over. Everything that reaches here asked about the
+          // RATES and has no figure of its own to be given.
+          //
+          // ⚠️ AND IT SITS BELOW THE VAT, NATIONAL INSURANCE AND STUDENT LOAN LANES, which is
+          // belt and braces rather than the guard: those three taxes are reserved and not
+          // devolved, and isScottishRatesQuestion refuses them itself, because
+          // app/api/thread/route.ts has none of those lanes and order cannot protect a channel
+          // that does not run them.
+          // ═══════════════════════════════════════════════════════════════════════════════
+          } else if (isScottishRatesQuestion(text)) {
+            await sendText(from, SCOTTISH_RATES_ANSWER);
           } else if (isQuestion(text)) {
             await handleMoneyQuestion(from, text);
           // ═══════════════════════════════════════════════════════════════════════════════

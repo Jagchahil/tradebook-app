@@ -35,7 +35,7 @@
 // Run: node test/thread.test.mjs
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
-import { readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -613,6 +613,17 @@ export function compoundAsk(q) {
   return parts.length >= 2 ? parts.slice(0, 3) : null;
 }
 export function compoundAskNote(asks) { return 'TWO QUESTIONS: ' + asks.join(' | '); }
+// B16, 17 August 2026. The Scottish rates lane. Stubbed to its plainest clause, a nation word beside
+// a tax word: the real matcher, its refusal of the three reserved taxes and the city names the real
+// customer actually typed are owned by test/laneparity.test.mjs section 6b against the real
+// lib/waintents.ts. What this sandbox walks is the ROUTING, which is that the gate exists, sits
+// BELOW the totals lane so a man asking how much still gets his figure, and sits above the model.
+export function isScottishRatesQuestion(q) {
+  // ⚠️ DOUBLE BACKSLASHES: this stub lives inside a TEMPLATE LITERAL, where a single \\b is the
+  // backspace character and not a word boundary. The first draft of this stub used \\b, the
+  // predicate silently never matched, and the walk below came back with the model answer.
+  return /\\b(scotland|scottish|glasgow)\\b/i.test(q) && /\\b(tax|rate|rates|band|bands)\\b/i.test(q);
+}
 `);
   // ⚠️ isClaimQuestion IS STUBBED FALSE, ALONGSIDE A checkExpense THAT ANSWERS NOTHING. This
   // sandbox walks the ROUTING, not the corpus, and the two stubs agree: the claim lane produces no
@@ -681,10 +692,66 @@ export function chatRefBelongsTo() { return true; }
     .replace(/from '(?:\.\.\/)+lib\/([a-zA-Z]+)'/g, "from './$1.ts'")
     .replace("from '../../app/chatref'", "from './chatref.ts'"));
 
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE STUBS ARE A HAND WRITTEN LIST, AND A HAND WRITTEN LIST OF IMPORTS HAS ALREADY COST THIS
+  // PROJECT A RED CI. 17 August 2026.
+  //
+  // test/receiptvat.test.mjs stages lib/claude.ts and its imports the same way. One new import was
+  // added to the real file, the list here did not hear about it, and the suite died with
+  // ERR_MODULE_NOT_FOUND on a temp path. The local gate at the time grepped each suite for "N
+  // failed", a CRASHING SUITE PRINTS NO SUCH LINE, so a dead suite counted as green and the handover
+  // said 230 suites, 0 failed. CI #556 found it. It happened again HERE five hours later, when the
+  // Scottish rates lane was wired into the route and this stub had never heard of it.
+  //
+  // So the list is now CHECKED AGAINST THE ROUTE, before the module is loaded. Every name the real
+  // route imports from a module this sandbox stubs must be exported by the stub, and a missing one
+  // fails BY NAME with the name in it, instead of throwing a stack trace three frames deep in the
+  // module loader. The cure for a list that rots is not a longer list, it is a derived one.
+  //
+  // ⚠️ TYPE ONLY IMPORTS ARE ERASED BEFORE LOAD AND ARE DELIBERATELY NOT DEMANDED, the same
+  // exemption test/receiptvat.test.mjs settled on and for the same reason: nothing resolves them at
+  // runtime, so a stub that omits one is not a defect.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  {
+    const stubbed = new Map();
+    for (const f of readdirSync(rt)) {
+      if (!f.endsWith('.ts')) continue;
+      const src = readFileSync(path.join(rt, f), 'utf8');
+      const names = new Set();
+      for (const m of src.matchAll(/export\s+(?:async\s+)?(?:function|const|class|let|var)\s+([A-Za-z_$][\w$]*)/g)) {
+        names.add(m[1]);
+      }
+      stubbed.set(f.replace(/\.ts$/, ''), names);
+    }
+    const wanted = [];
+    const re = /import\s+(?!type\s)\{([^}]*)\}\s*from\s*'(?:(?:\.\.\/)+lib\/|\.\.\/\.\.\/app\/)([a-zA-Z]+)'/g;
+    for (const m of routeSrc.matchAll(re)) {
+      const mod = m[2];
+      if (!stubbed.has(mod)) continue;
+      for (const raw of m[1].split(',')) {
+        const t = raw.trim();
+        // The inline type specifier, `import { busyMessage, type AiBlockReason }`. Erased before
+        // load, so a stub that omits it is not a defect. This is the exemption named above, and it
+        // must SKIP the name rather than strip the keyword off it.
+        if (/^type\s/.test(t)) continue;
+        const n = t.split(/\s+as\s+/)[0].trim();
+        if (n) wanted.push([mod, n]);
+      }
+    }
+    ok('🔴 the stub check found real imports to check, so it is not vacuous', wanted.length >= 10);
+    const holes = wanted.filter(([mod, n]) => !stubbed.get(mod).has(n));
+    ok(`🔴 EVERY name the route imports from a stubbed module IS stubbed (${wanted.length} checked)`,
+      holes.length === 0);
+    if (holes.length) {
+      for (const [mod, n] of holes) console.log(`        MISSING from the ${mod} stub: ${n}`);
+    }
+  }
+
   const R = await import(pathToFileURL(path.join(rt, 'route.ts')).href);
   const DB = await import(pathToFileURL(path.join(rt, 'supabase.ts')).href);
   const AI = await import(pathToFileURL(path.join(rt, 'claude.ts')).href);
   const RI = await import(pathToFileURL(path.join(rt, 'receiptingest.ts')).href);
+  const SCOT = await import(pathToFileURL(path.join(rt, 'scotland.ts')).href);
 
   const screwfix = {
     merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
@@ -750,6 +817,39 @@ export function chatRefBelongsTo() { return true; }
       writes.length === 0 && turns.length === 2
       && turns[0].content === 'when is the tax deadline'
       && turns[1].content === 'The deadline answer.');
+  }
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B16. THE SCOTTISH RATES LANE, RUN RATHER THAN READ. 17 August 2026.
+  //
+  // test/laneparity.test.mjs section 6 derives this lane's POSITION from the indices in all three
+  // routers, which is the right guard for an ordering defect and is still only an argument about
+  // where a call site sits. THIS is the one place in the tree where the thread route actually RUNS,
+  // so it is the only place that can prove what a customer would receive.
+  //
+  // ⚠️ AND THE ASSERTION THAT MATTERS IS THE SECOND ONE: THE MODEL WAS NEVER ASKED. B2 caught the
+  // model, on this exact surface, telling a Glasgow plumber his rates are the same as the rest of
+  // the UK and then quoting a band table with a 41% higher rate. A lane that fires and then hands
+  // the question to the model anyway is the defect wearing the fix's clothes, and the stub answer
+  // is deliberately distinguishable ('the model answer') so it cannot pass by looking similar.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  {
+    const { turns, writes } = await post({ q: 'am in glasgow mate do i pay the same income tax as england' });
+    ok('🔴 A SCOTTISH RATES QUESTION IS ANSWERED FROM lib/scotland.ts, and the ingest never wakes',
+      writes.length === 0 && turns.length === 2
+      && turns[1].content === SCOT.SCOTTISH_RATES_ANSWER);
+    ok('🔴 ...AND THE MODEL WAS NEVER ASKED, so the answer cannot be disobeyed and costs him nothing',
+      turns.length === 2 && turns[1].content !== 'the model answer'
+      && !/\b(?:19|20|21|41|42|45|46|48)\s*%/.test(turns[1].content));
+  }
+  // ⚠️ AND THE FIGURE STILL WINS WHEN HE ASKS FOR A FIGURE. Since J8 the set aside answer carries
+  // the sentence itself, so hoisting the Scotland lane above the totals lane would hand a man
+  // asking HOW MUCH a rule instead of his number. matchTotalsQuestion is stubbed to null in this
+  // sandbox, so what this proves is the narrower and still useful half: a Scottish message naming a
+  // quantity is not swallowed by the rates lane on its way past.
+  {
+    const { turns } = await post({ q: 'am in glasgow mate, how much should i be putting by for the taxman' });
+    ok('⚠️ a Scottish message asking HOW MUCH is not eaten by the rates lane',
+      turns.length === 2 && turns[1].content !== SCOT.SCOTTISH_RATES_ANSWER);
   }
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 RUN 6 F7. TWO QUESTIONS IN ONE MESSAGE, ANSWERED IN HALF, SILENTLY.

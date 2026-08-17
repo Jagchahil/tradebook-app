@@ -358,6 +358,42 @@ console.log('\n7. THE INLINE sendText COUNT MAY FALL BUT NEVER RISE');
 // So the ceiling now sits ON the count, which is the only value at which a new send is a
 // conversation. If a legitimate one lands, raise this to the new count and write the argument here,
 // the way every rise above did.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// ⚠️ 153 BECAME 154 ON 17 AUGUST 2026, FOR THE SCOTTISH RATES LANE. B16. HERE IS THE ARGUMENT, AND
+// PART OF IT IS THAT THE RULE ABOVE DOES NOT QUITE FIT, WHICH IS WORTH SAYING OUT LOUD RATHER THAN
+// QUIETLY SATISFYING ON PAPER.
+//
+// What landed: app/api/whatsapp/route.ts answers a Scottish rates question from lib/scotland.ts and
+// never asks the model. B2 walked a Glasgow sole trader and caught the conversational lanes stating
+// Scottish tax law of their own, wrongly, twice in one account: "your tax rates are the same as the
+// rest of the UK", then a band table with a 41% higher rate and no advanced rate. The prompt rule
+// that should have governed both was fixed the same day and is mitigation, not a gate. This send is
+// the gate.
+//
+// ⚠️ WHY IT DOES NOT ASK channelsFor, AND WHY THAT IS NOT THE OLD HABIT WEARING A JUSTIFICATION.
+// The rule above was written for a MESSAGE TYPE: a thing this product decides to say to a customer,
+// which therefore has a channel question to answer, which is what ROUTES exists to answer. This is
+// a REPLY. He wrote to us on WhatsApp and the reply goes back down the socket he wrote in on; there
+// is no channel to choose and channelsFor has no opinion to give. Every deterministic reply lane on
+// this router is shaped this way already: the data rights answer, somebody else's money, the vent
+// reply. None asks the table, and a row in ROUTES for "the answer to the question he just asked"
+// would be a document with a type annotation on it, which is the exact thing the 30 July note
+// complained about.
+//
+// ⚠️ SO THE TEST THIS ONE HAD TO PASS INSTEAD WAS THE COLLAPSE TEST, AND IT WAS ACTUALLY APPLIED.
+// The obvious cheaper move is to fold the fixed sentence lanes into one table of predicate and
+// constant, which would have LOWERED this number rather than raised it. It was rejected on the
+// merits and not on effort: those lanes sit at three deliberately different HEIGHTS in a first match
+// chain. The data rights gate sits above the claim corpus because "delete all my data" was answered
+// with a verdict on phone and broadband. Somebody else's money sits above every lane that reads his
+// rows. This one sits BELOW the totals lane, because since J8 a man asking how much to put by gets
+// his figure with the sentence on it, and hoisting it would hand him a rule instead of a number.
+// test/laneparity.test.mjs holds all three of those orders. One table entry cannot hold three
+// heights, so collapsing them would trade a real ordering guarantee for a count.
+//
+// It is one call site, for one new reply, in the lane that stops a model inventing a man's tax
+// bands. The rule's spirit holds: it did not stop the feature, and it made the sprawl a decision.
 // ═══════════════════════════════════════════════════════════════════════════════════════════
 
 const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', '_to_delete']);
@@ -381,7 +417,7 @@ function stripComments(s) {
   return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
-const CALL_SITE_CEILING = 153;
+const CALL_SITE_CEILING = 154;
 let callSites = 0;
 const perFile = [];
 for (const f of [...walk(path.join(repo, 'app')), ...walk(lib)]) {

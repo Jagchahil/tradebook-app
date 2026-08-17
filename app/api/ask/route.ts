@@ -11,7 +11,9 @@ import { gateForUser, refuseUnentitled } from '../../../lib/gateserver';
 import {
   matchProductTruth, productTruthAnswer,
   isDataRightsRequest, DATA_RIGHTS_ANSWER, isVehicleQuestion, vehicleAnswer,
+  isScottishRatesQuestion,
 } from '../../../lib/waintents';
+import { SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { getOptimiserInput } from '../../../lib/supabase';
 import { hmrcFilingLive } from '../../../lib/features';
 
@@ -114,6 +116,27 @@ export async function POST(req: NextRequest) {
       allowanceThisYear: Math.max(0, o?.ytdCapitalAllowances ?? 0),
     });
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 SCOTTISH RATES, ON THIS SURFACE TOO, AND THE HEADER ABOVE SAYS WHY IN ADVANCE. B16, 17
+  // August 2026. "This product answers questions on THREE surfaces and the fix reached one of
+  // them." It was written on 12 August about the data rights lane. It was true again five days
+  // later: B2 built the Scotland rule for the two prompts and this route answers from a prompt.
+  //
+  // ⚠️ THIS IS THE ROUTE WHOSE PROMPT ALREADY HAD A SCOTLAND RULE AND IGNORED IT. accountantSystem()
+  // carried the instruction as a literal all along. Asked what a Glasgow plumber should put by, the
+  // lane replied that his rates are the same as the rest of the UK, which is false, and then quoted
+  // a band table with a 41% higher rate and a 46% top rate, which matches no tax year in force. The
+  // rule moved into the shared block the same day so the other channel gets it too. This line is
+  // the part that does not depend on the model reading it.
+  //
+  // ⚠️ AND IT REFUSES TO PRICE ANYTHING, which is lib/scotland.ts's fourth rule and the reason the
+  // answer is a constant from that file rather than a sentence typed here.
+  //
+  // Above the cache and above the cap with the other three, for the reason the block above gives:
+  // the answer is fixed and true, so it costs nothing and is never withheld.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (!truth && isScottishRatesQuestion(question)) truth = SCOTTISH_RATES_ANSWER;
 
   if (truth) {
     let conversationId = '';

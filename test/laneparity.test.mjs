@@ -492,5 +492,137 @@ for (const [name, code] of ROUTERS) {
 ok('🔴 THE WHATSAPP PAYWALL EXEMPTION NAMES THE DATA RIGHTS LANE',
   /function alwaysAnswered[\s\S]{0,900}?isDataRightsRequest\(text\)/.test(waCode));
 
+// ---------------------------------------------------------------------------------------------
+// 6. B16. THE SCOTTISH RATES LANE, ON ALL THREE ROUTERS, BELOW THE FIGURE AND ABOVE THE MODEL.
+// ---------------------------------------------------------------------------------------------
+// 🔴 WHY THIS SECTION EXISTS, AND IT IS NOT THE REASON THE REST OF THIS SUITE EXISTS. Every lane
+// above was wired and then found to be wired on one channel out of two or three. This one was
+// written because the MODEL WAS WATCHED DISOBEYING AN INSTRUCTION IT HAD BEEN GIVEN.
+//
+// B2, 17 August 2026, a live Glasgow sole trader with money in the account. Two answers minutes
+// apart on one account: "you're in Scotland so your tax rates are the same as the rest of the UK",
+// which is false, and then a band table with a 41% higher rate, a 46% top rate and no advanced rate,
+// which matches no tax year in force. 2026/27 Scotland is 19, 20, 21, 42, 45 and 48.
+//
+// The rule was moved into the prompt block both channels spread on the same day, and
+// test/scotland.test.mjs section 2b holds it there. That guard is scoped to WHAT THE MODEL IS TOLD
+// and it passed all the way through both of those answers. The lesson written up that day was that
+// the scope of a guard is a place a defect can hide. So the question is now answered from code.
+//
+// THIS SECTION HOLDS THE ROUTING. test/scotland.test.mjs section 2d holds the words.
+//
+// ⚠️ AND THE ORDER IS THE ASSERTION, NOT JUST THE PRESENCE. Two bounds, and each is a real defect:
+//   . BELOW the totals lane, because since J8 "how much should i put by for the taxman" is answered
+//     with his figure AND the sentence. Hoisted above it, a man asking for a number gets a rule
+//     instead, which is section 2 of this suite's own defect with the hands changed over.
+//   . ABOVE the model, because a lane below the paid call answers correctly and still charges him
+//     for the question, which is the judgement section 5 applies to the data rights lane.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 6. B16: the Scottish rates lane, derived from all three routers ===\n');
+
+const scotSites = {
+  whatsapp: 'isScottishRatesQuestion(text)',
+  thread: 'isScottishRatesQuestion(q)',
+  ask: 'isScottishRatesQuestion(question)',
+};
+
+for (const [name, code] of ROUTERS) {
+  const needle = scotSites[name];
+  const n = occurrences(code, needle);
+  ok(`${name}: \`${needle}\` EXISTS in the router`, n > 0);
+  ok(`${name}: ...and exactly once, so its index names one call site`, n === 1);
+  const scotAt = n === 1 ? code.indexOf(needle) : -1;
+
+  // The fixed words, from the one file that owns them. A lane that fires and then hands the
+  // question to the model anyway is the defect wearing the fix's clothes.
+  ok(`${name}: and the fixed words are what he gets, from lib/scotland.ts`,
+    code.includes('SCOTTISH_RATES_ANSWER'));
+
+  const modelNeedle = modelCall[name];
+  const modelAt = code.indexOf(modelNeedle);
+  ok(`${name}: the paid model call was located, so the bound below is not vacuous`, modelAt !== -1);
+  ok(`🔴 ${name}: THE SCOTLAND LANE RUNS BEFORE THE MODEL, so it is free and it cannot be ignored`,
+    scotAt !== -1 && modelAt !== -1 && scotAt < modelAt);
+}
+
+// The lower bound, on the two routers that HAVE a totals lane. /api/ask has none: it reads his
+// figures into the model's context rather than answering a totals question from code, so there is
+// no figure lane there for this one to undercut, and asserting an order against a gate that does not
+// exist is how an ordering check passes by the absence of the thing it guards.
+for (const [name, code, arg] of ROUTERS.filter(([n]) => n !== 'ask')) {
+  const totalsNeedle = `matchTotalsQuestion(${arg})`;
+  const totalsAt = code.indexOf(totalsNeedle);
+  const scotAt = code.indexOf(scotSites[name]);
+  ok(`${name}: the totals gate \`${totalsNeedle}\` was located`, totalsAt !== -1);
+  ok(`🔴 ${name}: AND THE SCOTLAND LANE RUNS BELOW IT, so a man asking HOW MUCH still gets his figure`,
+    totalsAt !== -1 && scotAt !== -1 && totalsAt < scotAt);
+}
+
+// ---------------------------------------------------------------------------------------------
+// 6b. THE MATCHER HEARS THE CUSTOMER, AND EACH ASSERTION TURNS ON ONE THING.
+// ---------------------------------------------------------------------------------------------
+// 🔴 THE VACUITY RULE, LEARNED THE HARD WAY ON 17 AUGUST. The first B2-F3 guard asked "how much
+// should i put by FOR TAX" to prove the matcher heard "put by". "tax" is itself a trigger, so the
+// verb could have been anything, five sabotages walked straight through it and a control went red.
+//
+// So every phrase below carries the signal under test and NO OTHER signal of the same kind. The
+// nation phrases name exactly one nation word each. The refusals name exactly one reserved tax.
+const isScot = W.isScottishRatesQuestion;
+ok('lib/waintents.ts exports isScottishRatesQuestion', typeof isScot === 'function');
+
+// One nation word each, and the subject word is never itself a nation word.
+const NATION_PHRASES = [
+  ['scotland', 'i live in scotland, are the rates different'],
+  ['scottish', 'do i pay the scottish rate of income tax'],
+  ['scot', 'am a scot, what are my tax bands'],
+  // 🔴 THE ONE THE REAL CUSTOMER TYPED. He opened with "am in glasgow mate" and never once typed
+  // the word Scotland. A matcher that only hears the formal noun does not hear him.
+  ['glasgow', 'am in glasgow mate do i pay the same income tax as england'],
+  ['edinburgh', 'do i pay more tax living in edinburgh'],
+  ['aberdeen', 'whats my tax band up here in aberdeen'],
+  ['dundee', 'is the tax rate different in dundee'],
+];
+for (const [word, phrase] of NATION_PHRASES) {
+  ok(`  it hears "${word}" on its own: ${JSON.stringify(phrase)}`, isScot(phrase) === true);
+}
+
+// 🔴 THE THREE RESERVED TAXES, REFUSED BY THE PREDICATE AND NOT BY ROUTER ORDER. Income tax rates
+// and bands above the personal allowance are devolved. National Insurance, VAT and student loan
+// repayment are NOT, so answering one of those with an income tax caveat states something false
+// about his own figures. app/api/whatsapp/route.ts has lanes for all three ABOVE this one and would
+// catch them anyway; app/api/thread/route.ts and app/api/ask/route.ts have none of the three, so
+// order protects one channel out of three. The refusal has to live in the predicate.
+const RESERVED_REFUSALS = [
+  ['national insurance', 'in scotland do i pay the same national insurance'],
+  ['ni', 'am in glasgow, is my ni rate the same'],
+  ['class 4', 'is class 4 different in scotland'],
+  ['vat', 'is vat different in scotland'],
+  ['student loan', 'im in scotland which student loan plan am i on'],
+  ['postgraduate', 'is my postgraduate loan rate different in scotland'],
+];
+for (const [word, phrase] of RESERVED_REFUSALS) {
+  ok(`  🔴 it REFUSES "${word}", which is reserved and not devolved: ${JSON.stringify(phrase)}`,
+    isScot(phrase) === false);
+}
+
+// Both halves are required, so neither signal alone can drag a message into this lane.
+ok('  a tax question with no nation word is not this lane', isScot('whats the tax rates') === false);
+ok('  a nation word with no tax word is not this lane', isScot('am in glasgow mate') === false);
+
+// A money amount calls it off, the same refusal isVatQuestion and isPricing make and for the same
+// reason: a figure being logged is not a question about the bands.
+ok('  🔴 a money amount calls it off, so an entry is never eaten',
+  isScot('paid £40 tax in glasgow') === false);
+
+// ⚠️ AND THE PREDICATE IS NOT COPIED INTO ANY ROUTER. One definition, three callers, or the three
+// channels drift apart word by word, which is what this whole suite is for.
+ok('🔴 lib/waintents.ts holds the ONE definition',
+  (read('lib/waintents.ts').match(/export function isScottishRatesQuestion/g) || []).length === 1);
+for (const [name, code] of ROUTERS) {
+  ok(`  ${name}: keeps no private copy of the rule`,
+    !/function isScottishRatesQuestion/.test(code)
+    && !/scotland\|scottish/i.test(code));
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

@@ -44,3 +44,46 @@
 
 export const SCOTLAND_LINE =
   'Income tax is worked out at the England, Wales and Northern Ireland rates, and Scottish rates are coming to Lekhio.';
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE DETERMINISTIC ANSWER. B16, 17 August 2026, AND IT IS WHY THIS FILE HAS A SECOND EXPORT.
+//
+// B2 walked a Glasgow sole trader and caught the conversational lanes STATING SCOTTISH TAX LAW OF
+// THEIR OWN. Two answers, one account, minutes apart: "you're in Scotland so your tax rates are the
+// same as the rest of the UK", which is false, and then a band table with a 41% higher rate, a 46%
+// top rate and no advanced rate, which matches no tax year in force.
+//
+// B2's fix was to move the governing rule into the block both system prompts spread, so that one
+// rule reaches both channels and cannot go missing from one of them. That was the right repair and
+// it is MITIGATION, not a gate. The walk found the model disobeying the rule it already had, and a
+// sentence in a prompt cannot make it obey. The durable fix for a question with ONE correct answer
+// is to answer it from code and never ask the model at all.
+//
+// ⚠️ SO THIS CONSTANT IS THE ANSWER, AND IT LIVES HERE RATHER THAN IN THE ROUTERS OR IN
+// lib/waintents.ts, for the same reason SCOTLAND_LINE does: what this product is willing to claim
+// about a man's tax is not a routing decision and not a presentation decision. The matcher that
+// recognises the question is a language judgement and lives in lib/waintents.ts beside every other
+// intent. The words live here, under the four rules above, which bind this sentence exactly as they
+// bind SCOTLAND_LINE:
+//   . it does not claim we know where he lives, so it reads as a fact about the product,
+//   . it puts no date on the Scottish rates,
+//   . it sends him nowhere, and above all
+//   . IT PRICES NOTHING. No band, no threshold, no percentage, not even to compare.
+//
+// ⚠️ THE SECOND SENTENCE EARNS ITS PLACE AND IS NOT DECORATION. A man told his income tax is worked
+// at somebody else's rates asks the obvious next thing, which is whether the rest of his figures
+// are wrong too. National Insurance and VAT are reserved rather than devolved, so they are the same
+// for him, and his student loan is decided by the plan he is on and not by his address. Plan 4 is
+// named because it is the Scottish plan, this product computes it exactly, and /app/tax/student-loan
+// already offers it by name. Answering the anxious follow up in the same breath is cheaper than
+// making him ask it, and doc 103's bar is met: it is the difference between a caveat and an answer.
+//
+// ⚠️ NO FIGURE OF ANY KIND MAY ENTER THIS STRING. test/scotland.test.mjs section 2d holds it: no
+// percent sign, no pound sign, and no number of two digits or more, so every Scottish band (19, 20,
+// 21, 42, 45, 48) and every threshold is excluded by shape rather than by a list somebody has to
+// keep. The single digit in "plan 4" is the only number allowed through, and it is a plan name.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+export const SCOTTISH_RATES_ANSWER =
+  `${SCOTLAND_LINE} National Insurance and VAT are the same wherever you are in the UK, and your `
+  + 'student loan is worked out from the plan you are on, which includes plan 4.';

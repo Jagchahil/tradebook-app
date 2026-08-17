@@ -11,11 +11,12 @@ import {
   matchProductTruth, productTruthAnswer, isDataRightsRequest, DATA_RIGHTS_ANSWER,
   isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
   isVehicleQuestion, vehicleAnswer, compoundAsk, compoundAskNote,
+  isScottishRatesQuestion,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
 import { taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition } from '../../../lib/taxoptimiser';
-import { SCOTLAND_LINE } from '../../../lib/scotland';
+import { SCOTLAND_LINE, SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { quarterForDate } from '../../../lib/quarterpack';
 import { gbp0 } from '../../../lib/money';
@@ -316,6 +317,31 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
       ].join('\n');
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 SCOTTISH RATES, THE LAST GATE BEFORE THE MODEL. B16, 17 August 2026.
+  //
+  // THIS SURFACE IS WHERE B2 CAUGHT IT. Signed in as a Glasgow sole trader with money in the
+  // account, this chat replied "you're in Scotland so your tax rates are the same as the rest of
+  // the UK", which is false, and minutes later quoted a band table with a 41% higher rate, a 46%
+  // top rate and no advanced rate, which matches no tax year in force. The rule forbidding both
+  // was in accountantSystem() at the time. It was ignored.
+  //
+  // So the rule is no longer the only thing standing there. A question whose only correct answer
+  // is one fixed sentence is answered from lib/scotland.ts and the model is never asked, exactly
+  // as the deadline, the totals, somebody else's money, his data rights and the van already are.
+  //
+  // ⚠️ BELOW THE TOTALS LANE, which is the order app/api/whatsapp/route.ts runs and the reason is
+  // written out there: since J8 the totals lane answers "how much should i put by" with the figure
+  // AND the sentence, and hoisting this above it would hand a man asking for a number a rule
+  // instead. Everything reaching here asked about the RATES.
+  //
+  // ⚠️ AND THE REFUSAL OF THE THREE RESERVED TAXES IS IN THE PREDICATE, NOT IN THIS ORDER, because
+  // this router has no VAT lane, no National Insurance lane and no student loan lane to catch them.
+  // The webhook has all three above this gate. One phrase, one lane, on both channels, or
+  // test/laneparity.test.mjs is red.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  if (isScottishRatesQuestion(q)) return SCOTTISH_RATES_ANSWER;
 
   // 4. Everything else: the guarded AI path, the same one WhatsApp falls through to.
   if (!hasClaudeConfig()) {

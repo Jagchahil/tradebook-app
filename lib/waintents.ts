@@ -2049,3 +2049,73 @@ export function compoundAskNote(asks: string[]): string {
     'If only one of those is answered, send me the other on its own and I will answer that one properly.',
   ].join('\n');
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 SCOTTISH RATES. B16 AND THE B2 INTERCEPT, 17 August 2026. THE FIRST LANE IN THIS FILE
+// WRITTEN BECAUSE THE MODEL WAS WATCHED DISOBEYING AN INSTRUCTION, RATHER THAN LACKING ONE.
+//
+// B2 asked a live Glasgow sole trader's questions and got, minutes apart on one account: "you're in
+// Scotland so your tax rates are the same as the rest of the UK", and then a band table with a 41%
+// higher rate and no advanced rate. The first is false. The second matches no year in force.
+//
+// The rule that should have governed both was moved into the shared prompt block the same day, so
+// both channels now carry it. That is mitigation and this is the gate. A question whose only correct
+// answer is one fixed sentence should never reach a model, and every other question in this file
+// that reads that way is already answered from code: the deadline, the totals, somebody else's
+// money, his data rights, the van. This is the same shape, and it was the one left to a guess.
+//
+// ⚠️ TWO SIGNALS ARE REQUIRED, AND THAT IS THE WHOLE MATCHER. A nation word and a tax-or-rate word.
+// Anything less takes messages that are not about this, and a stack of extra conditions is how a
+// matcher stops hearing the man it was written for. See B2-F3: the product answered "Put by £X for
+// tax" and could not hear "put by", because the list of phrasings was typed rather than derived.
+//
+// ⚠️ A FALSE POSITIVE HERE IS CHEAP AND A FALSE NEGATIVE IS NOT, WHICH SETS THE DIRECTION. Read it
+// again: SCOTLAND_LINE is TRUE OF EVERY CUSTOMER, in Cardiff or Carlisle or Coatbridge, because it
+// is a statement about what this product computes with and not about where he lives. So a Londoner
+// who somehow trips this lane is told something accurate about his own product. A Scot who does not
+// trip it is handed an invented band table. That asymmetry is why the nation list below is generous
+// and why nothing is added to narrow it.
+//
+// ⚠️ THE CITY NAMES ARE A LIST AND A LIST ROTS, AND THEY ARE HERE ANYWAY. The corpus rule is that a
+// person is recognised by SHAPE and not by a list of names, and it is the right rule for names of
+// people, of which our customers will mention an unbounded number. A nation is not that: there are
+// four, they do not change, and the real customer B2 walked opened with "am in glasgow mate". He
+// never typed the word Scotland. A matcher that only hears the formal noun does not hear him.
+//
+// ⚠️ AND IT REFUSES THE THREE TAXES THAT ARE NOT DEVOLVED, WHICH IS THE ONE CONDITION THAT IS NOT
+// OPTIONAL. Income tax rates and bands above the personal allowance are devolved. National
+// Insurance, VAT and student loan repayment are NOT. Handing SCOTLAND_LINE to "is vat different in
+// scotland" would answer a VAT question with an income tax caveat and imply his VAT figures are
+// somebody else's, which is a new false statement in the place of the old one.
+//
+// It is deliberately NOT left to router order. On app/api/whatsapp/route.ts the VAT, National
+// Insurance and student loan lanes all sit above this one and would claim those messages anyway.
+// app/api/thread/route.ts HAS NO SUCH LANES, so order protects one channel and not the other, and
+// one phrase getting two answers on two channels is the defect test/laneparity.test.mjs exists for.
+// The refusal lives in the predicate, so it is true wherever the predicate is called.
+//
+// ⚠️ A MONEY AMOUNT CALLS IT OFF, exactly as isVatQuestion and isPricing do above and for the same
+// reason: "paid 40 quid tax in glasgow" is a figure being logged, not a question about the bands.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+// The nation, as a Scot refers to it. Not a postcode: nothing in this product reads his postcode
+// and lib/scotland.ts says so in terms, so the only signal is the word he chose to type.
+const SCOTTISH_NATION_RE =
+  /\b(?:scotland|scottish|scot(?:s|sman|smen)?|glasgow|edinburgh|aberdeen|dundee|inverness|stirling|paisley)\b/i;
+
+// The subject. Broad on purpose, per the asymmetry above.
+const TAX_RATE_RE =
+  /\b(?:income tax|tax|taxed|rate|rates|band|bands|bracket|brackets|percent|per cent|threshold|thresholds)\b/i;
+
+// The three that are reserved and not devolved. Any of these and this lane declines, so the
+// question keeps going to the lane that owns it, or to the model, which has the correct rule.
+const UK_WIDE_TAX_RE =
+  /\b(?:national insurance|nics?|class\s*[24]|vat|value added tax|student loan|postgraduate)\b|\bni\b/i;
+
+export function isScottishRatesQuestion(body: string): boolean {
+  const b = body.trim();
+  if (/£\s*\d/.test(b)) return false;
+  if (UK_WIDE_TAX_RE.test(b)) return false;
+  if (!SCOTTISH_NATION_RE.test(b)) return false;
+  return TAX_RATE_RE.test(b);
+}

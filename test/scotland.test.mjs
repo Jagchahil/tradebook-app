@@ -29,7 +29,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -307,6 +307,83 @@ for (const [name, line] of [
   const stmt = idx === -1 ? '' : THREAD_CODE.slice(idx, stmtEnd === -1 ? idx : stmtEnd);
   ok(`⚠️ the ${name} answer stays clean, it is not band derived`,
     idx !== -1 && !stmt.includes('SCOTLAND_LINE'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 2d. B16. THE DETERMINISTIC ANSWER, AND THE ONE THING IT MUST NEVER CONTAIN.
+//
+// Section 2b holds what the MODEL IS TOLD about Scotland. It is a good guard and it cannot be the
+// only one, because B2 watched the model be told and disobey: "you're in Scotland so your tax rates
+// are the same as the rest of the UK", then a band table with a 41% higher rate and no advanced
+// rate. Section 2b would have passed all the way through both of those answers, and did.
+//
+// So there is now a lane that answers a Scottish rates question from lib/scotland.ts and never asks
+// the model. This section holds the WORDS. test/laneparity.test.mjs holds the ROUTING, because that
+// is a fact about the two route files and this suite has no business deriving their order.
+//
+// ⚠️ THE CENTRAL ASSERTION IS THAT THE ANSWER PRICES NOTHING, AND IT IS HELD BY SHAPE. lib/scotland
+// .ts's fourth written rule is that the sentence must not price what Scotland would change, because
+// that is a number we cannot compute and the reason the sentence exists. A list of the six Scottish
+// rates would be a list somebody has to maintain, and the day Scotland adds a seventh the guard
+// still passes. So: no percent sign, no pound sign, and no number of two digits or more. Every
+// Scottish band (19, 20, 21, 42, 45, 48), every rUK band and every threshold is excluded by that,
+// and so is the 41 and 46 the walk actually caught. The one digit allowed through is "plan 4",
+// which is the name of a student loan plan and not a rate.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 2d. the deterministic Scottish rates answer prices nothing ===\n');
+
+const RATES_DECL = (() => {
+  const i = SCOTLAND_SRC.indexOf('export const SCOTTISH_RATES_ANSWER');
+  if (i === -1) return '';
+  const end = SCOTLAND_SRC.indexOf(';', i);
+  return end === -1 ? SCOTLAND_SRC.slice(i) : SCOTLAND_SRC.slice(i, end);
+})();
+ok('🔴 lib/scotland.ts exports SCOTTISH_RATES_ANSWER', RATES_DECL.length > 0);
+
+// It is BUILT FROM the sentence, never a second wording of it. One caveat becoming two slightly
+// different caveats is the exact failure this file's header was written about.
+ok('🔴 and it is built from SCOTLAND_LINE rather than wording its own caveat',
+  RATES_DECL.includes('${SCOTLAND_LINE}'));
+
+// The answer as the routers will actually send it, resolved through the module rather than read off
+// the source, so a constant that no longer interpolates is caught here and not by a customer.
+const RATES_ANSWER = (await import(
+  pathToFileURL(path.join(root, 'lib/scotland.ts')).href
+)).SCOTTISH_RATES_ANSWER ?? '';
+ok('and it resolves to a non empty string that contains the sentence verbatim',
+  typeof RATES_ANSWER === 'string' && declared !== null && RATES_ANSWER.includes(declared[1]));
+
+// 🔴 THE ONE THAT MATTERS. Three separate shapes, so a sabotage has to defeat all three.
+ok('🔴 IT PRICES NOTHING: no percent sign anywhere in it',
+  RATES_ANSWER.length > 0 && !/%|\bper ?cent\b/i.test(RATES_ANSWER));
+ok('🔴 IT PRICES NOTHING: no pound sign, so no threshold and no allowance',
+  RATES_ANSWER.length > 0 && !/£/.test(RATES_ANSWER));
+ok('🔴 IT PRICES NOTHING: no number of two digits or more, so no band can be in it',
+  RATES_ANSWER.length > 0 && !/\d{2,}/.test(RATES_ANSWER));
+
+// The other three written rules of this file, applied to the new sentence.
+ok('⚠️ it does not claim we know where he lives',
+  !/\b(?:since|because|as) you(?:'re| are)? in scotland\b/i.test(RATES_ANSWER)
+  && !/\byour postcode\b/i.test(RATES_ANSWER));
+ok('⚠️ it puts no date on the Scottish rates',
+  !/\b(?:20\d\d|january|february|march|april|may|june|july|august|september|october|november|december)\b/i
+    .test(RATES_ANSWER));
+ok('⚠️ it sends him nowhere: no gov.scot, no gov.uk, no link of any kind',
+  !/gov\.scot|gov\.uk|https?:|www\./i.test(RATES_ANSWER));
+
+// And it never says the thing the walk caught, in either direction.
+ok('🔴 it never says Scotland is the same as the rest of the UK',
+  !/\b(?:same|identical|no different)\b[^.]{0,40}\b(?:rest of the uk|england|ruk)\b/i
+    .test(RATES_ANSWER.replace(/National Insurance and VAT[^.]*\./i, '')));
+
+// ⚠️ BOTH ROUTERS SEND THE SHARED CONSTANT, NOT A COPY OF IT. A hand written Scotland sentence in a
+// route file is how this product ended up with one caveat in app/tax-calculator and none anywhere
+// else, which is the story in lib/scotland.ts's own header.
+for (const [name, code] of [['thread', THREAD_CODE], ['whatsapp', WA_CODE]]) {
+  ok(`🔴 the ${name} router sends SCOTTISH_RATES_ANSWER, the shared constant`,
+    /SCOTTISH_RATES_ANSWER/.test(code));
+  ok(`⚠️ and the ${name} router prices nothing Scottish of its own either`,
+    !/scottish[^\n]{0,60}\d{2,}\s*%/i.test(code));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

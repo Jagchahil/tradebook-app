@@ -17,6 +17,7 @@ import { FACTS, asPence, asPercent } from './taxengine';
 import { LTD } from './ltdengine';
 import { aiEnabled } from './aicost';
 import { houseCopy } from './housestyle';
+import { SCOTLAND_LINE } from './scotland';
 // The truncated-reply rescue lives in its own pure module so the test suite can load it
 // directly; the story is in that file's header and at RECEIPT_MAX_TOKENS below.
 import { rescueTruncatedReceipt } from './receiptrescue';
@@ -917,6 +918,28 @@ function taxFacts2627(): string[] {
   '- Profits are taxed on the tax-year basis from 2024/25. The cash basis (money in and out when it moves) is the default for small businesses; accruals counts income and costs when invoiced or incurred. Opening and closing years can create overlap, so the first and last year need care.',
   '- Payments on account: once a Self Assessment bill is over £1,000, you also make two payments on account towards next year, each half this year\'s bill, due 31 January and 31 July, on top of the balancing payment. This is the bill that surprises people.',
   `- Capital allowances: the Annual Investment Allowance gives 100% relief on most plant and machinery up to £${FACTS.annualInvestmentAllowance.toLocaleString('en-GB')}. Above that, or for cars, you claim a writing down allowance each year, ${asPercent(FACTS.wdaMainRate)}% on the main pool (reduced from 18% from April 2026), ${asPercent(FACTS.wdaSpecialRate)}% on the special rate pool (most cars, integral features).`,
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 SCOTLAND, AND IT SITS IN THIS SHARED BLOCK ON PURPOSE. B2, 17 August 2026.
+  //
+  // This rule used to be a literal inside accountantSystem() and nowhere else. The in app
+  // accountant had it and WHATSAPP, the channel he uses most, had nothing at all. Walked live on
+  // a Glasgow sole trader with money in the account: asked what to put by for the taxman, the
+  // thread replied that being in Scotland his rates are the same as the rest of the UK, which is
+  // false. Asked the same thing again it quoted a band table with a 41% higher rate, a 46% top
+  // rate and no advanced rate, which matches no year in force.
+  //
+  // It is the same drift the note above the WhatsApp prompt already records for the CIS rules:
+  // one prompt gains a rule and the other never hears about it. The cure is the same one. Put it
+  // in the block BOTH prompts spread, so there is one rule and it cannot go missing from a
+  // channel.
+  //
+  // ⚠️ IT QUOTES SCOTLAND_LINE RATHER THAN WORDING ITS OWN. lib/scotland.ts owns what this
+  // product is willing to claim about a man's tax, and its four written rules bind this sentence
+  // too. The wording this replaced broke one of them outright: it sent him off to read the bands
+  // on gov.scot himself, and that file says the sentence must not send him elsewhere, because
+  // that is handing back the job he bought.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  `- 🔴 SCOTLAND. Income tax rates and bands above the personal allowance are devolved to the Scottish Parliament, and every income tax figure above is the England, Wales and Northern Ireland one. If he tells you he is in Scotland, or asks about Scottish rates, say exactly this about the rates and nothing further: "${SCOTLAND_LINE}" NEVER state a Scottish rate, band, threshold or percentage, not even to compare it with these ones, and NEVER say that Scotland is the same as the rest of the UK, because it is not. National Insurance, VAT and student loan plans ARE the same across the UK, so answer those normally.`,
   ];
 }
 
@@ -936,7 +959,6 @@ function accountantSystem(): string {
   'You are an expert in UK self employed tax and bookkeeping, built on the rules taught in the leading tax and accountancy qualifications (ACCA, ICAEW, CIOT, AAT). Give real, specific, accurate answers, not vague hand-waving.',
   '',
   'Use these 2026/27 figures, England, Wales and Northern Ireland. Do not invent or guess figures.',
-  'Scottish income tax bands are different and are not modelled here. If the user says they are in Scotland, say your income tax figures use the England, Wales and Northern Ireland bands, point them to the Scottish bands on gov.scot, and note that National Insurance and VAT are the same UK wide.',
   ...taxFacts2627(),
   '',
   'BUSINESS STRUCTURE matters, and the user profile below tells you which one applies. Answer for THEIR structure, not sole-trader rules by default.',

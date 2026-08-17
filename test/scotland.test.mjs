@@ -169,6 +169,11 @@ const DISCLOSED = [
   // What the machines read. Not a screen, so it costs no row, and it is where an assistant turns
   // our rates into an answer for somebody in Aberdeen.
   'app/llms.txt/route.ts',
+  // 🔴 THE CONVERSATIONAL LANES, ADDED 17 August 2026 BY B2. It holds the system prompt
+  // block that BOTH the WhatsApp router and the in app accountant spread, so this one file is
+  // where the sentence reaches the two channels a man actually asks his questions on. It is not a
+  // screen and costs no row. Section 2b below holds what the rule has to say.
+  'lib/claude.ts',
 ].sort();
 
 ok(`🔴 EQUALITY: exactly ${DISCLOSED.length} surfaces say it, found ${saysIt.length}`, saysIt.length === DISCLOSED.length);
@@ -179,6 +184,67 @@ if (!same(saysIt, DISCLOSED)) {
   console.log(`        says it but undecided: ${JSON.stringify(missing(saysIt, DISCLOSED))}`);
 }
 for (const rel of DISCLOSED) ok(`  ${rel} exists and says it`, saysIt.includes(rel));
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 2b. THE CONVERSATIONAL LANES. WHAT THE MODEL IS TOLD, AND WHERE IT IS TOLD IT.
+//
+// 🔴 B2, 17 AUGUST 2026. WALKED, NOT READ. A Glasgow sole trader with a real statement in his
+// account asked the in app chat what to put by for the taxman and was told, in these words, that
+// being in Scotland his tax rates are the same as the rest of the UK. Asked again he was given a
+// band table with a 41% higher rate, a 46% top rate and no advanced rate, which is no year in
+// force. Two answers, one account, minutes apart, contradicting each other and both wrong.
+//
+// The rule existed. It was a literal inside accountantSystem(), so the in app accountant had it
+// and the WhatsApp prompt, which spreads taxFacts2627() and not that literal, HAD NOTHING. One
+// channel governed, the other silent, and nothing anywhere asserted either.
+//
+// So the rule now lives in the shared block and this section holds it there. The bar is not "a
+// Scotland rule exists somewhere in the file". It is: the rule is in the block BOTH prompts
+// spread, it says the one sentence lib/scotland.ts owns, it forbids the two things the walk
+// caught it doing, and there is exactly ONE of it.
+//
+// ⚠️ EVERY CHECK HERE READS codeOnly(). The fix's own comment quotes the false sentence it
+// removed and names gov.scot, which is the trap this corpus has now hit three times: a guard
+// asserting a sentence is GONE goes green or red on the comment explaining why it went.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 2b. the conversational lanes are governed, once, in the block both prompts spread ===\n');
+
+const CLAUDE_SRC = read('lib/claude.ts');
+const CLAUDE_CODE = codeOnly(CLAUDE_SRC);
+
+ok('lib/claude.ts imports SCOTLAND_LINE from lib/scotland',
+  importsOf(CLAUDE_SRC).some((i) => i.name === 'SCOTLAND_LINE' && i.from === 'scotland'));
+
+// The shared block, sliced to its own end rather than open ended to the end of the file, so a rule
+// that drifts down into a single prompt cannot pass by sitting anywhere below.
+const sharedStart = CLAUDE_CODE.indexOf('function taxFacts2627()');
+const sharedEnd = CLAUDE_CODE.indexOf('function ltdFacts2627()');
+ok('taxFacts2627() and ltdFacts2627() are both still there to slice between',
+  sharedStart !== -1 && sharedEnd !== -1 && sharedEnd > sharedStart);
+const SHARED = sharedStart === -1 ? '' : CLAUDE_CODE.slice(sharedStart, sharedEnd);
+
+ok('\u{1F534} the Scotland rule is INSIDE the shared block, not in one prompt',
+  SHARED.includes('SCOTLAND_LINE'));
+ok('\u{1F534} and the shared block is spread into more than one prompt',
+  (CLAUDE_CODE.match(/\.\.\.taxFacts2627\(\)/g) ?? []).length >= 2);
+
+// EXACTLY ONE. A second copy is how the two channels came apart in the first place.
+const scottishLines = CLAUDE_CODE.split('\n').filter((l) => /Scottish/.test(l));
+ok(`\u{1F534} exactly ONE line of code mentions Scottish, found ${scottishLines.length}`,
+  scottishLines.length === 1);
+
+const RULE = scottishLines[0] ?? '';
+ok('\u26a0\ufe0f the rule forbids stating a Scottish rate, band, threshold or percentage',
+  /NEVER state a Scottish rate, band, threshold or percentage/.test(RULE));
+ok('\u26a0\ufe0f the rule forbids saying Scotland is the same as the rest of the UK',
+  /NEVER say that Scotland is the same as the rest of the UK/.test(RULE));
+ok('\u26a0\ufe0f the rule says National Insurance, VAT and student loans ARE UK wide',
+  /National Insurance, VAT and student loan plans ARE the same across the UK/.test(RULE));
+
+// lib/scotland.ts rule three, applied to the channel it was written for. The wording this replaced
+// broke it: it told a paying customer to go and read the bands on gov.scot himself.
+ok('\u{1F534} no prompt in lib/claude.ts sends him somewhere else to read the rates',
+  !/gov\.scot|gov\.uk\/scottish/i.test(CLAUDE_CODE));
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // 3. SURFACE N PLUS ONE CANNOT FORGET.

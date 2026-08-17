@@ -253,18 +253,31 @@ ok('31 January is still today on 31 January, and next year on 1 February',
 // 7. 🔴 THE CALL SITES PASS THE ASKER, so the answers above are the ones customers get.
 //
 // A module that words six answers correctly and is still called with nothing has fixed nothing.
-// Both production call sites are pinned here, on CODE with the comments stripped, because the
+// All THREE production call sites are pinned here, on CODE with the comments stripped, because the
 // comments explaining the old bug quote the old call.
+//
+// ⚠️ IT SAID "BOTH CALL SITES" UNTIL 17 AUGUST 2026 AND THERE WERE ONLY EVER TWO, WHICH IS THE
+// POINT. This section was written on 7 August, when the lane lived on WhatsApp and the chat. The in
+// app accountant answers typed questions too and had no deadline lane at all, so the one surface
+// this suite could not see was the one where the model answered "when is my tax due" from nothing.
+// B19 wired it. The list is now three and test/laneparity.test.mjs section 10 derives the order.
 // ---------------------------------------------------------------------------------------------
-console.log('\n=== both call sites pass who is asking ===\n');
+console.log('\n=== all three call sites pass who is asking ===\n');
 
 const waCode = stripComments(read('app/api/whatsapp/route.ts'));
 const threadCode = stripComments(read('app/api/thread/route.ts'));
+const askCode = stripComments(read('app/api/ask/route.ts'));
 
 ok('🔴 the WhatsApp route no longer calls deadlineAnswer with nothing',
   !/deadlineAnswer\(\s*\)/.test(waCode));
 ok('🔴 nor does the chat route, which had his id in scope on the line above all along',
   !/deadlineAnswer\(\s*\)/.test(threadCode));
+ok('🔴 nor the in app accountant, which had no lane at all until B19',
+  !/deadlineAnswer\(\s*\)/.test(askCode));
+ok('🔴 AND THE IN APP ACCOUNTANT DISPATCHES IT, so the assertion above is not true of a file that '
+  + 'simply never mentions the builder',
+  /isDeadlineQuestion\(question\)\s*&&\s*!asksAmount\(question\)/.test(askCode)
+  && /deadlineAnswer\(new Date\(\), \{/.test(askCode));
 ok('the WhatsApp route resolves the position through mtdPosition, the ONE definition',
   /mtdPosition\(\{/.test(waCode) && /from '\.\.\/\.\.\/\.\.\/lib\/taxengine'/.test(waCode));
 ok('...and reads his own answer through mtdStatedFrom, which maps a skip and a failed read to null',
@@ -274,11 +287,22 @@ ok('...and the mandation test is on GROSS qualifying income, trade PLUS rent',
   && /grossQualifyingIncome: gross/.test(waCode));
 ok('...and a failed read is unknown, never a no', /getOptimiserInput\(userId\)\.catch\(\(\) => null\)/.test(waCode)
   && /readCircumstances\(userId\)\.catch\(\(\) => null\)/.test(waCode));
-ok('both routes hand the structure across, so a director and a partner are answered as themselves',
-  /structure/.test(waCode) && /structure: optimiser\?\.businessType \?\? null/.test(threadCode));
-ok('🔴 the chat passes a null position out loud, because article 9 keeps that fact off this surface',
-  /mtdPosition: null/.test(threadCode)
-  && !/circumstances|CIRCUMSTANCES/.test(threadCode));
+ok('all three routes hand the structure across, so a director and a partner are answered as themselves',
+  /structure/.test(waCode)
+  && /structure: optimiser\?\.businessType \?\? null/.test(threadCode)
+  // 🔴 THE SHAPE, NOT THE VARIABLE NAME. The chat's line above pins `optimiser?.` and would fail
+  // anybody who renamed a local, which is the trap this corpus keeps finding: a guard that defends
+  // a spelling after the fact stops depending on it. What matters is that the STRUCTURE he was read
+  // out of the database is what goes across, so that is what this matches.
+  && /structure:\s*\w+\?\.businessType \?\? null/.test(askCode));
+// 🔴 BOTH WEB SURFACES PASS null OUT LOUD, AND NEITHER CAN REACH THE CHAIN THAT WOULD FILL IT IN.
+// The chat's reason is pinned by test/thread.test.mjs (article 9, one special category row in the
+// chain and a surface with no business reading it). /api/ask has never touched that chain either,
+// and this is what stops a future session "improving" the answer by reaching for it.
+for (const [name, code] of [['the chat', threadCode], ['the in app accountant', askCode]]) {
+  ok(`🔴 ${name} passes a null position out loud`, /mtdPosition: null/.test(code));
+  ok(`   ...and cannot reach the circumstances chain`, !/circumstances|CIRCUMSTANCES/i.test(code));
+}
 
 // 🔴 STILL EXACTLY ONE SEND ON THE WHATSAPP SIDE. test/routing.test.mjs caps inline sendText call
 // sites across the whole repo and the ceiling sits ON the count, so a handler that answered from
@@ -297,6 +321,10 @@ ok('🔴 the chat passes a null position out loud, because article 9 keeps that 
 ok('the deterministic deadline answer still runs before the AI path in the chat',
   threadCode.indexOf('isDeadlineQuestion(q)') > -1
   && threadCode.indexOf('isDeadlineQuestion(q)') < threadCode.indexOf('answerMoneyQuestion(q'));
+ok('...and before the paid model on the in app accountant, where it also runs before the shared cache',
+  askCode.indexOf('isDeadlineQuestion(question)') > -1
+  && askCode.indexOf('isDeadlineQuestion(question)') < askCode.indexOf('answerAccountantQuestion(')
+  && askCode.indexOf('isDeadlineQuestion(question)') < askCode.indexOf('normaliseQuestion(question)'));
 
 // ---------------------------------------------------------------------------------------------
 // 8. 🔴 THE PUBLIC GUIDE AT /file-your-tax-return, WHICH SAID THE SAME THING TO STRANGERS.

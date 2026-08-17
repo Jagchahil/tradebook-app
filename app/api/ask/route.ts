@@ -13,6 +13,7 @@ import {
   isDataRightsRequest, DATA_RIGHTS_ANSWER, isVehicleQuestion, vehicleAnswer,
   isScottishRatesQuestion, isVatQuestion,
   isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
+  isDeadlineQuestion, asksAmount, deadlineAnswer,
 } from '../../../lib/waintents';
 import { SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { vatAnswerForUser } from '../../../lib/vatanswer';
@@ -147,6 +148,61 @@ export async function POST(req: NextRequest) {
   // Both sit above the cache and above the cap, exactly like product truth, and for the same
   // reason: the answer is fixed and true, so it costs nothing and is never withheld.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHEN HIS RETURN IS DUE, ON THIS SURFACE TOO. B19, 17 August 2026, and it is the fifth
+  // time this exact shape has been written down. The comment two blocks up was written on 12 August
+  // about the data rights lane and says the whole of it in advance: "this product answers questions
+  // on THREE surfaces and the fix reached one of them."
+  //
+  // deadlineAnswer() has taken WHO IS ASKING since 7 August, and app/api/whatsapp/route.ts and
+  // app/api/thread/route.ts have both dispatched it since. This route never did, so a man who typed
+  // "when is my tax due" into the in app accountant was answered by the MODEL, and every reason the
+  // header on deadlineAnswer() gives applied to him in full: a limited company director handed a
+  // quarterly update for a return his company does not file, a partner handed one for a regime
+  // GOV.UK has announced no date for, and a sole trader HMRC has never written to handed one for an
+  // update he does not have to make. The model has none of those three facts about him and no way
+  // to ask for them.
+  //
+  // ⚠️ THE TIE BREAK IS NOT OPTIONAL AND IT IS THE SAME ONE THE OTHER TWO CARRY. asksAmount() is the
+  // ONE definition, in lib/waintents.ts. "how much tax is due on 31 January" satisfies
+  // isDeadlineQuestion() and is a man asking for a NUMBER, so without `&& !asksAmount(question)`
+  // this lane answers him with a DATE, which is test/laneparity.test.mjs section 2's own defect with
+  // the hands changed over. A copy of the rule typed here would be the second definition this
+  // codebase keeps deleting.
+  //
+  // ⚠️ ABOVE THE SHARED CACHE, AND ON THIS ROUTE THAT IS THE PART THAT IS NOT OPTIONAL. qa_cache is
+  // keyed on the QUESTION ALONE with no user id and served to every other customer who asks the
+  // same thing. "when is the self assessment deadline" carries no first person word, so it is
+  // classed GENERAL and IS cacheable, and the answer below depends on HIS structure: a director's
+  // reply would be written to the shared cache and read back to a sole trader as his own. Returning
+  // here means it is returned before questionNorm is ever computed, so a structure specific answer
+  // cannot enter a shared cache by any path. Structural rather than hopeful, like the VAT lane
+  // below, and test/laneparity.test.mjs holds the order.
+  //
+  // ⚠️ AND ABOVE THE CAP, because a missed deadline is an automatic penalty of HIS money and a man
+  // must not be refused the date for having used up his six. It costs one read of his own profile
+  // and no model call at all, so there is nothing to meter.
+  //
+  // ⚠️ THE POSITION IS null HERE ON PURPOSE, WHICH IS NOT A SHORTCUT, AND IT IS THE CHOICE
+  // app/api/thread/route.ts ARGUED FIRST. Making Tax Digital mandation is a fact only HE holds: HMRC
+  // decides it from a return already filed and writes to him, and the only place we keep his answer
+  // is the circumstances chain. This route has never touched that chain and does not start here,
+  // for the reason test/thread.test.mjs pins on the other web surface (article 9): the chain carries
+  // one special category row and the control is that a surface which has no business reading it
+  // cannot reach it at all. So this route says plainly what it cannot know, deadlineAnswer() words
+  // it conditionally and asks him, and the WhatsApp channel, which runs that chain, answers the
+  // sharper way. Weaker, never contradictory.
+  //
+  // ⚠️ A FAILED READ IS UNKNOWN, NEVER A NO. The catch lands on null, which asks him.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (!truth && isDeadlineQuestion(question) && !asksAmount(question)) {
+    const o = await getOptimiserInput(userId).catch(() => null);
+    truth = deadlineAnswer(new Date(), {
+      structure: o?.businessType ?? null,
+      mtdPosition: null,
+    });
+  }
+
   if (!truth && isDataRightsRequest(question)) truth = DATA_RIGHTS_ANSWER;
   if (!truth && isVehicleQuestion(question)) {
     const o = await getOptimiserInput(userId).catch(() => null);

@@ -71,6 +71,11 @@ const stripComments = (s) => s
 
 const waCode = stripComments(read('app/api/whatsapp/route.ts'));
 const threadCode = stripComments(read('app/api/thread/route.ts'));
+// 🔴 READ BESIDE THE OTHER TWO, NOT TWO HUNDRED LINES DOWN, AND THAT IS B19's DOING.
+// It used to be declared inside section 5, which is where the third router was first admitted to
+// exist. Section 3 below therefore compared the tie break on TWO channels while a third one carried
+// the same lane, which is this suite's own banner failing on this suite's own file.
+const askCode = stripComments(read('app/api/ask/route.ts'));
 
 // ---------------------------------------------------------------------------------------------
 // 1. THE MARKERS EXIST, EXACTLY ONCE EACH, BEFORE ANY INDEX IS USED.
@@ -124,21 +129,35 @@ eq('the two channels run the two lanes in the SAME order', waOrder, thOrder);
 // asksAmount() is what stops the deadline lane, now that it runs first, from eating a man asking
 // for a figure ("how much tax is due on 31 January"). A channel that drops it widens its deadline
 // lane, its phrases move, and the comparison below goes red on that channel alone.
-const waGuarded = /isDeadlineQuestion\(text\)\s*&&\s*!asksAmount\(text\)/.test(waCode);
-const thGuarded = /isDeadlineQuestion\(q\)\s*&&\s*!asksAmount\(q\)/.test(threadCode);
+//
+// 🔴 AND IT IS DERIVED OVER THREE ROUTERS SINCE B19, NOT TWO. app/api/ask took the deadline lane
+// on 17 August 2026. A tie break held on two of the three surfaces that run the lane is the exact
+// asymmetry this file exists to catch, and this section was blind to it because it named its two
+// channels by hand. The argument name comes from the table, so a fourth router is a row, not an
+// edit to the regex.
+const TIE_BREAK = [
+  ['whatsapp', waCode, 'text'],
+  ['thread', threadCode, 'q'],
+  ['ask', askCode, 'question'],
+];
+const guarded = new Map();
+for (const [name, code, arg] of TIE_BREAK) {
+  const re = new RegExp(`isDeadlineQuestion\\(${arg}\\)\\s*&&\\s*!asksAmount\\(${arg}\\)`);
+  guarded.set(name, re.test(code));
+  ok(`the ${name} router gates its deadline lane on !asksAmount`, re.test(code));
+}
+const waGuarded = guarded.get('whatsapp');
+const thGuarded = guarded.get('thread');
 
-ok('the webhook gates its deadline lane on !asksAmount', waGuarded);
-ok('the chat gates its deadline lane on !asksAmount', thGuarded);
-ok('🔴 both channels carry the tie break, or neither does', waGuarded === thGuarded);
-ok('asksAmount is imported from lib/waintents by both routers, so there is ONE definition',
-  /\basksAmount\b/.test(waCode.slice(0, waCode.indexOf('export async function')))
-  && /\basksAmount\b/.test(threadCode.slice(0, threadCode.indexOf('export async function'))));
+ok('🔴 EVERY ROUTER THAT RUNS THE LANE CARRIES THE TIE BREAK, OR NONE OF THEM DOES',
+  new Set(guarded.values()).size === 1);
+ok('asksAmount is imported from lib/waintents by all three routers, so there is ONE definition',
+  TIE_BREAK.every(([, code]) => /\basksAmount\b/.test(code.slice(0, code.indexOf('export async function')))));
 // A router that re-declared the rule locally would satisfy every gate assertion above while the
 // two channels drifted apart word by word. Neither may hold a copy: not the function, and not the
 // date shapes that are the only part of it a reader would be tempted to paste.
-ok('...and neither router keeps a private copy of the rule',
-  !/function asksAmount/.test(waCode) && !/function asksAmount/.test(threadCode)
-  && !/date\|day\|time\|month/.test(waCode) && !/date\|day\|time\|month/.test(threadCode));
+ok('...and NO router keeps a private copy of the rule',
+  TIE_BREAK.every(([, code]) => !/function asksAmount/.test(code) && !/date\|day\|time\|month/.test(code)));
 ok('...while lib/waintents.ts holds the one definition it is imported from',
   (read('lib/waintents.ts').match(/export function asksAmount/g) || []).length === 1);
 
@@ -398,7 +417,6 @@ function cutImports(s) {
   }
   return lines.slice(end).join('\n');
 }
-const askCode = stripComments(read('app/api/ask/route.ts'));
 const ROUTERS = [
   ['whatsapp', cutImports(waCode), 'text'],
   ['thread', cutImports(threadCode), 'q'],
@@ -930,6 +948,112 @@ ok('  and a man asking about himself by name is not refused, where the caller kn
   aboutElse('how much has jerome spent this year', W.selfNameTokens('Jerome Adeyemi')) === false);
 
 // ---------------------------------------------------------------------------------------------
+// 10. B19. THE DEADLINE LANE, ON ALL THREE ROUTERS, ABOVE THE SHARED CACHE AND ABOVE THE MODEL.
+// ---------------------------------------------------------------------------------------------
+// 🔴 WHY THIS SECTION EXISTS. Sections 1 to 3 of this file are about the deadline lane and have
+// been since the day it was written, and every one of them said "both channels". THERE ARE THREE.
+// app/api/ask is the in app accountant, it takes a typed question, and it had no deadline lane at
+// all: from 7 August, when deadlineAnswer() learned who was asking, until 17 August, a man who typed
+// "when is my tax due" into the box in the app was answered by the MODEL, which holds none of the
+// three facts the answer turns on and has no way to ask for them.
+//
+// ⚠️ AND THE CACHE IS WHY THIS ONE IS NOT MERELY A WORSE REPLY ON ONE SURFACE. "when is the self
+// assessment deadline" carries no first person word, so /api/ask classes it GENERAL and a general
+// answer is written to qa_cache, which is keyed on the QUESTION ALONE with no user id and served to
+// every other customer who ever asks it. The answer depends on HIS structure. A limited company
+// director's reply, cached, is read back to a sole trader as his own. So the lane returns above
+// questionNorm, and that bound is asserted below rather than hoped for.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 10. B19: the deadline lane, derived from all three routers ===\n');
+
+// Three routers, three shapes: an else if chain, an early return, an assignment. Written down per
+// router for the reason section 5 gives, because a shape derived from the argument name matched a
+// paywall exemption once and called a hole a wired lane.
+const deadlineSites = {
+  whatsapp: '} else if (isDeadlineQuestion(text) && !asksAmount(text)) {',
+  thread: 'if (isDeadlineQuestion(q) && !asksAmount(q)) {',
+  ask: 'if (!truth && isDeadlineQuestion(question) && !asksAmount(question)) {',
+};
+
+for (const [name, code] of ROUTERS) {
+  const site = deadlineSites[name];
+  const n = occurrences(code, site);
+  ok(`${name}: the deadline lane is DISPATCHED  \`${site.trim()}\``, n > 0);
+  ok(`${name}: ...and exactly once, so its index names one call site`, n === 1);
+  const laneAt = n === 1 ? code.indexOf(site) : -1;
+
+  // The paid call, located and asserted present before any comparison, because indexOf returns
+  // minus one and minus one is less than every real index.
+  const modelNeedle = modelCall[name];
+  const modelAt = code.indexOf(modelNeedle);
+  ok(`${name}: the paid model call \`${modelNeedle}\` was located, so the bound below is not vacuous`,
+    modelAt !== -1);
+  ok(`🔴 ${name}: HE IS NEVER CHARGED A QUESTION FOR ASKING WHEN HIS RETURN IS DUE`,
+    laneAt !== -1 && modelAt !== -1 && laneAt < modelAt);
+}
+
+// 🔴 AND EVERY ONE OF THEM HANDS OVER WHO IS ASKING. deadlineAnswer() took a clock and nothing
+// else until 7 August 2026, and the whole of test/wave9_deadlineasker.test.mjs is about what that
+// cost. A router that dispatches the lane and then calls the builder empty has wired the defect.
+for (const [name, code] of ROUTERS) {
+  ok(`${name}: never calls deadlineAnswer with nothing`, !/deadlineAnswer\(\s*\)/.test(code));
+  ok(`${name}: and hands it the asker`, /deadlineAnswer\(new Date\(\), \{/.test(code));
+}
+
+// 🔴 THE WORDS HAVE ONE HOME. A router that assembled its own dates would answer the same
+// question differently on one surface, which is the whole of this file's argument.
+ok('🔴 lib/waintents.ts holds the ONE deadlineAnswer',
+  (read('lib/waintents.ts').match(/export function deadlineAnswer/g) || []).length === 1);
+for (const [name, code] of ROUTERS) {
+  ok(`  ${name}: keeps no private copy of the dates`,
+    !/7 August, 7 November, 7 February and 7 May/.test(code)
+    && !/Self Assessment return is due online by/.test(code));
+}
+
+// 🔴 THE TWO WEB SURFACES BOTH PASS A NULL POSITION, AND NEITHER CAN REACH THE CHAIN THAT WOULD
+// FILL IT IN. Making Tax Digital mandation is a fact only HE holds and the only place we keep his
+// answer is the circumstances chain, which carries one special category row. test/thread.test.mjs
+// pins the chat out of that chain entirely (article 9); /api/ask has never touched it and this
+// asserts it did not start. The WhatsApp channel runs the chain and answers the sharper way, which
+// is weaker here and never contradictory.
+for (const [name, code] of [['thread', threadCode], ['ask', askCode]]) {
+  ok(`🔴 ${name}: passes a null MTD position out loud`, /mtdPosition: null/.test(code));
+  ok(`🔴 ${name}: ...and cannot reach the circumstances chain to fill it in`,
+    !/circumstances|CIRCUMSTANCES/i.test(code));
+  ok(`  ${name}: while the structure it CAN read is handed across`,
+    /businessType \?\? null/.test(code));
+}
+ok('🔴 and the WhatsApp channel is the one that resolves it, through mtdPosition, the ONE definition',
+  /mtdPosition\(\{/.test(waCode));
+
+// 🔴 ON /api/ask IT RETURNS ABOVE THE SHARED CACHE, WHICH IS THE BOUND THE OTHER TWO DO NOT NEED.
+{
+  const askOnly = ROUTERS.find(([n]) => n === 'ask')[1];
+  const laneAt = askOnly.indexOf(deadlineSites.ask);
+  const normAt = askOnly.indexOf('const questionNorm = normaliseQuestion(question);');
+  const upsertAt = askOnly.indexOf('upsertQaCache(');
+  const capAt = askOnly.indexOf("bumpAiUsage('ask', userId)");
+  ok('ask: the cache key line was located, so the bounds below are not vacuous', normAt !== -1);
+  ok('ask: the cache WRITE was located too', upsertAt !== -1);
+  ok('ask: and the per user daily cap was located as well', capAt !== -1);
+  ok('🔴 ask: A STRUCTURE SPECIFIC ANSWER IS RETURNED BEFORE THE SHARED CACHE IS EVEN KEYED',
+    laneAt !== -1 && normAt !== -1 && laneAt < normAt && laneAt < upsertAt);
+  ok('🔴 ask: AND ABOVE THE DAILY CAP, so a penalty date is never withheld for having used up his six',
+    laneAt !== -1 && capAt !== -1 && laneAt < capAt);
+
+  // Parity of ORDER against the VAT lane, which both other routers already run below the deadline
+  // lane. A third router that ran them the other way round would answer "when is my vat return due"
+  // one way in the app and another way on WhatsApp, which is this file's founding complaint.
+  for (const [name, code, arg] of ROUTERS) {
+    const vatAt = code.indexOf(`isVatQuestion(${arg})`);
+    const dAt = code.indexOf(deadlineSites[name]);
+    ok(`${name}: the VAT lane was located, so the order below is not vacuous`, vatAt !== -1);
+    ok(`  ${name}: the deadline lane runs above the VAT lane, the same way on every router`,
+      dAt !== -1 && vatAt !== -1 && dAt < vatAt);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
 // 9b. THE DERIVED SCOPE TABLE. EVERY PREDICATE, EVERY ROUTER, WRITTEN DOWN OR RED.
 // ---------------------------------------------------------------------------------------------
 // 🔴 WHY THIS EXISTS AND WHY IT IS NOT ANOTHER HAND WRITTEN LIST. Sections 5 to 9 each hold ONE lane
@@ -978,13 +1102,9 @@ const SCOPE = {
   isScottishRatesQuestion: { on: ALL3, why: '' },
   matchProductTruth: { on: ALL3, why: '' },
 
+  isDeadlineQuestion: { on: ALL3, why: '' },
+
   // Short of three, and each of these is a written decision or a written debt.
-  isDeadlineQuestion: {
-    on: WA_THREAD,
-    why: 'B19 DEBT, NOT A DECISION: /api/ask has no deadline lane, so a man asking the in app '
-      + 'accountant when his return is due is answered by the model. Deliberately left for its own '
-      + 'item rather than folded into the privacy packet.',
-  },
   matchTotalsQuestion: {
     on: WA_THREAD,
     why: 'section 7 records that /api/ask has no totals lane to order against. Whether it should '

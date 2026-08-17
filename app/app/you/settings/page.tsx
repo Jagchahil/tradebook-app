@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { userFromSessionCookie, identityForUser } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
-import { readNudgePrefs, readIdentityCard } from '../../../../lib/supabase';
+import { readNudgePrefs, readIdentityCard, getBusinessProfile } from '../../../../lib/supabase';
 import { templateLegBlock } from '../../../../lib/routing';
 import { settingsNotice, maskEmail, bindNotice, BOUND_LINE } from '../identity';
 import { A11Y_CSS, APP_CSS, FONT, RADIUS, SPACE, TYPE } from '../../../../lib/tokens';
@@ -104,12 +104,24 @@ export default async function SettingsPage({
   // by push and email with hasWhatsApp false, so it reaches a web only customer today. This page
   // was half true, which is the hardest kind to see.
   // ═══════════════════════════════════════════════════════════════════════════════════════
-  const [prefs, card, identity] = await Promise.all([
+  const [prefs, card, identity, profile] = await Promise.all([
     readNudgePrefs(user.id),
     readIdentityCard(user.id).catch(() => null),
     // His contact points, for the card that moved here from /app/you on 14 August 2026.
     identityForUser(user),
+    // Only to decide whether a business name is a thing he HAS. A sole trader trading under his
+    // own name has no second name to hold, and drawing him an empty box for one is an invitation
+    // to invent something that then prints on his invoices.
+    getBusinessProfile(user.id).catch(() => null),
   ]);
+  // ⚠️ NOT JUST THE STRUCTURE. A sole trader who picked "A business name" at /start step 2 is
+  // stored as a sole trader and HAS a trading name, so the box is drawn whenever there is one on
+  // file as well as whenever the structure implies one. What it must not do is draw an empty box
+  // for a man trading under his own name: that is an invitation to invent a name that then prints
+  // on his invoices.
+  const businessShaped = profile?.businessType === 'limited_company'
+    || profile?.businessType === 'partnership'
+    || Boolean((card?.businessName ?? '').trim());
   // Unknown is not a promise. A failed read draws no daily row rather than claiming one.
   //
   // ⚠️ templateLegBlock, NOT templateSendable, SINCE 10 AUGUST 2026. This asked half the question:
@@ -266,6 +278,93 @@ export default async function SettingsPage({
         </a>
       </section>
 
+      {/* ═══════════════════════════════════════════════════════════════════════════════════════
+          HIS OWN DETAILS. NEW 17 AUGUST 2026, FROM THE B1 EMPTY ACCOUNT WALK.
+
+          🔴 THERE WAS NO WAY TO CHANGE ANY OF THIS, AND NOTHING SAID SO. reconcileSignupToUser was
+          the only writer of his name, his business name and his address in the whole repo, and it
+          runs once, at first sign in. users.trade_type had no writer at all. So a man who tapped
+          Continue on an optional step at /start, or made a typo in one, was stuck with it for good,
+          while /start step 5 told him the opposite: "Optional. Tap Continue to skip and add it when
+          you send your first invoice." The invoice screen never asked, and INV-0001 on the walked
+          account went to a customer reading FROM his name with no address under it.
+
+          ⚠️ WHY SETTINGS AND NOT THE HUB. Doc 103's once test, and the judgement this codebase had
+          already made in writing: /app/you's own comment says an address he sets once in his life
+          and a phone he binds once belong here rather than costing every customer a card at the top
+          of the screen he opens to see his diary. /app/you/testimonial has pointed at "Your
+          details" since it was written, so this section carries that name and its copy is now true.
+
+          ⚠️ ONE FORM, EVERY BOX, ONE SAVE. Not the press-is-the-change shape of the switches above:
+          a man correcting his address should not have four separate saves, and the route treats a
+          box that was not drawn as one to leave alone rather than one to clear.
+          ═════════════════════════════════════════════════════════════════════════════════════ */}
+      <section className="lek-card">
+        <h2 className="lek-h2">Your details</h2>
+        <p style={S.blurb}>
+          What your invoices are made out from, and what we call you. Change any of it and the next
+          invoice you make carries the new version. Nothing here is sent anywhere.
+        </p>
+
+        <form action="/api/you/details" method="post" style={S.form}>
+          <label htmlFor="name" style={S.label}>Your name</label>
+          <input
+            id="name"
+            name="name"
+            type="text"
+            maxLength={120}
+            defaultValue={card?.name ?? ''}
+            className="lek-field"
+            style={S.detailInput}
+          />
+
+          {businessShaped ? (
+            <>
+              <label htmlFor="business_name" style={S.detailLabel}>Your business name</label>
+              <input
+                id="business_name"
+                name="business_name"
+                type="text"
+                maxLength={120}
+                defaultValue={card?.businessName ?? ''}
+                className="lek-field"
+                style={S.detailInput}
+              />
+            </>
+          ) : null}
+
+          <label htmlFor="trade" style={S.detailLabel}>What you do</label>
+          <input
+            id="trade"
+            name="trade"
+            type="text"
+            maxLength={40}
+            placeholder="Electrician"
+            defaultValue={card?.trade ?? ''}
+            className="lek-field"
+            style={S.detailInput}
+          />
+
+          <label htmlFor="address" style={S.detailLabel}>Your business address</label>
+          <textarea
+            id="address"
+            name="address"
+            rows={3}
+            maxLength={300}
+            defaultValue={card?.address ?? ''}
+            className="lek-field"
+            style={S.detailArea}
+          />
+          <p style={S.quiet}>
+            It goes at the top of every invoice you make. GOV.UK lists the supplier&rsquo;s address
+            as one of the things an invoice must carry, and a VAT registered business has to show
+            it. Leave it empty and your invoices go out without it.
+          </p>
+
+          <button type="submit" style={S.detailSubmit}>Save my details</button>
+        </form>
+      </section>
+
       <p style={S.foot}>
         Replies to things you send us are not switched here. Ask a question, get an answer, always.
       </p>
@@ -310,4 +409,10 @@ const S: Record<string, React.CSSProperties> = {
   emailInput: { flex: '1 1 220px', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: TYPE.strong, fontFamily: FONT, color: INK },
   codeInput: { flex: '0 1 160px', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: TYPE.stat, fontFamily: FONT, color: INK, letterSpacing: '0.2em', fontVariantNumeric: 'tabular-nums' },
   submit: { background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.sm, padding: '11px 18px', fontSize: TYPE.body, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
+
+  // ── His own details, new 17 August 2026 ────────────────────────────────────────────────────
+  detailLabel: { display: 'block', fontSize: TYPE.label, fontWeight: 700, color: MUTED, marginTop: SPACE.sm, marginBottom: SPACE.xs },
+  detailInput: { width: '100%', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: TYPE.strong, fontFamily: FONT, color: INK, boxSizing: 'border-box' },
+  detailArea: { width: '100%', background: PANEL, border: `1.5px solid ${LINE}`, borderRadius: RADIUS.sm, padding: '11px 12px', fontSize: TYPE.strong, fontFamily: FONT, color: INK, boxSizing: 'border-box', resize: 'vertical' },
+  detailSubmit: { marginTop: SPACE.sm, background: RIVER, color: ON_RIVER, border: 'none', borderRadius: RADIUS.sm, padding: '12px 20px', fontSize: TYPE.body, fontWeight: 700, fontFamily: FONT, cursor: 'pointer' },
 };

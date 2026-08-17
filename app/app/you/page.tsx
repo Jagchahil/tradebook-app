@@ -257,9 +257,17 @@ export default async function YouPage({
               {vatLine(vatProfile, vatAnswer)}{' '}
               <a href="/app/you/vat" style={S.inlineLink}>{vatDoor(vatProfile, vatAnswer)}</a>
             </p>
+            {/* 🔴 THIS SENTENCE WAS TRUE OF THE STRUCTURE AND FALSE OF EVERYTHING ELSE ON THE
+                CARD. B1 EMPTY ACCOUNT WALK, 17 AUGUST 2026. His name, his business name, his
+                address and his trade were written once by reconcileSignupToUser at first sign in
+                and by nothing else in the repo, and no page below carried any of them. A man
+                reading "the rest comes from what you tell us on the pages below" went looking for
+                a page that did not exist. It exists now, and the sentence names it. */}
             <p style={S.quiet}>
               Wrong about any of this? How you trade is changed in{' '}
-              <a href="/app/setup?step=business" style={S.inlineLink}>setup</a>, and the rest comes
+              <a href="/app/setup?step=business" style={S.inlineLink}>setup</a>, your name, your
+              trade and your business address in{' '}
+              <a href="/app/you/settings" style={S.inlineLink}>Settings</a>, and the rest comes
               from what you tell us on the pages below.
             </p>
           </>

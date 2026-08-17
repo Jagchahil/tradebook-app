@@ -207,7 +207,7 @@ export default async function TestimonialPage({
                   <span style={S.toggleNote}>
                     {haveName
                       ? `We have you as ${on.name}. Off, it reads ${TESTIMONIAL_ANON}.`
-                      : `We do not hold a name for you, so this would change nothing. Add one under Your details and it will be here.`}
+                      : `We do not hold a name for you, so this would change nothing. Add one under Your details in Settings and it will be here.`}
                   </span>
                 </span>
                 <span style={S.track} className="lek-track"><span style={S.knob} className="lek-knob" /></span>
@@ -228,7 +228,7 @@ export default async function TestimonialPage({
                   <span style={S.toggleNote}>
                     {haveTrade
                       ? `We have you as ${on.trade}. Off, nothing appears in its place.`
-                      : 'We do not hold a trade for you, so this would change nothing. Add one under Your details and it will be here.'}
+                      : 'We do not hold a trade for you, so this would change nothing. Add one under Your details in Settings and it will be here.'}
                   </span>
                 </span>
                 <span style={S.track} className="lek-track"><span style={S.knob} className="lek-knob" /></span>

@@ -4,7 +4,7 @@ import { userFromSessionCookie } from '../../../../lib/webauth';
 import { SESSION_COOKIE } from '../../../../lib/websession';
 import { gateForUser } from '../../../../lib/gateserver';
 import { READONLY_TITLE, READONLY_LINE } from '../../../../lib/gate';
-import { readVatProfile } from '../../../../lib/supabase';
+import { readVatProfile, readIdentityCard } from '../../../../lib/supabase';
 import { rateLabel, reverseChargeApplies, type VatRateKey } from '../../../../lib/vat';
 import {
   A11Y_CSS, APP_CSS, BREAK, FONT, MOTION, RADIUS, SPACE, TYPE,
@@ -114,6 +114,31 @@ export default async function NewInvoicePage({
   // to refuse it. So the form is not drawn at all and the page says why.
   const vatProfile = locked ? null : await readVatProfile(user.id);
   const vatUnknown = !locked && vatProfile === null;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HIS OWN ADDRESS, ASKED FOR HERE BECAUSE HE WAS PROMISED IT WOULD BE. B1, 17 AUG 2026.
+  //
+  // /start step 5 says, in these words: "Optional. Tap Continue to skip and add it when you send
+  // your first invoice." Nothing on this page had ever mentioned it, and until today there was no
+  // field for it anywhere in the product, so a man who tapped Continue sent invoices for ever with
+  // no supplier address on them. INV-0001 on the empty account walk went out reading FROM his name
+  // with nothing under it, on the same document that carried his customer's address in full,
+  // because THAT field is required three inches below and cites GOV.UK for it.
+  //
+  // ⚠️ SHOWN ONLY WHEN IT IS MISSING, which is doc 103's empty test and the reason this is a
+  // line rather than a field. Most men have an address on file and must not be asked again on the
+  // screen where they are trying to bill a job. A man who has not is told once, here, where it
+  // matters, with the door to fix it.
+  //
+  // ⚠️ AND IT DOES NOT BLOCK HIM. He may be billing a job right now and the address can wait
+  // ten minutes. Refusing to make his invoice over a field he skipped would be the product
+  // deciding his priorities for him.
+  //
+  // ⚠️ A FAILED READ SAYS NOTHING. readIdentityCard returns null when it could not read, and
+  // telling a man his address is missing when we simply could not look would send him to a
+  // Settings page that already has it.
+  const identityCard = locked ? null : await readIdentityCard(user.id).catch(() => null);
+  const ownAddressMissing = identityCard !== null && !(identityCard.address ?? '').trim();
   const registered = Boolean(vatProfile?.registered);
   // ═══════════════════════════════════════════════════════════════════════════════════════
   // 🔴 EVERY VAT REGISTERED TRADER IS ASKED. This read `registered && cisSubcontractor`, and that
@@ -176,6 +201,16 @@ export default async function NewInvoicePage({
             It comes out numbered and dated, due fourteen days from today, with a link your
             customer can open and see.
           </p>
+
+          {ownAddressMissing ? (
+            <p style={S.ownAddress}>
+              <b>Your own address is not on your account.</b> GOV.UK lists the supplier&rsquo;s
+              address as one of the things an invoice must carry, and this one will go out without
+              it. It takes a minute:{' '}
+              <a href="/app/you/settings" style={S.ownAddressLink}>add it in Settings</a>. You can
+              make this invoice now either way.
+            </p>
+          ) : null}
 
           <form action="/api/invoices" method="post">
             {/* What this form actually asked him. Not a decision, a statement of fact about the
@@ -407,6 +442,10 @@ const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: '100dvh', background: PAPER, fontFamily: FONT, color: INK },
 
   said: { fontSize: TYPE.body, lineHeight: 1.55, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px', margin: '0 0 14px' },
+  // Said in the page's own voice, not in a warning colour. It is a thing worth doing, not a fault
+  // of his, and he was told at signup that this screen would ask him.
+  ownAddress: { fontSize: TYPE.note, lineHeight: 1.6, color: INK, background: SURFACE, borderRadius: RADIUS.md, padding: '12px 14px', margin: '0 0 14px', maxWidth: '62ch' },
+  ownAddressLink: { color: RIVER, fontWeight: 700, textDecoration: 'underline' },
 
   locked: { display: 'block', background: SURFACE, border: `1px solid ${LINE}`, borderRadius: RADIUS.lg, padding: '15px 16px', marginBottom: 14 },
   lockedTop: { display: 'block', fontSize: TYPE.label, fontWeight: 800, letterSpacing: '0.3px', color: INK, marginBottom: 5 },

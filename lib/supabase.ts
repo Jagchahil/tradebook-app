@@ -1932,6 +1932,30 @@ export async function reconcileSignupToUser(
   // when there is something to say: a null leaves him unknown, and unknown is asked everything.
   const shape = incomeShapeOfSignup({ trade: s.trade, streams: s.streams });
   if (shape) patch.income_shape = shape;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 2c. AND THE TRADE WORD ITSELF, WHICH WAS ASKED FOR AND NEVER REACHED THE ACCOUNT.
+  // FOUND BY THE B1 EMPTY ACCOUNT WALK, 17 AUGUST 2026.
+  //
+  // /start step 3 of 6 asks "What do you do?" and lists twenty six trades. createSignup writes the
+  // answer to signups.trade. The line above then reads it, decides whether the letting IS the work,
+  // and throws the word away. users.trade_type is the column that holds it, readIdentityCard is
+  // built to read it, /app/you draws "{trade} by trade." from it, and the team customer list shows
+  // it. **NOTHING IN EITHER REPO EVER WROTE IT.** Grepped both trees: the only other trade_type
+  // write is createSignup, and that is the STRUCTURE column of the same name on the signups row,
+  // which is the trap the comment on readIdentityCard exists to mark.
+  //
+  // ⚠️ THIS IS R2-F26 WITH A DIFFERENT COLUMN, AND F26'S FIX IS TWENTY LINES ABOVE THIS ONE.
+  // That was his own name: asked at /start, stored on the signup row, never selected here. Nobody
+  // asked the same question of the two columns beside it. When something is fixed on this function,
+  // the next question is always which OTHER answer of his dies at the same door.
+  //
+  // ⚠️ NEVER OVERWRITES, same as the name. A trade already on his row stays, because he can
+  // now change it himself in Settings and a re run of this reconcile must not undo him.
+  if (s.trade && !patch.trade_type) {
+    const word = String(s.trade).trim().slice(0, 40);
+    if (word) patch.trade_type = word;
+  }
   if (Object.keys(patch).length > 0) {
     const writeProfile = (body: Record<string, unknown>) => fetch(
       `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`,
@@ -9784,6 +9808,10 @@ export interface IdentityCard {
   // table has a column of the same name holding the STRUCTURE, which is a trap this comment exists
   // to mark. The structure lives in users.business_type and is read by getBusinessProfile.
   trade: string | null;
+  // His BUSINESS address, the one printed at the top of every invoice. Added 17 August 2026 with
+  // the Settings form that can finally write it: the column has existed all along and no screen
+  // he could reach had ever read it back to him.
+  address: string | null;
   phone: string | null;
   phoneVerifiedAt: string | null;
 }
@@ -9794,27 +9822,99 @@ export async function readIdentityCard(userId: string): Promise<IdentityCard | n
     const { url } = config();
     const res = await fetch(
       `${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}` +
-        `&select=name,business_name,trade_type,phone_number,phone_verified_at&limit=1`,
+        `&select=name,business_name,trade_type,address,phone_number,phone_verified_at&limit=1`,
       { headers: headers() },
     );
     if (!res.ok) return null;
     const rows = (await res.json().catch(() => null)) as Array<{
       name: string | null; business_name: string | null; trade_type: string | null;
+      address: string | null;
       phone_number: string | null; phone_verified_at: string | null;
     }> | null;
     if (!Array.isArray(rows)) return null;
     const r = rows[0];
-    if (!r) return { name: null, businessName: null, trade: null, phone: null, phoneVerifiedAt: null };
+    if (!r) return { name: null, businessName: null, trade: null, address: null, phone: null, phoneVerifiedAt: null };
     return {
       name: r.name ?? null,
       businessName: r.business_name ?? null,
       trade: r.trade_type ?? null,
+      address: r.address ?? null,
       phone: r.phone_number ?? null,
       phoneVerifiedAt: r.phone_verified_at ?? null,
     };
   } catch {
     return null;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WRITER FOR ALL OF THAT, WHICH DID NOT EXIST UNTIL 17 AUGUST 2026.
+//
+// reconcileSignupToUser was the ONLY writer of users.name, users.business_name and users.address in
+// the whole repo, and it runs once, at first sign in, off the signups row. users.trade_type had no
+// writer at all. So a man who tapped Continue on an optional step at /start, or made a typo in one,
+// could never put it right: there was no field for any of it anywhere in app/app.
+//
+// What that cost him, proved live on 17 August: /start step 5 says "Optional. Tap Continue to skip
+// and add it when you send your first invoice", and the invoice screen never asks. INV-0001 on the
+// walked account went out reading FROM his name with no address under it, while carrying his
+// customer's address in full, because THAT field is required and cites GOV.UK for it. See the
+// header on PublicInvoice: a VAT invoice must carry the supplier's address, VAT Regulations 1995
+// reg 14, so for a VAT registered customer the document is not a valid VAT invoice at all.
+//
+// ⚠️ AN ABSENT FIELD IS NOT AN EMPTY ONE. undefined means "he did not send this box", and it is
+// left alone. An empty string means "he cleared it", and that is written as null, because a man
+// must be able to take his address off his own invoices as well as put one on. The two cannot be
+// collapsed: the settings form posts every box every time, so treating a missing key as a clear
+// would wipe whatever the other form did not draw.
+//
+// ⚠️ LENGTHS ARE CLAMPED HERE AND AT THE ROUTE, the createSignup rule: two doors, one bound,
+// neither trusting the other. Nothing here is ever printed as HTML by us; the invoice PDF escapes
+// its own inputs and test/invoicepdf.test.mjs holds it to that.
+export interface IdentityDetails {
+  name?: string | null;
+  businessName?: string | null;
+  address?: string | null;
+  trade?: string | null;
+}
+
+const IDENTITY_COLUMN: Record<keyof IdentityDetails, string> = {
+  name: 'name',
+  businessName: 'business_name',
+  address: 'address',
+  trade: 'trade_type',
+};
+
+const IDENTITY_MAX: Record<keyof IdentityDetails, number> = {
+  name: 120,
+  businessName: 120,
+  address: 300,
+  trade: 40,
+};
+
+export async function saveIdentityDetails(
+  userId: string,
+  details: IdentityDetails,
+): Promise<boolean> {
+  if (!userId) return false;
+  const patch: Record<string, unknown> = {};
+  for (const key of Object.keys(IDENTITY_COLUMN) as Array<keyof IdentityDetails>) {
+    const given = details[key];
+    if (given === undefined) continue;
+    const trimmed = String(given ?? '').trim().slice(0, IDENTITY_MAX[key]);
+    patch[IDENTITY_COLUMN[key]] = trimmed === '' ? null : trimmed;
+  }
+  // Nothing to say is not a failure, and it must not become a PATCH with an empty body: PostgREST
+  // matches every row for the filter and succeeds, which is the lesson recorded further up this
+  // file about a write that says nothing and reports success.
+  if (Object.keys(patch).length === 0) return true;
+  const { url } = config();
+  const res = await fetch(`${url}/rest/v1/users?id=eq.${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify(patch),
+  });
+  return res.ok;
 }
 
 // One user's reminder preferences, with the three states kept apart.

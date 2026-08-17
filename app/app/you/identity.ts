@@ -97,6 +97,10 @@ export function settingsNotice(code: string | null | undefined): string | null {
   switch (code) {
     case 'saved':
       return 'Saved. It takes effect from the next message we would have sent.';
+    // Its own sentence rather than 'saved', because these are not messages and telling a man his
+    // address takes effect from the next message we would have sent would be nonsense.
+    case 'details':
+      return 'Saved. Your details are what your invoices are made out from, so they are right from the next one you make.';
     case 'unavailable':
       return 'That did not save. Nothing has changed, so try it again in a minute.';
     case 'slow':

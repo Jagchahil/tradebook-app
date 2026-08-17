@@ -785,8 +785,29 @@ export default function StartPage() {
                 </Step>
               )}
 
+              {/* ═══════════════════════════════════════════════════════════════════════════════════
+                  🔴 THIS SUB LINE SAID "We use this to sort your expenses into the right categories
+                  automatically." IT WAS NOT TRUE, TWICE OVER. B1 EMPTY ACCOUNT WALK, 17 AUG 2026.
+
+                  lib/categories.ts is a merchant NAME list: Screwfix, Toolstation, Jewson, the fuel
+                  majors. It takes no trade and never has, so an electrician and a florist are
+                  categorised identically. And the answer did not even reach his account: it lands
+                  in signups.trade, reconcileSignupToUser read it only to decide whether the letting
+                  IS the work, and users.trade_type, the column that holds the word, had no writer
+                  anywhere in either repo until today.
+
+                  ⚠️ THE WRITE IS FIXED AND THE SENTENCE IS FIXED, NOT ONE OR THE OTHER. Writing the
+                  trade would have left a true sentence about categories still false. Rewriting the
+                  sentence alone would have left a question we ask twenty six ways and throw away.
+
+                  ⚠️ WHAT IT SAYS NOW IS WHAT ACTUALLY HAPPENS. Landlord genuinely changes the whole
+                  question set through incomeShapeOfSignup and lib/persona.ts, which is wave nine and
+                  is the largest thing any answer on this step does. The rest is his own word for
+                  what he does, kept on his details, and he can change it in Settings. When the
+                  categoriser learns a trade, this sentence earns the old claim back.
+                  ═══════════════════════════════════════════════════════════════════════════════ */}
               {step === 3 && (
-                <Step title="What do you do?" sub="We use this to sort your expenses into the right categories automatically.">
+                <Step title="What do you do?" sub="It goes on your details, and you can change it later in Settings. Landlord is the one that changes things: it tells us the letting is the business itself, so we stop asking you trade questions that cannot apply to you.">
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                     {trades.map((t) => {
                       const active = trade === t;

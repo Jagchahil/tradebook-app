@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Check out the website
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           path: tradebook
 
@@ -48,7 +48,7 @@ jobs:
       # Jagchahil/tradebook-mobile.
       # ---------------------------------------------------------------------------------------
       - name: Check out the mobile app, as a sibling, for the parity suites
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           repository: Jagchahil/tradebook-mobile
           path: tradebook-app

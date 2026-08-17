@@ -183,10 +183,29 @@ const SABOTAGES = [
   // ── THE SCOPE TABLE. Section 9b is the only thing that can SEE the next lane land on one ──
   // ── router, so it is attacked in every direction it claims to hold. ───────────────────────
   {
+    // 🔴 REPOINTED 17 August 2026, AND THE REASON IS THE POINT OF THE SABOTAGE.
+    //
+    // This sabotage used isNiQuestion, because on the day it was written isNiQuestion was declared
+    // WA_ONLY and adding a second router to it was a lane landing somewhere the table did not know
+    // about. B19's three lane packet then WIRED isNiQuestion to all three routers and widened the
+    // table to match, correctly and deliberately. From that commit this sabotage went on applying
+    // cleanly and stopped biting: it added a call the table already declared, so nothing went red
+    // and the pass reported it MISSED.
+    //
+    // ⚠️ SO THE SPECIMEN IS NOW A SETTLED DECISION AND NOT AN OPEN DEBT. isGreeting is WhatsApp
+    // only because nobody types hello into an accountant box, which is a reason that does not
+    // expire. Picking isSavingsQuestion or isIdentity would have armed the same trap again: both
+    // are B19 debts and both are MEANT to gain routers, so both would kill this sabotage the day
+    // somebody did the work it exists to protect.
     name: '🔴 TABLE: a lane is wired to a new router and nobody widens the table, which is the whole shape of B19',
-    apply: ({ dir }) => edit(dir, 'app/api/ask/route.ts',
-      '  if (!truth && isAboutSomeoneElse(question)) truth = SOMEONE_ELSE_ANSWER;',
-      '  if (!truth && isAboutSomeoneElse(question)) truth = SOMEONE_ELSE_ANSWER;\n  if (isNiQuestion(question)) { /* wired, unclassified */ }'),
+    apply: ({ dir }) => {
+      edit(dir, 'app/api/ask/route.ts',
+        '  isNiQuestion, isStudentLoanQuestion, isPropertyQuestion,',
+        '  isNiQuestion, isStudentLoanQuestion, isPropertyQuestion, isGreeting,');
+      edit(dir, 'app/api/ask/route.ts',
+        '  if (!truth && isAboutSomeoneElse(question)) truth = SOMEONE_ELSE_ANSWER;',
+        '  if (!truth && isAboutSomeoneElse(question)) truth = SOMEONE_ELSE_ANSWER;\n  if (isGreeting(question)) { /* wired, unclassified */ }');
+    },
   },
   {
     name: '🔴 TABLE: a brand new predicate is dispatched and never classified at all',
@@ -200,10 +219,14 @@ const SABOTAGES = [
     },
   },
   {
+    // 🔴 REPOINTED 17 August 2026. This quoted the isNiQuestion row while that row read WA_ONLY.
+    // B19's three lane packet changed the row to ALL3, the anchor stopped existing, and the pass
+    // reported ANCHOR MISSING. Same specimen rule as above: matchStopStart is WhatsApp only because
+    // STOP and START are a messaging channel obligation, which is a reason that cannot expire.
     name: '🔴 TABLE: the table CLAIMS three routers for a lane that is on one, which is the optimistic lie',
     apply: ({ dir }) => edit(dir, 'test/laneparity.test.mjs',
-      '  isNiQuestion: { on: WA_ONLY,',
-      '  isNiQuestion: { on: ALL3,'),
+      '  matchStopStart: { on: WA_ONLY,',
+      '  matchStopStart: { on: ALL3,'),
   },
   {
     // ⚠️ isWeeklySummaryRequest AND NOT isPricing, AND THE FIRST DRAFT IS THE REASON. isPricing has
@@ -216,10 +239,12 @@ const SABOTAGES = [
       '          } else if (isWeeklySummaryRequest(text)) {\n            await handleWeeklySummary(from);\n', ''),
   },
   {
+    // 🔴 REPOINTED 17 August 2026, for the same reason and by the same rule. The old anchor quoted
+    // the isNiQuestion row's WHOLE B19 DEBT sentence, so it broke the moment the debt was paid.
     name: '🔴 TABLE: an asymmetry keeps its row and loses its reason, so nobody has to argue for it',
     apply: ({ dir }) => editOnce(dir, 'test/laneparity.test.mjs',
-      "  isNiQuestion: { on: WA_ONLY, why: 'B19 DEBT: niAnswer exists, is tested and reads his rows, and is dispatched by one router.' },",
-      "  isNiQuestion: { on: WA_ONLY, why: '' },"),
+      "  matchStopStart: { on: WA_ONLY, why: 'STOP and START are a messaging channel obligation and mean nothing in a web form.' },",
+      "  matchStopStart: { on: WA_ONLY, why: '' },"),
   },
 ];
 

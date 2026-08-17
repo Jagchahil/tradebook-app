@@ -45,7 +45,23 @@ import {
   streamFor, offerPropertyCategories, categoriesFor,
 } from '../lib/propertylanes.ts';
 import {
-  matchEditLast, isVatQuestion, isVatThresholdQuestion, isAboutSomeoneElse,
+  // ⚠️ isVatQuestion and isVatThresholdQuestion were imported here and never called. Removed 16
+  // August 2026, Run 7, and it is worth saying why rather than just deleting two names.
+  //
+  // isVatQuestion IS still asserted by this file, three times, but as SOURCE TEXT: the checks below
+  // read app/api/whatsapp/route.ts and hold that the VAT lane exists and sits above the totals and
+  // open question lanes. That is a check on the ROUTER'S ORDER, which is what Run 2 found, and it
+  // needs the name as a string, not the function.
+  //
+  // 🔴 isVatThresholdQuestion is a different thing and it is recorded rather than tidied away.
+  // lib/waintents.ts:1588 exports it, its own comment says it exists "so a surface can lead with
+  // the figure rather than the rules", and NOTHING IN EITHER REPO CALLS IT. Not the WhatsApp
+  // router, not the thread router, not the phone. It is asserted by no test. So the behaviour its
+  // comment describes does not exist: a man near the line who asks WhatsApp about the threshold
+  // gets the same rules first answer as anybody else. That is a question for the Run 7 matrix under
+  // WhatsApp crossed with VAT near the line, NOT a deletion to make a linter quiet, because the
+  // right answer may well be to start calling it.
+  matchEditLast, isAboutSomeoneElse,
   matchInvoiceDraft, invoiceDraftAnswer, detectScript, languageApology,
   looksLikeMoneyEntry, isGreeting, isNonWords, isVent, normaliseBritishTime,
   greetingReply, SOMEONE_ELSE_ANSWER, VENT_REPLY,

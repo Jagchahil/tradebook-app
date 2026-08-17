@@ -183,6 +183,12 @@ for (const t of created) {
 }
 ok('and every row level security exemption carries a reason somebody can read',
   Object.values(RLS_NOT_REQUIRED).every((why) => typeof why === 'string' && why.length > 40));
+// The list, not seventy one lines to scroll. A red run should say what to do.
+const unprotected = missing(created.filter((t) => !(t in RLS_NOT_REQUIRED)), [...PROTECTED]);
+if (unprotected.length) {
+  console.log(`        created here, row level security never turned on here: ${JSON.stringify(unprotected)}`);
+  console.log('        fix: add "alter table public.<name> enable row level security;" to a migration, or name it in RLS_NOT_REQUIRED with the reason.');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // 2. EVERY TABLE THE CODE TALKS TO IS CREATED BY THIS REPO.
@@ -237,6 +243,11 @@ ok('and every unused table carries a reason somebody can read',
   Object.values(CREATED_UNUSED).every((why) => typeof why === 'string' && why.length > 40));
 ok('and no unused entry has quietly gained a caller, which would mean deleting it here',
   Object.keys(CREATED_UNUSED).every((t) => !ADDRESSED.has(t)));
+const unused = missing(created.filter((t) => !(t in CREATED_UNUSED)), addressed);
+if (unused.length) {
+  console.log(`        created here, read or written by nothing: ${JSON.stringify(unused)}`);
+  console.log('        fix: wire it up, drop the migration, or name it in CREATED_UNUSED with its story.');
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // 4. THE SENTENCE THAT CAUSED IT.

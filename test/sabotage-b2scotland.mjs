@@ -124,6 +124,21 @@ const SABOTAGES = [
     name: '🔴 one channel loses the shared block, so the rule exists and that prompt never receives it',
     apply: ({ dir }) => editOnce(dir, 'lib/claude.ts', '    ...taxFacts2627(),\n', ''),
   },
+  // ── J8: the set aside figure carries the sentence on every channel ───────────────────────
+  {
+    name: '🔴 the THREAD set aside answer drops the sentence, so web and chat disagree about one figure',
+    apply: ({ dir }) => edit(dir, 'app/api/thread/route.ts', '${cisLine} ${collection} ${SCOTLAND_LINE}`', '${cisLine} ${collection}`'),
+  },
+  {
+    name: '🔴 WHATSAPP drops it, so the channel he uses from a van is the uncaveated one',
+    apply: ({ dir }) => edit(dir, 'app/api/whatsapp/route.ts',
+      "const scot = hasPosition ? ` ${SCOTLAND_LINE}` : '';", "const scot = '';"),
+  },
+  {
+    name: 'WhatsApp stops guarding on hasPosition, so a man with no figure gets a caveat about one',
+    apply: ({ dir }) => edit(dir, 'app/api/whatsapp/route.ts',
+      "const scot = hasPosition ? ` ${SCOTLAND_LINE}` : '';", "const scot = ` ${SCOTLAND_LINE}`;"),
+  },
   {
     name: 'a SECOND Scotland line is added, the exact drift that put the two channels out of step',
     apply: ({ dir }) => editOnce(dir, 'lib/claude.ts',

@@ -184,6 +184,7 @@ import { openTicket } from '../../../lib/support';
 import { matchKb } from '../../../lib/supportkb';
 import { soleTraderTax, homeOfficeFlatRateMonthly, FACTS } from '../../../lib/taxengine';
 import { taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition } from '../../../lib/taxoptimiser';
+import { SCOTLAND_LINE } from '../../../lib/scotland';
 import { aprilDelta } from '../../../lib/propertyengine';
 import { niPosition, studentLoanRepayment, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
@@ -2221,7 +2222,12 @@ async function handleTotals(from: string, body: string): Promise<void> {
   // 13 August 2026: "Put by £37,457.00 for tax" on WhatsApp against £28,250 on every web surface,
   // the difference being his £9,207 of CIS. billFromPosition() is the one door; see the note on it.
   const owed = oweAnswer(billFromPosition(tax), tax.projected, hasPosition);
-  await sendText(from, hasPosition && basis ? `${owed} ${basis}` : owed);
+  // 🔴 J8, 17 August 2026. The same figure carries the same caveat on every channel. /app/tax
+  // prints SCOTLAND_LINE under this number every time; so does the thread; so does this. Guarded on
+  // hasPosition so a man with no figure is never handed a caveat about one. Set aside only: the
+  // made and spent answers are not band derived and stay clean. See the note in the thread route.
+  const scot = hasPosition ? ` ${SCOTLAND_LINE}` : '';
+  await sendText(from, (hasPosition && basis ? `${owed} ${basis}` : owed) + scot);
 }
 
 // The UK tax year starts 6 April. Same rule as matchTotalsQuestion.

@@ -15,6 +15,7 @@ import {
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
 import { taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition } from '../../../lib/taxoptimiser';
+import { SCOTLAND_LINE } from '../../../lib/scotland';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { quarterForDate } from '../../../lib/quarterpack';
 import { gbp0 } from '../../../lib/money';
@@ -563,5 +564,26 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
         ? ` On these figures January looks like a repayment of about ${formatGbp(tax.refundLikely)} rather than a bill, though only your filed return settles that.`
         : ''}`
     : '';
-  return `Put by ${formatGbp(leadFigure)} for tax. ${note}${basis ? ` ${basis}` : ''}${cisLine} ${collection}`;
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE SAME FIGURE CARRIES THE SAME CAVEAT ON EVERY CHANNEL. J8, decided 17 August 2026.
+  //
+  // This number is taxPosition() on getOptimiserInput(), the identical call /app/tax leads with,
+  // and the comment above says so as a promise. /app/tax prints SCOTLAND_LINE under it every time
+  // he opens the page. This channel printed the same number and said nothing, so a Scottish
+  // customer got a caveated figure on the web and an uncaveated one in the chat, which is the
+  // shape this corpus keeps finding: one figure, two surfaces, two different truths.
+  //
+  // ⚠️ THE ALTERNATIVE WAS A STORED FLAG, SAID ONCE PER CUSTOMER, and it was rejected. A caveat he
+  // read once in March and cannot recall in January is the APPEARANCE of disclosure without the
+  // function, which is worse than either honest answer. It also wanted a column, and the reason it
+  // was deferred ("lib/supabase.ts is reserved to another lane") had already gone stale.
+  //
+  // ⚠️ AND IT IS ON THE SET ASIDE ANSWER ONLY. "You have brought in £22,910" and "you have spent
+  // £5,286" are not band derived and must stay clean. The bar is lib/scotland.ts's own: would a
+  // Scot be misled by THIS number if the line were absent. Only this one.
+  //
+  // ⚠️ IT SITS AFTER THE EARLY RETURN ABOVE, so a man with no position gets no caveat about a
+  // figure he has not been given. Same guard lib/incomeproof.ts applies with personalTaxShown.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  return `Put by ${formatGbp(leadFigure)} for tax. ${note}${basis ? ` ${basis}` : ''}${cisLine} ${collection} ${SCOTLAND_LINE}`;
 }

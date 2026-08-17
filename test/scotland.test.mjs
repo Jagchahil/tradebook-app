@@ -174,6 +174,16 @@ const DISCLOSED = [
   // where the sentence reaches the two channels a man actually asks his questions on. It is not a
   // screen and costs no row. Section 2b below holds what the rule has to say.
   'lib/claude.ts',
+  // 🔴 J8, DECIDED 17 August 2026. THE SAME FIGURE CARRIES THE SAME CAVEAT ON EVERY CHANNEL.
+  // Both of these print taxPosition() on getOptimiserInput(), the identical call /app/tax leads
+  // with, and both say so in their own comments as a promise. /app/tax prints the sentence under
+  // that number every time it is opened. These printed the same number and said nothing, so a
+  // Scot got a caveated figure on the web and an uncaveated one in the chat he actually uses.
+  // The rejected alternative was a stored flag saying it once per customer: a caveat read once in
+  // March and forgotten by January is the appearance of disclosure without the function.
+  // ⚠️ SET ASIDE ONLY. The made, spent and profit answers are not band derived and stay clean.
+  'app/api/thread/route.ts',
+  'app/api/whatsapp/route.ts',
 ].sort();
 
 ok(`🔴 EQUALITY: exactly ${DISCLOSED.length} surfaces say it, found ${saysIt.length}`, saysIt.length === DISCLOSED.length);
@@ -247,6 +257,59 @@ ok('\u{1F534} no prompt in lib/claude.ts sends him somewhere else to read the ra
   !/gov\.scot|gov\.uk\/scottish/i.test(CLAUDE_CODE));
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 2c. J8. THE SET ASIDE FIGURE CARRIES THE SENTENCE ON EVERY CHANNEL, AND ONLY THAT FIGURE.
+//
+// Decided 17 August 2026 after B2 walked it. The number these two print is taxPosition() on
+// getOptimiserInput(), the identical call /app/tax leads with, which both files already promise in
+// their own comments. /app/tax caveats it every time. These did not.
+//
+// The bar is unchanged and is lib/scotland.ts's own: would a Scot be misled by THIS number if the
+// line were absent. So it rides the set aside answer and nothing else. The made, spent and profit
+// answers are turnover and costs, true in every nation, and a caveat under them is the ten helpful
+// additions that make an unhelpful product.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 2c. the set aside answer says it on both channels, and only that answer ===\n');
+
+const THREAD = read('app/api/thread/route.ts');
+const WA = read('app/api/whatsapp/route.ts');
+const THREAD_CODE = codeOnly(THREAD);
+const WA_CODE = codeOnly(WA);
+
+// ⚠️ SLICED TO THE END OF THE STATEMENT, NOT MATCHED BY ONE REGEX. The answer is a template
+// literal containing NESTED template literals, so a [^`]* span cannot cross it. The first draft of
+// this check used one and went red against correct code.
+const setAsideStmt = (() => {
+  const i = THREAD_CODE.indexOf('Put by ${formatGbp(');
+  if (i === -1) return '';
+  const end = THREAD_CODE.indexOf(';', i);
+  return end === -1 ? THREAD_CODE.slice(i) : THREAD_CODE.slice(i, end);
+})();
+ok('🔴 the thread set aside answer carries the sentence',
+  setAsideStmt.length > 0 && setAsideStmt.includes('${SCOTLAND_LINE}'));
+ok('🔴 the WhatsApp set aside answer carries it too, so the two channels cannot drift',
+  /SCOTLAND_LINE/.test(WA_CODE) && /hasPosition \? ` \$\{SCOTLAND_LINE\}` : ''/.test(WA_CODE));
+
+// ⚠️ NO CAVEAT ABOUT A FIGURE HE HAS NOT BEEN GIVEN. Same guard lib/incomeproof.ts applies with
+// personalTaxShown: a man with nothing confirmed gets the empty sentence and nothing else.
+ok('⚠️ WhatsApp guards it on there being a position at all',
+  /const scot = hasPosition \? ` \$\{SCOTLAND_LINE\}` : '';/.test(WA_CODE));
+ok('⚠️ and the thread guards it by sitting after the empty return',
+  THREAD_CODE.indexOf('hasTaxPosition(optimiser, tax.setAside)') < THREAD_CODE.indexOf('${SCOTLAND_LINE}'));
+
+// SET ASIDE ONLY. If the sentence ever appears in the same statement as a turnover or costs answer,
+// somebody has widened it past the decision without writing down why.
+for (const [name, line] of [
+  ['made', 'You have brought in'],
+  ['spent', 'You have spent'],
+]) {
+  const idx = THREAD_CODE.indexOf(line);
+  const stmtEnd = idx === -1 ? -1 : THREAD_CODE.indexOf('`;', idx);
+  const stmt = idx === -1 ? '' : THREAD_CODE.slice(idx, stmtEnd === -1 ? idx : stmtEnd);
+  ok(`⚠️ the ${name} answer stays clean, it is not band derived`,
+    idx !== -1 && !stmt.includes('SCOTLAND_LINE'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
 // 3. SURFACE N PLUS ONE CANNOT FORGET.
 //
 // The band derived surfaces are discovered from the imports on disk, not typed out, and every one
@@ -280,10 +343,6 @@ const NOT_DISCLOSED = {
     'Same as the income proof route. lib/quarterpack.ts prints it into the pack this route serves.',
   'app/api/optimise/route.ts':
     'JSON for the lever list behind /app/tax. It renders no money itself, and the levers are not disclosed on their own screen either, for the reason given under ways-to-save.',
-  'app/api/thread/route.ts':
-    'The in app chat, which repeats the set aside on demand. The honest treatment is to say it once, not on every answer to a question he asks weekly, and the two screens the thread sits inside carry it.',
-  'app/api/whatsapp/route.ts':
-    'The same figure on the channel he uses most. Saying it every time he asks what he owes is doc 103 inverted, a caveat read fifty times a year is a caveat he stops reading. Saying it once needs a stored flag, which is a change to lib/supabase.ts. That file is reserved to another lane, so this is reported rather than half done.',
   'lib/agent.ts':
     'The nudges. Same reasoning as the thread and WhatsApp: conversational, repeated, and pointed at a figure the app screens already caveat.',
   'app/app/pay-yourself/plan.ts':

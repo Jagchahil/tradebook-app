@@ -836,7 +836,39 @@ export function matchTotalsQuestion(body: string, now: Date = new Date()): Total
   const asksSpent = /\b(how much (have i|did i|i've)? ?spen[dt]|what (have|did) i spen[dt]|total spen[dt]|my (spending|expenses|outgoings)\b)/.test(b) || (/\bspent\b/.test(b) && b.endsWith('?') && !/\d/.test(b));
   const asksMade = /\b(how much (have i|did i) (made|earned|earnt|taken|took|billed|invoiced)|how much did i make|what (have|did) i (make|made|earn|earned)|my (income|earnings|takings)\b|how much money (have i|did i) (made|earned))/.test(b);
   const asksProfit = /\bprofit\b/.test(b) && /\b(what|how much|my)\b/.test(b);
-  const asksTax = /\b(tax|owe|set aside|put aside|put away)\b/.test(b) && /\b(how much|what|my)\b/.test(b) && !/\bcan i\b|\bclaim\b/.test(b);
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE PRODUCT SPOKE A PHRASE IT COULD NOT HEAR. B2-F3, 17 August 2026.
+  //
+  // This lane answers with "Put by £10,618 for tax." It did not recognise "put by" as a question.
+  // Walked live on a Glasgow sole trader with 77 confirmed entries and £10,618 on his Tax page:
+  //
+  //   him: how much should i be putting by for the taxman
+  //   it:  are you a sole trader registered for CIS, or do you run a limited company?
+  //
+  // He had answered that at signup step 2 and again at setup step 2, and production SQL says
+  // business_type is sole_trader. Nothing was broken downstream. THE MATCHER NEVER FIRED, so the
+  // question fell through to the model, which asked him what it had already been handed and gave
+  // him no figure at all, on a surface that promises "I answer from your own figures, straight
+  // away".
+  //
+  // TWO MISSES, BOTH OF THEM ORDINARY BRITISH:
+  //   . "taxman" does not match \btax\b. The word boundary fails on the m, and this is the word a
+  //     tradesman actually uses.
+  //   . "putting by" was in none of the phrases, while "Put by" is how THIS FUNCTION'S OWN ANSWER
+  //     opens.
+  //
+  // ⚠️ SO THE RULE IS NOT A LONGER LIST, IT IS A PAIRING: every phrase the product uses to ANSWER
+  // a set aside question must be a phrase it hears when he ASKS it. test/waintents.test.mjs
+  // derives the answer wording from the route source and asserts this lane hears it, so changing
+  // the answer and not the matcher fails there rather than in front of a customer.
+  //
+  // ⚠️ AND IT IS ONE FUNCTION FOR TWO CHANNELS. app/api/whatsapp/route.ts calls this at lines 645
+  // and 2148 and app/api/thread/route.ts at 259, which is why the fix belongs here and not in a
+  // route. Same reason the Scotland rule moved into taxFacts2627() the same afternoon.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const asksTax = /\b(taxman|tax man|tax|owe|set(?:ting|tin)? aside|put(?:ting|tin)? (?:by|aside|away))\b/.test(b)
+    && /\b(how much|what|my|should i)\b/.test(b)
+    && !/\bcan i\b|\bclaim\b/.test(b);
   if (/£\s*\d/.test(b)) return null; // an amount means it is probably an entry
   let kind: TotalsKind | null = null;
   if (asksTax) kind = 'tax';

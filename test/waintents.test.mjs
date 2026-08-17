@@ -700,5 +700,93 @@ ok('the webhook asks matchProductTruth before the claim rulebook and the totals 
 ok('a product truth question is answered even in read only',
   /\|\| matchProductTruth\(text\) !== null/.test(wroute));
 
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// B2-F3. THE PRODUCT MUST HEAR THE WORDS IT SPEAKS.
+//
+// 🔴 WALKED LIVE, 17 August 2026, on a Glasgow sole trader with 77 confirmed entries and £10,618
+// on his Tax page:
+//
+//   him: how much should i be putting by for the taxman
+//   it:  are you a sole trader registered for CIS, or do you run a limited company?
+//
+// He answered that at signup step 2 and again at setup step 2, and production SQL says
+// business_type is sole_trader. Nothing downstream was broken: matchTotalsQuestion never fired, so
+// the question fell through to the model, which asked for a fact it had been handed and gave him no
+// figure, on a surface that promises "I answer from your own figures, straight away".
+//
+// "taxman" does not match \btax\b, the boundary fails on the m. And "putting by" was in none of
+// the phrases, while "Put by" is how the answer itself OPENS.
+//
+// ⚠️ SO THIS IS NOT A LIST OF PHRASINGS, IT IS A PAIRING, DERIVED FROM THE ROUTE SOURCE. The verb
+// the answer uses is read off app/api/thread/route.ts and fed back in as a question. Change the
+// answer wording without teaching the matcher and this fails here, which is the only place it can
+// fail that is not in front of a customer.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== B2-F3: the set aside lane hears the words the product answers with ===\n');
+
+const threadRoute = readFileSync(path.resolve(here, '../app/api/thread/route.ts'), 'utf8');
+const waRoute = readFileSync(path.resolve(here, '../app/api/whatsapp/route.ts'), 'utf8');
+
+// The answer template, e.g. `Put by ${formatGbp(leadFigure)} for tax.` The captured verb phrase is
+// what a customer will say back to us.
+const answerVerbs = [...threadRoute.matchAll(/`([A-Z][a-z]+(?: [a-z]+)?) \$\{formatGbp\([^)]*\)\} for tax/g)]
+  .map((m) => m[1].toLowerCase());
+ok(`🔴 the thread's set aside answer template was found, verbs: ${JSON.stringify(answerVerbs)}`,
+  answerVerbs.length > 0);
+// ⚠️ THE QUESTION MUST NOT CONTAIN THE WORD TAX. An earlier draft of this asked
+// "how much should i <verb> for tax", and "tax" is itself a trigger, so the verb could have been
+// anything at all and the assertion still passed. It was vacuous, and the sabotage that changes the
+// answer wording walked straight through it. The verb has to carry the match on its own.
+for (const verb of answerVerbs) {
+  const asked = `how much should i ${verb}`;
+  ok(`🔴 the answer opens "${verb}", so the question "${asked}" must be heard, and it says nothing about tax`,
+    !/tax/.test(asked));
+  const got = W.matchTotalsQuestion(asked);
+  ok(`🔴 it answers with "${verb}", so it must hear "${asked}"`, got !== null && got.kind === 'tax');
+}
+
+// The phrasings the walk used, and the ordinary British ones beside them. Each of these is a man
+// asking the single most important question this product answers.
+for (const asked of [
+  'how much should i be putting by for the taxman',
+  'how much should i put by for the taxman',
+  'what should i be putting by',
+  'how much do i owe the taxman',
+  'how much am i putting by for the tax man',
+  'how much should i put away for tax',
+  'what do i need to set aside',
+  'how much tax do i owe',
+  // ⚠️ EACH OF THE NEXT TWO CARRIES THE MATCH ON ONE THING ONLY, so removing that one thing fails
+  // here. Every phrase above it has two or more triggers, which is why the first draft of this
+  // section had five sabotages walk through it untouched.
+  'what does the taxman want',                    // "taxman" alone. \btax\b cannot match it.
+  'should i be putting money by for the taxman',  // "should i" alone as the question word.
+]) {
+  const got = W.matchTotalsQuestion(asked);
+  ok(`hears "${asked}"`, got !== null && got.kind === 'tax');
+}
+
+// And it must not have got greedier. A claim question is a different lane with a different answer,
+// and an amount is an entry he is logging, not a question he is asking.
+for (const asked of [
+  'can i claim my boots',
+  'can i claim a van against tax',
+  'i spent £40 on tax software',
+  // ⚠️ THESE TWO CARRY A TRIGGER AND A QUESTION WORD, so they are the only ones that actually test
+  // the two exclusions. The three above are refused for want of a trigger and prove nothing.
+  'how much tax can i claim on my van',  // tests the can i / claim exclusion
+  'my tax bill was £500',                // tests the amount guard: he is telling us, not asking
+]) {
+  const got = W.matchTotalsQuestion(asked);
+  ok(`does NOT hear "${asked}" as a tax question`, got === null || got.kind !== 'tax');
+}
+
+// ⚠️ ONE FUNCTION, TWO CHANNELS, WHICH IS WHY THE FIX IS IN lib AND NOT IN A ROUTE. If either
+// channel stops asking this function, it grows its own answer to the same question and the two
+// drift, which is the defect the Scotland rule had on the same afternoon.
+ok('🔴 the thread lane asks matchTotalsQuestion', /matchTotalsQuestion\(/.test(threadRoute));
+ok('🔴 and the WhatsApp webhook asks the SAME function', /matchTotalsQuestion\(/.test(waRoute));
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

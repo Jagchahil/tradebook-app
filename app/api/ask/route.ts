@@ -14,9 +14,11 @@ import {
   isScottishRatesQuestion, isVatQuestion,
   isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
   isDeadlineQuestion, asksAmount, deadlineAnswer,
+  isNiQuestion, isStudentLoanQuestion, isPropertyQuestion,
 } from '../../../lib/waintents';
 import { SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { vatAnswerForUser } from '../../../lib/vatanswer';
+import { niAnswerForUser, studentLoanAnswerForUser, propertyAnswerForUser } from '../../../lib/laneanswers';
 import { getOptimiserInput } from '../../../lib/supabase';
 import { hmrcFilingLive } from '../../../lib/features';
 
@@ -232,6 +234,39 @@ export async function POST(req: NextRequest) {
   // costs no model call at all, so there is nothing to meter.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   if (!truth && isVatQuestion(question)) truth = await vatAnswerForUser(userId, question);
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HIS PROPERTY STREAM, HIS STUDENT LOAN AND HIS NATIONAL INSURANCE, ON THIS SURFACE TOO.
+  // B19, 17 August 2026, and the block written on 12 August about the data rights lane says the
+  // whole of it in advance: "this product answers questions on THREE surfaces and the fix reached
+  // one of them."
+  //
+  // Three predicates that have existed since Run 2, three pure builders that read his own rows,
+  // and one router dispatching all three. A man who typed "how much national insurance do i pay"
+  // into the accountant box was answered by the model, which holds none of his rows, none of his
+  // plan and none of his income shape, AND IT COST HIM ONE OF HIS SIX QUESTIONS FOR THE DAY.
+  //
+  // ⚠️ ABOVE THE SHARED CACHE, AND ON THIS ROUTE THAT IS THE PART THAT IS NOT OPTIONAL. qa_cache is
+  // keyed on the QUESTION ALONE with no user id and served to every other customer who asks the
+  // same thing. Every one of these three answers is nothing BUT his own figures: his Class 4 on his
+  // profit, his student loan building against his own income, his rent and the tax it causes. And
+  // every one of them has an ordinary phrasing with no first person word in it. "how much national
+  // insurance is due on a profit of this size" and "what tax is owed on rental income" are classed
+  // GENERAL, so without this bound the answer composed from HIS books would be written to a shared
+  // cache under a question anybody can ask. Returning here means it is returned before questionNorm
+  // is ever computed and long before upsertQaCache is reached, so a personal figure cannot enter
+  // that cache by any path. Structural rather than hopeful, and test/laneparity.test.mjs holds all
+  // three bounds by index rather than by inspection.
+  //
+  // ⚠️ AND ABOVE THE CAP, because none of the three costs a model call. They are reads of his own
+  // rows, and metering a man for asking what National Insurance he owes is metering him for the
+  // thing the product exists to do.
+  //
+  // ⚠️ THE ORDER IS THE OTHER TWO ROUTERS' ORDER: below the VAT lane, above the Scottish rates gate.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (!truth && isPropertyQuestion(question)) truth = await propertyAnswerForUser(userId, 'web');
+  if (!truth && isStudentLoanQuestion(question)) truth = await studentLoanAnswerForUser(userId, 'web');
+  if (!truth && isNiQuestion(question)) truth = await niAnswerForUser(userId);
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 SCOTTISH RATES, ON THIS SURFACE TOO, AND THE HEADER ABOVE SAYS WHY IN ADVANCE. B16, 17

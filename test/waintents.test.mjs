@@ -280,11 +280,23 @@ ok('ni answer says pension covered', /pension year looks covered/i.test(nia));
 const nib = W.niAnswer({ profit: 5000, salary: 0, class1: 0, class4: 0, class2Annual: 189.8, qualifies: false, voluntarySuggested: true });
 ok('low profit ni answer suggests voluntary class 2', /Voluntary Class 2/i.test(nib) && /189\.80/.test(nib));
 
-const sla = W.studentLoanAnswer({ hasPlan: true, planLabel: 'Plan 2', annual: 505.35, threshold: 29385, income: 35000 });
+const sla = W.studentLoanAnswer({ hasPlan: true, planLabel: 'Plan 2', annual: 505.35, threshold: 29385, income: 35000, channel: 'whatsapp' });
 ok('student loan answer has figure and january', /505\.35/.test(sla) && /January/.test(sla));
-const slb = W.studentLoanAnswer({ hasPlan: false, planLabel: null, annual: 0, threshold: 0, income: 0 });
+// 🔴 THE NO PLAN BRANCH TURNS ON THE CHANNEL SINCE 17 August 2026, AND THE TWO ANSWERS ARE HELD
+// APART HERE. It offers a door, and only WhatsApp has it: matchStudentLoanPlanSet is dispatched by
+// that router alone, by the written decision in test/laneparity.test.mjs section 9b. Telling a man
+// in a browser to "tell me here, like plan 2" is telling him to do a thing the box will not hear,
+// and he finds out by doing it.
+const slb = W.studentLoanAnswer({ hasPlan: false, planLabel: null, annual: 0, threshold: 0, income: 0, channel: 'whatsapp' });
 ok('no plan answer asks for the plan', /plan 2/i.test(slb));
-const slc = W.studentLoanAnswer({ hasPlan: true, planLabel: 'Plan 5', annual: 0, threshold: 25000, income: 20000 });
+ok('...and offers to take it right here, because on WhatsApp it can', /Tell me here/.test(slb));
+const slbWeb = W.studentLoanAnswer({ hasPlan: false, planLabel: null, annual: 0, threshold: 0, income: 0, channel: 'web' });
+ok('🔴 ON THE WEB HE IS NEVER TOLD TO TELL US HERE, because nothing on that channel would hear it',
+  !/Tell me here/.test(slbWeb) && !/"plan 2"/.test(slbWeb));
+ok('...and he is still sent to the screen that does work', /Money, Student loan/.test(slbWeb));
+ok('...and both spellings still say the same true thing: we do not know his plan',
+  /I do not know your student loan plan yet/.test(slb) && /I do not know your student loan plan yet/.test(slbWeb));
+const slc = W.studentLoanAnswer({ hasPlan: true, planLabel: 'Plan 5', annual: 0, threshold: 25000, income: 20000, channel: 'whatsapp' });
 ok('under threshold answer says nothing due', /Nothing due/.test(slc) && /25,000/.test(slc));
 
 
@@ -328,13 +340,19 @@ ok('no goals answer invites one', /my goal is/.test(gb));
   ok('logging never reads as a question', !W.isPropertyQuestion('rent 950 in from flat 2'));
   ok('plain trade totals stay out', !W.isPropertyQuestion('how much have I made'));
 
-  const empty = W.propertyAnswer(0, 0, 0, 0);
+  // 🔴 SAME CHANGE, SAME REASON, ON THE PROPERTY EMPTY STATE. matchRentIn is WhatsApp only too.
+  const empty = W.propertyAnswer(0, 0, 0, 0, '', 'whatsapp');
   ok('no rent answer teaches the intent', /rent 950 in from flat 2/.test(empty));
-  const full = W.propertyAnswer(12000, 800, 80, 2);
+  const emptyWeb = W.propertyAnswer(0, 0, 0, 0, '', 'web');
+  ok('🔴 ON THE WEB HE IS NEVER TOLD TO TEXT IT, because that channel has no rent lane at all',
+    !/Text it as it lands/.test(emptyWeb) && !/rent 950 in from flat 2/.test(emptyWeb));
+  ok('...and he is still sent to the door that works, and still told why the stream is kept apart',
+    /under Money/.test(emptyWeb) && /separate from your work money/.test(emptyWeb));
+  const full = W.propertyAnswer(12000, 800, 80, 2, '', 'whatsapp');
   ok('answer carries the figures', /£12,000/.test(full) && /£800/.test(full) && /2 properties/.test(full));
   ok('answer warns about April 2027', /April 2027/.test(full) && /£80/.test(full));
   ok('no NI line present', /no National Insurance/.test(full));
-  ok('answers carry no forbidden dashes', !/[\u2013\u2014\u2212]/.test(empty + full));
+  ok('answers carry no forbidden dashes', !/[\u2013\u2014\u2212]/.test(empty + emptyWeb + full));
 }
 
 // --- The invoice chaser -----------------------------------------------------------

@@ -66,7 +66,6 @@ import {
   claimMessage,
   insertTransaction,
   listUserProperties,
-  propertyYtdTotals,
   listOverdueInvoices,
   transactionSummaryForUser,
   getSession,
@@ -84,7 +83,6 @@ import {
   deleteTransactionById,
   updateTransactionAmount,
   setNudgePrefs,
-  getStudentLoanSettings,
   setStudentLoanPlan,
   getActiveGoals,
   insertUserGoal,
@@ -126,13 +124,10 @@ import {
   isNiQuestion,
   isStudentLoanQuestion,
   matchStudentLoanPlanSet,
-  niAnswer,
-  studentLoanAnswer,
   matchGoalSet,
   buildGoal,
   matchRentIn,
   isPropertyQuestion,
-  propertyAnswer,
   matchChaseRequest,
   chaseMessage,
   isSetupRequest,
@@ -172,6 +167,9 @@ import {
   normaliseBritishTime,
 } from '../../../lib/waintents';
 import { vatAnswerForUser } from '../../../lib/vatanswer';
+import {
+  niAnswerForUser, studentLoanAnswerForUser, propertyAnswerForUser, taxYearSinceISO,
+} from '../../../lib/laneanswers';
 import { hmrcFilingLive } from '../../../lib/features';
 import { weeklySummaryText } from '../../../lib/weeklyupdate';
 import {
@@ -183,8 +181,7 @@ import { matchKb } from '../../../lib/supportkb';
 import { soleTraderTax, homeOfficeFlatRateMonthly, FACTS } from '../../../lib/taxengine';
 import { taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition } from '../../../lib/taxoptimiser';
 import { SCOTLAND_LINE, SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
-import { aprilDelta } from '../../../lib/propertyengine';
-import { niPosition, studentLoanRepayment, STUDENT_PLANS, type StudentPlan } from '../../../lib/nistudentloan';
+import { STUDENT_PLANS } from '../../../lib/nistudentloan';
 import { TAXGUIDE_TRIGGER, matchTrade, cardText, totalCards } from '../../../lib/taxguide';
 import type { TradeInfo } from '../../../lib/taxguide';
 import { rateLimitedShared } from '../../../lib/ratelimit';
@@ -2220,95 +2217,29 @@ async function handleTotals(from: string, body: string): Promise<void> {
   await sendText(from, (hasPosition && basis ? `${owed} ${basis}` : owed) + scot);
 }
 
-// The UK tax year starts 6 April. Same rule as matchTotalsQuestion.
-function taxYearSinceISO(now: Date = new Date()): string {
-  const d = new Date(now);
-  const y = d.getUTCMonth() > 3 || (d.getUTCMonth() === 3 && d.getUTCDate() >= 6) ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
-  return `${y}-04-06`;
-}
-
-// "How much national insurance do I pay": Class 4 on the year to date profit,
-// Class 1 if they have saved a salary, and the pension year status. No AI.
+// "How much national insurance do I pay": the year to date position out of the ONE reader every
+// channel now asks, lib/laneanswers.ts. This handler used to hold the read, the profile fetch, the
+// landlord gate's argument and the failed read sentence, and it was the only router that had them.
+// See that file's header for why a lane with a builder and one caller is the shape this codebase
+// keeps finding.
 async function handleNiQuestion(from: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
     await replyNotLinked(from);
     return;
   }
-  const totals = await totalsForUser(userId, taxYearSinceISO(), null);
-  if (!totals) {
-    await sendText(from, 'I could not fetch your figures just now. Try again in a minute.');
-    return;
-  }
-  // 🔴 THE PROFILE READ IS WHAT MAKES THE LANDLORD GATE IN niAnswer() RUN AT ALL.
-  //
-  // The gate went into lib/waintents.ts on 31 July and this call site passed nothing, so it was
-  // inert on the only channel that reaches it: a man whose whole business is letting was still
-  // being told a lean year could be protected with voluntary Class 2. HMRC NIM74250: "A person
-  // whose activities in managing the property are those generally associated with being a landlord
-  // would not meet the definition of gainful employment for self-employed NICs purposes." There are
-  // no relevant profits, no small profits threshold to fall under, and no Class 2 to buy the year
-  // with. His route is Class 3, at several times the price.
-  //
-  // Fetched alongside the settings rather than after them, so the answer is no slower than it was.
-  // A failed read is null, which is unknown, and niAnswer answers exactly as it always has: NIM74250
-  // itself says a guest house is a trade, so only a KNOWN landlord is ever told something different.
-  const [settings, biz] = await Promise.all([
-    getStudentLoanSettings(userId),
-    getBusinessProfile(userId).catch(() => null),
-  ]);
-  const salary = settings?.employmentIncome ?? 0;
-  const profit = Math.max(0, totals.income - totals.expenses);
-  const pos = niPosition(salary, profit);
-  await sendText(
-    from,
-    niAnswer({
-      profit,
-      salary,
-      class1: pos.class1,
-      class4: pos.class4,
-      class2Annual: pos.class2Voluntary.annual,
-      qualifies: pos.qualifiesViaEmployment || pos.qualifiesViaProfits,
-      voluntarySuggested: pos.voluntaryClass2Suggested,
-      incomeShape: biz?.incomeShape ?? null,
-    }),
-  );
+  await sendText(from, await niAnswerForUser(userId));
 }
 
-// "How much student loan will I owe": the stored plan against year to date
-// income (profit plus any saved salary). No AI.
+// "How much student loan will I owe": the stored plan against year to date income, out of the ONE
+// reader, lib/laneanswers.ts. No plan is an ANSWER rather than a failure and that file says so.
 async function handleStudentLoanQuestion(from: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
     await replyNotLinked(from);
     return;
   }
-  const settings = await getStudentLoanSettings(userId);
-  const plans: StudentPlan[] = [];
-  if (settings?.plan) plans.push(settings.plan);
-  if (settings?.postgrad) plans.push('postgrad');
-  if (plans.length === 0) {
-    await sendText(from, studentLoanAnswer({ hasPlan: false, planLabel: null, annual: 0, threshold: 0, income: 0 }));
-    return;
-  }
-  const totals = await totalsForUser(userId, taxYearSinceISO(), null);
-  if (!totals) {
-    await sendText(from, 'I could not fetch your figures just now. Try again in a minute.');
-    return;
-  }
-  const profit = Math.max(0, totals.income - totals.expenses);
-  const income = profit + (settings?.employmentIncome ?? 0);
-  const r = studentLoanRepayment(income, plans);
-  await sendText(
-    from,
-    studentLoanAnswer({
-      hasPlan: true,
-      planLabel: plans.map((p) => STUDENT_PLANS[p].label).join(' plus '),
-      annual: r.annualTotal,
-      threshold: Math.min(...plans.map((p) => STUDENT_PLANS[p].threshold)),
-      income,
-    }),
-  );
+  await sendText(from, await studentLoanAnswerForUser(userId, 'whatsapp'));
 }
 
 // "My goal is a van for 24k": create the goal in the user's own words.
@@ -2668,30 +2599,19 @@ async function handleRentIn(from: string, text: string): Promise<void> {
   );
 }
 
-// "How are my properties doing": this year's stream plus the April 2027 line,
-// the same engine as the app and the website calculator.
+// "How are my properties doing": this year's stream plus the April 2027 line, out of the ONE
+// reader, lib/laneanswers.ts, and the same engine the app and the website calculator run.
+//
+// 🔴 AND THE FAILED READ IS NOW A REFUSAL RATHER THAN AN EMPTY STATE. This handler used to hand
+// propertyAnswer a zero it had guessed, so an unreachable database told a landlord his property
+// stream was empty. lib/laneanswers.ts and propertyYtdTotals both carry that argument.
 async function handlePropertyQuestion(from: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
     await replyNotLinked(from);
     return;
   }
-  const [totals, tradeTotals, properties, profile] = await Promise.all([
-    propertyYtdTotals(userId, taxYearSinceISO()),
-    totalsForUser(userId, taxYearSinceISO(), null),
-    listUserProperties(userId),
-    getStudentLoanSettings(userId),
-  ]);
-  const tradeProfit = Math.max(0, (tradeTotals?.income ?? 0) - (tradeTotals?.expenses ?? 0) - totals.rents + totals.expenses + totals.finance);
-  const d = aprilDelta({
-    employmentIncome: profile?.employmentIncome ?? 0,
-    tradeProfit,
-    rents: totals.rents,
-    propertyExpenses: totals.expenses,
-    financeCosts: totals.finance,
-    jointShare: 1,
-  });
-  await sendText(from, propertyAnswer(totals.rents, d.now.taxCausedByProperty, d.extraPerYear, properties.length));
+  await sendText(from, await propertyAnswerForUser(userId, 'whatsapp'));
 }
 
 // 🔴 THE SETUP GOAL FLOW. Returns true if it consumed the message.

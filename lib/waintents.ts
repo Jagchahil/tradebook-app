@@ -950,6 +950,47 @@ export function oweAnswer(setAside: number, projected: boolean, hasPosition: boo
 // generic tax totals matcher. The maths comes from lib/nistudentloan.ts, the
 // same engine as the app hub and the free website tools.
 
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A FAILED READ IS SAID OUT LOUD ON ALL THREE OF THESE LANES, AND IT IS NEVER A FIGURE.
+//
+// The same decision lib/vatstanding.ts made for VAT_UNREADABLE, made once for National Insurance,
+// the student loan and the property stream. These are the webhook's own words, moved here so three
+// channels refuse in ONE sentence rather than three sentences that drift.
+//
+// ⚠️ AND THE PROPERTY LANE HAD NO REFUSAL AT ALL. propertyYtdTotals answered a failed read with
+// { rents: 0 }, and propertyAnswer's empty branch then told a landlord with a full year of rent in
+// his books "No rental money logged this tax year yet". A guessed zero wearing the words of a read
+// one. lib/laneanswers.ts is where that is unpicked and its header carries the argument.
+//
+// ⚠️ NOT KNOWING HIS PLAN IS NOT A FAILED READ, and nor is not knowing his income shape. Those
+// are answered, not refused. Only a failure of a read the FIGURE turns on says this.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+export const LANE_UNREADABLE = 'I could not fetch your figures just now. Try again in a minute.';
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE EMPTY STATES OF THESE LANES ARE CHANNEL SPECIFIC, AND NOBODY KNEW BECAUSE THE LANES HAD
+// NEVER LEFT WHATSAPP. Found 17 August 2026 by B19 typing the adjacent questions into the surface
+// it had just wired, which is where every recent finding in this repo has come from.
+//
+// B19 records isIdentity as the lane whose WORDS are channel specific ("right here in WhatsApp",
+// 'text "help" to see the lot'), and says the other lanes merely need a move. TWO OF THESE THREE
+// ARE THE SAME PROBLEM and it is invisible until you wire them:
+//
+//   studentLoanAnswer, no plan stored:  'Tell me here, like "plan 2"'
+//   propertyAnswer, no rent logged:     'Text it as it lands, like "rent 950 in from flat 2"'
+//
+// Both are instructions to do a thing THE WEB CANNOT DO. matchStudentLoanPlanSet and matchRentIn
+// are WhatsApp only, correctly and by written decision (the web has the settings screen and the
+// money form), so a man in a browser told to "tell me here" types "plan 2", nothing happens, and
+// the same reply comes back. A promise the channel cannot keep is worse than no offer at all.
+//
+// ⚠️ THE CHANNEL IS REQUIRED, NOT DEFAULTED. A default is how a fourth caller silently gets the
+// wrong one, and there are only ever two answers, so a caller that cannot say which it is has not
+// finished thinking. Both builders take it and test/laneparity.test.mjs section 11 asserts each
+// router passes its own.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+export type LaneChannel = 'whatsapp' | 'web';
+
 export function isNiQuestion(body: string): boolean {
   const b = body.trim().toLowerCase();
   if (/£\s*\d/.test(b)) return false; // an amount means it is probably an entry
@@ -1056,9 +1097,18 @@ export function studentLoanAnswer(input: {
   annual: number;
   threshold: number;
   income: number;
+  // Which channel is asking. See LaneChannel above: the no plan branch offers a door, and only one
+  // of the two channels has it.
+  channel: LaneChannel;
 }): string {
   if (!input.hasPlan) {
-    return 'I do not know your student loan plan yet. Tell me here, like "plan 2", or set it in the app under Money, Student loan, and I will track the repayment on your real numbers.';
+    // 🔴 THE OFFER IS ONLY MADE WHERE IT CAN BE TAKEN. matchStudentLoanPlanSet is dispatched by
+    // app/api/whatsapp/route.ts alone, by written decision, because the web has the settings screen
+    // this would write to. So a man in a browser is sent to that screen and is never told to say
+    // "plan 2" at a box that will not hear it.
+    return input.channel === 'whatsapp'
+      ? 'I do not know your student loan plan yet. Tell me here, like "plan 2", or set it in the app under Money, Student loan, and I will track the repayment on your real numbers.'
+      : 'I do not know your student loan plan yet. Set it under Money, Student loan, and I will track the repayment on your real numbers.';
   }
   if (input.annual <= 0) {
     return `Nothing due so far: your income this tax year (${formatGbp(input.income)}) is under the ${input.planLabel} threshold of ${formatGbp(input.threshold)}. If income grows past it, I will have the figure ready.`;
@@ -1207,20 +1257,47 @@ export function isPropertyQuestion(body: string): boolean {
 
 // The property position in one message: this year's stream plus the April
 // 2027 line, the same engine as the app and the website tool.
+// ⚠️ THE SCOTLAND CAVEAT ARRIVES AS A STRING, IT IS NOT IMPORTED, AND IT IS NOT OPTIONAL
+// BECAUSE THE FIGURE IS BAND DERIVED. Found 17 August 2026 by B19 moving this lane's read into
+// lib/laneanswers.ts: test/scotland.test.mjs section 3 discovers band derived surfaces from the
+// imports on disk, and the moment aprilDelta moved into a file of its own the ratchet asked the
+// question nobody had been able to ask. app/api/whatsapp/route.ts produced this figure, said
+// nothing about it, and passed the ratchet anyway, because the SAME FILE says the sentence on the
+// totals lane thirty lines up. One file, two lanes, and only one of them disclosed.
+//
+// "adding about £2,400 to your tax bill" is his rent stacked on his trade profit and taxed at the
+// England, Wales and Northern Ireland rates. A Scottish landlord is misled by it exactly as he is
+// misled by the set aside, which is lib/scotland.ts's own bar.
+//
+// ⚠️ AND IT GOES ON THE BRANCH THAT CARRIES A FIGURE, NOWHERE ELSE. A man with no rent logged
+// is given no number, so a caveat about a number he has not been given is a row he has to read and
+// reject for nothing. Same guard the thread's set aside answer applies after its early return.
+//
+// ⚠️ THE STRING IS PASSED because this module has no imports and must keep none. See the note
+// above IncomeShape. lib/scotland.ts owns the words and lib/laneanswers.ts hands them over, so
+// there is still exactly one wording of the caveat in the product.
 export function propertyAnswer(
   rents: number,
   taxAdded: number,
   extra2027: number,
   propertyCount: number,
+  scotlandLine: string,
+  channel: LaneChannel,
 ): string {
   if (rents <= 0) {
-    return 'No rental money logged this tax year yet. Text it as it lands, like "rent 950 in from flat 2", and I will keep your property stream separate from your work money, ready for tax.';
+    // 🔴 THE OFFER IS ONLY MADE WHERE IT CAN BE TAKEN, for the reason written above LaneChannel.
+    // matchRentIn is WhatsApp only by written decision, so "text it as it lands" on the web is an
+    // instruction to a man in a browser to send a text, at a box that would not log it if he did.
+    return channel === 'whatsapp'
+      ? 'No rental money logged this tax year yet. Text it as it lands, like "rent 950 in from flat 2", and I will keep your property stream separate from your work money, ready for tax.'
+      : 'No rental money logged this tax year yet. Add it under Money as it lands and I will keep your property stream separate from your work money, ready for tax.';
   }
   const where = propertyCount > 0 ? ` across ${propertyCount} ${propertyCount === 1 ? 'property' : 'properties'}` : '';
   const april = extra2027 > 0
     ? ` Heads up: the new property rates from April 2027 would add about ${gbpShort(extra2027)} a year on these numbers. You will hear it from me first, not from a January surprise.`
     : '';
-  return `Property this tax year${where}: ${gbpShort(rents)} of rent in, adding about ${gbpShort(taxAdded)} to your tax bill (rent carries no National Insurance).${april}`;
+  const scot = scotlandLine ? ` ${scotlandLine}` : '';
+  return `Property this tax year${where}: ${gbpShort(rents)} of rent in, adding about ${gbpShort(taxAdded)} to your tax bill (rent carries no National Insurance).${april}${scot}`;
 }
 
 // --- Instant invoice from a logged sale (the Tyms mechanic) ---------------------

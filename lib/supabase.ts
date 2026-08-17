@@ -6738,16 +6738,30 @@ export async function listUserProperties(userId: string): Promise<UserProperty[]
 
 // Confirmed property stream totals for the tax year, split so the engine can
 // treat mortgage interest as the Section 24 credit rather than an expense.
+//
+// 🔴 A FAILED READ IS null, NOT A ZERO, AND THAT CHANGED ON 17 AUGUST 2026 BECAUSE THE ZERO WAS
+// BEING READ BACK TO THE CUSTOMER AS A FACT ABOUT HIS BOOKS.
+//
+// This used to answer an unreachable database with { rents: 0, expenses: 0, finance: 0 }. Its only
+// caller hands that to propertyAnswer(), whose first branch is `if (rents <= 0)` and whose words
+// are "No rental money logged this tax year yet. Text it as it lands". So a landlord with a full
+// year of rent behind him, on one five second wobble, was told his property stream was EMPTY and
+// invited to start logging again. Nothing anywhere could tell that from the true empty case,
+// because a guessed zero and a read zero were the same value.
+//
+// A zero we READ and a zero we GUESSED are two different facts, so the type says which. The genuine
+// empty case still returns real zeros and still gets propertyAnswer's real empty state.
+// lib/laneanswers.ts turns the null into LANE_UNREADABLE for every channel that asks.
 export async function propertyYtdTotals(
   userId: string,
   sinceISO: string,
-): Promise<{ rents: number; expenses: number; finance: number }> {
+): Promise<{ rents: number; expenses: number; finance: number } | null> {
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}&income_type=eq.property&confirmed=eq.true&is_personal=eq.false&transaction_date=gte.${sinceISO}&select=amount,category,vendor`,
     { headers: headers() },
   );
-  if (!res.ok) return { rents: 0, expenses: 0, finance: 0 };
+  if (!res.ok) return null;
   const rows = (await res.json().catch(() => [])) as Array<{ amount: number | string; category: string | null; vendor: string | null }>;
   let rents = 0;
   let expenses = 0;

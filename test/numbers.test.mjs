@@ -224,7 +224,7 @@ console.log('\n5. THE WHATSAPP ANSWERS, WHICH ARE THE MOST READ COPY WE HAVE');
       }));
       clean('waintents.studentLoanAnswer', I.studentLoanAnswer({
         hasPlan: true, planLabel: 'Plan 2', annual: profit / 11,
-        threshold: 28_470, income: profit + salary,
+        threshold: 28_470, income: profit + salary, channel: 'whatsapp',
       }));
       rendered += 2;
     }

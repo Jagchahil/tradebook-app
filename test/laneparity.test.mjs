@@ -1053,6 +1053,287 @@ ok('🔴 and the WhatsApp channel is the one that resolves it, through mtdPositi
   }
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// 11. B19. THE NATIONAL INSURANCE, STUDENT LOAN AND PROPERTY LANES, ON ALL THREE ROUTERS.
+// ---------------------------------------------------------------------------------------------
+// 🔴 WHY THIS SECTION EXISTS, AND IT IS THE SIXTH TIME. isNiQuestion, isStudentLoanQuestion and
+// isPropertyQuestion have existed since Run 2. All three have a pure builder in lib/waintents.ts,
+// all three are unit tested, all three read his own rows, and all three were dispatched by
+// app/api/whatsapp/route.ts and by NOTHING ELSE.
+//
+// So a man signed in at /app/thread, with his whole ledger one query away, asked "how much national
+// insurance do i pay" and was answered by the MODEL, which holds none of his rows, none of his plan
+// and none of his income shape, and has no way to ask for them. Section 7 is the same paragraph
+// about VAT and section 10 is the same paragraph about the deadline lane.
+//
+// ⚠️ AND THE UPPER BOUND IS THE TOTALS LANE, MEASURED RATHER THAN ASSUMED. "how much student loan
+// will i owe", "what tax do i owe on my rental" and "do i pay national insurance on my profit" all
+// satisfy matchTotalsQuestion, because it takes any money word plus one of "how much", "what" or
+// "my". Below the totals lane every one of them is answered with a whole business set aside figure,
+// which is section 2's own defect with a different lane wearing it.
+//
+// ⚠️ THE SITES ARE NAMED PER ROUTER, for the reason section 5 gives: the three routers genuinely
+// have three shapes, an else if chain, an early return and an assignment, and deriving one shape
+// from the argument name is how a sabotage killed a branch without turning this red.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 11. B19: the NI, student loan and property lanes, derived from all three routers ===\n');
+
+// The three lanes, each with its dispatch site per router and the reader that answers it.
+const B19_LANES = [
+  {
+    lane: 'isPropertyQuestion',
+    reader: 'propertyAnswerForUser(',
+    sites: {
+      whatsapp: '} else if (isPropertyQuestion(text)) {',
+      thread: "if (isPropertyQuestion(q)) return propertyAnswerForUser(userId, 'web');",
+      ask: "if (!truth && isPropertyQuestion(question)) truth = await propertyAnswerForUser(userId, 'web');",
+    },
+  },
+  {
+    lane: 'isStudentLoanQuestion',
+    reader: 'studentLoanAnswerForUser(',
+    sites: {
+      whatsapp: '} else if (isStudentLoanQuestion(text)) {',
+      thread: "if (isStudentLoanQuestion(q)) return studentLoanAnswerForUser(userId, 'web');",
+      ask: "if (!truth && isStudentLoanQuestion(question)) truth = await studentLoanAnswerForUser(userId, 'web');",
+    },
+  },
+  {
+    lane: 'isNiQuestion',
+    reader: 'niAnswerForUser(',
+    sites: {
+      whatsapp: '} else if (isNiQuestion(text)) {',
+      thread: 'if (isNiQuestion(q)) return niAnswerForUser(userId);',
+      ask: 'if (!truth && isNiQuestion(question)) truth = await niAnswerForUser(userId);',
+    },
+  },
+];
+
+const b19At = {};
+for (const { lane, reader, sites } of B19_LANES) {
+  b19At[lane] = {};
+  for (const [name, code] of ROUTERS) {
+    const site = sites[name];
+    const n = occurrences(code, site);
+    ok(`${lane}: DISPATCHED by ${name}  \`${site.trim()}\``, n > 0);
+    ok(`${lane}: ...and exactly once on ${name}, so its index names one call site`, n === 1);
+    const at = n === 1 ? code.indexOf(site) : -1;
+    b19At[lane][name] = at;
+
+    // 🔴 AND IT IS ANSWERED BY THE ONE READER. A lane that fires and then hands the question to the
+    // model anyway is the defect wearing the fix's clothes.
+    ok(`${lane}: ${name} answers it from lib/laneanswers.ts, not from the model`, code.includes(reader));
+
+    const modelNeedle = modelCall[name];
+    const modelAt = code.indexOf(modelNeedle);
+    ok(`${lane}: the paid model call was located on ${name}, so the bound below is not vacuous`,
+      modelAt !== -1);
+    ok(`🔴 ${lane}: ${name} NEVER CHARGES HIM A QUESTION FOR ASKING ABOUT HIS OWN ROWS`,
+      at !== -1 && modelAt !== -1 && at < modelAt);
+  }
+}
+
+// The upper bound, on the two routers that HAVE a totals lane. /api/ask has none, so there is
+// nothing there to order against and asserting one would pass by the absence of the thing it guards.
+// Section 7 records that as an open question rather than a settled decision.
+for (const { lane } of B19_LANES) {
+  for (const [name, code, arg] of ROUTERS.filter(([n]) => n !== 'ask')) {
+    const totalsNeedle = `matchTotalsQuestion(${arg})`;
+    const totalsAt = code.indexOf(totalsNeedle);
+    ok(`${lane}: the totals gate \`${totalsNeedle}\` was located on ${name}`, totalsAt !== -1);
+    ok(`🔴 ${lane}: AND IT RUNS ABOVE THE TOTALS LANE ON ${name}, so his rental question is not answered with a set aside figure`,
+      totalsAt !== -1 && b19At[lane][name] !== -1 && b19At[lane][name] < totalsAt);
+  }
+}
+
+// 🔴 THE SAME THREE, IN THE SAME ORDER, ON EVERY ROUTER. Three lanes whose phrasings overlap at the
+// edges ("what tax do i owe on my rental" is a property question and a tax question) answer the same
+// way on every channel only if they are ASKED in the same order. A router that ran them the other
+// way round is exactly the shape this file was written for.
+for (const [name] of ROUTERS) {
+  const p = b19At.isPropertyQuestion[name];
+  const s = b19At.isStudentLoanQuestion[name];
+  const n = b19At.isNiQuestion[name];
+  ok(`${name}: all three lane sites were located, so the order below is not vacuous`,
+    p !== -1 && s !== -1 && n !== -1);
+  ok(`🔴 ${name}: property, then student loan, then National Insurance, the same on every router`,
+    p !== -1 && s !== -1 && n !== -1 && p < s && s < n);
+}
+
+// 🔴 ON /api/ask ALL THREE RETURN ABOVE THE SHARED CACHE, AND THAT IS THE BOUND THAT IS NOT OPTIONAL.
+//
+// qa_cache is keyed on the QUESTION ALONE, with no user id, and is served to every other customer who
+// ever asks the same thing. Every one of these three answers is nothing but his own figures: his
+// Class 4 on his profit, his student loan building against his own income, his rent and the tax it
+// causes. And every one has an ordinary phrasing carrying no first person word, which is what
+// isGeneralQuestion tests, so the answer WOULD be cacheable. Returning above questionNorm means the
+// question is never keyed and upsertQaCache is never reached with it.
+{
+  const askOnly = ROUTERS.find(([n]) => n === 'ask')[1];
+  const normAt = askOnly.indexOf('const questionNorm = normaliseQuestion(question);');
+  const upsertAt = askOnly.indexOf('upsertQaCache(');
+  const capAt = askOnly.indexOf("bumpAiUsage('ask', userId)");
+  ok('ask: the cache key line was located, so the bounds below are not vacuous', normAt !== -1);
+  ok('ask: the cache WRITE was located too', upsertAt !== -1);
+  ok('ask: and the per user daily cap was located as well', capAt !== -1);
+  for (const { lane } of B19_LANES) {
+    const at = b19At[lane].ask;
+    ok(`🔴 ask: ${lane} RETURNS HIS OWN FIGURES BEFORE THE SHARED CACHE IS EVEN KEYED`,
+      at !== -1 && normAt !== -1 && at < normAt && at < upsertAt);
+    ok(`🔴 ask: ...AND ABOVE THE DAILY CAP, so a read of his own rows is never one of his six`,
+      at !== -1 && capAt !== -1 && at < capAt);
+  }
+}
+
+// ⚠️ AND NO ROUTER ASSEMBLES OR READS ANY OF IT. This is the half that makes the parity durable
+// rather than momentary: three routers calling one reader while one of them also keeps the read is
+// two owners again, with a shared function standing next to them looking like the fix. The webhook
+// held all three reads, the profile fetch, the landlord gate's call site and three copies of the
+// failed read sentence until today.
+for (const [name, code] of ROUTERS) {
+  ok(`  ${name}: keeps no copy of the three answers`,
+    !/niAnswer\(/.test(code) && !/studentLoanAnswer\(/.test(code) && !/propertyAnswer\(/.test(code));
+  ok(`  ${name}: and does not read the rows for itself either`,
+    !/niPosition\(/.test(code) && !/studentLoanRepayment\(/.test(code)
+    && !/aprilDelta\(/.test(code) && !/propertyYtdTotals\(/.test(code));
+}
+
+// One reader, one predicate, one set of words, each with exactly one home.
+for (const fn of ['niAnswerForUser', 'studentLoanAnswerForUser', 'propertyAnswerForUser']) {
+  ok(`🔴 lib/laneanswers.ts holds the ONE ${fn}`,
+    (read('lib/laneanswers.ts').match(new RegExp(`export async function ${fn}`, 'g')) || []).length === 1);
+}
+for (const fn of ['niAnswer', 'studentLoanAnswer', 'propertyAnswer']) {
+  ok(`🔴 lib/waintents.ts holds the ONE ${fn}`,
+    (read('lib/waintents.ts').match(new RegExp(`export function ${fn}\\(`, 'g')) || []).length === 1);
+}
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND EVERY ROUTER SAYS WHICH CHANNEL IT IS. B19, 17 August 2026, found by typing the adjacent
+// questions into the surface that had just been wired.
+//
+// Two of these three lanes have an EMPTY STATE that offers a door, and only one channel has it. The
+// student loan lane with no plan stored says 'Tell me here, like "plan 2"'; the property lane with
+// no rent logged says 'Text it as it lands'. matchStudentLoanPlanSet and matchRentIn are WhatsApp
+// only, by the written decisions in section 9b, so both sentences are instructions to do a thing
+// the web cannot do: he types "plan 2" into the chat, nothing happens, and the same reply returns.
+//
+// The backlog recorded isIdentity as the ONE lane with channel specific words. It was two more.
+// The National Insurance lane needs no channel: its only door is the app, which is true everywhere.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const CHANNEL = { whatsapp: "'whatsapp'", thread: "'web'", ask: "'web'" };
+  for (const [name, code] of ROUTERS) {
+    for (const fn of ['studentLoanAnswerForUser', 'propertyAnswerForUser']) {
+      ok(`🔴 ${name}: ${fn} is told which channel is asking, ${CHANNEL[name]}`,
+        code.includes(`${fn}(userId, ${CHANNEL[name]})`));
+    }
+    // 🔴 AND NEVER WITHOUT ONE. A default would let a fourth caller silently pick the wrong door.
+    for (const fn of ['studentLoanAnswerForUser', 'propertyAnswerForUser']) {
+      ok(`  ${name}: ...and never calls ${fn} with the id alone`,
+        !new RegExp(`${fn}\\(userId\\)`).test(code));
+    }
+  }
+  ok('🔴 lib/waintents.ts holds the ONE LaneChannel',
+    (read('lib/waintents.ts').match(/export type LaneChannel/g) || []).length === 1);
+  // The two builders that take it, and the one that deliberately does not.
+  ok('🔴 studentLoanAnswer takes the channel and its no plan branch turns on it',
+    /channel: LaneChannel;/.test(read('lib/waintents.ts'))
+    && /input\.channel === 'whatsapp'/.test(read('lib/waintents.ts')));
+  ok('🔴 propertyAnswer takes it too, and REQUIRES it rather than defaulting',
+    /channel: LaneChannel,\n\): string \{/.test(read('lib/waintents.ts')));
+  ok('⚠️ and niAnswer does NOT, because its only door is the app and that is true wherever he stands',
+    !/channel/.test(read('lib/waintents.ts').slice(
+      read('lib/waintents.ts').indexOf('export function niAnswer('),
+      read('lib/waintents.ts').indexOf('export function studentLoanAnswer('))));
+}
+
+// 🔴 AND THE REFUSAL IS ONE SENTENCE, NOT THREE. The webhook typed "I could not fetch your figures
+// just now" into each of the three handlers, which is how three channels come to refuse three ways.
+ok('🔴 lib/waintents.ts holds the ONE LANE_UNREADABLE',
+  (read('lib/waintents.ts').match(/export const LANE_UNREADABLE/g) || []).length === 1);
+
+// ---------------------------------------------------------------------------------------------
+// 11b. NOTHING ABOVE THESE LANES, ON ANY ROUTER, EATS ONE OF THESE PHRASES.
+// ---------------------------------------------------------------------------------------------
+// 🔴 THIS IS SECTION 6's TEST, GENERALISED, AND IT IS THE HALF AN ORDERING ASSERTION CANNOT DO.
+// Knowing lane X sits above lane Y proves nothing about the twenty gates that sit above BOTH. A
+// phrase claimed by one of them is answered by that lane on that router and by this one everywhere
+// else, which is one phrase and two answers, which is this file's founding complaint.
+//
+// So the gates above each lane are DERIVED, per router, off disk: every predicate lib/waintents.ts
+// exports whose call site in that router has a lower index than the lane's. Every phrase below is
+// then walked through all of them. Nothing is written down here except the phrases a customer types.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 11b. nothing above these lanes claims one of their phrases ===\n');
+
+const B19_PHRASES = {
+  isNiQuestion: [
+    'how much national insurance do i pay',
+    'what is my class 4',
+    'do i need to pay class 2',
+    'am i paying enough for my state pension',
+    'how much ni do i pay',
+    'what national insurance will i owe this year',
+    'do i pay national insurance on my profit',
+  ],
+  isStudentLoanQuestion: [
+    'how much student loan will i owe',
+    'whats my uni loan looking like',
+    'do i owe on my postgraduate loan',
+    'how much student loan is building up',
+    'what will my student loan repayment be',
+  ],
+  isPropertyQuestion: [
+    'how are my properties doing',
+    'what tax do i owe on my rental',
+    'how is my rental income doing',
+    'what is my property position',
+    'how much tax on my rentals',
+  ],
+};
+
+// The predicate names, off disk, exactly as section 9b derives them.
+const b19Exported = [];
+for (const m of read('lib/waintents.ts').matchAll(/^export\s+(?:async\s+)?function\s+((?:is|match|looksLike)[A-Za-z0-9_]*)/gm)) {
+  b19Exported.push(m[1]);
+}
+ok('the predicate names were read off lib/waintents.ts, so 11b is derived', b19Exported.length >= 25);
+
+for (const [lane, phrases] of Object.entries(B19_PHRASES)) {
+  // Every phrase reaches its own predicate in the first place. A phrase that does not is a phrase
+  // this section would then prove nothing about.
+  for (const phrase of phrases) {
+    ok(`  ${lane}: hears ${JSON.stringify(phrase)}`, W[lane](phrase) === true);
+  }
+
+  for (const [name, code] of ROUTERS) {
+    const laneAt = b19At[lane][name];
+    // The gates dispatched ABOVE this lane on this router, derived by index.
+    const above = b19Exported.filter((fn) => {
+      if (fn === lane) return false;
+      const m = code.match(new RegExp(`\\b${fn}\\s*\\(`));
+      return m && m.index !== -1 && m.index < laneAt;
+    });
+    ok(`  ${lane} on ${name}: at least four gates were derived above it, so the walk is not vacuous`,
+      above.length >= 4);
+    const eaten = [];
+    for (const phrase of phrases) {
+      for (const fn of above) {
+        let hit = false;
+        try { const r = W[fn](phrase); hit = r !== null && r !== false && r !== undefined; } catch { hit = false; }
+        // 🔴 asksAmount IS NOT A LANE, IT IS THE DEADLINE LANE'S TIE BREAK, and the deadline gate is
+        // `isDeadlineQuestion(x) && !asksAmount(x)`. Judging isDeadlineQuestion on its own here would
+        // report a phrase eaten that the router never gives it.
+        if (hit && fn === 'isDeadlineQuestion' && W.asksAmount(phrase)) hit = false;
+        if (hit) eaten.push(`${fn} claims ${JSON.stringify(phrase)}`);
+      }
+    }
+    ok(`🔴 ${lane} on ${name}: NOTHING ABOVE IT CLAIMS ONE OF ITS PHRASES${eaten.length ? `, EATEN: ${eaten.join('; ')}` : ''}`,
+      eaten.length === 0);
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // 9b. THE DERIVED SCOPE TABLE. EVERY PREDICATE, EVERY ROUTER, WRITTEN DOWN OR RED.
 // ---------------------------------------------------------------------------------------------
@@ -1104,6 +1385,9 @@ const SCOPE = {
 
   isDeadlineQuestion: { on: ALL3, why: '' },
 
+  // Flipped from WA_ONLY on 17 August 2026 by B19's three lane packet. All three had a pure builder
+  // and one caller; lib/laneanswers.ts is now the ONE reader and section 11 holds the wiring.
+
   // Short of three, and each of these is a written decision or a written debt.
   matchTotalsQuestion: {
     on: WA_THREAD,
@@ -1111,9 +1395,9 @@ const SCOPE = {
       + 'have one is an open question and NOT a settled decision, because that route answers a '
       + 'personal money question from the model on transactionSummaryForUser instead.',
   },
-  isNiQuestion: { on: WA_ONLY, why: 'B19 DEBT: niAnswer exists, is tested and reads his rows, and is dispatched by one router.' },
-  isStudentLoanQuestion: { on: WA_ONLY, why: 'B19 DEBT: studentLoanAnswer exists, is tested and reads his rows, and is dispatched by one router.' },
-  isPropertyQuestion: { on: WA_ONLY, why: 'B19 DEBT: propertyAnswer exists, is tested and reads his rows, and is dispatched by one router.' },
+  isNiQuestion: { on: ALL3, why: '' },
+  isStudentLoanQuestion: { on: ALL3, why: '' },
+  isPropertyQuestion: { on: ALL3, why: '' },
   isSavingsQuestion: {
     on: WA_ONLY,
     why: 'B19 DEBT, AND THE HARDEST OF THEM: there is NO pure builder. app/api/whatsapp/route.ts '

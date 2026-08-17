@@ -634,6 +634,18 @@ export function isVatQuestion(q) {
   if (/\u00a3\\s*\\d/.test(q)) return false;
   return /\\bvat\\b/i.test(q);
 }
+// B19, 17 August 2026. The three lanes that had a pure builder, read his own rows, and were
+// dispatched by app/api/whatsapp/route.ts and by nothing else. Each stubbed to its plainest clause,
+// because the real matchers, their refusal of a logged amount and their negative sets are owned by
+// test/waintents.test.mjs and test/laneparity.test.mjs section 11b against the real file. What this
+// sandbox walks is the ROUTING and the half no static read can prove: that a customer typing one of
+// these into this chat receives HIS OWN POSITION out of lib/laneanswers.ts and not the model.
+export function isPropertyQuestion(q) {
+  // ⚠️ DOUBLE BACKSLASHES, for the reason written on the two stubs above.
+  return /\\b(propert(y|ies)|rentals?|landlord)\\b/i.test(q) && /\\b(how|what|doing|going|position|tax|owe)\\b/i.test(q);
+}
+export function isStudentLoanQuestion(q) { return /\\b(student loan|uni loan|postgrad(uate)? loan)\\b/i.test(q); }
+export function isNiQuestion(q) { return /\\b(national insurance|class ?2|class ?4)\\b/i.test(q); }
 `);
   // ⚠️ isClaimQuestion IS STUBBED FALSE, ALONGSIDE A checkExpense THAT ANSWERS NOTHING. This
   // sandbox walks the ROUTING, not the corpus, and the two stubs agree: the claim lane produces no
@@ -689,6 +701,26 @@ export const state = { asked: [] };
 export async function vatAnswerForUser(userId, body) {
   state.asked.push({ userId, body });
   return 'Your last twelve months come to \u00a383,562.07, so you are \u00a36,437.93 below the line.';
+}
+`);
+  // 🔴 B19. THE ONE READER BEHIND THE OTHER THREE LANES, STUBBED THE SAME WAY AND FOR THE SAME
+  // REASON. The real lib/laneanswers.ts reads his rows, his plan and his income shape; what it says
+  // on a failed read, and the property empty state it used to guess, are owned by
+  // test/b19threelanes.test.mjs against the real file. What this sandbox proves is the half no
+  // static read can: that the chat answers these three from HIS ACCOUNT and never from the model.
+  w('laneanswers.ts', `
+export const state = { asked: [] };
+export async function niAnswerForUser(userId) {
+  state.asked.push({ lane: 'ni', userId });
+  return 'National Insurance this tax year: \u00a31,982.40 Class 4 on your profit so far.';
+}
+export async function studentLoanAnswerForUser(userId, channel) {
+  state.asked.push({ lane: 'studentloan', userId, channel });
+  return 'About \u00a31,161.00 of student loan (Plan 2) is building up.';
+}
+export async function propertyAnswerForUser(userId, channel) {
+  state.asked.push({ lane: 'property', userId, channel });
+  return 'Property this tax year across 1 property: \u00a311.4k of rent in.';
 }
 `);
   w('chatref.ts', `
@@ -776,6 +808,7 @@ export function chatRefBelongsTo() { return true; }
   const RI = await import(pathToFileURL(path.join(rt, 'receiptingest.ts')).href);
   const SCOT = await import(pathToFileURL(path.join(rt, 'scotland.ts')).href);
   const VA = await import(pathToFileURL(path.join(rt, 'vatanswer.ts')).href);
+  const LA = await import(pathToFileURL(path.join(rt, 'laneanswers.ts')).href);
 
   const screwfix = {
     merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
@@ -910,6 +943,46 @@ export function chatRefBelongsTo() { return true; }
       VA.state.asked.length === 1
       && VA.state.asked[0].body === 'should i be registered for vat, im scared im getting close');
   }
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B19. NATIONAL INSURANCE, THE STUDENT LOAN AND THE PROPERTY STREAM, ON THIS SURFACE.
+  //
+  // All three predicates have existed since Run 2, all three had a pure builder, all three read his
+  // own rows, and until 17 August 2026 all three were dispatched by app/api/whatsapp/route.ts and by
+  // nothing else. So this chat, signed in, with his whole ledger one query away, answered "how much
+  // national insurance do i pay" out of the MODEL.
+  //
+  // test/laneparity.test.mjs section 11 holds the routing by index on all three routers. This is the
+  // one place composeOneLane actually RUNS, so it is the only place that can prove the reply a
+  // customer receives came from his account rather than from a fluent guess.
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  for (const [q, lane, tell] of [
+    ['how much national insurance do i pay', 'ni', 'Class 4 on your profit so far'],
+    ['how much student loan will i owe', 'studentloan', 'student loan (Plan 2) is building up'],
+    ['how are my properties doing', 'property', 'of rent in'],
+  ]) {
+    LA.state.asked.length = 0;
+    const { turns } = await post({ q });
+    ok(`🔴 ${JSON.stringify(q)} IS ANSWERED FROM HIS OWN ROWS ON THIS SURFACE`,
+      turns.length === 2 && turns[1].content.includes(tell));
+    ok('🔴 ...AND THE MODEL WAS NEVER ASKED, so it cannot invent a figure about his money',
+      turns.length === 2 && turns[1].content !== 'the model answer');
+    ok('🔴 ...AND THE READER WAS ASKED ABOUT HIS ACCOUNT, not merely called',
+      LA.state.asked.length === 1 && LA.state.asked[0].lane === lane && LA.state.asked[0].userId === 'u-1');
+    // 🔴 AND IT WAS TOLD WHERE HE IS STANDING. Two of the three lanes have an empty state that
+    // offers a door, and only WhatsApp has it: "tell me here, like plan 2" and "text it as it lands"
+    // are both instructions this surface cannot honour, because matchStudentLoanPlanSet and
+    // matchRentIn are WhatsApp only by written decision. A router that does not say which channel it
+    // is sends a man in a browser to type at a box that will not hear him.
+    if (lane !== 'ni') {
+      ok('🔴 ...AND THE READER WAS TOLD THIS IS THE WEB, so it never offers a WhatsApp only door',
+        LA.state.asked.length === 1 && LA.state.asked[0].channel === 'web');
+    }
+  }
+  // ⚠️ AND THE TOTALS LANE DOES NOT EAT THEM. matchTotalsQuestion takes any money word plus one of
+  // "how much", "what" or "my", so all three phrasings above satisfy it as well. It is stubbed null
+  // here, so the ORDER is held by test/laneparity.test.mjs section 11 by index on all three routers,
+  // and this line records why the walk above cannot prove it.
+
   // ⚠️ AND A VAT AMOUNT BEING LOGGED IS NOT A VAT QUESTION. "vat was £4.83" is a figure on a
   // receipt, and a lane that eats it turns an entry into a lecture about the threshold. The real
   // matcher refuses any message carrying a money amount; the stub carries that one clause, so this

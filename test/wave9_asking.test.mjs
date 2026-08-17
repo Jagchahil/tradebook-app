@@ -351,12 +351,29 @@ const E = await import(pathToFileURL(path.join(stage, 'elections.ts')).href);
 const W = await import(pathToFileURL(path.join(root, 'lib/waintents.ts')).href);
 
 {
-  const ni = handler(wa, 'handleNiQuestion');
-  ok('🔴 the NI handler reads the profile, so the landlord gate in niAnswer is no longer inert',
+  // 🔴 REPOINTED 17 AUGUST 2026, NOT DELETED AND NOT LEFT WHERE IT WAS. B19 moved this read out
+  // of handleNiQuestion in app/api/whatsapp/route.ts into lib/laneanswers.ts, the ONE reader all
+  // three routers now ask, because the lane had a pure builder and one caller. An assertion follows
+  // the work: deleting it would have been silent scope loss, and leaving it pointed at a handler
+  // that is now four lines would have been a guard quietly true about nothing. Same choice, both
+  // wrong, and this repo has written that down once already.
+  //
+  // ⚠️ AND THE PROFILE READ IS WORTH MORE NOW THAN IT WAS. When it was inert it was inert on the
+  // one channel that reached it. It is now on three, so a landlord asking the web chat about his
+  // National Insurance gets NIM74250's answer as well.
+  const ni = handler(codeOnly(read('lib/laneanswers.ts')), 'niAnswerForUser');
+  ok('🔴 the ONE reader reads the profile, so the landlord gate in niAnswer is no longer inert',
     /getBusinessProfile\(userId\)\.catch\(\(\) => null\)/.test(ni)
     && /incomeShape: biz\?\.incomeShape \?\? null/.test(ni));
-  ok('and it costs him no extra wait: the read rides alongside the settings',
-    /Promise\.all\(\[\s*getStudentLoanSettings\(userId\),/.test(ni));
+  ok('and it costs him no extra wait: the read rides alongside the totals and the settings',
+    /Promise\.all\(\[\s*totalsForUser\(userId, since, null\),/.test(ni)
+    && /getStudentLoanSettings\(userId\)\.catch\(\(\) => null\),/.test(ni));
+  // 🔴 AND THE WEBHOOK KEPT NO COPY. Two readers over one answer is the house disease, and a
+  // handler still holding the old read while a shared function stands next to it looking like the
+  // fix is exactly how the product came to answer one question three ways in an evening.
+  ok('🔴 and app/api/whatsapp/route.ts keeps no read of its own for this lane',
+    !/getBusinessProfile\(userId\)\.catch/.test(handler(wa, 'handleNiQuestion'))
+    && /await niAnswerForUser\(userId\)/.test(handler(wa, 'handleNiQuestion')));
 
   // A lean year with no job: exactly the man the voluntary Class 2 sentence was written for.
   const lean = {

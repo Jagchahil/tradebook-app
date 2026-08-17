@@ -184,6 +184,18 @@ const DISCLOSED = [
   // ⚠️ SET ASIDE ONLY. The made, spent and profit answers are not band derived and stay clean.
   'app/api/thread/route.ts',
   'app/api/whatsapp/route.ts',
+  // 🔴 ADDED 17 August 2026 BY B19, AND THIS SECTION FOUND IT RATHER THAN A CUSTOMER.
+  // lib/laneanswers.ts is the one reader behind the National Insurance, student loan and property
+  // lanes on all three routers. Two of those three are UK wide and are deliberately not disclosed
+  // (National Insurance is reserved, student loan plans and thresholds are the same everywhere).
+  // The PROPERTY one is band derived: "adding about £2,400 to your tax bill" is his rent stacked on
+  // his trade profit at the England, Wales and Northern Ireland rates.
+  //
+  // ⚠️ AND IT HAD NEVER BEEN DISCLOSED ON ANY CHANNEL. app/api/whatsapp/route.ts produced this
+  // figure and said nothing about it, and section 3 could not see the gap because THE SAME FILE says
+  // the sentence on the totals lane thirty lines up. One file, two lanes, one of them silent. Moving
+  // the read into a file of its own is what let this ratchet ask the question.
+  'lib/laneanswers.ts',
 ].sort();
 
 ok(`🔴 EQUALITY: exactly ${DISCLOSED.length} surfaces say it, found ${saysIt.length}`, saysIt.length === DISCLOSED.length);
@@ -443,6 +455,7 @@ const NOT_DISCLOSED = {
   'lib/rakhamoves.ts':
     'Internal move generation. It renders no figure to anybody.',
 };
+
 
 const classified = [...DISCLOSED.filter((f) => discovered.includes(f)), ...Object.keys(NOT_DISCLOSED)].sort();
 ok(`🔴 EQUALITY: every band derived surface on disk is classified (${discovered.length} found)`,

@@ -12,12 +12,14 @@ import {
   isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
   isVehicleQuestion, vehicleAnswer, compoundAsk, compoundAskNote,
   isScottishRatesQuestion, isVatQuestion,
+  isNiQuestion, isStudentLoanQuestion, isPropertyQuestion,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
 import { taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition } from '../../../lib/taxoptimiser';
 import { SCOTLAND_LINE, SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { vatAnswerForUser } from '../../../lib/vatanswer';
+import { niAnswerForUser, studentLoanAnswerForUser, propertyAnswerForUser } from '../../../lib/laneanswers';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { quarterForDate } from '../../../lib/quarterpack';
 import { gbp0 } from '../../../lib/money';
@@ -284,6 +286,33 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
   // on one evening.
   // ═══════════════════════════════════════════════════════════════════════════════════════
   if (isVatQuestion(q)) return vatAnswerForUser(userId, q);
+
+  // ═════════════════════════════════════════════════════════════════════════════════
+  // 🔴 HIS PROPERTY STREAM, HIS STUDENT LOAN AND HIS NATIONAL INSURANCE. B19, 17 August 2026.
+  //
+  // All three predicates have existed since Run 2, all three have a pure builder in
+  // lib/waintents.ts, all three read his own rows, and all three were dispatched by
+  // app/api/whatsapp/route.ts and by nothing else. So this chat, signed in, with his whole ledger
+  // one query away, answered "how much national insurance do i pay" out of the MODEL, which holds
+  // none of his rows, none of his plan and none of his income shape.
+  //
+  // That is the fifth time this file has been given the same finding, and the header at the top of
+  // it is the standing complaint: one phrase, three channels, and the answer depends on which box
+  // he typed it in. Whenever you wire a lane, wire three.
+  //
+  // ⚠️ ABOVE THE TOTALS LANE, which is the order app/api/whatsapp/route.ts runs and the reason is
+  // the same one the VAT lane gives above: "what tax do i owe on my rental" and "how much student
+  // loan will i owe" both carry a quantity word AND a money word, so matchTotalsQuestion claims
+  // them and answers a rental question with a whole business set aside figure.
+  //
+  // ⚠️ AND THE READ IS THE SAME FUNCTION, NOT THE SAME SHAPE. lib/laneanswers.ts does the reading
+  // and lib/waintents.ts does the words, so this router computes nothing, reads nothing and can say
+  // nothing the other two do not say. Its header argues why the three share ONE reader rather than
+  // three files shaped like lib/vatanswer.ts, and what a failed read says to the customer.
+  // ═════════════════════════════════════════════════════════════════════════════════
+  if (isPropertyQuestion(q)) return propertyAnswerForUser(userId, 'web');
+  if (isStudentLoanQuestion(q)) return studentLoanAnswerForUser(userId, 'web');
+  if (isNiQuestion(q)) return niAnswerForUser(userId);
 
   // 2. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
   const totals = matchTotalsQuestion(q);

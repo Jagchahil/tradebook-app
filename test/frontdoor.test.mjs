@@ -26,6 +26,9 @@
 import { readFileSync, readdirSync, lstatSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
+// Counted, never typed. The "eleven UK banks" claim on /product and in /llms.txt is asserted
+// against this list, so a twelfth bank turns a test red rather than making two pages liars.
+import { BANKS } from '../lib/statementimport.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -509,8 +512,16 @@ console.log('\n=== the bank feed is offered by one switch, honestly ===\n');
     /const offered = bankFeedOffered\(\);/.test(setup)
     && /\) : !offered \? \(/.test(setup)
     && setup.indexOf(': !offered ? (') < setup.indexOf('action="/api/bank/connect"'));
+  // ⚠️ REPOINTED 17 AUGUST 2026, NOT DELETED. This asserted the exact string "a bank statement
+  // CSV does the same job", which sat in the sentence "The bank feed is on its way. Until it lands,
+  // a bank statement CSV does the same job". That sentence went, because "on its way" asserts
+  // motion and nothing is moving: the provider declined on 30 July 2026 and no other is engaged.
+  // The work this guard was doing is unchanged and still worth doing, so it follows the work:
+  // the step must still hand him the route that WORKS, and it must no longer imply a date.
   ok('and its honest copy points at the statement importer instead',
-    setup.includes('a bank statement CSV does the same job'));
+    setup.includes('A bank statement CSV does the job today'));
+  ok('🔴 ...and the step no longer tells him the feed is on its way, because it is not',
+    !/bank feed is on its way/i.test(codeOnly(setup)));
 
   // 🔴 THE SWEEP. Every customer facing "connect the bank" is chosen by the switch.
   //
@@ -558,10 +569,13 @@ console.log('\n=== the bank feed is offered by one switch, honestly ===\n');
   // connects to your bank" both walked past it. The endings are covered here rather than waited for.
   //
   // ⚠️ AND THE POSSESSIVE IS THE POINT, which is why this is "your bank feed" and not "bank feed".
-  // "The bank feed is on its way" (the setup step's honest copy) and "none of this is in a bank
-  // feed" (why the circumstances questions exist) are both TRUE with the switch off, and gating
-  // them would be gating the sentences that explain the absence. What must be behind the switch
-  // is any sentence asserting he HAS one, and in English that is the possessive.
+  // "none of this is in a bank feed" (why the circumstances questions exist) is TRUE with the switch
+  // off, and gating it would be gating the sentences that explain the absence. What must be behind
+  // the switch is any sentence asserting he HAS one, and in English that is the possessive.
+  //
+  // ⚠️ THIS PARAGRAPH USED TO CITE "The bank feed is on its way" AS THE SECOND EXAMPLE OF AN HONEST
+  // SENTENCE. It was the setup step's copy and it went on 17 August 2026, because a sentence can be
+  // honest about HAVING nothing and still dishonest about WHEN. See the repointed assertion above.
   // ═══════════════════════════════════════════════════════════════════════════════════════
   const BANK_SENTENCE = /([Cc]onnect(ed|ing|s)? (to )?(your|the) bank|your bank feed)/g;
 
@@ -620,6 +634,130 @@ console.log('\n=== the bank feed is offered by one switch, honestly ===\n');
     ok(`${f} carries both states of the switch: "${offCopy.slice(0, 30)}..."`,
       src.includes(onCopy) && src.includes(offCopy));
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE PUBLIC SITE SELLS NO BANK CONNECTION THAT NOBODY CAN MAKE. 17 AUGUST 2026.
+//
+// THE SWEEP ABOVE THIS ONE COVERS app/app AND TWO LIBS, AND THAT IS WHY THIS WAS MISSED FOR SIX
+// WEEKS. Everything inside the product was honest: BANK_FEED_OFFERED, three independent reads, both
+// branches of six empty states pinned. A paying customer was promised nothing. Meanwhile the PUBLIC
+// site, which is indexed, read by models, and the page a stranger sees before he pays us:
+//
+//   /product        a card headed "Connect your bank" badged BUILT and SWITCHING ON SOON
+//   /compare        a SOON chip in the Lekhio column of a row where the other apps column ticks
+//   /llms.txt       "waiting on ICO registration and the provider's production access", unflagged
+//   /privacy        TrueLayer named as a processor we use
+//
+// TrueLayer declined production authorisation on 30 July 2026, and the reason is the fact this
+// estate never recorded: THEY ARE SCALING AND ARE NOT TAKING ON SMALL BUSINESSES. ICO registration
+// completed on 15 July 2026, ZC198977, and was never the blocker. So there was no provider, no
+// date, and four public claims that a reader could check and find false. docs/120.
+//
+// 🔴 THE SHAPE THESE GUARD, AND IT IS NOT "DO NOT SAY BANK". A connection is genuinely PLANNED and
+// the site may say so. What it may not do is assert a DATE it has not got, and what it must do is
+// give the two routes that work today equal billing, because they are not a stopgap for the third.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== the public site sells no bank connection nobody can make ===\n');
+{
+  const feat = read('lib/features.ts');
+  const featCode = codeOnly(feat);
+
+  ok('🔴 the bank badge off branch says PLANNED', /\{ text: 'PLANNED', live: false \}/.test(featCode));
+  ok('🔴 ...and BUILT and SWITCHING ON SOON are gone from the code that renders it',
+    !featCode.includes('BUILT · SWITCHING ON SOON') && !/switching on soon/i.test(featCode));
+
+  // 🔴 BOTH DIRECTIONS, because the whole point is that these two marks are NOT the same mark.
+  // 'soon' asserts a date and filing has one in flight (HMRC production recognition). The bank
+  // connection has no provider, so it may not borrow filing's word. Assert each carries its own.
+  ok("🔴 bankMark is 'planned', because there is no provider and so no date",
+    /return bankFeedLive\(\) \? true : 'planned';/.test(featCode));
+  ok("...and filingMark is STILL 'soon', because HMRC recognition genuinely is in flight",
+    /return hmrcFilingLive\(\) \? true : 'soon';/.test(featCode));
+
+  ok('🔴 the connection line names the missing provider and refuses to give a date',
+    feat.includes('We have no open banking provider engaged, so we will not put a date on it.'));
+
+  // --- /compare. A chip beside a competitor's tick is the claim, not the word inside it. --------
+  const cmpCode = codeOnly(read('app/compare/page.tsx'));
+  ok("🔴 /compare admits 'planned' in its cell type, so it cannot fall through as a raw string",
+    /type Cell = boolean \| 'soon' \| 'planned'/.test(cmpCode));
+  ok("🔴 ...and renders it as a plain grey label, in the same list as \"Costs extra\"",
+    /planned: 'Planned'/.test(cmpCode));
+  ok("...while the SOON chip branch is still reserved for 'soon' alone",
+    /if \(v === 'soon'\) return <span className="mk soon">SOON<\/span>;/.test(cmpCode));
+
+  // --- the three routes, told together, wherever the capture story is told. --------------------
+  //
+  // ⚠️ THE NEGATIVES ABOVE ARE SATISFIED BY SILENCE AND THAT IS NOT THE FIX. Deleting every bank
+  // sentence would pass all of them, and the site would still be selling one working capture route
+  // out of two. The statement import reads what eleven UK banks hand out and it was named on no
+  // public page at all. So the routes that WORK are asserted present, not merely un-lied about.
+  ok('🔴 the statement import is a row in the comparison table',
+    /Import a bank statement, no connection needed/.test(cmpCode));
+
+  const prodCode = codeOnly(read('app/product/page.tsx'));
+  ok('🔴 /product tells all three routes in one section', prodCode.includes('Three ways money gets in'));
+  ok('...the statement import is one of the three, and it is badged as working TODAY',
+    /Import your statement/.test(prodCode) && /<h3>Import your statement<\/h3>[\s\S]{0,400}rbadge live">WORKS TODAY/.test(prodCode));
+  ok('🔴 ...and the connection sits WITH the routes, above the soon grid, not inside it',
+    prodCode.indexOf('Three ways money gets in') < prodCode.indexOf('<h3>Connect your bank</h3>')
+    && prodCode.indexOf('<h3>Connect your bank</h3>') < prodCode.indexOf('Soon, Lekhio does the lot'));
+  ok('...wearing the quiet badge rather than the saffron soon chip',
+    /bankBadge\(\)\.live \? 'rbadge live' : 'rbadge plan'/.test(prodCode));
+
+  // ⚠️ "ELEVEN UK BANKS" IS A NUMBER IN PROSE, WHICH IS THE THING THIS ESTATE KEEPS GETTING WRONG.
+  // It is counted from the importer rather than trusted, so adding a twelfth bank turns this red
+  // instead of quietly making the page a liar.
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen'];
+  ok(`the "${WORDS[BANKS.length]} UK banks" on /product is counted from lib/statementimport.ts, never typed`,
+    prodCode.includes(`${WORDS[BANKS.length]} UK banks`));
+  ok('...and /llms.txt says the same number to the machines',
+    read('app/llms.txt/route.ts').includes(`${WORDS[BANKS.length]} UK banks`));
+
+  // --- /privacy. The one document whose whole job is a true list of who touches his data. -------
+  const privCode = codeOnly(read('app/privacy/page.tsx'));
+  ok('🔴 the privacy policy names NO open banking provider, because we use none',
+    !/TrueLayer|GoCardless|Finexer|Yapily|Enable Banking/i.test(privCode));
+  ok('...and commits to naming one BEFORE anybody can connect, which is when it is worth reading',
+    /name it on this page[\s\S]{0,60}before a single customer can connect/i.test(privCode));
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE SWEEP. NO PUBLIC PAGE MAY PUT A DATE NEAR A BANK SENTENCE.
+  //
+  // The four findings above were four separate sentences written by four different passes, and each
+  // one was individually defensible to whoever wrote it. What they had in common was a word that
+  // asserted WHEN. So the shape is swept rather than the sentences listed: find every bank phrase
+  // on every public surface and fail if a word of imminence is standing next to it.
+  //
+  // ⚠️ "COMING SOON" IS IN THE LIST AND IT IS ALSO ON /product TWICE, LEGITIMATELY, on the HMRC
+  // balance card and the Rakha card. That is why this is a PROXIMITY sweep and not a flat ban: both
+  // of those are far away from any bank sentence, and if somebody moves a bank card back in beside
+  // them this goes red, which is exactly the mistake being guarded.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const PUBLIC_BANK_SURFACES = [
+    'app/page.tsx', 'app/product/page.tsx', 'app/compare/page.tsx', 'app/privacy/page.tsx',
+    'app/_shared/site.tsx', 'app/llms.txt/route.ts', 'lib/features.ts',
+  ];
+  const BANK_PHRASE = /(bank feed|bank connection|connect (your|an|the) bank|connecting your bank)/gi;
+  const IMMINENT = /(switching on soon|coming soon|on its way|any day now|imminent|nearly there|weeks away|switched on soon)/i;
+
+  const dated = [];
+  let phrasesSeen = 0;
+  for (const f of PUBLIC_BANK_SURFACES) {
+    const src = codeOnly(read(f));
+    for (const m of src.matchAll(BANK_PHRASE)) {
+      phrasesSeen += 1;
+      const around = src.slice(Math.max(0, m.index - 170), m.index + 210);
+      if (IMMINENT.test(around)) dated.push(`${f}: ...${around.replace(/\s+/g, ' ').slice(0, 150)}...`);
+    }
+  }
+  ok(`🔴 no public surface puts a word of imminence next to a bank sentence${dated.length ? `\n     ${dated.join('\n     ')}` : ''}`,
+    dated.length === 0);
+  // A sweep that finds nothing to sweep is a green light on an empty road. If every bank phrase is
+  // renamed out of these files, take the file off the list in the same commit and this says so.
+  ok(`the public surfaces really do carry bank sentences, so the sweep is not vacuous (${phrasesSeen} found)`,
+    phrasesSeen >= 5);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════

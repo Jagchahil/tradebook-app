@@ -105,7 +105,56 @@ ok(`the trial length matches the code (${TRIAL_DAYS} days)`, txt.includes(`${TRI
 ok('it still says we do not file without you', /does not file your tax return for you without you/i.test(txt));
 ok('it still disclaims HMRC endorsement', /not endorsed by, affiliated with, or approved by HMRC/i.test(txt));
 ok('it is still honest that live HMRC filing is NOT on', /Live filing directly to HMRC is not switched on yet/i.test(txt));
-ok('it is still honest that the bank feed is NOT public', /bank feed is built but not yet switched on/i.test(txt));
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THIS ASSERTION USED TO PIN A FALSE SENTENCE IN PLACE. 17 AUGUST 2026.
+//
+// It read:
+//
+//   ok('it is still honest that the bank feed is NOT public',
+//      /bank feed is built but not yet switched on/i.test(txt));
+//
+// The sentence it demanded was: "The bank feed is built but not yet switched on for the public. It
+// is waiting on ICO registration and the provider's production access." BOTH HALVES OF THAT WERE
+// FALSE. ICO registration completed on 15 July 2026 (ZC198977). TrueLayer declined production
+// authorisation on 30 July 2026, because they are scaling and are not taking on small businesses,
+// so there was no provider left to grant production access to anybody.
+//
+// 🔴 SO A GUARD WRITTEN TO STOP US OVERCLAIMING WAS THE THING KEEPING THE OVERCLAIM ALIVE, and
+// it would have failed anybody who tried to tell the truth here. That is the failure mode worth
+// remembering out of this whole session: an assertion pinned to a SENTENCE outlives the fact the
+// sentence was about, and then defends it. The three below pin the SHAPE instead. The product may
+// word the absence however it likes, as long as it declares the connection unavailable, never
+// claims it is nearly on, and never blames a regulator who cleared us five weeks earlier.
+//
+// docs/120 records the decline, the reason and the decision. lib/features.ts bankBadge() carries
+// the wording. Do not soften any of these three back into one sentence match.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+ok('it is still honest that a bank connection is NOT available to anybody',
+  /bank connection is PLANNED and is not available/i.test(txt));
+ok('🔴 and it NEVER says the feed is built and all but switched on',
+  !/built but not yet switched on/i.test(txt) && !/switching on soon/i.test(txt));
+// ⚠️ AND THE BODY DELIBERATELY DOES NOT CONTAIN THE PHRASE, EVEN TO DENY IT. The first draft of
+// the fix wrote "It is NOT waiting on ICO registration", which is true and which failed this
+// assertion, because a blunt negative cannot tell a denial from a claim. The choice was a lookbehind
+// here or a rewording there, and the rewording is the one that cannot rot: the body says "ICO
+// registration is not what holds it up" and this stays a flat, unmissable negative.
+ok('🔴 and it NEVER blames ICO registration, which completed on 15 July 2026',
+  !/waiting on ICO registration/i.test(txt));
+ok('...it states the true ICO position instead, with the number a reader can check',
+  txt.includes('ZC198977') && /completed on 15 July 2026/i.test(txt));
+
+// ⚠️ THE OTHER HALF OF THE SAME FIX, AND WITHOUT IT THE THREE ABOVE ARE SATISFIED BY SILENCE.
+//
+// Deleting the false sentence would pass every negative on this page. But this file told every
+// assistant on earth about a bank feed we do not have and said NOTHING about the bank statement
+// import we do have, which is one of the two routes that works from the day a customer signs up.
+// An assistant asked "can it read my bank" would have answered "soon", when the true answer is
+// "yes, by statement, today". So the routes that work are asserted PRESENT, not merely un-lied
+// about. lib/statementimport.ts BANKS is the source of the eleven.
+ok('🔴 the statement import, which WORKS, is told to the machines as a route in',
+  /bank statement CSV/i.test(txt));
+ok('...and all three routes are named where the capture story is told',
+  /whichever of three routes/i.test(txt) && /voice note or plain text/i.test(txt));
 ok('it still says we are not FCA authorised', /not FCA authorised/i.test(txt));
 ok('it still refuses to fake testimonials or user counts', /does not publish invented testimonials or user numbers/i.test(txt));
 ok('it is still honest that we are NOT end to end encrypted', /not end-to-end encrypted/i.test(txt));

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import ClientScript from '../_shared/ClientScript';
 // alertChannels: the email half of this was never true. See lib/features.ts remindersLive().
-import { filingBadge, bankBadge, alertChannels, helpersLead } from '../../lib/features';
+import { filingBadge, bankBadge, bankRouteLine, alertChannels, helpersLead } from '../../lib/features';
 import { css } from '../../lib/tokens';
 import Link from 'next/link';
 import {
@@ -12,8 +12,9 @@ import {
 export const metadata: Metadata = {
   alternates: { canonical: '/product' },
   title: 'What Lekhio does. The first employee your business hires.',
-  // ⚠️ THE SEARCH RESULT HAS TO MATCH THE PAGE. This said "Connect your bank" while the card
-  // further down correctly badges that feature BUILT, SWITCHING ON SOON from bankBadge().
+  // ⚠️ THE SEARCH RESULT HAS TO MATCH THE PAGE. This once said "Connect your bank" while the page
+  // itself did not offer one. The three routes money gets in by are told in full further down and
+  // the connection is badged PLANNED from bankBadge(); see lib/features.ts and docs/120.
   description:
     'Lekhio keeps the books, works out the tax, writes the invoice chase for you and finds what you are owed, then brings it to you to sign off. Receipts, mileage, invoices, CIS and quarterly tax. £12.99 a month, and you approve before anything reaches HMRC.',
 };
@@ -58,6 +59,16 @@ const PRODUCT_CSS = css`
 .rbadge.soon{color:var(--on-saffron-tint);background:var(--saffron-tint)}
 .rbadge.prog{color:var(--river);background:var(--river-tint)}
 .rbadge.live{color:var(--on-green-tint);background:var(--green-tint)}
+/* PLANNED is deliberately the quietest badge on the page. Saffron is the "soon" colour and there
+   is no soon: see lib/features.ts bankBadge(). */
+.rbadge.plan{color:var(--tx-mut);background:var(--panel-2);border:1px solid var(--line)}
+/* THREE ACROSS, NOT FOUR, AND BOTH CARD GRIDS ON THIS PAGE USE IT. The shared .soongrid is a four
+   column grid and the "on the way" section dropped to three cards when the bank connection moved
+   up into the routes section, which would have left a hole in the fourth column. One rule for both
+   rather than an override fight with MARKETING_CSS's media queries, which come earlier in the
+   cascade and would have had to be beaten at every breakpoint. */
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:1000px;margin:0 auto}
+@media(max-width:860px){.trio{grid-template-columns:1fr}}
 .helpers{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:940px;margin:0 auto}
 @media(max-width:820px){.helpers{grid-template-columns:1fr}}
 .helpercard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px}
@@ -212,6 +223,39 @@ export default function ProductPage() {
         </div>
       </section>
 
+      {/* ════════════════════════════════════════════════════════════════════════════════════
+          🔴 THREE ROUTES IN, TOLD TOGETHER, AND THIS SECTION REPLACES A BADGE THAT LIED.
+
+          Until 17 August 2026 the only place this page mentioned how money arrives other than by
+          photo was a card in the "Soon, Lekhio does the lot" grid below, headed "Connect your bank"
+          and badged BUILT and SWITCHING ON SOON. TrueLayer declined production authorisation on 30
+          July 2026 because they are scaling and are not taking on small businesses, and no other
+          provider has been engaged since. SOON is a claim about a date and we have not got one.
+
+          ⚠️ AND THE STATEMENT IMPORT WAS NOWHERE ON THIS PAGE AT ALL. The one capture route that
+          works today for a man who does not want to photograph anything was described in docs as a
+          fallback and sold nowhere. It is not a fallback, it is one of three doors.
+
+          🔴 DOC 103's STANDING QUESTION: WHAT CAME OUT TO MAKE ROOM. The bank card came out of the
+          soon grid, which is one card fewer to read and one promise fewer to make. Jag, 17 August:
+          an employee does not take the owner's freedom away. He picks the route. We say which ones
+          work today, plainly, and we do not put a date on the one that does not.
+          ════════════════════════════════════════════════════════════════════════════════════ */}
+      <section>
+        <div className="wrap">
+          <div className="center reveal" style={{ marginBottom: 28 }}>
+            <div className="eyebrow">However you want it done</div>
+            <h2 className="h2">Three ways money gets in. You pick.</h2>
+            <p className="lead">Your books, your call. Use one of these, use all three, or change your mind next week.</p>
+          </div>
+          <div className="trio reveal">
+            <div className="sooncard"><div className="se"><Ic e="📸" color="var(--river)" size={24} /></div><h3>Send it as you go</h3><p>A photo of a receipt, a voice note, or a line of plain words. Read, sorted and logged in seconds, from wherever you are standing.</p><span className="rbadge live">WORKS TODAY</span></div>
+            <div className="sooncard"><div className="se"><Ic e="📄" color="var(--on-saffron-tint)" size={24} /></div><h3>Import your statement</h3><p>Export a CSV from your bank and upload it under Money. A whole month lands in one go, and eleven UK banks are read exactly as they hand it out.</p><span className="rbadge live">WORKS TODAY</span></div>
+            <div className="sooncard"><div className="se"><Ic e="🏦" color="var(--on-green-tint)" size={24} /></div><h3>Connect your bank</h3><p>{bankRouteLine()}</p><span className={bankBadge().live ? 'rbadge live' : 'rbadge plan'}>{bankBadge().text}</span></div>
+          </div>
+        </div>
+      </section>
+
       {/* The two helpers: the reactive AI and Rakha, the proactive agent */}
       <section style={{ background: 'var(--panel-2)', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
         <div className="wrap">
@@ -293,10 +337,9 @@ export default function ProductPage() {
             <h2 className="h2">Soon, Lekhio does the lot.</h2>
             <p className="lead">Every one keeps you in control, and never sends a thing without your yes.</p>
           </div>
-          <div className="soongrid reveal">
+          <div className="trio reveal">
             <div className="sooncard"><div className="se"><Ic e="📤" color="var(--river)" size={24} /></div><h3>File straight to HMRC</h3><p>Submit your quarterly updates and return from Lekhio, when you approve, through a recognised route.</p><span className={filingBadge().live ? 'rbadge live' : 'rbadge prog'}>{filingBadge().text}</span></div>
             <div className="sooncard"><div className="se"><Ic e="📊" color="var(--on-saffron-tint)" size={24} /></div><h3>Your HMRC balance, live</h3><p>See exactly what you owe, what is due, and any refund building, right in the app.</p><span className="rbadge soon">COMING SOON</span></div>
-            <div className="sooncard"><div className="se"><Ic e="🏦" color="var(--on-green-tint)" size={24} /></div><h3>Connect your bank</h3><p>Money in and out logs itself, read only, so your books stay up to date with no effort.</p><span className={bankBadge().live ? 'rbadge live' : 'rbadge soon'}>{bankBadge().text}</span></div>
             <div className="sooncard"><div className="se"><Ic e="🛡️" color="var(--river)" size={24} /></div><h3>Rakha gets sharper</h3><p>Rakha already watches your thresholds. Soon it reads HMRC updates and the Budget the moment they land, and tells you exactly what changes for you.</p><span className="rbadge soon">COMING SOON</span></div>
           </div>
         </div>

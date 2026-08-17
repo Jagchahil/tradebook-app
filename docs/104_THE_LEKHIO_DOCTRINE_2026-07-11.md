@@ -269,7 +269,7 @@ That is a sentence no competitor in this category can say, because all of them a
 
 ### Why this makes the absence of a bank feed a position
 
-We have no bank provider (doc 100, and the July pricing verdict). The honest options were to call that a gap and apologise for it, or to notice that **the thing we cannot ship is the thing his complaint is about.**
+We have no bank provider. 🔴 **CORRECTED 17 AUGUST 2026: this said "doc 100, and the July pricing verdict", and a pricing verdict is not what happened.** TrueLayer DECLINED production authorisation on 30 July 2026, because they are scaling and are not taking on small businesses. We were refused, not priced out, and the difference matters to this section: the thing we cannot ship is a thing somebody would not sell us for being small, which is a sharper version of the same argument rather than a weaker one. See `docs/120`. The honest options were to call that a gap and apologise for it, or to notice that **the thing we cannot ship is the thing his complaint is about.**
 
 A bank connection is sold as the end of admin. What it actually does is move every payment into his books the moment it leaves his account, and hand him an evening of taking things back out. He did not choose any of it. **He is doing data entry in reverse, for a machine, at eleven o'clock.**
 
@@ -306,7 +306,7 @@ The regulatory readings in section 5 are mine, not a lawyer's. Article 53, artic
 ## Related
 
 - **98** the group, the bank, the numbers, the licensing map.
-- **100** the bank feed, and the July pricing verdict that left us without a provider. **Section 12 is why that is a position and not an apology.**
+- **100** the bank feed. 🔴 **SUPERSEDED ON THE PLAN by `docs/120` (17 August 2026), and the line here was wrong twice over: it was not a pricing verdict, it was a refusal, and doc 100 is not a live runbook.** TrueLayer declined production authorisation on 30 July 2026 because they are scaling and are not taking on small businesses. The feature is PARKED until there is revenue. **Section 12 is why that is a position and not an apology, and doc 120 section 8 is the sharper version Jag wrote on 17 August: a provider refused us for being small, and Lekhio exists to serve exactly the businesses that provider will not serve.**
 - **`lib/control.ts`** the words themselves, and the reason the costs sentence is not exported.
 - **103** design restraint, the tactical child of section 4.
 - **07** brand identity. Colours, logo, voice.

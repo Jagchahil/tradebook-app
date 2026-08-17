@@ -5,7 +5,7 @@
 // behaviour is injected as an idempotent inline script by <SharedHead />.
 import Link from 'next/link';
 import ClientScript from './ClientScript';
-import { filingFaqAnswer, filingMark, bankMark, hmrcFilingLive, bankFeedLive, diaryRowLabel } from '../../lib/features';
+import { filingFaqAnswer, filingMark, bankMark, hmrcFilingLive, diaryRowLabel } from '../../lib/features';
 import type { CSSProperties } from 'react';
 import { TRADES } from '../../lib/trades';
 import { A11Y_CSS, THEME_CSS, THEME_SWAP_JS, css } from '../../lib/tokens';
@@ -439,6 +439,9 @@ export const compareRows = [
   { label: 'Snap a receipt and it is fully logged, not just matched', lekhio: true, apps: 'limit', diy: false },
   { label: 'Log an expense by voice note', lekhio: true, apps: false, diy: false },
   { label: 'Claim mileage, home, phone and CIS from a text', lekhio: true, apps: false, diy: false },
+  // The second of the three routes money gets in by, added here on 17 August 2026 in step with
+  // app/compare/page.tsx, which is the copy of this table anybody actually reads.
+  { label: 'Import a bank statement, no connection needed', lekhio: true, apps: true, diy: false },
   { label: 'Create and send an invoice from a text', lekhio: true, apps: 'extra', diy: false },
   { label: 'CIS split and deduction done for you', lekhio: true, apps: 'higher', diy: false },
   { label: 'Quarterly MTD updates prepared for you', lekhio: true, apps: 'higher', diy: false },
@@ -518,9 +521,12 @@ export const comingSoon = [
     ? []
     : [{ icon: '📤', title: 'File straight to HMRC', body: 'Submit your quarterly updates and your return from Lekhio, when you approve, through a recognised route.' }]),
   { icon: '📊', title: 'Your HMRC balance, live', body: 'See exactly what you owe, what is due, and any refund building, right in the app.' },
-  ...(bankFeedLive()
-    ? []
-    : [{ icon: '🏦', title: 'Connect your bank', body: 'Money in and out logs itself, read only, so your books stay up to date with no effort.' }]),
+  // 🔴 THE BANK CONNECTION CAME OUT OF THIS LIST ON 17 AUGUST 2026, AND NOT BECAUSE IT WAS DROPPED.
+  // This export is named comingSoon, so anything in it is sold as imminent by the list it sits in
+  // rather than by its own words. TrueLayer declined production authorisation on 30 July 2026
+  // because they are scaling and are not taking on small businesses, and no other provider is
+  // engaged, so there is no date to be imminent about. A connection is PLANNED and it is told as
+  // one of three routes in, on /product, where the other two are told beside it. See docs/120.
   { icon: '🧑‍💼', title: 'A real accountant, on tap', body: 'For the tricky bits, a qualified accountant inside Lekhio. No leaving for help, ever.' },
 ];
 
@@ -765,7 +771,10 @@ export function Mark({ value }: { value: boolean | string }) {
   if (value === 'soon') {
     return <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.3px', color: ON_SAFFRON_TINT, background: SAFFRON_TINT, padding: '4px 9px', borderRadius: 12 }}>Soon</span>;
   }
-  const labels: Record<string, string> = { limit: 'Up to a limit', extra: 'Costs extra', higher: 'Higher tiers', maybe: 'If you pay' };
+  // 'planned' joined CompareMark on 17 August 2026 and this renderer is dead, so it would have
+  // painted the raw word through the ?? fallback rather than failing. A label, not a chip, for the
+  // reason lib/features.ts bankMark() gives: a chip beside a competitor's tick asserts a date.
+  const labels: Record<string, string> = { planned: 'Planned', limit: 'Up to a limit', extra: 'Costs extra', higher: 'Higher tiers', maybe: 'If you pay' };
   return <span style={{ fontSize: 12, fontWeight: 600, color: MUTED }}>{labels[value] ?? String(value)}</span>;
 }
 

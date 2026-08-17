@@ -159,7 +159,23 @@ export default function PrivacyPage() {
             bank feed has no provider today (lib/bankfeed.ts, bankFeedOffered() defaults off), so it
             was telling a reader about a choice that was not in front of him. Written this way it is
             accurate now, when nobody can connect one, and still accurate the day a provider lands
-            and somebody does. */}
+            and somebody does.
+
+            ═══════════════════════════════════════════════════════════════════════════════════
+            🔴 AND ON 17 AUGUST 2026 IT STILL NAMED A PROCESSOR WE DO NOT USE.
+
+            The conditional framing was right and the paragraph under it was wrong: "we use
+            TrueLayer, a provider authorised and regulated by the Financial Conduct Authority". We
+            do not use them. They declined our production authorisation on 30 July 2026, because
+            they are scaling and are not taking on small businesses.
+
+            A privacy policy is the one document on this site whose whole job is to be a true list
+            of who touches a customer's data. Naming a company that touches none of it is a
+            different order of error from an over eager feature card: it is the record itself being
+            wrong. So no provider is named until one is engaged, and this page commits to naming
+            the one we pick BEFORE anybody can connect, which is the only version of this promise
+            that is worth anything to a reader deciding whether to trust us. See docs/120.
+            ═══════════════════════════════════════════════════════════════════════════════════ */}
         <h2 style={heading}>Connecting your bank (optional)</h2>
         <p style={para}>
           This section applies only if you connect a bank account to Lekhio, so that your
@@ -169,20 +185,27 @@ export default function PrivacyPage() {
           this data about you.
         </p>
         <p style={para}>
-          If you connect a bank, we use TrueLayer, a provider authorised and regulated by the
-          Financial Conduct Authority to provide account information services. You give consent
-          in your bank&apos;s own screens, not ours, and we never see your bank login details. The
-          access we ask for is READ ONLY: we can see your account information, balance and
-          transactions, and we cannot move money, make payments, or change anything in your
-          account.
+          Today there is no bank connection to make. We are not naming an open banking provider
+          here, because we do not have one, and naming a company that handles none of your data
+          would be worse than saying nothing. When one is engaged we will name it on this page
+          before a single customer can connect, so that you know who would see your information
+          before you decide whether to let them.
         </p>
         <p style={para}>
-          We use that data for one purpose: to build your bookkeeping records so your tax figures
-          are right. Incoming transactions arrive as unconfirmed entries and count toward nothing
-          until you confirm them, exactly like a receipt you send us. The access tokens are
-          encrypted and stored on our servers only. You can disconnect at any time, in the app or
-          by emailing info@lekhio.app, and you can withdraw consent with your bank directly. Our
-          lawful basis is your consent, and performance of the contract to deliver the service.
+          Whoever it turns out to be, they will be authorised and regulated by the Financial
+          Conduct Authority to provide account information services, you would give consent in your
+          bank&apos;s own screens rather than ours, and we would never see your bank login details.
+          The access would be READ ONLY: account information, balance and transactions. It could
+          not move money, make payments, or change anything in your account.
+        </p>
+        <p style={para}>
+          That data would be used for one purpose: to build your bookkeeping records so your tax
+          figures are right. Incoming transactions would arrive as unconfirmed entries and count
+          toward nothing until you confirm them, exactly like a receipt you send us. Access tokens
+          are encrypted and stored on our servers only. You would be able to disconnect at any
+          time, in the app or by emailing info@lekhio.app, and to withdraw consent with your bank
+          directly. The lawful basis would be your consent, and performance of the contract to
+          deliver the service.
         </p>
         <p style={para}>
           Lekhio Ltd is registered with the Information Commissioner&apos;s Office as a data

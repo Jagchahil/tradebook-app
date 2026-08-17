@@ -13,10 +13,18 @@ export const metadata: Metadata = {
   alternates: { canonical: '/compare' },
   title: 'Lekhio vs the other options. An honest comparison.',
   description:
-    'How Lekhio compares to other apps and doing it yourself. Bank capture, voice notes, CIS, invoices and quarterly tax prep, side by side. We do not name competitors, and we show the gaps fairly.',
+    'How Lekhio compares to other apps and doing it yourself. Receipts, voice notes, bank statement import, CIS, invoices and quarterly tax prep, side by side. We do not name competitors, and we show the gaps fairly.',
 };
 
-type Cell = boolean | 'soon' | 'limit' | 'extra' | 'higher' | 'maybe';
+// 🔴 'planned' IS NOT 'soon', AND IN A COLUMN BESIDE A COMPETITOR'S TICK THAT MATTERS.
+//
+// Until 17 August 2026 the bank row showed a SOON chip against a tick in the other apps column. A
+// chip reading SOON in that position tells a reader the gap closes shortly. TrueLayer declined
+// production authorisation on 30 July because they are scaling and are not taking on small
+// businesses, and no other provider is engaged, so we have no date to assert. 'planned' renders as
+// a plain grey label in the same style as "Costs extra", never as a chip. See lib/features.ts
+// bankMark() and docs/120.
+type Cell = boolean | 'soon' | 'planned' | 'limit' | 'extra' | 'higher' | 'maybe';
 interface Row { label: string; lekhio: Cell; apps: Cell; diy: Cell }
 const GROUPS: { cat: string; rows: Row[] }[] = [
   { cat: 'Capture and logging', rows: [
@@ -24,6 +32,11 @@ const GROUPS: { cat: string; rows: Row[] }[] = [
     { label: 'Snap a receipt and it is fully logged', lekhio: true, apps: 'limit', diy: false },
     { label: 'Log an expense by voice note', lekhio: true, apps: false, diy: false },
     { label: 'Claim mileage, home, phone and CIS from a text', lekhio: true, apps: false, diy: false },
+    // 🔴 THE SECOND OF THE THREE ROUTES IN, AND THE TABLE NEVER MENTIONED IT.
+    // It showed a bank connection we do not have and said nothing about the statement import we do,
+    // so the only capture route a reader could see us lacking was the one with no provider. Every
+    // route the owner may pick is in the table now, which is the point of an honest comparison.
+    { label: 'Import a bank statement, no connection needed', lekhio: true, apps: true, diy: false },
   ] },
   { cat: 'Tax and MTD', rows: [
     { label: 'CIS split and deduction done for you', lekhio: true, apps: 'higher', diy: false },
@@ -46,7 +59,7 @@ function Mk({ v }: { v: Cell }) {
   if (v === true) return <span className="mk yes">✓</span>;
   if (v === 'soon') return <span className="mk soon">SOON</span>;
   if (v === false) return <span className="mk no">✕</span>;
-  const L: Record<string, string> = { limit: 'Up to a limit', extra: 'Costs extra', higher: 'Higher tiers', maybe: 'If you pay' };
+  const L: Record<string, string> = { planned: 'Planned', limit: 'Up to a limit', extra: 'Costs extra', higher: 'Higher tiers', maybe: 'If you pay' };
   return <span className="lbl">{L[v]}</span>;
 }
 const isWin = (r: Row) => r.lekhio === true && r.apps !== true && r.diy !== true;

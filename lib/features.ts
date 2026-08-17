@@ -18,7 +18,7 @@
 //
 //   NEXT_PUBLIC_HMRC_FILING_LIVE = true    (the day production recognition is granted)
 //   NEXT_PUBLIC_APP_STORE_LIVE   = true    (the day the app is live in BOTH stores)
-//   NEXT_PUBLIC_BANK_FEED_LIVE   = true    (the day TrueLayer production is switched on)
+//   NEXT_PUBLIC_BANK_FEED_LIVE   = true    (the day a bank connection is genuinely live)
 //
 // NEXT_PUBLIC_ so client components (the /start wizard) can read them too.
 
@@ -39,8 +39,45 @@ export function appStoreLive(): boolean {
   return on(process.env.NEXT_PUBLIC_APP_STORE_LIVE);
 }
 
-// Bank feeds (TrueLayer). FALSE until ICO registration and TrueLayer production
-// are both done (docs/100). While false: shown as "built, switching on soon".
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE BANK CONNECTION IS PLANNED. IT IS NOT BUILT AND IT IS NOT SOON. 17 AUGUST 2026.
+//
+// This flag used to read "FALSE until ICO registration and TrueLayer production are both done
+// (docs/100)", and the copy behind it said BUILT and SWITCHING ON SOON. By 17 August every part of
+// that sentence was false, and had been for six weeks:
+//
+//   * ICO registration COMPLETED on 15 July 2026, reference ZC198977. It was never the blocker.
+//   * TrueLayer DECLINED production authorisation on 30 July 2026. The reason is the useful part
+//     and no document in this estate had ever recorded it: THEY ARE SCALING AND ARE NOT TAKING ON
+//     SMALL BUSINESSES. That is a commercial decision about account size, not a compliance one, so
+//     there is nothing in our licensing theory, our ICO position or our use case wording to fix.
+//   * GoCardless Bank Account Data closed to new signups on 2 July 2026. Finexer wanted £650 a
+//     month before a single connection (lib/trialnudge.ts).
+//
+// No provider means no date, and SOON is a date. docs/120 records the decline, the reason, and the
+// decision that came out of it. docs/100 is the old go live runbook and carries a superseded banner.
+//
+// 🅿️ AND IT IS PARKED, WHICH IS NOT THE SAME AS ABANDONED. Jag, 17 August: "it's the first thing we
+// look into as soon as we have rev. for now we need to park this but not forget about it." The cost
+// is the LICENCE, not the software: lib/bankfeed.ts and lib/banksync.ts are written and tested, and
+// a UK bank checks an Open Banking Directory certificate on every call, which only an FCA
+// registration gets you. So it is a POST REVENUE feature and the trigger is a subscriber number Jag
+// sets, not a feeling. Nobody pays anybody, reopens the application or builds against a bank's own
+// developer API until he says so. docs/120 section 10 is the list of what a session may and may not
+// do; PROVIDER-SEARCH-J11.md is the research and must not be redone.
+//
+// 🔴 AND THE HONEST FRAME IS BETTER THAN THE APOLOGY, WHICH IS WHY THE COPY IS NOT AN EXCUSE.
+// Jag, 17 August: an employee does not take the owner's freedom away, it works with him. So money
+// reaches Lekhio by whichever of three routes the owner picks. Send it as you go, import a
+// statement, or one day connect an account. Two of the three work from the day he signs up. The
+// third is PLANNED, said plainly, with no button and no date, and it is one of three rather than
+// the missing centrepiece the other two stand in for.
+//
+// ⚠️ DO NOT CONFUSE THIS WITH BANK_FEED_OFFERED. That one gates the product and it is right:
+// three independent reads, a sweep in test/frontdoor.test.mjs, both branches of six empty states
+// pinned. This one gates the PUBLIC site, and until today an off switch here made the site
+// advertise rather than go quiet.
+// ═══════════════════════════════════════════════════════════════════════════════════════
 export function bankFeedLive(): boolean {
   return on(process.env.NEXT_PUBLIC_BANK_FEED_LIVE);
 }
@@ -301,18 +338,46 @@ export function filingChip(): string {
     : 'HMRC recognition in progress';
 }
 
-// The badge on the "Connect your bank" card.
+// The badge on the "Connect your bank" route card on /product.
+//
+// ⚠️ IT MAY NOT SAY BUILT AND IT MAY NOT SAY SOON. It said "BUILT · SWITCHING ON SOON" until 17
+// August 2026, on a live indexed page that takes card payments, for a capability whose provider had
+// refused us six weeks earlier. BUILT was arguable, the integration code is written. SOON was not:
+// soon is a claim about a date, and there is no provider to give us one. PLANNED is the whole of
+// what is true, and it is enough, because the two routes beside it work today.
 export function bankBadge(): { text: string; live: boolean } {
   return bankFeedLive()
     ? { text: 'LIVE', live: true }
-    : { text: 'BUILT · SWITCHING ON SOON', live: false };
+    : { text: 'PLANNED', live: false };
 }
 
-// How the comparison table should mark a capability: true (have it), 'soon', or false.
-export type CompareMark = boolean | 'soon';
+// The body of the "Connect your bank" route card. Both wordings side by side, the same discipline
+// as everything else in this file, so the day a provider is engaged the page upgrades itself.
+//
+// ⚠️ THE OFF WORDING NAMES THE ABSENCE RATHER THAN HINTING AT IT. "Coming soon" invites him to
+// wait. Saying we have no provider and will not put a date on it tells him to pick one of the two
+// routes that work, which is the only useful thing we can say to him today.
+export function bankRouteLine(): string {
+  return bankFeedLive()
+    ? 'Connect an account read only and money in and out logs itself. Lekhio can see it and can never move it.'
+    : 'Money in and out logging itself, read only. We have no open banking provider engaged, so we will not put a date on it. The two routes beside this one are not a stopgap, they are how Lekhio works.';
+}
+
+// How the comparison table should mark a capability: true (have it), 'soon', 'planned', or false.
+//
+// 🔴 'soon' AND 'planned' ARE NOT THE SAME MARK, AND THE DIFFERENCE IS THE WHOLE FIX.
+//
+// 'soon' asserts a date. In a table where the competitor column shows a tick, a SOON chip tells a
+// reader the gap closes shortly, and we may only say that about something genuinely in flight. HMRC
+// production recognition IS in flight, so filing is 'soon' and stays 'soon'.
+//
+// A bank connection is not in flight. Its provider declined on 30 July 2026 and no other has been
+// engaged, so it is 'planned', and app/compare renders that as a plain grey label in the same style
+// as "Costs extra", never as a chip, so it cannot read as a near tick.
+export type CompareMark = boolean | 'soon' | 'planned';
 export function filingMark(): CompareMark {
   return hmrcFilingLive() ? true : 'soon';
 }
 export function bankMark(): CompareMark {
-  return bankFeedLive() ? true : 'soon';
+  return bankFeedLive() ? true : 'planned';
 }

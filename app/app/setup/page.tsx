@@ -631,10 +631,22 @@ async function BankStep({ userId, note }: { userId: string; note: string | null 
       ) : !offered ? (
         // Doc 103's honesty test again. No button, no radios, and no dressing it up: the feed is
         // not something we can honestly offer yet, and the statement importer does the same job.
+        //
+        // 🔴 "THE BANK FEED IS ON ITS WAY" CAME OUT ON 17 AUGUST 2026, AND IT WAS THE CLOSEST CALL
+        // OF THAT WHOLE PASS. It is the honest kind of forward promise: it names the working route
+        // in the same breath and it draws no button, which is why it survived every earlier sweep.
+        // But "on its way" asserts motion, and nothing is moving. TrueLayer declined production
+        // authorisation on 30 July 2026 because they are scaling and are not taking on small
+        // businesses, and no other provider is engaged. A man who reads "on its way" waits for it.
+        //
+        // So the order is turned round to match the three route frame: the route that works today
+        // is the offer, and the connection is named as PLANNED with the reason there is no date.
+        // He is not being managed, he is being told. docs/120.
         <p style={S.body}>
-          The bank feed is on its way. Until it lands, a bank statement CSV does the same job:
-          download one from your bank and give it to us at Upload receipts or statements once you
-          are inside, along with any receipts, all in one go.
+          A bank statement CSV does the job today: download one from your bank and give it to us at
+          Upload receipts or statements once you are inside, along with any receipts, all in one go.
+          A bank connection is planned as well, and we will not put a date on it until we have a
+          provider to give us one.
         </p>
       ) : !enabled ? (
         // Doc 103's honesty test. A button whose only function is to say the feature does not exist

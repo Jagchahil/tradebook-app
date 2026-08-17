@@ -1,5 +1,35 @@
 # 100: Bank feed go live (11 July 2026)
 
+> # 🛑 SUPERSEDED ON THE PLAN, 17 AUGUST 2026. THIS IS NOT A LIVE RUNBOOK.
+>
+> **Read `docs/120_THE_BANK_CONNECTION_PARKED_2026-08-17.md` first.** This document was written as a
+> go live plan with two gates in front of it, and it stayed that way, unamended, for five weeks after
+> both gates resolved. It was still being read as a live plan on 17 August 2026.
+>
+> **What actually happened to the two gates:**
+>
+> - **Gate 1, ICO registration: DONE.** 15 July 2026, reference **ZC198977**. Everything below about
+>   the fee, the tier and the registration is complete. It unblocked nothing, because it was never
+>   the final blocker, and doc 107 still says otherwise.
+> - **Gate 2, TrueLayer production: REFUSED.** They declined production authorisation on **30 July
+>   2026**, and the reason, recorded 17 August, is that **they are scaling and are not taking on
+>   small businesses**. A commercial decision about account size, not a compliance one. Do not
+>   reopen the application: nothing in our submission was wrong.
+>
+> **There has been no open banking provider since 30 July 2026, and the feature is PARKED until there
+> is revenue to point at it.** Jag, 17 August: "it's the first thing we look into as soon as we have
+> rev. for now we need to park this but not forget about it."
+>
+> **WHY THIS IS KEPT RATHER THAN DELETED.** Everything below about the ENGINEERING is still true and
+> still correct: the client, the resumable sync, the read only scopes, the encryption at rest and the
+> approval gate are all built and tested. The regulatory theory is still the theory. **This is the
+> document to read on the day somebody unparks it.** What is dead is the plan and the timeline, and
+> a reader who does not know that will act on a schedule that ended five weeks ago.
+>
+> ⚠️ **AND NOTHING BELOW MAY BE USED AS A LICENCE TO SELL THE FEATURE.** The public copy rules are
+> in doc 120 section 6: a connection may be called PLANNED, never BUILT, never SWITCHING ON SOON, and
+> never a SOON chip beside a competitor's tick. `test/sabotage-b1banktruth.mjs` holds them.
+
 > The bank feed is BUILT and dormant. Nothing here is a code project: the blockers are two registrations and an env swap. Doing this while HMRC recognition and the D-U-N-S tick along is the right use of the wait. Writing rule holds: no em dashes, no en dashes, no hyphens used as dashes.
 
 ## Why this matters more than it looks

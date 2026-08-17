@@ -286,9 +286,20 @@ sabotage('the source link style key is removed, which tsc stays silent about',
   (d) => edit(d, 'app/app/tax/vat/page.tsx',
     "  inlineLink: { color: RIVER, fontWeight: 700, textDecoration: 'none' },", ''));
 
-// THE WIDENING MUST NOT BE A MOVE. WhatsApp keeps both.
-sabotage('the tests are taken off WhatsApp now the web has them, which is a move not a widening',
-  (d) => edit(d, 'app/api/whatsapp/route.ts',
+// THE WIDENING MUST NOT BE A MOVE. THE CONVERSATIONAL ANSWER KEEPS BOTH.
+//
+// 🔴 THIS ANCHOR MOVED ON 17 AUGUST 2026, B18, AND THE BROKEN ANCHOR IS WHY THE FULL LOOP EXISTS.
+//
+// It read `app/api/whatsapp/route.ts` for `parts.push(BACKWARD_TEST);`, which was right while the
+// webhook assembled the VAT answer. B18 moved the assembly into `vatAnswer` in lib/vatstanding.ts
+// so the web chat and the in app accountant could give a customer the same answer, and this
+// sabotage silently stopped being able to bite. The suite it drives went on passing, because a
+// sabotage that cannot be applied is BROKEN, not caught, and only the full pass on the Mac said so.
+//
+// The claim it holds is unchanged and is now stronger: taking the tests off the shared builder
+// takes them off ALL THREE channels, which is the move-not-a-widening it was written to forbid.
+sabotage('the tests are taken off the conversational answer now the web has them, which is a move not a widening',
+  (d) => edit(d, 'lib/vatstanding.ts',
     '  parts.push(BACKWARD_TEST);\n', ''));
 
 // ── F6. THE TWENTY FOUR HOUR DAY. ────────────────────────────────────────────────────────────

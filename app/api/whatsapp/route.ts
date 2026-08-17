@@ -605,7 +605,7 @@ async function processMessage(message: IncomingMessage): Promise<void> {
           // example spent £40 on diesel". Above the totals lane because "should i register for
           // vat" also trips asksAmount.
           } else if (isVatQuestion(text)) {
-            await handleVatQuestion(from);
+            await handleVatQuestion(from, text);
           // 🔴 THE VAN, ABOVE THE CORPUS, FOR THE REASON F7 WAS RAISED: the corpus answered a man
           // who had typed the price, the month and his weekly miles with a generic card that knew
           // none of it and never mentioned that the choice is locked for as long as he owns it.
@@ -1868,13 +1868,13 @@ async function handleProductTruth(from: string, text: string): Promise<void> {
 // the model with the statute and no sight of his books. lib/vatanswer.ts is the one reader now and
 // all three routers call it. What is left here is the only part that is genuinely WhatsApp's: a
 // phone number is not an account until it has been bound to one.
-async function handleVatQuestion(from: string): Promise<void> {
+async function handleVatQuestion(from: string, text: string): Promise<void> {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
     await replyNotLinked(from);
     return;
   }
-  await sendText(from, await vatAnswerForUser(userId));
+  await sendText(from, await vatAnswerForUser(userId, text));
 }
 
 // 🔴 AN INVOICE IS NOT INCOME. See matchInvoiceDraft in lib/waintents.ts for what this cost.

@@ -283,7 +283,7 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
   // to avoid, and VAT is the question this product has already answered three different wrong ways
   // on one evening.
   // ═══════════════════════════════════════════════════════════════════════════════════════
-  if (isVatQuestion(q)) return vatAnswerForUser(userId);
+  if (isVatQuestion(q)) return vatAnswerForUser(userId, q);
 
   // 2. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
   const totals = matchTotalsQuestion(q);

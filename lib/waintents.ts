@@ -2126,6 +2126,39 @@ export function compoundAskNote(asks: string[]): string {
 const SCOTTISH_NATION_RE =
   /\b(?:scotland|scottish|scot(?:s|sman|smen)?|glasgow|edinburgh|aberdeen|dundee|inverness|stirling|paisley)\b/i;
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE OTHER THREE NATIONS, FOR THE ANSWERS THAT ARE TRUE OF ALL FOUR. B20, 17 August 2026.
+//
+// SCOTTISH_NATION_RE above is deliberately Scotland only and must stay that way: income tax rates
+// and bands above the personal allowance are devolved to SCOTLAND, Wales sets its rates equal to
+// England's, and Northern Ireland does not set them at all. A matcher that heard "cardiff" and
+// handed back SCOTLAND_LINE would be telling a Welshman his income tax is computed at somebody
+// else's rates, which is false.
+//
+// VAT IS THE OPPOSITE CASE. It is reserved, it is identical in all four nations, and the sentence
+// saying so is true of every customer who asks. So the VAT answer needs a wider ear than the income
+// tax caveat does, and the two must not share one list or the next person to widen this widens the
+// wrong one.
+//
+// ⚠️ A FALSE POSITIVE IS CHEAP HERE, WHICH SETS THE DIRECTION, exactly as it does for the Scottish
+// list. Being told that VAT is the same wherever you are in the UK is true whether or not you asked
+// from a nation, so a generous list can only ever add a true sentence to an answer. Being NOT heard
+// is the expensive side: the real customer asked "am in glasgow, is vat different up here" and got
+// three paragraphs that never said no.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+const OTHER_NATION_RE =
+  /\b(?:wales|welsh|cymru|cardiff|swansea|newport|northern ireland|belfast|londonderry|ulster|england|english|london)\b/i;
+
+/**
+ * He named a nation, any of the four, or a city that stands for one.
+ *
+ * For answers that are TRUE UK WIDE and are therefore worth saying to anyone who asked from a
+ * nation. Never for the Scottish income tax caveat, which has its own narrower ear above.
+ */
+export function namesNation(body: string): boolean {
+  return SCOTTISH_NATION_RE.test(body) || OTHER_NATION_RE.test(body);
+}
+
 // The subject. Broad on purpose, per the asymmetry above.
 const TAX_RATE_RE =
   /\b(?:income tax|tax|taxed|rate|rates|band|bands|bracket|brackets|percent|per cent|threshold|thresholds)\b/i;

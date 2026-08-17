@@ -728,5 +728,54 @@ ok('🔴 lib/waintents.ts holds the ONE predicate',
 ok('🔴 lib/vatstanding.ts holds the ONE assembly',
   (read('lib/vatstanding.ts').match(/export function vatAnswer\(/g) || []).length === 1);
 
+// ---------------------------------------------------------------------------------------------
+// 7b. B20. THE NATION EAR THE VAT ANSWER USES, AND WHY IT IS NOT THE SCOTTISH ONE.
+// ---------------------------------------------------------------------------------------------
+// Income tax rates and bands above the personal allowance are devolved to SCOTLAND. Wales sets its
+// rates equal to England's and Northern Ireland does not set them at all, so isScottishRatesQuestion
+// must stay Scotland only: handing SCOTLAND_LINE to a man in Cardiff would tell him his income tax
+// is computed at somebody else's rates, which is false.
+//
+// VAT is reserved and identical in all four nations, so the VAT answer needs a WIDER ear. Two
+// different truths, two different lists, and this section holds them apart in both directions.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 7b. B20: the nation ear, wider than the Scottish one and deliberately so ===\n');
+
+const namesNation = W.namesNation;
+ok('lib/waintents.ts exports namesNation', typeof namesNation === 'function');
+
+for (const word of ['scotland', 'glasgow', 'wales', 'cardiff', 'northern ireland', 'belfast', 'england']) {
+  ok(`  the VAT ear hears "${word}"`, namesNation(`am in ${word}, is vat different up here`) === true);
+}
+ok('  and a message naming no nation at all is not a nation question',
+  namesNation('should i be registered for vat, im scared im getting close') === false);
+
+// 🔴 THE DIRECTION THAT MATTERS. The wider ear must NOT have been achieved by widening the Scottish
+// one, because that list decides who is told his income tax is worked at other people's rates.
+for (const phrase of ['do i pay a different tax rate in cardiff', 'are the tax bands different in belfast']) {
+  ok(`  🔴 the SCOTTISH ear still refuses ${JSON.stringify(phrase)}, which is not a devolved question`,
+    isScot(phrase) === false);
+}
+ok('  🔴 ...while the Scottish ear still hears Scotland, so widening one did not break the other',
+  isScot('do i pay the scottish rate of income tax') === true);
+
+// One definition each, and the VAT answer asks the wide one.
+ok('🔴 lib/waintents.ts holds ONE namesNation',
+  (read('lib/waintents.ts').match(/export function namesNation/g) || []).length === 1);
+ok('🔴 the VAT reader asks it, so the yes or no is decided in one place',
+  /namesNation\(body\)/.test(read('lib/vatanswer.ts')));
+// And all three routers hand the message over. A router that passes only the id answers a question
+// the customer did not ask, which reads exactly like a wired lane.
+{
+  const bodies = {
+    whatsapp: 'vatAnswerForUser(userId, text)',
+    thread: 'vatAnswerForUser(userId, q)',
+    ask: 'vatAnswerForUser(userId, question)',
+  };
+  for (const [name, code] of ROUTERS) {
+    ok(`  🔴 ${name}: hands his WORDS to the reader, not just his id`, code.includes(bodies[name]));
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

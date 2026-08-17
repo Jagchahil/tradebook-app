@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
   // UP HIS SIX. Registering late is a penalty. The read is two queries against his own rows and
   // costs no model call at all, so there is nothing to meter.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
-  if (!truth && isVatQuestion(question)) truth = await vatAnswerForUser(userId);
+  if (!truth && isVatQuestion(question)) truth = await vatAnswerForUser(userId, question);
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 SCOTTISH RATES, ON THIS SURFACE TOO, AND THE HEADER ABOVE SAYS WHY IN ADVANCE. B16, 17

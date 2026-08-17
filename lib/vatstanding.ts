@@ -264,15 +264,93 @@ export const VAT_UNREADABLE =
   'I could not read your figures just now, and I am not going to answer a VAT question with a '
   + 'guess. Try me again in a minute.';
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B20. THE MAN ASKED A YES OR NO AND WAS NEVER GIVEN ONE. 17 August 2026.
+//
+// B18 wired this answer to all three routers, and the walk that proved it asked, in the customer's
+// own words: "am in glasgow, is vat different up here". He got his figure, both statutory tests and
+// the source, which is a far better answer than the statute he used to get. It still never said NO.
+//
+// ⚠️ AND THAT IS NOT AN OVERSIGHT IN THE SCOTLAND LANE, IT IS THAT LANE WORKING. isScottishRatesQuestion
+// refuses VAT in the predicate, deliberately, because VAT is reserved and handing a VAT question an
+// income tax caveat states something false about his own figures. B16 wrote that the question then
+// "keeps going to the lane that owns it". This is that lane, so this is where the answer belongs.
+//
+// ⚠️ IT LIVES IN THIS FILE AND NOT IN lib/scotland.ts, AND THE LINE BETWEEN THEM IS WORTH KEEPING.
+// That file owns a CAVEAT: what we must admit about an income tax figure we compute at rates that
+// are not his. This is an ANSWER, about VAT, which is the same in all four nations. The file that
+// owns what this product claims about his VAT owns it. Putting it there would also have meant
+// arguing a third export past that file's derived surface ratchet for a sentence that is not a
+// Scotland sentence at all.
+//
+// ⚠️ IT LEADS, AND THAT IS NOT A BREACH OF "THE FIGURE LEADS". That promise exists so a man is
+// never handed the STATUTE before his position. This is one clause answering the exact yes or no he
+// typed, and a direct question deserves its answer in the first breath. Everything below it is
+// unchanged and his figure still comes before every rule. test/run2fixes.test.mjs holds BOTH now:
+// the tests come after his figure, and the ONLY thing permitted above his figure is this line.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const VAT_IS_UK_WIDE = 'VAT is the same wherever you are in the UK.';
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B21. WHAT THIS ANSWER OWED A MAN WHO IS ALREADY REGISTERED, WHICH WAS NOT THREE PARAGRAPHS
+// OF HOW TO REGISTER. 17 August 2026, found by asking what B18's own blunt matcher would do.
+//
+// isVatQuestion fires on any message carrying the word with no money amount in it, which is right:
+// the alternative is the entry parser answering "should i be registered for vat" with diesel and
+// Dave, which is what Run 2 found. But every VAT question from a REGISTERED customer was being
+// answered "You are already VAT registered, so the threshold question is behind you", and then
+// handed BACKWARD_TEST and FORWARD_TEST, which are the two tests for when you must register, and a
+// source link titled "when to register". He has registered. He passed both tests. He knows.
+//
+// That was live on WhatsApp from 12 August and B18 put it on three channels instead of one, which
+// is why it is fixed the same day rather than filed.
+//
+// ⚠️ WHAT HE GETS INSTEAD IS SHORT, AND SHORT IS THE POINT. Doc 103: every row is a thing he has to
+// read and reject before he reaches what he came for. He gets the true sentence and the door to the
+// screen that actually holds his VAT, which is /app/tax/vat's registered arm: the quarter's output
+// tax, the input tax he can reclaim, and what that leaves him owing or owed. That screen exists and
+// is good, and this lane was reciting registration law at him instead of naming it.
+//
+// ⚠️ THE CARD FEE NOTE AND THE SOURCE GO WITH THEM, AND FOR THE SAME REASON RATHER THAN FOR TIDINESS.
+// CARD_FEE_NOTE exists to warn a man that his books under-read the gross takings that decide whether
+// he crosses a line. He has crossed it. VAT_SOURCE points at the registration guidance. Neither can
+// change what he does now, which is the bar this file already applies to the card fee note.
+//
+// ⚠️ AND THIS IS NOT A HAND OFF TO THE MODEL. Falling through would let a model tell a registered
+// man he needs to register, on the two routers that cannot see his VAT profile. One true sentence
+// and a real door beats a fluent answer nobody checked.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+export const VAT_REGISTERED_DOOR =
+  'For this quarter, open Tax and then VAT: what you have charged, what you can reclaim on your '
+  + 'costs, and what that leaves you owing or owed.';
+
 /**
  * The VAT answer every door gives, in the order a frightened customer needs it.
  *
- * His figure first, then both statutory tests, then the card fee gap when it is close enough to
- * matter, then the source. The lead is not a style choice: it is the promise test/run2fixes.test.mjs
- * holds by index, that a man is told WHERE HE STANDS before he is told what the rules are.
+ * A direct yes or no if he asked one, then his figure, then both statutory tests, then the card fee
+ * gap when it is close enough to matter, then the source. The lead is not a style choice: it is the
+ * promise test/run2fixes.test.mjs holds by index, that a man is told WHERE HE STANDS before he is
+ * told what the rules are.
+ *
+ * @param opts.nationAsked he named a nation, so the yes or no he actually asked is answered first.
  */
-export function vatAnswer(s: VatStanding, gbp: (n: number) => string): string {
-  const parts: string[] = [standingSentence(s, gbp)];
+export function vatAnswer(
+  s: VatStanding,
+  gbp: (n: number) => string,
+  opts: { nationAsked?: boolean } = {},
+): string {
+  const parts: string[] = [];
+
+  if (opts.nationAsked) parts.push(VAT_IS_UK_WIDE);
+
+  parts.push(standingSentence(s, gbp));
+
+  // 🔴 HE HAS ALREADY REGISTERED, SO THE REGISTRATION LAW IS NOT HIS. See B21 above. Everything
+  // below this line is about crossing a line he is past.
+  if (s.kind === 'registered') {
+    parts.push(VAT_REGISTERED_DOOR);
+    return parts.join('\n\n');
+  }
 
   // Both tests, always. People who know about the rolling twelve months usually do not know about
   // the forward look, and the forward look is the one that registers you the same day.

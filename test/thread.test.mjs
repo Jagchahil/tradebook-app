@@ -686,8 +686,8 @@ export async function readVatProfile() { return null; }
   // reader was asked about HIS account, and that the model was never called.
   w('vatanswer.ts', `
 export const state = { asked: [] };
-export async function vatAnswerForUser(userId) {
-  state.asked.push(userId);
+export async function vatAnswerForUser(userId, body) {
+  state.asked.push({ userId, body });
   return 'Your last twelve months come to \u00a383,562.07, so you are \u00a36,437.93 below the line.';
 }
 `);
@@ -900,7 +900,15 @@ export function chatRefBelongsTo() { return true; }
     ok('🔴 ...AND THE MODEL WAS NEVER ASKED, so he is not charged for it and it cannot invent a run rate',
       turns.length === 2 && turns[1].content !== 'the model answer');
     ok('🔴 ...AND THE READER WAS ASKED ABOUT HIS ACCOUNT, not merely called',
-      VA.state.asked.length === 1 && VA.state.asked[0] === 'u-1');
+      VA.state.asked.length === 1 && VA.state.asked[0].userId === 'u-1');
+    // 🔴 B20. AND HIS WORDS GO WITH HIS ID, so the reader can answer the yes or no he asked. The
+    // sentence itself and the nation ear are owned by test/run2fixes.test.mjs and
+    // test/laneparity.test.mjs against the real files; what this proves is that the router does not
+    // drop the message on the floor, which is the only way a wired lane can still answer the
+    // wrong question.
+    ok('🔴 ...AND HIS WORDS WENT WITH IT, or the yes or no can never be answered',
+      VA.state.asked.length === 1
+      && VA.state.asked[0].body === 'should i be registered for vat, im scared im getting close');
   }
   // ⚠️ AND A VAT AMOUNT BEING LOGGED IS NOT A VAT QUESTION. "vat was £4.83" is a figure on a
   // receipt, and a lane that eats it turns an entry into a lecture about the threshold. The real

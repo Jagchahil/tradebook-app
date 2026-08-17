@@ -87,9 +87,9 @@ const moveLine = (dir, rel, needle, anchor, offset) => {
   writeFileSync(p, lines.join('\n'));
 };
 
-const WA_GATE = '          } else if (isVatQuestion(text)) {\n            await handleVatQuestion(from);\n';
-const TH_GATE = '  if (isVatQuestion(q)) return vatAnswerForUser(userId);\n';
-const ASK_GATE = '  if (!truth && isVatQuestion(question)) truth = await vatAnswerForUser(userId);\n';
+const WA_GATE = '          } else if (isVatQuestion(text)) {\n            await handleVatQuestion(from, text);\n';
+const TH_GATE = '  if (isVatQuestion(q)) return vatAnswerForUser(userId, q);\n';
+const ASK_GATE = '  if (!truth && isVatQuestion(question)) truth = await vatAnswerForUser(userId, question);\n';
 
 const SABOTAGES = [
   // ── A CHANNEL LOSES THE LANE. This is the finding itself, one channel at a time. ──────────
@@ -109,19 +109,19 @@ const SABOTAGES = [
   {
     name: '🔴 sunk BELOW the totals lane, so "should i register for vat" is answered with a set aside figure',
     apply: ({ dir }) => moveLine(dir, 'app/api/thread/route.ts',
-      'if (isVatQuestion(q)) return vatAnswerForUser(userId);',
+      'if (isVatQuestion(q)) return vatAnswerForUser(userId, q);',
       'if (isDataRightsRequest(q)) return DATA_RIGHTS_ANSWER;', 1),
   },
   {
     name: '🔴 sunk BELOW the paid model call, so it answers correctly and charges him for it',
     apply: ({ dir }) => moveLine(dir, 'app/api/thread/route.ts',
-      'if (isVatQuestion(q)) return vatAnswerForUser(userId);',
+      'if (isVatQuestion(q)) return vatAnswerForUser(userId, q);',
       'const answer = await answerMoneyQuestion(q, summary, knowledge);', 1),
   },
   {
     name: '🔴 sunk BELOW the qa_cache key on /api/ask, so his own turnover can reach a SHARED cache',
     apply: ({ dir }) => moveLine(dir, 'app/api/ask/route.ts',
-      'if (!truth && isVatQuestion(question)) truth = await vatAnswerForUser(userId);',
+      'if (!truth && isVatQuestion(question)) truth = await vatAnswerForUser(userId, question);',
       'const questionNorm = normaliseQuestion(question);', 1),
   },
   {
@@ -132,8 +132,8 @@ const SABOTAGES = [
   {
     name: '🔴 THE FIGURE STOPS LEADING: the statutory tests are pushed ahead of his standing',
     apply: ({ dir }) => edit(dir, 'lib/vatstanding.ts',
-      "  const parts: string[] = [standingSentence(s, gbp)];",
-      "  const parts: string[] = [BACKWARD_TEST];\n  parts.push(standingSentence(s, gbp));"),
+      '  parts.push(standingSentence(s, gbp));',
+      '  parts.push(BACKWARD_TEST);\n  parts.push(standingSentence(s, gbp));'),
   },
   {
     name: '🔴 the backward test goes, so a man is told the forward look and not the rolling one',
@@ -175,20 +175,20 @@ const SABOTAGES = [
   {
     name: '🔴 THE THREAD GROWS ITS OWN COPY of the assembly, so there are two owners with one wearing the fix',
     apply: ({ dir }) => edit(dir, 'app/api/thread/route.ts',
-      '  if (isVatQuestion(q)) return vatAnswerForUser(userId);',
+      '  if (isVatQuestion(q)) return vatAnswerForUser(userId, q);',
       '  if (isVatQuestion(q)) return [BACKWARD_TEST, FORWARD_TEST].join(String.fromCharCode(10));'),
   },
   {
     name: '🔴 a router reads the rows for itself, which is how three doors answered three ways',
     apply: ({ dir }) => edit(dir, 'app/api/ask/route.ts',
-      '  if (!truth && isVatQuestion(question)) truth = await vatAnswerForUser(userId);',
+      '  if (!truth && isVatQuestion(question)) truth = await vatAnswerForUser(userId, question);',
       '  if (!truth && isVatQuestion(question)) truth = String(vatStanding([], "2026-08-17", 90000).kind);'),
   },
   {
     name: 'a second reader appears, so lib/vatanswer.ts is no longer the ONE reader',
     apply: ({ dir }) => edit(dir, 'lib/vatanswer.ts',
-      'export async function vatAnswerForUser(userId: string): Promise<string> {',
-      'export async function vatAnswerForUserLegacy(): Promise<string> { return VAT_UNREADABLE; }\nexport async function vatAnswerForUser(userId: string): Promise<string> {'),
+      'export async function vatAnswerForUser(userId: string, body = \'\'): Promise<string> {',
+      'export async function vatAnswerForUserLegacy(): Promise<string> { return VAT_UNREADABLE; }\nexport async function vatAnswerForUser(userId: string, body = \'\'): Promise<string> {'),
   },
   {
     name: 'a second definition of the matcher appears, so there is no longer ONE rule',
@@ -196,11 +196,75 @@ const SABOTAGES = [
       'export function isVatQuestion(body: string): boolean {',
       'export function isVatQuestionOld(body: string): boolean { return false; }\nexport function isVatQuestion(body: string): boolean {'),
   },
+  // ── B20. THE YES OR NO HE ACTUALLY ASKED. ────────────────────────────────────────────────
+  {
+    name: '🔴 B20: the UK wide line goes, so a Scot asking "is vat different up here" is never told no',
+    apply: ({ dir }) => edit(dir, 'lib/vatstanding.ts',
+      '  if (opts.nationAsked) parts.push(VAT_IS_UK_WIDE);\n', ''),
+  },
+  {
+    name: '🔴 B20: it is pushed BELOW his figure, so the yes or no arrives after three paragraphs',
+    apply: ({ dir }) => edit(dir, 'lib/vatstanding.ts',
+      '  if (opts.nationAsked) parts.push(VAT_IS_UK_WIDE);\n\n  parts.push(standingSentence(s, gbp));',
+      '  parts.push(standingSentence(s, gbp));\n  if (opts.nationAsked) parts.push(VAT_IS_UK_WIDE);'),
+  },
+  {
+    name: '🔴 B20: the router stops handing over his words, so the nation is never heard',
+    apply: ({ dir }) => edit(dir, 'app/api/thread/route.ts',
+      '  if (isVatQuestion(q)) return vatAnswerForUser(userId, q);',
+      '  if (isVatQuestion(q)) return vatAnswerForUser(userId);'),
+  },
+  {
+    name: '🔴 B20: the reader stops asking namesNation, so only a hard coded shape is heard',
+    apply: ({ dir }) => edit(dir, 'lib/vatanswer.ts',
+      '{ nationAsked: namesNation(body) }', '{ nationAsked: false }'),
+  },
+  {
+    name: '🔴 B20: the nation ear narrows back to Scotland, so a man in Cardiff is not answered',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
+      '  return SCOTTISH_NATION_RE.test(body) || OTHER_NATION_RE.test(body);',
+      '  return SCOTTISH_NATION_RE.test(body);'),
+  },
+  {
+    name: '⚠️ B20: the SCOTTISH ear is widened to all four nations, which would caveat a Welshman wrongly',
+    apply: ({ dir }) => edit(dir, 'lib/waintents.ts',
+      '/\\b(?:scotland|scottish|scot(?:s|sman|smen)?|glasgow|edinburgh|aberdeen|dundee|inverness|stirling|paisley)\\b/i;',
+      '/\\b(?:scotland|scottish|scot(?:s|sman|smen)?|glasgow|edinburgh|aberdeen|dundee|inverness|stirling|paisley|wales|cardiff|belfast)\\b/i;'),
+  },
+  {
+    name: '🔴 B20: the two sentences saying VAT is UK wide drift apart',
+    apply: ({ dir }) => edit(dir, 'lib/vatstanding.ts',
+      "'VAT is the same wherever you are in the UK.'",
+      "'VAT does not change from nation to nation.'"),
+  },
+  // ── B21. WHAT A REGISTERED CUSTOMER IS OWED. ─────────────────────────────────────────────
+  {
+    name: '🔴 B21: the registered branch goes, so he is read both registration tests again',
+    apply: ({ dir }) => edit(dir, 'lib/vatstanding.ts',
+      "  if (s.kind === 'registered') {\n    parts.push(VAT_REGISTERED_DOOR);\n    return parts.join('\\n\\n');\n  }\n", ''),
+  },
+  {
+    name: '🔴 B21: the branch stops RETURNING, so the tests leak back to a man who has passed them',
+    apply: ({ dir }) => edit(dir, 'lib/vatstanding.ts',
+      "    parts.push(VAT_REGISTERED_DOOR);\n    return parts.join('\\n\\n');",
+      '    parts.push(VAT_REGISTERED_DOOR);'),
+  },
+  {
+    name: '🔴 B21: the door goes, so a registered man gets one sentence and nowhere to go',
+    apply: ({ dir }) => edit(dir, 'lib/vatstanding.ts',
+      '    parts.push(VAT_REGISTERED_DOOR);\n', ''),
+  },
+  {
+    name: '🔴 B21: the door stops naming a screen and becomes a roadmap notice',
+    apply: ({ dir }) => edit(dir, 'lib/vatstanding.ts',
+      "  'For this quarter, open Tax and then VAT: what you have charged, what you can reclaim on your '\n  + 'costs, and what that leaves you owing or owed.'",
+      "  'VAT reporting is coming to Lekhio soon.'"),
+  },
   {
     name: '🔴 THE READER IS CALLED WITH SOMEBODY ELSE, which reads as wired and answers about the wrong man',
     apply: ({ dir }) => edit(dir, 'app/api/thread/route.ts',
-      '  if (isVatQuestion(q)) return vatAnswerForUser(userId);',
-      "  if (isVatQuestion(q)) return vatAnswerForUser('u-2');"),
+      '  if (isVatQuestion(q)) return vatAnswerForUser(userId, q);',
+      "  if (isVatQuestion(q)) return vatAnswerForUser('u-2', q);"),
   },
 ];
 
@@ -224,8 +288,8 @@ const CONTROLS = [
   {
     name: 'a blank line inside the builder, which changes nothing about what he reads',
     apply: ({ dir }) => editOnce(dir, 'lib/vatstanding.ts',
-      'export function vatAnswer(s: VatStanding, gbp: (n: number) => string): string {\n',
-      'export function vatAnswer(s: VatStanding, gbp: (n: number) => string): string {\n\n'),
+      '): string {\n  const parts: string[] = [];\n',
+      '): string {\n  const parts: string[] = [];\n\n'),
   },
 ];
 

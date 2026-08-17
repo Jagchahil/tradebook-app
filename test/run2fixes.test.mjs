@@ -234,24 +234,88 @@ console.log('F14: every door calls the one function');
   ok('🔴 ...and it is the ROWS failing that refuses, never the profile',
     /if \(rows === null\) return VAT_UNREADABLE;/.test(readerSrc));
 
-  // 🔴 THE FIGURE LEADS, AND THE STATUTORY TESTS FOLLOW IT. B16, 17 August 2026.
+  // 🔴 THE FIGURE LEADS, AND THE STATUTORY TESTS FOLLOW IT. B16, extended by B20 on 17 August 2026.
   //
-  // This is the promise a deleted predicate used to stand next to without holding: a man near the
-  // line gets WHERE HE STANDS first and the rules after, never the other way round. Derived from
-  // the builder rather than typed: the standing sentence must be the FIRST element of the parts
-  // array, and both statutory tests must be pushed after it. Held by index, so reversing them
-  // turns this red.
+  // The promise a deleted predicate used to stand next to without holding: a man near the line gets
+  // WHERE HE STANDS before he gets the rules, never the other way round.
+  //
+  // ⚠️ B20 PUT ONE THING ABOVE HIS FIGURE AND THE GUARD GOT STRICTER RATHER THAN LOOSER. A customer
+  // who names a nation asked a yes or no ("am in glasgow, is vat different up here") and is owed it
+  // in the first breath. So the shape is no longer "the standing sentence is element zero", which
+  // would have to be deleted; it is "the ONLY thing that may precede his figure is the UK wide
+  // line, and both statutory tests still come after it". Derived by index from the builder, so
+  // anything else creeping above his figure turns this red.
   {
-    const leadAt = answerSrc.indexOf('const parts: string[] = [standingSentence(');
+    const leadAt = answerSrc.indexOf('parts.push(standingSentence(s, gbp));');
+    const nationAt = answerSrc.indexOf('if (opts.nationAsked) parts.push(VAT_IS_UK_WIDE);');
     const backAt = answerSrc.indexOf('parts.push(BACKWARD_TEST)');
     const fwdAt = answerSrc.indexOf('parts.push(FORWARD_TEST)');
-    ok('🔴 the VAT answer OPENS with his standing figure, not with the rules',
-      leadAt !== -1);
+    ok('🔴 the VAT answer leads with his standing figure', leadAt !== -1);
     ok('🔴 ...and both statutory tests come AFTER it, so he is never handed rules first',
       leadAt !== -1 && backAt > leadAt && fwdAt > leadAt);
+    ok('🔴 ...and the ONE thing allowed above his figure is the direct yes or no he asked for',
+      nationAt !== -1 && nationAt < leadAt);
+    // The push list, in order, so a fourth thing appearing above his figure cannot hide between the
+    // two indices above. Derived from the function body rather than typed.
+    {
+      const fnAt = answerSrc.indexOf('export function vatAnswer(');
+      const body = fnAt === -1 ? '' : answerSrc.slice(fnAt, answerSrc.indexOf('\n}', fnAt));
+      const pushes = [...body.matchAll(/parts\.push\(([A-Za-z_]+)/g)].map((m) => m[1]);
+      ok('🔴 the builder body was located, so the list below is real', pushes.length >= 5);
+      ok('🔴 EXACTLY ONE THING PRECEDES HIS FIGURE, and it is the UK wide line',
+        pushes.indexOf('standingSentence') === 1 && pushes[0] === 'VAT_IS_UK_WIDE');
+    }
     ok('⚠️ and the standing sentence carries his own twelve month figure',
       /export function standingSentence/.test(read('lib/vatstanding.ts'))
       && /rolling12m/.test(read('lib/vatstanding.ts')));
+  }
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B21. A REGISTERED CUSTOMER IS NOT READ THE LAW ON HOW TO REGISTER.
+  //
+  // Live on WhatsApp from 12 August and put on three channels by B18: every VAT question from a
+  // registered customer was answered "the threshold question is behind you" and then handed
+  // BACKWARD_TEST, FORWARD_TEST and a source titled "when to register". He has registered. He
+  // passed both tests. Held by index: his branch RETURNS above the first statutory test, so no
+  // reordering can leak them back to him.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  {
+    const regAt = answerSrc.indexOf("if (s.kind === 'registered') {");
+    const regReturnAt = answerSrc.indexOf("return parts.join", regAt === -1 ? 0 : regAt);
+    const backAt = answerSrc.indexOf('parts.push(BACKWARD_TEST)');
+    ok('🔴 the registered branch exists in the shared builder', regAt !== -1);
+    ok('🔴 ...and RETURNS before either registration test is pushed',
+      regAt !== -1 && regReturnAt !== -1 && backAt !== -1 && regReturnAt < backAt);
+    ok('🔴 ...and he is given the door to the screen that holds his actual VAT instead',
+      /parts\.push\(VAT_REGISTERED_DOOR\);/.test(answerSrc)
+      && /open Tax and then VAT/.test(read('lib/vatstanding.ts')));
+    // The door has to be a real one. app/app/tax/vat/page.tsx draws a registered arm with the
+    // quarter's output tax, input tax and what that leaves him owing, so the sentence names a
+    // screen that exists rather than a roadmap.
+    ok('🔴 ...and that screen really does answer a REGISTERED man, which is what makes it a door',
+      /!profile\.registered \? \(/.test(read('app/app/tax/vat/page.tsx'))
+      && /outputVat: out\.outputVat/.test(read('app/app/tax/vat/page.tsx')));
+    // 🔴 AND THE CARD FEE NOTE CANNOT REACH HIM EITHER. It warns that his books under-read the
+    // gross takings deciding whether he crosses a line he has already crossed.
+    ok('🔴 ...and the card fee note cannot reach him, because it is below his return',
+      answerSrc.indexOf('parts.push(CARD_FEE_NOTE)') > regReturnAt);
+  }
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B20. THE TWO PLACES THIS PRODUCT SAYS VAT IS UK WIDE MUST SAY THE SAME THING.
+  //
+  // SCOTTISH_RATES_ANSWER in lib/scotland.ts has carried the claim since B16, inside a sentence
+  // that also covers National Insurance and the student loan. VAT_IS_UK_WIDE says it alone, for the
+  // VAT lane. Two constants, one fact, so the clause they share is pinned: rewording one and not
+  // the other is the drift that turns one caveat into nine.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  {
+    const CLAUSE = 'the same wherever you are in the UK';
+    ok('🔴 the VAT lane says VAT is UK wide', read('lib/vatstanding.ts').includes(`VAT is ${CLAUSE}.`));
+    ok('🔴 ...in the same words lib/scotland.ts uses for the same fact',
+      read('lib/scotland.ts').includes(CLAUSE));
+    // And it prices nothing, the rule lib/scotland.ts applies to every sentence of this kind: a
+    // threshold or a percentage in here would be a figure nobody guards.
+    ok('⚠️ ...and it prices nothing, so no figure can drift into it',
+      !/[£%]|\d\d/.test('VAT is the same wherever you are in the UK.'));
   }
   // 🔴 THE CARD FEE NOTE IS THE ONE PART THAT IS CONDITIONAL, AND IT IS CONDITIONAL ON nearLine
   // AND NOTHING ELSE. Flattened to always it is noise far from the line; dropped on the web it

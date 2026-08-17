@@ -32,7 +32,7 @@
 import { getConfirmedTransactionsForRange, readVatProfile } from './supabase';
 import { VAT_REGISTRATION_THRESHOLD } from './vat';
 import { vatStanding, vatAnswer, VAT_UNREADABLE } from './vatstanding';
-import { formatGbp } from './waintents';
+import { formatGbp, namesNation } from './waintents';
 
 // Twelve months back plus a margin, so the window is closed by vatStanding rather than by the
 // query being clever.
@@ -44,8 +44,15 @@ const LOOKBACK_DAYS = 400;
  * Always returns a sentence. A read that fails returns VAT_UNREADABLE, never a figure and never a
  * reassurance: the one answer that must not be given to a man near the line is a comfortable
  * sounding guess.
+ *
+ * ⚠️ THE MESSAGE COMES IN AS WELL AS THE ACCOUNT, AND ONLY FOR THE YES OR NO. B20, 17 August 2026.
+ * A customer who names a nation asked whether VAT is different where he lives, and he is owed that
+ * answer in the first breath rather than left to infer it from a figure. Nothing else in here reads
+ * his words: the arithmetic is his rows and only his rows.
+ *
+ * @param body his message, used ONLY to decide whether he asked a nation question.
  */
-export async function vatAnswerForUser(userId: string): Promise<string> {
+export async function vatAnswerForUser(userId: string, body = ''): Promise<string> {
   const today = new Date();
   const todayISO = today.toISOString().slice(0, 10);
   const fromISO = new Date(today.getTime() - LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
@@ -68,5 +75,5 @@ export async function vatAnswerForUser(userId: string): Promise<string> {
     vatProfile !== null && vatProfile.registered,
   );
 
-  return vatAnswer(standing, formatGbp);
+  return vatAnswer(standing, formatGbp, { nationAsked: namesNation(body) });
 }

@@ -54,7 +54,7 @@ jobs:
           path: tradebook-app
           token: ${{ secrets.MOBILE_REPO_TOKEN }}
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm

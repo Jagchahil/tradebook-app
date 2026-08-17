@@ -81,8 +81,13 @@ const SABOTAGES = [
   {
     name: 'F14 the WhatsApp VAT lane is removed',
     apply: (d) => edit(d, 'app/api/whatsapp/route.ts',
-      '          } else if (isVatQuestion(text)) {\n            await handleVatQuestion(from);',
-      '          } else if (false) {\n            await handleVatQuestion(from);'),
+      // ⚠️ ANCHOR REPAIRED 17 August 2026. It read `handleVatQuestion(from)` until B18 collapsed that
+      // handler to four lines and gave it the message text, so BOTH F14 anchors in this file could no
+      // longer be applied and this suite's two WhatsApp VAT lane guards went UNPROVEN rather than
+      // broken. Found by the full eighteen pass loop on the Mac, which is the only thing that can see
+      // it: nothing in Cowork runs the whole loop. FOURTH broken anchor from that one refactor.
+      '          } else if (isVatQuestion(text)) {\n            await handleVatQuestion(from, text);',
+      '          } else if (false) {\n            await handleVatQuestion(from, text);'),
   },
   {
     // ⚠️ THE SABOTAGE HAS TO BE A REAL REGRESSION. An earlier version of this moved the lane to
@@ -94,7 +99,7 @@ const SABOTAGES = [
     apply: (d) => {
       const p = path.join(d, 'app/api/whatsapp/route.ts');
       let s = readFileSync(p, 'utf8');
-      const lane = '          } else if (isVatQuestion(text)) {\n            await handleVatQuestion(from);\n';
+      const lane = '          } else if (isVatQuestion(text)) {\n            await handleVatQuestion(from, text);\n';
       if (!s.includes(lane)) throw new Error('ANCHOR MISSING: vat lane');
       s = s.replace(lane, '');
       const below = '          } else if (isVent(text)) {';

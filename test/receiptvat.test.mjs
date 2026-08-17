@@ -115,7 +115,32 @@ console.log('\n2. The parser, staged and run against a stubbed model');
 
 const stage = mkdtempSync(path.join(tmpdir(), 'receiptvat-'));
 const asTs = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'nistudentloan', 'ltdengine', 'aicost', 'housestyle', 'receiptrescue', 'claude']) {
+const STAGED = ['taxengine', 'nistudentloan', 'ltdengine', 'aicost', 'housestyle', 'receiptrescue', 'scotland', 'claude'];
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE LIST ABOVE IS HAND WRITTEN, SO IT IS CHECKED AGAINST THE FILE. B2, 17 August 2026.
+//
+// lib/claude.ts is copied into a scratch directory and imported for real, which means every module
+// it imports has to be copied beside it. That list was maintained by hand and nothing compared it
+// to the file. B2 added one import to lib/claude.ts, the local gate said 0 failed, and CI went red
+// on ERR_MODULE_NOT_FOUND for a file nobody had thought about.
+//
+// A missing name here does not read as a missing name. It reads as a module resolution stack trace
+// from a temp directory, three sections below the thing that caused it. So the omission is caught
+// where it happens, by its own name, and the next person who adds an import to lib/claude.ts is
+// told what to do rather than left to work it out from /tmp.
+//
+// ⚠️ `import type` is erased before the module ever loads, so a type only import needs no copy and
+// must not be demanded here. receiptconfidence is exactly that case and has always been.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+const relImports = [...codeOnly(claudeSrc).matchAll(/import\s+(type\s+)?[^;]*?from\s+'\.\/([a-zA-Z0-9]+)'/g)]
+  .filter((m) => !m[1])
+  .map((m) => m[2]);
+const notStaged = [...new Set(relImports)].filter((m) => !STAGED.includes(m));
+ok(`🔴 every module lib/claude.ts imports is staged beside it${notStaged.length ? `, MISSING: ${notStaged.join(', ')}` : ''}`,
+  notStaged.length === 0);
+
+for (const f of STAGED) {
   writeFileSync(path.join(stage, `${f}.ts`), asTs(read(`lib/${f}.ts`)));
 }
 

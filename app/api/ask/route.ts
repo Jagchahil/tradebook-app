@@ -12,6 +12,7 @@ import {
   matchProductTruth, productTruthAnswer,
   isDataRightsRequest, DATA_RIGHTS_ANSWER, isVehicleQuestion, vehicleAnswer,
   isScottishRatesQuestion, isVatQuestion,
+  isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
 } from '../../../lib/waintents';
 import { SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { vatAnswerForUser } from '../../../lib/vatanswer';
@@ -90,6 +91,43 @@ export async function POST(req: NextRequest) {
   // withheld because a man has used up his paid questions.
   const productKind = matchProductTruth(question);
   let truth = productKind ? productTruthAnswer(productKind, { filingLive: hmrcFilingLive() }) : '';
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 SOMEBODY ELSE'S MONEY, AND THIS IS THE THIRD ROUTER AND THE LAST ONE. B19, 17 August 2026.
+  //
+  // This is not an answer lane. It is the GATE that stops a lane reading his books to answer a
+  // question that was not about them, and it has now been found three times on three surfaces.
+  // Run 1 found the shape on the chat router: "what does the barber next door owe you lot then"
+  // answered with HER OWN set aside figure. Run 2 built isAboutSomeoneElse and wired it into the
+  // WhatsApp webhook. Run 3 found the chat router, the one the finding came from, still had no gate
+  // of any kind, and wired it there. NOBODY EVER WIRED THIS ONE, so from Run 2 until today the gate
+  // has been on two routers out of three and a man typing "how much has jerome made this year" into
+  // the in app accountant reached the model.
+  //
+  // ⚠️ AND THIS ROUTE FAILS IN TWO DIRECTIONS, NOT ONE, WHICH IS WHY IT HAS TO SIT UP HERE.
+  //
+  //   1. WITH a first person word ("how much has my mate jerome made this year"), isGeneralQuestion
+  //      is false, so transactionSummaryForUser hands the model this customer's entire ledger while
+  //      it composes an answer about somebody else. That is Run 1's finding exactly, on the surface
+  //      that was never told about it.
+  //   2. WITHOUT one, the question is classed GENERAL, the model is handed no books and invents,
+  //      and then the invented answer is written to qa_cache under the third party's name and
+  //      served for free to every other customer who ever asks it. Run 3 read two channels invent
+  //      two different pairs of figures for one man in one evening; this route is the one that can
+  //      keep an invention and hand it on.
+  //
+  // The gate returns above BOTH of those, above the daily cap, and above the model, so neither path
+  // exists rather than both being unlikely. It is also free and must be: refusing to discuss a
+  // third party is not worth one of his six questions for the day, and a man who is metered for
+  // asking is a man who rephrases until something answers.
+  //
+  // ⚠️ NO SELF NAMES PASSED, AND THAT IS THE SAME ARGUED CHOICE app/api/thread/route.ts MADE.
+  // sessionUser returns an id, an email and a phone, and no person name, so passing one would add a
+  // database round trip to every question to remove a false positive that costs one re-ask ("how
+  // much has marcus made", asked by Marcus). selfNameTokens() is exported and ready for a caller
+  // that already holds the name. Nothing should fetch it just for this.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (!truth && isAboutSomeoneElse(question)) truth = SOMEONE_ELSE_ANSWER;
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 AND THE OTHER TWO DETERMINISTIC LANES, ON THIS SURFACE TOO. Found 12 August 2026 by asking

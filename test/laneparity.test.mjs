@@ -777,5 +777,318 @@ ok('🔴 the VAT reader asks it, so the yes or no is decided in one place',
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// 9. B19. THE THIRD PARTY GATE, ON ALL THREE ROUTERS, ABOVE EVERY LANE THAT READS HIS BOOKS.
+// ---------------------------------------------------------------------------------------------
+// 🔴 WHY THIS SECTION EXISTS. This one is not an answer lane and that is the point of it. It is the
+// gate that stops a lane reading his books to answer a question that was not about them, and it has
+// been found three separate times on three separate surfaces.
+//
+//   Run 1, 11 August: "what does the barber next door owe you lot then", asked ON THE CHAT ROUTER,
+//                     answered with HER OWN set aside figure, £1,200, read out as though it were an
+//                     answer to the question she asked.
+//   Run 2, 13 August: isAboutSomeoneElse built, and wired into app/api/whatsapp/route.ts only.
+//   Run 3, 13 August: "how much has jerome made this year", asked on BOTH channels by his business
+//                     partner. WhatsApp gave the WHOLE FIRM'S turnover under Jerome's name with an
+//                     invented expenses figure attached; the web chat invented a different pair.
+//                     The chat router, the one Run 1's finding came from, still had no gate at all.
+//
+// AND THE THIRD ROUTER WAS NEVER WIRED, from Run 2 until B19 on 17 August. app/api/ask is the in
+// app accountant, it takes a typed question, and it had no gate of any kind.
+//
+// ⚠️ THE ORDER IS THE WHOLE GUARD. A gate below the lanes it guards is not a gate, it is a second
+// opinion nobody asks for. So it is held above the VAT lane and the vehicle lane on all three, above
+// the totals lane on the two that have one, and above the paid model everywhere.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 9. B19: somebody else\'s money, derived from all three routers ===\n');
+
+const elseSites = {
+  whatsapp: '} else if (isAboutSomeoneElse(text)) {',
+  thread: 'if (isAboutSomeoneElse(q)) return SOMEONE_ELSE_ANSWER;',
+  ask: 'if (!truth && isAboutSomeoneElse(question)) truth = SOMEONE_ELSE_ANSWER;',
+};
+
+for (const [name, code, arg] of ROUTERS) {
+  const site = elseSites[name];
+  const n = occurrences(code, site);
+  ok(`${name}: the third party GATE is dispatched  \`${site.trim()}\``, n > 0);
+  ok(`${name}: ...and exactly once, so its index names one call site`, n === 1);
+  const gateAt = n === 1 ? code.indexOf(site) : -1;
+
+  // The refusal has to be the fixed words. A gate that fires and then lets the question through is
+  // the defect wearing the fix's clothes, and on this lane the difference is a disclosure.
+  ok(`${name}: and the fixed refusal is what he gets`, code.includes('SOMEONE_ELSE_ANSWER'));
+
+  // Above every lane on this router that reads his rows. Both markers proved present first, because
+  // indexOf returns minus one and minus one is less than every real index.
+  for (const [lane, needle] of [['the VAT lane', `isVatQuestion(${arg})`], ['the vehicle lane', `isVehicleQuestion(${arg})`]]) {
+    const laneAt = code.indexOf(needle);
+    ok(`${name}: ${lane} \`${needle}\` was located, so the bound below is not vacuous`, laneAt !== -1);
+    ok(`🔴 ${name}: THE GATE RUNS ABOVE ${lane}, which reads his own rows`,
+      gateAt !== -1 && laneAt !== -1 && gateAt < laneAt);
+  }
+
+  const modelNeedle = modelCall[name];
+  const modelAt = code.indexOf(modelNeedle);
+  ok(`${name}: the paid model call was located too`, modelAt !== -1);
+  ok(`🔴 ${name}: AND ABOVE THE MODEL, so his books are never handed over to answer about somebody else`,
+    gateAt !== -1 && modelAt !== -1 && gateAt < modelAt);
+}
+
+// The totals lane, on the two routers that have one. It is the lane that recited her own figure in
+// Run 1, so it is the one this gate was built to get in front of.
+for (const [name, code, arg] of ROUTERS.filter(([n]) => n !== 'ask')) {
+  const totalsNeedle = `matchTotalsQuestion(${arg})`;
+  const totalsAt = code.indexOf(totalsNeedle);
+  const gateAt = code.indexOf(elseSites[name]);
+  ok(`${name}: the totals gate \`${totalsNeedle}\` was located`, totalsAt !== -1);
+  ok(`🔴 ${name}: AND THE GATE RUNS ABOVE IT, which is Run 1's finding by name`,
+    totalsAt !== -1 && gateAt !== -1 && gateAt < totalsAt);
+}
+
+// 🔴 AND ON /api/ask IT RUNS ABOVE THE SHARED CACHE, FOR A REASON THE OTHER TWO ROUTERS DO NOT HAVE.
+//
+// This route fails in two directions. WITH a first person word the question is personal, so
+// transactionSummaryForUser hands the model his entire ledger while it composes an answer about
+// somebody else. WITHOUT one it is classed GENERAL, so the model invents with no books at all and
+// the invention is then written to qa_cache under the third party's name and served free to every
+// other customer who ever asks it. Returning above questionNorm closes both, structurally.
+{
+  const askCodeOnly = ROUTERS.find(([n]) => n === 'ask')[1];
+  const gateAt = askCodeOnly.indexOf(elseSites.ask);
+  const normAt = askCodeOnly.indexOf('const questionNorm = normaliseQuestion(question);');
+  const upsertAt = askCodeOnly.indexOf('upsertQaCache(');
+  const summaryAt = askCodeOnly.indexOf('transactionSummaryForUser(');
+  ok('ask: the cache key line was located, so the bounds below are not vacuous', normAt !== -1);
+  ok('ask: the cache WRITE was located too', upsertAt !== -1);
+  ok('ask: and the read of his books was located as well', summaryAt !== -1);
+  ok('🔴 ask: THE REFUSAL RETURNS BEFORE THE SHARED CACHE IS EVEN KEYED',
+    gateAt !== -1 && normAt !== -1 && gateAt < normAt && gateAt < upsertAt);
+  ok('🔴 ask: AND BEFORE HIS BOOKS ARE READ FOR THE MODEL AT ALL',
+    gateAt !== -1 && summaryAt !== -1 && gateAt < summaryAt);
+}
+
+// One gate, one refusal, each with exactly one home.
+ok('🔴 lib/waintents.ts holds the ONE gate',
+  (read('lib/waintents.ts').match(/export function isAboutSomeoneElse/g) || []).length === 1);
+ok('🔴 lib/waintents.ts holds the ONE refusal',
+  (read('lib/waintents.ts').match(/export const SOMEONE_ELSE_ANSWER/g) || []).length === 1);
+// And no router keeps a copy of the words or a rule of its own for deciding who is a third party.
+for (const [name, code] of ROUTERS) {
+  ok(`  ${name}: keeps no private copy of the refusal or the rule`,
+    !/I can only see your books/.test(code) && !/THIRD_PARTY_RE|namesAPerson\(/.test(code));
+}
+
+// ---------------------------------------------------------------------------------------------
+// 9a. THE NAMED PERSON BRANCH, WHICH WAS LOAD BEARING AND GUARDED BY NOTHING.
+// ---------------------------------------------------------------------------------------------
+// 🔴 FOUND BY test/sabotage-b19lanes.mjs ON ITS FIRST RUN, 17 August 2026, AND IT IS THE CORPUS
+// RULE ABOUT VACUOUS GUARDS BITING IN MINIATURE.
+//
+// isAboutSomeoneElse ends with two lines. `if (named) return true;` answers a question about a
+// person by name, and the line under it falls back to a list of money words for the older "barber
+// next door" shape. Deleting the named line entirely was NOT CAUGHT by any suite in this repo.
+//
+// The reason is that Run 3's three phrases each carry a SECOND signal. "how much has jerome MADE",
+// "whats jerome's PROFIT" and "how much did priya EARN" all contain a word that is ALSO in the
+// fallback list, so all three stayed true with the branch they were written for removed. Twelve
+// ordinary phrasings do not: spent, taken, turned over, billed, paid, income, wages, money, share,
+// account, bill and vat are in the named person patterns and in NEITHER fallback list. Every one
+// of them silently stopped being a refusal.
+//
+// ⚠️ SO EACH PROBE BELOW CARRIES THE SIGNAL UNDER TEST AND NO OTHER SIGNAL OF THE SAME KIND, and
+// that is asserted rather than asserted about. Swapping the NAME for a stoplisted word must make
+// the same sentence fall through, which is the only way to know the name is what refused it. A
+// phrase that stays true with the name taken out is proving the fallback, not this branch.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 9a. B19: the named person branch, isolated from the fallback ===\n');
+
+const aboutElse = W.isAboutSomeoneElse;
+ok('lib/waintents.ts exports isAboutSomeoneElse', typeof aboutElse === 'function');
+ok('...and selfNameTokens beside it', typeof W.selfNameTokens === 'function');
+
+const NAMED_PROBES = [
+  'how much has jerome spent this year',
+  'how much has jerome taken this year',
+  'how much has jerome billed this year',
+  "whats jerome's income",
+  "whats jerome's wages",
+  "whats jerome's share",
+  "whats jerome's account",
+];
+for (const phrase of NAMED_PROBES) {
+  const neutral = phrase.replace(/jerome/g, 'it');
+  ok(`  🔴 refused: ${JSON.stringify(phrase)}`, aboutElse(phrase) === true);
+  ok(`     ...and the NAME is what refused it, not a money word  (${JSON.stringify(neutral)} falls through)`,
+    aboutElse(neutral) === false);
+}
+
+// The two directions that keep it usable. His own money is his, and his own name is not somebody
+// else, which is what selfNameTokens is for on a caller that already holds the name.
+ok('  his own spending is still his to ask about', aboutElse('how much have i spent this year') === false);
+ok('  and a man asking about himself by name is not refused, where the caller knows the name',
+  aboutElse('how much has jerome spent this year', W.selfNameTokens('Jerome Adeyemi')) === false);
+
+// ---------------------------------------------------------------------------------------------
+// 9b. THE DERIVED SCOPE TABLE. EVERY PREDICATE, EVERY ROUTER, WRITTEN DOWN OR RED.
+// ---------------------------------------------------------------------------------------------
+// 🔴 WHY THIS EXISTS AND WHY IT IS NOT ANOTHER HAND WRITTEN LIST. Sections 5 to 9 each hold ONE lane
+// on three routers, and each of them was written the day somebody found that lane live on one router
+// out of three. That is four findings with one shape, and the shape is that nothing in this repo
+// could SEE the asymmetry. A hand written list of the lanes that matter cannot see it either: it
+// only ever contains the lanes somebody has already been bitten by.
+//
+// So the names come off disk. Every predicate lib/waintents.ts exports, every router that dispatches
+// it, derived. The table below declares which routers each one is EXPECTED on, and the assertion is
+// equality in both directions, so:
+//
+//   - a predicate wired to fewer routers than declared goes red (a lane landed on one router),
+//   - a predicate wired to MORE goes red (a lane was widened without anybody writing down why),
+//   - a NEW predicate dispatched anywhere goes red by name until somebody classifies it,
+//   - and a row for a predicate no router dispatches any more goes red, so the table cannot rot.
+//
+// ⚠️ THE CUT IS BY NAME AND IT IS DELIBERATE. `is*`, `match*` and `looksLike*` are the exports that
+// DECIDE a lane. Answer builders (niAnswer, deadlineAnswer, vehicleAnswer) and helpers (formatGbp,
+// entryDate) are not gates and classifying them would turn this table into a chore, which is how
+// tables stop being read. TWO KNOWN EXCLUSIONS, both named rather than hidden: `asksAmount`, which is
+// a tie break and has section 2 to itself, and `compoundAsk`, which appends a note rather than
+// choosing a lane and is on WhatsApp and the thread only.
+//
+// ⚠️ AND ROUTER LOCAL PREDICATES ARE OUT OF SCOPE BY CONSTRUCTION. isCIS, isMileage, isHomeOffice,
+// isPhoneShare, isSchedule, isHelp, isTaxTips, isReferRequest, isExpenseCheck and isQuestion are
+// defined inside app/api/whatsapp/route.ts and exported by nothing, so they cannot be derived from
+// lib/waintents.ts. If one of them ever needs to be on three surfaces it has to move into the shared
+// file first, and that is the right order anyway.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 9b. the derived scope table: every predicate, every router ===\n');
+
+const ALL3 = ['ask', 'thread', 'whatsapp'];
+const WA_ONLY = ['whatsapp'];
+const WA_THREAD = ['thread', 'whatsapp'];
+
+// on: the routers this predicate is EXPECTED to be dispatched by, sorted. why: required whenever
+// that is not all three, because an asymmetry with no reason written next to it is the defect.
+const SCOPE = {
+  // Everywhere. Being wrong on a surface is a breach or an irreversible decision, never merely a
+  // worse reply, which is the bar section 5 wrote down.
+  isAboutSomeoneElse: { on: ALL3, why: '' },
+  isDataRightsRequest: { on: ALL3, why: '' },
+  isVehicleQuestion: { on: ALL3, why: '' },
+  isVatQuestion: { on: ALL3, why: '' },
+  isScottishRatesQuestion: { on: ALL3, why: '' },
+  matchProductTruth: { on: ALL3, why: '' },
+
+  // Short of three, and each of these is a written decision or a written debt.
+  isDeadlineQuestion: {
+    on: WA_THREAD,
+    why: 'B19 DEBT, NOT A DECISION: /api/ask has no deadline lane, so a man asking the in app '
+      + 'accountant when his return is due is answered by the model. Deliberately left for its own '
+      + 'item rather than folded into the privacy packet.',
+  },
+  matchTotalsQuestion: {
+    on: WA_THREAD,
+    why: 'section 7 records that /api/ask has no totals lane to order against. Whether it should '
+      + 'have one is an open question and NOT a settled decision, because that route answers a '
+      + 'personal money question from the model on transactionSummaryForUser instead.',
+  },
+  isNiQuestion: { on: WA_ONLY, why: 'B19 DEBT: niAnswer exists, is tested and reads his rows, and is dispatched by one router.' },
+  isStudentLoanQuestion: { on: WA_ONLY, why: 'B19 DEBT: studentLoanAnswer exists, is tested and reads his rows, and is dispatched by one router.' },
+  isPropertyQuestion: { on: WA_ONLY, why: 'B19 DEBT: propertyAnswer exists, is tested and reads his rows, and is dispatched by one router.' },
+  isSavingsQuestion: {
+    on: WA_ONLY,
+    why: 'B19 DEBT, AND THE HARDEST OF THEM: there is NO pure builder. app/api/whatsapp/route.ts '
+      + 'assembles the sentences inline in handleSavingsQuestion, so this lane cannot be wired to a '
+      + 'second router without extracting one first, exactly as B18 had to for VAT.',
+  },
+  isIdentity: {
+    on: WA_ONLY,
+    why: 'B19 DEBT WITH A CATCH: the words are inline in the route AND they are channel specific. '
+      + 'They say "right here in WhatsApp" and "text help to see the lot", so copying them to a web '
+      + 'surface would tell a man in a browser to send a text. It needs a builder that takes the '
+      + 'channel, not a move.',
+  },
+
+  // Correctly WhatsApp only. These are the channel itself, not answers about money. A box on a web
+  // page has no last message to delete, no thread to stop, and no keyword to reserve.
+  matchStopStart: { on: WA_ONLY, why: 'STOP and START are a messaging channel obligation and mean nothing in a web form.' },
+  matchReservedWord: { on: WA_ONLY, why: 'reserved keywords exist because a text can only be words. A web form has buttons.' },
+  matchAck: { on: WA_ONLY, why: 'acknowledging a receipt we sent is a reply to a message. There is no message here.' },
+  matchEditLast: { on: WA_ONLY, why: 'the web has the row itself, with an edit on it.' },
+  isDeleteLast: { on: WA_ONLY, why: 'the web has the row itself, with a delete on it.' },
+  isGreeting: { on: WA_ONLY, why: 'nobody types hello into an accountant box.' },
+  isThanks: { on: WA_ONLY, why: 'nobody types thanks into an accountant box.' },
+  isVent: { on: WA_ONLY, why: 'a man swearing at his phone at 8pm is a WhatsApp shape.' },
+  isNonWords: { on: WA_ONLY, why: 'a pocket dial sends "aaaa". A web form is typed on purpose.' },
+  isSetupRequest: { on: WA_ONLY, why: 'setup on the web is the setup screens. He is already in them.' },
+  isInvoiceThis: { on: WA_ONLY, why: 'the web has an invoice screen, and it is one tap away.' },
+  matchInvoiceDraft: { on: WA_ONLY, why: 'the web has an invoice screen, and it is one tap away.' },
+  matchChaseRequest: { on: WA_ONLY, why: 'chasing is a button on the invoice, on the web.' },
+  matchRentIn: { on: WA_ONLY, why: 'a rent received is an ENTRY. Entries on the web go through the pile, not a sentence.' },
+  looksLikeMoneyEntry: { on: WA_ONLY, why: 'an entry is not a question, and the web has a form for it.' },
+  matchSalarySet: { on: WA_ONLY, why: 'a setting. The web has the settings screen it writes to.' },
+  matchStudentLoanPlanSet: { on: WA_ONLY, why: 'a setting. The web has the settings screen it writes to.' },
+  matchUseOfHomeElection: { on: WA_ONLY, why: 'an election. The web has the elections screen it writes to.' },
+  matchGoalSet: { on: WA_ONLY, why: 'the goal is a WhatsApp feature end to end and has no web surface at all.' },
+  isGoalQuestion: { on: WA_ONLY, why: 'the goal is a WhatsApp feature end to end and has no web surface at all.' },
+  isGoalDone: { on: WA_ONLY, why: 'the goal is a WhatsApp feature end to end and has no web surface at all.' },
+  isWeeklySummaryRequest: { on: WA_ONLY, why: 'a request to be SENT something. The web shows it instead.' },
+  isSupportRequest: { on: WA_ONLY, why: 'the web has a support door on the page. A texter has only the text.' },
+  isPricing: {
+    on: WA_ONLY,
+    why: 'OPEN QUESTION rather than a settled decision. What Lekhio costs is a product truth and a '
+      + 'signed in man can ask it in the accountant box, where matchProductTruth does not carry '
+      + 'price. Recorded here so it is a decision somebody takes rather than a gap nobody sees.',
+  },
+};
+
+// Derived: the export list, off disk, and every dispatch site in every router.
+const waintentsSrc = read('lib/waintents.ts');
+const exportedNames = new Set();
+for (const m of waintentsSrc.matchAll(/^export\s+(?:async\s+)?function\s+([A-Za-z0-9_]+)/gm)) exportedNames.add(m[1]);
+for (const m of waintentsSrc.matchAll(/^export\s+const\s+([A-Za-z0-9_]+)/gm)) exportedNames.add(m[1]);
+ok('the export list was read off lib/waintents.ts, so the table below is derived', exportedNames.size > 30);
+
+const GATE_NAME = /^(is|match|looksLike)[A-Z]/;
+const EXCLUDED = new Set(['asksAmount', 'compoundAsk']);
+
+const dispatchedOn = new Map();
+for (const name of exportedNames) {
+  if (!GATE_NAME.test(name) || EXCLUDED.has(name)) continue;
+  const on = [];
+  for (const [router, code] of ROUTERS) {
+    if (new RegExp(`\\b${name}\\s*\\(`).test(code)) on.push(router);
+  }
+  if (on.length) dispatchedOn.set(name, on.sort());
+}
+ok('...and at least twenty predicates are dispatched by at least one router', dispatchedOn.size >= 20);
+
+// Direction one: nothing is dispatched that nobody has classified.
+const unclassified = [...dispatchedOn.keys()].filter((n) => !SCOPE[n]).sort();
+ok(`🔴 EVERY DISPATCHED PREDICATE IS CLASSIFIED${unclassified.length ? `, MISSING: ${unclassified.join(', ')}` : ''}`,
+  unclassified.length === 0);
+
+// Direction two: nothing is classified that no router dispatches any more.
+const rotted = Object.keys(SCOPE).filter((n) => !dispatchedOn.has(n)).sort();
+ok(`🔴 AND NO ROW HAS ROTTED${rotted.length ? `, DEAD ROWS: ${rotted.join(', ')}` : ''}`,
+  rotted.length === 0);
+
+// Direction three: the routers a predicate is actually on are the routers the table says.
+for (const [name, on] of [...dispatchedOn.entries()].sort()) {
+  const want = SCOPE[name];
+  if (!want) continue;
+  eq(`  ${name}: dispatched by exactly the routers the table declares`, on, [...want.on].sort());
+  ok(`  ${name}: ...and an asymmetry carries a written reason`,
+    want.on.length === 3 || want.why.trim().length > 20);
+}
+
+// The tally, printed rather than asserted, so the remaining lane gap is visible in the run output of
+// the suite that owns it instead of only in a handover document.
+{
+  const short = [...dispatchedOn.entries()].filter(([, on]) => on.length < 3).map(([n, on]) => `${n} (${on.join('+')})`);
+  console.log(`\n  three routers: ${[...dispatchedOn.values()].filter((o) => o.length === 3).length}`
+    + `   short of three: ${short.length}`);
+  console.log(`  still short: ${short.sort().join(', ')}\n`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

@@ -53,14 +53,24 @@ import {
   // open question lanes. That is a check on the ROUTER'S ORDER, which is what Run 2 found, and it
   // needs the name as a string, not the function.
   //
-  // 🔴 isVatThresholdQuestion is a different thing and it is recorded rather than tidied away.
-  // lib/waintents.ts:1588 exports it, its own comment says it exists "so a surface can lead with
-  // the figure rather than the rules", and NOTHING IN EITHER REPO CALLS IT. Not the WhatsApp
-  // router, not the thread router, not the phone. It is asserted by no test. So the behaviour its
-  // comment describes does not exist: a man near the line who asks WhatsApp about the threshold
-  // gets the same rules first answer as anybody else. That is a question for the Run 7 matrix under
-  // WhatsApp crossed with VAT near the line, NOT a deletion to make a linter quiet, because the
-  // right answer may well be to start calling it.
+  // 🟢 isVatThresholdQuestion WAS DELETED ON 17 AUGUST 2026, B16. The note that stood here for a day
+  // is kept, struck through, because the reason it was wrong is more useful than the note was.
+  //
+  // It said: "NOTHING IN EITHER REPO CALLS IT... So the behaviour its comment describes does not
+  // exist: a man near the line who asks WhatsApp about the threshold gets the same rules first
+  // answer as anybody else... NOT a deletion to make a linter quiet, because the right answer may
+  // well be to start calling it."
+  //
+  // The first half was true and the second half was not, and it was checkable in one file.
+  // handleVatQuestion opens with `[standingSentence(standing, formatGbp)]` and pushes the two
+  // statutory tests AFTER it, and standingSentence carries his own rolling twelve month figure. THE
+  // FIGURE ALREADY LEADS, for every VAT question, unconditionally. There was no rules first answer
+  // to rescue anybody from and no second behaviour to select, so there was nothing to start calling
+  // it for. lib/waintents.ts carries the full argument where the function used to be.
+  //
+  // ⚠️ AND THE LESSON IS R5's, WHICH THIS IS THE SECOND PAYMENT ON IN TWO DAYS: a claim written in
+  // prose and checked by nothing drifts, and the safe sounding "record it rather than tidy it away"
+  // recorded a false premise for the next reader to inherit. The behaviour is now asserted below.
   matchEditLast, isAboutSomeoneElse,
   matchInvoiceDraft, invoiceDraftAnswer, detectScript, languageApology,
   looksLikeMoneyEntry, isGreeting, isNonWords, isVent, normaliseBritishTime,
@@ -183,6 +193,29 @@ console.log('F14: every door calls the one function');
   ok('the VAT lane sits ABOVE the totals lane', before(chain, 'isVatQuestion(text)', 'matchTotalsQuestion(text)'));
   ok('the VAT lane sits ABOVE the open question lane', before(chain, 'isVatQuestion(text)', 'isQuestion(text)'));
   ok('a failed read refuses to guess', /not going to answer a VAT question with a/.test(read('app/api/whatsapp/route.ts')));
+  // 🔴 THE FIGURE LEADS, AND THE STATUTORY TESTS FOLLOW IT. B16, 17 August 2026.
+  //
+  // This is the promise a deleted predicate used to stand next to without holding: a man near the
+  // line gets WHERE HE STANDS first and the rules after, never the other way round. Derived from the
+  // route rather than typed: the standing sentence must be the FIRST element of the parts array, and
+  // both statutory tests must be pushed after it. Held by index, so reversing them turns this red.
+  {
+    // ⚠️ COMMENTS STRIPPED FIRST, in the safe form. The block above this one quotes the old
+    // predicate's comment, which names the standing sentence, and the naive /\/\/[^\n]*/ shape
+    // truncates every https:// URL in the file it is handed. Three suites have learned that.
+    const codeOnly = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    const src = codeOnly(read('app/api/whatsapp/route.ts'));
+    const leadAt = src.indexOf('const parts: string[] = [standingSentence(');
+    const backAt = src.indexOf('parts.push(BACKWARD_TEST)');
+    const fwdAt = src.indexOf('parts.push(FORWARD_TEST)');
+    ok('🔴 the VAT answer OPENS with his standing figure, not with the rules',
+      leadAt !== -1);
+    ok('🔴 ...and both statutory tests come AFTER it, so he is never handed rules first',
+      leadAt !== -1 && backAt > leadAt && fwdAt > leadAt);
+    ok('⚠️ and the standing sentence is the one in lib/vatstanding.ts, carrying his own twelve month figure',
+      /export function standingSentence/.test(read('lib/vatstanding.ts'))
+      && /rolling12m/.test(read('lib/vatstanding.ts')));
+  }
   ok('the gov.uk source travels with the answer', /gov\.uk\/vat-registration\/when-to-register/.test(read('app/api/whatsapp/route.ts')));
 
   const page = codeOnly(read('app/app/tax/vat/page.tsx'));

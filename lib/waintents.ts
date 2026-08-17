@@ -1615,12 +1615,35 @@ export function isVatQuestion(body: string): boolean {
   return true;
 }
 
-// The threshold question specifically, so a surface can lead with the figure rather than the rules.
-// Anything else VAT shaped still gets the VAT answer, just rules first.
-export function isVatThresholdQuestion(body: string): boolean {
-  if (!isVatQuestion(body)) return false;
-  return /\b(threshold|register|registered|registration|90|ninety|limit|line|close|near|over|go over|cross)\b/i.test(body);
-}
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 isVatThresholdQuestion WAS DELETED HERE ON 17 August 2026, B16, AND THE ARGUMENT IS THE POINT.
+//
+// It existed, exported, called by nothing in either repo and asserted by no test, and its own
+// comment said it was there "so a surface can lead with the figure rather than the rules. Anything
+// else VAT shaped still gets the VAT answer, just rules first."
+//
+// Run 7 looked at it on 16 August, declined to delete it, and wrote down why: "a man near the line
+// who asks WhatsApp about the threshold gets the same rules first answer as anybody else... the
+// right answer may well be to start calling it." That caution was correct in spirit and its premise
+// was false, which is why this is a deletion and not a wiring.
+//
+// 🔴 THE FIGURE ALREADY LEADS, FOR EVERY VAT QUESTION, UNCONDITIONALLY. handleVatQuestion in
+// app/api/whatsapp/route.ts opens with `const parts = [standingSentence(standing, formatGbp)]` and
+// pushes BACKWARD_TEST and FORWARD_TEST after it. standingSentence carries his own rolling twelve
+// month figure. So there is no rules first answer for this predicate to rescue anybody from, there
+// is no second behaviour for it to select, and no surface has ever wanted one.
+//
+// A predicate whose comment describes a behaviour the product already has everywhere is not a
+// capability being held in reserve. It is a claim. Doc 103's honesty test is written about buttons
+// and it reads the same about exports: a thing whose only function is to describe a feature is an
+// advert for the feature, not the feature.
+//
+// ⚠️ SO THE BEHAVIOUR IT DESCRIBED IS NOW ASSERTED INSTEAD OF IMPLIED. test/run2fixes.test.mjs holds
+// that the VAT answer leads with his figure and puts the statutory tests after it. That was a
+// customer visible promise held by nothing at all while a dead function stood next to it looking
+// like the thing that held it. If a surface ever genuinely needs to branch on the threshold, write
+// it then, against a caller.
+// ═══════════════════════════════════════════════════════════════════════════════════════════
 
 // --- Somebody else's money ----------------------------------------------------------------
 //

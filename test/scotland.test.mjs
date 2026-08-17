@@ -317,7 +317,6 @@ if (!existsSync(MOBILE)) {
     'soleTraderTax', 'planLtd', 'businessTaxOnProfit', 'businessTaxSaved', 'setAsideAfterCis',
     'incomeTaxOnProfit', 'salaryIncomeTax', 'dividendTax', 'corporationTax', 'class4NIC',
   ]);
-  const mobileFiles = walk(path.join(MOBILE, 'app')).map((r) => r.replace(/^.*?tradebook-app\//, ''));
   const mWalk = [];
   (function collect(dir) {
     let entries; try { entries = readdirSync(dir); } catch { return; }

@@ -25,7 +25,15 @@ const PROD_ALLOWED = [
 ];
 
 function corsHeaders(origin: string | null): Record<string, string> {
-  const isLocalhost = !!origin && /^http:\/\/localhost:\d+$/.test(origin);
+  // 🔴 GATED ON THE ENVIRONMENT SINCE 17 AUGUST 2026, RUN 7. The comment above has said "in
+  // development any localhost port is allowed" since the day this was written, and there was no
+  // check, so production reflected http://localhost:<any port> into Access-Control-Allow-Origin
+  // too. Nothing authenticated leaked, because Access-Control-Allow-Credentials is set nowhere in
+  // either repo and these routes carry a Bearer token rather than a cookie. But a comment that
+  // describes a control the code does not have is worse than no comment, because the next reader
+  // stops looking. test/run7fixes.test.mjs holds the shape.
+  const isLocalhost = process.env.NODE_ENV !== 'production'
+    && !!origin && /^http:\/\/localhost:\d+$/.test(origin);
   const allow = origin && (PROD_ALLOWED.includes(origin) || isLocalhost) ? origin : PROD_ALLOWED[0];
   return {
     'Access-Control-Allow-Origin': allow,

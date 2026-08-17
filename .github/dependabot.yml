@@ -1,0 +1,25 @@
+# Nothing in either repo has ever told anybody that a dependency has a published advisory.
+# Both CI files are thorough about correctness and were silent about supply chain, and the hand
+# written `overrides` block pinning postcss and sharp is the evidence that this has already had to
+# be done by hand at least once. Added 17 August 2026, Run 7.
+#
+# Weekly, not daily. At six production dependencies on the web and eighteen on the phone there is no
+# false positive burden to fear, but a pull request every morning is a thing people learn to ignore,
+# and an ignored alert is the same as no alert.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # One pull request for the routine bumps, so the security ones stand out on their own.
+      routine:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

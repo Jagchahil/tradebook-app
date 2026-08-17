@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Check out the website
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: tradebook
 
@@ -48,19 +48,36 @@ jobs:
       # Jagchahil/tradebook-mobile.
       # ---------------------------------------------------------------------------------------
       - name: Check out the mobile app, as a sibling, for the parity suites
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: Jagchahil/tradebook-mobile
           path: tradebook-app
           token: ${{ secrets.MOBILE_REPO_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: tradebook/package-lock.json
 
       - run: npm ci
+
+      # 🔴 SUPPLY CHAIN. Added 17 August 2026, Run 7, because nothing in either repo had ever
+
+      # reported a published advisory and nothing ever would have.
+
+      #
+
+      # --omit=dev on purpose: a advisory in a build time package is worth a Dependabot pull
+
+      # request, not a red main. What blocks is a HIGH or CRITICAL in something we actually ship
+
+      # to a man's browser or phone. This is a product holding UK financial data.
+
+      - name: No high or critical advisory in anything we ship
+
+        run: npm audit --omit=dev --audit-level=high
+
 
       - name: Typecheck
         run: npx tsc --noEmit

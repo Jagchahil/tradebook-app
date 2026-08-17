@@ -52,6 +52,31 @@ function esc(s: string | null | undefined): string {
     .replace(/'/g, '&#39;');
 }
 
+// 🔴 A NAME IS NOT A HEADER. Run 7, 17 August 2026.
+//
+// The trader types his business name and we put it in the From display name and the Subject of a
+// message we send to HIS CUSTOMER. esc() is ten lines away and is applied correctly to the same
+// value inside the HTML body, and neither of these two places had anything at all.
+//
+// This is NOT classic CRLF header injection: both go to Resend as JSON fields, so a newline cannot
+// smuggle a header. The real shapes are smaller and still ours to refuse. A name containing < or >
+// produces a malformed From, and a name shaped like "Someone <spoof@example.com>" reads to a human
+// as a second address. Angle brackets and quotes are the syntax of an address, so they come out;
+// newlines and control characters come out because they belong to no name; and the result is capped
+// because a header is not a paragraph.
+//
+// It strips rather than escapes, on purpose. There is no one escaping scheme that is correct in
+// both a display name and a subject line, and a tradesman's real business name does not contain
+// these characters.
+function headerName(value: string): string {
+  return value
+    .replace(/[<>"'\\]/g, '')
+    .replace(/[\r\n\t\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 78);
+}
+
 function fromAddr(): string {
   return FROM.replace(/.*</, '').replace(/>.*/, '');
 }
@@ -479,7 +504,7 @@ export interface InvoiceEmail {
 export async function sendInvoiceEmail(opts: InvoiceEmail): Promise<boolean> {
   // The mark is the invoice number, plus the trader's name when there is one, so the customer's
   // inbox holds one thread per invoice and not one thread per tradesman.
-  const mark = `${opts.number}${opts.businessName ? ` from ${opts.businessName}` : ''}`;
+  const mark = `${opts.number}${opts.businessName ? ` from ${headerName(opts.businessName)}` : ''}`;
   const total = poundsFromNumber(opts.total);
   const link = safeUrl(opts.link);
   const senderName = opts.businessName ? esc(opts.businessName) : 'the sender';
@@ -508,7 +533,8 @@ export async function sendInvoiceEmail(opts: InvoiceEmail): Promise<boolean> {
     ${button(link, 'View and pay the invoice')}
     ${pMuted(`Or open this link: <a href="${link}" style="color:${RIVER}">${esc(link)}</a>`)}`;
   // Invoices are branded as the trader "via Lekhio" so the customer recognises who it is from.
-  const from = opts.businessName ? `${opts.businessName} via Lekhio <${fromAddr()}>` : `Lekhio <${fromAddr()}>`;
+  const cleanName = opts.businessName ? headerName(opts.businessName) : '';
+  const from = cleanName ? `${cleanName} via Lekhio <${fromAddr()}>` : `Lekhio <${fromAddr()}>`;
   return send({ from, to: opts.to, subject: { repeats: 'invoice', mark }, html: shell(inner, { preheader: `Invoice ${opts.number} for ${total}` }), tag: 'invoice' });
 }
 

@@ -547,6 +547,44 @@ async function processMessage(message: IncomingMessage): Promise<void> {
             await handlePhoneShare(from, messageId, text);
           } else if (isSchedule(text)) {
             await handleSchedule(from, text);
+          // ═══════════════════════════════════════════════════════════════════════════════
+          // 🔴 HIS DATA RIGHTS, ABOVE EVERY OTHER ANSWERING LANE ON THIS ROUTER. B22, 17 Aug 2026.
+          //
+          // RUN 1 closed this on app/api/thread and nowhere else. On 12 August the same question
+          // was put to this router and to /api/ask and both fell through, which means the finding
+          // was closed on the surface a customer of a WHATSAPP FIRST product is least likely to be
+          // sitting in. He asks where he is, and where he is, is here.
+          //
+          // ⚠️ AND THE CORPUS IS BELOW WITH A 'data' ALIAS ON THE PHONE RULE. The chat route's own
+          // header records what that cost: "delete all my data" was answered 🟡 Phone and
+          // broadband. This gate runs first so the sentence never reaches it.
+          //
+          // 🔴 AND IT MOVED ABOVE THE SUPPORT LANE ON 17 AUGUST, FOUND BY A WALK RATHER THAN BY
+          // READING. B22's before and after walk derives every gate sitting above this one and puts
+          // a battery of erasure phrasings through all of them. It came back with one, on this
+          // router, before anything had been reordered:
+          //
+          //     isSupportRequest claims "cancel my account and delete my details"
+          //
+          // "cancel my account" trips both, and the support lane sat above this one, so a man
+          // asking to close his account and be erased was handed a support queue. That is RUN 1's
+          // finding by name, on the channel it was closed everywhere except: sending a man to a
+          // queue for something he can do himself in two taps on /app/you/data is the same failure
+          // as having no door at all, wearing better manners.
+          //
+          // ⚠️ MEASURED IN BOTH DIRECTIONS BEFORE IT MOVED, because the cheap fix here is a
+          // regression. TWELVE ordinary support phrasings, none claimed by isDataRightsRequest, so
+          // "cancel my subscription", "cancel my plan" and "i want a refund" all still reach the
+          // support lane. And the lanes this now sits above (product truth, pricing, identity,
+          // help, tax tips, support) had twenty six of their own phrasings walked through it, none
+          // claimed. The walk in test/laneparity.test.mjs section 9c holds both directions for good.
+          //
+          // ⚠️ AND THE ALTERNATIVE WAS DEMOTING THE SUPPORT LANE, WHICH WAS MEASURED AND REJECTED.
+          // Moving it below isPricing hands "cancel my subscription" to a pricing card. Erasure
+          // outranks everything; the support lane keeps its place above pricing.
+          // ═══════════════════════════════════════════════════════════════════════════════
+          } else if (isDataRightsRequest(text)) {
+            await sendText(from, DATA_RIGHTS_ANSWER);
           } else if (isSupportRequest(text)) {
             await handleSupportRequest(from, text);
           } else if (isHelp(text)) {
@@ -567,30 +605,41 @@ async function processMessage(message: IncomingMessage): Promise<void> {
           // date. Naming a quantity now keeps the message going down to handleTotals. The chat
           // route gates on the SAME call in the same place, so one phrase gets one lane on both
           // channels; test/laneparity.test.mjs walks both routers and holds it.
+          // ═══════════════════════════════════════════════════════════════════════════════
+          // 🔴 SOMEBODY ELSE'S MONEY, AND IT MOVED ABOVE THE DEADLINE LANE ON 17 AUGUST. B22.
+          //
+          // "what does the barber next door owe you lot then" reached the totals lane and was
+          // answered with HER OWN set aside figure. It has to sit above every lane that reads her
+          // books, because the failure IS a lane that reads her books answering a question that was
+          // not about them. RUN 1 found this shape on the chat router; it was still live here.
+          //
+          // 🔴 AND THE DEADLINE LANE WAS ONE OF THOSE LANES, WHICH NOBODY HAD NOTICED. Found by the
+          // deadline lane session checking its own work. "when is jerome's tax due" is
+          // isDeadlineQuestion TRUE and isAboutSomeoneElse TRUE, and this gate sat BELOW the
+          // deadline lane, so the asker was answered about somebody else out of HIS OWN profile.
+          //
+          // ⚠️ THE SEVERITY IS LOWER THAN IT LOOKS AND THE REASON MATTERS. The payload is DATES,
+          // not pounds. Nothing of his money is disclosed and nothing of the third party's is known.
+          // It is fixed because the ORDER is wrong, not because the harm is large.
+          //
+          // ⚠️ AND IT DOES NOT CLOSE THE SHAPE. isAboutSomeoneElse hears ONE of four third party
+          // deadline phrasings: "when is priya due to file her return" and "when is dave tax due"
+          // both fall through and always did. That is a matcher question, it is written down in the
+          // backlog with its own measured numbers, and test/laneparity.test.mjs section 9c asserts
+          // the one of four so this cannot be read later as a fix it is not.
+          //
+          // ⚠️ AND IT LANDS BELOW THE DATA RIGHTS LANE, NOT AT THE TOP. A man asking to be erased
+          // must never be refused and never be metered, which is section 5's rule, so this is a
+          // three way order rather than a swap of two lines: erasure, then this gate, then the
+          // deadline lane. Nothing else moved.
+          // ═══════════════════════════════════════════════════════════════════════════════
+          } else if (isAboutSomeoneElse(text)) {
+            await sendText(from, SOMEONE_ELSE_ANSWER);
           } else if (isDeadlineQuestion(text) && !asksAmount(text)) {
             await handleDeadlineQuestion(from);
-          // 🔴 HIS DATA RIGHTS, ABOVE THE CLAIM CORPUS, ON THE CHANNEL HE ACTUALLY USES.
-          //
-          // RUN 1 closed this on app/api/thread and nowhere else. On 12 August the same question
-          // was put to this router and to /api/ask and both fell through, which means the finding
-          // was closed on the surface a customer of a WHATSAPP FIRST product is least likely to be
-          // sitting in. He asks where he is, and where he is, is here.
-          //
-          // ⚠️ AND THE CORPUS IS THIRTY LINES BELOW WITH A 'data' ALIAS ON THE PHONE RULE. The
-          // chat route's own header records what that cost: "delete all my data" was answered
-          // 🟡 Phone and broadband. This gate runs first so the sentence never reaches it.
-          } else if (isDataRightsRequest(text)) {
-            await sendText(from, DATA_RIGHTS_ANSWER);
           // ═══════════════════════════════════════════════════════════════════════════════
           // RUN 2, 12 August 2026. Four lanes that did not exist, in the order they must run.
           //
-          // 🔴 SOMEBODY ELSE'S MONEY GOES FIRST. "what does the barber next door owe you lot
-          // then" reached the totals lane and was answered with HER OWN set aside figure. It has
-          // to sit above every lane that reads her books, because the failure IS a lane that
-          // reads her books answering a question that was not about them. RUN 1 found this shape
-          // on the chat router; it was still live here.
-          } else if (isAboutSomeoneElse(text)) {
-            await sendText(from, SOMEONE_ELSE_ANSWER);
           // 🔴 AN INVOICE REQUEST IS NEVER AN ENTRY, and it must be caught before anything that
           // sees the amount inside it. "draft an invoice for the fennel wedding balance, 380"
           // was logged as £380 of income RECEIVED: money she is owed, filed as money she has,

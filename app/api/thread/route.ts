@@ -188,6 +188,46 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
   const truth = matchProductTruth(q);
   if (truth) return productTruthAnswer(truth, { filingLive: hmrcFilingLive() });
 
+  // 0a. 🔴 HIS DATA RIGHTS, ABOVE EVERY LANE THAT READS HIS BOOKS AND ABOVE THE MODEL. See
+  // lib/waintents.ts, isDataRightsRequest, for the two findings that put it here. Deterministic on
+  // purpose: the answer to "delete everything you hold on me" does not get to be probabilistic, and
+  // it must not cost an AI call either, because a man at his spend cap still has the right to leave.
+  //
+  // 🔴 IT MOVED UP HERE ON 17 AUGUST 2026, B22, AND THE MOVE IS ONE RULE ON THREE ROUTERS. It used
+  // to sit BELOW the third party gate on this router, which is the wrong way round: an erasure that
+  // happened to name somebody would have been refused rather than answered, and the day either
+  // matcher is widened that stops being hypothetical. Erasure, then the gate, then the deadline
+  // lane, on all three, and test/laneparity.test.mjs section 9c holds it by index AND by a derived
+  // walk of every gate above this one.
+  if (isDataRightsRequest(q)) return DATA_RIGHTS_ANSWER;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 0b. 🔴 SOMEBODY ELSE'S MONEY, AND THIS ROUTER HAD NO GATE AT ALL. Run 3, 13 August 2026.
+  //
+  // Run 1 found this shape ON THE CHAT ROUTER: "what does the barber next door owe you lot then",
+  // answered with HER OWN set aside figure. Run 2 built isAboutSomeoneElse and wired it into the
+  // WhatsApp webhook. Nothing ever wired it here, so the router the finding came from was the one
+  // channel with no gate. Marcus Whitfield asked this chat "how much has jerome made this year"
+  // about his business partner and was handed the whole firm's turnover under Jerome's name with an
+  // invented expenses figure attached.
+  //
+  // 🔴 AND IT MOVED ABOVE THE DEADLINE LANE ON 17 AUGUST 2026. B22. "when is jerome's tax due" is
+  // isDeadlineQuestion TRUE and isAboutSomeoneElse TRUE, and the deadline lane ran first, so the
+  // asker was answered about somebody else out of HIS OWN profile. The payload is DATES rather than
+  // pounds, so this is a non sequitur with a name on it and not a breach, and it is fixed because
+  // the order is wrong. It does NOT close the shape: the gate hears one of four third party
+  // deadline phrasings and section 9c asserts the one of four so nobody can read it as more.
+  //
+  // ⚠️ ABOVE EVERY LANE THAT READS HIS BOOKS, for the reason the webhook gives: the failure IS a
+  // lane that reads his books answering a question that was not about them. And BELOW the erasure
+  // lane above, because a man asking to leave must never be refused.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // ⚠️ NO SELF NAMES PASSED, AND THAT IS THE CHEAP SAFE CHOICE. Reading users.person_name here
+  // would add a database round trip to every chat message to remove a false positive that costs
+  // one re-ask ("how much has marcus made", asked by Marcus). selfNameTokens() is exported and
+  // ready for a caller that already holds the name; nothing should fetch it just for this.
+  if (isAboutSomeoneElse(q)) return SOMEONE_ELSE_ANSWER;
+
   // 1. Tax deadline questions: computed, no AI.
   //
   // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -254,12 +294,6 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
   // ⚠️ ABOVE EVERY LANE THAT READS HIS BOOKS, for the reason the webhook gives: the failure IS a
   // lane that reads his books answering a question that was not about them.
   // ═══════════════════════════════════════════════════════════════════════════════════════
-  // ⚠️ NO SELF NAMES PASSED, AND THAT IS THE CHEAP SAFE CHOICE. Reading users.person_name here
-  // would add a database round trip to every chat message to remove a false positive that costs
-  // one re-ask ("how much has marcus made", asked by Marcus). selfNameTokens() is exported and
-  // ready for a caller that already holds the name; nothing should fetch it just for this.
-  if (isAboutSomeoneElse(q)) return SOMEONE_ELSE_ANSWER;
-
   // ═══════════════════════════════════════════════════════════════════════════════════════
   // 🔴 VAT, WHICH THIS ROUTER ANSWERED OUT OF THE MODEL. B18, 17 August 2026.
   //
@@ -317,12 +351,6 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
   // 2. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
   const totals = matchTotalsQuestion(q);
   if (totals) return totalsAnswer(userId, totals);
-
-  // 🔴 HIS DATA RIGHTS, ABOVE THE CLAIM CORPUS AND ABOVE THE MODEL. See lib/waintents.ts,
-  // isDataRightsRequest, for the two findings that put it here. Deterministic on purpose: the
-  // answer to "delete everything you hold on me" does not get to be probabilistic, and it must not
-  // cost an AI call either, because a man at his spend cap still has the right to leave.
-  if (isDataRightsRequest(q)) return DATA_RIGHTS_ANSWER;
 
 
   // 🔴 THE VAN QUESTION, ABOVE THE CLAIM CORPUS, BECAUSE THE CORPUS ANSWERED IT WITH A CARD.

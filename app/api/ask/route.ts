@@ -130,6 +130,14 @@ export async function POST(req: NextRequest) {
   // much has marcus made", asked by Marcus). selfNameTokens() is exported and ready for a caller
   // that already holds the name. Nothing should fetch it just for this.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND THE ERASURE LANE RUNS ABOVE IT, WHICH MOVED ON 17 AUGUST 2026. B22. It used to sit
+  // below this gate, and that is the wrong way round for the reason test/laneparity.test.mjs
+  // section 5 gives: a man asking to be erased must never be refused and never be metered, and an
+  // erasure that happens to name somebody would have been refused. One rule on three routers:
+  // erasure, then this gate, then the deadline lane. This route was already the right way round on
+  // the second half of that and is now the right way round on both.
+  if (!truth && isDataRightsRequest(question)) truth = DATA_RIGHTS_ANSWER;
+
   if (!truth && isAboutSomeoneElse(question)) truth = SOMEONE_ELSE_ANSWER;
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -205,7 +213,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  if (!truth && isDataRightsRequest(question)) truth = DATA_RIGHTS_ANSWER;
   if (!truth && isVehicleQuestion(question)) {
     const o = await getOptimiserInput(userId).catch(() => null);
     truth = vehicleAnswer({

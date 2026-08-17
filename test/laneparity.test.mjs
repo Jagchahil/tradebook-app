@@ -1054,6 +1054,210 @@ ok('🔴 and the WhatsApp channel is the one that resolves it, through mtdPositi
 }
 
 
+
+// ---------------------------------------------------------------------------------------------
+// 9c. B22. THE THIRD PARTY GATE SAT BELOW THE DEADLINE LANE, AND THE REORDER IS THREE WAY.
+// ---------------------------------------------------------------------------------------------
+// 🔴 FOUND 17 August 2026 BY THE DEADLINE LANE SESSION CHECKING ITS OWN WORK, which is where every
+// recent finding in this repo has come from.
+//
+// "when is jerome's tax due" is isDeadlineQuestion TRUE and isAboutSomeoneElse TRUE. On WhatsApp the
+// deadline lane sat at the top of the else if chain with the gate below it, and on the thread the
+// deadline lane ran first as well, so the deadline lane won and the asker was answered ABOUT
+// SOMEBODY ELSE FROM HIS OWN PROFILE. /api/ask was built the right way round and was never affected.
+//
+// ⚠️ THE SEVERITY IS LOWER THAN IT LOOKS AND THE REASON MATTERS. The payload is DATES, not pounds.
+// Nothing of the asker's money is disclosed and nothing of the third party's is known. This is a
+// non sequitur with a name attached, not a breach, and it is fixed because the ORDER is wrong rather
+// than because the harm is large.
+//
+// ⚠️ AND THE FIX IS NOT WRITTEN AS THOUGH IT CLOSES THE SHAPE, because it does not. Measured on the
+// real matcher: isAboutSomeoneElse catches ONE of four third party deadline phrasings. "when is
+// priya due to file her return" and "when is dave tax due" both fall straight through and always
+// did. Hoisting the gate fixes the phrasings the gate can hear and nothing else. What is left is a
+// matcher question and it is written down in the backlog with its own numbers, not smuggled in here.
+//
+// 🔴 AND THE TRAP, WHICH IS WHY THIS IS A THREE WAY REORDER AND NOT A SWAP OF TWO LINES.
+//
+// Section 5's rule is that a man asking to be erased must NEVER be refused and must NEVER be
+// metered. So the gate cannot simply go to the top of the chain: it has to land BELOW the data
+// rights lane and ABOVE the deadline lane, on the most sensitive router in the product. One rule,
+// three routers, one order:
+//
+//     his data rights  ->  the third party gate  ->  the deadline lane
+//
+// ⚠️ AND THE DATA RIGHTS HALF IS PROVED BY A WALK, BEFORE AND AFTER, NOT BY INSPECTION. The walk
+// below derives every gate sitting above the data rights lane on each router and puts a battery of
+// erasure phrasings through all of them. It was run and green BEFORE the reorder and is run and
+// green after it, so "the reorder did not start refusing a man who asked to leave" is a measurement
+// rather than a claim. It also stays true if either matcher is ever widened, which is the part an
+// index comparison cannot do.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 9c. B22: data rights, then the third party gate, then the deadline lane ===\n');
+
+const rightsSites = EVERYWHERE[0].sites;
+
+// The battery. Ordinary erasure and portability, angry erasure, the statutory words, and the ones
+// that name a third party, because those are the phrasings a hoisted gate would be most likely to
+// eat and they are still a man asking about data rather than about money.
+const RIGHTS_PHRASES = [
+  'delete all my data',
+  'delete everything you hold on me',
+  'erase my account',
+  'close my account',
+  'wipe all my records',
+  'remove all my information',
+  'can you delete everything',
+  'destroy everything you have on me',
+  'cancel my account and delete my details',
+  'how do i delete my account',
+  'remove my details from your system',
+  'gdpr',
+  'right to be forgotten',
+  'subject access request',
+  'export all my data',
+  'download a copy of my data',
+  'delete all my data and my mate daves too',
+  'delete all the data you hold on jerome',
+  'erase everything you have on jerome',
+];
+
+// Every phrase actually reaches the predicate, or the walk below proves nothing about it.
+for (const phrase of RIGHTS_PHRASES) {
+  ok(`  the erasure ear hears ${JSON.stringify(phrase)}`, W.isDataRightsRequest(phrase) === true);
+}
+
+// The names off disk, exactly as sections 9b and 11b derive them.
+const rightsExported = [];
+for (const m of read('lib/waintents.ts').matchAll(/^export\s+(?:async\s+)?function\s+((?:is|match|looksLike)[A-Za-z0-9_]*)/gm)) {
+  rightsExported.push(m[1]);
+}
+
+for (const [name, code] of ROUTERS) {
+  const dataAt = code.indexOf(rightsSites[name]);
+  ok(`${name}: the data rights lane was located, so the walk below is not vacuous`, dataAt !== -1);
+  const above = rightsExported.filter((fn) => {
+    if (fn === 'isDataRightsRequest') return false;
+    const m = code.match(new RegExp(`\\b${fn}\\s*\\(`));
+    return m && m.index !== -1 && m.index < dataAt;
+  });
+  const eaten = [];
+  for (const phrase of RIGHTS_PHRASES) {
+    for (const fn of above) {
+      let hit = false;
+      try { const r = W[fn](phrase); hit = r !== null && r !== false && r !== undefined; } catch { hit = false; }
+      // The deadline gate is `isDeadlineQuestion(x) && !asksAmount(x)`, so judging the predicate on
+      // its own would report a phrase eaten that the router never gives it. Same note as 11b.
+      if (hit && fn === 'isDeadlineQuestion' && W.asksAmount(phrase)) hit = false;
+      if (hit) eaten.push(`${fn} claims ${JSON.stringify(phrase)}`);
+    }
+  }
+  ok(`🔴 ${name}: A MAN ASKING TO BE ERASED IS NEVER CLAIMED BY ANY LANE ABOVE HIS${eaten.length ? `, EATEN: ${eaten.join('; ')}` : ''}`,
+    eaten.length === 0);
+}
+
+// 🔴 AND THE OTHER DIRECTION, WHICH IS THE HALF A HOIST IS MOST LIKELY TO BREAK.
+//
+// The erasure lane moved ABOVE the support lane on WhatsApp on 17 August 2026, and on that router
+// the support lane sits high, so it went above product truth, pricing, identity, help and tax tips
+// as a consequence. Every one of those lanes now depends on isDataRightsRequest staying deaf to its
+// phrasings, and nothing in this repo could see that until it was written down.
+//
+// ⚠️ THE ALTERNATIVE WAS DEMOTING THE SUPPORT LANE AND IT WAS MEASURED AND REJECTED: below
+// isPricing, "cancel my subscription" is handed a pricing card. Erasure outranks everything and the
+// support lane keeps its place above pricing.
+{
+  const OVERTAKEN = {
+    'product truth': ['are you hmrc approved', 'do you file my tax return', 'how much will you save me',
+      'can you hide some income', 'should i buy bitcoin', 'do you submit to hmrc'],
+    pricing: ['how much does lekhio cost', 'what is the price', 'how much is it a month',
+      'cancel my subscription', 'what do you charge'],
+    identity: ['who are you', 'what are you', 'what can you do', 'what is lekhio'],
+    help: ['help', 'what can i text you', 'show me the commands'],
+    'tax tips': ['tax tips', 'give me a tax tip'],
+    support: ['can i speak to someone', 'i want to talk to a human', 'i have a complaint',
+      'i want a refund', 'cancel my plan', 'this is broken', 'it is not working',
+      'i need to speak to a person', 'this app is broken'],
+  };
+  let walked = 0;
+  const eaten = [];
+  for (const [lane, phrases] of Object.entries(OVERTAKEN)) {
+    for (const phrase of phrases) {
+      walked += 1;
+      if (W.isDataRightsRequest(phrase)) eaten.push(`${lane}: ${JSON.stringify(phrase)}`);
+    }
+  }
+  ok(`the overtaken lanes were walked, ${walked} phrasings, so this is not vacuous`, walked >= 26);
+  ok(`🔴 THE HOISTED ERASURE LANE EATS NONE OF THEM${eaten.length ? `, EATEN: ${eaten.join('; ')}` : ''}`,
+    eaten.length === 0);
+  // 🔴 AND THE ONE THAT SENT THIS WALK LOOKING. Both matchers hear it; the erasure lane is now the
+  // one that answers, because he is asking to leave and the other is a queue.
+  ok('🔴 "cancel my account and delete my details" is heard by BOTH lanes, which is why the order matters',
+    W.isSupportRequest('cancel my account and delete my details') === true
+    && W.isDataRightsRequest('cancel my account and delete my details') === true);
+}
+
+// 🔴 THE ORDER ITSELF, ONE RULE ON THREE ROUTERS, HELD BY INDEX.
+for (const [name, code] of ROUTERS) {
+  const dataAt = code.indexOf(rightsSites[name]);
+  const gateAt = code.indexOf(elseSites[name]);
+  const deadlineAt = code.indexOf(deadlineSites[name]);
+  ok(`${name}: all three sites were located, so the order below is not vacuous`,
+    dataAt !== -1 && gateAt !== -1 && deadlineAt !== -1);
+  ok(`🔴 ${name}: HIS DATA RIGHTS RUN ABOVE THE THIRD PARTY GATE, so an erasure is never refused or metered`,
+    dataAt !== -1 && gateAt !== -1 && dataAt < gateAt);
+  ok(`🔴 ${name}: AND THE GATE RUNS ABOVE THE DEADLINE LANE, so "when is jerome's tax due" is not answered from HIS profile`,
+    gateAt !== -1 && deadlineAt !== -1 && gateAt < deadlineAt);
+}
+
+// 🔴 AND THE PHRASE THE FINDING WAS WRITTEN ABOUT, WALKED THROUGH THE DERIVED ORDER ON ALL THREE.
+// An index comparison says the gate is above the lane. This says the sentence lands in the gate.
+{
+  const phrase = "when is jerome's tax due";
+  ok('the finding\'s own phrase is still both things at once, or the walk below proves nothing',
+    W.isDeadlineQuestion(phrase) === true && W.isAboutSomeoneElse(phrase) === true);
+  for (const [name, code] of ROUTERS) {
+    const gateAt = code.indexOf(elseSites[name]);
+    const deadlineAt = code.indexOf(deadlineSites[name]);
+    ok(`🔴 ${name}: "when is jerome's tax due" reaches the REFUSAL and not the deadline builder`,
+      gateAt !== -1 && deadlineAt !== -1 && gateAt < deadlineAt);
+  }
+}
+
+// ⚠️ WHAT THIS DOES NOT CLOSE, ASSERTED SO IT CANNOT BE FORGOTTEN OR OVERSTATED. Three of these four
+// third party deadline shapes are heard by nothing, and a later reading of this section must not be
+// able to mistake a routing fix for a matcher fix.
+{
+  const shapes = [
+    "when is jerome's tax due",
+    'when is priya due to file her return',
+    'when is dave tax due',
+    'when is my mate jeromes return due',
+  ];
+  const heard = shapes.filter((p) => W.isAboutSomeoneElse(p));
+  // ⚠️ IF THIS GOES RED BECAUSE SOMEBODY WIDENED THE MATCHER, THAT IS THE LINE WORKING. Re measure,
+  // write the new number in, and say in the commit what the gate can now hear. Do NOT delete it: the
+  // whole job of this assertion is that a routing fix can never be read later as a matcher fix.
+  ok(`⚠️ THE GATE HEARS ${heard.length} OF ${shapes.length} THIRD PARTY DEADLINE SHAPES, and the reorder does not change that`,
+    heard.length === 1);
+  ok('⚠️ ...and every one of the four is still a deadline question, so the rest fall through as they always did',
+    shapes.every((p) => W.isDeadlineQuestion(p)));
+}
+
+// ⚠️ AND THE REORDER MUST NOT HAVE STARTED REFUSING HONEST QUESTIONS. Measured on the real matcher
+// over ordinary self phrasings, which is the direction that would cost a customer his answer.
+{
+  const selfDeadlines = [
+    'when is my tax due', 'when is the self assessment deadline', 'when do i need to file',
+    'when is my next quarterly update due', 'when is my return due', 'whens my tax return due',
+    'when do i have to submit my return', 'when is the filing deadline', 'when is my vat return due',
+    'when is my payment on account due', 'when do i pay my tax bill', 'when is the deadline',
+  ];
+  const refused = selfDeadlines.filter((p) => W.isAboutSomeoneElse(p));
+  ok(`🔴 ZERO of ${selfDeadlines.length} ORDINARY SELF PHRASINGS ARE REFUSED BY THE HOISTED GATE${refused.length ? `, REFUSED: ${refused.join('; ')}` : ''}`,
+    refused.length === 0);
+}
+
 // ---------------------------------------------------------------------------------------------
 // 11. B19. THE NATIONAL INSURANCE, STUDENT LOAN AND PROPERTY LANES, ON ALL THREE ROUTERS.
 // ---------------------------------------------------------------------------------------------

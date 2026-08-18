@@ -43,7 +43,7 @@ const stage = mkdtempSync(path.join(tmpdir(), 'persona-'));
 const fixImports = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
 for (const f of [
   'taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome',
-  'partnership', 'position', 'rakhamoves', 'waintents', 'agent',
+  'partnership', 'position', 'rakhamoves', 'waintents', 'scotland', 'agent',
 ]) {
   writeFileSync(path.join(stage, f + '.ts'), fixImports(read(`lib/${f}.ts`)));
 }

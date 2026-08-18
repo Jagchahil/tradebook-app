@@ -12,7 +12,7 @@ const stage = mkdtempSync(path.join(tmpdir(), 'agent-'));
 // agent.ts now composes the structure-aware spine (position.ts) and the money-moves engine
 // (rakhamoves.ts) too, so stage the whole chain and rewrite every relative import to .ts.
 const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'agent']) {
+for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'scotland', 'agent']) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);
@@ -648,6 +648,65 @@ eq('Q4 label', A.mtdQuarter(new Date('2027-02-01T00:00:00Z')).label, '2026-27Q4'
   const c2 = find(A.computeSignals(input(late, monthsFor(late, 12, { incomePerMonth: 4000, expensesPerMonth: 1000 }))), 'year_end_countdown');
   ok('countdown shrinks as the door closes', c2.numbers.weeksLeft < c.numbers.weeksLeft);
   ok('each week has its own period key', c2.periodKey !== c.periodKey);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// SCOTLAND. B30, 18 AUGUST 2026. THE BEHAVIOURAL HALF.
+//
+// test/scotland.test.mjs holds the DECISION (which signals, and a written reason for the ones that
+// stay clean) and reads source only, on purpose. This is the half that drives the engine and reads
+// what a customer would actually receive.
+//
+// 🔴 AND THE FIRST ASSERTION IS THE ONE MOST LIKELY TO BE "FIXED" BY MISTAKE. The caveat fires for
+// EVERY customer, in Carlisle and Cardiff exactly as in Coatbridge, and that is deliberate and
+// decided. lib/scotland.ts: "It must not claim we know where he lives. We do not ask him and we do
+// not detect it, and a sentence implying otherwise turns a caveat into a false statement about our
+// own product." The sentence is a fact about how Lekhio computes, not a guess about his address,
+// and it is true of every customer. Nothing on AgentInput carries a nation, which this proves.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+{
+  const t = new Date('2026-11-20T09:00:00Z');
+  const m = monthsFor(t, 8, { incomePerMonth: 6000, expensesPerMonth: 900 });
+  const sigs = A.computeSignals(input(t, m, {
+    selfAssessmentBill: 12000,
+    selfAssessmentPoa: { tax: 12000, deductedAtSource: 0 },
+  }));
+  const LINE = 'Income tax is worked out at the England, Wales and Northern Ireland rates, and Scottish rates are coming to Lekhio.';
+  const CLAUSE = LINE.slice(0, -1);
+
+  ok('the corpus fired at least one disclosed and one undisclosed signal (vacuity)',
+    sigs.some((x) => A.SCOTLAND_SIGNALS.has(x.signalKey))
+    && sigs.some((x) => !A.SCOTLAND_SIGNALS.has(x.signalKey)));
+
+  for (const sig of sigs) {
+    const should = A.SCOTLAND_SIGNALS.has(sig.signalKey);
+    ok(`${sig.signalKey}: the card ${should ? 'carries' : 'does not carry'} the Scotland sentence`,
+      sig.body.includes(LINE) === should);
+    ok(`${sig.signalKey}: the WhatsApp text ${should ? 'carries' : 'does not carry'} it`,
+      sig.waText.includes(CLAUSE) === should);
+  }
+
+  // 🔴 THE PUNCTUATION. The approved template interpolates "From your Lekhio agent: {{1}}." and
+  // supplies its own stop, so no waText in this engine may end in one. A body ending in a stop
+  // would read "coming to Lekhio.. You approve everything" on a paying customer's phone.
+  for (const sig of sigs) {
+    ok(`${sig.signalKey}: its WhatsApp text does not end in a full stop`, !/\.$/.test(sig.waText));
+  }
+
+  // And the card keeps the sentence whole, stop and all, because nothing is appended to it.
+  const disclosed = sigs.filter((x) => A.SCOTLAND_SIGNALS.has(x.signalKey));
+  ok('at least one disclosed signal in this corpus', disclosed.length > 0);
+  ok('every disclosed card ends with the sentence, whole',
+    disclosed.every((x) => x.body.endsWith(LINE)));
+  ok('and says it exactly once, never twice',
+    disclosed.every((x) => (x.body.match(/Scottish rates are coming to Lekhio/g) ?? []).length === 1));
+
+  // 🔴 NOTHING ON AgentInput SAYS WHERE HE LIVES, which is why the sentence cannot be conditional
+  // on it. Derived from the interface rather than remembered.
+  const agentSrc = readFileSync(path.join(lib, 'agent.ts'), 'utf8');
+  const iface = agentSrc.slice(agentSrc.indexOf('export interface AgentInput'), agentSrc.indexOf('export interface AgentSignal'));
+  ok('AgentInput carries no nation, region, country or postcode field',
+    iface.length > 500 && !/\b(nation|region|country|postcode|scotland|address)\s*[?:]/i.test(iface));
 }
 
 console.log(`agent: ${pass} passed, ${fail} failed`);

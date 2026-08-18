@@ -63,7 +63,7 @@ const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9._-]+)'/g, "from '$1.ts'");
 const stage = mkdtempSync(path.join(tmpdir(), 'f23-'));
 for (const f of [
   'taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome',
-  'partnership', 'position', 'rakhamoves', 'waintents', 'agent',
+  'partnership', 'position', 'rakhamoves', 'waintents', 'scotland', 'agent',
   // The optimiser chain, for the identity guards in section B.
   'autonomy', 'taxoptimiser',
 ]) {

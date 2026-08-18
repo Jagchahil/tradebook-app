@@ -35,7 +35,7 @@ const read = (p) => readFileSync(path.join(root, p), 'utf8');
 const lib = path.resolve(here, '../lib');
 const stage = mkdtempSync(path.join(tmpdir(), 'wave9vat-'));
 const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'agent']) {
+for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'scotland', 'agent']) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);

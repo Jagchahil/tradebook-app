@@ -196,6 +196,22 @@ const DISCLOSED = [
   // the sentence on the totals lane thirty lines up. One file, two lanes, one of them silent. Moving
   // the read into a file of its own is what let this ratchet ask the question.
   'lib/laneanswers.ts',
+  // 🔴 ADDED 18 August 2026 BY B30, AND WHAT WAS WRONG WAS THE REASON, NOT THE DISCOVERY.
+  // This file was ALREADY discovered by section 3 below and was already classified, as: "The
+  // nudges. Same reasoning as the thread and WhatsApp: conversational, repeated, and pointed at a
+  // figure the app screens already caveat." Both of the surfaces that reason cited reached the
+  // OPPOSITE conclusion on 17 August and moved onto this list as J8. The excuse outlived its own
+  // premise by a day, and the only thing this suite could check about it was that it was longer
+  // than forty characters.
+  //
+  // ⚠️ AND THE OTHER HALF OF IT IS FALSE ON THIS CHANNEL. "One tap behind a screen that already
+  // carries it" is what excuses the levers, the what if and the CIS refund. A WhatsApp message at
+  // 08:00 is not one tap behind anything: it arrives on a phone with no page above it.
+  //
+  // Section 3c below holds WHICH signals say it, because file granularity cannot see a file that
+  // says the sentence on one signal and stays silent on the next. That is the lib/laneanswers.ts
+  // lesson (one file, two lanes, one of them silent) one channel further out.
+  'lib/agent.ts',
 ].sort();
 
 ok(`🔴 EQUALITY: exactly ${DISCLOSED.length} surfaces say it, found ${saysIt.length}`, saysIt.length === DISCLOSED.length);
@@ -442,8 +458,6 @@ const NOT_DISCLOSED = {
     'Same as the income proof route. lib/quarterpack.ts prints it into the pack this route serves.',
   'app/api/optimise/route.ts':
     'JSON for the lever list behind /app/tax. It renders no money itself, and the levers are not disclosed on their own screen either, for the reason given under ways-to-save.',
-  'lib/agent.ts':
-    'The nudges. Same reasoning as the thread and WhatsApp: conversational, repeated, and pointed at a figure the app screens already caveat.',
   'app/app/pay-yourself/plan.ts':
     'It quotes the set aside the Overview and the tax hub already show, one tap behind both.',
   'app/app/tax/cis/page.tsx':
@@ -629,6 +643,125 @@ if (!existsSync(MOBILE)) {
   ok('🔴 STOP ITEM: and the SHARED document carries it, not just the screen',
     /SCOTLAND_LINE/.test(poi.split('async function share()')[1]?.split('async function pdf()')[0] ?? ''));
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 3c. B30, 18 AUGUST 2026. THE SIGNAL AFTER NEXT CANNOT FORGET EITHER.
+//
+// Section 3 discovers SURFACES, which is a file. lib/agent.ts is one file holding twenty five
+// separate messages, and file granularity cannot tell a file that says the sentence on one of them
+// and stays silent on the next twenty four. That is exactly how lib/laneanswers.ts got here: one
+// file, two lanes, one of them silent, and section 3 could not see the gap because the same file
+// said the sentence thirty lines up.
+//
+// So the same equality runs one level down. Every signal key the engine can emit is discovered from
+// the source and must be classified, either into SCOTLAND_SIGNALS or into a written reason below.
+// Add a twenty sixth signal and this fails until somebody decides.
+//
+// ⚠️ SOURCE ONLY, LIKE THE REST OF THIS SUITE. It reads lib/agent.ts and never imports it, so it
+// still reports a clean red when a module it depends on is gone. The BEHAVIOURAL half, that a
+// disclosed signal really does carry the sentence and an undisclosed one really does not, lives in
+// test/agent.test.mjs, which stages the engine and is where the engine is driven.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\n=== 3c. every agent signal is classified, and the disclosed ones say it ===\n');
+
+const AGENT_SRC = read('lib/agent.ts');
+
+// Discovered, never typed. The dynamic key at moveToSignal() is excluded BY NAME below.
+const signalKeys = [...new Set(
+  [...AGENT_SRC.matchAll(/signalKey: '([a-z0-9_]+)'/g)].map((m) => m[1]),
+)].sort();
+ok('the signal key scan found something at all (vacuity)', signalKeys.length > 20);
+
+const declaredSet = /export const SCOTLAND_SIGNALS = new Set<string>\(\[([\s\S]*?)\]\);/.exec(AGENT_SRC);
+ok('lib/agent.ts declares SCOTLAND_SIGNALS as a literal set', Boolean(declaredSet));
+const disclosedSignals = declaredSet
+  ? [...new Set([...declaredSet[1].matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]))].sort()
+  : [];
+
+// ─── THE DECIDED LIST, SIGNAL SIDE ───────────────────────────────────────────────────────────
+// The bar is lib/scotland.ts's own: would a Scot be misled by THIS number if the line were absent.
+const SIGNAL_DISCLOSED = [
+  'poa_cliff', 'january_rehearsal',
+  'higher_rate_approach', 'pa_taper', 'goal_threshold_combo', 's24_exposure',
+  'cis_refund_milestone', 'property_rates_2027',
+].sort();
+
+const SIGNAL_NOT_DISCLOSED = {
+  monday_brief:
+    'Its WhatsApp text carries no tax figure at all (in, out, kept). Its body reaches one on ONE of three branches, where it is a pointer to the set aside number rather than the number itself, and january_rehearsal and poa_cliff both state that number and both carry the line. It is also the only signal on this page a limited company still receives, and ltdMondayBrief() swaps its tax line for Corporation Tax, which is not devolved.',
+  goal_purchase_timing:
+    'A lever. It prices a purchase he is choosing to make, at his marginal rate, and it is the same call the web makes on /app/tax/ways-to-save and /app/tax/vehicle. A caveat under every "about £340" chip is doc 103\'s ten helpful additions.',
+  goal_within_reach:
+    'A lever in the other direction: whether his after tax earnings cover a thing he is saving for. An affordability figure, not a statement of what he owes. Same reasoning as the phone\'s app/goals.tsx, excused in section 3b.',
+  goal_progress:
+    'Progress towards a goal he set. It states no tax figure at all.',
+  aia_timing:
+    'A lever, and it prints his PROFIT rather than his tax. Profit does not move when a band moves.',
+  home_office_saving:
+    'A lever. What a claim he has not made yet would save him, priced at his marginal rate. Same class as the ways to save chips.',
+  trading_allowance_saving:
+    'A lever, and an election he has to make himself. It compares two ways of claiming, and both move together under any band.',
+  year_end_countdown:
+    'A list of levers with a countdown on it. Every figure in it prices a move he can choose to make before 5 April, and it states no bill.',
+  vat_approach:
+    'VAT is reserved, not devolved. The threshold and the rate are the same in Coatbridge as in Carlisle.',
+  mtd_mandation:
+    'Making Tax Digital thresholds are UK wide, and the figure is his qualifying INCOME, not his tax.',
+  mtd_combined_trap:
+    'The same UK wide threshold, read across two streams.',
+  class2_pension_year:
+    'Class 2 National Insurance is reserved. The small profits threshold and the weekly rate are the same everywhere in the UK.',
+  sl_threshold_cross:
+    'Student loan plans, thresholds and rates are the same across the UK, and plan 4 is already named as the Scottish one on /app/tax/student-loan. This is the same reasoning that keeps the sentence off that page.',
+  quiet_expenses:
+    'Last month\'s expenses against his usual. No tax figure of any kind.',
+  quarter_unconfirmed:
+    'A count of entries and a number of days. No money in it.',
+  expense_completeness:
+    'A list of claims he has logged nothing for. It names categories, never a figure.',
+  invoice_chase:
+    'An unpaid invoice and a drafted chase. His customer\'s money, not HMRC\'s.',
+};
+
+const signalClassified = [...SIGNAL_DISCLOSED, ...Object.keys(SIGNAL_NOT_DISCLOSED)].sort();
+ok(`🔴 EQUALITY: every agent signal is classified (${signalKeys.length} found)`,
+  same(signalKeys, signalClassified));
+if (!same(signalKeys, signalClassified)) {
+  console.log(`        emitted but never decided: ${JSON.stringify(missing(signalKeys, signalClassified))}`);
+  console.log(`        decided but never emitted:  ${JSON.stringify(missing(signalClassified, signalKeys))}`);
+}
+ok('🔴 EQUALITY: and the set in lib/agent.ts is exactly the decided disclosed list',
+  same(disclosedSignals, SIGNAL_DISCLOSED));
+if (!same(disclosedSignals, SIGNAL_DISCLOSED)) {
+  console.log(`        decided but not in the code: ${JSON.stringify(missing(SIGNAL_DISCLOSED, disclosedSignals))}`);
+  console.log(`        in the code but not decided: ${JSON.stringify(missing(disclosedSignals, SIGNAL_DISCLOSED))}`);
+}
+ok('and every undisclosed signal carries a reason somebody can read',
+  Object.values(SIGNAL_NOT_DISCLOSED).every((why) => typeof why === 'string' && why.length > 40));
+ok('and no signal is on both lists at once',
+  SIGNAL_DISCLOSED.every((k) => !(k in SIGNAL_NOT_DISCLOSED)));
+
+// 🔴 THE ONE DYNAMIC KEY, NAMED SO IT IS AN EXCLUSION RATHER THAN AN OVERSIGHT. moveToSignal()
+// builds its key from a lib/rakhamoves Move, so it cannot be scanned for. Every one of those is a
+// LIMITED COMPANY money move and Corporation Tax is not devolved, which is the same reason the
+// company half of monday_brief is excluded above.
+ok('the dynamic money move key is still built in moveToSignal and nowhere else',
+  (AGENT_SRC.match(/signalKey: m\.ownerName/g) ?? []).length === 1);
+ok('and money moves are only ever built for a structure branch, never for the sole trader engine',
+  /if \(structure !== 'limited_company'\) return base;/.test(AGENT_SRC));
+
+// 🔴 THE PUNCTUATION LOCK. The WhatsApp half drops the constant's trailing full stop, because the
+// approved template interpolates "From your Lekhio agent: {{1}}." and supplies its own. If somebody
+// ever rewords lib/scotland.ts to end without one, this breaks here rather than silently shipping a
+// sentence with no stop to a paying customer's phone.
+ok('🔴 SCOTLAND_LINE still ends in a full stop, which is what the agent strips for WhatsApp',
+  LINE.endsWith('.'));
+ok('and lib/agent.ts strips exactly that, and nothing else',
+  /SCOTLAND_LINE\.replace\(\/\\\.\$\/, ''\)/.test(AGENT_SRC));
+// ⚠️ \w+ RATHER THAN THE LETTER s, AND A CONTROL IS WHAT FOUND IT. This read `${s.body}` and went
+// RED when a no op sabotage renamed the function's own parameter, which is this repo's oldest
+// anchor rule stated backwards: a guard anchored on a variable NAME is guarding the name.
+ok('and the card keeps the sentence whole', /body: `\$\{\w+\.body\} \$\{SCOTLAND_LINE\}`/.test(AGENT_SRC));
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // 4. THE RATCHET ITSELF. THIS IS THE ASSERTION THAT IS MEANT TO FAIL ONE DAY.

@@ -49,7 +49,7 @@ delete process.env.BANK_FEED_OFFERED;
 // relative import to .ts, exactly as test/agent.test.mjs and test/agentstructure.test.mjs do.
 const stage = mkdtempSync(path.join(tmpdir(), 'wave9nudge-'));
 const fix = (s) => s.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
-for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'agent']) {
+for (const f of ['taxengine', 'money', 'nistudentloan', 'propertyengine', 'ltdengine', 'personalincome', 'partnership', 'position', 'rakhamoves', 'waintents', 'scotland', 'agent']) {
   writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
 }
 // lib/trialnudge.ts imports lib/watemplates.ts with an extensionless specifier, so it is staged the

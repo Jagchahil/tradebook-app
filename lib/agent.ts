@@ -18,6 +18,7 @@ import { chaseMessage } from './waintents';
 import { savingsMoves, type Move } from './rakhamoves';
 import { computePosition, type BusinessType, type OwnerInput } from './position';
 import { gbp0 } from './money';
+import { SCOTLAND_LINE } from './scotland';
 
 // --- Input ---------------------------------------------------------------------
 
@@ -1131,7 +1132,68 @@ Send it as it is or tweak it first. You send, never me. Most invoices get paid w
     }
   }
 
-  return out;
+  return out.map(discloseScotland);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 SCOTLAND. B30, 18 AUGUST 2026. THE SAME FIGURE CARRIES THE SAME CAVEAT ON EVERY CHANNEL, AND
+// THIS WAS THE CHANNEL WITH NO SCREEN BEHIND IT.
+//
+// J8 put SCOTLAND_LINE on the set aside answer on both chat routers on 17 August, on the argument
+// that /app/tax prints it under the same number every time it is opened. This engine was left out,
+// and on 18 August a Glasgow customer was texted a band derived January at 08:00 with no caveat
+// anywhere in it, while every chat answer on the same account carried one.
+//
+// 🔴 AND THE EXCUSE THAT EXCUSED IT HAD ROTTED. test/scotland.test.mjs DID discover this file, from
+// its imports, and somebody classified it: "The nudges. Same reasoning as the thread and WhatsApp:
+// conversational, repeated, and pointed at a figure the app screens already caveat." Both of those
+// surfaces reached the OPPOSITE conclusion on 17 August and moved to the disclosed list. The reason
+// outlived its own premise, and the only thing the suite could check about it was that it was over
+// forty characters long. It was never a blind spot in the discovery. It was a dead reason.
+//
+// ⚠️ AND THE OTHER HALF OF THAT EXCUSE IS FALSE ON THIS CHANNEL ANYWAY. "One tap behind a screen
+// that already carries it" is what keeps the caveat off the levers, the what if and the CIS screen.
+// A WhatsApp message is not one tap behind anything. It arrives on its own, on a phone, and there
+// is no page above it.
+//
+// ⚠️ WHICH SIGNALS, AND THE BAR IS lib/scotland.ts's OWN: would a Scot be misled by THIS number if
+// the line were absent. That lands it on the signals that state what he OWES, or state an England,
+// Wales and Northern Ireland rate or threshold AS HIS. It stays off the ones that price a CHOICE,
+// which is the same call the web makes on the levers and the what if.
+//
+// ⚠️ monday_brief IS DELIBERATELY NOT ON THE LIST, AND THE REASON IS WORTH THE LINE. Its waText
+// carries no tax figure at all (in, out, kept), and its body reaches a tax figure on ONE of three
+// branches, where it is a pointer to the set aside number rather than the number itself. The two
+// signals that DO state that number, january_rehearsal and poa_cliff, both carry the line. It also
+// happens to be the only one of these a limited company still receives, and ltdMondayBrief() then
+// swaps its tax line for Corporation Tax, which is not devolved: a caveat about income tax bands
+// under a CT600 figure would be worse than none. Measured: every other key below is already in
+// LTD_SUPPRESSED_SIGNALS, so no company ever sees one of these.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export const SCOTLAND_SIGNALS = new Set<string>([
+  // What he owes, and what he is asked to put money aside against.
+  'poa_cliff', 'january_rehearsal',
+  // A rate or a threshold stated as his. These are the ones that are not merely uncaveated, they
+  // are wrong for him: a Scot's higher rate does not start where this sentence says it does.
+  'higher_rate_approach', 'pa_taper', 'goal_threshold_combo', 's24_exposure',
+  // A position rather than a choice. The refund is his tax already paid netted against his bill,
+  // and the April 2027 preview prices his rent at the bands this engine holds.
+  'cis_refund_milestone', 'property_rates_2027',
+]);
+
+// ⚠️ THE WHATSAPP HALF DROPS THE TRAILING FULL STOP AND THE CARD KEEPS IT, WHICH IS PUNCTUATION AND
+// NOT A SECOND VERSION OF THE SENTENCE. Every waText in this file ends without a stop, because the
+// approved template interpolates "From your Lekhio agent: {{1}}." and supplies its own. A body
+// ending in a stop would read "coming to Lekhio.. You approve everything". test/scotland.test.mjs
+// asserts the constant still ENDS in a full stop, so the day somebody reworders it this breaks
+// loudly instead of quietly double punctuating a paying customer's phone.
+function discloseScotland(s: AgentSignal): AgentSignal {
+  if (!SCOTLAND_SIGNALS.has(s.signalKey)) return s;
+  return {
+    ...s,
+    body: `${s.body} ${SCOTLAND_LINE}`,
+    waText: `${s.waText}. ${SCOTLAND_LINE.replace(/\.$/, '')}`,
+  };
 }
 
 // Order the ping subset by importance for the noise caps. Cards pass through.

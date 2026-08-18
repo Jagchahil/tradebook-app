@@ -43,6 +43,27 @@ function runSuite(dir) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 PROVE AN UNMODIFIED TREE IS GREEN BEFORE SCORING ANYTHING. Added 18 August 2026, from the
+// rule this repo learned three times over: a pass measures a DIFFERENCE and has no way of knowing
+// whether the red it sees came from the sabotage or from a harness that reds on everything. A
+// missing supabase/ directory did it once, a full disk did it once, and a tally line without a
+// full stop did it once. It costs one tree.
+function baseline() {
+  const dir = scratch();
+  const r = runSuite(dir);
+  rmSync(dir, { recursive: true, force: true });
+  if (r.red) {
+    console.log('🔴 BROKEN HARNESS: an UNMODIFIED scratch tree is already RED.');
+    console.log('   Nothing below would mean anything. Check, in this order:');
+    console.log('   1. every directory f23bill.test.mjs READS is copied by scratch()');
+    console.log('   2. its tally line still matches the regex in runSuite (it ends with a full stop)');
+    console.log('   3. df -h on TMPDIR: a suite that dies of ENOSPC scores as caught');
+    process.exit(1);
+  }
+  console.log('BASELINE: an unmodified scratch tree is GREEN, so a red below is the sabotage.\n');
+}
+
 const edit = (dir, rel, from, to) => {
   const p = path.join(dir, rel);
   const s = readFileSync(p, 'utf8');
@@ -54,9 +75,13 @@ const SABOTAGES = [
   // ── The finding itself: the agent doing its own tax again ────────────────────────────────
   {
     name: 'the agent computes the bill itself, exactly as it did on 13 August',
+    // ⚠️ RE ANCHORED 18 AUGUST 2026 BY THE FULL LOOP. B30 lifted the typeof and isFinite test out
+    // of this assignment into `haveGiven`, so the three line anchor stopped matching and this
+    // sabotage became ABSENT rather than passing. Nine of this pass's anchors died the same way in
+    // the same packet, which is why a MISSED line and a broken anchor must be read, never a tally.
     apply: (d) => edit(d, 'lib/agent.ts',
-      `    const estBill = typeof given === 'number' && Number.isFinite(given)
-      ? Math.max(0, given)
+      `    const estBill = haveGiven
+      ? Math.max(0, given as number)
       : hasRent ? null : blendedBill;`,
       '    const estBill = blendedBill;'),
   },
@@ -75,11 +100,10 @@ const SABOTAGES = [
   // ── The undefined door. This is the one that would have shipped a NaN. ───────────────────
   {
     name: 'the finite check is loosened back to !== null, so undefined walks through',
+    // ⚠️ RE ANCHORED 18 AUGUST 2026 ONTO haveGiven, which is where B30 moved this decision.
     apply: (d) => edit(d, 'lib/agent.ts',
-      `    const estBill = typeof given === 'number' && Number.isFinite(given)
-      ? Math.max(0, given)`,
-      `    const estBill = given !== null
-      ? Math.max(0, given)`),
+      "    const haveGiven = typeof given === 'number' && Number.isFinite(given);",
+      '    const haveGiven = given !== null;'),
   },
   {
     name: 'NaN is allowed through by dropping isFinite alone',
@@ -134,38 +158,53 @@ const SABOTAGES = [
   // ── The wiring. Every call site, per discipline 2. ────────────────────────────────────────
   {
     name: 'the nightly walk stops passing the bill',
+    // ⚠️ RE ANCHORED 18 AUGUST 2026. B30's reader hands back a bill AND a base, so the routes
+    // read `january?.bill` where they used to read a bare `bill`.
     apply: (d) => edit(d, 'app/api/cron/agent/route.ts',
-      'selfAssessmentBill: bill,', 'selfAssessmentBill: null,'),
+      'selfAssessmentBill: january?.bill ?? null,', 'selfAssessmentBill: null,'),
   },
   {
     name: 'the on demand reassess stops passing the bill',
+    // ⚠️ RE ANCHORED 18 AUGUST 2026, same move as the walk above.
     apply: (d) => edit(d, 'app/api/agent/reassess/route.ts',
-      'selfAssessmentBill: bill,', 'selfAssessmentBill: null,'),
+      'selfAssessmentBill: january?.bill ?? null,', 'selfAssessmentBill: null,'),
   },
   {
     name: 'the walk stops calling the shared reader',
+    // ⚠️ RE ANCHORED 18 AUGUST 2026. selfAssessmentBillFor was renamed selfAssessmentJanuaryFor
+    // by B30, because a function called "BillFor" that hands back a payments on account base is a
+    // function whose name is a lie. The suite's own assertion was repointed then; this was not.
     apply: (d) => edit(d, 'app/api/cron/agent/route.ts',
-      'selfAssessmentBillFor(user.id),', 'Promise.resolve(null),'),
+      'selfAssessmentJanuaryFor(user.id),', 'Promise.resolve(null),'),
   },
   {
     name: 'reassess stops calling the shared reader',
+    // ⚠️ RE ANCHORED 18 AUGUST 2026, same rename as the walk above.
     apply: (d) => edit(d, 'app/api/agent/reassess/route.ts',
-      'selfAssessmentBillFor(userId),', 'Promise.resolve(null),'),
+      'selfAssessmentJanuaryFor(userId),', 'Promise.resolve(null),'),
   },
   // ── The reader's failure mode. Zero is the dangerous default. ────────────────────────────
   {
     name: 'the reader fails to 0, which reads as "no bill" rather than "unknown"',
+    // ⚠️ RE ANCHORED 18 AUGUST 2026. The reader hands back an OBJECT now, so "fails to zero" is an
+    // object of zeros rather than a bare 0, and the log line was reworded with the rename.
     apply: (d) => edit(d, 'lib/supabase.ts',
-      `    console.error('[agent] self assessment bill unavailable:', err instanceof Error ? err.message : err);
+      `    console.error('[agent] self assessment january unavailable:', err instanceof Error ? err.message : err);
     return null;`,
-      `    console.error('[agent] self assessment bill unavailable:', err instanceof Error ? err.message : err);
-    return 0;`),
+      `    console.error('[agent] self assessment january unavailable:', err instanceof Error ? err.message : err);
+    return { bill: 0, poa: { tax: 0, deductedAtSource: 0 } };`),
   },
   {
     name: 'the reader stops using the optimiser input and guesses',
+    // ⚠️ RE ANCHORED 18 AUGUST 2026. B30 replaced the one line body with a taxPosition() read that
+    // both numbers come off, so the guess has to replace the whole of it to be the same sabotage.
     apply: (d) => edit(d, 'lib/supabase.ts',
-      'return selfAssessmentBill(await getOptimiserInput(userId));',
-      'return 1200;'),
+      `    const position = taxPosition(await getOptimiserInput(userId));
+    return {
+      bill: billFromPosition(position),
+      poa: { tax: position.selfAssessmentTax, deductedAtSource: position.cisSuffered },
+    };`,
+      '    return { bill: 1200, poa: { tax: 1200, deductedAtSource: 0 } };'),
   },
   // ── The import rule that keeps the .mjs suites resolvable ────────────────────────────────
   {
@@ -176,10 +215,18 @@ const SABOTAGES = [
   },
   // ── The threshold, which must be tested against the real figure ──────────────────────────
   {
-    name: 'the POA threshold is tested against the blend rather than the real bill',
+    // ⚠️ RE ANCHORED 18 AUGUST 2026, ONTO THE WORK RATHER THAN ONTO THE OLD LINE, AND THE MOVE IS
+    // THE POINT. This block no longer tests a threshold at all: B30 handed the whole decision to
+    // lib/taxengine.ts paymentsOnAccount(), which applies the £1,000 test to the RELEVANT AMOUNT,
+    // knows the 80 percent deducted at source excuse, and does the halving. So the equivalent
+    // defect is no longer "test the wrong number against the threshold", it is "hand the engine
+    // the wrong number", which is exactly the £639 B30 found on a real customer's January.
+    // Deleting this would have been silent scope loss; leaving it pointed at a line nobody runs
+    // would have been a guard that was quietly true about nothing. Same choice, both wrong.
+    name: 'the schedule is computed from the bill rather than from the tax HMRC halves',
     apply: (d) => edit(d, 'lib/agent.ts',
-      'if (estBill !== null && estBill > FACTS.poaThreshold) {',
-      'if (estBill !== null && blendedBill > FACTS.poaThreshold) {'),
+      '      : paymentsOnAccount(base.tax, taxYearEnd(today).getUTCFullYear(), base.atSource);',
+      '      : paymentsOnAccount(estBill ?? 0, taxYearEnd(today).getUTCFullYear(), base.atSource);'),
   },
 ];
 
@@ -202,16 +249,36 @@ const CONTROLS = [
   return billFromPosition(position);`),
   },
   {
-    name: 'whitespace is added to the reader in supabase.ts',
+    // ⚠️ RE ANCHORED 18 AUGUST 2026, AND OFF THE DECLARATION ON PURPOSE. It quoted the whole
+    // signature of selfAssessmentBillFor, which B30 renamed, so this control reported BAD while
+    // hiding behind a number that still looked nearly full. A control that cannot apply is worse
+    // than a sabotage that cannot apply. It now adds a comment INSIDE the work, which is a thing
+    // no rename and no signature change can take away.
+    name: 'a comment is added inside the reader in supabase.ts',
     apply: (d) => edit(d, 'lib/supabase.ts',
-      'export async function selfAssessmentBillFor(userId: string): Promise<number | null> {',
-      'export async function selfAssessmentBillFor(userId: string): Promise<number | null> {\n'),
+      '      bill: billFromPosition(position),',
+      '      // The one bill function, and it is the only one.\n      bill: billFromPosition(position),'),
   },
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// SLICING, so this pass can be run inside Cowork at all. Every shell call there is capped at 45
+// seconds in a fresh sandbox and a detached process does not survive between calls, so a session
+// that cannot run the whole pass has to be able to run it in pieces AND SAY WHICH PIECES IT RAN.
+// SAB_FROM and SAB_TO are indices into the sabotage list; unset means all of it, which is what CI
+// and the Mac run. SAB_SKIP_CONTROLS skips the controls for the same reason.
+const FROM = Number(process.env.SAB_FROM ?? 0);
+const TO = Number(process.env.SAB_TO ?? SABOTAGES.length);
+const RUNNING = SABOTAGES.slice(FROM, TO);
+if (RUNNING.length !== SABOTAGES.length) {
+  console.log(`SLICE: sabotages ${FROM}..${TO - 1} of ${SABOTAGES.length}. NOT THE WHOLE PASS.`);
+}
+
+baseline();
+
 let caught = 0, missed = 0;
 console.log('SABOTAGES (each must go RED)');
-for (const s of SABOTAGES) {
+for (const s of RUNNING) {
   const dir = scratch();
   try {
     s.apply(dir);
@@ -228,8 +295,9 @@ for (const s of SABOTAGES) {
 }
 
 let controlsOk = 0, controlsBad = 0;
-console.log('\nCONTROLS (each must stay GREEN)');
-for (const c of CONTROLS) {
+const SKIP_CONTROLS = process.env.SAB_SKIP_CONTROLS === '1';
+console.log(SKIP_CONTROLS ? '\nCONTROLS SKIPPED (SAB_SKIP_CONTROLS=1)' : '\nCONTROLS (each must stay GREEN)');
+for (const c of (SKIP_CONTROLS ? [] : CONTROLS)) {
   const dir = scratch();
   try {
     c.apply(dir);
@@ -245,8 +313,11 @@ for (const c of CONTROLS) {
   rmSync(dir, { recursive: true, force: true });
 }
 
-const total = SABOTAGES.length + CONTROLS.length;
+// ⚠️ THE DENOMINATORS ARE WHAT WAS RUN, NOT WHAT EXISTS, or a slice prints a hole it never had.
+const ranControls = SKIP_CONTROLS ? 0 : CONTROLS.length;
+const total = RUNNING.length + ranControls;
 console.log('');
-console.log(`${caught}/${SABOTAGES.length} sabotages caught, ${controlsOk}/${CONTROLS.length} controls green.`);
+console.log(`${caught}/${RUNNING.length} sabotages caught, ${controlsOk}/${ranControls} controls green.`);
 console.log(`${caught + controlsOk} of ${total}.`);
+if (RUNNING.length !== SABOTAGES.length || SKIP_CONTROLS) console.log('NOT THE WHOLE PASS.');
 if (missed > 0 || controlsBad > 0) process.exit(1);

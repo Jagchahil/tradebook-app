@@ -173,6 +173,24 @@ console.log('A. The agent must not do its own tax for a landlord');
   const figures = [...new Set((s?.waText.match(/£[\d,]*\d/g) ?? []))].sort();
   eq('the text carries exactly two figures, both derived from the passed bill',
     figures.join(' '), '£1,171 £1,757');
+
+  // 🔴 AND THE BODY GETS THE SAME TREATMENT, WHICH IT DID NOT UNTIL 18 AUGUST 2026. A HOLE FOUND
+  //    BY THE FULL LOOP. The body quotes the bill TWICE ("heading for about X ... X for the
+  //    year"), and includes('£1,171') cannot tell WHICH occurrence it found. sabotage-f23 swaps
+  //    the FIRST one for the blend, the second one went on satisfying the guard, and the sabotage
+  //    sat green: the customer would have read the wrong number in the opening clause of the one
+  //    sentence he actually reads, and nothing anywhere would have gone red.
+  //
+  // ⚠️ THE BLEND IS DERIVED, NEVER TYPED. It comes from the trade only fixture that produces it,
+  //    so a change to the months moves both sides together and this can never rot into a guard
+  //    defending a stale number. The vacuity check first, because a guard asserting that an
+  //    undefined string is absent passes everything.
+  const blendText = poa(A.computeSignals(input()))?.body.match(/£[\d,]*\d/)?.[0];
+  ok('the blend is derivable and is a different figure, so the two below are not vacuous',
+    !!blendText && blendText !== '£1,171');
+  ok('🔴 the blend never reaches a landlord body, at any occurrence',
+    !!s && !!blendText && !s.body.includes(blendText));
+  ok('🔴 nor his WhatsApp text', !!s && !!blendText && !s.waText.includes(blendText));
 }
 
 // 5 and 6. THE UNDEFINED AND NaN DOORS. lib/agent.ts is driven by .mjs suites that tsc never sees,
@@ -188,6 +206,35 @@ console.log('A. The agent must not do its own tax for a landlord');
 
   const inf = poa(A.computeSignals(input({ property: LANDLORD, selfAssessmentBill: Infinity })));
   ok('landlord, figure is Infinity: withheld', !inf);
+
+  // 🔴 AND THE SAME THREE DOORS WITH THE BASE PRESENT, WHICH IS THE ONLY WAY THEY TEST WHAT THEY
+  //    SAY THEY TEST. 18 AUGUST 2026, A HOLE FOUND BY THE FULL LOOP.
+  //
+  //    Every case above passes NO payments on account base, so B30's own "a bill with no base
+  //    beside it fires nothing" rule withheld all three, and Number.isFinite was never the thing
+  //    doing the work. Dropping it alone therefore stayed GREEN here while walking a NaN into a
+  //    customer's set aside on any account that DOES have a base, which after B30 is every account
+  //    either route builds. The guard existed, the case did not.
+  //
+  // ⚠️ AND THE SOURCE SCAN AT SECTION 16 COULD NOT HAVE SEEN IT EITHER: /Number\.isFinite/ still
+  //    matches, because B30 added two more isFinite checks to the same block for the base. A scan
+  //    that cannot tell WHICH of three checks it found is not a guard on any of them.
+  const withBaseNan = poa(A.computeSignals(input({
+    property: LANDLORD, selfAssessmentBill: NaN,
+    selfAssessmentPoa: { tax: 9214, deductedAtSource: 0 },
+  })));
+  ok('🔴 landlord, figure is NaN and the base IS present: still withheld', !withBaseNan);
+
+  // The trade only half, where the safe path is a FALLBACK rather than silence, so the proof is
+  // that a real number comes out rather than that nothing does.
+  const tradeNan = poa(A.computeSignals(input({
+    selfAssessmentBill: NaN, selfAssessmentPoa: { tax: 9214, deductedAtSource: 0 },
+  })));
+  ok('trade only, figure is NaN: it falls back to the blend rather than going quiet', !!tradeNan);
+  ok('🔴 ...and the figure it carries is a real number',
+    !!tradeNan && Number.isFinite(tradeNan.numbers.estBill));
+  ok('🔴 ...and nothing a customer reads carries NaN',
+    !!tradeNan && !/NaN/.test(`${tradeNan.body} ${tradeNan.waText}`));
 }
 
 // 7. And the same omission for a trade only customer keeps the OLD behaviour, which is what lets
@@ -340,11 +387,29 @@ ok('🔴 and the tax page still passes those same two fields to the engine',
 // ⚠️ THE SLICE IS BOUNDED BY THE SECTION'S OWN EDGES NOW, NOT BY A MAGIC 2200 CHARACTERS.
 //    B30 added comment to this block and the old window very nearly slid off the front of it,
 //    which would have turned three real guards green about nothing. Slice a block to its own end.
+//
+// 🔴 AND THE EDGES ARE TWO SIGNAL KEYS NOW, NOT TWO COMMENTS. 18 AUGUST 2026, FOUND BY THE FULL
+//    LOOP, AND IT IS THE OLDEST RULE IN THIS REPO ARRIVING FROM THE OTHER SIDE. sabotage-f23's own
+//    no op control REWORDED the heading `// 7. Payments on account cliff.`, which is an edit no
+//    customer could ever see, and this suite went RED: indexOf returned -1, the window collapsed,
+//    and the four guards below hung off a sentence somebody was free to improve at any moment.
+//    A COMMENT IS NOT A CONTRACT. A signal key is: lib/routing.ts dispatches on it and every sent
+//    row carries it, so renaming one is never a no op and nobody tidies one away by accident.
+const PREV_KEY = "signalKey: 'sl_threshold_cross'";
+const NEXT_KEY = "signalKey: 'cis_refund_milestone'";
 const poaBlock = agentSrc.slice(
-  agentSrc.indexOf('// 7. Payments on account cliff.'),
-  agentSrc.indexOf('// 8. CIS refund milestones.'),
+  agentSrc.indexOf(PREV_KEY) + PREV_KEY.length,
+  agentSrc.indexOf(NEXT_KEY),
 );
 ok('the poa block was found at all', poaBlock.length > 500 && poaBlock.includes("signalKey: 'poa_cliff'"));
+// ⚠️ AND IT HOLDS ONE SIGNAL, WHICH IS THE ONE UNDER TEST. A window bounded by its NEIGHBOURS
+//    rather than by itself can swallow one if a key moves, and three guards below would then be
+//    green about somebody else's block. Derived from the window, never counted by hand.
+{
+  const keysInside = poaBlock.match(/signalKey: '[a-z0-9_]+'/g) ?? [];
+  ok('...and it holds exactly one signal, the one under test',
+    keysInside.length === 1 && keysInside[0] === "signalKey: 'poa_cliff'");
+}
 ok('the bill is taken from the input, not computed locally', /input\.selfAssessmentBill/.test(poaBlock));
 ok('rent is what withholds the fallback', /hasRent\s*\?\s*null/.test(poaBlock));
 ok('a non number takes the safe path', /Number\.isFinite/.test(poaBlock));

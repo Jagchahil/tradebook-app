@@ -72,6 +72,7 @@ for (const f of [
 const A = await import(pathToFileURL(path.join(stage, 'agent.ts')).href);
 const O = await import(pathToFileURL(path.join(stage, 'taxoptimiser.ts')).href);
 const TE = await import(pathToFileURL(path.join(stage, 'taxengine.ts')).href);
+const W = await import(pathToFileURL(path.join(stage, 'waintents.ts')).href);
 
 let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; } else { fail++; console.error(`  FAIL ${name}`); } };
@@ -469,6 +470,112 @@ ok('and it does not eat an https:// URL',
   codeOnly("const u = 'https://lekhio.app';").includes('https://lekhio.app'));
 ok('lib/agent.ts no longer promises one and a half times the bill',
   !/one and a half times/.test(codeOnly(agentSrc)));
+
+// ════════════════════════════════════════════════════════════════════════════════════════
+console.log('E. B30. THREE DOORS, ONE DAY, ONE FIGURE. And the day is the only thing that moves.');
+// ════════════════════════════════════════════════════════════════════════════════════════
+//
+// 🔴 THE B30 ITEM SAID "TWO ENGINES, TWO FIGURES, ONE MAN, 17 HOURS APART, SAME BOOKS", and named
+// the chat lane as the outlier by £126.00: chat £10,618.00, the Tax page and the 08:00 alert
+// £10,492. RECONCILED ON A FROZEN INPUT ON 18 AUGUST 2026, AND THERE IS NO OUTLIER AND THERE ARE
+// NOT TWO ENGINES.
+//
+// The books below are the ones that were reported (£22,910 in, £5,286 out, £17,624 of profit, plan
+// 4, no CIS, no rent). Run through the ONE engine on 17 August they give £10,618. Run through the
+// SAME engine on 18 August they give £10,492. Both reported figures, exactly, from one taxPosition.
+//
+// £126.00 IS ONE DAY OF THE CLOCK. projectionFactor() divides the year by daysElapsed from 6 April,
+// so a man who logged nothing on the 18th is on a slightly lower run rate than he was on the 17th,
+// and his projected year falls. That is correct, and it is the safe direction.
+//
+// ⚠️ WHAT IS LEFT, AND IT IS REAL: the chat prints formatGbp (two places) and the Tax page prints
+// gbp0 (whole pounds), so on the SAME DAY they read "£10,618.00" and "£10,618" while the chat's own
+// next sentence promises "It is the same figure your Tax screen leads with". That is B26's shape on
+// the largest figure in the product, and it is recorded rather than changed here because the page
+// hero is Jag's copy. See the B30 handback.
+//
+// This section exists so nobody reopens the £126 as an arithmetic bug, and so the three doors
+// cannot come apart on one day without a suite saying so.
+
+// The reported books, frozen. Only daysElapsed differs between the two runs.
+const CALLUM = (daysElapsed) => ({
+  startYear: 2026, monthsElapsed: 4, daysElapsed, observedDays: daysElapsed,
+  ytdTradeIncome: 22910, ytdTradeExpenses: 5286, ytdCisSuffered: 0,
+  employmentIncome: 0, studentPlans: ['plan4'], categoriesLogged: ['materials', 'fuel'],
+  homeOfficeClaimed: false, ytdPropertyIncome: 0, ytdPropertyExpenses: 0, ytdPropertyFinance: 0,
+  businessType: 'sole_trader', dividendIncome: 0, savingsIncome: 0,
+});
+// 6 April 2026 is day 0. 17 August is 133, 18 August is 134, derived rather than typed.
+const YEAR_START = Date.UTC(2026, 3, 6);
+const dayOf = (utcMs) => Math.floor((utcMs - YEAR_START) / 86400000);
+eq('17 August 2026 is day 133 of the tax year', dayOf(Date.UTC(2026, 7, 17)), 133);
+eq('18 August 2026 is day 134', dayOf(Date.UTC(2026, 7, 18)), 134);
+
+// 26. 🔴 THE RECONCILIATION. Both reported figures, from one engine, off one set of books.
+{
+  const d17 = O.taxPosition(CALLUM(133));
+  const d18 = O.taxPosition(CALLUM(134));
+  eq('17 August: the engine gives the figure the chat printed', O.billFromPosition(d17), 10618);
+  eq('18 August: the SAME engine gives the figure the page and the alert printed', O.billFromPosition(d18), 10492);
+  eq('and the gap is the £126.00 the item called two engines', O.billFromPosition(d17) - O.billFromPosition(d18), 126);
+  ok('the year to date profit did not move between them, so the books really are the same',
+    CALLUM(133).ytdTradeIncome - CALLUM(133).ytdTradeExpenses === 17624
+    && CALLUM(134).ytdTradeIncome - CALLUM(134).ytdTradeExpenses === 17624);
+}
+
+// 27. AND THE REASON, SO NOBODY HAS TO GUESS AGAIN. More of the year run on the same money is a
+//     lower run rate, so the projection falls. Monotone, and in the safe direction.
+{
+  const bill = (d) => O.billFromPosition(O.taxPosition(CALLUM(d)));
+  ok('the projection falls as the year runs on unchanged books',
+    bill(120) > bill(133) && bill(133) > bill(134) && bill(134) > bill(160));
+  const f133 = TE.projectionFactor({ monthsElapsed: 4, daysElapsed: 133, observedDays: 133 });
+  const f134 = TE.projectionFactor({ monthsElapsed: 4, daysElapsed: 134, observedDays: 134 });
+  ok('and the divisor is the day count, not anything about the rows', f133.factor > f134.factor);
+  eq('the factor is the year over the days elapsed', f134.factor, TE.DAYS_IN_TAX_YEAR / 134, 1e-9);
+}
+
+// 28. 🔴 THREE DOORS, ONE DAY, ONE FIGURE. The chat sentence, the Tax page hero and the alert's
+//     bill are one expression on one position. On 13 August 2026 two of them wrote that expression
+//     out by hand and the third did not, and WhatsApp said £37,457 while three screens said
+//     £28,250 on the same evening. billFromPosition() is the one door and this is the lock.
+{
+  const t = O.taxPosition(CALLUM(134));
+  const bill = O.billFromPosition(t);
+
+  // The chat: lib/waintents oweAnswer, which takes the figure and never works one out.
+  const chat = W.oweAnswer(bill, t.projected, true);
+  ok('the chat prints the one bill', chat.includes(W.formatGbp(bill)));
+
+  // The agent: the same bill, plus the base the payments on account engine needs.
+  const s = poa(A.computeSignals(input({
+    selfAssessmentBill: bill,
+    selfAssessmentPoa: { tax: t.selfAssessmentTax, deductedAtSource: t.cisSuffered },
+  })));
+  eq('the alert quotes the one bill', s?.numbers.estBill, bill);
+
+  // The page: paymentsOnAccount on the same two fields, which is what app/app/tax/page.tsx passes.
+  const pagePoa = TE.paymentsOnAccount(t.selfAssessmentTax, 2027, t.cisSuffered);
+  eq('and the alert and the page agree on the payment on account, to the penny',
+    s?.numbers.poa, pagePoa.eachPayment);
+  ok('which on these books is NOT half the bill, because of the loan',
+    Math.abs((s?.numbers.poa ?? 0) - bill / 2) > 1);
+}
+
+// 29. THE FORMAT GAP THAT IS LEFT, ASSERTED AS IT STANDS RATHER THAN AS WE WISH IT WERE. The chat
+//     says pence and the Tax page hero says whole pounds, on the same number, under a sentence
+//     promising they are the same figure. Recorded here so that when the page hero moves to two
+//     places this suite is what tells whoever does it that the chat already agreed.
+{
+  const t = O.taxPosition(CALLUM(134));
+  const bill = O.billFromPosition(t);
+  eq('the chat writes it with pence', W.formatGbp(bill), '£10,492.00');
+  const money = readFileSync(path.join(lib, 'money.ts'), 'utf8');
+  ok('lib/money.ts still owns both formats', /export function gbp0/.test(money) && /export function gbp2/.test(money));
+  const taxPage = readFileSync(path.join(root, 'app/app/tax/page.tsx'), 'utf8');
+  ok('and the Tax page hero still prints whole pounds, which is the difference',
+    /lek-hero">\{gbp0\(billFromPosition\(tax\)\)\}/.test(taxPage));
+}
 
 console.log('');
 console.log(`${pass} passed, ${fail} failed.`);

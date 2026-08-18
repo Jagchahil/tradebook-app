@@ -27,12 +27,34 @@
 // paid template, and that goes through the existing budget cap and kill switch
 // (lib/wabudget.ts), so it can never run away.
 //
-// Import free, so the node runner can test it directly.
+// ⚠️ IT USED TO BE IMPORT FREE, "so the node runner can test it directly", AND THAT PROPERTY WAS
+// TRADED AWAY DELIBERATELY ON 18 AUGUST 2026 BY B30. The one import is lib/money.ts, which is
+// itself pure and exists precisely so that a sweep never finds seventeen money formatters again.
+// The local one here was the eighteenth: `£${Math.abs(n).toFixed(2)}` printed "£1034.30", with no
+// thousands separator, which is neither of this product's two money families. Keeping the property
+// meant keeping a private formatter, which is the thing lib/money.ts was written to stop.
+//
+// test/digest.test.mjs now stages this module and lib/money.ts the way eight other suites already
+// stage their chain, because Node's type stripping cannot resolve an extensionless relative import.
+// That is the whole cost.
+
+import { gbpAbs2 } from './money';
 
 // Meta's free window: 24 hours from the user's last inbound message.
 const FREE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // More than this in one message is a wall of text nobody reads.
+//
+// ⚠️ AND IT APPLIES TO WHAT HE IS TOLD, NEVER TO WHAT HE IS ASKED. B30, 18 August 2026, signed off
+// by Jag. Until today it capped BOTH lists, so a man with twelve unrecognised entries read "12 I do
+// not recognise:", saw eight of them, and then read "Reply YES to file those too". Four rows he was
+// never shown, in the one message in this product whose entire job is to ask.
+//
+// The reason for the cap is a good reason for the FILED list, which he is only being told about and
+// can undo. It is not a reason on the ASKING list. handleAck's own comment says "He can only
+// approve what he was shown", and this cap was what made that false. The list is bounded at twenty
+// by bankEntriesForDigestMany, so the worst case is twenty lines, and twenty lines he must decide
+// about beats eight lines and four decisions taken for him.
 const MAX_LINES = 8;
 
 export interface DigestEntry {
@@ -110,15 +132,34 @@ export function isWindowOpen(lastInboundAt: string | null | undefined, now: Date
   return now.getTime() - t < FREE_WINDOW_MS;
 }
 
-function gbp(n: number): string {
-  return `£${Math.abs(n).toFixed(2)}`;
-}
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE LINE CARRIES THE DIRECTION NOW, AND UNTIL 18 AUGUST 2026 IT COULD NOT. B30.
+//
+// supabase/schema.sql, line 627, verbatim: "Income vs expense is the sign of `amount`. Expenses are
+// negative." The old local formatter was `£${Math.abs(n).toFixed(2)}`, so the sign, which is the
+// ONLY thing in the row saying which way the money went, was thrown away before it reached the
+// sentence. A £900 sale and a £900 spend both printed "Wickes, £900.00, labour".
+//
+// And it is reachable, not theoretical: bankEntriesForDigestMany filters source_type, confirmed and
+// is_personal, and nothing else. A bank statement import carries credits as well as debits, so
+// money IN has been landing in that list since the importer was built.
+//
+// ⚠️ gbpAbs2 RATHER THAN gbp2, AND lib/money.ts's OWN WARNING IS WHY: the magnitude only formatters
+// may be used "only where the sentence carries the direction". So the sentence carries it. "in" is
+// this product's word for it already: lib/agent.ts's Monday brief says "£22,910 in, £5,286 out".
+// Expenses say nothing extra, because they are the common case and reading them was never wrong.
+//
+// ⚠️ `>= 0` IS INCOME, TAKEN FROM THE SCHEMA'S OWN SQL rather than chosen here: the year to date
+// views read `case when t.amount >= 0 then t.amount end as income`. A zero row is neither, and
+// calling it money in is harmless and keeps this expression identical to the one the database uses.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
 
-// "Screwfix, £84.30, materials"
+// "Screwfix, £84.30, materials", and "Wickes, £900.00 in, labour"
 function line(e: DigestEntry): string {
   const name = (e.vendor ?? '').trim() || 'Something';
   const cat = (e.category ?? '').trim();
-  return `${name}, ${gbp(e.amount)}${cat && cat.toLowerCase() !== 'other' ? `, ${cat}` : ''}`;
+  const direction = e.amount >= 0 ? ' in' : '';
+  return `${name}, ${gbpAbs2(e.amount)}${direction}${cat && cat.toLowerCase() !== 'other' ? `, ${cat}` : ''}`;
 }
 
 // The message. It says what we DID, and then asks about the one thing that is
@@ -187,9 +228,10 @@ export function buildDigest(split: DigestSplit): string | null {
   }
 
   if (asking.length > 0) {
-    const shown = asking.slice(0, MAX_LINES);
+    // 🔴 NO SLICE. See MAX_LINES above: the count in the heading and the number of lines below it
+    // are the same number, always, because he is about to be asked a question about them.
     parts.push(asking.length === 1 ? 'One I do not recognise:' : `${asking.length} I do not recognise:`);
-    parts.push(shown.map((e) => `• ${line(e)}`).join('\n'));
+    parts.push(asking.map((e) => `• ${line(e)}`).join('\n'));
     parts.push('Reply YES to file those too, or tell me what they were and I will remember.');
   } else if (filed.length > 0) {
     // ═══════════════════════════════════════════════════════════════════════════════════
@@ -209,7 +251,27 @@ export function buildDigest(split: DigestSplit): string | null {
     // sentence claiming more than it checked. "Nothing here needs you" is true of what it saw.
     // The full scope fix is written up as R2-F22 and is not this packet's to make.
     // ═══════════════════════════════════════════════════════════════════════════════════
-    parts.push('Nothing here needs you. Reply NO if any of that looks wrong.');
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    // 🔴 AND IT NO LONGER CONTRADICTS THE 08:00 TEXT. B30, 18 August 2026, signed off by Jag.
+    //
+    // This said "Nothing here needs you. Reply NO if any of that looks wrong." at 00:01. The agent
+    // alert's approved template says "You approve everything, nothing sends itself." at 08:00, to
+    // the same man, on the same phone. Read one after the other they disagree about whether his
+    // books move without him, and they are both trying to say the same true thing.
+    //
+    // They do move. Entries land, and that is the product working: doc 104, "Lekhio decides
+    // everything that is reversible. The user decides everything that is not." What never moves
+    // without him is the irreversible half, and naming it is what makes both sentences true.
+    //
+    // ⚠️ THE WORD "here" STAYS, AND IT IS NOT A FILLER. R2-F22 put it there because `asking` is
+    // scoped to one door, so this sentence can only ever be true of what it looked at. "Nothing
+    // needs you" without it was a false all clear to a woman with £380 waiting in another pile.
+    //
+    // ⚠️ AND THE 08:00 SIDE WAS DELIBERATELY LEFT ALONE. Its words live in a Meta approved
+    // template, so changing them means a re approval, and the AGENT_TEMPLATES_APPROVED gate shuts
+    // while it is pending. This side is sendText, free form, and costs nothing. Jag's call.
+    // ═══════════════════════════════════════════════════════════════════════════════════════
+    parts.push('Nothing here needs you tonight. Entries land in your books on their own; nothing reaches HMRC without your yes. Reply NO if any of that looks wrong.');
   }
 
   return parts.join('\n\n');

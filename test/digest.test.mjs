@@ -5,7 +5,25 @@
 // paid message when the budget is gone, or sends when there is nothing to say, does
 // not just annoy someone. It takes the margin under 80%.
 
-import * as D from '../lib/digest.ts';
+// ⚠️ STAGED RATHER THAN IMPORTED DIRECTLY, SINCE 18 AUGUST 2026. lib/digest.ts was import free on
+// purpose so this line could be a plain import, and B30 traded that away for lib/money.ts: the
+// local formatter here printed "£1034.30", with no thousands separator, and keeping the property
+// meant keeping the eighteenth money formatter in a codebase that swept out seventeen. Node's type
+// stripping cannot resolve an extensionless relative import, so the chain is staged and rewritten,
+// the way eight other suites in this directory already do it.
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const lib = path.resolve(here, '../lib');
+const stage = mkdtempSync(path.join(tmpdir(), 'digest-'));
+const fix = (t) => t.replace(/from '(\.\/[a-zA-Z0-9]+)'/g, "from '$1.ts'");
+for (const f of ['money', 'digest']) {
+  writeFileSync(path.join(stage, f + '.ts'), fix(readFileSync(path.join(lib, f + '.ts'), 'utf8')));
+}
+const D = await import(pathToFileURL(path.join(stage, 'digest.ts')).href);
 
 let pass = 0;
 let fail = 0;
@@ -170,6 +188,97 @@ ok('but SCREWFIX, taught by him, files itself',
     knownPersonal: null,
     looksPersonal: P.looksPersonal('SCREWFIX') !== null,
   }) === true);
+
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+console.log('\nB30, 18 August 2026. What he is SHOWN, what he is ASKED, and which way the money went\n');
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+const rows = (n, prefix, amount) => Array.from({ length: n }, (_, i) => ({
+  id: `${prefix}-${i}`, vendor: `${prefix} ${i + 1}`,
+  amount: typeof amount === 'function' ? amount(i) : (amount ?? -(100 + i)),
+  category: 'materials',
+}));
+const bullets = (text) => text.split('\n').filter((l) => l.startsWith('• ') && !l.startsWith('• and ')).length;
+
+// ─── 1. THE ASKING LIST IS NEVER TRUNCATED, AT ANY SIZE ────────────────────────────────────────
+// 🔴 THIS IS THE DEFECT. Until 18 August the builder sliced BOTH lists to eight. A man with twelve
+// unrecognised entries read "12 I do not recognise:", saw eight, and then read "Reply YES to file
+// those too". handleAck's own comment says "He can only approve what he was shown"; this cap was
+// what made that false. The heading count and the line count are now the same number, always.
+for (const n of [1, 7, 8, 9, 12, 20]) {
+  const msg = D.buildDigest({ filed: [], asking: rows(n, 'Shop') });
+  ok(`asking ${n}: every one he is asked about is printed`, bullets(msg) === n);
+  const heading = n === 1 ? 'One I do not recognise:' : `${n} I do not recognise:`;
+  ok(`asking ${n}: the heading count is the printed count`, msg.includes(heading));
+  ok(`asking ${n}: nothing is hidden behind an "and more"`, !/\n• and \d+ more/.test(msg.split('Reply YES')[0]));
+}
+
+// ─── 2. THE FILED LIST KEEPS ITS CAP, AND THE ARITHMETIC ADDS UP ───────────────────────────────
+// The cap is a good reason for the list he is only being TOLD about, and it is untouched. What is
+// checked here is that shown plus more equals the heading, at the boundary and past it.
+for (const n of [1, 8, 9, 20]) {
+  const msg = D.buildDigest({ filed: rows(n, 'Vendor'), asking: [] });
+  const shown = bullets(msg);
+  const m = /\n• and (\d+) more/.exec(msg);
+  const more = m ? Number(m[1]) : 0;
+  ok(`filed ${n}: shown plus "and N more" equals the heading count`, shown + more === n);
+  ok(`filed ${n}: never more than eight lines`, shown <= 8);
+  ok(`filed ${n}: the "and N more" line appears exactly when something is hidden`, (more > 0) === (n > 8));
+}
+
+// ─── 3. WHICH WAY THE MONEY WENT ───────────────────────────────────────────────────────────────
+// supabase/schema.sql: "Income vs expense is the sign of `amount`. Expenses are negative." The old
+// formatter was Math.abs(), so a £900 sale and a £900 spend printed identically.
+{
+  const both = D.buildDigest({
+    filed: [
+      { id: 'a', vendor: 'Travis Perkins', amount: -900, category: 'materials' },
+      { id: 'b', vendor: 'Wickes', amount: 900, category: 'labour' },
+    ],
+    asking: [],
+  });
+  ok('🔴 an expense and a sale of the same size no longer read the same',
+    both.includes('Travis Perkins, £900.00, materials') && both.includes('Wickes, £900.00 in, labour'));
+  ok('money out says nothing extra, because reading it was never wrong',
+    !/Travis Perkins[^\n]*\bin\b/.test(both));
+  const zero = D.buildDigest({ filed: [{ id: 'z', vendor: 'Refund', amount: 0, category: 'other' }], asking: [] });
+  ok('a zero row takes the schema\'s own >= 0 branch and says in', zero.includes('Refund, £0.00 in'));
+}
+
+// ─── 4. ONE MONEY FORMATTER, AND IT IS lib/money.ts ────────────────────────────────────────────
+{
+  const big = D.buildDigest({ filed: [{ id: 'a', vendor: 'Travis Perkins', amount: -1034.30, category: 'materials' }], asking: [] });
+  ok('🔴 a four figure amount has a thousands separator', big.includes('£1,034.30'));
+  ok('and it is not the old bare toFixed', !big.includes('£1034.30'));
+  ok('two decimal places, which is the direction of travel', /£1,034\.30/.test(big));
+  const src = readFileSync(path.join(lib, 'digest.ts'), 'utf8');
+  // ⚠️ COMMENTS STRIPPED FIRST. The block above digest's line() quotes the old formatter in prose
+  // to say why it went, so a naive scan fails on its own explanation. Sixth time in this repo.
+  // The safe form is the one lib/scotland.ts's suite uses: `(^|[^:])//` never eats an https:// URL.
+  const codeOnly = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  ok('the comment stripper actually strips (vacuity check)',
+    !codeOnly('// toFixed(2) in a comment').includes('toFixed')
+    && codeOnly("const u = 'https://lekhio.app';").includes('https://lekhio.app'));
+  ok('lib/digest.ts has no money formatter of its own any more', !/toFixed\(2\)/.test(codeOnly(src)));
+  ok('and it asks lib/money.ts for the one it uses', /from '\.\/money'/.test(src));
+}
+
+// ─── 5. THE TWO MESSAGES TELL THE SAME TRUTH ───────────────────────────────────────────────────
+// The 00:01 digest said "Nothing here needs you" while the 08:00 template said "You approve
+// everything, nothing sends itself". Both were trying to say the same thing and read as opposites.
+// The template's words live in Meta and were deliberately left alone; this side names the
+// irreversible half so the two agree. Signed off by Jag, 18 August 2026.
+{
+  const quiet = D.buildDigest({ filed: rows(3, 'Vendor'), asking: [] });
+  ok('🔴 the all clear names what never moves without him', quiet.includes('nothing reaches HMRC without your yes'));
+  ok('and it still admits its books move on their own', quiet.includes('Entries land in your books on their own'));
+  // ⚠️ "here" IS NOT A FILLER AND MUST SURVIVE. R2-F22 put it there because `asking` is scoped to
+  // one door, so this sentence can only ever be true of what it looked at.
+  ok('and it is still scoped to what it actually looked at', /Nothing here needs you/.test(quiet));
+  ok('the all clear is never printed when something IS waiting',
+    !D.buildDigest({ filed: rows(3, 'Vendor'), asking: rows(1, 'Shop') }).includes('Nothing here needs you'));
+}
 
 console.log(`\n${pass} passed, ${fail} failed.\n`);
 process.exitCode = fail ? 1 : 0;

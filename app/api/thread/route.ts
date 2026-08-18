@@ -708,9 +708,26 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
   // surfaces cannot drift to different Januaries.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   const sameFigure = 'It is the same figure your Tax screen leads with';
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 AND IT MOVES, WHICH THIS SENTENCE NEVER SAID. B30, 18 August 2026, signed off by Jag.
+  //
+  // The promise above is true at the moment it is made and false by the next morning, because
+  // projectionFactor() divides the year by daysElapsed from 6 April. A man who logs nothing
+  // overnight is on a slightly lower run rate, so his projected year falls, and that is correct
+  // and is the safe direction.
+  //
+  // The B30 item recorded it as two engines disagreeing by £126.00: the chat £10,618.00 one
+  // evening, the Tax page and the 08:00 alert £10,492 the next morning. RECONCILED ON A FROZEN
+  // INPUT: one taxPosition on one set of books gives £10,618 at 133 days elapsed and £10,492 at
+  // 134. Both reported figures, exactly. There is no second engine. There is a sentence promising
+  // sameness beside a number that moves daily, and a man who checks is owed the reason.
+  //
+  // test/f23bill.test.mjs section E holds the reconciliation so nobody reopens it as arithmetic.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  const itMoves = ' It moves as your year does.';
   let collection: string;
   if (optimiser.businessType === 'limited_company') {
-    collection = `${sameFigure}.`;
+    collection = `${sameFigure}.${itMoves}`;
   } else {
     const { startYear } = quarterForDate(new Date());
     // 🔴 THE CIS CREDIT GOES IN HERE TOO, AND THAT IS NOT OPTIONAL. paymentsOnAccount gained its
@@ -723,6 +740,9 @@ async function totalsAnswer(userId: string, q: TotalsQuestion): Promise<string> 
     if (poa.required) {
       collection += ` Because the bill is over ${gbp0(FACTS.poaThreshold)}, HMRC also asks for two payments on account towards the following year, about ${gbp0(poa.eachPayment)} each, due ${poa.firstDue} and ${poa.secondDue}.`;
     }
+    // ⚠️ LAST, NOT SPLICED INTO THE SAMENESS CLAUSE. Appending it to sameFigure would give a
+    // sentence with three "and"s in it once the January date and the instalments arrive.
+    collection += itMoves;
   }
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 THE SAME FIGURE MEANS THE SAME FIGURE. Since 11 August 2026 the Overview and the Tax screen

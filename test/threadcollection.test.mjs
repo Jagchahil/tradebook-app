@@ -211,5 +211,38 @@ ok('and the January date is still printed for him, because a figure with no day 
 ok('no en dash or em dash anywhere in the owed branch',
   !/[\u2013\u2014]/.test(route.slice(route.indexOf('async function totalsAnswer('))));
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// B30, 18 AUGUST 2026. THE SAMENESS PROMISE HAS A CLOCK IN IT, AND NOW IT SAYS SO.
+//
+// "It is the same figure your Tax screen leads with" is true at the moment it is said and false the
+// next morning, because projectionFactor() divides the year by daysElapsed from 6 April. The B30
+// item recorded this as two engines disagreeing by £126.00. It is one engine, one day apart:
+// £10,618 at 133 days elapsed, £10,492 at 134, on identical books. test/f23bill.test.mjs section E
+// holds the reconciliation to the penny.
+//
+// ⚠️ THE CLAUSE GOES LAST, NOT INSIDE THE SAMENESS SENTENCE. Splicing it into sameFigure gives a
+// sentence carrying three "and"s once the January date and the two instalments arrive. Both arms
+// of the structure gate carry it, because a director's figure moves for exactly the same reason.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+{
+  // ⚠️ \w+ RATHER THAN THE NAME itMoves, AND A NO OP CONTROL IS WHAT FOUND IT. This pinned the
+  // identifier, so renaming the local, consistently, went RED. That is this repo's oldest anchor
+  // rule stated backwards: a guard anchored on a variable NAME is guarding the name. Second time
+  // in one day. The identifier is DERIVED from the declaration and then used, so both arms are
+  // still held by the same one thing.
+  const decl = /const (\w+) = ' It moves as your year does\.';/.exec(route);
+  ok('🔴 the chat says the figure moves as his year does', Boolean(decl));
+  const movesName = decl ? decl[1] : '\u0000none';
+  const both = gate ? gate[1].includes(movesName) && gate[2].includes(movesName) : false;
+  ok('🔴 and BOTH arms of the structure gate carry it, the company one included', both);
+  // Anchored on the WORK: the clause is appended after the payments on account sentence, never
+  // folded into the constant that promises sameness. A guard on the constant would go green on a
+  // rewrite that put the two claims in one breath, which is the sentence this rejected.
+  const SAME = "const sameFigure = 'It is the same figure your Tax screen leads with';";
+  ok('the sameness promise itself is unchanged, so its own guards still point at something',
+    route.includes(SAME));
+  ok('and the movement clause is not spliced into it', !/leads with, and it moves/.test(route));
+}
+
 process.stdout.write(`\n  ${pass} passed, ${fail} failed\n`);
 if (fail > 0) process.exit(1);

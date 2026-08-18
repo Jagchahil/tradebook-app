@@ -62,6 +62,25 @@ function runSuite(dir) {
   return false;
 }
 
+// 🔴 THE BASELINE, ADDED 18 AUGUST 2026 BECAUSE THIS PASS IS BEING TOUCHED, WHICH IS EXACTLY THE
+// RULE test/sabotage-b19savings.mjs WROTE DOWN: a pass that cannot prove an unmodified tree green
+// scores nothing. A sabotage pass measures a DIFFERENCE and has no way of knowing whether the red
+// it sees came from the sabotage or from a harness that reds on everything. It costs one tree.
+function baseline() {
+  const t = scratch();
+  const red = runSuite(t.dir);
+  rmSync(t.base, { recursive: true, force: true });
+  if (red) {
+    console.log('🔴 BROKEN HARNESS: an UNMODIFIED scratch tree is already RED.');
+    console.log('   Nothing below would mean anything. Check, in this order:');
+    console.log('   1. every directory these suites READ is copied by scratch() (supabase/ is one)');
+    console.log('   2. every suite tally line matches the regex in runSuite (ledger.test.mjs has no full stop)');
+    console.log('   3. df -h on TMPDIR: a suite that dies of ENOSPC scores as caught');
+    process.exit(1);
+  }
+  console.log('BASELINE: an unmodified scratch tree is GREEN, so a red below is the sabotage.\n');
+}
+
 const edit = (dir, rel, from, to) => {
   const p = path.join(dir, rel);
   const s = readFileSync(p, 'utf8');
@@ -70,14 +89,25 @@ const edit = (dir, rel, from, to) => {
 };
 
 const W = 'lib/waintents.ts';
-const NOUNS = '|national insurance|ni|class ?[24]|student loan|propert(?:y|ies)|rentals?|rent)';
+// 🔴 REPAIRED 18 AUGUST 2026, AND THE REPAIR IS A RULE RATHER THAN A STRING. This constant, the
+// "rent and rentals go" sabotage below and the "widened with pension" control ALL quoted this
+// list's CLOSING BRACKET, and B19's savings packet appended |savings?|saving to it hours later.
+// All three died at once: two sabotages that could not be applied and a control that could not be
+// applied either, and the pass went on reporting 18/20 and 6/7 with nobody able to see why from
+// the tally alone. Found by the full loop on the Mac, which is the only thing that can see it.
+//
+// ⚠️ THE LESSON IS NOT "FIX THE STRING". AN ANCHOR THAT QUOTES THE EDGE OF A LIST BREAKS EVERY
+// TIME THE LIST GROWS, AND THIS LIST IS DESIGNED TO GROW: B23's own rule is that the gate gains
+// the nouns of every lane that gets wired, and two lanes have been wired since. All three anchors
+// below now quote the INTERIOR of the list, which an append cannot touch.
+const NOUNS = '|national insurance|ni|class ?[24]|student loan|propert(?:y|ies)|rentals?|rent';
 const RUN = "(?:(?!of\\b|from\\b|to\\b|in\\b|on\\b|for\\b|with\\b|off\\b|out\\b|at\\b|by\\b|as\\b)[a-z0-9'\\u2019-]+\\s+){0,5}?";
 
 const SABOTAGES = [
   // ── DEAF: THE POSSESSIVE NOUNS GO, ONE AT A TIME. Each is a noun 9d walks by name. ────────
   {
     name: '🔴 the whole B23 noun list goes, which is the state the finding was written about',
-    apply: ({ dir }) => edit(dir, W, NOUNS, ')'),
+    apply: ({ dir }) => edit(dir, W, NOUNS, ''),
   },
   {
     name: '🔴 "student loan" goes, so "whats jerome\'s student loan" reads HIS threshold out loud again',
@@ -101,7 +131,7 @@ const SABOTAGES = [
   },
   {
     name: '🔴 "rent" and "rentals" go, so a landlord asking about another landlord is answered from his own rows',
-    apply: ({ dir }) => edit(dir, W, '|rentals?|rent)', ')'),
+    apply: ({ dir }) => edit(dir, W, '|rentals?|rent', ''),
   },
 
   // ── DEAF: THE OBJECT NOUN RUN. Three of the six live here. ────────────────────────────────
@@ -186,7 +216,9 @@ const CONTROLS = [
   },
   {
     name: '⚠️ THE EAR IS WIDENED FURTHER with "pension", which is somebody being MORE careful and must not be frozen',
-    apply: ({ dir }) => edit(dir, W, '|rentals?|rent)', '|rentals?|rent|pension)'),
+    // 🔴 THE NEW NOUN IS INSERTED IN THE MIDDLE, NOT APPENDED. Appending is what killed this
+    // control when the savings packet appended after it. An interior anchor cannot rot that way.
+    apply: ({ dir }) => edit(dir, W, '|turnover|vat|', '|turnover|vat|pension|'),
   },
   {
     name: '⚠️ A ROLE WORD IS ADDED TO THE STOPLIST, which returns an honest question and must not be frozen',
@@ -224,6 +256,8 @@ const RUNNING = SABOTAGES.slice(FROM, TO);
 if (RUNNING.length !== SABOTAGES.length) {
   console.log(`SLICE: sabotages ${FROM}..${TO - 1} of ${SABOTAGES.length}. NOT THE WHOLE PASS.`);
 }
+
+baseline();
 
 let caught = 0, missed = 0;
 console.log('SABOTAGES (each must go RED)');

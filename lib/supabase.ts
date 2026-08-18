@@ -26,7 +26,7 @@ import { quarterForDate, quarterBounds } from './quarterpack';
 // hand here; see the note on isResidentialFinanceCost for the document that drifted because of it.
 import { isResidentialFinanceCost } from './propertyengine';
 import { sumCapitalAllowances as sumCapitalAllowancesYtd, aggregateConfirmedRows as aggregateRowsYtd } from './yeartodate';
-import { selfAssessmentBill, type OptimiserInput } from './taxoptimiser';
+import { billFromPosition, taxPosition, type OptimiserInput } from './taxoptimiser';
 import { qaDedupeKey, qaPrunePaths } from './qaretention';
 import type { KnowledgeState } from './knowledgewatch';
 import type {
@@ -6614,11 +6614,38 @@ export interface AgentAggregates {
 // The cron already does five round trips per user in one Promise.all; this is the sixth, in the
 // same wave, so it costs latency once rather than per user in series.
 // ═════════════════════════════════════════════════════════════════════════════════════════════
-export async function selfAssessmentBillFor(userId: string): Promise<number | null> {
+//
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND IT RETURNS TWO NUMBERS NOW, NOT ONE, AND IT IS RENAMED TO SAY SO. B30, 18 August 2026.
+//
+// January is a balancing payment PLUS a payment on account, and gov.uk computes them off different
+// bases: the balancing payment carries the student loan, the payment on account never does
+// (SALF303, quoted in full on AgentInput.selfAssessmentPoa). The agent was handed the bill alone
+// and halved it, so a borrower's January was overstated by half his loan.
+//
+// ⚠️ ONE READ, ONE POSITION, TWO NUMBERS. taxPosition() is called ONCE and both figures come off
+// the same object, which is the whole point: a second reader would be a second round trip AND a
+// second chance for the two halves of one sentence to describe two different afternoons.
+//
+// ⚠️ RENAMED FROM selfAssessmentBillFor RATHER THAN WIDENED IN SILENCE. A function called
+// "BillFor" that hands back a payments on account base is a function whose name is now a lie, and
+// this file has a rule about that. Three call sites, all named in test/f23bill.test.mjs.
+//
+// ⚠️ THE TWO poa FIELDS ARE taxPosition().selfAssessmentTax AND .cisSuffered, WHICH ARE EXACTLY
+// THE TWO ARGUMENTS app/app/tax/page.tsx PASSES TO paymentsOnAccount(). Not a coincidence and not
+// to be tidied: the page and the 08:00 text are meant to be one function call on one position.
+// ═════════════════════════════════════════════════════════════════════════════════════════════
+export async function selfAssessmentJanuaryFor(
+  userId: string,
+): Promise<{ bill: number; poa: { tax: number; deductedAtSource: number } } | null> {
   try {
-    return selfAssessmentBill(await getOptimiserInput(userId));
+    const position = taxPosition(await getOptimiserInput(userId));
+    return {
+      bill: billFromPosition(position),
+      poa: { tax: position.selfAssessmentTax, deductedAtSource: position.cisSuffered },
+    };
   } catch (err) {
-    console.error('[agent] self assessment bill unavailable:', err instanceof Error ? err.message : err);
+    console.error('[agent] self assessment january unavailable:', err instanceof Error ? err.message : err);
     return null;
   }
 }

@@ -11,7 +11,7 @@
 // finance products (the FCA line, doc 82 section 5). Visibly automated.
 // Writing rule: no em dashes, no en dashes anywhere, including every message.
 
-import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly, mtdPosition } from './taxengine';
+import { FACTS, soleTraderTax, homeOfficeFlatRateMonthly, mtdPosition, paymentsOnAccount } from './taxengine';
 import { studentLoanForSA, STUDENT_PLANS, type StudentPlan } from './nistudentloan';
 import { aprilDelta, PROPERTY_FACTS } from './propertyengine';
 import { chaseMessage } from './waintents';
@@ -143,6 +143,38 @@ export interface AgentInput {
   // Node's type stripping cannot resolve an extensionless import, so a new import here would break
   // them on module resolution rather than on anything real.
   selfAssessmentBill: number | null;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 THE PAYMENTS ON ACCOUNT BASE, WHICH IS NOT THE BILL ABOVE, AND NO ARITHMETIC ON THE BILL CAN
+  // RECOVER IT. B30, 18 August 2026.
+  //
+  // gov.uk, derived live on 18 August from the Self Assessment Legal Framework manual SALF303:
+  // "Capital gains tax and student loan repayments are excluded from the computation of payments on
+  // account. So any capital gains tax or Student Loan repayment is simply payable as part of the
+  // balancing payment on 31 January following the tax year." Class 4 National Insurance IS
+  // included. The public page says the identical thing from the other side: the BALANCING payment
+  // "will also include anything you owe for capital gains or student loans (if you're self
+  // employed)".
+  //
+  // So January is TWO numbers with two different rules. The bill above is the balancing payment and
+  // it correctly carries the loan. What HMRC asks for ON ACCOUNT is half the tax with the loan
+  // taken out, and until today this engine worked it out as half the bill. A borrower was charged
+  // half his student loan a year before HMRC will ask for it, and the error is always exactly half
+  // his projected repayment.
+  //
+  // ⚠️ IT IS A SEPARATE FIELD RATHER THAN A SUBTRACTION HERE, because the loan inside the bill is
+  // invisible from this file: the bill arrives as one number from taxPosition() and nothing about
+  // it says how much of it is loan. tax is taxPosition().selfAssessmentTax, which has excluded the
+  // loan since it was written; deductedAtSource is taxPosition().cisSuffered. Those are the exact
+  // two arguments app/app/tax/page.tsx has passed to paymentsOnAccount() since 11 August, so the
+  // page and the 08:00 text are now one function call, the way the bill already is.
+  //
+  // ⚠️ NULL MEANS "COULD NOT BE COMPUTED", AND A NULL BASE FIRES NOTHING. It deliberately does NOT
+  // fall back to halving the bill: that fallback is the defect, and keeping it alive for whoever
+  // did not read the memo is how a defect survives a fix. No signal beats a wrong signal, every
+  // time. The trade only fallback below has its own pair (projTax and projCis) and never needs it.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════════
+  selfAssessmentPoa: { tax: number; deductedAtSource: number } | null;
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 THE SECOND AXIS: WHETHER HE TRADES AT ALL, WHICH businessType CANNOT ANSWER.
@@ -629,9 +661,24 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
 
   // 7. Payments on account cliff.
   //
-  // 🔴 R2-F23. THE FIGURE COMES FROM THE ROUTE NOW, NOT FROM HERE. See selfAssessmentBill on
-  // AgentInput for the florist who was texted £1,708 against a page reading £1,171. The blend below
-  // survives only as the trade-only fallback, where taxPosition equals it to the penny.
+  // 🔴 R2-F23 IS CLOSED, AND CLOSING IT MEANT ADMITTING THERE ARE TWO NUMBERS HERE, NOT ONE. B30,
+  // 18 August 2026. The comment this replaces said "the figure comes from the route now, not from
+  // here", and it was true of the BILL and quietly false about the HALF: the half was still worked
+  // out in this block, by dividing the bill in two. Half the right number is not the right number
+  // when HMRC halves a different one. See selfAssessmentPoa on AgentInput for gov.uk's own words.
+  //
+  // The florist who started R2-F23 was texted £1,708 against a page reading £1,171. The customer
+  // who finished it was texted a January of £15,738 against a page implying £15,099, and the £639
+  // between them is exactly half his projected student loan repayment, asked for a year early.
+  //
+  // ⚠️ AND THE HALVING IS NOT ARITHMETIC THIS FILE DOES ANY MORE. lib/taxengine.ts
+  // paymentsOnAccount() is the one engine, and /app/tax and /api/thread have both called it since
+  // 11 August. It carries three things this block did not: the £1,000 test on the RELEVANT AMOUNT
+  // rather than on the whole bill, the 80 percent deducted at source excuse that a CIS
+  // subcontractor is the taxpayer it was written for, and the halving. The last of those matters
+  // most here, because until today this engine texted two payments on account to a groundworker
+  // whose contractors have already paid four fifths of his year. That is the identical defect Run 1
+  // found on /app/tax on 11 August, fixed there, and nowhere else.
   if (canProject) {
     const projTax = soleTraderTax(projProfit).total;
     const projSl = plans.length > 0 ? studentLoanForSA(projProfit, salary, plans) : 0;
@@ -644,17 +691,50 @@ export function computeSignals(input: AgentInput): AgentSignal[] {
     // arrives as undefined. `undefined !== null` is TRUE, which would have walked a NaN straight
     // into a customer's set aside. Anything that is not a real number takes the safe path.
     const given = input.selfAssessmentBill;
-    const estBill = typeof given === 'number' && Number.isFinite(given)
-      ? Math.max(0, given)
+    const haveGiven = typeof given === 'number' && Number.isFinite(given);
+    const estBill = haveGiven
+      ? Math.max(0, given as number)
       : hasRent ? null : blendedBill;
-    if (estBill !== null && estBill > FACTS.poaThreshold) {
-      const poa = Math.round(estBill / 2);
+
+    // THE BASE TRAVELS WITH THE BILL IT BELONGS TO. A route that hands in a bill hands in the base
+    // beside it, from the same taxPosition() call, because the two cannot be derived from each
+    // other. The trade only fallback keeps its own pair: projTax is the tax, and projSl was never
+    // inside it. Same typeof and isFinite discipline as the bill, and for the same reason.
+    const p = input.selfAssessmentPoa;
+    const baseTax = p && typeof p.tax === 'number' && Number.isFinite(p.tax) ? Math.max(0, p.tax) : null;
+    const baseAtSource = p && typeof p.deductedAtSource === 'number' && Number.isFinite(p.deductedAtSource)
+      ? Math.max(0, p.deductedAtSource)
+      : 0;
+    const base = haveGiven
+      ? (baseTax === null ? null : { tax: baseTax, atSource: baseAtSource })
+      : { tax: projTax, atSource: projCis };
+
+    // The engine answers all three questions: is it required at all, is he excused because his
+    // contractors already paid it, and how much is each instalment. The year is passed so the
+    // schedule it returns is not lying about its own dates, even though this block prints none.
+    const schedule = base === null
+      ? null
+      : paymentsOnAccount(base.tax, taxYearEnd(today).getUTCFullYear(), base.atSource);
+    if (estBill !== null && schedule !== null && schedule.required) {
+      const poa = schedule.eachPayment;
+      // ⚠️ THE CLAUSE THAT EXPLAINS WHY THE SUM DOES NOT LOOK RIGHT, AND ONLY FOR THE MAN WHOSE SUM
+      // DOES NOT LOOK RIGHT. Doc 103: a row he has to read and reject is a cost. Without a student
+      // loan the payment on account IS half the bill and the sentence would be answering a question
+      // he never asked. With one, he can divide two numbers on the screen and get a third, and a
+      // product whose arithmetic he cannot reproduce is a product he stops believing.
+      const loanClause = projSl > 0
+        ? ' The payment on account is half your tax, not half the bill: HMRC never asks for a student loan repayment up front.'
+        : '';
       out.push({
         signalKey: 'poa_cliff',
         periodKey: year,
         priority: 'ping',
         title: 'Payments on account will apply',
-        body: `Your Self Assessment bill is heading for about ${gbp(estBill)}. Over ${gbp(FACTS.poaThreshold)}, HMRC also asks for half of next year in advance, so the first January bill is roughly one and a half times what you expect: the year's bill plus about ${gbp(poa)} on account. Brutal if it surprises you, boring if you set aside for it, and your set aside number can carry it from here.`,
+        // ⚠️ "roughly one and a half times what you expect" CAME OUT, and it was not a style edit.
+        // It is only true of a man with no student loan and no tax deducted at source. For anybody
+        // else it is a claim he can check against the two figures in the same sentence and find
+        // wrong, which is the worst kind of copy: confident, checkable and false.
+        body: `Your Self Assessment bill is heading for about ${gbp(estBill)}. Over ${gbp(FACTS.poaThreshold)}, HMRC also asks for half of next year's tax up front, so January is bigger than the bill itself: ${gbp(estBill)} for the year plus about ${gbp(poa)} on account.${loanClause} Brutal if it surprises you, boring if you set aside for it, and your set aside number can carry it from here.`,
         waText: `your Self Assessment bill is heading for about ${gbp(estBill)}, which switches on payments on account: January asks for roughly ${gbp(estBill + poa)} in total`,
         numbers: { estBill, poa, threshold: FACTS.poaThreshold },
         action: { kind: 'set_aside', amount: estBill, label: 'Tax set aside' },

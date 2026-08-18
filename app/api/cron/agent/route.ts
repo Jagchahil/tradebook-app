@@ -37,7 +37,7 @@ import {
   getStudentLoanSettings,
   refreshFactsFromDb,
   readCircumstances,
-  selfAssessmentBillFor,
+  selfAssessmentJanuaryFor,
 } from '../../../../lib/supabase';
 import { sendExpoPush, isExpoPushToken } from '../../../../lib/push';
 import { T_AGENT_THRESHOLD, T_AGENT_DEADLINE, T_AGENT_OPPORTUNITY } from '../../../../lib/watemplates';
@@ -122,17 +122,21 @@ async function processUser(user: {
   // A user with no data produces no signals; skip the engine's edge cases early.
   if (agg.months.length === 0 && agg.unconfirmed === 0) return { inserted: 0, pinged: 0 };
 
-  const [goals, overdue, profile, income, circs, bill] = await Promise.all([
+  const [goals, overdue, profile, income, circs, january] = await Promise.all([
     getActiveGoals(user.id),
     listOverdueInvoices(user.id),
     getBusinessProfile(user.id),
     getStudentLoanSettings(user.id),
     readCircumstances(user.id),
     // 🔴 R2-F23. THE BILL, FROM THE ENGINE THE TAX PAGE USES, NOT FROM THE AGENT'S OWN ARITHMETIC.
-    // getOptimiserInput + selfAssessmentBill is the same pair /app/tax calls to draw its headline,
-    // so the phone and the page cannot say different numbers. A failure here is null, and null
-    // withholds the signal from anyone with rent rather than guessing. See AgentInput.
-    selfAssessmentBillFor(user.id),
+    // getOptimiserInput + taxPosition is the same pair /app/tax calls to draw its headline, so the
+    // phone and the page cannot say different numbers. A failure here is null, and null withholds
+    // the signal from anyone with rent rather than guessing. See AgentInput.
+    //
+    // 🔴 B30, 18 August: it returns the PAYMENTS ON ACCOUNT BASE beside the bill, from the same
+    // position, because gov.uk computes the two halves of January off different bases and this
+    // walk was halving the wrong one. See AgentInput.selfAssessmentPoa.
+    selfAssessmentJanuaryFor(user.id),
   ]);
   const input: AgentInput = {
     today: new Date(),
@@ -178,7 +182,9 @@ async function processUser(user: {
     // null, which means "not asked yet" and never "no". See mtdPosition() in lib/taxengine.ts.
     mtdStated: mtdStatedFrom(Object.fromEntries((circs ?? []).map((c) => [c.key, c.answer]))),
     // 🔴 R2-F23. One engine, one bill. See AgentInput.selfAssessmentBill.
-    selfAssessmentBill: bill,
+    // 🔴 B30. And one base for the half, off the same read. See AgentInput.selfAssessmentPoa.
+    selfAssessmentBill: january?.bill ?? null,
+    selfAssessmentPoa: january?.poa ?? null,
   };
   let signals = computeSignalsForStructure(input);
   if (signals.length === 0) return { inserted: 0, pinged: 0 };

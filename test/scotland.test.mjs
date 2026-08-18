@@ -414,6 +414,16 @@ const PRODUCERS = new Set([
   'soleTraderTax', 'soleTraderTaxForYear', 'incomeTaxOnProfit', 'taxPosition', 'marginalRate',
   'findOptimisations', 'totalEstimatedSaving', 'applyDial', 'combinedIncomeTax', 'computePosition',
   'combinedBill', 'aprilDelta', 'compare', 'buildQuarterPack', 'buildIncomeProof',
+  // 🔴 FOUR MORE, ADDED 18 August 2026 BY B30, AND THE MEASUREMENT IS THE POINT. Until this
+  // morning lib/supabase.ts imported selfAssessmentBill and NOTHING ELSE band derived, so a file
+  // holding the number the 08:00 text quotes was invisible to this discovery. It only appeared
+  // when the import changed to taxPosition. These four are the doors into a band derived figure
+  // that were not producers: selfAssessmentBill and billFromPosition ARE the bill, paymentsOnAccount
+  // halves it, and setAsideBasisLine writes the sentence under it.
+  // ⚠️ MEASURED BEFORE ADDING, NOT ASSUMED: with these four in, the discovery finds the SAME 27
+  // files it found without them, because every file importing one of these already imports a
+  // producer above. So this costs nothing today and closes a door that was open an hour ago.
+  'selfAssessmentBill', 'billFromPosition', 'paymentsOnAccount', 'setAsideBasisLine',
 ]);
 const ENGINE_MODULES = new Set([...PURE_ENGINES, 'quarterpack', 'incomeproof']);
 
@@ -452,6 +462,12 @@ const NOT_DISCLOSED = {
     'It computes and renders nothing. The surfaces that read it are each classified here.',
   'lib/prepop.ts':
     'It pre populates a return draft from stored figures. No user facing number of its own.',
+  // 🔴 ADDED 18 August 2026 BY B30, AND THIS RATCHET FOUND IT THE MOMENT THE IMPORT CHANGED.
+  // selfAssessmentJanuaryFor() now calls taxPosition() directly, so the data layer became a
+  // discovered surface within one edit and this suite refused to go green until somebody decided.
+  // That is the ratchet doing its job on a file nobody thought of as a screen.
+  'lib/supabase.ts':
+    'The data layer. Its one taxPosition() call exists so that the agent and the two routes quote the SAME position the tax page draws, and it renders no sentence to anybody: it returns numbers. Every surface that reads those numbers is classified in this file, and app/api/cron/agent and lib/agent.ts are both on that list. A caveat here would have no reader.',
   'lib/rakhamoves.ts':
     'Internal move generation. It renders no figure to anybody.',
 };

@@ -222,7 +222,14 @@ const withProperty = input(dec, monthsFor(dec, 12, { incomePerMonth: 7000, expen
   // the blended profit it used charges Class 4 National Insurance on rent, which carries none. Both
   // routes now hand the figure in from taxPosition(), so the fixture does what production does.
   // The assertion below is UNCHANGED: a landlord still gets the signal. Only the wiring moved.
+  //
+  // 🔴 B30, 18 August 2026. AND THE BASE TRAVELS WITH IT NOW, FOR THE SAME REASON: production
+  // hands both numbers in off one taxPosition(), because HMRC computes the balancing payment and
+  // the payment on account off different bases. This landlord has no student loan and no CIS, so
+  // his tax and his bill are the same figure and nothing he reads moves. A fixture that passed the
+  // bill alone would be testing a state no route can produce.
   selfAssessmentBill: 24000,
+  selfAssessmentPoa: { tax: 24000, deductedAtSource: 0 },
 });
 ok('🔴 Section 24 still reaches the landlord it was written for', has(landlord(withProperty), 's24_exposure'));
 ok('🔴 and the April 2027 property rates preview does too', has(landlord(withProperty), 'property_rates_2027'));

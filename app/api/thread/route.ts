@@ -349,21 +349,6 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
   if (isStudentLoanQuestion(q)) return studentLoanAnswerForUser(userId, 'web');
   if (isNiQuestion(q)) return niAnswerForUser(userId);
 
-  // ══════════════════════════════════════════════════════════════════════════════════════════
-  // 🔴 WHAT LEKHIO HAS SAVED HIM. B19, 18 August 2026, and it is the last money lane with one door.
-  //
-  // isSavingsQuestion has been dispatched by app/api/whatsapp/route.ts and by nothing else since
-  // Run 2, because it was the only lane with no pure builder to move: the sentences were assembled
-  // inline in the route. So a man signed in HERE, with his whole ledger one query away, asked "what
-  // have you saved me" or "was it worth it" and was answered by the MODEL, which cannot run the
-  // engine twice and would paraphrase the figure. "was it worth it" is a man deciding whether to
-  // keep paying, and it is the worst question in the product to hand to a guess.
-  //
-  // ⚠️ NO CHANNEL PARAMETER, UNLIKE THE PROPERTY AND STUDENT LOAN LANES ABOVE. Measured, not
-  // assumed: the one sentence in this lane with a channel in it belongs to a state only WhatsApp
-  // has (a phone number with no account). See savingsAnswer in lib/waintents.ts.
-  // ══════════════════════════════════════════════════════════════════════════════════════════
-  if (isSavingsQuestion(q)) return savingsAnswerForUser(userId);
 
   // 2. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
   const totals = matchTotalsQuestion(q);
@@ -383,6 +368,40 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
       allowanceThisYear: Math.max(0, o?.ytdCapitalAllowances ?? 0),
     });
   }
+
+  // 🔴 BELOW THE VEHICLE LANE, AND IT WAS ABOVE IT FOR ONE COMMIT. FOUND BY TYPING THE ADJACENT
+  // QUESTIONS INTO THIS SURFACE RATHER THAN BY READING THE CHAIN.
+  //
+  // isSavingsQuestion's second arm is `worth it`, which is broad on purpose: "was it worth it" is a
+  // man deciding whether to keep paying us and it is the whole reason the lane exists. But "is a van
+  // worth it" is that phrase inside somebody else's question. BOTH other routers already order these
+  // correctly and nobody had written down that they did: app/api/whatsapp/route.ts has the vehicle
+  // lane at 657 against savings at 685, and app/api/ask/route.ts has 217 against 293. This surface
+  // was the only one with them the other way round, so a man asking whether to buy a van was handed
+  // the ledger of what Lekhio had saved him.
+  //
+  // MEASURED BEFORE THE MOVE AND AFTER: two phrasings diverged from WhatsApp, now one, and every one
+  // of the five savings phrasings still reaches this lane. The one left is "am i saving enough for
+  // my tax bill", which lands on the set aside here and on the savings ledger on WhatsApp. That is
+  // this surface being MORE right, and it is recorded rather than smoothed over: the WhatsApp ear is
+  // the thing that is wrong there, and widening or narrowing it needs the self corpus re run.
+  //
+  // test/laneparity.test.mjs section 12 now holds this relationship by INDEX on all three routers.
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT LEKHIO HAS SAVED HIM. B19, 18 August 2026, and it is the last money lane with one door.
+  //
+  // isSavingsQuestion has been dispatched by app/api/whatsapp/route.ts and by nothing else since
+  // Run 2, because it was the only lane with no pure builder to move: the sentences were assembled
+  // inline in the route. So a man signed in HERE, with his whole ledger one query away, asked "what
+  // have you saved me" or "was it worth it" and was answered by the MODEL, which cannot run the
+  // engine twice and would paraphrase the figure. "was it worth it" is a man deciding whether to
+  // keep paying, and it is the worst question in the product to hand to a guess.
+  //
+  // ⚠️ NO CHANNEL PARAMETER, UNLIKE THE PROPERTY AND STUDENT LOAN LANES ABOVE. Measured, not
+  // assumed: the one sentence in this lane with a channel in it belongs to a state only WhatsApp
+  // has (a phone number with no account). See savingsAnswer in lib/waintents.ts.
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  if (isSavingsQuestion(q)) return savingsAnswerForUser(userId);
 
   // 3. "Can I claim it" questions: the deterministic claim rules, no AI.
   //

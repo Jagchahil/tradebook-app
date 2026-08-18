@@ -1990,6 +1990,36 @@ for (const [name, code] of ROUTERS) {
     at !== -1 && modelAt !== -1 && at < modelAt);
 }
 
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND IT SITS BELOW THE VEHICLE LANE ON ALL THREE, WHICH IS A CUSTOMER VISIBLE ORDER AND WAS
+// WRONG ON ONE OF THEM FOR EXACTLY ONE COMMIT.
+//
+// isSavingsQuestion's `worth it` arm is broad by design, because "was it worth it" is the question
+// this lane exists to answer. "is a van worth it" is the same three words inside somebody else's
+// question. app/api/whatsapp/route.ts and app/api/ask/route.ts BOTH already had the vehicle lane
+// above it and neither had written down that this mattered; the thread was wired the other way and
+// handed a man asking about a van the ledger of what we had saved him. Held by index now, on all
+// three, so the next router to gain this lane cannot get it wrong quietly.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const vehSites = {
+    whatsapp: '} else if (isVehicleQuestion(text)) {',
+    thread: 'if (isVehicleQuestion(q)) {',
+    ask: 'if (!truth && isVehicleQuestion(question)) {',
+  };
+  for (const [name, code] of ROUTERS) {
+    const vehAt = code.indexOf(vehSites[name]);
+    ok(`${name}: the vehicle lane was located, so the bound below is not vacuous`, vehAt !== -1);
+    ok(`🔴 ${name}: "is a van worth it" REACHES THE VEHICLE LANE, not the savings ledger`,
+      vehAt !== -1 && savingsAt[name] !== -1 && vehAt < savingsAt[name]);
+  }
+  // And the phrasing itself, run rather than reasoned about, in both directions.
+  ok('🔴 the phrase that made this matter really does satisfy BOTH matchers',
+    W.isSavingsQuestion('is a van worth it') && W.isVehicleQuestion('is a van worth it'));
+  ok('  ...while the lane\'s own question is NOT a vehicle question, so the order costs it nothing',
+    W.isSavingsQuestion('was it worth it') && !W.isVehicleQuestion('was it worth it'));
+}
+
 // 🔴 THE WORDS HAVE ONE HOME AND NO ROUTER KEEPS A COPY. This is the assertion that would have
 // failed before 18 August 2026, when the webhook held the only copy and it was the whole answer.
 ok('🔴 lib/waintents.ts holds the ONE savingsAnswer builder',

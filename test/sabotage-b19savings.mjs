@@ -256,6 +256,16 @@ const SABOTAGES = [
     apply: ({ dir }) => edit(dir, LP, "  isSavingsQuestion: { on: ALL3, why: '' },",
       "  isSavingsQuestion: { on: WA_ONLY, why: 'a reason long enough to pass the length check entirely on its own' },"),
   },
+  // ── AND THE ORDER AGAINST THE VEHICLE LANE, WHICH WAS WRONG ON THE THREAD FOR ONE COMMIT.
+  {
+    // ⚠️ THE LANE MOVES, NOT THE VEHICLE BLOCK. The first draft of this sabotage lifted
+    // `if (isVehicleQuestion(q)) {` and left its body behind, which is a SYNTAX ERROR, and a suite
+    // that dies of a syntax error is red for a reason that has nothing to do with any guard. It
+    // scored as caught and proved nothing. Moving the savings lane, which is one whole statement on
+    // one line, reproduces the defect exactly as it shipped and compiles cleanly.
+    name: '🔴 the thread hoists savings ABOVE the vehicle lane, so "is a van worth it" gets the ledger',
+    apply: ({ dir }) => demote(dir, TH, TH_LANE, '  if (totals) return totalsAnswer(userId, totals);'),
+  },
   // ── AND THE GATE'S EAR FOR THIS LANE'S VOCABULARY. B23's rule is that the noun list gains a
   // ── lane's words when that lane gains routers, and this lane gained two of them today.
   {

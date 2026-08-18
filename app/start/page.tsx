@@ -567,8 +567,16 @@ export default function StartPage() {
         </div>
       </div>
 
-      {/* Progress */}
-      {!done && !billingResult && (
+      {/* Progress. 🔴 AND NOT ON THE BLOCKED SCREEN, FOUND BY READING THE WHOLE SCREEN ON
+          PRODUCTION, 18 AUGUST 2026, AFTER THE PUSH AND BEFORE THE HANDOVER.
+          The gate walked correctly and every sentence of it was honest, and above it the bar still
+          read "STEP 1 OF 6" and "10 to 15 minutes in total" to a man who had just been told there
+          is no setup for him. Two promises, both false the moment the blocked screen draws: he is
+          not on step one of anything, and it is not going to take him fifteen minutes.
+          Nothing in this repo could have caught it: every assertion reads the copy, and the bar is
+          a different component forty lines up. Same lesson as the identity lane's header repeat,
+          which is why the dispatch said to read the whole screen. */}
+      {!done && !billingResult && !blocked && (
         <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: '20px 22px 0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: RIVER, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step {step} of {TOTAL}</span>

@@ -232,6 +232,13 @@ const SABOTAGES = [
       'if (signup.phone) record.phone = normalizeUkPhone(signup.phone);',
       'record.phone = normalizeUkPhone(signup.phone ?? "");'),
   },
+  {
+    // The claim that /early-access cannot reach the relaxed branch is only worth making while its
+    // own check is there. Take the check away and the claim has to go red with it.
+    name: 'the marketing waitlist drops its own phone check, so the relaxation reaches it',
+    apply: (d) => edit(d, 'app/early-access/page.tsx',
+      'if (cleaned.length < 10) {', 'if (false) {'),
+  },
   // ── The blast radius. It gates NEW onboarding and nothing else. ─────────────────────────
   {
     name: 'the gate spreads to the signed in setup interview',
@@ -246,9 +253,23 @@ const SABOTAGES = [
       "alter table public.waitlist add column if not exists region text;\nupdate public.waitlist set region = 'england-wales-or-northern-ireland' where region is null;"),
   },
   {
+    // ⚠️ THE TWO CHROME BLOCKS ARE SABOTAGED SEPARATELY, BECAUSE THEY ARE TWO DIFFERENT COMPONENTS
+    // AND ONE OF THEM GOT THROUGH THE FIRST PUSH. Each anchor carries the tail of its own comment
+    // so it cannot match the other one: `edit` replaces EVERY occurrence, so a bare conditional
+    // would knock out both and pass for one sabotage while hiding the other.
     name: 'the Continue footer is drawn under the blocked screen',
     apply: (d) => edit(d, 'app/start/page.tsx',
-      '{!done && !billingResult && !blocked && (', '{!done && !billingResult && ('),
+      'disappoint. */}\n      {!done && !billingResult && !blocked && (',
+      'disappoint. */}\n      {!done && !billingResult && ('),
+  },
+  {
+    // 🔴 THE ONE PRODUCTION FOUND. The bar read "STEP 1 OF 6" and "10 to 15 minutes in total" over
+    // a heading saying there is no setup for him: two false promises in the chrome, where no
+    // assertion in this repo was looking, on a screen whose entire job is to be honest.
+    name: 'the progress bar promises him a fifteen minute setup he cannot have',
+    apply: (d) => edit(d, 'app/start/page.tsx',
+      'read the whole screen. */}\n      {!done && !billingResult && !blocked && (',
+      'read the whole screen. */}\n      {!done && !billingResult && ('),
   },
 ];
 

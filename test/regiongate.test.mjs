@@ -239,8 +239,19 @@ for (const fn of ['regionBlockedHeading', 'regionBlockedBody', 'regionWaitlistAs
   const arms = [...upto.matchAll(/\)\s*:\s*(\w+)\s*\?\s*\(/g)];
   const name = arms.length ? arms[arms.length - 1][1] : null;
   ok('the blocked screen is an alternative to the steps, not an addition', !!name);
-  ok('🔴 and the Continue footer is not drawn under it',
-    !!name && startCode.includes(`!done && !billingResult && !${name} && (`));
+  // Both chrome blocks, and the count is DERIVED: the footer and the progress bar are two
+  // different components that must both stand down, and asserting one of them was how the bar
+  // survived the first push.
+  const guarded = name
+    ? (startCode.split(`!done && !billingResult && !${name} && (`).length - 1)
+    : 0;
+  ok('🔴 and the Continue footer is not drawn under it', guarded >= 1);
+  // 🔴 NOR THE PROGRESS BAR, WHICH IS THE ONE THAT GOT THROUGH. Found by reading the whole screen
+  //    on production: the blocked screen wore "STEP 1 OF 6" and "10 to 15 minutes in total" over a
+  //    heading saying there is no setup for him. He is not on step one of anything, and it is not
+  //    going to take him fifteen minutes. Two false promises, in the chrome rather than in the
+  //    copy, which is exactly where no assertion in this repo was looking.
+  eq('🔴 both the bar and the footer stand down on the blocked screen', guarded, 2);
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════════
@@ -321,6 +332,15 @@ ok('it sends an address and nothing else besides the tag',
   ok('🔴 the route takes an address where it used to demand a number',
     /if \(!phone && !email\)/.test(code) && !/const phone = cleanPhone\(rawPhone\);\s*\n\s*if \(!phone\)/.test(code));
   ok('...and it still refuses a row nobody can be reached on', /if \(!phone && !email\)/.test(code));
+  // 🔴 AND THE OTHER CALLER CANNOT REACH THE RELAXED BRANCH, WHICH IS THE ARGUMENT THE ROUTE'S OWN
+  //    COMMENT MAKES AND WHICH WAS UNTIL NOW ONLY AN ARGUMENT. /early-access is phone first: it
+  //    refuses below ten digits before it posts, and it sends `phone` on every submit. So loosening
+  //    the server rule to "one of the two" cannot silently start accepting phoneless rows from the
+  //    marketing form. If somebody removes that check, this goes red and the claim comes with it.
+  const early = codeOnly(read('app/early-access/page.tsx'));
+  ok('/early-access still guards its own number before it posts',
+    /cleaned\.length < 10/.test(early) && /setError\('Enter a valid UK mobile number\.'\)/.test(early));
+  ok('...and still sends it on every submit', /phone: cleaned/.test(early));
   ok('the region is validated as a slug, never taken as typed',
     /\/\^\[a-z0-9-\]\{1,60\}\$\//.test(code));
   ok('the region travels to the insert', /insertWaitlistSignup\(\{ phone, email, region \}\)/.test(code));

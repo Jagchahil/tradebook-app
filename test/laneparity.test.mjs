@@ -2113,6 +2113,289 @@ for (const [name, code] of ROUTERS) {
     && !/factUpdateNote\(\)[\s\S]{0,80}LANE_UNREADABLE/.test(sav));
 }
 
+console.log('\n=== 13. B19: the identity lane, derived from all three routers ===\n');
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHO LEKHIO IS, ON ALL THREE ROUTERS, AND IT CLOSES B19. 18 August 2026.
+//
+// isIdentity has existed since Run 2 and app/api/whatsapp/route.ts was its only caller, because its
+// two sentences were assembled INLINE in that file's handleIdentity. So a man signed in at
+// /app/thread who typed "who are you" was handed to a paid model call to paraphrase two fixed
+// sentences, one of which is the compliance promise that HE approves before anything goes to HMRC.
+//
+// ⚠️ THIS SECTION HOLDS THE WORDS AS WELL AS THE WIRING, WHICH IS UNUSUAL AND DELIBERATE. Every
+// other lane's words are figures out of a reader and are held by their own suite on fixtures. This
+// lane's words ARE the lane: it reads nothing, so a guard on its routing alone would pass a build
+// that told a man in a browser to send a text.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+
+const identitySites = {
+  whatsapp: '} else if (isIdentity(text)) {',
+  thread: "if (isIdentity(q)) return identityAnswer('web');",
+  ask: "if (!truth && isIdentity(question)) truth = identityAnswer('web');",
+};
+
+const identityAt = {};
+for (const [name, code] of ROUTERS) {
+  const site = identitySites[name];
+  const n = occurrences(code, site);
+  ok(`isIdentity: DISPATCHED by ${name}  \`${site.trim()}\``, n > 0);
+  ok(`isIdentity: ...and exactly once on ${name}, so its index names one call site`, n === 1);
+  identityAt[name] = n === 1 ? code.indexOf(site) : -1;
+
+  const modelAt = code.indexOf(modelCall[name]);
+  ok(`isIdentity: the paid model call was located on ${name}, so the bound below is not vacuous`,
+    modelAt !== -1);
+  ok(`🔴 isIdentity: ${name} NEVER PAYS A MODEL TO SAY WHAT LEKHIO IS`,
+    identityAt[name] !== -1 && modelAt !== -1 && identityAt[name] < modelAt);
+
+  // ══════════════════════════════════════════════════════════════════════════════════════
+  // ⚠️ AND THIS LANE SITS ON DIFFERENT SIDES OF THE THIRD PARTY GATE ON DIFFERENT ROUTERS, WHICH
+  // IS DELIBERATE, PRE EXISTING, AND PROVED HARMLESS RATHER THAN ASSUMED TO BE.
+  //
+  // On WhatsApp isIdentity has sat ABOVE the gate since Run 2, alongside the other lanes that read
+  // nothing (support, help, tax tips). On the two web routers this packet added it BELOW, because
+  // below is the safer default: a phrase that somehow came to name a person could never be answered
+  // from a lane that ignores who is asking.
+  //
+  // 🔴 AN INDEX COMPARISON CANNOT SETTLE THAT, SO IT IS SETTLED IN BOTH DIRECTIONS INSTEAD, WHICH
+  // IS STRONGER. If the gate hears none of the identity phrasings and the identity matcher hears
+  // none of the third party ones, the order between them cannot change one reply on any router, and
+  // no future re ordering of either can make it matter without going red here first.
+  // ══════════════════════════════════════════════════════════════════════════════════════
+  const gateAt = code.indexOf(elseSites[name]);
+  ok(`${name}: the third party gate was located, so B22's own order is still checked below`, gateAt !== -1);
+}
+
+// 🔴 AND ON /api/ask THE BOUND THAT MATTERS IS THE DAILY CAP, NOT THE CACHE, WHICH IS THE OPPOSITE
+// OF EVERY OTHER LANE IN THIS FILE. The savings, VAT and deadline lanes are placed above qa_cache
+// because their answers carry HIS figures and the cache is keyed on the question alone. This reply
+// carries no figure of his at all, so a cached copy would be harmless. What must never happen is a
+// man being told he has used up his questions for the day when he asks what he is talking to. It is
+// a string, it costs nothing, and it answers before he can be metered for it.
+{
+  const askOnly = ROUTERS.find(([n]) => n === 'ask')[1];
+  const laneAt = identityAt.ask;
+  const capAt = askOnly.indexOf("bumpAiUsage('ask', userId)");
+  const normAt = askOnly.indexOf('const questionNorm = normaliseQuestion(question);');
+  ok('ask: the identity lane call site was located', laneAt !== -1);
+  ok('ask: and the per user daily cap was located, so the bound below is not vacuous', capAt !== -1);
+  ok('🔴 ask: A MAN IS NEVER METERED FOR ASKING WHAT HE IS TALKING TO', laneAt !== -1 && capAt !== -1 && laneAt < capAt);
+  ok('ask: the cache key line was located as well', normAt !== -1);
+  ok('  ...and the lane returns above it too, which costs nothing and cannot be got wrong later',
+    laneAt !== -1 && normAt !== -1 && laneAt < normAt);
+}
+
+// 🔴 THE WORDS HAVE ONE HOME AND NO ROUTER KEEPS A COPY. This is the assertion that would have
+// failed on every build before today, when the webhook held the only copy and it WAS the answer.
+{
+  const wai = read('lib/waintents.ts');
+  ok('🔴 lib/waintents.ts holds the ONE identityAnswer builder',
+    (wai.match(/export function identityAnswer/g) || []).length === 1);
+  for (const [name, code] of ROUTERS) {
+    ok(`  ${name}: keeps no private copy of the identity sentences`,
+      !code.includes('a bookkeeping assistant for the UK self employed')
+      && !code.includes('with real people behind me'));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 THE WHATSAPP WORDS ARE UNCHANGED, WORD FOR WORD, AND THAT IS THE POINT OF THE PACKET.
+//
+// The job was to give the lane a second and third door, NOT to rewrite the reply a live customer
+// already gets on the channel that has always had it. These three strings are the ones that were
+// inline in app/api/whatsapp/route.ts at e5a6e1e9, character for character.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+const WA_IDENTITY_1 = 'I am Lekhio, a bookkeeping assistant for the UK self employed, right here in WhatsApp. Yes, I am software, with real people behind me.';
+const WA_IDENTITY_2 = 'Snap a receipt, say what you spent or got paid, and I log it for tax. You approve everything before anything goes near HMRC. Text "help" to see the lot.';
+{
+  const wa = W.identityAnswer('whatsapp');
+  ok('🔴 THE WHATSAPP FIRST PARAGRAPH IS WORD FOR WORD WHAT IT WAS', wa.includes(WA_IDENTITY_1));
+  ok('🔴 THE WHATSAPP SECOND PARAGRAPH IS WORD FOR WORD WHAT IT WAS', wa.includes(WA_IDENTITY_2));
+  ok('  ...and it is those two and a blank line, and nothing else', wa === `${WA_IDENTITY_1}\n\n${WA_IDENTITY_2}`);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND THE WEB WORDING NAMES NO CAPABILITY THE WEB DOES NOT HAVE, WHICH IS THE WHOLE REASON THIS
+// LANE WAITED WHILE FIVE CHEAPER ONES SHIPPED.
+//
+// MEASURED CLAUSE BY CLAUSE rather than assumed. Three of the seven clauses are channel specific:
+//
+//   "right here in WhatsApp"                       a browser is not WhatsApp
+//   "say what you spent or got paid, and I log it" looksLikeMoneyEntry is WA_ONLY in the table above
+//   'Text "help" to see the lot'                   isHelp is private to the webhook, not exported
+//
+// ⚠️ AND "Snap a receipt" IS THE ONE THAT SPLITS THE TWO WEB CALLERS, WHICH IS WHY IT IS ABSENT
+// RATHER THAN KEPT. The web chat's composer really does take an image file, so it would be true at
+// /app/thread. The phone's Ask box is text only, and both routers pass 'web'. A sentence true on one
+// web surface and false on the other is the same defect as a sentence true on WhatsApp and false on
+// the web, one level down.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+{
+  const web = W.identityAnswer('web');
+  const forbidden = [
+    ['whatsapp', /whatsapp/i],
+    ['the help keyword, which only the webhook dispatches', /text\s+"?help"?/i],
+    ['snapping a receipt, which the phone Ask box cannot do', /snap a receipt/i],
+    ['saying what you spent, which looksLikeMoneyEntry hears on WhatsApp alone', /say what you spent/i],
+    ['texting anything at all', /\btext it\b|\btext me\b/i],
+  ];
+  for (const [what, re] of forbidden) {
+    ok(`🔴 THE WEB REPLY DOES NOT MENTION ${what}`, !re.test(web));
+  }
+  ok('🔴 AND THE TWO CHANNELS REALLY DO DIFFER, so a later tidy collapsing them into one string goes red',
+    W.identityAnswer('web') !== W.identityAnswer('whatsapp'));
+
+  // 🔴 THE FOUR NEUTRAL CLAUSES SURVIVE WORD FOR WORD ON BOTH. Guarding only what is REMOVED would
+  // pass a web reply that shared nothing with the WhatsApp one, which is two products, not one.
+  const shared = [
+    'I am Lekhio, a bookkeeping assistant for the UK self employed',
+    'Yes, I am software, with real people behind me.',
+    'You approve everything before anything goes near HMRC.',
+  ];
+  for (const clause of shared) {
+    ok(`  both channels still say ${JSON.stringify(clause.slice(0, 42))}...`,
+      web.includes(clause) && W.identityAnswer('whatsapp').includes(clause));
+  }
+  // 🔴 THE COMPLIANCE SENTENCE IS NOT OPTIONAL ON ANY CHANNEL. We prepare, he approves. A reply
+  // about what Lekhio is that drops it is the one edit to this string that would actually matter.
+  for (const ch of ['whatsapp', 'web']) {
+    ok(`🔴 ${ch}: "You approve everything before anything goes near HMRC." IS PRESENT`,
+      W.identityAnswer(ch).includes('You approve everything before anything goes near HMRC.'));
+  }
+}
+
+// 🔴 THE CHANNEL IS PASSED BY EVERY ROUTER AND NEVER DEFAULTED, the same rule section 11 holds for
+// the other two builders that take one. A default is how a fourth caller silently gets the wrong
+// door, and there are only ever two answers.
+{
+  const CH = { whatsapp: "'whatsapp'", thread: "'web'", ask: "'web'" };
+  for (const [name, code] of ROUTERS) {
+    ok(`🔴 ${name}: identityAnswer is told which channel is asking, ${CH[name]}`,
+      code.includes(`identityAnswer(${CH[name]})`));
+    ok(`  ${name}: ...and never calls identityAnswer with no channel at all`,
+      !/identityAnswer\(\s*\)/.test(code));
+  }
+  ok('🔴 and the builder REQUIRES it rather than defaulting',
+    /export function identityAnswer\(channel: LaneChannel\): string \{/.test(read('lib/waintents.ts')));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 AND NOTHING ABOVE THIS LANE, ON ANY ROUTER, CLAIMS ONE OF ITS PHRASES. Section 11b's test,
+// applied to the last lane. An index comparison says the lane is reachable; this says the sentence
+// reaches it. The gates above are DERIVED off disk per router, never listed by hand.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+const IDENTITY_PHRASES = [
+  'who are you',
+  'who is this',
+  'what are you',
+  'what is this',
+  'are you a bot',
+  'are you a robot',
+  'are you a person',
+  'are you a human',
+  'is this a bot',
+  'am i talking to a bot',
+  'am i talking to a robot',
+  'am i talking to a human',
+  'am i talking to a person',
+  'what is lekhio',
+  'who is lekhio',
+  "who's lekhio",
+];
+{
+  const deaf = IDENTITY_PHRASES.filter((p) => !W.isIdentity(p));
+  ok(`🔴 EVERY PHRASE BELOW REALLY REACHES THE MATCHER, ${IDENTITY_PHRASES.length} of them${deaf.length ? `, NOT HEARD: ${deaf.map((p) => JSON.stringify(p)).join('; ')}` : ''}`,
+    deaf.length === 0);
+
+{
+  const ELSE_PHRASES = [
+    'how much has jerome made this year',
+    "whats jerome's profit",
+    'how much did priya earn',
+    "when is jerome's tax due",
+  ];
+  const deaf = ELSE_PHRASES.filter((q) => !W.isAboutSomeoneElse(q));
+  ok(`the third party phrasings really do reach the gate, ${ELSE_PHRASES.length} of them`, deaf.length === 0);
+  const gateEats = IDENTITY_PHRASES.filter((q) => W.isAboutSomeoneElse(q));
+  ok(`🔴 THE THIRD PARTY GATE HEARS NONE OF THE IDENTITY PHRASINGS${gateEats.length ? `, EATEN: ${gateEats.join('; ')}` : ''}`,
+    gateEats.length === 0);
+  const idEats = ELSE_PHRASES.filter((q) => W.isIdentity(q));
+  ok(`🔴 AND THE IDENTITY MATCHER HEARS NONE OF THE THIRD PARTY ONES${idEats.length ? `, EATEN: ${idEats.join('; ')}` : ''}`,
+    idEats.length === 0);
+}
+
+
+  const exported = [];
+  for (const m of read('lib/waintents.ts').matchAll(/^export\s+(?:async\s+)?function\s+((?:is|match|looksLike)[A-Za-z0-9_]*)/gm)) {
+    exported.push(m[1]);
+  }
+  for (const [name, code] of ROUTERS) {
+    const at = identityAt[name];
+    ok(`${name}: the identity lane was located, so the walk below is not vacuous`, at !== -1);
+    const above = exported.filter((fn) => {
+      if (fn === 'isIdentity') return false;
+      const m = code.match(new RegExp(`\\b${fn}\\s*\\(`));
+      return m && m.index !== -1 && m.index < at;
+    });
+    const eaten = [];
+    for (const phrase of IDENTITY_PHRASES) {
+      for (const fn of above) {
+        let hit = false;
+        try { const r = W[fn](phrase); hit = r !== null && r !== false && r !== undefined; } catch { hit = false; }
+        // Same note as 9c and 11b: the deadline gate is `isDeadlineQuestion(x) && !asksAmount(x)`,
+        // so judging the predicate alone would report a phrase eaten that the router never gives it.
+        if (hit && fn === 'isDeadlineQuestion' && W.asksAmount(phrase)) hit = false;
+        if (hit) eaten.push(`${fn} claims ${JSON.stringify(phrase)}`);
+      }
+    }
+    // ══════════════════════════════════════════════════════════════════════════════════
+    // 🔴 AND THE WALK FOUND ONE, ON WHATSAPP, PRE EXISTING AND NOT THIS PACKET'S. RECORDED WITH
+    // ITS NUMBER RATHER THAN FIXED, BECAUSE IT IS A MATCHER QUESTION AND THIS PACKET IS A WIRING
+    // ONE, AND BECAUSE IT CHANGES WHAT A LIVE CUSTOMER GETS ON THE ONE CHANNEL THAT HAS PAYING
+    // USERS.
+    //
+    // SUPPORT_HUMAN is `(speak|talk|chat|...)[^.?!]{0,25}(human|person|someone|...)`, built for a
+    // REQUEST ("can I speak to a human"). "am i talking to a human" is not a request, it is the
+    // QUESTION isIdentity exists to answer, and isSupportRequest sits above isIdentity on WhatsApp.
+    // So today, on WhatsApp:
+    //
+    //   "am i talking to a bot"    ->  the identity answer
+    //   "am i talking to a human"  ->  the support queue
+    //
+    // TWO PHRASINGS OF ONE QUESTION, TWO ANSWERS, ON ONE CHANNEL. Measured: 2 of the 16 phrasings
+    // below, "am i talking to a human" and "am i talking to a person", and supportReason calls both
+    // of them 'human'. The other fourteen reach the identity lane cleanly.
+    //
+    // ⚠️ THE COUNT IS ASSERTED SO A LATER WIDENING OF EITHER MATCHER CANNOT MOVE IT IN THE DARK.
+    // RE MEASURE this rather than deleting the line, exactly as B22's 1 of 4 and B23's 6 of 9 say.
+    // isSupportRequest is WhatsApp only, so on the two web routers the number is ZERO and this
+    // packet is what makes it zero: before today those phrasings reached the MODEL there.
+    // ══════════════════════════════════════════════════════════════════════════════════
+    const KNOWN = name === 'whatsapp'
+      ? ['isSupportRequest claims "am i talking to a human"', 'isSupportRequest claims "am i talking to a person"']
+      : [];
+    const unexpected = eaten.filter((e) => !KNOWN.includes(e));
+    ok(`🔴 ${name}: NOTHING ABOVE THE IDENTITY LANE CLAIMS ONE OF ITS PHRASES${unexpected.length ? `, EATEN: ${unexpected.join('; ')}` : ''}`,
+      unexpected.length === 0);
+    ok(`⚠️ ${name}: and the KNOWN overlap is exactly ${KNOWN.length}, the pre existing support ear`,
+      eaten.length === KNOWN.length);
+  }
+}
+
+// ⚠️ WHAT THIS DOES NOT CLOSE, ASSERTED SO IT CANNOT BE READ AS MORE THAN IT IS. isIdentity is
+// anchored end to end, so it hears the fourteen phrasings above and NOTHING ELSE. "are you an ai",
+// "who r u" and "what can you do" all fall through to the model on every channel, today as before.
+// That is a MATCHER question and not a wiring one, it is unchanged by this packet in either
+// direction, and the numbers are here so a later widening cannot happen in the dark. RE MEASURE
+// this rather than deleting the line.
+{
+  const UNHEARD = ['are you an ai', 'are you ai', 'who r u', 'what can you do', 'what do you do', 'are you human', 'are you real'];
+  const heard = UNHEARD.filter((p) => W.isIdentity(p));
+  ok(`⚠️ THE MATCHER HEARS ${heard.length} OF ${UNHEARD.length} OF THESE, which is the shape this packet deliberately did not touch`,
+    heard.length === 0);
+}
+
 console.log('\n=== 9b. the derived scope table: every predicate, every router ===\n');
 
 const ALL3 = ['ask', 'thread', 'whatsapp'];
@@ -2150,13 +2433,11 @@ const SCOPE = {
   // real and is paid: savingsAnswer is the pure builder, in lib/waintents.ts beside the others, and
   // lib/savingsanswer.ts is the reader. Section 12 holds the wiring and the cache bound.
   isSavingsQuestion: { on: ALL3, why: '' },
-  isIdentity: {
-    on: WA_ONLY,
-    why: 'B19 DEBT WITH A CATCH: the words are inline in the route AND they are channel specific. '
-      + 'They say "right here in WhatsApp" and "text help to see the lot", so copying them to a web '
-      + 'surface would tell a man in a browser to send a text. It needs a builder that takes the '
-      + 'channel, not a move.',
-  },
+  // Flipped from WA_ONLY on 18 August 2026 by B19's identity packet, WHICH CLOSES B19. The debt
+  // this row recorded was real and both halves are paid: identityAnswer is the pure builder, in
+  // lib/waintents.ts beside its matcher, and it takes the channel, so the three WhatsApp specific
+  // clauses are replaced rather than copied. Section 13 holds the wiring AND the words.
+  isIdentity: { on: ALL3, why: '' },
 
   // Correctly WhatsApp only. These are the channel itself, not answers about money. A box on a web
   // page has no last message to delete, no thread to stop, and no keyword to reserve.

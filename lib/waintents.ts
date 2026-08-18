@@ -407,6 +407,73 @@ export function isIdentity(body: string): boolean {
   return /^(who are you|who is this|what are you|what is this|are you a (bot|robot|person|human)|is this a bot|am i talking to a (bot|robot|human|person)|what is lekhio|who('?s| is) lekhio)$/.test(t);
 }
 
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 WHO LEKHIO IS, IN WORDS THAT ARE TRUE OF THE CHANNEL HE IS STANDING IN. B19, 18 August 2026,
+// AND IT IS THE LANE THAT CLOSES B19.
+//
+// THE FINDING IS THE SAME ONE AGAIN. isIdentity has existed since Run 2 and was dispatched by
+// app/api/whatsapp/route.ts and by NOTHING ELSE, so a man signed in at /app/thread who typed "who
+// are you" was answered by the MODEL. This lane reads NOTHING: no findUserIdByPhone, no rows, no
+// position, no database call of any kind. It is two sentences, and a paid model call was being
+// spent paraphrasing them into whatever words it chose.
+//
+// ⚠️ AND THE WORDS ARE WHY IT WAS LEFT UNTIL LAST, NOT THE CODE. Copying the WhatsApp reply to a
+// browser would tell a man in a browser to send a text. MEASURED CLAUSE BY CLAUSE rather than
+// assumed, the way savingsAnswer's header below says to. It is SEVEN clauses and THREE are channel
+// specific:
+//
+//   "I am Lekhio, a bookkeeping assistant for the UK self employed"  true everywhere
+//   "right here in WhatsApp"                                         WhatsApp only
+//   "Yes, I am software, with real people behind me"                 true everywhere
+//   "Snap a receipt ... and I log it for tax"                        true on WhatsApp AND in the
+//                                                                    web chat, whose composer takes
+//                                                                    an image file, and FALSE in
+//                                                                    the phone Ask box, text only
+//   "say what you spent or got paid, and I log it"                   WhatsApp only, because
+//                                                                    looksLikeMoneyEntry is
+//                                                                    WhatsApp only by the written
+//                                                                    decision in laneparity 9b
+//   "You approve everything before anything goes near HMRC"          true everywhere
+//   'Text "help" to see the lot'                                     WhatsApp only, and isHelp is
+//                                                                    not even exported from this
+//                                                                    file: it is private to the
+//                                                                    webhook
+//
+// So the FOUR neutral clauses survive WORD FOR WORD and only the three channel specific ones are
+// replaced. test/laneparity.test.mjs section 13 asserts both halves, because a later tidy that
+// collapsed these into one string would be the exact failure this lane exists to prevent.
+//
+// ⚠️ ONE WEB WORDING, NOT TWO, AND THAT IS A MEASURED CHOICE RATHER THAN A SHORTCUT.
+// app/api/thread/route.ts and app/api/ask/route.ts both pass 'web', and the ONLY capability that
+// splits them is the receipt photograph in the box itself. Naming it would be true in a browser and
+// false on the phone, so it is not named and the web wording claims nothing either surface lacks.
+// The web chat's composer already carries the label "Or send a receipt photograph and I will read
+// it" one line under the box, so an answer repeating it would be a row he has already read.
+//
+// ⚠️ NO DOOR AND NO OFFER, DELIBERATELY. Both web surfaces carry their own navigation on the screen
+// and neither needs this reply to be a menu. The best button is no button.
+//
+// ⚠️ AND ONE THING THIS LANE DOES NOT FIX, RECORDED SO IT IS NOT MISTAKEN FOR SETTLED. On the phone
+// the box this answer lands in is titled "Puchio", not Lekhio, in five customer facing places in
+// the mobile repo. Saying "I am Lekhio" there is a brand mismatch, not a lie, and the phone channel
+// cannot reach a customer at all until the EAS variables are set. It is a mobile item and it is in
+// the backlog, not a thing to fix from inside a web lane packet.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+export function identityAnswer(channel: LaneChannel): string {
+  if (channel === 'whatsapp') {
+    return [
+      'I am Lekhio, a bookkeeping assistant for the UK self employed, right here in WhatsApp. Yes, I am software, with real people behind me.',
+      '',
+      'Snap a receipt, say what you spent or got paid, and I log it for tax. You approve everything before anything goes near HMRC. Text "help" to see the lot.',
+    ].join('\n');
+  }
+  return [
+    'I am Lekhio, a bookkeeping assistant for the UK self employed. Yes, I am software, with real people behind me.',
+    '',
+    'I keep your receipts, invoices and mileage straight, and work out what you owe and when. You approve everything before anything goes near HMRC.',
+  ].join('\n');
+}
+
 
 // --- Questions about Lekhio itself: filing, approval, promised savings --------------------------
 //

@@ -107,6 +107,7 @@ import {
   matchEditLast,
   isPricing,
   isIdentity,
+  identityAnswer,
   matchProductTruth,
   productTruthAnswer,
   isDeadlineQuestion,
@@ -1961,15 +1962,13 @@ async function handleVehicleQuestion(from: string): Promise<void> {
   }));
 }
 
+// 🔴 THE WORDS LEFT THIS FILE ON 18 AUGUST 2026 AND LIVE IN lib/waintents.ts, identityAnswer.
+// They were inline here, so the two web routers had nothing to call and answered "who are you" out
+// of the model. The channel is passed rather than defaulted, for the reason written above
+// LaneChannel: there are only ever two answers and a caller that cannot say which it is has not
+// finished thinking. This router assembles nothing.
 async function handleIdentity(from: string): Promise<void> {
-  await sendText(
-    from,
-    [
-      'I am Lekhio, a bookkeeping assistant for the UK self employed, right here in WhatsApp. Yes, I am software, with real people behind me.',
-      '',
-      'Snap a receipt, say what you spent or got paid, and I log it for tax. You approve everything before anything goes near HMRC. Text "help" to see the lot.',
-    ].join('\n'),
-  );
+  await sendText(from, identityAnswer('whatsapp'));
 }
 
 async function handlePricing(from: string): Promise<void> {

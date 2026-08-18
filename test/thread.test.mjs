@@ -652,6 +652,15 @@ export function isNiQuestion(q) { return /\\b(national insurance|class ?2|class 
 // ROUTING, so that a man asking THIS chat what Lekhio has saved him gets his own ledger and not a
 // model paraphrasing his money.
 export function isSavingsQuestion(q) { return /\\bsaved me\\b|\\bworth it\\b/i.test(q); }
+// 🔴 B19, 18 August 2026. THE LAST LANE THAT HAD ONE DOOR, and the only one whose whole reply is a
+// fixed string rather than a figure. The matcher is stubbed to its plainest three phrasings for the
+// reason written above: the real one is anchored end to end and is owned by test/waintents.test.mjs
+// against the real file. identityAnswer is stubbed to ECHO ITS CHANNEL rather than to any wording,
+// on purpose and twice over: this sandbox walks the ROUTING, and the words themselves are Jag's
+// sign off and will be edited again, so a stub that copied them would make this suite red every
+// time somebody changed a sentence it does not own.
+export function isIdentity(q) { return /^(who are you|what are you|what is lekhio)$/i.test(q.trim()); }
+export function identityAnswer(channel) { return 'IDENTITY(' + channel + ')'; }
 `);
   // ⚠️ isClaimQuestion IS STUBBED FALSE, ALONGSIDE A checkExpense THAT ANSWERS NOTHING. This
   // sandbox walks the ROUTING, not the corpus, and the two stubs agree: the claim lane produces no
@@ -1025,6 +1034,29 @@ export function chatRefBelongsTo() { return true; }
     // than assumed, so a later caller cannot quietly start passing one and mean something by it.
     ok('🔴 ...AND WAS PASSED NO CHANNEL, because its words are true wherever he is standing',
       SA.state.asked.length === 1 && SA.state.asked[0].channel === undefined);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B19, 18 AUGUST 2026. WHO LEKHIO IS, ON THIS SURFACE, FOR THE FIRST TIME. THE LAST LANE.
+  //
+  // isIdentity has existed since Run 2 and the webhook was its only caller, because its two
+  // sentences were assembled inline in that file. So a man signed in here who typed "who are you"
+  // was handed to a paid model call, and the model chose the words for a reply that has to carry a
+  // compliance sentence: that HE approves before anything goes to HMRC.
+  //
+  // ⚠️ THE ASSERTION IS ON THE CHANNEL, NOT ON THE WORDING, AND THAT IS DELIBERATE. The stub echoes
+  // the channel it was given, so this proves the two things a router can get wrong (that the lane
+  // fires at all, and that it says 'web' and not 'whatsapp') without pinning a sentence this suite
+  // does not own. The repo has been bitten by guards that went on defending a sentence after the
+  // fact changed; the WORDS are held once, in test/laneparity.test.mjs section 13, against the real
+  // builder.
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  for (const q of ['who are you', 'what are you', 'what is lekhio']) {
+    const { turns } = await post({ q });
+    ok(`🔴 ${JSON.stringify(q)} IS ANSWERED BY THE LANE ON THIS SURFACE, not by the model`,
+      turns.length === 2 && turns[1].content === 'IDENTITY(web)');
+    ok('🔴 ...AND THE CHANNEL SAID web, so he is never told to send a text at a box that cannot take one',
+      turns.length === 2 && !turns[1].content.includes('whatsapp'));
   }
 
   // ⚠️ AND THE TOTALS LANE DOES NOT EAT THEM. matchTotalsQuestion takes any money word plus one of

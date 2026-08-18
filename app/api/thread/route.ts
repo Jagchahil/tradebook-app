@@ -13,6 +13,7 @@ import {
   isVehicleQuestion, vehicleAnswer, compoundAsk, compoundAskNote,
   isScottishRatesQuestion, isVatQuestion,
   isNiQuestion, isStudentLoanQuestion, isPropertyQuestion, isSavingsQuestion,
+  isIdentity, identityAnswer,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
@@ -280,6 +281,32 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
       mtdPosition: null,
     });
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHO LEKHIO IS, AND THIS ROUTER ANSWERED IT OUT OF THE MODEL. B19, 18 August 2026, and it
+  // is the LAST of B19's answer lanes.
+  //
+  // isIdentity has existed since Run 2 and app/api/whatsapp/route.ts was its only caller, because
+  // its two sentences were assembled inline in that file's handleIdentity. So a man signed in here
+  // who typed "who are you" was handed to a paid model call to paraphrase two fixed sentences, and
+  // the model chose the words. lib/waintents.ts, identityAnswer, is the ONE builder now, and this
+  // router assembles nothing.
+  //
+  // ⚠️ THE CHANNEL IS 'web' AND IT IS PASSED, NOT DEFAULTED. The WhatsApp wording points at
+  // WhatsApp affordances ("right here in WhatsApp", "say what you spent", 'text "help"') and two of
+  // those three are things this surface CANNOT do: looksLikeMoneyEntry is WhatsApp only by the
+  // written decision in test/laneparity.test.mjs section 9b, and isHelp is private to the webhook.
+  // A promise the channel cannot keep is worse than no offer at all.
+  //
+  // ⚠️ BELOW THE THIRD PARTY GATE AND BELOW THE DEADLINE LANE, which is B22's one rule on three
+  // routers, untouched: his data rights, then the gate, then the deadline lane. This lane is added
+  // UNDER all three rather than among them, so nothing about that order moves.
+  //
+  // ⚠️ AND IT LEADS THE ANSWER LANES BECAUSE IT READS NOTHING. No user lookup, no rows, no database
+  // call, no money. A lane that costs nothing has no business queuing behind lanes that do, and
+  // section 13 holds it above every lane that reads his books, on all three.
+  // ═══════════════════════════════════════════════════════════════════════════════════════
+  if (isIdentity(q)) return identityAnswer('web');
 
   // ═══════════════════════════════════════════════════════════════════════════════════════
   // 🔴 SOMEBODY ELSE'S MONEY, AND THIS ROUTER HAD NO GATE AT ALL. Run 3, 13 August 2026.

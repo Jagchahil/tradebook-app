@@ -195,8 +195,14 @@ const SABOTAGES = [
     // ⚠️ SO THE SPECIMEN IS NOW A SETTLED DECISION AND NOT AN OPEN DEBT. isGreeting is WhatsApp
     // only because nobody types hello into an accountant box, which is a reason that does not
     // expire. Picking isSavingsQuestion or isIdentity would have armed the same trap again: both
-    // are B19 debts and both are MEANT to gain routers, so both would kill this sabotage the day
+    // were B19 debts and both were MEANT to gain routers, so both would kill this sabotage the day
     // somebody did the work it exists to protect.
+    //
+    // 🟢 AND THAT DAY CAME, WHICH IS THE PROOF THE CHOICE WAS RIGHT RATHER THAN AN ANECDOTE ABOUT
+    // IT. isSavingsQuestion went to all three routers on 18 August 2026 and isIdentity followed it
+    // hours later, closing B19. Had either been the specimen, this sabotage would have died twice
+    // in one day. isGreeting and matchStopStart are untouched and still biting. Corrected in place
+    // 18 August 2026: the two lanes named above are no longer debts, and the past tense says so.
     name: '🔴 TABLE: a lane is wired to a new router and nobody widens the table, which is the whole shape of B19',
     apply: ({ dir }) => {
       edit(dir, 'app/api/ask/route.ts',

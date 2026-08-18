@@ -15,6 +15,7 @@ import {
   isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
   isDeadlineQuestion, asksAmount, deadlineAnswer,
   isNiQuestion, isStudentLoanQuestion, isPropertyQuestion, isSavingsQuestion,
+  isIdentity, identityAnswer,
 } from '../../../lib/waintents';
 import { SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { vatAnswerForUser } from '../../../lib/vatanswer';
@@ -213,6 +214,26 @@ export async function POST(req: NextRequest) {
       mtdPosition: null,
     });
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHO LEKHIO IS, AND THIS IS THE THIRD ROUTER AND THE LAST ONE. B19, 18 August 2026.
+  //
+  // isIdentity was dispatched by app/api/whatsapp/route.ts and by nothing else, because its two
+  // sentences were assembled inline in that file. So the in app accountant answered "who are you"
+  // from the model, which holds none of the four things this reply has to be right about: that we
+  // are software, that there are people behind it, what we do, and that HE approves before anything
+  // goes to HMRC. That last one is a compliance sentence and it does not get to be probabilistic.
+  //
+  // ⚠️ IT RETURNS ABOVE normaliseQuestion, ABOVE THE CACHE AND ABOVE THE DAILY CAP, and on this
+  // lane the cap matters more than the cache. "who are you" carries no first person word, so it is
+  // classed GENERAL and its answer would be written to the shared qa_cache; that is harmless here
+  // because the reply holds no figure of his, which is why this lane is placed for the CAP rather
+  // than for the cache. A man asking what he is talking to must never be told he has used up his
+  // questions for the day, and it costs nothing to answer, because it is a string.
+  //
+  // ⚠️ BELOW THE THIRD PARTY GATE, which is B22's one rule on three routers, untouched.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  if (!truth && isIdentity(question)) truth = identityAnswer('web');
 
   if (!truth && isVehicleQuestion(question)) {
     const o = await getOptimiserInput(userId).catch(() => null);

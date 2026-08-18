@@ -1320,6 +1320,23 @@ const B23_CONTROLS = [
   'what does the barber next door owe you lot then',
 ];
 
+// 🔴 B19, 18 AUGUST 2026. THE SAVINGS LANE'S OWN THIRD PARTY SHAPES. Nobody had measured these
+// because the lane had one door until this packet gave it three. The gate held every other wired
+// lane's vocabulary and not this one's, so a man could type another man's name at a lane that
+// answers from HIS rows. lib/waintents.ts carries the before and after on all six corpora.
+//
+// ⚠️ THE FIFTH IS DELIBERATELY OPEN AND THE NUMBER IS ASSERTED SO IT CANNOT MOVE IN THE DARK.
+// "how much has lekhio saved jerome" names OUR PRODUCT as the subject, so the captured word is
+// "lekhio" and the stoplist correctly refuses to read it as a man. RE MEASURE this rather than
+// deleting the line if it ever changes, exactly as the 1 of 4 and the 6 of 9 above say.
+const B19_SAVINGS_THIRD = [
+  'how much tax has priya saved',
+  "what is jerome's saving",
+  "what are dave's savings",
+  'how much has priya saved this year',
+  'how much has lekhio saved jerome',
+];
+
 // A vent is long, has no question mark, and asks for nothing. The predicate needs 300 characters.
 const VENT = 'right so the council have been at it again this morning i parked on the same bit of road i have parked on for eleven years and there was a bloke there with a machine before i had even got the ladders off the roof and he would not have it that i was working and now there is a ticket on the windscreen and the whole day is behind before it has started and i have three jobs on and no way of getting to any of them on time';
 
@@ -1575,6 +1592,17 @@ const B23_LONG_OBJECT = [
   }
   ok(`🔴 THE WIDENED EAR CLAIMS NONE OF THEM${eaten.length ? `, EATEN: ${eaten.join('; ')}` : ''}`,
     eaten.length === 0);
+
+  // 🔴 B19's WIDENING, MEASURED HERE RATHER THAN CLAIMED IN A COMMENT.
+  {
+    const heard = B19_SAVINGS_THIRD.filter((p) => aboutElse(p));
+    ok(`🔴 the gate hears ${heard.length} of ${B19_SAVINGS_THIRD.length} SAVINGS third party shapes`,
+      heard.length === 4);
+    ok('🔴 ...and the one it does not is the one naming OUR OWN product as the subject',
+      !aboutElse('how much has lekhio saved jerome'));
+    ok('🔴 ...and every one it hears is a lane a live web customer can now reach',
+      heard.every((p) => /saved|saving/i.test(p)));
+  }
 }
 
 // ── AND THE ORDER, WHICH A MATCHER CHANGE CAN BREAK WITHOUT TOUCHING A ROUTER. ──────────────
@@ -1926,6 +1954,135 @@ for (const [lane, phrases] of Object.entries(B19_PHRASES)) {
 // lib/waintents.ts. If one of them ever needs to be on three surfaces it has to move into the shared
 // file first, and that is the right order anyway.
 // ---------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------
+// 12. B19: WHAT LEKHIO HAS SAVED HIM, ON ALL THREE ROUTERS, AND WHAT A FAILED READ SAYS.
+//
+// The last money lane with one door. It had no pure builder to move, which is exactly why it was
+// last: the sentences were assembled inline in app/api/whatsapp/route.ts, so wiring a second router
+// meant extracting one first. Everything below is DERIVED from the three routers and the two lib
+// files, never from this comment.
+// ---------------------------------------------------------------------------------------------
+console.log('\n=== 12. B19: the savings lane, derived from all three routers ===\n');
+
+const savingsSites = {
+  whatsapp: '} else if (isSavingsQuestion(text)) {',
+  thread: 'if (isSavingsQuestion(q)) return savingsAnswerForUser(userId);',
+  ask: 'if (!truth && isSavingsQuestion(question)) truth = await savingsAnswerForUser(userId);',
+};
+
+const savingsAt = {};
+for (const [name, code] of ROUTERS) {
+  const site = savingsSites[name];
+  const n = occurrences(code, site);
+  ok(`isSavingsQuestion: DISPATCHED by ${name}  \`${site.trim()}\``, n > 0);
+  ok(`isSavingsQuestion: ...and exactly once on ${name}, so its index names one call site`, n === 1);
+  const at = n === 1 ? code.indexOf(site) : -1;
+  savingsAt[name] = at;
+
+  ok(`isSavingsQuestion: ${name} answers it from lib/savingsanswer.ts, not from the model`,
+    code.includes('savingsAnswerForUser('));
+
+  const modelNeedle = modelCall[name];
+  const modelAt = code.indexOf(modelNeedle);
+  ok(`isSavingsQuestion: the paid model call was located on ${name}, so the bound below is not vacuous`,
+    modelAt !== -1);
+  ok(`🔴 isSavingsQuestion: ${name} NEVER HANDS "was it worth it" TO A MODEL`,
+    at !== -1 && modelAt !== -1 && at < modelAt);
+}
+
+// 🔴 THE WORDS HAVE ONE HOME AND NO ROUTER KEEPS A COPY. This is the assertion that would have
+// failed before 18 August 2026, when the webhook held the only copy and it was the whole answer.
+ok('🔴 lib/waintents.ts holds the ONE savingsAnswer builder',
+  (read('lib/waintents.ts').match(/export function savingsAnswer/g) || []).length === 1);
+for (const [name, code] of ROUTERS) {
+  ok(`  ${name}: keeps no private copy of the Tesla screen`,
+    !code.includes('Claiming nothing') && !code.includes('With Lekhio:'));
+  ok(`  ${name}: and does no arithmetic of its own for it`, !/ledgerFor\(/.test(code));
+}
+
+// 🔴 ON /api/ask IT RETURNS ABOVE THE SHARED CACHE, AND ON THIS LANE THAT BOUND CARRIES THE MOST.
+//
+// qa_cache is keyed on the QUESTION ALONE with no user id. "was it worth it" carries no first
+// person word, so isGeneralQuestion classes it GENERAL, and the payload is the largest personal
+// money figure this product prints. Every bound is located BEFORE it is compared, because indexOf
+// returns minus one and minus one is less than every real index, which is how a vacuous bound
+// passes.
+{
+  const askOnly = ROUTERS.find(([n]) => n === 'ask')[1];
+  const laneAt = savingsAt.ask;
+  const normAt = askOnly.indexOf('const questionNorm = normaliseQuestion(question);');
+  const lookupAt = askOnly.indexOf('lookupQaCache(');
+  const upsertAt = askOnly.indexOf('upsertQaCache(');
+  const capAt = askOnly.indexOf("bumpAiUsage('ask', userId)");
+  ok('ask: the savings lane call site was located', laneAt !== -1);
+  ok('ask: the cache key line was located, so the bounds below are not vacuous', normAt !== -1);
+  ok('ask: the cache READ was located', lookupAt !== -1);
+  ok('ask: the cache WRITE was located too', upsertAt !== -1);
+  ok('ask: and the per user daily cap was located as well', capAt !== -1);
+  ok('🔴 ask: HIS OWN SAVING IS RETURNED BEFORE THE SHARED CACHE IS EVEN KEYED',
+    laneAt !== -1 && normAt !== -1 && laneAt < normAt);
+  ok('🔴 ask: ...and before the cache is READ, so he is never handed another man\'s figure',
+    laneAt !== -1 && lookupAt !== -1 && laneAt < lookupAt);
+  ok('🔴 ask: ...and before the cache is WRITTEN, so his figure never becomes another man\'s answer',
+    laneAt !== -1 && upsertAt !== -1 && laneAt < upsertAt);
+  ok('🔴 ask: AND ABOVE THE DAILY CAP, so he is never metered for asking what we saved him',
+    laneAt !== -1 && capAt !== -1 && laneAt < capAt);
+}
+
+// ---------------------------------------------------------------------------------------------
+// 12a. A ZERO WE READ AND A ZERO WE GUESSED. THE FINDING BEHIND THIS PACKET.
+//
+// getConfirmedTransactionsForRange answered `[]` for both "he has confirmed nothing" and "the
+// database refused to answer". Measured before anything moved, by running ledgerFor on the exact
+// input a failed read produces: `enough: false`, note "Nothing confirmed yet. Add your first entry
+// or upload a bank statement, and this fills itself in." A settled false statement about a man's
+// own records, and the third time this shape has been found in this repo.
+// ---------------------------------------------------------------------------------------------
+{
+  const db = read('lib/supabase.ts');
+  const vat = read('lib/vatanswer.ts');
+  const sav = read('lib/savingsanswer.ts');
+  const opt = read('lib/taxoptimiser.ts');
+
+  ok('🔴 there is an honest row reader that can SAY it failed',
+    /export async function getConfirmedTransactionsForRangeOrNull\(/.test(db));
+  ok('  ...and it returns null rather than an empty row set on a non ok response',
+    /if \(!res\.ok\) return null;/.test(db));
+  ok('🔴 the old name survives with the old behaviour, so its ten callers did not have to move',
+    /export async function getConfirmedTransactionsForRange\(/.test(db)
+    && /getConfirmedTransactionsForRangeOrNull\(userId, startISO, endISO\)\) \?\? \[\]/.test(db));
+
+  ok('🔴 getOptimiserInput reads the HONEST one, so the failure reaches its callers as a fact',
+    /getConfirmedTransactionsForRangeOrNull\(userId, taxYearStart, todayISO\)/.test(db));
+  ok('  ...and reports it on the object rather than swallowing it',
+    /rowsUnreadable = rowsOrNull === null/.test(db) && /^\s*rowsUnreadable,$/m.test(db));
+  ok('  ...and the type says the field exists', /rowsUnreadable\?: boolean;/.test(opt));
+
+  ok('🔴 THE VAT LANE\'S REFUSAL COULD NOT FIRE FOR AN HTTP ERROR AND NOW CAN',
+    /getConfirmedTransactionsForRangeOrNull\(userId, fromISO, todayISO\)\.catch\(\(\) => null\)/.test(vat)
+    && /if \(rows === null\) return VAT_UNREADABLE;/.test(vat));
+  ok('  ...and the catch STAYS, because a thrown fetch is still a failed read',
+    /\.catch\(\(\) => null\)/.test(vat));
+
+  ok('🔴 the savings lane refuses rather than describing records it could not read',
+    /if \(input\.unreadable\) return LANE_UNREADABLE;/.test(read('lib/waintents.ts')));
+  ok('  ...on BOTH shapes of failure: the thrown fetch and the non ok response',
+    /getOptimiserInput\(userId\)\.catch\(\(\) => null\)/.test(sav)
+    && /if \(input === null\) return LANE_UNREADABLE;/.test(sav)
+    && /unreadable: input\.rowsUnreadable === true/.test(sav));
+  ok('🔴 and the refusal is the SAME sentence the other lanes already send',
+    sav.includes('LANE_UNREADABLE') && !/could not fetch/i.test(sav));
+
+  // ⚠️ NOT A FAILURE, AND THE LINE IS DRAWN IN THE SAME PLACE lib/laneanswers.ts DRAWS IT.
+  // 🔴 ANCHORED ON THE WORK, NOT ON A LOCAL'S NAME, AND A CONTROL IN THE SABOTAGE PASS IS WHY.
+  // This read `/const factNote = await factUpdateNote\(\);/`, so renaming that local went RED on a
+  // change that moved nobody's money. The repo's anchor rule says a guard goes on the work and not
+  // on an identifier; the control that renames it consistently is the thing that found the breach.
+  ok('  a silent Khoji note is NOT treated as a failed read',
+    /await factUpdateNote\(\)/.test(sav)
+    && !/factUpdateNote\(\)[\s\S]{0,80}LANE_UNREADABLE/.test(sav));
+}
+
 console.log('\n=== 9b. the derived scope table: every predicate, every router ===\n');
 
 const ALL3 = ['ask', 'thread', 'whatsapp'];
@@ -1959,12 +2116,10 @@ const SCOPE = {
   isNiQuestion: { on: ALL3, why: '' },
   isStudentLoanQuestion: { on: ALL3, why: '' },
   isPropertyQuestion: { on: ALL3, why: '' },
-  isSavingsQuestion: {
-    on: WA_ONLY,
-    why: 'B19 DEBT, AND THE HARDEST OF THEM: there is NO pure builder. app/api/whatsapp/route.ts '
-      + 'assembles the sentences inline in handleSavingsQuestion, so this lane cannot be wired to a '
-      + 'second router without extracting one first, exactly as B18 had to for VAT.',
-  },
+  // Flipped from WA_ONLY on 18 August 2026 by B19's savings packet. The debt this row recorded was
+  // real and is paid: savingsAnswer is the pure builder, in lib/waintents.ts beside the others, and
+  // lib/savingsanswer.ts is the reader. Section 12 holds the wiring and the cache bound.
+  isSavingsQuestion: { on: ALL3, why: '' },
   isIdentity: {
     on: WA_ONLY,
     why: 'B19 DEBT WITH A CATCH: the words are inline in the route AND they are channel specific. '

@@ -263,6 +263,10 @@ ok('...and it reuses getOptimiserInput rather than assembling a SECOND set of fi
 // made.
 
 const ledgerSrc = rf(path.join(root, 'lib/ledger.ts'), 'utf8');
+// The savings lane's reader. B19 moved the assembly out of the WhatsApp route into this file on
+// 18 August 2026 so the thread and the in app accountant could reach it, so the pins below that
+// used to read `wa` follow it here. See the repointing note above each one.
+const sav = rf(path.join(root, 'lib/savingsanswer.ts'), 'utf8');
 // ⚠️ THIS PATTERN GAINED A SECOND SUBTRACTION ON 31 JULY 2026, AND THE OLD ONE WAS WRONG.
 //
 // It used to read `input.ytdTradeExpenses - mileage`, full stop, because the file believed use of
@@ -321,15 +325,35 @@ ok('...and the arithmetic still lives in lib/ledger.ts rather than at a call sit
 ok('🔴 the API route DELEGATES rather than assembling its own figures',
   api.includes('ledgerFor(input)') && !movedNotAdded(api));
 
-ok('🔴 the WhatsApp reply DELEGATES to the same function, so the two surfaces cannot disagree',
-  wa.includes('ledgerFor(input)') && !movedNotAdded(wa));
+// 🔴 REPOINTED 18 AUGUST 2026, NOT DELETED AND NOT LEFT WHERE IT WAS. B19 moved the savings
+// assembly out of app/api/whatsapp/route.ts into lib/savingsanswer.ts so all three routers could
+// reach it. This pin said "the WhatsApp reply DELEGATES to the same function". Deleting it would
+// have been silent scope loss and leaving it on `wa` would have been a guard quietly true about
+// nothing, which is the same choice made twice and wrong both times. It now names the file that
+// does the thing, and the line under it makes the WEBHOOK's claim stronger than it was: it no
+// longer delegates, it cannot assemble at all.
+ok('🔴 the savings lane DELEGATES to the same function, so no two surfaces can disagree',
+  sav.includes('ledgerFor(input)') && !movedNotAdded(sav));
+
+ok('...and it is ONE reader for all three routers, not a copy per door',
+  ['app/api/whatsapp/route.ts', 'app/api/thread/route.ts', 'app/api/ask/route.ts']
+    .every((f) => rf(path.join(root, f), 'utf8').includes('savingsAnswerForUser(')));
+
+ok('🔴 and no router assembles the saving for itself any more, on ANY channel',
+  ['app/api/whatsapp/route.ts', 'app/api/thread/route.ts', 'app/api/ask/route.ts']
+    .every((f) => {
+      const src = rf(path.join(root, f), 'utf8');
+      return !/ledgerFor\(/.test(src) && !src.includes('Claiming nothing');
+    }));
 
 ok('🔴 the web app money screen DELEGATES to it too',
   rf(path.join(root, 'app/app/page.tsx'), 'utf8').includes('ledgerFor('));
 
 ok('...and no caller passes a raw ytdMileage into the ledger without the subtraction',
+  // `wa` was the third source here until 18 August 2026. The assembly it watched now lives in
+  // lib/savingsanswer.ts, so the pin follows it rather than watching a file that stopped doing it.
   !/expenses:\s*input\.ytdTradeExpenses,[\s\S]{0,120}mileage:\s*input\.ytdMileage/.test(api)
-  && !/expenses:\s*input\.ytdTradeExpenses,[\s\S]{0,120}mileage:\s*input\.ytdMileage/.test(wa));
+  && !/expenses:\s*input\.ytdTradeExpenses,[\s\S]{0,120}mileage:\s*input\.ytdMileage/.test(sav));
 
 // The use of home half of the same lesson, pinned so it cannot silently go back to zero anywhere.
 // Same repair, same reason. The election must WIN over the logged rows rather than add to them, and
@@ -562,8 +586,16 @@ ok('...and isMileageRow reads the VENDOR the inserter really writes, not a categ
 ok('WHATSAPP can answer "what have you saved me", which is where he actually is',
   wa.includes('isSavingsQuestion') && wa.includes('handleSavingsQuestion'));
 
+// 🔴 REPOINTED 18 AUGUST 2026. This pinned "not an AI call" by PROXIMITY: no answerMoneyQuestion
+// within 900 characters of handleSavingsQuestion in the webhook. Once B19 shrank that handler to
+// two lines the distance stopped meaning anything, and the assertion would have gone on passing
+// while proving less every time somebody edited a neighbouring function. It now names the reader
+// and asserts the shape instead of the gap: the lane's answer comes from a builder, and no model
+// call of any kind appears in the file that produces it.
 ok('...and it is arithmetic, NOT an AI call. A paraphrased money figure is a different money figure',
-  wa.includes('handleSavingsQuestion') && !/handleSavingsQuestion[\s\S]{0,900}answerMoneyQuestion/.test(wa));
+  wa.includes('handleSavingsQuestion')
+  && sav.includes('savingsAnswer(')
+  && !/answerMoneyQuestion|askClaude|anthropic/i.test(sav));
 
 ok('...routed BEFORE the generic question handler, so a model never gets the chance to guess',
   wa.indexOf('isSavingsQuestion(text)') < wa.indexOf('isQuestion(text)'));

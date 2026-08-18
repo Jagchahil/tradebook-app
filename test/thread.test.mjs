@@ -646,6 +646,12 @@ export function isPropertyQuestion(q) {
 }
 export function isStudentLoanQuestion(q) { return /\\b(student loan|uni loan|postgrad(uate)? loan)\\b/i.test(q); }
 export function isNiQuestion(q) { return /\\b(national insurance|class ?2|class ?4)\\b/i.test(q); }
+// B19, 18 August 2026. The last money lane that had one door. Stubbed to its plainest clause for
+// the reason written above: the real matcher, its 90 character ceiling and its "worth it" arm are
+// owned by test/waintents.test.mjs against the real file, and what this sandbox walks is the
+// ROUTING, so that a man asking THIS chat what Lekhio has saved him gets his own ledger and not a
+// model paraphrasing his money.
+export function isSavingsQuestion(q) { return /\\bsaved me\\b|\\bworth it\\b/i.test(q); }
 `);
   // ⚠️ isClaimQuestion IS STUBBED FALSE, ALONGSIDE A checkExpense THAT ANSWERS NOTHING. This
   // sandbox walks the ROUTING, not the corpus, and the two stubs agree: the claim lane produces no
@@ -721,6 +727,18 @@ export async function studentLoanAnswerForUser(userId, channel) {
 export async function propertyAnswerForUser(userId, channel) {
   state.asked.push({ lane: 'property', userId, channel });
   return 'Property this tax year across 1 property: \u00a311.4k of rent in.';
+}
+`);
+  // 🔴 B19, 18 AUGUST 2026. THE SAVINGS READER, STUBBED FOR THE SAME REASON AS THE TWO ABOVE. The
+  // real lib/savingsanswer.ts runs getOptimiserInput and lib/ledger.ts and refuses on a failed read;
+  // the refusal, the builder's words and the money format are owned by test/laneparity.test.mjs
+  // section 12a and test/waintents.test.mjs against the real files. What this sandbox proves is that
+  // this chat ASKS it, about THIS account, and never reaches the model with the question.
+  w('savingsanswer.ts', `
+export const state = { asked: [] };
+export async function savingsAnswerForUser(userId) {
+  state.asked.push({ lane: 'savings', userId });
+  return 'The costs you have logged are keeping \u00a34,120.40 off your tax bill this year.';
 }
 `);
   w('chatref.ts', `
@@ -809,6 +827,7 @@ export function chatRefBelongsTo() { return true; }
   const SCOT = await import(pathToFileURL(path.join(rt, 'scotland.ts')).href);
   const VA = await import(pathToFileURL(path.join(rt, 'vatanswer.ts')).href);
   const LA = await import(pathToFileURL(path.join(rt, 'laneanswers.ts')).href);
+  const SA = await import(pathToFileURL(path.join(rt, 'savingsanswer.ts')).href);
 
   const screwfix = {
     merchant_name: 'Screwfix', amount: 164.78, category: 'materials',
@@ -978,6 +997,36 @@ export function chatRefBelongsTo() { return true; }
         LA.state.asked.length === 1 && LA.state.asked[0].channel === 'web');
     }
   }
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 B19, 18 AUGUST 2026. WHAT LEKHIO HAS SAVED HIM, ON THIS SURFACE, FOR THE FIRST TIME.
+  //
+  // The last money lane with one door, and the one it had was WhatsApp. It was last because it was
+  // the only lane with NO pure builder to move: the sentences were assembled inline in the webhook.
+  // So a man signed in here, a month into paying us, typing the question a man types when he is
+  // deciding whether to carry on paying us, was answered by the MODEL out of nothing.
+  //
+  // ⚠️ "was it worth it" IS THE SAME QUESTION AND IT IS THE DANGEROUS ONE. It carries no first
+  // person word at all, which on /api/ask is what sends an answer into the shared qa_cache. Both
+  // phrasings are walked here.
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  for (const q of ['what have you saved me', 'was it worth it']) {
+    SA.state.asked.length = 0;
+    const { turns } = await post({ q });
+    ok(`🔴 ${JSON.stringify(q)} IS ANSWERED FROM HIS OWN LEDGER ON THIS SURFACE`,
+      turns.length === 2 && turns[1].content.includes('off your tax bill this year'));
+    ok('🔴 ...AND THE MODEL WAS NEVER ASKED, so his saving is never a fluent guess',
+      turns.length === 2 && turns[1].content !== 'the model answer');
+    ok('🔴 ...AND THE READER WAS ASKED ABOUT HIS ACCOUNT, not merely called',
+      SA.state.asked.length === 1 && SA.state.asked[0].lane === 'savings'
+      && SA.state.asked[0].userId === 'u-1');
+    // ⚠️ AND IT TAKES NO CHANNEL, WHICH IS THE MEASURED DIFFERENCE FROM THE TWO LANES ABOVE. The
+    // one sentence in this lane with a channel in it belongs to a state only WhatsApp has, an
+    // unlinked phone number, so there is nothing here for a channel to switch. Asserted rather
+    // than assumed, so a later caller cannot quietly start passing one and mean something by it.
+    ok('🔴 ...AND WAS PASSED NO CHANNEL, because its words are true wherever he is standing',
+      SA.state.asked.length === 1 && SA.state.asked[0].channel === undefined);
+  }
+
   // ⚠️ AND THE TOTALS LANE DOES NOT EAT THEM. matchTotalsQuestion takes any money word plus one of
   // "how much", "what" or "my", so all three phrasings above satisfy it as well. It is stubbed null
   // here, so the ORDER is held by test/laneparity.test.mjs section 11 by index on all three routers,

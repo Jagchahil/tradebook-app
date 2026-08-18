@@ -12,13 +12,14 @@ import {
   isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
   isVehicleQuestion, vehicleAnswer, compoundAsk, compoundAskNote,
   isScottishRatesQuestion, isVatQuestion,
-  isNiQuestion, isStudentLoanQuestion, isPropertyQuestion,
+  isNiQuestion, isStudentLoanQuestion, isPropertyQuestion, isSavingsQuestion,
 } from '../../../lib/waintents';
 import { hmrcFilingLive } from '../../../lib/features';
 import { checkExpense, isClaimQuestion, VERDICT_ICON } from '../../../lib/taxrules';
 import { taxPosition, setAsideBasisLine, hasTaxPosition, billFromPosition } from '../../../lib/taxoptimiser';
 import { SCOTLAND_LINE, SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { vatAnswerForUser } from '../../../lib/vatanswer';
+import { savingsAnswerForUser } from '../../../lib/savingsanswer';
 import { niAnswerForUser, studentLoanAnswerForUser, propertyAnswerForUser } from '../../../lib/laneanswers';
 import { paymentsOnAccount, FACTS } from '../../../lib/taxengine';
 import { quarterForDate } from '../../../lib/quarterpack';
@@ -347,6 +348,22 @@ async function composeOneLane(userId: string, q: string): Promise<string> {
   if (isPropertyQuestion(q)) return propertyAnswerForUser(userId, 'web');
   if (isStudentLoanQuestion(q)) return studentLoanAnswerForUser(userId, 'web');
   if (isNiQuestion(q)) return niAnswerForUser(userId);
+
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT LEKHIO HAS SAVED HIM. B19, 18 August 2026, and it is the last money lane with one door.
+  //
+  // isSavingsQuestion has been dispatched by app/api/whatsapp/route.ts and by nothing else since
+  // Run 2, because it was the only lane with no pure builder to move: the sentences were assembled
+  // inline in the route. So a man signed in HERE, with his whole ledger one query away, asked "what
+  // have you saved me" or "was it worth it" and was answered by the MODEL, which cannot run the
+  // engine twice and would paraphrase the figure. "was it worth it" is a man deciding whether to
+  // keep paying, and it is the worst question in the product to hand to a guess.
+  //
+  // ⚠️ NO CHANNEL PARAMETER, UNLIKE THE PROPERTY AND STUDENT LOAN LANES ABOVE. Measured, not
+  // assumed: the one sentence in this lane with a channel in it belongs to a state only WhatsApp
+  // has (a phone number with no account). See savingsAnswer in lib/waintents.ts.
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  if (isSavingsQuestion(q)) return savingsAnswerForUser(userId);
 
   // 2. Totals and what he owes: computed from his own confirmed rows, no AI, instant.
   const totals = matchTotalsQuestion(q);

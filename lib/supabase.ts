@@ -4918,11 +4918,46 @@ export async function getCapitalAssets(userId: string): Promise<CapitalAsset[]> 
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 A ZERO WE READ AND A ZERO WE GUESSED ARE TWO DIFFERENT FACTS, AND UNTIL NOW THIS READER COULD
+// NOT SAY WHICH IT WAS HANDING BACK. B19, 18 August 2026.
+//
+// getConfirmedTransactionsForRange answered `[]` for BOTH "this man has confirmed nothing" and
+// "Supabase replied 401, 500 or 503". Every surface downstream then spoke about his records in the
+// words of a settled fact. Two lanes had already tried to tell those apart and only one of them
+// could:
+//
+//   handleSavingsQuestion   no refusal at all. A man eleven months into a full book, on one
+//                           wobble, was told "Nothing confirmed yet. Add your first entry or
+//                           upload a bank statement, and this fills itself in."
+//   lib/vatanswer.ts        wrote the RIGHT refusal, VAT_UNREADABLE, behind
+//                           `.catch(() => null)`. A non ok HTTP response does not throw, it
+//                           returned `[]`, so B18's refusal could only ever fire for a thrown
+//                           fetch and never for the commonest failure there is.
+//
+// That is lib/laneanswers.ts's propertyYtdTotals finding for the second time, one layer lower
+// down, and this is the same repair: the failure gets a value of its own and the type says so.
+//
+// ⚠️ THE OLD NAME KEEPS ITS OLD BEHAVIOUR, DELIBERATELY, AND THAT IS THE WHOLE SHAPE OF THIS
+// CHANGE. Ten callers read this function and moving a line another sabotage pass quotes is what
+// broke four anchors in one day on 17 August. So nothing MOVES: the honest reader is ADDED beside
+// it, the old name becomes one line over the top of it, and every existing caller is untouched and
+// behaves to the byte as it did. A door that wants to know can ask. A door that does not is no
+// worse off than it was this morning.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
 export async function getConfirmedTransactionsForRange(
   userId: string,
   startISO: string,
   endISO: string,
 ): Promise<PackRow[]> {
+  return (await getConfirmedTransactionsForRangeOrNull(userId, startISO, endISO)) ?? [];
+}
+
+export async function getConfirmedTransactionsForRangeOrNull(
+  userId: string,
+  startISO: string,
+  endISO: string,
+): Promise<PackRow[] | null> {
   const { url } = config();
   const res = await fetch(
     `${url}/rest/v1/transactions?user_id=eq.${encodeURIComponent(userId)}` +
@@ -4933,9 +4968,9 @@ export async function getConfirmedTransactionsForRange(
       `&order=transaction_date.asc&limit=20000`,
     { headers: headers() },
   );
-  if (!res.ok) return [];
+  if (!res.ok) return null;
   const rows = (await res.json().catch(() => null)) as (Array<Record<string, unknown>>) | null;
-  if (rows === null) return [];
+  if (rows === null) return null;
   return rows
     .filter((r) => typeof r.transaction_date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(r.transaction_date as string))
     .map((r) => ({
@@ -5003,8 +5038,15 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   const taxYearStart = quarterBounds(startYear, 1).start;
   const todayISO = now.toISOString().slice(0, 10);
 
-  const [rows, sl, goals, biz, assets] = await Promise.all([
-    getConfirmedTransactionsForRange(userId, taxYearStart, todayISO),
+  // 🔴 THE HONEST READER, NOT THE FORGIVING ONE. See the header on
+  // getConfirmedTransactionsForRangeOrNull: `[]` used to mean both "he has nothing" and "the
+  // database refused", and this is the one call site in the product that turns that value into
+  // sentences about a man's own records. The other four reads below are NOT treated as failures,
+  // for the reason lib/waintents.ts states above LANE_UNREADABLE: not knowing his plan, his goals,
+  // his profile or his assets is answered, not refused. Only a failure of the read the FIGURE
+  // turns on says we could not look.
+  const [rowsOrNull, sl, goals, biz, assets] = await Promise.all([
+    getConfirmedTransactionsForRangeOrNull(userId, taxYearStart, todayISO),
     getStudentLoanSettings(userId),
     getActiveGoals(userId),
     getBusinessProfile(userId),
@@ -5030,6 +5072,11 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
   // scaled by his share BEFORE any tax is worked out, inside the aggregation. It is 100% for a
   // sole trader and a director, so nothing moves for them.
   // ═══════════════════════════════════════════════════════════════════════════════════════
+  // A failed read still produces the same object it always did, to the byte, so no existing caller
+  // changes behaviour. What is new is that it now SAYS so, on the field below.
+  const rows = rowsOrNull ?? [];
+  const rowsUnreadable = rowsOrNull === null;
+
   const partnerFactor = biz && biz.businessType === 'partnership' ? biz.partnershipShare / 100 : 1;
   const {
     ytdTradeIncome, ytdTradeExpenses, ytdCisSuffered, ytdPropertyIncome, ytdPropertyExpenses,
@@ -5150,6 +5197,7 @@ export async function getOptimiserInput(userId: string): Promise<OptimiserInput>
     monthsElapsed,
     daysElapsed,
     observedDays,
+    rowsUnreadable,
     ytdTradeIncome: Math.round(ytdTradeIncome * 100) / 100,
     ytdTradeExpenses: Math.round(ytdTradeExpenses * 100) / 100,
     ytdCapitalAllowances: Math.round(ytdCapitalAllowances * 100) / 100,

@@ -60,6 +60,30 @@ export interface OptimiserInput {
   // that builds this from real rows (getOptimiserInput) now says which is which.
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   observedDays?: number;
+
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHETHER THE ROWS BELOW ARE HIS FIGURES OR OUR GUESS. B19, 18 August 2026.
+  //
+  // Every ytd figure in this object comes from ONE read, and until today that read answered `[]`
+  // for a man with nothing AND for a database that refused to answer. So a zero here meant either
+  // "he has confirmed nothing" or "we could not look", and no caller could tell which. The savings
+  // lane turned the second one into "Nothing confirmed yet", which is a settled false statement
+  // about a man's own records.
+  //
+  // ⚠️ OPTIONAL, AND OPTIONAL ON PURPOSE, AND THIS IS THE ARGUABLE HALF OF THE CHANGE. The obvious
+  // move is what lib/laneanswers.ts did for property: return null and let the type force everyone
+  // to think. It is the wrong move HERE, and the reason is the count. propertyYtdTotals had one
+  // caller. getOptimiserInput has twelve, most of them server rendered pages, and a null would
+  // have made twelve doors invent twelve answers to a question only some of them can sensibly
+  // answer. That is the exact drift lib/ledger.ts's own header exists to prevent.
+  //
+  // So the failure gets a value rather than a shape: a door that must not speak about his records
+  // asks, and a door that has not been taught is no worse off than it was this morning. THE COST
+  // IS WRITTEN DOWN RATHER THAN HIDDEN: an unasking caller still prints a guessed zero, so the
+  // server rendered tax pages read a failed database as an empty year to this day. That is a
+  // FINDING, recorded under B19 with its own size, and not something this field quietly fixes.
+  // ═══════════════════════════════════════════════════════════════════════════════════════════
+  rowsUnreadable?: boolean;
   ytdTradeIncome: number;
   ytdTradeExpenses: number;
   ytdCisSuffered: number;

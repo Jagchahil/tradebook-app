@@ -14,10 +14,11 @@ import {
   isScottishRatesQuestion, isVatQuestion,
   isAboutSomeoneElse, SOMEONE_ELSE_ANSWER,
   isDeadlineQuestion, asksAmount, deadlineAnswer,
-  isNiQuestion, isStudentLoanQuestion, isPropertyQuestion,
+  isNiQuestion, isStudentLoanQuestion, isPropertyQuestion, isSavingsQuestion,
 } from '../../../lib/waintents';
 import { SCOTTISH_RATES_ANSWER } from '../../../lib/scotland';
 import { vatAnswerForUser } from '../../../lib/vatanswer';
+import { savingsAnswerForUser } from '../../../lib/savingsanswer';
 import { niAnswerForUser, studentLoanAnswerForUser, propertyAnswerForUser } from '../../../lib/laneanswers';
 import { getOptimiserInput } from '../../../lib/supabase';
 import { hmrcFilingLive } from '../../../lib/features';
@@ -274,6 +275,22 @@ export async function POST(req: NextRequest) {
   if (!truth && isPropertyQuestion(question)) truth = await propertyAnswerForUser(userId, 'web');
   if (!truth && isStudentLoanQuestion(question)) truth = await studentLoanAnswerForUser(userId, 'web');
   if (!truth && isNiQuestion(question)) truth = await niAnswerForUser(userId);
+
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  // 🔴 WHAT LEKHIO HAS SAVED HIM, AND ON THIS ROUTE THE CACHE BOUND IS THE PART THAT IS NOT
+  // OPTIONAL. B19, 18 August 2026.
+  //
+  // qa_cache is keyed on the QUESTION ALONE with no user id, and "was it worth it" carries no first
+  // person word at all, so isGeneralQuestion classes it GENERAL and the model's answer is written
+  // to the shared cache and read back to the next man who types it. The payload here is the largest
+  // personal money figure this product prints: what his own costs took off his own tax bill, plus
+  // his CIS refund. One man's saving read back to another as his own is the worst leak on the list.
+  //
+  // This lane returns ABOVE normaliseQuestion, above lookupQaCache, above the daily cap and above
+  // the model, exactly as the deadline, VAT and three lane cells do. test/laneparity.test.mjs
+  // section 10 DERIVES all four bounds from this file rather than trusting this comment.
+  // ══════════════════════════════════════════════════════════════════════════════════════════
+  if (!truth && isSavingsQuestion(question)) truth = await savingsAnswerForUser(userId);
 
   // ═══════════════════════════════════════════════════════════════════════════════════════════
   // 🔴 SCOTTISH RATES, ON THIS SURFACE TOO, AND THE HEADER ABOVE SAYS WHY IN ADVANCE. B16, 17

@@ -18,7 +18,6 @@ import {
   draftSupportReply,
 } from '../../../lib/claude';
 import { checkExpense, VERDICT_ICON, TAX_TIPS } from '../../../lib/taxrules';
-import { headline, ledgerFor } from '../../../lib/ledger';
 import { createVoiceJob } from '../../../lib/voicejobs';
 import { confirmationLine } from '../../../lib/voiceflow';
 import { isWorkerLive } from '../../../lib/bridge';
@@ -94,7 +93,6 @@ import {
   getRelevantKnowledge,
   getOptimiserInput,
   refreshFactsFromDb,
-  factUpdateNote,
 } from '../../../lib/supabase';
 import { isReferRequest, referralInvite } from '../../../lib/referral';
 import {
@@ -167,6 +165,7 @@ import {
   normaliseBritishTime,
 } from '../../../lib/waintents';
 import { vatAnswerForUser } from '../../../lib/vatanswer';
+import { savingsAnswerForUser } from '../../../lib/savingsanswer';
 import {
   niAnswerForUser, studentLoanAnswerForUser, propertyAnswerForUser, taxYearSinceISO,
 } from '../../../lib/laneanswers';
@@ -3247,64 +3246,25 @@ async function handleMoneyQuestion(from: string, body: string): Promise<void> {
 async function handleSavingsQuestion(from: string) {
   const userId = await findUserIdByPhone(from);
   if (!userId) {
+    // ⚠️ THE ONE SENTENCE IN THIS LANE THAT STAYS HERE, AND IT IS NOT AN OVERSIGHT.
+    //
+    // B19 says to assume this lane's empty state has channel specific words, because the last
+    // three lanes all did. Measured, there is exactly one, and it is this. It is not a channel
+    // specific WORDING of a shared state, it is a state that exists on ONE channel: a phone number
+    // with no account behind it. The thread and the in app accountant authenticate a man before he
+    // can type, so neither can ever be here. A shared builder would have had to carry a branch
+    // that two of its three callers can never reach. See savingsAnswer in lib/waintents.ts.
     await sendText(from, 'Send me a receipt or two first and I will show you exactly what I have saved you.');
     return;
   }
 
-  const input = await getOptimiserInput(userId);
-
-  // 🔴 THIS USED TO BE A HAND WRITTEN COPY OF THE LEDGER ASSEMBLY, AND IT HAD ALREADY DRIFTED.
-  //
-  // The old comment here said "THIS MUST MATCH app/api/ledger/route.ts EXACTLY", which is the sort
-  // of instruction that is true right up until it is not. It passed a hardcoded zero for use of home,
-  // alongside a comment saying it was "never captured at all". That stopped being true on 27 July 2026,
-  // when lib/elections.ts shipped and the API route started passing the real figure. From that moment a
-  // man who had elected use of home saw one total on his ledger and a SMALLER one in the WhatsApp
-  // reply, which are the two places he would actually compare.
-  //
-  // Nobody wrote a bug. Two readers over one number drifted, exactly as the header on
-  // app/api/ledger/route.ts says they always do. So there is now one assembler, ledgerFor(), and
-  // this call site cannot fall behind again because it no longer knows how the sum is made.
-  const l = ledgerFor(input);
-
-  // NOT ENOUGH IS NOT ZERO. Two weeks in we do not proudly announce that we saved him £14.
-  if (!l.enough) {
-    await sendText(from, l.note ?? 'Too early to say yet.');
-    return;
-  }
-
-  const lines: string[] = [];
-  lines.push(headline(l));
-  lines.push('');
-  // THE TESLA SCREEN. Two numbers, side by side. The gap is the product.
-  lines.push(`Claiming nothing: £${l.withoutLekhio.toLocaleString('en-GB')} of tax`);
-  lines.push(`With Lekhio: £${l.withLekhio.toLocaleString('en-GB')}`);
-
-  if (l.lines.length) {
-    lines.push('');
-    lines.push('Where it came from:');
-    for (const x of l.lines.slice(0, 4)) {
-      lines.push(`  ${x.label}: £${x.saved.toLocaleString('en-GB')}`);
-    }
-  }
-
-  // HIS OWN MONEY. Separate, always, and never added to the saving. This product has already once
-  // quoted a man a CIS refund that did not exist.
-  if (l.refundDue > 0) {
-    lines.push('');
-    lines.push(`And £${l.refundDue.toLocaleString('en-GB')} of CIS is sitting with HMRC. That is your money, not a saving. You get it back when you file.`);
-  }
-
-  // THE FINAL-CHECK LINE. When Khoji has learned of a change and you have approved it, the figures
-  // above were worked on that latest law, and we say so, so the number a man files is provably the
-  // current one. Silent when nothing has changed, so an ordinary answer is unchanged.
-  const factNote = await factUpdateNote();
-  if (factNote) {
-    lines.push('');
-    lines.push(`These are worked on the current tax rules, ${factNote}. Nothing goes to HMRC without you.`);
-  }
-
-  await sendText(from, lines.join('\n'));
+  // 🔴 THIS ASSEMBLED THE WHOLE REPLY INLINE UNTIL 18 AUGUST 2026, AND THAT IS WHY THE LANE HAD
+  // ONE DOOR. Every other money lane closed this week had a pure builder sitting ready with one
+  // caller; this one had nothing to move, so a man on the web chat who asked what Lekhio had saved
+  // him got the MODEL. The words are lib/waintents.ts, the sum is lib/ledger.ts, the read is
+  // lib/savingsanswer.ts, and this handler now knows how to do none of it. That is the point: a
+  // router that cannot assemble an answer cannot drift from the router next to it.
+  await sendText(from, await savingsAnswerForUser(userId));
 }
 
 // --- "Can I claim this?" expense checker ----------------------------------

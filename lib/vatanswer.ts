@@ -29,7 +29,7 @@
 // second owner of the boundary, and there is exactly one.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
-import { getConfirmedTransactionsForRange, readVatProfile } from './supabase';
+import { getConfirmedTransactionsForRangeOrNull, readVatProfile } from './supabase';
 import { VAT_REGISTRATION_THRESHOLD } from './vat';
 import { vatStanding, vatAnswer, VAT_UNREADABLE } from './vatstanding';
 import { formatGbp, namesNation } from './waintents';
@@ -58,7 +58,16 @@ export async function vatAnswerForUser(userId: string, body = ''): Promise<strin
   const fromISO = new Date(today.getTime() - LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
 
   const [rows, vatProfile] = await Promise.all([
-    getConfirmedTransactionsForRange(userId, fromISO, todayISO).catch(() => null),
+    // 🔴 THE REFUSAL BELOW WAS HALF BLIND UNTIL 18 AUGUST 2026, AND B18 WROTE IT CORRECTLY.
+    // This read `getConfirmedTransactionsForRange(...).catch(() => null)`. The catch is right and
+    // the reader was not: a non ok HTTP response does not throw, it returned `[]`, so `rows` was
+    // never null for a 401, a 500 or a 503 and VAT_UNREADABLE could only fire for a thrown fetch.
+    // Measured before it was changed, on an empty row set: vatStanding returns `{ kind: 'nothing' }`
+    // and a man whose read had just failed was told "I have nothing confirmed from you yet, so I
+    // cannot tell you where you stand". It stops short of a false money figure, which is the honest
+    // half, and it is still a settled false statement about his records. The catch STAYS: a thrown
+    // fetch is still a failed read and still has to reach the same sentence.
+    getConfirmedTransactionsForRangeOrNull(userId, fromISO, todayISO).catch(() => null),
     readVatProfile(userId).catch(() => null),
   ]);
 

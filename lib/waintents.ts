@@ -1398,6 +1398,101 @@ export function isSavingsQuestion(body: string): boolean {
   return false;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// WHAT LEKHIO HAS SAVED HIM, IN WORDS, FOR EVERY DOOR THAT ASKS. B19, 18 August 2026.
+//
+// 🔴 THE FINDING, AND IT IS THE SAME ONE FOR THE SEVENTH TIME. isSavingsQuestion has existed since
+// Run 2 and was dispatched by app/api/whatsapp/route.ts and by NOTHING ELSE, because unlike every
+// other lane closed this week it had no pure builder to move: handleSavingsQuestion assembled the
+// whole reply inline, the Tesla screen, the CIS line and the fact note with it. So a man signed in
+// at /app/thread who asked what this thing has actually saved him, which is the question a man asks
+// the month before he decides whether to keep paying, was answered by the MODEL. The model holds
+// none of his rows, cannot run the engine twice, and would paraphrase the one figure in this
+// product that must never be paraphrased.
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// 🔴 IT DOES NOT TAKE A LaneChannel, AND THAT IS A MEASURED CORRECTION TO THE ITEM THAT SIZED IT.
+//
+// The backlog says to assume this lane's empty state has channel specific words, because the last
+// three lanes all turned out to have them. Measured rather than assumed: every sentence this lane
+// can emit was pulled out and read, and there is exactly ONE with a channel in it,
+//
+//   'Send me a receipt or two first and I will show you exactly what I have saved you.'
+//
+// and it is not a channel specific WORDING of a shared state. It is the branch for a phone number
+// with no account behind it, and it has no web equivalent AT ALL, because a caller on the thread or
+// the in app accountant is authenticated before he can type. It stays in the webhook, where the
+// state it describes is the only place that state exists. Everything below is neutral already, and
+// the "Nothing confirmed yet" note was deliberately de-WhatsApped once before (see lib/ledger.ts:
+// it used to say "send a receipt or connect the bank"). So this builder is niAnswer's case, not
+// studentLoanAnswer's: one set of words, true wherever he is standing.
+//
+// ⚠️ THE MONEY FORMATTER IS PASSED IN, like vatAnswer's, because this module stays import free so
+// the node runner can drive it with no bundler.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+export function savingsAnswer(
+  input: {
+    // Whether the read behind these figures actually reached the database. See LANE_UNREADABLE.
+    unreadable: boolean;
+    // The ledger, already assembled by lib/ledger.ts. This builder does no arithmetic of its own
+    // and must not start: two readers over one money figure drift, and the one that drifts is the
+    // one he is looking at.
+    enough: boolean;
+    note: string | null;
+    headline: string;
+    withoutLekhio: number;
+    withLekhio: number;
+    lines: Array<{ label: string; saved: number }>;
+    refundDue: number;
+    // The Khoji fact update note, or '' when nothing has moved. Silent by design.
+    factNote: string;
+  },
+  money: (n: number) => string,
+): string {
+  // 🔴 FIRST, ALWAYS, AND IT IS THE WHOLE REASON THIS BUILDER EXISTS RATHER THAN A MOVE.
+  // A failed read used to arrive here as a row set of zero length, which ledgerFor correctly turns
+  // into "Nothing confirmed yet. Add your first entry or upload a bank statement, and this fills
+  // itself in." That sentence is true of an empty account and a lie about a full one, and nothing
+  // could tell the two apart. It never says a figure and it never says a thing about his records.
+  if (input.unreadable) return LANE_UNREADABLE;
+
+  // NOT ENOUGH IS NOT ZERO. Two weeks in we do not proudly announce that we saved him £14.
+  // The words are lib/ledger.ts's, unchanged, and the fallback is the webhook's own.
+  if (!input.enough) return input.note ?? 'Too early to say yet.';
+
+  const lines: string[] = [];
+  lines.push(input.headline);
+  lines.push('');
+  // THE TESLA SCREEN. Two numbers, side by side. The gap is the product.
+  lines.push(`Claiming nothing: ${money(input.withoutLekhio)} of tax`);
+  lines.push(`With Lekhio: ${money(input.withLekhio)}`);
+
+  if (input.lines.length) {
+    lines.push('');
+    lines.push('Where it came from:');
+    for (const x of input.lines.slice(0, 4)) {
+      lines.push(`  ${x.label}: ${money(x.saved)}`);
+    }
+  }
+
+  // HIS OWN MONEY. Separate, always, and never added to the saving. This product has already once
+  // quoted a man a CIS refund that did not exist.
+  if (input.refundDue > 0) {
+    lines.push('');
+    lines.push(`And ${money(input.refundDue)} of CIS is sitting with HMRC. That is your money, not a saving. You get it back when you file.`);
+  }
+
+  // THE FINAL-CHECK LINE. When Khoji has learned of a change and you have approved it, the figures
+  // above were worked on that latest law, and we say so, so the number a man files is provably the
+  // current one. Silent when nothing has changed, so an ordinary answer is unchanged.
+  if (input.factNote) {
+    lines.push('');
+    lines.push(`These are worked on the current tax rules, ${input.factNote}. Nothing goes to HMRC without you.`);
+  }
+
+  return lines.join('\n');
+}
+
 // --- Support escalation -------------------------------------------------------------------------
 // When a customer asks for a human, complains, or reports something broken, we lift them out of the
 // automated flow and open a support ticket for Jag to answer. DELIBERATELY SPECIFIC: a false positive
@@ -1838,11 +1933,36 @@ const NOT_A_PERSON = new Set([
 // was added for ("what is dave's property position") is already closed by propert(y|ies), so it
 // earned nothing, and it reached into questions that are not about money at all.
 // ═══════════════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 🔴 B19, 18 AUGUST 2026: THE SAVINGS LANE'S VOCABULARY, ADDED BECAUSE THE LANE WAS WIRED TODAY.
+//
+// B23's own rule is that the possessive noun list gains a lane's nouns WHEN THAT LANE GAINS
+// ROUTERS, which is why it holds "national insurance", "student loan", "property" and "rent". The
+// savings lane was WhatsApp only when B23 ran, so its words were correctly absent. It is on all
+// three routers as of this packet, so "how much tax has priya saved" and "what is jerome's saving"
+// are now questions a live web customer can type at a lane that answers from HIS rows.
+//
+// MEASURED IN BOTH DIRECTIONS BEFORE IT WAS TAKEN, on section 9d's own four corpora plus a fifth
+// written for this lane, and the trade is free:
+//
+//   savings third party shapes    0 of 5  ->  4 of 5     the gain
+//   the nine B23 measured         6 of 9  ->  6 of 9     unchanged
+//   third party shapes already heard 6/6  ->  6 of 6     nothing traded away
+//   ordinary self phrasings       0 of 61 ->  0 of 61    NOTHING taken from a customer
+//   every dispatched lane's phrasings 0/60 -> 0 of 60    no lane eaten
+//   bare s possessives            0 of 4  ->  0 of 4     that decision is untouched
+//
+// ⚠️ THE FIFTH SHAPE IS NOT CLOSED AND IS NOT MEANT TO BE. "how much has lekhio saved jerome" names
+// OUR OWN PRODUCT as the subject, so the word the gate captures is "lekhio" and the stoplist
+// correctly refuses to read it as a man. Asserted at 4 of 5 in 9d with a re measure comment, for the
+// same reason the 1 of 4 and the 6 of 9 are asserted: a number nobody wrote down is a number that
+// moves in the dark.
+// ═══════════════════════════════════════════════════════════════════════════════════════
 const NAMED_PERSON_VERB_RE =
-  /\bhow much (?:(?!of\b|from\b|to\b|in\b|on\b|for\b|with\b|off\b|out\b|at\b|by\b|as\b)[a-z0-9'\u2019-]+\s+){0,5}?(?:has|have|had|did|does|do|is|was)\s+(?:the\s+)?([a-z][a-z'\u2019-]{1,20})\s+(?:made|make|makes|earn|earned|earns|owe|owes|owed|spent|spend|spends|paid|pay|pays|taken|take|takes|turned|billed|invoiced)\b/i;
+  /\bhow much (?:(?!of\b|from\b|to\b|in\b|on\b|for\b|with\b|off\b|out\b|at\b|by\b|as\b)[a-z0-9'\u2019-]+\s+){0,5}?(?:has|have|had|did|does|do|is|was)\s+(?:the\s+)?([a-z][a-z'\u2019-]{1,20})\s+(?:made|make|makes|earn|earned|earns|owe|owes|owed|spent|spend|spends|paid|pay|pays|taken|take|takes|turned|billed|invoiced|saved|save|saves)\b/i;
 
 const NAMED_PERSON_POSSESSIVE_RE =
-  /\b([a-z][a-z'\u2019-]{1,20})(?:'s|\u2019s)\s+(?:books|tax|figures|takings|profit|income|account|bill|turnover|vat|earnings|wages|money|share|national insurance|ni|class ?[24]|student loan|propert(?:y|ies)|rentals?|rent)\b/i;
+  /\b([a-z][a-z'\u2019-]{1,20})(?:'s|\u2019s)\s+(?:books|tax|figures|takings|profit|income|account|bill|turnover|vat|earnings|wages|money|share|national insurance|ni|class ?[24]|student loan|propert(?:y|ies)|rentals?|rent|savings?|saving)\b/i;
 
 // The customer's own name is not somebody else. Split on whitespace so "Marcus Whitfield" excuses
 // both "marcus" and "whitfield", and lower cased because nobody capitalises their partner on
